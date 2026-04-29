@@ -1,0 +1,20 @@
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = ["D"]
+
+# Ignore rules that conflict with one-line or Sphinx preferences
+ignore = [
+    "D203", # Disable: 1 blank line required before class docstring
+    "D213", # Disable: Multi-line docstring summary should start at the second line
+    "D200", # Sometimes disabled if you prefer multi-line for even short docstrings
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+

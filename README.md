@@ -32,4 +32,10 @@ pytest -qq build.py
 python build.py
 ```
 
+Prior to updating `build.py`, these commands should be run to ensure proper formatting:
+```
+ruff format build.py
+ruff check build.py
+```
+
 There is a notebook showing usage examples named `exhaust_manifolds.ipynb`. I use the lab GUI to modify the notebook. Prior to committing, you should run nbstripout prior to pushing any changes to the notebook to make sure the notebook is free of artifacts.
