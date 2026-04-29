@@ -11,35 +11,35 @@ class Builder:
         self.ver = 4
         self.thickness = 3
         self.outer_diameter = 63.5
-        self.inner_diameter = self.outer_diameter - self.thickness
+        self.inner_diameter = self.outer_diameter - self.thickness # 60mm
         self.clamp_len = 50.4 # 2 inches
 
         # Define the raw measurements taken here 
-        measurements = {
-            1: np.array([443, 152, 521]),
+        p = {
+            1: np.array([443, 152, 521]), # p[1] -> p[2] valve controller bottom plane
             2: np.array([652, 205, 500]),
-            3: np.array([565, 356, 352]),
-            4: np.array([555, 327, 0]),
+            3: np.array([565, 356, 352]), # p[3] passenger exhaust input inlet start
+            4: np.array([555, 327, 0]),   # p[4] -> p[5] direction of driver exhaust input
             5: np.array([480, 343, 0]),
-            6: np.array([347, 279, 382]),
-            7: np.array([410, 350, 0]),
+            6: np.array([347, 279, 382]), # p[6] driver exhaust input inlet start
+            7: np.array([410, 350, 0]),   # p[7] -> p[8] direction of driver exhaust output
             8: np.array([392, 300, 0]),
-            9: np.array([200, 0, 520]),
-            10: np.array([895, 0, 525]),
+            9: np.array([200, 0, 520]),   # p[9] driver exhaust output inlet start 
+            10: np.array([895, 0, 525]),  # p[10] passenger exhaust output inlet start
         }
 
         # Do some data correction here
-        outlet_arrays = np.stack([measurements[9], measurements[10]])
+        outlet_arrays = np.stack([p[9], p[10]])
         outlet_height = np.mean(outlet_arrays[:, 2]) 
-        measurements[9][2] = measurements[10][2] = outlet_height
+        p[9][2] = p[10][2] = outlet_height
 
-        vc_arrays = np.stack([measurements[1], measurements[2]])
+        vc_arrays = np.stack([p[1], p[2]])
         vc_depth, vc_height = np.mean(vc_arrays[:, 1]), np.mean(vc_arrays[:, 2])
-        measurements[1][1] = measurements[2][1] = vc_depth
-        measurements[1][2] = measurements[2][2] = vc_height
+        p[1][1] = p[2][1] = vc_depth
+        p[1][2] = p[2][2] = vc_height
 
         for idx in [3, 6, 9, 10]:
-            measurements[idx][2] = measurements[idx][2] - (self.outer_diameter / 2)
+            p[idx][2] = p[idx][2] - (self.outer_diameter / 2)
 
         # We need to rotate the driver exhaust inlet up by 15 degrees
         def dir_vector(start, end):
@@ -54,16 +54,16 @@ class Builder:
         self.names = ["driver", "passenger"]
             
         self.P = {
-            "driver_inlet": measurements[6],
-            "driver_outlet": measurements[9],
-            "passenger_inlet": measurements[3],
-            "passenger_outlet": measurements[10],
+            "driver_inlet": p[6],
+            "driver_outlet": p[9],
+            "passenger_inlet": p[3],
+            "passenger_outlet": p[10],
         }
             
         self.V = {
-            "driver_inlet": dir_vector(measurements[7], measurements[8]) @ R_driver_inlet,
+            "driver_inlet": dir_vector(p[7], p[8]) @ R_driver_inlet,
             "driver_outlet": np.array([-1, 0, 0]),
-            "passenger_inlet": dir_vector(measurements[5], measurements[4]),
+            "passenger_inlet": dir_vector(p[5], p[4]),
             "passenger_outlet": np.array([1, 0, 0]),
         }
 
