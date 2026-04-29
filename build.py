@@ -8,6 +8,8 @@ import cadquery as cq
 
 
 class Builder:
+    """The manifold builder creates the manifold objects and exports them for 3D printing."""
+
     def __init__(self):
         self.ver = 4
         self.thickness = 3
@@ -49,7 +51,9 @@ class Builder:
         for idx in [3, 6, 9, 10]:
             p[idx][2] = p[idx][2] - (self.outer_diameter / 2)
 
-        # We need to rotate the driver exhaust inlet up by 15 degrees
+        """Generate a 3D direction vector for the given points, e.g. p[4] and p[5]
+        """
+
         def dir_vector(start, end):
             return (end - start) / np.linalg.norm(end - start)
 
@@ -74,7 +78,24 @@ class Builder:
         }
 
     def build_wire(self, name, trim_start=0, trim_end=0):
+        """Builds the wire
+        The wire defines the path around which the manifold is profiled.
+        The wire connects the exhaust inlet and outlets across a 3D coordinate system.
+
+        :param _type_ name: The name of the manifold
+        :param int trim_start: How much to trim from the start of the wire in mm, defaults to 0
+        :param int trim_end: How much to trim from the end of the wire in mm, defaults to 0
+        """
+
         def create_wire(p_start, v_start, p_end, v_end):
+            """Creates the wire based on the input and output path
+
+            :param _type_ p_start: The inlet endpoint
+            :param _type_ v_start: The inlet direction
+            :param _type_ p_end: The outlet endpoint
+            :param _type_ v_end: The output direction
+            :return _type_: A tuple containing the wire path information
+            """
             p1 = p_start  # Manifold start
             p2 = p_start + v_start * self.clamp_len  # Spline start
             p3 = p_end  # Spline end
@@ -94,6 +115,14 @@ class Builder:
             return path, path.val()
 
         def trim_wire(path, path_obj, start, end):
+            """Trim the wire
+
+            :param _type_ path: The wire assembly
+            :param _type_ path_obj: The underlying wire object
+            :param _type_ start: The start offset in mm
+            :param _type_ end: The end offset in mm
+            :return _type_: The trimmed wire
+            """
             s, e = path_obj.positionAt(start), path_obj.positionAt(end)
             dx, dy, dz = (abs(s.x - e.x), abs(s.y - e.y), abs(s.z - e.z))
             cx, cy, cz = (
@@ -135,6 +164,16 @@ class Builder:
         edge_rounding=0.5,
         **kwargs,
     ):
+        """Build the exhaust manifold shape
+
+        :param _type_ name: The name of the manifold to build
+        :param int start_deg: If building part of the manifold, the start angle of the tube offset to include in degrees, defaults to 0
+        :param int end_deg: If building part of the manifold, the end angle of the tube offset to include in degrees, defaults to 0
+        :param int trim_start: If building part of the manifold, how much to trim from the start in mm, defaults to 0
+        :param int trim_end: If building part of the manifold, how much to trim from the end in mm, defaults to 0
+        :param float edge_rounding: How much rounding to perform on each edge of the manifold, defaults to 0.5
+        :return _type_: The exhaust manifold
+        """
         path, path_obj = self.build_wire(name, trim_start=trim_start, trim_end=trim_end)
         start_point, start_tangent = path_obj.positionAt(0), path_obj.tangentAt(0)
         inner_radius = kwargs.pop("inner_radius", self.inner_diameter / 2)
@@ -172,12 +211,26 @@ class Builder:
         return tube
 
     def build_manifold_half(self, name, right=False):
-        if right:
-            return self.build_manifold(name, start_deg=180, end_deg=360)
-        else:
-            return self.build_manifold(name, end_deg=180)
+        """Build the left or right half of the manifold
+
+        :param _type_ name: The name of the manifold
+        :param bool right: True if building the right half, defaults to False
+        :return _type_: The manifold half
+        """
+        return (
+            self.build_manifold(name, start_deg=180, end_deg=360)
+            if right
+            else self.build_manifold(name, end_deg=180)
+        )
 
     def build_guide(self, name, right=False):
+        """Build the right or left manifold guide
+        The guide helps align the parts to each other as well as reduce material deformation
+
+        :param _type_ name: The name of the manifold
+        :param bool right: True if building the right half, defaults to False
+        :return _type_: The manifold guide
+        """
         angle = 0 if right else 180
         sweep_off = 10
         space = 0.1
@@ -203,12 +256,23 @@ class Builder:
         return guide
 
     def build_part(self, name, right=False):
+        """Build a 3D printable manifold part
+
+        :param _type_ name: The name of the manifold
+        :param bool right: True if building the right half, defaults to False
+        :return _type_: The manifold part
+        """
         part = self.build_manifold_half(name, right=right).union(
             self.build_guide(name, right=right)
         )
         return part
 
     def build_back_manifold(self, name):
+        """Build back the manifold shape from parts
+
+        :param _type_ name: The name of the manifold
+        :return _type_: A tuple containing the exhaust manifiold, and the manifold built from parts
+        """
         left_guide, right_guide = (
             self.build_guide(name),
             self.build_guide(name, right=True),
@@ -221,6 +285,12 @@ class Builder:
         return manifold, manifold_from_parts
 
     def calc_part_error(self, name):
+        """Calculate the build error for parts
+        This method provides a percentage index which can be used in testing
+
+        :param _type_ name: The name of the manifold
+        :return _type_: A percentage indicating the part error when attempting to assemble the manifold from parts
+        """
         manifold, manifold_from_parts = self.build_back_manifold(name)
         manifold_vol, manifold_from_parts_vol = (
             manifold.val().Volume(),
@@ -235,8 +305,28 @@ class Builder:
         return error_pct
 
     def export_parts(self, name):
+        """Export manifold parts to STL for assembly
+
+        :param _type_ name: The name of the manifold
+        """
+
         def prepare_part(name, start, end, right=False):
+            """Prepare the part for export
+
+            :param _type_ name: The name of the manifold
+            :param _type_ start: The inlet endpoint
+            :param _type_ end: The outlet endpoint
+            :param bool right: True if building the right half, defaults to False
+            """
+
             def rot_angle(start, end):
+                """Get the rotation angle for the part in degrees
+                We rotate the part slope about the x axis to try and place it as close to the bed as possible
+
+                :param _type_ start: The inlet endpoint
+                :param _type_ end: The outlet endpoint
+                :return _type_: The rotation angle in degrees
+                """
                 # We rotate the part slope about the x axis to try and place it as close to the bed as possible
                 dy, dz = (end[1] - start[1]), (end[2] - start[2])
                 return -math.degrees(-math.atan2(dy, dz)) - 90
@@ -264,30 +354,58 @@ class Builder:
             print(f"Done writing {mesh_file_name}.")
 
     def export_all_parts(self):
+        """Export all parts as STL files"""
         for name in self.names:
             self.export_parts(name)
 
 
 class TestBuilder:
+    """Manifold builder unit tests"""
+
     def pytest_generate_tests(self, metafunc):
+        """Generate tests from test fixtures
+
+        :param _type_ metafunc: The test meta function
+        """
         if "name" in metafunc.fixturenames:
             builder = Builder()
             metafunc.parametrize("name", builder.names)
 
     @pytest.fixture(scope="class")
     def builder(self):
+        """Returns the test fixture for the manifold builder
+
+        :return _type_: A manifold builder object
+        """
         return Builder()
 
     def test_measurements(self, builder):
-        # Do some validation of the pointlists based on the measurements I took on graph paper.
-        # Adjust coordinates to be 2D, then check how the driver and passenger inlets and outlets related to each other
-        # The inlets are connected to midpipes with slip ring connectors, while the exhaust pipes have cuff style clamps
+        """Validates physical measurements
+        Do some validation of the pointlists based on the measurements I took on graph paper.
+        Adjust coordinates to be 2D, then check how the driver and passenger inlets and outlets related to each other
+        The inlets are connected to midpipes with slip ring connectors, while the exhaust pipes have cuff style clamps
+
+        :param _type_ builder: The manifold builder to test
+        """
+
         def dist(p1, p2):
+            """Get the 2D distance between two points
+
+            :param _type_ p1: The first point
+            :param _type_ p2: The second type
+            :return _type_: The 2D point distance
+            """
             x1, y1, z1 = p1
             x2, y2, z2 = p2
             return round(math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2))
 
         def get_end_points(name):
+            """Get the inlet and output start and end points
+            The exhaust inlets and outlets are cuffs of size clamp_len. The inlet connects directly to the midpipe, and the outlet must fit inside the exhaust tip.
+
+            :param _type_ name: The name of the part to test
+            :return _type_: A tuple
+            """
             inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
             return (
                 # Inlet start
@@ -333,6 +451,12 @@ class TestBuilder:
         ) == pytest.approx(170)
 
     def test_wire(self, name, builder):
+        """Perform wire testing
+
+        :param _type_ name: The name of the part to test
+        :param _type_ builder: The manifold builder to test
+        """
+
         def calc_point_err(v, p):
             return abs((v - cq.Vector([p[0], p[1], p[2]])).Length)
 
@@ -367,6 +491,11 @@ class TestBuilder:
         )
 
     def test_wire_trim(self, name, builder):
+        """Test trimming related functionality for wires
+
+        :param _type_ name: The name of the part to test
+        :param _type_ builder: The manifold builder to test
+        """
         wire, wire_obj = builder.build_wire(name)
         guide_wire, guide_wire_obj = builder.build_wire(
             name, trim_start=builder.clamp_len, trim_end=builder.clamp_len
@@ -377,7 +506,12 @@ class TestBuilder:
             < max_error
         )
 
-    def test_intersection(self, builder):
+    def test_overlap(self, builder):
+        """Tests that the parts do not overlap with each other
+
+        :param _type_ builder: The manifold builder to test
+        """
+
         def parts_intersect(part1, part2):
             intersection = part1.intersect(part2)
             return (intersection.val() is not None) and (
@@ -392,6 +526,12 @@ class TestBuilder:
         assert not parts_intersect(driver_manifold, passenger_manifold)
 
     def test_diameter(self, name, builder):
+        """Tests the exhaust inlets and outlets diameters
+
+        :param _type_ name: The name of the part to test
+        :param _type_ builder: The manifold builder to test
+        """
+
         def calc_outer(tube):
             circular_edges = tube.edges("%CIRCLE").vals()
             radii = [e.radius() for e in circular_edges]
@@ -401,12 +541,20 @@ class TestBuilder:
         outer = calc_outer(builder.build_manifold(name))
         assert outer == pytest.approx(builder.outer_diameter)
 
-    def test_part_error(self, name, builder):
+    def test_part(self, name, builder):
+        """Tests the assembled parts
+        Verifies that the assembled parts will create the manifold shape
+
+        :param _type_ name: The name of the part to test
+        :param _type_ builder: The manifold builder to test
+        """
         error_pct = builder.calc_part_error(name)
         assert error_pct < 2
 
 
 if __name__ == "__main__":
+    """When run, exports all parts as STL files.
+    """
     logging.basicConfig(filename="out.txt", level=logging.DEBUG, filemode="w")
     builder = Builder()
     builder.export_all_parts()
