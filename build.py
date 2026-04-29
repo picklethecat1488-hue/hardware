@@ -5,10 +5,11 @@ import math
 import numpy as np
 import pytest
 import cadquery as cq
+from itertools import combinations
 
 
 class Builder:
-    """The manifold builder creates the manifold objects and exports them for 3D printing."""
+    """The manifold builder creates the manifold objects and exports them as files for 3D printing"""
 
     def __init__(self):
         self.ver = 4
@@ -512,18 +513,26 @@ class TestBuilder:
         :param _type_ builder: The manifold builder to test
         """
 
-        def parts_intersect(part1, part2):
-            intersection = part1.intersect(part2)
-            return (intersection.val() is not None) and (
-                intersection.val().Volume() > 1e-6
-            )
+        def no_overlap(names):
+            """Checks if all the given manifolds do not overlap
 
-        driver_manifold, passenger_manifold = (
-            builder.build_manifold("driver"),
-            builder.build_manifold("passenger"),
-        )
+            :param _type_ names: An array of manifold names to check
+            :return _type_: True if the manifolds don't overlap, else False
+            """
+            for name1, name2 in combinations(names, 2):
+                part1, part2 = (
+                    builder.build_manifold(name1),
+                    builder.build_manifold(name2),
+                )
+                inter_result = part1.intersect(part2)
 
-        assert not parts_intersect(driver_manifold, passenger_manifold)
+                # Check if the intersection contains any volume
+                if inter_result.val().Volume() > 1e-6:  # Using a small tolerance
+                    print(f"Intersection detected between {name1} and {name2}")
+                    return False
+            return True
+
+        assert no_overlap(builder.names)
 
     def test_diameter(self, name, builder):
         """Tests the exhaust inlets and outlets diameters
@@ -533,6 +542,11 @@ class TestBuilder:
         """
 
         def calc_outer(tube):
+            """Calculates the outer diameter of an inlet or outlet
+
+            :param _type_ tube: The tube
+            :return _type_: The tube outer diameter
+            """
             circular_edges = tube.edges("%CIRCLE").vals()
             radii = [e.radius() for e in circular_edges]
             # Extract radii
