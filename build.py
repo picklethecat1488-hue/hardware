@@ -401,12 +401,12 @@ class TestBuilder:
                 builder.P[outlet_key] + builder.V[outlet_key] * builder.clamp_len,
             )
 
-        driver_inlet_start, driver_inlet_end, driver_outlet_start, driver_outlet_end = get_end_points("driver")
+        driver_inlet_start, driver_inlet_end, driver_outlet_start, _ = get_end_points("driver")
         (
             passenger_inlet_start,
             passenger_inlet_end,
             passenger_outlet_start,
-            passenger_outlet_end,
+            _,
         ) = get_end_points("passenger")
 
         # Check dist between inlets
@@ -463,8 +463,8 @@ class TestBuilder:
         :param _type_ name: The name of the part to test
         :param _type_ builder: The manifold builder to test
         """
-        wire, wire_obj = builder.build_wire(name)
-        guide_wire, guide_wire_obj = builder.build_wire(name, trim_start=builder.clamp_len, trim_end=builder.clamp_len)
+        _, wire_obj = builder.build_wire(name)
+        _, guide_wire_obj = builder.build_wire(name, trim_start=builder.clamp_len, trim_end=builder.clamp_len)
         max_error = 5e-2
         assert abs(wire_obj.Length() - guide_wire_obj.Length() - 2 * builder.clamp_len) < max_error
 
