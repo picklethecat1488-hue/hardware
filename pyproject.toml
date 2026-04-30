@@ -1,5 +1,6 @@
 [tool.ruff]
 line-length = 120
+extend-exclude = [".git", ".sl"]
 
 [tool.ruff.format]
 quote-style = "double"
