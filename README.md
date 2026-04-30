@@ -9,10 +9,8 @@ I currently have version 3 of the manifolds (the initial commit) scheduled for c
 There are two manifolds, driver and passenger. The manifolds are further separated into left and right sides to satisfy engineering requirements.
 
 - **exhaust\_manifolds.ipynb** \- contains the project code and documentation  
-- **exhaust\_manifolds\_v{x}\_driver.stl** \- the fully assembled driver manifold.  
 - **exhaust\_manifolds\_v{x}\_driver\_left.stl** \- the left side of the driver manifold.  
 - **exhaust\_manifolds\_v{x}\_driver\_right.stl** \- the right side of the driver manifold.  
-- **exhaust\_manifolds\_v{x}\_passenger.stl** \- the fully assembled passenger manifold.  
 - **exhaust\_manifolds\_v{x}\_passenger\_left.stl** \- the left side of the passenger manifold.  
 - **exhaust\_manifolds\_v{x}\_passenger\_right.stl** \- the right side of the passenger manifold.
 
