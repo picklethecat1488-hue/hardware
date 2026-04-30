@@ -181,7 +181,9 @@ class Builder:
                 cq.Sketch().arc((0, 0), outer_radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
             )
             # Make the sides of the tube more rounded
-            profile = (circle * pie_slice).vertices().fillet(edge_rounding)
+            profile = (circle * pie_slice).vertices()
+            if edge_rounding > 0:
+                profile = profile.fillet(edge_rounding)
             tube = (
                 cq.Workplane(cq.Plane(origin=start_point, normal=start_tangent))
                 .placeSketch(profile)
@@ -198,7 +200,9 @@ class Builder:
             )
         # Round the ends of the tube
         if (trim_start == 0) and (trim_end == 0):
-            tube = tube.edges("%Circle").fillet(edge_rounding)
+            tube = tube.edges("%Circle")
+            if edge_rounding > 0:
+                tube = tube.fillet(edge_rounding)
         return tube
 
     def build_manifold_half(self, name, right=False):
@@ -224,6 +228,8 @@ class Builder:
         angle = 0 if right else 180
         sweep_off = 10
         space = 0.1
+        extra = 2
+        # Left side guide and extra space to remove
         guide1 = self.build_manifold(
             name,
             inner_radius=(self.outer_diameter - space) / 2,
@@ -233,6 +239,16 @@ class Builder:
             trim_start=self.clamp_len,
             trim_end=self.clamp_len,
         )
+        extra = self.build_manifold(
+            name,
+            inner_radius=(self.outer_diameter + self.thickness / 2) / 2,
+            outer_radius=(self.outer_diameter + self.thickness * 2) / 2,
+            start_deg=angle - sweep_off + extra,
+            end_deg=angle - extra,
+            trim_start=self.clamp_len + extra,
+            trim_end=self.clamp_len + extra,
+        )
+        # Right side guide
         guide2 = self.build_manifold(
             name,
             inner_radius=(self.outer_diameter + space) / 2,
@@ -242,7 +258,7 @@ class Builder:
             trim_start=self.clamp_len,
             trim_end=self.clamp_len,
         )
-        guide = guide1.union(guide2)
+        guide = guide1.union(guide2).cut(extra)
         return guide
 
     def build_part(self, name, right=False):
