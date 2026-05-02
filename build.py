@@ -2,10 +2,12 @@
 
 import math
 import numpy as np
+import os
 from pathlib import Path
 import pytest
 import cadquery as cq
 from itertools import combinations
+import zipfile
 
 
 class Builder:
@@ -303,8 +305,8 @@ class Builder:
         error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
         return error_pct
 
-    def export_parts(self, name, out_dir):
-        """Export manifold parts to STL for assembly.
+    def generate_parts(self, name, out_dir):
+        """Generate STL parts files for assembly.
 
         :param _type_ name: The name of the manifold
         """
@@ -352,8 +354,8 @@ class Builder:
             cq.exporters.export(prepared_part, path_str)
             print(f"Done writing {path_str}")
 
-    def export_diagram(self, names, out_dir):
-        """Build a diagram for the given part names."""
+    def generate_diagram(self, names, out_dir):
+        """Generate a diagram for the given part names."""
 
         def get_part_location(wire_obj, offset=0, dist=0, right=False):
             """Return the part location for the part in the exploded diagram.
@@ -401,18 +403,40 @@ class Builder:
         assy.toCompound().export(path_str, opt=svg_opt)
         print(f"Done writing {path_str}")
 
-    def export_all_files(self, out_dir="build"):
-        """Export all parts files."""
+    def generate_all(self, out_dir="build", zip_name="build.zip"):
+        """Generate all project files.
+
+        :param str out_dir: The output directory generate all files in, defaults to "build"
+        :param str zip_name: The name of the zip file containing all outputs, defaults to "build.zip"
+        """
+
+        def zip_build(zip_file_str):
+            """Zip the build output.
+
+            :param _type_ zip_file_str: The path to the ZIP file to write
+            """
+            with zipfile.ZipFile(zip_file_str, "w", zipfile.ZIP_DEFLATED) as zipf:
+                for _, _, files in os.walk(out_dir):
+                    for file in files:
+                        file_str = str(Path(out_dir) / file)
+                        if not os.path.samefile(zip_file_str, file_str):
+                            zipf.write(file_str, file)
+
         # Create the output directory
         path = Path(out_dir)
         path.mkdir(parents=True, exist_ok=True)
 
         # Export the diagram
-        self.export_diagram(self.names, out_dir=out_dir)
+        self.generate_diagram(self.names, out_dir=out_dir)
 
         # Export the STL files
         for name in self.names:
-            self.export_parts(name, out_dir=out_dir)
+            self.generate_parts(name, out_dir=out_dir)
+
+        # Compress the build
+        zip_file_str = str(Path(out_dir) / zip_name)
+        zip_build(zip_file_str)
+        print(f"Done writing {zip_file_str}")
 
 
 class TestBuilder:
@@ -607,4 +631,4 @@ if __name__ == "__main__":
     """When run, exports all parts as STL files.
     """
     builder = Builder()
-    builder.export_all_files()
+    builder.generate_all()
