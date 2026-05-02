@@ -219,49 +219,65 @@ class Builder:
             self.build_manifold(name, start_deg=180, end_deg=360) if right else self.build_manifold(name, end_deg=180)
         )
 
-    def build_guide(self, name, right=False):
+    def build_guide(self, name, right=False, guide_angle_deg=10, extra_angle_dist=2, guide_space=0.1):
         """Build the right or left manifold guide.
 
         The guide helps align the parts to each other as well as reduce material deformation.
 
         :param _type_ name: The name of the manifold
         :param bool right: True if building the right half, defaults to False
+        :param _type_ guide_angle_deg Determines the size of the guide (in degrees)
+        :param _type_ extra_angle_dist Determines the inner guide space to keep (in mm)
+        :param _type_ guide_space How much space between the guide and the other part (in mm)
         :return _type_: The manifold guide
         """
-        angle = 0 if right else 180
-        sweep_off = 10
-        space = 0.1
-        extra = 2
-        # Left side guide and extra space to remove
-        guide1 = self.build_manifold(
-            name,
-            inner_radius=(self.outer_diameter - space) / 2,
-            outer_radius=(self.outer_diameter + self.thickness + space) / 2,
-            start_deg=angle - sweep_off,
-            end_deg=angle,
-            trim_start=self.clamp_len,
-            trim_end=self.clamp_len,
-        )
-        extra = self.build_manifold(
-            name,
-            inner_radius=(self.outer_diameter + self.thickness / 2) / 2,
-            outer_radius=(self.outer_diameter + self.thickness * 2) / 2,
-            start_deg=angle - sweep_off + extra,
-            end_deg=angle - extra,
-            trim_start=self.clamp_len + extra,
-            trim_end=self.clamp_len + extra,
-        )
-        # Right side guide
-        guide2 = self.build_manifold(
-            name,
-            inner_radius=(self.outer_diameter + space) / 2,
-            outer_radius=(self.outer_diameter + self.thickness + space) / 2,
-            start_deg=angle - sweep_off,
-            end_deg=angle + sweep_off,
-            trim_start=self.clamp_len,
-            trim_end=self.clamp_len,
-        )
-        guide = guide1.union(guide2).cut(extra)
+
+        def get_build_manifold_args(right):
+            """Get the list of manifolds to add and cut for the given part.
+
+            :param _type_ right: True if building the right hand part, otherwise false
+            :return _type_: A tuple containing arguments of manifold parts to build and parts to cut
+            """
+            angle = 0 if right else 180
+            add_args = [
+                {
+                    "inner_radius": (self.outer_diameter - guide_space) / 2,
+                    "outer_radius": (self.outer_diameter + self.thickness + guide_space) / 2,
+                    "start_deg": angle - guide_angle_deg,
+                    "end_deg": angle,
+                    "trim_start": self.clamp_len,
+                    "trim_end": self.clamp_len,
+                },
+                {
+                    "inner_radius": (self.outer_diameter + guide_space) / 2,
+                    "outer_radius": (self.outer_diameter + self.thickness + guide_space) / 2,
+                    "start_deg": angle - guide_angle_deg,
+                    "end_deg": angle + guide_angle_deg,
+                    "trim_start": self.clamp_len,
+                    "trim_end": self.clamp_len,
+                },
+            ]
+            cut_args = [
+                {
+                    "inner_radius": (self.outer_diameter + self.thickness / 2) / 2,
+                    "outer_radius": (self.outer_diameter + self.thickness * 2) / 2,
+                    "start_deg": angle - guide_angle_deg + extra_angle_dist,
+                    "end_deg": angle - extra_angle_dist,
+                    "trim_start": self.clamp_len + extra_angle_dist,
+                    "trim_end": self.clamp_len + extra_angle_dist,
+                },
+            ]
+            return add_args, cut_args
+
+        add_args, cut_args = get_build_manifold_args(right=right)
+
+        # Constuct guides and remove any extra space from them
+        adds = [self.build_manifold(name, **add_arg) for add_arg in add_args]
+        guide = adds[0]
+        for add in adds[1:]:
+            guide = guide.union(add)
+        for cut in [self.build_manifold(name, **cut_arg) for cut_arg in cut_args]:
+            guide = guide.cut(cut)
         return guide
 
     def build_part(self, name, right=False):
