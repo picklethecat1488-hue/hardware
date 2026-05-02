@@ -8,7 +8,7 @@ I currently have version 3 of the manifolds (the initial commit) scheduled for c
 
 There are two manifolds, driver and passenger. The manifolds are further separated into left and right sides and are reattached after printing using high temperature epoxy:
 
-![Diagram](diagram.jpg)
+![Diagram](diagram.svg)
 *Exploded assembly diagram.*
 
 - **build.py** \- contains the project source.
