@@ -21,7 +21,7 @@ There are two manifolds, driver and passenger. The manifolds are further separat
 
 ## Getting Started
 
-This project uses conda for dependency management. You can easily setup the build environment using these commands:
+This project uses [conda](https://conda-forge.org/download/) for dependency management. You can easily setup the build environment using these commands:
 ```
 conda env create -f environment.yml
 conda activate cq
