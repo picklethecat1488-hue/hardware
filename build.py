@@ -1,6 +1,5 @@
 """Contains the code to build exhaust manifolds."""
 
-import logging
 import math
 import numpy as np
 from pathlib import Path
@@ -607,6 +606,5 @@ class TestBuilder:
 if __name__ == "__main__":
     """When run, exports all parts as STL files.
     """
-    logging.basicConfig(filename="out.txt", level=logging.DEBUG, filemode="w")
     builder = Builder()
     builder.export_all_files()
