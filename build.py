@@ -350,8 +350,60 @@ class Builder:
             cq.exporters.export(prepared_part, mesh_file_name)
             print(f"Done writing {mesh_file_name}.")
 
-    def export_all_parts(self):
-        """Export all parts as STL files."""
+    def export_diagram(self, names):
+        """Build a diagram for the given part names."""
+
+        def get_part_location(wire_obj, offset=0, dist=0, right=False):
+            """Return the part location for the part in the exploded diagram.
+
+            :param _type_ wire_obj: The wire object
+            :param bool right: Right if True, defaults to False
+            :return _type_: The part location in the exploded diagram
+            """
+            part_dist = dist if right else 0
+            part_offset = offset + part_dist
+            dir = wire_obj.tangentAt(0)
+            loc = cq.Vector(dir) * part_dist + cq.Vector(0, 1, 0) * part_offset
+            return loc
+
+        diagram_name = f"exhaust_manifolds_v{self.ver}_diagram.svg"
+        svg_opt = {
+            "showAxes": False,
+            "strokeWidth": 3,
+            "strokeColor": (0, 0, 0),
+            "projectionDir": (1, 1, 1),
+            "width": 1024,
+            "height": 1024,
+        }
+        part_offset, part_dist = 60, 120
+        assy = cq.Assembly()
+        wire_objs = [self.build_wire(name)[1] for name in names]
+
+        for i, wire_obj in enumerate(wire_objs):
+            for right in [False, True]:
+                loc = get_part_location(wire_obj, right=right, offset=(i * part_offset), dist=part_dist)
+                other_loc = get_part_location(wire_obj, right=(not right), offset=(i * part_offset), dist=part_dist)
+
+                # Add parts to the diagram
+                part = self.build_part(names[i], right=right)
+                assy.add(part.translate(loc))
+
+                # Connect parts to each other
+                if right:
+                    off = wire_obj.positionAt(0.5)
+                    line = cq.Workplane("XY").polyline([loc + off, other_loc + off])
+                    assy.add(line)
+
+        # Save the tech diagram
+        assy.toCompound().export(diagram_name, opt=svg_opt)
+        print(f"Done writing {diagram_name}.")
+
+    def export_all_files(self):
+        """Export all parts files."""
+        # Export the diagram
+        self.export_diagram(self.names)
+
+        # Export the STL files
         for name in self.names:
             self.export_parts(name)
 
@@ -451,7 +503,7 @@ class TestBuilder:
         def calc_point_err(v, p):
             return abs((v - cq.Vector([p[0], p[1], p[2]])).Length)
 
-        wire, wire_obj = builder.build_wire(name)
+        _, wire_obj = builder.build_wire(name)
         length = wire_obj.Length()
         inlet_clamp_start = wire_obj.positionAt(0.0)
         inlet_clamp_end = wire_obj.positionAt(builder.clamp_len / length)
@@ -549,4 +601,4 @@ if __name__ == "__main__":
     """
     logging.basicConfig(filename="out.txt", level=logging.DEBUG, filemode="w")
     builder = Builder()
-    builder.export_all_parts()
+    builder.export_all_files()
