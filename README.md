@@ -6,9 +6,13 @@ I currently have version 3 of the manifolds (the initial commit) scheduled for c
 
 ## Files
 
-There are two manifolds, driver and passenger. The manifolds are further separated into left and right sides to satisfy engineering requirements.
+There are two manifolds, driver and passenger. The manifolds are further separated into left and right sides and are reattached after printing using high temperature epoxy:
 
-- **exhaust\_manifolds.ipynb** \- contains the project code and documentation  
+![Diagram](diagram.jpg)
+*Exploded assembly diagram.*
+
+- **build.py** \- contains the project source.
+- **exhaust\_manifolds.ipynb** \- contains examples of using the `Builder` class.
 - **exhaust\_manifolds\_v{x}\_driver\_left.stl** \- the left side of the driver manifold.  
 - **exhaust\_manifolds\_v{x}\_driver\_right.stl** \- the right side of the driver manifold.  
 - **exhaust\_manifolds\_v{x}\_passenger\_left.stl** \- the left side of the passenger manifold.  
