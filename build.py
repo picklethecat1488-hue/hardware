@@ -3,6 +3,7 @@
 import logging
 import math
 import numpy as np
+from pathlib import Path
 import pytest
 import cadquery as cq
 from itertools import combinations
@@ -13,6 +14,7 @@ class Builder:
 
     def __init__(self):
         """Initialize the builder."""
+        self.project_name = "exhaust_manifolds"
         self.ver = 4
         self.thickness = 3
         self.outer_diameter = 63.5
@@ -302,7 +304,7 @@ class Builder:
         error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
         return error_pct
 
-    def export_parts(self, name):
+    def export_parts(self, name, out_dir):
         """Export manifold parts to STL for assembly.
 
         :param _type_ name: The name of the manifold
@@ -342,15 +344,16 @@ class Builder:
             return prepared_part
 
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
-        file_prefix = f"exhaust_manifolds_v{self.ver}"
+        file_prefix = f"{self.project_name}_{self.ver}"
 
         for side in ["left", "right"]:
             mesh_file_name = f"{file_prefix}_{name}_{side}.stl"
             prepared_part = prepare_part(name, self.P[inlet_key], self.P[outlet_key], right=("right" in side))
-            cq.exporters.export(prepared_part, mesh_file_name)
-            print(f"Done writing {mesh_file_name}.")
+            path_str = str(Path(out_dir) / mesh_file_name)
+            cq.exporters.export(prepared_part, path_str)
+            print(f"Done writing {path_str}")
 
-    def export_diagram(self, names):
+    def export_diagram(self, names, out_dir):
         """Build a diagram for the given part names."""
 
         def get_part_location(wire_obj, offset=0, dist=0, right=False):
@@ -366,7 +369,7 @@ class Builder:
             loc = cq.Vector(dir) * part_dist + cq.Vector(0, 1, 0) * part_offset
             return loc
 
-        diagram_name = f"exhaust_manifolds_v{self.ver}_diagram.svg"
+        diagram_name = f"{self.project_name}_v{self.ver}_diagram.svg"
         svg_opt = {
             "showAxes": False,
             "strokeWidth": 3,
@@ -395,17 +398,22 @@ class Builder:
                     assy.add(line)
 
         # Save the tech diagram
-        assy.toCompound().export(diagram_name, opt=svg_opt)
-        print(f"Done writing {diagram_name}.")
+        path_str = str(Path(out_dir) / diagram_name)
+        assy.toCompound().export(path_str, opt=svg_opt)
+        print(f"Done writing {path_str}")
 
-    def export_all_files(self):
+    def export_all_files(self, out_dir="build"):
         """Export all parts files."""
+        # Create the output directory
+        path = Path(out_dir)
+        path.mkdir(parents=True, exist_ok=True)
+
         # Export the diagram
-        self.export_diagram(self.names)
+        self.export_diagram(self.names, out_dir=out_dir)
 
         # Export the STL files
         for name in self.names:
-            self.export_parts(name)
+            self.export_parts(name, out_dir=out_dir)
 
 
 class TestBuilder:
