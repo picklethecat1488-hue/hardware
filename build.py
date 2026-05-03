@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import pytest
 import cadquery as cq
+from functools import lru_cache
 from itertools import combinations
 import zipfile
 
@@ -80,6 +81,7 @@ class Builder:
             "passenger_outlet": np.array([1, 0, 0]),
         }
 
+    @lru_cache
     def build_wire(self, name, trim_start=0, trim_end=0):
         """Build the wire.
 
@@ -152,6 +154,7 @@ class Builder:
             path, path_obj = trim_wire(path, path_obj, s, e)
         return path, path_obj
 
+    @lru_cache
     def build_manifold(
         self,
         name,
@@ -208,6 +211,7 @@ class Builder:
                 tube = tube.fillet(edge_rounding)
         return tube
 
+    @lru_cache
     def build_manifold_half(self, name, right=False):
         """Build the left or right half of the manifold.
 
@@ -219,6 +223,7 @@ class Builder:
             self.build_manifold(name, start_deg=180, end_deg=360) if right else self.build_manifold(name, end_deg=180)
         )
 
+    @lru_cache
     def build_guide(self, name, right=False, guide_angle_deg=10, extra_angle_dist=2, guide_space=0.1):
         """Build the right or left manifold guide.
 
@@ -280,6 +285,7 @@ class Builder:
             guide = guide.cut(cut)
         return guide
 
+    @lru_cache
     def build_part(self, name, right=False):
         """Build a 3D printable manifold part.
 
@@ -290,6 +296,7 @@ class Builder:
         part = self.build_manifold_half(name, right=right).union(self.build_guide(name, right=right))
         return part
 
+    @lru_cache
     def build_back_manifold(self, name):
         """Build back the manifold shape from parts.
 
@@ -305,6 +312,7 @@ class Builder:
         manifold_from_parts = left_part.union(right_part).cut(left_guide).cut(right_guide)
         return manifold, manifold_from_parts
 
+    @lru_cache
     def calc_part_error(self, name):
         """Calculate the build error for parts.
 
@@ -327,6 +335,7 @@ class Builder:
         :param _type_ name: The name of the manifold
         """
 
+        @lru_cache
         def prepare_part(name, start, end, right=False):
             """Prepare the part for export.
 
