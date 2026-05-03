@@ -356,7 +356,6 @@ class Builder:
         :param _type_ name: The name of the manifold
         """
 
-        @lru_cache
         def prepare_part(name, start, end, right=False):
             """Prepare the part for export.
 
