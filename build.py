@@ -139,8 +139,13 @@ class Builder:
 
             # Create a trim box to remove unwanted portions of the wire
             clip_region = cq.Workplane("XY").center(cx, cy).workplane(offset=cz).box(dx, dy, dz)
-            trimmed_path = cq.Workplane("XY").add(path_obj.intersect(clip_region.val()).Wires()[0])
-            return trimmed_path, trimmed_path.val()
+            wires = path_obj.intersect(clip_region.val()).Wires()
+
+            # Extract a trimmed path from the compound created by trimming the wire
+            if len(wires) != 1:
+                raise ValueError("Trim failed")
+            path = cq.Workplane("XY").add(wires[0])
+            return path, path.val()
 
         # Create the wire which defines the manifold shape
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
@@ -218,7 +223,7 @@ class Builder:
 
                 for edge in all_edges:
                     try:
-                        new_part= part.newObject([edge]).fillet(edge_rounding)
+                        new_part = part.newObject([edge]).fillet(edge_rounding)
                         part = new_part
                     except Exception as _:
                         continue
