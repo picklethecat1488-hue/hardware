@@ -22,6 +22,7 @@ class Builder:
         self.outer_diameter = 63.5
         self.inner_diameter = self.outer_diameter - self.thickness  # 60mm
         self.clamp_len = 50.4  # 2 inches
+        self.edge_rounding = 0.5
 
         # Define the raw measurements taken here
         p = {
@@ -167,7 +168,6 @@ class Builder:
         end_deg=0,
         trim_start=0,
         trim_end=0,
-        edge_rounding=0.5,
         **kwargs,
     ):
         """Build the exhaust manifold shape.
@@ -177,7 +177,6 @@ class Builder:
         :param int end_deg: If building part of the manifold, the end angle of the tube offset to include in degrees, defaults to 0
         :param int trim_start: If building part of the manifold, how much to trim from the start in mm, defaults to 0
         :param int trim_end: If building part of the manifold, how much to trim from the end in mm, defaults to 0
-        :param float edge_rounding: How much rounding to perform on each edge of the manifold, defaults to 0.5
         :return _type_: The exhaust manifold
         """
         path, path_obj = self.build_wire(name, trim_start=trim_start, trim_end=trim_end)
@@ -208,20 +207,19 @@ class Builder:
                 .sweep(path, transition="round")
             )
         # Round the ends of the tube
-        if edge_rounding > 0:
+        if self.edge_rounding > 0:
 
-            def wrap_fillet(part, edge_rounding):
+            def wrap_fillet(part):
                 """Fillet every edge that can possibly be filleted.
 
                 :param _type_ part: The part to fillet.
-                :param _type_ edge_rounding: The amount of rounding to apply.
                 :return _type_: A filleted part.
                 """
                 all_edges = part.vals()
 
                 for edge in all_edges:
                     try:
-                        new_part = part.newObject([edge]).fillet(edge_rounding)
+                        new_part = part.newObject([edge]).fillet(self.edge_rounding)
                         part = new_part
                     except Exception as _:
                         continue
@@ -229,7 +227,7 @@ class Builder:
                 return part
 
             # Micro fillet the tube first to generate new edge geometry, then perform a full fillet.
-            tube = wrap_fillet(tube, edge_rounding)
+            tube = wrap_fillet(tube)
         return tube
 
     @lru_cache
@@ -245,15 +243,14 @@ class Builder:
         )
 
     @lru_cache
-    def build_guide(self, name, right=False, guide_angle_deg=10, extra_angle_dist=2, guide_space=0.1):
+    def build_guide(self, name, right=False, guide_range=(-2, 4), guide_space=0.1):
         """Build the right or left manifold guide.
 
         The guide helps align the parts to each other as well as reduce material deformation.
 
         :param _type_ name: The name of the manifold
         :param bool right: True if building the right half, defaults to False
-        :param _type_ guide_angle_deg Determines the size of the guide (in degrees)
-        :param _type_ extra_angle_dist Determines the inner guide space to keep (in mm)
+        :param _type_ guide_range Determine the start and end offsets of the guide
         :param _type_ guide_space How much space between the guide and the other part (in mm)
         :return _type_: The manifold guide
         """
@@ -262,14 +259,17 @@ class Builder:
             """Get the list of manifolds to add and cut for the given part.
 
             :param _type_ right: True if building the right hand part, otherwise false
-            :return _type_: A tuple containing arguments of manifold parts to build and parts to cut
+            :return _type_: An array of arguments to build_manifold
             """
+            guide_start, guide_end = guide_range
+            if guide_start > 0 or guide_end < 0:
+                raise ValueError("Invalid guide range")
             angle = 0 if right else 180
-            add_args = [
+            args = [
                 {
                     "inner_radius": (self.outer_diameter - guide_space) / 2,
                     "outer_radius": (self.outer_diameter + self.thickness + guide_space) / 2,
-                    "start_deg": angle - guide_angle_deg,
+                    "start_deg": angle + guide_start,
                     "end_deg": angle,
                     "trim_start": self.clamp_len,
                     "trim_end": self.clamp_len,
@@ -277,33 +277,21 @@ class Builder:
                 {
                     "inner_radius": (self.outer_diameter + guide_space) / 2,
                     "outer_radius": (self.outer_diameter + self.thickness + guide_space) / 2,
-                    "start_deg": angle - guide_angle_deg,
-                    "end_deg": angle + guide_angle_deg,
+                    "start_deg": angle + guide_start,
+                    "end_deg": angle + guide_end,
                     "trim_start": self.clamp_len,
                     "trim_end": self.clamp_len,
                 },
             ]
-            cut_args = [
-                {
-                    "inner_radius": (self.outer_diameter + self.thickness / 2) / 2,
-                    "outer_radius": (self.outer_diameter + self.thickness * 2) / 2,
-                    "start_deg": angle - guide_angle_deg + extra_angle_dist,
-                    "end_deg": angle - extra_angle_dist,
-                    "trim_start": self.clamp_len + extra_angle_dist,
-                    "trim_end": self.clamp_len + extra_angle_dist,
-                },
-            ]
-            return add_args, cut_args
+            return args
 
-        add_args, cut_args = get_build_manifold_args(right=right)
+        args = get_build_manifold_args(right=right)
 
         # Constuct guides and remove any extra space from them
-        adds = [self.build_manifold(name, **add_arg) for add_arg in add_args]
+        adds = [self.build_manifold(name, **arg) for arg in args]
         guide = adds[0]
         for add in adds[1:]:
             guide = guide.union(add)
-        for cut in [self.build_manifold(name, **cut_arg) for cut_arg in cut_args]:
-            guide = guide.cut(cut)
         return guide
 
     @lru_cache
