@@ -120,7 +120,7 @@ class Builder:
             path = cq.Workplane("XY").add(wire)
             return path, path.val()
 
-        def trim_wire(path, path_obj, start, end):
+        def trim_wire(path_obj, start, end):
             """Trim the wire.
 
             :param _type_ path: The wire assembly
@@ -151,7 +151,7 @@ class Builder:
             length = path_obj.Length()
             s = trim_start / length
             e = (length - trim_end) / length
-            path, path_obj = trim_wire(path, path_obj, s, e)
+            path, path_obj = trim_wire(path_obj, s, e)
         return path, path_obj
 
     @lru_cache
@@ -205,10 +205,28 @@ class Builder:
                 .sweep(path, transition="round")
             )
         # Round the ends of the tube
-        if (trim_start == 0) and (trim_end == 0):
-            tube = tube.edges("%Circle")
-            if edge_rounding > 0:
-                tube = tube.fillet(edge_rounding)
+        if edge_rounding > 0:
+
+            def wrap_fillet(part, edge_rounding):
+                """Fillet every edge that can possibly be filleted.
+
+                :param _type_ part: The part to fillet.
+                :param _type_ edge_rounding: The amount of rounding to apply.
+                :return _type_: A filleted part.
+                """
+                all_edges = part.vals()
+
+                for edge in all_edges:
+                    try:
+                        new_part= part.newObject([edge]).fillet(edge_rounding)
+                        part = new_part
+                    except Exception as _:
+                        continue
+
+                return part
+
+            # Micro fillet the tube first to generate new edge geometry, then perform a full fillet.
+            tube = wrap_fillet(tube, edge_rounding)
         return tube
 
     @lru_cache
