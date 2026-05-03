@@ -390,7 +390,7 @@ class Builder:
             # Ensure that the part is sitting directly on the bed
             z_min = prepared_part.val().BoundingBox().zmin
             prepared_part = prepared_part.translate((0, 0, -z_min))
-            return prepared_part
+            return prepared_part.clean()
 
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
         file_prefix = f"{self.project_name}_{self.ver}"
