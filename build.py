@@ -419,51 +419,71 @@ class Builder:
         error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
         return error_pct
 
+    @lru_cache
+    def build_prepared_part(self, name, right=False):
+        """Build the part and prepare it for export to STL.
+
+        :param _type_ name: The name of the manifold
+        :param bool right: True if building the right half, defaults to False
+        """
+
+        def facing_up(part):
+            """Determine if the part is facing up.
+
+            Uses Center of Mass method. Can only be called prior to rotating or translating the part.
+
+            :return _type_: True if facing up, otherwise False
+            """
+            manifold = self.build_manifold(name)
+            diff = part.val().Center() - manifold.val().Center()
+            normal = diff.normalized()
+            return normal.z > 0
+
+        def rotation(part):
+            """Determine the flattening rotation to perform on the part.
+
+            :param _type_ part: The part to rotate.
+            :return _type_: The rotation to perform.
+            """
+            # Find the path edge, then extract the first and last points from it
+            path = sorted(part.edges(), key=lambda e: e.Length())[-1]
+            p1, p2 = path.startPoint(), path.endPoint()
+            diff = p2 - p1
+
+            # Compute the tilt axis and angle
+            axis = (-diff.y, diff.x, 0)
+            horizontal_dist = math.sqrt(diff.x**2 + diff.y**2)
+            angle_deg = math.degrees(math.atan2(diff.z, horizontal_dist))
+            return axis, angle_deg
+
+        def translation(part):
+            """Determine the flattening translation to perform on the part.
+
+            :param _type_ part: The part to translate.
+            :return _type_: The translation to perform.
+            """
+            return (0, 0, -part.val().BoundingBox().zmin)
+
+        # Ensure the part is facing down on the print bed in a way that is optimal for 3D printing
+        part = self.build_part(name, right=right)
+        if facing_up():
+            part = part.mirror("XY")
+        axis, angle_deg = rotation(part)
+        part = part.rotate((0, 0, 0), axis, angle_deg)
+        part = part.translate(translation(part))
+        return part
+
     def generate_parts(self, name, out_dir):
         """Generate STL parts files for assembly.
 
         :param _type_ name: The name of the manifold
         """
-
-        def prepare_part(name, start, end, right=False):
-            """Prepare the part for export.
-
-            :param _type_ name: The name of the manifold
-            :param _type_ start: The inlet endpoint
-            :param _type_ end: The outlet endpoint
-            :param bool right: True if building the right half, defaults to False
-            """
-
-            def rot_angle(start, end):
-                """Get the rotation angle for the part in degrees.
-
-                We rotate the part slope about the x axis to try and place it as close to the bed as possible.
-
-                :param _type_ start: The inlet endpoint
-                :param _type_ end: The outlet endpoint
-                :return _type_: The rotation angle in degrees
-                """
-                # We rotate the part slope about the x axis to try and place it as close to the bed as possible
-                dy, dz = (end[1] - start[1]), (end[2] - start[2])
-                return -math.degrees(-math.atan2(dy, dz)) - 90
-
-            angle_x = rot_angle(start, end)
-            part = self.build_part(name, right=right)
-            prepared_part = part.rotate((0, 0, 0), (1, 0, 0), angle_x)
-            if right:
-                # Flip right half upside down
-                prepared_part = prepared_part.mirror("XY")
-            # Ensure that the part is sitting directly on the bed
-            z_min = prepared_part.val().BoundingBox().zmin
-            prepared_part = prepared_part.translate((0, 0, -z_min))
-            return prepared_part.clean()
-
-        inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
         file_prefix = f"{self.project_name}_{self.ver}"
 
-        for side in ["left", "right"]:
+        for right in [False, True]:
+            side = "right" if right else "left"
             mesh_file_name = f"{file_prefix}_{name}_{side}.stl"
-            prepared_part = prepare_part(name, self.P[inlet_key], self.P[outlet_key], right=("right" in side))
+            prepared_part = self.build_prepared_part(name, right=right)
             path_str = str(Path(out_dir) / mesh_file_name)
             cq.exporters.export(prepared_part, path_str)
             self.logger.print(f"Saved {path_str}", symbol="📄")
@@ -564,6 +584,8 @@ class TestBuilder:
         if "name" in metafunc.fixturenames:
             builder = Builder()
             metafunc.parametrize("name", builder.names)
+        if "right" in metafunc.fixturenames:
+            metafunc.parametrize("right", [False, True])
 
     @pytest.fixture(scope="class")
     def builder(self):
@@ -730,7 +752,7 @@ class TestBuilder:
         assert outer == pytest.approx(builder.outer_diameter)
 
     def test_part(self, name, builder):
-        """Test the assembled parts.
+        """Test the parts.
 
         Verifies that the assembled parts will create the manifold shape.
 
@@ -739,6 +761,16 @@ class TestBuilder:
         """
         error_pct = builder.calc_part_error(name)
         assert error_pct < 2
+
+    def test_prepared_part(self, name, right, builder):
+        """Test the part prepared parts.
+
+        :param _type_ name: The name of the part to test
+        :param _type_ right: True if building the right part, else False
+        :param _type_ builder: The manifold builder to test
+        """
+        part = builder.build_prepared_part(name, right=right)
+        assert abs(part.val().BoundingBox().zmin) < 1e-6
 
 
 if __name__ == "__main__":
