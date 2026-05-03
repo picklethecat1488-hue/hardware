@@ -8,13 +8,93 @@ import pytest
 import cadquery as cq
 from functools import lru_cache
 from itertools import combinations
+from IPython import get_ipython
 import zipfile
+
+
+class Logger:
+    """Provides a print-based logging interface for the Builder."""
+
+    def __init__(self, text="Building...", enabled=True):
+        """Initialize the logger.
+
+        :param str text: Descriptive text of what is done, defaults to "Building..."
+        :param bool enabled: True if logging is enabled, defaults to True
+        """
+
+        def in_notebook():
+            """Check if we are inside a notebook.
+
+            :return _type_: True if inside a notebook, else false.
+            """
+            try:
+                shell = get_ipython().__class__.__name__
+                return shell == "ZMQInteractiveShell"
+            except NameError:
+                return False
+
+        self.text = text
+        self.backend = None
+        self.in_notebook = in_notebook()
+        self.enabled = enabled
+
+        if self.enabled:
+            if self.in_notebook:
+                from html_sanitizer import Sanitizer
+                import ipywidgets as widgets
+                from IPython.display import display
+
+                self.sanitizer = Sanitizer()
+                sanitized_text = self.sanitizer.sanitize(self.text)
+                self.backend = widgets.HTML(value=f"⏳ <b>{sanitized_text}</b>")
+                display(self.backend)
+            else:
+                from halo import Halo
+
+                self.backend = Halo(text=self.text, spinner="dots", interval=33)
+                self.backend.start()
+                self.running = True
+
+    def print(self, msg, symbol="▶"):
+        """Print a log message.
+
+        :param _type_ msg: The message to print.
+        """
+        if not self.enabled:
+            print(msg)
+        elif self.in_notebook:
+            import ipywidgets as widgets
+            from IPython.display import display
+
+            sanitized_symbol = self.sanitizer.sanitize(symbol)
+            sanitized_text = self.sanitizer.sanitize(msg)
+            self.backend = widgets.HTML(value=f"{sanitized_symbol} <pre>{sanitized_text}</pre>")
+            display(self.backend)
+        else:
+            if not self.running:
+                # Start the spinner, if not already running.
+                self.backend.start()
+                self.running = True
+            # Display the message, along with a custom symbol, while keeping the spinner going.
+            self.backend.text = ""
+            self.backend.stop_and_persist(f"{symbol} {msg}")
+            self.backend.start()
+
+    def done(self):
+        """Indicate the operation has succeeded."""
+        if not self.in_notebook:
+            self.backend.text = f"Done {self.text}"
+            self.backend.succeed()
+            if self.running:
+                # Stop the spinner after the operation has completed.
+                self.backend.stop()
+                self.running = False
 
 
 class Builder:
     """The manifold builder creates the manifold objects and exports them as files for 3D printing."""
 
-    def __init__(self):
+    def __init__(self, logger=None):
         """Initialize the builder."""
         self.project_name = "exhaust_manifolds"
         self.ver = 4
@@ -23,6 +103,7 @@ class Builder:
         self.inner_diameter = self.outer_diameter - self.thickness  # 60mm
         self.clamp_len = 50.4  # 2 inches
         self.edge_rounding = 0.5
+        self.logger = logger if logger else Logger(enabled=False)
 
         # Define the raw measurements taken here
         p = {
@@ -385,7 +466,7 @@ class Builder:
             prepared_part = prepare_part(name, self.P[inlet_key], self.P[outlet_key], right=("right" in side))
             path_str = str(Path(out_dir) / mesh_file_name)
             cq.exporters.export(prepared_part, path_str)
-            print(f"Done writing {path_str}")
+            self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_diagram(self, names, out_dir):
         """Generate a diagram for the given part names."""
@@ -434,7 +515,7 @@ class Builder:
         # Save the tech diagram
         path_str = str(Path(out_dir) / diagram_name)
         assy.toCompound().export(path_str, opt=svg_opt)
-        print(f"Done writing {path_str}")
+        self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_all(self, out_dir="build", zip_name="build.zip"):
         """Generate all project files.
@@ -469,7 +550,7 @@ class Builder:
         # Compress the build
         zip_file_str = str(Path(out_dir) / zip_name)
         zip_build(zip_file_str)
-        print(f"Done writing {zip_file_str}")
+        self.logger.print(f"Done writing {zip_file_str}", symbol="📦")
 
 
 class TestBuilder:
@@ -663,5 +744,7 @@ class TestBuilder:
 if __name__ == "__main__":
     """When run, exports all parts as STL files.
     """
-    builder = Builder()
+    logger = Logger()
+    builder = Builder(logger=logger)
     builder.generate_all()
+    logger.done()
