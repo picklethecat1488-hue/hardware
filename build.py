@@ -193,8 +193,6 @@ class Builder:
             )
             # Make the sides of the tube more rounded
             profile = (circle * pie_slice).vertices()
-            if edge_rounding > 0:
-                profile = profile.fillet(edge_rounding)
             tube = (
                 cq.Workplane(cq.Plane(origin=start_point, normal=start_tangent))
                 .placeSketch(profile)
