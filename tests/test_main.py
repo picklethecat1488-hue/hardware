@@ -2,6 +2,7 @@
 
 import argparse
 from build import main, get_args
+from pathlib import Path
 import pytest
 from unittest.mock import MagicMock
 
@@ -40,17 +41,20 @@ class TestMain:
         assert args.diagram == "my_diag"
         assert args.output is None
 
-    def test_main_diagram_path(self, mock_logger, mock_builder):
+    def test_main_diagram_path(self, mock_logger, mock_builder, tmp_path):
         """Check if generate_diagram was called with correct unpacked gen_args.
 
         :param _type_ mock_logger: The Logger.
         :param _type_ mock_builder: The Builder.
+        :param _type_ tmp_path: The temporary path.
         """
-        args = argparse.Namespace(outdir="build", diagram="schema", output=None)
+        args = argparse.Namespace(outdir=tmp_path, diagram="schema", output=None)
 
         main(mock_logger, args)
 
-        mock_builder.return_value.generate_diagram.assert_called_once_with(out_dir="build", names=["schema"])
+        assert Path(tmp_path).exists()
+
+        mock_builder.return_value.generate_diagram.assert_called_once_with(out_dir=tmp_path, names=["schema"])
         mock_logger.done.assert_called_once()
 
     def test_main_output_path(self, mock_logger, mock_builder):
@@ -65,17 +69,18 @@ class TestMain:
 
         mock_builder.return_value.generate_parts.assert_called_once_with(names=["part1"])
 
-    def test_main_generate_all_fallback(self, mock_logger, mock_builder):
+    def test_main_generate_all_fallback(self, mock_logger, mock_builder, tmp_path):
         """Test the else block when no flags are provided.
 
         :param _type_ mock_logger: The Logger.
         :param _type_ mock_builder: The Builder.
+        :param _type_ tmp_path: The temporary path to use.
         """
-        args = argparse.Namespace(outdir="dist", diagram=None, output=None)
+        args = argparse.Namespace(outdir=tmp_path, diagram=None, output=None)
 
         main(mock_logger, args)
 
-        mock_builder.return_value.generate_all.assert_called_once_with(out_dir="dist")
+        mock_builder.return_value.generate_all.assert_called_once_with(out_dir=tmp_path)
 
     def test_mutually_exclusive_error(self, mocker):
         """Verify that providing both -d and -o raises a SystemExit (argparse behavior).

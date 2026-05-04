@@ -547,7 +547,7 @@ class Builder:
         assy.toCompound().export(path_str, opt=svg_opt)
         self.logger.print(f"Saved {path_str}", symbol="📄")
 
-    def generate_all(self, out_dir="build", zip_name="build.zip"):
+    def generate_all(self, out_dir, zip_name="build.zip"):
         """Generate all project files.
 
         :param str out_dir: The output directory generate all files in, defaults to "build"
@@ -566,10 +566,6 @@ class Builder:
                         if not os.path.samefile(zip_file_str, file_str):
                             zipf.write(file_str, file)
 
-        # Create the output directory
-        path = Path(out_dir)
-        path.mkdir(parents=True, exist_ok=True)
-
         # Export the diagram and files
         self.generate_diagram(names=self.names, out_dir=out_dir)
         self.generate_parts(names=self.names, out_dir=out_dir)
@@ -586,7 +582,7 @@ def get_args():
     :return _type_: Parsed arguments.
     """
     parser = argparse.ArgumentParser(description="Build Utility.")
-    parser.add_argument("-out", "--outdir", help="Target directory for outputs")
+    parser.add_argument("-out", "--outdir", default="build", help="Target directory for outputs")
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument("-d", "--diagram", nargs="?", const=True, help="Generate diagram. Optional: provide a name.")
 
@@ -609,6 +605,10 @@ def main(logger, args):
     gen_args = {}
     if args.outdir:
         gen_args["out_dir"] = args.outdir
+
+    # Create the output directory
+    path = Path(args.outdir)
+    path.mkdir(parents=True, exist_ok=True)
 
     builder = Builder(logger=logger)
     if not args.diagram is None:
