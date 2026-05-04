@@ -18,6 +18,7 @@ There are two manifolds, driver and passenger. The manifolds are further separat
 - **exhaust\_manifolds\_v{x}\_driver\_right.stl** \- the right side of the driver manifold.  
 - **exhaust\_manifolds\_v{x}\_passenger\_left.stl** \- the left side of the passenger manifold.  
 - **exhaust\_manifolds\_v{x}\_passenger\_right.stl** \- the right side of the passenger manifold.
+- **tests/\*\*** \- contains test files.
 
 ## Getting Started
 
@@ -31,7 +32,7 @@ conda activate cq
 
 This will run unit tests, then update the current version of STL files checked into the repo:
 ```
-pytest -qq build.py
+pytest
 python build.py
 ```
 
