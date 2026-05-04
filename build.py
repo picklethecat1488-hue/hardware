@@ -573,7 +573,7 @@ class Builder:
         :param _type_ out_dir: The output directory.
         :param _type_ names: The optional names to generate.
         """
-        file_prefix = f"{self.project_name}_{self.ver}"
+        file_prefix = f"{self.project_name}_v{self.ver}"
 
         if names is None:
             names = self.names
@@ -873,6 +873,24 @@ class TestBuilder:
         """
         part = builder.build_prepared_part(name, right=right)
         assert abs(part.val().BoundingBox().zmin) < 1e-6
+
+    def test_generate_all(self, builder, tmp_path):
+        """Test the part generation happy path.
+
+        :param _type_ builder: The Builder to test.
+        :param _type_ tmp_path: A temporary path to generate files in.
+        """
+        builder.generate_all(out_dir=tmp_path, zip_name="build.zip")
+        zip_path = tmp_path / "build.zip"
+        assert zip_path.exists()
+
+        # Open the resulting zip and verify its contents.
+        with zipfile.ZipFile(zip_path, "r") as z:
+            contents = z.namelist()
+            assert f"{builder.project_name}_v{builder.ver}_diagram.svg" in contents
+            for name in builder.names:
+                for side in ["left", "right"]:
+                    assert f"{builder.project_name}_v{builder.ver}_{name}_{side}.stl" in contents
 
 
 def get_args():
