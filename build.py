@@ -1,5 +1,6 @@
 """Contains the code to build exhaust manifolds."""
 
+import argparse
 import math
 import numpy as np
 import os
@@ -9,6 +10,7 @@ import cadquery as cq
 from functools import lru_cache
 from itertools import combinations
 from IPython import get_ipython
+from unittest.mock import MagicMock, patch
 import zipfile
 
 
@@ -473,23 +475,32 @@ class Builder:
         part = part.translate(translation(part))
         return part.clean()
 
-    def generate_parts(self, name, out_dir):
+    def generate_parts(self, out_dir, names=None):
         """Generate STL parts files for assembly.
 
-        :param _type_ name: The name of the manifold
+        :param _type_ out_dir: The output directory.
+        :param _type_ names: The optional names to generate.
         """
         file_prefix = f"{self.project_name}_{self.ver}"
 
-        for right in [False, True]:
-            side = "right" if right else "left"
-            mesh_file_name = f"{file_prefix}_{name}_{side}.stl"
-            prepared_part = self.build_prepared_part(name, right=right)
-            path_str = str(Path(out_dir) / mesh_file_name)
-            cq.exporters.export(prepared_part, path_str)
-            self.logger.print(f"Saved {path_str}", symbol="📄")
+        if names is None:
+            names = self.names
 
-    def generate_diagram(self, names, out_dir):
-        """Generate a diagram for the given part names."""
+        for name in names:
+            for right in [False, True]:
+                side = "right" if right else "left"
+                mesh_file_name = f"{file_prefix}_{name}_{side}.stl"
+                prepared_part = self.build_prepared_part(name, right=right)
+                path_str = str(Path(out_dir) / mesh_file_name)
+                cq.exporters.export(prepared_part, path_str)
+                self.logger.print(f"Saved {path_str}", symbol="📄")
+
+    def generate_diagram(self, out_dir, names=None):
+        """Generate a diagram for the given part names.
+
+        :param _type_ out_dir: The output directory.
+        :param _type_ names: The optional names to generate.
+        """
 
         def get_part_location(wire_obj, offset=0, dist=0, right=False):
             """Return the part location for the part in the exploded diagram.
@@ -504,6 +515,8 @@ class Builder:
             loc = cq.Vector(dir) * part_dist + cq.Vector(0, 1, 0) * part_offset
             return loc
 
+        if names is None:
+            names = self.names
         diagram_name = f"{self.project_name}_v{self.ver}_diagram.svg"
         svg_opt = {
             "showAxes": False,
@@ -560,12 +573,9 @@ class Builder:
         path = Path(out_dir)
         path.mkdir(parents=True, exist_ok=True)
 
-        # Export the diagram
-        self.generate_diagram(self.names, out_dir=out_dir)
-
-        # Export the STL files
-        for name in self.names:
-            self.generate_parts(name, out_dir=out_dir)
+        # Export the diagram and files
+        self.generate_diagram(names=self.names, out_dir=out_dir)
+        self.generate_parts(names=self.names, out_dir=out_dir)
 
         # Compress the build
         zip_file_str = str(Path(out_dir) / zip_name)
@@ -773,10 +783,135 @@ class TestBuilder:
         assert abs(part.val().BoundingBox().zmin) < 1e-6
 
 
+def get_args():
+    """Get parsed arguments for the program.
+
+    :return _type_: Parsed arguments.
+    """
+    parser = argparse.ArgumentParser(description="Build Utility.")
+    parser.add_argument("-out", "--outdir", help="Target directory for outputs")
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument("-d", "--diagram", nargs="?", const=True, help="Generate diagram. Optional: provide a name.")
+
+    group.add_argument(
+        "-o",
+        "--output",
+        nargs="+",
+        metavar=("NAME", "SIDE"),
+        help="Generate a file and exit. Usage: -o <name> [<side>]",
+    )
+    args = parser.parse_args()
+    return args
+
+
+def main(logger, args):
+    """Initialize the build environment and perform build actions.
+
+    :param _type_ args: The program arguments.
+    """
+    gen_args = {}
+    if args.outdir:
+        gen_args["out_dir"] = args.outdir
+
+    builder = Builder(logger=logger)
+    if not args.diagram is None:
+        if not args.diagram is True:
+            gen_args["names"] = [args.diagram]
+        builder.generate_diagram(**gen_args)
+    elif not args.output is None:
+        if args.output[0]:
+            gen_args["names"] = [args.output[0]]
+        builder.generate_parts(**gen_args)
+    else:
+        builder.generate_all(**gen_args)
+    logger.done()
+
+
+class TestMain:
+    """Main unit tests.
+
+    :return _type_: A Main test harness.
+    """
+
+    @pytest.fixture
+    def mock_logger(self):
+        """Return a mock Logger.
+
+        :return _type_: A mock Logger.
+        """
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_builder(self, mocker):
+        """Return a mock Builder.
+
+        :param _type_ mocker: The Mocker.
+        :return _type_: A Builder class patched into the build module.
+        """
+        return mocker.patch("build.Builder")
+
+    def test_get_args_parsing(self, mocker):
+        """Test the argparse configuration directly.
+
+        :param _type_ mocker: The Mocker.
+        """
+        mocker.patch("sys.argv", ["script.py", "-out", "tmp", "-d", "my_diag"])
+        args = get_args()
+        assert args.outdir == "tmp"
+        assert args.diagram == "my_diag"
+        assert args.output is None
+
+    def test_main_diagram_path(self, mock_logger, mock_builder):
+        """Check if generate_diagram was called with correct unpacked gen_args.
+
+        :param _type_ mock_logger: The Logger.
+        :param _type_ mock_builder: The Builder.
+        """
+        args = argparse.Namespace(outdir="build", diagram="schema", output=None)
+
+        main(mock_logger, args)
+
+        mock_builder.return_value.generate_diagram.assert_called_once_with(out_dir="build", names=["schema"])
+        mock_logger.done.assert_called_once()
+
+    def test_main_output_path(self, mock_logger, mock_builder):
+        """Test -o flag with name.
+
+        :param _type_ mock_logger: The Logger.
+        :param _type_ mock_builder: The Builder.
+        """
+        args = argparse.Namespace(outdir=None, diagram=None, output=["part1"])
+
+        main(mock_logger, args)
+
+        mock_builder.return_value.generate_parts.assert_called_once_with(names=["part1"])
+
+    def test_main_generate_all_fallback(self, mock_logger, mock_builder):
+        """Test the else block when no flags are provided.
+
+        :param _type_ mock_logger: The Logger.
+        :param _type_ mock_builder: The Builder.
+        """
+        args = argparse.Namespace(outdir="dist", diagram=None, output=None)
+
+        main(mock_logger, args)
+
+        mock_builder.return_value.generate_all.assert_called_once_with(out_dir="dist")
+
+    def test_mutually_exclusive_error(self, mocker):
+        """Verify that providing both -d and -o raises a SystemExit (argparse behavior).
+
+        :param _type_ mock_logger: The Logger.
+        :param _type_ mock_builder: The Builder.
+        """
+        mocker.patch("sys.argv", ["script.py", "-d", "-o", "name"])
+        with pytest.raises(SystemExit):
+            get_args()
+
+
 if __name__ == "__main__":
-    """When run, exports all parts as STL files.
+    """Program entry point.
     """
     logger = Logger()
-    builder = Builder(logger=logger)
-    builder.generate_all()
-    logger.done()
+    args = get_args()
+    main(logger, args)
