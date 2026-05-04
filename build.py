@@ -464,14 +464,14 @@ class Builder:
             """
             return (0, 0, -part.val().BoundingBox().zmin)
 
-        # Ensure the part is facing down on the print bed in a way that is optimal for 3D printing
+        # Ensure the part is facing up on the print bed in a way that is optimal for 3D printing
         part = self.build_part(name, right=right)
-        if facing_up():
+        if not facing_up(part):
             part = part.mirror("XY")
         axis, angle_deg = rotation(part)
         part = part.rotate((0, 0, 0), axis, angle_deg)
         part = part.translate(translation(part))
-        return part
+        return part.clean()
 
     def generate_parts(self, name, out_dir):
         """Generate STL parts files for assembly.
