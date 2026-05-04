@@ -60,12 +60,12 @@ class TestLogger:
         :param _type_ mocker: The Mocker object.
         :param _type_ mock_dependencies: The mock dependencies.
         """
-        with mocker.patch("build.Logger.in_notebook", return_value=False):
-            logger = Logger(enabled=False)
-            logger.print("Direct message")
+        mocker.patch("build.Logger.in_notebook", return_value=False)
+        logger = Logger(enabled=False)
+        logger.print("Direct message")
 
-            captured = capsys.readouterr()
-            assert "Direct message" in captured.out
+        captured = capsys.readouterr()
+        assert "Direct message" in captured.out
 
     def test_terminal_print_persists_message(self, mocker):
         """Verify print stops the spinner to persist text, then restarts.
