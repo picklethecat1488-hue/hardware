@@ -472,19 +472,22 @@ class Builder:
         part = part.translate(translation(part))
         return part.clean()
 
-    def generate_parts(self, out_dir, names=None):
+    def generate_parts(self, out_dir, names=None, right_vals=None):
         """Generate STL parts files for assembly.
 
         :param _type_ out_dir: The output directory.
         :param _type_ names: The optional names to generate.
+        :param _type_ right_vals: The optional right values to use.
         """
         file_prefix = f"{self.project_name}_v{self.ver}"
 
         if names is None:
             names = self.names
+        if right_vals is None:
+            right_vals = [False, True]
 
         for name in names:
-            for right in [False, True]:
+            for right in right_vals:
                 side = "right" if right else "left"
                 mesh_file_name = f"{file_prefix}_{name}_{side}.stl"
                 prepared_part = self.build_prepared_part(name, right=right)
@@ -492,7 +495,7 @@ class Builder:
                 cq.exporters.export(prepared_part, path_str)
                 self.logger.print(f"Saved {path_str}", symbol="📄")
 
-    def generate_diagram(self, out_dir, names=None):
+    def generate_diagram(self, out_dir, names=None, right_vals=None):
         """Generate a diagram for the given part names.
 
         :param _type_ out_dir: The output directory.
@@ -514,6 +517,9 @@ class Builder:
 
         if names is None:
             names = self.names
+        if right_vals is None:
+            right_vals = [False, True]
+
         diagram_name = f"{self.project_name}_v{self.ver}_diagram.svg"
         svg_opt = {
             "showAxes": False,
@@ -528,7 +534,7 @@ class Builder:
         wire_objs = [self.build_wire(name)[1] for name in names]
 
         for i, wire_obj in enumerate(wire_objs):
-            for right in [False, True]:
+            for right in right_vals:
                 loc = get_part_location(wire_obj, right=right, offset=(i * part_offset), dist=part_dist)
                 other_loc = get_part_location(wire_obj, right=(not right), offset=(i * part_offset), dist=part_dist)
 
@@ -547,7 +553,7 @@ class Builder:
         assy.toCompound().export(path_str, opt=svg_opt)
         self.logger.print(f"Saved {path_str}", symbol="📄")
 
-    def generate_all(self, out_dir, zip_name="build.zip"):
+    def generate_all(self, out_dir, right_vals=None, zip_name="build.zip"):
         """Generate all project files.
 
         :param str out_dir: The output directory generate all files in, defaults to "build"
@@ -567,8 +573,8 @@ class Builder:
                             zipf.write(file_str, file)
 
         # Export the diagram and files
-        self.generate_diagram(names=self.names, out_dir=out_dir)
-        self.generate_parts(names=self.names, out_dir=out_dir)
+        self.generate_diagram(names=self.names, out_dir=out_dir, right_vals=right_vals)
+        self.generate_parts(names=self.names, out_dir=out_dir, right_vals=right_vals)
 
         # Compress the build
         zip_file_str = str(Path(out_dir) / zip_name)
@@ -583,9 +589,9 @@ def get_args():
     """
     parser = argparse.ArgumentParser(description="Build Utility.")
     parser.add_argument("-out", "--outdir", default="build", help="Target directory for outputs")
+
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument("-d", "--diagram", nargs="?", const=True, help="Generate diagram. Optional: provide a name.")
-
     group.add_argument(
         "-o",
         "--output",
@@ -593,6 +599,11 @@ def get_args():
         metavar=("NAME", "SIDE"),
         help="Generate a file and exit. Usage: -o <name> [<side>]",
     )
+
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument("-l", "--left", action="store_true", help="Write left side only")
+    group.add_argument("-r", "--right", action="store_true", help="Write right side only")
+
     args = parser.parse_args()
     return args
 
@@ -602,9 +613,14 @@ def main(logger, args):
 
     :param _type_ args: The program arguments.
     """
+    # Generate optional arguments
     gen_args = {}
     if args.outdir:
         gen_args["out_dir"] = args.outdir
+    if args.left:
+        gen_args["right_vals"] = [False]
+    elif args.right:
+        gen_args["right_vals"] = [True]
 
     # Create the output directory
     path = Path(args.outdir)
