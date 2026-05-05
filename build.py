@@ -246,10 +246,15 @@ class Builder:
         :param bool right: True if building the right half, defaults to False
         :return _type_: The manifold half
         """
-        half = (
-            self.build_manifold(name, start_deg=180, end_deg=360) if right else self.build_manifold(name, end_deg=180)
-        )
-        return half
+        if name == "driver" or name == "passenger":
+            part = (
+                self.build_manifold(name, start_deg=180, end_deg=360)
+                if right
+                else self.build_manifold(name, end_deg=180)
+            )
+        else:
+            raise ValueError(f"Invalid name: {name}")
+        return part
 
     @lru_cache
     def build_back_manifold(self, name):
@@ -258,6 +263,8 @@ class Builder:
         :param _type_ name: The name of the manifold
         :return _type_: A tuple containing the exhaust manifiold, and the manifold built from parts
         """
+        if name != "driver" and name != "passenger":
+            raise ValueError(f"Invalid name: {name}")
         left_part, right_part = self.build_part(name), self.build_part(name, right=True)
         manifold = self.build_manifold(name)
         manifold_from_parts = left_part.union(right_part, tol=self.boolean_tolerance)
@@ -272,6 +279,8 @@ class Builder:
         :param _type_ name: The name of the manifold
         :return _type_: A percentage indicating the part error when attempting to assemble the manifold from parts
         """
+        if name != "driver" and name != "passenger":
+            raise ValueError(f"Invalid name: {name}")
         manifold, manifold_from_parts = self.build_back_manifold(name)
         manifold_vol, manifold_from_parts_vol = (
             manifold.val().Volume(),
@@ -295,8 +304,11 @@ class Builder:
 
             :return _type_: True if facing up, otherwise False
             """
-            manifold = self.build_manifold(name)
-            diff = part.val().Center() - manifold.val().Center()
+            if name == "driver" or name == "passenger":
+                full_part = self.build_manifold(name)
+            else:
+                raise ValueError(f"Invalid name: {name}")
+            diff = part.val().Center() - full_part.val().Center()
             normal = diff.normalized()
             return normal.z > 0
 
