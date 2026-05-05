@@ -269,20 +269,15 @@ class Builder:
         profile = cq.Sketch().circle(outer_radius).circle(inner_radius, mode="s")
         if (start_deg != 0) or (end_deg != 0):
             cutter = (
-                cq.Sketch()
-                .arc((0, 0), outer_radius, start_deg, end_deg - start_deg)
-                .segment((0, 0))
-                .close()
-                .assemble()  # Converts edges into a face
+                cq.Sketch().arc((0, 0), outer_radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
             )
-            profile = (profile * cutter).vertices()
+            profile = (profile * cutter).vertices().fillet(self.edge_rounding)
 
         # Sweep out our hollow tube
         tube = (
             cq.Workplane(cq.Plane(origin=start_point, normal=start_tangent))
             .placeSketch(profile)
             .sweep(path, transition="round")
-            .fillet(self.edge_rounding)
         )
 
         return tube
@@ -360,8 +355,8 @@ class Builder:
         :param bool right: True if building the right half, defaults to False
         :return _type_: The manifold part
         """
-        part = self.build_manifold_half(name, right=right).union(
-            self.build_guide(name, right=right), tol=self.boolean_tolerance
+        part = self.build_manifold_half(name, right=right).add(
+            self.build_guide(name, right=right)
         )
         return part
 

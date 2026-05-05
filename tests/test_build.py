@@ -209,7 +209,7 @@ class TestBuilder:
 
         # Ensure the part is a watertight solid
         assert part_val.isValid()
-        # assert part_val.Closed()
+        assert part_val.Closed()
         assert part_val.Volume() > 0
 
         # Ensure the part is touching the print bed
