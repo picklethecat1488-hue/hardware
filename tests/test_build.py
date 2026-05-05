@@ -54,7 +54,7 @@ class TestBuilder:
         def get_end_points(name):
             """Get the inlet and output start and end points.
 
-            The exhaust inlets and outlets are cuffs of size clamp_len. The inlet connects directly to the midpipe, and the outlet must fit inside the exhaust tip.
+            The exhaust inlets and outlets are fixed size cuffs. The inlet connects directly to the midpipe, and the outlet must fit inside the exhaust tip.
 
             :param _type_ name: The name of the part to test
             :return _type_: A tuple
@@ -64,11 +64,11 @@ class TestBuilder:
                 # Inlet start
                 builder.P[inlet_key],
                 # Inlet end
-                builder.P[inlet_key] + builder.V[inlet_key] * builder.clamp_len,
+                builder.P[inlet_key] + builder.V[inlet_key] * builder.clamp_lengths[0],
                 # Outlet start
                 builder.P[outlet_key],
                 # Outlet end
-                builder.P[outlet_key] + builder.V[outlet_key] * builder.clamp_len,
+                builder.P[outlet_key] + builder.V[outlet_key] * builder.clamp_lengths[-1],
             )
 
         driver_inlet_start, driver_inlet_end, driver_outlet_start, _ = get_end_points("driver")
@@ -108,8 +108,8 @@ class TestBuilder:
         _, wire_obj = builder.build_wire(name)
         length = wire_obj.Length()
         inlet_clamp_start = wire_obj.positionAt(0.0)
-        inlet_clamp_end = wire_obj.positionAt(builder.clamp_len / length)
-        outlet_clamp_start = wire_obj.positionAt((length - builder.clamp_len) / length)
+        inlet_clamp_end = wire_obj.positionAt(builder.clamp_lengths[0] / length)
+        outlet_clamp_start = wire_obj.positionAt((length - builder.clamp_lengths[-1]) / length)
         outlet_clamp_end = wire_obj.positionAt(1.0)
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
 
@@ -124,8 +124,8 @@ class TestBuilder:
         assert calc_point_err(
             (outlet_clamp_end - outlet_clamp_start).normalized(), builder.V[outlet_key]
         ) == pytest.approx(0)
-        assert (inlet_clamp_end - inlet_clamp_start).Length == pytest.approx(builder.clamp_len)
-        assert (outlet_clamp_end - outlet_clamp_start).Length == pytest.approx(builder.clamp_len)
+        assert (inlet_clamp_end - inlet_clamp_start).Length == pytest.approx(builder.clamp_lengths[0])
+        assert (outlet_clamp_end - outlet_clamp_start).Length == pytest.approx(builder.clamp_lengths[-1])
 
     def test_overlap(self, builder):
         """Test that the parts do not overlap with each other.

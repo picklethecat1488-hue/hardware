@@ -101,8 +101,8 @@ class Builder:
         self.wall_thickness = 1.4
         # Outer diameter 2.5"
         self.outer_diameter = 63.5
-        # Clamp volume length ~2"
-        self.clamp_len = 50.4
+        # Inlet and outlet clamp length 2"
+        self.clamp_lengths = [50.4, 50.4]
         self.edge_rounding = 0.5
         self.boolean_tolerance = 0.01
         self.logger = logger if logger else Logger(enabled=False)
@@ -184,10 +184,14 @@ class Builder:
             :param _type_ v_end: The output direction
             :return _type_: A tuple containing the wire path information
             """
-            p1 = p_start  # Manifold start
-            p2 = p_start + v_start * self.clamp_len  # Spline start
-            p3 = p_end  # Spline end
-            p4 = p_end + v_end * self.clamp_len  # Manifold end
+            # Inlet start
+            p1 = p_start
+            # Inlet end
+            p2 = p_start + v_start * self.clamp_lengths[0]
+            # Outlet start
+            p3 = p_end
+            # Outlet end
+            p4 = p_end + v_end * self.clamp_lengths[-1]
             wire = cq.Wire.assembleEdges(
                 [
                     cq.Edge.makeLine(cq.Vector(*p1), cq.Vector(*p2)),
