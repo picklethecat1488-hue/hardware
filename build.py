@@ -265,50 +265,26 @@ class Builder:
         inner_radius = kwargs.pop("inner_radius", self.inner_diameter / 2)
         outer_radius = kwargs.pop("outer_radius", self.outer_diameter / 2)
 
+        # Define the tube profile
+        profile = cq.Sketch().circle(outer_radius).circle(inner_radius, mode="s")
         if (start_deg != 0) or (end_deg != 0):
-            # We might want to cut a portion of the circle to use in building only part of the tube profile
-            circle = cq.Sketch().circle(outer_radius).circle(inner_radius, "s")
-            pie_slice = (
-                cq.Sketch().arc((0, 0), outer_radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
+            cutter = (
+                cq.Sketch()
+                .arc((0, 0), outer_radius, start_deg, end_deg - start_deg)
+                .segment((0, 0))
+                .close()
+                .assemble()  # Converts edges into a face
             )
-            # Make the sides of the tube more rounded
-            profile = (circle * pie_slice).vertices()
-            tube = (
-                cq.Workplane(cq.Plane(origin=start_point, normal=start_tangent))
-                .placeSketch(profile)
-                .sweep(path, transition="round")
-            )
+            profile = (profile * cutter).vertices()
 
-        else:
-            # Create our hollow tube profile instead
-            tube = (
-                cq.Workplane(cq.Plane(origin=start_point, normal=start_tangent))
-                .circle(outer_radius)
-                .circle(inner_radius)
-                .sweep(path, transition="round")
-            )
-        # Round the ends of the tube
-        if self.edge_rounding > 0:
+        # Sweep out our hollow tube
+        tube = (
+            cq.Workplane(cq.Plane(origin=start_point, normal=start_tangent))
+            .placeSketch(profile)
+            .sweep(path, transition="round")
+            .fillet(self.edge_rounding)
+        )
 
-            def wrap_fillet(part):
-                """Fillet every edge that can possibly be filleted.
-
-                :param _type_ part: The part to fillet.
-                :return _type_: A filleted part.
-                """
-                all_edges = part.vals()
-
-                for edge in all_edges:
-                    try:
-                        new_part = part.newObject([edge]).fillet(self.edge_rounding)
-                        part = new_part
-                    except Exception as _:
-                        continue
-
-                return part
-
-            # Micro fillet the tube first to generate new edge geometry, then perform a full fillet.
-            tube = wrap_fillet(tube)
         return tube
 
     @lru_cache
