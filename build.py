@@ -102,6 +102,7 @@ class Builder:
         self.inner_diameter = self.outer_diameter - self.thickness  # 60mm
         self.clamp_len = 50.4  # 2 inches
         self.edge_rounding = 0.5
+        self.boolean_tolerance = 0.01
         self.logger = logger if logger else Logger(enabled=False)
 
         # Define the raw measurements taken here
@@ -318,9 +319,10 @@ class Builder:
         :param bool right: True if building the right half, defaults to False
         :return _type_: The manifold half
         """
-        return (
+        half = (
             self.build_manifold(name, start_deg=180, end_deg=360) if right else self.build_manifold(name, end_deg=180)
         )
+        return half
 
     @lru_cache
     def build_guide(self, name, right=False, guide_range=(-2, 4), guide_space=0.1):
@@ -357,7 +359,7 @@ class Builder:
                 {
                     "inner_radius": (self.outer_diameter + guide_space) / 2,
                     "outer_radius": (self.outer_diameter + self.thickness + guide_space) / 2,
-                    "start_deg": angle + guide_start,
+                    "start_deg": angle - 1e-2,
                     "end_deg": angle + guide_end,
                     "trim_start": self.clamp_len,
                     "trim_end": self.clamp_len,
@@ -371,7 +373,7 @@ class Builder:
         adds = [self.build_manifold(name, **arg) for arg in args]
         guide = adds[0]
         for add in adds[1:]:
-            guide = guide.union(add)
+            guide = guide.union(add, tol=self.boolean_tolerance)
         return guide
 
     @lru_cache
@@ -382,7 +384,9 @@ class Builder:
         :param bool right: True if building the right half, defaults to False
         :return _type_: The manifold part
         """
-        part = self.build_manifold_half(name, right=right).union(self.build_guide(name, right=right))
+        part = self.build_manifold_half(name, right=right).union(
+            self.build_guide(name, right=right), tol=self.boolean_tolerance
+        )
         return part
 
     @lru_cache
@@ -398,7 +402,11 @@ class Builder:
         )
         left_part, right_part = self.build_part(name), self.build_part(name, right=True)
         manifold = self.build_manifold(name)
-        manifold_from_parts = left_part.union(right_part).cut(left_guide).cut(right_guide)
+        manifold_from_parts = (
+            left_part.union(right_part, tol=self.boolean_tolerance)
+            .cut(left_guide, tol=self.boolean_tolerance)
+            .cut(right_guide, tol=self.boolean_tolerance)
+        )
         return manifold, manifold_from_parts
 
     @lru_cache

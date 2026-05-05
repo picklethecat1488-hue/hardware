@@ -79,14 +79,18 @@ class TestMain:
         """
         args = argparse.Namespace(outdir=tmp_path, diagram=None, output=["part1"], left=True, right=False)
         main(mock_logger, args)
-        mock_builder.return_value.generate_parts.assert_called_once_with(out_dir=tmp_path, names=["part1"], right_vals=[False])
+        mock_builder.return_value.generate_parts.assert_called_once_with(
+            out_dir=tmp_path, names=["part1"], right_vals=[False]
+        )
 
         mock_logger.done.assert_called_once()
 
         mock_builder.return_value.generate_parts.reset_mock()
         args = argparse.Namespace(outdir=tmp_path, diagram=None, output=["part1"], left=False, right=True)
         main(mock_logger, args)
-        mock_builder.return_value.generate_parts.assert_called_once_with(out_dir=tmp_path, names=["part1"], right_vals=[True])
+        mock_builder.return_value.generate_parts.assert_called_once_with(
+            out_dir=tmp_path, names=["part1"], right_vals=[True]
+        )
 
         mock_builder.return_value.generate_parts.reset_mock()
         args = argparse.Namespace(outdir=tmp_path, diagram=None, output=["part1"], left=False, right=False)

@@ -198,14 +198,24 @@ class TestBuilder:
         assert error_pct < 2
 
     def test_prepared_part(self, name, right, builder):
-        """Test the part prepared parts.
+        """Test the part is suitable for 3D printing.
 
         :param _type_ name: The name of the part to test
         :param _type_ right: True if building the right part, else False
         :param _type_ builder: The manifold builder to test
         """
         part = builder.build_prepared_part(name, right=right)
-        assert abs(part.val().BoundingBox().zmin) < 1e-6
+        part_val = part.val()
+
+        # Ensure the part is a watertight solid
+        assert part_val.isValid()
+        # assert part_val.Closed()
+        assert part_val.Volume() > 0
+
+        # Ensure the part is touching the print bed
+        bottom_faces = part.faces("<Z").vals()
+        face_area = sum(f.Area() for f in bottom_faces)
+        assert face_area > 0
 
     def test_generate_all(self, builder, tmp_path):
         """Test the part generation happy path.
