@@ -164,15 +164,13 @@ class Builder:
         }
 
     @lru_cache
-    def build_wire(self, name, trim_start=0, trim_end=0):
+    def build_wire(self, name):
         """Build the wire.
 
         The wire defines the path around which the manifold is profiled.
         The wire connects the exhaust inlet and outlets across a 3D coordinate system.
 
         :param _type_ name: The name of the manifold
-        :param int trim_start: How much to trim from the start of the wire in mm, defaults to 0
-        :param int trim_end: How much to trim from the end of the wire in mm, defaults to 0
         """
 
         def create_wire(p_start, v_start, p_end, v_end):
@@ -202,43 +200,9 @@ class Builder:
             path = cq.Workplane("XY").add(wire)
             return path, path.val()
 
-        def trim_wire(path_obj, start, end):
-            """Trim the wire.
-
-            :param _type_ path: The wire assembly
-            :param _type_ path_obj: The underlying wire object
-            :param _type_ start: The start offset in mm
-            :param _type_ end: The end offset in mm
-            :return _type_: The trimmed wire
-            """
-            s, e = path_obj.positionAt(start), path_obj.positionAt(end)
-            dx, dy, dz = (abs(s.x - e.x), abs(s.y - e.y), abs(s.z - e.z))
-            cx, cy, cz = (
-                (s.x + e.x) / 2.0,
-                (s.y + e.y) / 2.0,
-                (s.z + e.z) / 2.0,
-            )
-
-            # Create a trim box to remove unwanted portions of the wire
-            clip_region = cq.Workplane("XY").center(cx, cy).workplane(offset=cz).box(dx, dy, dz)
-            wires = path_obj.intersect(clip_region.val()).Wires()
-
-            # Extract a trimmed path from the compound created by trimming the wire
-            if len(wires) != 1:
-                raise ValueError("Trim failed")
-            path = cq.Workplane("XY").add(wires[0])
-            return path, path.val()
-
         # Create the wire which defines the manifold shape
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
         path, path_obj = create_wire(self.P[inlet_key], self.V[inlet_key], self.P[outlet_key], self.V[outlet_key])
-
-        # Apply wire trimming if needed
-        if (trim_start > 0) or (trim_end > 0):
-            length = path_obj.Length()
-            s = trim_start / length
-            e = (length - trim_end) / length
-            path, path_obj = trim_wire(path_obj, s, e)
         return path, path_obj
 
     @lru_cache
@@ -247,8 +211,6 @@ class Builder:
         name,
         start_deg=0,
         end_deg=0,
-        trim_start=0,
-        trim_end=0,
         **kwargs,
     ):
         """Build the exhaust manifold shape.
@@ -256,11 +218,9 @@ class Builder:
         :param _type_ name: The name of the manifold to build
         :param int start_deg: If building part of the manifold, the start angle of the tube offset to include in degrees, defaults to 0
         :param int end_deg: If building part of the manifold, the end angle of the tube offset to include in degrees, defaults to 0
-        :param int trim_start: If building part of the manifold, how much to trim from the start in mm, defaults to 0
-        :param int trim_end: If building part of the manifold, how much to trim from the end in mm, defaults to 0
         :return _type_: The exhaust manifold
         """
-        path, path_obj = self.build_wire(name, trim_start=trim_start, trim_end=trim_end)
+        path, path_obj = self.build_wire(name)
         start_point, start_tangent = path_obj.positionAt(0), path_obj.tangentAt(0)
         inner_radius = kwargs.pop("inner_radius", self.inner_diameter / 2)
         outer_radius = kwargs.pop("outer_radius", self.outer_diameter / 2)
@@ -271,7 +231,7 @@ class Builder:
             cutter = (
                 cq.Sketch().arc((0, 0), outer_radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
             )
-            profile = (profile * cutter).vertices().fillet(self.edge_rounding)
+            profile = (profile * cutter).vertices()
 
         # Sweep out our hollow tube
         tube = (
@@ -283,7 +243,7 @@ class Builder:
         return tube
 
     @lru_cache
-    def build_manifold_half(self, name, right=False):
+    def build_part(self, name, right=False):
         """Build the left or right half of the manifold.
 
         :param _type_ name: The name of the manifold
@@ -296,87 +256,16 @@ class Builder:
         return half
 
     @lru_cache
-    def build_guide(self, name, right=False, guide_range=(-2, 4), guide_space=0.1):
-        """Build the right or left manifold guide.
-
-        The guide helps align the parts to each other as well as reduce material deformation.
-
-        :param _type_ name: The name of the manifold
-        :param bool right: True if building the right half, defaults to False
-        :param _type_ guide_range Determine the start and end offsets of the guide
-        :param _type_ guide_space How much space between the guide and the other part (in mm)
-        :return _type_: The manifold guide
-        """
-
-        def get_build_manifold_args(right):
-            """Get the list of manifolds to add and cut for the given part.
-
-            :param _type_ right: True if building the right hand part, otherwise false
-            :return _type_: An array of arguments to build_manifold
-            """
-            guide_start, guide_end = guide_range
-            if guide_start > 0 or guide_end < 0:
-                raise ValueError("Invalid guide range")
-            angle = 0 if right else 180
-            args = [
-                {
-                    "inner_radius": (self.outer_diameter - guide_space) / 2,
-                    "outer_radius": (self.outer_diameter + self.thickness + guide_space) / 2,
-                    "start_deg": angle + guide_start,
-                    "end_deg": angle,
-                    "trim_start": self.clamp_len,
-                    "trim_end": self.clamp_len,
-                },
-                {
-                    "inner_radius": (self.outer_diameter + guide_space) / 2,
-                    "outer_radius": (self.outer_diameter + self.thickness + guide_space) / 2,
-                    "start_deg": angle - 1e-2,
-                    "end_deg": angle + guide_end,
-                    "trim_start": self.clamp_len,
-                    "trim_end": self.clamp_len,
-                },
-            ]
-            return args
-
-        args = get_build_manifold_args(right=right)
-
-        # Constuct guides and remove any extra space from them
-        adds = [self.build_manifold(name, **arg) for arg in args]
-        guide = adds[0]
-        for add in adds[1:]:
-            guide = guide.union(add, tol=self.boolean_tolerance)
-        return guide
-
-    @lru_cache
-    def build_part(self, name, right=False):
-        """Build a 3D printable manifold part.
-
-        :param _type_ name: The name of the manifold
-        :param bool right: True if building the right half, defaults to False
-        :return _type_: The manifold part
-        """
-        part = self.build_manifold_half(name, right=right).add(
-            self.build_guide(name, right=right)
-        )
-        return part
-
-    @lru_cache
     def build_back_manifold(self, name):
         """Build back the manifold shape from parts.
 
         :param _type_ name: The name of the manifold
         :return _type_: A tuple containing the exhaust manifiold, and the manifold built from parts
         """
-        left_guide, right_guide = (
-            self.build_guide(name),
-            self.build_guide(name, right=True),
-        )
         left_part, right_part = self.build_part(name), self.build_part(name, right=True)
         manifold = self.build_manifold(name)
         manifold_from_parts = (
             left_part.union(right_part, tol=self.boolean_tolerance)
-            .cut(left_guide, tol=self.boolean_tolerance)
-            .cut(right_guide, tol=self.boolean_tolerance)
         )
         return manifold, manifold_from_parts
 
