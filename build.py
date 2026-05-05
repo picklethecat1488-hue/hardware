@@ -278,7 +278,11 @@ class Builder:
         :return _type_: The manifold half
         """
         if name == "driver" or name == "passenger":
-            part = self.build_tube(name, start_deg=180, end_deg=360) if right else self.build_tube(name, end_deg=180)
+            part = (
+                self.build_tube(name, start_deg=-90, end_deg=90)
+                if right
+                else self.build_tube(name, start_deg=90, end_deg=270)
+            )
         else:
             raise ValueError(f"Invalid name: {name}")
         return part

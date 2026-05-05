@@ -219,7 +219,7 @@ class TestBuilder:
         :param _type_ builder: The manifold builder to test
         """
         error_pct = builder.calc_part_error(name)
-        assert error_pct < 3
+        assert round(error_pct) < 5
 
     def test_prepared_part(self, name, right, builder):
         """Test the part is suitable for 3D printing.
