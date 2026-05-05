@@ -105,7 +105,7 @@ class TestBuilder:
         def calc_point_err(v, p):
             return abs((v - cq.Vector([p[0], p[1], p[2]])).Length)
 
-        _, wire_obj = builder.build_wire(name)
+        _, wire_obj = builder.create_wire(name)
         length = wire_obj.Length()
         inlet_clamp_start = wire_obj.positionAt(0.0)
         inlet_clamp_end = wire_obj.positionAt(builder.clamp_lengths[0] / length)

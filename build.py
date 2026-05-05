@@ -165,9 +165,8 @@ class Builder:
             "passenger_outlet": np.array([1, 0, 0]),
         }
 
-    @lru_cache
-    def build_wire(self, name):
-        """Build the wire.
+    def create_wire(self, name):
+        """Create the wire.
 
         The wire defines the path around which the manifold is profiled.
         The wire connects the exhaust inlet and outlets across a 3D coordinate system.
@@ -175,41 +174,30 @@ class Builder:
         :param _type_ name: The name of the manifold
         """
 
-        def create_wire(p_start, v_start, p_end, v_end):
-            """Create the wire based on the input and output path.
-
-            :param _type_ p_start: The inlet endpoint
-            :param _type_ v_start: The inlet direction
-            :param _type_ p_end: The outlet endpoint
-            :param _type_ v_end: The output direction
-            :return _type_: A tuple containing the wire path information
-            """
-            # Inlet start
-            p1 = p_start
-            # Inlet end
-            p2 = p_start + v_start * self.clamp_lengths[0]
-            # Outlet start
-            p3 = p_end
-            # Outlet end
-            p4 = p_end + v_end * self.clamp_lengths[-1]
-            wire = cq.Wire.assembleEdges(
-                [
-                    cq.Edge.makeLine(cq.Vector(*p1), cq.Vector(*p2)),
-                    cq.Edge.makeSpline(
-                        listOfVector=[cq.Vector(*p2), cq.Vector(*p3)],
-                        tangents=(cq.Vector(*v_start), cq.Vector(*v_end)),
-                        periodic=False,
-                    ),
-                    cq.Edge.makeLine(cq.Vector(*p3), cq.Vector(*p4)),
-                ]
-            )
-            path = cq.Workplane("XY").add(wire)
-            return path, path.val()
-
-        # Create the wire which defines the manifold shape
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
-        path, path_obj = create_wire(self.P[inlet_key], self.V[inlet_key], self.P[outlet_key], self.V[outlet_key])
-        return path, path_obj
+        p_start, v_start, p_end, v_end = self.P[inlet_key], self.V[inlet_key], self.P[outlet_key], self.V[outlet_key]
+
+        # Inlet start
+        p1 = p_start
+        # Inlet end
+        p2 = p_start + v_start * self.clamp_lengths[0]
+        # Outlet start
+        p3 = p_end
+        # Outlet end
+        p4 = p_end + v_end * self.clamp_lengths[-1]
+        wire = cq.Wire.assembleEdges(
+            [
+                cq.Edge.makeLine(cq.Vector(*p1), cq.Vector(*p2)),
+                cq.Edge.makeSpline(
+                    listOfVector=[cq.Vector(*p2), cq.Vector(*p3)],
+                    tangents=(cq.Vector(*v_start), cq.Vector(*v_end)),
+                    periodic=False,
+                ),
+                cq.Edge.makeLine(cq.Vector(*p3), cq.Vector(*p4)),
+            ]
+        )
+        path = cq.Workplane("XY").add(wire)
+        return path, path.val()
 
     def create_profile(self, outer_radius, start_deg, end_deg):
         """Create the profile shape.
@@ -238,7 +226,7 @@ class Builder:
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :return _type_: The exhaust manifold
         """
-        path, path_obj = self.build_wire(name)
+        path, path_obj = self.create_wire(name)
         start_point, start_tangent = path_obj.positionAt(0), path_obj.tangentAt(0)
 
         # Define the tube profile
@@ -420,7 +408,7 @@ class Builder:
         }
         part_offset, part_dist = 60, 120
         assy = cq.Assembly()
-        wire_objs = [self.build_wire(name)[1] for name in names]
+        wire_objs = [self.create_wire(name)[1] for name in names]
 
         for i, wire_obj in enumerate(wire_objs):
             for right in right_vals:
