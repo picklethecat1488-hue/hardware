@@ -211,6 +211,24 @@ class Builder:
         path, path_obj = create_wire(self.P[inlet_key], self.V[inlet_key], self.P[outlet_key], self.V[outlet_key])
         return path, path_obj
 
+    def create_profile(self, outer_radius, start_deg, end_deg):
+        """Create the profile shape.
+
+        :param _type_ name: The name of the manifold to build
+        :param _type_ outer_radius: The profile outer radius
+        :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
+        :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
+        :return _type_: The exhaust manifold
+        """
+        inner_radius = outer_radius - self.wall_thickness
+        profile = cq.Sketch().circle(outer_radius).circle(inner_radius, mode="s")
+        if start_deg != 0 or end_deg != 360:
+            cutter = (
+                cq.Sketch().arc((0, 0), outer_radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
+            )
+            profile = (profile * cutter).vertices().fillet(self.edge_rounding)
+        return profile
+
     @lru_cache
     def build_manifold(self, name, start_deg=0, end_deg=360):
         """Build the exhaust manifold shape.
@@ -222,16 +240,9 @@ class Builder:
         """
         path, path_obj = self.build_wire(name)
         start_point, start_tangent = path_obj.positionAt(0), path_obj.tangentAt(0)
-        outer_radius = self.outer_diameter / 2
-        inner_radius = outer_radius - self.wall_thickness
 
         # Define the tube profile
-        profile = cq.Sketch().circle(outer_radius).circle(inner_radius, mode="s")
-        if start_deg != 0 or end_deg != 360:
-            cutter = (
-                cq.Sketch().arc((0, 0), outer_radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
-            )
-            profile = (profile * cutter).vertices().fillet(self.edge_rounding)
+        profile = self.create_profile(self.outer_diameter / 2, start_deg, end_deg)
 
         # Sweep out our hollow tube
         tube = (
