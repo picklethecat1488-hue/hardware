@@ -99,11 +99,10 @@ class Builder:
         self.ver = 4
         # Wall thickness ~1.4mm
         self.wall_thickness = 1.4
-        # Outer diameter 2.5"
-        self.outer_diameter = 63.5
+        # Inlet diameter 2.5", outlet diameter is slightly bigger
+        self.clamp_diameters = [63.5, 65]
         # Inlet and outlet clamp length 2"
         self.clamp_lengths = [50.4, 50.4]
-        self.edge_rounding = 0.5
         self.boolean_tolerance = 0.01
         self.logger = logger if logger else Logger(enabled=False)
 
@@ -138,8 +137,10 @@ class Builder:
         p[1][1] = p[2][1] = vc_depth
         p[1][2] = p[2][2] = vc_height
 
-        for idx in [3, 6, 9, 10]:
-            p[idx][2] = p[idx][2] - (self.outer_diameter / 2)
+        for idx in [3, 6]:
+            p[idx][2] = p[idx][2] - (self.clamp_diameters[0] / 2)
+        for idx in [9, 10]:
+            p[idx][2] = p[idx][2] - (self.clamp_diameters[-1] / 2)
 
         def dir_vector(start, end):
             """Generate a 3D direction vector for the given points, e.g. p[4] and p[5]."""
@@ -173,7 +174,6 @@ class Builder:
 
         :param _type_ name: The name of the manifold
         """
-
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
         p_start, v_start, p_end, v_end = self.P[inlet_key], self.V[inlet_key], self.P[outlet_key], self.V[outlet_key]
 
@@ -199,46 +199,74 @@ class Builder:
         path = cq.Workplane("XY").add(wire)
         return path, path.val()
 
-    def create_profile(self, outer_radius, start_deg, end_deg):
+    def create_profile(self, radius, start_deg, end_deg):
         """Create the profile shape.
 
         :param _type_ name: The name of the manifold to build
-        :param _type_ outer_radius: The profile outer radius
+        :param _type_ radius: The profile radius
         :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
-        :return _type_: The exhaust manifold
+        :return _type_: The profile sketch.
         """
-        inner_radius = outer_radius - self.wall_thickness
-        profile = cq.Sketch().circle(outer_radius).circle(inner_radius, mode="s")
-        if start_deg != 0 or end_deg != 360:
-            cutter = (
-                cq.Sketch().arc((0, 0), outer_radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
-            )
-            profile = (profile * cutter).vertices().fillet(self.edge_rounding)
+        profile = cq.Sketch().arc((0, 0), radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
         return profile
 
+    def create_section(self, path_obj, off, radius, start_deg, end_deg):
+        """Create a profile section using the given radius.
+
+        :param _type_ path_obj: The wire path.
+        :param _type_ off: The section offset from the path start.
+        :param _type_ radius: The profile radius
+        :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
+        :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
+        :return _type_: The profile section.
+        """
+        pos, tan = path_obj.positionAt(off), path_obj.tangentAt(off)
+        plane = cq.Plane(origin=pos, xDir=cq.Vector(0, 0, 1), normal=tan)
+        profile = self.create_profile(radius, start_deg, end_deg)
+        return cq.Workplane(plane).placeSketch(profile)
+
+    def create_tube(self, name, radii, start_deg, end_deg):
+        """Create a tube shape for the given part.
+
+        :param _type_ name: The name of the tube to build
+        :param int radii: The tube radii in mm
+        :param int start_deg: The start angle of the tube in degrees
+        :param int end_deg: The end angle of the tube in degrees
+        :return _type_: The exhaust manifold
+        """
+        path, path_obj = self.create_wire(name)
+        length = path_obj.Length()
+        start_point, start_tangent = path_obj.positionAt(0), path_obj.tangentAt(0)
+
+        positions = [0, 1 - (self.clamp_lengths[-1] / length)]
+        sections = [
+            self.create_section(path_obj, pos, radius, start_deg, end_deg) for pos, radius in zip(positions, radii)
+        ]
+        tube = (
+            cq.Workplane(cq.Plane(origin=start_point, xDir=cq.Vector(0, 0, 1), normal=start_tangent))
+            .add([section.val() for section in sections])
+            .sweep(path, transition="round", multisection=True)
+        )
+        return tube
+
     @lru_cache
-    def build_manifold(self, name, start_deg=0, end_deg=360):
-        """Build the exhaust manifold shape.
+    def build_tube(self, name, start_deg=0, end_deg=360):
+        """Build an exhaust tube.
 
         :param _type_ name: The name of the manifold to build
         :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :return _type_: The exhaust manifold
         """
-        path, path_obj = self.create_wire(name)
-        start_point, start_tangent = path_obj.positionAt(0), path_obj.tangentAt(0)
-
-        # Define the tube profile
-        profile = self.create_profile(self.outer_diameter / 2, start_deg, end_deg)
-
-        # Sweep out our hollow tube
-        tube = (
-            cq.Workplane(cq.Plane(origin=start_point, normal=start_tangent))
-            .placeSketch(profile)
-            .sweep(path, transition="round")
+        # Create the tube using boolean operations
+        tube = self.create_tube(name, np.array(self.clamp_diameters) / 2, 0, 360).cut(
+            self.create_tube(name, np.array(self.clamp_diameters) / 2 - self.wall_thickness, 0, 360),
+            tol=self.boolean_tolerance,
         )
-
+        tube = tube.intersect(
+            self.create_tube(name, np.array(self.clamp_diameters) / 2, start_deg, end_deg), tol=self.boolean_tolerance
+        )
         return tube
 
     @lru_cache
@@ -250,11 +278,7 @@ class Builder:
         :return _type_: The manifold half
         """
         if name == "driver" or name == "passenger":
-            part = (
-                self.build_manifold(name, start_deg=180, end_deg=360)
-                if right
-                else self.build_manifold(name, end_deg=180)
-            )
+            part = self.build_tube(name, start_deg=180, end_deg=360) if right else self.build_tube(name, end_deg=180)
         else:
             raise ValueError(f"Invalid name: {name}")
         return part
@@ -269,7 +293,7 @@ class Builder:
         if name != "driver" and name != "passenger":
             raise ValueError(f"Invalid name: {name}")
         left_part, right_part = self.build_part(name), self.build_part(name, right=True)
-        manifold = self.build_manifold(name)
+        manifold = self.build_tube(name)
         manifold_from_parts = left_part.union(right_part, tol=self.boolean_tolerance)
         return manifold, manifold_from_parts
 
@@ -308,7 +332,7 @@ class Builder:
             :return _type_: True if facing up, otherwise False
             """
             if name == "driver" or name == "passenger":
-                full_part = self.build_manifold(name)
+                full_part = self.build_tube(name)
             else:
                 raise ValueError(f"Invalid name: {name}")
             diff = part.val().Center() - full_part.val().Center()

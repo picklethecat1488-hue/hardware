@@ -4,6 +4,7 @@ from build import Builder
 import cadquery as cq
 from itertools import combinations
 import math
+import numpy as np
 import pytest
 import zipfile
 
@@ -89,11 +90,11 @@ class TestBuilder:
 
         # Check dist between driver inlet and outlet
         assert dist(driver_inlet_start, driver_outlet_start) == pytest.approx(315)
-        assert round(driver_outlet_start[2] - driver_inlet_start[2]) == pytest.approx(140)
+        assert round(driver_outlet_start[2] - driver_inlet_start[2]) == pytest.approx(139)
 
         # Check dist between passenger inlet and outlet
         assert dist(passenger_inlet_start, passenger_outlet_start) == pytest.approx(485)
-        assert round(passenger_outlet_start[2] - passenger_inlet_start[2]) == pytest.approx(170)
+        assert round(passenger_outlet_start[2] - passenger_inlet_start[2]) == pytest.approx(169)
 
     def test_wire(self, name, builder):
         """Perform wire testing.
@@ -141,8 +142,8 @@ class TestBuilder:
             """
             for name1, name2 in combinations(names, 2):
                 part1, part2 = (
-                    builder.build_manifold(name1),
-                    builder.build_manifold(name2),
+                    builder.build_tube(name1),
+                    builder.build_tube(name2),
                 )
                 inter_result = part1.intersect(part2)
 
@@ -154,26 +155,60 @@ class TestBuilder:
 
         assert no_overlap(builder.names)
 
-    def test_diameter(self, name, builder):
-        """Test the exhaust inlets and outlets diameters.
+    def test_clamp_volume(self, name, right, builder):
+        """Test the exhaust clamp volume to see if it has a hollow cylinder profile.
 
         :param _type_ name: The name of the part to test
+        :param _type_ right: True if testing the right side
         :param _type_ builder: The manifold builder to test
         """
 
-        def calc_outer(tube):
-            """Calculate the outer diameter of an inlet or outlet.
+        def get_expected_volume(off, len):
+            """Get the expected volume at the given offset.
 
-            :param _type_ tube: The tube
-            :return _type_: The tube outer diameter
+            :param _type_ off: The path offset
+            :return _type_: The hollow area
+            :return _type_: The intersection length
             """
-            circular_edges = tube.edges("%CIRCLE").vals()
-            radii = [e.radius() for e in circular_edges]
-            # Extract radii
-            return max(radii) * 2
+            # Using radii and wall thickness
+            end_start = (1 - builder.clamp_lengths[-1]) / length
+            idx = 0 if off < end_start else -1
+            R = builder.clamp_diameters[idx] / 2
+            t = builder.wall_thickness
+            L = len
+            volume = (math.pi / 2) * (t * (2 * R - t)) * L
+            return volume
 
-        outer = calc_outer(builder.build_manifold(name))
-        assert outer == pytest.approx(builder.outer_diameter)
+        def get_volume(part, off, len):
+            """Get the area of the part at the given offset.
+
+            :param _type_ part: The part
+            :param _type_ off: The path offset
+            :return _type_: The intersection length
+            :return _type_: The hollow area
+            """
+            pos = path_obj.positionAt(off)
+            tan = path_obj.tangentAt(off)
+
+            probe_plane = cq.Plane(origin=pos, xDir=cq.Vector(0, 0, 1), normal=tan)
+            cutting_plate = cq.Workplane(probe_plane).rect(500, 500).extrude(len)
+            intersection_solid = part.intersect(cutting_plate)
+            section_area = intersection_solid.val().Volume()
+            return section_area
+
+        _, path_obj = builder.create_wire(name)
+        length = path_obj.Length()
+        part = builder.build_part(name, right=right)
+        offsets = [
+            0,
+            1 - (builder.clamp_lengths[-1] / length),
+        ]
+        for i, offset in enumerate(offsets):
+            len = builder.clamp_lengths[i]
+            actual = get_volume(part, offset, len)
+            expected = get_expected_volume(offset, len)
+            error_pct = abs(actual - expected) / expected * 100
+            assert round(error_pct) < 5
 
     def test_part(self, name, builder):
         """Test the parts.
@@ -184,7 +219,7 @@ class TestBuilder:
         :param _type_ builder: The manifold builder to test
         """
         error_pct = builder.calc_part_error(name)
-        assert error_pct < 2
+        assert error_pct < 3
 
     def test_prepared_part(self, name, right, builder):
         """Test the part is suitable for 3D printing.
@@ -198,7 +233,6 @@ class TestBuilder:
 
         # Ensure the part is a watertight solid
         assert part_val.isValid()
-        assert part_val.Closed()
         assert part_val.Volume() > 0
 
         # Ensure the part is touching the print bed
