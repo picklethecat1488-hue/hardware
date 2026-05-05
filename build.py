@@ -97,10 +97,12 @@ class Builder:
         """Initialize the builder."""
         self.project_name = "exhaust_manifolds"
         self.ver = 4
-        self.thickness = 3
+        # Wall thickness ~1.4mm
+        self.wall_thickness = 1.4
+        # Outer diameter 2.5"
         self.outer_diameter = 63.5
-        self.inner_diameter = self.outer_diameter - self.thickness  # 60mm
-        self.clamp_len = 50.4  # 2 inches
+        # Clamp volume length ~2"
+        self.clamp_len = 50.4
         self.edge_rounding = 0.5
         self.boolean_tolerance = 0.01
         self.logger = logger if logger else Logger(enabled=False)
@@ -206,32 +208,26 @@ class Builder:
         return path, path_obj
 
     @lru_cache
-    def build_manifold(
-        self,
-        name,
-        start_deg=0,
-        end_deg=0,
-        **kwargs,
-    ):
+    def build_manifold(self, name, start_deg=0, end_deg=360):
         """Build the exhaust manifold shape.
 
         :param _type_ name: The name of the manifold to build
-        :param int start_deg: If building part of the manifold, the start angle of the tube offset to include in degrees, defaults to 0
-        :param int end_deg: If building part of the manifold, the end angle of the tube offset to include in degrees, defaults to 0
+        :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
+        :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :return _type_: The exhaust manifold
         """
         path, path_obj = self.build_wire(name)
         start_point, start_tangent = path_obj.positionAt(0), path_obj.tangentAt(0)
-        inner_radius = kwargs.pop("inner_radius", self.inner_diameter / 2)
-        outer_radius = kwargs.pop("outer_radius", self.outer_diameter / 2)
+        outer_radius = self.outer_diameter / 2
+        inner_radius = outer_radius - self.wall_thickness
 
         # Define the tube profile
         profile = cq.Sketch().circle(outer_radius).circle(inner_radius, mode="s")
-        if (start_deg != 0) or (end_deg != 0):
+        if start_deg != 0 or end_deg != 360:
             cutter = (
                 cq.Sketch().arc((0, 0), outer_radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
             )
-            profile = (profile * cutter).vertices()
+            profile = (profile * cutter).vertices().fillet(self.edge_rounding)
 
         # Sweep out our hollow tube
         tube = (
@@ -264,9 +260,7 @@ class Builder:
         """
         left_part, right_part = self.build_part(name), self.build_part(name, right=True)
         manifold = self.build_manifold(name)
-        manifold_from_parts = (
-            left_part.union(right_part, tol=self.boolean_tolerance)
-        )
+        manifold_from_parts = left_part.union(right_part, tol=self.boolean_tolerance)
         return manifold, manifold_from_parts
 
     @lru_cache
