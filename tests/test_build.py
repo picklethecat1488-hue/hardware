@@ -20,6 +20,9 @@ class TestBuilder:
         if "name" in metafunc.fixturenames:
             builder = Builder()
             metafunc.parametrize("name", builder.names)
+        if "clamp_idx" in metafunc.fixturenames:
+            builder = Builder()
+            metafunc.parametrize("clamp_idx", range(len(builder.clamp_lengths)))
         if "right" in metafunc.fixturenames:
             metafunc.parametrize("right", [False, True])
 
@@ -155,60 +158,45 @@ class TestBuilder:
 
         assert no_overlap(builder.names)
 
-    def test_clamp_volume(self, name, right, builder):
+    def test_clamp_volume(self, name, clamp_idx, right, builder):
         """Test the exhaust clamp volume to see if it has a hollow cylinder profile.
 
         :param _type_ name: The name of the part to test
+        :param _type_ clamp_idx: The clamp index to test
         :param _type_ right: True if testing the right side
         :param _type_ builder: The manifold builder to test
         """
 
-        def get_expected_volume(off, len):
-            """Get the expected volume at the given offset.
-
-            :param _type_ off: The path offset
-            :return _type_: The hollow area
-            :return _type_: The intersection length
-            """
-            # Using radii and wall thickness
-            end_start = (1 - builder.clamp_lengths[-1]) / length
-            idx = 0 if off < end_start else -1
-            R = builder.clamp_diameters[idx] / 2
-            t = builder.wall_thickness
-            L = len
-            volume = (math.pi / 2) * (t * (2 * R - t)) * L
-            return volume
-
-        def get_volume(part, off, len):
-            """Get the area of the part at the given offset.
+        def get_radius(part, off, len, radius):
+            """Get radii of clamp at offset and length.
 
             :param _type_ part: The part
-            :param _type_ off: The path offset
-            :return _type_: The intersection length
-            :return _type_: The hollow area
+            :param _type_ off: The part offset
+            :param _type_: The clamp length
+            :return _type_: The expected radius
             """
             pos = path_obj.positionAt(off)
             tan = path_obj.tangentAt(off)
 
             probe_plane = cq.Plane(origin=pos, xDir=cq.Vector(0, 0, 1), normal=tan)
-            cutting_plate = cq.Workplane(probe_plane).rect(500, 500).extrude(len)
-            intersection_solid = part.intersect(cutting_plate)
-            section_area = intersection_solid.val().Volume()
-            return section_area
+            volume = cq.Workplane(probe_plane).circle(radius).extrude(len)
+            volume = volume.intersect(part)
+            edges = volume.edges("%circle").vals()
+            radii = [edge.radius() for edge in edges]
+            return np.min(radii), np.max(radii)
 
         _, path_obj = builder.create_wire(name)
+        offsets = builder.get_clamp_offsets(path_obj)
         length = path_obj.Length()
         part = builder.build_part(name, right=right)
-        offsets = [
-            0,
-            1 - (builder.clamp_lengths[-1] / length),
-        ]
-        for i, offset in enumerate(offsets):
-            len = builder.clamp_lengths[i]
-            actual = get_volume(part, offset, len)
-            expected = get_expected_volume(offset, len)
-            error_pct = abs(actual - expected) / expected * 100
-            assert round(error_pct) < 5
+        pos, len, expected = (
+            offsets[clamp_idx],
+            builder.clamp_lengths[clamp_idx],
+            builder.clamp_diameters[clamp_idx] / 2,
+        )
+        min, max = get_radius(part, pos, len, expected)
+        assert min == pytest.approx(expected), f"clamp length invalid at {pos}"
+        assert max == pytest.approx(expected), f"clamp length invalid at {pos}"
 
     def test_part(self, name, builder):
         """Test the parts.
