@@ -204,19 +204,7 @@ class Builder:
         path = cq.Workplane("XY").add(wire)
         return path, path.val()
 
-    def create_profile(self, radius, start_deg, end_deg):
-        """Create the profile shape.
-
-        :param _type_ name: The name of the manifold to build
-        :param _type_ radius: The profile radius
-        :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
-        :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
-        :return _type_: The profile sketch.
-        """
-        profile = cq.Sketch().arc((0, 0), radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
-        return profile
-
-    def create_section(self, path_obj, off, radius, start_deg, end_deg):
+    def create_profile(self, loc, radius, start_deg, end_deg):
         """Create a profile section using the given radius.
 
         :param _type_ path_obj: The wire path.
@@ -226,10 +214,10 @@ class Builder:
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :return _type_: The profile section.
         """
-        pos, tan = path_obj.positionAt(off), path_obj.tangentAt(off)
-        plane = cq.Plane(origin=pos, xDir=self.norm_axis, normal=tan)
-        profile = self.create_profile(radius, start_deg, end_deg)
-        return cq.Workplane(plane).placeSketch(profile)
+        profile = cq.Workplane(loc).placeSketch(
+            cq.Sketch().arc((0, 0), radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
+        )
+        return profile
 
     def get_clamp_offsets(self, path_obj):
         """Get array of clamp start positions.
@@ -263,7 +251,8 @@ class Builder:
 
         offsets = self.get_clamp_offsets(path_obj)
         sections = [
-            self.create_section(path_obj, off, radius, start_deg, end_deg).val() for off, radius in zip(offsets, radii)
+            self.create_profile(path_obj.locationAt(off), radius, start_deg, end_deg).val()
+            for off, radius in zip(offsets, radii)
         ]
         tube = cq.Workplane(plane).add(sections).sweep(path, transition="round", multisection=True)
         return tube
