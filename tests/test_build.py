@@ -158,7 +158,7 @@ class TestBuilder:
 
         assert no_overlap(builder.names)
 
-    def test_clamp_volume(self, name, clamp_idx, right, builder):
+    def test_clamp_radius(self, name, clamp_idx, right, builder):
         """Test the exhaust clamp volume to see if it has a hollow cylinder profile.
 
         :param _type_ name: The name of the part to test
@@ -175,13 +175,9 @@ class TestBuilder:
             :param _type_: The clamp length
             :return _type_: The expected radius
             """
-            pos = path_obj.positionAt(off)
-            tan = path_obj.tangentAt(off)
-
-            probe_plane = cq.Plane(origin=pos, xDir=builder.norm_axis, normal=tan)
-            volume = cq.Workplane(probe_plane).circle(radius).extrude(len)
+            volume = cq.Workplane(path_obj.positionAt(off)).circle(radius).extrude(len)
             volume = volume.intersect(part)
-            edges = volume.edges("%circle").vals()
+            edges = volume.edges("%Circle").vals()
             radii = [edge.radius() for edge in edges]
             return np.min(radii), np.max(radii)
 
