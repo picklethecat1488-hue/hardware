@@ -246,15 +246,12 @@ class Builder:
         :return _type_: The exhaust manifold
         """
         path, path_obj = self.create_wire(name)
-        start_point, start_tangent = path_obj.positionAt(0), path_obj.tangentAt(0)
-        plane = cq.Plane(origin=start_point, xDir=self.norm_axis, normal=start_tangent)
-
         offsets = self.get_clamp_offsets(path_obj)
         sections = [
             self.create_profile(path_obj.locationAt(off), radius, start_deg, end_deg).val()
             for off, radius in zip(offsets, radii)
         ]
-        tube = cq.Workplane(plane).add(sections).sweep(path, transition="round", multisection=True)
+        tube = cq.Workplane(path_obj.locationAt(0)).add(sections).sweep(path, transition="round", multisection=True)
         return tube
 
     @lru_cache
@@ -285,18 +282,11 @@ class Builder:
         :return _type_: The manifold half
         """
         if name == "driver" or name == "passenger":
-            # Determine what rotation is needed to make the part open across the x axis
-            rot_axis = cq.Vector(1, 0, 0)
-            angle = math.degrees(self.norm_axis.getAngle(rot_axis))
-            cross = self.norm_axis.cross(self.ref_axis)
-            sign = -1 if cross.dot(self.ref_axis) < 0 else 1
-            signed_angle = angle * sign
-
             # Create the 3D printable tube part
             part = (
-                self.build_tube(name, start_deg=0 + signed_angle, end_deg=180 + signed_angle)
+                self.build_tube(name, start_deg=0, end_deg=180)
                 if right
-                else self.build_tube(name, start_deg=180 + signed_angle, end_deg=360 + signed_angle)
+                else self.build_tube(name, start_deg=180, end_deg=360)
             )
         else:
             raise ValueError(f"Invalid name: {name}")
