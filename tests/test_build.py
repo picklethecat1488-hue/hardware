@@ -178,7 +178,7 @@ class TestBuilder:
             pos = path_obj.positionAt(off)
             tan = path_obj.tangentAt(off)
 
-            probe_plane = cq.Plane(origin=pos, xDir=cq.Vector(0, 0, 1), normal=tan)
+            probe_plane = cq.Plane(origin=pos, xDir=builder.norm_axis, normal=tan)
             volume = cq.Workplane(probe_plane).circle(radius).extrude(len)
             volume = volume.intersect(part)
             edges = volume.edges("%circle").vals()
@@ -187,7 +187,6 @@ class TestBuilder:
 
         _, path_obj = builder.create_wire(name)
         offsets = builder.get_clamp_offsets(path_obj)
-        length = path_obj.Length()
         part = builder.build_part(name, right=right)
         pos, len, expected = (
             offsets[clamp_idx],

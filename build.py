@@ -106,6 +106,9 @@ class Builder:
         # Inlet and outlet clamp positions (-1) means offset by clamp length from the end
         self.clamp_positions = [0, -1]
         self.boolean_tolerance = 0.01
+        # Normal axis and hinge axis for workspace locating
+        self.norm_axis = cq.Vector(0, 0, 1)
+        self.ref_axis = cq.Vector(0, 1, 0)
         self.logger = logger if logger else Logger(enabled=False)
 
         # Define the raw measurements taken here
@@ -224,7 +227,7 @@ class Builder:
         :return _type_: The profile section.
         """
         pos, tan = path_obj.positionAt(off), path_obj.tangentAt(off)
-        plane = cq.Plane(origin=pos, xDir=cq.Vector(0, 0, 1), normal=tan)
+        plane = cq.Plane(origin=pos, xDir=self.norm_axis, normal=tan)
         profile = self.create_profile(radius, start_deg, end_deg)
         return cq.Workplane(plane).placeSketch(profile)
 
@@ -256,7 +259,7 @@ class Builder:
         """
         path, path_obj = self.create_wire(name)
         start_point, start_tangent = path_obj.positionAt(0), path_obj.tangentAt(0)
-        plane = cq.Plane(origin=start_point, xDir=cq.Vector(0, 0, 1), normal=start_tangent)
+        plane = cq.Plane(origin=start_point, xDir=self.norm_axis, normal=start_tangent)
 
         offsets = self.get_clamp_offsets(path_obj)
         sections = [
@@ -289,13 +292,22 @@ class Builder:
 
         :param _type_ name: The name of the manifold
         :param bool right: True if building the right half, defaults to False
+        :param _type_ offset_deg: The rotational start offset in degrees, default to -90
         :return _type_: The manifold half
         """
         if name == "driver" or name == "passenger":
+            # Determine what rotation is needed to make the part open across the x axis
+            rot_axis = cq.Vector(1, 0, 0)
+            angle = math.degrees(self.norm_axis.getAngle(rot_axis))
+            cross = self.norm_axis.cross(self.ref_axis)
+            sign = -1 if cross.dot(self.ref_axis) < 0 else 1
+            signed_angle = angle * sign
+
+            # Create the 3D printable tube part
             part = (
-                self.build_tube(name, start_deg=-90, end_deg=90)
+                self.build_tube(name, start_deg=0 + signed_angle, end_deg=180 + signed_angle)
                 if right
-                else self.build_tube(name, start_deg=90, end_deg=270)
+                else self.build_tube(name, start_deg=180 + signed_angle, end_deg=360 + signed_angle)
             )
         else:
             raise ValueError(f"Invalid name: {name}")
