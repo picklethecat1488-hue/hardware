@@ -175,14 +175,14 @@ class TestBuilder:
             :param _type_: The clamp length
             :return _type_: The expected radius
             """
-            volume = cq.Workplane(path_obj.positionAt(off)).circle(radius).extrude(len)
+            volume = cq.Workplane(path.val().positionAt(off)).circle(radius).extrude(len)
             volume = volume.intersect(part)
             edges = volume.edges("%Circle").vals()
             radii = [edge.radius() for edge in edges]
             return np.min(radii), np.max(radii)
 
-        _, path_obj = builder.create_wire(name)
-        offsets = builder.get_clamp_offsets(path_obj)
+        path, _ = builder.create_wire(name)
+        offsets = builder.get_clamp_offsets(path.val().Length())
         part = builder.build_part(name, right=right)
         pos, len, expected = (
             offsets[clamp_idx],

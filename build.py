@@ -219,12 +219,11 @@ class Builder:
         )
         return profile
 
-    def get_clamp_offsets(self, path_obj):
+    def get_clamp_offsets(self, length):
         """Get array of clamp start positions.
 
-        :param _type_ path_obj: The wire path.
+        :param _type_ length: The wire length.
         """
-        length = path_obj.Length()
         offsets = (
             np.array(
                 [
@@ -236,22 +235,31 @@ class Builder:
         )
         return offsets
 
-    def create_tube(self, name, radii, start_deg, end_deg):
+    def create_tube(self, path, radii, start_deg, end_deg):
         """Create a tube shape for the given part.
 
-        :param _type_ name: The name of the tube to build
+        :param _type_ path: The path to use
         :param int radii: The tube radii in mm
         :param int start_deg: The start angle of the tube in degrees
         :param int end_deg: The end angle of the tube in degrees
         :return _type_: The exhaust manifold
         """
-        path, path_obj = self.create_wire(name)
-        offsets = self.get_clamp_offsets(path_obj)
-        sections = [
-            self.create_profile(path_obj.locationAt(off), radius, start_deg, end_deg).val()
-            for off, radius in zip(offsets, radii)
-        ]
-        tube = cq.Workplane(path_obj.locationAt(0)).add(sections).sweep(path, transition="round", multisection=True)
+        length = path.val().Length()
+        start_offsets = self.get_clamp_offsets(length)
+        end_offsets = np.array(start_offsets) + np.array(self.clamp_lengths) / length
+        sections = []
+        for start_off, end_off, cur_radius in zip(start_offsets, end_offsets, radii):
+            sections.extend(
+                [
+                    self.create_profile(path.val().locationAt(start_off), cur_radius, start_deg, end_deg).val(),
+                    self.create_profile(path.val().locationAt(end_off), cur_radius, start_deg, end_deg).val(),
+                ]
+            )
+        tube = (
+            cq.Workplane(path.val().locationAt(0))
+            .add(sections[0])
+            .sweep(path, transition="round", multisection=True, sweepAlongWires=sections[1:])
+        )
         return tube
 
     @lru_cache
@@ -264,12 +272,13 @@ class Builder:
         :return _type_: The exhaust manifold
         """
         # Create the tube using boolean operations
+        path, _ = self.create_wire(name)
         radii = np.array(self.clamp_diameters) / 2
-        tube = self.create_tube(name, radii, 0, 360).cut(
-            self.create_tube(name, radii - self.wall_thickness, 0, 360),
+        tube = self.create_tube(path, radii, 0, 360).cut(
+            self.create_tube(path, radii - self.wall_thickness, 0, 360),
             tol=self.boolean_tolerance,
         )
-        tube = tube.intersect(self.create_tube(name, radii, start_deg, end_deg), tol=self.boolean_tolerance)
+        tube = tube.intersect(self.create_tube(path, radii, start_deg, end_deg), tol=self.boolean_tolerance)
         return tube
 
     @lru_cache
