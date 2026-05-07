@@ -171,6 +171,7 @@ class Builder:
             "passenger_outlet": np.array([1, 0, 0]),
         }
 
+    @lru_cache
     def create_wire(self, name):
         """Create the wire.
 
@@ -228,11 +229,10 @@ class Builder:
         offsets = (
             np.array(
                 [
-                    (length - clamp_length) if (clamp_position == -1) else clamp_position
+                    (length - clamp_length) / length if (clamp_position == -1) else clamp_position
                     for clamp_position, clamp_length in zip(self.clamp_positions, self.clamp_lengths)
                 ]
             )
-            / length
         )
         return offsets
 
