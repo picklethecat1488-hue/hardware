@@ -106,9 +106,6 @@ class Builder:
         # Inlet and outlet clamp positions (-1) means offset by clamp length from the end
         self.clamp_positions = [0, 0.1, -1]
         self.boolean_tolerance = 0.01
-        # Normal axis and hinge axis for workspace locating
-        self.norm_axis = cq.Vector(0, 0, 1)
-        self.ref_axis = cq.Vector(0, 1, 0)
         self.logger = logger if logger else Logger(enabled=False)
 
         # Define the raw measurements taken here
