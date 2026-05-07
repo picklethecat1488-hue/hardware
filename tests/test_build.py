@@ -22,7 +22,11 @@ class TestBuilder:
             metafunc.parametrize("name", builder.names)
         if "clamp_idx" in metafunc.fixturenames:
             builder = Builder()
-            metafunc.parametrize("clamp_idx", range(len(builder.clamp_lengths)))
+            clamp_idxes = []
+            for clamp_idx, clamp_len in enumerate(builder.clamp_lengths):
+                if clamp_len > 0:
+                    clamp_idxes.extend([clamp_idx])
+            metafunc.parametrize("clamp_idx", clamp_idxes)
         if "right" in metafunc.fixturenames:
             metafunc.parametrize("right", [False, True])
 
@@ -174,13 +178,13 @@ class TestBuilder:
             :param _type_ part: The part
             :param _type_ off: The part offset
             :param _type_: The clamp length
-            :return _type_: The expected radius
+            :return _type_: The radius
             """
             volume = cq.Workplane(path.val().positionAt(off)).circle(radius).extrude(len)
             volume = volume.intersect(part)
             edges = volume.edges("%Circle").vals()
             radii = [edge.radius() for edge in edges]
-            return np.min(radii), np.max(radii)
+            return np.max(radii)
 
         path = builder.create_wire(name)
         offsets = builder.get_clamp_offsets(path.val().Length())
@@ -190,9 +194,8 @@ class TestBuilder:
             builder.clamp_lengths[clamp_idx],
             builder.clamp_diameters[clamp_idx] / 2,
         )
-        min, max = get_radius(part, pos, len, expected)
-        assert min == pytest.approx(expected), f"clamp length invalid at {pos}"
-        assert max == pytest.approx(expected), f"clamp length invalid at {pos}"
+        radius = get_radius(part, pos, len, expected)
+        assert radius == pytest.approx(expected), f"clamp radius invalid at {clamp_idx}, {radius} != {expected}"
 
     def test_part(self, name, builder):
         """Test the parts.

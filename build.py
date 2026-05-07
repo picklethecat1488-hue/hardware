@@ -100,11 +100,11 @@ class Builder:
         # Wall thickness ~1.4mm
         self.wall_thickness = 1.4
         # Inlet diameter 2.5", outlet diameter is slightly bigger
-        self.clamp_diameters = [63.5, 65]
+        self.clamp_diameters = [63.5, 63.5, 65]
         # Inlet and outlet clamp length 2"
-        self.clamp_lengths = [50.4, 50.4]
+        self.clamp_lengths = [50.4, 0, 50.4]
         # Inlet and outlet clamp positions (-1) means offset by clamp length from the end
-        self.clamp_positions = [0, -1]
+        self.clamp_positions = [0, 0.1, -1]
         self.boolean_tolerance = 0.01
         # Normal axis and hinge axis for workspace locating
         self.norm_axis = cq.Vector(0, 0, 1)
@@ -246,16 +246,11 @@ class Builder:
         :return _type_: The exhaust manifold
         """
         length = path.val().Length()
-        start_offsets = self.get_clamp_offsets(length)
-        end_offsets = np.array(start_offsets) + np.array(self.clamp_lengths) / length
-        sections = []
-        for start_off, end_off, cur_radius in zip(start_offsets, end_offsets, radii):
-            sections.extend(
-                [
-                    self.create_profile(path.val().locationAt(start_off), cur_radius, start_deg, end_deg).val(),
-                    self.create_profile(path.val().locationAt(end_off), cur_radius, start_deg, end_deg).val(),
-                ]
-            )
+        offsets = self.get_clamp_offsets(length)
+        sections = [
+            self.create_profile(path.val().locationAt(off), radius, start_deg, end_deg).val()
+            for off, radius in zip(offsets, radii)
+        ]
         tube = (
             cq.Workplane(path.val().locationAt(0))
             .add(sections[0])
