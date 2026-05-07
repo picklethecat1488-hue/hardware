@@ -178,6 +178,7 @@ class Builder:
         The wire connects the exhaust inlet and outlets across a 3D coordinate system.
 
         :param _type_ name: The name of the manifold
+        :return _type_: The wire path
         """
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
         p_start, v_start, p_end, v_end = self.P[inlet_key], self.V[inlet_key], self.P[outlet_key], self.V[outlet_key]
@@ -202,7 +203,7 @@ class Builder:
             ]
         )
         path = cq.Workplane("XY").add(wire)
-        return path, path.val()
+        return path
 
     def create_profile(self, loc, radius, start_deg, end_deg):
         """Create a profile section using the given radius.
@@ -272,7 +273,7 @@ class Builder:
         :return _type_: The exhaust manifold
         """
         # Create the tube using boolean operations
-        path, _ = self.create_wire(name)
+        path = self.create_wire(name)
         radii = np.array(self.clamp_diameters) / 2
         tube = self.create_tube(path, radii, 0, 360).cut(
             self.create_tube(path, radii - self.wall_thickness, 0, 360),
@@ -450,7 +451,7 @@ class Builder:
         }
         part_offset, part_dist = 60, 120
         assy = cq.Assembly()
-        wire_objs = [self.create_wire(name)[1] for name in names]
+        wire_objs = [self.create_wire(name).val() for name in names]
 
         for i, wire_obj in enumerate(wire_objs):
             for right in right_vals:

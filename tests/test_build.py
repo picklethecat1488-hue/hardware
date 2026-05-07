@@ -109,7 +109,8 @@ class TestBuilder:
         def calc_point_err(v, p):
             return abs((v - cq.Vector([p[0], p[1], p[2]])).Length)
 
-        _, wire_obj = builder.create_wire(name)
+        wire = builder.create_wire(name)
+        wire_obj = wire.val()
         length = wire_obj.Length()
         inlet_clamp_start = wire_obj.positionAt(0.0)
         inlet_clamp_end = wire_obj.positionAt(builder.clamp_lengths[0] / length)
@@ -181,7 +182,7 @@ class TestBuilder:
             radii = [edge.radius() for edge in edges]
             return np.min(radii), np.max(radii)
 
-        path, _ = builder.create_wire(name)
+        path = builder.create_wire(name)
         offsets = builder.get_clamp_offsets(path.val().Length())
         part = builder.build_part(name, right=right)
         pos, len, expected = (
