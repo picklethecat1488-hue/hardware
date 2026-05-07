@@ -10,6 +10,7 @@ from functools import lru_cache
 from itertools import combinations
 from IPython import get_ipython
 import zipfile
+from jupyter_cadquery import *
 
 
 class Logger:
@@ -101,8 +102,10 @@ class Builder:
         self.wall_thickness = 1.4
         # Inlet diameter 2.5", outlet diameter is slightly bigger, but I couldn't get a working variable diameter model going with cadquery.
         self.outer_diameter = 63.5
-        # Inlet and outlet clamp length 2"
-        self.clamp_lengths = [50.4, 50.4]
+        # Inner clamp diameter 3"
+        self.clamp_diameter = 76.2
+        # Inlet and outlet clamp length 2", inner clamp length 1"
+        self.clamp_lengths = [50.4, 25.4, 50.4]
         self.boolean_tolerance = 0.01
         # Applying a 0.5mm fillet/chamfer to all objects.
         self.edge_rounding = 0.5
@@ -201,27 +204,36 @@ class Builder:
         path = cq.Workplane("XY").add(wire)
         return path
 
-    def create_profile(self, loc, start_deg, end_deg):
+    def create_profile(self, loc, start_deg, end_deg, outer_radius=None, inner_radius=None):
         """Create a profile section using the given radius.
 
         :param _type_ path_obj: The wire path.
         :param _type_ off: The section offset from the path start.
         :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
+        :param int outer_radius: The optional outer radius of the profile.
+        :param int inner_radius: The optional inner radius of the profile.
         :return _type_: The profile section.
         """
-        radius = self.outer_diameter / 2
-        profile = cq.Workplane(loc).placeSketch(
+        if outer_radius is None:
+            outer_radius = self.outer_diameter / 2
+        if inner_radius is None:
+            inner_radius = outer_radius - self.wall_thickness
+        if inner_radius >= outer_radius:
+            raise ValueError("Invalid radius or inner radius")
+        sketch = (
             cq.Sketch()
-            .arc((0, 0), radius, start_deg, end_deg - start_deg)
+            .arc((0, 0), outer_radius, start_deg, end_deg - start_deg)
             .segment((0, 0))
             .close()
             .assemble()
-            .circle(radius, mode="i")
-            # Subtract the center to make it hollow
-            .circle(radius - self.wall_thickness, mode="s")
-            .clean()
+            .circle(outer_radius, mode="i")
         )
+        if inner_radius > 0:
+            # Subtract the center to make it hollow
+            sketch = sketch.circle(inner_radius, mode="s")
+        sketch = sketch.clean()
+        profile = cq.Workplane(loc).placeSketch(sketch)
         return profile
 
     @lru_cache
@@ -240,6 +252,70 @@ class Builder:
         return tube
 
     @lru_cache
+    def build_clamp_bed(self, name, off, clamp_space=10, start_deg=0, end_deg=360):
+        """Build a clamp bed.
+
+        :param _type_ name: The part name to build.
+        :param _type_ off: The tube offset to build the clamp bed
+        :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
+        :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
+        :return _type_: The clamp bed
+        """
+
+        def create_ring(path, len, inner_radius, outer_radius, start_deg, end_deg):
+            """Create a ring at a given offset.
+
+            :param _type_ path: The ring path
+            :param _type_ len: The ring length
+            :param _type_ inner_radius: The inner radius.
+            :param _type_ outer_radius: The outer radius.
+            :param _type_ start_deg: The start angle.
+            :param _type_ end_deg: The end angle.
+            :return _type_: The ring
+            """
+            loc = path.val().locationAt(off)
+            tan = path.val().tangentAt(off)
+            profile = self.create_profile(
+                loc,
+                start_deg,
+                end_deg,
+                outer_radius=outer_radius,
+                inner_radius=inner_radius,
+            )
+            p1 = path.val().positionAt(off)
+            p2 = p1 + (tan * len)
+            path = cq.Workplane(loc).polyline([p1, p2])
+            ring = cq.Workplane(loc).placeSketch(profile.val()).sweep(path)
+            return ring
+
+        path = self.create_wire(name)
+        length = self.clamp_lengths[1]
+        outer_radius = self.clamp_diameter / 2
+        inner_radius = (self.outer_diameter - self.wall_thickness) / 2
+        space_sign = 1 if start_deg < end_deg else -1
+        space_deg = space_sign * clamp_space / 2
+        start_deg, end_deg = start_deg + space_deg, end_deg - space_deg
+
+        # Create the clamp bed out of multiple ring profiles
+        top = create_ring(path, length, outer_radius - self.wall_thickness, outer_radius, start_deg, end_deg)
+        base = create_ring(
+            path, length - self.wall_thickness, inner_radius, outer_radius - self.wall_thickness, start_deg, end_deg
+        ).cut(
+            create_ring(
+                path, self.wall_thickness, inner_radius, outer_radius - self.wall_thickness, start_deg, end_deg
+            ),
+            tol=self.boolean_tolerance,
+        )
+        bed = top.union(base, tol=self.boolean_tolerance).fillet(self.edge_rounding)
+
+        # Cut the empty volume of tube out of the clamp bed
+        loc = path.val().locationAt(off)
+        profile = self.create_profile(loc, 0, 360, outer_radius=inner_radius)
+        tube = cq.Workplane(loc).placeSketch(profile.val()).sweep(path, transition="round").fillet(self.edge_rounding)
+        bed = bed.cut(tube)
+        return bed
+
+    @lru_cache
     def build_part(self, name, right=False):
         """Build the left or right half of the manifold.
 
@@ -251,6 +327,10 @@ class Builder:
             # Create the main part body.
             build_args = {"start_deg": (0 if right else 180), "end_deg": (180 if right else 360)}
             part = self.build_tube(name, **build_args)
+            if len(self.clamp_lengths) > 2:
+                # Add the clamp bed
+                clamp_bed = self.build_clamp_bed(name, 0.5, **build_args)
+                part = part.union(clamp_bed, tol=self.boolean_tolerance)
         else:
             raise ValueError(f"Invalid name: {name}")
         return part

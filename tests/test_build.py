@@ -188,12 +188,13 @@ class TestBuilder:
 
         path = builder.create_wire(name)
         length = path.val().Length()
-        offsets = np.array([0, length - builder.clamp_lengths[-1]]) / length
+        offsets = [0, 0.5, (length - builder.clamp_lengths[-1]) / length]
+        expected = [builder.outer_diameter / 2, builder.clamp_diameter / 2, builder.outer_diameter / 2]
         part = builder.build_part(name, right=right)
         pos, len, expected = (
             offsets[clamp_idx],
             builder.clamp_lengths[clamp_idx],
-            builder.outer_diameter / 2,
+            expected[clamp_idx],
         )
         radius = get_radius(part, pos, len, expected)
         assert radius == pytest.approx(expected), f"clamp radius invalid at {clamp_idx}, {radius} != {expected}"
