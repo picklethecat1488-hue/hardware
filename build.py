@@ -99,13 +99,13 @@ class Builder:
         self.ver = 4
         # Wall thickness ~1.4mm
         self.wall_thickness = 1.4
-        # Inlet diameter 2.5", outlet diameter is slightly bigger
-        self.clamp_diameters = [63.5, 63.5, 65]
+        # Inlet diameter 2.5", outlet diameter is slightly bigger, but I couldn't get a working variable diameter model going with cadquery.
+        self.outer_diameter = 63.5
         # Inlet and outlet clamp length 2"
-        self.clamp_lengths = [50.4, 0, 50.4]
-        # Inlet and outlet clamp positions (-1) means offset by clamp length from the end
-        self.clamp_positions = [0, 0.1, -1]
+        self.clamp_lengths = [50.4, 50.4]
         self.boolean_tolerance = 0.01
+        # Applying a 0.5mm fillet/chamfer to all objects.
+        self.edge_rounding = 0.5
         self.logger = logger if logger else Logger(enabled=False)
 
         # Define the raw measurements taken here
@@ -139,10 +139,8 @@ class Builder:
         p[1][1] = p[2][1] = vc_depth
         p[1][2] = p[2][2] = vc_height
 
-        for idx in [3, 6]:
-            p[idx][2] = p[idx][2] - (self.clamp_diameters[0] / 2)
-        for idx in [9, 10]:
-            p[idx][2] = p[idx][2] - (self.clamp_diameters[-1] / 2)
+        for idx in [3, 6, 9, 10]:
+            p[idx][2] = p[idx][2] - (self.outer_diameter / 2)
 
         def dir_vector(start, end):
             """Generate a 3D direction vector for the given points, e.g. p[4] and p[5]."""
@@ -203,57 +201,28 @@ class Builder:
         path = cq.Workplane("XY").add(wire)
         return path
 
-    def create_profile(self, loc, radius, start_deg, end_deg):
+    def create_profile(self, loc, start_deg, end_deg):
         """Create a profile section using the given radius.
 
         :param _type_ path_obj: The wire path.
         :param _type_ off: The section offset from the path start.
-        :param _type_ radius: The profile radius
         :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :return _type_: The profile section.
         """
+        radius = self.outer_diameter / 2
         profile = cq.Workplane(loc).placeSketch(
-            cq.Sketch().arc((0, 0), radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble()
+            cq.Sketch()
+            .arc((0, 0), radius, start_deg, end_deg - start_deg)
+            .segment((0, 0))
+            .close()
+            .assemble()
+            .circle(radius, mode="i")
+            # Subtract the center to make it hollow
+            .circle(radius - self.wall_thickness, mode="s")
+            .clean()
         )
         return profile
-
-    def get_clamp_offsets(self, length):
-        """Get array of clamp start positions.
-
-        :param _type_ length: The wire length.
-        """
-        offsets = (
-            np.array(
-                [
-                    (length - clamp_length) / length if (clamp_position == -1) else clamp_position
-                    for clamp_position, clamp_length in zip(self.clamp_positions, self.clamp_lengths)
-                ]
-            )
-        )
-        return offsets
-
-    def create_tube(self, path, radii, start_deg, end_deg):
-        """Create a tube shape for the given part.
-
-        :param _type_ path: The path to use
-        :param int radii: The tube radii in mm
-        :param int start_deg: The start angle of the tube in degrees
-        :param int end_deg: The end angle of the tube in degrees
-        :return _type_: The exhaust manifold
-        """
-        length = path.val().Length()
-        offsets = self.get_clamp_offsets(length)
-        sections = [
-            self.create_profile(path.val().locationAt(off), radius, start_deg, end_deg).val()
-            for off, radius in zip(offsets, radii)
-        ]
-        tube = (
-            cq.Workplane(path.val().locationAt(0))
-            .add(sections[0])
-            .sweep(path, transition="round", multisection=True, sweepAlongWires=sections[1:])
-        )
-        return tube
 
     @lru_cache
     def build_tube(self, name, start_deg=0, end_deg=360):
@@ -264,14 +233,10 @@ class Builder:
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :return _type_: The exhaust manifold
         """
-        # Create the tube using boolean operations
         path = self.create_wire(name)
-        radii = np.array(self.clamp_diameters) / 2
-        tube = self.create_tube(path, radii, 0, 360).cut(
-            self.create_tube(path, radii - self.wall_thickness, 0, 360),
-            tol=self.boolean_tolerance,
-        )
-        tube = tube.intersect(self.create_tube(path, radii, start_deg, end_deg), tol=self.boolean_tolerance)
+        loc = path.val().locationAt(0)
+        profile = self.create_profile(loc, start_deg, end_deg)
+        tube = cq.Workplane(loc).placeSketch(profile.val()).sweep(path, transition="round").fillet(self.edge_rounding)
         return tube
 
     @lru_cache
@@ -280,22 +245,18 @@ class Builder:
 
         :param _type_ name: The name of the manifold
         :param bool right: True if building the right half, defaults to False
-        :param _type_ offset_deg: The rotational start offset in degrees, default to -90
         :return _type_: The manifold half
         """
         if name == "driver" or name == "passenger":
-            # Create the 3D printable tube part
-            part = (
-                self.build_tube(name, start_deg=0, end_deg=180)
-                if right
-                else self.build_tube(name, start_deg=180, end_deg=360)
-            )
+            # Create the main part body.
+            build_args = {"start_deg": (0 if right else 180), "end_deg": (180 if right else 360)}
+            part = self.build_tube(name, **build_args)
         else:
             raise ValueError(f"Invalid name: {name}")
         return part
 
     @lru_cache
-    def build_back_manifold(self, name):
+    def build_back_part(self, name):
         """Build back the manifold shape from parts.
 
         :param _type_ name: The name of the manifold
@@ -308,7 +269,6 @@ class Builder:
         manifold_from_parts = left_part.union(right_part, tol=self.boolean_tolerance)
         return manifold, manifold_from_parts
 
-    @lru_cache
     def calc_part_error(self, name):
         """Calculate the build error for parts.
 
@@ -319,7 +279,7 @@ class Builder:
         """
         if name != "driver" and name != "passenger":
             raise ValueError(f"Invalid name: {name}")
-        manifold, manifold_from_parts = self.build_back_manifold(name)
+        manifold, manifold_from_parts = self.build_back_part(name)
         manifold_vol, manifold_from_parts_vol = (
             manifold.val().Volume(),
             manifold_from_parts.val().Volume(),

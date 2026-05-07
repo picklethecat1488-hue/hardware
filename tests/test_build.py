@@ -97,11 +97,11 @@ class TestBuilder:
 
         # Check dist between driver inlet and outlet
         assert dist(driver_inlet_start, driver_outlet_start) == pytest.approx(315)
-        assert round(driver_outlet_start[2] - driver_inlet_start[2]) == pytest.approx(139)
+        assert round(driver_outlet_start[2] - driver_inlet_start[2]) == pytest.approx(140)
 
         # Check dist between passenger inlet and outlet
         assert dist(passenger_inlet_start, passenger_outlet_start) == pytest.approx(485)
-        assert round(passenger_outlet_start[2] - passenger_inlet_start[2]) == pytest.approx(169)
+        assert round(passenger_outlet_start[2] - passenger_inlet_start[2]) == pytest.approx(170)
 
     def test_wire(self, name, builder):
         """Perform wire testing.
@@ -187,12 +187,13 @@ class TestBuilder:
             return np.max(radii)
 
         path = builder.create_wire(name)
-        offsets = builder.get_clamp_offsets(path.val().Length())
+        length = path.val().Length()
+        offsets = np.array([0, length - builder.clamp_lengths[-1]]) / length
         part = builder.build_part(name, right=right)
         pos, len, expected = (
             offsets[clamp_idx],
             builder.clamp_lengths[clamp_idx],
-            builder.clamp_diameters[clamp_idx] / 2,
+            builder.outer_diameter / 2,
         )
         radius = get_radius(part, pos, len, expected)
         assert radius == pytest.approx(expected), f"clamp radius invalid at {clamp_idx}, {radius} != {expected}"
@@ -206,7 +207,8 @@ class TestBuilder:
         :param _type_ builder: The manifold builder to test
         """
         error_pct = builder.calc_part_error(name)
-        assert round(error_pct) < 5
+        # less than 0.5% error for each rebuilt part.
+        assert error_pct < 0.5
 
     def test_prepared_part(self, name, right, builder):
         """Test the part is suitable for 3D printing.
