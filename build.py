@@ -288,6 +288,21 @@ class Builder:
             ring = cq.Workplane(loc).placeSketch(profile.val()).sweep(path)
             return ring
 
+        def clean_tube(path, bed, inner_radius):
+            """Clean up the tube after adding the clamp bed.
+
+            :param _type_ path: The tube path
+            :param _type_ bed: The clamp bed
+            :param _type_ inner_radius: The inner radius.
+            :return _type_: The clamp bed.
+            """
+            # Cut the empty volume of tube out of the clamp bed
+            loc = path.val().locationAt(off)
+            profile = self.create_profile(loc, 0, 360, outer_radius=inner_radius)
+            tube = cq.Workplane(loc).placeSketch(profile.val()).sweep(path, transition="round")
+            bed = bed.cut(tube)
+            return bed
+
         path = self.create_wire(name)
         length = self.clamp_lengths[1]
         outer_radius = self.clamp_diameter / 2
@@ -309,11 +324,7 @@ class Builder:
         bed = top.union(base, tol=self.boolean_tolerance).fillet(self.edge_rounding)
 
         # Cut the empty volume of tube out of the clamp bed
-        loc = path.val().locationAt(off)
-        profile = self.create_profile(loc, 0, 360, outer_radius=inner_radius)
-        tube = cq.Workplane(loc).placeSketch(profile.val()).sweep(path, transition="round").fillet(self.edge_rounding)
-        bed = bed.cut(tube)
-        return bed
+        return clean_tube(path, bed, inner_radius)
 
     @lru_cache
     def build_part(self, name, right=False):
