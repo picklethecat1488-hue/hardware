@@ -174,21 +174,21 @@ class Logger:
         else:
             if not self.running:
                 # Start the spinner, if not already running.
-                self.backend.start()
+                self.backend.start()  # type: ignore
                 self.running = True
             # Display the message, along with a custom symbol, while keeping the spinner going.
-            self.backend.text = ""
-            self.backend.stop_and_persist(f"{symbol} {msg}")
-            self.backend.start()
+            self.backend.text = ""  # type: ignore
+            self.backend.stop_and_persist(f"{symbol} {msg}")  # type: ignore
+            self.backend.start()  # type: ignore
 
     def done(self):
         """Indicate the operation has succeeded."""
         if not self.in_notebook:
-            self.backend.text = f"Done {self.text}"
-            self.backend.succeed()
+            self.backend.text = f"Done {self.text}"  # type: ignore
+            self.backend.succeed()  # type: ignore
             if self.running:
                 # Stop the spinner after the operation has completed.
-                self.backend.stop()
+                self.backend.stop()  # type: ignore
                 self.running = False
 
 
@@ -269,7 +269,7 @@ class Builder:
         return profile
 
     @lru_cache
-    def build_tube(self, name, start_deg=0, end_deg=360):
+    def build_tube(self, name, start_deg: float = 0, end_deg: float = 360):
         """Build an exhaust tube.
 
         :param _type_ name: The name of the manifold to build
@@ -278,17 +278,19 @@ class Builder:
         :return _type_: The exhaust manifold
         """
         path = self.create_wire(name)
-        loc = path.val().locationAt(0)
+        loc = path.val().locationAt(0)  # type: ignore
         profile = self.create_profile(loc, start_deg, end_deg)
         tube = (
             cq.Workplane(loc)
-            .placeSketch(profile.val())
+            .placeSketch(profile.val())  # type: ignore
             .sweep(path, transition="round")
             .fillet(self.config.edge_rounding)
         )
         return tube
 
-    def create_ring(self, path, off, len, inner_radius=None, outer_radius=None, start_deg=0, end_deg=360):
+    def create_ring(
+        self, path, off, len, inner_radius=None, outer_radius=None, start_deg: float = 0, end_deg: float = 360
+    ):
         """Create a ring at a given offset.
 
         :param _type_ path: The ring path
@@ -312,11 +314,11 @@ class Builder:
         p1 = path.val().positionAt(off)
         p2 = p1 + (tan * len)
         path = cq.Workplane(loc).polyline([p1, p2])
-        ring = cq.Workplane(loc).placeSketch(profile.val()).sweep(path)
+        ring = cq.Workplane(loc).placeSketch(profile.val()).sweep(path)  # type: ignore
         return ring
 
     @lru_cache
-    def build_clamp_bed(self, name, off, clamp_space=None, start_deg=0, end_deg=360):
+    def build_clamp_bed(self, name, off, clamp_space=None, start_deg: float = 0, end_deg: float = 360):
         """Build a clamp bed.
 
         :param _type_ name: The part name to build.
@@ -337,7 +339,7 @@ class Builder:
             # Cut the empty volume of tube out of the clamp bed
             loc = path.val().locationAt(off)
             profile = self.create_profile(loc, 0, 360, outer_radius=inner_radius)
-            tube = cq.Workplane(loc).placeSketch(profile.val()).sweep(path, transition="round")
+            tube = cq.Workplane(loc).placeSketch(profile.val()).sweep(path, transition="round")  # type: ignore
             bed = bed.cut(tube)
             return bed
 
@@ -425,7 +427,7 @@ class Builder:
                 full_part = self.build_tube(name)
             else:
                 raise ValueError(f"Invalid name: {name}")
-            diff = part.val().Center() - full_part.val().Center()
+            diff = part.val().Center() - full_part.val().Center()  # type: ignore
             normal = diff.normalized()
             return normal.z > 0
 
@@ -535,7 +537,7 @@ class Builder:
 
                 # Connect parts to each other
                 if right:
-                    off = wire_obj.positionAt(0.5)
+                    off = wire_obj.positionAt(0.5)  # type: ignore
                     line = cq.Workplane("XY").polyline([loc + off, other_loc + off])
                     assy.add(line)
 
