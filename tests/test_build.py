@@ -133,32 +133,24 @@ class TestBuilder:
         assert (inlet_clamp_end - inlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[0])
         assert (outlet_clamp_end - outlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[-1])
 
-    def test_overlap(self, builder):
+    def test_overlap(self, builder, name, right):
         """Test that the parts do not overlap with each other.
 
         :param _type_ builder: The manifold builder to test
+        :param _type_ name: The name of the part to test
+        :param _type_ right: True if building the right part
         """
+        part = builder.build_part(name, right=right)
+        for other_name in builder.config.names:
+            for other_right in [False, True]:
+                if name != other_name and right != other_right:
+                    other_part = builder.build_part(other_name, right=other_right)
+                    inter_result = part.intersect(other_part)
 
-        def no_overlap(names):
-            """Check if all the given manifolds do not overlap.
-
-            :param _type_ names: An array of manifold names to check
-            :return _type_: True if the manifolds don't overlap, else False
-            """
-            for name1, name2 in combinations(names, 2):
-                part1, part2 = (
-                    builder.build_tube(name1),
-                    builder.build_tube(name2),
-                )
-                inter_result = part1.intersect(part2)
-
-                # Check if the intersection contains any volume
-                if inter_result.val().Volume() > 1e-6:  # Using a small tolerance
-                    print(f"Intersection detected between {name1} and {name2}")
-                    return False
-            return True
-
-        assert no_overlap(builder.config.names)
+                    assert inter_result.val().Volume() == pytest.approx(0), (
+                        f"intersection detected between {name},right={right} and {other_name},right={other_right}"
+                    )
+        return True
 
     def test_in_bounds(self, builder, name, right):
         """Test the parts are in bounds.
