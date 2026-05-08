@@ -347,38 +347,6 @@ class Builder:
         return part
 
     @lru_cache
-    def build_back_part(self, name):
-        """Build back the manifold shape from parts.
-
-        :param _type_ name: The name of the manifold
-        :return _type_: A tuple containing the exhaust manifiold, and the manifold built from parts
-        """
-        if name != "driver" and name != "passenger":
-            raise ValueError(f"Invalid name: {name}")
-        left_part, right_part = self.build_part(name), self.build_part(name, right=True)
-        manifold = self.build_tube(name)
-        manifold_from_parts = left_part.union(right_part, tol=self.boolean_tolerance)
-        return manifold, manifold_from_parts
-
-    def calc_part_error(self, name):
-        """Calculate the build error for parts.
-
-        This method provides a percentage index which can be used in testing.
-
-        :param _type_ name: The name of the manifold
-        :return _type_: A percentage indicating the part error when attempting to assemble the manifold from parts
-        """
-        if name != "driver" and name != "passenger":
-            raise ValueError(f"Invalid name: {name}")
-        manifold, manifold_from_parts = self.build_back_part(name)
-        manifold_vol, manifold_from_parts_vol = (
-            manifold.val().Volume(),
-            manifold_from_parts.val().Volume(),
-        )
-        error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
-        return error_pct
-
-    @lru_cache
     def build_prepared_part(self, name, right=False):
         """Build the part and prepare it for export to STL.
 

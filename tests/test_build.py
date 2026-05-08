@@ -199,15 +199,25 @@ class TestBuilder:
         radius = get_radius(part, pos, len, expected)
         assert radius == pytest.approx(expected), f"clamp radius invalid at {clamp_idx}, {radius} != {expected}"
 
-    def test_part(self, name, builder):
+    def test_part(self, name, right, builder):
         """Test the parts.
 
         Verifies that the assembled parts will create the manifold shape.
 
         :param _type_ name: The name of the part to test
+        :param _type_ right: True if building the right part, else False
         :param _type_ builder: The manifold builder to test
         """
-        error_pct = builder.calc_part_error(name)
+        if name != "driver" and name != "passenger":
+            raise ValueError(f"Invalid name: {name}")
+        build_args = {"start_deg": (0 if right else 180), "end_deg": (180 if right else 360)}
+        manifold = builder.build_tube(name, **build_args)
+        part = builder.build_part(name, right=right)
+        manifold_vol, manifold_from_parts_vol = (
+            manifold.val().Volume(),
+            part.intersect(manifold, tol=0.01).val().Volume(),
+        )
+        error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
         # less than 0.5% error for each rebuilt part.
         assert error_pct < 0.5
 
