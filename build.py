@@ -251,6 +251,33 @@ class Builder:
         tube = cq.Workplane(loc).placeSketch(profile.val()).sweep(path, transition="round").fillet(self.edge_rounding)
         return tube
 
+    def create_ring(self, path, off, len, inner_radius=None, outer_radius=None, start_deg=0, end_deg=360):
+        """Create a ring at a given offset.
+
+        :param _type_ path: The ring path
+        :param _type_ path: The path offset
+        :param _type_ len: The ring length
+        :param _type_ inner_radius: The inner radius.
+        :param _type_ outer_radius: The outer radius.
+        :param _type_ start_deg: The start angle.
+        :param _type_ end_deg: The end angle.
+        :return _type_: The ring
+        """
+        loc = path.val().locationAt(off)
+        tan = path.val().tangentAt(off)
+        profile = self.create_profile(
+            loc,
+            start_deg,
+            end_deg,
+            outer_radius=outer_radius,
+            inner_radius=inner_radius,
+        )
+        p1 = path.val().positionAt(off)
+        p2 = p1 + (tan * len)
+        path = cq.Workplane(loc).polyline([p1, p2])
+        ring = cq.Workplane(loc).placeSketch(profile.val()).sweep(path)
+        return ring
+
     @lru_cache
     def build_clamp_bed(self, name, off, clamp_space=10, start_deg=0, end_deg=360):
         """Build a clamp bed.
@@ -261,32 +288,6 @@ class Builder:
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :return _type_: The clamp bed
         """
-
-        def create_ring(path, len, inner_radius, outer_radius, start_deg, end_deg):
-            """Create a ring at a given offset.
-
-            :param _type_ path: The ring path
-            :param _type_ len: The ring length
-            :param _type_ inner_radius: The inner radius.
-            :param _type_ outer_radius: The outer radius.
-            :param _type_ start_deg: The start angle.
-            :param _type_ end_deg: The end angle.
-            :return _type_: The ring
-            """
-            loc = path.val().locationAt(off)
-            tan = path.val().tangentAt(off)
-            profile = self.create_profile(
-                loc,
-                start_deg,
-                end_deg,
-                outer_radius=outer_radius,
-                inner_radius=inner_radius,
-            )
-            p1 = path.val().positionAt(off)
-            p2 = p1 + (tan * len)
-            path = cq.Workplane(loc).polyline([p1, p2])
-            ring = cq.Workplane(loc).placeSketch(profile.val()).sweep(path)
-            return ring
 
         def clean_tube(path, bed, inner_radius):
             """Clean up the tube after adding the clamp bed.
@@ -312,12 +313,32 @@ class Builder:
         start_deg, end_deg = start_deg + space_deg, end_deg - space_deg
 
         # Create the clamp bed out of multiple ring profiles
-        top = create_ring(path, length, outer_radius - self.wall_thickness, outer_radius, start_deg, end_deg)
-        base = create_ring(
-            path, length - self.wall_thickness, inner_radius, outer_radius - self.wall_thickness, start_deg, end_deg
+        top = self.create_ring(
+            path,
+            off,
+            length,
+            inner_radius=outer_radius - self.wall_thickness,
+            outer_radius=outer_radius,
+            start_deg=start_deg,
+            end_deg=end_deg,
+        )
+        base = self.create_ring(
+            path,
+            off,
+            length - self.wall_thickness,
+            inner_radius=inner_radius,
+            outer_radius=outer_radius - self.wall_thickness,
+            start_deg=start_deg,
+            end_deg=end_deg,
         ).cut(
-            create_ring(
-                path, self.wall_thickness, inner_radius, outer_radius - self.wall_thickness, start_deg, end_deg
+            self.create_ring(
+                path,
+                off,
+                self.wall_thickness,
+                inner_radius=inner_radius,
+                outer_radius=outer_radius - self.wall_thickness,
+                start_deg=start_deg,
+                end_deg=end_deg,
             ),
             tol=self.boolean_tolerance,
         )

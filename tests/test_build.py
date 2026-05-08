@@ -22,10 +22,7 @@ class TestBuilder:
             metafunc.parametrize("name", builder.names)
         if "clamp_idx" in metafunc.fixturenames:
             builder = Builder()
-            clamp_idxes = []
-            for clamp_idx, clamp_len in enumerate(builder.clamp_lengths):
-                if clamp_len > 0:
-                    clamp_idxes.extend([clamp_idx])
+            clamp_idxes = range(len(builder.clamp_lengths))
             metafunc.parametrize("clamp_idx", clamp_idxes)
         if "right" in metafunc.fixturenames:
             metafunc.parametrize("right", [False, True])
@@ -163,31 +160,18 @@ class TestBuilder:
 
         assert no_overlap(builder.names)
 
-    def test_clamp_radius(self, name, clamp_idx, right, builder):
-        """Test the exhaust clamp volume to see if it has a hollow cylinder profile.
+    def test_can_clamp(self, name, clamp_idx, right, builder):
+        """Test if the given clamp bed satisfies the clamp property.
 
         :param _type_ name: The name of the part to test
         :param _type_ clamp_idx: The clamp index to test
         :param _type_ right: True if testing the right side
         :param _type_ builder: The manifold builder to test
         """
-
-        def get_radius(part, off, len, radius):
-            """Get radii of clamp at offset and length.
-
-            :param _type_ part: The part
-            :param _type_ off: The part offset
-            :param _type_: The clamp length
-            :return _type_: The radius
-            """
-            volume = cq.Workplane(path.val().positionAt(off)).circle(radius).extrude(len)
-            volume = volume.intersect(part)
-            edges = volume.edges("%Circle").vals()
-            radii = [edge.radius() for edge in edges]
-            return np.max(radii)
-
         path = builder.create_wire(name)
         length = path.val().Length()
+
+        # Map clamp_idx to clamp paraeters
         offsets = [0, 0.5, (length - builder.clamp_lengths[-1]) / length]
         expected = [builder.outer_diameter / 2, builder.clamp_diameter / 2, builder.outer_diameter / 2]
         part = builder.build_part(name, right=right)
@@ -196,8 +180,18 @@ class TestBuilder:
             builder.clamp_lengths[clamp_idx],
             expected[clamp_idx],
         )
-        radius = get_radius(part, pos, len, expected)
-        assert radius == pytest.approx(expected), f"clamp radius invalid at {clamp_idx}, {radius} != {expected}"
+
+        # Check if we can move clamp over section
+        clamp_off = builder.create_ring(
+            path, pos, len, outer_radius=expected + builder.wall_thickness, inner_radius=expected
+        )
+        assert part.intersect(clamp_off).val().Volume() == pytest.approx(0)
+
+        # Check if we can push clamp onto section
+        clamp_on = builder.create_ring(
+            path, pos, len, outer_radius=expected + builder.wall_thickness, inner_radius=expected - 0.01
+        )
+        assert part.intersect(clamp_on).val().Volume() > 0
 
     def test_part(self, name, right, builder):
         """Test the parts.
