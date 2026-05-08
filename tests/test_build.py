@@ -160,6 +160,19 @@ class TestBuilder:
 
         assert no_overlap(builder.config.names)
 
+    def test_in_bounds(self, builder, name, right):
+        """Test the parts are in bounds.
+
+        :param _type_ builder: The builder to test
+        :param _type_ name: The name of the part to test
+        :param _type_ right: True if testing the right side
+        """
+        part = builder.build_part(name, right=right)
+        proj_bounds = builder.config.get_bounds()
+        volume = part.cut(proj_bounds).val().Volume()
+
+        assert volume == pytest.approx(0)
+
     def test_can_clamp(self, name, clamp_idx, right, builder):
         """Test if the given clamp bed satisfies the clamp property.
 

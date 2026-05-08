@@ -105,13 +105,15 @@ class TestMain:
         :param _type_ mock_builder: The Builder.
         :param _type_ tmp_path: The temporary path.
         """
-        args = argparse.Namespace(outdir=tmp_path, env=f"{tmp_path}.env", diagram=None, output=None, left=False, right=False)
+        args = argparse.Namespace(
+            outdir=tmp_path, env=f"{tmp_path}.env", diagram=None, output=None, left=False, right=False
+        )
         main(mock_logger, args)
         mock_builder.return_value.generate_all.assert_called_once_with(out_dir=tmp_path)
 
         assert Path(f"{tmp_path}.env").exists()
         mock_logger.done.assert_called_once()
-        
+
     def test_main_generate_all_fallback(self, mock_logger, mock_builder, tmp_path):
         """Test the else block when no flags are provided.
 

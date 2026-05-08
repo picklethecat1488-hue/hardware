@@ -25,6 +25,15 @@ class AppConfig(BaseSettings):
     # Build version
     ver: int = 4
 
+    # The part x boundaries
+    x_bounds: list[float] = [145, 950]
+
+    # The part y boundaries
+    y_bounds: list[float] = [-32, 390]
+
+    # The part bounds
+    z_bounds: list[float] = [145, 530]
+
     # Wall thickness ~1.4mm
     wall_thickness: float = 1.4
 
@@ -48,12 +57,10 @@ class AppConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env")
 
-    def get_p_v(self):
-        """Return the P and V dictionaries for the environment.
+    def get_measurements(self):
+        """Get the raw measurements used for the project.
 
-        The P and V dictionaries define inlet and outlet points and directions for each model.
-
-        :return _type_: The P and V vectors
+        :return _type_: The raw measurement points.
         """
         # Define the raw measurements taken here
         p = {
@@ -75,6 +82,16 @@ class AppConfig(BaseSettings):
             # p[10] passenger exhaust output inlet start
             10: np.array([895, 0, 525]),
         }
+        return p
+
+    def get_p_v(self):
+        """Return the P and V dictionaries for the environment.
+
+        The P and V dictionaries define inlet and outlet points and directions for each model.
+
+        :return _type_: The P and V vectors
+        """
+        p = self.get_measurements()
 
         # Do some data correction here
         outlet_arrays = np.stack([p[9], p[10]])
@@ -112,6 +129,38 @@ class AppConfig(BaseSettings):
         }
 
         return P, V
+
+    def get_bounds(self):
+        """Return the application bounds.
+
+        The bounds are an Axis Aligned Boundary Box representing the valid space parts may occupy.
+
+        :return _type_: The bounding box.
+        """
+        # Create the overall bounds.
+        x_len = np.max(self.x_bounds) - np.min(self.x_bounds)
+        y_len = np.max(self.y_bounds) - np.min(self.y_bounds)
+        z_len = np.max(self.z_bounds) - np.min(self.z_bounds)
+        center = (
+            np.min(self.x_bounds) + x_len / 2,
+            np.min(self.y_bounds) + y_len / 2,
+            np.min(self.z_bounds) + z_len / 2,
+        )
+        bounds = cq.Workplane("XY").box(x_len, y_len, z_len).translate(center)
+
+        # Subtract the valve controller bottom plane from the overall bounds.
+        p = self.get_measurements()
+        x_len = p[2][0] - p[1][0]
+        y_len = np.max(self.y_bounds) - np.mean([p[2][1], p[1][1]])
+        z_len = np.max(self.z_bounds) - np.mean([p[2][2], p[1][2]])
+        center = (
+            np.min([p[2][0], p[1][0]]) + x_len / 2,
+            np.min([p[2][1], p[1][1]]) + y_len / 2,
+            np.min([p[2][2], p[1][2]]) + z_len / 2,
+        )
+        top_plane = cq.Workplane("XY").box(x_len, y_len, z_len).translate(center)
+        bounds = bounds.cut(top_plane)
+        return bounds
 
 
 class Logger:
