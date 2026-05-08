@@ -7,10 +7,111 @@ import os
 from pathlib import Path
 import cadquery as cq
 from functools import lru_cache
-from itertools import combinations
-from IPython import get_ipython
+from IPython.core.getipython import get_ipython
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
 import zipfile
-from jupyter_cadquery import *
+
+
+class AppConfig(BaseSettings):
+    """Builder app configuration.
+
+    :param _type_ BaseSettings: The base settings for the builder.
+    """
+
+    # Project name
+    project_name: str = "exhaust_manifolds"
+
+    # Build version
+    ver: int = 4
+
+    # Wall thickness ~1.4mm
+    wall_thickness: float = 1.4
+
+    # Inlet and outlet diameters, 2.5"
+    outer_diameter: float = 63.5
+
+    # Inner clamp diameter 3"
+    clamp_diameter: float = 76.2
+
+    # Inlet and outlet clamp length 2", inner clamp length 1"
+    clamp_lengths: list[float] = [50.4, 25.4, 50.4]
+
+    # The minimum space between each clanp bed
+    clamp_space: float = 10
+
+    # Applying a 0.5mm fillet/chamfer to all objects.
+    edge_rounding: float = 0.5
+
+    # The part names, driver and passenger
+    names: list[str] = ["driver", "passenger"]
+
+    model_config = SettingsConfigDict(env_file=".env")
+
+    def get_p_v(self):
+        """Return the P and V dictionaries for the environment.
+
+        The P and V dictionaries define inlet and outlet points and directions for each model.
+
+        :return _type_: The P and V vectors
+        """
+        # Define the raw measurements taken here
+        p = {
+            # p[1] -> p[2] valve controller bottom plane
+            1: np.array([443, 152, 521]),
+            2: np.array([652, 205, 500]),
+            # p[3] passenger exhaust input inlet start
+            3: np.array([565, 356, 352]),
+            # p[4] -> p[5] direction of driver exhaust input
+            4: np.array([555, 327, 0]),
+            5: np.array([480, 343, 0]),
+            # p[6] driver exhaust input inlet start
+            6: np.array([347, 279, 382]),
+            # p[7] -> p[8] direction of driver exhaust output
+            7: np.array([410, 350, 0]),
+            8: np.array([392, 300, 0]),
+            # p[9] driver exhaust output inlet start
+            9: np.array([200, 0, 520]),
+            # p[10] passenger exhaust output inlet start
+            10: np.array([895, 0, 525]),
+        }
+
+        # Do some data correction here
+        outlet_arrays = np.stack([p[9], p[10]])
+        outlet_height = np.mean(outlet_arrays[:, 2])
+        p[9][2] = p[10][2] = outlet_height
+
+        vc_arrays = np.stack([p[1], p[2]])
+        vc_depth, vc_height = np.mean(vc_arrays[:, 1]), np.mean(vc_arrays[:, 2])
+        p[1][1] = p[2][1] = vc_depth
+        p[1][2] = p[2][2] = vc_height
+
+        for idx in [3, 6, 9, 10]:
+            p[idx][2] = p[idx][2] - (self.outer_diameter / 2)
+
+        def dir_vector(start, end):
+            """Generate a 3D direction vector for the given points, e.g. p[4] and p[5]."""
+            return (end - start) / np.linalg.norm(end - start)
+
+        theta = np.radians(15)
+        c, s = np.cos(theta), np.sin(theta)
+        R_driver_inlet = np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
+
+        P = {
+            "driver_inlet": p[6],
+            "driver_outlet": p[9],
+            "passenger_inlet": p[3],
+            "passenger_outlet": p[10],
+        }
+
+        V = {
+            "driver_inlet": dir_vector(p[7], p[8]) @ R_driver_inlet,
+            "driver_outlet": np.array([-1, 0, 0]),
+            "passenger_inlet": dir_vector(p[5], p[4]),
+            "passenger_outlet": np.array([1, 0, 0]),
+        }
+
+        return P, V
 
 
 class Logger:
@@ -24,7 +125,7 @@ class Logger:
         """
         self.text = text
         self.backend = None
-        self.in_notebook = Logger.in_notebook()
+        self.in_notebook = self.get_in_notebook()
         self.enabled = enabled
 
         if self.enabled:
@@ -44,7 +145,7 @@ class Logger:
                 self.backend.start()
                 self.running = True
 
-    def in_notebook():
+    def get_in_notebook(self):
         """Check if we are inside a notebook.
 
         :return _type_: True if inside a notebook, else false.
@@ -94,79 +195,11 @@ class Logger:
 class Builder:
     """The manifold builder creates the manifold objects and exports them as files for 3D printing."""
 
-    def __init__(self, logger=None):
+    def __init__(self, config=None, logger=None):
         """Initialize the builder."""
-        self.project_name = "exhaust_manifolds"
-        self.ver = 4
-        # Wall thickness ~1.4mm
-        self.wall_thickness = 1.4
-        # Inlet diameter 2.5", outlet diameter is slightly bigger, but I couldn't get a working variable diameter model going with cadquery.
-        self.outer_diameter = 63.5
-        # Inner clamp diameter 3"
-        self.clamp_diameter = 76.2
-        # Inlet and outlet clamp length 2", inner clamp length 1"
-        self.clamp_lengths = [50.4, 25.4, 50.4]
-        # Applying a 0.5mm fillet/chamfer to all objects.
-        self.edge_rounding = 0.5
-        self.logger = logger if logger else Logger(enabled=False)
-
-        # Define the raw measurements taken here
-        p = {
-            # p[1] -> p[2] valve controller bottom plane
-            1: np.array([443, 152, 521]),
-            2: np.array([652, 205, 500]),
-            # p[3] passenger exhaust input inlet start
-            3: np.array([565, 356, 352]),
-            # p[4] -> p[5] direction of driver exhaust input
-            4: np.array([555, 327, 0]),
-            5: np.array([480, 343, 0]),
-            # p[6] driver exhaust input inlet start
-            6: np.array([347, 279, 382]),
-            # p[7] -> p[8] direction of driver exhaust output
-            7: np.array([410, 350, 0]),
-            8: np.array([392, 300, 0]),
-            # p[9] driver exhaust output inlet start
-            9: np.array([200, 0, 520]),
-            # p[10] passenger exhaust output inlet start
-            10: np.array([895, 0, 525]),
-        }
-
-        # Do some data correction here
-        outlet_arrays = np.stack([p[9], p[10]])
-        outlet_height = np.mean(outlet_arrays[:, 2])
-        p[9][2] = p[10][2] = outlet_height
-
-        vc_arrays = np.stack([p[1], p[2]])
-        vc_depth, vc_height = np.mean(vc_arrays[:, 1]), np.mean(vc_arrays[:, 2])
-        p[1][1] = p[2][1] = vc_depth
-        p[1][2] = p[2][2] = vc_height
-
-        for idx in [3, 6, 9, 10]:
-            p[idx][2] = p[idx][2] - (self.outer_diameter / 2)
-
-        def dir_vector(start, end):
-            """Generate a 3D direction vector for the given points, e.g. p[4] and p[5]."""
-            return (end - start) / np.linalg.norm(end - start)
-
-        theta = np.radians(15)
-        c, s = np.cos(theta), np.sin(theta)
-        R_driver_inlet = np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
-
-        self.names = ["driver", "passenger"]
-
-        self.P = {
-            "driver_inlet": p[6],
-            "driver_outlet": p[9],
-            "passenger_inlet": p[3],
-            "passenger_outlet": p[10],
-        }
-
-        self.V = {
-            "driver_inlet": dir_vector(p[7], p[8]) @ R_driver_inlet,
-            "driver_outlet": np.array([-1, 0, 0]),
-            "passenger_inlet": dir_vector(p[5], p[4]),
-            "passenger_outlet": np.array([1, 0, 0]),
-        }
+        self.config = config or AppConfig()
+        self.logger = logger or Logger(enabled=False)
+        self.P, self.V = self.config.get_p_v()
 
     @lru_cache
     def create_wire(self, name):
@@ -184,11 +217,11 @@ class Builder:
         # Inlet start
         p1 = p_start
         # Inlet end
-        p2 = p_start + v_start * self.clamp_lengths[0]
+        p2 = p_start + v_start * self.config.clamp_lengths[0]
         # Outlet start
         p3 = p_end
         # Outlet end
-        p4 = p_end + v_end * self.clamp_lengths[-1]
+        p4 = p_end + v_end * self.config.clamp_lengths[-1]
         wire = cq.Wire.assembleEdges(
             [
                 cq.Edge.makeLine(cq.Vector(*p1), cq.Vector(*p2)),
@@ -215,9 +248,9 @@ class Builder:
         :return _type_: The profile section.
         """
         if outer_radius is None:
-            outer_radius = self.outer_diameter / 2
+            outer_radius = self.config.outer_diameter / 2
         if inner_radius is None:
-            inner_radius = outer_radius - self.wall_thickness
+            inner_radius = outer_radius - self.config.wall_thickness
         if inner_radius >= outer_radius:
             raise ValueError("Invalid radius or inner radius")
         sketch = (
@@ -247,7 +280,12 @@ class Builder:
         path = self.create_wire(name)
         loc = path.val().locationAt(0)
         profile = self.create_profile(loc, start_deg, end_deg)
-        tube = cq.Workplane(loc).placeSketch(profile.val()).sweep(path, transition="round").fillet(self.edge_rounding)
+        tube = (
+            cq.Workplane(loc)
+            .placeSketch(profile.val())
+            .sweep(path, transition="round")
+            .fillet(self.config.edge_rounding)
+        )
         return tube
 
     def create_ring(self, path, off, len, inner_radius=None, outer_radius=None, start_deg=0, end_deg=360):
@@ -278,7 +316,7 @@ class Builder:
         return ring
 
     @lru_cache
-    def build_clamp_bed(self, name, off, clamp_space=10, start_deg=0, end_deg=360):
+    def build_clamp_bed(self, name, off, clamp_space=None, start_deg=0, end_deg=360):
         """Build a clamp bed.
 
         :param _type_ name: The part name to build.
@@ -303,10 +341,13 @@ class Builder:
             bed = bed.cut(tube)
             return bed
 
+        if clamp_space is None:
+            clamp_space = self.config.clamp_space
+
         path = self.create_wire(name)
-        length = self.clamp_lengths[1]
-        outer_radius = self.clamp_diameter / 2
-        inner_radius = (self.outer_diameter - self.wall_thickness) / 2
+        length = self.config.clamp_lengths[1]
+        outer_radius = self.config.clamp_diameter / 2
+        inner_radius = (self.config.outer_diameter - self.config.wall_thickness) / 2
         space_sign = 1 if start_deg < end_deg else -1
         space_deg = space_sign * clamp_space / 2
         start_deg, end_deg = start_deg + space_deg, end_deg - space_deg
@@ -316,7 +357,7 @@ class Builder:
             path,
             off,
             length,
-            inner_radius=outer_radius - self.wall_thickness,
+            inner_radius=outer_radius - self.config.wall_thickness,
             outer_radius=outer_radius,
             start_deg=start_deg,
             end_deg=end_deg,
@@ -324,23 +365,23 @@ class Builder:
         base = self.create_ring(
             path,
             off,
-            length - self.wall_thickness,
+            length - self.config.wall_thickness,
             inner_radius=inner_radius,
-            outer_radius=outer_radius - self.wall_thickness,
+            outer_radius=outer_radius - self.config.wall_thickness,
             start_deg=start_deg,
             end_deg=end_deg,
         ).cut(
             self.create_ring(
                 path,
                 off,
-                self.wall_thickness,
+                self.config.wall_thickness,
                 inner_radius=inner_radius,
-                outer_radius=outer_radius - self.wall_thickness,
+                outer_radius=outer_radius - self.config.wall_thickness,
                 start_deg=start_deg,
                 end_deg=end_deg,
             ),
         )
-        bed = top.union(base).fillet(self.edge_rounding)
+        bed = top.union(base).fillet(self.config.edge_rounding)
 
         # Cut the empty volume of tube out of the clamp bed
         return clean_tube(path, bed, inner_radius)
@@ -357,7 +398,7 @@ class Builder:
             # Create the main part body.
             build_args = {"start_deg": (0 if right else 180), "end_deg": (180 if right else 360)}
             part = self.build_tube(name, **build_args)
-            if len(self.clamp_lengths) > 2:
+            if len(self.config.clamp_lengths) > 2:
                 # Add the clamp bed
                 clamp_bed = self.build_clamp_bed(name, 0.5, **build_args)
                 part = part.union(clamp_bed)
@@ -429,10 +470,10 @@ class Builder:
         :param _type_ names: The optional names to generate.
         :param _type_ right_vals: The optional right values to use.
         """
-        file_prefix = f"{self.project_name}_v{self.ver}"
+        file_prefix = f"{self.config.project_name}_v{self.config.ver}"
 
         if names is None:
-            names = self.names
+            names = self.config.names
         if right_vals is None:
             right_vals = [False, True]
 
@@ -466,11 +507,11 @@ class Builder:
             return loc
 
         if names is None:
-            names = self.names
+            names = self.config.names
         if right_vals is None:
             right_vals = [False, True]
 
-        diagram_name = f"{self.project_name}_v{self.ver}_diagram.svg"
+        diagram_name = f"{self.config.project_name}_v{self.config.ver}_diagram.svg"
         svg_opt = {
             "showAxes": False,
             "strokeWidth": 3,
@@ -523,8 +564,8 @@ class Builder:
                             zipf.write(file_str, file)
 
         # Export the diagram and files
-        self.generate_diagram(names=self.names, out_dir=out_dir, right_vals=right_vals)
-        self.generate_parts(names=self.names, out_dir=out_dir, right_vals=right_vals)
+        self.generate_diagram(names=self.config.names, out_dir=out_dir, right_vals=right_vals)
+        self.generate_parts(names=self.config.names, out_dir=out_dir, right_vals=right_vals)
 
         # Compress the build
         zip_file_str = str(Path(out_dir) / zip_name)

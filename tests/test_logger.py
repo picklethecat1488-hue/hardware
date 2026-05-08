@@ -29,7 +29,7 @@ class TestLogger:
         :param _type_ mocker: The Mocker object.
         :param _type_ mock_dependencies: The mock dependencies.
         """
-        mocker.patch("build.Logger.in_notebook", return_value=False)
+        mocker.patch("build.Logger.get_in_notebook", return_value=False)
         logger = Logger(text="Testing Terminal", enabled=True)
 
         mock_dependencies["halo"].assert_called_once_with(text="Testing Terminal", spinner="dots", interval=33)
@@ -43,7 +43,7 @@ class TestLogger:
         :param _type_ mock_dependencies: The mock dependencies.
         """
         # Setup sanitizer mock to return a string
-        mocker.patch("build.Logger.in_notebook", return_value=True)
+        mocker.patch("build.Logger.get_in_notebook", return_value=True)
         mock_dependencies["sanitizer"].return_value.sanitize.return_value = "Sanitized"
 
         logger = Logger(text="Testing Notebook", enabled=True)
@@ -60,7 +60,7 @@ class TestLogger:
         :param _type_ mocker: The Mocker object.
         :param _type_ mock_dependencies: The mock dependencies.
         """
-        mocker.patch("build.Logger.in_notebook", return_value=False)
+        mocker.patch("build.Logger.get_in_notebook", return_value=False)
         logger = Logger(enabled=False)
         logger.print("Direct message")
 
@@ -73,7 +73,7 @@ class TestLogger:
         :param _type_ mocker: The Mocker object.
         :param _type_ mock_dependencies: The mock dependencies.
         """
-        mocker.patch("build.Logger.in_notebook", return_value=False)
+        mocker.patch("build.Logger.get_in_notebook", return_value=False)
         mock_halo_class = mocker.patch("halo.Halo")
         logger = Logger(enabled=True)
         mock_halo = mock_halo_class.return_value
@@ -90,7 +90,7 @@ class TestLogger:
         :param _type_ mocker: The Mocker object.
         :param _type_ mock_dependencies: The mock dependencies.
         """
-        mocker.patch("build.Logger.in_notebook", return_value=False)
+        mocker.patch("build.Logger.get_in_notebook", return_value=False)
         logger = Logger(text="Build", enabled=True)
         logger.done()
 

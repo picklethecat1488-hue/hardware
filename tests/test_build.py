@@ -19,10 +19,10 @@ class TestBuilder:
         """
         if "name" in metafunc.fixturenames:
             builder = Builder()
-            metafunc.parametrize("name", builder.names)
+            metafunc.parametrize("name", builder.config.names)
         if "clamp_idx" in metafunc.fixturenames:
             builder = Builder()
-            clamp_idxes = range(len(builder.clamp_lengths))
+            clamp_idxes = range(len(builder.config.clamp_lengths))
             metafunc.parametrize("clamp_idx", clamp_idxes)
         if "right" in metafunc.fixturenames:
             metafunc.parametrize("right", [False, True])
@@ -69,11 +69,11 @@ class TestBuilder:
                 # Inlet start
                 builder.P[inlet_key],
                 # Inlet end
-                builder.P[inlet_key] + builder.V[inlet_key] * builder.clamp_lengths[0],
+                builder.P[inlet_key] + builder.V[inlet_key] * builder.config.clamp_lengths[0],
                 # Outlet start
                 builder.P[outlet_key],
                 # Outlet end
-                builder.P[outlet_key] + builder.V[outlet_key] * builder.clamp_lengths[-1],
+                builder.P[outlet_key] + builder.V[outlet_key] * builder.config.clamp_lengths[-1],
             )
 
         driver_inlet_start, driver_inlet_end, driver_outlet_start, _ = get_end_points("driver")
@@ -114,8 +114,8 @@ class TestBuilder:
         wire_obj = wire.val()
         length = wire_obj.Length()
         inlet_clamp_start = wire_obj.positionAt(0.0)
-        inlet_clamp_end = wire_obj.positionAt(builder.clamp_lengths[0] / length)
-        outlet_clamp_start = wire_obj.positionAt((length - builder.clamp_lengths[-1]) / length)
+        inlet_clamp_end = wire_obj.positionAt(builder.config.clamp_lengths[0] / length)
+        outlet_clamp_start = wire_obj.positionAt((length - builder.config.clamp_lengths[-1]) / length)
         outlet_clamp_end = wire_obj.positionAt(1.0)
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
 
@@ -130,8 +130,8 @@ class TestBuilder:
         assert calc_point_err(
             (outlet_clamp_end - outlet_clamp_start).normalized(), builder.V[outlet_key]
         ) == pytest.approx(0)
-        assert (inlet_clamp_end - inlet_clamp_start).Length == pytest.approx(builder.clamp_lengths[0])
-        assert (outlet_clamp_end - outlet_clamp_start).Length == pytest.approx(builder.clamp_lengths[-1])
+        assert (inlet_clamp_end - inlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[0])
+        assert (outlet_clamp_end - outlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[-1])
 
     def test_overlap(self, builder):
         """Test that the parts do not overlap with each other.
@@ -158,7 +158,7 @@ class TestBuilder:
                     return False
             return True
 
-        assert no_overlap(builder.names)
+        assert no_overlap(builder.config.names)
 
     def test_can_clamp(self, name, clamp_idx, right, builder):
         """Test if the given clamp bed satisfies the clamp property.
@@ -172,24 +172,28 @@ class TestBuilder:
         length = path.val().Length()
 
         # Map clamp_idx to clamp paraeters
-        offsets = [0, 0.5, (length - builder.clamp_lengths[-1]) / length]
-        expected = [builder.outer_diameter / 2, builder.clamp_diameter / 2, builder.outer_diameter / 2]
+        offsets = [0, 0.5, (length - builder.config.clamp_lengths[-1]) / length]
+        expected = [
+            builder.config.outer_diameter / 2,
+            builder.config.clamp_diameter / 2,
+            builder.config.outer_diameter / 2,
+        ]
         part = builder.build_part(name, right=right)
         pos, len, expected = (
             offsets[clamp_idx],
-            builder.clamp_lengths[clamp_idx],
+            builder.config.clamp_lengths[clamp_idx],
             expected[clamp_idx],
         )
 
         # Check if we can move clamp over section
         clamp_off = builder.create_ring(
-            path, pos, len, outer_radius=expected + builder.wall_thickness, inner_radius=expected
+            path, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected
         )
         assert part.intersect(clamp_off).val().Volume() == pytest.approx(0)
 
         # Check if we can push clamp onto section
         clamp_on = builder.create_ring(
-            path, pos, len, outer_radius=expected + builder.wall_thickness, inner_radius=expected - 0.01
+            path, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected - 0.01
         )
         assert part.intersect(clamp_on).val().Volume() > 0
 
@@ -247,7 +251,7 @@ class TestBuilder:
         # Open the resulting zip and verify its contents.
         with zipfile.ZipFile(zip_path, "r") as z:
             contents = z.namelist()
-            assert f"{builder.project_name}_v{builder.ver}_diagram.svg" in contents
-            for name in builder.names:
+            assert f"{builder.config.project_name}_v{builder.config.ver}_diagram.svg" in contents
+            for name in builder.config.names:
                 for side in ["left", "right"]:
-                    assert f"{builder.project_name}_v{builder.ver}_{name}_{side}.stl" in contents
+                    assert f"{builder.config.project_name}_v{builder.config.ver}_{name}_{side}.stl" in contents
