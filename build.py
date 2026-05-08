@@ -581,6 +581,8 @@ def get_args():
     :return _type_: Parsed arguments.
     """
     parser = argparse.ArgumentParser(description="Build Utility.")
+    parser.add_argument("-e", "--env", required=False, default=None, help="Output environment to file.")
+
     parser.add_argument("-out", "--outdir", default="build", help="Target directory for outputs")
 
     group = parser.add_mutually_exclusive_group(required=False)
@@ -620,6 +622,13 @@ def main(logger, args):
     path.mkdir(parents=True, exist_ok=True)
 
     builder = Builder(logger=logger)
+
+    if not args.env is None:
+        with open(args.env, "w") as f:
+            for key, value in builder.config.model_dump().items():
+                f.write(f"{key}={value}\n")
+        logger.print(f"Saved environment to {args.env}", symbol="⚙️ ")
+
     if not args.diagram is None:
         if not args.diagram is True:
             gen_args["names"] = [args.diagram]
