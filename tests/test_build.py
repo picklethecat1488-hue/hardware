@@ -209,7 +209,7 @@ class TestBuilder:
         part = builder.build_part(name, right=right)
         manifold_vol, manifold_from_parts_vol = (
             manifold.val().Volume(),
-            part.intersect(manifold, tol=0.01).val().Volume(),
+            part.intersect(manifold).val().Volume(),
         )
         error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
         # less than 0.5% error for each rebuilt part.

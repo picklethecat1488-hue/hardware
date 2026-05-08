@@ -106,7 +106,6 @@ class Builder:
         self.clamp_diameter = 76.2
         # Inlet and outlet clamp length 2", inner clamp length 1"
         self.clamp_lengths = [50.4, 25.4, 50.4]
-        self.boolean_tolerance = 0.01
         # Applying a 0.5mm fillet/chamfer to all objects.
         self.edge_rounding = 0.5
         self.logger = logger if logger else Logger(enabled=False)
@@ -340,9 +339,8 @@ class Builder:
                 start_deg=start_deg,
                 end_deg=end_deg,
             ),
-            tol=self.boolean_tolerance,
         )
-        bed = top.union(base, tol=self.boolean_tolerance).fillet(self.edge_rounding)
+        bed = top.union(base).fillet(self.edge_rounding)
 
         # Cut the empty volume of tube out of the clamp bed
         return clean_tube(path, bed, inner_radius)
@@ -362,7 +360,7 @@ class Builder:
             if len(self.clamp_lengths) > 2:
                 # Add the clamp bed
                 clamp_bed = self.build_clamp_bed(name, 0.5, **build_args)
-                part = part.union(clamp_bed, tol=self.boolean_tolerance)
+                part = part.union(clamp_bed)
         else:
             raise ValueError(f"Invalid name: {name}")
         return part
