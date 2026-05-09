@@ -94,11 +94,11 @@ class TestBuilder:
 
         # Check dist between driver inlet and outlet
         assert dist(driver_inlet_start, driver_outlet_start) == pytest.approx(315)
-        assert round(driver_outlet_start[2] - driver_inlet_start[2]) == pytest.approx(140)
+        assert round(driver_outlet_start[2] - driver_inlet_start[2]) == pytest.approx(141)
 
         # Check dist between passenger inlet and outlet
         assert dist(passenger_inlet_start, passenger_outlet_start) == pytest.approx(485)
-        assert round(passenger_outlet_start[2] - passenger_inlet_start[2]) == pytest.approx(170)
+        assert round(passenger_outlet_start[2] - passenger_inlet_start[2]) == pytest.approx(171)
 
     def test_wire(self, name, builder):
         """Perform wire testing.

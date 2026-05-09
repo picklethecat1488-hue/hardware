@@ -78,9 +78,9 @@ class AppConfig(BaseSettings):
             7: np.array([410, 350, 0]),
             8: np.array([392, 300, 0]),
             # p[9] driver exhaust output inlet start
-            9: np.array([200, 0, 520]),
+            9: np.array([200, 0, 522.5]),
             # p[10] passenger exhaust output inlet start
-            10: np.array([895, 0, 525]),
+            10: np.array([895, 0, 522.5]),
         }
         return p
 
@@ -92,16 +92,6 @@ class AppConfig(BaseSettings):
         :return _type_: The P and V vectors
         """
         p = self.get_measurements()
-
-        # Do some data correction here
-        outlet_arrays = np.stack([p[9], p[10]])
-        outlet_height = np.mean(outlet_arrays[:, 2])
-        p[9][2] = p[10][2] = outlet_height
-
-        vc_arrays = np.stack([p[1], p[2]])
-        vc_depth, vc_height = np.mean(vc_arrays[:, 1]), np.mean(vc_arrays[:, 2])
-        p[1][1] = p[2][1] = vc_depth
-        p[1][2] = p[2][2] = vc_height
 
         for idx in [3, 6, 9, 10]:
             p[idx][2] = p[idx][2] - (self.outer_diameter / 2)
