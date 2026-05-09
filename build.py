@@ -69,12 +69,12 @@ class AppConfig(BaseSettings):
             2: np.array([652, 205, 500]),
             # p[3] passenger exhaust input inlet start
             3: np.array([565, 356, 352]),
-            # p[4] -> p[5] direction of driver exhaust input
+            # p[4] -> p[5] direction of passenger exhaust input
             4: np.array([555, 327, 0]),
             5: np.array([480, 343, 0]),
             # p[6] driver exhaust input inlet start
             6: np.array([347, 279, 382]),
-            # p[7] -> p[8] direction of driver exhaust output
+            # p[7] -> p[8] direction of driver exhaust input
             7: np.array([410, 350, 0]),
             8: np.array([392, 300, 0]),
             # p[9] driver exhaust output inlet start
