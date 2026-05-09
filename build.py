@@ -261,10 +261,15 @@ class Builder:
         :return _type_: The wire path
         """
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
-        inlet_start, v_start, outlet_start, v_end = self.P[inlet_key], self.V[inlet_key], self.P[outlet_key], self.V[outlet_key]
+        inlet_start, v_start, outlet_start, v_end = (
+            self.P[inlet_key],
+            self.V[inlet_key],
+            self.P[outlet_key],
+            self.V[outlet_key],
+        )
         inlet_end = inlet_start + v_start * self.config.clamp_lengths[0]
         outlet_end = outlet_start + v_end * self.config.clamp_lengths[-1]
-        
+
         wire = cq.Wire.assembleEdges(
             [
                 cq.Edge.makeLine(cq.Vector(*inlet_start), cq.Vector(*inlet_end)),

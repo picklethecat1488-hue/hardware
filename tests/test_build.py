@@ -150,7 +150,6 @@ class TestBuilder:
                     assert inter_result.val().Volume() == pytest.approx(0), (
                         f"intersection detected between {name},right={right} and {other_name},right={other_right}"
                     )
-        return True
 
     def test_in_bounds(self, builder, name, right):
         """Test the parts are in bounds.
