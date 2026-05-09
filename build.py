@@ -75,8 +75,8 @@ class AppConfig(BaseSettings):
             # p[6] driver exhaust input inlet start
             6: np.array([347, 279, 382]),
             # p[7] -> p[8] direction of driver exhaust input
-            7: np.array([410, 350, 0]),
-            8: np.array([392, 300, 0]),
+            7: np.array([0, 0, 0]),
+            8: np.array([-0.33871947, -0.90882745, 0.24351958]),
             # p[9] driver exhaust output inlet start
             9: np.array([200, 0, 522.5]),
             # p[10] passenger exhaust output inlet start
@@ -91,18 +91,15 @@ class AppConfig(BaseSettings):
 
         :return _type_: The P and V vectors
         """
-        p = self.get_measurements()
-
-        for idx in [3, 6, 9, 10]:
-            p[idx][2] = p[idx][2] - (self.outer_diameter / 2)
 
         def dir_vector(start, end):
             """Generate a 3D direction vector for the given points, e.g. p[4] and p[5]."""
             return (end - start) / np.linalg.norm(end - start)
 
-        theta = np.radians(15)
-        c, s = np.cos(theta), np.sin(theta)
-        R_driver_inlet = np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
+        p = self.get_measurements()
+
+        for idx in [3, 6, 9, 10]:
+            p[idx][2] = p[idx][2] - (self.outer_diameter / 2)
 
         P = {
             "driver_inlet": p[6],
@@ -112,7 +109,7 @@ class AppConfig(BaseSettings):
         }
 
         V = {
-            "driver_inlet": dir_vector(p[7], p[8]) @ R_driver_inlet,
+            "driver_inlet": dir_vector(p[7], p[8]),
             "driver_outlet": np.array([-1, 0, 0]),
             "passenger_inlet": dir_vector(p[5], p[4]),
             "passenger_outlet": np.array([1, 0, 0]),

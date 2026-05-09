@@ -259,3 +259,34 @@ class TestBuilder:
             for name in builder.config.names:
                 for side in ["left", "right"]:
                     assert f"{builder.config.project_name}_v{builder.config.ver}_{name}_{side}.stl" in contents
+
+    def test_end_angle(self, builder, name):
+        """Test the inlet slope on the driver inlet.
+
+        :param _type_ builder: The Builder to test.
+        :param _type_ name: The name of the part to test
+        """
+
+        def get_angle(key):
+            """Return the veritcal angle for the given exhaust end.
+
+            :param _type_ key: The key to return.
+            :return _type_: The angle in degrees.
+            """
+            z_axis = cq.Vector(0, 0, 1)
+            v_test = cq.Vector(*builder.V[key])
+            angle = 90 - math.degrees(v_test.getAngle(z_axis))
+            return angle
+
+        # Horizontal magnitude (distance in XY plane)
+        inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
+
+        # Test inlet angle
+        angle = get_angle(inlet_key)
+        expected_angle = 14.09 if name == "driver" else 0
+        assert round(angle, 2) == pytest.approx(expected_angle)
+
+        # Test outlet angle
+        angle = get_angle(outlet_key)
+        expected_angle = 0
+        assert round(angle, 2) == pytest.approx(expected_angle)
