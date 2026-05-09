@@ -261,25 +261,19 @@ class Builder:
         :return _type_: The wire path
         """
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
-        p_start, v_start, p_end, v_end = self.P[inlet_key], self.V[inlet_key], self.P[outlet_key], self.V[outlet_key]
-
-        # Inlet start
-        p1 = p_start
-        # Inlet end
-        p2 = p_start + v_start * self.config.clamp_lengths[0]
-        # Outlet start
-        p3 = p_end
-        # Outlet end
-        p4 = p_end + v_end * self.config.clamp_lengths[-1]
+        inlet_start, v_start, outlet_start, v_end = self.P[inlet_key], self.V[inlet_key], self.P[outlet_key], self.V[outlet_key]
+        inlet_end = inlet_start + v_start * self.config.clamp_lengths[0]
+        outlet_end = outlet_start + v_end * self.config.clamp_lengths[-1]
+        
         wire = cq.Wire.assembleEdges(
             [
-                cq.Edge.makeLine(cq.Vector(*p1), cq.Vector(*p2)),
+                cq.Edge.makeLine(cq.Vector(*inlet_start), cq.Vector(*inlet_end)),
                 cq.Edge.makeSpline(
-                    listOfVector=[cq.Vector(*p2), cq.Vector(*p3)],
+                    listOfVector=[cq.Vector(*inlet_end), cq.Vector(*outlet_start)],
                     tangents=(cq.Vector(*v_start), cq.Vector(*v_end)),
                     periodic=False,
                 ),
-                cq.Edge.makeLine(cq.Vector(*p3), cq.Vector(*p4)),
+                cq.Edge.makeLine(cq.Vector(*outlet_start), cq.Vector(*outlet_end)),
             ]
         )
         path = cq.Workplane("XY").add(wire)
