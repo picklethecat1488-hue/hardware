@@ -6,7 +6,7 @@ import numpy as np
 import os
 from pathlib import Path
 import cadquery as cq
-from functools import lru_cache
+from functools import lru_cache, cached_property
 from IPython.core.getipython import get_ipython
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
@@ -55,99 +55,39 @@ class AppConfig(BaseSettings):
     # The part names, driver and passenger
     names: list[str] = ["driver", "passenger"]
 
+    # Raw measurements used for part construction
+    _measurements: list[tuple[float, float, float]] = [
+        # p[1] -> p[2] valve controller bottom plane
+        (443, 152, 521),
+        (652, 205, 500),
+        # p(3) passenger exhaust input inlet start
+        (565, 356, 352),
+        # p(4) -> p(5) direction of passenger exhaust input
+        (555, 327, 0),
+        (480, 343, 0),
+        # p(6) driver exhaust input inlet start
+        (347, 279, 382),
+        # p(7) -> p(8) direction of driver exhaust input
+        (0, 0, 0),
+        (-0.33871947, -0.90882745, 0.24351958),
+        # p(9) driver exhaust output inlet start
+        (200, 0, 522.5),
+        # p(10) passenger exhaust output inlet start
+        (895, 0, 522.5),
+    ]
+
     model_config = SettingsConfigDict(env_file=".env")
 
-    def get_measurements(self):
+    @cached_property
+    def measurements(self):
         """Get the raw measurements used for the project.
 
         :return _type_: The raw measurement points.
         """
-        # Define the raw measurements taken here
-        p = {
-            # p[1] -> p[2] valve controller bottom plane
-            1: np.array([443, 152, 521]),
-            2: np.array([652, 205, 500]),
-            # p[3] passenger exhaust input inlet start
-            3: np.array([565, 356, 352]),
-            # p[4] -> p[5] direction of passenger exhaust input
-            4: np.array([555, 327, 0]),
-            5: np.array([480, 343, 0]),
-            # p[6] driver exhaust input inlet start
-            6: np.array([347, 279, 382]),
-            # p[7] -> p[8] direction of driver exhaust input
-            7: np.array([0, 0, 0]),
-            8: np.array([-0.33871947, -0.90882745, 0.24351958]),
-            # p[9] driver exhaust output inlet start
-            9: np.array([200, 0, 522.5]),
-            # p[10] passenger exhaust output inlet start
-            10: np.array([895, 0, 522.5]),
-        }
+        p = {}
+        for idx, item in enumerate(self._measurements):
+            p[idx + 1] = np.array(item)
         return p
-
-    def get_p_v(self):
-        """Return the P and V dictionaries for the environment.
-
-        The P and V dictionaries define inlet and outlet points and directions for each model.
-
-        :return _type_: The P and V vectors
-        """
-
-        def dir_vector(start, end):
-            """Generate a 3D direction vector for the given points, e.g. p[4] and p[5]."""
-            return (end - start) / np.linalg.norm(end - start)
-
-        p = self.get_measurements()
-
-        for idx in [3, 6, 9, 10]:
-            p[idx][2] = p[idx][2] - (self.outer_diameter / 2)
-
-        P = {
-            "driver_inlet": p[6],
-            "driver_outlet": p[9],
-            "passenger_inlet": p[3],
-            "passenger_outlet": p[10],
-        }
-
-        V = {
-            "driver_inlet": dir_vector(p[7], p[8]),
-            "driver_outlet": np.array([-1, 0, 0]),
-            "passenger_inlet": dir_vector(p[5], p[4]),
-            "passenger_outlet": np.array([1, 0, 0]),
-        }
-
-        return P, V
-
-    def get_bounds(self):
-        """Return the application bounds.
-
-        The bounds are an Axis Aligned Boundary Box representing the valid space parts may occupy.
-
-        :return _type_: The bounding box.
-        """
-        # Create the overall bounds.
-        x_len = np.max(self.x_bounds) - np.min(self.x_bounds)
-        y_len = np.max(self.y_bounds) - np.min(self.y_bounds)
-        z_len = np.max(self.z_bounds) - np.min(self.z_bounds)
-        center = (
-            np.min(self.x_bounds) + x_len / 2,
-            np.min(self.y_bounds) + y_len / 2,
-            np.min(self.z_bounds) + z_len / 2,
-        )
-        bounds = cq.Workplane("XY").box(x_len, y_len, z_len).translate(center)
-
-        # Subtract the valve controller bottom plane from the overall bounds.
-        p = self.get_measurements()
-        x_len = p[2][0] - p[1][0]
-        y_len = np.max(self.y_bounds) - np.mean([p[2][1], p[1][1]])
-        z_len = np.max(self.z_bounds) - np.mean([p[2][2], p[1][2]])
-        center = (
-            np.min([p[2][0], p[1][0]]) + x_len / 2,
-            np.min([p[2][1], p[1][1]]) + y_len / 2,
-            np.min([p[2][2], p[1][2]]) + z_len / 2,
-        )
-        top_plane = cq.Workplane("XY").box(x_len, y_len, z_len).translate(center)
-        bounds = bounds.cut(top_plane)
-        return bounds
 
 
 class Logger:
@@ -233,9 +173,63 @@ class Builder:
 
     def __init__(self, config=None, logger=None):
         """Initialize the builder."""
+
+        def dir_vector(start, end):
+            """Generate a 3D direction vector for the given points, e.g. p[4] and p[5]."""
+            return (end - start) / np.linalg.norm(end - start)
+
         self.config = config or AppConfig()
         self.logger = logger or Logger(enabled=False)
-        self.P, self.V = self.config.get_p_v()
+        self.p = self.config.measurements
+
+        for idx in [3, 6, 9, 10]:
+            self.p[idx][2] = self.p[idx][2] - (self.config.outer_diameter / 2)
+
+        self.P = {
+            "driver_inlet": self.p[6],
+            "driver_outlet": self.p[9],
+            "passenger_inlet": self.p[3],
+            "passenger_outlet": self.p[10],
+        }
+
+        self.V = {
+            "driver_inlet": dir_vector(self.p[7], self.p[8]),
+            "driver_outlet": np.array([-1, 0, 0]),
+            "passenger_inlet": dir_vector(self.p[5], self.p[4]),
+            "passenger_outlet": np.array([1, 0, 0]),
+        }
+
+    @lru_cache
+    def build_bound_box(self):
+        """Build the bounding box.
+
+        The bounds are an Axis Aligned Boundary Box representing the valid space parts may occupy.
+
+        :return _type_: The bounding box.
+        """
+        # Create the overall bounds.
+        x_len = np.max(self.config.x_bounds) - np.min(self.config.x_bounds)
+        y_len = np.max(self.config.y_bounds) - np.min(self.config.y_bounds)
+        z_len = np.max(self.config.z_bounds) - np.min(self.config.z_bounds)
+        center = (
+            np.min(self.config.x_bounds) + x_len / 2,
+            np.min(self.config.y_bounds) + y_len / 2,
+            np.min(self.config.z_bounds) + z_len / 2,
+        )
+        bounds = cq.Workplane("XY").box(x_len, y_len, z_len).translate(center)
+
+        # Subtract the valve controller bottom plane from the overall bounds.
+        x_len = self.p[2][0] - self.p[1][0]
+        y_len = np.max(self.config.y_bounds) - np.mean([self.p[2][1], self.p[1][1]])
+        z_len = np.max(self.config.z_bounds) - np.mean([self.p[2][2], self.p[1][2]])
+        center = (
+            np.min([self.p[2][0], self.p[1][0]]) + x_len / 2,
+            np.min([self.p[2][1], self.p[1][1]]) + y_len / 2,
+            np.min([self.p[2][2], self.p[1][2]]) + z_len / 2,
+        )
+        top_plane = cq.Workplane("XY").box(x_len, y_len, z_len).translate(center)
+        bounds = bounds.cut(top_plane)
+        return bounds
 
     @lru_cache
     def create_wire(self, name):

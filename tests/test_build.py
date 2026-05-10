@@ -95,6 +95,7 @@ class TestBuilder:
         # Check dist between driver inlet and outlet
         assert dist(driver_inlet_start, driver_outlet_start) == pytest.approx(315)
         assert round(driver_outlet_start[2] - driver_inlet_start[2]) == pytest.approx(141)
+        print(f"{driver_outlet_start[2]} {driver_inlet_start[2]}")
 
         # Check dist between passenger inlet and outlet
         assert dist(passenger_inlet_start, passenger_outlet_start) == pytest.approx(485)
@@ -159,7 +160,7 @@ class TestBuilder:
         :param _type_ right: True if testing the right side
         """
         part = builder.build_part(name, right=right)
-        proj_bounds = builder.config.get_bounds()
+        proj_bounds = builder.build_bound_box()
         volume = part.cut(proj_bounds).val().Volume()
 
         assert volume == pytest.approx(0)
