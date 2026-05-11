@@ -49,6 +49,9 @@ class AppConfig(BaseSettings):
     # The minimum space between each clanp bed
     clamp_space: float = 10
 
+    # The clamp position
+    clamp_pos: float = 0.5
+
     # Applying a 0.5mm fillet/chamfer to all objects.
     edge_rounding: float = 0.5
 
@@ -347,7 +350,7 @@ class Builder:
         return ring
 
     @lru_cache
-    def build_clamp_bed(self, name, off, clamp_space=None, start_deg: float = 0, end_deg: float = 360):
+    def build_clamp_bed(self, name, clamp_space=None, start_deg: float = 0, end_deg: float = 360):
         """Build a clamp bed.
 
         :param _type_ name: The part name to build.
@@ -366,7 +369,7 @@ class Builder:
             :return _type_: The clamp bed.
             """
             # Cut the empty volume of tube out of the clamp bed
-            loc = path.val().locationAt(off)
+            loc = path.val().locationAt(self.config.clamp_pos)
             profile = self.create_profile(loc, 0, 360, outer_radius=inner_radius)
             tube = cq.Workplane(loc).placeSketch(profile.val()).sweep(path, transition="round")  # type: ignore
             bed = bed.cut(tube)
@@ -386,7 +389,7 @@ class Builder:
         # Create the clamp bed out of multiple ring profiles
         top = self.create_ring(
             path,
-            off,
+            self.config.clamp_pos,
             length,
             inner_radius=outer_radius - self.config.wall_thickness,
             outer_radius=outer_radius,
@@ -395,7 +398,7 @@ class Builder:
         )
         base = self.create_ring(
             path,
-            off,
+            self.config.clamp_pos,
             length - self.config.wall_thickness,
             inner_radius=inner_radius,
             outer_radius=outer_radius - self.config.wall_thickness,
@@ -404,7 +407,7 @@ class Builder:
         ).cut(
             self.create_ring(
                 path,
-                off,
+                self.config.clamp_pos,
                 self.config.wall_thickness,
                 inner_radius=inner_radius,
                 outer_radius=outer_radius - self.config.wall_thickness,
