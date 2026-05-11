@@ -79,7 +79,7 @@ class AppConfig(BaseSettings):
         (895, 0, 522.5),
     ]
 
-    model_config = SettingsConfigDict(env_file=None, env_prefix='APP_')
+    model_config = SettingsConfigDict(env_file=None, env_prefix="APP_")
 
     @cached_property
     def measurements(self):
