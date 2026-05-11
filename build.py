@@ -319,12 +319,12 @@ class Builder:
         return tube
 
     def create_ring(
-        self, path, off, len, inner_radius=None, outer_radius=None, start_deg: float = 0, end_deg: float = 360
+        self, name, off, len, inner_radius=None, outer_radius=None, start_deg: float = 0, end_deg: float = 360
     ):
         """Create a ring at a given offset.
 
-        :param _type_ path: The ring path
-        :param _type_ path: The path offset
+        :param _type_ name: The part name.
+        :param _type_ off: The ring offset
         :param _type_ len: The ring length
         :param _type_ inner_radius: The inner radius.
         :param _type_ outer_radius: The outer radius.
@@ -332,6 +332,7 @@ class Builder:
         :param _type_ end_deg: The end angle.
         :return _type_: The ring
         """
+        path = self.create_wire(name)
         loc = path.val().locationAt(off)
         workplane = cq.Workplane(loc)
         profile_sketch = self.create_profile_sketch(
@@ -356,14 +357,13 @@ class Builder:
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :return _type_: The clamp bed
         """
-        path = self.create_wire(name)
         length = self.config.clamp_lengths[1]
         outer_radius = self.config.clamp_diameter / 2
         inner_radius = (self.config.outer_diameter - self.config.wall_thickness) / 2
 
         # Create the clamp bed
         bed = self.create_ring(
-            path,
+            name,
             self.config.clamp_pos,
             length,
             inner_radius=inner_radius,

@@ -192,13 +192,13 @@ class TestBuilder:
 
         # Check if we can move clamp over section
         clamp_off = builder.create_ring(
-            path, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected
+            name, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected
         )
         assert part.intersect(clamp_off).val().Volume() == pytest.approx(0)
 
         # Check if we can push clamp onto section
         clamp_on = builder.create_ring(
-            path, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected - 0.01
+            name, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected - 0.01
         )
         assert part.intersect(clamp_on).val().Volume() > 0
 
