@@ -384,7 +384,7 @@ class Builder:
         path = self.create_wire(name)
         inner_radius = (self.config.outer_diameter) / 2 - self.config.wall_thickness
         tube_loc = path.val().locationAt(0)
-        profile_sketch = self.create_profile_sketch(0, 360, outer_radius=inner_radius)
+        profile_sketch = self.create_profile_sketch(0, 360, outer_radius=inner_radius, inner_radius=0)
         tube = cq.Workplane(tube_loc).placeSketch(profile_sketch).sweep(path, transition="round")  # type: ignore
         return tube
 
