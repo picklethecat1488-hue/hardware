@@ -1,7 +1,7 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-qq -n auto"
+addopts = "-qq -n auto -x"
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
