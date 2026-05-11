@@ -47,7 +47,7 @@ class AppConfig(BaseSettings):
     clamp_lengths: list[float] = [50.4, 25.4, 50.4]
 
     # The minimum space between each clanp bed
-    clamp_space: float = 10
+    clamp_space: float = 20
 
     # The clamp position
     clamp_pos: float = 0.5
@@ -268,11 +268,10 @@ class Builder:
         path = cq.Workplane("XY").add(wire)
         return path
 
-    def create_profile(self, loc, start_deg, end_deg, outer_radius=None, inner_radius=None):
-        """Create a profile section using the given radius.
+    def create_profile_sketch(self, start_deg, end_deg, outer_radius=None, inner_radius=None):
+        """Create a profile sketch using the given radius.
 
         :param _type_ path_obj: The wire path.
-        :param _type_ off: The section offset from the path start.
         :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :param int outer_radius: The optional outer radius of the profile.
@@ -297,8 +296,7 @@ class Builder:
             # Subtract the center to make it hollow
             sketch = sketch.circle(inner_radius, mode="s")
         sketch = sketch.clean()
-        profile = cq.Workplane(loc).placeSketch(sketch)
-        return profile
+        return sketch
 
     @lru_cache
     def build_tube(self, name, start_deg: float = 0, end_deg: float = 360):
@@ -310,11 +308,11 @@ class Builder:
         :return _type_: The exhaust manifold
         """
         path = self.create_wire(name)
-        loc = path.val().locationAt(0)  # type: ignore
-        profile = self.create_profile(loc, start_deg, end_deg)
+        loc = path.val().locationAt(0)
+        profile_sketch = self.create_profile_sketch(start_deg, end_deg)
         tube = (
             cq.Workplane(loc)
-            .placeSketch(profile.val())  # type: ignore
+            .placeSketch(profile_sketch)  # type: ignore
             .sweep(path, transition="round")
             .fillet(self.config.edge_rounding)
         )
@@ -335,18 +333,17 @@ class Builder:
         :return _type_: The ring
         """
         loc = path.val().locationAt(off)
-        tan = path.val().tangentAt(off)
-        profile = self.create_profile(
-            loc,
+        workplane = cq.Workplane(loc)
+        profile_sketch = self.create_profile_sketch(
             start_deg,
             end_deg,
             outer_radius=outer_radius,
             inner_radius=inner_radius,
         )
         p1 = path.val().positionAt(off)
-        p2 = p1 + (tan * len)
-        path = cq.Workplane(loc).polyline([p1, p2])
-        ring = cq.Workplane(loc).placeSketch(profile.val()).sweep(path)  # type: ignore
+        p2 = path.val().positionAt(off + len / path.val().Length())
+        path = workplane.polyline([p1, p2])
+        ring = workplane.placeSketch(profile_sketch).sweep(path)  # type: ignore
         return ring
 
     @lru_cache
@@ -370,8 +367,8 @@ class Builder:
             """
             # Cut the empty volume of tube out of the clamp bed
             loc = path.val().locationAt(self.config.clamp_pos)
-            profile = self.create_profile(loc, 0, 360, outer_radius=inner_radius)
-            tube = cq.Workplane(loc).placeSketch(profile.val()).sweep(path, transition="round")  # type: ignore
+            profile_sketch = self.create_profile_sketch(0, 360, outer_radius=inner_radius)
+            tube = cq.Workplane(loc).placeSketch(profile_sketch).sweep(path, transition="round")  # type: ignore
             bed = bed.cut(tube)
             return bed
 
@@ -412,7 +409,7 @@ class Builder:
                 end_deg=end_deg,
             ),
         )
-        bed = top.union(base).fillet(self.config.edge_rounding)
+        bed = top.union(base)  # .fillet(self.config.edge_rounding)
 
         # Cut the empty volume of tube out of the clamp bed
         return clean_tube(path, bed, inner_radius)
