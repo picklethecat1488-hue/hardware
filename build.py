@@ -350,7 +350,7 @@ class Builder:
         return ring
 
     @lru_cache
-    def build_clamp_bed(self, name, clamp_space=None, start_deg: float = 0, end_deg: float = 360):
+    def build_clamp_bed(self, name, start_deg: float = 0, end_deg: float = 360):
         """Build a clamp bed.
 
         :param _type_ name: The part name to build.
@@ -375,15 +375,12 @@ class Builder:
             bed = bed.cut(tube)
             return bed
 
-        if clamp_space is None:
-            clamp_space = self.config.clamp_space
-
         path = self.create_wire(name)
         length = self.config.clamp_lengths[1]
         outer_radius = self.config.clamp_diameter / 2
         inner_radius = (self.config.outer_diameter - self.config.wall_thickness) / 2
         space_sign = 1 if start_deg < end_deg else -1
-        space_deg = space_sign * clamp_space / 2
+        space_deg = space_sign * self.config.clamp_space / 2
         start_deg, end_deg = start_deg + space_deg, end_deg - space_deg
 
         # Create the clamp bed out of multiple ring profiles
@@ -434,7 +431,7 @@ class Builder:
             part = self.build_tube(name, **build_args)
             if len(self.config.clamp_lengths) > 2:
                 # Add the clamp bed
-                clamp_bed = self.build_clamp_bed(name, 0.5, **build_args)
+                clamp_bed = self.build_clamp_bed(name, **build_args)
                 part = part.union(clamp_bed)
         else:
             raise ValueError(f"Invalid name: {name}")
