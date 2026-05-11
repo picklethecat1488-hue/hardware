@@ -47,7 +47,7 @@ class AppConfig(BaseSettings):
     clamp_lengths: list[float] = [50.4, 25.4, 50.4]
 
     # The minimum space between each clanp bed
-    clamp_space: float = 20
+    clamp_space: float = 10
 
     # The clamp position
     clamp_pos: float = 0.5
@@ -409,7 +409,7 @@ class Builder:
                 end_deg=end_deg,
             ),
         )
-        bed = top.union(base)  # .fillet(self.config.edge_rounding)
+        bed = top.fillet(self.config.edge_rounding).union(base)
 
         # Cut the empty volume of tube out of the clamp bed
         return clean_tube(path, bed, inner_radius)
