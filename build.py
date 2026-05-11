@@ -362,24 +362,31 @@ class Builder:
         inner_radius = (self.config.outer_diameter - self.config.wall_thickness) / 2
 
         # Create the clamp bed
+        bed = self.create_ring(
+            path,
+            self.config.clamp_pos,
+            length,
+            inner_radius=inner_radius,
+            outer_radius=outer_radius,
+            start_deg=start_deg,
+            end_deg=end_deg,
+        ).fillet(self.config.edge_rounding)
+        return bed
+
+    @lru_cache
+    def build_clean_tool(self, name):
+        """Build the clean tool.
+
+        :param _type_ name: The name of the part to build for.
+        :return _type_: The clean tool to cut excess inner part volume off of.
+        """
+        # Create the clean tool
+        path = self.create_wire(name)
+        inner_radius = (self.config.outer_diameter) / 2 - self.config.wall_thickness
         tube_loc = path.val().locationAt(0)
         profile_sketch = self.create_profile_sketch(0, 360, outer_radius=inner_radius)
         tube = cq.Workplane(tube_loc).placeSketch(profile_sketch).sweep(path, transition="round")  # type: ignore
-
-        bed = (
-            self.create_ring(
-                path,
-                self.config.clamp_pos,
-                length,
-                inner_radius=inner_radius,
-                outer_radius=outer_radius,
-                start_deg=start_deg,
-                end_deg=end_deg,
-            )
-            .fillet(self.config.edge_rounding)
-            .cut(tube)
-        )
-        return bed
+        return tube
 
     @lru_cache
     def build_part(self, name, right=False):
@@ -401,6 +408,9 @@ class Builder:
                 }
                 clamp_bed = self.build_clamp_bed(name, **clamp_build_args)
                 part = part.union(clamp_bed)
+            # Clean the inner part volume
+            clean_tool = self.build_clean_tool(name)
+            part = part.cut(clean_tool)
         else:
             raise ValueError(f"Invalid name: {name}")
         return part
