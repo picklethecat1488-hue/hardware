@@ -356,63 +356,30 @@ class Builder:
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :return _type_: The clamp bed
         """
-
-        def clean_tube(path, bed, inner_radius):
-            """Clean up the tube after adding the clamp bed.
-
-            :param _type_ path: The tube path
-            :param _type_ bed: The clamp bed
-            :param _type_ inner_radius: The inner radius.
-            :return _type_: The clamp bed.
-            """
-            # Cut the empty volume of tube out of the clamp bed
-            loc = path.val().locationAt(self.config.clamp_pos)
-            profile_sketch = self.create_profile_sketch(0, 360, outer_radius=inner_radius)
-            tube = cq.Workplane(loc).placeSketch(profile_sketch).sweep(path, transition="round")  # type: ignore
-            bed = bed.cut(tube)
-            return bed
-
         path = self.create_wire(name)
         length = self.config.clamp_lengths[1]
         outer_radius = self.config.clamp_diameter / 2
         inner_radius = (self.config.outer_diameter - self.config.wall_thickness) / 2
-        space_sign = 1 if start_deg < end_deg else -1
-        space_deg = space_sign * self.config.clamp_space / 2
-        start_deg, end_deg = start_deg + space_deg, end_deg - space_deg
 
-        # Create the clamp bed out of multiple ring profiles
-        top = self.create_ring(
-            path,
-            self.config.clamp_pos,
-            length,
-            inner_radius=outer_radius - self.config.wall_thickness,
-            outer_radius=outer_radius,
-            start_deg=start_deg,
-            end_deg=end_deg,
-        )
-        base = self.create_ring(
-            path,
-            self.config.clamp_pos,
-            length - self.config.wall_thickness,
-            inner_radius=inner_radius,
-            outer_radius=outer_radius - self.config.wall_thickness,
-            start_deg=start_deg,
-            end_deg=end_deg,
-        ).cut(
+        # Create the clamp bed
+        tube_loc = path.val().locationAt(0)
+        profile_sketch = self.create_profile_sketch(0, 360, outer_radius=inner_radius)
+        tube = cq.Workplane(tube_loc).placeSketch(profile_sketch).sweep(path, transition="round")  # type: ignore
+
+        bed = (
             self.create_ring(
                 path,
                 self.config.clamp_pos,
-                self.config.wall_thickness,
+                length,
                 inner_radius=inner_radius,
-                outer_radius=outer_radius - self.config.wall_thickness,
+                outer_radius=outer_radius,
                 start_deg=start_deg,
                 end_deg=end_deg,
-            ),
+            )
+            .fillet(self.config.edge_rounding)
+            .cut(tube)
         )
-        bed = top.fillet(self.config.edge_rounding).union(base)
-
-        # Cut the empty volume of tube out of the clamp bed
-        return clean_tube(path, bed, inner_radius)
+        return bed
 
     @lru_cache
     def build_part(self, name, right=False):
@@ -428,7 +395,11 @@ class Builder:
             part = self.build_tube(name, **build_args)
             if len(self.config.clamp_lengths) > 2:
                 # Add the clamp bed
-                clamp_bed = self.build_clamp_bed(name, **build_args)
+                clamp_build_args = {
+                    "start_deg": build_args["start_deg"] + self.config.clamp_space,
+                    "end_deg": build_args["end_deg"] - self.config.clamp_space,
+                }
+                clamp_bed = self.build_clamp_bed(name, **clamp_build_args)
                 part = part.union(clamp_bed)
         else:
             raise ValueError(f"Invalid name: {name}")
