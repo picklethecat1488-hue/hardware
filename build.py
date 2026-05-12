@@ -43,11 +43,14 @@ class AppConfig(BaseSettings):
     # Inlet and outlet clamp length 2", inner clamp length 1"
     clamp_lengths: list[float] = [50.4, 25.4, 50.4]
 
+    # The clamp positions, each one is a tuple of path offset and angle offset
+    clamp_positions: dict[str, list[tuple[float, float] | None]] = {
+        "driver": [None, (0.5, 0), None],
+        "passenger": [None, (0.5, 0), None],
+    }
+
     # The minimum space between each clamp bed
     clamp_space: float = 10
-
-    # The clamp position
-    clamp_pos: float = 0.5
 
     # Applying a 0.5mm fillet/chamfer to all objects.
     edge_rounding: float = 0.5
@@ -347,28 +350,29 @@ class Builder:
         return ring
 
     @lru_cache
-    def build_clamp_bed(self, name, start_deg: float = 0, end_deg: float = 360):
+    def build_clamp_bed(self, name, clamp_idx, start_deg: float = 0, end_deg: float = 360):
         """Build a clamp bed.
 
         :param _type_ name: The part name to build.
-        :param _type_ off: The tube offset to build the clamp bed
+        :param _type_ clamp_idx: The clamp index to build
         :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
         :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
         :return _type_: The clamp bed
         """
-        length = self.config.clamp_lengths[1]
-        outer_radius = self.config.clamp_diameters[1] / 2
+        length = self.config.clamp_lengths[clamp_idx]
+        outer_radius = self.config.clamp_diameters[clamp_idx] / 2
         inner_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
+        clamp_pos, angle_offset = self.config.clamp_positions[name][clamp_idx]
 
         # Create the clamp bed
         bed = self.create_ring(
             name,
-            self.config.clamp_pos,
+            clamp_pos,
             length,
             inner_radius=inner_radius,
             outer_radius=outer_radius,
-            start_deg=start_deg,
-            end_deg=end_deg,
+            start_deg=angle_offset + start_deg + self.config.clamp_space,
+            end_deg=angle_offset + end_deg - self.config.clamp_space,
         ).fillet(self.config.edge_rounding)
         return bed
 
@@ -399,13 +403,9 @@ class Builder:
             # Create the main part body.
             build_args = {"start_deg": (0 if right else 180), "end_deg": (180 if right else 360)}
             part = self.build_tube(name, **build_args)
-            if len(self.config.clamp_lengths) > 2:
-                # Add the clamp bed
-                clamp_build_args = {
-                    "start_deg": build_args["start_deg"] + self.config.clamp_space,
-                    "end_deg": build_args["end_deg"] - self.config.clamp_space,
-                }
-                clamp_bed = self.build_clamp_bed(name, **clamp_build_args)
+            for idx in range(1, len(self.config.clamp_positions[name]) - 1):
+                # Add inner clamp beds.
+                clamp_bed = self.build_clamp_bed(name, idx, **build_args)
                 part = part.union(clamp_bed)
             # Clean the inner part volume
             clean_tool = self.build_clean_tool(name)
