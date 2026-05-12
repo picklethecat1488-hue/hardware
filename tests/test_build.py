@@ -178,11 +178,7 @@ class TestBuilder:
 
         # Map clamp_idx to clamp paraeters
         offsets = [0, 0.5, (length - builder.config.clamp_lengths[-1]) / length]
-        expected = [
-            builder.config.outer_diameter / 2,
-            builder.config.clamp_diameter / 2,
-            builder.config.outer_diameter / 2,
-        ]
+        expected = np.array(builder.config.clamp_diameters) / 2
         part = builder.build_part(name, right=right)
         pos, len, expected = (
             offsets[clamp_idx],

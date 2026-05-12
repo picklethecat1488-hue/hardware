@@ -37,16 +37,13 @@ class AppConfig(BaseSettings):
     # Wall thickness ~1.4mm
     wall_thickness: float = 1.4
 
-    # Inlet and outlet diameters, 2.5"
-    outer_diameter: float = 63.5
-
-    # Inner clamp diameter 3"
-    clamp_diameter: float = 76.2
+    # Inlet and outlet diameters, 2.5", inner clamp diameter 3"
+    clamp_diameters: list[float] = [63.5, 76.2, 63.5]
 
     # Inlet and outlet clamp length 2", inner clamp length 1"
     clamp_lengths: list[float] = [50.4, 25.4, 50.4]
 
-    # The minimum space between each clanp bed
+    # The minimum space between each clamp bed
     clamp_space: float = 10
 
     # The clamp position
@@ -185,8 +182,10 @@ class Builder:
         self.logger = logger or Logger(enabled=False)
         self.p = self.config.measurements
 
-        for idx in [3, 6, 9, 10]:
-            self.p[idx][2] = self.p[idx][2] - (self.config.outer_diameter / 2)
+        for idx in [3, 6]:
+            self.p[idx][2] = self.p[idx][2] - (self.config.clamp_diameters[0] / 2)
+        for idx in [9, 10]:
+            self.p[idx][2] = self.p[idx][2] - (self.config.clamp_diameters[-1] / 2)
 
         self.P = {
             "driver_inlet": self.p[6],
@@ -279,7 +278,7 @@ class Builder:
         :return _type_: The profile section.
         """
         if outer_radius is None:
-            outer_radius = self.config.outer_diameter / 2
+            outer_radius = min(self.config.clamp_diameters) / 2
         if inner_radius is None:
             inner_radius = outer_radius - self.config.wall_thickness
         if inner_radius >= outer_radius:
@@ -358,8 +357,8 @@ class Builder:
         :return _type_: The clamp bed
         """
         length = self.config.clamp_lengths[1]
-        outer_radius = self.config.clamp_diameter / 2
-        inner_radius = (self.config.outer_diameter - self.config.wall_thickness) / 2
+        outer_radius = self.config.clamp_diameters[1] / 2
+        inner_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
 
         # Create the clamp bed
         bed = self.create_ring(
@@ -382,7 +381,7 @@ class Builder:
         """
         # Create the clean tool
         path = self.create_wire(name)
-        inner_radius = (self.config.outer_diameter) / 2 - self.config.wall_thickness
+        inner_radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
         tube_loc = path.val().locationAt(0)
         profile_sketch = self.create_profile_sketch(0, 360, outer_radius=inner_radius, inner_radius=0)
         tube = cq.Workplane(tube_loc).placeSketch(profile_sketch).sweep(path, transition="round")  # type: ignore
