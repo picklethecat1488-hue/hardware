@@ -84,7 +84,7 @@ class Configurator:
         tube = self.builder.build_part(name, right=True, tube_only=True)
         other_tube = self.builder.build_part(name, tube_only=True)
         path = self.builder.create_wire(name)
-        text_offset, _, is_mirrored = self.config.logo_text_positions[name]
+        text_offset, _ = self.config.logo_text_positions[name]
         center = self.get_part_position(tube, path, text_offset)
         min_distance = float("inf")
         offset_deg = None
@@ -102,7 +102,7 @@ class Configurator:
 
         # Update the text offset
         if not offset_deg is None:
-            self.config.logo_text_positions[name] = (text_offset, float(offset_deg), is_mirrored)  # type: ignore
+            self.config.logo_text_positions[name] = (text_offset, float(offset_deg))  # type: ignore
             self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
 
     def configure_clamps(self, names=None):
