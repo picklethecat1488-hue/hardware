@@ -291,3 +291,33 @@ class TestBuilder:
         angle = get_angle(outlet_key)
         expected_angle = 0
         assert round(angle, 2) == pytest.approx(expected_angle)
+
+    def test_overall_bounds(self, builder, name):
+        """Test the overall bounds of an assembly.
+
+        :param _type_ builder: The Builder to test.
+        :param _type_ name: The name of the part to test
+        """
+        part = builder.build_part(name).union(builder.build_part(name, right=True))
+        bbox = part.val().BoundingBox()
+
+        if name == "driver":
+            xmin, xlen = 150, 227
+            ymin, ylen = -32, 324
+            zmin, zlen = 319, 203
+        elif name == "passenger":
+            xmin, xlen = 558, 387
+            ymin, ylen = -32, 419
+            zmin, zlen = 288, 234
+        else:
+            raise ValueError("Invalid part name")
+
+        # Make sure the overall dimensions of the part haven't changed since last revision.
+        assert round(bbox.xmin) == xmin
+        assert round(bbox.xlen) == xlen
+
+        assert round(bbox.ymin) == ymin
+        assert round(bbox.ylen) == ylen
+
+        assert round(bbox.zmin) == zmin
+        assert round(bbox.zlen) == zlen
