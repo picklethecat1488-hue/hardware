@@ -80,6 +80,23 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         (895, 0, 522.5),
     ]
 
+    # The logo text arguments
+    logo_text_args: dict[str, str | int | float] = {
+        "txt": "FHB",
+        "fontsize": 10,
+        "distance": 1.5,
+        "fontPath": "DancingScript-VariableFont_wght.ttf",
+        "halign": "center",
+        "valign": "center",
+        "kind": "bold",
+    }
+
+    # The logo text offset, pathwise and anglewise
+    logo_text_positions: dict[str, tuple[float, float]] = {
+        "driver": (0.3, 90),
+        "passenger": (0.3, 270),
+    }
+
     model_config = SettingsConfigDict(
         env_file=".env", env_prefix="APP_", alias_generator=str.upper, populate_by_name=True
     )
@@ -382,6 +399,34 @@ class Builder:
         return bed
 
     @lru_cache
+    def build_text(self, name, angle_deg, offset_deg=None):
+        """Build and place the logo text.
+
+        :param _type_ name: The name of the part to build for.
+        :param _type_ angle_deg: The angle to place the text.
+        :return _type_: The logo text.
+        """
+        path = self.create_wire(name)
+        off, angle_offset = self.config.logo_text_positions[name]  # type: ignore
+        pos = path.val().positionAt(off)  # type: ignore
+        tan = path.val().tangentAt(off)  # type: ignore
+        plane = cq.Plane(origin=pos, normal=tan)
+        outer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2  # type: ignore
+        if offset_deg:
+            angle_offset = offset_deg
+        angle_deg = angle_deg + angle_offset
+
+        # Place the text
+        text = (
+            cq.Workplane(plane)
+            .transformed(rotate=(0, 90, 0))
+            .transformed(rotate=(angle_deg, 0, 0))
+            .transformed(offset=(0, 0, outer_radius))
+            .text(**self.config.logo_text_args)  # type: ignore
+        )
+        return text
+
+    @lru_cache
     def build_clean_tool(self, name, radius=None):
         """Build the clean tool.
 
@@ -415,6 +460,12 @@ class Builder:
                     # Add inner clamp beds.
                     clamp_bed = self.build_clamp_bed(name, idx, **build_args)
                     part = part.union(clamp_bed)
+
+                # Add the text
+                if right:
+                    text = self.build_text(name, (build_args["start_deg"] + build_args["end_deg"]) / 2)
+                    part = part.union(text)
+
                 # Clean the inner part volume
                 clean_tool = self.build_clean_tool(name)
                 part = part.cut(clean_tool)

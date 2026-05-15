@@ -48,18 +48,17 @@ class Configurator:
         and bare part, on both the left and right side. We combine both
         distances into an average value to index on which offset is most optimal.
 
-        :param _type_ name: The name of the clamp to configure.
+        :param _type_ name: The name of the part to configure.
         """
         tube = self.builder.build_part(name, tube_only=True)
         other_tube = self.builder.build_part(name, right=True, tube_only=True)
         path = self.builder.create_wire(name)
-        center = self.get_part_position(tube, path, 0.5)
-        min_distance = float("inf")
-        offset_deg = None
 
         for idx in range(1, len(self.config.clamp_positions[name]) - 1):
-            clamp_pos = self.config.clamp_positions[name][idx]
-            self.config.clamp_positions[name][idx] = (clamp_pos[0], 0)  # type: ignore
+            min_distance = float("inf")
+            offset_deg = None
+            clamp_offset, _ = self.config.clamp_positions[name][idx]  # type: ignore
+            center = self.get_part_position(tube, path, clamp_offset)
 
             for cur_offset_deg in np.arange(0, 360, 1.0):
                 # Compute Center of Mass distance for each part side
@@ -68,18 +67,46 @@ class Configurator:
                 distance = (clamp_center - center).Length
 
                 # Update the distance tracker
-                if (distance < min_distance) and (clamp.intersect(other_tube).val().Volume() == 0): # type: ignore
+                if (distance < min_distance) and (clamp.intersect(other_tube).val().Volume() == 0):  # type: ignore
                     min_distance = distance
                     offset_deg = cur_offset_deg
 
             # Update the clamp offset
             if not offset_deg is None:
-                clamp_pos = self.config.clamp_positions[name][idx]
-                self.config.clamp_positions[name][idx] = (clamp_pos[0], float(offset_deg))  # type: ignore
+                self.config.clamp_positions[name][idx] = (clamp_offset, float(offset_deg))  # type: ignore
                 self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
 
+    def config_text_logo(self, name):
+        """Configure text logo.
+
+        :param _type_ name: The name of the part to configure.
+        """
+        tube = self.builder.build_part(name, right=True, tube_only=True)
+        other_tube = self.builder.build_part(name, tube_only=True)
+        path = self.builder.create_wire(name)
+        min_distance = float("inf")
+        offset_deg = None
+        text_offset, _ = self.config.logo_text_positions[name]
+        center = self.get_part_position(tube, path, text_offset)
+
+        for cur_offset_deg in np.arange(0, 360, 15.0):
+            # Compute Center of Mass distance for each part side
+            text = self.builder.build_text(name, angle_deg=180, offset_deg=cur_offset_deg)
+            text_center = text.val().Center()  # type: ignore
+            distance = (text_center - center).Length
+
+            # Update the distance tracker
+            if (distance < min_distance) and (text.intersect(other_tube).val().Volume() == 0):  # type: ignore
+                min_distance = distance
+                offset_deg = cur_offset_deg
+
+        # Update the text offset
+        if not offset_deg is None:
+            self.config.logo_text_positions[name] = (text_offset, float(offset_deg))  # type: ignore
+            self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
+
     def configure_clamps(self, names=None):
-        """Perform clamp configuration and adjustment.
+        """Perform clamp configuration.
 
         :param _type_ name: The name of the part.
         """
@@ -88,11 +115,22 @@ class Configurator:
         for name in names:
             self.config_clamp(name)
 
+    def configure_text_logos(self, names=None):
+        """Perform text logo configuration.
+
+        :param _type_ name: The name of the part.
+        """
+        if names is None:
+            names = self.config.names
+        for name in names:
+            self.config_text_logo(name)
+
     def configure_all(self, names=None):
         """Perform all configuration steps."""
         if names is None:
             names = self.config.names
         self.configure_clamps(names)
+        self.configure_text_logos(names)
 
 
 def get_args():
@@ -102,8 +140,10 @@ def get_args():
     """
     parser = argparse.ArgumentParser(description="Configuration Utility.")
     parser.add_argument("-e", "--env", required=False, default=".env", help="Output environment to file.")
-    parser.add_argument("-c", "--clamps", action="store_true", help="Configure clamps and exit.")
     parser.add_argument("-n", "--name", required=False, default=None, help="The part to configure.")
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument("-c", "--clamps", required=False, action="store_true", help="Configure part clamps.")
+    group.add_argument("-t", "--logo_text", required=False, action="store_true", help="Configure logo text.")
     args = parser.parse_args()
     return args
 
@@ -116,13 +156,15 @@ def main(logger, args):
     gen_args = {}
     if not args.name is None:
         gen_args["names"] = [args.name]
-    config = AppConfig()
+    config = AppConfig(_env_file=None)
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
 
     # Perform requested configurations, output the model, and exit.
     if args.clamps:
         configurator.configure_clamps(**gen_args)
+    elif args.logo_text:
+        configurator.configure_text_logos(**gen_args)
     else:
         configurator.configure_all(**gen_args)
 
