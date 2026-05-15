@@ -62,7 +62,7 @@ class Configurator:
 
             for cur_offset_deg in np.arange(0, 360, 1.0):
                 # Compute Center of Mass distance for each part side
-                clamp = self.builder.build_clamp_bed(name, idx, start_deg=180, end_deg=360, offset_deg=cur_offset_deg)
+                clamp = self.builder.build_clamp_bed(name, idx, offset_deg=cur_offset_deg)
                 clamp_center = clamp.val().Center()  # type: ignore
                 distance = (clamp_center - center).Length
 
@@ -84,14 +84,14 @@ class Configurator:
         tube = self.builder.build_part(name, right=True, tube_only=True)
         other_tube = self.builder.build_part(name, tube_only=True)
         path = self.builder.create_wire(name)
-        min_distance = float("inf")
-        offset_deg = None
         text_offset, _, is_mirrored = self.config.logo_text_positions[name]
         center = self.get_part_position(tube, path, text_offset)
+        min_distance = float("inf")
+        offset_deg = None
 
-        for cur_offset_deg in np.arange(0, 360, 15.0):
+        for cur_offset_deg in np.arange(0, 360, 10.0):
             # Compute Center of Mass distance for each part side
-            text = self.builder.build_text(name, angle_deg=90, offset_deg=cur_offset_deg)
+            text = self.builder.build_text(name, right=True, offset_deg=cur_offset_deg)
             text_center = text.val().Center()  # type: ignore
             distance = (text_center - center).Length
 
@@ -156,7 +156,7 @@ def main(logger, args):
     gen_args = {}
     if not args.name is None:
         gen_args["names"] = [args.name]
-    config = AppConfig(_env_file=None)
+    config = AppConfig(_env_file=None)  # type: ignore
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
 

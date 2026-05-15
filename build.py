@@ -93,8 +93,8 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
 
     # The logo text offset, pathwise and anglewise
     logo_text_positions: dict[str, tuple[float, float, bool]] = {
-        "driver": (0.3, 90, True),
-        "passenger": (0.3, 270, False),
+        "driver": (0.3, 0, True),
+        "passenger": (0.3, 0, False),
     }
 
     model_config = SettingsConfigDict(
@@ -321,16 +321,17 @@ class Builder:
         return sketch
 
     @lru_cache
-    def build_tube(self, name, start_deg: float = 0, end_deg: float = 360):
+    def build_tube(self, name, right=False):
         """Build an exhaust tube.
 
         :param _type_ name: The name of the manifold to build
-        :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
-        :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
+        :param bool right: True if building the right half, defaults to False
         :return _type_: The exhaust manifold
         """
         path = self.create_wire(name)
         loc = path.val().locationAt(0)  # type: ignore
+        start_deg = 0 if right else 180
+        end_deg = 180 if right else 360
         profile_sketch = self.create_profile_sketch(start_deg, end_deg)
         tube = (
             cq.Workplane(loc)
@@ -370,13 +371,12 @@ class Builder:
         return ring
 
     @lru_cache
-    def build_clamp_bed(self, name, clamp_idx, start_deg: float = 0, end_deg: float = 360, offset_deg=None):
+    def build_clamp_bed(self, name, clamp_idx, right=False, offset_deg=None):
         """Build a clamp bed.
 
         :param _type_ name: The part name to build.
         :param _type_ clamp_idx: The clamp index to build
-        :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
-        :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
+        :param bool right: True if building the right half, defaults to False
         :return _type_: The clamp bed
         """
         length = self.config.clamp_lengths[clamp_idx]
@@ -385,6 +385,8 @@ class Builder:
         clamp_pos, angle_offset = self.config.clamp_positions[name][clamp_idx]
         if offset_deg:
             angle_offset = offset_deg
+        start_deg = (0 if right else 180) + angle_offset + self.config.clamp_space
+        end_deg = (180 if right else 360) + angle_offset - self.config.clamp_space
 
         # Create the clamp bed
         bed = self.create_ring(
@@ -393,17 +395,18 @@ class Builder:
             length,
             inner_radius=inner_radius,
             outer_radius=outer_radius,
-            start_deg=angle_offset + start_deg + self.config.clamp_space,
-            end_deg=angle_offset + end_deg - self.config.clamp_space,
+            start_deg=start_deg,
+            end_deg=end_deg,
         ).fillet(self.config.edge_rounding)
         return bed
 
     @lru_cache
-    def build_text(self, name, angle_deg, offset_deg=None):
+    def build_text(self, name, right=False, offset_deg=None):
         """Build and place the logo text.
 
         :param _type_ name: The name of the part to build for.
         :param _type_ angle_deg: The angle to place the text.
+        :param bool right: True if building the right half, defaults to False
         :return _type_: The logo text.
         """
         path = self.create_wire(name)
@@ -414,7 +417,7 @@ class Builder:
         outer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2  # type: ignore
         if offset_deg:
             angle_offset = offset_deg
-        angle_deg = angle_deg + angle_offset
+        angle_deg = (90 if right else 270) + angle_offset
 
         # Place the text
         text_wp = (
@@ -429,10 +432,10 @@ class Builder:
         def place_text(loc):
             """Conditionally mirrors the baseline text shape locally."""
             if is_mirrored:
-                return text_solid.mirror("YZ", (0, 0, 0)).located(loc)
-            return text_solid.located(loc)
+                return text_solid.mirror("YZ", (0, 0, 0)).located(loc)  # type: ignore
+            return text_solid.located(loc)  # type: ignore
 
-        text = text_wp.eachpoint(place_text, True)
+        text = text_wp.eachpoint(place_text, True)  # type: ignore
         return text
 
     @lru_cache
@@ -462,17 +465,16 @@ class Builder:
         """
         if name == "driver" or name == "passenger":
             # Create the main part body.
-            build_args = {"start_deg": (0 if right else 180), "end_deg": (180 if right else 360)}
-            part = self.build_tube(name, **build_args)
+            part = self.build_tube(name, right=right)
             if not tube_only:
                 for idx in range(1, len(self.config.clamp_positions[name]) - 1):
                     # Add inner clamp beds.
-                    clamp_bed = self.build_clamp_bed(name, idx, **build_args)
+                    clamp_bed = self.build_clamp_bed(name, idx, right=right)
                     part = part.union(clamp_bed)
 
                 # Add the text
                 if right:
-                    text = self.build_text(name, (build_args["start_deg"] + build_args["end_deg"]) / 2)
+                    text = self.build_text(name, right=right)
                     part = part.union(text)
 
                 # Clean the inner part volume
