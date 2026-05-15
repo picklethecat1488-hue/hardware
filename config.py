@@ -51,6 +51,7 @@ class Configurator:
         :param _type_ name: The name of the clamp to configure.
         """
         tube = self.builder.build_part(name, tube_only=True)
+        other_tube = self.builder.build_part(name, right=True, tube_only=True)
         path = self.builder.create_wire(name)
         center = self.get_part_position(tube, path, 0.5)
         min_distance = float("inf")
@@ -67,7 +68,7 @@ class Configurator:
                 distance = (clamp_center - center).Length
 
                 # Update the distance tracker
-                if distance < min_distance:
+                if (distance < min_distance) and (clamp.intersect(other_tube).val().Volume() == 0): # type: ignore
                     min_distance = distance
                     offset_deg = cur_offset_deg
 
