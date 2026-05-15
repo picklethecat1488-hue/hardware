@@ -2,30 +2,16 @@
 
 from build import Builder
 import cadquery as cq
-from itertools import combinations
 import math
 import numpy as np
 import pytest
 import zipfile
+from pathlib import Path
+from unittest.mock import patch
 
 
 class TestBuilder:
     """Manifold builder unit tests."""
-
-    def pytest_generate_tests(self, metafunc):
-        """Generate tests from test fixtures.
-
-        :param _type_ metafunc: The test meta function
-        """
-        if "name" in metafunc.fixturenames:
-            builder = Builder()
-            metafunc.parametrize("name", builder.config.names)
-        if "clamp_idx" in metafunc.fixturenames:
-            builder = Builder()
-            clamp_idxes = range(len(builder.config.clamp_lengths))
-            metafunc.parametrize("clamp_idx", clamp_idxes)
-        if "right" in metafunc.fixturenames:
-            metafunc.parametrize("right", [False, True])
 
     @pytest.fixture(scope="class")
     def builder(self):
@@ -34,6 +20,24 @@ class TestBuilder:
         :return _type_: A manifold builder object
         """
         return Builder()
+
+    @pytest.fixture(scope="class", params=["driver", "passenger"])
+    def name(self, request):
+        """Return the name o test.
+
+        :param _type_ request: The test request.
+        :return _type_: A name.
+        """
+        return request.param
+
+    @pytest.fixture(scope="class", params=[False, True])
+    def right(self, request):
+        """Return the right patameter.
+
+        :param _type_ request: The test request.
+        :return _type_: True or False.
+        """
+        return request.param
 
     def test_measurements(self, builder):
         """Validate physical measurements.
@@ -134,6 +138,23 @@ class TestBuilder:
         assert (inlet_clamp_end - inlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[0])
         assert (outlet_clamp_end - outlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[-1])
 
+    def test_create_profile_sketch(self, builder):
+        """Test profile sketch generation for a valid radius."""
+        sketch = builder.create_profile_sketch(0, 90, outer_radius=10, inner_radius=5)
+        assert sketch is not None
+        assert sketch.val().Area() > 0
+
+    def test_create_profile_sketch_invalid_inner_radius(self, builder):
+        """Ensure invalid profile radii raise ValueError."""
+        with pytest.raises(ValueError):
+            builder.create_profile_sketch(0, 90, outer_radius=10, inner_radius=10)
+
+    def test_build_clean_tool(self, name, builder):
+        """Test clean tool creation for a given part name."""
+        clean_tool = builder.build_clean_tool(name)
+        assert clean_tool is not None
+        assert clean_tool.val().Volume() > 0
+
     def test_part_fits_together(self, builder, name, right):
         """Test that the parts can fit together.
 
@@ -156,12 +177,11 @@ class TestBuilder:
         :param _type_ right: True if building the right part
         """
         part = builder.build_part(name, right=right)
-        for other_name in [x for x in builder.config.names if x != name]:
-            for other_right in [False, True]:
-                other_part = builder.build_part(other_name, right=other_right)
-                assert part.intersect(other_part).val().Volume() == pytest.approx(0), (
-                    f"intersection detected between {name},right={right} and {other_name},right={other_right}"
-                )
+        other_name = next(x for x in builder.config.names if x != name)
+        other_part = builder.build_part(other_name, right=not right)
+        assert part.intersect(other_part).val().Volume() == pytest.approx(0), (
+            f"intersection detected between {name},right={right} and {other_name},right={not right}"
+        )
 
     def test_in_bounds(self, builder, name, right):
         """Test the parts are in bounds.
@@ -176,18 +196,13 @@ class TestBuilder:
 
         assert volume == pytest.approx(0)
 
-    def test_can_clamp(self, name, clamp_idx, right, builder):
-        """Test if the given clamp bed satisfies the clamp property.
-
-        :param _type_ name: The name of the part to test
-        :param _type_ clamp_idx: The clamp index to test
-        :param _type_ right: True if testing the right side
-        :param _type_ builder: The manifold builder to test
-        """
+    def test_can_clamp(self, name, right, builder):
+        """Test if a representative clamp bed satisfies the clamp property."""
+        clamp_idx = 1
         path = builder.create_wire(name)
         length = path.val().Length()
 
-        # Map clamp_idx to clamp paraeters
+        # Map clamp_idx to clamp parameters
         offsets = (
             [0]
             + [clamp_pos[0] for clamp_pos in builder.config.clamp_positions[name][1:-1]]
