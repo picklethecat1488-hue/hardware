@@ -4,6 +4,7 @@
 """
 
 import argparse
+import json
 import subprocess
 from build import AppConfig, Builder, Logger
 from config import Configurator
@@ -29,7 +30,7 @@ class Pathfinder:
 
         :return _type_: _description_
         """
-        logger.print("Invoking pytest...", symbol="🧪 ")
+        self.logger.print("Invoking pytest...", symbol="🧪 ")
         result = subprocess.run(["pytest", "-qq", "-n", "auto", "-x", "--maxfail=1", "tests/"])
         exit_code = result.returncode
         if exit_code != 0:
@@ -101,12 +102,8 @@ def main(logger, args):
 
             # Run our path evaluation and log the attractor if it works.
             if pathfinder.try_point(args.name, point, out_dir):
-                file.write(f"{args.name},{point},")
-                for name in pathfinder.config.names:
-                    path = pathfinder.builder.create_wire(name)
-                    length = path.val().Length()  # type: ignore
-                    file.write(f"{name},{length},")
-                file.write("\n")
+                json_line = json.dumps(pathfinder.config.model_dump(exclude_unset=True, by_alias=True))
+                file.write(f"{json_line}\n")
                 logger.print(f"Found path! Wrote to {str(log_file_path)}", symbol="✅")
     logger.done()
 
