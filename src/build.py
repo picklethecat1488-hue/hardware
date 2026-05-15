@@ -298,6 +298,7 @@ class Builder:
         path = cq.Workplane("XY").add(wire)
         return path
 
+    @lru_cache
     def create_profile_sketch(self, start_deg, end_deg, outer_radius=None, inner_radius=None):
         """Create a profile sketch using the given radius.
 
@@ -364,7 +365,8 @@ class Builder:
         :return _type_: The ring
         """
         path = self.create_wire(name)
-        loc = path.val().locationAt(off)  # type: ignore
+        wire = path.val()
+        loc = wire.locationAt(off)  # type: ignore
         workplane = cq.Workplane(loc)
         profile_sketch = self.create_profile_sketch(
             start_deg,
@@ -372,8 +374,8 @@ class Builder:
             outer_radius=outer_radius,
             inner_radius=inner_radius,
         )
-        p1 = path.val().positionAt(off)  # type: ignore
-        p2 = path.val().positionAt(off + len / path.val().Length())  # type: ignore
+        p1 = wire.positionAt(off)  # type: ignore
+        p2 = wire.positionAt(off + len / wire.Length())  # type: ignore
         path = workplane.polyline([p1, p2])
         ring = workplane.placeSketch(profile_sketch).sweep(path)  # type: ignore
         return ring
@@ -418,9 +420,10 @@ class Builder:
         :return _type_: The logo text.
         """
         path = self.create_wire(name)
+        wire = path.val()
         off, angle_offset = self.config.logo_text_positions[name]  # type: ignore
-        pos = path.val().positionAt(off)  # type: ignore
-        tan = path.val().tangentAt(off)  # type: ignore
+        pos = wire.positionAt(off)  # type: ignore
+        tan = wire.tangentAt(off)  # type: ignore
         plane = cq.Plane(origin=pos, normal=tan)
         outer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2  # type: ignore
         if offset_deg:
@@ -446,7 +449,8 @@ class Builder:
         """
         # Create the clean tool
         path = self.create_wire(name)
-        tube_loc = path.val().locationAt(0)  # type: ignore
+        wire = path.val()
+        tube_loc = wire.locationAt(0)  # type: ignore
         if radius is None:
             radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
         profile_sketch = self.create_profile_sketch(0, 360, outer_radius=radius, inner_radius=0)
