@@ -134,23 +134,34 @@ class TestBuilder:
         assert (inlet_clamp_end - inlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[0])
         assert (outlet_clamp_end - outlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[-1])
 
-    def test_overlap(self, builder, name, right):
-        """Test that the parts do not overlap with each other.
+    def test_part_fits_together(self, builder, name, right):
+        """Test that the parts can fit together.
+
+        :param _type_ builder: The manifold builder to test
+        :param _type_ name: The name of the part to test
+        :param _type_ right: True if building the right part
+        """
+        # Make sure parts do not self intersect
+        part = builder.build_part(name, right=right)
+        other_part = builder.build_part(name, right=(not right))
+        assert part.intersect(other_part).val().Volume() == pytest.approx(0), (
+            f"intersection detected between {name} parts"
+        )
+
+    def test_part_doesnt_overlap(self, builder, name, right):
+        """Test that the part does not interlap with another assembly.
 
         :param _type_ builder: The manifold builder to test
         :param _type_ name: The name of the part to test
         :param _type_ right: True if building the right part
         """
         part = builder.build_part(name, right=right)
-        for other_name in builder.config.names:
+        for other_name in [x for x in builder.config.names if x != name]:
             for other_right in [False, True]:
-                if name != other_name and right != other_right:
-                    other_part = builder.build_part(other_name, right=other_right)
-                    inter_result = part.intersect(other_part)
-
-                    assert inter_result.val().Volume() == pytest.approx(0), (
-                        f"intersection detected between {name},right={right} and {other_name},right={other_right}"
-                    )
+                other_part = builder.build_part(other_name, right=other_right)
+                assert part.intersect(other_part).val().Volume() == pytest.approx(0), (
+                    f"intersection detected between {name},right={right} and {other_name},right={other_right}"
+                )
 
     def test_in_bounds(self, builder, name, right):
         """Test the parts are in bounds.

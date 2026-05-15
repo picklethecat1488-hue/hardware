@@ -24,7 +24,7 @@ class Configurator:
     def get_part_position(self, tube, path, off):
         """Get the part position of the tube at offset.
 
-        If a part is attached to the tube at this offset, it should be attached 
+        If a part is attached to the tube at this offset, it should be attached
         as closed to the part position as possible.
 
         :param _type_ part: The tube to test
