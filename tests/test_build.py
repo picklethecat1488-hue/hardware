@@ -321,3 +321,19 @@ class TestBuilder:
 
         assert round(bbox.zmin) == zmin
         assert round(bbox.zlen) == zlen
+
+    def test_tube_only(self, builder, name, right):
+        """Test if the part can be built with only the tube.
+
+        :param _type_ builder: The Builder to test.
+        :param _type_ name: The name of the part to test
+        """
+        clean_tool = builder.build_clean_tool(name, radius=min(builder.config.clamp_diameters) / 2)
+        part = builder.build_part(name, right=right, tube_only=True)
+        build_args = {"start_deg": (0 if right else 180), "end_deg": (180 if right else 360)}
+
+        for idx in range(1, len(builder.config.clamp_positions[name]) - 1):
+            # Add inner clamp beds.
+            clamp_bed = builder.build_clamp_bed(name, idx, **build_args).cut(clean_tool)
+            intersection = part.intersect(clamp_bed)
+            assert intersection.val().Volume() == pytest.approx(0), f"tube only test failed for {name}, clamp {idx}"

@@ -377,7 +377,7 @@ class Builder:
         return bed
 
     @lru_cache
-    def build_clean_tool(self, name):
+    def build_clean_tool(self, name, radius=None):
         """Build the clean tool.
 
         :param _type_ name: The name of the part to build for.
@@ -385,31 +385,34 @@ class Builder:
         """
         # Create the clean tool
         path = self.create_wire(name)
-        inner_radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
         tube_loc = path.val().locationAt(0)
-        profile_sketch = self.create_profile_sketch(0, 360, outer_radius=inner_radius, inner_radius=0)
+        if radius is None:
+            radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
+        profile_sketch = self.create_profile_sketch(0, 360, outer_radius=radius, inner_radius=0)
         tube = cq.Workplane(tube_loc).placeSketch(profile_sketch).sweep(path, transition="round")  # type: ignore
         return tube
 
     @lru_cache
-    def build_part(self, name, right=False):
+    def build_part(self, name, right=False, tube_only=False):
         """Build the left or right half of the manifold.
 
         :param _type_ name: The name of the manifold
         :param bool right: True if building the right half, defaults to False
+        :param bool tube_only: True if only building the tube
         :return _type_: The manifold half
         """
         if name == "driver" or name == "passenger":
             # Create the main part body.
             build_args = {"start_deg": (0 if right else 180), "end_deg": (180 if right else 360)}
             part = self.build_tube(name, **build_args)
-            for idx in range(1, len(self.config.clamp_positions[name]) - 1):
-                # Add inner clamp beds.
-                clamp_bed = self.build_clamp_bed(name, idx, **build_args)
-                part = part.union(clamp_bed)
-            # Clean the inner part volume
-            clean_tool = self.build_clean_tool(name)
-            part = part.cut(clean_tool)
+            if not tube_only:
+                for idx in range(1, len(self.config.clamp_positions[name]) - 1):
+                    # Add inner clamp beds.
+                    clamp_bed = self.build_clamp_bed(name, idx, **build_args)
+                    part = part.union(clamp_bed)
+                # Clean the inner part volume
+                clean_tool = self.build_clean_tool(name)
+                part = part.cut(clean_tool)
         else:
             raise ValueError(f"Invalid name: {name}")
         return part
