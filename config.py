@@ -21,6 +21,26 @@ class Configurator:
         self.logger = logger or Logger(text="Configuring...", enabled=False)
         self.builder = builder or Builder(config=config, logger=logger)
 
+    def get_part_position(self, tube, path, off):
+        """Get the part position of the tube at offset.
+
+        If a part is attached to the tube at this offset, it should be attached 
+        as closed to the part position as possible.
+
+        :param _type_ part: The tube to test
+        :param _type_ path: The wire path used to create the tube
+        :param _type_ off: The path offset to use
+        :return _type_: The part midpoint of the tube.
+        """
+        pos = path.val().positionAt(off)
+        radius = min(self.builder.config.clamp_diameters) / 2
+        midpoint_up = pos + cq.Vector(0, 0, radius)
+        midpoint_down = pos - cq.Vector(0, 0, radius)
+        solid_center = tube.val().Center()
+        dist_up = midpoint_up.sub(solid_center).Length
+        dist_down = midpoint_down.sub(solid_center).Length
+        return midpoint_up if dist_up < dist_down else midpoint_down
+
     def config_clamp(self, name):
         """Configure clamps.
 
@@ -30,26 +50,9 @@ class Configurator:
 
         :param _type_ name: The name of the clamp to configure.
         """
-
-        def get_midpoint(tube, path):
-            """Get the part midpoint of the tube.
-
-            :param _type_ part: The tube to test
-            :param _type_ path: The wire path used to create the tube
-            :return _type_: The part midpoint of the tube.
-            """
-            pos = path.val().positionAt(0.5)
-            radius = min(self.builder.config.clamp_diameters) / 2
-            midpoint_up = pos + cq.Vector(0, 0, radius)
-            midpoint_down = pos - cq.Vector(0, 0, radius)
-            solid_center = tube.val().Center()
-            dist_up = midpoint_up.sub(solid_center).Length
-            dist_down = midpoint_down.sub(solid_center).Length
-            return midpoint_up if dist_up < dist_down else midpoint_down
-
         tube = self.builder.build_part(name, tube_only=True)
         path = self.builder.create_wire(name)
-        center = get_midpoint(tube, path)
+        center = self.get_part_position(tube, path, 0.5)
         min_distance = float("inf")
         offset_deg = None
 
