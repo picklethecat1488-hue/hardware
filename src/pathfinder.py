@@ -58,8 +58,8 @@ class Pathfinder:
         self.config.attractors[name] = points
         try:
             self.logger.print(f"Trying {points} on {name}...", symbol="📍")
-            self.configurator.configure_all()
-            self.builder.generate_all(out_dir=str(out_dir))
+            self.configurator.configure_all(names=[name])
+            self.builder.generate_parts(out_dir=str(out_dir), names=[name])
             self.invoke_pytest()
             return True
         except Exception as e:
