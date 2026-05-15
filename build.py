@@ -92,9 +92,9 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     }
 
     # The logo text offset, pathwise and anglewise
-    logo_text_positions: dict[str, tuple[float, float]] = {
-        "driver": (0.3, 90),
-        "passenger": (0.3, 270),
+    logo_text_positions: dict[str, tuple[float, float, bool]] = {
+        "driver": (0.3, 90, True),
+        "passenger": (0.3, 270, False),
     }
 
     model_config = SettingsConfigDict(
@@ -407,7 +407,7 @@ class Builder:
         :return _type_: The logo text.
         """
         path = self.create_wire(name)
-        off, angle_offset = self.config.logo_text_positions[name]  # type: ignore
+        off, angle_offset, is_mirrored = self.config.logo_text_positions[name]  # type: ignore
         pos = path.val().positionAt(off)  # type: ignore
         tan = path.val().tangentAt(off)  # type: ignore
         plane = cq.Plane(origin=pos, normal=tan)
@@ -417,13 +417,22 @@ class Builder:
         angle_deg = angle_deg + angle_offset
 
         # Place the text
-        text = (
+        text_wp = (
             cq.Workplane(plane)
             .transformed(rotate=(0, 90, 0))
             .transformed(rotate=(angle_deg, 0, 0))
             .transformed(offset=(0, 0, outer_radius))
-            .text(**self.config.logo_text_args)  # type: ignore
         )
+
+        text_solid = cq.Workplane("XY").text(**self.config.logo_text_args).val()  # type: ignore
+
+        def place_text(loc):
+            """Conditionally mirrors the baseline text shape locally."""
+            if is_mirrored:
+                return text_solid.mirror("YZ", (0, 0, 0)).located(loc)
+            return text_solid.located(loc)
+
+        text = text_wp.eachpoint(place_text, True)
         return text
 
     @lru_cache
