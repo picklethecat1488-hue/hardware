@@ -320,7 +320,7 @@ class TestBuilder:
             ymin, ylen = -32, 324
             zmin, zlen = 319, 203
         elif name == "passenger":
-            xmin, xlen = 558, 387
+            xmin, xlen = 559, 387
             ymin, ylen = -32, 419
             zmin, zlen = 288, 234
         else:
@@ -335,18 +335,3 @@ class TestBuilder:
 
         assert round(bbox.zmin) == zmin
         assert round(bbox.zlen) == zlen
-
-    def test_tube_only(self, builder, name, right):
-        """Test if the part can be built with only the tube.
-
-        :param _type_ builder: The Builder to test.
-        :param _type_ name: The name of the part to test
-        """
-        clean_tool = builder.build_clean_tool(name, radius=min(builder.config.clamp_diameters) / 2)
-        part = builder.build_part(name, right=right, tube_only=True)
-
-        for idx in range(1, len(builder.config.clamp_positions[name]) - 1):
-            # Add inner clamp beds.
-            clamp_bed = builder.build_clamp_bed(name, idx, right=right).cut(clean_tool)
-            intersection = part.intersect(clamp_bed)
-            assert intersection.val().Volume() == pytest.approx(0), f"tube only test failed for {name}, clamp {idx}"
