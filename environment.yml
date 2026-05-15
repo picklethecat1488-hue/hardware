@@ -6,9 +6,6 @@ dependencies:
   - cadquery=2.7
   - jupyterlab=4.4
   - matplotlib=3.10
-  - pytest-xdist
-  - pydantic-changedetect
-  - pydantic-settings      # Added back for Pydantic v2 settings support
   - pip
   - pip:
     - jupyter-cadquery==4.0.2
@@ -16,3 +13,9 @@ dependencies:
     - pyvista==0.47.3
     - opencv-python==4.13.0.92
     - pytest==9.0.3
+    - halo
+    - html_sanitizer
+    - pytest-xdist
+    - pydantic-changedetect
+    - pydantic-settings      # Added back for Pydantic v2 settings support
+    - pytest-mock 
