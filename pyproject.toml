@@ -4,7 +4,7 @@ version = "0.1.0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src"]
 addopts = "-qq -n auto -x --maxfail=1"
 filterwarnings = [
     "ignore::DeprecationWarning",
