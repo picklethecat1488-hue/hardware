@@ -6,6 +6,9 @@ dependencies:
   - cadquery=2.7
   - jupyterlab=4.4
   - matplotlib=3.10
+  - pytest-xdist
+  - pydantic-changedetect
+  - pydantic-settings      # Added back for Pydantic v2 settings support
   - pip
   - pip:
     - jupyter-cadquery==4.0.2
