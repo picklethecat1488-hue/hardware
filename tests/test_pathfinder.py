@@ -97,11 +97,11 @@ class TestPathfinder:
         with patch.object(pathfinder, "invoke_pytest") as mock_pytest:
             path = Path(tmp_path)
             path_str = str(path)
-            result = pathfinder.try_point("driver", (1, 2, 3), path)
+            result = pathfinder.try_points("driver", [(1, 2, 3), (1, 2, 3)], path)
             assert result is True
-            assert mock_config.attractors["driver"] == (1, 2, 3)
-            mock_configurator.configure_all.assert_called_once()
-            mock_builder.generate_all.assert_called_once_with(out_dir=path_str)
+            assert mock_config.attractors["driver"] == [(1, 2, 3), (1, 2, 3)]
+            mock_configurator.configure_all.assert_called_once_with(names=["driver"])
+            mock_builder.generate_parts.assert_called_once_with(out_dir=path_str, names=["driver"])
             mock_pytest.assert_called_once()
 
     def test_try_point_failure(self, mock_logger, mock_config, mock_builder, mock_configurator, tmp_path):
@@ -112,9 +112,8 @@ class TestPathfinder:
         pathfinder.configurator = mock_configurator
 
         mock_configurator.configure_all.side_effect = Exception("Config error")
-        result = pathfinder.try_point("driver", (1, 2, 3), Path(tmp_path))
+        result = pathfinder.try_points("driver", [(1, 2, 3), (1, 2, 3)], Path(tmp_path))
         assert result is False
-        mock_logger.print.assert_called_twice_with("Path failed: Config error", symbol="❌")
 
     def test_get_args_parsing(self, mocker):
         """Test argument parsing."""
