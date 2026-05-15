@@ -59,6 +59,12 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     # The part names, driver and passenger
     names: list[str] = ["driver", "passenger"]
 
+    # Path attractors to be used to change exhaust tube paths
+    attractors: dict[str, tuple[float, float, float] | None] = {
+        "driver": None,
+        "passenger": None,
+    }
+
     # Raw measurements used for part construction
     _measurements: list[tuple[float, float, float]] = [
         # p[1] -> p[2] valve controller bottom plane
@@ -273,14 +279,19 @@ class Builder:
             self.P[outlet_key],
             self.V[outlet_key],
         )
+        attractor = self.config.attractors[name]
         inlet_end = inlet_start + v_start * self.config.clamp_lengths[0]
         outlet_end = outlet_start + v_end * self.config.clamp_lengths[-1]
+        if not attractor is None:
+            points = [cq.Vector(*inlet_end), cq.Vector(*attractor), cq.Vector(*outlet_start)]
+        else:
+            points = [cq.Vector(*inlet_end), cq.Vector(*outlet_start)]
 
         wire = cq.Wire.assembleEdges(
             [
                 cq.Edge.makeLine(cq.Vector(*inlet_start), cq.Vector(*inlet_end)),
                 cq.Edge.makeSpline(
-                    listOfVector=[cq.Vector(*inlet_end), cq.Vector(*outlet_start)],
+                    listOfVector=points,
                     tangents=(cq.Vector(*v_start), cq.Vector(*v_end)),
                     periodic=False,
                 ),
@@ -657,9 +668,7 @@ def get_args():
     group.add_argument(
         "-o",
         "--output",
-        nargs="+",
-        metavar=("NAME", "SIDE"),
-        help="Generate a file and exit. Usage: -o <name> [<side>]",
+        help="Generate a file and exit. Usage: -o <name>",
     )
 
     group = parser.add_mutually_exclusive_group(required=False)

@@ -1,0 +1,119 @@
+"""Evaluate different paths to try and equalize the passenger and driver side manifold lengths.
+
+:return _type_: _description_
+"""
+
+import argparse
+import subprocess
+from build import AppConfig, Builder, Logger
+from config import Configurator
+from pathlib import Path
+import random
+
+
+class Pathfinder:
+    """Tries building a part with a random attractor point."""
+
+    def __init__(self, logger=None):
+        """Initialize the pathfinder class.
+
+        :param _type_ logger: The logger instance, defaults to None
+        """
+        self.logger = logger or Logger(text="Pathfinding...")
+        self.config = AppConfig(_env_file=None)  # type: ignore
+        self.builder = Builder(logger=logger, config=self.config)
+        self.configurator = Configurator(logger=logger, builder=self.builder, config=self.config)
+
+    def invoke_pytest(self):
+        """Invoke pytest, raising a ValueError if pytest fails.
+
+        :return _type_: _description_
+        """
+        logger.print("Invoking pytest...", symbol="🧪 ")
+        result = subprocess.run(["pytest", "-qq", "-n", "auto", "-x", "--maxfail=1", "tests/"])
+        exit_code = result.returncode
+        if exit_code != 0:
+            raise RuntimeError(f"Test suite failed with pytest exit code {exit_code}.")
+
+    def get_point(self):
+        """Get a random point within a bounding box.
+
+        :return _type_: A tuple.
+        """
+        bbox = self.builder.build_bound_box().val().BoundingBox()  # type: ignore
+        x = round(random.uniform(bbox.xmin, bbox.xmax), 2)
+        y = round(random.uniform(bbox.ymin, bbox.ymax), 2)
+        z = round(random.uniform(bbox.zmin, bbox.zmax), 2)
+        return (x, y, z)
+
+    def try_point(self, name, point, out_dir):
+        """Try the given point.
+
+        :param _type_ name: The name to try
+        :param _type_ point: The point to try
+        :param _type_ out_dir: The path to generate build output in.
+        :return _type_: True if the attractor is valid, else false.
+        """
+        self.config.attractors[name] = point
+        try:
+            self.logger.print(f"Trying {point} on {name}...", symbol="📍")
+            self.configurator.configure_all()
+            self.builder.generate_all(out_dir=str(out_dir))
+            self.invoke_pytest()
+            return True
+        except Exception as e:
+            self.logger.print(f"Path failed: {str(e)}", symbol="❌")
+            return False
+
+
+def get_args():
+    """Get parsed arguments for the program.
+
+    :return _type_: Parsed arguments.
+    """
+    parser = argparse.ArgumentParser(description="Pathfinder Experiment.")
+    parser.add_argument("-out", "--outdir", default="out", help="Target directory for outputs")
+    parser.add_argument("-n", "--num_iterations", default=1, type=int, help="Number of iterations")
+    parser.add_argument(
+        "-s",
+        "--name",
+        default="driver",
+        help="The name to evaluate",
+    )
+    args = parser.parse_args()
+    return args
+
+
+def main(logger, args):
+    """Initialize the build environment and perform build actions.
+
+    :param _type_ args: The program arguments.
+    """
+    # Create the output directory
+    out_dir = Path(args.outdir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log_file_path = out_dir / "pathfinder_output.txt"
+
+    with open(log_file_path, "a", encoding="utf-8") as file:
+        for _ in range(args.num_iterations):
+            pathfinder = Pathfinder()
+            point = pathfinder.get_point()
+
+            # Run our path evaluation and log the attractor if it works.
+            if pathfinder.try_point(args.name, point, out_dir):
+                file.write(f"{args.name},{point},")
+                for name in pathfinder.config.names:
+                    path = pathfinder.builder.create_wire(name)
+                    length = path.val().Length()  # type: ignore
+                    file.write(f"{name},{length},")
+                file.write("\n")
+                logger.print(f"Found path! Wrote to {str(log_file_path)}", symbol="✅")
+    logger.done()
+
+
+if __name__ == "__main__":
+    """Program entry point.
+    """
+    logger = Logger(text="Pathfinding...")
+    args = get_args()
+    main(logger, args)
