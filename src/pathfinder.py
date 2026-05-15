@@ -73,7 +73,7 @@ def get_args():
     :return _type_: Parsed arguments.
     """
     parser = argparse.ArgumentParser(description="Pathfinder Experiment.")
-    parser.add_argument("-out", "--outdir", default="out", help="Target directory for outputs")
+    parser.add_argument("-o", "--outdir", default="out", help="Target directory for outputs")
     parser.add_argument("-n", "--num_iterations", default=1, type=int, help="Number of iterations")
     parser.add_argument("-p", "--num_points", default=2, type=int, help="Number of points")
     parser.add_argument(
