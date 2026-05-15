@@ -1,10 +1,10 @@
 """Run any pre-build configuration steps."""
 
 from build import AppConfig, Builder, Logger
+from functools import lru_cache
 import argparse
 import cadquery as cq
 import json
-import numpy as np
 
 
 class Configurator:
@@ -20,20 +20,40 @@ class Configurator:
         self.config = config or AppConfig()
         self.logger = logger or Logger(text="Configuring...", enabled=False)
         self.builder = builder or Builder(config=config, logger=logger)
+        self._tube_cache = {}
+        self._path_cache = {}
 
     def get_part_position(self, tube, path, off):
         """Get the part position of the tube at offset.
 
-        If a part is attached to the tube at this offset, it should be attached
-        as closed to the part position as possible.
+        If a part is attached to this offset, it should be attached
+        as close to the part position as possible.
 
         :param _type_ part: The tube to test
         :param _type_ path: The wire path used to create the tube
         :param _type_ off: The path offset to use
         :return _type_: The part midpoint of the tube.
         """
-        pos = path.val().positionAt(off)
         radius = min(self.builder.config.clamp_diameters) / 2
+        self._tube_cache[id(tube)] = tube
+        self._path_cache[id(path)] = path
+        return self._get_part_position_cached(id(tube), id(path), off, radius)
+
+    @lru_cache
+    def _get_part_position_cached(self, tube_id, path_id, off, radius):
+        """Get the part position of the tube at offset.
+
+        If a part is attached to this offset, it should be attached
+        as close to the part position as possible.
+
+        :param _type_ part: The tube to test
+        :param _type_ path: The wire path used to create the tube
+        :param _type_ off: The path offset to use
+        :return _type_: The part midpoint of the tube.
+        """
+        tube = self._tube_cache[tube_id]
+        path = self._path_cache[path_id]
+        pos = path.val().positionAt(off)
         midpoint_up = pos + cq.Vector(0, 0, radius)
         midpoint_down = pos - cq.Vector(0, 0, radius)
         solid_center = tube.val().Center()
@@ -60,9 +80,9 @@ class Configurator:
             clamp_offset, _ = self.config.clamp_positions[name][idx]  # type: ignore
             center = self.get_part_position(tube, path, clamp_offset)
 
-            for cur_offset_deg in np.arange(0, 360, 1.0):
+            for cur_offset_deg in range(360):
                 # Compute Center of Mass distance for each part side
-                clamp = self.builder.build_clamp_bed(name, idx, offset_deg=cur_offset_deg)
+                clamp = self.builder.build_clamp_bed(name, idx, offset_deg=float(cur_offset_deg))
                 clamp_center = clamp.val().Center()  # type: ignore
                 distance = (clamp_center - center).Length
 
@@ -89,9 +109,9 @@ class Configurator:
         min_distance = float("inf")
         offset_deg = None
 
-        for cur_offset_deg in np.arange(0, 360, 10.0):
+        for cur_offset_deg in range(0, 360, 10):
             # Compute Center of Mass distance for each part side
-            text = self.builder.build_text(name, right=True, offset_deg=cur_offset_deg)
+            text = self.builder.build_text(name, right=True, offset_deg=float(cur_offset_deg))
             text_center = text.val().Center()  # type: ignore
             distance = (text_center - center).Length
 
