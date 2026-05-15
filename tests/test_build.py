@@ -224,8 +224,7 @@ class TestBuilder:
         """
         if name != "driver" and name != "passenger":
             raise ValueError(f"Invalid name: {name}")
-        build_args = {"start_deg": (0 if right else 180), "end_deg": (180 if right else 360)}
-        manifold = builder.build_tube(name, **build_args)
+        manifold = builder.build_tube(name, right=right)
         part = builder.build_part(name, right=right)
         manifold_vol, manifold_from_parts_vol = (
             manifold.val().Volume(),
@@ -242,17 +241,25 @@ class TestBuilder:
         :param _type_ right: True if building the right part, else False
         :param _type_ builder: The manifold builder to test
         """
+        orig_part = builder.build_part(name, right=right)
         part = builder.build_prepared_part(name, right=right)
-        part_val = part.val()
 
         # Ensure the part is a watertight solid
-        assert part_val.isValid()
-        assert part_val.Volume() > 0
+        assert part.val().isValid()
+        assert part.val().Volume() > 0
 
         # Ensure the part is touching the print bed
         bottom_faces = part.faces("<Z").vals()
         face_area = sum(f.Area() for f in bottom_faces)
         assert face_area > 0
+
+        # Run a few more checks to see if the part was mutated during preparation
+        assert len(orig_part.val().Solids()) == len(part.val().Solids()), "Solid structure mutated"
+        assert len(orig_part.val().Faces()) == len(part.val().Faces()), "Face array mutated"
+        assert len(orig_part.val().Edges()) == len(part.val().Edges()), "Edge array mutated"
+        assert abs(orig_part.val().Volume() - part.val().Volume()) < 1e-6, "Volume changed during movement"
+        assert abs(orig_part.val().Volume() - part.val().Volume()) < 1e-5, "Volume changed"
+        assert abs(orig_part.val().Area() - part.val().Area()) < 1e-5, "Surface area changed"
 
     def test_generate_all(self, builder, tmp_path):
         """Test the part generation happy path.
@@ -341,10 +348,9 @@ class TestBuilder:
         """
         clean_tool = builder.build_clean_tool(name, radius=min(builder.config.clamp_diameters) / 2)
         part = builder.build_part(name, right=right, tube_only=True)
-        build_args = {"start_deg": (0 if right else 180), "end_deg": (180 if right else 360)}
 
         for idx in range(1, len(builder.config.clamp_positions[name]) - 1):
             # Add inner clamp beds.
-            clamp_bed = builder.build_clamp_bed(name, idx, **build_args).cut(clean_tool)
+            clamp_bed = builder.build_clamp_bed(name, idx, right=right).cut(clean_tool)
             intersection = part.intersect(clamp_bed)
             assert intersection.val().Volume() == pytest.approx(0), f"tube only test failed for {name}, clamp {idx}"
