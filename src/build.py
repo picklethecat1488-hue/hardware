@@ -35,8 +35,8 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     # The part bounds
     z_bounds: list[float] = [145, 530]
 
-    # Wall thickness ~1.4mm
-    wall_thickness: float = 1.4
+    # Wall thickness ~3mm
+    wall_thickness: float = 3.0
 
     # Inlet and outlet diameters, 2.5", inner clamp diameter 3"
     clamp_diameters: list[float] = [63.5, 76.2, 63.5]
@@ -53,8 +53,8 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     # The minimum space between each clamp bed
     clamp_space: float = 10
 
-    # Applying a 0.5mm fillet/chamfer to all objects.
-    edge_rounding: float = 0.5
+    # The fillet or chamfer to apply to object edges
+    edge_rounding: float = 0.75
 
     # The part names, driver and passenger
     names: list[str] = ["driver", "passenger"]
@@ -90,7 +90,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     logo_text_args: dict[str, str | int | float] = {
         "txt": "FHB",
         "fontsize": 10,
-        "distance": 1.5,
+        "distance": 2,
         "fontPath": "DancingScript-VariableFont_wght.ttf",
         "halign": "center",
         "valign": "center",
@@ -474,7 +474,7 @@ class Builder:
                 # Add the text
                 if right:
                     text = self.build_text(name, right=right)
-                    part = part.union(text)
+                    part = part.cut(text)
 
                 # Clean the inner part volume
                 clean_tool = self.build_clean_tool(name)
