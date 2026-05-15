@@ -47,7 +47,7 @@ class Pathfinder:
         z = round(random.uniform(bbox.zmin, bbox.zmax), 2)
         return (x, y, z)
 
-    def try_point(self, name, point, out_dir):
+    def try_points(self, name, points, out_dir):
         """Try the given point.
 
         :param _type_ name: The name to try
@@ -55,9 +55,9 @@ class Pathfinder:
         :param _type_ out_dir: The path to generate build output in.
         :return _type_: True if the attractor is valid, else false.
         """
-        self.config.attractors[name] = point
+        self.config.attractors[name] = points
         try:
-            self.logger.print(f"Trying {point} on {name}...", symbol="📍")
+            self.logger.print(f"Trying {points} on {name}...", symbol="📍")
             self.configurator.configure_all()
             self.builder.generate_all(out_dir=str(out_dir))
             self.invoke_pytest()
@@ -75,6 +75,7 @@ def get_args():
     parser = argparse.ArgumentParser(description="Pathfinder Experiment.")
     parser.add_argument("-out", "--outdir", default="out", help="Target directory for outputs")
     parser.add_argument("-n", "--num_iterations", default=1, type=int, help="Number of iterations")
+    parser.add_argument("-p", "--num_points", default=2, type=int, help="Number of points")
     parser.add_argument(
         "-s",
         "--name",
@@ -98,10 +99,10 @@ def main(logger, args):
     with open(log_file_path, "a", encoding="utf-8") as file:
         for _ in range(args.num_iterations):
             pathfinder = Pathfinder()
-            point = pathfinder.get_point()
+            points = [pathfinder.get_point() for _ in range(args.num_points)]
 
             # Run our path evaluation and log the attractor if it works.
-            if pathfinder.try_point(args.name, point, out_dir):
+            if pathfinder.try_points(args.name, points, out_dir):
                 json_line = json.dumps(pathfinder.config.model_dump(exclude_unset=True, by_alias=True))
                 file.write(f"{json_line}\n")
                 logger.print(f"Found path! Wrote to {str(log_file_path)}", symbol="✅")

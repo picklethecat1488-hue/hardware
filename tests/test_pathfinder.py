@@ -123,19 +123,25 @@ class TestPathfinder:
         assert args.outdir == "custom_out"
         assert args.num_iterations == 5
         assert args.name == "passenger"
+        assert args.num_points == 2
 
     def test_main_creates_output_directory_and_logs(self, mock_logger, tmp_path):
         """Test main creates output directory and logs successful paths."""
-        args = argparse.Namespace(outdir=str(tmp_path), num_iterations=1, name="driver")
+        args = argparse.Namespace(outdir=str(tmp_path), num_iterations=1, num_points=2, name="driver")
         log_file = tmp_path / "pathfinder_output.txt"
 
         with patch("pathfinder.Pathfinder") as mock_pathfinder_class:
             mock_pathfinder = MagicMock()
             mock_pathfinder.get_point.return_value = (10, 20, 30)
-            mock_pathfinder.try_point.return_value = True
+            mock_pathfinder.try_points.return_value = True
             mock_pathfinder.config = MagicMock(
                 names=["driver", "passenger"],
-                model_dump=MagicMock(return_value={"names": ["driver", "passenger"], "attractors": {"driver": [10, 20, 30]}}),
+                model_dump=MagicMock(
+                    return_value={
+                        "names": ["driver", "passenger"],
+                        "attractors": {"driver": [[10, 20, 30], [10, 20, 30]]},
+                    }
+                ),
             )
             mock_pathfinder.builder.create_wire.return_value.val.return_value.Length.return_value = 100.0
             mock_pathfinder_class.return_value = mock_pathfinder
@@ -143,12 +149,11 @@ class TestPathfinder:
             main(mock_logger, args)
 
             mock_pathfinder_class.assert_called_once()
-            mock_pathfinder.get_point.assert_called_once()
-            mock_pathfinder.try_point.assert_called_once_with("driver", (10, 20, 30), tmp_path)
+            mock_pathfinder.try_points.assert_called_once_with("driver", [(10, 20, 30), (10, 20, 30)], tmp_path)
             assert log_file.exists()
             content = log_file.read_text(encoding="utf-8").strip()
             assert content.startswith("{")
             data = json.loads(content)
             assert data["names"] == ["driver", "passenger"]
-            assert data["attractors"]["driver"] == [10, 20, 30]
+            assert data["attractors"]["driver"] == [[10, 20, 30], [10, 20, 30]]
             mock_logger.done.assert_called_once()
