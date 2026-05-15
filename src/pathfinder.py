@@ -24,6 +24,23 @@ class Pathfinder:
         self.config = AppConfig(_env_file=None)  # type: ignore
         self.builder = Builder(logger=logger, config=self.config)
         self.configurator = Configurator(logger=logger, builder=self.builder, config=self.config)
+        self._bbox = None
+
+    def _clear_builder_cache(self):
+        """Clear cached builder geometry that depends on attractors."""
+        self.builder.create_wire.cache_clear()
+        self.builder.build_tube.cache_clear()
+        self.builder.build_clamp_bed.cache_clear()
+        self.builder.build_text.cache_clear()
+        self.builder.build_clean_tool.cache_clear()
+        self.builder.build_part.cache_clear()
+        self.builder.build_prepared_part.cache_clear()
+
+    def _get_bounding_box(self):
+        """Cache the static bounding box used for random point generation."""
+        if self._bbox is None:
+            self._bbox = self.builder.build_bound_box().val().BoundingBox()  # type: ignore
+        return self._bbox
 
     def invoke_pytest(self):
         """Invoke pytest, raising a ValueError if pytest fails.
@@ -41,7 +58,7 @@ class Pathfinder:
 
         :return _type_: A tuple.
         """
-        bbox = self.builder.build_bound_box().val().BoundingBox()  # type: ignore
+        bbox = self._get_bounding_box()
         x = round(random.uniform(bbox.xmin, bbox.xmax), 2)
         y = round(random.uniform(bbox.ymin, bbox.ymax), 2)
         z = round(random.uniform(bbox.zmin, bbox.zmax), 2)
@@ -56,6 +73,7 @@ class Pathfinder:
         :return _type_: True if the attractor is valid, else false.
         """
         self.config.attractors[name] = points
+        self._clear_builder_cache()
         try:
             self.logger.print(f"Trying {points} on {name}...", symbol="📍")
             self.configurator.configure_all(names=[name])
@@ -96,9 +114,9 @@ def main(logger, args):
     out_dir.mkdir(parents=True, exist_ok=True)
     log_file_path = out_dir / "pathfinder_output.txt"
 
+    pathfinder = Pathfinder()
     with open(log_file_path, "a", encoding="utf-8") as file:
         for _ in range(args.num_iterations):
-            pathfinder = Pathfinder()
             points = [pathfinder.get_point() for _ in range(args.num_points)]
 
             # Run our path evaluation and log the attractor if it works.
