@@ -99,8 +99,8 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
 
     # The logo text offset, pathwise and anglewise
     logo_text_positions: dict[str, tuple[float, float]] = {
-        "driver": (0.3, 0),
-        "passenger": (0.3, 0),
+        "driver": (0.4, 0),
+        "passenger": (0.4, 0),
     }
 
     model_config = SettingsConfigDict(
