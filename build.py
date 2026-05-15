@@ -535,7 +535,7 @@ class Builder:
         # Ensure the part is facing up on the print bed in a way that is optimal for 3D printing
         part = self.build_part(name, right=right)
         if not facing_up(part):
-            part = part.mirror("XY")
+            part = part.rotate((0, 0, 0), (1, 0, 0), 180)
         axis, angle_deg = rotation(part)
         part = part.rotate((0, 0, 0), axis, angle_deg)
         part = part.translate(translation(part))
