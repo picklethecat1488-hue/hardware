@@ -117,7 +117,7 @@ class TestPathfinder:
 
     def test_get_args_parsing(self, mocker):
         """Test argument parsing."""
-        mocker.patch("sys.argv", ["script.py", "-out", "custom_out", "-n", "5", "-s", "passenger"])
+        mocker.patch("sys.argv", ["script.py", "-o", "custom_out", "-n", "5", "-s", "passenger"])
         args = get_args()
         assert args.outdir == "custom_out"
         assert args.num_iterations == 5
