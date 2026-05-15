@@ -1,17 +1,14 @@
-"""Contains Main unit tests."""
+"""Contains Build main unit tests."""
 
 import argparse
-from build import main, get_args
+from build import Builder, main, get_args
 from pathlib import Path
 import pytest
 from unittest.mock import MagicMock
 
 
-class TestMain:
-    """Main unit tests.
-
-    :return _type_: A Main test harness.
-    """
+class TestBuildMain:
+    """Build main unit tests."""
 
     @pytest.fixture
     def mock_logger(self):
@@ -31,10 +28,7 @@ class TestMain:
         return mocker.patch("build.Builder")
 
     def test_get_args_parsing(self, mocker):
-        """Test the argparse configuration directly.
-
-        :param _type_ mocker: The Mocker.
-        """
+        """Test the argparse configuration directly."""
         mocker.patch("sys.argv", ["script.py", "-e", "foo.env", "-out", "tmp", "-d", "my_diag", "-l"])
         args = get_args()
         assert args.env == "foo.env"
@@ -44,12 +38,7 @@ class TestMain:
         assert args.left is True
 
     def test_main_diagram_path(self, mock_logger, mock_builder, tmp_path):
-        """Check if generate_diagram was called with correct unpacked gen_args.
-
-        :param _type_ mock_logger: The Logger.
-        :param _type_ mock_builder: The Builder.
-        :param _type_ tmp_path: The temporary path.
-        """
+        """Check if generate_diagram was called with correct unpacked gen_args."""
         args = argparse.Namespace(outdir=tmp_path, env=None, diagram="schema", output=None, left=False, right=False)
         main(mock_logger, args)
         mock_builder.return_value.generate_diagram.assert_called_once_with(out_dir=tmp_path, names=["schema"])
@@ -72,12 +61,7 @@ class TestMain:
         )
 
     def test_main_output_path(self, mock_logger, mock_builder, tmp_path):
-        """Test -o flag with name.
-
-        :param _type_ mock_logger: The Logger.
-        :param _type_ mock_builder: The Builder.
-        :param _type_ tmp_path: The temporary path.
-        """
+        """Test -o flag with name."""
         args = argparse.Namespace(outdir=tmp_path, env=None, diagram=None, output=["part1"], left=True, right=False)
         main(mock_logger, args)
         mock_builder.return_value.generate_parts.assert_called_once_with(
@@ -99,12 +83,7 @@ class TestMain:
         mock_builder.return_value.generate_parts.assert_called_once_with(out_dir=tmp_path, names=["part1"])
 
     def test_main_output_env_path(self, mock_logger, mock_builder, tmp_path):
-        """Check if generate_diagram was called with correct unpacked gen_args.
-
-        :param _type_ mock_logger: The Logger.
-        :param _type_ mock_builder: The Builder.
-        :param _type_ tmp_path: The temporary path.
-        """
+        """Check if generate_diagram was called with correct unpacked gen_args."""
         args = argparse.Namespace(
             outdir=tmp_path, env=f"{tmp_path}.env", diagram=None, output=None, left=False, right=False
         )
@@ -115,12 +94,7 @@ class TestMain:
         mock_logger.done.assert_called_once()
 
     def test_main_generate_all_fallback(self, mock_logger, mock_builder, tmp_path):
-        """Test the else block when no flags are provided.
-
-        :param _type_ mock_logger: The Logger.
-        :param _type_ mock_builder: The Builder.
-        :param _type_ tmp_path: The temporary path to use.
-        """
+        """Test the else block when no flags are provided."""
         args = argparse.Namespace(outdir=tmp_path, env=None, diagram=None, output=None, left=False, right=False)
 
         main(mock_logger, args)
@@ -130,11 +104,7 @@ class TestMain:
         mock_logger.done.assert_called_once()
 
     def test_mutually_exclusive_error(self, mocker):
-        """Verify that providing both -d and -o raises a SystemExit (argparse behavior).
-
-        :param _type_ mock_logger: The Logger.
-        :param _type_ mock_builder: The Builder.
-        """
+        """Verify that providing both -d and -o raises a SystemExit (argparse behavior)."""
         mocker.patch("sys.argv", ["script.py", "-d", "-o", "name"])
         with pytest.raises(SystemExit):
             get_args()

@@ -5,6 +5,7 @@ import math
 import numpy as np
 import os
 from pathlib import Path
+from pydantic_changedetect import ChangeDetectionMixin
 import cadquery as cq
 from functools import lru_cache, cached_property
 from IPython.core.getipython import get_ipython
@@ -13,7 +14,7 @@ from typing import Optional
 import zipfile
 
 
-class AppConfig(BaseSettings):
+class AppConfig(ChangeDetectionMixin, BaseSettings):
     """Builder app configuration.
 
     :param _type_ BaseSettings: The base settings for the builder.
@@ -79,7 +80,9 @@ class AppConfig(BaseSettings):
         (895, 0, 522.5),
     ]
 
-    model_config = SettingsConfigDict(env_file=None, env_prefix="APP_")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_prefix="APP_", alias_generator=str.upper, populate_by_name=True
+    )
 
     @cached_property
     def measurements(self):
@@ -310,7 +313,7 @@ class Builder:
         :return _type_: The exhaust manifold
         """
         path = self.create_wire(name)
-        loc = path.val().locationAt(0)
+        loc = path.val().locationAt(0)  # type: ignore
         profile_sketch = self.create_profile_sketch(start_deg, end_deg)
         tube = (
             cq.Workplane(loc)
@@ -335,7 +338,7 @@ class Builder:
         :return _type_: The ring
         """
         path = self.create_wire(name)
-        loc = path.val().locationAt(off)
+        loc = path.val().locationAt(off)  # type: ignore
         workplane = cq.Workplane(loc)
         profile_sketch = self.create_profile_sketch(
             start_deg,
@@ -343,14 +346,14 @@ class Builder:
             outer_radius=outer_radius,
             inner_radius=inner_radius,
         )
-        p1 = path.val().positionAt(off)
-        p2 = path.val().positionAt(off + len / path.val().Length())
+        p1 = path.val().positionAt(off)  # type: ignore
+        p2 = path.val().positionAt(off + len / path.val().Length())  # type: ignore
         path = workplane.polyline([p1, p2])
         ring = workplane.placeSketch(profile_sketch).sweep(path)  # type: ignore
         return ring
 
     @lru_cache
-    def build_clamp_bed(self, name, clamp_idx, start_deg: float = 0, end_deg: float = 360):
+    def build_clamp_bed(self, name, clamp_idx, start_deg: float = 0, end_deg: float = 360, offset_deg=None):
         """Build a clamp bed.
 
         :param _type_ name: The part name to build.
@@ -363,6 +366,8 @@ class Builder:
         outer_radius = self.config.clamp_diameters[clamp_idx] / 2
         inner_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
         clamp_pos, angle_offset = self.config.clamp_positions[name][clamp_idx]
+        if offset_deg:
+            angle_offset = offset_deg
 
         # Create the clamp bed
         bed = self.create_ring(
@@ -385,7 +390,7 @@ class Builder:
         """
         # Create the clean tool
         path = self.create_wire(name)
-        tube_loc = path.val().locationAt(0)
+        tube_loc = path.val().locationAt(0)  # type: ignore
         if radius is None:
             radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
         profile_sketch = self.create_profile_sketch(0, 360, outer_radius=radius, inner_radius=0)

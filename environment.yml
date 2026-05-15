@@ -371,6 +371,7 @@ dependencies:
       - pooch==1.9.0
       - pyaml==26.2.1
       - pydantic==2.12.5
+      - pydantic-changedetect==0.10.1
       - pydantic-core==2.41.5
       - pydantic-numpy==9.0.1
       - pydantic-settings==2.14.0
@@ -388,6 +389,7 @@ dependencies:
       - semver==3.0.4
       - simple-websocket==1.1.0
       - typing-inspection==0.4.2
+      - unknown==0.0.0
       - webcolors==24.8.0
       - websockets==13.1
       - werkzeug==3.1.8

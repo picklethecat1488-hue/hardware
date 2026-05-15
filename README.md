@@ -37,6 +37,11 @@ pytest
 python build.py
 ```
 
+If the profile of the exhaust tubes has changed, you may need to run this command to get the correct output prior to running `build.py`:
+```
+python config.py
+```
+
 Prior to updating `build.py`, these commands should be run to ensure proper formatting:
 ```
 ruff format build.py
