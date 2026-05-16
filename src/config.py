@@ -61,6 +61,25 @@ class Configurator:
         dist_down = midpoint_down.sub(solid_center).Length
         return midpoint_up if dist_up < dist_down else midpoint_down
 
+    def boxes_overlap(self, lhs, rhs):
+        """Return True when two CAD objects' bounding boxes overlap."""
+        lhs_box = lhs.val().BoundingBox()
+        rhs_box = rhs.val().BoundingBox()
+        return not (
+            lhs_box.xmax < rhs_box.xmin
+            or lhs_box.xmin > rhs_box.xmax
+            or lhs_box.ymax < rhs_box.ymin
+            or lhs_box.ymin > rhs_box.ymax
+            or lhs_box.zmax < rhs_box.zmin
+            or lhs_box.zmin > rhs_box.zmax
+        )
+
+    def is_geometry_clear(self, candidate, other):
+        """Return True if the candidate does not intersect the other object."""
+        if not self.boxes_overlap(candidate, other):
+            return True
+        return candidate.intersect(other).val().Volume() == 0
+
     def config_clamp(self, name):
         """Configure clamps.
 
@@ -87,7 +106,7 @@ class Configurator:
                 distance = (clamp_center - center).Length
 
                 # Update the distance tracker
-                if (distance < min_distance) and (clamp.intersect(other_tube).val().Volume() == 0):  # type: ignore
+                if (distance < min_distance) and self.is_geometry_clear(clamp, other_tube):
                     min_distance = distance
                     offset_deg = cur_offset_deg
 
@@ -116,7 +135,7 @@ class Configurator:
             distance = (text_center - center).Length
 
             # Update the distance tracker
-            if (distance < min_distance) and (text.intersect(other_tube).val().Volume() == 0):  # type: ignore
+            if (distance < min_distance) and self.is_geometry_clear(text, other_tube):
                 min_distance = distance
                 offset_deg = cur_offset_deg
 
