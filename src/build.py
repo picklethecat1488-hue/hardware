@@ -166,21 +166,23 @@ class Logger:
         else:
             if not self.running:
                 # Start the spinner, if not already running.
-                self.backend.start()  # type: ignore
+                cast(Any, self.backend).start()
                 self.running = True
             # Display the message, along with a custom symbol, while keeping the spinner going.
-            self.backend.text = ""  # type: ignore
-            self.backend.stop_and_persist(f"{symbol} {msg}")  # type: ignore
-            self.backend.start()  # type: ignore
+            backend = cast(Any, self.backend)
+            backend.text = ""
+            backend.stop_and_persist(f"{symbol} {msg}")
+            backend.start()
 
     def done(self):
         """Mark the operation as complete."""
-        if not self.in_notebook:
-            self.backend.text = f"Done {self.text}"  # type: ignore
-            self.backend.succeed()  # type: ignore
+        if not self.in_notebook and self.backend:
+            backend = cast(Any, self.backend)
+            backend.text = f"Done {self.text}"
+            backend.succeed()
             if self.running:
                 # Stop the spinner after the operation has completed.
-                self.backend.stop()  # type: ignore
+                backend.stop()
                 self.running = False
 
 
@@ -380,8 +382,8 @@ class Builder:
     ):
         """Create a ring-shaped tube segment."""
         path = self.create_wire(name)
-        wire = path.val()
-        loc = wire.locationAt(off)  # type: ignore
+        wire = cast(cq.Wire, path.val())
+        loc = wire.locationAt(off)
         workplane = cq.Workplane(loc)
         profile_sketch = self.create_profile(
             center_deg=center_deg,
@@ -390,8 +392,8 @@ class Builder:
             inner_radius=inner_radius,
             joint_space=joint_space,
         )
-        p1 = wire.positionAt(off)  # type: ignore
-        p2 = wire.positionAt(off + len / wire.Length())  # type: ignore
+        p1 = wire.positionAt(off)
+        p2 = wire.positionAt(off + len / wire.Length())
         path = workplane.polyline([p1, p2])
         wp: Any = workplane
         ring = wp.placeSketch(profile_sketch).sweep(path)
@@ -435,11 +437,11 @@ class Builder:
         """Generate text geometry wrapped to the tube surface."""
         path = self.create_wire(name)
         wire = cast(cq.Wire, path.val())
-        off, angle_offset = self.config.logo_text_positions[name]  # type: ignore
-        pos = wire.positionAt(off)  # type: ignore
-        tan = wire.tangentAt(off)  # type: ignore
+        off, angle_offset = self.config.logo_text_positions[name]
+        pos = wire.positionAt(off)
+        tan = wire.tangentAt(off)
         plane = cq.Plane(origin=pos, normal=tan)
-        outer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2  # type: ignore
+        outer_radius = (cast(float, min(self.config.clamp_diameters)) - self.config.wall_thickness) / 2
         if offset_deg is not None:
             angle_offset = offset_deg
         angle_deg = (90 if right else 270) + angle_offset
@@ -461,8 +463,8 @@ class Builder:
         """Build a cutting tool used to clean the internal tube volume."""
         # Create the clean tool
         path = self.create_wire(name)
-        wire = path.val()
-        tube_loc = wire.locationAt(0)  # type: ignore
+        wire = cast(cq.Wire, path.val())
+        tube_loc = wire.locationAt(0)
         if radius is None:
             radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
         profile_sketch = self.create_profile(center_deg=0, angle_deg=360, outer_radius=radius, inner_radius=0)
@@ -506,7 +508,9 @@ class Builder:
                 full_part = self.build_tube(name)
             else:
                 raise ValueError(f"Invalid name: {name}")
-            diff = part.val().Center() - full_part.val().Center()  # type: ignore
+            center_part = cast(cq.Vector, part.val().Center())
+            center_full = cast(cq.Vector, full_part.val().Center())
+            diff = center_part - center_full
             normal = diff.normalized()
             return normal.z > 0
 
