@@ -184,7 +184,7 @@ class TestBuilder:
         """Verify rebuilt part geometry matches manifold volume."""
         if name != "driver" and name != "passenger":
             raise ValueError(f"Invalid name: {name}")
-        manifold = builder.build_tube(name, right=right)
+        manifold = builder.build_tube(name, right=right, half_tube=True)
         part = builder.build_part(name, right=right)
         manifold_vol, manifold_from_parts_vol = (
             manifold.val().Volume(),

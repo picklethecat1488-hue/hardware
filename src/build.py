@@ -338,13 +338,20 @@ class Builder:
         return sketch.moved(cq.Location(cq.Vector(0, 0, 0), cq.Vector(0, 0, 1), center_deg))
 
     @lru_cache
-    def build_tube(self, name, right=False, lap_joint=False):
-        """Build a manifold tube half."""
+    def build_tube(self, name, right=False, lap_joint=False, half_tube=False):
+        """Build a manifold tube."""
         path = self.create_wire(name)
         wire_obj = cast(cq.Wire, path.val())
         loc = wire_obj.locationAt(0)
-        center_deg = 90 if right else 270
-        angle_deg = 180
+
+        if half_tube:
+            center_deg = 90 if right else 270
+            angle_deg = 180
+        else:
+            center_deg = 0
+            angle_deg = 360
+            lap_joint = False
+
         profile_sketch = self.create_profile(center_deg, angle_deg, lap_joint=lap_joint)
         wp: Any = cq.Workplane(loc)
         tube = wp.placeSketch(profile_sketch).sweep(path, transition="round")
@@ -456,7 +463,7 @@ class Builder:
         """Build one half of the manifold assembly."""
         if name == "driver" or name == "passenger":
             # Create the main part body.
-            part = self.build_tube(name, right=right, lap_joint=True)
+            part = self.build_tube(name, right=right, lap_joint=True, half_tube=True)
             if not tube_only:
                 for idx in range(1, len(self.config.clamp_positions[name]) - 1):
                     # Add inner clamp beds.
