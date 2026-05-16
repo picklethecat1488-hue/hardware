@@ -31,6 +31,7 @@ class Pathfinder:
         self.builder.create_wire.cache_clear()
         self.builder.build_tube.cache_clear()
         self.builder.build_clamp_bed.cache_clear()
+        self.builder.create_logo_text_shape.cache_clear()
         self.builder.build_text.cache_clear()
         self.builder.build_clean_tool.cache_clear()
         self.builder.build_part.cache_clear()

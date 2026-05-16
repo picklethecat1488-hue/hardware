@@ -411,6 +411,11 @@ class Builder:
         return bed
 
     @lru_cache
+    def create_logo_text_shape(self):
+        """Create and cache the raw logo text shape used for placement."""
+        return cq.Workplane("XY").text(**self.config.logo_text_args)  # type: ignore
+
+    @lru_cache
     def build_text(self, name, right=False, offset_deg=None):
         """Build and place the logo text.
 
@@ -426,17 +431,19 @@ class Builder:
         tan = wire.tangentAt(off)  # type: ignore
         plane = cq.Plane(origin=pos, normal=tan)
         outer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2  # type: ignore
-        if offset_deg:
+        if offset_deg is not None:
             angle_offset = offset_deg
         angle_deg = (90 if right else 270) + angle_offset
 
-        # Place the text
+        # Generate the cached base text shape once as a pure Workplane.
+        text_wp = self.create_logo_text_shape()
+
         text = (
             cq.Workplane(plane)
             .transformed(rotate=(0, 90, 0))
             .transformed(rotate=(angle_deg, 0, 0))
             .transformed(offset=(0, 0, outer_radius))
-            .text(**self.config.logo_text_args)  # type: ignore
+            .eachpoint(lambda loc: text_wp.val().moved(loc), True)
         )
         return text
 
