@@ -128,7 +128,7 @@ class Configurator:
         min_distance = float("inf")
         offset_deg = None
 
-        for cur_offset_deg in range(0, 360, 10):
+        for cur_offset_deg in range(0, 360, 1):
             # Compute Center of Mass distance for each part side
             text = self.builder.build_text(name, right=True, offset_deg=float(cur_offset_deg))
             text_center = text.val().Center()  # type: ignore
