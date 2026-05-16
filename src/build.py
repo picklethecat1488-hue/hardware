@@ -51,7 +51,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     clamp_space: float = 10
 
     # The fillet or chamfer to apply to object edges
-    edge_rounding: float = 0.75
+    edge_rounding: float = 0.25
 
     # The radius of the circular lap joint features
     joint_radius: float = 1.5
@@ -310,6 +310,10 @@ class Builder:
                 mode="i"
             )
 
+            # Apply chamfer to the sharp corners of the profile before adding lap joint features.
+            # This is more robust and faster than 3D chamfering after a complex sweep.
+            sketch.vertices().chamfer(self.config.edge_rounding)
+
             if lap_joint:
                 # To ensure the parts align without intersecting the 'full circle' volume,
                 # we create an alternating lap joint. The 'left' side gets a protrusion,
@@ -343,7 +347,7 @@ class Builder:
         angle_deg = 180
         profile_sketch = self.create_profile(center_deg, angle_deg, lap_joint=lap_joint)
         wp: Any = cq.Workplane(loc)
-        tube = wp.placeSketch(profile_sketch).sweep(path, transition="round").fillet(self.config.edge_rounding)
+        tube = wp.placeSketch(profile_sketch).sweep(path, transition="round")
         return tube
 
     @lru_cache
@@ -396,7 +400,7 @@ class Builder:
             outer_radius=outer_radius,
             center_deg=center_deg,
             angle_deg=angle_span,
-        ).fillet(self.config.edge_rounding)
+        )
         return bed
 
     @lru_cache
