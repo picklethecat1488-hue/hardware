@@ -50,9 +50,6 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     # The minimum space between each clamp bed
     clamp_space: float = 10
 
-    # The fillet or chamfer to apply to object edges
-    edge_rounding: float = 0.25
-
     # The radius of the circular lap joint features
     joint_radius: float = 1.5
 
@@ -277,12 +274,14 @@ class Builder:
         return path
 
     @lru_cache
-    def create_profile_sketch(self, angle_deg, outer_radius=None, inner_radius=None, lap_joint=False):
+    def create_profile_sketch(self, angle_deg, outer_radius=None, inner_radius=None, lap_joint=False, joint_space=None):
         """Create a circular tube profile sketch."""
         if outer_radius is None:
             outer_radius = min(self.config.clamp_diameters) / 2
         if inner_radius is None:
             inner_radius = outer_radius - self.config.wall_thickness
+        if joint_space is None:
+            joint_space = self.config.joint_space
 
         if outer_radius < 0:
             raise ValueError("Invalid radius")
@@ -310,35 +309,45 @@ class Builder:
                 mode="i"
             )
 
-            # Apply chamfer to the sharp corners of the profile before adding lap joint features.
-            # This is more robust and faster than 3D chamfering after a complex sweep.
-            sketch.vertices().chamfer(self.config.edge_rounding)
+            # Apply a gap between the half-tubes to account for part deformation and epoxy.
+            # By using rotated rectangles, we ensure the gap is applied perpendicular to
+            # each parting line, regardless of the sector angle.
+            h = (outer_radius + self.config.joint_radius) * 2
+            sketch.push([(0, 0)]).rect(joint_space, h, angle=start_deg, mode="s").reset()
+            sketch.push([(0, 0)]).rect(joint_space, h, angle=end_deg, mode="s").reset()
 
             if lap_joint:
-                # To ensure the parts align without intersecting the 'full circle' volume,
-                # we create an alternating lap joint. The 'left' side gets a protrusion,
-                # and the 'right' side gets a matching recess.
-                # Centering the joint at the inner radius avoids sharp corners at the bore.
-                # Calculate center points for the circular lap joint features at the inner radius
+                # Calculate shifted center points for the lap joint circles so they remain
+                # attached to the part after the joint_space gap is subtracted.
+                # The shift is applied perpendicular to the rotated parting line.
                 end_rad = math.radians(end_deg)
                 start_rad = math.radians(start_deg)
-                c_left = (inner_radius * math.cos(end_rad), inner_radius * math.sin(end_rad))
-                c_right = (inner_radius * math.cos(start_rad), inner_radius * math.sin(start_rad))
+                face_shift = joint_space / 2
+                c_left = (
+                    inner_radius * math.cos(end_rad) + face_shift * math.sin(end_rad),
+                    inner_radius * math.sin(end_rad) - face_shift * math.cos(end_rad),
+                )
+                c_right = (
+                    inner_radius * math.cos(start_rad) - face_shift * math.sin(start_rad),
+                    inner_radius * math.sin(start_rad) + face_shift * math.cos(start_rad),
+                )
 
-                # Create the interlocking protrusion and recess using full circles centered on the parting line
+                # Create the interlocking protrusion and recess using full circles.
                 sketch.push([c_left]).circle(self.config.joint_radius, mode="a").reset()
-                sketch.push([c_right]).circle(self.config.joint_radius + self.config.joint_space, mode="s").reset()
+                sketch.push([c_right]).circle(self.config.joint_radius + joint_space, mode="s").reset()
 
         return sketch
 
     @lru_cache
-    def create_profile(self, center_deg, angle_deg, outer_radius=None, inner_radius=None, lap_joint=False):
+    def create_profile(
+        self, center_deg, angle_deg, outer_radius=None, inner_radius=None, lap_joint=False, joint_space=None
+    ):
         """Create a circular tube profile sketch with rotation applied."""
-        sketch = self.create_profile_sketch(angle_deg, outer_radius, inner_radius, lap_joint)
+        sketch = self.create_profile_sketch(angle_deg, outer_radius, inner_radius, lap_joint, joint_space)
         return sketch.moved(cq.Location(cq.Vector(0, 0, 0), cq.Vector(0, 0, 1), center_deg))
 
     @lru_cache
-    def build_tube(self, name, right=False, lap_joint=False, half_tube=False):
+    def build_tube(self, name, right=False, lap_joint=False, half_tube=False, joint_space=None):
         """Build a manifold tube."""
         path = self.create_wire(name)
         wire_obj = cast(cq.Wire, path.val())
@@ -352,7 +361,7 @@ class Builder:
             angle_deg = 360
             lap_joint = False
 
-        profile_sketch = self.create_profile(center_deg, angle_deg, lap_joint=lap_joint)
+        profile_sketch = self.create_profile(center_deg, angle_deg, lap_joint=lap_joint, joint_space=joint_space)
         wp: Any = cq.Workplane(loc)
         tube = wp.placeSketch(profile_sketch).sweep(path, transition="round")
         return tube
@@ -463,7 +472,9 @@ class Builder:
         """Build one half of the manifold assembly."""
         if name == "driver" or name == "passenger":
             # Create the main part body.
-            part = self.build_tube(name, right=right, lap_joint=True, half_tube=True)
+            part = self.build_tube(
+                name, right=right, lap_joint=True, half_tube=True, joint_space=self.config.joint_space
+            )
             if not tube_only:
                 for idx in range(1, len(self.config.clamp_positions[name]) - 1):
                     # Add inner clamp beds.
