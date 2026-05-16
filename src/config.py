@@ -125,7 +125,7 @@ class Configurator:
         center = self.get_part_position(tube, path, text_offset)
 
         def build_text(angle):
-            return self.builder.build_text(name, right=True, offset_deg=angle)
+            return self.builder.build_text(name, right=True, offset_deg=angle, font_path="Sans")
 
         offset_deg = self.find_best_angle(
             build_text,
