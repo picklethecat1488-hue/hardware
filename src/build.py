@@ -317,6 +317,7 @@ class Builder:
         )
         return tube
 
+    @lru_cache
     def create_ring(
         self,
         name,
