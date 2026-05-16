@@ -271,7 +271,7 @@ class Builder:
         return path
 
     @lru_cache
-    def create_profile(self, center_deg, angle_deg, outer_radius=None, inner_radius=None):
+    def create_profile_sketch(self, angle_deg, outer_radius=None, inner_radius=None):
         """Create a circular tube profile sketch."""
         if outer_radius is None:
             outer_radius = min(self.config.clamp_diameters) / 2
@@ -279,8 +279,8 @@ class Builder:
             inner_radius = outer_radius - self.config.wall_thickness
         if inner_radius >= outer_radius:
             raise ValueError("Invalid radius or inner radius")
-        start_deg = center_deg - angle_deg / 2
-        end_deg = center_deg + angle_deg / 2
+        start_deg = -angle_deg / 2
+        end_deg = angle_deg / 2
         sketch = (
             cq.Sketch()
             .arc((0, 0), outer_radius, start_deg, end_deg - start_deg)
@@ -294,6 +294,12 @@ class Builder:
             sketch = sketch.circle(inner_radius, mode="s")
         sketch = sketch.clean()
         return sketch
+
+    @lru_cache
+    def create_profile(self, center_deg, angle_deg, outer_radius=None, inner_radius=None):
+        """Create a circular tube profile sketch with rotation applied."""
+        sketch = self.create_profile_sketch(angle_deg, outer_radius, inner_radius)
+        return sketch.moved(cq.Location(cq.Vector(0, 0, 0), cq.Vector(0, 0, 1), center_deg))
 
     @lru_cache
     def build_tube(self, name, right=False):
