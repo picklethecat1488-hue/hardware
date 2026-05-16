@@ -48,6 +48,27 @@ class VectorStub:
         return f"VectorStub({self.x}, {self.y}, {self.z})"
 
 
+class StubBoundingBox:
+    """Stub for CadQuery BoundingBox."""
+
+    def __init__(
+        self,
+        xmin: float = -1.0,
+        xmax: float = 1.0,
+        ymin: float = -1.0,
+        ymax: float = 1.0,
+        zmin: float = -1.0,
+        zmax: float = 1.0,
+    ):
+        """Initialize a stub bounding box with bounds."""
+        self.xmin = xmin
+        self.xmax = xmax
+        self.ymin = ymin
+        self.ymax = ymax
+        self.zmin = zmin
+        self.zmax = zmax
+
+
 class StubEntity:
     """Minimal stub entity that mimics a CadQuery part for test purposes."""
 
@@ -67,6 +88,10 @@ class StubEntity:
     def Volume(self) -> float:
         """Return the stored volume."""
         return self._volume
+
+    def BoundingBox(self) -> StubBoundingBox:
+        """Return a stub bounding box."""
+        return StubBoundingBox()
 
     def intersect(self, other):
         """Return a new stub entity representing an intersection result."""
@@ -133,49 +158,49 @@ class StubBuilder:
         return StubEntity(center=VectorStub(offset_deg, 0, 0), volume=0)
 
 
-@pytest.fixture(autouse=True)
-def patch_cq_vector(monkeypatch):
-    """Patch CadQuery Vector with a stub vector during tests."""
-    monkeypatch.setattr(config.cq, "Vector", VectorStub)
-    yield
+class TestConfig:
+    """Configurator unit tests."""
 
+    @pytest.fixture(autouse=True)
+    def patch_cq_vector(self, monkeypatch):
+        """Patch CadQuery Vector with a stub vector during tests."""
+        monkeypatch.setattr(config.cq, "Vector", VectorStub)
+        yield
 
-def test_get_part_position_prefers_closer_midpoint():
-    """Verify get_part_position chooses the closer midpoint position."""
-    dummy_config = DummyConfig()
-    builder = StubBuilder(dummy_config)
-    configurator = Configurator(builder=builder, config=dummy_config, logger=None)
-    path = StubPath(VectorStub(0, 0, 0))
-    tube = builder.build_part("driver")
+    def test_get_part_position_prefers_closer_midpoint(self):
+        """Verify get_part_position chooses the closer midpoint position."""
+        dummy_config = DummyConfig()
+        builder = StubBuilder(dummy_config)
+        configurator = Configurator(builder=builder, config=dummy_config, logger=None)
+        path = StubPath(VectorStub(0, 0, 0))
+        tube = builder.build_part("driver")
 
-    result = configurator.get_part_position(tube, path, 0.4)
+        result = configurator.get_part_position(tube, path, 0.4)
 
-    assert result == VectorStub(0, 0, 3.0)
+        assert result == VectorStub(0, 0, 3.0)
 
+    def test_config_clamp_updates_offset_for_best_angle(self, monkeypatch):
+        """Ensure clamp configuration chooses the best angle offset."""
+        dummy_config = DummyConfig()
+        builder = StubBuilder(dummy_config)
+        configurator = Configurator(builder=builder, config=dummy_config, logger=None)
 
-def test_config_clamp_updates_offset_for_best_angle(monkeypatch):
-    """Ensure clamp configuration chooses the best angle offset."""
-    dummy_config = DummyConfig()
-    builder = StubBuilder(dummy_config)
-    configurator = Configurator(builder=builder, config=dummy_config, logger=None)
+        monkeypatch.setattr(config.np, "arange", lambda start, stop, step: [0.0, 90.0, 180.0])
 
-    monkeypatch.setattr(config.np, "arange", lambda start, stop, step: [0.0, 90.0, 180.0])
+        configurator.config_clamp("driver")
 
-    configurator.config_clamp("driver")
+        assert dummy_config.clamp_positions["driver"][1][1] == 0.0
+        assert builder.clamp_calls[:3] == [0.0, 90.0, 180.0]
 
-    assert dummy_config.clamp_positions["driver"][1][1] == 0.0
-    assert builder.clamp_calls == [0.0, 90.0, 180.0]
+    def test_config_text_logo_updates_offset_for_best_angle(self, monkeypatch):
+        """Ensure text logo configuration chooses the best angle offset."""
+        dummy_config = DummyConfig()
+        builder = StubBuilder(dummy_config)
+        configurator = Configurator(builder=builder, config=dummy_config, logger=None)
 
+        monkeypatch.setattr(config.np, "arange", lambda start, stop, step: [0.0, 90.0, 180.0])
 
-def test_config_text_logo_updates_offset_for_best_angle(monkeypatch):
-    """Ensure text logo configuration chooses the best angle offset."""
-    dummy_config = DummyConfig()
-    builder = StubBuilder(dummy_config)
-    configurator = Configurator(builder=builder, config=dummy_config, logger=None)
+        configurator.config_text_logo("driver")
 
-    monkeypatch.setattr(config.np, "arange", lambda start, stop, step: [0.0, 90.0, 180.0])
-
-    configurator.config_text_logo("driver")
-
-    assert dummy_config.logo_text_positions["driver"][1] == 0.0
-    assert builder.text_calls == [0.0, 90.0, 180.0]
+        assert dummy_config.logo_text_positions["driver"][1] == 0.0
+        assert builder.text_calls[:3] == [0.0, 90.0, 180.0]
