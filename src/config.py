@@ -80,6 +80,36 @@ class Configurator:
             return True
         return candidate.intersect(other).val().Volume() == 0
 
+    def angle_window(self, center, radius, step):
+        """Return a wrapped angular window around a center angle."""
+        start = int(center - radius)
+        end = int(center + radius)
+        return [(angle % 360) for angle in range(start, end + 1, step)]
+
+    def scan_angles(self, angles, candidate_factory, other_obj, center):
+        """Scan angle candidates and return the best angle based on distance."""
+        best_angle = None
+        best_distance = float("inf")
+        for angle in angles:
+            candidate = candidate_factory(float(angle))
+            if not self.is_geometry_clear(candidate, other_obj):
+                continue
+            candidate_center = candidate.val().Center()  # type: ignore
+            distance = (candidate_center - center).Length
+            if distance < best_distance:
+                best_distance = distance
+                best_angle = float(angle)
+        return best_angle
+
+    def find_best_angle(self, candidate_factory, other_obj, center, coarse_step=10, fine_window=10, fine_step=1):
+        """Find the best offset with a coarse sweep followed by a fine search."""
+        coarse_angles = range(0, 360, coarse_step)
+        best_angle = self.scan_angles(coarse_angles, candidate_factory, other_obj, center)
+        if best_angle is None:
+            return None
+        fine_angles = self.angle_window(best_angle, fine_window, fine_step)
+        return self.scan_angles(fine_angles, candidate_factory, other_obj, center)
+
     def config_clamp(self, name):
         """Configure clamps.
 
@@ -94,21 +124,20 @@ class Configurator:
         path = self.builder.create_wire(name)
 
         for idx in range(1, len(self.config.clamp_positions[name]) - 1):
-            min_distance = float("inf")
-            offset_deg = None
             clamp_offset, _ = self.config.clamp_positions[name][idx]  # type: ignore
             center = self.get_part_position(tube, path, clamp_offset)
 
-            for cur_offset_deg in range(360):
-                # Compute Center of Mass distance for each part side
-                clamp = self.builder.build_clamp_bed(name, idx, offset_deg=float(cur_offset_deg))
-                clamp_center = clamp.val().Center()  # type: ignore
-                distance = (clamp_center - center).Length
+            def build_clamp(angle):
+                return self.builder.build_clamp_bed(name, idx, offset_deg=angle)
 
-                # Update the distance tracker
-                if (distance < min_distance) and self.is_geometry_clear(clamp, other_tube):
-                    min_distance = distance
-                    offset_deg = cur_offset_deg
+            offset_deg = self.find_best_angle(
+                build_clamp,
+                other_tube,
+                center,
+                coarse_step=10,
+                fine_window=10,
+                fine_step=1,
+            )
 
             # Update the clamp offset
             if not offset_deg is None:
@@ -125,19 +154,18 @@ class Configurator:
         path = self.builder.create_wire(name)
         text_offset, _ = self.config.logo_text_positions[name]
         center = self.get_part_position(tube, path, text_offset)
-        min_distance = float("inf")
-        offset_deg = None
 
-        for cur_offset_deg in range(0, 360, 1):
-            # Compute Center of Mass distance for each part side
-            text = self.builder.build_text(name, right=True, offset_deg=float(cur_offset_deg))
-            text_center = text.val().Center()  # type: ignore
-            distance = (text_center - center).Length
+        def build_text(angle):
+            return self.builder.build_text(name, right=True, offset_deg=angle)
 
-            # Update the distance tracker
-            if (distance < min_distance) and self.is_geometry_clear(text, other_tube):
-                min_distance = distance
-                offset_deg = cur_offset_deg
+        offset_deg = self.find_best_angle(
+            build_text,
+            other_tube,
+            center,
+            coarse_step=10,
+            fine_window=10,
+            fine_step=1,
+        )
 
         # Update the text offset
         if not offset_deg is None:
