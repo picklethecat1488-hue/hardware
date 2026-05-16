@@ -299,12 +299,11 @@ class Builder:
         return path
 
     @lru_cache
-    def create_profile_sketch(self, start_deg, end_deg, outer_radius=None, inner_radius=None):
+    def create_profile(self, center_deg, angle_deg, outer_radius=None, inner_radius=None):
         """Create a profile sketch using the given radius.
 
-        :param _type_ path_obj: The wire path.
-        :param int start_deg: If building part of the manifold, the start angle of the tube half in degrees, defaults to 0
-        :param int end_deg: If building part of the manifold, the end angle of the half in degrees, defaults to 360
+        :param float center_deg: The center angle of the tube profile in degrees.
+        :param float angle_deg: The angular span of the tube profile in degrees.
         :param int outer_radius: The optional outer radius of the profile.
         :param int inner_radius: The optional inner radius of the profile.
         :return _type_: The profile section.
@@ -315,6 +314,8 @@ class Builder:
             inner_radius = outer_radius - self.config.wall_thickness
         if inner_radius >= outer_radius:
             raise ValueError("Invalid radius or inner radius")
+        start_deg = center_deg - angle_deg / 2
+        end_deg = center_deg + angle_deg / 2
         sketch = (
             cq.Sketch()
             .arc((0, 0), outer_radius, start_deg, end_deg - start_deg)
@@ -339,9 +340,9 @@ class Builder:
         """
         path = self.create_wire(name)
         loc = path.val().locationAt(0)  # type: ignore
-        start_deg = 0 if right else 180
-        end_deg = 180 if right else 360
-        profile_sketch = self.create_profile_sketch(start_deg, end_deg)
+        center_deg = 90 if right else 270
+        angle_deg = 180
+        profile_sketch = self.create_profile(center_deg, angle_deg)
         tube = (
             cq.Workplane(loc)
             .placeSketch(profile_sketch)  # type: ignore
@@ -375,11 +376,9 @@ class Builder:
         wire = path.val()
         loc = wire.locationAt(off)  # type: ignore
         workplane = cq.Workplane(loc)
-        start_deg = center_deg - angle_deg / 2
-        end_deg = center_deg + angle_deg / 2
-        profile_sketch = self.create_profile_sketch(
-            start_deg,
-            end_deg,
+        profile_sketch = self.create_profile(
+            center_deg=center_deg,
+            angle_deg=angle_deg,
             outer_radius=outer_radius,
             inner_radius=inner_radius,
         )
@@ -469,7 +468,7 @@ class Builder:
         tube_loc = wire.locationAt(0)  # type: ignore
         if radius is None:
             radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
-        profile_sketch = self.create_profile_sketch(0, 360, outer_radius=radius, inner_radius=0)
+        profile_sketch = self.create_profile(center_deg=0, angle_deg=360, outer_radius=radius, inner_radius=0)
         tube = cq.Workplane(tube_loc).placeSketch(profile_sketch).sweep(path, transition="round")  # type: ignore
         return tube
 

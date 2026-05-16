@@ -15,7 +15,7 @@ class VectorStub:
 
     @property
     def Length(self) -> float:
-        return (self.x ** 2 + self.y ** 2 + self.z ** 2) ** 0.5
+        return (self.x**2 + self.y**2 + self.z**2) ** 0.5
 
     def __add__(self, other: VectorStub) -> VectorStub:
         return VectorStub(self.x + other.x, self.y + other.y, self.z + other.z)

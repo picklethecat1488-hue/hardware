@@ -138,16 +138,16 @@ class TestBuilder:
         assert (inlet_clamp_end - inlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[0])
         assert (outlet_clamp_end - outlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[-1])
 
-    def test_create_profile_sketch(self, builder):
-        """Test profile sketch generation for a valid radius."""
-        sketch = builder.create_profile_sketch(0, 90, outer_radius=10, inner_radius=5)
+    def test_create_profile(self, builder):
+        """Test profile sketch generation for a valid center/angle profile."""
+        sketch = builder.create_profile(45, 90, outer_radius=10, inner_radius=5)
         assert sketch is not None
         assert sketch.val().Area() > 0
 
-    def test_create_profile_sketch_invalid_inner_radius(self, builder):
+    def test_create_profile_invalid_inner_radius(self, builder):
         """Ensure invalid profile radii raise ValueError."""
         with pytest.raises(ValueError):
-            builder.create_profile_sketch(0, 90, outer_radius=10, inner_radius=10)
+            builder.create_profile(45, 90, outer_radius=10, inner_radius=10)
 
     def test_build_clean_tool(self, name, builder):
         """Test clean tool creation for a given part name."""
