@@ -1,7 +1,4 @@
-"""Evaluate different paths to try and equalize the passenger and driver side manifold lengths.
-
-:return _type_: _description_
-"""
+"""Search for valid attractor points to balance manifold paths."""
 
 import argparse
 import json
@@ -16,10 +13,7 @@ class Pathfinder:
     """Tries building a part with a random attractor point."""
 
     def __init__(self, logger=None):
-        """Initialize the pathfinder class.
-
-        :param _type_ logger: The logger instance, defaults to None
-        """
+        """Initialize the pathfinder."""
         self.logger = logger or Logger(text="Pathfinding...")
         self.config = AppConfig(_env_file=None)  # type: ignore
         self.builder = Builder(logger=logger, config=self.config)
@@ -44,10 +38,7 @@ class Pathfinder:
         return self._bbox
 
     def invoke_pytest(self):
-        """Invoke pytest, raising a ValueError if pytest fails.
-
-        :return _type_: _description_
-        """
+        """Run pytest for validation and raise on failure."""
         self.logger.print("Invoking pytest...", symbol="🧪 ")
         result = subprocess.run(["pytest", "-qq", "-n", "auto", "-x", "--maxfail=1", "tests/"])
         exit_code = result.returncode
@@ -55,10 +46,7 @@ class Pathfinder:
             raise RuntimeError(f"Test suite failed with pytest exit code {exit_code}.")
 
     def get_point(self):
-        """Get a random point within a bounding box.
-
-        :return _type_: A tuple.
-        """
+        """Generate a random point inside the bounding box."""
         bbox = self.get_bounding_box()
         x = round(random.uniform(bbox.xmin, bbox.xmax), 2)
         y = round(random.uniform(bbox.ymin, bbox.ymax), 2)
@@ -66,13 +54,7 @@ class Pathfinder:
         return (x, y, z)
 
     def try_points(self, name, points, out_dir):
-        """Try the given point.
-
-        :param _type_ name: The name to try
-        :param _type_ point: The point to try
-        :param _type_ out_dir: The path to generate build output in.
-        :return _type_: True if the attractor is valid, else false.
-        """
+        """Test a candidate attractor and log success if valid."""
         self.config.attractors[name] = points
         self.clear_builder_cache()
         try:

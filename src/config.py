@@ -1,4 +1,4 @@
-"""Run any pre-build configuration steps."""
+"""Run manifold configuration steps before building."""
 
 from build import AppConfig, Builder, Logger
 from functools import lru_cache
@@ -11,12 +11,7 @@ class Configurator:
     """Runs configuration steps on the app config."""
 
     def __init__(self, builder=None, config=None, logger=None):
-        """Initialize the configurator.
-
-        :param _type_ builder: The Builder to use, defaults to None
-        :param _type_ config: The Configurator to use, defaults to None
-        :param _type_ logger: The Logger to use, defaults to None
-        """
+        """Initialize the configurator."""
         self.config = config or AppConfig()
         self.logger = logger or Logger(text="Configuring...", enabled=False)
         self.builder = builder or Builder(config=config, logger=logger)
@@ -24,16 +19,7 @@ class Configurator:
         self._path_cache = {}
 
     def get_part_position(self, tube, path, off):
-        """Get the part position of the tube at offset.
-
-        If a part is attached to this offset, it should be attached
-        as close to the part position as possible.
-
-        :param _type_ part: The tube to test
-        :param _type_ path: The wire path used to create the tube
-        :param _type_ off: The path offset to use
-        :return _type_: The part midpoint of the tube.
-        """
+        """Get a suitable attachment position on the tube."""
         radius = min(self.builder.config.clamp_diameters) / 2
         self._tube_cache[id(tube)] = tube
         self._path_cache[id(path)] = path
@@ -41,16 +27,7 @@ class Configurator:
 
     @lru_cache
     def get_part_position_cached(self, tube_id, path_id, off, radius):
-        """Get the part position of the tube at offset.
-
-        If a part is attached to this offset, it should be attached
-        as close to the part position as possible.
-
-        :param _type_ part: The tube to test
-        :param _type_ path: The wire path used to create the tube
-        :param _type_ off: The path offset to use
-        :return _type_: The part midpoint of the tube.
-        """
+        """Get a cached attachment position on the tube."""
         tube = self._tube_cache[tube_id]
         path = self._path_cache[path_id]
         pos = path.val().positionAt(off)
@@ -111,14 +88,7 @@ class Configurator:
         return self.scan_angles(fine_angles, candidate_factory, other_obj, center)
 
     def config_clamp(self, name):
-        """Configure clamps.
-
-        We need to sweep angle offsets for this part to minimize the center of mass distances between clamp
-        and bare part, on both the left and right side. We combine both
-        distances into an average value to index on which offset is most optimal.
-
-        :param _type_ name: The name of the part to configure.
-        """
+        """Tune clamp positions for a part."""
         tube = self.builder.build_part(name, tube_only=True)
         other_tube = self.builder.build_part(name, right=True, tube_only=True)
         path = self.builder.create_wire(name)
@@ -145,10 +115,7 @@ class Configurator:
                 self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
 
     def config_text_logo(self, name):
-        """Configure text logo.
-
-        :param _type_ name: The name of the part to configure.
-        """
+        """Tune logo text placement for a part."""
         tube = self.builder.build_part(name, right=True, tube_only=True)
         other_tube = self.builder.build_part(name, tube_only=True)
         path = self.builder.create_wire(name)
@@ -173,20 +140,14 @@ class Configurator:
             self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
 
     def configure_clamps(self, names=None):
-        """Perform clamp configuration.
-
-        :param _type_ name: The name of the part.
-        """
+        """Configure clamps for all specified parts."""
         if names is None:
             names = self.config.names
         for name in names:
             self.config_clamp(name)
 
     def configure_text_logos(self, names=None):
-        """Perform text logo configuration.
-
-        :param _type_ name: The name of the part.
-        """
+        """Configure logo text for all specified parts."""
         if names is None:
             names = self.config.names
         for name in names:

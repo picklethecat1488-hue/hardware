@@ -1,4 +1,4 @@
-"""Contains the code to build exhaust manifolds."""
+"""Build exhaust manifold geometry and export 3D printable parts."""
 
 import argparse
 import math
@@ -15,10 +15,7 @@ import zipfile
 
 
 class AppConfig(ChangeDetectionMixin, BaseSettings):
-    """Builder app configuration.
-
-    :param _type_ BaseSettings: The base settings for the builder.
-    """
+    """Application build configuration."""
 
     # Project name
     project_name: str = "exhaust_manifolds"
@@ -109,10 +106,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
 
     @cached_property
     def measurements(self):
-        """Get the raw measurements used for the project.
-
-        :return _type_: The raw measurement points.
-        """
+        """Return raw measurement points."""
         p = {}
         for idx, item in enumerate(self._measurements):
             p[idx + 1] = np.array(item)
@@ -120,14 +114,10 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
 
 
 class Logger:
-    """Provides a print-based logging interface for the Builder."""
+    """Logger wrapper for console and notebook output."""
 
     def __init__(self, text="Building...", enabled=True):
-        """Initialize the logger.
-
-        :param str text: Descriptive text of what is done, defaults to "Building..."
-        :param bool enabled: True if logging is enabled, defaults to True
-        """
+        """Create a logger instance."""
         self.text = text
         self.backend = None
         self.in_notebook = self.get_in_notebook()
@@ -151,10 +141,7 @@ class Logger:
                 self.running = True
 
     def get_in_notebook(self):
-        """Check if we are inside a notebook.
-
-        :return _type_: True if inside a notebook, else false.
-        """
+        """Return whether the code is running in a notebook."""
         try:
             shell = get_ipython().__class__.__name__
             return shell == "ZMQInteractiveShell"
@@ -162,10 +149,7 @@ class Logger:
             return False
 
     def print(self, msg, symbol="▶"):
-        """Print a log message.
-
-        :param _type_ msg: The message to print.
-        """
+        """Print a formatted log message."""
         if not self.enabled:
             print(msg)
         elif self.in_notebook:
@@ -187,7 +171,7 @@ class Logger:
             self.backend.start()  # type: ignore
 
     def done(self):
-        """Indicate the operation has succeeded."""
+        """Mark the operation as complete."""
         if not self.in_notebook:
             self.backend.text = f"Done {self.text}"  # type: ignore
             self.backend.succeed()  # type: ignore
@@ -198,10 +182,10 @@ class Logger:
 
 
 class Builder:
-    """The manifold builder creates the manifold objects and exports them as files for 3D printing."""
+    """Builds manifold geometry and exports parts."""
 
     def __init__(self, config=None, logger=None):
-        """Initialize the builder."""
+        """Initialize builder dependencies and measurements."""
 
         def dir_vector(start, end):
             """Generate a 3D direction vector for the given points, e.g. p[4] and p[5]."""
@@ -232,12 +216,7 @@ class Builder:
 
     @lru_cache
     def build_bound_box(self):
-        """Build the bounding box.
-
-        The bounds are an Axis Aligned Boundary Box representing the valid space parts may occupy.
-
-        :return _type_: The bounding box.
-        """
+        """Return the axis-aligned build bounding box."""
         # Create the overall bounds.
         x_len = np.max(self.config.x_bounds) - np.min(self.config.x_bounds)
         y_len = np.max(self.config.y_bounds) - np.min(self.config.y_bounds)
@@ -264,14 +243,7 @@ class Builder:
 
     @lru_cache
     def create_wire(self, name):
-        """Create the wire.
-
-        The wire defines the path around which the manifold is profiled.
-        The wire connects the exhaust inlet and outlets across a 3D coordinate system.
-
-        :param _type_ name: The name of the manifold
-        :return _type_: The wire path
-        """
+        """Create the manifold path wire."""
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
         inlet_start, v_start, outlet_start, v_end = (
             self.P[inlet_key],
@@ -300,14 +272,7 @@ class Builder:
 
     @lru_cache
     def create_profile(self, center_deg, angle_deg, outer_radius=None, inner_radius=None):
-        """Create a profile sketch using the given radius.
-
-        :param float center_deg: The center angle of the tube profile in degrees.
-        :param float angle_deg: The angular span of the tube profile in degrees.
-        :param int outer_radius: The optional outer radius of the profile.
-        :param int inner_radius: The optional inner radius of the profile.
-        :return _type_: The profile section.
-        """
+        """Create a circular tube profile sketch."""
         if outer_radius is None:
             outer_radius = min(self.config.clamp_diameters) / 2
         if inner_radius is None:
@@ -332,12 +297,7 @@ class Builder:
 
     @lru_cache
     def build_tube(self, name, right=False):
-        """Build an exhaust tube.
-
-        :param _type_ name: The name of the manifold to build
-        :param bool right: True if building the right half, defaults to False
-        :return _type_: The exhaust manifold
-        """
+        """Build a manifold tube half."""
         path = self.create_wire(name)
         loc = path.val().locationAt(0)  # type: ignore
         center_deg = 90 if right else 270
@@ -361,17 +321,7 @@ class Builder:
         center_deg: float = 0,
         angle_deg: float = 360,
     ):
-        """Create a ring at a given offset.
-
-        :param _type_ name: The part name.
-        :param _type_ off: The ring offset
-        :param _type_ len: The axial path length of the ring section
-        :param _type_ inner_radius: The inner radius.
-        :param _type_ outer_radius: The outer radius.
-        :param float center_deg: The center angle of the ring section.
-        :param float angle_deg: The angular width of the ring section in degrees.
-        :return _type_: The ring
-        """
+        """Create a ring-shaped tube segment."""
         path = self.create_wire(name)
         wire = path.val()
         loc = wire.locationAt(off)  # type: ignore
@@ -390,13 +340,7 @@ class Builder:
 
     @lru_cache
     def build_clamp_bed(self, name, clamp_idx, right=False, offset_deg=None):
-        """Build a clamp bed.
-
-        :param _type_ name: The part name to build.
-        :param _type_ clamp_idx: The clamp index to build
-        :param bool right: True if building the right half, defaults to False
-        :return _type_: The clamp bed
-        """
+        """Create a clamp bed on the tube."""
         length = self.config.clamp_lengths[clamp_idx]
         outer_radius = self.config.clamp_diameters[clamp_idx] / 2
         inner_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
@@ -420,18 +364,12 @@ class Builder:
 
     @lru_cache
     def create_logo_text_shape(self):
-        """Create and cache the raw logo text shape used for placement."""
+        """Return a cached logo text workplane."""
         return cq.Workplane("XY").text(**self.config.logo_text_args)  # type: ignore
 
     @lru_cache
     def build_text(self, name, right=False, offset_deg=None):
-        """Build and place the logo text.
-
-        :param _type_ name: The name of the part to build for.
-        :param _type_ angle_deg: The angle to place the text.
-        :param bool right: True if building the right half, defaults to False
-        :return _type_: The logo text.
-        """
+        """Build text geometry for the tube."""
         path = self.create_wire(name)
         wire = path.val()
         off, angle_offset = self.config.logo_text_positions[name]  # type: ignore
@@ -457,11 +395,7 @@ class Builder:
 
     @lru_cache
     def build_clean_tool(self, name, radius=None):
-        """Build the clean tool.
-
-        :param _type_ name: The name of the part to build for.
-        :return _type_: The clean tool to cut excess inner part volume off of.
-        """
+        """Build a cutting tool used to clean the internal tube volume."""
         # Create the clean tool
         path = self.create_wire(name)
         wire = path.val()
@@ -474,13 +408,7 @@ class Builder:
 
     @lru_cache
     def build_part(self, name, right=False, tube_only=False):
-        """Build the left or right half of the manifold.
-
-        :param _type_ name: The name of the manifold
-        :param bool right: True if building the right half, defaults to False
-        :param bool tube_only: True if only building the tube
-        :return _type_: The manifold half
-        """
+        """Build one half of the manifold assembly."""
         if name == "driver" or name == "passenger":
             # Create the main part body.
             part = self.build_tube(name, right=right)
@@ -504,19 +432,10 @@ class Builder:
 
     @lru_cache
     def build_prepared_part(self, name, right=False):
-        """Build the part and prepare it for export to STL.
-
-        :param _type_ name: The name of the manifold
-        :param bool right: True if building the right half, defaults to False
-        """
+        """Prepare a part for STL export."""
 
         def facing_up(part):
-            """Determine if the part is facing up.
-
-            Uses Center of Mass method. Can only be called prior to rotating or translating the part.
-
-            :return _type_: True if facing up, otherwise False
-            """
+            """Return whether the part is oriented upward."""
             if name == "driver" or name == "passenger":
                 full_part = self.build_tube(name)
             else:
@@ -526,11 +445,7 @@ class Builder:
             return normal.z > 0
 
         def rotation(part):
-            """Determine the flattening rotation to perform on the part.
-
-            :param _type_ part: The part to rotate.
-            :return _type_: The rotation to perform.
-            """
+            """Compute the rotation needed to flatten the part."""
             # Find the path edge, then extract the first and last points from it
             path = sorted(part.edges(), key=lambda e: e.Length())[-1]
             p1, p2 = path.startPoint(), path.endPoint()
@@ -543,11 +458,7 @@ class Builder:
             return axis, angle_deg
 
         def translation(part):
-            """Determine the flattening translation to perform on the part.
-
-            :param _type_ part: The part to translate.
-            :return _type_: The translation to perform.
-            """
+            """Compute the Z translation to flatten the part."""
             return (0, 0, -part.val().BoundingBox().zmin)
 
         # Ensure the part is facing up on the print bed in a way that is optimal for 3D printing
@@ -560,12 +471,7 @@ class Builder:
         return part.clean()
 
     def generate_parts(self, out_dir, names=None, right_vals=None):
-        """Generate STL parts files for assembly.
-
-        :param _type_ out_dir: The output directory.
-        :param _type_ names: The optional names to generate.
-        :param _type_ right_vals: The optional right values to use.
-        """
+        """Export STL files for generated parts."""
         file_prefix = f"{self.config.project_name}_v{self.config.ver}"
 
         if names is None:
@@ -583,19 +489,10 @@ class Builder:
                 self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_diagram(self, out_dir, names=None, right_vals=None):
-        """Generate a diagram for the given part names.
-
-        :param _type_ out_dir: The output directory.
-        :param _type_ names: The optional names to generate.
-        """
+        """Export an exploded diagram for the parts."""
 
         def get_part_location(wire_obj, offset=0, dist=0, right=False):
-            """Return the part location for the part in the exploded diagram.
-
-            :param _type_ wire_obj: The wire object
-            :param bool right: Right if True, defaults to False
-            :return _type_: The part location in the exploded diagram
-            """
+            """Compute part placement positions for the diagram."""
             part_dist = dist if right else 0
             part_offset = offset + part_dist
             dir = wire_obj.tangentAt(0)
@@ -641,17 +538,10 @@ class Builder:
         self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_all(self, out_dir, right_vals=None, zip_name="build.zip"):
-        """Generate all project files.
-
-        :param str out_dir: The output directory generate all files in, defaults to "build"
-        :param str zip_name: The name of the zip file containing all outputs, defaults to "build.zip"
-        """
+        """Generate diagrams, parts, and package them."""
 
         def zip_build(zip_file_str):
-            """Zip the build output.
-
-            :param _type_ zip_file_str: The path to the ZIP file to write
-            """
+            """Write generated files into a zip archive."""
             with zipfile.ZipFile(zip_file_str, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for _, _, files in os.walk(out_dir):
                     for file in files:

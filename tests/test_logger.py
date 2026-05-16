@@ -5,17 +5,11 @@ import pytest
 
 
 class TestLogger:
-    """Logger tests.
-
-    :return _type_: A TestLogger object.
-    """
+    """Logger tests."""
 
     @pytest.fixture
     def mock_dependencies(self, mocker):
-        """Mock all external UI/Notebook dependencies.
-
-        :param _type_ mocker: The Mocker object.
-        """
+        """Mock external notebook and UI dependencies."""
         return {
             "widgets": mocker.patch("ipywidgets.HTML", autospec=True),
             "display": mocker.patch("IPython.display.display"),
@@ -24,11 +18,7 @@ class TestLogger:
         }
 
     def test_init_terminal_mode(self, mocker, mock_dependencies):
-        """Verify Halo spinner starts when in a terminal.
-
-        :param _type_ mocker: The Mocker object.
-        :param _type_ mock_dependencies: The mock dependencies.
-        """
+        """Verify terminal logger initializes Halo spinner."""
         mocker.patch("build.Logger.get_in_notebook", return_value=False)
         logger = Logger(text="Testing Terminal", enabled=True)
 
@@ -37,11 +27,7 @@ class TestLogger:
         assert logger.running is True
 
     def test_init_notebook_mode(self, mocker, mock_dependencies):
-        """Verify HTML widgets are used when in a notebook.
-
-        :param _type_ mocker: The Mocker object.
-        :param _type_ mock_dependencies: The mock dependencies.
-        """
+        """Verify notebook logger uses HTML widget backend."""
         # Setup sanitizer mock to return a string
         mocker.patch("build.Logger.get_in_notebook", return_value=True)
         mock_dependencies["sanitizer"].return_value.sanitize.return_value = "Sanitized"
@@ -55,11 +41,7 @@ class TestLogger:
         assert "Sanitized" in mock_dependencies["widgets"].call_args[1]["value"]
 
     def test_disabled_logger_prints_directly(self, mocker, capsys):
-        """Verify that when disabled, it uses standard print.
-
-        :param _type_ mocker: The Mocker object.
-        :param _type_ mock_dependencies: The mock dependencies.
-        """
+        """Verify disabled logger prints directly."""
         mocker.patch("build.Logger.get_in_notebook", return_value=False)
         logger = Logger(enabled=False)
         logger.print("Direct message")
@@ -68,11 +50,7 @@ class TestLogger:
         assert "Direct message" in captured.out
 
     def test_terminal_print_persists_message(self, mocker):
-        """Verify print stops the spinner to persist text, then restarts.
-
-        :param _type_ mocker: The Mocker object.
-        :param _type_ mock_dependencies: The mock dependencies.
-        """
+        """Verify print persists messages and restarts the spinner."""
         mocker.patch("build.Logger.get_in_notebook", return_value=False)
         mock_halo_class = mocker.patch("halo.Halo")
         logger = Logger(enabled=True)
@@ -85,11 +63,7 @@ class TestLogger:
         assert mock_halo.start.call_count == 2  # Once in init, once in print
 
     def test_done_terminal(self, mocker):
-        """Verify done() calls succeed and stops the runner.
-
-        :param _type_ mocker: The Mocker object.
-        :param _type_ mock_dependencies: The mock dependencies.
-        """
+        """Verify done() stops the logger."""
         mocker.patch("build.Logger.get_in_notebook", return_value=False)
         logger = Logger(text="Build", enabled=True)
         logger.done()

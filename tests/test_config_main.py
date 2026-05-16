@@ -11,10 +11,7 @@ class TestConfigMain:
 
     @pytest.fixture
     def mock_logger(self):
-        """Return a mock Logger.
-
-        :return _type_: A mock Logger.
-        """
+        """Return a mock logger fixture."""
         return MagicMock()
 
     def test_get_args_parsing(self, mocker):

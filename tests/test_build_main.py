@@ -12,19 +12,12 @@ class TestBuildMain:
 
     @pytest.fixture
     def mock_logger(self):
-        """Return a mock Logger.
-
-        :return _type_: A mock Logger.
-        """
+        """Return a mock logger fixture."""
         return MagicMock()
 
     @pytest.fixture
     def mock_builder(self, mocker):
-        """Return a mock Builder.
-
-        :param _type_ mocker: The Mocker.
-        :return _type_: A Builder class patched into the build module.
-        """
+        """Patch Builder in the build module."""
         return mocker.patch("build.Builder")
 
     def test_get_args_parsing(self, mocker):

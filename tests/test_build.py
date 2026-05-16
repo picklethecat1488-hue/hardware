@@ -15,59 +15,30 @@ class TestBuilder:
 
     @pytest.fixture(scope="class")
     def builder(self):
-        """Return the test fixture for the manifold builder.
-
-        :return _type_: A manifold builder object
-        """
+        """Return the manifold builder fixture."""
         return Builder()
 
     @pytest.fixture(scope="class", params=["driver", "passenger"])
     def name(self, request):
-        """Return the name o test.
-
-        :param _type_ request: The test request.
-        :return _type_: A name.
-        """
+        """Return a test part name."""
         return request.param
 
     @pytest.fixture(scope="class", params=[False, True])
     def right(self, request):
-        """Return the right patameter.
-
-        :param _type_ request: The test request.
-        :return _type_: True or False.
-        """
+        """Return a side selection fixture."""
         return request.param
 
     def test_measurements(self, builder):
-        """Validate physical measurements.
-
-        Do some validation of the pointlists based on the measurements I took on graph paper.
-        Adjust coordinates to be 2D, then check how the driver and passenger inlets and outlets related to each other
-        The inlets are connected to midpipes with slip ring connectors, while the exhaust pipes have cuff style clamps.
-
-        :param _type_ builder: The manifold builder to test
-        """
+        """Validate key manifold measurement relationships."""
 
         def dist(p1, p2):
-            """Get the 2D distance between two points.
-
-            :param _type_ p1: The first point
-            :param _type_ p2: The second type
-            :return _type_: The 2D point distance
-            """
+            """Compute the 2D distance between two points."""
             x1, y1, z1 = p1
             x2, y2, z2 = p2
             return round(math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2))
 
         def get_end_points(name):
-            """Get the inlet and output start and end points.
-
-            The exhaust inlets and outlets are fixed size cuffs. The inlet connects directly to the midpipe, and the outlet must fit inside the exhaust tip.
-
-            :param _type_ name: The name of the part to test
-            :return _type_: A tuple
-            """
+            """Return the inlet and outlet endpoint locations for a part."""
             inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
             return (
                 # Inlet start
@@ -106,11 +77,7 @@ class TestBuilder:
         assert round(passenger_outlet_start[2] - passenger_inlet_start[2]) == pytest.approx(171)
 
     def test_wire(self, name, builder):
-        """Perform wire testing.
-
-        :param _type_ name: The name of the part to test
-        :param _type_ builder: The manifold builder to test
-        """
+        """Verify wire path and clamp endpoints."""
 
         def calc_point_err(v, p):
             return abs((v - cq.Vector([p[0], p[1], p[2]])).Length)
@@ -156,12 +123,7 @@ class TestBuilder:
         assert clean_tool.val().Volume() > 0
 
     def test_part_fits_together(self, builder, name, right):
-        """Test that the parts can fit together.
-
-        :param _type_ builder: The manifold builder to test
-        :param _type_ name: The name of the part to test
-        :param _type_ right: True if building the right part
-        """
+        """Test that mirrored parts do not intersect."""
         # Make sure parts do not self intersect
         part = builder.build_part(name, right=right)
         other_part = builder.build_part(name, right=(not right))
@@ -170,12 +132,7 @@ class TestBuilder:
         )
 
     def test_part_doesnt_overlap(self, builder, name, right):
-        """Test that the part does not interlap with another assembly.
-
-        :param _type_ builder: The manifold builder to test
-        :param _type_ name: The name of the part to test
-        :param _type_ right: True if building the right part
-        """
+        """Ensure parts from different assemblies do not intersect."""
         part = builder.build_part(name, right=right)
         other_name = next(x for x in builder.config.names if x != name)
         other_part = builder.build_part(other_name, right=not right)
@@ -184,12 +141,7 @@ class TestBuilder:
         )
 
     def test_in_bounds(self, builder, name, right):
-        """Test the parts are in bounds.
-
-        :param _type_ builder: The builder to test
-        :param _type_ name: The name of the part to test
-        :param _type_ right: True if testing the right side
-        """
+        """Verify part fits inside bound box volume."""
         part = builder.build_part(name, right=right)
         proj_bounds = builder.build_bound_box()
         volume = part.cut(proj_bounds).val().Volume()
@@ -229,14 +181,7 @@ class TestBuilder:
         assert part.intersect(clamp_on).val().Volume() > 0
 
     def test_part(self, name, right, builder):
-        """Test the parts.
-
-        Verifies that the assembled parts will create the manifold shape.
-
-        :param _type_ name: The name of the part to test
-        :param _type_ right: True if building the right part, else False
-        :param _type_ builder: The manifold builder to test
-        """
+        """Verify rebuilt part geometry matches manifold volume."""
         if name != "driver" and name != "passenger":
             raise ValueError(f"Invalid name: {name}")
         manifold = builder.build_tube(name, right=right)
@@ -250,12 +195,7 @@ class TestBuilder:
         assert error_pct < 0.5
 
     def test_prepared_part(self, name, right, builder):
-        """Test the part is suitable for 3D printing.
-
-        :param _type_ name: The name of the part to test
-        :param _type_ right: True if building the right part, else False
-        :param _type_ builder: The manifold builder to test
-        """
+        """Verify the prepared part is printable and stable."""
         orig_part = builder.build_part(name, right=right)
         part = builder.build_prepared_part(name, right=right)
 
@@ -273,11 +213,7 @@ class TestBuilder:
         assert abs(orig_part.val().Area() - part.val().Area()) < 1, "Surface area changed"
 
     def test_generate_all(self, builder, tmp_path):
-        """Test the part generation happy path.
-
-        :param _type_ builder: The Builder to test.
-        :param _type_ tmp_path: A temporary path to generate files in.
-        """
+        """Test generate_all exports expected build artifacts."""
         builder.generate_all(out_dir=tmp_path, zip_name="build.zip")
         zip_path = tmp_path / "build.zip"
         assert zip_path.exists()
@@ -291,18 +227,10 @@ class TestBuilder:
                     assert f"{builder.config.project_name}_v{builder.config.ver}_{name}_{side}.stl" in contents
 
     def test_end_angle(self, builder, name):
-        """Test the inlet slope on the driver inlet.
-
-        :param _type_ builder: The Builder to test.
-        :param _type_ name: The name of the part to test
-        """
+        """Verify inlet and outlet angles for each part."""
 
         def get_angle(key):
-            """Return the veritcal angle for the given exhaust end.
-
-            :param _type_ key: The key to return.
-            :return _type_: The angle in degrees.
-            """
+            """Compute the vertical angle of an exhaust end vector."""
             z_axis = cq.Vector(0, 0, 1)
             v_test = cq.Vector(*builder.V[key])
             angle = 90 - math.degrees(v_test.getAngle(z_axis))
@@ -322,11 +250,7 @@ class TestBuilder:
         assert round(angle, 2) == pytest.approx(expected_angle)
 
     def test_overall_bounds(self, builder, name):
-        """Test the overall bounds of an assembly.
-
-        :param _type_ builder: The Builder to test.
-        :param _type_ name: The name of the part to test
-        """
+        """Verify assembly bounding box dimensions."""
         part = builder.build_part(name).union(builder.build_part(name, right=True))
         bbox = part.val().BoundingBox()
 
