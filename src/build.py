@@ -53,6 +53,12 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     # The fillet or chamfer to apply to object edges
     edge_rounding: float = 0.75
 
+    # The radius of the circular lap joint features
+    joint_radius: float = 1.5
+
+    # The clearance added to the recess side of the lap joint
+    joint_space: float = 0.3
+
     # The part names, driver and passenger
     names: list[str] = ["driver", "passenger"]
 
@@ -242,7 +248,7 @@ class Builder:
         return bounds
 
     @lru_cache
-    def create_wire(self, name):
+    def create_wire(self, name: str):
         """Create the manifold path wire."""
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
         inlet_start, v_start, outlet_start, v_end = (
@@ -271,7 +277,7 @@ class Builder:
         return path
 
     @lru_cache
-    def create_profile_sketch(self, angle_deg, outer_radius=None, inner_radius=None):
+    def create_profile_sketch(self, angle_deg, outer_radius=None, inner_radius=None, lap_joint=False):
         """Create a circular tube profile sketch."""
         if outer_radius is None:
             outer_radius = min(self.config.clamp_diameters) / 2
@@ -286,6 +292,8 @@ class Builder:
             raise ValueError("Invalid radius or inner radius")
         elif angle_deg > 360:
             raise ValueError("Invalid angle")
+        elif angle_deg == 360 and lap_joint:
+            raise ValueError("Invalid angle and lap joint")
 
         sketch = cq.Sketch()
         sketch.circle(outer_radius)
@@ -301,24 +309,39 @@ class Builder:
             sketch.arc((0, 0), outer_radius + 1, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble(
                 mode="i"
             )
-            
+
+            if lap_joint:
+                # To ensure the parts align without intersecting the 'full circle' volume,
+                # we create an alternating lap joint. The 'left' side gets a protrusion,
+                # and the 'right' side gets a matching recess.
+                # Centering the joint at the inner radius avoids sharp corners at the bore.
+                # Calculate center points for the circular lap joint features at the inner radius
+                end_rad = math.radians(end_deg)
+                start_rad = math.radians(start_deg)
+                c_left = (inner_radius * math.cos(end_rad), inner_radius * math.sin(end_rad))
+                c_right = (inner_radius * math.cos(start_rad), inner_radius * math.sin(start_rad))
+
+                # Create the interlocking protrusion and recess using full circles centered on the parting line
+                sketch.push([c_left]).circle(self.config.joint_radius, mode="a").reset()
+                sketch.push([c_right]).circle(self.config.joint_radius + self.config.joint_space, mode="s").reset()
+
         return sketch
 
     @lru_cache
-    def create_profile(self, center_deg, angle_deg, outer_radius=None, inner_radius=None):
+    def create_profile(self, center_deg, angle_deg, outer_radius=None, inner_radius=None, lap_joint=False):
         """Create a circular tube profile sketch with rotation applied."""
-        sketch = self.create_profile_sketch(angle_deg, outer_radius, inner_radius)
+        sketch = self.create_profile_sketch(angle_deg, outer_radius, inner_radius, lap_joint)
         return sketch.moved(cq.Location(cq.Vector(0, 0, 0), cq.Vector(0, 0, 1), center_deg))
 
     @lru_cache
-    def build_tube(self, name, right=False):
+    def build_tube(self, name, right=False, lap_joint=False):
         """Build a manifold tube half."""
         path = self.create_wire(name)
         wire_obj = cast(cq.Wire, path.val())
         loc = wire_obj.locationAt(0)
         center_deg = 90 if right else 270
         angle_deg = 180
-        profile_sketch = self.create_profile(center_deg, angle_deg)
+        profile_sketch = self.create_profile(center_deg, angle_deg, lap_joint=lap_joint)
         wp: Any = cq.Workplane(loc)
         tube = wp.placeSketch(profile_sketch).sweep(path, transition="round").fillet(self.config.edge_rounding)
         return tube
@@ -429,7 +452,7 @@ class Builder:
         """Build one half of the manifold assembly."""
         if name == "driver" or name == "passenger":
             # Create the main part body.
-            part = self.build_tube(name, right=right)
+            part = self.build_tube(name, right=right, lap_joint=True)
             if not tube_only:
                 for idx in range(1, len(self.config.clamp_positions[name]) - 1):
                     # Add inner clamp beds.
