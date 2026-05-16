@@ -277,22 +277,31 @@ class Builder:
             outer_radius = min(self.config.clamp_diameters) / 2
         if inner_radius is None:
             inner_radius = outer_radius - self.config.wall_thickness
-        if inner_radius >= outer_radius:
+
+        if outer_radius < 0:
+            raise ValueError("Invalid radius")
+        elif inner_radius < 0:
+            raise ValueError("Invalid inner radius")
+        elif inner_radius >= outer_radius:
             raise ValueError("Invalid radius or inner radius")
-        start_deg = -angle_deg / 2
-        end_deg = angle_deg / 2
-        sketch = (
-            cq.Sketch()
-            .arc((0, 0), outer_radius, start_deg, end_deg - start_deg)
-            .segment((0, 0))
-            .close()
-            .assemble()
-            .circle(outer_radius, mode="i")
-        )
+        elif angle_deg > 360:
+            raise ValueError("Invalid angle")
+
+        sketch = cq.Sketch()
+        sketch.circle(outer_radius)
+
         if inner_radius > 0:
-            # Subtract the center to make it hollow
-            sketch = sketch.circle(inner_radius, mode="s")
-        sketch = sketch.clean()
+            # Construct a hollow circle
+            sketch.circle(inner_radius, mode="s")
+
+        if angle_deg < 360:
+            # Construct a partial circle
+            start_deg = -angle_deg / 2
+            end_deg = angle_deg / 2
+            sketch.arc((0, 0), outer_radius + 1, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble(
+                mode="i"
+            )
+            
         return sketch
 
     @lru_cache
