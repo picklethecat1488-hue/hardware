@@ -4,6 +4,7 @@ from build import AppConfig, Builder, Logger
 from functools import lru_cache
 import argparse
 import cadquery as cq
+from typing import cast, Any
 import json
 
 
@@ -12,7 +13,7 @@ class Configurator:
 
     def __init__(self, builder=None, config=None, logger=None):
         """Initialize the configurator."""
-        self.config = config or AppConfig()
+        self.config = config or AppConfig(**{"_env_file": None})
         self.logger = logger or Logger(text="Configuring...", enabled=False)
         self.builder = builder or Builder(config=config, logger=logger)
         self._tube_cache = {}
@@ -111,7 +112,7 @@ class Configurator:
 
             # Update the clamp offset
             if not offset_deg is None:
-                self.config.clamp_positions[name][idx] = (clamp_offset, float(offset_deg))  # type: ignore
+                self.config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
                 self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
 
     def config_text_logo(self, name):
@@ -136,7 +137,7 @@ class Configurator:
 
         # Update the text offset
         if not offset_deg is None:
-            self.config.logo_text_positions[name] = (text_offset, float(offset_deg))  # type: ignore
+            self.config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
             self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
 
     def configure_clamps(self, names=None):
@@ -184,7 +185,7 @@ def main(logger, args):
     gen_args = {}
     if not args.name is None:
         gen_args["names"] = [args.name]
-    config = AppConfig(_env_file=None)  # type: ignore
+    config = AppConfig(**{"_env_file": None})
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
 

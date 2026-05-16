@@ -8,9 +8,9 @@ from pathlib import Path
 from pydantic_changedetect import ChangeDetectionMixin
 import cadquery as cq
 from functools import lru_cache, cached_property
-from IPython.core.getipython import get_ipython
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+from IPython.core.getipython import get_ipython  # type: ignore
+from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore
+from typing import Any, Optional, cast
 import zipfile
 
 
@@ -84,7 +84,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     ]
 
     # The logo text arguments
-    logo_text_args: dict[str, str | int | float] = {
+    logo_text_args: dict[str, Any] = {
         "txt": "FHB",
         "fontsize": 10,
         "distance": 2,
@@ -119,7 +119,7 @@ class Logger:
     def __init__(self, text="Building...", enabled=True):
         """Create a logger instance."""
         self.text = text
-        self.backend = None
+        self.backend: Any = None
         self.in_notebook = self.get_in_notebook()
         self.enabled = enabled
 
@@ -305,16 +305,13 @@ class Builder:
     def build_tube(self, name, right=False):
         """Build a manifold tube half."""
         path = self.create_wire(name)
-        loc = path.val().locationAt(0)  # type: ignore
+        wire_obj = cast(cq.Wire, path.val())
+        loc = wire_obj.locationAt(0)
         center_deg = 90 if right else 270
         angle_deg = 180
         profile_sketch = self.create_profile(center_deg, angle_deg)
-        tube = (
-            cq.Workplane(loc)
-            .placeSketch(profile_sketch)  # type: ignore
-            .sweep(path, transition="round")
-            .fillet(self.config.edge_rounding)
-        )
+        wp: Any = cq.Workplane(loc)
+        tube = wp.placeSketch(profile_sketch).sweep(path, transition="round").fillet(self.config.edge_rounding)
         return tube
 
     @lru_cache
@@ -342,7 +339,8 @@ class Builder:
         p1 = wire.positionAt(off)  # type: ignore
         p2 = wire.positionAt(off + len / wire.Length())  # type: ignore
         path = workplane.polyline([p1, p2])
-        ring = workplane.placeSketch(profile_sketch).sweep(path)  # type: ignore
+        wp: Any = workplane
+        ring = wp.placeSketch(profile_sketch).sweep(path)
         return ring
 
     @lru_cache
@@ -372,13 +370,13 @@ class Builder:
     @lru_cache
     def create_logo_text_shape(self):
         """Return a cached logo text workplane."""
-        return cq.Workplane("XY").text(**self.config.logo_text_args)  # type: ignore
+        return cq.Workplane("XY").text(**self.config.logo_text_args)
 
     @lru_cache
     def build_text(self, name, right=False, offset_deg=None):
         """Build text geometry for the tube."""
         path = self.create_wire(name)
-        wire = path.val()
+        wire = cast(cq.Wire, path.val())
         off, angle_offset = self.config.logo_text_positions[name]  # type: ignore
         pos = wire.positionAt(off)  # type: ignore
         tan = wire.tangentAt(off)  # type: ignore
@@ -396,7 +394,7 @@ class Builder:
             .transformed(rotate=(0, 90, 0))
             .transformed(rotate=(angle_deg, 0, 0))
             .transformed(offset=(0, 0, outer_radius))
-            .eachpoint(lambda loc: text_wp.val().moved(loc), True)
+            .eachpoint(lambda loc: cast(cq.Shape, text_wp.val()).moved(loc), True)
         )
         return text
 
@@ -410,7 +408,8 @@ class Builder:
         if radius is None:
             radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
         profile_sketch = self.create_profile(center_deg=0, angle_deg=360, outer_radius=radius, inner_radius=0)
-        tube = cq.Workplane(tube_loc).placeSketch(profile_sketch).sweep(path, transition="round")  # type: ignore
+        wp: Any = cq.Workplane(tube_loc)
+        tube = wp.placeSketch(profile_sketch).sweep(path, transition="round")
         return tube
 
     @lru_cache

@@ -6,6 +6,7 @@ import subprocess
 from build import AppConfig, Builder, Logger
 from config import Configurator
 from pathlib import Path
+from typing import Any, cast
 import random
 
 
@@ -15,7 +16,7 @@ class Pathfinder:
     def __init__(self, logger=None):
         """Initialize the pathfinder."""
         self.logger = logger or Logger(text="Pathfinding...")
-        self.config = AppConfig(_env_file=None)  # type: ignore
+        self.config = AppConfig(**{"_env_file": None})
         self.builder = Builder(logger=logger, config=self.config)
         self.configurator = Configurator(logger=logger, builder=self.builder, config=self.config)
         self._bbox = None
@@ -34,7 +35,7 @@ class Pathfinder:
     def get_bounding_box(self):
         """Cache the static bounding box used for random point generation."""
         if self._bbox is None:
-            self._bbox = self.builder.build_bound_box().val().BoundingBox()  # type: ignore
+            self._bbox = cast(Any, self.builder.build_bound_box().val()).BoundingBox()
         return self._bbox
 
     def invoke_pytest(self):
