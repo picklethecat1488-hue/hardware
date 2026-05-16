@@ -29,6 +29,14 @@ class VectorStub:
         """Subtract another vector stub."""
         return VectorStub(self.x - other.x, self.y - other.y, self.z - other.z)
 
+    def add(self, other: VectorStub) -> VectorStub:
+        """Add two vector stubs (method version)."""
+        return self.__add__(other)
+
+    def sub(self, other: VectorStub) -> VectorStub:
+        """Subtract another vector stub (method version)."""
+        return self.__sub__(other)
+
     def __eq__(self, other: object) -> bool:
         """Compare two vector stubs for equality."""
         if not isinstance(other, VectorStub):
@@ -89,6 +97,7 @@ class DummyConfig:
         self.names = ["driver", "passenger"]
         self.clamp_positions = {"driver": [None, (0.5, 10.0), None], "passenger": [None, (0.5, 10.0), None]}
         self.logo_text_positions = {"driver": (0.4, 10.0), "passenger": (0.4, 10.0)}
+        self.clamp_diameters = [6.0, 6.0, 6.0]
 
     def model_dump(self, by_alias=True):
         """Return an empty model dump for the dummy config."""
@@ -137,8 +146,9 @@ def test_get_part_position_prefers_closer_midpoint():
     builder = StubBuilder(dummy_config)
     configurator = Configurator(builder=builder, config=dummy_config, logger=None)
     path = StubPath(VectorStub(0, 0, 0))
+    tube = builder.build_part("driver")
 
-    result = configurator.get_part_position("driver", path, 0.4)
+    result = configurator.get_part_position(tube, path, 0.4)
 
     assert result == VectorStub(0, 0, 3.0)
 

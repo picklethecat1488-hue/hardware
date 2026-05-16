@@ -5,6 +5,7 @@ from functools import lru_cache
 import argparse
 import cadquery as cq
 from typing import cast, Any
+import numpy as np
 import json
 
 
@@ -81,7 +82,7 @@ class Configurator:
 
     def find_best_angle(self, candidate_factory, other_obj, center, coarse_step=10, fine_window=10, fine_step=1):
         """Find the best offset with a coarse sweep followed by a fine search."""
-        coarse_angles = range(0, 360, coarse_step)
+        coarse_angles = np.arange(0, 360, coarse_step)
         best_angle = self.scan_angles(coarse_angles, candidate_factory, other_obj, center)
         if best_angle is None:
             return None
