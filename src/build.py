@@ -48,7 +48,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     }
 
     # The minimum space between each clamp bed
-    clamp_space: float = 10
+    clamp_space: float = 3.0
 
     # The radius of the circular lap joint features
     joint_radius: float = 1.5
@@ -376,6 +376,7 @@ class Builder:
         outer_radius=None,
         center_deg: float = 0,
         angle_deg: float = 360,
+        joint_space: Optional[float] = None,
     ):
         """Create a ring-shaped tube segment."""
         path = self.create_wire(name)
@@ -387,6 +388,7 @@ class Builder:
             angle_deg=angle_deg,
             outer_radius=outer_radius,
             inner_radius=inner_radius,
+            joint_space=joint_space,
         )
         p1 = wire.positionAt(off)  # type: ignore
         p2 = wire.positionAt(off + len / wire.Length())  # type: ignore
@@ -404,7 +406,7 @@ class Builder:
         clamp_pos, angle_offset = self.config.clamp_positions[name][clamp_idx]
         if offset_deg:
             angle_offset = offset_deg
-        angle_span = 180 - 2 * self.config.clamp_space
+        angle_span = 180
         center_deg = (90 if right else 270) + angle_offset
 
         # Create the clamp bed
@@ -416,6 +418,7 @@ class Builder:
             outer_radius=outer_radius,
             center_deg=center_deg,
             angle_deg=angle_span,
+            joint_space=self.config.clamp_space,
         )
         return bed
 
