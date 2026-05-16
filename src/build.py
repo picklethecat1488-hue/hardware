@@ -351,23 +351,32 @@ class Builder:
         return tube
 
     def create_ring(
-        self, name, off, len, inner_radius=None, outer_radius=None, start_deg: float = 0, end_deg: float = 360
+        self,
+        name,
+        off,
+        len,
+        inner_radius=None,
+        outer_radius=None,
+        center_deg: float = 0,
+        angle_deg: float = 360,
     ):
         """Create a ring at a given offset.
 
         :param _type_ name: The part name.
         :param _type_ off: The ring offset
-        :param _type_ len: The ring length
+        :param _type_ len: The axial path length of the ring section
         :param _type_ inner_radius: The inner radius.
         :param _type_ outer_radius: The outer radius.
-        :param _type_ start_deg: The start angle.
-        :param _type_ end_deg: The end angle.
+        :param float center_deg: The center angle of the ring section.
+        :param float angle_deg: The angular width of the ring section in degrees.
         :return _type_: The ring
         """
         path = self.create_wire(name)
         wire = path.val()
         loc = wire.locationAt(off)  # type: ignore
         workplane = cq.Workplane(loc)
+        start_deg = center_deg - angle_deg / 2
+        end_deg = center_deg + angle_deg / 2
         profile_sketch = self.create_profile_sketch(
             start_deg,
             end_deg,
@@ -395,8 +404,8 @@ class Builder:
         clamp_pos, angle_offset = self.config.clamp_positions[name][clamp_idx]
         if offset_deg:
             angle_offset = offset_deg
-        start_deg = (0 if right else 180) + angle_offset + self.config.clamp_space
-        end_deg = (180 if right else 360) + angle_offset - self.config.clamp_space
+        angle_span = 180 - 2 * self.config.clamp_space
+        center_deg = (90 if right else 270) + angle_offset
 
         # Create the clamp bed
         bed = self.create_ring(
@@ -405,8 +414,8 @@ class Builder:
             length,
             inner_radius=inner_radius,
             outer_radius=outer_radius,
-            start_deg=start_deg,
-            end_deg=end_deg,
+            center_deg=center_deg,
+            angle_deg=angle_span,
         ).fillet(self.config.edge_rounding)
         return bed
 
