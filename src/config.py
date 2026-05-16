@@ -37,10 +37,10 @@ class Configurator:
         radius = min(self.builder.config.clamp_diameters) / 2
         self._tube_cache[id(tube)] = tube
         self._path_cache[id(path)] = path
-        return self._get_part_position_cached(id(tube), id(path), off, radius)
+        return self.get_part_position_cached(id(tube), id(path), off, radius)
 
     @lru_cache
-    def _get_part_position_cached(self, tube_id, path_id, off, radius):
+    def get_part_position_cached(self, tube_id, path_id, off, radius):
         """Get the part position of the tube at offset.
 
         If a part is attached to this offset, it should be attached

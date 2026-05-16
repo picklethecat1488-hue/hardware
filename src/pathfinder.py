@@ -26,7 +26,7 @@ class Pathfinder:
         self.configurator = Configurator(logger=logger, builder=self.builder, config=self.config)
         self._bbox = None
 
-    def _clear_builder_cache(self):
+    def clear_builder_cache(self):
         """Clear cached builder geometry that depends on attractors."""
         self.builder.create_wire.cache_clear()
         self.builder.build_tube.cache_clear()
@@ -36,7 +36,7 @@ class Pathfinder:
         self.builder.build_part.cache_clear()
         self.builder.build_prepared_part.cache_clear()
 
-    def _get_bounding_box(self):
+    def get_bounding_box(self):
         """Cache the static bounding box used for random point generation."""
         if self._bbox is None:
             self._bbox = self.builder.build_bound_box().val().BoundingBox()  # type: ignore
@@ -58,7 +58,7 @@ class Pathfinder:
 
         :return _type_: A tuple.
         """
-        bbox = self._get_bounding_box()
+        bbox = self.get_bounding_box()
         x = round(random.uniform(bbox.xmin, bbox.xmax), 2)
         y = round(random.uniform(bbox.ymin, bbox.ymax), 2)
         z = round(random.uniform(bbox.zmin, bbox.zmax), 2)
@@ -73,7 +73,7 @@ class Pathfinder:
         :return _type_: True if the attractor is valid, else false.
         """
         self.config.attractors[name] = points
-        self._clear_builder_cache()
+        self.clear_builder_cache()
         try:
             self.logger.print(f"Trying {points} on {name}...", symbol="📍")
             self.configurator.configure_all(names=[name])
