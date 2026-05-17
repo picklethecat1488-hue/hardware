@@ -141,9 +141,10 @@ class Configurator:
                 )
 
                 # Update the clamp offset
-                if not offset_deg is None:
-                    self.config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
-                    self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
+                if offset_deg is None:
+                    raise ValueError(f"failed to configure {name} clamp")
+                self.config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
+                self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
 
     def config_text_logo(self, name):
         """Tune logo text placement for a part."""
@@ -164,9 +165,10 @@ class Configurator:
         )
 
         # Update the text offset
-        if not offset_deg is None:
-            self.config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
-            self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
+        if offset_deg is None:
+            raise ValueError(f"failed to configure {name} text logo")
+        self.config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
+        self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
 
     def configure_clamps(self, names=None):
         """Configure clamps for all specified parts."""
