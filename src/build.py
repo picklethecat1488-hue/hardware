@@ -311,13 +311,14 @@ class Builder:
                 mode="i"
             )
 
-            # Apply a gap between the half-tubes to account for part deformation and epoxy.
-            # We rotate the rectangle by (angle - 90) because the default Sketch.rect
-            # has its height axis aligned with Y (90°). This ensures the gap is
-            # subtracted perpendicular to each parting line.
-            h = (outer_radius + self.config.joint_radius) * 2
-            sketch.push([(0, 0)]).rect(joint_space, h, angle=start_deg - 90, mode="s").reset()
-            sketch.push([(0, 0)]).rect(joint_space, h, angle=end_deg - 90, mode="s").reset()
+            if joint_space > 0:
+                # Apply a gap between the half-tubes to account for part deformation and epoxy.
+                # We rotate the rectangle by (angle - 90) because the default Sketch.rect
+                # has its height axis aligned with Y (90°). This ensures the gap is
+                # subtracted perpendicular to each parting line.
+                h = (outer_radius + self.config.joint_radius) * 2
+                sketch.push([(0, 0)]).rect(joint_space, h, angle=start_deg - 90, mode="s").reset()
+                sketch.push([(0, 0)]).rect(joint_space, h, angle=end_deg - 90, mode="s").reset()
 
             if lap_joint:
                 # Calculate shifted center points for the lap joint circles so they remain
@@ -401,7 +402,7 @@ class Builder:
         return ring
 
     @lru_cache
-    def build_clamp_bed(self, name, clamp_idx, right=False, offset_deg=None):
+    def build_clamp_bed(self, name, clamp_idx, right=False, offset_deg=None, joint_space=None):
         """Create a clamp bed on the tube."""
         length = self.config.clamp_lengths[clamp_idx]
         outer_radius = self.config.clamp_diameters[clamp_idx] / 2
@@ -411,6 +412,7 @@ class Builder:
             angle_offset = offset_deg
         angle_span = 180
         center_deg = (90 if right else 270) + angle_offset
+        joint_space = joint_space or self.config.clamp_space
 
         # Create the clamp bed
         bed = self.create_ring(
@@ -418,10 +420,9 @@ class Builder:
             clamp_pos,
             length,
             inner_radius=inner_radius,
-            outer_radius=outer_radius,
             center_deg=center_deg,
             angle_deg=angle_span,
-            joint_space=self.config.clamp_space,
+            joint_space=joint_space,
         )
         return bed
 
@@ -479,7 +480,11 @@ class Builder:
         if name == "driver" or name == "passenger":
             # Create the main part body.
             part = self.build_tube(
-                name, right=right, lap_joint=True, half_tube=True, joint_space=self.config.joint_space
+                name,
+                right=right,
+                lap_joint=(not tube_only),
+                half_tube=True,
+                joint_space=0 if tube_only else self.config.joint_space,
             )
             if not tube_only:
                 for idx in range(1, len(self.config.clamp_positions[name]) - 1):

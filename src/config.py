@@ -40,10 +40,8 @@ class Configurator:
         dist_down = midpoint_down.sub(solid_center).Length
         return midpoint_up if dist_up < dist_down else midpoint_down
 
-    def boxes_overlap(self, lhs, rhs):
+    def shapes_overlap(self, lhs_box, rhs_box):
         """Return True when two CAD objects' bounding boxes overlap."""
-        lhs_box = lhs.val().BoundingBox()
-        rhs_box = rhs.val().BoundingBox()
         return not (
             lhs_box.xmax < rhs_box.xmin
             or lhs_box.xmin > rhs_box.xmax
@@ -53,11 +51,15 @@ class Configurator:
             or lhs_box.zmin > rhs_box.zmax
         )
 
-    def is_geometry_clear(self, candidate, other):
+    def parts_not_touching(self, c_shape, o_shape, c_box, o_box, tol=0.1):
         """Return True if the candidate does not intersect the other object."""
-        if not self.boxes_overlap(candidate, other):
+        # Bail early checks here before doing expensive boolean thing.
+        if not self.shapes_overlap(c_box, o_box):
             return True
-        return candidate.intersect(other).val().Volume() == 0
+        elif c_shape.distance(o_shape) > tol:
+            return True
+        else:
+            return not c_shape.intersect(o_shape).Solids()
 
     def angle_window(self, center, radius, step):
         """Return a wrapped angular window around a center angle."""
@@ -69,25 +71,32 @@ class Configurator:
         """Scan angle candidates and return the best angle based on distance."""
         best_angle = None
         best_distance = float("inf")
+        o_shape = other_obj.val()
+        o_box = o_shape.BoundingBox()
         for angle in angles:
             candidate = candidate_factory(float(angle))
-            if not self.is_geometry_clear(candidate, other_obj):
-                continue
-            candidate_center = candidate.val().Center()  # type: ignore
-            distance = (candidate_center - center).Length
-            if distance < best_distance:
-                best_distance = distance
-                best_angle = float(angle)
+            c_shape = candidate.val()
+            c_box = c_shape.BoundingBox()
+            if self.parts_not_touching(c_shape, o_shape, c_box, o_box):
+                candidate_center = c_shape.Center()
+                distance = (candidate_center - center).Length
+                if distance < best_distance:
+                    best_distance = distance
+                    best_angle = float(angle)
         return best_angle
 
-    def find_best_angle(self, candidate_factory, other_obj, center, coarse_step=10, fine_window=10, fine_step=1):
+    def find_best_angle(self, candidate_factory, other_obj, center, coarse_step=None, fine_window=None, fine_step=1):
         """Find the best offset with a coarse sweep followed by a fine search."""
-        coarse_angles = np.arange(0, 360, coarse_step)
-        best_angle = self.scan_angles(coarse_angles, candidate_factory, other_obj, center)
-        if best_angle is None:
-            return None
-        fine_angles = self.angle_window(best_angle, fine_window, fine_step)
-        return self.scan_angles(fine_angles, candidate_factory, other_obj, center)
+        if coarse_step:
+            coarse_angles = np.arange(0, 360, coarse_step)
+            best_angle = self.scan_angles(coarse_angles, candidate_factory, other_obj, center)
+            if best_angle is None:
+                return None
+            fine_angles = self.angle_window(best_angle, fine_window, fine_step)
+            return self.scan_angles(fine_angles, candidate_factory, other_obj, center)
+        else:
+            fine_angles = np.arange(0, 360, fine_step)
+            return self.scan_angles(fine_angles, candidate_factory, other_obj, center)
 
     def config_clamp(self, name):
         """Tune clamp positions for a part."""
@@ -100,14 +109,12 @@ class Configurator:
             center = self.get_part_position(tube, path, clamp_offset)
 
             def build_clamp(angle):
-                return self.builder.build_clamp_bed(name, idx, offset_deg=angle)
+                return self.builder.build_clamp_bed(name, idx, offset_deg=angle, joint_space=0)
 
             offset_deg = self.find_best_angle(
                 build_clamp,
                 other_tube,
                 center,
-                coarse_step=10,
-                fine_window=10,
                 fine_step=1,
             )
 
@@ -131,8 +138,8 @@ class Configurator:
             build_text,
             other_tube,
             center,
-            coarse_step=10,
-            fine_window=10,
+            coarse_step=30,
+            fine_window=15,
             fine_step=1,
         )
 
