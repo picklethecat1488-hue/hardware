@@ -19,3 +19,4 @@ dependencies:
     - pydantic-changedetect
     - pydantic-settings      # Added back for Pydantic v2 settings support
     - pytest-mock 
+    - numpy
