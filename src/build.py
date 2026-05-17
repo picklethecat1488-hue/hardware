@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from pydantic_changedetect import ChangeDetectionMixin
 import cadquery as cq
+import threading
 from functools import lru_cache, cached_property
 from IPython.core.getipython import get_ipython  # type: ignore
 from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore
@@ -125,6 +126,7 @@ class Logger:
         self.backend: Any = None
         self.in_notebook = self.get_in_notebook()
         self.enabled = enabled
+        self.lock = threading.Lock()
 
         if self.enabled:
             if self.in_notebook:
@@ -155,35 +157,38 @@ class Logger:
         """Print a formatted log message."""
         if not self.enabled:
             print(msg)
-        elif self.in_notebook:
-            import ipywidgets as widgets
-            from IPython.display import display
-
-            sanitized_symbol = self.sanitizer.sanitize(symbol)
-            sanitized_text = self.sanitizer.sanitize(msg)
-            self.backend = widgets.HTML(value=f"{sanitized_symbol} <pre>{sanitized_text}</pre>")
-            display(self.backend)
         else:
-            if not self.running:
-                # Start the spinner, if not already running.
-                cast(Any, self.backend).start()
-                self.running = True
-            # Display the message, along with a custom symbol, while keeping the spinner going.
-            backend = cast(Any, self.backend)
-            backend.text = ""
-            backend.stop_and_persist(f"{symbol} {msg}")
-            backend.start()
+            with self.lock:
+                if self.in_notebook:
+                    import ipywidgets as widgets
+                    from IPython.display import display
+
+                    sanitized_symbol = self.sanitizer.sanitize(symbol)
+                    sanitized_text = self.sanitizer.sanitize(msg)
+                    self.backend = widgets.HTML(value=f"{sanitized_symbol} <pre>{sanitized_text}</pre>")
+                    display(self.backend)
+                else:
+                    if not self.running:
+                        # Start the spinner, if not already running.
+                        cast(Any, self.backend).start()
+                        self.running = True
+                    # Display the message, along with a custom symbol, while keeping the spinner going.
+                    backend = cast(Any, self.backend)
+                    backend.text = ""
+                    backend.stop_and_persist(f"{symbol} {msg}")
+                    backend.start()
 
     def done(self):
         """Mark the operation as complete."""
-        if not self.in_notebook and self.backend:
-            backend = cast(Any, self.backend)
-            backend.text = f"Done {self.text}"
-            backend.succeed()
-            if self.running:
-                # Stop the spinner after the operation has completed.
-                backend.stop()
-                self.running = False
+        with self.lock:
+            if not self.in_notebook and self.backend:
+                backend = cast(Any, self.backend)
+                backend.text = f"Done {self.text}"
+                backend.succeed()
+                if self.running:
+                    # Stop the spinner after the operation has completed.
+                    backend.stop()
+                    self.running = False
 
 
 class Builder:
@@ -592,7 +597,7 @@ class Builder:
         }
         part_offset, part_dist = 60, 120
         assy = cq.Assembly()
-        wire_objs = [self.create_wire(name).val() for name in names]
+        wire_objs = [cast(cq.Wire, self.create_wire(name).val()) for name in names]
 
         for i, wire_obj in enumerate(wire_objs):
             for right in right_vals:
@@ -605,7 +610,7 @@ class Builder:
 
                 # Connect parts to each other
                 if right:
-                    off = wire_obj.positionAt(0.5)  # type: ignore
+                    off = wire_obj.positionAt(0.5)
                     line = cq.Workplane("XY").polyline([loc + off, other_loc + off])
                     assy.add(line)
 

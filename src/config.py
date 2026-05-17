@@ -7,6 +7,7 @@ import cadquery as cq
 from typing import cast, Any
 import numpy as np
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 
 class Configurator:
@@ -19,6 +20,7 @@ class Configurator:
         self.builder = builder or Builder(config=config, logger=logger)
         self._tube_cache = {}
         self._path_cache = {}
+        self.executor = ThreadPoolExecutor()
 
     @lru_cache
     def get_part_position(self, tube, path, off):
@@ -74,13 +76,21 @@ class Configurator:
         best_distance = float("inf")
         o_shape = other_obj.val()
         o_box = o_shape.BoundingBox()
-        for angle in angles:
+
+        def check_angle(angle):
             candidate = candidate_factory(float(angle))
             c_shape = candidate.val()
             c_box = c_shape.BoundingBox()
             if self.parts_not_touching(c_shape, o_shape, c_box, o_box):
                 candidate_center = c_shape.Center()
                 distance = (candidate_center - center).Length
+                return angle, distance
+            return None, None
+
+        # Parallelize the angle scanning to utilize multiple CPU cores for CAD calculations.
+        results = self.executor.map(check_angle, angles)
+        for angle, distance in results:
+            if angle is not None and distance is not None:
                 if distance < best_distance:
                     best_distance = distance
                     best_angle = float(angle)
@@ -106,23 +116,25 @@ class Configurator:
         path = self.builder.create_wire(name)
 
         for idx in range(1, len(self.config.clamp_positions[name]) - 1):
-            clamp_offset, _ = self.config.clamp_positions[name][idx]  # type: ignore
-            center = self.get_part_position(tube, path, clamp_offset)
+            pos_info = self.config.clamp_positions[name][idx]
+            if not pos_info is None:
+                clamp_offset, _ = pos_info
+                center = self.get_part_position(tube, path, clamp_offset)
 
-            def build_clamp(angle):
-                return self.builder.build_clamp_bed(name, idx, offset_deg=angle, joint_space=0)
+                def build_clamp(angle):
+                    return self.builder.build_clamp_bed(name, idx, offset_deg=angle, joint_space=0)
 
-            offset_deg = self.find_best_angle(
-                build_clamp,
-                other_tube,
-                center,
-                fine_step=1,
-            )
+                offset_deg = self.find_best_angle(
+                    build_clamp,
+                    other_tube,
+                    center,
+                    fine_step=1,
+                )
 
-            # Update the clamp offset
-            if not offset_deg is None:
-                self.config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
-                self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
+                # Update the clamp offset
+                if not offset_deg is None:
+                    self.config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
+                    self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
 
     def config_text_logo(self, name):
         """Tune logo text placement for a part."""
@@ -153,22 +165,29 @@ class Configurator:
         """Configure clamps for all specified parts."""
         if names is None:
             names = self.config.names
-        for name in names:
-            self.config_clamp(name)
+        # Run configuration tasks for each part in parallel.
+        futures = [self.executor.submit(self.config_clamp, name) for name in names]
+        for future in futures:
+            future.result()
 
     def configure_text_logos(self, names=None):
         """Configure logo text for all specified parts."""
         if names is None:
             names = self.config.names
-        for name in names:
-            self.config_text_logo(name)
+        # Run configuration tasks for each part in parallel.
+        futures = [self.executor.submit(self.config_text_logo, name) for name in names]
+        for future in futures:
+            future.result()
 
     def configure_all(self, names=None):
         """Perform all configuration steps."""
         if names is None:
             names = self.config.names
-        self.configure_clamps(names)
-        self.configure_text_logos(names)
+        # Execute clamp and logo configuration in parallel to maximize throughput.
+        f1 = self.executor.submit(self.configure_clamps, names)
+        f2 = self.executor.submit(self.configure_text_logos, names)
+        f1.result()
+        f2.result()
 
 
 def get_args():
