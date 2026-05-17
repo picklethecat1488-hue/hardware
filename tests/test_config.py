@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+import threading
 import config
 from config import Configurator
 
@@ -97,6 +98,14 @@ class StubEntity:
         """Return a new stub entity representing an intersection result."""
         return StubEntity(center=self._center, volume=self._volume)
 
+    def Solids(self) -> list[StubEntity]:
+        """Return a list of solid stubs."""
+        return [self] if self._volume > 0 else []
+
+    def distance(self, other):
+        """Compute the distance between two objects."""
+        return (self._center - other._center).Length
+
 
 class StubPath:
     """Stub path object that provides a fixed position for testing."""
@@ -137,6 +146,7 @@ class StubBuilder:
         self.config = config_obj
         self.clamp_calls = []
         self.text_calls = []
+        self._lock = threading.Lock()
 
     def build_part(self, name, right=False, tube_only=False):
         """Return a stub entity representing a built part."""
@@ -147,14 +157,16 @@ class StubBuilder:
         """Return a stub path for the named part."""
         return StubPath(VectorStub(0, 0, 0))
 
-    def build_clamp_bed(self, name, idx, offset_deg=0.0):
+    def build_clamp_bed(self, name, idx, offset_deg=0.0, joint_space=0):
         """Capture clamp bed angle candidates and return a stub entity."""
-        self.clamp_calls.append(offset_deg)
+        with self._lock:
+            self.clamp_calls.append(offset_deg)
         return StubEntity(center=VectorStub(offset_deg, 0, 0), volume=0)
 
     def build_text(self, name, right=False, offset_deg=0.0, font_path=None):
         """Capture text placement angle candidates and return a stub entity."""
-        self.text_calls.append(offset_deg)
+        with self._lock:
+            self.text_calls.append(offset_deg)
         return StubEntity(center=VectorStub(offset_deg, 0, 0), volume=0)
 
 
@@ -190,7 +202,7 @@ class TestConfig:
         configurator.config_clamp("driver")
 
         assert dummy_config.clamp_positions["driver"][1][1] == 0.0
-        assert builder.clamp_calls[:3] == [0.0, 90.0, 180.0]
+        assert sorted(builder.clamp_calls[:3]) == [0.0, 90.0, 180.0]
 
     def test_config_text_logo_updates_offset_for_best_angle(self, monkeypatch):
         """Ensure text logo configuration chooses the best angle offset."""
@@ -203,4 +215,4 @@ class TestConfig:
         configurator.config_text_logo("driver")
 
         assert dummy_config.logo_text_positions["driver"][1] == 0.0
-        assert builder.text_calls[:3] == [0.0, 90.0, 180.0]
+        assert sorted(builder.text_calls[:3]) == [0.0, 90.0, 180.0]

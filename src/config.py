@@ -151,8 +151,8 @@ class Configurator:
             build_text,
             other_tube,
             center,
-            coarse_step=30,
-            fine_window=15,
+            coarse_step=10,
+            fine_window=10,
             fine_step=1,
         )
 

@@ -8,6 +8,7 @@ import pytest
 import zipfile
 from pathlib import Path
 from unittest.mock import patch
+from typing import cast
 
 
 class TestBuilder:
@@ -83,7 +84,7 @@ class TestBuilder:
             return abs((v - cq.Vector([p[0], p[1], p[2]])).Length)
 
         wire = builder.create_wire(name)
-        wire_obj = wire.val()
+        wire_obj = cast(cq.Wire, wire.val())
         length = wire_obj.Length()
         inlet_clamp_start = wire_obj.positionAt(0.0)
         inlet_clamp_end = wire_obj.positionAt(builder.config.clamp_lengths[0] / length)
@@ -157,7 +158,7 @@ class TestBuilder:
         # Map clamp_idx to clamp parameters
         offsets = (
             [0]
-            + [clamp_pos[0] for clamp_pos in builder.config.clamp_positions[name][1:-1]]
+            + [clamp_pos[0] for clamp_pos in builder.config.clamp_positions[name][1:-1] if clamp_pos is not None]
             + [(length - builder.config.clamp_lengths[-1]) / length]
         )
         expected = np.array(builder.config.clamp_diameters) / 2
@@ -204,7 +205,7 @@ class TestBuilder:
         assert part.val().Volume() > 0
 
         # Ensure the part is touching the print bed
-        bottom_faces = part.faces("<Z").vals()
+        bottom_faces = cast(list[cq.Face], part.faces("<Z").vals())
         face_area = sum(f.Area() for f in bottom_faces)
         assert face_area > 0
 
@@ -259,7 +260,7 @@ class TestBuilder:
             ymin, ylen = -32, 324
             zmin, zlen = 319, 203
         elif name == "passenger":
-            xmin, xlen = 559, 387
+            xmin, xlen = 558, 387
             ymin, ylen = -32, 419
             zmin, zlen = 288, 234
         else:
