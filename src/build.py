@@ -312,11 +312,12 @@ class Builder:
             )
 
             # Apply a gap between the half-tubes to account for part deformation and epoxy.
-            # By using rotated rectangles, we ensure the gap is applied perpendicular to
-            # each parting line, regardless of the sector angle.
+            # We rotate the rectangle by (angle - 90) because the default Sketch.rect
+            # has its height axis aligned with Y (90°). This ensures the gap is
+            # subtracted perpendicular to each parting line.
             h = (outer_radius + self.config.joint_radius) * 2
-            sketch.push([(0, 0)]).rect(joint_space, h, angle=start_deg, mode="s").reset()
-            sketch.push([(0, 0)]).rect(joint_space, h, angle=end_deg, mode="s").reset()
+            sketch.push([(0, 0)]).rect(joint_space, h, angle=start_deg - 90, mode="s").reset()
+            sketch.push([(0, 0)]).rect(joint_space, h, angle=end_deg - 90, mode="s").reset()
 
             if lap_joint:
                 # Calculate shifted center points for the lap joint circles so they remain
