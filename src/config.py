@@ -54,12 +54,10 @@ class Configurator:
             or lhs_box.zmin > rhs_box.zmax
         )
 
-    def parts_not_touching(self, c_shape, o_shape, c_box, o_box, tol=0.1):
+    def parts_not_touching(self, c_shape, o_shape, c_box, o_box):
         """Return True if the candidate does not intersect the other object."""
         # Bail early checks here before doing expensive boolean thing.
         if not self.shapes_overlap(c_box, o_box):
-            return True
-        elif c_shape.distance(o_shape) > tol:
             return True
         else:
             return not c_shape.intersect(o_shape).Solids()
@@ -96,39 +94,50 @@ class Configurator:
                     best_angle = float(angle)
         return best_angle
 
-    def find_best_angle(self, candidate_factory, other_obj, center, coarse_step=None, fine_window=None, fine_step=1):
-        """Find the best offset with a coarse sweep followed by a fine search."""
-        if coarse_step:
-            coarse_angles = np.arange(0, 360, coarse_step)
-            best_angle = self.scan_angles(coarse_angles, candidate_factory, other_obj, center)
-            if best_angle is None:
-                return None
-            fine_angles = self.angle_window(best_angle, fine_window, fine_step)
-            return self.scan_angles(fine_angles, candidate_factory, other_obj, center)
-        else:
-            fine_angles = np.arange(0, 360, fine_step)
-            return self.scan_angles(fine_angles, candidate_factory, other_obj, center)
+    def get_signed_angle(self, v1: cq.Vector, v2: cq.Vector, normal: cq.Vector) -> float:
+        """Compute the signed angle between two vectors around a normal."""
+        angle = v1.getAngle(v2)
+        # Determine the sign by checking the cross product against the normal
+        if v1.cross(v2).dot(normal) < 0:
+            return -angle
+        return angle
+
+    def find_best_angle(self, candidate_factory, other_obj, center, position, normal, fine_window=10, fine_step=1):
+        """Find the best offset using a geometric estimate followed by a fine search."""
+        # Use a reference part at 0 degrees to determine the local orientation of the sweep.
+        ref_angle = 0.0
+        ref_candidate = candidate_factory(ref_angle)
+        ref_center = ref_candidate.val().Center()
+        v_ref = (ref_center - position).normalized()
+        v_target = (center - position).normalized()
+        angle_rad = self.get_signed_angle(v_ref, v_target, normal)
+        start_angle = ref_angle + np.degrees(angle_rad)
+
+        # Perform a fine search around the estimated angle.
+        radius = fine_window / 2
+        fine_angles = self.angle_window(start_angle, radius, fine_step)
+        return self.scan_angles(fine_angles, candidate_factory, other_obj, center)
 
     def config_clamp(self, name):
         """Tune clamp positions for a part."""
         tube = self.builder.build_part(name, tube_only=True)
         other_tube = self.builder.build_part(name, right=True, tube_only=True)
         path = self.builder.create_wire(name)
+        p_shape = path.val()
 
         for idx in range(1, len(self.config.clamp_positions[name]) - 1):
             pos_info = self.config.clamp_positions[name][idx]
             if not pos_info is None:
                 clamp_offset, _ = pos_info
+                position = p_shape.positionAt(clamp_offset)
+                normal = p_shape.tangentAt(clamp_offset)
                 center = self.get_part_position(tube, path, clamp_offset)
-
-                def build_clamp(angle):
-                    return self.builder.build_clamp_bed(name, idx, offset_deg=angle, joint_space=0)
-
                 offset_deg = self.find_best_angle(
-                    build_clamp,
+                    lambda angle: self.builder.build_clamp_bed(name, idx, offset_deg=angle, joint_space=0),
                     other_tube,
                     center,
-                    fine_step=1,
+                    position,
+                    normal,
                 )
 
                 # Update the clamp offset
@@ -141,19 +150,17 @@ class Configurator:
         tube = self.builder.build_part(name, right=True, tube_only=True)
         other_tube = self.builder.build_part(name, tube_only=True)
         path = self.builder.create_wire(name)
+        p_shape = path.val()
         text_offset, _ = self.config.logo_text_positions[name]
+        position = p_shape.positionAt(text_offset)
+        normal = p_shape.tangentAt(text_offset)
         center = self.get_part_position(tube, path, text_offset)
-
-        def build_text(angle):
-            return self.builder.build_text(name, right=True, offset_deg=angle, font_path="Sans")
-
         offset_deg = self.find_best_angle(
-            build_text,
+            lambda angle: self.builder.build_text(name, right=True, offset_deg=angle, font_path="Sans"),
             other_tube,
             center,
-            coarse_step=10,
-            fine_window=10,
-            fine_step=1,
+            position,
+            normal,
         )
 
         # Update the text offset

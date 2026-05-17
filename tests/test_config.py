@@ -38,6 +38,27 @@ class VectorStub:
         """Subtract another vector stub (method version)."""
         return self.__sub__(other)
 
+    def normalized(self) -> VectorStub:
+        """Return a normalized vector stub."""
+        length = self.Length
+        return VectorStub(self.x / length, self.y / length, self.z / length) if length > 0 else self
+
+    def cross(self, other: VectorStub) -> VectorStub:
+        """Return the cross product of two vector stubs."""
+        return VectorStub(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x,
+        )
+
+    def dot(self, other: VectorStub) -> float:
+        """Return the dot product of two vector stubs."""
+        return self.x * other.x + self.y * other.y + self.z * other.z
+
+    def getAngle(self, other: VectorStub) -> float:
+        """Return a stub angle."""
+        return 0.0
+
     def __eq__(self, other: object) -> bool:
         """Compare two vector stubs for equality."""
         if not isinstance(other, VectorStub):
@@ -122,6 +143,10 @@ class StubPath:
         """Return the fixed position regardless of offset."""
         return self._position
 
+    def tangentAt(self, off):
+        """Return a fixed tangent vector."""
+        return VectorStub(0, 1, 0)
+
 
 class DummyConfig:
     """Dummy configuration object used by configurator tests."""
@@ -197,12 +222,12 @@ class TestConfig:
         builder = StubBuilder(dummy_config)
         configurator = Configurator(builder=builder, config=dummy_config, logger=None)
 
-        monkeypatch.setattr(config.np, "arange", lambda start, stop, step: [0.0, 90.0, 180.0])
+        monkeypatch.setattr(configurator, "angle_window", lambda angle, radius, step: [0.0, 90.0, 180.0])
 
         configurator.config_clamp("driver")
 
         assert dummy_config.clamp_positions["driver"][1][1] == 0.0
-        assert sorted(builder.clamp_calls[:3]) == [0.0, 90.0, 180.0]
+        assert sorted(builder.clamp_calls) == [0.0, 0.0, 90.0, 180.0]
 
     def test_config_text_logo_updates_offset_for_best_angle(self, monkeypatch):
         """Ensure text logo configuration chooses the best angle offset."""
@@ -210,9 +235,9 @@ class TestConfig:
         builder = StubBuilder(dummy_config)
         configurator = Configurator(builder=builder, config=dummy_config, logger=None)
 
-        monkeypatch.setattr(config.np, "arange", lambda start, stop, step: [0.0, 90.0, 180.0])
+        monkeypatch.setattr(configurator, "angle_window", lambda angle, radius, step: [0.0, 90.0, 180.0])
 
         configurator.config_text_logo("driver")
 
         assert dummy_config.logo_text_positions["driver"][1] == 0.0
-        assert sorted(builder.text_calls[:3]) == [0.0, 90.0, 180.0]
+        assert sorted(builder.text_calls) == [0.0, 0.0, 90.0, 180.0]
