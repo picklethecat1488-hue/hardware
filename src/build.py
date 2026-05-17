@@ -11,6 +11,7 @@ import threading
 from functools import lru_cache, cached_property
 from IPython.core.getipython import get_ipython  # type: ignore
 from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, cast
 import zipfile
 
@@ -204,6 +205,7 @@ class Builder:
         self.config = config or AppConfig()
         self.logger = logger or Logger(enabled=False)
         self.p = self.config.measurements
+        self.executor = ThreadPoolExecutor()
 
         for idx in [3, 6]:
             self.p[idx][2] = self.p[idx][2] - (self.config.clamp_diameters[0] / 2)
@@ -561,14 +563,17 @@ class Builder:
         if right_vals is None:
             right_vals = [False, True]
 
-        for name in names:
-            for right in right_vals:
-                side = "right" if right else "left"
-                mesh_file_name = f"{file_prefix}_{name}_{side}.stl"
-                prepared_part = self.build_prepared_part(name, right=right)
-                path_str = str(Path(out_dir) / mesh_file_name)
-                cq.exporters.export(prepared_part, path_str)
-                self.logger.print(f"Saved {path_str}", symbol="📄")
+        def export_task(name, right):
+            side = "right" if right else "left"
+            mesh_file_name = f"{file_prefix}_{name}_{side}.stl"
+            prepared_part = self.build_prepared_part(name, right=right)
+            path_str = str(Path(out_dir) / mesh_file_name)
+            cq.exporters.export(prepared_part, path_str)
+            self.logger.print(f"Saved {path_str}", symbol="📄")
+
+        # Run STL meshing and file export in parallel to utilize all CPU cores.
+        tasks = [(name, right) for name in names for right in right_vals]
+        list(self.executor.map(lambda p: export_task(*p), tasks))
 
     def generate_diagram(self, out_dir, names=None, right_vals=None):
         """Export an exploded diagram for the parts."""
