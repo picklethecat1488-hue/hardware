@@ -361,7 +361,8 @@ class Builder:
     def build_tube(self, name, right=False, lap_joint=False, half_tube=False, joint_space=None):
         """Build a manifold tube."""
         path = self.create_wire(name)
-        wire_obj = cast(cq.Wire, path.val())
+        # Use Any to bypass linter protocol mismatch in CadQuery Wire stubs
+        wire_obj = cast(Any, path.val())
         loc = wire_obj.locationAt(0)
 
         if half_tube:
@@ -391,7 +392,7 @@ class Builder:
     ):
         """Create a ring-shaped tube segment."""
         path = self.create_wire(name)
-        wire = cast(cq.Wire, path.val())
+        wire = cast(Any, path.val())
         loc = wire.locationAt(off)
         workplane = cq.Workplane(loc)
         profile_sketch = self.create_profile(
@@ -446,7 +447,7 @@ class Builder:
     def build_text(self, name, right=False, offset_deg=None, font_path=None):
         """Generate text geometry wrapped to the tube surface."""
         path = self.create_wire(name)
-        wire = cast(cq.Wire, path.val())
+        wire = cast(Any, path.val())
         off, angle_offset = self.config.logo_text_positions[name]
         pos = wire.positionAt(off)
         tan = wire.tangentAt(off)
@@ -602,7 +603,7 @@ class Builder:
         }
         part_offset, part_dist = 60, 120
         assy = cq.Assembly()
-        wire_objs = [cast(cq.Wire, self.create_wire(name).val()) for name in names]
+        wire_objs = [cast(Any, self.create_wire(name).val()) for name in names]
 
         for i, wire_obj in enumerate(wire_objs):
             for right in right_vals:

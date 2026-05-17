@@ -35,7 +35,8 @@ class Configurator:
         """Get a cached attachment position on the tube."""
         tube = self._tube_cache[tube_id]
         path = self._path_cache[path_id]
-        p_shape = cast(cq.Wire, path.val())
+        # Use Any to bypass linter protocol mismatch in CadQuery Wire stubs
+        p_shape = cast(Any, path.val())
         pos = p_shape.positionAt(off)
         midpoint_up = pos + cq.Vector(0, 0, radius)
         midpoint_down = pos - cq.Vector(0, 0, radius)
@@ -124,7 +125,7 @@ class Configurator:
         tube = self.builder.build_part(name, tube_only=True)
         other_tube = self.builder.build_part(name, right=True, tube_only=True)
         path = self.builder.create_wire(name)
-        p_shape = cast(cq.Wire, path.val())
+        p_shape = cast(Any, path.val())
 
         for idx in range(1, len(self.config.clamp_positions[name]) - 1):
             pos_info = self.config.clamp_positions[name][idx]
@@ -152,7 +153,7 @@ class Configurator:
         tube = self.builder.build_part(name, right=True, tube_only=True)
         other_tube = self.builder.build_part(name, tube_only=True)
         path = self.builder.create_wire(name)
-        p_shape = cast(cq.Wire, path.val())
+        p_shape = cast(Any, path.val())
         text_offset, _ = self.config.logo_text_positions[name]
         position = p_shape.positionAt(text_offset)
         normal = p_shape.tangentAt(text_offset)

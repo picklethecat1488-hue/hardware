@@ -8,7 +8,7 @@ import pytest
 import zipfile
 from pathlib import Path
 from unittest.mock import patch
-from typing import cast
+from typing import cast, Any
 
 
 class TestBuilder:
@@ -84,7 +84,8 @@ class TestBuilder:
             return abs((v - cq.Vector([p[0], p[1], p[2]])).Length)
 
         wire = builder.create_wire(name)
-        wire_obj = cast(cq.Wire, wire.val())
+        # Use Any to bypass linter protocol mismatch in CadQuery Wire stubs
+        wire_obj = cast(Any, wire.val())
         length = wire_obj.Length()
         inlet_clamp_start = wire_obj.positionAt(0.0)
         inlet_clamp_end = wire_obj.positionAt(builder.config.clamp_lengths[0] / length)
