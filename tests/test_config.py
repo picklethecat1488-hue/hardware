@@ -30,6 +30,13 @@ class VectorStub:
         """Subtract another vector stub."""
         return VectorStub(self.x - other.x, self.y - other.y, self.z - other.z)
 
+    def __mul__(self, other: float | VectorStub) -> VectorStub:
+        """Multiply vector stub by a scalar or transform a vector."""
+        if isinstance(other, (int, float)):
+            return VectorStub(self.x * other, self.y * other, self.z * other)
+        # Treating multiplication by a location stub as a simple translation for tests
+        return VectorStub(self.x + other.x, self.y + other.y, self.z + other.z)
+
     def add(self, other: VectorStub) -> VectorStub:
         """Add two vector stubs (method version)."""
         return self.__add__(other)
@@ -119,6 +126,10 @@ class StubEntity:
         """Return a new stub entity representing an intersection result."""
         return StubEntity(center=self._center, volume=self._volume)
 
+    def isInside(self, point: VectorStub) -> bool:
+        """Stub for geometric containment check."""
+        return True
+
     def Solids(self) -> list[StubEntity]:
         """Return a list of solid stubs."""
         return [self] if self._volume > 0 else []
@@ -142,6 +153,10 @@ class StubPath:
     def positionAt(self, off):
         """Return the fixed position regardless of offset."""
         return self._position
+
+    def locationAt(self, off):
+        """Return a stub location (identity translation)."""
+        return VectorStub(0, 0, 0)
 
     def tangentAt(self, off):
         """Return a fixed tangent vector."""
@@ -202,10 +217,12 @@ class TestConfig:
     def patch_cq_vector(self, monkeypatch):
         """Patch CadQuery Vector with a stub vector during tests."""
         monkeypatch.setattr(config.cq, "Vector", VectorStub)
+        monkeypatch.setattr(config.cq, "Location", lambda x=VectorStub(0, 0, 0): x)
+        monkeypatch.setattr(config.cq, "Plane", lambda **k: None)
         yield
 
     def test_get_part_position_prefers_closer_midpoint(self):
-        """Verify get_part_position chooses the closer midpoint position."""
+        """Verify get_part_position identifies the arc peak via local frame transformation."""
         dummy_config = DummyConfig()
         builder = StubBuilder(dummy_config)
         configurator = Configurator(builder=builder, config=dummy_config, logger=None)

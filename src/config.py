@@ -22,7 +22,6 @@ class Configurator:
         self._path_cache = {}
         self.executor = ThreadPoolExecutor()
 
-    @lru_cache
     def get_part_position(self, tube, path, off):
         """Get a suitable attachment position on the tube."""
         radius = min(self.builder.config.clamp_diameters) / 2
@@ -31,19 +30,28 @@ class Configurator:
         return self.get_part_position_cached(id(tube), id(path), off, radius)
 
     @lru_cache
-    def get_part_position_cached(self, tube_id, path_id, off, radius):
-        """Get a cached attachment position on the tube."""
+    def get_orientation_normal(self, tube_id, path_id):
+        """Get if we should use midpoint_up, otherwise use midpoint_down."""
         tube = self._tube_cache[tube_id]
         path = self._path_cache[path_id]
-        # Use Any to bypass linter protocol mismatch in CadQuery Wire stubs
+        p_tube = cast(Any, tube.val())
+        p_shape = cast(Any, path.val())
+        pos = p_shape.positionAt(0.5)
+        midpoint_up = pos + cq.Vector(0, 0, 1)
+        solid_center = p_tube.Center()
+        # Orientation is normal if midpoint_up is closer to solid center than path position.
+        return (solid_center - midpoint_up).Length < (solid_center - pos).Length
+
+    @lru_cache
+    def get_part_position_cached(self, tube_id, path_id, off, radius):
+        """Get a cached attachment position on the tube."""
+        path = self._path_cache[path_id]
         p_shape = cast(Any, path.val())
         pos = p_shape.positionAt(off)
         midpoint_up = pos + cq.Vector(0, 0, radius)
-        midpoint_down = pos - cq.Vector(0, 0, radius)
-        solid_center = tube.val().Center()
-        dist_up = midpoint_up.sub(solid_center).Length
-        dist_down = midpoint_down.sub(solid_center).Length
-        return midpoint_up if dist_up < dist_down else midpoint_down
+        midpoint_down = pos + cq.Vector(0, 0, -radius)
+        orientation_normal = self.get_orientation_normal(tube_id, path_id)
+        return midpoint_up if orientation_normal else midpoint_down
 
     def shapes_overlap(self, lhs_box, rhs_box):
         """Return True when two CAD objects' bounding boxes overlap."""
