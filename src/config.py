@@ -20,6 +20,7 @@ class Configurator:
         self._tube_cache = {}
         self._path_cache = {}
 
+    @lru_cache
     def get_part_position(self, tube, path, off):
         """Get a suitable attachment position on the tube."""
         radius = min(self.builder.config.clamp_diameters) / 2

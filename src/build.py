@@ -420,6 +420,7 @@ class Builder:
             clamp_pos,
             length,
             inner_radius=inner_radius,
+            outer_radius=outer_radius,
             center_deg=center_deg,
             angle_deg=angle_span,
             joint_space=joint_space,
