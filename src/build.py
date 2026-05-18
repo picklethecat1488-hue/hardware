@@ -92,7 +92,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     logo_text_args: dict[str, Any] = {
         "txt": "FHB",
         "fontsize": 10,
-        "distance": 2,
+        "distance": 1.5,
         "fontPath": "DancingScript-VariableFont_wght.ttf",
         "halign": "center",
         "valign": "center",
