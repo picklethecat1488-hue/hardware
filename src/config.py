@@ -7,6 +7,7 @@ import cadquery as cq
 from typing import cast, Any
 import numpy as np
 import json
+from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -126,7 +127,7 @@ class Configurator:
                 clamp_offset, _ = pos_info
                 center = self.get_part_position(tube, path, clamp_offset)
                 offset_deg = self.find_best_angle(
-                    lambda angle: self.builder.build_clamp_bed(name, idx, offset_deg=angle),
+                    lambda angle: self.builder.build_clamp_bed(name, idx, offset_deg=angle, joint_space=0),
                     other_tube,
                     center,
                 )
@@ -178,6 +179,13 @@ class Configurator:
         """Perform all configuration steps."""
         if names is None:
             names = self.config.names
+
+        # Reset fields targeted by configuration to their class-level defaults.
+        # This ensures changes are detected relative to factory settings even if .env exists.
+        self.config.clamp_positions = deepcopy(AppConfig.model_fields["clamp_positions"].default)
+        self.config.logo_text_positions = deepcopy(AppConfig.model_fields["logo_text_positions"].default)
+        self.config.model_reset_changed()
+
         # Execute clamp and logo configuration in parallel to maximize throughput.
         f1 = self.executor.submit(self.configure_clamps, names)
         f2 = self.executor.submit(self.configure_text_logos, names)
@@ -209,6 +217,7 @@ def main(logger, args):
     if not args.name is None:
         gen_args["names"] = [args.name]
     config = AppConfig()
+
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
 
@@ -226,8 +235,8 @@ def main(logger, args):
         with open(args.env, "w") as file:
             for key, value in changed_items.items():
                 if isinstance(value, (dict, list)):
-                    # Fix json.decoder.JSONDecodeError
-                    value_str = json.dumps(value)
+                    # Use compact separators to ensure standard .env parsing
+                    value_str = json.dumps(value, separators=(",", ":"))
                 else:
                     value_str = str(value)
                 file.write(f"{key}={value_str}\n")

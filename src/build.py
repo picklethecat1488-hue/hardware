@@ -50,7 +50,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     }
 
     # The minimum space between each clamp bed
-    clamp_space: float = 3.0
+    clamp_space: float = 30.0
 
     # The radius of the circular lap joint features
     joint_radius: float = 1.5
