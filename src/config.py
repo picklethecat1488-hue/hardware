@@ -126,6 +126,7 @@ class Configurator:
         # Perform a fine search around the estimated angle.
         radius = fine_window / 2
         fine_angles = self.angle_window(start_angle, radius, fine_step)
+        self.logger.print(f"{fine_angles}")
         return self.scan_angles(fine_angles, candidate_factory, other_obj, center)
 
     def config_clamp(self, name):
@@ -143,7 +144,7 @@ class Configurator:
                 normal = p_shape.tangentAt(clamp_offset)
                 center = self.get_part_position(tube, path, clamp_offset)
                 offset_deg = self.find_best_angle(
-                    lambda angle: self.builder.build_clamp_bed(name, idx, offset_deg=angle, joint_space=0),
+                    lambda angle: self.builder.build_clamp_bed(name, idx, offset_deg=angle),
                     other_tube,
                     center,
                     position,
