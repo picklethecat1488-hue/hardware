@@ -212,12 +212,6 @@ def main(logger, args):
         gen_args["names"] = [args.name]
     config = AppConfig()
 
-    # Reset fields targeted by configuration to their class-level defaults.
-    # This ensures changes are detected relative to factory settings even if .env exists.
-    config.clamp_positions = deepcopy(AppConfig.model_fields["clamp_positions"].default)
-    config.logo_text_positions = deepcopy(AppConfig.model_fields["logo_text_positions"].default)
-    config.model_reset_changed()
-
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
 
