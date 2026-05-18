@@ -583,7 +583,7 @@ class Builder:
     def generate_diagram(self, out_dir, names=None, right_vals=None):
         """Export an exploded diagram for the parts."""
 
-        def get_part_location(wire_obj, offset=0, dist=0, right=False):
+        def get_part_location(offset=0, dist=0, right=False):
             """Compute part placement positions for the diagram."""
             # Separate the halves vertically along Z and space assemblies along Y.
             z_move = dist if right else -dist
@@ -601,8 +601,8 @@ class Builder:
 
         for i, wire_obj in enumerate(wire_objs):
             for right in right_vals:
-                loc = get_part_location(wire_obj, right=right, offset=(i * part_offset), dist=part_dist)
-                other_loc = get_part_location(wire_obj, right=(not right), offset=(i * part_offset), dist=part_dist)
+                loc = get_part_location(right=right, offset=(i * part_offset), dist=part_dist)
+                other_loc = get_part_location(right=(not right), offset=(i * part_offset), dist=part_dist)
 
                 # Add parts to the diagram
                 part = self.build_part(names[i], right=right)
