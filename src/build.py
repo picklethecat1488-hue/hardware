@@ -583,11 +583,13 @@ class Builder:
     def generate_diagram(self, out_dir, names=None, right_vals=None):
         """Export an exploded diagram for the parts."""
 
-        def get_part_location(offset=0, dist=0, right=False):
+        def get_part_location(part, full_part, offset=0, dist=0):
             """Compute part placement positions for the diagram."""
-            # Separate the halves vertically along Z and space assemblies along Y.
-            z_move = dist if right else -dist
-            return cq.Vector(0, offset, z_move)
+            # Separate the halves by moving them away from the common center.
+            center_part = cast(cq.Vector, part.val().Center())
+            center_full = cast(cq.Vector, full_part.val().Center())
+            move_dir = (center_part - center_full).normalized()
+            return move_dir * dist + cq.Vector(0, offset, 0)
 
         if names is None:
             names = self.config.names
@@ -596,30 +598,35 @@ class Builder:
 
         diagram_name = f"{self.config.project_name}_v{self.config.ver}_diagram.svg"
         part_offset, part_dist = 60, 120
-        label_dist = 60
+        label_dist = 120
         assy = cq.Assembly()
+        indexes = range(len(names))
         wire_objs = [cast(Any, self.create_wire(name).val()) for name in names]
+        proj_dir = self.config.diagram_options.get("projectionDir", (1, 1, 1))
 
-        for i, wire_obj in enumerate(wire_objs):
-            name = names[i]
-            mid_pt = cast(cq.Vector, wire_obj.positionAt(0.5))
-            label_loc = mid_pt + cq.Vector(0, i * part_offset, part_dist + label_dist)
-            label = cq.Workplane("XY").text(name.upper(), 15, 3).translate(label_loc)
-            assy.add(label)
+        for i, name, wire_obj in zip(indexes, names, wire_objs):
+            # Cache parts and locations to calculate connection lines correctly
+            full_part = self.build_tube(name)
+            parts = {r: self.build_part(name, right=r) for r in right_vals}
+            locs = {
+                r: get_part_location(parts[r], full_part, offset=(i * part_offset), dist=part_dist) for r in right_vals
+            }
 
+            # Add parts to the diagram
             for right in right_vals:
-                loc = get_part_location(right=right, offset=(i * part_offset), dist=part_dist)
-                other_loc = get_part_location(right=(not right), offset=(i * part_offset), dist=part_dist)
+                assy.add(parts[right].translate(locs[right]))
 
-                # Add parts to the diagram
-                part = self.build_part(names[i], right=right)
-                assy.add(part.translate(loc))
+            # Connect parts to each other
+            if right:
+                off = wire_obj.positionAt(0.5)
+                line = cq.Workplane("XY").polyline([locs[right] + off, locs[not right] + off])
+                assy.add(line)
 
-                # Connect parts to each other
-                if right:
-                    off = wire_obj.positionAt(0.5)
-                    line = cq.Workplane("XY").polyline([loc + off, other_loc + off])
-                    assy.add(line)
+            # Label parts
+            text_pos = cast(cq.Vector, wire_obj.positionAt(1))
+            label_loc = text_pos + cq.Vector(label_dist, i * part_offset, part_dist)
+            label = cq.Workplane(cq.Plane(origin=label_loc, normal=proj_dir)).text(name.upper(), 45, 5)
+            assy.add(label)
 
         # Save the tech diagram
         path_str = str(Path(out_dir) / diagram_name)
