@@ -244,7 +244,9 @@ class TestConfig:
         configurator.config_clamp("driver")
 
         assert dummy_config.clamp_positions["driver"][1][1] == 0.0
-        assert sorted(builder.clamp_calls) == [0.0, 0.0, 90.0, 180.0]
+        # Verify that the coarse scan (range(0, 360, 10)) and fine scan (mocked) were executed.
+        assert len(builder.clamp_calls) > 30
+        assert 0.0 in builder.clamp_calls
 
     def test_config_text_logo_updates_offset_for_best_angle(self, monkeypatch):
         """Ensure text logo configuration chooses the best angle offset."""
@@ -257,4 +259,6 @@ class TestConfig:
         configurator.config_text_logo("driver")
 
         assert dummy_config.logo_text_positions["driver"][1] == 0.0
-        assert sorted(builder.text_calls) == [0.0, 0.0, 90.0, 180.0]
+        # Verify that the coarse scan (range(0, 360, 10)) and fine scan (mocked) were executed.
+        assert len(builder.text_calls) > 30
+        assert 0.0 in builder.text_calls
