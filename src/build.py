@@ -474,7 +474,7 @@ class Builder:
         """Build a cutting tool used to clean the internal tube volume."""
         # Create the clean tool
         path = self.create_wire(name)
-        wire = cast(cq.Wire, path.val())
+        wire = cast(Any, path.val())
         tube_loc = wire.locationAt(0)
         if radius is None:
             radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
