@@ -120,7 +120,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
                 try:
                     self._measurements = yaml.safe_load(f)
                 except yaml.YAMLError:
-                    raise ValueError("missing measurements.yml")
+                    raise ValueError("missing or invalid measurements.yml")
 
     @cached_property
     def measurements(self):
