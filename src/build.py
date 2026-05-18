@@ -88,6 +88,16 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         "passenger": (0.4, 0),
     }
 
+    # Diagram export options
+    diagram_options: dict[str, Any] = {
+        "showAxes": False,
+        "strokeWidth": 3,
+        "strokeColor": (0, 0, 0),
+        "projectionDir": (1, 1, 1),
+        "width": 1024,
+        "height": 1024,
+    }
+
     model_config = SettingsConfigDict(
         env_file=".env", env_prefix="APP_", alias_generator=str.upper, populate_by_name=True
     )
@@ -585,14 +595,6 @@ class Builder:
             right_vals = [False, True]
 
         diagram_name = f"{self.config.project_name}_v{self.config.ver}_diagram.svg"
-        svg_opt = {
-            "showAxes": False,
-            "strokeWidth": 3,
-            "strokeColor": (0, 0, 0),
-            "projectionDir": (1, 1, 1),
-            "width": 1024,
-            "height": 1024,
-        }
         part_offset, part_dist = 60, 120
         assy = cq.Assembly()
         wire_objs = [cast(Any, self.create_wire(name).val()) for name in names]
@@ -614,7 +616,7 @@ class Builder:
 
         # Save the tech diagram
         path_str = str(Path(out_dir) / diagram_name)
-        assy.toCompound().export(path_str, opt=svg_opt)
+        assy.toCompound().export(path_str, opt=self.config.diagram_options)
         self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_all(self, out_dir, right_vals=None, zip_name="build.zip"):
