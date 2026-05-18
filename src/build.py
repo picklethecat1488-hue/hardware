@@ -51,7 +51,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     }
 
     # Space between clamps on each side
-    clamp_space: float = 10
+    clamp_space: float = 15
 
     # The radius of the circular lap joint features
     joint_radius: float = 1.5
