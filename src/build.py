@@ -596,10 +596,17 @@ class Builder:
 
         diagram_name = f"{self.config.project_name}_v{self.config.ver}_diagram.svg"
         part_offset, part_dist = 60, 120
+        label_dist = 60
         assy = cq.Assembly()
         wire_objs = [cast(Any, self.create_wire(name).val()) for name in names]
 
         for i, wire_obj in enumerate(wire_objs):
+            name = names[i]
+            mid_pt = cast(cq.Vector, wire_obj.positionAt(0.5))
+            label_loc = mid_pt + cq.Vector(0, i * part_offset, part_dist + label_dist)
+            label = cq.Workplane("XY").text(name.upper(), 15, 3).translate(label_loc)
+            assy.add(label)
+
             for right in right_vals:
                 loc = get_part_location(right=right, offset=(i * part_offset), dist=part_dist)
                 other_loc = get_part_location(right=(not right), offset=(i * part_offset), dist=part_dist)
