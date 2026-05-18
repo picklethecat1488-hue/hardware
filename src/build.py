@@ -575,11 +575,9 @@ class Builder:
 
         def get_part_location(wire_obj, offset=0, dist=0, right=False):
             """Compute part placement positions for the diagram."""
-            part_dist = dist if right else 0
-            part_offset = offset + part_dist
-            dir = wire_obj.tangentAt(0)
-            loc = cq.Vector(dir) * part_dist + cq.Vector(0, 1, 0) * part_offset
-            return loc
+            # Separate the halves vertically along Z and space assemblies along Y.
+            z_move = dist if right else -dist
+            return cq.Vector(0, offset, z_move)
 
         if names is None:
             names = self.config.names
