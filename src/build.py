@@ -605,9 +605,11 @@ class Builder:
         proj_dir = self.config.diagram_options.get("projectionDir", (1, 1, 1))
 
         for i, name, wire_obj in zip(indexes, names, wire_objs):
-            # Cache parts and locations to calculate connection lines correctly
-            full_part = self.build_tube(name)
-            parts = {r: self.build_part(name, right=r) for r in right_vals}
+            # Build manifold parts and get diagram locations.
+            full_part_f = self.executor.submit(self.build_tube, name)
+            parts_f = {r: self.executor.submit(self.build_part, name, right=r) for r in right_vals}
+            full_part = full_part_f.result()
+            parts = {r: f.result() for r, f in parts_f.items()}
             locs = {
                 r: get_part_location(parts[r], full_part, offset=(i * part_offset), dist=part_dist) for r in right_vals
             }
