@@ -15,7 +15,7 @@ class Configurator:
 
     def __init__(self, builder=None, config=None, logger=None):
         """Initialize the configurator."""
-        self.config = config or AppConfig(**{"_env_file": None})
+        self.config = config or AppConfig()
         self.logger = logger or Logger(text="Configuring...", enabled=False)
         self.builder = builder or Builder(config=config, logger=logger)
         self._tube_cache = {}
@@ -208,7 +208,7 @@ def main(logger, args):
     gen_args = {}
     if not args.name is None:
         gen_args["names"] = [args.name]
-    config = AppConfig(**{"_env_file": None})
+    config = AppConfig()
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
 
