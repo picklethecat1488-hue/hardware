@@ -13,6 +13,7 @@ from IPython.core.getipython import get_ipython  # type: ignore
 from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, cast
+import yaml
 import zipfile
 
 
@@ -67,26 +68,8 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         "passenger": None,
     }
 
-    # Raw measurements used for part construction
-    _measurements: list[tuple[float, float, float]] = [
-        # p[1] -> p[2] valve controller bottom plane
-        (443, 152, 521),
-        (652, 205, 500),
-        # p(3) passenger exhaust input inlet start
-        (565, 356, 352),
-        # p(4) -> p(5) direction of passenger exhaust input
-        (555, 327, 0),
-        (480, 343, 0),
-        # p(6) driver exhaust input inlet start
-        (347, 279, 382),
-        # p(7) -> p(8) direction of driver exhaust input
-        (0, 0, 0),
-        (-0.33871947, -0.90882745, 0.24351958),
-        # p(9) driver exhaust output inlet start
-        (200, 0, 522.5),
-        # p(10) passenger exhaust output inlet start
-        (895, 0, 522.5),
-    ]
+    # Private attribute to store raw measurements loaded from file
+    _measurements: list[list[float]] = []
 
     # The logo text arguments
     logo_text_args: dict[str, Any] = {
@@ -108,6 +91,17 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_prefix="APP_", alias_generator=str.upper, populate_by_name=True
     )
+
+    def __init__(self, **kwargs):
+        """Initialize the config and load measurements from YAML."""
+        super().__init__(**kwargs)
+        yml_path = Path(__file__).parent / "measurements.yml"
+        if yml_path.exists():
+            with open(yml_path, "r") as f:
+                try:
+                    self._measurements = yaml.safe_load(f)
+                except yaml.YAMLError:
+                    raise ValueError("missing measurements.yml")
 
     @cached_property
     def measurements(self):
