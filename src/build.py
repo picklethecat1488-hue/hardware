@@ -75,7 +75,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     logo_text_args: dict[str, Any] = {
         "txt": "FHB",
         "fontsize": 10,
-        "distance": 1.5,
+        "distance": 3,
         "fontPath": "DancingScript-VariableFont_wght.ttf",
         "halign": "center",
         "valign": "center",
@@ -517,7 +517,7 @@ class Builder:
                 # Add the text
                 if right:
                     text = self.build_text(name, right=right)
-                    part = part.cut(text)
+                    part = part.union(text)
 
                 # Clean the inner part volume
                 clean_tool = self.build_clean_tool(name)
