@@ -98,6 +98,15 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         "height": 1024,
     }
 
+    # Distance between manifold assemblies in the diagram
+    diagram_part_offset: int = 60
+
+    # Distance between exploded halves in the diagram
+    diagram_part_dist: int = 120
+
+    # Distance of the labels from the parts in the diagram
+    diagram_label_dist: int = 120
+
     model_config = SettingsConfigDict(
         env_file=".env", env_prefix="APP_", alias_generator=str.upper, populate_by_name=True
     )
@@ -597,8 +606,6 @@ class Builder:
             right_vals = [False, True]
 
         diagram_name = f"{self.config.project_name}_v{self.config.ver}_diagram.svg"
-        part_offset, part_dist = 60, 120
-        label_dist = 120
         assy = cq.Assembly()
         indexes = range(len(names))
         wire_objs = [cast(Any, self.create_wire(name).val()) for name in names]
@@ -611,7 +618,13 @@ class Builder:
             full_part = full_part_f.result()
             parts = {r: f.result() for r, f in parts_f.items()}
             locs = {
-                r: get_part_location(parts[r], full_part, offset=(i * part_offset), dist=part_dist) for r in right_vals
+                r: get_part_location(
+                    parts[r],
+                    full_part,
+                    offset=(i * self.config.diagram_part_offset),
+                    dist=self.config.diagram_part_dist,
+                )
+                for r in right_vals
             }
 
             # Add parts to the diagram
@@ -626,7 +639,11 @@ class Builder:
 
             # Label parts
             text_pos = cast(cq.Vector, wire_obj.positionAt(1))
-            label_loc = text_pos + cq.Vector(label_dist, i * part_offset, part_dist)
+            label_loc = text_pos + cq.Vector(
+                self.config.diagram_label_dist,
+                i * self.config.diagram_part_offset,
+                self.config.diagram_part_dist,
+            )
             label = cq.Workplane(cq.Plane(origin=label_loc, normal=proj_dir)).text(name.upper(), 45, 5)
             assy.add(label)
 
