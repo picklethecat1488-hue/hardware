@@ -163,6 +163,7 @@ class TestBuilder:
             + [(length - builder.config.clamp_lengths[-1]) / length]
         )
         expected = np.array(builder.config.clamp_diameters) / 2
+        """Test if manifold clamps satisfy fitment requirements."""
         part = builder.build_part(name, right=right)
         pos, len, expected = (
             offsets[clamp_idx],
