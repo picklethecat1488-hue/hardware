@@ -625,9 +625,9 @@ class Builder:
                 assy.add(parts[right].translate(locs[right]))
 
             # Connect parts to each other
-            if right:
+            if True in locs and False in locs:
                 off = wire_obj.positionAt(0.5)
-                line = cq.Workplane("XY").polyline([locs[right] + off, locs[not right] + off])
+                line = cq.Workplane("XY").polyline([locs[True] + off, locs[False] + off])
                 assy.add(line)
 
             # Label parts
