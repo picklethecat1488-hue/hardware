@@ -744,8 +744,8 @@ def main(logger, args):
             gen_args["names"] = [args.diagram]
         builder.generate_diagram(**gen_args)
     elif not args.output is None:
-        if args.output[0]:
-            gen_args["names"] = [args.output[0]]
+        if args.output:
+            gen_args["names"] = [args.output]
         builder.generate_parts(**gen_args)
     else:
         builder.generate_all(**gen_args)
