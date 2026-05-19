@@ -475,8 +475,12 @@ class Builder:
         )
         return text
 
+    def create_chamfer_cone(self, origin, normal, radius):
+        """Create a cone used for chamfering."""
+        return cq.Workplane("XY").add(cq.Solid.makeCone(radius, 0, radius, origin, normal))
+
     @lru_cache
-    def build_clean_tool(self, name, radius=None):
+    def build_clean_tool(self, name, radius=None, chamfer_radius=None):
         """Build a cutting tool used to clean the internal tube volume."""
         # Create the clean tool
         path = self.create_wire(name)
@@ -484,10 +488,21 @@ class Builder:
         tube_loc = wire.locationAt(0)
         if radius is None:
             radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
+
+        # Build the main cylindrical part of the clean tool
         profile_sketch = self.create_profile(center_deg=0, angle_deg=360, outer_radius=radius, inner_radius=0)
-        wp: Any = cq.Workplane(tube_loc)
-        tube = wp.placeSketch(profile_sketch).sweep(path, transition="round")
-        return tube
+        clean_tool = cq.Workplane(tube_loc).placeSketch(profile_sketch).sweep(path, transition="round")
+
+        if chamfer_radius is not None and chamfer_radius > 0:
+            # Chamfer at the inlet start and end
+            clean_tool = clean_tool.union(
+                self.create_chamfer_cone(wire.positionAt(0), wire.tangentAt(0), chamfer_radius)
+            )
+            clean_tool = clean_tool.union(
+                self.create_chamfer_cone(wire.positionAt(1), wire.tangentAt(1).multiply(-1), chamfer_radius)
+            )
+
+        return clean_tool
 
     @lru_cache
     def build_part(self, name, right=False, tube_only=False):
@@ -514,8 +529,9 @@ class Builder:
                     text = self.build_text(name, font_path="Sans", text="L" if (name == "driver") else "R")
                 part = part.union(text)
 
-                # Clean the inner part volume
-                clean_tool = self.build_clean_tool(name)
+                # Clean the inner part volume and chamfer the ends
+                chamfer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
+                clean_tool = self.build_clean_tool(name, chamfer_radius=chamfer_radius)
                 part = part.cut(clean_tool)
         else:
             raise ValueError(f"Invalid name: {name}")
