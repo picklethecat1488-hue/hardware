@@ -2,7 +2,7 @@
 
 I got an [IE exhaust kit](http://ecstuning.com/b-integrated-engineering-parts/ie-b9-sq5-cat-back-exhaust-system/ieexcz1~int/?__cf_chl_tk=3.sM98lc3zO6.TljKxYxHSWbfedp2mBXP4KXyj35eUw-1776977950-1.0.1.1-Kr.Mao_o47HH8.Kwx2htw8uEozn_W59rgKzPN0KS9hY) for my car and after looking around, decided the best way to add some [exhaust tips](https://parts.audibethesda.com/p/Audi__SQ5/SQ5-Sport-Exhaust--Black/109131021/ZAW071897EDSP.html) to the kit and make it look nice was by creating some custom exhaust manifolds to connect the midpipe section of the kit to the pipes I got.
 
-I initially prototyped the manifolds shapes mesh generation in Jupyter Lab using mainly cadquery and numpy, but have since totally redesigned my code to have it's own build and configuration processes, as well as many design and functional tests suites. The manifolds themselves include a mechanical jig to place a 3" clamp in the middle, as well as lap jointing to ensure they are aligned correctly. The outer diameter is 2.5". 
+I initially prototyped the manifolds shapes mesh generation in Jupyter Lab using mainly cadquery and numpy, but have since totally redesigned my code to have it's own build and configuration processes, as well as many design and functional tests suites. The manifolds themselves include a mechanical jig to place a 3" clamp in the middle, as well as lap jointing to ensure they are aligned correctly. The outer diameter is 2.5" with a 3mm wall thickness. The production process is 316L stainless steel using SLM. 
 
 ## Releases
 
