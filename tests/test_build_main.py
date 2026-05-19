@@ -55,7 +55,7 @@ class TestBuildMain:
 
     def test_main_output_path(self, mock_logger, mock_builder, tmp_path):
         """Test -o flag with name."""
-        args = argparse.Namespace(outdir=tmp_path, env=None, diagram=None, output=["part1"], left=True, right=False)
+        args = argparse.Namespace(outdir=tmp_path, env=None, diagram=None, output="part1", left=True, right=False)
         main(mock_logger, args)
         mock_builder.return_value.generate_parts.assert_called_once_with(
             out_dir=tmp_path, names=["part1"], right_vals=[False]
@@ -64,14 +64,14 @@ class TestBuildMain:
         mock_logger.done.assert_called_once()
 
         mock_builder.return_value.generate_parts.reset_mock()
-        args = argparse.Namespace(outdir=tmp_path, env=None, diagram=None, output=["part1"], left=False, right=True)
+        args = argparse.Namespace(outdir=tmp_path, env=None, diagram=None, output="part1", left=False, right=True)
         main(mock_logger, args)
         mock_builder.return_value.generate_parts.assert_called_once_with(
             out_dir=tmp_path, names=["part1"], right_vals=[True]
         )
 
         mock_builder.return_value.generate_parts.reset_mock()
-        args = argparse.Namespace(outdir=tmp_path, env=None, diagram=None, output=["part1"], left=False, right=False)
+        args = argparse.Namespace(outdir=tmp_path, env=None, diagram=None, output="part1", left=False, right=False)
         main(mock_logger, args)
         mock_builder.return_value.generate_parts.assert_called_once_with(out_dir=tmp_path, names=["part1"])
 

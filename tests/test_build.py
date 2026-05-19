@@ -212,8 +212,18 @@ class TestBuilder:
         assert face_area > 0
 
         # Run a few more checks to see if the part was mutated during preparation
-        assert abs(orig_part.val().Volume() - part.val().Volume()) < 1, "Volume changed"
-        assert abs(orig_part.val().Area() - part.val().Area()) < 1, "Surface area changed"
+        error_pct = (
+            abs(orig_part.val().Volume() - part.val().Volume())
+            / (orig_part.val().Volume() + part.val().Volume())
+            / 2
+            * 100
+        )
+        assert error_pct < 1e-3, "Volume changed"
+
+        error_pct = (
+            abs(orig_part.val().Area() - part.val().Area()) / (orig_part.val().Area() + part.val().Area()) / 2 * 100
+        )
+        assert error_pct < 1e-3, "Surface area changed"
 
     def test_generate_all(self, builder, tmp_path):
         """Test generate_all exports expected build artifacts."""
