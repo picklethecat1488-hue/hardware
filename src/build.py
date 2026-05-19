@@ -639,7 +639,8 @@ class Builder:
                 i * self.config.diagram_part_offset,
                 self.config.diagram_part_dist,
             )
-            label = cq.Workplane(cq.Plane(origin=label_loc, normal=proj_dir)).text(name.upper(), 45, 5)
+            label_text = f"{name.upper()} ({'L' if (name == 'driver') else 'R'})"
+            label = cq.Workplane(cq.Plane(origin=label_loc, normal=proj_dir)).text(label_text, 45, 5)
             assy.add(label)
 
         # Save the tech diagram
