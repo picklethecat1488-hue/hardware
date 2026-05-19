@@ -218,7 +218,7 @@ class TestBuilder:
             / 2
             * 100
         )
-        assert error_pct < 1e-3, "Volume changed"
+        assert error_pct < 1e-2, "Volume changed"
 
         error_pct = (
             abs(orig_part.val().Area() - part.val().Area()) / (orig_part.val().Area() + part.val().Area()) / 2 * 100

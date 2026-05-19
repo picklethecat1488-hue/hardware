@@ -67,10 +67,9 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
 
     # The logo text arguments
     logo_text_args: dict[str, Any] = {
-        "txt": "FHB",
         "fontsize": 10,
         "distance": 3,
-        "fontPath": "DancingScript-VariableFont_wght.ttf",
+        "fontPath": "Sans",
         "halign": "center",
         "valign": "center",
         "kind": "bold",
@@ -443,17 +442,16 @@ class Builder:
         return bed
 
     @lru_cache
-    def create_logo_text_shape(self, font_path=None, text=None):
+    def create_text_shape(self, text):
         """Return a cached logo text shape."""
+        if not text:
+            raise ValueError("Invalid text")
         text_args = self.config.logo_text_args.copy()
-        if font_path:
-            text_args["fontPath"] = font_path
-        if text:
-            text_args["txt"] = text
+        text_args["txt"] = text
         return cq.Workplane("XY").text(**text_args)
 
     @lru_cache
-    def build_text(self, name, right=False, offset_deg=None, font_path=None, text=None):
+    def build_text(self, name, text, right=False, offset_deg=None):
         """Generate text geometry wrapped to the tube surface."""
         path = self.create_wire(name)
         wire = cast(Any, path.val())
@@ -467,7 +465,7 @@ class Builder:
         angle_deg = (0 if right else 180) + angle_offset
 
         # Generate the cached base text shape once as a pure Workplane.
-        text_wp = self.create_logo_text_shape(font_path=font_path, text=text)
+        text_wp = self.create_text_shape(text)
 
         text = (
             cq.Workplane(plane)
@@ -527,9 +525,9 @@ class Builder:
 
                 # Add text, either logo text or an orientation marker on the other side.
                 if right:
-                    text = self.build_text(name, True)
+                    text = self.build_text(name, text=f"{self.config.ver}", right=True)
                 else:
-                    text = self.build_text(name, font_path="Sans", text="L" if (name == "driver") else "R")
+                    text = self.build_text(name, text="L" if (name == "driver") else "R")
                 part = part.union(text)
 
                 # Clean the inner part volume and chamfer the ends

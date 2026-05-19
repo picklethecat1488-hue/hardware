@@ -150,7 +150,7 @@ class Configurator:
             text_offset, _ = self.config.logo_text_positions[name]
             center = self.get_part_position(tube, path, text_offset)
             offset_deg = self.find_best_angle(
-                lambda angle: self.builder.build_text(name, right=True, offset_deg=angle, font_path="Sans"),
+                lambda angle: self.builder.build_text(name, "FHB", right=True, offset_deg=angle),
                 other_tube,
                 center,
             )

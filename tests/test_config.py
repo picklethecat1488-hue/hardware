@@ -208,7 +208,7 @@ class StubBuilder:
             self.clamp_calls.append(offset_deg)
         return StubEntity(center=VectorStub(offset_deg, 0, 0), volume=0)
 
-    def build_text(self, name, right=False, offset_deg=0.0, font_path=None):
+    def build_text(self, name, text=None, right=False, offset_deg=0.0, font_path=None):
         """Capture text placement angle candidates and return a stub entity."""
         with self._lock:
             self.text_calls.append(offset_deg)
