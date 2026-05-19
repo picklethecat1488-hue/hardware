@@ -443,15 +443,17 @@ class Builder:
         return bed
 
     @lru_cache
-    def create_logo_text_shape(self, font_path=None):
+    def create_logo_text_shape(self, font_path=None, text=None):
         """Return a cached logo text shape."""
         text_args = self.config.logo_text_args.copy()
         if font_path:
             text_args["fontPath"] = font_path
+        if text:
+            text_args["txt"] = text
         return cq.Workplane("XY").text(**text_args)
 
     @lru_cache
-    def build_text(self, name, right=False, offset_deg=None, font_path=None):
+    def build_text(self, name, right=False, offset_deg=None, font_path=None, text=None):
         """Generate text geometry wrapped to the tube surface."""
         path = self.create_wire(name)
         wire = cast(Any, path.val())
@@ -465,7 +467,7 @@ class Builder:
         angle_deg = (0 if right else 180) + angle_offset
 
         # Generate the cached base text shape once as a pure Workplane.
-        text_wp = self.create_logo_text_shape(font_path=font_path)
+        text_wp = self.create_logo_text_shape(font_path=font_path, text=text)
 
         text = (
             cq.Workplane(plane)
