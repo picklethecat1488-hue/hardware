@@ -142,9 +142,10 @@ class StubEntity:
 class StubPath:
     """Stub path object that provides a fixed position for testing."""
 
-    def __init__(self, position: VectorStub):
-        """Initialize the stub path with a fixed position."""
+    def __init__(self, position: VectorStub, length: float = 0.0):
+        """Initialize the stub path with a fixed position and length."""
         self._position = position
+        self._length = float(length)
 
     def val(self):
         """Return itself as a value wrapper."""
@@ -161,6 +162,10 @@ class StubPath:
     def tangentAt(self, off):
         """Return a fixed tangent vector."""
         return VectorStub(0, 1, 0)
+
+    def Length(self):
+        """Return a fixed length."""
+        return self._length
 
 
 class DummyConfig:
@@ -195,7 +200,7 @@ class StubBuilder:
 
     def create_wire(self, name):
         """Return a stub path for the named part."""
-        return StubPath(VectorStub(0, 0, 0))
+        return StubPath(VectorStub(0, 0, 0), length=400.0)
 
     def build_clamp_bed(self, name, idx, offset_deg=0.0, joint_space=0):
         """Capture clamp bed angle candidates and return a stub entity."""
