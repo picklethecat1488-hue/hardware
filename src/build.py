@@ -320,7 +320,7 @@ class Builder:
             # Construct a partial circle
             start_deg = -angle_deg / 2
             end_deg = angle_deg / 2
-            sketch.arc((0, 0), outer_radius + 1, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble(
+            sketch.arc((0, 0), outer_radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble(
                 mode="i"
             )
 
