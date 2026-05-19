@@ -117,45 +117,51 @@ class Configurator:
 
     def config_clamp(self, name):
         """Tune clamp positions for a part."""
-        tube = self.builder.build_part(name, tube_only=True)
-        other_tube = self.builder.build_part(name, right=True, tube_only=True)
-        path = self.builder.create_wire(name)
+        if name == "driver" or name == "passenger":
+            tube = self.builder.build_part(name, tube_only=True)
+            other_tube = self.builder.build_part(name, right=True, tube_only=True)
+            path = self.builder.create_wire(name)
 
-        for idx in range(1, len(self.config.clamp_positions[name]) - 1):
-            pos_info = self.config.clamp_positions[name][idx]
-            if not pos_info is None:
-                clamp_offset, _ = pos_info
-                center = self.get_part_position(tube, path, clamp_offset)
-                offset_deg = self.find_best_angle(
-                    lambda angle: self.builder.build_clamp_bed(name, idx, offset_deg=angle),
-                    other_tube,
-                    center,
-                )
+            for idx in range(1, len(self.config.clamp_positions[name]) - 1):
+                pos_info = self.config.clamp_positions[name][idx]
+                if not pos_info is None:
+                    clamp_offset, _ = pos_info
+                    center = self.get_part_position(tube, path, clamp_offset)
+                    offset_deg = self.find_best_angle(
+                        lambda angle: self.builder.build_clamp_bed(name, idx, offset_deg=angle),
+                        other_tube,
+                        center,
+                    )
 
-                # Update the clamp offset
-                if offset_deg is None:
-                    raise ValueError(f"failed to configure {name} clamp")
-                self.config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
-                self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
+                    # Update the clamp offset
+                    if offset_deg is None:
+                        raise ValueError(f"failed to configure {name} clamp")
+                    self.config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
+                    self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
+        else:
+            raise ValueError(f"Invalid name: {name}")
 
     def config_text_logo(self, name):
         """Tune logo text placement for a part."""
-        tube = self.builder.build_part(name, right=True, tube_only=True)
-        other_tube = self.builder.build_part(name, tube_only=True)
-        path = self.builder.create_wire(name)
-        text_offset, _ = self.config.logo_text_positions[name]
-        center = self.get_part_position(tube, path, text_offset)
-        offset_deg = self.find_best_angle(
-            lambda angle: self.builder.build_text(name, right=True, offset_deg=angle, font_path="Sans"),
-            other_tube,
-            center,
-        )
+        if name == "driver" or name == "passenger":
+            tube = self.builder.build_part(name, right=True, tube_only=True)
+            other_tube = self.builder.build_part(name, tube_only=True)
+            path = self.builder.create_wire(name)
+            text_offset, _ = self.config.logo_text_positions[name]
+            center = self.get_part_position(tube, path, text_offset)
+            offset_deg = self.find_best_angle(
+                lambda angle: self.builder.build_text(name, right=True, offset_deg=angle, font_path="Sans"),
+                other_tube,
+                center,
+            )
 
-        # Update the text offset
-        if offset_deg is None:
-            raise ValueError(f"failed to configure {name} text logo")
-        self.config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
-        self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
+            # Update the text offset
+            if offset_deg is None:
+                raise ValueError(f"failed to configure {name} text logo")
+            self.config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
+            self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
+        else:
+            raise ValueError(f"Invalid name: {name}")
 
     def configure_clamps(self, names=None):
         """Configure clamps for all specified parts."""
