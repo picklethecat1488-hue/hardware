@@ -49,3 +49,15 @@ ruff check build.py
 ```
 
 There is a notebook showing usage examples named `exhaust_manifolds.ipynb`. I use the lab GUI to modify the notebook. Prior to committing, you should run nbstripout prior to pushing any changes to the notebook to make sure the notebook is free of artifacts.
+
+## Creating a Release
+
+Releases are automated via GitHub Actions and are triggered by pushing a version tag.
+
+1. Ensure your changes are committed and tests pass locally.
+2. Create a new release using the `v*` format (e.g., `v4.0.0`):
+   ```bash
+   gh release create v4.0.0 --generate-notes
+   ```
+
+To verify the release process, check the "Actions" tab on your GitHub repository after pushing a tag. You can view the progress, logs, and download the generated artifacts from there.
