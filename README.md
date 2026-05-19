@@ -55,9 +55,13 @@ There is a notebook showing usage examples named `exhaust_manifolds.ipynb`. I us
 Releases are automated via GitHub Actions and are triggered by pushing a version tag.
 
 1. Ensure your changes are committed and tests pass locally.
-2. Create a new release using the `v*` format (e.g., `v4.0.0`):
+2. Create a new release using the `v*` format. Use `v0.0.0` for main:
    ```bash
-   gh release create v4.0.0 --generate-notes
+   gh release create v0.0.0 --generate-notes -p
+   ```
+   Use `v4.0.x` for V4:
+   ```bash
+   gh release create v4.0.1 --generate-notes
    ```
 
 To verify the release process, check the "Actions" tab on your GitHub repository after pushing a tag. You can view the progress, logs, and download the generated artifacts from there.
