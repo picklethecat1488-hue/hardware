@@ -211,7 +211,8 @@ class Builder:
 
         self.config = config or AppConfig()
         self.logger = logger or Logger(enabled=False)
-        self.p = self.config.measurements
+        # Make a deep copy of measurements to prevent in-place modification drift
+        self.p = {k: np.array(v, copy=True) for k, v in self.config.measurements.items()}
         self.executor = ThreadPoolExecutor()
 
         for idx in [3, 6]:
