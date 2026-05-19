@@ -1,0 +1,45 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Mambaforge
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          mamba-version: "*"
+          channels: conda-forge
+          environment-file: environment.yml
+          activate-environment: cq
+
+      - name: Run tests
+        # Set PYTHONPATH so pytest can find modules in src/
+        shell: bash -el {0}
+        env:
+          PYTHONPATH: src
+        run: |
+          set -o pipefail
+          pytest | tee pytest_report.txt
+
+      - name: Build manifolds
+        shell: bash -el {0}
+        run: |
+          python src/build.py -out build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/build.zip
+            pytest_report.txt
+          generate_release_notes: true
