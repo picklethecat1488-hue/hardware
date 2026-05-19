@@ -507,10 +507,12 @@ class Builder:
                     clamp_bed = self.build_clamp_bed(name, idx, right=right)
                     part = part.union(clamp_bed)
 
-                # Add the text
+                # Add text, either logo text or an orientation marker on the other side.
                 if right:
-                    text = self.build_text(name, right=right)
-                    part = part.union(text)
+                    text = self.build_text(name, True)
+                else:
+                    text = self.build_text(name, font_path="Sans", text="L" if (name == "driver") else "R")
+                part = part.union(text)
 
                 # Clean the inner part volume
                 clean_tool = self.build_clean_tool(name)
