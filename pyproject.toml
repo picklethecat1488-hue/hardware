@@ -5,7 +5,7 @@ version = "0.1.0"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-qq -n auto -x --maxfail=1"
+addopts = "-qq -n auto --maxfail=1 --max-worker-restart=2"
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
@@ -30,4 +30,3 @@ ignore = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
-
