@@ -2,7 +2,12 @@
 
 I got an [IE exhaust kit](http://ecstuning.com/b-integrated-engineering-parts/ie-b9-sq5-cat-back-exhaust-system/ieexcz1~int/?__cf_chl_tk=3.sM98lc3zO6.TljKxYxHSWbfedp2mBXP4KXyj35eUw-1776977950-1.0.1.1-Kr.Mao_o47HH8.Kwx2htw8uEozn_W59rgKzPN0KS9hY) for my car and after looking around, decided the best way to add some [exhaust tips](https://parts.audibethesda.com/p/Audi__SQ5/SQ5-Sport-Exhaust--Black/109131021/ZAW071897EDSP.html) to the kit and make it look nice was by creating some custom exhaust manifolds to connect the midpipe section of the kit to the pipes I got. I generated the manifolds in Jupyter Lab using mainly cadquery. 
 
-I currently have version 3 of the manifolds (the initial commit) scheduled for construction at the supplier, and am maintaining their engineering feedback as github issues, which I plan to fix in the next version. The material is stainless steel. This stuff is provided totally as is and I have no plans of supporting it once I have a working build. 
+## Releases
+
+I'm not anticipating any more releases of the manifolds tubing after V4 completes production, but there is a potential to design some kind of blockoff plate or dummy exhaust valve for a dash light I'm getting in a future release:
+
+- **V3** This completed production with the supplier after about 3 weeks. There were a couple issues, but the main issue was that half these parts are unusuable due to a geometry error. Oops!!
+- **V4** These are currenty being scheduled for production. They are pretty much a total redesign of V3, and include a bunch of fixed issues.
 
 ## Files
 
