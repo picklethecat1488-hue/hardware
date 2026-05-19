@@ -310,25 +310,25 @@ class Builder:
             raise ValueError("Invalid angle and lap joint")
 
         sketch = cq.Sketch()
-        sketch.circle(outer_radius)
+        if angle_deg == 360:
+            # Construct full circle
+            sketch.circle(outer_radius)
+        else:
+            # Construct a partial circle
+            start_deg = -angle_deg / 2
+            sketch.arc((0, 0), outer_radius, start_deg, angle_deg).segment((0, 0)).close().assemble()
 
         if inner_radius > 0:
-            # Construct a hollow circle
+            # Hollow out the circle
             sketch.circle(inner_radius, mode="s")
 
         if angle_deg < 360:
-            # Construct a partial circle
-            start_deg = -angle_deg / 2
-            end_deg = angle_deg / 2
-            sketch.arc((0, 0), outer_radius, start_deg, end_deg - start_deg).segment((0, 0)).close().assemble(
-                mode="i"
-            )
-
             if joint_space > 0:
                 # Apply a gap between the half-tubes to account for part deformation and epoxy.
                 # We rotate the rectangle by (angle - 90) because the default Sketch.rect
                 # has its height axis aligned with Y (90°). This ensures the gap is
                 # subtracted perpendicular to each parting line.
+                end_deg = angle_deg / 2
                 h = (outer_radius + self.config.joint_radius) * 2
                 sketch.push([(0, 0)]).rect(joint_space, h, angle=start_deg - 90, mode="s").reset()
                 sketch.push([(0, 0)]).rect(joint_space, h, angle=end_deg - 90, mode="s").reset()
