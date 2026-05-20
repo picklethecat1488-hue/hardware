@@ -24,7 +24,7 @@ There are two manifolds, driver and passenger. The manifolds are further separat
 - **src/build.py** \- contains the build source.
 - **src/config.py** \- contains the configurator source.
 - **src/exhaust\_manifolds.ipynb** \- contains examples of using the `Builder` class in Jupyter Lab.
-- **tests/\*\*** \- contains test files.
+- **tests/\*\*** \- contains test suite files.
 
 ## Build Files
 
