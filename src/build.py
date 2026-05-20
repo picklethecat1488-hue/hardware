@@ -260,7 +260,7 @@ class Builder:
         if offset_deg:
             angle_offset = offset_deg
         angle_span = 180
-        center_deg = (0 if right else 180) + angle_offset
+        center_deg = ((0 if right else 180) + angle_offset) % 360
         joint_space = joint_space or self.config.clamp_space
 
         # Create the clamp bed
@@ -303,7 +303,7 @@ class Builder:
         outer_radius = (cast(float, min(self.config.clamp_diameters)) - self.config.wall_thickness) / 2
         if offset_deg is not None:
             angle_offset = offset_deg
-        angle_deg = (0 if right else 180) + angle_offset
+        angle_deg = ((0 if right else 180) + angle_offset) % 360
 
         # Generate the cached base text shape once as a pure Workplane.
         text_wp = self.create_text_shape(text)
