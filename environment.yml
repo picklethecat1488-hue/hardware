@@ -6,6 +6,7 @@ dependencies:
   - cadquery=2.7
   - jupyterlab=4.4
   - matplotlib=3.10
+  - build123d
   - pip
   - pip:
     - jupyter-cadquery==4.0.2
