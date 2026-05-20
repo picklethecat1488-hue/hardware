@@ -10,7 +10,7 @@ The manifolds themselves include a 3" clamp bed in the middle, as well as lap jo
 
 I'm not anticipating any more releases of the manifolds tubing after V4 completes production, but there is a potential to design some kind of blockoff plate or dummy exhaust valve for a dash light I'm getting in a future release:
 
-- **V3** This completed production with the supplier after about 3 weeks. There were a couple issues, but the main issue was that half these parts are unusuable due to a geometry error. Oops!!
+- **V3** This completed production with the supplier after about 3 weeks. There were a couple issues, but the main issue was that half these parts are unusuable due to a geometry error I introduced attempting to place them flat on the print bed. Oops!!
 - **V4** These are currenty being scheduled for production. They are pretty much a total redesign of V3, and include a bunch of fixed issues.
 
 ## Files
