@@ -1,6 +1,6 @@
 """Contains Logger system unit tests."""
 
-from build import Logger
+from shell import Logger
 import pytest
 
 

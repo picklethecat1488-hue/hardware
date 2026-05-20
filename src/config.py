@@ -1,5 +1,6 @@
 """Run manifold configuration steps before building."""
 
+from shell import Logger
 from build import AppConfig, Builder, Logger
 from functools import lru_cache
 import argparse
