@@ -13,22 +13,29 @@ I'm not anticipating any more releases of the manifolds tubing after V4 complete
 - **V3** This completed production with the supplier after about 3 weeks. There were a couple issues, but the main issue was that half these parts are unusuable due to a geometry error I introduced attempting to place them flat on the print bed. Oops!!
 - **V4** These are currenty being scheduled for production. They are pretty much a total redesign of V3, and include a bunch of fixed issues.
 
-## Files
-
 There are two manifolds, driver and passenger. The manifolds are further separated into left and right sides, and must be sealed together with a high temperature adhesive or gasket sealer to prevent leaks:
 
 ![Diagram](diagram.svg)
 
 *Exploded assembly diagram.*
 
-- **build.py** \- contains the project source.
-- **exhaust\_manifolds.ipynb** \- contains examples of using the `Builder` class.
-- **exhaust\_manifolds\_v{x}\_driver\_left.stl** \- the left side of the driver manifold.  
-- **exhaust\_manifolds\_v{x}\_driver\_right.stl** \- the right side of the driver manifold.  
-- **exhaust\_manifolds\_v{x}\_passenger\_left.stl** \- the left side of the passenger manifold.  
-- **exhaust\_manifolds\_v{x}\_passenger\_right.stl** \- the right side of the passenger manifold.
-- **build/\*\*** \- contains output from the last build.
+## Source Files
+
+- **src/build.py** \- contains the build source.
+- **src/config.py** \- contains the configurator source.
+- **src/exhaust\_manifolds.ipynb** \- contains examples of using the `Builder` class in Jupyter Lab.
 - **tests/\*\*** \- contains test files.
+
+## Build Files
+
+After running `build.py`, you should see these files in your build output:
+
+- **build/\*\*** \- contains output from the last build.
+- **build/exhaust\_manifolds\_v{x}\_diagram** \- an exploded diagram of the manifolds assembly lrpcess.  
+- **build/exhaust\_manifolds\_v{x}\_driver\_left.stl** \- the left side of the driver manifold.  
+- **build/exhaust\_manifolds\_v{x}\_driver\_right.stl** \- the right side of the driver manifold.  
+- **build/exhaust\_manifolds\_v{x}\_passenger\_left.stl** \- the left side of the passenger manifold.  
+- **build/exhaust\_manifolds\_v{x}\_passenger\_right.stl** \- the right side of the passenger manifold.
 
 ## Getting Started
 
