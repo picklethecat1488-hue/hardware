@@ -7,14 +7,13 @@ import os
 from pathlib import Path
 from model import AppConfig
 import cadquery as cq
-import threading
-from functools import lru_cache, cached_property
-from IPython.core.getipython import get_ipython  # type: ignore
-from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore
+from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Optional, cast
+from typing import Any, Optional, cast, Annotated, Literal
+from pydantic import validate_call, Field
 import zipfile
 from shell import Logger
+
 
 class Builder:
     """Builds manifold geometry and exports parts."""
@@ -78,6 +77,7 @@ class Builder:
         bounds = bounds.cut(top_plane)
         return bounds
 
+    @validate_call(config={"arbitrary_types_allowed": True})
     @lru_cache
     def create_wire(self, name: str):
         """Create the manifold path wire."""
@@ -106,8 +106,16 @@ class Builder:
         path = cq.Workplane("XY").add(wire)
         return path
 
+    @validate_call(config={"arbitrary_types_allowed": True})
     @lru_cache
-    def create_profile_sketch(self, angle_deg, outer_radius=None, inner_radius=None, lap_joint=False, joint_space=None):
+    def create_profile_sketch(
+        self,
+        angle_deg: Annotated[float, Field(ge=0, le=360)],
+        outer_radius: Annotated[float | None, Field(ge=0)] = None,
+        inner_radius: Annotated[float | None, Field(ge=0)] = None,
+        lap_joint: bool = False,
+        joint_space: Annotated[float | None, Field(ge=0)] = None,
+    ):
         """Create a circular tube profile sketch."""
         if outer_radius is None:
             outer_radius = min(self.config.clamp_diameters) / 2
@@ -116,16 +124,10 @@ class Builder:
         if joint_space is None:
             joint_space = self.config.joint_space
 
-        if outer_radius < 0:
-            raise ValueError("Invalid radius")
-        elif inner_radius < 0:
-            raise ValueError("Invalid inner radius")
-        elif inner_radius >= outer_radius:
-            raise ValueError("Invalid radius or inner radius")
-        elif angle_deg > 360:
-            raise ValueError("Invalid angle")
-        elif angle_deg == 360 and lap_joint:
-            raise ValueError("Invalid angle and lap joint")
+        if inner_radius >= outer_radius:
+            raise ValueError(f"Inner radius must be smaller than outer: {inner_radius=}, {outer_radius=}")
+        if angle_deg == 360 and lap_joint:
+            raise ValueError("Lap joints cannot be used with a 360 degree full circle profile")
 
         sketch = cq.Sketch()
         if angle_deg == 360:
@@ -173,9 +175,16 @@ class Builder:
 
         return sketch
 
+    @validate_call(config={"arbitrary_types_allowed": True})
     @lru_cache
     def create_profile(
-        self, center_deg, angle_deg, outer_radius=None, inner_radius=None, lap_joint=False, joint_space=None
+        self,
+        center_deg: Annotated[float, Field(ge=0, le=360)],
+        angle_deg: Annotated[float, Field(ge=0, le=360)],
+        outer_radius: Annotated[float | None, Field(ge=0)] = None,
+        inner_radius: Annotated[float | None, Field(ge=0)] = None,
+        lap_joint: bool = False,
+        joint_space: Annotated[float | None, Field(ge=0)] = None,
     ):
         """Create a circular tube profile sketch with rotation applied."""
         sketch = self.create_profile_sketch(angle_deg, outer_radius, inner_radius, lap_joint, joint_space)
@@ -202,16 +211,17 @@ class Builder:
         tube = wp.placeSketch(profile_sketch).sweep(path, transition="round")
         return tube
 
+    @validate_call(config={"arbitrary_types_allowed": True})
     @lru_cache
     def create_ring(
         self,
-        name,
-        off,
-        len,
-        inner_radius=None,
-        outer_radius=None,
-        center_deg: float = 0,
-        angle_deg: float = 360,
+        name: str,
+        off: Annotated[float, Field(ge=0, le=1)],
+        len: Annotated[float, Field(gt=0)],
+        inner_radius: Annotated[float | None, Field(ge=0)] = None,
+        outer_radius: Annotated[float | None, Field(ge=0)] = None,
+        center_deg: Annotated[float, Field(ge=0, le=360)] = 0,
+        angle_deg: Annotated[float, Field(ge=0, le=360)] = 360,
         joint_space: Optional[float] = None,
     ):
         """Create a ring-shaped tube segment."""
@@ -233,13 +243,21 @@ class Builder:
         ring = wp.placeSketch(profile_sketch).sweep(path)
         return ring
 
+    @validate_call(config={"arbitrary_types_allowed": True})
     @lru_cache
-    def build_clamp_bed(self, name, clamp_idx, right=False, offset_deg=None, joint_space=None):
+    def build_clamp_bed(
+        self,
+        name: str,
+        clamp_idx: int,
+        right: bool = False,
+        offset_deg: Optional[float] = None,
+        joint_space: Optional[float] = None,
+    ):
         """Create a clamp bed on the tube."""
         length = self.config.clamp_lengths[clamp_idx]
         outer_radius = self.config.clamp_diameters[clamp_idx] / 2
         inner_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
-        clamp_pos, angle_offset = self.config.clamp_positions[name][clamp_idx]
+        clamp_pos, angle_offset = cast(tuple[float, float], self.config.clamp_positions[name][clamp_idx])
         if offset_deg:
             angle_offset = offset_deg
         angle_span = 180
@@ -259,17 +277,23 @@ class Builder:
         )
         return bed
 
+    @validate_call(config={"arbitrary_types_allowed": True})
     @lru_cache
-    def create_text_shape(self, text):
+    def create_text_shape(self, text: Annotated[str, Field(min_length=1)]):
         """Return a cached logo text shape."""
-        if not text:
-            raise ValueError("Invalid text")
         text_args = self.config.logo_text_args.copy()
         text_args["txt"] = text
         return cq.Workplane("XY").text(**text_args)
 
+    @validate_call(config={"arbitrary_types_allowed": True})
     @lru_cache
-    def build_text(self, name, text, right=False, offset_deg=None):
+    def build_text(
+        self,
+        name: str,
+        text: str,
+        right: bool = False,
+        offset_deg: Optional[float] = None,
+    ):
         """Generate text geometry wrapped to the tube surface."""
         path = self.create_wire(name)
         wire = cast(Any, path.val())
@@ -285,21 +309,27 @@ class Builder:
         # Generate the cached base text shape once as a pure Workplane.
         text_wp = self.create_text_shape(text)
 
-        text = (
+        text_shape = (
             cq.Workplane(plane)
             .transformed(rotate=(0, 90, 0))
             .transformed(rotate=(angle_deg, 0, 0))
             .transformed(offset=(0, 0, outer_radius))
             .eachpoint(lambda loc: cast(cq.Shape, text_wp.val()).moved(loc), True)
         )
-        return text
+        return text_shape
 
     def create_chamfer_cone(self, origin, normal, radius):
         """Create a cone used for chamfering."""
         return cq.Workplane("XY").add(cq.Solid.makeCone(radius, 0, radius, origin, normal))
 
+    @validate_call(config={"arbitrary_types_allowed": True})
     @lru_cache
-    def build_clean_tool(self, name, radius=None, chamfer_radius=None):
+    def build_clean_tool(
+        self,
+        name: str,
+        radius: Annotated[float | None, Field(ge=0)] = None,
+        chamfer_radius: Annotated[float | None, Field(ge=0)] = None,
+    ):
         """Build a cutting tool used to clean the internal tube volume."""
         # Create the clean tool
         path = self.create_wire(name)
@@ -323,41 +353,45 @@ class Builder:
 
         return clean_tool
 
+    @validate_call(config={"arbitrary_types_allowed": True})
     @lru_cache
-    def build_part(self, name, right=False, tube_only=False):
+    def build_part(
+        self,
+        name: Literal["driver", "passenger"],
+        right: bool = False,
+        tube_only: bool = False,
+    ):
         """Build one half of the manifold assembly."""
-        if name == "driver" or name == "passenger":
-            # Create the main part body.
-            part = self.build_tube(
-                name,
-                right=right,
-                lap_joint=(not tube_only),
-                half_tube=True,
-                joint_space=0 if tube_only else self.config.joint_space,
-            )
-            if not tube_only:
-                for idx in range(1, len(self.config.clamp_positions[name]) - 1):
-                    # Add inner clamp beds.
-                    clamp_bed = self.build_clamp_bed(name, idx, right=right)
-                    part = part.union(clamp_bed)
+        # Create the main part body.
+        part = self.build_tube(
+            name,
+            right=right,
+            lap_joint=(not tube_only),
+            half_tube=True,
+            joint_space=0 if tube_only else self.config.joint_space,
+        )
+        if not tube_only:
+            for idx in range(1, len(self.config.clamp_positions[name]) - 1):
+                # Add inner clamp beds.
+                clamp_bed = self.build_clamp_bed(name, idx, right=right)
+                part = part.union(clamp_bed)
 
-                # Add text, either logo text or an orientation marker on the other side.
-                if right:
-                    text = self.build_text(name, text=f"{self.config.ver}", right=True)
-                else:
-                    text = self.build_text(name, text="L" if (name == "driver") else "R")
-                part = part.union(text)
+            # Add text, either logo text or an orientation marker on the other side.
+            if right:
+                text = self.build_text(name, text=f"{self.config.ver}", right=True)
+            else:
+                text = self.build_text(name, text="L" if (name == "driver") else "R")
+            part = part.union(text)
 
-                # Clean the inner part volume and chamfer the ends
-                chamfer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
-                clean_tool = self.build_clean_tool(name, chamfer_radius=chamfer_radius)
-                part = part.cut(clean_tool)
-        else:
-            raise ValueError(f"Invalid name: {name}")
+            # Clean the inner part volume and chamfer the ends
+            chamfer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
+            clean_tool = self.build_clean_tool(name, chamfer_radius=chamfer_radius)
+            part = part.cut(clean_tool)
         return part
 
+    @validate_call(config={"arbitrary_types_allowed": True})
     @lru_cache
-    def build_prepared_part(self, name, right=False):
+    def build_prepared_part(self, name: Literal["driver", "passenger"], right: bool = False):
         """Prepare a part for STL export."""
 
         def facing_up(part):

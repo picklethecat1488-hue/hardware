@@ -6,7 +6,8 @@ from shell import Logger
 from functools import lru_cache
 import argparse
 import cadquery as cq
-from typing import cast, Any
+from typing import cast, Any, Literal, Annotated, Optional
+from pydantic import validate_call, Field
 import numpy as np
 import json
 from copy import deepcopy
@@ -117,64 +118,60 @@ class Configurator:
             return self.scan_angles(fine_angles, candidate_factory, other_obj, center)
         return None
 
-    def config_clamp(self, name):
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def config_clamp(self, name: Literal["driver", "passenger"]):
         """Tune clamp positions for a part."""
-        if name == "driver" or name == "passenger":
-            tube = self.builder.build_part(name, tube_only=True)
-            other_tube = self.builder.build_part(name, right=True, tube_only=True)
-            path = self.builder.create_wire(name)
+        tube = self.builder.build_part(name, tube_only=True)
+        other_tube = self.builder.build_part(name, right=True, tube_only=True)
+        path = self.builder.create_wire(name)
 
-            for idx in range(1, len(self.config.clamp_positions[name]) - 1):
-                pos_info = self.config.clamp_positions[name][idx]
-                if not pos_info is None:
-                    clamp_offset, _ = pos_info
-                    center = self.get_part_position(tube, path, clamp_offset)
-                    offset_deg = self.find_best_angle(
-                        lambda angle: self.builder.build_clamp_bed(name, idx, offset_deg=angle),
-                        other_tube,
-                        center,
-                    )
+        for idx in range(1, len(self.config.clamp_positions[name]) - 1):
+            pos_info = self.config.clamp_positions[name][idx]
+            if not pos_info is None:
+                clamp_offset, _ = pos_info
+                center = self.get_part_position(tube, path, clamp_offset)
+                offset_deg = self.find_best_angle(
+                    lambda angle: self.builder.build_clamp_bed(name, idx, offset_deg=angle),
+                    other_tube,
+                    center,
+                )
 
-                    # Update the clamp offset
-                    if offset_deg is None:
-                        raise ValueError(f"failed to configure {name} clamp")
-                    self.config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
-                    self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
-        else:
-            raise ValueError(f"Invalid name: {name}")
+                # Update the clamp offset
+                if offset_deg is None:
+                    raise ValueError(f"failed to configure {name} clamp")
+                self.config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
+                self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
 
-    def config_text_logo(self, name):
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def config_text_logo(self, name: Literal["driver", "passenger"]):
         """Tune logo text placement for a part."""
-        if name == "driver" or name == "passenger":
-            tube = self.builder.build_part(name, right=True, tube_only=True)
-            other_tube = self.builder.build_part(name, tube_only=True)
-            path = self.builder.create_wire(name)
-            text_offset, _ = self.config.logo_text_positions[name]
-            center = self.get_part_position(tube, path, text_offset)
-            offset_deg = self.find_best_angle(
-                lambda angle: self.builder.build_text(name, "FHB", right=True, offset_deg=angle),
-                other_tube,
-                center,
-            )
+        tube = self.builder.build_part(name, right=True, tube_only=True)
+        other_tube = self.builder.build_part(name, tube_only=True)
+        path = self.builder.create_wire(name)
+        text_offset, _ = self.config.logo_text_positions[name]
+        center = self.get_part_position(tube, path, text_offset)
+        offset_deg = self.find_best_angle(
+            lambda angle: self.builder.build_text(name, "FHB", right=True, offset_deg=angle),
+            other_tube,
+            center,
+        )
 
-            # Update the text offset
-            if offset_deg is None:
-                raise ValueError(f"failed to configure {name} text logo")
-            self.config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
-            self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
-        else:
-            raise ValueError(f"Invalid name: {name}")
+        # Update the text offset
+        if offset_deg is None:
+            raise ValueError(f"failed to configure {name} text logo")
+        self.config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
+        self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
 
-    def configure_clamps(self, names=None):
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def configure_clamps(self, names: list[Literal["driver", "passenger"]] = ["driver", "passenger"]):
         """Configure clamps for all specified parts."""
-        if names is None:
-            names = self.config.names
         # Run configuration tasks for each part in parallel.
         futures = [self.executor.submit(self.config_clamp, name) for name in names]
         for future in futures:
             future.result()
 
-    def configure_text_logos(self, names=None):
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def configure_text_logos(self, names: list[Literal["driver", "passenger"]] = ["driver", "passenger"]):
         """Configure logo text for all specified parts."""
         if names is None:
             names = self.config.names
@@ -183,11 +180,9 @@ class Configurator:
         for future in futures:
             future.result()
 
-    def configure_all(self, names=None):
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def configure_all(self, names: list[Literal["driver", "passenger"]] = ["driver", "passenger"]):
         """Perform all configuration steps."""
-        if names is None:
-            names = self.config.names
-
         # Execute clamp and logo configuration in parallel to maximize throughput.
         f1 = self.executor.submit(self.configure_clamps, names)
         f2 = self.executor.submit(self.configure_text_logos, names)
