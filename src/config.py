@@ -1,7 +1,8 @@
 """Run manifold configuration steps before building."""
 
+from model import AppConfig
+from build import Builder
 from shell import Logger
-from build import AppConfig, Builder, Logger
 from functools import lru_cache
 import argparse
 import cadquery as cq
