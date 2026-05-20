@@ -4,7 +4,7 @@ I got an [IE exhaust kit](http://ecstuning.com/b-integrated-engineering-parts/ie
 
 I initially prototyped the manifolds shapes mesh generation in Jupyter Lab using mainly cadquery and numpy, but have since totally redesigned my code to have it's own build and configuration processes, as well as many design and functional tests suites.
 
-The manifolds themselves include a 3" clamp bed in the middle, as well as lap jointing to ensure they are align with each other correctly. The outer diameter is 2.5" with a 3mm wall thickness. The production process is 316L stainless steel using [SLM[(https://www.pcbway.com/rapid-prototyping/3D-Printing/3D-Printing-SLM.html).
+The manifolds themselves include a 3" clamp bed in the middle, as well as lap jointing to ensure they are align with each other correctly. The outer diameter is 2.5" with a 3mm wall thickness. The production process is 316L stainless steel using [SLM](https://www.pcbway.com/rapid-prototyping/3D-Printing/3D-Printing-SLM.html).
 
 ## Releases
 
