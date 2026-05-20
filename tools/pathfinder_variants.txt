@@ -1,6 +1,0 @@
--oout/1
--oout/2
--oout/3
--oout/4
--oout/5
--oout/6
