@@ -15,7 +15,7 @@ I'm not anticipating any more releases of the manifolds tubing after V4 complete
 
 ## Files
 
-There are two manifolds, driver and passenger. The manifolds are further separated into left and right sides and are reattached after printing using a high temperature adhesive or gasket sealer:
+There are two manifolds, driver and passenger. The manifolds are further separated into left and right sides, and must be sealed together with a high temperature adhesive or gasket sealer:
 
 ![Diagram](diagram.svg)
 
