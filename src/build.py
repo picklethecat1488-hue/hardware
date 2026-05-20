@@ -453,7 +453,10 @@ class Builder:
         tasks = [(name, right) for name in names for right in right_vals]
         list(self.executor.map(lambda p: export_task(*p), tasks))
 
-    def generate_diagram(self, out_dir, names=None, right_vals=None):
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def generate_diagram(
+        self, out_dir, names: list[Literal["driver", "passenger"]] = ["driver", "passenger"], right_vals=None
+    ):
         """Export an exploded diagram for the parts."""
 
         def get_part_location(part, full_part, offset=0, dist=0):
@@ -471,8 +474,9 @@ class Builder:
 
         diagram_name = f"{self.config.project_name}_v{self.config.ver}_diagram.svg"
         assy = cq.Assembly()
-        indexes = range(len(names))
-        wire_objs = [cast(Any, self.create_wire(name).val()) for name in names]
+        names_as_str_list = cast(list[str], names)
+        indexes = range(len(names_as_str_list))
+        wire_objs = [cast(Any, self.create_wire(name).val()) for name in names_as_str_list]
         proj_dir = self.config.diagram_options.get("projectionDir", (1, 1, 1))
 
         for i, name, wire_obj in zip(indexes, names, wire_objs):

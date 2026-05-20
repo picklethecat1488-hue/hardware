@@ -7,6 +7,7 @@ import numpy as np
 import yaml
 from pydantic_changedetect import ChangeDetectionMixin
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Literal
 
 
 class AppConfig(ChangeDetectionMixin, BaseSettings):
@@ -52,7 +53,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     joint_space: float = 0.3
 
     # The part names, driver and passenger
-    names: list[str] = ["driver", "passenger"]
+    names: list[Literal["driver", "passenger"]] = ["driver", "passenger"]
 
     # Private attribute to store raw measurements loaded from file
     _measurements: list[list[float]] = []
