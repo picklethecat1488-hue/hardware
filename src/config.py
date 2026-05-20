@@ -1,9 +1,8 @@
 """Run manifold configuration steps before building."""
 
-from model import AppConfig
+from model import AppConfig, method_cache
 from build import Builder
 from shell import Logger
-from functools import lru_cache
 import argparse
 import cadquery as cq
 from typing import cast, Any, Literal, Annotated, Optional
@@ -33,7 +32,7 @@ class Configurator:
         self._path_cache[id(path)] = path
         return self.get_part_position_cached(id(tube), id(path), off, radius)
 
-    @lru_cache
+    @method_cache
     def get_orientation_normal(self, tube_id, path_id):
         """Get if we should use midpoint_up, otherwise use midpoint_down."""
         tube = self._tube_cache[tube_id]
@@ -46,7 +45,7 @@ class Configurator:
         # Orientation is normal if midpoint_up is closer to solid center than path position.
         return (solid_center - midpoint_up).Length < (solid_center - pos).Length
 
-    @lru_cache
+    @method_cache
     def get_part_position_cached(self, tube_id, path_id, off, radius):
         """Get a cached attachment position on the tube."""
         path = self._path_cache[path_id]

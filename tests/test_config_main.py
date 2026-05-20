@@ -42,9 +42,9 @@ class TestConfigMain:
         configurator.configure_clamps = MagicMock()
         configurator.configure_text_logos = MagicMock()
 
-        configurator.configure_all(names=["part1"])
+        configurator.configure_all(names=["driver"])
 
-        configurator.configure_clamps.assert_called_once_with(["part1"])
+        configurator.configure_clamps.assert_called_once_with(["driver"])
 
     def test_main_calls_configure_clamps_when_clamps_flag(self, mocker, mock_logger):
         """Test configure_clamps with explicit names passed in."""

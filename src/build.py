@@ -5,9 +5,8 @@ import math
 import numpy as np
 import os
 from pathlib import Path
-from model import AppConfig
+from model import AppConfig, method_cache
 import cadquery as cq
-from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, cast, Annotated, Literal
 from pydantic import validate_call, Field
@@ -50,7 +49,7 @@ class Builder:
             "passenger_outlet": np.array([1, 0, 0]),
         }
 
-    @lru_cache
+    @method_cache
     def build_bound_box(self):
         """Return the axis-aligned build bounding box."""
         # Create the overall bounds.
@@ -78,7 +77,7 @@ class Builder:
         return bounds
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    @lru_cache
+    @method_cache
     def create_wire(self, name: str):
         """Create the manifold path wire."""
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
@@ -107,7 +106,7 @@ class Builder:
         return path
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    @lru_cache
+    @method_cache
     def create_profile_sketch(
         self,
         angle_deg: Annotated[float, Field(ge=0, le=360)],
@@ -176,7 +175,7 @@ class Builder:
         return sketch
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    @lru_cache
+    @method_cache
     def create_profile(
         self,
         center_deg: Annotated[float, Field(ge=0, le=360)],
@@ -190,7 +189,7 @@ class Builder:
         sketch = self.create_profile_sketch(angle_deg, outer_radius, inner_radius, lap_joint, joint_space)
         return sketch.moved(cq.Location(cq.Vector(0, 0, 0), cq.Vector(0, 0, 1), center_deg))
 
-    @lru_cache
+    @method_cache
     def build_tube(self, name, right=False, lap_joint=False, half_tube=False, joint_space=None):
         """Build a manifold tube."""
         path = self.create_wire(name)
@@ -212,7 +211,7 @@ class Builder:
         return tube
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    @lru_cache
+    @method_cache
     def create_ring(
         self,
         name: str,
@@ -244,7 +243,7 @@ class Builder:
         return ring
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    @lru_cache
+    @method_cache
     def build_clamp_bed(
         self,
         name: str,
@@ -278,7 +277,7 @@ class Builder:
         return bed
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    @lru_cache
+    @method_cache
     def create_text_shape(self, text: Annotated[str, Field(min_length=1)]):
         """Return a cached logo text shape."""
         text_args = self.config.logo_text_args.copy()
@@ -286,7 +285,7 @@ class Builder:
         return cq.Workplane("XY").text(**text_args)
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    @lru_cache
+    @method_cache
     def build_text(
         self,
         name: str,
@@ -323,7 +322,7 @@ class Builder:
         return cq.Workplane("XY").add(cq.Solid.makeCone(radius, 0, radius, origin, normal))
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    @lru_cache
+    @method_cache
     def build_clean_tool(
         self,
         name: str,
@@ -354,7 +353,7 @@ class Builder:
         return clean_tool
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    @lru_cache
+    @method_cache
     def build_part(
         self,
         name: Literal["driver", "passenger"],
@@ -390,7 +389,7 @@ class Builder:
         return part
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    @lru_cache
+    @method_cache
     def build_prepared_part(self, name: Literal["driver", "passenger"], right: bool = False):
         """Prepare a part for STL export."""
 

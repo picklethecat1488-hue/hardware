@@ -1,13 +1,15 @@
 """Data models and configuration for the exhaust manifolds project."""
 
+from functools import wraps
+import inspect
+from collections import OrderedDict
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeVar, overload, Union, Literal, cast
 from functools import cached_property
 import numpy as np
 import yaml
 from pydantic_changedetect import ChangeDetectionMixin
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Literal
 
 
 class AppConfig(ChangeDetectionMixin, BaseSettings):
@@ -115,3 +117,59 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         for idx, item in enumerate(self._measurements):
             p[idx + 1] = np.array(item)
         return p
+
+
+# Generic type for callables used by the method_cache decorator
+T = TypeVar("T", bound=Callable[..., Any])
+
+
+@overload
+def method_cache(func: Callable[..., Any]) -> Callable[..., Any]: ...
+
+
+@overload
+def method_cache(*, maxsize: int = 128) -> Callable[[Callable[..., Any]], Callable[..., Any]]: ...
+
+
+def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128) -> Any:
+    """Create per-instance cache to avoid memory leaks and Pydantic @validate_call conflicts."""
+
+    def decorator(f: T) -> T:
+        """Implement the decorator behavior for method_cache."""
+
+        @wraps(f)
+        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            # Create a unique string identifier for this specific method
+            cache_attr = f"_cache_{f.__name__}"
+            if not hasattr(self, cache_attr):
+                setattr(self, cache_attr, OrderedDict())
+            cache = getattr(self, cache_attr)
+
+            # Create a cache key from the arguments
+            key = (args, tuple(sorted(kwargs.items())))
+            if key in cache:
+                cache.move_to_end(key)
+                return cache[key]
+
+            # Compute new value
+            result = f(self, *args, **kwargs)
+            cache[key] = result
+            if len(cache) > maxsize:
+                cache.popitem(last=False)
+            return result
+
+        # Masking __wrapped__ prevents Pydantic 2.x from following the wrapper back
+        # to underlying compiled 'cyfunction' types, which causes validation errors.
+        try:
+            setattr(wrapper, "__signature__", inspect.signature(f))
+        except (ValueError, TypeError):
+            pass
+
+        if hasattr(wrapper, "__wrapped__"):
+            delattr(wrapper, "__wrapped__")
+
+        return cast(T, wrapper)
+
+    if func is None:
+        return decorator
+    return decorator(func)
