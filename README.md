@@ -21,6 +21,7 @@ There are two manifolds, driver and passenger. The manifolds are further separat
 
 ## Source Files
 
+- **src/measurements.yml** \- contains raw measurements used to construct the manifolds.
 - **src/build.py** \- contains the build source.
 - **src/config.py** \- contains the configurator source.
 - **src/exhaust\_manifolds.ipynb** \- contains examples of using the `Builder` class in Jupyter Lab.
