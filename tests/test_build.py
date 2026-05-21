@@ -43,15 +43,15 @@ class TestBuilder:
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
 
         # Make sure the clamp starts are correct
-        assert calc_point_err(inlet_clamp_start, builder.P[inlet_key]) == pytest.approx(0)
-        assert calc_point_err(outlet_clamp_start, builder.P[outlet_key]) == pytest.approx(0)
+        assert calc_point_err(inlet_clamp_start, builder.config.P[inlet_key]) == pytest.approx(0)
+        assert calc_point_err(outlet_clamp_start, builder.config.P[outlet_key]) == pytest.approx(0)
 
         # Check clamp direction and length
         assert calc_point_err(
-            (inlet_clamp_end - inlet_clamp_start).normalized(), builder.V[inlet_key]
+            (inlet_clamp_end - inlet_clamp_start).normalized(), builder.config.V[inlet_key]
         ) == pytest.approx(0)
         assert calc_point_err(
-            (outlet_clamp_end - outlet_clamp_start).normalized(), builder.V[outlet_key]
+            (outlet_clamp_end - outlet_clamp_start).normalized(), builder.config.V[outlet_key]
         ) == pytest.approx(0)
         assert (inlet_clamp_end - inlet_clamp_start).length == pytest.approx(builder.config.clamp_lengths[0])
         assert (outlet_clamp_end - outlet_clamp_start).length == pytest.approx(builder.config.clamp_lengths[-1])
