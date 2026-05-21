@@ -5,6 +5,7 @@ import math
 import numpy as np
 import os
 from pathlib import Path
+import OCP.TopoDS  # type: ignore
 from model import AppConfig, method_cache
 from build123d import *  # type: ignore
 from concurrent.futures import ThreadPoolExecutor
@@ -12,6 +13,11 @@ from typing import Any, Optional, cast, Annotated, Literal
 from pydantic import validate_call, Field
 import zipfile
 from shell import Logger
+
+# Monkey-patch TopoDS_Shape to resolve Pydantic validation errors.
+# Pydantic 2 probes for a HashCode method when validating OCP-wrapped types.
+if not hasattr(OCP.TopoDS.TopoDS_Shape, "HashCode"):
+    OCP.TopoDS.TopoDS_Shape.HashCode = lambda self, upper: id(self) % upper  # type: ignore
 
 
 class Builder:
