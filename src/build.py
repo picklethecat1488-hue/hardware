@@ -74,7 +74,7 @@ class Builder:
             else:
                 # Construct a partial circle
                 start_deg = -angle_deg / 2
-                with BuildLine() as perimeter:
+                with BuildLine():
                     p1 = Vector(outer_radius, 0).rotate(Axis.Z, start_deg)
                     p2 = p1.rotate(Axis.Z, angle_deg)
                     Line((0, 0), p1)
@@ -114,9 +114,9 @@ class Builder:
                     inner_radius * math.sin(start_rad) + face_shift * math.cos(start_rad),
                 )
                 # Create the interlocking protrusion and recess using full circles.
-                with BuildSketch(Location(Vector(c_left))):
+                with Locations(c_left):
                     Circle(self.config.joint_radius)
-                with BuildSketch(Location(Vector(c_right))):
+                with Locations(c_right):
                     Circle(self.config.joint_radius + joint_space, mode=Mode.SUBTRACT)
         return sketch.sketch
 

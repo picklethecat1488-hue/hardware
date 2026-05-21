@@ -58,9 +58,10 @@ class TestBuilder:
 
     def test_create_profile(self, builder):
         """Test profile sketch generation for a valid center/angle profile."""
-        sketch = builder.create_profile(45, 90, outer_radius=10, inner_radius=5)
-        assert sketch is not None
-        assert sketch.area > 0
+        sketch = builder.create_profile(45, 90, outer_radius=10, inner_radius=5, joint_space=0)
+        # Area of a quarter annulus: (90/360) * pi * (R^2 - r^2)
+        expected_area = math.pi * (10**2 - 5**2) / 4
+        assert sketch.area == pytest.approx(expected_area)
 
     def test_create_profile_invalid_inner_radius(self, builder):
         """Ensure invalid profile radii raise ValueError."""
