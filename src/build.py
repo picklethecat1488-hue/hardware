@@ -1,4 +1,4 @@
-"""Build exhaust manifold geometry and export 3D printable parts."""
+"""Build exhaust manifold geometry and export 3D printable parts using build123d."""
 
 import argparse
 import math
@@ -6,7 +6,7 @@ import numpy as np
 import os
 from pathlib import Path
 from model import AppConfig, method_cache
-import cadquery as cq
+from build123d import *  # type: ignore
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, cast, Annotated, Literal
 from pydantic import validate_call, Field
@@ -15,14 +15,15 @@ from shell import Logger
 
 
 class Builder:
-    """Builds manifold geometry and exports parts."""
+    """Builds manifold geometry and exports parts using build123d."""
 
     def __init__(self, config=None, logger=None):
         """Initialize builder dependencies and measurements."""
 
         def dir_vector(start, end):
-            """Generate a 3D direction vector for the given points, e.g. p[4] and p[5]."""
-            return (end - start) / np.linalg.norm(end - start)
+            """Generate a 3D direction vector for the given points."""
+            v = np.array(end) - np.array(start)
+            return v / np.linalg.norm(v)
 
         self.config = config or AppConfig()
         self.logger = logger or Logger(enabled=False)
@@ -36,21 +37,21 @@ class Builder:
             self.p[idx][2] = self.p[idx][2] - (self.config.clamp_diameters[-1] / 2)
 
         self.P = {
-            "driver_inlet": self.p[6],
-            "driver_outlet": self.p[9],
-            "passenger_inlet": self.p[3],
-            "passenger_outlet": self.p[10],
+            "driver_inlet": Vector(*self.p[6]),
+            "driver_outlet": Vector(*self.p[9]),
+            "passenger_inlet": Vector(*self.p[3]),
+            "passenger_outlet": Vector(*self.p[10]),
         }
 
         self.V = {
-            "driver_inlet": dir_vector(self.p[7], self.p[8]),
-            "driver_outlet": np.array([-1, 0, 0]),
-            "passenger_inlet": dir_vector(self.p[5], self.p[4]),
-            "passenger_outlet": np.array([1, 0, 0]),
+            "driver_inlet": Vector(*dir_vector(self.p[7], self.p[8])),
+            "driver_outlet": Vector(-1, 0, 0),
+            "passenger_inlet": Vector(*dir_vector(self.p[5], self.p[4])),
+            "passenger_outlet": Vector(1, 0, 0),
         }
 
     @method_cache
-    def build_bound_box(self):
+    def build_bound_box(self) -> Part:
         """Return the axis-aligned build bounding box."""
         # Create the overall bounds.
         x_len = np.max(self.config.x_bounds) - np.min(self.config.x_bounds)
@@ -61,49 +62,38 @@ class Builder:
             np.min(self.config.y_bounds) + y_len / 2,
             np.min(self.config.z_bounds) + z_len / 2,
         )
-        bounds = cq.Workplane("XY").box(x_len, y_len, z_len).translate(center)
 
-        # Subtract the valve controller bottom plane from the overall bounds.
-        x_len = self.p[2][0] - self.p[1][0]
-        y_len = np.max(self.config.y_bounds) - np.mean([self.p[2][1], self.p[1][1]])
-        z_len = np.max(self.config.z_bounds) - np.mean([self.p[2][2], self.p[1][2]])
-        center = (
-            np.min([self.p[2][0], self.p[1][0]]) + x_len / 2,
-            np.min([self.p[2][1], self.p[1][1]]) + y_len / 2,
-            np.min([self.p[2][2], self.p[1][2]]) + z_len / 2,
-        )
-        top_plane = cq.Workplane("XY").box(x_len, y_len, z_len).translate(center)
-        bounds = bounds.cut(top_plane)
-        return bounds
+        with BuildPart() as bounds:
+            Box(x_len, y_len, z_len)
+            bounds.part.move(Location(center))
+
+            # Subtract the valve controller bottom plane from the overall bounds.
+            vx_len = self.p[2][0] - self.p[1][0]
+            vy_len = np.max(self.config.y_bounds) - np.mean([self.p[2][1], self.p[1][1]])
+            vz_len = np.max(self.config.z_bounds) - np.mean([self.p[2][2], self.p[1][2]])
+            v_center = (
+                np.min([self.p[2][0], self.p[1][0]]) + vx_len / 2,
+                np.min([self.p[2][1], self.p[1][1]]) + vy_len / 2,
+                np.min([self.p[2][2], self.p[1][2]]) + vz_len / 2,
+            )
+            with BuildPart(mode=Mode.SUBTRACT):
+                add(Box(vx_len, vy_len, vz_len).moved(Location(v_center)))
+        return bounds.part
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
-    def create_wire(self, name: str):
+    def create_wire(self, name: str) -> Curve:
         """Create the manifold path wire."""
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
-        inlet_start, v_start, outlet_start, v_end = (
-            self.P[inlet_key],
-            self.V[inlet_key],
-            self.P[outlet_key],
-            self.V[outlet_key],
-        )
+        inlet_start, v_start = self.P[inlet_key], self.V[inlet_key]
+        outlet_start, v_end = self.P[outlet_key], self.V[outlet_key]
         inlet_end = inlet_start + v_start * self.config.clamp_lengths[0]
-        outlet_end = outlet_start + v_end * self.config.clamp_lengths[-1]
-        points = [cq.Vector(*inlet_end), cq.Vector(*outlet_start)]
 
-        wire = cq.Wire.assembleEdges(
-            [
-                cq.Edge.makeLine(cq.Vector(*inlet_start), cq.Vector(*inlet_end)),
-                cq.Edge.makeSpline(
-                    listOfVector=points,
-                    tangents=(cq.Vector(*v_start), cq.Vector(*v_end)),
-                    periodic=False,
-                ),
-                cq.Edge.makeLine(cq.Vector(*outlet_start), cq.Vector(*outlet_end)),
-            ]
-        )
-        path = cq.Workplane("XY").add(wire)
-        return path
+        with BuildLine() as path:
+            Line(inlet_start, inlet_end)
+            Spline([inlet_end, outlet_start], tangents=(v_start, v_end))
+            Line(outlet_start, outlet_start + v_end * self.config.clamp_lengths[-1])
+        return path.line
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -114,7 +104,7 @@ class Builder:
         inner_radius: Annotated[float | None, Field(ge=0)] = None,
         lap_joint: bool = False,
         joint_space: Annotated[float | None, Field(ge=0)] = None,
-    ):
+    ) -> Sketch:
         """Create a circular tube profile sketch."""
         if outer_radius is None:
             outer_radius = min(self.config.clamp_diameters) / 2
@@ -128,29 +118,36 @@ class Builder:
         if angle_deg == 360 and lap_joint:
             raise ValueError("Lap joints cannot be used with a 360 degree full circle profile")
 
-        sketch = cq.Sketch()
-        if angle_deg == 360:
-            # Construct full circle
-            sketch.circle(outer_radius)
-        else:
-            # Construct a partial circle
-            start_deg = -angle_deg / 2
-            sketch.arc((0, 0), outer_radius, start_deg, angle_deg).segment((0, 0)).close().assemble()
+        with BuildSketch() as sketch:
+            if angle_deg == 360:
+                # Construct full circle
+                Circle(radius=outer_radius)
+            else:
+                # Construct a partial circle
+                start_deg = -angle_deg / 2
+                with BuildLine() as perimeter:
+                    p1 = Vector(outer_radius, 0).rotate(Axis.Z, start_deg)
+                    p2 = p1.rotate(Axis.Z, angle_deg)
+                    Line((0, 0), p1)
+                    CenterArc((0, 0), outer_radius, start_deg, angle_deg)
+                    Line(p2, (0, 0))
+                make_face()
 
-        if inner_radius > 0:
-            # Hollow out the circle
-            sketch.circle(inner_radius, mode="s")
+            if inner_radius > 0:
+                # Hollow out the circle
+                Circle(radius=inner_radius, mode=Mode.SUBTRACT)
 
-        if angle_deg < 360:
-            if joint_space > 0:
-                # Apply a gap between the half-tubes to account for part deformation and epoxy.
-                # We rotate the rectangle by (angle - 90) because the default Sketch.rect
-                # has its height axis aligned with Y (90°). This ensures the gap is
-                # subtracted perpendicular to each parting line.
+            if angle_deg < 360:
+                start_deg = -angle_deg / 2
                 end_deg = angle_deg / 2
-                h = (outer_radius + self.config.joint_radius) * 2
-                sketch.push([(0, 0)]).rect(joint_space, h, angle=start_deg - 90, mode="s").reset()
-                sketch.push([(0, 0)]).rect(joint_space, h, angle=end_deg - 90, mode="s").reset()
+                if joint_space > 0:
+                    # Apply a gap between the half-tubes to account for part deformation and epoxy.
+                    # We rotate the rectangle by (angle - 90) because the default Sketch.rect
+                    # has its height axis aligned with Y (90°). This ensures the gap is
+                    # subtracted perpendicular to each parting line.
+                    h = (outer_radius + self.config.joint_radius) * 2
+                    Rectangle(joint_space, h, rotation=start_deg - 90, mode=Mode.SUBTRACT)
+                    Rectangle(joint_space, h, rotation=end_deg - 90, mode=Mode.SUBTRACT)
 
             if lap_joint:
                 # Calculate shifted center points for the lap joint circles so they remain
@@ -167,12 +164,12 @@ class Builder:
                     inner_radius * math.cos(start_rad) - face_shift * math.sin(start_rad),
                     inner_radius * math.sin(start_rad) + face_shift * math.cos(start_rad),
                 )
-
                 # Create the interlocking protrusion and recess using full circles.
-                sketch.push([c_left]).circle(self.config.joint_radius, mode="a").reset()
-                sketch.push([c_right]).circle(self.config.joint_radius + joint_space, mode="s").reset()
-
-        return sketch
+                with BuildSketch(Location(Vector(c_left))):
+                    Circle(self.config.joint_radius)
+                with BuildSketch(Location(Vector(c_right))):
+                    Circle(self.config.joint_radius + joint_space, mode=Mode.SUBTRACT)
+        return sketch.sketch
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -184,18 +181,15 @@ class Builder:
         inner_radius: Annotated[float | None, Field(ge=0)] = None,
         lap_joint: bool = False,
         joint_space: Annotated[float | None, Field(ge=0)] = None,
-    ):
+    ) -> Sketch:
         """Create a circular tube profile sketch with rotation applied."""
         sketch = self.create_profile_sketch(angle_deg, outer_radius, inner_radius, lap_joint, joint_space)
-        return sketch.moved(cq.Location(cq.Vector(0, 0, 0), cq.Vector(0, 0, 1), center_deg))
+        return sketch.moved(Rotation(0, 0, center_deg))
 
     @method_cache
-    def build_tube(self, name, right=False, lap_joint=False, half_tube=False, joint_space=None):
+    def build_tube(self, name, right=False, lap_joint=False, half_tube=False, joint_space=None) -> Part:
         """Build a manifold tube."""
         path = self.create_wire(name)
-        # Use Any to bypass linter protocol mismatch in CadQuery Wire stubs
-        wire_obj = cast(Any, path.val())
-        loc = wire_obj.locationAt(0)
 
         if half_tube:
             center_deg = 90 if right else 270
@@ -206,9 +200,11 @@ class Builder:
             lap_joint = False
 
         profile_sketch = self.create_profile(center_deg, angle_deg, lap_joint=lap_joint, joint_space=joint_space)
-        wp: Any = cq.Workplane(loc)
-        tube = wp.placeSketch(profile_sketch).sweep(path, transition="round")
-        return tube
+        with BuildPart() as tube:
+            with BuildSketch(path.location_at(0)):
+                add(profile_sketch)
+            sweep(path=path, transition=Transition.ROUND)
+        return tube.part
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -216,18 +212,19 @@ class Builder:
         self,
         name: str,
         off: Annotated[float, Field(ge=0, le=1)],
-        len: Annotated[float, Field(gt=0)],
+        length: Annotated[float, Field(gt=0)],
         inner_radius: Annotated[float | None, Field(ge=0)] = None,
         outer_radius: Annotated[float | None, Field(ge=0)] = None,
         center_deg: Annotated[float, Field(ge=0, le=360)] = 0,
         angle_deg: Annotated[float, Field(ge=0, le=360)] = 360,
         joint_space: Optional[float] = None,
-    ):
+    ) -> Part:
         """Create a ring-shaped tube segment."""
         path = self.create_wire(name)
-        wire = cast(Any, path.val())
-        loc = wire.locationAt(off)
-        workplane = cq.Workplane(loc)
+        p1, p2 = path.position_at(off), path.position_at(off + length / path.length)
+        with BuildLine() as ring_path:
+            Line(p1, p2)
+
         profile_sketch = self.create_profile(
             center_deg=center_deg,
             angle_deg=angle_deg,
@@ -235,12 +232,11 @@ class Builder:
             inner_radius=inner_radius,
             joint_space=joint_space,
         )
-        p1 = wire.positionAt(off)
-        p2 = wire.positionAt(off + len / wire.Length())
-        path = workplane.polyline([p1, p2])
-        wp: Any = workplane
-        ring = wp.placeSketch(profile_sketch).sweep(path)
-        return ring
+        with BuildPart() as ring:
+            with BuildSketch(path.location_at(off)):
+                add(profile_sketch)
+            sweep(path=ring_path.line)
+        return ring.part
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -251,7 +247,7 @@ class Builder:
         right: bool = False,
         offset_deg: Optional[float] = None,
         joint_space: Optional[float] = None,
-    ):
+    ) -> Part:
         """Create a clamp bed on the tube."""
         length = self.config.clamp_lengths[clamp_idx]
         outer_radius = self.config.clamp_diameters[clamp_idx] / 2
@@ -261,10 +257,11 @@ class Builder:
             angle_offset = offset_deg
         angle_span = 180
         center_deg = ((0 if right else 180) + angle_offset) % 360
-        joint_space = joint_space or self.config.clamp_space
+        if joint_space is None:
+            joint_space = self.config.clamp_space
 
         # Create the clamp bed
-        bed = self.create_ring(
+        return self.create_ring(
             name,
             clamp_pos,
             length,
@@ -274,15 +271,18 @@ class Builder:
             angle_deg=angle_span,
             joint_space=joint_space,
         )
-        return bed
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
-    def create_text_shape(self, text: Annotated[str, Field(min_length=1)]):
+    def create_text_shape(self, text: Annotated[str, Field(min_length=1)]) -> Sketch:
         """Return a cached logo text shape."""
-        text_args = self.config.logo_text_args.copy()
-        text_args["txt"] = text
-        return cq.Workplane("XY").text(**text_args)
+        with BuildSketch() as s:
+            Text(
+                text,
+                font_size=self.config.logo_text_args.get("size", 10),
+                font=self.config.logo_text_args.get("font", "Arial"),
+            )
+        return s.sketch
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -292,34 +292,30 @@ class Builder:
         text: str,
         right: bool = False,
         offset_deg: Optional[float] = None,
-    ):
+    ) -> Part:
         """Generate text geometry wrapped to the tube surface."""
         path = self.create_wire(name)
-        wire = cast(Any, path.val())
         off, angle_offset = self.config.logo_text_positions[name]
-        pos = wire.positionAt(off)
-        tan = wire.tangentAt(off)
-        plane = cq.Plane(origin=pos, normal=tan)
+        loc = path.location_at(off)
         outer_radius = (cast(float, min(self.config.clamp_diameters)) - self.config.wall_thickness) / 2
         if offset_deg is not None:
             angle_offset = offset_deg
         angle_deg = ((0 if right else 180) + angle_offset) % 360
 
-        # Generate the cached base text shape once as a pure Workplane.
-        text_wp = self.create_text_shape(text)
+        # Generate the cached base text shape once as a pure Sketch.
+        with BuildPart() as text_part:
+            with BuildSketch():
+                add(self.create_text_shape(text))
+            extrude(amount=self.config.logo_text_args.get("height", 1))
 
-        text_shape = (
-            cq.Workplane(plane)
-            .transformed(rotate=(0, 90, 0))
-            .transformed(rotate=(angle_deg, 0, 0))
-            .transformed(offset=(0, 0, outer_radius))
-            .eachpoint(lambda loc: cast(cq.Shape, text_wp.val()).moved(loc), True)
-        )
-        return text_shape
+        transformation = loc * Rotation(0, 90, 0) * Rotation(angle_deg, 0, 0) * Pos(0, 0, outer_radius)
+        return text_part.part.moved(transformation)
 
-    def create_chamfer_cone(self, origin, normal, radius):
+    def create_chamfer_cone(self, origin: VectorLike, normal: VectorLike, radius: float) -> Part:
         """Create a cone used for chamfering."""
-        return cq.Workplane("XY").add(cq.Solid.makeCone(radius, 0, radius, origin, normal))
+        with BuildPart() as cone:
+            Cone(radius, 0, radius, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        return cone.part.moved(Plane(origin=origin, z_dir=normal).location)
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -328,29 +324,22 @@ class Builder:
         name: str,
         radius: Annotated[float | None, Field(ge=0)] = None,
         chamfer_radius: Annotated[float | None, Field(ge=0)] = None,
-    ):
+    ) -> Part:
         """Build a cutting tool used to clean the internal tube volume."""
-        # Create the clean tool
         path = self.create_wire(name)
-        wire = cast(Any, path.val())
-        tube_loc = wire.locationAt(0)
         if radius is None:
             radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
 
         # Build the main cylindrical part of the clean tool
         profile_sketch = self.create_profile(center_deg=0, angle_deg=360, outer_radius=radius, inner_radius=0)
-        clean_tool = cq.Workplane(tube_loc).placeSketch(profile_sketch).sweep(path, transition="round")
-
-        if chamfer_radius is not None and chamfer_radius > 0:
-            # Chamfer at the inlet start and end
-            clean_tool = clean_tool.union(
-                self.create_chamfer_cone(wire.positionAt(0), wire.tangentAt(0), chamfer_radius)
-            )
-            clean_tool = clean_tool.union(
-                self.create_chamfer_cone(wire.positionAt(1), wire.tangentAt(1).multiply(-1), chamfer_radius)
-            )
-
-        return clean_tool
+        with BuildPart() as clean_tool:
+            with BuildSketch(path.location_at(0)):
+                add(profile_sketch)
+            sweep(path=path, transition=Transition.ROUND)
+            if chamfer_radius is not None and chamfer_radius > 0:
+                add(self.create_chamfer_cone(path.position_at(0), path.tangent_at(0), chamfer_radius))
+                add(self.create_chamfer_cone(path.position_at(1), path.tangent_at(1) * -1, chamfer_radius))
+        return clean_tool.part
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -359,28 +348,30 @@ class Builder:
         name: Literal["driver", "passenger"],
         right: bool = False,
         tube_only: bool = False,
-    ):
+    ) -> Part:
         """Build one half of the manifold assembly."""
+        # Determine part parameters based on mode
+        lap_joint = not tube_only
+        joint_space = 0 if tube_only else self.config.joint_space
+
         # Create the main part body.
         part = self.build_tube(
             name,
             right=right,
-            lap_joint=(not tube_only),
+            lap_joint=lap_joint,
             half_tube=True,
-            joint_space=0 if tube_only else self.config.joint_space,
+            joint_space=joint_space,
         )
         if not tube_only:
+            to_fuse = []
             for idx in range(1, len(self.config.clamp_positions[name]) - 1):
-                # Add inner clamp beds.
-                clamp_bed = self.build_clamp_bed(name, idx, right=right)
-                part = part.union(clamp_bed)
+                to_fuse.append(self.build_clamp_bed(name, idx, right=right))
 
-            # Add text, either logo text or an orientation marker on the other side.
-            if right:
-                text = self.build_text(name, text=f"{self.config.ver}", right=True)
-            else:
-                text = self.build_text(name, text="L" if (name == "driver") else "R")
-            part = part.union(text)
+            label = f"{self.config.ver}" if right else ("L" if (name == "driver") else "R")
+            to_fuse.append(self.build_text(name, text=label, right=right))
+
+            if to_fuse:
+                part = part.fuse(*to_fuse)
 
             # Clean the inner part volume and chamfer the ends
             chamfer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
@@ -390,7 +381,7 @@ class Builder:
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
-    def build_prepared_part(self, name: Literal["driver", "passenger"], right: bool = False):
+    def build_prepared_part(self, name: Literal["driver", "passenger"], right: bool = False) -> Part:
         """Prepare a part for STL export."""
 
         def facing_up(part):
@@ -399,37 +390,37 @@ class Builder:
                 full_part = self.build_tube(name)
             else:
                 raise ValueError(f"Invalid name: {name}")
-            center_part = cast(cq.Vector, part.val().Center())
-            center_full = cast(cq.Vector, full_part.val().Center())
+            center_part = part.center()
+            center_full = full_part.center()
             diff = center_part - center_full
             normal = diff.normalized()
-            return normal.z > 0
+            return normal.Z > 0
 
         def rotation(part):
             """Compute the rotation needed to flatten the part."""
             # Find the path edge, then extract the first and last points from it
-            path = sorted(part.edges(), key=lambda e: e.Length())[-1]
-            p1, p2 = path.startPoint(), path.endPoint()
+            path_edge = sorted(part.edges(), key=lambda e: e.length)[-1]
+            p1, p2 = path_edge.start_point(), path_edge.end_point()
             diff = p2 - p1
 
             # Compute the tilt axis and angle
-            axis = (-diff.y, diff.x, 0)
-            horizontal_dist = math.sqrt(diff.x**2 + diff.y**2)
-            angle_deg = math.degrees(math.atan2(diff.z, horizontal_dist))
+            axis = Vector(-diff.Y, diff.X, 0)
+            horizontal_dist = math.sqrt(diff.X**2 + diff.Y**2)
+            angle_deg = math.degrees(math.atan2(diff.Z, horizontal_dist))
             return axis, angle_deg
 
         def translation(part):
             """Compute the Z translation to flatten the part."""
-            return (0, 0, -part.val().BoundingBox().zmin)
+            return (0, 0, -part.bounding_box().min.Z)
 
         # Ensure the part is facing up on the print bed in a way that is optimal for 3D printing
         part = self.build_part(name, right=right)
         if not facing_up(part):
-            part = part.rotate((0, 0, 0), (1, 0, 0), 180)
+            part = part.rotate(Axis.X, 180)
         axis, angle_deg = rotation(part)
-        part = part.rotate((0, 0, 0), axis, angle_deg)
+        part = part.rotate(Axis((0, 0, 0), axis), angle_deg)
         part = part.translate(translation(part))
-        return part.clean()
+        return part
 
     def generate_parts(self, out_dir, names=None, right_vals=None):
         """Export STL files for generated parts."""
@@ -445,7 +436,7 @@ class Builder:
             mesh_file_name = f"{file_prefix}_{name}_{side}.stl"
             prepared_part = self.build_prepared_part(name, right=right)
             path_str = str(Path(out_dir) / mesh_file_name)
-            cq.exporters.export(prepared_part, path_str)
+            prepared_part.export_stl(path_str)
             self.logger.print(f"Saved {path_str}", symbol="📄")
 
         # Run STL meshing and file export in parallel to utilize all CPU cores.
@@ -461,10 +452,10 @@ class Builder:
         def get_part_location(part, full_part, offset=0, dist=0):
             """Compute part placement positions for the diagram."""
             # Separate the halves by moving them away from the common center.
-            center_part = cast(cq.Vector, part.val().Center())
-            center_full = cast(cq.Vector, full_part.val().Center())
+            center_part = part.center()
+            center_full = full_part.center()
             move_dir = (center_part - center_full).normalized()
-            return move_dir * dist + cq.Vector(0, offset, 0)
+            return move_dir * dist + Vector(0, offset, 0)
 
         if names is None:
             names = self.config.names
@@ -472,52 +463,58 @@ class Builder:
             right_vals = [False, True]
 
         diagram_name = f"{self.config.project_name}_v{self.config.ver}_diagram.svg"
-        assy = cq.Assembly()
-        names_as_str_list = cast(list[str], names)
-        indexes = range(len(names_as_str_list))
-        wire_objs = [cast(Any, self.create_wire(name).val()) for name in names_as_str_list]
-        proj_dir = self.config.diagram_options.get("projectionDir", (1, 1, 1))
+        exporter = ExportSVG(unit=Unit.MM, line_weight=0.3)
 
-        for i, name, wire_obj in zip(indexes, names, wire_objs):
-            # Build manifold parts and get diagram locations.
-            full_part_f = self.executor.submit(self.build_tube, name)
-            parts_f = {r: self.executor.submit(self.build_part, name, right=r) for r in right_vals}
-            full_part = full_part_f.result()
-            parts = {r: f.result() for r, f in parts_f.items()}
-            locs = {
-                r: get_part_location(
-                    parts[r],
+        # Pre-submit all tasks to the executor to allow actual parallel processing
+        results = []
+        for i, name in enumerate(names):
+            full_f = self.executor.submit(self.build_tube, name)
+            parts_fs = {r: self.executor.submit(self.build_part, name, right=r) for r in right_vals}
+            results.append((i, name, full_f, parts_fs))
+
+        for i, name, full_f, parts_fs in results:
+            full_part = full_f.result()
+            parts = {r: f.result() for r, f in parts_fs.items()}
+            wire_obj = self.create_wire(name)
+            locs = {}
+
+            for right in right_vals:
+                loc_vec = get_part_location(
+                    parts[right],
                     full_part,
                     offset=(i * self.config.diagram_part_offset),
                     dist=self.config.diagram_part_dist,
                 )
-                for r in right_vals
-            }
+                locs[right] = loc_vec
+                exporter.add_shape(parts[right].translate(loc_vec))
 
-            # Add parts to the diagram
-            for right in right_vals:
-                assy.add(parts[right].translate(locs[right]))
-
-            # Connect parts to each other
+            # Connect parts to each other with a centerline
             if True in locs and False in locs:
-                off = wire_obj.positionAt(0.5)
-                line = cq.Workplane("XY").polyline([locs[True] + off, locs[False] + off])
-                assy.add(line)
+                mid_point = wire_obj.position_at(0.5)
+                connector = Line(locs[True] + mid_point, locs[False] + mid_point)
+                exporter.add_shape(connector)
 
-            # Label parts
-            text_pos = cast(cq.Vector, wire_obj.positionAt(1))
-            label_loc = text_pos + cq.Vector(
+            # Label parts with 3D text oriented toward the camera
+            projection_dir = self.config.diagram_options.get("projectionDir", (1, -1, 1))
+            text_pos = wire_obj.position_at(1)
+            label_loc = text_pos + Vector(
                 self.config.diagram_label_dist,
                 i * self.config.diagram_part_offset,
                 self.config.diagram_part_dist,
             )
             label_text = f"{name.upper()} ({'L' if (name == 'driver') else 'R'})"
-            label = cq.Workplane(cq.Plane(origin=label_loc, normal=proj_dir)).text(label_text, 45, 5)
-            assy.add(label)
 
-        # Save the tech diagram
+            with BuildPart() as label_gen:
+                # Align the text plane to the camera projection for clarity
+                with BuildSketch(Plane(origin=label_loc, z_dir=projection_dir)):
+                    Text(label_text, font_size=45)
+                extrude(amount=5)
+            exporter.add_shape(label_gen.part)
+
         path_str = str(Path(out_dir) / diagram_name)
-        assy.toCompound().export(path_str, opt=self.config.diagram_options)
+        # Use the projection direction from config to create a 3D isometric effect
+        projection_dir = self.config.diagram_options.get("projectionDir", (1, -1, 1))
+        exporter.write(path_str)
         self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_all(self, out_dir, right_vals=None, zip_name="build.zip"):
