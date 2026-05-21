@@ -186,8 +186,8 @@ class TestBuilder:
         def get_angle(key):
             """Compute the vertical angle of an exhaust end vector."""
             z_axis = Vector(0, 0, 1)
-            v_test = Vector(builder.V[key])
-            angle = 90 - math.degrees(v_test.get_angle(z_axis))
+            v_test = Vector(builder.config.V[key])
+            angle = 90 - v_test.get_angle(z_axis)
             return angle
 
         # Horizontal magnitude (distance in XY plane)
