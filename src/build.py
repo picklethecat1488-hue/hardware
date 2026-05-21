@@ -82,7 +82,7 @@ class Builder:
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
-    def create_wire(self, name: str) -> Curve:
+    def create_wire(self, name: str) -> Wire:
         """Create the manifold path wire."""
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
         inlet_start, v_start = self.P[inlet_key], self.V[inlet_key]

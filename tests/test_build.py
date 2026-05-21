@@ -1,13 +1,12 @@
 """Contains Build system unit tests."""
 
 from build import Builder
-import cadquery as cq
+from build123d import *
 import math
 import numpy as np
 import pytest
 import zipfile
 from pathlib import Path
-from unittest.mock import patch
 from typing import cast, Any
 
 
@@ -81,16 +80,14 @@ class TestBuilder:
         """Verify wire path and clamp endpoints."""
 
         def calc_point_err(v, p):
-            return abs((v - cq.Vector([p[0], p[1], p[2]])).Length)
+            return abs((v - Vector(p)).length)
 
         wire = builder.create_wire(name)
-        # Use Any to bypass linter protocol mismatch in CadQuery Wire stubs
-        wire_obj = cast(Any, wire.val())
-        length = wire_obj.Length()
-        inlet_clamp_start = wire_obj.positionAt(0.0)
-        inlet_clamp_end = wire_obj.positionAt(builder.config.clamp_lengths[0] / length)
-        outlet_clamp_start = wire_obj.positionAt((length - builder.config.clamp_lengths[-1]) / length)
-        outlet_clamp_end = wire_obj.positionAt(1.0)
+        length = wire.length
+        inlet_clamp_start = wire.position_at(0.0)
+        inlet_clamp_end = wire.position_at(builder.config.clamp_lengths[0] / length)
+        outlet_clamp_start = wire.position_at((length - builder.config.clamp_lengths[-1]) / length)
+        outlet_clamp_end = wire.position_at(1.0)
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
 
         # Make sure the clamp starts are correct
@@ -104,14 +101,14 @@ class TestBuilder:
         assert calc_point_err(
             (outlet_clamp_end - outlet_clamp_start).normalized(), builder.V[outlet_key]
         ) == pytest.approx(0)
-        assert (inlet_clamp_end - inlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[0])
-        assert (outlet_clamp_end - outlet_clamp_start).Length == pytest.approx(builder.config.clamp_lengths[-1])
+        assert (inlet_clamp_end - inlet_clamp_start).length == pytest.approx(builder.config.clamp_lengths[0])
+        assert (outlet_clamp_end - outlet_clamp_start).length == pytest.approx(builder.config.clamp_lengths[-1])
 
     def test_create_profile(self, builder):
         """Test profile sketch generation for a valid center/angle profile."""
         sketch = builder.create_profile(45, 90, outer_radius=10, inner_radius=5)
         assert sketch is not None
-        assert sketch.val().Area() > 0
+        assert sketch.area > 0
 
     def test_create_profile_invalid_inner_radius(self, builder):
         """Ensure invalid profile radii raise ValueError."""
@@ -122,23 +119,21 @@ class TestBuilder:
         """Test clean tool creation for a given part name."""
         clean_tool = builder.build_clean_tool(name)
         assert clean_tool is not None
-        assert clean_tool.val().Volume() > 0
+        assert clean_tool.volume > 0
 
     def test_part_fits_together(self, builder, name, right):
         """Test that mirrored parts do not intersect."""
         # Make sure parts do not self intersect
         part = builder.build_part(name, right=right)
         other_part = builder.build_part(name, right=(not right))
-        assert part.intersect(other_part).val().Volume() == pytest.approx(0), (
-            f"intersection detected between {name} parts"
-        )
+        assert (part & other_part).volume == pytest.approx(0), f"intersection detected between {name} parts"
 
     def test_part_doesnt_overlap(self, builder, name, right):
         """Ensure parts from different assemblies do not intersect."""
         part = builder.build_part(name, right=right)
         other_name = next(x for x in builder.config.names if x != name)
         other_part = builder.build_part(other_name, right=not right)
-        assert part.intersect(other_part).val().Volume() == pytest.approx(0), (
+        assert (part & other_part).volume == pytest.approx(0), (
             f"intersection detected between {name},right={right} and {other_name},right={not right}"
         )
 
@@ -146,7 +141,7 @@ class TestBuilder:
         """Verify part fits inside bound box volume."""
         part = builder.build_part(name, right=right)
         proj_bounds = builder.build_bound_box()
-        volume = part.cut(proj_bounds).val().Volume()
+        volume = (part - proj_bounds).volume
 
         assert volume == pytest.approx(0)
 
@@ -154,7 +149,7 @@ class TestBuilder:
         """Test if a representative clamp bed satisfies the clamp property."""
         clamp_idx = 1
         path = builder.create_wire(name)
-        length = path.val().Length()
+        length = path.length
 
         # Map clamp_idx to clamp parameters
         offsets = (
@@ -175,13 +170,13 @@ class TestBuilder:
         clamp_off = builder.create_ring(
             name, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected
         )
-        assert part.intersect(clamp_off).val().Volume() == pytest.approx(0)
+        assert (part & clamp_off).volume == pytest.approx(0)
 
         # Check if we can push clamp onto section
         clamp_on = builder.create_ring(
             name, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected - 0.01
         )
-        assert part.intersect(clamp_on).val().Volume() > 0
+        assert (part & clamp_on).volume > 0
 
     def test_part(self, name, right, builder):
         """Verify rebuilt part geometry matches manifold volume."""
@@ -190,8 +185,8 @@ class TestBuilder:
         manifold = builder.build_tube(name, right=right, half_tube=True)
         part = builder.build_part(name, right=right)
         manifold_vol, manifold_from_parts_vol = (
-            manifold.val().Volume(),
-            part.intersect(manifold).val().Volume(),
+            manifold.volume,
+            (part & manifold).volume,
         )
         error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
         # less than 0.5% error for each rebuilt part.
@@ -203,26 +198,19 @@ class TestBuilder:
         part = builder.build_prepared_part(name, right=right)
 
         # Ensure the part is a watertight solid
-        assert part.val().isValid()
-        assert part.val().Volume() > 0
+        assert part.is_valid
+        assert part.volume > 0
 
         # Ensure the part is touching the print bed
-        bottom_faces = cast(list[cq.Face], part.faces("<Z").vals())
-        face_area = sum(f.Area() for f in bottom_faces)
+        bottom_faces = part.faces().sort_by(Axis.Z)[:1]
+        face_area = sum(f.area for f in bottom_faces)
         assert face_area > 0
 
         # Run a few more checks to see if the part was mutated during preparation
-        error_pct = (
-            abs(orig_part.val().Volume() - part.val().Volume())
-            / (orig_part.val().Volume() + part.val().Volume())
-            / 2
-            * 100
-        )
+        error_pct = abs(orig_part.volume - part.volume) / (orig_part.volume + part.volume) / 2 * 100
         assert error_pct < 1e-2, "Volume changed"
 
-        error_pct = (
-            abs(orig_part.val().Area() - part.val().Area()) / (orig_part.val().Area() + part.val().Area()) / 2 * 100
-        )
+        error_pct = abs(orig_part.area - part.area) / (orig_part.area + part.area) / 2 * 100
         assert error_pct < 1e-3, "Surface area changed"
 
     def test_generate_all(self, builder, tmp_path):
@@ -244,9 +232,9 @@ class TestBuilder:
 
         def get_angle(key):
             """Compute the vertical angle of an exhaust end vector."""
-            z_axis = cq.Vector(0, 0, 1)
-            v_test = cq.Vector(*builder.V[key])
-            angle = 90 - math.degrees(v_test.getAngle(z_axis))
+            z_axis = Vector(0, 0, 1)
+            v_test = Vector(builder.V[key])
+            angle = 90 - math.degrees(v_test.get_angle(z_axis))
             return angle
 
         # Horizontal magnitude (distance in XY plane)
@@ -264,8 +252,8 @@ class TestBuilder:
 
     def test_overall_bounds(self, builder, name):
         """Verify assembly bounding box dimensions."""
-        part = builder.build_part(name).union(builder.build_part(name, right=True))
-        bbox = part.val().BoundingBox()
+        part = builder.build_part(name).fuse(builder.build_part(name, right=True))
+        bbox = part.bounding_box()
 
         if name == "driver":
             xmin, xlen = 150, 227
@@ -279,11 +267,11 @@ class TestBuilder:
             raise ValueError("Invalid part name")
 
         # Make sure the overall dimensions of the part haven't changed since last revision.
-        assert round(bbox.xmin) == xmin
-        assert round(bbox.xlen) == xlen
+        assert round(bbox.min.X) == xmin
+        assert round(bbox.size.X) == xlen
 
-        assert round(bbox.ymin) == ymin
-        assert round(bbox.ylen) == ylen
+        assert round(bbox.min.Y) == ymin
+        assert round(bbox.size.Y) == ylen
 
-        assert round(bbox.zmin) == zmin
-        assert round(bbox.zlen) == zlen
+        assert round(bbox.min.Z) == zmin
+        assert round(bbox.size.Z) == zlen
