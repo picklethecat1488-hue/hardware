@@ -79,14 +79,14 @@ class TestBuilder:
         # Make sure parts do not self intersect
         part = builder.build_part(name, right=right)
         other_part = builder.build_part(name, right=(not right))
-        assert (part & other_part).volume == pytest.approx(0), f"intersection detected between {name} parts"
+        assert part.intersect(other_part).volume == pytest.approx(0), f"intersection detected between {name} parts"
 
     def test_part_doesnt_overlap(self, builder, name, right):
         """Ensure parts from different assemblies do not intersect."""
         part = builder.build_part(name, right=right)
         other_name = next(x for x in builder.config.names if x != name)
         other_part = builder.build_part(other_name, right=not right)
-        assert (part & other_part).volume == pytest.approx(0), (
+        assert part.intersect(other_part).volume == pytest.approx(0), (
             f"intersection detected between {name},right={right} and {other_name},right={not right}"
         )
 
@@ -94,7 +94,7 @@ class TestBuilder:
         """Verify part fits inside bound box volume."""
         part = builder.build_part(name, right=right)
         proj_bounds = builder.config.bound_box
-        volume = (part - proj_bounds).volume
+        volume = part.cut(proj_bounds).volume
 
         assert volume == pytest.approx(0)
 
@@ -123,13 +123,13 @@ class TestBuilder:
         clamp_off = builder.create_ring(
             name, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected
         )
-        assert (part & clamp_off).volume == pytest.approx(0)
+        assert part.intersect(clamp_off).volume == pytest.approx(0)
 
         # Check if we can push clamp onto section
         clamp_on = builder.create_ring(
             name, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected - 0.01
         )
-        assert (part & clamp_on).volume > 0
+        assert part.intersect(clamp_on).volume > 0
 
     def test_part(self, name, right, builder):
         """Verify rebuilt part geometry matches manifold volume."""
@@ -139,7 +139,7 @@ class TestBuilder:
         part = builder.build_part(name, right=right)
         manifold_vol, manifold_from_parts_vol = (
             manifold.volume,
-            (part & manifold).volume,
+            part.intersect(manifold).volume,
         )
         error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
         # less than 0.5% error for each rebuilt part.
