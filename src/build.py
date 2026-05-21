@@ -93,7 +93,7 @@ class Builder:
             Line(inlet_start, inlet_end)
             Spline([inlet_end, outlet_start], tangents=(v_start, v_end))
             Line(outlet_start, outlet_start + v_end * self.config.clamp_lengths[-1])
-        return path.line
+        return cast(Wire, path.line)
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
