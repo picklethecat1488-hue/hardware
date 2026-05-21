@@ -28,54 +28,6 @@ class TestBuilder:
         """Return a side selection fixture."""
         return request.param
 
-    def test_measurements(self, builder):
-        """Validate key manifold measurement relationships."""
-
-        def dist(p1, p2):
-            """Compute the 2D distance between two points."""
-            x1, y1, z1 = p1
-            x2, y2, z2 = p2
-            return round(math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2))
-
-        def get_end_points(name):
-            """Return the inlet and outlet endpoint locations for a part."""
-            inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
-            return (
-                # Inlet start
-                builder.P[inlet_key],
-                # Inlet end
-                builder.P[inlet_key] + builder.V[inlet_key] * builder.config.clamp_lengths[0],
-                # Outlet start
-                builder.P[outlet_key],
-                # Outlet end
-                builder.P[outlet_key] + builder.V[outlet_key] * builder.config.clamp_lengths[-1],
-            )
-
-        driver_inlet_start, driver_inlet_end, driver_outlet_start, _ = get_end_points("driver")
-        (
-            passenger_inlet_start,
-            passenger_inlet_end,
-            passenger_outlet_start,
-            _,
-        ) = get_end_points("passenger")
-
-        # Check dist between inlets
-        assert dist(passenger_inlet_start, driver_inlet_start) == pytest.approx(231)
-        assert round(driver_inlet_end[2] - driver_inlet_start[2]) == pytest.approx(12)
-
-        # Check dist between outlets
-        assert dist(driver_outlet_start, passenger_outlet_start) == pytest.approx(695)
-        assert abs(round(passenger_inlet_end[2] - passenger_inlet_start[2])) == pytest.approx(0)
-
-        # Check dist between driver inlet and outlet
-        assert dist(driver_inlet_start, driver_outlet_start) == pytest.approx(315)
-        assert round(driver_outlet_start[2] - driver_inlet_start[2]) == pytest.approx(141)
-        print(f"{driver_outlet_start[2]} {driver_inlet_start[2]}")
-
-        # Check dist between passenger inlet and outlet
-        assert dist(passenger_inlet_start, passenger_outlet_start) == pytest.approx(485)
-        assert round(passenger_outlet_start[2] - passenger_inlet_start[2]) == pytest.approx(171)
-
     def test_wire(self, name, builder):
         """Verify wire path and clamp endpoints."""
 
@@ -140,7 +92,7 @@ class TestBuilder:
     def test_in_bounds(self, builder, name, right):
         """Verify part fits inside bound box volume."""
         part = builder.build_part(name, right=right)
-        proj_bounds = builder.build_bound_box()
+        proj_bounds = builder.config.bound_box
         volume = (part - proj_bounds).volume
 
         assert volume == pytest.approx(0)

@@ -8,6 +8,7 @@ from typing import Any, Callable, TypeVar, overload, Union, Literal, cast
 from functools import cached_property
 import numpy as np
 import yaml
+from build123d import *  # type: ignore
 from pydantic_changedetect import ChangeDetectionMixin
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -111,12 +112,78 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
                     raise ValueError("missing or invalid measurements.yml")
 
     @cached_property
-    def measurements(self):
+    def measurements(self) -> dict[int, np.ndarray]:
         """Return raw measurement points."""
         p = {}
         for idx, item in enumerate(self._measurements):
             p[idx + 1] = np.array(item)
+        # Correct for expected Z offset- middle of outlet instead of top
+        for idx in [3, 6, 9, 10]:
+            p[idx][2] = p[idx][2] - min(self.clamp_diameters) / 2
         return p
+
+    def _ndarray2vec(self, arr: np.ndarray) -> Vector:
+        return Vector(X=arr[0], Y=arr[1], Z=arr[2])
+
+    @cached_property
+    def P(self) -> dict[str, Vector]:
+        """Get position vectors for all endpoints."""
+        ret_val = {
+            "driver_inlet": self._ndarray2vec(self.measurements[6]),
+            "driver_outlet": self._ndarray2vec(self.measurements[9]),
+            "passenger_inlet": self._ndarray2vec(self.measurements[3]),
+            "passenger_outlet": self._ndarray2vec(self.measurements[10]),
+        }
+        return ret_val
+
+    @cached_property
+    def V(self) -> dict[str, Vector]:
+        """Get direction vectors for all endpoints."""
+
+        def dir_vector(start, end):
+            """Generate a 3D direction vector for the given points."""
+            v = np.array(end) - np.array(start)
+            return v / np.linalg.norm(v)
+
+        raw_driver_inlet = dir_vector(self.measurements[7], self.measurements[8])
+        raw_passenger_inlet = dir_vector(self.measurements[5], self.measurements[4])
+        ret_val = {
+            "driver_inlet": self._ndarray2vec(raw_driver_inlet),
+            "driver_outlet": Vector(X=-1, Y=0, Z=0),
+            "passenger_inlet": self._ndarray2vec(raw_passenger_inlet),
+            "passenger_outlet": Vector(X=1, Y=0, Z=0),
+        }
+        return ret_val
+
+    @cached_property
+    def bound_box(self) -> Part:
+        """Return the axis-aligned build bounding box."""
+        # Create the overall bounds.
+        x_len = np.max(self.x_bounds) - np.min(self.x_bounds)
+        y_len = np.max(self.y_bounds) - np.min(self.y_bounds)
+        z_len = np.max(self.z_bounds) - np.min(self.z_bounds)
+        center = (
+            np.min(self.x_bounds) + x_len / 2,
+            np.min(self.y_bounds) + y_len / 2,
+            np.min(self.z_bounds) + z_len / 2,
+        )
+
+        with BuildPart() as bounds:
+            Box(x_len, y_len, z_len)
+            bounds.part.move(Location(center))
+
+            # Subtract the valve controller bottom plane from the overall bounds.
+            vx_len = self.measurements[2][0] - self.measurements[1][0]
+            vy_len = np.max(self.y_bounds) - np.mean([self.measurements[2][1], self.measurements[1][1]])
+            vz_len = np.max(self.z_bounds) - np.mean([self.measurements[2][2], self.measurements[1][2]])
+            v_center = (
+                np.min([self.measurements[2][0], self.measurements[1][0]]) + vx_len / 2,
+                np.min([self.measurements[2][1], self.measurements[1][1]]) + vy_len / 2,
+                np.min([self.measurements[2][2], self.measurements[1][2]]) + vz_len / 2,
+            )
+            with BuildPart(mode=Mode.SUBTRACT):
+                add(Box(vx_len, vy_len, vz_len).moved(Location(v_center)))
+        return bounds.part
 
 
 # Generic type for callables used by the method_cache decorator

@@ -25,74 +25,17 @@ class Builder:
 
     def __init__(self, config=None, logger=None):
         """Initialize builder dependencies and measurements."""
-
-        def dir_vector(start, end):
-            """Generate a 3D direction vector for the given points."""
-            v = np.array(end) - np.array(start)
-            return v / np.linalg.norm(v)
-
         self.config = config or AppConfig()
         self.logger = logger or Logger(enabled=False)
-        # Make a deep copy of measurements to prevent in-place modification drift
-        self.p = {k: np.array(v, copy=True) for k, v in self.config.measurements.items()}
         self.executor = ThreadPoolExecutor()
-
-        for idx in [3, 6]:
-            self.p[idx][2] = self.p[idx][2] - (self.config.clamp_diameters[0] / 2)
-        for idx in [9, 10]:
-            self.p[idx][2] = self.p[idx][2] - (self.config.clamp_diameters[-1] / 2)
-
-        self.P = {
-            "driver_inlet": Vector(*self.p[6]),
-            "driver_outlet": Vector(*self.p[9]),
-            "passenger_inlet": Vector(*self.p[3]),
-            "passenger_outlet": Vector(*self.p[10]),
-        }
-
-        self.V = {
-            "driver_inlet": Vector(*dir_vector(self.p[7], self.p[8])),
-            "driver_outlet": Vector(-1, 0, 0),
-            "passenger_inlet": Vector(*dir_vector(self.p[5], self.p[4])),
-            "passenger_outlet": Vector(1, 0, 0),
-        }
-
-    @method_cache
-    def build_bound_box(self) -> Part:
-        """Return the axis-aligned build bounding box."""
-        # Create the overall bounds.
-        x_len = np.max(self.config.x_bounds) - np.min(self.config.x_bounds)
-        y_len = np.max(self.config.y_bounds) - np.min(self.config.y_bounds)
-        z_len = np.max(self.config.z_bounds) - np.min(self.config.z_bounds)
-        center = (
-            np.min(self.config.x_bounds) + x_len / 2,
-            np.min(self.config.y_bounds) + y_len / 2,
-            np.min(self.config.z_bounds) + z_len / 2,
-        )
-
-        with BuildPart() as bounds:
-            Box(x_len, y_len, z_len)
-            bounds.part.move(Location(center))
-
-            # Subtract the valve controller bottom plane from the overall bounds.
-            vx_len = self.p[2][0] - self.p[1][0]
-            vy_len = np.max(self.config.y_bounds) - np.mean([self.p[2][1], self.p[1][1]])
-            vz_len = np.max(self.config.z_bounds) - np.mean([self.p[2][2], self.p[1][2]])
-            v_center = (
-                np.min([self.p[2][0], self.p[1][0]]) + vx_len / 2,
-                np.min([self.p[2][1], self.p[1][1]]) + vy_len / 2,
-                np.min([self.p[2][2], self.p[1][2]]) + vz_len / 2,
-            )
-            with BuildPart(mode=Mode.SUBTRACT):
-                add(Box(vx_len, vy_len, vz_len).moved(Location(v_center)))
-        return bounds.part
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
     def create_wire(self, name: str) -> Wire:
         """Create the manifold path wire."""
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
-        inlet_start, v_start = self.P[inlet_key], self.V[inlet_key]
-        outlet_start, v_end = self.P[outlet_key], self.V[outlet_key]
+        inlet_start, v_start = self.config.P[inlet_key], self.config.V[inlet_key]
+        outlet_start, v_end = self.config.P[outlet_key], self.config.V[outlet_key]
         inlet_end = inlet_start + v_start * self.config.clamp_lengths[0]
 
         with BuildLine() as path:
