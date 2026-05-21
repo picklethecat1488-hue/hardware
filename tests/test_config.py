@@ -3,39 +3,40 @@
 from __future__ import annotations
 
 import pytest
+from typing import Any
 import threading
 import config
 from config import Configurator
 
 
 class VectorStub:
-    """Simple 3D vector stub used for CadQuery test replacement."""
+    """Simple 3D vector stub used for build123d test replacement."""
 
-    def __init__(self, x: float, y: float, z: float):
+    def __init__(self, X: float, Y: float, Z: float):
         """Initialize a vector stub with coordinates."""
-        self.x = float(x)
-        self.y = float(y)
-        self.z = float(z)
+        self.X = float(X)
+        self.Y = float(Y)
+        self.Z = float(Z)
 
     @property
-    def Length(self) -> float:
+    def length(self) -> float:
         """Return the Euclidean length of the vector."""
-        return (self.x**2 + self.y**2 + self.z**2) ** 0.5
+        return (self.X**2 + self.Y**2 + self.Z**2) ** 0.5
 
     def __add__(self, other: VectorStub) -> VectorStub:
         """Add two vector stubs."""
-        return VectorStub(self.x + other.x, self.y + other.y, self.z + other.z)
+        return VectorStub(self.X + other.X, self.Y + other.Y, self.Z + other.Z)
 
     def __sub__(self, other: VectorStub) -> VectorStub:
         """Subtract another vector stub."""
-        return VectorStub(self.x - other.x, self.y - other.y, self.z - other.z)
+        return VectorStub(self.X - other.X, self.Y - other.Y, self.Z - other.Z)
 
     def __mul__(self, other: float | VectorStub) -> VectorStub:
         """Multiply vector stub by a scalar or transform a vector."""
         if isinstance(other, (int, float)):
-            return VectorStub(self.x * other, self.y * other, self.z * other)
+            return VectorStub(self.X * other, self.Y * other, self.Z * other)
         # Treating multiplication by a location stub as a simple translation for tests
-        return VectorStub(self.x + other.x, self.y + other.y, self.z + other.z)
+        return VectorStub(self.X + other.X, self.Y + other.Y, self.Z + other.Z)
 
     def add(self, other: VectorStub) -> VectorStub:
         """Add two vector stubs (method version)."""
@@ -47,22 +48,22 @@ class VectorStub:
 
     def normalized(self) -> VectorStub:
         """Return a normalized vector stub."""
-        length = self.Length
-        return VectorStub(self.x / length, self.y / length, self.z / length) if length > 0 else self
+        l = self.length
+        return VectorStub(self.X / l, self.Y / l, self.Z / l) if l > 0 else self
 
     def cross(self, other: VectorStub) -> VectorStub:
         """Return the cross product of two vector stubs."""
         return VectorStub(
-            self.y * other.z - self.z * other.y,
-            self.z * other.x - self.x * other.z,
-            self.x * other.y - self.y * other.x,
+            self.Y * other.Z - self.Z * other.Y,
+            self.Z * other.X - self.X * other.Z,
+            self.X * other.Y - self.Y * other.X,
         )
 
     def dot(self, other: VectorStub) -> float:
         """Return the dot product of two vector stubs."""
-        return self.x * other.x + self.y * other.y + self.z * other.z
+        return self.X * other.X + self.Y * other.Y + self.Z * other.Z
 
-    def getAngle(self, other: VectorStub) -> float:
+    def get_angle(self, other: VectorStub) -> float:
         """Return a stub angle."""
         return 0.0
 
@@ -70,102 +71,66 @@ class VectorStub:
         """Compare two vector stubs for equality."""
         if not isinstance(other, VectorStub):
             return False
-        return (self.x, self.y, self.z) == (other.x, other.y, other.z)
+        return (self.X, self.Y, self.Z) == (other.X, other.Y, other.Z)
 
     def __repr__(self) -> str:
         """Return a repr string for the vector stub."""
-        return f"VectorStub({self.x}, {self.y}, {self.z})"
+        return f"VectorStub({self.X}, {self.Y}, {self.Z})"
 
 
-class StubBoundingBox:
-    """Stub for CadQuery BoundingBox."""
+class StubBoundBox:
+    """Stub for build123d BoundBox."""
 
-    def __init__(
-        self,
-        xmin: float = -1.0,
-        xmax: float = 1.0,
-        ymin: float = -1.0,
-        ymax: float = 1.0,
-        zmin: float = -1.0,
-        zmax: float = 1.0,
-    ):
+    def __init__(self, min_vec: VectorStub, max_vec: VectorStub):
         """Initialize a stub bounding box with bounds."""
-        self.xmin = xmin
-        self.xmax = xmax
-        self.ymin = ymin
-        self.ymax = ymax
-        self.zmin = zmin
-        self.zmax = zmax
+        self.min = min_vec
+        self.max = max_vec
 
 
-class StubEntity:
-    """Minimal stub entity that mimics a CadQuery part for test purposes."""
+class StubPart:
+    """Minimal stub entity that mimics a build123d Part for test purposes."""
 
     def __init__(self, center: VectorStub, volume: float = 0.0):
         """Initialize a stub entity with center and volume."""
         self._center = center
         self._volume = float(volume)
 
-    def val(self) -> StubEntity:
-        """Return itself as a value wrapper."""
-        return self
-
-    def Center(self) -> VectorStub:
+    def center(self) -> VectorStub:
         """Return the stored center vector."""
         return self._center
 
-    def Volume(self) -> float:
+    def volume(self) -> float:
         """Return the stored volume."""
         return self._volume
 
-    def BoundingBox(self) -> StubBoundingBox:
+    def bounding_box(self) -> StubBoundBox:
         """Return a stub bounding box."""
-        return StubBoundingBox()
+        return StubBoundBox(VectorStub(-1, -1, -1), VectorStub(1, 1, 1))
 
-    def intersect(self, other):
-        """Return a new stub entity representing an intersection result."""
-        return StubEntity(center=self._center, volume=self._volume)
+    def __and__(self, other: StubPart):
+        """Mimic algebraic intersection."""
+        return self
 
-    def isInside(self, point: VectorStub) -> bool:
-        """Stub for geometric containment check."""
-        return True
-
-    def Solids(self) -> list[StubEntity]:
+    def solids(self) -> list[StubPart]:
         """Return a list of solid stubs."""
         return [self] if self._volume > 0 else []
 
-    def distance(self, other):
-        """Compute the distance between two objects."""
-        return (self._center - other._center).Length
 
-
-class StubPath:
-    """Stub path object that provides a fixed position for testing."""
+class StubWire:
+    """Stub wire object that provides a fixed position for testing."""
 
     def __init__(self, position: VectorStub, length: float = 0.0):
         """Initialize the stub path with a fixed position and length."""
         self._position = position
-        self._length = float(length)
+        self.length = float(length)
 
-    def val(self):
-        """Return itself as a value wrapper."""
-        return self
-
-    def positionAt(self, off):
+    def position_at(self, off):
         """Return the fixed position regardless of offset."""
         return self._position
 
-    def locationAt(self, off):
-        """Return a stub location (identity translation)."""
-        return VectorStub(0, 0, 0)
-
-    def tangentAt(self, off):
-        """Return a fixed tangent vector."""
-        return VectorStub(0, 1, 0)
-
-    def Length(self):
-        """Return a fixed length."""
-        return self._length
+    def location_at(self, off):
+        """Return a stub location."""
+        return self._position
 
 
 class DummyConfig:
@@ -193,37 +158,38 @@ class StubBuilder:
         self.text_calls = []
         self._lock = threading.Lock()
 
-    def build_part(self, name, right=False, tube_only=False):
+    def build_part(self, name, right=False, tube_only=False) -> Any:
         """Return a stub entity representing a built part."""
         center = VectorStub(0, 0, 2) if not right else VectorStub(10, 0, 2)
-        return StubEntity(center=center)
+        return StubPart(center=center)
 
-    def create_wire(self, name):
+    def create_wire(self, name) -> Any:
         """Return a stub path for the named part."""
-        return StubPath(VectorStub(0, 0, 0), length=400.0)
+        return StubWire(VectorStub(0, 0, 0), length=400.0)
 
-    def build_clamp_bed(self, name, idx, offset_deg=0.0, joint_space=0):
+    def build_clamp_bed(self, name, idx, offset_deg=0.0, joint_space=0) -> Any:
         """Capture clamp bed angle candidates and return a stub entity."""
         with self._lock:
             self.clamp_calls.append(offset_deg)
-        return StubEntity(center=VectorStub(offset_deg, 0, 0), volume=0)
+        return StubPart(center=VectorStub(offset_deg, 0, 0), volume=0)
 
-    def build_text(self, name, text=None, right=False, offset_deg=0.0, font_path=None):
+    def build_text(self, name, text=None, right=False, offset_deg=0.0, font_path=None) -> Any:
         """Capture text placement angle candidates and return a stub entity."""
         with self._lock:
             self.text_calls.append(offset_deg)
-        return StubEntity(center=VectorStub(offset_deg, 0, 0), volume=0)
+        return StubPart(center=VectorStub(offset_deg, 0, 0), volume=0)
 
 
 class TestConfig:
     """Configurator unit tests."""
 
     @pytest.fixture(autouse=True)
-    def patch_cq_vector(self, monkeypatch):
-        """Patch CadQuery Vector with a stub vector during tests."""
-        monkeypatch.setattr(config.cq, "Vector", VectorStub)
-        monkeypatch.setattr(config.cq, "Location", lambda x=VectorStub(0, 0, 0): x)
-        monkeypatch.setattr(config.cq, "Plane", lambda **k: None)
+    def patch_build123d(self, monkeypatch):
+        """Patch build123d components with stubs during tests."""
+        monkeypatch.setattr(config, "Vector", VectorStub)
+        monkeypatch.setattr(config, "Part", StubPart)
+        monkeypatch.setattr(config, "Wire", StubWire)
+        monkeypatch.setattr(config, "BoundBox", StubBoundBox)
         yield
 
     def test_get_part_position_prefers_closer_midpoint(self):
@@ -231,8 +197,8 @@ class TestConfig:
         dummy_config = DummyConfig()
         builder = StubBuilder(dummy_config)
         configurator = Configurator(builder=builder, config=dummy_config, logger=None)
-        path = StubPath(VectorStub(0, 0, 0))
-        tube = builder.build_part("driver")
+        path: Any = StubWire(VectorStub(0, 0, 0))
+        tube: Any = builder.build_part("driver")
 
         result = configurator.get_part_position(tube, path, 0.4)
 
