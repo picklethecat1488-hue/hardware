@@ -386,7 +386,7 @@ class Builder:
             mesh_file_name = f"{file_prefix}_{name}_{side}.stl"
             prepared_part = self.build_prepared_part(name, right=right)
             path_str = str(Path(out_dir) / mesh_file_name)
-            prepared_part.export_stl(path_str)
+            export_stl(prepared_part, path_str)
             self.logger.print(f"Saved {path_str}", symbol="📄")
 
         # Run STL meshing and file export in parallel to utilize all CPU cores.
