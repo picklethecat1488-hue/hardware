@@ -4,12 +4,10 @@ from model import AppConfig, method_cache
 from build import Builder
 from shell import Logger
 import argparse
-import cadquery as cq
-from typing import cast, Any, Literal, Annotated, Optional
+from build123d import *  # type: ignore
+from typing import cast, Literal, Annotated, Optional
 from pydantic import validate_call, Field
-import numpy as np
 import json
-from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -25,7 +23,7 @@ class Configurator:
         self._path_cache = {}
         self.executor = ThreadPoolExecutor()
 
-    def get_part_position(self, tube, path, off):
+    def get_part_position(self, tube: Part, path: Wire, off: float):
         """Get a suitable attachment position on the tube."""
         radius = min(self.builder.config.clamp_diameters) / 2
         self._tube_cache[id(tube)] = tube
@@ -34,46 +32,43 @@ class Configurator:
 
     @method_cache
     def get_orientation_normal(self, tube_id, path_id):
-        """Get if we should use midpoint_up, otherwise use midpoint_down."""
-        tube = self._tube_cache[tube_id]
-        path = self._path_cache[path_id]
-        p_tube = cast(Any, tube.val())
-        p_shape = cast(Any, path.val())
-        pos = p_shape.positionAt(0.5)
-        midpoint_up = pos + cq.Vector(0, 0, 1)
-        solid_center = p_tube.Center()
+        """Return True if we should use midpoint_up, False if we should use midpoint_down."""
+        tube: Part = self._tube_cache[tube_id]
+        path: Wire = self._path_cache[path_id]
+        pos = path.position_at(0.5)
+        midpoint_up = pos + Vector(0, 0, 1)
+        solid_center = tube.center()
         # Orientation is normal if midpoint_up is closer to solid center than path position.
-        return (solid_center - midpoint_up).Length < (solid_center - pos).Length
+        return (solid_center - midpoint_up).length < (solid_center - pos).length
 
     @method_cache
     def get_part_position_cached(self, tube_id, path_id, off, radius):
         """Get a cached attachment position on the tube."""
-        path = self._path_cache[path_id]
-        p_shape = cast(Any, path.val())
-        pos = p_shape.positionAt(off)
-        midpoint_up = pos + cq.Vector(0, 0, radius)
-        midpoint_down = pos + cq.Vector(0, 0, -radius)
+        path: Wire = self._path_cache[path_id]
+        pos = path.position_at(off)
+        midpoint_up = pos + Vector(0, 0, radius)
+        midpoint_down = pos + Vector(0, 0, -radius)
         orientation_normal = self.get_orientation_normal(tube_id, path_id)
         return midpoint_up if orientation_normal else midpoint_down
 
-    def shapes_overlap(self, lhs_box, rhs_box):
+    def shapes_overlap(self, lhs_box: BoundBox, rhs_box: BoundBox):
         """Return True when two CAD objects' bounding boxes overlap."""
         return not (
-            lhs_box.xmax < rhs_box.xmin
-            or lhs_box.xmin > rhs_box.xmax
-            or lhs_box.ymax < rhs_box.ymin
-            or lhs_box.ymin > rhs_box.ymax
-            or lhs_box.zmax < rhs_box.zmin
-            or lhs_box.zmin > rhs_box.zmax
+            lhs_box.max.X < rhs_box.min.X
+            or lhs_box.min.X > rhs_box.max.X
+            or lhs_box.max.Y < rhs_box.min.Y
+            or lhs_box.min.Y > rhs_box.max.Y
+            or lhs_box.max.Z < rhs_box.min.Z
+            or lhs_box.min.Z > rhs_box.max.Z
         )
 
-    def parts_not_touching(self, c_shape, o_shape, c_box, o_box):
+    def parts_not_touching(self, c_shape: Part, o_shape: Part, c_box: BoundBox, o_box: BoundBox):
         """Return True if the candidate does not intersect the other object."""
         # Bail early checks here before doing expensive boolean thing.
         if not self.shapes_overlap(c_box, o_box):
             return True
         else:
-            return not c_shape.intersect(o_shape).Solids()
+            return len((c_shape & o_shape).solids()) == 0
 
     def angle_window(self, center, radius, step):
         """Return a wrapped angular window around a center angle."""
@@ -81,20 +76,18 @@ class Configurator:
         end = int(center + radius)
         return [(angle % 360) for angle in range(start, end + 1, step)]
 
-    def scan_angles(self, angles, candidate_factory, other_obj, center):
+    def scan_angles(self, angles, candidate_factory, other_obj: Part, center: Vector):
         """Scan angle candidates and return the best angle based on distance."""
         best_angle = None
         best_distance = float("inf")
-        o_shape = other_obj.val()
-        o_box = o_shape.BoundingBox()
+        o_box = other_obj.bounding_box()
 
         def check_angle(angle):
             candidate = candidate_factory(float(angle))
-            c_shape = candidate.val()
-            c_box = c_shape.BoundingBox()
-            if self.parts_not_touching(c_shape, o_shape, c_box, o_box):
-                candidate_center = c_shape.Center()
-                distance = (candidate_center - center).Length
+            c_box = candidate.bounding_box()
+            if self.parts_not_touching(candidate, other_obj, c_box, o_box):
+                candidate_center = candidate.center()
+                distance = (candidate_center - center).length
                 return angle, distance
             return None, None
 
