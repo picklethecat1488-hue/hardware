@@ -3,10 +3,10 @@ channels:
   - conda-forge
 dependencies:
   - python=3.13
-  - cadquery=2.7
   - jupyterlab=4.4
   - matplotlib=3.10
   - build123d
+  - cadquery
   - pip
   - pip:
     - jupyter-cadquery==4.0.2
@@ -21,3 +21,4 @@ dependencies:
     - pydantic-settings      # Added back for Pydantic v2 settings support
     - pytest-mock 
     - numpy
+    - scipy
