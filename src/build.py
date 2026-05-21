@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import OCP.TopoDS  # type: ignore
 from model import AppConfig, method_cache
+import cadquery as cq  # type: ignore
 from build123d import *  # type: ignore
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, cast, Annotated, Literal
@@ -406,13 +407,18 @@ class Builder:
             move_dir = (center_part - center_full).normalized()
             return move_dir * dist + Vector(0, offset, 0)
 
+        def to_cq_shape(b123d_obj) -> cq.Shape:
+            """Convert a build123d shape to a CadQuery shape."""
+            # Extract the underlying OCP shape and cast it to a CadQuery Shape object
+            return cq.Shape.cast(b123d_obj.wrapped)
+
         if names is None:
             names = self.config.names
         if right_vals is None:
             right_vals = [False, True]
 
         diagram_name = f"{self.config.project_name}_v{self.config.ver}_diagram.svg"
-        exporter = ExportSVG(unit=Unit.MM, line_weight=0.3)
+        assy = cq.Assembly()
 
         # Pre-submit all tasks to the executor to allow actual parallel processing
         results = []
@@ -435,13 +441,13 @@ class Builder:
                     dist=self.config.diagram_part_dist,
                 )
                 locs[right] = loc_vec
-                exporter.add_shape(parts[right].translate(loc_vec))
+                assy.add(to_cq_shape(parts[right].translate(loc_vec)))
 
             # Connect parts to each other with a centerline
             if True in locs and False in locs:
                 mid_point = wire_obj.position_at(0.5)
                 connector = Line(locs[True] + mid_point, locs[False] + mid_point)
-                exporter.add_shape(connector)
+                assy.add(to_cq_shape(connector))
 
             # Label parts with 3D text oriented toward the camera
             projection_dir = self.config.diagram_options.get("projectionDir", (1, -1, 1))
@@ -458,12 +464,11 @@ class Builder:
                 with BuildSketch(Plane(origin=label_loc, z_dir=projection_dir)):
                     Text(label_text, font_size=45)
                 extrude(amount=5)
-            exporter.add_shape(label_gen.part)
+                assy.add(to_cq_shape(label_gen.part))
 
         path_str = str(Path(out_dir) / diagram_name)
-        # Use the projection direction from config to create a 3D isometric effect
-        projection_dir = self.config.diagram_options.get("projectionDir", (1, -1, 1))
-        exporter.write(path_str)
+        # Use CadQuery's exporter via the assembly's compound shape
+        assy.toCompound().export(path_str, opt=self.config.diagram_options)
         self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_all(self, out_dir, right_vals=None, zip_name="build.zip"):
