@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 import zipfile
 from pathlib import Path
-from typing import cast, Any
 
 
 class TestBuilder:
@@ -79,14 +78,18 @@ class TestBuilder:
         # Make sure parts do not self intersect
         part = builder.build_part(name, right=right)
         other_part = builder.build_part(name, right=(not right))
-        assert part.intersect(other_part).volume == pytest.approx(0), f"intersection detected between {name} parts"
+        intersection = part.intersect(other_part)
+        assert (intersection.volume if intersection else 0) == pytest.approx(0), (
+            f"intersection detected between {name} parts"
+        )
 
     def test_part_doesnt_overlap(self, builder, name, right):
         """Ensure parts from different assemblies do not intersect."""
         part = builder.build_part(name, right=right)
         other_name = next(x for x in builder.config.names if x != name)
         other_part = builder.build_part(other_name, right=not right)
-        assert part.intersect(other_part).volume == pytest.approx(0), (
+        intersection = part.intersect(other_part)
+        assert (intersection.volume if intersection else 0) == pytest.approx(0), (
             f"intersection detected between {name},right={right} and {other_name},right={not right}"
         )
 
@@ -123,13 +126,15 @@ class TestBuilder:
         clamp_off = builder.create_ring(
             name, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected
         )
-        assert part.intersect(clamp_off).volume == pytest.approx(0)
+        intersection_off = part.intersect(clamp_off)
+        assert (intersection_off.volume if intersection_off else 0) == pytest.approx(0)
 
         # Check if we can push clamp onto section
         clamp_on = builder.create_ring(
             name, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected - 0.01
         )
-        assert part.intersect(clamp_on).volume > 0
+        intersection_on = part.intersect(clamp_on)
+        assert intersection_on is not None and intersection_on.volume > 0
 
     def test_part(self, name, right, builder):
         """Verify rebuilt part geometry matches manifold volume."""
@@ -137,10 +142,10 @@ class TestBuilder:
             raise ValueError(f"Invalid name: {name}")
         manifold = builder.build_tube(name, right=right, half_tube=True)
         part = builder.build_part(name, right=right)
-        manifold_vol, manifold_from_parts_vol = (
-            manifold.volume,
-            part.intersect(manifold).volume,
-        )
+        manifold_vol = manifold.volume
+        intersection = part.intersect(manifold)
+        manifold_from_parts_vol = intersection.volume if intersection else 0
+
         error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
         # less than 0.5% error for each rebuilt part.
         assert error_pct < 0.5
@@ -205,7 +210,7 @@ class TestBuilder:
 
     def test_overall_bounds(self, builder, name):
         """Verify assembly bounding box dimensions."""
-        part = builder.build_part(name).fuse(builder.build_part(name, right=True))
+        part = Compound(builder.build_part(name).fuse(builder.build_part(name, right=True)))
         bbox = part.bounding_box()
 
         if name == "driver":
