@@ -2,7 +2,6 @@
 
 import argparse
 import math
-import numpy as np
 import os
 from pathlib import Path
 import OCP.TopoDS  # type: ignore
@@ -10,7 +9,7 @@ from model import AppConfig, method_cache
 import cadquery as cq  # type: ignore
 from build123d import *  # type: ignore
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Optional, cast, Annotated, Literal
+from typing import Optional, cast, Annotated, Literal
 from pydantic import validate_call, Field
 import zipfile
 from shell import Logger
@@ -43,7 +42,7 @@ class Builder:
             Line(inlet_start, inlet_end)
             Spline([inlet_end, outlet_start], tangents=(v_start, v_end))
             Line(outlet_start, outlet_start + v_end * self.config.clamp_lengths[-1])
-        return path.line.wire()
+        return path.wire()
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -229,8 +228,8 @@ class Builder:
         with BuildSketch() as s:
             Text(
                 text,
-                font_size=self.config.logo_text_args.get("size", 10),
-                font=self.config.logo_text_args.get("font", "Arial"),
+                font_size=self.config.logo_text_args.get("fontsize", 10),
+                font=self.config.logo_text_args.get("fontPath", "Arial"),
             )
         return s.sketch
 
