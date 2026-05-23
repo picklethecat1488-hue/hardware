@@ -4,7 +4,7 @@ from functools import wraps
 import inspect
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Callable, TypeVar, overload, Union, Literal, cast
+from typing import Any, Callable, TypeVar, overload, Literal, cast
 from functools import cached_property
 import numpy as np
 import yaml
@@ -108,8 +108,8 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
             with open(yml_path, "r") as f:
                 try:
                     self._measurements = yaml.safe_load(f)
-                except yaml.YAMLError:
-                    raise ValueError("missing or invalid measurements.yml")
+                except yaml.YAMLError as e:
+                    raise ValueError("missing or invalid measurements.yml") from e
 
     @cached_property
     def measurements(self) -> dict[int, np.ndarray]:
