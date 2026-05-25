@@ -22,8 +22,9 @@ There are two manifolds, driver and passenger. The manifolds are further separat
 ## Source Files
 
 - **src/measurements.yml** \- contains raw measurements used to construct the manifolds.
-- **src/build.py** \- contains the build source.
-- **src/config.py** \- contains the configurator source.
+- **src/build.py** \- build the project outputs.
+- **src/config.py** \- do any application configuration.
+- **src/view.py** \- view and debug project assets.
 - **src/exhaust\_manifolds.ipynb** \- contains examples of using the `Builder` class in Jupyter Lab.
 - **tests/\*\*** \- contains test suite files.
 
@@ -57,6 +58,11 @@ python build.py
 If the profile of the exhaust tubes has changed, you may need to run this command to get the correct output prior to running `build.py`:
 ```
 python config.py
+```
+
+If you want to view parts or profiles, use `view.py`. For example:
+```
+python view.py parts
 ```
 
 Prior to updating `build.py`, these commands should be run to ensure proper formatting:
