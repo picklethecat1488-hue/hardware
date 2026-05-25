@@ -3,16 +3,15 @@ channels:
   - conda-forge
 dependencies:
   - python=3.13
-  - jupyterlab=4.4
   - matplotlib=3.10
   - build123d
   - cadquery
   - pip
   - pip:
-    - jupyter-cadquery==4.0.2
     - ocp-vscode==2.7.1
     - pyvista==0.47.3
     - opencv-python==4.13.0.92
+    - ocp_vscode
     - pytest==9.0.3
     - halo
     - html_sanitizer
