@@ -225,11 +225,14 @@ class Builder:
     @method_cache
     def create_text_shape(self, text: Annotated[str, Field(min_length=1)]) -> Sketch:
         """Return a cached logo text shape."""
+        args = self.config.logo_text_args.model_dump()
         with BuildSketch() as s:
             Text(
                 text,
-                font_size=self.config.logo_text_args.get("fontsize", 10),
-                font=self.config.logo_text_args.get("fontPath", "Arial"),
+                font_size=args.get("font_size", 10),
+                font=args.get("font", "Sans"),
+                font_style=args.get("font_style", FontStyle.REGULAR),
+                align=args.get("align", (Align.CENTER, Align.CENTER)),
             )
         return s.sketch
 
@@ -255,7 +258,7 @@ class Builder:
         with BuildPart() as text_part:
             with BuildSketch():
                 add(self.create_text_shape(text))
-            extrude(amount=self.config.logo_text_args.get("height", 1))
+            extrude(amount=self.config.logo_text_args.height)
 
         transformation = loc * Rotation(0, 90, 0) * Rotation(angle_deg, 0, 0) * Pos(0, 0, outer_radius)
         return text_part.part.moved(transformation)

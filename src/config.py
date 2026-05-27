@@ -219,7 +219,7 @@ def main(logger, args):
         configurator.configure_all(**gen_args)
 
     # Output the changed items only and exit.
-    changed_items = config.model_dump(by_alias=True)
+    changed_items = config.model_dump(by_alias=True, mode="json")
     if len(changed_items) > 0:
         with open(args.env, "w") as file:
             for key, value in changed_items.items():

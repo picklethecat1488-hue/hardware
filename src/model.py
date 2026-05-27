@@ -4,13 +4,24 @@ from functools import wraps
 import inspect
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Callable, TypeVar, overload, Literal, cast
+from typing import Any, Callable, TypeVar, overload, Literal, cast, Tuple
 from functools import cached_property
 import numpy as np
 import yaml
 from build123d import *  # type: ignore
+from pydantic import BaseModel, Field
 from pydantic_changedetect import ChangeDetectionMixin
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class TextArgs(BaseModel):
+    """Text configuration arguments."""
+
+    font_size: float = 10
+    font: str = "Sans"
+    align: Tuple[Align, Align] = (Align.CENTER, Align.CENTER)
+    font_style: FontStyle = FontStyle.BOLD
+    height: float = 3
 
 
 class AppConfig(ChangeDetectionMixin, BaseSettings):
@@ -62,14 +73,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     _measurements: list[list[float]] = []
 
     # The logo text arguments
-    logo_text_args: dict[str, Any] = {
-        "fontsize": 10,
-        "distance": 3,
-        "fontPath": "Sans",
-        "halign": "center",
-        "valign": "center",
-        "kind": "bold",
-    }
+    logo_text_args: TextArgs = TextArgs()
 
     # The logo text offset, pathwise and anglewise
     logo_text_positions: dict[str, tuple[float, float]] = {
