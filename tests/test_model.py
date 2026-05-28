@@ -5,7 +5,7 @@ import yaml
 import numpy as np
 import pytest
 from pathlib import Path
-from model import method_cache, AppConfig, TubeConfig
+from model import method_cache, AppConfig, TubeConfig, parse_measurements
 
 
 class MockService:
@@ -140,7 +140,7 @@ class TestModel:
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
-        measurements = TubeConfig.parse_measurements(str(yml_file))
+        measurements = parse_measurements(str(yml_file))
         assert "point_a" in measurements
         assert np.array_equal(measurements["point_a"], np.array([10.0, 20.0, 30.0]))
 
@@ -151,7 +151,7 @@ class TestModel:
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
-        measurements = TubeConfig.parse_measurements(f"{yml_file}:v2")
+        measurements = parse_measurements(f"{yml_file}:v2")
         assert measurements["p1"][0] == 2
 
     def test_measurements_list_format_conversion(self, tmp_path):
@@ -161,7 +161,7 @@ class TestModel:
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
-        measurements = TubeConfig.parse_measurements(str(yml_file))
+        measurements = parse_measurements(str(yml_file))
         assert measurements[1][0] == 10
         assert measurements[2][0] == 20
 

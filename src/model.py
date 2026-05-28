@@ -1,221 +1,54 @@
 """Data models and configuration for the exhaust manifolds project."""
 
-from functools import wraps
 import os
-import inspect
 import json
-from collections import OrderedDict
-from pathlib import Path
-from typing import Any, Callable, TypeVar, overload, Literal, cast, Tuple, Optional
 from functools import cached_property
+from pathlib import Path
+from typing import Any, cast
+
 import numpy as np
-import yaml
-from build123d import *  # type: ignore
-from pydantic import BaseModel, Field
+from pydantic import Field
 from pydantic_changedetect import ChangeDetectionMixin
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from build123d import BuildPart, Box, Part, Location, Mode, add
 
-
-class TextArgs(BaseModel):
-    """Text configuration arguments."""
-
-    font_size: float = Field(default=10, description="Font size in points")
-    font: str = Field(default="Sans", description="Font name")
-    align: Tuple[Align, Align] = Field(
-        default=(Align.CENTER, Align.CENTER), description="Horizontal and vertical alignment"
-    )
-    font_style: FontStyle = Field(default=FontStyle.BOLD, description="Font style (Regular, Bold, Italic)")
-    height: float = Field(default=3, description="Extrusion height of the text")
-
-
-class DiagramOptions(BaseModel):
-    """Diagram export configuration."""
-
-    show_axes: bool = Field(default=False, alias="showAxes", description="Show coordinate axes")
-    stroke_width: float = Field(default=3, alias="strokeWidth", description="Width of lines")
-    stroke_color: Tuple[int, int, int] = Field(default=(0, 0, 0), alias="strokeColor", description="RGB color of lines")
-    projection_dir: Tuple[float, float, float] = Field(
-        default=(1, 1, 1), alias="projectionDir", description="Camera projection direction"
-    )
-    width: int = Field(default=1024, description="Output image width")
-    height: int = Field(default=1024, description="Output image height")
-
-
-class TubeConfig(BaseModel):
-    """Tube and part configuration."""
-
-    measurements_path: Optional[str] = Field(
-        default=None,
-        description="Optional override for the measurements YAML file path. Defaults to AppConfig.measurements_path.",
-    )
-
-    wall_thickness: float = Field(default=3.0, description="Wall thickness ~3mm", gt=0)
-
-    clamp_diameters: list[float] = Field(
-        default_factory=lambda: [63.5, 76.2, 63.5],
-        description='Inlet and outlet diameters, 2.5", inner clamp diameter 3"',
-        min_length=3,
-    )
-
-    clamp_lengths: list[float] = Field(
-        default_factory=lambda: [50.4, 25.4, 50.4],
-        description='Inlet and outlet clamp length 2", inner clamp length 1"',
-        min_length=3,
-    )
-
-    clamp_positions: dict[str, list[tuple[float, float] | None]] = Field(
-        default_factory=lambda: {
-            "driver": [None, (0.5, 0), None],
-            "passenger": [None, (0.5, 0), None],
-        },
-        description="The clamp positions, each one is a tuple of path offset and angle offset",
-    )
-
-    clamp_space: float = Field(default=15, description="Space between clamps on each side", ge=0)
-
-    joint_radius: float = Field(default=1.5, description="The radius of the circular lap joint features", gt=0)
-
-    joint_space: float = Field(default=0.3, description="The clearance added to the recess side of the lap joint", ge=0)
-
-    names: list[Literal["driver", "passenger"]] = Field(
-        default_factory=lambda: ["driver", "passenger"], description="The part names, driver and passenger"
-    )
-
-    logo_text_args: TextArgs = Field(default_factory=TextArgs, description="The logo text arguments")
-
-    logo_text_positions: dict[str, tuple[float, float]] = Field(
-        default_factory=lambda: {
-            "driver": (0.4, 0),
-            "passenger": (0.4, 0),
-        },
-        description="The logo text offset, pathwise and anglewise",
-    )
-
-    @classmethod
-    def parse_measurements(cls, path: str) -> dict[int | str, np.ndarray]:
-        """Parse the measurements YAML file and return processed numpy arrays."""
-        if ":" in path:
-            file_path_str, key = path.split(":", 1)
-        else:
-            file_path_str, key = path, None
-
-        file_path = Path(file_path_str)
-        if not file_path.exists():
-            return {}
-
-        with open(file_path, "r") as f:
-            try:
-                raw_data = yaml.safe_load(f) or {}
-                data = raw_data.get(key, {}) if key else raw_data
-            except yaml.YAMLError as e:
-                raise ValueError(f"Invalid YAML at {file_path}") from e
-
-        p = {}
-        if isinstance(data, list):
-            for idx, item in enumerate(data):
-                p[idx + 1] = np.array(item, dtype=float)
-        elif isinstance(data, dict):
-            for k, item in data.items():
-                p[k] = np.array(item, dtype=float)
-        return p
-
-    @cached_property
-    def measurements(self) -> dict[int, np.ndarray]:
-        """Return raw measurement points."""
-        if self.measurements_path is None:
-            raise ValueError(
-                "measurements_path is not set. This usually happens if TubeConfig is used outside of AppConfig."
-            )
-
-        raw = TubeConfig.parse_measurements(cast(str, self.measurements_path))
-        # Filter to ensure we only have integer keys for the manifold specific Z-corrections
-        p = {int(k): v for k, v in raw.items() if isinstance(k, int) or (isinstance(k, str) and k.isdigit())}
-
-        # Correct for expected Z offset- middle of outlet instead of top
-        for idx in [3, 6, 9, 10]:
-            if idx in p:
-                p[idx][2] = p[idx][2] - min(self.clamp_diameters) / 2
-        return cast(dict[int, np.ndarray], p)
-
-    def _ndarray2vec(self, arr: np.ndarray) -> Vector:
-        return Vector(X=float(arr[0]), Y=float(arr[1]), Z=float(arr[2]))
-
-    @cached_property
-    def P(self) -> dict[str, Vector]:
-        """Get position vectors for all endpoints."""
-        return {
-            "driver_inlet": self._ndarray2vec(self.measurements[6]),
-            "driver_outlet": self._ndarray2vec(self.measurements[9]),
-            "passenger_inlet": self._ndarray2vec(self.measurements[3]),
-            "passenger_outlet": self._ndarray2vec(self.measurements[10]),
-        }
-
-    @cached_property
-    def V(self) -> dict[str, Vector]:
-        """Get direction vectors for all endpoints."""
-
-        def dir_vector(start, end):
-            v = np.array(end) - np.array(start)
-            return v / np.linalg.norm(v)
-
-        return {
-            "driver_inlet": self._ndarray2vec(dir_vector(self.measurements[7], self.measurements[8])),
-            "driver_outlet": Vector(X=-1, Y=0, Z=0),
-            "passenger_inlet": self._ndarray2vec(dir_vector(self.measurements[5], self.measurements[4])),
-            "passenger_outlet": Vector(X=1, Y=0, Z=0),
-        }
+from models import TextArgs, DiagramOptions, TubeConfig, method_cache, parse_measurements
 
 
 class AppConfig(ChangeDetectionMixin, BaseSettings):
     """Application build configuration."""
 
     project_name: str = Field(default="exhaust_manifolds", description="The project name")
-
-    ver: int = Field(default=4, description="Build version", gt=0)
-
+    ver: int = Field(default=4, gt=0, description="Build version")
     measurements_path: str = Field(
         default=str(Path(__file__).parent / "measurements.yml"),
         description="Path to the measurements YAML file, optionally followed by ':key' to select a sub-entry.",
     )
-
     x_bounds: list[float] = Field(
         default_factory=lambda: [145, 950],
         description="The project x boundaries",
         min_length=2,
         max_length=2,
     )
-
     y_bounds: list[float] = Field(
         default_factory=lambda: [-32, 390],
         description="The project y boundaries",
         min_length=2,
         max_length=2,
     )
-
     z_bounds: list[float] = Field(
         default_factory=lambda: [145, 530],
         description="The project z boundaries",
         min_length=2,
         max_length=2,
     )
-
     tube: TubeConfig = Field(default_factory=TubeConfig, description="Tube and part configuration")
-
     diagram_options: DiagramOptions = Field(default_factory=DiagramOptions, description="Diagram export options")
-
     diagram_part_offset: int = Field(default=60, description="Distance between manifold assemblies in the diagram")
-
     diagram_part_dist: int = Field(default=120, description="Distance between exploded halves in the diagram")
-
     diagram_label_dist: int = Field(default=120, description="Distance of the labels from the parts in the diagram")
 
-    """ The list of model keys which flattening gets applied to by dump_env. """
-    _env_flattened_keys: list[str] = [
-        "TUBE",
-        "LOGO_TEXT_ARGS",
-        "LOGO_TEXT_POSITIONS",
-        "DIAGRAM_OPTIONS",
-    ]
+    _env_flattened_keys: list[str] = ["TUBE", "LOGO_TEXT_ARGS", "LOGO_TEXT_POSITIONS", "DIAGRAM_OPTIONS"]
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -227,7 +60,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     )
 
     def model_post_init(self, __context: Any) -> None:
-        """Ensure TubeConfig has a valid measurements_path default."""
+        """Sync global settings to sub-models after initialization."""
         if self.tube.measurements_path is None:
             self.tube.measurements_path = self.measurements_path
 
@@ -244,23 +77,19 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
                 if k_upper in self._env_flattened_keys and isinstance(v, dict):
                     write_recursive(f, v, f"{full_key}__")
                 else:
-                    # Relativize absolute paths for portability in the .env file
                     val = v
                     if isinstance(v, str):
                         path_candidate = v
                         suffix = ""
-                        # Handle 'path:key' syntax used for measurements
                         if ":" in v and not os.path.exists(v):
                             parts = v.rsplit(":", 1)
                             if os.path.isabs(parts[0]):
                                 path_candidate, suffix = parts[0], ":" + parts[1]
-
                         if os.path.isabs(path_candidate) and os.path.exists(path_candidate):
                             try:
                                 val = os.path.relpath(path_candidate, env_dir) + suffix
                             except (ValueError, TypeError):
                                 pass
-
                     val_str = json.dumps(val, separators=(",", ":")) if isinstance(val, (dict, list)) else str(val)
                     f.write(f"{full_key}={val_str}\n")
 
@@ -270,7 +99,6 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     @cached_property
     def bound_box(self) -> Part:
         """Return the axis-aligned build bounding box."""
-        # Create the overall bounds.
         x_len = np.max(self.x_bounds) - np.min(self.x_bounds)
         y_len = np.max(self.y_bounds) - np.min(self.y_bounds)
         z_len = np.max(self.z_bounds) - np.min(self.z_bounds)
@@ -283,8 +111,6 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         with BuildPart() as bounds:
             Box(x_len, y_len, z_len)
             cast(Part, bounds.part).move(Location(center))
-
-            # Subtract the valve controller bottom plane from the overall bounds.
             vx_len = self.tube.measurements[2][0] - self.tube.measurements[1][0]
             vy_len = np.max(self.y_bounds) - np.mean([self.tube.measurements[2][1], self.tube.measurements[1][1]])
             vz_len = np.max(self.z_bounds) - np.mean([self.tube.measurements[2][2], self.tube.measurements[1][2]])
@@ -296,59 +122,3 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
             with BuildPart(mode=Mode.SUBTRACT):
                 add(Box(vx_len, vy_len, vz_len).moved(Location(v_center)))
         return cast(Part, bounds.part)
-
-
-# Generic type for callables used by the method_cache decorator
-T = TypeVar("T", bound=Callable[..., Any])
-
-
-@overload
-def method_cache(func: Callable[..., Any]) -> Callable[..., Any]: ...
-
-
-@overload
-def method_cache(*, maxsize: int = 128) -> Callable[[Callable[..., Any]], Callable[..., Any]]: ...
-
-
-def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128) -> Any:
-    """Create per-instance cache to avoid memory leaks and Pydantic @validate_call conflicts."""
-
-    def decorator(f: T) -> T:
-        """Implement the decorator behavior for method_cache."""
-
-        @wraps(f)
-        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            # Create a unique string identifier for this specific method
-            cache_attr = f"_cache_{f.__name__}"
-            if not hasattr(self, cache_attr):
-                setattr(self, cache_attr, OrderedDict())
-            cache = getattr(self, cache_attr)
-
-            # Create a cache key from the arguments
-            key = (args, tuple(sorted(kwargs.items())))
-            if key in cache:
-                cache.move_to_end(key)
-                return cache[key]
-
-            # Compute new value
-            result = f(self, *args, **kwargs)
-            cache[key] = result
-            if len(cache) > maxsize:
-                cache.popitem(last=False)
-            return result
-
-        # Masking __wrapped__ prevents Pydantic 2.x from following the wrapper back
-        # to underlying compiled 'cyfunction' types, which causes validation errors.
-        try:
-            setattr(wrapper, "__signature__", inspect.signature(f))
-        except (ValueError, TypeError):
-            pass
-
-        if hasattr(wrapper, "__wrapped__"):
-            delattr(wrapper, "__wrapped__")
-
-        return cast(T, wrapper)
-
-    if func is None:
-        return decorator
-    return decorator(func)
