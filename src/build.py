@@ -543,9 +543,7 @@ def main(logger, args):
     builder = Builder(logger=logger)
 
     if not args.env is None:
-        with open(args.env, "w") as f:
-            for key, value in builder.config.model_dump().items():
-                f.write(f"{key}={value}\n")
+        builder.config.dump_env(args.env)
         logger.print(f"Saved environment to {args.env}", symbol="⚙️ ")
 
     if not args.diagram is None:

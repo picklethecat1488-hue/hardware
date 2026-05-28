@@ -2,6 +2,7 @@
 
 from functools import wraps
 import inspect
+import json
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable, TypeVar, overload, Literal, cast, Tuple
@@ -124,18 +125,41 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
 
     diagram_label_dist: int = Field(default=120, description="Distance of the labels from the parts in the diagram")
 
+    """ The list of model keys which flattening gets applied to by dump_env. """
+    _env_flattened_keys: list[str] = ["LOGO_TEXT_ARGS", "DIAGRAM_OPTIONS"]
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_prefix="APP_",
         alias_generator=str.upper,
         validate_by_name=True,
         validate_by_alias=True,
+        env_nested_delimiter="__",
     )
 
     def __init__(self, **kwargs):
         """Initialize the config and load measurements from YAML."""
         super().__init__(**kwargs)
         self._measurements = parse_measurements(self.measurements_path)
+
+    def dump_env(self, path: str | Path):
+        """Dump the configuration to a .env file with flattened nested keys."""
+        dump = self.model_dump(by_alias=True, mode="json")
+        with open(path, "w") as f:
+            for key, value in dump.items():
+                if key in self._env_flattened_keys and isinstance(value, dict):
+                    for sub_key, sub_value in value.items():
+                        # Flatten nested models into individual lines using the double underscore delimiter
+                        if isinstance(sub_value, (dict, list)):
+                            val_str = json.dumps(sub_value, separators=(",", ":"))
+                        else:
+                            val_str = str(sub_value)
+                        f.write(f"{key}__{sub_key.upper()}={val_str}\n")
+                elif isinstance(value, (dict, list)):
+                    val_str = json.dumps(value, separators=(",", ":"))
+                    f.write(f"{key}={val_str}\n")
+                else:
+                    f.write(f"{key}={value}\n")
 
     @cached_property
     def measurements(self) -> dict[int, np.ndarray]:
