@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from unittest.mock import MagicMock
 from typing import Any
 import threading
 import config
@@ -215,7 +216,7 @@ class TestConfig:
 
         configurator.config_clamp("driver")
 
-        assert dummy_config.clamp_positions["driver"][1][1] == 0.0
+        assert dummy_config.tube.clamp_positions["driver"][1][1] == 0.0
         # Verify that the coarse scan (range(0, 360, 10)) and fine scan (mocked) were executed.
         assert len(builder.clamp_calls) > 30
         assert 0.0 in builder.clamp_calls
@@ -230,7 +231,7 @@ class TestConfig:
 
         configurator.config_text_logo("driver")
 
-        assert dummy_config.logo_text_positions["driver"][1] == 0.0
+        assert dummy_config.tube.logo_text_positions["driver"][1] == 0.0
         # Verify that the coarse scan (range(0, 360, 10)) and fine scan (mocked) were executed.
         assert len(builder.text_calls) > 30
         assert 0.0 in builder.text_calls
