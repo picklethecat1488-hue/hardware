@@ -1,6 +1,7 @@
 """Data models and configuration for the exhaust manifolds project."""
 
 from functools import wraps
+import os
 import inspect
 import json
 from collections import OrderedDict
@@ -234,6 +235,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         """Dump the configuration to a .env file with flattened nested keys."""
         env_prefix = cast(str, self.model_config.get("env_prefix", ""))
         dump = self.model_dump(by_alias=True, mode="json")
+        env_dir = Path(path).parent.absolute()
 
         def write_recursive(f, data, prefix=""):
             for k, v in data.items():
@@ -242,7 +244,24 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
                 if k_upper in self._env_flattened_keys and isinstance(v, dict):
                     write_recursive(f, v, f"{full_key}__")
                 else:
-                    val_str = json.dumps(v, separators=(",", ":")) if isinstance(v, (dict, list)) else str(v)
+                    # Relativize absolute paths for portability in the .env file
+                    val = v
+                    if isinstance(v, str):
+                        path_candidate = v
+                        suffix = ""
+                        # Handle 'path:key' syntax used for measurements
+                        if ":" in v and not os.path.exists(v):
+                            parts = v.rsplit(":", 1)
+                            if os.path.isabs(parts[0]):
+                                path_candidate, suffix = parts[0], ":" + parts[1]
+
+                        if os.path.isabs(path_candidate) and os.path.exists(path_candidate):
+                            try:
+                                val = os.path.relpath(path_candidate, env_dir) + suffix
+                            except (ValueError, TypeError):
+                                pass
+
+                    val_str = json.dumps(val, separators=(",", ":")) if isinstance(val, (dict, list)) else str(val)
                     f.write(f"{full_key}={val_str}\n")
 
         with open(path, "w") as f:
