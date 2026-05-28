@@ -33,6 +33,11 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
 
     ver: int = Field(default=4, description="Build version", gt=0)
 
+    measurements_path: str = Field(
+        str(Path(__file__).parent / "measurements.yml"),
+        description="Path to the measurements YAML file, optionally followed by ':key' to select a sub-entry.",
+    )
+
     x_bounds: list[float] = Field(
         default_factory=lambda: [145, 950],
         description="The project x boundaries",
@@ -86,7 +91,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         default_factory=lambda: ["driver", "passenger"], description="The part names, driver and passenger"
     )
 
-    _measurements: list[list[float]] = []
+    _measurements: list[list[float]] | dict[int | str, list[float]] = []
 
     logo_text_args: TextArgs = Field(default_factory=TextArgs, description="The logo text arguments")
 
@@ -120,26 +125,28 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         env_file=".env",
         env_prefix="APP_",
         alias_generator=str.upper,
-        populate_by_name=True,
+        validate_by_name=True,
+        validate_by_alias=True,
     )
 
     def __init__(self, **kwargs):
         """Initialize the config and load measurements from YAML."""
         super().__init__(**kwargs)
-        yml_path = Path(__file__).parent / "measurements.yml"
-        if yml_path.exists():
-            with open(yml_path, "r") as f:
-                try:
-                    self._measurements = yaml.safe_load(f)
-                except yaml.YAMLError as e:
-                    raise ValueError("missing or invalid measurements.yml") from e
+        self._measurements = parse_measurements(self.measurements_path)
 
     @cached_property
     def measurements(self) -> dict[int, np.ndarray]:
         """Return raw measurement points."""
         p = {}
-        for idx, item in enumerate(self._measurements):
-            p[idx + 1] = np.array(item)
+        if isinstance(self._measurements, list):
+            measurements = cast(list, self._measurements)
+            for idx, item in enumerate(measurements):
+                p[idx + 1] = np.array(item)
+        elif isinstance(self._measurements, dict):
+            measurements = cast(dict, self._measurements)
+            for key, item in measurements.items():
+                p[key] = np.array(item)
+
         # Correct for expected Z offset- middle of outlet instead of top
         for idx in [3, 6, 9, 10]:
             p[idx][2] = p[idx][2] - min(self.clamp_diameters) / 2
@@ -193,7 +200,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
 
         with BuildPart() as bounds:
             Box(x_len, y_len, z_len)
-            bounds.part.move(Location(center))
+            cast(Part, bounds.part).move(Location(center))
 
             # Subtract the valve controller bottom plane from the overall bounds.
             vx_len = self.measurements[2][0] - self.measurements[1][0]
@@ -206,7 +213,26 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
             )
             with BuildPart(mode=Mode.SUBTRACT):
                 add(Box(vx_len, vy_len, vz_len).moved(Location(v_center)))
-        return bounds.part
+        return cast(Part, bounds.part)
+
+
+def parse_measurements(measurements_path: str) -> Any:
+    """Parse the measurements YAML file and return the raw data."""
+    if ":" in measurements_path:
+        file_path_str, key = measurements_path.split(":", 1)
+    else:
+        file_path_str, key = measurements_path, None
+
+    file_path = Path(file_path_str)
+    if not file_path.exists():
+        return {}
+
+    with open(file_path, "r") as f:
+        try:
+            data = yaml.safe_load(f) or {}
+            return data.get(key, {}) if key else data
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML at {file_path}") from e
 
 
 # Generic type for callables used by the method_cache decorator
