@@ -219,17 +219,9 @@ def main(logger, args):
         configurator.configure_all(**gen_args)
 
     # Output the changed items only and exit.
-    changed_items = config.model_dump(by_alias=True, mode="json")
-    if len(changed_items) > 0:
-        with open(args.env, "w") as file:
-            for key, value in changed_items.items():
-                if isinstance(value, (dict, list)):
-                    # Use compact separators to ensure standard .env parsing
-                    value_str = json.dumps(value, separators=(",", ":"))
-                else:
-                    value_str = str(value)
-                file.write(f"{key}={value_str}\n")
-            logger.print(f"Saved environment to {args.env}", symbol="⚙️ ")
+    if args.env:
+        config.dump_env(args.env)
+        logger.print(f"Saved environment to {args.env}", symbol="⚙️ ")
     logger.done()
 
 
