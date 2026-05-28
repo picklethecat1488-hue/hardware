@@ -25,7 +25,7 @@ class Configurator:
 
     def get_part_position(self, tube: Part, path: Wire, off: float):
         """Get a suitable attachment position on the tube."""
-        radius = min(self.builder.config.clamp_diameters) / 2
+        radius = min(self.builder.config.tube.clamp_diameters) / 2
         self._tube_cache[id(tube)] = tube
         self._path_cache[id(path)] = path
         return self.get_part_position_cached(id(tube), id(path), off, radius)
@@ -117,8 +117,8 @@ class Configurator:
         other_tube = self.builder.build_part(name, right=True, tube_only=True)
         path = self.builder.create_wire(name)
 
-        for idx in range(1, len(self.config.clamp_positions[name]) - 1):
-            pos_info = self.config.clamp_positions[name][idx]
+        for idx in range(1, len(self.config.tube.clamp_positions[name]) - 1):
+            pos_info = self.config.tube.clamp_positions[name][idx]
             if not pos_info is None:
                 clamp_offset, _ = pos_info
                 center = self.get_part_position(tube, path, clamp_offset)
@@ -131,7 +131,7 @@ class Configurator:
                 # Update the clamp offset
                 if offset_deg is None:
                     raise ValueError(f"failed to configure {name} clamp") from None
-                self.config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
+                self.config.tube.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
                 self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -140,7 +140,7 @@ class Configurator:
         tube = self.builder.build_part(name, right=True, tube_only=True)
         other_tube = self.builder.build_part(name, tube_only=True)
         path = self.builder.create_wire(name)
-        text_offset, _ = self.config.logo_text_positions[name]
+        text_offset, _ = self.config.tube.logo_text_positions[name]
         center = self.get_part_position(tube, path, text_offset)
         offset_deg = self.find_best_angle(
             lambda angle: self.builder.build_text(name, "FHB", right=True, offset_deg=angle),
@@ -151,7 +151,7 @@ class Configurator:
         # Update the text offset
         if offset_deg is None:
             raise ValueError(f"failed to configure {name} text logo") from None
-        self.config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
+        self.config.tube.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
         self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -166,7 +166,7 @@ class Configurator:
     def configure_text_logos(self, names: list[Literal["driver", "passenger"]] = ["driver", "passenger"]):
         """Configure logo text for all specified parts."""
         if names is None:
-            names = self.config.names
+            names = self.config.tube.names
         # Run configuration tasks for each part in parallel.
         futures = [self.executor.submit(self.config_text_logo, name) for name in names]
         for future in futures:

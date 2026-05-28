@@ -5,7 +5,7 @@ import inspect
 import json
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Callable, TypeVar, overload, Literal, cast, Tuple
+from typing import Any, Callable, TypeVar, overload, Literal, cast, Tuple, Optional
 from functools import cached_property
 import numpy as np
 import yaml
@@ -40,37 +40,12 @@ class DiagramOptions(BaseModel):
     height: int = Field(default=1024, description="Output image height")
 
 
-class AppConfig(ChangeDetectionMixin, BaseSettings):
-    """Application build configuration."""
+class TubeConfig(BaseModel):
+    """Tube and part configuration."""
 
-    project_name: str = Field(default="exhaust_manifolds", description="The project name")
-
-    ver: int = Field(default=4, description="Build version", gt=0)
-
-    measurements_path: str = Field(
-        default=str(Path(__file__).parent / "measurements.yml"),
-        description="Path to the measurements YAML file, optionally followed by ':key' to select a sub-entry.",
-    )
-
-    x_bounds: list[float] = Field(
-        default_factory=lambda: [145, 950],
-        description="The project x boundaries",
-        min_length=2,
-        max_length=2,
-    )
-
-    y_bounds: list[float] = Field(
-        default_factory=lambda: [-32, 390],
-        description="The project y boundaries",
-        min_length=2,
-        max_length=2,
-    )
-
-    z_bounds: list[float] = Field(
-        default_factory=lambda: [145, 530],
-        description="The project z boundaries",
-        min_length=2,
-        max_length=2,
+    measurements_path: Optional[str] = Field(
+        default=None,
+        description="Optional override for the measurements YAML file path. Defaults to AppConfig.measurements_path.",
     )
 
     wall_thickness: float = Field(default=3.0, description="Wall thickness ~3mm", gt=0)
@@ -115,26 +90,6 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         description="The logo text offset, pathwise and anglewise",
     )
 
-    diagram_options: DiagramOptions = Field(default_factory=DiagramOptions, description="Diagram export options")
-
-    diagram_part_offset: int = Field(default=60, description="Distance between manifold assemblies in the diagram")
-
-    diagram_part_dist: int = Field(default=120, description="Distance between exploded halves in the diagram")
-
-    diagram_label_dist: int = Field(default=120, description="Distance of the labels from the parts in the diagram")
-
-    """ The list of model keys which flattening gets applied to by dump_env. """
-    _env_flattened_keys: list[str] = ["LOGO_TEXT_ARGS", "DIAGRAM_OPTIONS"]
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_prefix="APP_",
-        alias_generator=str.upper,
-        validate_by_name=True,
-        validate_by_alias=True,
-        env_nested_delimiter="__",
-    )
-
     @classmethod
     def parse_measurements(cls, path: str) -> dict[int | str, np.ndarray]:
         """Parse the measurements YAML file and return processed numpy arrays."""
@@ -163,29 +118,15 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
                 p[k] = np.array(item, dtype=float)
         return p
 
-    def dump_env(self, path: str | Path):
-        """Dump the configuration to a .env file with flattened nested keys."""
-        dump = self.model_dump(by_alias=True, mode="json")
-        with open(path, "w") as f:
-            for key, value in dump.items():
-                if key in self._env_flattened_keys and isinstance(value, dict):
-                    for sub_key, sub_value in value.items():
-                        # Flatten nested models into individual lines using the double underscore delimiter
-                        if isinstance(sub_value, (dict, list)):
-                            val_str = json.dumps(sub_value, separators=(",", ":"))
-                        else:
-                            val_str = str(sub_value)
-                        f.write(f"{key}__{sub_key.upper()}={val_str}\n")
-                elif isinstance(value, (dict, list)):
-                    val_str = json.dumps(value, separators=(",", ":"))
-                    f.write(f"{key}={val_str}\n")
-                else:
-                    f.write(f"{key}={value}\n")
-
     @cached_property
     def measurements(self) -> dict[int, np.ndarray]:
         """Return raw measurement points."""
-        raw = AppConfig.parse_measurements(self.measurements_path)
+        if self.measurements_path is None:
+            raise ValueError(
+                "measurements_path is not set. This usually happens if TubeConfig is used outside of AppConfig."
+            )
+
+        raw = TubeConfig.parse_measurements(cast(str, self.measurements_path))
         # Filter to ensure we only have integer keys for the manifold specific Z-corrections
         p = {int(k): v for k, v in raw.items() if isinstance(k, int) or (isinstance(k, str) and k.isdigit())}
 
@@ -201,32 +142,111 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     @cached_property
     def P(self) -> dict[str, Vector]:
         """Get position vectors for all endpoints."""
-        ret_val = {
+        return {
             "driver_inlet": self._ndarray2vec(self.measurements[6]),
             "driver_outlet": self._ndarray2vec(self.measurements[9]),
             "passenger_inlet": self._ndarray2vec(self.measurements[3]),
             "passenger_outlet": self._ndarray2vec(self.measurements[10]),
         }
-        return ret_val
 
     @cached_property
     def V(self) -> dict[str, Vector]:
         """Get direction vectors for all endpoints."""
 
         def dir_vector(start, end):
-            """Generate a 3D direction vector for the given points."""
             v = np.array(end) - np.array(start)
             return v / np.linalg.norm(v)
 
-        raw_driver_inlet = dir_vector(self.measurements[7], self.measurements[8])
-        raw_passenger_inlet = dir_vector(self.measurements[5], self.measurements[4])
-        ret_val = {
-            "driver_inlet": self._ndarray2vec(raw_driver_inlet),
+        return {
+            "driver_inlet": self._ndarray2vec(dir_vector(self.measurements[7], self.measurements[8])),
             "driver_outlet": Vector(X=-1, Y=0, Z=0),
-            "passenger_inlet": self._ndarray2vec(raw_passenger_inlet),
+            "passenger_inlet": self._ndarray2vec(dir_vector(self.measurements[5], self.measurements[4])),
             "passenger_outlet": Vector(X=1, Y=0, Z=0),
         }
-        return ret_val
+
+
+class AppConfig(ChangeDetectionMixin, BaseSettings):
+    """Application build configuration."""
+
+    project_name: str = Field(default="exhaust_manifolds", description="The project name")
+
+    ver: int = Field(default=4, description="Build version", gt=0)
+
+    measurements_path: str = Field(
+        default=str(Path(__file__).parent / "measurements.yml"),
+        description="Path to the measurements YAML file, optionally followed by ':key' to select a sub-entry.",
+    )
+
+    x_bounds: list[float] = Field(
+        default_factory=lambda: [145, 950],
+        description="The project x boundaries",
+        min_length=2,
+        max_length=2,
+    )
+
+    y_bounds: list[float] = Field(
+        default_factory=lambda: [-32, 390],
+        description="The project y boundaries",
+        min_length=2,
+        max_length=2,
+    )
+
+    z_bounds: list[float] = Field(
+        default_factory=lambda: [145, 530],
+        description="The project z boundaries",
+        min_length=2,
+        max_length=2,
+    )
+
+    tube: TubeConfig = Field(default_factory=TubeConfig, description="Tube and part configuration")
+
+    diagram_options: DiagramOptions = Field(default_factory=DiagramOptions, description="Diagram export options")
+
+    diagram_part_offset: int = Field(default=60, description="Distance between manifold assemblies in the diagram")
+
+    diagram_part_dist: int = Field(default=120, description="Distance between exploded halves in the diagram")
+
+    diagram_label_dist: int = Field(default=120, description="Distance of the labels from the parts in the diagram")
+
+    """ The list of model keys which flattening gets applied to by dump_env. """
+    _env_flattened_keys: list[str] = [
+        "TUBE",
+        "LOGO_TEXT_ARGS",
+        "LOGO_TEXT_POSITIONS",
+        "DIAGRAM_OPTIONS",
+    ]
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="APP_",
+        alias_generator=str.upper,
+        validate_by_name=True,
+        validate_by_alias=True,
+        env_nested_delimiter="__",
+    )
+
+    def model_post_init(self, __context: Any) -> None:
+        """Ensure TubeConfig has a valid measurements_path default."""
+        if self.tube.measurements_path is None:
+            self.tube.measurements_path = self.measurements_path
+
+    def dump_env(self, path: str | Path):
+        """Dump the configuration to a .env file with flattened nested keys."""
+        env_prefix = cast(str, self.model_config.get("env_prefix", ""))
+        dump = self.model_dump(by_alias=True, mode="json")
+
+        def write_recursive(f, data, prefix=""):
+            for k, v in data.items():
+                k_upper = k.upper()
+                full_key = f"{prefix}{k_upper}"
+                if k_upper in self._env_flattened_keys and isinstance(v, dict):
+                    write_recursive(f, v, f"{full_key}__")
+                else:
+                    val_str = json.dumps(v, separators=(",", ":")) if isinstance(v, (dict, list)) else str(v)
+                    f.write(f"{full_key}={val_str}\n")
+
+        with open(path, "w") as f:
+            write_recursive(f, dump, prefix=env_prefix)
 
     @cached_property
     def bound_box(self) -> Part:
@@ -246,13 +266,13 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
             cast(Part, bounds.part).move(Location(center))
 
             # Subtract the valve controller bottom plane from the overall bounds.
-            vx_len = self.measurements[2][0] - self.measurements[1][0]
-            vy_len = np.max(self.y_bounds) - np.mean([self.measurements[2][1], self.measurements[1][1]])
-            vz_len = np.max(self.z_bounds) - np.mean([self.measurements[2][2], self.measurements[1][2]])
+            vx_len = self.tube.measurements[2][0] - self.tube.measurements[1][0]
+            vy_len = np.max(self.y_bounds) - np.mean([self.tube.measurements[2][1], self.tube.measurements[1][1]])
+            vz_len = np.max(self.z_bounds) - np.mean([self.tube.measurements[2][2], self.tube.measurements[1][2]])
             v_center = (
-                np.min([self.measurements[2][0], self.measurements[1][0]]) + vx_len / 2,
-                np.min([self.measurements[2][1], self.measurements[1][1]]) + vy_len / 2,
-                np.min([self.measurements[2][2], self.measurements[1][2]]) + vz_len / 2,
+                np.min([self.tube.measurements[2][0], self.tube.measurements[1][0]]) + vx_len / 2,
+                np.min([self.tube.measurements[2][1], self.tube.measurements[1][1]]) + vy_len / 2,
+                np.min([self.tube.measurements[2][2], self.tube.measurements[1][2]]) + vz_len / 2,
             )
             with BuildPart(mode=Mode.SUBTRACT):
                 add(Box(vx_len, vy_len, vz_len).moved(Location(v_center)))

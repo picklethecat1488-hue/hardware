@@ -138,10 +138,11 @@ class DummyConfig:
 
     def __init__(self):
         """Initialize the dummy configuration values."""
-        self.names = ["driver", "passenger"]
-        self.clamp_positions = {"driver": [None, (0.5, 10.0), None], "passenger": [None, (0.5, 10.0), None]}
-        self.logo_text_positions = {"driver": (0.4, 10.0), "passenger": (0.4, 10.0)}
-        self.clamp_diameters = [6.0, 6.0, 6.0]
+        self.tube = MagicMock()
+        self.tube.names = ["driver", "passenger"]
+        self.tube.clamp_positions = {"driver": [None, (0.5, 10.0), None], "passenger": [None, (0.5, 10.0), None]}
+        self.tube.logo_text_positions = {"driver": (0.4, 10.0), "passenger": (0.4, 10.0)}
+        self.tube.clamp_diameters = [6.0, 6.0, 6.0]
 
     def model_dump(self, by_alias=True):
         """Return an empty model dump for the dummy config."""

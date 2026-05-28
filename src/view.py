@@ -16,7 +16,7 @@ class Viewer:
         self.builder = builder
         self.configurator = configurator
         self.logger = logger
-        self.names = builder.config.names
+        self.names = builder.config.tube.names
 
     def get_summary(self, names: list[str]) -> str:
         """Return a truncated summary string of the names being shown."""
@@ -96,7 +96,7 @@ class Viewer:
 
     def show_view(self, scene: str, name: str | None = None, show_bounds: bool = False):
         """Build and show the requested geometry in ocp_vscode."""
-        self.names = [name] if name else self.builder.config.names
+        self.names = [name] if name else self.builder.config.tube.names
 
         to_show = {}
         if show_bounds:
