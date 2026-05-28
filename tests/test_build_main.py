@@ -83,7 +83,7 @@ class TestBuildMain:
         main(mock_logger, args)
         mock_builder.return_value.generate_all.assert_called_once_with(out_dir=tmp_path)
 
-        assert Path(f"{tmp_path}.env").exists()
+        mock_builder.return_value.config.dump_env.assert_called_once_with(f"{tmp_path}.env")
         mock_logger.done.assert_called_once()
 
     def test_main_generate_all_fallback(self, mock_logger, mock_builder, tmp_path):

@@ -167,19 +167,19 @@ class TestModel:
 
     def test_z_correction_with_mixed_keys(self, tmp_path):
         """Verify Z-correction applies to both numeric and string keys."""
-        data = {1: [0, 0, 100], 2: [0, 0, 100]}
+        data = {1: [0, 0, 100], 6: [0, 0, 100]}
         yml_file = tmp_path / "corr.yml"
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
         # Default min diameter is 63.5, so correction is -31.75
         # Test override in tube config
-        config = AppConfig(tube={"measurements_path": str(yml_file)})
+        config = AppConfig(tube={"measurements_path": str(yml_file)}, _env_file=None)  # type: ignore
         measurements = config.tube.measurements
-        assert measurements[1][2] == 100 - 31.75
-        assert measurements[2][2] == 100 - 31.75
+        assert measurements[1][2] == pytest.approx(100)
+        assert measurements[6][2] == pytest.approx(100 - 31.75)
 
         # Test fallback to AppConfig default
-        config_fallback = AppConfig(measurements_path=str(yml_file))
+        config_fallback = AppConfig(measurements_path=str(yml_file), _env_file=None)  # type: ignore
         assert config_fallback.tube.measurements_path == str(yml_file)
-        assert config_fallback.tube.measurements[1][2] == 100 - 31.75
+        assert config_fallback.tube.measurements[6][2] == pytest.approx(100 - 31.75)

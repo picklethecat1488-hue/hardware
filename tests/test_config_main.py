@@ -76,7 +76,7 @@ class TestConfigMain:
 
         main(mock_logger, args)
 
-        configurator_mock.configure_clamps.configure_text_logos(names=["driver"])
+        configurator_mock.configure_text_logos.assert_called_once_with(names=["driver"])
         configurator_mock.configure_all.assert_not_called()
         mock_logger.done.assert_called_once()
 
@@ -93,6 +93,6 @@ class TestConfigMain:
 
         main(logger, args)
 
-        assert env_path.read_text() == "APP_FOO=bar\n"
+        app_config.dump_env.assert_called_once_with(env_path)
         logger.print.assert_called_once()
         logger.done.assert_called_once()

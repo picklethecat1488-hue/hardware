@@ -12,7 +12,7 @@ class TestViewer:
     def mock_builder(self):
         """Mock Builder fixture."""
         builder = MagicMock()
-        builder.config.names = ["driver", "passenger"]
+        builder.config.tube.names = ["driver", "passenger"]
         builder.config.bound_box = "mock_box"
         return builder
 
