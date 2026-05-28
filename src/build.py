@@ -153,7 +153,7 @@ class Builder:
             with BuildSketch(path.location_at(0)):
                 add(profile_sketch)
             sweep(path=path, transition=Transition.ROUND)
-        return tube.part
+        return cast(Part, tube.part)
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -185,7 +185,7 @@ class Builder:
             with BuildSketch(path.location_at(off)):
                 add(profile_sketch)
             sweep(path=ring_path.line)
-        return ring.part
+        return cast(Part, ring.part)
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -262,13 +262,13 @@ class Builder:
             extrude(amount=args.height)
 
         transformation = loc * Rotation(0, 90, 0) * Rotation(angle_deg, 0, 0) * Pos(0, 0, outer_radius)
-        return text_part.part.moved(transformation)
+        return cast(Part, text_part.part).moved(transformation)
 
     def create_chamfer_cone(self, origin: VectorLike, normal: VectorLike, radius: float) -> Part:
         """Create a cone used for chamfering."""
         with BuildPart() as cone:
             Cone(radius, 0, radius, align=(Align.CENTER, Align.CENTER, Align.MIN))
-        return cone.part.moved(Plane(origin=origin, z_dir=normal).location)
+        return cast(Part, cone.part).moved(Plane(origin=origin, z_dir=normal).location)
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -292,7 +292,7 @@ class Builder:
             if chamfer_radius is not None and chamfer_radius > 0:
                 add(self.create_chamfer_cone(path.position_at(0), path.tangent_at(0), chamfer_radius))
                 add(self.create_chamfer_cone(path.position_at(1), path.tangent_at(1) * -1, chamfer_radius))
-        return clean_tool.part
+        return cast(Part, clean_tool.part)
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -467,11 +467,11 @@ class Builder:
                 with BuildSketch(Plane(origin=label_loc, z_dir=projection_dir)):
                     Text(label_text, font_size=45)
                 extrude(amount=5)
-                assy.add(to_cq_shape(label_gen.part))
+                assy.add(to_cq_shape(cast(Part, label_gen.part)))
 
         path_str = str(Path(out_dir) / diagram_name)
         # Use CadQuery's exporter via the assembly's compound shape
-        assy.toCompound().export(path_str, opt=self.config.diagram_options)
+        assy.toCompound().export(path_str, opt=self.config.diagram_options.model_dump(by_alias=True))
         self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_all(self, out_dir, right_vals=None, zip_name="build.zip"):
