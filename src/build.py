@@ -62,6 +62,11 @@ class Builder:
         if joint_space is None:
             joint_space = self.config.joint_space
 
+        # Narrow types for the static analyzer
+        outer_radius = cast(float, outer_radius)
+        inner_radius = cast(float, inner_radius)
+        joint_space = cast(float, joint_space)
+
         if inner_radius >= outer_radius:
             raise ValueError(f"Inner radius must be smaller than outer: {inner_radius=}, {outer_radius=}")
         if angle_deg == 360 and lap_joint:
@@ -202,7 +207,7 @@ class Builder:
         outer_radius = self.config.clamp_diameters[clamp_idx] / 2
         inner_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
         clamp_pos, angle_offset = cast(tuple[float, float], self.config.clamp_positions[name][clamp_idx])
-        if offset_deg:
+        if offset_deg is not None:
             angle_offset = offset_deg
         angle_span = 180
         center_deg = ((0 if right else 180) + angle_offset) % 360
@@ -326,10 +331,10 @@ class Builder:
             if to_fuse:
                 part = part.fuse(*to_fuse)
 
-            # Clean the inner part volume and chamfer the ends
-            chamfer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
-            clean_tool = self.build_clean_tool(name, chamfer_radius=chamfer_radius)
-            part = part.cut(clean_tool)
+        # Clean the inner part volume and chamfer the ends
+        chamfer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
+        clean_tool = self.build_clean_tool(name, chamfer_radius=chamfer_radius)
+        part = part.cut(clean_tool)
         return part
 
     @validate_call(config={"arbitrary_types_allowed": True})

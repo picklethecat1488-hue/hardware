@@ -105,8 +105,6 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         default_factory=lambda: ["driver", "passenger"], description="The part names, driver and passenger"
     )
 
-    _measurements: list[list[float]] | dict[int | str, list[float]] = []
-
     logo_text_args: TextArgs = Field(default_factory=TextArgs, description="The logo text arguments")
 
     logo_text_positions: dict[str, tuple[float, float]] = Field(
@@ -137,10 +135,33 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         env_nested_delimiter="__",
     )
 
-    def __init__(self, **kwargs):
-        """Initialize the config and load measurements from YAML."""
-        super().__init__(**kwargs)
-        self._measurements = parse_measurements(self.measurements_path)
+    @classmethod
+    def parse_measurements(cls, path: str) -> dict[int | str, np.ndarray]:
+        """Parse the measurements YAML file and return processed numpy arrays."""
+        if ":" in path:
+            file_path_str, key = path.split(":", 1)
+        else:
+            file_path_str, key = path, None
+
+        file_path = Path(file_path_str)
+        if not file_path.exists():
+            return {}
+
+        with open(file_path, "r") as f:
+            try:
+                raw_data = yaml.safe_load(f) or {}
+                data = raw_data.get(key, {}) if key else raw_data
+            except yaml.YAMLError as e:
+                raise ValueError(f"Invalid YAML at {file_path}") from e
+
+        p = {}
+        if isinstance(data, list):
+            for idx, item in enumerate(data):
+                p[idx + 1] = np.array(item, dtype=float)
+        elif isinstance(data, dict):
+            for k, item in data.items():
+                p[k] = np.array(item, dtype=float)
+        return p
 
     def dump_env(self, path: str | Path):
         """Dump the configuration to a .env file with flattened nested keys."""
@@ -164,23 +185,18 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     @cached_property
     def measurements(self) -> dict[int, np.ndarray]:
         """Return raw measurement points."""
-        p = {}
-        if isinstance(self._measurements, list):
-            measurements = cast(list, self._measurements)
-            for idx, item in enumerate(measurements):
-                p[idx + 1] = np.array(item, dtype=float)
-        elif isinstance(self._measurements, dict):
-            measurements = cast(dict, self._measurements)
-            for key, item in measurements.items():
-                p[key] = np.array(item, dtype=float)
+        raw = self.parse_measurements(self.measurements_path)
+        # Filter to ensure we only have integer keys for the manifold specific Z-corrections
+        p = {int(k): v for k, v in raw.items() if isinstance(k, int) or (isinstance(k, str) and k.isdigit())}
 
         # Correct for expected Z offset- middle of outlet instead of top
         for idx in [3, 6, 9, 10]:
-            p[idx][2] = p[idx][2] - min(self.clamp_diameters) / 2
-        return p
+            if idx in p:
+                p[idx][2] = p[idx][2] - min(self.clamp_diameters) / 2
+        return cast(dict[int, np.ndarray], p)
 
     def _ndarray2vec(self, arr: np.ndarray) -> Vector:
-        return Vector(X=arr[0], Y=arr[1], Z=arr[2])
+        return Vector(X=float(arr[0]), Y=float(arr[1]), Z=float(arr[2]))
 
     @cached_property
     def P(self) -> dict[str, Vector]:
@@ -241,25 +257,6 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
             with BuildPart(mode=Mode.SUBTRACT):
                 add(Box(vx_len, vy_len, vz_len).moved(Location(v_center)))
         return cast(Part, bounds.part)
-
-
-def parse_measurements(measurements_path: str) -> Any:
-    """Parse the measurements YAML file and return the raw data."""
-    if ":" in measurements_path:
-        file_path_str, key = measurements_path.split(":", 1)
-    else:
-        file_path_str, key = measurements_path, None
-
-    file_path = Path(file_path_str)
-    if not file_path.exists():
-        return {}
-
-    with open(file_path, "r") as f:
-        try:
-            data = yaml.safe_load(f) or {}
-            return data.get(key, {}) if key else data
-        except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML at {file_path}") from e
 
 
 # Generic type for callables used by the method_cache decorator

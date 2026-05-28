@@ -5,7 +5,7 @@ import yaml
 import numpy as np
 import pytest
 from pathlib import Path
-from model import method_cache, AppConfig, parse_measurements
+from model import method_cache, AppConfig
 
 
 class MockService:
@@ -140,7 +140,7 @@ class TestModel:
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
-        measurements = parse_measurements(str(yml_file))
+        measurements = AppConfig.parse_measurements(str(yml_file))
         assert "point_a" in measurements
         assert np.array_equal(measurements["point_a"], np.array([10.0, 20.0, 30.0]))
 
@@ -151,7 +151,7 @@ class TestModel:
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
-        measurements = parse_measurements(f"{yml_file}:v2")
+        measurements = AppConfig.parse_measurements(f"{yml_file}:v2")
         assert measurements["p1"][0] == 2
 
     def test_measurements_list_format_conversion(self, tmp_path):
@@ -161,18 +161,19 @@ class TestModel:
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
-        measurements = parse_measurements(str(yml_file))
+        measurements = AppConfig.parse_measurements(str(yml_file))
         assert measurements[1][0] == 10
         assert measurements[2][0] == 20
 
     def test_z_correction_with_mixed_keys(self, tmp_path):
         """Verify Z-correction applies to both numeric and string keys."""
-        data = {1: [0, 0, 100], "inlet": [0, 0, 100]}
+        data = {1: [0, 0, 100], 2: [0, 0, 100]}
         yml_file = tmp_path / "corr.yml"
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
         # Default min diameter is 63.5, so correction is -31.75
-        measurements = parse_measurements(str(yml_file))
+        config = AppConfig(measurements_path=str(yml_file))
+        measurements = config.measurements
         assert measurements[1][2] == 100 - 31.75
-        assert measurements["inlet"][2] == 100 - 31.75
+        assert measurements[2][2] == 100 - 31.75
