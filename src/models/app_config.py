@@ -1,4 +1,4 @@
-"""Data models and configuration for the exhaust manifolds project."""
+"""Application build configuration."""
 
 import os
 import json
@@ -12,7 +12,10 @@ from pydantic_changedetect import ChangeDetectionMixin
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from build123d import BuildPart, Box, Part, Location, Mode, add
 
-from models import TextArgs, DiagramOptions, TubeConfig, method_cache, parse_measurements
+from .text_args import TextArgs
+from .diagram_options import DiagramOptions
+from .tube_config import TubeConfig
+from .utils import method_cache, parse_measurements
 
 
 class AppConfig(ChangeDetectionMixin, BaseSettings):
@@ -21,7 +24,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     project_name: str = Field(default="exhaust_manifolds", description="The project name")
     ver: int = Field(default=4, gt=0, description="Build version")
     measurements_path: str = Field(
-        default=str(Path(__file__).parent / "measurements.yml"),
+        default=str(Path(__file__).parent.parent / "measurements.yml"),
         description="Path to the measurements YAML file, optionally followed by ':key' to select a sub-entry.",
     )
     x_bounds: list[float] = Field(
