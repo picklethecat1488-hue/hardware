@@ -17,91 +17,110 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class TextArgs(BaseModel):
     """Text configuration arguments."""
 
-    font_size: float = 10
-    font: str = "Sans"
-    align: Tuple[Align, Align] = (Align.CENTER, Align.CENTER)
-    font_style: FontStyle = FontStyle.BOLD
-    height: float = 3
+    font_size: float = Field(default=10, description="Font size in points")
+    font: str = Field(default="Sans", description="Font name")
+    align: Tuple[Align, Align] = Field(
+        default=(Align.CENTER, Align.CENTER), description="Horizontal and vertical alignment"
+    )
+    font_style: FontStyle = Field(default=FontStyle.BOLD, description="Font style (Regular, Bold, Italic)")
+    height: float = Field(default=3, description="Extrusion height of the text")
 
 
 class AppConfig(ChangeDetectionMixin, BaseSettings):
     """Application build configuration."""
 
-    # Project name
-    project_name: str = "exhaust_manifolds"
+    project_name: str = Field(default="exhaust_manifolds", description="The project name")
 
-    # Build version
-    ver: int = 4
+    ver: int = Field(default=4, description="Build version", gt=0)
 
-    # The part x boundaries
-    x_bounds: list[float] = [145, 950]
+    x_bounds: list[float] = Field(
+        default_factory=lambda: [145, 950],
+        description="The project x boundaries",
+        min_length=2,
+        max_length=2,
+    )
 
-    # The part y boundaries
-    y_bounds: list[float] = [-32, 390]
+    y_bounds: list[float] = Field(
+        default_factory=lambda: [-32, 390],
+        description="The project y boundaries",
+        min_length=2,
+        max_length=2,
+    )
 
-    # The part bounds
-    z_bounds: list[float] = [145, 530]
+    z_bounds: list[float] = Field(
+        default_factory=lambda: [145, 530],
+        description="The project z boundaries",
+        min_length=2,
+        max_length=2,
+    )
 
-    # Wall thickness ~3mm
-    wall_thickness: float = 3.0
+    wall_thickness: float = Field(default=3.0, description="Wall thickness ~3mm", gt=0)
 
-    # Inlet and outlet diameters, 2.5", inner clamp diameter 3"
-    clamp_diameters: list[float] = [63.5, 76.2, 63.5]
+    clamp_diameters: list[float] = Field(
+        default_factory=lambda: [63.5, 76.2, 63.5],
+        description='Inlet and outlet diameters, 2.5", inner clamp diameter 3"',
+        min_length=3,
+    )
 
-    # Inlet and outlet clamp length 2", inner clamp length 1"
-    clamp_lengths: list[float] = [50.4, 25.4, 50.4]
+    clamp_lengths: list[float] = Field(
+        default_factory=lambda: [50.4, 25.4, 50.4],
+        description='Inlet and outlet clamp length 2", inner clamp length 1"',
+        min_length=3,
+    )
 
-    # The clamp positions, each one is a tuple of path offset and angle offset
-    clamp_positions: dict[str, list[tuple[float, float] | None]] = {
-        "driver": [None, (0.5, 0), None],
-        "passenger": [None, (0.5, 0), None],
-    }
+    clamp_positions: dict[str, list[tuple[float, float] | None]] = Field(
+        default_factory=lambda: {
+            "driver": [None, (0.5, 0), None],
+            "passenger": [None, (0.5, 0), None],
+        },
+        description="The clamp positions, each one is a tuple of path offset and angle offset",
+    )
 
-    # Space between clamps on each side
-    clamp_space: float = 15
+    clamp_space: float = Field(default=15, description="Space between clamps on each side", ge=0)
 
-    # The radius of the circular lap joint features
-    joint_radius: float = 1.5
+    joint_radius: float = Field(default=1.5, description="The radius of the circular lap joint features", gt=0)
 
-    # The clearance added to the recess side of the lap joint
-    joint_space: float = 0.3
+    joint_space: float = Field(default=0.3, description="The clearance added to the recess side of the lap joint", ge=0)
 
-    # The part names, driver and passenger
-    names: list[Literal["driver", "passenger"]] = ["driver", "passenger"]
+    names: list[Literal["driver", "passenger"]] = Field(
+        default_factory=lambda: ["driver", "passenger"], description="The part names, driver and passenger"
+    )
 
-    # Private attribute to store raw measurements loaded from file
     _measurements: list[list[float]] = []
 
-    # The logo text arguments
-    logo_text_args: TextArgs = TextArgs()
+    logo_text_args: TextArgs = Field(default_factory=TextArgs, description="The logo text arguments")
 
-    # The logo text offset, pathwise and anglewise
-    logo_text_positions: dict[str, tuple[float, float]] = {
-        "driver": (0.4, 0),
-        "passenger": (0.4, 0),
-    }
+    logo_text_positions: dict[str, tuple[float, float]] = Field(
+        default_factory=lambda: {
+            "driver": (0.4, 0),
+            "passenger": (0.4, 0),
+        },
+        description="The logo text offset, pathwise and anglewise",
+    )
 
-    # Diagram export options
-    diagram_options: dict[str, Any] = {
-        "showAxes": False,
-        "strokeWidth": 3,
-        "strokeColor": (0, 0, 0),
-        "projectionDir": (1, 1, 1),
-        "width": 1024,
-        "height": 1024,
-    }
+    diagram_options: dict[str, Any] = Field(
+        default_factory=lambda: {
+            "showAxes": False,
+            "strokeWidth": 3,
+            "strokeColor": (0, 0, 0),
+            "projectionDir": (1, 1, 1),
+            "width": 1024,
+            "height": 1024,
+        },
+        description="Diagram export options",
+    )
 
-    # Distance between manifold assemblies in the diagram
-    diagram_part_offset: int = 60
+    diagram_part_offset: int = Field(default=60, description="Distance between manifold assemblies in the diagram")
 
-    # Distance between exploded halves in the diagram
-    diagram_part_dist: int = 120
+    diagram_part_dist: int = Field(default=120, description="Distance between exploded halves in the diagram")
 
-    # Distance of the labels from the parts in the diagram
-    diagram_label_dist: int = 120
+    diagram_label_dist: int = Field(default=120, description="Distance of the labels from the parts in the diagram")
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_prefix="APP_", alias_generator=str.upper, populate_by_name=True
+        env_file=".env",
+        env_prefix="APP_",
+        alias_generator=str.upper,
+        populate_by_name=True,
     )
 
     def __init__(self, **kwargs):
