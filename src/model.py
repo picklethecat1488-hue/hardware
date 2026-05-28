@@ -26,6 +26,19 @@ class TextArgs(BaseModel):
     height: float = Field(default=3, description="Extrusion height of the text")
 
 
+class DiagramOptions(BaseModel):
+    """Diagram export configuration."""
+
+    show_axes: bool = Field(default=False, alias="showAxes", description="Show coordinate axes")
+    stroke_width: float = Field(default=3, alias="strokeWidth", description="Width of lines")
+    stroke_color: Tuple[int, int, int] = Field(default=(0, 0, 0), alias="strokeColor", description="RGB color of lines")
+    projection_dir: Tuple[float, float, float] = Field(
+        default=(1, 1, 1), alias="projectionDir", description="Camera projection direction"
+    )
+    width: int = Field(default=1024, description="Output image width")
+    height: int = Field(default=1024, description="Output image height")
+
+
 class AppConfig(ChangeDetectionMixin, BaseSettings):
     """Application build configuration."""
 
@@ -103,17 +116,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         description="The logo text offset, pathwise and anglewise",
     )
 
-    diagram_options: dict[str, Any] = Field(
-        default_factory=lambda: {
-            "showAxes": False,
-            "strokeWidth": 3,
-            "strokeColor": (0, 0, 0),
-            "projectionDir": (1, 1, 1),
-            "width": 1024,
-            "height": 1024,
-        },
-        description="Diagram export options",
-    )
+    diagram_options: DiagramOptions = Field(default_factory=DiagramOptions, description="Diagram export options")
 
     diagram_part_offset: int = Field(default=60, description="Distance between manifold assemblies in the diagram")
 
@@ -141,11 +144,11 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         if isinstance(self._measurements, list):
             measurements = cast(list, self._measurements)
             for idx, item in enumerate(measurements):
-                p[idx + 1] = np.array(item)
+                p[idx + 1] = np.array(item, dtype=float)
         elif isinstance(self._measurements, dict):
             measurements = cast(dict, self._measurements)
             for key, item in measurements.items():
-                p[key] = np.array(item)
+                p[key] = np.array(item, dtype=float)
 
         # Correct for expected Z offset- middle of outlet instead of top
         for idx in [3, 6, 9, 10]:

@@ -452,7 +452,7 @@ class Builder:
                 assy.add(to_cq_shape(connector))
 
             # Label parts with 3D text oriented toward the camera
-            projection_dir = self.config.diagram_options.get("projectionDir", (1, -1, 1))
+            projection_dir = self.config.diagram_options.projection_dir
             text_pos = wire_obj.position_at(1)
             label_loc = text_pos + Vector(
                 self.config.diagram_label_dist,
