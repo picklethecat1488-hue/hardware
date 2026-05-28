@@ -48,7 +48,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     ver: int = Field(default=4, description="Build version", gt=0)
 
     measurements_path: str = Field(
-        str(Path(__file__).parent / "measurements.yml"),
+        default=str(Path(__file__).parent / "measurements.yml"),
         description="Path to the measurements YAML file, optionally followed by ':key' to select a sub-entry.",
     )
 
@@ -185,7 +185,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     @cached_property
     def measurements(self) -> dict[int, np.ndarray]:
         """Return raw measurement points."""
-        raw = self.parse_measurements(self.measurements_path)
+        raw = AppConfig.parse_measurements(self.measurements_path)
         # Filter to ensure we only have integer keys for the manifold specific Z-corrections
         p = {int(k): v for k, v in raw.items() if isinstance(k, int) or (isinstance(k, str) and k.isdigit())}
 
