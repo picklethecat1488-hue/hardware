@@ -34,14 +34,14 @@ class Builder:
     def create_wire(self, name: str) -> Wire:
         """Create the manifold path wire."""
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
-        inlet_start, v_start = self.config.P[inlet_key], self.config.V[inlet_key]
-        outlet_start, v_end = self.config.P[outlet_key], self.config.V[outlet_key]
-        inlet_end = inlet_start + v_start * self.config.clamp_lengths[0]
+        inlet_start, v_start = self.config.tube.P[inlet_key], self.config.tube.V[inlet_key]
+        outlet_start, v_end = self.config.tube.P[outlet_key], self.config.tube.V[outlet_key]
+        inlet_end = inlet_start + v_start * self.config.tube.clamp_lengths[0]
 
         with BuildLine() as path:
             Line(inlet_start, inlet_end)
             Spline([inlet_end, outlet_start], tangents=(v_start, v_end))
-            Line(outlet_start, outlet_start + v_end * self.config.clamp_lengths[-1])
+            Line(outlet_start, outlet_start + v_end * self.config.tube.clamp_lengths[-1])
         return path.wire()
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -56,11 +56,11 @@ class Builder:
     ) -> Sketch:
         """Create a circular tube profile sketch."""
         if outer_radius is None:
-            outer_radius = min(self.config.clamp_diameters) / 2
+            outer_radius = min(self.config.tube.clamp_diameters) / 2
         if inner_radius is None:
-            inner_radius = outer_radius - self.config.wall_thickness
+            inner_radius = outer_radius - self.config.tube.wall_thickness
         if joint_space is None:
-            joint_space = self.config.joint_space
+            joint_space = self.config.tube.joint_space
 
         # Narrow types for the static analyzer
         outer_radius = cast(float, outer_radius)
@@ -99,7 +99,7 @@ class Builder:
                     # We rotate the rectangle by (angle - 90) because the default Sketch.rect
                     # has its height axis aligned with Y (90°). This ensures the gap is
                     # subtracted perpendicular to each parting line.
-                    h = (outer_radius + self.config.joint_radius) * 2
+                    h = (outer_radius + self.config.tube.joint_radius) * 2
                     Rectangle(joint_space, h, rotation=start_deg - 90, mode=Mode.SUBTRACT)
                     Rectangle(joint_space, h, rotation=end_deg - 90, mode=Mode.SUBTRACT)
 
@@ -120,9 +120,9 @@ class Builder:
                 )
                 # Create the interlocking protrusion and recess using full circles.
                 with Locations(c_left):
-                    Circle(self.config.joint_radius)
+                    Circle(self.config.tube.joint_radius)
                 with Locations(c_right):
-                    Circle(self.config.joint_radius + joint_space, mode=Mode.SUBTRACT)
+                    Circle(self.config.tube.joint_radius + joint_space, mode=Mode.SUBTRACT)
         return sketch.sketch
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -203,16 +203,16 @@ class Builder:
         joint_space: Optional[float] = None,
     ) -> Part:
         """Create a clamp bed on the tube."""
-        length = self.config.clamp_lengths[clamp_idx]
-        outer_radius = self.config.clamp_diameters[clamp_idx] / 2
-        inner_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
-        clamp_pos, angle_offset = cast(tuple[float, float], self.config.clamp_positions[name][clamp_idx])
+        length = self.config.tube.clamp_lengths[clamp_idx]
+        outer_radius = self.config.tube.clamp_diameters[clamp_idx] / 2
+        inner_radius = (min(self.config.tube.clamp_diameters) - self.config.tube.wall_thickness) / 2
+        clamp_pos, angle_offset = cast(tuple[float, float], self.config.tube.clamp_positions[name][clamp_idx])
         if offset_deg is not None:
             angle_offset = offset_deg
         angle_span = 180
         center_deg = ((0 if right else 180) + angle_offset) % 360
         if joint_space is None:
-            joint_space = self.config.clamp_space
+            joint_space = self.config.tube.clamp_space
 
         # Create the clamp bed
         return self.create_ring(
@@ -230,7 +230,7 @@ class Builder:
     @method_cache
     def create_text_shape(self, text: Annotated[str, Field(min_length=1)]) -> Sketch:
         """Return a cached logo text shape."""
-        args = self.config.logo_text_args
+        args = self.config.tube.logo_text_args
         with BuildSketch() as s:
             Text(
                 text,
@@ -252,9 +252,9 @@ class Builder:
     ) -> Part:
         """Generate text geometry wrapped to the tube surface."""
         path = self.create_wire(name)
-        off, angle_offset = self.config.logo_text_positions[name]
+        off, angle_offset = self.config.tube.logo_text_positions[name]
         loc = path.location_at(off)
-        outer_radius = (cast(float, min(self.config.clamp_diameters)) - self.config.wall_thickness) / 2
+        outer_radius = (cast(float, min(self.config.tube.clamp_diameters)) - self.config.tube.wall_thickness) / 2
         if offset_deg is not None:
             angle_offset = offset_deg
         angle_deg = ((0 if right else 180) + angle_offset) % 360
@@ -263,7 +263,7 @@ class Builder:
         with BuildPart() as text_part:
             with BuildSketch():
                 add(self.create_text_shape(text))
-            args = self.config.logo_text_args
+            args = self.config.tube.logo_text_args
             extrude(amount=args.height)
 
         transformation = loc * Rotation(0, 90, 0) * Rotation(angle_deg, 0, 0) * Pos(0, 0, outer_radius)
@@ -286,7 +286,7 @@ class Builder:
         """Build a cutting tool used to clean the internal tube volume."""
         path = self.create_wire(name)
         if radius is None:
-            radius = min(self.config.clamp_diameters) / 2 - self.config.wall_thickness
+            radius = min(self.config.tube.clamp_diameters) / 2 - self.config.tube.wall_thickness
 
         # Build the main cylindrical part of the clean tool
         profile_sketch = self.create_profile(center_deg=0, angle_deg=360, outer_radius=radius, inner_radius=0)
@@ -310,7 +310,7 @@ class Builder:
         """Build one half of the manifold assembly."""
         # Determine part parameters based on mode
         lap_joint = not tube_only
-        joint_space = 0 if tube_only else self.config.joint_space
+        joint_space = 0 if tube_only else self.config.tube.joint_space
 
         # Create the main part body.
         part = self.build_tube(
@@ -322,7 +322,7 @@ class Builder:
         )
         if not tube_only:
             to_fuse = []
-            for idx in range(1, len(self.config.clamp_positions[name]) - 1):
+            for idx in range(1, len(self.config.tube.clamp_positions[name]) - 1):
                 to_fuse.append(self.build_clamp_bed(name, idx, right=right))
 
             label = f"{self.config.ver}" if right else ("L" if (name == "driver") else "R")
@@ -332,7 +332,7 @@ class Builder:
                 part = part.fuse(*to_fuse)
 
         # Clean the inner part volume and chamfer the ends
-        chamfer_radius = (min(self.config.clamp_diameters) - self.config.wall_thickness) / 2
+        chamfer_radius = (min(self.config.tube.clamp_diameters) - self.config.tube.wall_thickness) / 2
         clean_tool = self.build_clean_tool(name, chamfer_radius=chamfer_radius)
         part = part.cut(clean_tool)
         return part
@@ -385,7 +385,7 @@ class Builder:
         file_prefix = f"{self.config.project_name}_v{self.config.ver}"
 
         if names is None:
-            names = self.config.names
+            names = self.config.tube.names
         if right_vals is None:
             right_vals = [False, True]
 
@@ -421,7 +421,7 @@ class Builder:
             return cq.Shape.cast(b123d_obj.wrapped)
 
         if names is None:
-            names = self.config.names
+            names = self.config.tube.names
         if right_vals is None:
             right_vals = [False, True]
 
@@ -492,8 +492,8 @@ class Builder:
                             zipf.write(file_str, file)
 
         # Export the diagram and files
-        self.generate_diagram(names=self.config.names, out_dir=out_dir, right_vals=right_vals)
-        self.generate_parts(names=self.config.names, out_dir=out_dir, right_vals=right_vals)
+        self.generate_diagram(names=self.config.tube.names, out_dir=out_dir, right_vals=right_vals)
+        self.generate_parts(names=self.config.tube.names, out_dir=out_dir, right_vals=right_vals)
 
         # Compress the build
         zip_file_str = str(Path(out_dir) / zip_name)

@@ -36,24 +36,24 @@ class TestBuilder:
         wire = builder.create_wire(name)
         length = wire.length
         inlet_clamp_start = wire.position_at(0.0)
-        inlet_clamp_end = wire.position_at(builder.config.clamp_lengths[0] / length)
-        outlet_clamp_start = wire.position_at((length - builder.config.clamp_lengths[-1]) / length)
+        inlet_clamp_end = wire.position_at(builder.config.tube.clamp_lengths[0] / length)
+        outlet_clamp_start = wire.position_at((length - builder.config.tube.clamp_lengths[-1]) / length)
         outlet_clamp_end = wire.position_at(1.0)
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
 
         # Make sure the clamp starts are correct
-        assert calc_point_err(inlet_clamp_start, builder.config.P[inlet_key]) == pytest.approx(0)
-        assert calc_point_err(outlet_clamp_start, builder.config.P[outlet_key]) == pytest.approx(0)
+        assert calc_point_err(inlet_clamp_start, builder.config.tube.P[inlet_key]) == pytest.approx(0)
+        assert calc_point_err(outlet_clamp_start, builder.config.tube.P[outlet_key]) == pytest.approx(0)
 
         # Check clamp direction and length
         assert calc_point_err(
-            (inlet_clamp_end - inlet_clamp_start).normalized(), builder.config.V[inlet_key]
+            (inlet_clamp_end - inlet_clamp_start).normalized(), builder.config.tube.V[inlet_key]
         ) == pytest.approx(0)
         assert calc_point_err(
-            (outlet_clamp_end - outlet_clamp_start).normalized(), builder.config.V[outlet_key]
+            (outlet_clamp_end - outlet_clamp_start).normalized(), builder.config.tube.V[outlet_key]
         ) == pytest.approx(0)
-        assert (inlet_clamp_end - inlet_clamp_start).length == pytest.approx(builder.config.clamp_lengths[0])
-        assert (outlet_clamp_end - outlet_clamp_start).length == pytest.approx(builder.config.clamp_lengths[-1])
+        assert (inlet_clamp_end - inlet_clamp_start).length == pytest.approx(builder.config.tube.clamp_lengths[0])
+        assert (outlet_clamp_end - outlet_clamp_start).length == pytest.approx(builder.config.tube.clamp_lengths[-1])
 
     def test_create_profile(self, builder):
         """Test profile sketch generation for a valid center/angle profile."""
@@ -86,7 +86,7 @@ class TestBuilder:
     def test_part_doesnt_overlap(self, builder, name, right):
         """Ensure parts from different assemblies do not intersect."""
         part = builder.build_part(name, right=right)
-        other_name = next(x for x in builder.config.names if x != name)
+        other_name = next(x for x in builder.config.tube.names if x != name)
         other_part = builder.build_part(other_name, right=not right)
         intersection = part.intersect(other_part)
         assert (intersection.volume if intersection else 0) == pytest.approx(0), (
@@ -110,28 +110,28 @@ class TestBuilder:
         # Map clamp_idx to clamp parameters
         offsets = (
             [0]
-            + [clamp_pos[0] for clamp_pos in builder.config.clamp_positions[name][1:-1] if clamp_pos is not None]
-            + [(length - builder.config.clamp_lengths[-1]) / length]
+            + [clamp_pos[0] for clamp_pos in builder.config.tube.clamp_positions[name][1:-1] if clamp_pos is not None]
+            + [(length - builder.config.tube.clamp_lengths[-1]) / length]
         )
-        expected = np.array(builder.config.clamp_diameters) / 2
+        expected = np.array(builder.config.tube.clamp_diameters) / 2
         """Test if manifold clamps satisfy fitment requirements."""
         part = builder.build_part(name, right=right)
         pos, len, expected = (
             offsets[clamp_idx],
-            builder.config.clamp_lengths[clamp_idx],
+            builder.config.tube.clamp_lengths[clamp_idx],
             expected[clamp_idx],
         )
 
         # Check if we can move clamp over section
         clamp_off = builder.create_ring(
-            name, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected
+            name, pos, len, outer_radius=expected + builder.config.tube.wall_thickness, inner_radius=expected
         )
         intersection_off = part.intersect(clamp_off)
         assert (intersection_off.volume if intersection_off else 0) == pytest.approx(0)
 
         # Check if we can push clamp onto section
         clamp_on = builder.create_ring(
-            name, pos, len, outer_radius=expected + builder.config.wall_thickness, inner_radius=expected - 0.01
+            name, pos, len, outer_radius=expected + builder.config.tube.wall_thickness, inner_radius=expected - 0.01
         )
         intersection_on = part.intersect(clamp_on)
         assert intersection_on is not None and intersection_on.volume > 0
@@ -181,7 +181,7 @@ class TestBuilder:
         with zipfile.ZipFile(zip_path, "r") as z:
             contents = z.namelist()
             assert f"{builder.config.project_name}_v{builder.config.ver}_diagram.svg" in contents
-            for name in builder.config.names:
+            for name in builder.config.tube.names:
                 for side in ["left", "right"]:
                     assert f"{builder.config.project_name}_v{builder.config.ver}_{name}_{side}.stl" in contents
 
@@ -191,7 +191,7 @@ class TestBuilder:
         def get_angle(key):
             """Compute the vertical angle of an exhaust end vector."""
             z_axis = Vector(0, 0, 1)
-            v_test = Vector(builder.config.V[key])
+            v_test = Vector(builder.config.tube.V[key])
             angle = 90 - v_test.get_angle(z_axis)
             return angle
 

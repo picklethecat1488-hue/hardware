@@ -25,7 +25,8 @@ class TestConfigMain:
 
     def test_configurator_configure_all_uses_config_names(self):
         """Test configure_clamps is called."""
-        config_mock = MagicMock(names=["driver", "passenger"])
+        config_mock = MagicMock()
+        config_mock.tube.names = ["driver", "passenger"]
         configurator = Configurator(builder=MagicMock(), config=config_mock, logger=MagicMock())
         configurator.configure_clamps = MagicMock()
         configurator.configure_text_logos = MagicMock()
@@ -37,7 +38,8 @@ class TestConfigMain:
 
     def test_configurator_configure_all_accepts_explicit_names(self):
         """Test configure_clamps with explicit names passed in."""
-        config_mock = MagicMock(names=["driver", "passenger"])
+        config_mock = MagicMock()
+        config_mock.tube.names = ["driver", "passenger"]
         configurator = Configurator(builder=MagicMock(), config=config_mock, logger=MagicMock())
         configurator.configure_clamps = MagicMock()
         configurator.configure_text_logos = MagicMock()

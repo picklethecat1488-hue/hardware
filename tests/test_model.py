@@ -5,7 +5,7 @@ import yaml
 import numpy as np
 import pytest
 from pathlib import Path
-from model import method_cache, AppConfig
+from model import method_cache, AppConfig, TubeConfig
 
 
 class MockService:
@@ -44,13 +44,13 @@ class TestModel:
             inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
             return (
                 # Inlet start
-                config.P[inlet_key],
+                config.tube.P[inlet_key],
                 # Inlet end
-                config.P[inlet_key] + config.V[inlet_key] * config.clamp_lengths[0],
+                config.tube.P[inlet_key] + config.tube.V[inlet_key] * config.tube.clamp_lengths[0],
                 # Outlet start
-                config.P[outlet_key],
+                config.tube.P[outlet_key],
                 # Outlet end
-                config.P[outlet_key] + config.V[outlet_key] * config.clamp_lengths[-1],
+                config.tube.P[outlet_key] + config.tube.V[outlet_key] * config.tube.clamp_lengths[-1],
             )
 
         driver_inlet_start, driver_inlet_end, driver_outlet_start, _ = get_end_points("driver")
@@ -140,7 +140,7 @@ class TestModel:
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
-        measurements = AppConfig.parse_measurements(str(yml_file))
+        measurements = TubeConfig.parse_measurements(str(yml_file))
         assert "point_a" in measurements
         assert np.array_equal(measurements["point_a"], np.array([10.0, 20.0, 30.0]))
 
@@ -151,7 +151,7 @@ class TestModel:
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
-        measurements = AppConfig.parse_measurements(f"{yml_file}:v2")
+        measurements = TubeConfig.parse_measurements(f"{yml_file}:v2")
         assert measurements["p1"][0] == 2
 
     def test_measurements_list_format_conversion(self, tmp_path):
@@ -161,7 +161,7 @@ class TestModel:
         with open(yml_file, "w") as f:
             yaml.dump(data, f)
 
-        measurements = AppConfig.parse_measurements(str(yml_file))
+        measurements = TubeConfig.parse_measurements(str(yml_file))
         assert measurements[1][0] == 10
         assert measurements[2][0] == 20
 
@@ -173,7 +173,13 @@ class TestModel:
             yaml.dump(data, f)
 
         # Default min diameter is 63.5, so correction is -31.75
-        config = AppConfig(measurements_path=str(yml_file))
-        measurements = config.measurements
+        # Test override in tube config
+        config = AppConfig(tube={"measurements_path": str(yml_file)})
+        measurements = config.tube.measurements
         assert measurements[1][2] == 100 - 31.75
         assert measurements[2][2] == 100 - 31.75
+
+        # Test fallback to AppConfig default
+        config_fallback = AppConfig(measurements_path=str(yml_file))
+        assert config_fallback.tube.measurements_path == str(yml_file)
+        assert config_fallback.tube.measurements[1][2] == 100 - 31.75
