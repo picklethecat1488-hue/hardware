@@ -1,0 +1,26 @@
+"""Common types and enums for build providers."""
+
+from enum import StrEnum
+
+
+class Action(StrEnum):
+    """Build actions for shapes."""
+
+    WIRE = "wire"
+    SKETCH = "sketch"
+    PART = "part"
+    DIAGRAM = "diagram"
+
+
+class Subassembly(StrEnum):
+    """Side identifiers for shapes."""
+
+    LEFT = "left"
+    RIGHT = "right"
+
+
+class Mode(StrEnum):
+    """Build modes for shapes."""
+
+    DEFAULT = "default"
+    BARE = "bare"
