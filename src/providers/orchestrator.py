@@ -88,18 +88,23 @@ class ProviderOrchestrator(Orchestrator):
     ) -> Any:
         """Perform the actual build action without caching."""
         self.pre_handler(targets, action, subassemblies, modes)
-        handler = self.provider.registry.get(action)
-        if not handler:
-            raise ValueError(f"No handler registered for action '{action}' in {self.provider.__class__.__name__}")
 
-        def handler_task(i: int) -> Any:
-            target: str = targets[i]
-            sa = (
-                subassemblies[i]
-                if len(subassemblies) == len(targets)
-                else (subassemblies[0] if subassemblies else None)
-            )
-            return handler(target, [sa] if sa else [], list(modes))
+        if action == Action.VIEW:
+
+            def handler_task(i: int) -> Any:
+                target = targets[i]
+                return self.provider.view[target]()
+        else:
+            handler = self.provider.registry[action]
+
+            def handler_task(i: int) -> Any:
+                target: str = targets[i]
+                sa = (
+                    subassemblies[i]
+                    if len(subassemblies) == len(targets)
+                    else (subassemblies[0] if subassemblies else None)
+                )
+                return handler(target, [sa] if sa else [], list(modes))
 
         results = list(self.executor.map(handler_task, range(len(targets))))
         self.post_handler(targets, results, action)
@@ -124,12 +129,18 @@ class ProviderOrchestrator(Orchestrator):
                 f"length of targets ({len(targets)}) or be exactly 1."
             )
 
+        if action != Action.VIEW and action not in self.provider.registry:
+            raise ValueError(f"No handler registered for action '{action}' in {self.provider.__class__.__name__}")
+
         valid_targets = self.provider.targets
         manifest = self.provider.manifest
 
         for i, name in enumerate(targets):
             if name not in valid_targets:
                 raise ValueError(f"Unsupported part name: '{name}'. Supported: {valid_targets}")
+
+            if action == Action.VIEW and name not in self.provider.view:
+                raise ValueError(f"No view function registered for room '{name}' in {self.provider.name}")
 
             actions_config = manifest.get(name, {})
             if action not in actions_config:

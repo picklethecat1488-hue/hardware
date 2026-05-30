@@ -16,6 +16,7 @@ class Action(StrEnum):
     PART = "part"
     DIAGRAM = "diagram"
     CONFIG = "config"
+    VIEW = "view"
 
 
 class Subassembly(StrEnum):
