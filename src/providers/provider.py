@@ -75,7 +75,7 @@ class Provider(ABC):
         return self.orchestrator.execute(tuple(targets), action, tuple(targets.subassemblies), tuple(targets.modes))
 
     @classmethod
-    def load_manifest_from_yaml(cls, path: str) -> dict[str, dict[Any, Any]]:
+    def load_manifest(cls, path: str) -> dict[str, dict[Any, Any]]:
         """
         Load and parse a manifest from a YAML file.
 
