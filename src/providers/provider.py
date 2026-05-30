@@ -1,6 +1,7 @@
 """Base definitions for geometry and data providers."""
 
 from abc import ABC, abstractmethod
+import yaml
 from typing import Optional, Any, Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
 from build123d import Part, Sketch, Wire
@@ -72,3 +73,39 @@ class Provider(ABC):
         if action is None:
             raise ValueError(f"No action specified for {targets}. You must call .supporting(action) before running.")
         return self.orchestrator.execute(tuple(targets), action, tuple(targets.subassemblies), tuple(targets.modes))
+
+    @classmethod
+    def load_manifest_from_yaml(cls, path: str) -> dict[str, dict[Any, Any]]:
+        """Load and parse a manifest from a YAML file."""
+        with open(path, "r") as f:
+            data = yaml.safe_load(f)
+
+        manifest = {}
+        for target, actions in data.items():
+            target_cfg = {}
+            for key, val in actions.items():
+                # Handle Color metadata
+                if key == "color":
+                    if isinstance(val, dict):
+                        target_cfg[COLOR] = {Subassembly(k): tuple(v) for k, v in val.items()}
+                    else:
+                        target_cfg[COLOR] = tuple(val)
+                    continue
+
+                # Map string keys to Action Enums
+                try:
+                    action_key = Action(key)
+                except ValueError:
+                    target_cfg[key] = val
+                    continue
+
+                action_cfg = {}
+                if isinstance(val, dict):
+                    if MODES in val:
+                        action_cfg[MODES] = [Mode(m) for m in val[MODES]]
+                    if SUBASSEMBLIES in val:
+                        action_cfg[SUBASSEMBLIES] = [Subassembly(s) for s in val[SUBASSEMBLIES]]
+                target_cfg[action_key] = action_cfg
+
+            manifest[target] = target_cfg
+        return manifest
