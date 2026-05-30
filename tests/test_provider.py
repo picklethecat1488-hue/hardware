@@ -64,10 +64,20 @@ class MockProvider(Provider):
                 Action.WIRE: MagicMock(return_value="wire_obj"),
                 Action.PART: MagicMock(return_value="part_obj"),
                 Action.SKETCH: MagicMock(return_value="sketch_obj"),
-                Action.CONFIG: MagicMock(return_value=None),
                 Action.DIAGRAM: MagicMock(return_value="diag_obj"),
             }
         return self._mock_registry
+
+    @property
+    def config(self) -> dict:
+        """Return a mock config registry."""
+        if not hasattr(self, "_mock_config"):
+            self._mock_config = {
+                Mode.DEFAULT: MagicMock(return_value=None),
+                Mode.TEXT: MagicMock(return_value=None),
+                Mode.MOUNT: MagicMock(return_value=None),
+            }
+        return self._mock_config
 
 
 @pytest.fixture(scope="module")
@@ -117,7 +127,7 @@ class TestProviderMetadata:
 
     def test_get_color_fallback_config(self, provider):
         """Verify get_color falls back to config color when missing."""
-        assert provider.get_color("part_b", Subassembly.LEFT) == provider.config.color
+        assert provider.get_color("part_b", Subassembly.LEFT) == provider.app_config.color
 
     def test_provider_default_manifest_path(self, monkeypatch):
         """Verify that Provider.manifest defaults to loading a YAML file by provider name."""
@@ -176,15 +186,15 @@ class TestProviderOrchestration:
     def test_configure_success(self, provider):
         """Verify successful configuration orchestration."""
         provider.run(provider.targets.supporting(Action.CONFIG))
-        provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.DEFAULT])
+        provider.config[Mode.DEFAULT].assert_called_once_with("part_a", [])
 
-        provider.registry[Action.CONFIG].reset_mock()
+        provider.config[Mode.DEFAULT].reset_mock()
         provider.run(provider.targets.supporting(Action.CONFIG).for_modes([Mode.TEXT]))
-        provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.TEXT])
+        provider.config[Mode.TEXT].assert_called_once_with("part_a", [])
 
-        provider.registry[Action.CONFIG].reset_mock()
+        provider.config[Mode.TEXT].reset_mock()
         provider.run(provider.targets.supporting(Action.CONFIG).for_modes([Mode.MOUNT]))
-        provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.MOUNT])
+        provider.config[Mode.MOUNT].assert_called_once_with("part_a", [])
 
     def test_build_action_unsupported(self, provider):
         """Verify ValueError when a target does not support an action."""

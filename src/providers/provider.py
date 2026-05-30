@@ -20,7 +20,7 @@ class Provider(ABC):
 
     def __init__(self, executor: Optional[ThreadPoolExecutor] = None, config: Optional[AppConfig] = None):
         """Initialize the provider."""
-        self.config = config or AppConfig()
+        self.app_config = config or AppConfig()
         self.orchestrator = self.orchestrator_type(self, executor=executor)
 
     @property
@@ -38,7 +38,7 @@ class Provider(ABC):
     @property
     def settings(self) -> Any:
         """Return the provider-specific configuration sub-model from the global config."""
-        return getattr(self.config, self.name.lower(), self.default_config)
+        return getattr(self.app_config, self.name.lower(), self.default_config)
 
     @property
     def manifest(self) -> dict[str, dict[str, Any]]:
@@ -53,6 +53,11 @@ class Provider(ABC):
     def registry(self) -> dict[Action, Callable[[str, list[Subassembly], list[Mode]], Any]]:
         """A mapping of Actions to their handler methods."""
         pass
+
+    @property
+    def config(self) -> dict[Mode, Callable[[str, list[Subassembly]], Any]]:
+        """A mapping of Modes to configuration handler methods."""
+        return {}
 
     @property
     def view(self) -> dict[str, Callable[[], list[tuple[Any, Any]]]]:
@@ -76,7 +81,7 @@ class Provider(ABC):
                 color = color.get(subassembly)
             else:
                 color = next(iter(color.values())) if color else None
-        return color or self.config.color
+        return color or self.app_config.color
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def run(self, targets: TargetList) -> Any:
