@@ -123,52 +123,52 @@ class TestProviderOrchestration:
 
     def test_build_success(self, provider):
         """Verify successful build orchestration and validation."""
-        results = provider.build_wires(provider.targets.supporting(Action.WIRE))
+        results = provider.run(provider.targets.supporting(Action.WIRE))
         assert results == ["wire_obj"]
         provider.registry[Action.WIRE].assert_called_once_with("part_a", [], [Mode.DEFAULT])
 
     def test_build_sketch_success(self, provider):
         """Verify successful sketch build orchestration."""
-        results = provider.build_sketches(provider.targets.supporting(Action.SKETCH))
+        results = provider.run(provider.targets.supporting(Action.SKETCH))
         assert results == ["sketch_obj"]
         provider.registry[Action.SKETCH].assert_called_once_with("part_a", [], [Mode.DEFAULT])
 
     def test_configure_success(self, provider):
         """Verify successful configuration orchestration."""
-        provider.configure(provider.targets.supporting(Action.CONFIG))
+        provider.run(provider.targets.supporting(Action.CONFIG))
         provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.DEFAULT])
 
         provider.registry[Action.CONFIG].reset_mock()
-        provider.configure(provider.targets.supporting(Action.CONFIG).for_modes([Mode.TEXT]))
+        provider.run(provider.targets.supporting(Action.CONFIG).for_modes([Mode.TEXT]))
         provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.TEXT])
 
         provider.registry[Action.CONFIG].reset_mock()
-        provider.configure(provider.targets.supporting(Action.CONFIG).for_modes([Mode.MOUNT]))
+        provider.run(provider.targets.supporting(Action.CONFIG).for_modes([Mode.MOUNT]))
         provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.MOUNT])
 
     def test_build_action_unsupported(self, provider):
         """Verify ValueError when a target does not support an action."""
         with pytest.raises(ValueError, match="Action 'wire' is not supported for part 'part_b'"):
-            provider.build_wires(TargetList(provider, ["part_b"]))
+            provider.run(TargetList(provider, ["part_b"], action=Action.WIRE))
 
     def test_build_diagram_special_case(self, provider):
         """Verify diagram build returns a single object and validates differently."""
-        result = provider.build_diagram(TargetList(provider, ["part_b"]))
+        result = provider.run(TargetList(provider, ["part_b"], action=Action.DIAGRAM))
         assert result == "diag_obj"
 
     def test_pre_build_validation_failures(self, provider):
         """Verify various validation failures in _pre_build."""
         with pytest.raises(ValueError, match="Length of subassemblies"):
             targets = TargetList(provider, ["part_a", "part_b"], subassemblies=[Subassembly.LEFT] * 3)
-            provider.build_parts(targets)
+            provider.run(targets)
 
         with pytest.raises(ValueError, match="Mode 'bare' is not supported.*part_b"):
             targets = TargetList(provider, ["part_b"], modes=[Mode.BARE])
-            provider.build_parts(targets)
+            provider.run(targets)
 
     def test_post_build_length_validation(self, provider):
         """Verify build result length validation."""
         # This test is less relevant now as _run guarantees length by construction,
         # but we keep it to ensure _post_build still executes correctly.
-        provider.build_parts(TargetList(provider, ["part_a", "part_b"]))
+        provider.run(TargetList(provider, ["part_a", "part_b"]))
         assert provider.registry[Action.PART].call_count == 2

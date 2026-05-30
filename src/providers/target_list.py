@@ -16,17 +16,19 @@ class TargetList(list[str]):
         targets: Iterable[str] = (),
         subassemblies: Optional[list[Subassembly]] = None,
         modes: Optional[list[Mode]] = None,
+        action: Action = Action.PART,
     ):
         """Initialize the TargetList."""
         super().__init__(targets)
         self.provider = provider
         self.subassemblies = subassemblies or []
         self.modes = modes or [Mode.DEFAULT]
+        self.action = action
 
     def __str__(self) -> str:
         """Return a string representation of the target list for logging."""
         name = f"{self.provider.name.title()}Targets"
-        return f"{name}(targets={super().__repr__()}, subassemblies={self.subassemblies}, modes={self.modes})"
+        return f"{name}(targets={super().__repr__()}, action={self.action}, subassemblies={self.subassemblies}, modes={self.modes})"
 
     def __repr__(self) -> str:
         """Return a string representation for debugging."""
@@ -39,6 +41,7 @@ class TargetList(list[str]):
             [t for t in self if action in self.provider.manifest.get(t, {})],
             self.subassemblies,
             self.modes,
+            action=action,
         )
 
     def for_subassemblies(self, subassemblies: list[Subassembly]) -> "TargetList":
@@ -56,6 +59,7 @@ class TargetList(list[str]):
             [t for t in self if target_supports_subs(t)],
             subassemblies,
             self.modes,
+            action=self.action,
         )
 
     def for_modes(self, modes: list[Mode]) -> "TargetList":
@@ -74,4 +78,5 @@ class TargetList(list[str]):
             [t for t in self if target_supports_modes(t)],
             self.subassemblies,
             modes,
+            action=self.action,
         )
