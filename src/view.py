@@ -4,6 +4,8 @@ import argparse
 from build123d import *  # type: ignore
 from build import Builder
 from config import Configurator
+from model import AppConfig
+from providers import ProviderManager
 from shell import Logger
 from ocp_vscode import show, set_port, Collapse, Camera  # type: ignore
 
@@ -166,8 +168,10 @@ def main():
     """Build and show the requested geometry in ocp_vscode."""
     args = get_args()
     logger = Logger(text="Visualizing...")
-    builder = Builder(logger=logger)
-    configurator = Configurator(builder=builder, logger=logger)
+    config = AppConfig()
+    manager = ProviderManager(config)
+    builder = Builder(config, logger)
+    configurator = Configurator(builder, config, logger)
     viewer = Viewer(builder, configurator, logger)
     viewer.show_view(args.scene, name=args.name, show_bounds=args.bounds)
     logger.done()

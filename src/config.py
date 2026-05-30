@@ -3,6 +3,7 @@
 from model import AppConfig, method_cache
 from build import Builder
 from shell import Logger
+from providers import ProviderManager
 import argparse
 from build123d import *  # type: ignore
 from typing import cast, Literal, Annotated, Optional
@@ -205,8 +206,9 @@ def main(logger, args):
     gen_args = {}
     if not args.name is None:
         gen_args["names"] = [args.name]
-    config = AppConfig()
 
+    config = AppConfig()
+    manager = ProviderManager(config)
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
 

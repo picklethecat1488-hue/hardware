@@ -11,6 +11,7 @@ from build123d import *  # type: ignore
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, cast, Annotated, Literal
 from pydantic import validate_call, Field
+from providers import ProviderManager
 import zipfile
 from shell import Logger
 
@@ -545,7 +546,9 @@ def main(logger, args):
     path = Path(args.outdir)
     path.mkdir(parents=True, exist_ok=True)
 
-    builder = Builder(logger=logger)
+    config = AppConfig()
+    manager = ProviderManager(config)
+    builder = Builder(config, logger)
 
     if not args.env is None:
         builder.config.dump_env(args.env)
