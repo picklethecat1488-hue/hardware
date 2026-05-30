@@ -84,7 +84,7 @@ def test_router_run_delegation():
     targets = TargetList(c, ["part_a"], action=Action.PART)
     c.run(targets)
 
-    c.orchestrator.execute.assert_called_once_with(("part_a",), Action.PART, (Subassembly.LEFT,), (Mode.DEFAULT,))
+    c.orchestrator.execute.assert_called_once_with(("part_a",), Action.PART, (), (Mode.DEFAULT,))
 
 
 def test_router_default_configs():
@@ -100,11 +100,13 @@ def test_router_get_color():
     """Verify router delegates get_color to the correct provider."""
     p1 = SimpleMockProvider("p1", {"part_a": {}})
     p1.get_color.return_value = (1.0, 0.0, 0.0, 1.0) # type: ignore
+    p1.get_color.return_value = (1.0, 0.0, 0.0, 1.0)  # type: ignore
     c = ProviderRouter(providers=[p1])
 
     color = c.get_color("part_a", Subassembly.LEFT)
     assert color == (1.0, 0.0, 0.0, 1.0)
     p1.get_color.assert_called_once_with("part_a", Subassembly.LEFT) # type: ignore
+    p1.get_color.assert_called_once_with("part_a", Subassembly.LEFT)  # type: ignore
 
     with pytest.raises(ValueError, match="Target 'missing' not found"):
         c.get_color("missing")

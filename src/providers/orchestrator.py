@@ -209,7 +209,6 @@ class ProviderRouterOrchestrator(Orchestrator):
             if action == Action.DIAGRAM:
                 diagram_results.append((provider.name, res))
             else:
-                # res is now list[tuple[str, Any]]
                 for local_idx, global_idx in enumerate(indices):
                     # Store only the result object in indexed_results for merging
                     indexed_results[global_idx] = res[local_idx][1]
