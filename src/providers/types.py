@@ -5,6 +5,7 @@ from enum import StrEnum
 
 MODES = "modes"
 SUBASSEMBLIES = "subassemblies"
+COLOR = "color"
 
 
 class Action(StrEnum):

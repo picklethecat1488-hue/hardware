@@ -47,7 +47,7 @@ class TargetList(list[str]):
         def target_supports_subs(t: str) -> bool:
             actions_dict = self.provider.manifest.get(t, {})
             for action_cfg in actions_dict.values():
-                if any(s in action_cfg.get(SUBASSEMBLIES, []) for s in subassemblies):
+                if isinstance(action_cfg, dict) and any(s in action_cfg.get(SUBASSEMBLIES, []) for s in subassemblies):
                     return True
             return False
 
@@ -65,7 +65,7 @@ class TargetList(list[str]):
             actions_dict = self.provider.manifest.get(t, {})
             # Check if any supported action for this target offers any of the requested modes
             for action_cfg in actions_dict.values():
-                if any(m in action_cfg.get(MODES, []) for m in modes):
+                if isinstance(action_cfg, dict) and any(m in action_cfg.get(MODES, []) for m in modes):
                     return True
             return False
 

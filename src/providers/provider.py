@@ -6,8 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from build123d import Part, Sketch, Wire
 import cadquery as cq
 from pydantic import validate_call, BaseModel
-from model import method_cache
-from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES
+from model import AppConfig, method_cache
+from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES, COLOR
 from .target_list import TargetList
 
 
@@ -16,8 +16,9 @@ class Provider(ABC):
 
     _default_executor: Optional[ThreadPoolExecutor] = None
 
-    def __init__(self, executor: Optional[ThreadPoolExecutor] = None):
+    def __init__(self, executor: Optional[ThreadPoolExecutor] = None, config: Optional[AppConfig] = None):
         """Initialize the provider."""
+        self.config = config or AppConfig()
         if executor is not None:
             self.executor = executor
         else:
@@ -40,7 +41,7 @@ class Provider(ABC):
     @property
     @abstractmethod
     def manifest(self) -> dict[str, dict[str, Any]]:
-        """A mapping of part names to their supported capabilities (actions mapping to modes and subassemblies)."""
+        """A mapping of part names to their supported capabilities and colors."""
         pass
 
     @property
@@ -53,6 +54,21 @@ class Provider(ABC):
     def targets(self) -> TargetList:
         """List of supported build targets derived from the manifest keys."""
         return TargetList(self, self.manifest.keys())
+
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def get_color(self, target: str, subassembly: Optional[Subassembly] = None) -> tuple[float, float, float, float]:
+        """Resolve the color for a specific target and subassembly."""
+        target_cfg = self.manifest.get(target, {})
+        color = target_cfg.get(COLOR)
+
+        if isinstance(color, dict):
+            # If COLOR is a dict, resolve by subassembly key.
+            if subassembly:
+                color = color.get(subassembly)
+            else:
+                color = next(iter(color.values())) if color else None
+
+        return color or self.config.color
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def build_wires(
