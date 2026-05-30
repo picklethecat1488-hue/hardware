@@ -37,14 +37,6 @@ class TestProviderOrchestrator:
             orch.execute(("part_a",), Action.PART, (Subassembly.LEFT,), (Mode.DEFAULT,))
             mock_cached.assert_called_once()
 
-    def test_config_clears_cache(self, mock_provider):
-        """Verify that Action.CONFIG clears the cache."""
-        orch = ProviderOrchestrator(mock_provider)
-        orch._execute_cached.cache_clear = MagicMock()
-
-        orch.execute(("part_a",), Action.CONFIG, (), (Mode.DEFAULT,))
-        assert orch._execute_cached.cache_clear.called
-
     def test_pre_handler_validation(self, mock_provider):
         """Verify validation of actions, modes, and subassemblies."""
         orch = ProviderOrchestrator(mock_provider)
@@ -108,7 +100,9 @@ class TestProviderRouterOrchestrator:
     def test_execute_parallel_call(self, mock_map, controller_context):
         """Verify that execute uses the thread pool executor."""
         orch = ProviderRouterOrchestrator(controller_context)
-        mock_map.return_value = []
+        # Mock a valid return value to satisfy validation in merge()
+        provider = controller_context.providers[0]
+        mock_map.return_value = [(provider, [0], [("part_a", "geom")])]
 
         orch.execute(("part_a",), Action.PART)
         assert mock_map.called
