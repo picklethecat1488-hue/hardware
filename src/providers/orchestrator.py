@@ -2,22 +2,27 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, TYPE_CHECKING, Optional
+from typing import Any, TYPE_CHECKING, Optional, Dict
 from concurrent.futures import ThreadPoolExecutor
 from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES
 from model import method_cache
 from pydantic import validate_call
+from .target_list import TargetList
 
 if TYPE_CHECKING:
     from .provider import Provider
+    from .provider_router import ProviderRouter
+
+
+_default_executor: Optional[ThreadPoolExecutor] = None
 
 
 class Orchestrator(ABC):
     """Base class for orchestrators."""
 
     @abstractmethod
-    def __init__(self, provider: Provider, executor: Optional[ThreadPoolExecutor] = None):
-        """Initialize the orchestrator with a provider reference."""
+    def __init__(self, context: Any, executor: Optional[ThreadPoolExecutor] = None):
+        """Initialize the orchestrator."""
         pass
 
     @abstractmethod
@@ -35,17 +40,16 @@ class Orchestrator(ABC):
 class ProviderOrchestrator(Orchestrator):
     """Handles the validation and execution strategy for build actions."""
 
-    _default_executor: Optional[ThreadPoolExecutor] = None
-
     def __init__(self, provider: Provider, executor: Optional[ThreadPoolExecutor] = None):
         """Initialize the orchestrator with a provider reference."""
         self.provider = provider
         if executor is not None:
             self.executor = executor
         else:
-            if ProviderOrchestrator._default_executor is None:
-                ProviderOrchestrator._default_executor = ThreadPoolExecutor()
-            self.executor = ProviderOrchestrator._default_executor
+            global _default_executor
+            if _default_executor is None:
+                _default_executor = ThreadPoolExecutor()
+            self.executor = _default_executor
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def execute(
@@ -104,7 +108,7 @@ class ProviderOrchestrator(Orchestrator):
             return results[0]
         elif action == Action.CONFIG:
             return None
-        return results
+        return list(zip(targets, results))
 
     def pre_handler(
         self,
@@ -157,5 +161,90 @@ class ProviderOrchestrator(Orchestrator):
         if len(results) != expected_len:
             raise ValueError(f"Orchestration failed: expected {expected_len} items, got {len(results)}.")
 
-        if action == Action.CONFIG and results != [None] * len(targets):
-            raise ValueError("Configuration actions should not return geometry or data values.")
+        if action == Action.CONFIG:
+            if results != [None] * len(targets):
+                raise ValueError("Configuration actions should not return geometry or data values.")
+        elif any(r is None for r in results):
+            raise ValueError(f"Orchestration failed: one or more results for action '{action}' were None.")
+
+
+class ProviderRouterOrchestrator(Orchestrator):
+    """Handles routing and merging for multiple providers."""
+
+    def __init__(self, controller: ProviderRouter, executor: Optional[ThreadPoolExecutor] = None):
+        """Initialize the orchestrator with a controller reference."""
+        self.controller = controller
+        if executor is not None:
+            self.executor = executor
+        else:
+            global _default_executor
+            if _default_executor is None:
+                _default_executor = ThreadPoolExecutor()
+            self.executor = _default_executor
+
+    def collect(self, targets: tuple[str, ...]) -> Dict[Provider, list[int]]:
+        """Map target names to providers and group indices by provider."""
+        lookup: Dict[str, Provider] = {}
+        for p in self.controller.providers:
+            for t in p.manifest:
+                lookup[t] = p
+
+        groups: Dict[Provider, list[int]] = {}
+        for i, target in enumerate(targets):
+            provider = lookup.get(target)
+            if not provider:
+                raise ValueError(f"No provider found for target '{target}'")
+            groups.setdefault(provider, []).append(i)
+        return groups
+
+    def merge(self, action: Action, targets: tuple[str, ...], results: list[Any]) -> Any:
+        """Merge results from multiple providers based on the action."""
+        if action == Action.CONFIG:
+            return None
+
+        indexed_results = [None] * len(targets)
+        diagram_results = []
+
+        for provider, indices, res in results:
+            if action == Action.DIAGRAM:
+                diagram_results.append((provider.name, res))
+            else:
+                # res is now list[tuple[str, Any]]
+                for local_idx, global_idx in enumerate(indices):
+                    # Store only the result object in indexed_results for merging
+                    indexed_results[global_idx] = res[local_idx][1]
+
+        if action == Action.DIAGRAM:
+            if any(r is None for _, r in diagram_results):
+                raise ValueError("Orchestration failed: one or more diagram results were None.")
+            return diagram_results
+
+        if any(r is None for r in indexed_results):
+            missing = [targets[i] for i, r in enumerate(indexed_results) if r is None]
+            raise ValueError(
+                f"Orchestration failed in ProviderRouter: results for targets {missing} were not collected."
+            )
+
+        return list(zip(targets, indexed_results))
+
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def execute(
+        self,
+        targets: tuple[str, ...],
+        action: Action,
+        subassemblies: tuple[Subassembly, ...] = (),
+        modes: tuple[Mode, ...] = (Mode.DEFAULT,),
+    ) -> Any:
+        """Route targets to their respective providers and merge results."""
+        groups = self.collect(targets)
+
+        def provider_task(item: tuple[Provider, list[int]]) -> tuple[Provider, list[int], Any]:
+            p, indices = item
+            p_targets = [targets[i] for i in indices]
+            p_subs = [subassemblies[i] for i in indices] if len(subassemblies) == len(targets) else list(subassemblies)
+            sub_list = TargetList(p, p_targets, subassemblies=p_subs, modes=list(modes), action=action)
+            return p, indices, p.run(sub_list)
+
+        # Execute all provider runs in parallel across the thread pool
+        results = list(self.executor.map(provider_task, groups.items()))
+        return self.merge(action, targets, results)
