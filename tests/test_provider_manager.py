@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel, Field
 from providers.provider_manager import ProviderManager
 from providers.provider import Provider
+from providers.utils import discover_provider
 from model import AppConfig
 
 
@@ -49,13 +50,90 @@ class MockSettings(BaseModel):
     items: list[int] = Field(default_factory=list)
 
 
+@discover_provider
+class DiscoveryPositiveProvider(Provider):
+    """Mock provider for positive discovery test."""
+
+    @property
+    def name(self) -> str:
+        """Return the mock provider name."""
+        return "positive"
+
+    @property
+    def default_config(self):
+        """Return a mock configuration instance."""
+        return None
+
+    @property
+    def build(self):
+        """Return an empty build registry."""
+        return {}
+
+
+@discover_provider(enabled=False)
+class DiscoveryNegativeProvider(Provider):
+    """Mock provider for negative discovery test."""
+
+    @property
+    def name(self) -> str:
+        """Return the mock provider name."""
+        return "negative"
+
+    @property
+    def default_config(self):
+        """Return a mock configuration instance."""
+        return None
+
+    @property
+    def build(self):
+        """Return an empty build registry."""
+        return {}
+
+
+class DiscoveryUndecoratedProvider(Provider):
+    """Mock provider that should be ignored by discovery."""
+
+    @property
+    def name(self) -> str:
+        """Return the mock provider name."""
+        return "undecorated"
+
+    @property
+    def default_config(self):
+        """Return a mock configuration instance."""
+        return None
+
+    @property
+    def build(self):
+        """Return an empty build registry."""
+        return {}
+
+
 def test_manager_init():
     """Verify manager initializes with config and router."""
     config = AppConfig()
     p1 = SimpleMockProvider("p1", {})
-    m = ProviderManager(config, providers=[p1])
+    m = ProviderManager(config, providers=[p1], bootstrap=False)
     assert m.config == config
     assert m.router.providers == [p1]
+
+
+def test_manager_bootstrap_invalid_combination():
+    """Verify that providing both explicit providers and bootstrap=True raises ValueError."""
+    config = AppConfig()
+    with pytest.raises(ValueError, match="Cannot bootstrap when providers are explicitly provided"):
+        ProviderManager(config, providers=[], bootstrap=True)
+
+
+def test_manager_discovery_filtering():
+    """Verify that discovery logic correctly filters based on @bootstrap decorator."""
+    config = AppConfig()
+    mgr = ProviderManager(config, bootstrap=True)
+    names = [p.name for p in mgr.router.providers]
+
+    assert "positive" in names
+    assert "negative" not in names
+    assert "undecorated" not in names
 
 
 def test_manager_load_configs():
@@ -68,7 +146,7 @@ def test_manager_load_configs():
     config.model_extra["P1__NUM"] = 10  # type: ignore
     config.model_extra["P1__ITEMS"] = "[1, 2, 3]"  # type: ignore
 
-    mgr = ProviderManager(config, providers=[p1])
+    mgr = ProviderManager(config, providers=[p1], bootstrap=False)
     mgr.load_configs()
 
     assert p1.settings.val == "env_val"
@@ -85,7 +163,7 @@ def test_manager_load_configs_json_error():
     config = AppConfig()
     config.model_extra["P1__ITEMS"] = "[1, 2"  # type: ignore
 
-    mgr = ProviderManager(config, providers=[p1])
+    mgr = ProviderManager(config, providers=[p1], bootstrap=False)
     with pytest.raises(ValueError, match="Failed to parse JSON configuration"):
         mgr.load_configs()
 
@@ -96,7 +174,7 @@ def test_manager_save_configs():
     p1 = SimpleMockProvider("p1", {}, default_config=p_settings)
 
     config = AppConfig()
-    mgr = ProviderManager(config, providers=[p1])
+    mgr = ProviderManager(config, providers=[p1], bootstrap=False)
     mgr.save_configs()
 
     assert getattr(config, "p1") == p_settings

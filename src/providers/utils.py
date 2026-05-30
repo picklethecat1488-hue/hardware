@@ -1,8 +1,30 @@
 """Utility functions for build providers."""
 
-from typing import Any
+from typing import Any, TypeVar, Callable, overload
 import yaml
 from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES, COLOR
+
+T = TypeVar("T", bound=type)
+
+
+@overload
+def discover_provider(cls: T) -> T: ...
+
+
+@overload
+def discover_provider(*, enabled: bool = True) -> Callable[[T], T]: ...
+
+
+def discover_provider(cls: T | None = None, *, enabled: bool = True) -> Any:
+    """Mark a Provider subclass for automatic discovery by ProviderManager."""
+
+    def decorator(target: T) -> T:
+        setattr(target, "_discover_provider", enabled)
+        return target
+
+    if cls is None:
+        return decorator
+    return decorator(cls)
 
 
 def load_manifest(path: str) -> dict[str, dict[Any, Any]]:
