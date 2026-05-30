@@ -119,6 +119,30 @@ class TestProviderMetadata:
         """Verify get_color falls back to config color when missing."""
         assert provider.get_color("part_b", Subassembly.LEFT) == provider.config.color
 
+    def test_provider_default_manifest_path(self, monkeypatch):
+        """Verify that Provider.manifest defaults to loading a YAML file by provider name."""
+        import providers.provider
+
+        mock_load = MagicMock(return_value={"test": "data"})
+        monkeypatch.setattr(providers.provider, "load_manifest", mock_load)
+
+        class MinimalProvider(Provider):
+            @property
+            def name(self) -> str:
+                return "minimal"
+
+            @property
+            def default_config(self):
+                return None
+
+            @property
+            def registry(self):
+                return {}
+
+        p = MinimalProvider()
+        assert p.manifest == {"test": "data"}
+        mock_load.assert_called_once_with("minimal_manifest.yaml")
+
     def test_load_manifest(self, tmp_path, provider):
         """Verify that load_manifest correctly parses Enum keys and values."""
         manifest_path = tmp_path / "manifest.yml"

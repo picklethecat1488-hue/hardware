@@ -10,6 +10,7 @@ from model import AppConfig, method_cache
 from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES, COLOR
 from .target_list import TargetList
 from .orchestrator import Orchestrator, ProviderOrchestrator
+from .utils import load_manifest
 
 
 class Provider(ABC):
@@ -35,10 +36,12 @@ class Provider(ABC):
         pass
 
     @property
-    @abstractmethod
     def manifest(self) -> dict[str, dict[str, Any]]:
-        """A mapping of part names to their supported capabilities and colors."""
-        pass
+        """A mapping of part names to their supported capabilities and colors.
+
+        By default, attempts to load f"{self.name}_manifest.yaml".
+        """
+        return load_manifest(f"{self.name}_manifest.yaml")
 
     @property
     @abstractmethod
