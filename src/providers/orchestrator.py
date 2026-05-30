@@ -106,7 +106,7 @@ class ProviderOrchestrator(Orchestrator):
                 mode = modes[0]
                 return self.provider.config[mode](target, [sa] if sa else [])
         else:
-            handler = self.provider.registry[action]
+            handler = self.provider.build[action]
 
             def handler_task(i: int) -> Any:
                 target: str = targets[i]
@@ -140,7 +140,7 @@ class ProviderOrchestrator(Orchestrator):
                 f"length of targets ({len(targets)}) or be exactly 1."
             )
 
-        if action != Action.VIEW and action != Action.CONFIG and action not in self.provider.registry:
+        if action != Action.VIEW and action != Action.CONFIG and action not in self.provider.build:
             raise ValueError(f"No handler registered for action '{action}' in {self.provider.__class__.__name__}")
 
         valid_targets = self.provider.targets

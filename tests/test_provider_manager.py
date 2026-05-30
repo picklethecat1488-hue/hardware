@@ -36,8 +36,8 @@ class SimpleMockProvider(Provider):
         return self._default_config
 
     @property
-    def registry(self):
-        """Return an empty handler registry."""
+    def build(self):
+        """Return an empty build registry."""
         return {}
 
 
