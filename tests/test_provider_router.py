@@ -2,10 +2,12 @@
 
 import pytest
 from unittest.mock import MagicMock
+from pydantic import BaseModel, Field
 from providers.provider_router import ProviderRouter
 from providers.provider import Provider
 from providers.types import Action, Mode, Subassembly, MODES, SUBASSEMBLIES
 from providers.target_list import TargetList
+from model import AppConfig
 
 
 class SimpleMockProvider(Provider):
@@ -43,6 +45,14 @@ class SimpleMockProvider(Provider):
     def run(self, targets):
         """Perform a mock build action."""
         return [("mock", "res")]
+
+
+class MockSettings(BaseModel):
+    """Mock settings model for testing."""
+
+    val: str = "default"
+    num: int = 0
+    items: list[int] = Field(default_factory=list)
 
 
 def test_router_init():
@@ -109,3 +119,48 @@ def test_router_get_color():
 
     with pytest.raises(ValueError, match="Target 'missing' not found"):
         c.get_color("missing")
+
+
+def test_router_load_configs():
+    """Verify loading and routing of environment variables."""
+    p_settings = MockSettings()
+    p1 = SimpleMockProvider("p1", {}, default_config=p_settings)
+    c = ProviderRouter(providers=[p1])
+
+    config = AppConfig()
+    config.model_extra["P1__VAL"] = "env_val"  # type: ignore
+    config.model_extra["P1__NUM"] = 10  # type: ignore
+    config.model_extra["P1__ITEMS"] = "[1, 2, 3]"  # type: ignore
+
+    c.load_configs(config)
+
+    assert p1.settings.val == "env_val"
+    assert p1.settings.num == 10
+    assert p1.settings.items == [1, 2, 3]
+    assert getattr(config, "p1") == p1.settings
+
+
+def test_router_load_configs_json_error():
+    """Verify ValueError on malformed JSON in environment variables."""
+    p_settings = MockSettings()
+    p1 = SimpleMockProvider("p1", {}, default_config=p_settings)
+    c = ProviderRouter(providers=[p1])
+
+    config = AppConfig()
+    config.model_extra["P1__ITEMS"] = "[1, 2"  # type: ignore
+
+    with pytest.raises(ValueError, match="Failed to parse JSON configuration"):
+        c.load_configs(config)
+
+
+def test_router_save_configs():
+    """Verify preparation of AppConfig for environment dumping."""
+    p_settings = MockSettings(val="custom")
+    p1 = SimpleMockProvider("p1", {}, default_config=p_settings)
+    c = ProviderRouter(providers=[p1])
+
+    config = AppConfig()
+    c.save_configs(config)
+
+    assert getattr(config, "p1") == p_settings
+    assert "P1" in config._env_flattened_keys
