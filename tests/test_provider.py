@@ -57,16 +57,16 @@ class MockProvider(Provider):
         }
 
     @property
-    def registry(self) -> dict:
-        """Return a mock registry."""
-        if not hasattr(self, "_mock_registry"):
-            self._mock_registry = {
+    def build(self) -> dict:
+        """Return a mock build registry."""
+        if not hasattr(self, "_mock_build"):
+            self._mock_build = {
                 Action.WIRE: MagicMock(return_value="wire_obj"),
                 Action.PART: MagicMock(return_value="part_obj"),
                 Action.SKETCH: MagicMock(return_value="sketch_obj"),
                 Action.DIAGRAM: MagicMock(return_value="diag_obj"),
             }
-        return self._mock_registry
+        return self._mock_build
 
     @property
     def config(self) -> dict:
@@ -146,7 +146,7 @@ class TestProviderMetadata:
                 return None
 
             @property
-            def registry(self):
+            def build(self):
                 return {}
 
         p = MinimalProvider()
@@ -175,13 +175,13 @@ class TestProviderOrchestration:
         """Verify successful build orchestration and validation."""
         results = provider.run(provider.targets.supporting(Action.WIRE))
         assert results == [("part_a", "wire_obj")]
-        provider.registry[Action.WIRE].assert_called_once_with("part_a", [], [Mode.DEFAULT])
+        provider.build[Action.WIRE].assert_called_once_with("part_a", [], [Mode.DEFAULT])
 
     def test_build_sketch_success(self, provider):
         """Verify successful sketch build orchestration."""
         results = provider.run(provider.targets.supporting(Action.SKETCH))
         assert results == [("part_a", "sketch_obj")]
-        provider.registry[Action.SKETCH].assert_called_once_with("part_a", [], [Mode.DEFAULT])
+        provider.build[Action.SKETCH].assert_called_once_with("part_a", [], [Mode.DEFAULT])
 
     def test_configure_success(self, provider):
         """Verify successful configuration orchestration."""
@@ -227,4 +227,4 @@ class TestProviderOrchestration:
         # but we keep it to ensure _post_build still executes correctly.
         results = provider.run(TargetList(provider, ["part_a", "part_b"], action=Action.PART))
         assert results == [("part_a", "part_obj"), ("part_b", "part_obj")]
-        assert provider.registry[Action.PART].call_count == 2
+        assert provider.build[Action.PART].call_count == 2

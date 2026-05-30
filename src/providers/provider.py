@@ -49,10 +49,9 @@ class Provider(ABC):
         return load_manifest(f"{self.name}_manifest.yaml")
 
     @property
-    @abstractmethod
-    def registry(self) -> dict[Action, Callable[[str, list[Subassembly], list[Mode]], Any]]:
+    def build(self) -> dict[Action, Callable[[str, list[Subassembly], list[Mode]], Any]]:
         """A mapping of Actions to their handler methods."""
-        pass
+        return {}
 
     @property
     def config(self) -> dict[Mode, Callable[[str, list[Subassembly]], Any]]:

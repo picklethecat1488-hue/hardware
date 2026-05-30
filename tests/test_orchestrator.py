@@ -18,7 +18,7 @@ def mock_provider():
         }
     }
     provider.targets = ["part_a"]
-    provider.registry = {
+    provider.build = {
         Action.PART: MagicMock(return_value="geom"),
         Action.CONFIG: MagicMock(return_value=None),
     }
