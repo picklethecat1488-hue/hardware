@@ -54,9 +54,9 @@ def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128) 
     return decorator(func)
 
 
-def parse_measurements(path: str) -> dict[int | str, np.ndarray]:
+def load_measurements(path: str) -> dict[int | str, np.ndarray]:
     """
-    Parse the measurements YAML file and return processed numpy arrays.
+    Load and parse the measurements YAML file and return processed numpy arrays.
 
     The path can optionally include a colon followed by a key to extract a
     specific section of the YAML file (e.g., 'measurements.yml:points').

@@ -6,7 +6,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 from build123d import Vector
 from .text_args import TextArgs
-from .utils import parse_measurements
+from .utils import load_measurements
 
 
 class TubeConfig(BaseModel):
@@ -54,7 +54,7 @@ class TubeConfig(BaseModel):
         if self.measurements_path is None:
             raise ValueError("measurements_path is not set.")
 
-        raw = parse_measurements(cast(str, self.measurements_path))
+        raw = load_measurements(cast(str, self.measurements_path))
         p = {int(k): v for k, v in raw.items() if isinstance(k, int) or (isinstance(k, str) and k.isdigit())}
 
         for idx in [3, 6, 9, 10]:
