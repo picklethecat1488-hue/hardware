@@ -95,12 +95,12 @@ class Provider(ABC):
         return self._run(tuple(targets), Action.PART, tuple(targets.subassemblies), tuple(targets.modes))
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def configure_parts(
+    def configure(
         self,
         targets: TargetList,
-    ) -> list[Any]:
+    ) -> None:
         """Run configuration for the specified names."""
-        return self._run(tuple(targets), Action.CONFIG, tuple(targets.subassemblies), tuple(targets.modes))
+        self._run(tuple(targets), Action.CONFIG, tuple(targets.subassemblies), tuple(targets.modes))
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def build_diagram(
@@ -198,3 +198,5 @@ class Provider(ABC):
                 f"Provider build failed validation for {action}: returned {len(results)} items, "
                 f"but {expected_len} were expected."
             )
+        if action == Action.CONFIG and results != [None] * len(targets):
+            raise ValueError(f"Provider build failed validation for {action}: action should not return a value.")

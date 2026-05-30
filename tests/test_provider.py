@@ -135,15 +135,15 @@ class TestProviderOrchestration:
 
     def test_configure_success(self, provider):
         """Verify successful configuration orchestration."""
-        provider.configure_parts(provider.targets.supporting(Action.CONFIG))
+        provider.configure(provider.targets.supporting(Action.CONFIG))
         provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.DEFAULT])
 
         provider.registry[Action.CONFIG].reset_mock()
-        provider.configure_parts(provider.targets.supporting(Action.CONFIG).for_modes([Mode.TEXT]))
+        provider.configure(provider.targets.supporting(Action.CONFIG).for_modes([Mode.TEXT]))
         provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.TEXT])
 
         provider.registry[Action.CONFIG].reset_mock()
-        provider.configure_parts(provider.targets.supporting(Action.CONFIG).for_modes([Mode.MOUNT]))
+        provider.configure(provider.targets.supporting(Action.CONFIG).for_modes([Mode.MOUNT]))
         provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.MOUNT])
 
     def test_build_action_unsupported(self, provider):
