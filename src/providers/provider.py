@@ -59,7 +59,7 @@ class Provider(ABC):
         return {}
 
     @property
-    def view(self) -> dict[str, Callable[[], list[tuple[Any, Any]]]]:
+    def view(self) -> dict[str, Callable[[], list[tuple[Any, tuple[float, float, float, float]]]]]:
         """A mapping of room names to view functions."""
         return {}
 
