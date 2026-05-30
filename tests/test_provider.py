@@ -1,6 +1,7 @@
 """Unit tests for geometry and data provider."""
 
 import pytest
+import yaml
 from unittest.mock import MagicMock
 from pydantic import BaseModel
 from providers.provider import Provider
@@ -116,6 +117,20 @@ class TestProviderMetadata:
     def test_get_color_fallback_config(self, provider):
         """Verify get_color falls back to config color when missing."""
         assert provider.get_color("part_b", Subassembly.LEFT) == provider.config.color
+
+    def test_load_manifest_from_yaml(self, tmp_path, provider):
+        """Verify that load_manifest_from_yaml correctly parses Enum keys and values."""
+        manifest_path = tmp_path / "manifest.yml"
+        yaml_content = {
+            "part_c": {"part": {"modes": ["default"], "subassemblies": ["left"]}, "color": [1.0, 1.0, 1.0, 1.0]}
+        }
+        manifest_path.write_text(yaml.dump(yaml_content))
+
+        loaded = provider.load_manifest_from_yaml(str(manifest_path))
+        assert "part_c" in loaded
+        assert Action.PART in loaded["part_c"]
+        assert loaded["part_c"][Action.PART][MODES] == [Mode.DEFAULT]
+        assert loaded["part_c"][COLOR] == (1.0, 1.0, 1.0, 1.0)
 
 
 class TestProviderOrchestration:

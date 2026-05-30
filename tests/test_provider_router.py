@@ -99,13 +99,13 @@ def test_router_default_configs():
 def test_router_get_color():
     """Verify router delegates get_color to the correct provider."""
     p1 = SimpleMockProvider("p1", {"part_a": {}})
-    p1.get_color.return_value = (1.0, 0.0, 0.0, 1.0) # type: ignore
+    p1.get_color.return_value = (1.0, 0.0, 0.0, 1.0)  # type: ignore
     p1.get_color.return_value = (1.0, 0.0, 0.0, 1.0)  # type: ignore
     c = ProviderRouter(providers=[p1])
 
     color = c.get_color("part_a", Subassembly.LEFT)
     assert color == (1.0, 0.0, 0.0, 1.0)
-    p1.get_color.assert_called_once_with("part_a", Subassembly.LEFT) # type: ignore
+    p1.get_color.assert_called_once_with("part_a", Subassembly.LEFT)  # type: ignore
     p1.get_color.assert_called_once_with("part_a", Subassembly.LEFT)  # type: ignore
 
     with pytest.raises(ValueError, match="Target 'missing' not found"):
