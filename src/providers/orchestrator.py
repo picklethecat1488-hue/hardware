@@ -184,14 +184,14 @@ class ProviderRouterOrchestrator(Orchestrator):
 
     def collect(self, targets: tuple[str, ...]) -> Dict[Provider, list[int]]:
         """Map target names to providers and group indices by provider."""
-        lookup: Dict[str, Provider] = {}
-        for p in self.controller.providers:
-            for t in p.manifest:
-                lookup[t] = p
+        p_map = {p.name: p for p in self.controller.providers}
 
         groups: Dict[Provider, list[int]] = {}
         for i, target in enumerate(targets):
-            provider = lookup.get(target)
+            if "/" not in target:
+                raise ValueError(f"Target '{target}' must use 'provider/target' syntax.")
+            p_name, _ = target.split("/", 1)
+            provider = p_map.get(p_name)
             if not provider:
                 raise ValueError(f"No provider found for target '{target}'")
             groups.setdefault(provider, []).append(i)
@@ -239,7 +239,7 @@ class ProviderRouterOrchestrator(Orchestrator):
 
         def provider_task(item: tuple[Provider, list[int]]) -> tuple[Provider, list[int], Any]:
             p, indices = item
-            p_targets = [targets[i] for i in indices]
+            p_targets = [targets[i].split("/", 1)[1] for i in indices]
             p_subs = [subassemblies[i] for i in indices] if len(subassemblies) == len(targets) else list(subassemblies)
             sub_list = TargetList(p, p_targets, subassemblies=p_subs, modes=list(modes), action=action)
             return p, indices, p.run(sub_list)

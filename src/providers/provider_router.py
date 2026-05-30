@@ -34,14 +34,8 @@ class ProviderRouter:
         """Aggregate manifest from all registered providers."""
         combined = {}
         for provider in self.providers:
-            p_manifest = provider.manifest
-            overlap = set(combined.keys()) & set(p_manifest.keys())
-            if overlap:
-                raise ValueError(
-                    f"Name collision detected in ProviderRouter: targets {overlap} are defined in multiple "
-                    f"providers. Provider '{provider.name}' conflicts with previously registered providers."
-                )
-            combined.update(p_manifest)
+            for target_name, config in provider.manifest.items():
+                combined[f"{provider.name}/{target_name}"] = config
         return combined
 
     @property
@@ -52,9 +46,11 @@ class ProviderRouter:
     @validate_call(config={"arbitrary_types_allowed": True})
     def get_color(self, target: str, subassembly: Optional[Subassembly] = None) -> tuple[float, float, float, float]:
         """Resolve the color for a specific target and subassembly."""
-        for provider in self.providers:
-            if target in provider.manifest:
-                return provider.get_color(target, subassembly)
+        if "/" in target:
+            p_name, t_name = target.split("/", 1)
+            for provider in self.providers:
+                if provider.name == p_name:
+                    return provider.get_color(t_name, subassembly)
         raise ValueError(f"Target '{target}' not found in any registered provider.")
 
     @property

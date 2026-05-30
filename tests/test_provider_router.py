@@ -60,19 +60,19 @@ def test_router_manifest_aggregation():
     c = ProviderRouter(providers=[p1, p2])
 
     manifest = c.manifest
-    assert "a" in manifest
-    assert "b" in manifest
+    assert "p1/a" in manifest
+    assert "p2/b" in manifest
     assert len(manifest) == 2
 
 
-def test_router_manifest_collision():
-    """Verify ValueError is raised on duplicate target names."""
+def test_router_path_syntax_avoids_collision():
+    """Verify that duplicate target names are namespaced correctly."""
     p1 = SimpleMockProvider("p1", {"collision": {}})
     p2 = SimpleMockProvider("p2", {"collision": {}})
     c = ProviderRouter(providers=[p1, p2])
 
-    with pytest.raises(ValueError, match="Name collision detected in ProviderRouter"):
-        _ = c.manifest
+    assert "p1/collision" in c.manifest
+    assert "p2/collision" in c.manifest
 
 
 def test_router_run_delegation():
@@ -81,10 +81,10 @@ def test_router_run_delegation():
     c = ProviderRouter(providers=[p1])
     c.orchestrator = MagicMock()
 
-    targets = TargetList(c, ["part_a"], action=Action.PART)
+    targets = TargetList(c, ["p1/part_a"], action=Action.PART)
     c.run(targets)
 
-    c.orchestrator.execute.assert_called_once_with(("part_a",), Action.PART, (), (Mode.DEFAULT,))
+    c.orchestrator.execute.assert_called_once_with(("p1/part_a",), Action.PART, (), (Mode.DEFAULT,))
 
 
 def test_router_default_configs():
@@ -103,9 +103,8 @@ def test_router_get_color():
     p1.get_color.return_value = (1.0, 0.0, 0.0, 1.0)  # type: ignore
     c = ProviderRouter(providers=[p1])
 
-    color = c.get_color("part_a", Subassembly.LEFT)
+    color = c.get_color("p1/part_a", Subassembly.LEFT)
     assert color == (1.0, 0.0, 0.0, 1.0)
-    p1.get_color.assert_called_once_with("part_a", Subassembly.LEFT)  # type: ignore
     p1.get_color.assert_called_once_with("part_a", Subassembly.LEFT)  # type: ignore
 
     with pytest.raises(ValueError, match="Target 'missing' not found"):

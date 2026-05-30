@@ -63,7 +63,7 @@ class TestProviderRouterOrchestrator:
     def test_collect_mapping(self, controller_context, mock_provider):
         """Verify targets are correctly mapped to providers."""
         orch = ProviderRouterOrchestrator(controller_context)
-        groups = orch.collect(("part_a",))
+        groups = orch.collect(("mock_p/part_a",))
 
         assert mock_provider in groups
         assert groups[mock_provider] == [0]
@@ -75,15 +75,15 @@ class TestProviderRouterOrchestrator:
         # simulate return from provider runs: (provider, indices, provider_results)
         raw_results = [(mock_provider, [0], [("part_a", "geom_obj")])]
 
-        merged = orch.merge(Action.PART, ("part_a",), raw_results)
-        assert merged == [("part_a", "geom_obj")]
+        merged = orch.merge(Action.PART, ("mock_p/part_a",), raw_results)
+        assert merged == [("mock_p/part_a", "geom_obj")]
 
     def test_merge_diagram_special_case(self, controller_context, mock_provider):
         """Verify diagram merging returns provider-named tuples."""
         orch = ProviderRouterOrchestrator(controller_context)
 
         raw_results = [(mock_provider, [0], "diag_obj")]
-        merged = orch.merge(Action.DIAGRAM, ("part_a",), raw_results)
+        merged = orch.merge(Action.DIAGRAM, ("mock_p/part_a",), raw_results)
 
         assert merged == [("mock_p", "diag_obj")]
 
@@ -94,7 +94,7 @@ class TestProviderRouterOrchestrator:
         # raw_results missing index 0
         raw_results = []
         with pytest.raises(ValueError, match="results for targets.*were not collected"):
-            orch.merge(Action.PART, ("part_a",), raw_results)
+            orch.merge(Action.PART, ("mock_p/part_a",), raw_results)
 
     @patch("concurrent.futures.ThreadPoolExecutor.map")
     def test_execute_parallel_call(self, mock_map, controller_context):
@@ -104,5 +104,5 @@ class TestProviderRouterOrchestrator:
         provider = controller_context.providers[0]
         mock_map.return_value = [(provider, [0], [("part_a", "geom")])]
 
-        orch.execute(("part_a",), Action.PART)
+        orch.execute(("mock_p/part_a",), Action.PART)
         assert mock_map.called
