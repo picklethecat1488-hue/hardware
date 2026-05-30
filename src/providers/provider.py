@@ -73,6 +73,14 @@ class Provider(ABC):
         return self._run(tuple(targets), Action.PART, tuple(targets.subassemblies), tuple(targets.modes))
 
     @validate_call(config={"arbitrary_types_allowed": True})
+    def configure_parts(
+        self,
+        targets: TargetList,
+    ) -> list[Any]:
+        """Run configuration for the specified names."""
+        return self._run(tuple(targets), Action.CONFIG, tuple(targets.subassemblies), tuple(targets.modes))
+
+    @validate_call(config={"arbitrary_types_allowed": True})
     def build_diagram(
         self,
         targets: TargetList,

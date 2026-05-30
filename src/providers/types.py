@@ -10,6 +10,7 @@ class Action(StrEnum):
     SKETCH = "sketch"
     PART = "part"
     DIAGRAM = "diagram"
+    CONFIG = "config"
 
 
 class Subassembly(StrEnum):
@@ -24,3 +25,5 @@ class Mode(StrEnum):
 
     DEFAULT = "default"
     BARE = "bare"
+    TEXT = "text"
+    MOUNT = "mount"
