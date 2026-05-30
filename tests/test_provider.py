@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel
 from providers.provider import Provider
 from providers.target_list import TargetList
+from providers.utils import load_manifest
 from providers.types import Action, Subassembly, Mode, MODES, SUBASSEMBLIES, COLOR
 
 
@@ -126,7 +127,7 @@ class TestProviderMetadata:
         }
         manifest_path.write_text(yaml.dump(yaml_content))
 
-        loaded = provider.load_manifest(str(manifest_path))
+        loaded = load_manifest(str(manifest_path))
         assert "part_c" in loaded
         assert Action.PART in loaded["part_c"]
         assert loaded["part_c"][Action.PART][MODES] == [Mode.DEFAULT]
