@@ -9,22 +9,18 @@ from pydantic import validate_call, BaseModel
 from model import AppConfig, method_cache
 from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES, COLOR
 from .target_list import TargetList
+from .orchestrator import Orchestrator, ProviderOrchestrator
 
 
 class Provider(ABC):
     """Base class for all build providers."""
 
-    _default_executor: Optional[ThreadPoolExecutor] = None
+    orchestrator_type: type[Orchestrator] = ProviderOrchestrator
 
     def __init__(self, executor: Optional[ThreadPoolExecutor] = None, config: Optional[AppConfig] = None):
         """Initialize the provider."""
         self.config = config or AppConfig()
-        if executor is not None:
-            self.executor = executor
-        else:
-            if Provider._default_executor is None:
-                Provider._default_executor = ThreadPoolExecutor()
-            self.executor = Provider._default_executor
+        self.orchestrator = self.orchestrator_type(self, executor=executor)
 
     @property
     @abstractmethod
@@ -67,7 +63,6 @@ class Provider(ABC):
                 color = color.get(subassembly)
             else:
                 color = next(iter(color.values())) if color else None
-
         return color or self.config.color
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -76,115 +71,4 @@ class Provider(ABC):
         action = targets.action
         if action is None:
             raise ValueError(f"No action specified for {targets}. You must call .supporting(action) before running.")
-
-        # Diagram action does not use subassemblies during build execution
-        subassemblies = tuple(targets.subassemblies) if action != Action.DIAGRAM else ()
-
-        if action == Action.CONFIG:
-            self._run_uncached(tuple(targets), action, subassemblies, tuple(targets.modes))
-            return None
-
-        results = self._run(tuple(targets), action, subassemblies, tuple(targets.modes))
-        if action == Action.DIAGRAM:
-            return results[0]
-
-        return results
-
-    @method_cache()
-    def _run(
-        self,
-        targets: tuple[str, ...],
-        action: Action,
-        subassemblies: tuple[Subassembly, ...] = (),
-        modes: tuple[Mode, ...] = (Mode.DEFAULT,),
-    ) -> list[Any]:
-        """Perform a cached provider-specific build action."""
-        return self._run_uncached(targets, action, subassemblies, modes)
-
-    def _run_uncached(
-        self,
-        targets: tuple[str, ...],
-        action: Action,
-        subassemblies: tuple[Subassembly, ...] = (),
-        modes: tuple[Mode, ...] = (Mode.DEFAULT,),
-    ) -> list[Any]:
-        """Perform a requested provider-specific build action without caching."""
-        self._pre_handler(targets, action, subassemblies, modes)
-        handler = self.registry.get(action)
-        if not handler:
-            raise ValueError(f"No handler registered for action '{action}' in {self.__class__.__name__}")
-
-        def handler_task(i: int) -> Any:
-            target = targets[i]
-            sa = (
-                subassemblies[i]
-                if len(subassemblies) == len(targets)
-                else (subassemblies[0] if subassemblies else None)
-            )
-            return handler(target, [sa] if sa else [], list(modes))
-
-        results = list(self.executor.map(handler_task, range(len(targets))))
-        self._post_handler(targets, results, action)
-        return results
-
-    def _pre_handler(
-        self,
-        targets: tuple[str, ...],
-        action: Action,
-        subassemblies: tuple[Subassembly, ...],
-        modes: tuple[Mode, ...],
-    ) -> None:
-        """Validate input parameters before the handler execution."""
-        # Validate that subassemblies list length matches names or is exactly 1
-        if subassemblies and len(subassemblies) != len(targets) and len(subassemblies) != 1:
-            raise ValueError(
-                f"Length of subassemblies ({len(subassemblies)}) must match "
-                f"length of targets ({len(targets)}) or be exactly 1."
-            )
-
-        # Cache references to avoid repeated property lookups in the loop
-        valid_targets = self.targets
-        manifest = self.manifest
-
-        # Validate name, action, format, and subassembly for each name
-        for i, name in enumerate(targets):
-            if name not in valid_targets:
-                raise ValueError(f"Unsupported part name: '{name}'. Supported: {valid_targets}")
-
-            actions_config = manifest.get(name, {})
-
-            if action not in actions_config:
-                raise ValueError(
-                    f"Action '{action}' is not supported for part '{name}'. "
-                    f"Supported actions: {list(actions_config.keys())}"
-                )
-
-            action_config = actions_config[action]
-            supported_modes = action_config.get(MODES, [])
-            for mode in modes:
-                if mode not in supported_modes:
-                    raise ValueError(
-                        f"Mode '{mode}' is not supported for action '{action}' on part '{name}'. "
-                        f"Supported modes: {supported_modes}"
-                    )
-
-            if subassemblies:
-                # Determine which subassembly to check for this name
-                sa = subassemblies[i] if len(subassemblies) == len(targets) else subassemblies[0]
-                supported_subs = action_config.get(SUBASSEMBLIES, [])
-                if sa not in supported_subs:
-                    raise ValueError(
-                        f"Subassembly '{sa}' is not supported for part '{name}'. "
-                        f"Supported subassemblies: {supported_subs}"
-                    )
-
-    def _post_handler(self, targets: tuple[str, ...], results: list[Any], action: Action) -> None:
-        """Validate build results after the handler execution."""
-        expected_len = 1 if action == Action.DIAGRAM else len(targets)
-        if len(results) != expected_len:
-            raise ValueError(
-                f"Provider build failed validation for {action}: returned {len(results)} items, "
-                f"but {expected_len} were expected."
-            )
-        if action == Action.CONFIG and results != [None] * len(targets):
-            raise ValueError(f"Provider build failed validation for {action}: action should not return a value.")
+        return self.orchestrator.execute(tuple(targets), action, tuple(targets.subassemblies), tuple(targets.modes))
