@@ -51,6 +51,10 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     diagram_part_dist: int = Field(default=120, description="Distance between exploded halves in the diagram")
     diagram_label_dist: int = Field(default=120, description="Distance of the labels from the parts in the diagram")
 
+    color: tuple[float, float, float, float] = Field(
+        default=(1.0, 0.0, 1.0, 1.0), description="The default object color"
+    )
+
     _env_flattened_keys: list[str] = ["TUBE", "LOGO_TEXT_ARGS", "LOGO_TEXT_POSITIONS", "DIAGRAM_OPTIONS"]
 
     model_config = SettingsConfigDict(

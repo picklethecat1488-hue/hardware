@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel
 from providers.provider import Provider
 from providers.target_list import TargetList
-from providers.types import Action, Subassembly, Mode, MODES, SUBASSEMBLIES
+from providers.types import Action, Subassembly, Mode, MODES, SUBASSEMBLIES, COLOR
 
 
 class MockConfig(BaseModel):
@@ -42,6 +42,7 @@ class MockProvider(Provider):
                     MODES: [Mode.DEFAULT, Mode.TEXT, Mode.MOUNT],
                     SUBASSEMBLIES: [Subassembly.LEFT],
                 },
+                COLOR: (0.8, 0.8, 0.8, 1.0),
             },
             "part_b": {
                 Action.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.RIGHT]},
@@ -49,6 +50,7 @@ class MockProvider(Provider):
                     MODES: [Mode.DEFAULT],
                     SUBASSEMBLIES: [Subassembly.RIGHT],
                 },
+                COLOR: {Subassembly.RIGHT: (0.9, 0.9, 0.9, 1.0)},
             },
         }
 
@@ -94,6 +96,26 @@ class TestTargetList:
         """Verify for_modes() filters targets correctly."""
         targets = provider.targets.for_modes([Mode.BARE])
         assert list(targets) == ["part_a"]
+
+
+class TestProviderMetadata:
+    """Tests for provider metadata and color resolution."""
+
+    def test_get_color_single(self, provider):
+        """Verify get_color returns a single defined color."""
+        assert provider.get_color("part_a") == (0.8, 0.8, 0.8, 1.0)
+
+    def test_get_color_dict_specific(self, provider):
+        """Verify get_color returns the specific subassembly color from a dict."""
+        assert provider.get_color("part_b", Subassembly.RIGHT) == (0.9, 0.9, 0.9, 1.0)
+
+    def test_get_color_dict_fallback_first(self, provider):
+        """Verify get_color returns the first dict color when no subassembly is specified."""
+        assert provider.get_color("part_b") == (0.9, 0.9, 0.9, 1.0)
+
+    def test_get_color_fallback_config(self, provider):
+        """Verify get_color falls back to config color when missing."""
+        assert provider.get_color("part_b", Subassembly.LEFT) == provider.config.color
 
 
 class TestProviderOrchestration:
