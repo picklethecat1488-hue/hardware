@@ -1,6 +1,11 @@
 """Manages the lifecycle and configuration of multiple providers."""
 
 import json
+import os
+import inspect
+import pkgutil
+import importlib
+import sys
 from typing import Any, Optional, cast
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import validate_call
@@ -17,15 +22,53 @@ class ProviderManager:
         config: AppConfig,
         providers: Optional[list[Provider]] = None,
         executor: Optional[ThreadPoolExecutor] = None,
+        bootstrap: bool = True,
     ):
         """Initialize the manager."""
         self.config = config
+
+        if providers is not None and bootstrap:
+            raise ValueError("Cannot bootstrap when providers are explicitly provided.")
+
+        if providers is None and bootstrap:
+            providers = self._discover_providers(executor)
+
         self._router = ProviderRouter(executor=executor, providers=providers)
+
+        if bootstrap:
+            self.load_configs()
 
     @property
     def router(self) -> ProviderRouter:
         """Return the managed router."""
         return self._router
+
+    def _discover_providers(self, executor: Optional[ThreadPoolExecutor]) -> list[Provider]:
+        """Automatically discover and instantiate Provider subclasses in the package."""
+        from . import provider as base_module
+
+        # Crawl the providers package to ensure all modules are loaded and subclasses are registered
+        if base_module.__file__:
+            package_path = os.path.dirname(base_module.__file__)
+            for _, name, is_pkg in pkgutil.iter_modules([package_path]):
+                if not is_pkg:
+                    module_name = f"{base_module.__package__}.{name}"
+                    if module_name not in sys.modules:
+                        importlib.import_module(module_name)
+
+        discovered: list[Provider] = []
+
+        def find_subclasses(cls):
+            for subclass in cls.__subclasses__():
+                if not inspect.isabstract(subclass) and getattr(subclass, "_discover_provider", False):
+                    try:
+                        discovered.append(subclass(executor=executor, config=self.config))
+                    except (TypeError, AttributeError):
+                        continue
+                find_subclasses(subclass)
+
+        find_subclasses(Provider)
+        return discovered
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def load_configs(self) -> None:
