@@ -50,6 +50,11 @@ class Provider(ABC):
         pass
 
     @property
+    def view(self) -> dict[str, Callable[[], list[tuple[Any, Any]]]]:
+        """A mapping of room names to view functions."""
+        return {}
+
+    @property
     def targets(self) -> TargetList:
         """List of supported build targets derived from the manifest keys."""
         return TargetList(self, self.manifest.keys())
