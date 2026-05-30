@@ -124,13 +124,13 @@ class TestProviderOrchestration:
     def test_build_success(self, provider):
         """Verify successful build orchestration and validation."""
         results = provider.run(provider.targets.supporting(Action.WIRE))
-        assert results == ["wire_obj"]
+        assert results == [("part_a", "wire_obj")]
         provider.registry[Action.WIRE].assert_called_once_with("part_a", [], [Mode.DEFAULT])
 
     def test_build_sketch_success(self, provider):
         """Verify successful sketch build orchestration."""
         results = provider.run(provider.targets.supporting(Action.SKETCH))
-        assert results == ["sketch_obj"]
+        assert results == [("part_a", "sketch_obj")]
         provider.registry[Action.SKETCH].assert_called_once_with("part_a", [], [Mode.DEFAULT])
 
     def test_configure_success(self, provider):
@@ -175,5 +175,6 @@ class TestProviderOrchestration:
         """Verify build result length validation."""
         # This test is less relevant now as _run guarantees length by construction,
         # but we keep it to ensure _post_build still executes correctly.
-        provider.run(TargetList(provider, ["part_a", "part_b"], action=Action.PART))
+        results = provider.run(TargetList(provider, ["part_a", "part_b"], action=Action.PART))
+        assert results == [("part_a", "part_obj"), ("part_b", "part_obj")]
         assert provider.registry[Action.PART].call_count == 2
