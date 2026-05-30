@@ -71,45 +71,26 @@ class Provider(ABC):
         return color or self.config.color
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def build_wires(
-        self,
-        targets: TargetList,
-    ) -> list[Wire]:
-        """Build wires for the specified names."""
-        return self._run(tuple(targets), Action.WIRE, tuple(targets.subassemblies), tuple(targets.modes))
+    def run(self, targets: TargetList) -> Any:
+        """Perform the requested provider-specific build action based on TargetList."""
+        action = targets.action
+        # Diagram action does not use subassemblies during build execution
+        subassemblies = tuple(targets.subassemblies) if action != Action.DIAGRAM else ()
 
-    @validate_call(config={"arbitrary_types_allowed": True})
-    def build_sketches(
-        self,
-        targets: TargetList,
-    ) -> list[Sketch]:
-        """Build sketches for the specified names."""
-        return self._run(tuple(targets), Action.SKETCH, tuple(targets.subassemblies), tuple(targets.modes))
+        results = self._run(
+            tuple(targets),
+            action,
+            subassemblies,
+            tuple(targets.modes),
+        )
 
-    @validate_call(config={"arbitrary_types_allowed": True})
-    def build_parts(
-        self,
-        targets: TargetList,
-    ) -> list[Part]:
-        """Build parts for the specified names."""
-        return self._run(tuple(targets), Action.PART, tuple(targets.subassemblies), tuple(targets.modes))
+        if action == Action.DIAGRAM:
+            return results[0]
 
-    @validate_call(config={"arbitrary_types_allowed": True})
-    def configure(
-        self,
-        targets: TargetList,
-    ) -> None:
-        """Run configuration for the specified names."""
-        self._run(tuple(targets), Action.CONFIG, tuple(targets.subassemblies), tuple(targets.modes))
+        if action == Action.CONFIG:
+            return None
 
-    @validate_call(config={"arbitrary_types_allowed": True})
-    def build_diagram(
-        self,
-        targets: TargetList,
-    ) -> cq.Assembly:
-        """Build an assembly diagram for the specified names."""
-        results = self._run(tuple(targets), Action.DIAGRAM, (), tuple(targets.modes))
-        return results[0]
+        return results
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
