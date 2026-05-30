@@ -36,6 +36,11 @@ class Provider(ABC):
         pass
 
     @property
+    def settings(self) -> Any:
+        """Return the provider-specific configuration sub-model from the global config."""
+        return getattr(self.config, self.name.lower(), self.default_config)
+
+    @property
     def manifest(self) -> dict[str, dict[str, Any]]:
         """A mapping of part names to their supported capabilities and colors.
 

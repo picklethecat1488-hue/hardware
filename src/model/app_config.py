@@ -64,6 +64,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         validate_by_name=True,
         validate_by_alias=True,
         env_nested_delimiter="__",
+        extra="allow",
     )
 
     def model_post_init(self, __context: Any) -> None:
