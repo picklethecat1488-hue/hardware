@@ -35,7 +35,7 @@ class ProviderManager:
 
         for provider in self.router.providers:
             # Sync the provider to use the shared global configuration
-            provider.config = config
+            provider.app_config = config
 
             name = provider.name.lower()
             env_key = name.upper()
@@ -67,7 +67,7 @@ class ProviderManager:
         config = self.config
         for provider in self.router.providers:
             # Sync the provider to use the shared global configuration
-            provider.config = config
+            provider.app_config = config
 
             provider_config = provider.settings
             if provider_config is None:

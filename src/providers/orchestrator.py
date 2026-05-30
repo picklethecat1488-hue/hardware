@@ -94,6 +94,17 @@ class ProviderOrchestrator(Orchestrator):
             def handler_task(i: int) -> Any:
                 target = targets[i]
                 return self.provider.view[target]()
+        elif action == Action.CONFIG:
+
+            def handler_task(i: int) -> Any:
+                target: str = targets[i]
+                sa = (
+                    subassemblies[i]
+                    if len(subassemblies) == len(targets)
+                    else (subassemblies[0] if subassemblies else None)
+                )
+                mode = modes[0]
+                return self.provider.config[mode](target, [sa] if sa else [])
         else:
             handler = self.provider.registry[action]
 
@@ -129,7 +140,7 @@ class ProviderOrchestrator(Orchestrator):
                 f"length of targets ({len(targets)}) or be exactly 1."
             )
 
-        if action != Action.VIEW and action not in self.provider.registry:
+        if action != Action.VIEW and action != Action.CONFIG and action not in self.provider.registry:
             raise ValueError(f"No handler registered for action '{action}' in {self.provider.__class__.__name__}")
 
         valid_targets = self.provider.targets
@@ -141,6 +152,11 @@ class ProviderOrchestrator(Orchestrator):
 
             if action == Action.VIEW and name not in self.provider.view:
                 raise ValueError(f"No view function registered for room '{name}' in {self.provider.name}")
+
+            if action == Action.CONFIG:
+                for mode in modes:
+                    if mode not in self.provider.config:
+                        raise ValueError(f"No config handler registered for mode '{mode}' in {self.provider.name}")
 
             actions_config = manifest.get(name, {})
             if action not in actions_config:
