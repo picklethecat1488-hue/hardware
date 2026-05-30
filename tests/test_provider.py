@@ -159,16 +159,21 @@ class TestProviderOrchestration:
     def test_pre_build_validation_failures(self, provider):
         """Verify various validation failures in _pre_build."""
         with pytest.raises(ValueError, match="Length of subassemblies"):
-            targets = TargetList(provider, ["part_a", "part_b"], subassemblies=[Subassembly.LEFT] * 3)
+            targets = TargetList(
+                provider,
+                ["part_a", "part_b"],
+                subassemblies=[Subassembly.LEFT] * 3,
+                action=Action.PART,
+            )
             provider.run(targets)
 
         with pytest.raises(ValueError, match="Mode 'bare' is not supported.*part_b"):
-            targets = TargetList(provider, ["part_b"], modes=[Mode.BARE])
+            targets = TargetList(provider, ["part_b"], modes=[Mode.BARE], action=Action.PART)
             provider.run(targets)
 
     def test_post_build_length_validation(self, provider):
         """Verify build result length validation."""
         # This test is less relevant now as _run guarantees length by construction,
         # but we keep it to ensure _post_build still executes correctly.
-        provider.run(TargetList(provider, ["part_a", "part_b"]))
+        provider.run(TargetList(provider, ["part_a", "part_b"], action=Action.PART))
         assert provider.registry[Action.PART].call_count == 2

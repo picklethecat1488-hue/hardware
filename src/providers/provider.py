@@ -74,6 +74,9 @@ class Provider(ABC):
     def run(self, targets: TargetList) -> Any:
         """Perform the requested provider-specific build action based on TargetList."""
         action = targets.action
+        if action is None:
+            raise ValueError(f"No action specified for {targets}. You must call .supporting(action) before running.")
+
         # Diagram action does not use subassemblies during build execution
         subassemblies = tuple(targets.subassemblies) if action != Action.DIAGRAM else ()
 

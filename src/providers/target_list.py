@@ -16,7 +16,7 @@ class TargetList(list[str]):
         targets: Iterable[str] = (),
         subassemblies: Optional[list[Subassembly]] = None,
         modes: Optional[list[Mode]] = None,
-        action: Action = Action.PART,
+        action: Optional[Action] = None,
     ):
         """Initialize the TargetList."""
         super().__init__(targets)
