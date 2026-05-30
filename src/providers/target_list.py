@@ -1,7 +1,7 @@
 """Specialized list for build targets."""
 
 from typing import Iterable, Optional, TYPE_CHECKING
-from .types import Subassembly, Mode, Action
+from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES
 
 if TYPE_CHECKING:
     from .provider import Provider
@@ -36,29 +36,42 @@ class TargetList(list[str]):
         """Filter targets that support the specified action."""
         return TargetList(
             self.provider,
-            [t for t in self if action in self.provider.manifest.get(t, {}).get("actions", [])],
+            [t for t in self if action in self.provider.manifest.get(t, {})],
             self.subassemblies,
             self.modes,
         )
 
     def for_subassemblies(self, subassemblies: list[Subassembly]) -> "TargetList":
         """Filter targets that support any of the specified subassemblies."""
+
+        def target_supports_subs(t: str) -> bool:
+            actions_dict = self.provider.manifest.get(t, {})
+            for action_cfg in actions_dict.values():
+                if any(s in action_cfg.get(SUBASSEMBLIES, []) for s in subassemblies):
+                    return True
+            return False
+
         return TargetList(
             self.provider,
-            [
-                t
-                for t in self
-                if any(s in self.provider.manifest.get(t, {}).get("subassemblies", []) for s in subassemblies)
-            ],
+            [t for t in self if target_supports_subs(t)],
             subassemblies,
             self.modes,
         )
 
     def for_modes(self, modes: list[Mode]) -> "TargetList":
         """Filter targets that support any of the specified modes."""
+
+        def target_supports_modes(t: str) -> bool:
+            actions_dict = self.provider.manifest.get(t, {})
+            # Check if any supported action for this target offers any of the requested modes
+            for action_cfg in actions_dict.values():
+                if any(m in action_cfg.get(MODES, []) for m in modes):
+                    return True
+            return False
+
         return TargetList(
             self.provider,
-            [t for t in self if any(m in self.provider.manifest.get(t, {}).get("modes", []) for m in modes)],
+            [t for t in self if target_supports_modes(t)],
             self.subassemblies,
             modes,
         )

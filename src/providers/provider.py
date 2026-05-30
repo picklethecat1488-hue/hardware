@@ -7,7 +7,7 @@ from build123d import Part, Sketch, Wire
 import cadquery as cq
 from pydantic import validate_call, BaseModel
 from model import method_cache
-from .types import Subassembly, Mode, Action
+from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES
 from .target_list import TargetList
 
 
@@ -27,6 +27,12 @@ class Provider(ABC):
 
     @property
     @abstractmethod
+    def name(self) -> str:
+        """Return the name of the provider."""
+        pass
+
+    @property
+    @abstractmethod
     def default_config(self) -> BaseModel:
         """Return a default instance of the provider's configuration."""
         pass
@@ -34,7 +40,7 @@ class Provider(ABC):
     @property
     @abstractmethod
     def manifest(self) -> dict[str, dict[str, Any]]:
-        """A mapping of part names to their supported capabilities (actions, modes, subassemblies)."""
+        """A mapping of part names to their supported capabilities (actions mapping to modes and subassemblies)."""
         pass
 
     @property
@@ -141,28 +147,31 @@ class Provider(ABC):
             if name not in valid_targets:
                 raise ValueError(f"Unsupported part name: '{name}'. Supported: {valid_targets}")
 
-            target_manifest = manifest.get(name, {})
+            actions_config = manifest.get(name, {})
 
-            if action not in target_manifest.get("actions", []):
+            if action not in actions_config:
                 raise ValueError(
                     f"Action '{action}' is not supported for part '{name}'. "
-                    f"Supported actions: {target_manifest.get('actions', [])}"
+                    f"Supported actions: {list(actions_config.keys())}"
                 )
 
+            action_config = actions_config[action]
+            supported_modes = action_config.get(MODES, [])
             for mode in modes:
-                if mode not in target_manifest.get("modes", []):
+                if mode not in supported_modes:
                     raise ValueError(
-                        f"Mode '{mode}' is not supported for part '{name}'. "
-                        f"Supported modes: {target_manifest.get('modes', [])}"
+                        f"Mode '{mode}' is not supported for action '{action}' on part '{name}'. "
+                        f"Supported modes: {supported_modes}"
                     )
 
             if subassemblies:
                 # Determine which subassembly to check for this name
                 sa = subassemblies[i] if len(subassemblies) == len(targets) else subassemblies[0]
-                if sa not in target_manifest.get("subassemblies", []):
+                supported_subs = action_config.get(SUBASSEMBLIES, [])
+                if sa not in supported_subs:
                     raise ValueError(
                         f"Subassembly '{sa}' is not supported for part '{name}'. "
-                        f"Supported subassemblies: {target_manifest.get('subassemblies', [])}"
+                        f"Supported subassemblies: {supported_subs}"
                     )
 
     def _post_handler(self, targets: tuple[str, ...], results: list[Any], action: Action) -> None:
