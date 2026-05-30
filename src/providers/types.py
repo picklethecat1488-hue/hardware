@@ -3,6 +3,10 @@
 from enum import StrEnum
 
 
+MODES = "modes"
+SUBASSEMBLIES = "subassemblies"
+
+
 class Action(StrEnum):
     """Build actions for shapes."""
 

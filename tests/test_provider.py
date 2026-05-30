@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel
 from providers.provider import Provider
 from providers.target_list import TargetList
-from providers.types import Action, Subassembly, Mode
+from providers.types import Action, Subassembly, Mode, MODES, SUBASSEMBLIES
 
 
 class MockConfig(BaseModel):
@@ -32,19 +32,23 @@ class MockProvider(Provider):
         """Return a mock manifest."""
         return {
             "part_a": {
-                "actions": [Action.WIRE, Action.PART, Action.SKETCH],
-                "subassemblies": [Subassembly.LEFT],
-                "modes": [Mode.DEFAULT, Mode.BARE],
+                Action.WIRE: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.LEFT]},
+                Action.PART: {
+                    MODES: [Mode.DEFAULT, Mode.BARE],
+                    SUBASSEMBLIES: [Subassembly.LEFT],
+                },
+                Action.SKETCH: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.LEFT]},
+                Action.CONFIG: {
+                    MODES: [Mode.DEFAULT, Mode.TEXT, Mode.MOUNT],
+                    SUBASSEMBLIES: [Subassembly.LEFT],
+                },
             },
             "part_b": {
-                "actions": [Action.PART, Action.DIAGRAM],
-                "subassemblies": [Subassembly.RIGHT],
-                "modes": [Mode.DEFAULT],
-            },
-            "part_a,config": {
-                "actions": [Action.CONFIG],
-                "subassemblies": [],
-                "modes": [Mode.DEFAULT, Mode.TEXT, Mode.MOUNT],
+                Action.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.RIGHT]},
+                Action.DIAGRAM: {
+                    MODES: [Mode.DEFAULT],
+                    SUBASSEMBLIES: [Subassembly.RIGHT],
+                },
             },
         }
 
@@ -110,15 +114,15 @@ class TestProviderOrchestration:
     def test_configure_success(self, provider):
         """Verify successful configuration orchestration."""
         provider.configure_parts(provider.targets.supporting(Action.CONFIG))
-        provider.registry[Action.CONFIG].assert_called_once_with("part_a,config", [], [Mode.DEFAULT])
+        provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.DEFAULT])
 
         provider.registry[Action.CONFIG].reset_mock()
         provider.configure_parts(provider.targets.supporting(Action.CONFIG).for_modes([Mode.TEXT]))
-        provider.registry[Action.CONFIG].assert_called_once_with("part_a,config", [], [Mode.TEXT])
+        provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.TEXT])
 
         provider.registry[Action.CONFIG].reset_mock()
         provider.configure_parts(provider.targets.supporting(Action.CONFIG).for_modes([Mode.MOUNT]))
-        provider.registry[Action.CONFIG].assert_called_once_with("part_a,config", [], [Mode.MOUNT])
+        provider.registry[Action.CONFIG].assert_called_once_with("part_a", [], [Mode.MOUNT])
 
     def test_build_action_unsupported(self, provider):
         """Verify ValueError when a target does not support an action."""
@@ -136,7 +140,7 @@ class TestProviderOrchestration:
             targets = TargetList(provider, ["part_a", "part_b"], subassemblies=[Subassembly.LEFT] * 3)
             provider.build_parts(targets)
 
-        with pytest.raises(ValueError, match="Mode 'bare' is not supported for part 'part_b'"):
+        with pytest.raises(ValueError, match="Mode 'bare' is not supported.*part_b"):
             targets = TargetList(provider, ["part_b"], modes=[Mode.BARE])
             provider.build_parts(targets)
 
