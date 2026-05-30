@@ -77,23 +77,17 @@ class Provider(ABC):
         # Diagram action does not use subassemblies during build execution
         subassemblies = tuple(targets.subassemblies) if action != Action.DIAGRAM else ()
 
-        results = self._run(
-            tuple(targets),
-            action,
-            subassemblies,
-            tuple(targets.modes),
-        )
+        if action == Action.CONFIG:
+            self._run_uncached(tuple(targets), action, subassemblies, tuple(targets.modes))
+            return None
 
+        results = self._run(tuple(targets), action, subassemblies, tuple(targets.modes))
         if action == Action.DIAGRAM:
             return results[0]
 
-        if action == Action.CONFIG:
-            return None
-
         return results
 
-    @validate_call(config={"arbitrary_types_allowed": True})
-    @method_cache
+    @method_cache()
     def _run(
         self,
         targets: tuple[str, ...],
@@ -101,7 +95,17 @@ class Provider(ABC):
         subassemblies: tuple[Subassembly, ...] = (),
         modes: tuple[Mode, ...] = (Mode.DEFAULT,),
     ) -> list[Any]:
-        """Perform a requested provider-specific build action."""
+        """Perform a cached provider-specific build action."""
+        return self._run_uncached(targets, action, subassemblies, modes)
+
+    def _run_uncached(
+        self,
+        targets: tuple[str, ...],
+        action: Action,
+        subassemblies: tuple[Subassembly, ...] = (),
+        modes: tuple[Mode, ...] = (Mode.DEFAULT,),
+    ) -> list[Any]:
+        """Perform a requested provider-specific build action without caching."""
         self._pre_handler(targets, action, subassemblies, modes)
         handler = self.registry.get(action)
         if not handler:

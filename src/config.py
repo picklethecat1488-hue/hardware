@@ -30,7 +30,7 @@ class Configurator:
         self._path_cache[id(path)] = path
         return self.get_part_position_cached(id(tube), id(path), off, radius)
 
-    @method_cache
+    @method_cache()
     def get_orientation_normal(self, tube_id, path_id):
         """Return True if we should use midpoint_up, False if we should use midpoint_down."""
         tube: Part = self._tube_cache[tube_id]
@@ -41,7 +41,7 @@ class Configurator:
         # Orientation is normal if midpoint_up is closer to solid center than path position.
         return (solid_center - midpoint_up).length < (solid_center - pos).length
 
-    @method_cache
+    @method_cache()
     def get_part_position_cached(self, tube_id, path_id, off, radius):
         """Get a cached attachment position on the tube."""
         path: Wire = self._path_cache[path_id]
