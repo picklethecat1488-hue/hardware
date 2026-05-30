@@ -1,10 +1,11 @@
 """Specialized list for build targets."""
 
-from typing import Iterable, Optional, TYPE_CHECKING
+from typing import Iterable, Optional, TYPE_CHECKING, Union
 from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES
 
 if TYPE_CHECKING:
     from .provider import Provider
+    from .provider_router import ProviderRouter
 
 
 class TargetList(list[str]):
@@ -12,7 +13,7 @@ class TargetList(list[str]):
 
     def __init__(
         self,
-        provider: "Provider",
+        provider: Union["Provider", "ProviderRouter"],
         targets: Iterable[str] = (),
         subassemblies: Optional[list[Subassembly]] = None,
         modes: Optional[list[Mode]] = None,
@@ -27,7 +28,8 @@ class TargetList(list[str]):
 
     def __str__(self) -> str:
         """Return a string representation of the target list for logging."""
-        name = f"{self.provider.name.title()}Targets"
+        p_name = getattr(self.provider, "name", self.provider.__class__.__name__.lower())
+        name = f"{p_name.title()}Targets"
         return f"{name}(targets={super().__repr__()}, action={self.action}, subassemblies={self.subassemblies}, modes={self.modes})"
 
     def __repr__(self) -> str:
