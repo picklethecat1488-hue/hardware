@@ -55,7 +55,37 @@ def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128) 
 
 
 def parse_measurements(path: str) -> dict[int | str, np.ndarray]:
-    """Parse the measurements YAML file and return processed numpy arrays."""
+    """
+    Parse the measurements YAML file and return processed numpy arrays.
+
+    The path can optionally include a colon followed by a key to extract a
+    specific section of the YAML file (e.g., 'measurements.yml:points').
+
+    Example YAML (list format):
+    ```yaml
+    - [0, 0, 0]
+    - [1, 2, 3]
+    ```
+    Returns: {1: array([0, 0, 0]), 2: array([1, 2, 3])}
+
+    Example YAML (dict format):
+    ```yaml
+    p1: [0, 0, 0]
+    p2: [1, 2, 3]
+    ```
+    Returns: {'p1': array([0, 0, 0]), 'p2': array([1, 2, 3])}
+
+    Example YAML (nested section):
+    ```yaml
+    section_a:
+      p1: [0, 0, 0]
+      p2: [1, 2, 3]
+    section_b:
+      p3: [4, 5, 6]
+    ```
+    Example path with key: 'data.yml:section_a'
+    Returns: {'p1': array([0, 0, 0]), 'p2': array([1, 2, 3])}
+    """
     if ":" in path:
         file_path_str, key = path.split(":", 1)
     else:

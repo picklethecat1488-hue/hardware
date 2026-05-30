@@ -76,7 +76,27 @@ class Provider(ABC):
 
     @classmethod
     def load_manifest_from_yaml(cls, path: str) -> dict[str, dict[Any, Any]]:
-        """Load and parse a manifest from a YAML file."""
+        """
+        Load and parse a manifest from a YAML file.
+
+        Example YAML format:
+        ```yaml
+        part_a:
+          wire:
+            modes: [default]
+            subassemblies: [left]
+          part:
+            modes: [default, bare]
+            subassemblies: [left]
+          color: [0.8, 0.8, 0.8, 1.0]
+        part_b:
+          part:
+            modes: [default]
+            subassemblies: [right]
+          color:
+            right: [0.9, 0.9, 0.9, 1.0]
+        ```
+        """
         with open(path, "r") as f:
             data = yaml.safe_load(f)
 
