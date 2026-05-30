@@ -41,6 +41,11 @@ class MockProvider(Provider):
                 "subassemblies": [Subassembly.RIGHT],
                 "modes": [Mode.DEFAULT],
             },
+            "part_a,config": {
+                "actions": [Action.CONFIG],
+                "subassemblies": [],
+                "modes": [Mode.DEFAULT, Mode.TEXT, Mode.MOUNT],
+            },
         }
 
     @property
@@ -50,6 +55,7 @@ class MockProvider(Provider):
             self._mock_registry = {
                 Action.WIRE: MagicMock(return_value="wire_obj"),
                 Action.PART: MagicMock(return_value="part_obj"),
+                Action.CONFIG: MagicMock(return_value=None),
                 Action.DIAGRAM: MagicMock(return_value="diag_obj"),
             }
         return self._mock_registry
@@ -93,6 +99,19 @@ class TestProviderOrchestration:
         results = provider.build_wires(provider.targets.supporting(Action.WIRE))
         assert results == ["wire_obj"]
         provider.registry[Action.WIRE].assert_called_once_with("part_a", [], [Mode.DEFAULT])
+
+    def test_configure_success(self, provider):
+        """Verify successful configuration orchestration."""
+        provider.configure_parts(provider.targets.supporting(Action.CONFIG))
+        provider.registry[Action.CONFIG].assert_called_once_with("part_a,config", [], [Mode.DEFAULT])
+
+        provider.registry[Action.CONFIG].reset_mock()
+        provider.configure_parts(provider.targets.supporting(Action.CONFIG).for_modes([Mode.TEXT]))
+        provider.registry[Action.CONFIG].assert_called_once_with("part_a,config", [], [Mode.TEXT])
+
+        provider.registry[Action.CONFIG].reset_mock()
+        provider.configure_parts(provider.targets.supporting(Action.CONFIG).for_modes([Mode.MOUNT]))
+        provider.registry[Action.CONFIG].assert_called_once_with("part_a,config", [], [Mode.MOUNT])
 
     def test_build_action_unsupported(self, provider):
         """Verify ValueError when a target does not support an action."""
