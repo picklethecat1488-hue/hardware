@@ -44,6 +44,7 @@ class MockProvider(Provider):
                     MODES: [Mode.DEFAULT, Mode.TEXT, Mode.MOUNT],
                     SUBASSEMBLIES: [Subassembly.LEFT],
                 },
+                Action.VIEW: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.LEFT]},
                 COLOR: (0.8, 0.8, 0.8, 1.0),
             },
             "part_b": {
@@ -78,6 +79,15 @@ class MockProvider(Provider):
                 Mode.MOUNT: MagicMock(return_value=None),
             }
         return self._mock_config
+
+    @property
+    def view(self) -> dict:
+        """Return a mock view registry."""
+        if not hasattr(self, "_mock_view"):
+            self._mock_view = {
+                "part_a": MagicMock(return_value=[("shape", "color")]),
+            }
+        return self._mock_view
 
 
 @pytest.fixture(scope="module")
@@ -195,6 +205,18 @@ class TestProviderOrchestration:
         provider.config[Mode.TEXT].reset_mock()
         provider.run(provider.targets.supporting(Action.CONFIG).for_modes([Mode.MOUNT]))
         provider.config[Mode.MOUNT].assert_called_once_with("part_a", [])
+
+    def test_view_success(self, provider):
+        """Verify successful view orchestration."""
+        results = provider.run(provider.targets.supporting(Action.VIEW))
+        assert results == [("part_a", [("shape", "color")])]
+        provider.view["part_a"].assert_called_once()
+
+    def test_view_unregistered_room(self, provider):
+        """Verify error when a target supports VIEW in manifest but lacks a function in view registry."""
+        provider.manifest["part_b"][Action.VIEW] = {MODES: [Mode.DEFAULT]}
+        with pytest.raises(ValueError, match="No view function registered for room 'part_b'"):
+            provider.run(TargetList(provider, ["part_b"], action=Action.VIEW))
 
     def test_build_action_unsupported(self, provider):
         """Verify ValueError when a target does not support an action."""
