@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, TYPE_CHECKING, Optional
+from typing import Any, TYPE_CHECKING, Optional, Dict
 from concurrent.futures import ThreadPoolExecutor
+import cadquery as cq
 from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES
 from model import method_cache
 from pydantic import validate_call
+from .target_list import TargetList
 
 if TYPE_CHECKING:
     from .provider import Provider
+    from .controller import Controller
 
 
 class Orchestrator(ABC):
@@ -159,3 +162,67 @@ class ProviderOrchestrator(Orchestrator):
 
         if action == Action.CONFIG and results != [None] * len(targets):
             raise ValueError("Configuration actions should not return geometry or data values.")
+
+
+class ControllerOrchestrator:
+    """Handles routing and merging for multiple providers."""
+
+    def __init__(self, controller: Controller):
+        """Initialize the orchestrator with a controller reference."""
+        self.controller = controller
+
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def execute(
+        self,
+        targets: tuple[str, ...],
+        action: Action,
+        subassemblies: tuple[Subassembly, ...] = (),
+        modes: tuple[Mode, ...] = (Mode.DEFAULT,),
+    ) -> Any:
+        """Route targets to their respective providers and merge results."""
+        # Map target names to providers
+        lookup: Dict[str, Provider] = {}
+        for p in self.controller.providers:
+            for t in p.manifest:
+                lookup[t] = p
+
+        # Group indices by provider to maintain result order
+        groups: Dict[Provider, list[int]] = {}
+        for i, target in enumerate(targets):
+            provider = lookup.get(target)
+            if not provider:
+                raise ValueError(f"No provider found for target '{target}'")
+            groups.setdefault(provider, []).append(i)
+
+        # Execute and collect
+        indexed_results = [None] * len(targets)
+        diagram_results = []
+
+        for provider, indices in groups.items():
+            p_targets = [targets[i] for i in indices]
+            p_subs = (
+                [subassemblies[i] for i in indices]
+                if len(subassemblies) == len(targets)
+                else list(subassemblies)
+            )
+            sub_list = TargetList(
+                provider, p_targets, subassemblies=p_subs, modes=list(modes), action=action
+            )
+            res = provider.run(sub_list)
+
+            if action == Action.DIAGRAM:
+                diagram_results.append(res)
+            elif action != Action.CONFIG:
+                for local_idx, global_idx in enumerate(indices):
+                    indexed_results[global_idx] = res[local_idx]
+
+        if action == Action.DIAGRAM:
+            # Merge assemblies if multiple providers provided diagrams
+            if len(diagram_results) == 1:
+                return diagram_results[0]
+            combined = cq.Assembly()
+            for assembly in diagram_results:
+                combined.add(assembly)
+            return combined
+
+        return None if action == Action.CONFIG else indexed_results
