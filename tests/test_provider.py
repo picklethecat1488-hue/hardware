@@ -118,15 +118,15 @@ class TestProviderMetadata:
         """Verify get_color falls back to config color when missing."""
         assert provider.get_color("part_b", Subassembly.LEFT) == provider.config.color
 
-    def test_load_manifest_from_yaml(self, tmp_path, provider):
-        """Verify that load_manifest_from_yaml correctly parses Enum keys and values."""
+    def test_load_manifest(self, tmp_path, provider):
+        """Verify that load_manifest correctly parses Enum keys and values."""
         manifest_path = tmp_path / "manifest.yml"
         yaml_content = {
             "part_c": {"part": {"modes": ["default"], "subassemblies": ["left"]}, "color": [1.0, 1.0, 1.0, 1.0]}
         }
         manifest_path.write_text(yaml.dump(yaml_content))
 
-        loaded = provider.load_manifest_from_yaml(str(manifest_path))
+        loaded = provider.load_manifest(str(manifest_path))
         assert "part_c" in loaded
         assert Action.PART in loaded["part_c"]
         assert loaded["part_c"][Action.PART][MODES] == [Mode.DEFAULT]
