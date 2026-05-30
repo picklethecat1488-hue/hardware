@@ -32,7 +32,7 @@ class MockProvider(Provider):
         """Return a mock manifest."""
         return {
             "part_a": {
-                "actions": [Action.WIRE, Action.PART],
+                "actions": [Action.WIRE, Action.PART, Action.SKETCH],
                 "subassemblies": [Subassembly.LEFT],
                 "modes": [Mode.DEFAULT, Mode.BARE],
             },
@@ -55,6 +55,7 @@ class MockProvider(Provider):
             self._mock_registry = {
                 Action.WIRE: MagicMock(return_value="wire_obj"),
                 Action.PART: MagicMock(return_value="part_obj"),
+                Action.SKETCH: MagicMock(return_value="sketch_obj"),
                 Action.CONFIG: MagicMock(return_value=None),
                 Action.DIAGRAM: MagicMock(return_value="diag_obj"),
             }
@@ -99,6 +100,12 @@ class TestProviderOrchestration:
         results = provider.build_wires(provider.targets.supporting(Action.WIRE))
         assert results == ["wire_obj"]
         provider.registry[Action.WIRE].assert_called_once_with("part_a", [], [Mode.DEFAULT])
+
+    def test_build_sketch_success(self, provider):
+        """Verify successful sketch build orchestration."""
+        results = provider.build_sketches(provider.targets.supporting(Action.SKETCH))
+        assert results == ["sketch_obj"]
+        provider.registry[Action.SKETCH].assert_called_once_with("part_a", [], [Mode.DEFAULT])
 
     def test_configure_success(self, provider):
         """Verify successful configuration orchestration."""
