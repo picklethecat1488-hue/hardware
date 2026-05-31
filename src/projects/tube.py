@@ -32,8 +32,8 @@ class TubeProvider(Provider):
         return {
             Action.PART: self.builder.build_part,
             Action.WIRE: self.builder.build_wire,
-            Action.SKETCH: self.builder.build_sketch,
             Action.DIAGRAM: self.builder.build_diagram,
+            Action.SKETCH: self.builder.build_sketch,
         }
 
     @property
@@ -51,4 +51,5 @@ class TubeProvider(Provider):
         return {
             "part_positions": self.viewer.view_part_positions,
             "overlay": self.viewer.view_overlay,
+            "tube_profile": self.viewer.view_tube_profile,
         }

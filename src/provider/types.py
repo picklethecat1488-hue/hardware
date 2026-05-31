@@ -33,3 +33,4 @@ class Mode(StrEnum):
     BARE = "bare"
     TEXT = "text"
     MOUNT = "mount"
+    PRINT = "print"

@@ -22,3 +22,7 @@ class TubeViewer:
     def view_overlay(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
         """Skeleton for part positions visualization."""
         return []
+
+    def view_tube_profile(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
+        """Skeleton for part positions visualization."""
+        return []
