@@ -1,5 +1,6 @@
 """Provider for manifold tube geometry."""
 
+from pathlib import Path
 from typing import Any, Callable
 from model import TubeConfig
 from .provider import Provider
@@ -19,7 +20,7 @@ class TubeProvider(Provider):
     @property
     def default_config(self) -> TubeConfig:
         """Return the default tube configuration."""
-        return TubeConfig()
+        return TubeConfig(measurements_path=str(Path(__file__).parent / "tube_measurements.yaml"))
 
     @property
     def build(self) -> dict[Action, Callable[[str, list[Subassembly], list[Mode]], Any]]:

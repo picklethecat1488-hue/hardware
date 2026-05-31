@@ -77,14 +77,11 @@ class ProviderManager:
         delimiter = cast(str, config.model_config.get("env_nested_delimiter", "__"))
 
         for provider in self.router.providers:
-            # Sync the provider to use the shared global configuration
-            provider.app_config = config
-
             name = provider.name.lower()
-            env_key = name.upper()
-            provider_config = provider.settings
+            provider_config = provider.default_config
             if provider_config is None:
                 continue
+            env_key = name.upper()
 
             # ROUTING: Extract values loaded by BaseSettings into model_extra and apply to sub-model
             prefix_with_delim = f"{env_key}{delimiter}"
@@ -103,6 +100,8 @@ class ProviderManager:
 
             # Ensure the config instance is attached to AppConfig as an extra field
             setattr(config, name, provider_config)
+            # Sync the provider to use the shared global configuration
+            provider.app_config = config
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def save_configs(self) -> None:
