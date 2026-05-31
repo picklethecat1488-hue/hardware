@@ -3,7 +3,7 @@
 from model import AppConfig, method_cache
 from build import Builder
 from shell import Logger
-from providers import ProviderManager
+from provider import ProviderManager
 import argparse
 from build123d import *  # type: ignore
 from typing import cast, Literal, Annotated, Optional

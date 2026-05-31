@@ -4,11 +4,11 @@ import pytest
 from unittest.mock import MagicMock
 from pydantic import BaseModel, Field
 from model import AppConfig
-from providers.provider_router import ProviderRouter
-from providers.provider_manager import ProviderManager
-from providers.provider import Provider
-from providers.types import Action, Mode, Subassembly, MODES, SUBASSEMBLIES
-from providers.target_list import TargetList
+from provider.provider_router import ProviderRouter
+from provider.provider_manager import ProviderManager
+from provider.provider import Provider
+from provider.types import Action, Mode, Subassembly, MODES, SUBASSEMBLIES
+from provider.target_list import TargetList
 
 
 class SimpleMockProvider(Provider):

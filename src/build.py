@@ -11,7 +11,7 @@ from build123d import *  # type: ignore
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, cast, Annotated, Literal
 from pydantic import validate_call, Field
-from providers import ProviderManager
+from provider import ProviderManager
 import zipfile
 from shell import Logger
 
