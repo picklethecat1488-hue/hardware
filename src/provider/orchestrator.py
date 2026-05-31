@@ -89,6 +89,14 @@ class ProviderOrchestrator(Orchestrator):
         """Perform the actual build action without caching."""
         self.pre_handler(targets, action, subassemblies, modes)
 
+        if action == Action.DIAGRAM:
+            handler = self.provider.build[Action.DIAGRAM]
+            # Diagrams operate on all targets at once and ignore subassemblies.
+            result = handler(list(targets), modes[0])
+            results = [result]
+            self.post_handler(targets, results, action)
+            return results[0]
+
         # Flatten units of work into (target, subassembly, mode) triples
         exec_subs = list(subassemblies) if subassemblies else [None]
         work = [(t, sa, m) for t in targets for sa in exec_subs for m in modes]
@@ -126,9 +134,6 @@ class ProviderOrchestrator(Orchestrator):
             results.append(group[0] if group_size == 1 else group)
 
         self.post_handler(targets, results, action)
-
-        if action == Action.DIAGRAM:
-            return results[0]
         return list(zip(targets, results))
 
     def pre_handler(
