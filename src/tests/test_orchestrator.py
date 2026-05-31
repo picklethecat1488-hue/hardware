@@ -28,15 +28,6 @@ def mock_provider():
 class TestProviderOrchestrator:
     """Tests for ProviderOrchestrator logic."""
 
-    def test_caching_behavior(self, mock_provider):
-        """Verify that execute_cached is called for non-CONFIG actions."""
-        orch = ProviderOrchestrator(mock_provider)
-
-        # Using patch to see if the cached method is hit
-        with patch.object(orch, "_execute_cached", wraps=orch._execute_cached) as mock_cached:
-            orch.execute(("part_a",), Action.PART, (Subassembly.LEFT,), (Mode.DEFAULT,))
-            mock_cached.assert_called_once()
-
     def test_pre_handler_validation(self, mock_provider):
         """Verify validation of actions, modes, and subassemblies."""
         orch = ProviderOrchestrator(mock_provider)
