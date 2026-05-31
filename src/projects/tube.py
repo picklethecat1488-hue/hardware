@@ -2,10 +2,10 @@
 
 from pathlib import Path
 from typing import Any, Callable, Optional
-from model import TubeConfig
-from .provider import Provider
-from .types import Action, Mode, Subassembly
-from .utils import discover_provider
+from projects.tube_config import TubeConfig
+from providers.provider import Provider
+from providers.types import Action, Mode, Subassembly
+from providers.utils import discover_provider
 
 
 @discover_provider
@@ -23,7 +23,7 @@ class TubeProvider(Provider):
         return TubeConfig(measurements_path=str(Path(__file__).parent / "tube_measurements.yaml"))
 
     @property
-    def build(self) -> dict[Action, Callable[[str, Optional[Subassembly], Mode], Any]]:
+    def build(self) -> dict[Action, Callable[[str, Optional[Subassembly], list[Mode]], Any]]:
         """A mapping of Actions to their handler methods."""
         return {
             Action.PART: self._build_part,
@@ -49,19 +49,19 @@ class TubeProvider(Provider):
             "overlay": self._view_overlay,
         }
 
-    def _build_part(self, target: str, subassembly: Optional[Subassembly], mode: Mode) -> Any:
+    def _build_part(self, target: str, subassembly: Optional[Subassembly], modes: list[Mode]) -> Any:
         """Skeleton for building part geometry."""
         return "part_placeholder"
 
-    def _build_wire(self, target: str, subassembly: Optional[Subassembly], mode: Mode) -> Any:
+    def _build_wire(self, target: str, subassembly: Optional[Subassembly], modes: list[Mode]) -> Any:
         """Skeleton for building wire geometry."""
         return "wire_placeholder"
 
-    def _build_sketch(self, target: str, subassembly: Optional[Subassembly], mode: Mode) -> Any:
+    def _build_sketch(self, target: str, subassembly: Optional[Subassembly], modes: list[Mode]) -> Any:
         """Skeleton for building sketch geometry."""
         return "sketch_placeholder"
 
-    def _build_diagram(self, target: str, subassembly: Optional[Subassembly], mode: Mode) -> Any:
+    def _build_diagram(self, target: str, subassembly: Optional[Subassembly], modes: list[Mode]) -> Any:
         """Skeleton for building assembly diagrams."""
         return "diagram_placeholder"
 
@@ -82,5 +82,5 @@ class TubeProvider(Provider):
         return []
 
     def _view_overlay(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
-        """Skeleton for overlay visualization."""
+        """Skeleton for part positions visualization."""
         return []

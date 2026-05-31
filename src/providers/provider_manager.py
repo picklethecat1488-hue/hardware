@@ -45,16 +45,24 @@ class ProviderManager:
 
     def _discover_providers(self, executor: Optional[ThreadPoolExecutor]) -> list[Provider]:
         """Automatically discover and instantiate Provider subclasses in the package."""
-        from . import provider as base_module
+        # Scan both the library providers and the project providers
+        import providers.provider as lib_base
 
-        # Crawl the providers package to ensure all modules are loaded and subclasses are registered
-        if base_module.__file__:
-            package_path = os.path.dirname(base_module.__file__)
-            for _, name, is_pkg in pkgutil.iter_modules([package_path]):
-                if not is_pkg:
-                    module_name = f"{base_module.__package__}.{name}"
-                    if module_name not in sys.modules:
-                        importlib.import_module(module_name)
+        try:
+            import projects as project_base
+
+            search_targets = [lib_base, project_base]
+        except ImportError:
+            search_targets = [lib_base]
+
+        for base_module in search_targets:
+            if hasattr(base_module, "__file__") and base_module.__file__:
+                package_path = os.path.dirname(base_module.__file__)
+                for _, name, is_pkg in pkgutil.iter_modules([package_path]):
+                    if not is_pkg:
+                        module_name = f"{base_module.__package__}.{name}"
+                        if module_name not in sys.modules:
+                            importlib.import_module(module_name)
 
         discovered: list[Provider] = []
 

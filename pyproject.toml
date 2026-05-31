@@ -3,7 +3,7 @@ name = "exhaust_manifolds"
 version = "0.1.0"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "src/projects/tests"]
 pythonpath = ["src"]
 addopts = "-qq -n auto --maxfail=1 --max-worker-restart=2"
 filterwarnings = [
