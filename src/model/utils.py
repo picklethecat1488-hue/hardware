@@ -58,9 +58,6 @@ def load_measurements(path: str) -> dict[int | str, np.ndarray]:
     """
     Load and parse the measurements YAML file and return processed numpy arrays.
 
-    The path can optionally include a colon followed by a key to extract a
-    specific section of the YAML file (e.g., 'measurements.yml:points').
-
     Example YAML (list format):
     ```yaml
     - [0, 0, 0]
@@ -83,22 +80,14 @@ def load_measurements(path: str) -> dict[int | str, np.ndarray]:
     section_b:
       p3: [4, 5, 6]
     ```
-    Example path with key: 'data.yml:section_a'
-    Returns: {'p1': array([0, 0, 0]), 'p2': array([1, 2, 3])}
     """
-    if ":" in path:
-        file_path_str, key = path.split(":", 1)
-    else:
-        file_path_str, key = path, None
-
-    file_path = Path(file_path_str)
+    file_path = Path(path)
     if not file_path.exists():
         return {}
 
     with open(file_path, "r") as f:
         try:
-            raw_data = yaml.safe_load(f) or {}
-            data = raw_data.get(key, {}) if key else raw_data
+            data = yaml.safe_load(f) or {}
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML at {file_path}") from e
 

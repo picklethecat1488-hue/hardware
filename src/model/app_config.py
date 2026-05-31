@@ -25,7 +25,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     ver: int = Field(default=4, gt=0, description="Build version")
     measurements_path: str = Field(
         default=str(Path(__file__).parent.parent / "measurements.yml"),
-        description="Path to the measurements YAML file, optionally followed by ':key' to select a sub-entry.",
+        description="Path to the measurements YAML file.",
     )
     x_bounds: list[float] = Field(
         default_factory=lambda: [145, 950],
@@ -87,15 +87,9 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
                 else:
                     val = v
                     if isinstance(v, str):
-                        path_candidate = v
-                        suffix = ""
-                        if ":" in v and not os.path.exists(v):
-                            parts = v.rsplit(":", 1)
-                            if os.path.isabs(parts[0]):
-                                path_candidate, suffix = parts[0], ":" + parts[1]
-                        if os.path.isabs(path_candidate) and os.path.exists(path_candidate):
+                        if os.path.isabs(v) and os.path.exists(v):
                             try:
-                                val = os.path.relpath(path_candidate, env_dir) + suffix
+                                val = os.path.relpath(v, env_dir)
                             except (ValueError, TypeError):
                                 pass
                     val_str = json.dumps(val, separators=(",", ":")) if isinstance(val, (dict, list)) else str(val)

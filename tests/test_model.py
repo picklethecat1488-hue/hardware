@@ -144,15 +144,14 @@ class TestModel:
         assert "point_a" in measurements
         assert np.array_equal(measurements["point_a"], np.array([10.0, 20.0, 30.0]))
 
-    def test_load_measurements_with_subkey(self, tmp_path):
-        """Verify loading measurements using the 'path:key' syntax."""
-        data = {"v1": {"p1": [1, 1, 1]}, "v2": {"p1": [2, 2, 2]}}
-        yml_file = tmp_path / "multi_model.yml"
-        with open(yml_file, "w") as f:
-            yaml.dump(data, f)
-
-        measurements = load_measurements(f"{yml_file}:v2")
-        assert measurements["p1"][0] == 2
+    def test_tube_measurements_default_load(self):
+        """Verify that the default tube measurements file loads correctly."""
+        config = AppConfig()
+        # Verify the path defaults to the standard measurements.yml
+        assert "measurements.yml" in config.tube.measurements_path
+        # Verify measurements are loaded and contain expected keys (e.g. 6 for driver inlet)
+        assert 6 in config.tube.measurements
+        assert isinstance(config.tube.measurements[6], np.ndarray)
 
     def test_measurements_list_format_conversion(self, tmp_path):
         """Verify that list-formatted measurements are converted to 1-based integer keys."""
