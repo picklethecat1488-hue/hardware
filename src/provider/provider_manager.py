@@ -10,6 +10,7 @@ from typing import Any, Optional, cast
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import validate_call
 from model import AppConfig
+from shell import Logger
 from .provider import Provider
 from .provider_router import ProviderRouter
 
@@ -22,10 +23,12 @@ class ProviderManager:
         config: AppConfig,
         providers: Optional[list[Provider]] = None,
         executor: Optional[ThreadPoolExecutor] = None,
+        logger: Optional[Logger] = None,
         bootstrap: bool = True,
     ):
         """Initialize the manager."""
         self.config = config
+        self.logger = logger
 
         if providers is not None and bootstrap:
             raise ValueError("Cannot bootstrap when providers are explicitly provided.")
@@ -70,7 +73,7 @@ class ProviderManager:
             for subclass in cls.__subclasses__():
                 if not inspect.isabstract(subclass) and getattr(subclass, "_discover_provider", False):
                     try:
-                        discovered.append(subclass(executor=executor, config=self.config))
+                        discovered.append(subclass(executor=executor, config=self.config, logger=self.logger))
                     except (TypeError, AttributeError):
                         continue
                 find_subclasses(subclass)

@@ -208,7 +208,7 @@ def main(logger, args):
         gen_args["names"] = [args.name]
 
     config = AppConfig()
-    manager = ProviderManager(config)
+    manager = ProviderManager(config, logger=logger)
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
 

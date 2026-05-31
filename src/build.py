@@ -547,7 +547,7 @@ def main(logger, args):
     path.mkdir(parents=True, exist_ok=True)
 
     config = AppConfig()
-    manager = ProviderManager(config)
+    manager = ProviderManager(config, logger=logger)
     builder = Builder(config, logger)
 
     if not args.env is None:
