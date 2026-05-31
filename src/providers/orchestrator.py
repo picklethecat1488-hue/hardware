@@ -89,41 +89,46 @@ class ProviderOrchestrator(Orchestrator):
         """Perform the actual build action without caching."""
         self.pre_handler(targets, action, subassemblies, modes)
 
+        # Flatten units of work into (target, subassembly, mode) triples
+        exec_subs = list(subassemblies) if subassemblies else [None]
+        work = [(t, sa, m) for t in targets for sa in exec_subs for m in modes]
+
         if action == Action.VIEW:
 
-            def handler_task(i: int) -> Any:
-                target = targets[i]
+            def view_task(item: tuple[str, Optional[Subassembly], Mode]) -> Any:
+                target, _, _ = item
                 return self.provider.view[target]()
+
+            raw_results = list(self.executor.map(view_task, work))
         elif action == Action.CONFIG:
 
-            def handler_task(i: int) -> Any:
-                target: str = targets[i]
-                sa = (
-                    subassemblies[i]
-                    if len(subassemblies) == len(targets)
-                    else (subassemblies[0] if subassemblies else None)
-                )
-                mode = modes[0]
-                return self.provider.config[mode](target, [sa] if sa else [])
+            def config_task(item: tuple[str, Optional[Subassembly], Mode]) -> None:
+                target, sa, m = item
+                self.provider.config[m](target, sa)
+
+            list(self.executor.map(config_task, work))
+            self.post_handler(targets, None, action)
+            return None
         else:
             handler = self.provider.build[action]
 
-            def handler_task(i: int) -> Any:
-                target: str = targets[i]
-                sa = (
-                    subassemblies[i]
-                    if len(subassemblies) == len(targets)
-                    else (subassemblies[0] if subassemblies else None)
-                )
-                return handler(target, [sa] if sa else [], list(modes))
+            def build_task(item: tuple[str, Optional[Subassembly], Mode]) -> Any:
+                target, sa, m = item
+                return handler(target, sa, m)
 
-        results = list(self.executor.map(handler_task, range(len(targets))))
+            raw_results = list(self.executor.map(build_task, work))
+
+        # Group results back by target for VIEW and BUILD
+        results = []
+        group_size = len(exec_subs) * len(modes)
+        for i in range(len(targets)):
+            group = raw_results[i * group_size : (i + 1) * group_size]
+            results.append(group[0] if group_size == 1 else group)
+
         self.post_handler(targets, results, action)
 
         if action == Action.DIAGRAM:
             return results[0]
-        elif action == Action.CONFIG:
-            return None
         return list(zip(targets, results))
 
     def pre_handler(
@@ -134,12 +139,6 @@ class ProviderOrchestrator(Orchestrator):
         modes: tuple[Mode, ...],
     ) -> None:
         """Validate input parameters before the handler execution."""
-        if subassemblies and len(subassemblies) != len(targets) and len(subassemblies) != 1:
-            raise ValueError(
-                f"Length of subassemblies ({len(subassemblies)}) must match "
-                f"length of targets ({len(targets)}) or be exactly 1."
-            )
-
         if action != Action.VIEW and action != Action.CONFIG and action not in self.provider.build:
             raise ValueError(f"No handler registered for action '{action}' in {self.provider.__class__.__name__}")
 
@@ -174,24 +173,26 @@ class ProviderOrchestrator(Orchestrator):
                     )
 
             if subassemblies:
-                sa = subassemblies[i] if len(subassemblies) == len(targets) else subassemblies[0]
                 supported_subs = action_config.get(SUBASSEMBLIES, [])
-                if sa not in supported_subs:
-                    raise ValueError(
-                        f"Subassembly '{sa}' is not supported for part '{name}'. "
-                        f"Supported subassemblies: {supported_subs}"
-                    )
+                for sa in subassemblies:
+                    if sa not in supported_subs:
+                        raise ValueError(
+                            f"Subassembly '{sa}' is not supported for part '{name}'. "
+                            f"Supported subassemblies: {supported_subs}"
+                        )
 
-    def post_handler(self, targets: tuple[str, ...], results: list[Any], action: Action) -> None:
+    def post_handler(self, targets: tuple[str, ...], results: Optional[list[Any]], action: Action) -> None:
         """Validate build results after the handler execution."""
-        expected_len = 1 if action == Action.DIAGRAM else len(targets)
-        if len(results) != expected_len:
-            raise ValueError(f"Orchestration failed: expected {expected_len} items, got {len(results)}.")
-
         if action == Action.CONFIG:
-            if results != [None] * len(targets):
-                raise ValueError("Configuration actions should not return geometry or data values.")
-        elif any(r is None for r in results):
+            return
+
+        expected_len = 1 if action == Action.DIAGRAM else len(targets)
+        if results is None or len(results) != expected_len:
+            raise ValueError(
+                f"Orchestration failed: expected {expected_len} items, got {len(results) if results else 0}."
+            )
+
+        if any(r is None for r in results):
             raise ValueError(f"Orchestration failed: one or more results for action '{action}' were None.")
 
 
@@ -266,6 +267,7 @@ class ProviderRouterOrchestrator(Orchestrator):
 
         def provider_task(item: tuple[Provider, list[int]]) -> tuple[Provider, list[int], Any]:
             p, indices = item
+            # Extract the leaf target name (e.g., 'p/t' -> 't')
             p_targets = [targets[i].split("/", 1)[1] for i in indices]
             p_subs = [subassemblies[i] for i in indices] if len(subassemblies) == len(targets) else list(subassemblies)
             sub_list = TargetList(p, p_targets, subassemblies=p_subs, modes=list(modes), action=action)

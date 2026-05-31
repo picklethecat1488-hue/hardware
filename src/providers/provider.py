@@ -60,12 +60,12 @@ class Provider(ABC):
         return load_manifest(f"{self.name}_manifest.yaml")
 
     @property
-    def build(self) -> dict[Action, Callable[[str, list[Subassembly], list[Mode]], Any]]:
+    def build(self) -> dict[Action, Callable[[str, Optional[Subassembly], Mode], Any]]:
         """A mapping of Actions to their handler methods."""
         return {}
 
     @property
-    def config(self) -> dict[Mode, Callable[[str, list[Subassembly]], Any]]:
+    def config(self) -> dict[Mode, Callable[[str, Optional[Subassembly]], Any]]:
         """A mapping of Modes to configuration handler methods."""
         return {}
 
