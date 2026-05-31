@@ -3,16 +3,19 @@
 import os
 import inspect
 from abc import ABC, abstractmethod
-from typing import Optional, Any, Callable, Iterable
+from typing import Optional, Any, Callable, Iterable, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor
 from build123d import Part, Sketch, Wire
 import cadquery as cq
 from pydantic import validate_call, BaseModel
-from model import AppConfig, method_cache
+from model.utils import method_cache
 from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES, COLOR
 from .target_list import TargetList
 from .orchestrator import Orchestrator, ProviderOrchestrator
 from .utils import load_manifest
+
+if TYPE_CHECKING:
+    from model.app_config import AppConfig
 
 
 class Provider(ABC):
@@ -20,9 +23,13 @@ class Provider(ABC):
 
     orchestrator_type: type[Orchestrator] = ProviderOrchestrator
 
-    def __init__(self, executor: Optional[ThreadPoolExecutor] = None, config: Optional[AppConfig] = None):
+    def __init__(self, executor: Optional[ThreadPoolExecutor] = None, config: Optional["AppConfig"] = None):
         """Initialize the provider."""
-        self.app_config = config or AppConfig()
+        if config is None:
+            from model.app_config import AppConfig
+
+            config = AppConfig()
+        self.app_config = config
         self.orchestrator = self.orchestrator_type(self, executor=executor)
 
     @property

@@ -2,10 +2,8 @@
 
 from pathlib import Path
 from typing import Any, Callable, Optional
-from projects.tube_config import TubeConfig
-from providers.provider import Provider
-from providers.types import Action, Mode, Subassembly
-from providers.utils import discover_provider
+from projects_config import TubeConfig
+from providers import Provider, Action, Mode, Subassembly, discover_provider
 
 
 @discover_provider

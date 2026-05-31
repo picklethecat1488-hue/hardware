@@ -2,12 +2,10 @@
 
 import pytest
 from unittest.mock import patch
-from projects.tube import TubeProvider
-from providers.types import Action, Mode, Subassembly
-from providers.target_list import TargetList
 from model import AppConfig
-from projects.tube_config import TubeConfig
-from providers.provider_manager import ProviderManager
+from projects_config import TubeConfig
+from projects import TubeProvider
+from providers import Action, Mode, Subassembly, TargetList, ProviderManager
 
 
 class TestTubeProvider:

@@ -6,8 +6,7 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel, Field
 from build123d import Vector
-from model.text_args import TextArgs
-from model.utils import load_measurements
+from model import TextArgs, load_measurements
 
 
 class TubeConfig(BaseModel):
