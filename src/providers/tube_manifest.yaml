@@ -1,0 +1,39 @@
+tube_profile:
+  color:
+    left: [1.0, 0.0, 0.0, 1.0]
+    right: [0.0, 1.0, 0.0, 1.0]
+  sketch:
+    modes: [default]
+    subassemblies: [left, right]
+driver:
+  color:
+    left: [1.0, 0.0, 0.0, 1.0]
+    right: [0.0, 1.0, 0.0, 1.0]
+  config:
+    modes: [default, mount, text]
+  diagram:
+    modes: [default]
+  part:
+    modes: [default, bare]
+    subassemblies: [left, right]
+  wire:
+    modes: [default]
+passenger:
+  color:
+    left: [1.0, 0.0, 0.0, 1.0]
+    right: [0.0, 1.0, 0.0, 1.0]
+  config:
+    modes: [default, mount, text]
+  diagram:
+    modes: [default]
+  part:
+    modes: [default, bare]
+    subassemblies: [left, right]
+  wire:
+    modes: [default]
+part_positions:
+  view:
+    modes: [default]
+overlay:
+  view:
+    modes: [default]

@@ -1,5 +1,7 @@
 """Base definitions for geometry and data providers."""
 
+import os
+import inspect
 from abc import ABC, abstractmethod
 from typing import Optional, Any, Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -44,8 +46,17 @@ class Provider(ABC):
     def manifest(self) -> dict[str, dict[str, Any]]:
         """A mapping of part names to their supported capabilities and colors.
 
-        By default, attempts to load f"{self.name}_manifest.yaml".
+        By default, attempts to load f"{self.name}_manifest.yaml" relative to the provider module.
         """
+        try:
+            # Resolve path relative to the module defining the concrete provider class
+            base_dir = os.path.dirname(os.path.abspath(inspect.getfile(self.__class__)))
+            manifest_path = os.path.join(base_dir, f"{self.name}_manifest.yaml")
+            if os.path.exists(manifest_path):
+                return load_manifest(manifest_path)
+        except (TypeError, ValueError, OSError):
+            pass
+
         return load_manifest(f"{self.name}_manifest.yaml")
 
     @property
