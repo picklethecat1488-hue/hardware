@@ -66,7 +66,7 @@ class Provider(ABC):
         return load_manifest(f"{self.name}_manifest.yaml")
 
     @property
-    def build(self) -> dict[Action, Callable[[str, Optional[Subassembly], Mode], Any]]:
+    def build(self) -> dict[Action, Callable[..., Any]]:
         """A mapping of Actions to their handler methods."""
         return {}
 
@@ -105,4 +105,11 @@ class Provider(ABC):
         action = targets.action
         if action is None:
             raise ValueError(f"No action specified for {targets}. You must call .supporting(action) before running.")
+
+        if action == Action.DIAGRAM and targets.subassemblies:
+            raise ValueError(
+                f"Subassemblies cannot be specified for Action.DIAGRAM in '{self.name}'. "
+                "Diagrams are global assembly views."
+            )
+
         return self.orchestrator.execute(tuple(targets), action, tuple(targets.subassemblies), tuple(targets.modes))
