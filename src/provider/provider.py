@@ -16,6 +16,7 @@ from .utils import load_manifest
 
 if TYPE_CHECKING:
     from model.app_config import AppConfig
+    from shell import Logger
 
 
 class Provider(ABC):
@@ -23,13 +24,19 @@ class Provider(ABC):
 
     orchestrator_type: type[Orchestrator] = ProviderOrchestrator
 
-    def __init__(self, executor: Optional[ThreadPoolExecutor] = None, config: Optional["AppConfig"] = None):
+    def __init__(
+        self,
+        executor: Optional[ThreadPoolExecutor] = None,
+        config: Optional["AppConfig"] = None,
+        logger: Optional["Logger"] = None,
+    ):
         """Initialize the provider."""
         if config is None:
             from model.app_config import AppConfig
 
             config = AppConfig()
         self.app_config = config
+        self.logger = logger
         self.orchestrator = self.orchestrator_type(self, executor=executor)
 
     @property

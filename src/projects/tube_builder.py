@@ -33,7 +33,7 @@ class TubeBuilder:
         with BuildLine() as path:
             Line(inlet_start, inlet_end)
             Spline([inlet_end, outlet_start], tangents=(v_start, v_end))
-            Line(outlet_start, outlet_start + v_end * self.config.tube.clamp_lengths[-1])
+            Line(outlet_start, outlet_start + v_end * self.tube_config.clamp_lengths[-1])
         return path.wire()
 
     @validate_call(config={"arbitrary_types_allowed": True})

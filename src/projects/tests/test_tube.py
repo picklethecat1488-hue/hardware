@@ -371,3 +371,84 @@ class TestTubeBuilder:
 
         assert round(bbox.min.Z) == zmin
         assert round(bbox.size.Z) == zlen
+
+
+class TestTubeConfigurator:
+    """Manifold configurator unit tests."""
+
+    @pytest.fixture
+    def configurator(self):
+        """Return the tube configurator fixture."""
+        config = AppConfig()
+        provider = TubeProvider(config=config)
+        return provider.configurator
+
+    def test_get_orientation_normal(self, configurator):
+        """Verify orientation detection logic identifies the peak correctly."""
+        # Setup a tube centered at Z=2. Path is at Z=0.
+        with BuildPart() as tube:
+            Box(10, 10, 10)
+        tube_obj = tube.part.moved(Location(Vector(0, 0, 2)))  # type: ignore
+        path = configurator.builder.create_wire("driver")
+
+        # Manually populate caches since methods use id(obj)
+        configurator._tube_cache[id(tube_obj)] = tube_obj
+        configurator._path_cache[id(path)] = path
+
+        # Orientation should be "normal" (up) because tube center (Z=2) is
+        # closer to midpoint_up (Z=1) than midpoint_down (Z=-1) relative to path.
+        assert configurator.get_orientation_normal(id(tube_obj), id(path)) is True
+
+    def test_get_part_position(self, configurator):
+        """Verify get_part_position calculates the correct attachment vector."""
+        with BuildPart() as tube:
+            Box(10, 10, 10)
+        tube_obj = tube.part.moved(Location(Vector(0, 0, 2)))  # type: ignore
+        path = configurator.builder.create_wire("driver")
+
+        radius = min(configurator.tube_config.clamp_diameters) / 2
+        result = configurator.get_part_position(tube_obj, path, 0.5)
+
+        expected = path.position_at(0.5) + Vector(0, 0, radius)
+        assert result == expected
+
+    def test_config_clamp_updates_config(self, configurator, monkeypatch):
+        """Verify that config_clamp updates the underlying TubeConfig."""
+        name = "driver"
+        # Mock find_best_angle to avoid expensive CAD collision scanning
+        monkeypatch.setattr(configurator, "find_best_angle", lambda *args, **kwargs: 45.0)
+
+        configurator.config_clamp(name)
+
+        # Verify that the angle for the middle clamp (index 1) was updated
+        _, angle = configurator.tube_config.clamp_positions[name][1]
+        assert angle == 45.0
+
+    def test_config_text_logo_updates_config(self, configurator, monkeypatch):
+        """Verify that config_text_logo updates the underlying TubeConfig."""
+        name = "passenger"
+        monkeypatch.setattr(configurator, "find_best_angle", lambda *args, **kwargs: 180.0)
+
+        configurator.config_text_logo(name)
+
+        _, angle = configurator.tube_config.logo_text_positions[name]
+        assert angle == 180.0
+
+    def test_config_routing(self, configurator):
+        """Verify that routing methods call the correct underlying config methods."""
+        with (
+            patch.object(configurator, "config_clamp") as mock_clamp,
+            patch.object(configurator, "config_text_logo") as mock_text,
+        ):
+            configurator.config_default("driver", None)
+            assert mock_clamp.call_count == 1
+            assert mock_text.call_count == 1
+
+            mock_clamp.reset_mock()
+            mock_text.reset_mock()
+            configurator.config_mount("driver", None)
+            assert mock_clamp.call_count == 1
+
+            mock_clamp.reset_mock()
+            configurator.config_text("driver", None)
+            assert mock_text.call_count == 1

@@ -17,9 +17,22 @@ class TubeProvider(Provider):
     def __init__(self, *args, **kwargs):
         """Initialize the provider and its builder."""
         super().__init__(*args, **kwargs)
-        self.builder = TubeBuilder(config=self.app_config, tube_config=self.settings)
-        self.configurator = TubeConfigurator(builder=self.builder, config=self.app_config, tube_config=self.settings)
-        self.viewer = TubeViewer(builder=self.builder, config=self.app_config, tube_config=self.settings)
+        # The orchestrator handles the thread pool lifecycle, so we extract it here.
+        executor = getattr(self.orchestrator, "executor", None)
+        self.builder = TubeBuilder(config=self.app_config, tube_config=self.settings, executor=executor)
+        self.configurator = TubeConfigurator(
+            builder=self.builder,
+            config=self.app_config,
+            tube_config=self.settings,
+            executor=executor,
+            logger=self.logger,
+        )
+        self.viewer = TubeViewer(
+            builder=self.builder,
+            config=self.app_config,
+            tube_config=self.settings,
+            executor=executor,
+        )
 
     @property
     def default_config(self) -> TubeConfig:
@@ -33,7 +46,6 @@ class TubeProvider(Provider):
             Action.PART: self.builder.build_part,
             Action.WIRE: self.builder.build_wire,
             Action.DIAGRAM: self.builder.build_diagram,
-            Action.SKETCH: self.builder.build_sketch,
         }
 
     @property

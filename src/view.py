@@ -169,7 +169,7 @@ def main():
     args = get_args()
     logger = Logger(text="Visualizing...")
     config = AppConfig()
-    manager = ProviderManager(config)
+    manager = ProviderManager(config, logger=logger)
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
     viewer = Viewer(builder, configurator, logger)
