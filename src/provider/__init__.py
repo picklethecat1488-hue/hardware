@@ -1,7 +1,7 @@
 """Models package root."""
 
 from .provider import Provider
-from .types import Subassembly, Mode, Action
+from .types import Subassembly, Mode, Action, MODES
 from .target_list import TargetList
 from .provider_router import ProviderRouter
 from .provider_manager import ProviderManager

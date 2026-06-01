@@ -59,26 +59,31 @@ class Provider(ABC):
     def manifest(self) -> dict[str, dict[str, Any]]:
         """A mapping of part names to their supported capabilities and colors.
 
-        By default, attempts to load f"{self.name}_manifest.yaml" relative to the provider module.
+        By default, attempts to load "manifest.yaml" relative to the provider module.
         """
         try:
             # Resolve path relative to the module defining the concrete provider class
             base_dir = os.path.dirname(os.path.abspath(inspect.getfile(self.__class__)))
-            manifest_path = os.path.join(base_dir, f"{self.name}_manifest.yaml")
+            manifest_path = os.path.join(base_dir, "manifest.yaml")
             if os.path.exists(manifest_path):
                 return load_manifest(manifest_path)
         except (TypeError, ValueError, OSError):
             pass
 
-        return load_manifest(f"{self.name}_manifest.yaml")
+        return load_manifest("manifest.yaml")
 
     @property
-    def build(self) -> dict[Action, Callable[..., Any]]:
-        """A mapping of Actions to their handler methods."""
+    def part(self) -> dict[str, Callable[..., Any]]:
+        """A mapping of part names to their build handler methods."""
         return {}
 
     @property
-    def config(self) -> dict[Mode, Callable[[str, Optional[Subassembly]], Any]]:
+    def diagram(self) -> dict[str, Callable[..., Any]]:
+        """A mapping of diagram names to their build handler methods."""
+        return {}
+
+    @property
+    def config(self) -> dict[str, Callable[[str, Optional[Subassembly]], Any]]:
         """A mapping of Modes to configuration handler methods."""
         return {}
 

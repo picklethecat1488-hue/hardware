@@ -336,10 +336,7 @@ class TubeBuilder:
 
         def facing_up(part):
             """Return whether the part is oriented upward."""
-            if name == "driver" or name == "passenger":
-                full_part = self.create_tube(name)
-            else:
-                raise ValueError(f"Invalid name: {name}")
+            full_part = self.create_tube(name)
             center_part = part.center()
             center_full = full_part.center()
             diff = center_part - center_full
@@ -348,12 +345,9 @@ class TubeBuilder:
 
         def rotation(part):
             """Compute the rotation needed to flatten the part."""
-            # Find the path edge, then extract the first and last points from it
             path_edge = sorted(part.edges(), key=lambda e: e.length)[-1]
             p1, p2 = path_edge.start_point(), path_edge.end_point()
             diff = p2 - p1
-
-            # Compute the tilt axis and angle
             axis = Vector(-diff.Y, diff.X, 0)
             horizontal_dist = math.sqrt(diff.X**2 + diff.Y**2)
             angle_deg = math.degrees(math.atan2(diff.Z, horizontal_dist))
@@ -363,7 +357,6 @@ class TubeBuilder:
             """Compute the Z translation to flatten the part."""
             return (0, 0, -part.bounding_box().min.Z)
 
-        # Ensure the part is facing up on the print bed in a way that is optimal for 3D printing
         part = self.create_part(name, right=right)
         if not facing_up(part):
             part = part.rotate(Axis.X, 180)
@@ -371,6 +364,17 @@ class TubeBuilder:
         part = part.rotate(Axis((0, 0, 0), axis), angle_deg)
         part = part.translate(translation(part))
         return part
+
+    def build_part(self, target: str, subassembly: Optional[Subassembly], mode: ProviderMode) -> Any:
+        """Build part geometry supporting subassemblies and various modes."""
+        name = cast(Literal["driver", "passenger"], target)
+        if subassembly is None:
+            return self.create_tube(name)
+        right = subassembly == Subassembly.RIGHT
+        if mode == ProviderMode.PRINT:
+            return self.create_prepared_part(name, right=right)
+        tube_only = mode == ProviderMode.BARE
+        return self.create_part(name, right=right, tube_only=tube_only)
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def create_diagram(
@@ -382,7 +386,6 @@ class TubeBuilder:
 
         def get_part_location(part, full_part, offset=0, dist=0):
             """Compute part placement positions for the diagram."""
-            # Separate the halves by moving them away from the common center.
             center_part = part.center()
             center_full = full_part.center()
             move_dir = (center_part - center_full).normalized()
@@ -390,15 +393,12 @@ class TubeBuilder:
 
         def to_cq_shape(b123d_obj) -> cq.Shape:
             """Convert a build123d shape to a CadQuery shape."""
-            # Extract the underlying OCP shape and cast it to a CadQuery Shape object
             return cq.Shape.cast(b123d_obj.wrapped)
 
         if names is None:
             names = cast(list[Literal["driver", "passenger"]], self.tube_config.names)
 
         assy = cq.Assembly()
-
-        # Pre-submit all tasks to the executor to allow actual parallel processing
         results = []
         for i, name in enumerate(names):
             full_f = self.executor.submit(self.create_tube, name)
@@ -410,7 +410,6 @@ class TubeBuilder:
             parts = {r: f.result() for r, f in parts_fs.items()}
             wire_obj = self.create_wire(name)
             locs = {}
-
             for right in right_vals:
                 loc_vec = get_part_location(
                     parts[right],
@@ -420,68 +419,24 @@ class TubeBuilder:
                 )
                 locs[right] = loc_vec
                 assy.add(to_cq_shape(parts[right].translate(loc_vec)))
-
-            # Connect parts to each other with a centerline
             if True in locs and False in locs:
                 mid_point = wire_obj.position_at(0.5)
                 connector = Line(locs[True] + mid_point, locs[False] + mid_point)
                 assy.add(to_cq_shape(connector))
-
-            # Label parts with 3D text oriented toward the camera
             projection_dir = self.config.diagram_options.projection_dir
             text_pos = wire_obj.position_at(1)
             label_loc = text_pos + Vector(
-                self.config.diagram_label_dist,
-                i * self.config.diagram_part_offset,
-                self.config.diagram_part_dist,
+                self.config.diagram_label_dist, i * self.config.diagram_part_offset, self.config.diagram_part_dist
             )
             label_text = f"{name.upper()} ({'L' if (name == 'driver') else 'R'})"
-
             with BuildPart() as label_gen:
-                # Align the text plane to the camera projection for clarity
                 with BuildSketch(Plane(origin=label_loc, z_dir=projection_dir)):
                     Text(label_text, font_size=45)
                 extrude(amount=5)
                 assy.add(to_cq_shape(cast(Part, label_gen.part)))
-
         return assy
 
     def build_diagram(self, targets: list[str], mode: ProviderMode) -> Any:
         """Build assembly diagrams."""
-        # Convert string targets to the expected literal type
         names = cast(list[Literal["driver", "passenger"]], targets)
         return self.create_diagram(names=names)
-
-    def build_part(self, target: str, subassembly: Optional[Subassembly], mode: ProviderMode) -> Any:
-        """Build part geometry supporting subassemblies and various modes."""
-        # Resolve target name and subassembly side
-        name = cast(Literal["driver", "passenger"], target)
-
-        if subassembly is None:
-            return self.create_tube(name)
-
-        right = subassembly == Subassembly.RIGHT
-
-        if mode == ProviderMode.PRINT:
-            # Flatten and orient for the print bed
-            return self.create_prepared_part(name, right=right)
-
-        # BARE mode generates only the tube volume, DEFAULT includes hardware and text
-        tube_only = mode == ProviderMode.BARE
-        return self.create_part(name, right=right, tube_only=tube_only)
-
-    def build_sketch(self, target: str, subassembly: Optional[Subassembly], mode: ProviderMode) -> Any:
-        """Build profile sketch geometry."""
-        if subassembly is None:
-            # Return a full 360 degree profile sketch
-            return self.create_profile(center_deg=0, angle_deg=360)
-
-        # Determine orientation and lap joint requirement based on subassembly and mode
-        right = subassembly == Subassembly.RIGHT
-        center_deg = 90 if right else 270
-        return self.create_profile(center_deg=center_deg, angle_deg=180)
-
-    def build_wire(self, target: str, subassembly: Optional[Subassembly], mode: ProviderMode) -> Any:
-        """Build path wire geometry."""
-        # Wires represent the centerline path and are mode-independent
-        return self.create_wire(target)

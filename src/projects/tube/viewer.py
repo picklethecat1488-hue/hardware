@@ -6,7 +6,7 @@ from typing import Any, Optional, Literal, cast
 from build123d import *  # type: ignore
 from model.app_config import AppConfig
 from projects_config import TubeConfig
-from .tube_builder import TubeBuilder
+from .builder import TubeBuilder
 
 
 class TubeViewer:
@@ -92,10 +92,6 @@ class TubeViewer:
     def show_profiles_room(self):
         """Build geometry for the profiles room."""
         return {
-            "quadrant_90deg_315center": (self.builder.create_profile(315, 90, joint_space=0.3), "magenta", 1.0),
-            "quadrant_90deg_45center": (self.builder.create_profile(45, 90, joint_space=0.3), "magenta", 1.0),
-            "sector_30deg_180center": (self.builder.create_profile(180, 30, joint_space=0.3), "magenta", 1.0),
-            "sector_30deg_210center": (self.builder.create_profile(210, 30, joint_space=0.3), "magenta", 1.0),
             "lap_joint_sketch": (self.builder.create_profile_sketch(180, lap_joint=True), "magenta", 1.0),
             "full_sketch": (self.builder.create_profile_sketch(360), "magenta", 1.0),
         }
@@ -110,7 +106,11 @@ class TubeViewer:
         room_data = self.show_overlay_room()
         return [(obj, self._get_rgba(color, alpha)) for obj, color, alpha in room_data.values()]
 
-    def view_tube_profile(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
+    def view_wire(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
+        """Return visualization data for path wires."""
+        return [(self.builder.create_wire(name), self._get_rgba("magenta", 1.0)) for name in self.names]
+
+    def view_sketch(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
         """Return visualization data for the profile sketches."""
         room_data = self.show_profiles_room()
         return [(obj, self._get_rgba(color, alpha)) for obj, color, alpha in room_data.values()]

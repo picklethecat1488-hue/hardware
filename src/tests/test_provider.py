@@ -2,7 +2,7 @@
 
 import pytest
 import yaml
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch, PropertyMock
 from pydantic import BaseModel
 from provider.provider import Provider
 from provider.target_list import TargetList
@@ -29,16 +29,11 @@ class MockProvider(Provider):
         """Return a mock manifest."""
         return {
             "part_a": {
-                Action.WIRE: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.LEFT]},
                 Action.PART: {
                     MODES: [Mode.DEFAULT, Mode.BARE],
                     SUBASSEMBLIES: [Subassembly.LEFT],
                 },
-                Action.SKETCH: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.LEFT]},
-                Action.CONFIG: {
-                    MODES: [Mode.DEFAULT, Mode.TEXT, Mode.MOUNT],
-                    SUBASSEMBLIES: [Subassembly.LEFT],
-                },
+                Action.CONFIG: {MODES: ["text", "mount"]},
                 Action.VIEW: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.LEFT]},
                 COLOR: (0.8, 0.8, 0.8, 1.0),
             },
@@ -53,25 +48,31 @@ class MockProvider(Provider):
         }
 
     @property
-    def build(self) -> dict:
-        """Return a mock build registry."""
-        if not hasattr(self, "_mock_build"):
-            self._mock_build = {
-                Action.WIRE: MagicMock(return_value="wire_obj"),
-                Action.PART: MagicMock(return_value="part_obj"),
-                Action.SKETCH: MagicMock(return_value="sketch_obj"),
-                Action.DIAGRAM: MagicMock(return_value="diag_obj"),
+    def part(self) -> dict:
+        """Return a mock part registry."""
+        if not hasattr(self, "_mock_part"):
+            self._mock_part = {
+                "part_a": MagicMock(return_value="part_obj"),
+                "part_b": MagicMock(return_value="part_obj"),
             }
-        return self._mock_build
+        return self._mock_part
+
+    @property
+    def diagram(self) -> dict:
+        """Return a mock diagram registry."""
+        if not hasattr(self, "_mock_diagram"):
+            self._mock_diagram = {
+                "part_b": MagicMock(return_value="diag_obj"),
+            }
+        return self._mock_diagram
 
     @property
     def config(self) -> dict:
         """Return a mock config registry."""
         if not hasattr(self, "_mock_config"):
             self._mock_config = {
-                Mode.DEFAULT: MagicMock(return_value=None),
-                Mode.TEXT: MagicMock(return_value=None),
-                Mode.MOUNT: MagicMock(return_value=None),
+                "text": MagicMock(return_value=None),
+                "mount": MagicMock(return_value=None),
             }
         return self._mock_config
 
@@ -96,8 +97,8 @@ class TestTargetList:
 
     def test_supporting_filter(self, provider):
         """Verify supporting() filters targets correctly."""
-        targets = provider.targets.supporting(Action.WIRE)
-        assert list(targets) == ["part_a"]
+        targets = provider.targets.supporting(Action.PART)
+        assert list(targets) == ["part_a", "part_b"]
         assert isinstance(targets, TargetList)
         assert targets.provider == provider
 
@@ -150,13 +151,9 @@ class TestProviderMetadata:
             def default_config(self):
                 return None
 
-            @property
-            def build(self):
-                return {}
-
         p = MinimalProvider()
         assert p.manifest == {"test": "data"}
-        mock_load.assert_called_once_with("minimal_manifest.yaml")
+        mock_load.assert_called_once_with("manifest.yaml")
 
     def test_load_manifest(self, tmp_path, provider):
         """Verify that load_manifest correctly parses Enum keys and values."""
@@ -178,35 +175,26 @@ class TestProviderOrchestration:
 
     def test_build_success(self, provider):
         """Verify successful build orchestration and validation."""
-        results = provider.run(provider.targets.supporting(Action.WIRE))
-        assert results == [("part_a", "wire_obj")]
-        provider.build[Action.WIRE].assert_called_once_with("part_a", None, Mode.DEFAULT)
-
-    def test_build_sketch_success(self, provider):
-        """Verify successful sketch build orchestration."""
-        results = provider.run(provider.targets.supporting(Action.SKETCH))
-        assert results == [("part_a", "sketch_obj")]
-        provider.build[Action.SKETCH].assert_called_once_with("part_a", None, Mode.DEFAULT)
+        results = provider.run(provider.targets.supporting(Action.PART))
+        assert results == [("part_a", "part_obj"), ("part_b", "part_obj")]
+        provider.part["part_a"].assert_called_once_with("part_a", None, Mode.DEFAULT)
+        provider.part["part_b"].assert_called_once_with("part_b", None, Mode.DEFAULT)
 
     def test_configure_success(self, provider):
         """Verify successful configuration orchestration."""
-        provider.run(provider.targets.supporting(Action.CONFIG))
-        provider.config[Mode.DEFAULT].assert_called_once_with("part_a", None)
+        provider.run(provider.targets.supporting(Action.CONFIG).for_modes(["text"]))
+        provider.config["text"].assert_called_once_with("part_a", None)
 
-        provider.config[Mode.DEFAULT].reset_mock()
-        provider.run(provider.targets.supporting(Action.CONFIG).for_modes([Mode.TEXT]))
-        provider.config[Mode.TEXT].assert_called_once_with("part_a", None)
-
-        provider.config[Mode.TEXT].reset_mock()
-        provider.run(provider.targets.supporting(Action.CONFIG).for_modes([Mode.MOUNT]))
-        provider.config[Mode.MOUNT].assert_called_once_with("part_a", None)
+        provider.config["text"].reset_mock()
+        provider.run(provider.targets.supporting(Action.CONFIG).for_modes(["mount"]))
+        provider.config["mount"].assert_called_once_with("part_a", None)
 
     def test_build_multiple_modes(self, provider):
         """Verify that multiple build modes result in multiple handler calls and results."""
         targets = provider.targets.supporting(Action.PART).for_modes([Mode.DEFAULT, Mode.BARE])
         results = provider.run(targets)
         assert results == [("part_a", ["part_obj", "part_obj"])]
-        assert provider.build[Action.PART].call_count == 2
+        assert provider.part["part_a"].call_count == 2
 
     def test_view_success(self, provider):
         """Verify successful view orchestration."""
@@ -216,14 +204,17 @@ class TestProviderOrchestration:
 
     def test_view_unregistered_room(self, provider):
         """Verify error when a target supports VIEW in manifest but lacks a function in view registry."""
-        provider.manifest["part_b"][Action.VIEW] = {MODES: [Mode.DEFAULT]}
-        with pytest.raises(ValueError, match="No view function registered for room 'part_b'"):
-            provider.run(TargetList(provider, ["part_b"], action=Action.VIEW))
+        m = provider.manifest
+        m["part_b"][Action.VIEW] = {MODES: [Mode.DEFAULT]}
+        with patch.object(MockProvider, "manifest", new_callable=PropertyMock) as mock_manifest:
+            mock_manifest.return_value = m
+            with pytest.raises(ValueError, match="No view function registered for room 'part_b'"):
+                provider.run(TargetList(provider, ["part_b"], action=Action.VIEW))
 
     def test_build_action_unsupported(self, provider):
         """Verify ValueError when a target does not support an action."""
-        with pytest.raises(ValueError, match="Action 'wire' is not supported for part 'part_b'"):
-            provider.run(TargetList(provider, ["part_b"], action=Action.WIRE))
+        with pytest.raises(ValueError, match="Action 'config' is not supported for part 'part_b'"):
+            provider.run(TargetList(provider, ["part_b"], action=Action.CONFIG))
 
     def test_build_diagram_special_case(self, provider):
         """Verify diagram build returns a single object and validates differently."""
@@ -242,4 +233,5 @@ class TestProviderOrchestration:
         # but we keep it to ensure _post_build still executes correctly.
         results = provider.run(TargetList(provider, ["part_a", "part_b"], action=Action.PART))
         assert results == [("part_a", "part_obj"), ("part_b", "part_obj")]
-        assert provider.build[Action.PART].call_count == 2
+        assert provider.part["part_a"].call_count == 1
+        assert provider.part["part_b"].call_count == 1

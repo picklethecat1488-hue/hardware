@@ -9,7 +9,7 @@ from provider import Subassembly
 from model.app_config import AppConfig
 from projects_config import TubeConfig
 from shell import Logger
-from .tube_builder import TubeBuilder
+from .builder import TubeBuilder
 
 
 class TubeConfigurator:
@@ -135,8 +135,8 @@ class TubeConfigurator:
         path = self.builder.create_wire(name)
 
         for idx in range(1, len(self.tube_config.clamp_positions[name]) - 1):
-            pos_info = self.config.tube.clamp_positions[name][idx]
-            if not pos_info is None:
+            pos_info = self.tube_config.clamp_positions[name][idx]
+            if pos_info is not None:
                 clamp_offset, _ = pos_info
                 center = self.get_part_position(tube, path, clamp_offset)
                 offset_deg = self.find_best_angle(
@@ -148,7 +148,7 @@ class TubeConfigurator:
                 # Update the clamp offset
                 if offset_deg is None:
                     raise ValueError(f"failed to configure {name} clamp") from None
-                self.config.tube.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
+                self.tube_config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
                 self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -168,41 +168,8 @@ class TubeConfigurator:
         # Update the text offset
         if offset_deg is None:
             raise ValueError(f"failed to configure {name} text logo") from None
-        self.config.tube.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
+        self.tube_config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
         self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
-
-    @validate_call(config={"arbitrary_types_allowed": True})
-    def configure_clamps(self, names: list[Literal["driver", "passenger"]] = ["driver", "passenger"]):
-        """Configure clamps for all specified parts."""
-        # Run configuration tasks for each part in parallel.
-        futures = [self.executor.submit(self.config_clamp, name) for name in names]
-        for future in futures:
-            future.result()
-
-    @validate_call(config={"arbitrary_types_allowed": True})
-    def configure_text_logos(self, names: list[Literal["driver", "passenger"]] = ["driver", "passenger"]):
-        """Configure logo text for all specified parts."""
-        if names is None:
-            names = self.tube_config.names
-        # Run configuration tasks for each part in parallel.
-        futures = [self.executor.submit(self.config_text_logo, name) for name in names]
-        for future in futures:
-            future.result()
-
-    @validate_call(config={"arbitrary_types_allowed": True})
-    def configure_all(self, names: list[Literal["driver", "passenger"]] = ["driver", "passenger"]):
-        """Perform all configuration steps."""
-        # Execute clamp and logo configuration in parallel to maximize throughput.
-        f1 = self.executor.submit(self.configure_clamps, names)
-        f2 = self.executor.submit(self.configure_text_logos, names)
-        f1.result()
-        f2.result()
-
-    def config_default(self, target: str, subassembly: Optional[Subassembly]) -> None:
-        """Configure all aspects of the tube geometry."""
-        name = cast(Literal["driver", "passenger"], target)
-        self.config_clamp(name)
-        self.config_text_logo(name)
 
     def config_mount(self, target: str, subassembly: Optional[Subassembly]) -> None:
         """Configure mounting hardware positions."""
