@@ -2,8 +2,8 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from providers.orchestrator import ProviderOrchestrator, ProviderRouterOrchestrator
-from providers.types import Action, Mode, Subassembly, MODES, SUBASSEMBLIES
+from provider.orchestrator import ProviderOrchestrator, ProviderRouterOrchestrator
+from provider.types import Action, Mode, Subassembly, MODES, SUBASSEMBLIES
 
 
 @pytest.fixture

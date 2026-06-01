@@ -4,10 +4,10 @@ import pytest
 import yaml
 from unittest.mock import MagicMock
 from pydantic import BaseModel
-from providers.provider import Provider
-from providers.target_list import TargetList
-from providers.utils import load_manifest
-from providers.types import Action, Subassembly, Mode, MODES, SUBASSEMBLIES, COLOR
+from provider.provider import Provider
+from provider.target_list import TargetList
+from provider.utils import load_manifest
+from provider.types import Action, Subassembly, Mode, MODES, SUBASSEMBLIES, COLOR
 
 
 class MockConfig(BaseModel):
@@ -141,10 +141,10 @@ class TestProviderMetadata:
 
     def test_provider_default_manifest_path(self, monkeypatch):
         """Verify that Provider.manifest defaults to loading a YAML file by provider name."""
-        import providers.provider
+        import provider.provider
 
         mock_load = MagicMock(return_value={"test": "data"})
-        monkeypatch.setattr(providers.provider, "load_manifest", mock_load)
+        monkeypatch.setattr(provider.provider, "load_manifest", mock_load)
 
         class MinimalProvider(Provider):
             @property

@@ -3,9 +3,9 @@
 import pytest
 from unittest.mock import MagicMock
 from pydantic import BaseModel, Field
-from providers.provider_manager import ProviderManager
-from providers.provider import Provider
-from providers.utils import discover_provider
+from provider.provider_manager import ProviderManager
+from provider.provider import Provider
+from provider.utils import discover_provider
 from model import AppConfig
 
 

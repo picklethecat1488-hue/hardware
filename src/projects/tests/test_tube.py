@@ -5,7 +5,7 @@ from unittest.mock import patch
 from model import AppConfig
 from projects_config import TubeConfig
 from projects import TubeProvider
-from providers import Action, Mode, Subassembly, TargetList, ProviderManager
+from provider import Action, Mode, Subassembly, TargetList, ProviderManager
 
 
 class TestTubeProvider:
@@ -31,7 +31,7 @@ class TestTubeProvider:
             "part_positions": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
             "overlay": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
         }
-        with patch("providers.provider.load_manifest", return_value=mock_manifest):
+        with patch("provider.provider.load_manifest", return_value=mock_manifest):
             yield TubeProvider()
 
     def test_identity(self, provider):

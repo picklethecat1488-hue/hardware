@@ -5,7 +5,7 @@ from build123d import *  # type: ignore
 from build import Builder
 from config import Configurator
 from model import AppConfig
-from providers import ProviderManager
+from provider import ProviderManager
 from shell import Logger
 from ocp_vscode import show, set_port, Collapse, Camera  # type: ignore
 

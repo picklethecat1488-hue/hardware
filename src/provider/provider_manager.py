@@ -46,7 +46,7 @@ class ProviderManager:
     def _discover_providers(self, executor: Optional[ThreadPoolExecutor]) -> list[Provider]:
         """Automatically discover and instantiate Provider subclasses in the package."""
         # Scan both the library providers and the project providers
-        import providers.provider as lib_base
+        import provider.provider as lib_base
 
         try:
             import projects as project_base

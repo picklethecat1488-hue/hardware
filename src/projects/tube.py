@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any, Callable, Optional
 from projects_config import TubeConfig
-from providers import Provider, Action, Mode, Subassembly, discover_provider
+from provider import Provider, Action, Mode, Subassembly, discover_provider
 
 
 @discover_provider
