@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from pathlib import Path
 from model import method_cache, AppConfig, load_measurements
-from projects.tube_config import TubeConfig
+from projects_config import TubeConfig
 
 
 class MockService:

@@ -26,7 +26,10 @@ There are two manifolds, driver and passenger. The manifolds are further separat
 - **src/config.py** \- do any application configuration.
 - **src/view.py** \- view and debug project assets.
 - **src/exhaust\_manifolds.ipynb** \- contains examples of using the `Builder` class in Jupyter Lab.
+- **src/model/\*\*** \- contains model library code.
+- **src/provider/\*\*** \- contains provider library code.
 - **src/projects/\*\*** \- contains project code.
+- **src/projects_config/\*\*** \- contains project model configuration.
 
 ## Build Files
 

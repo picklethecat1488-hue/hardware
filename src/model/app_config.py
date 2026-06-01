@@ -14,7 +14,7 @@ from build123d import BuildPart, Box, Part, Location, Mode, add
 
 from .text_args import TextArgs
 from .diagram_options import DiagramOptions
-from projects.tube_config import TubeConfig
+from projects_config import TubeConfig
 from .utils import method_cache, load_measurements
 
 
