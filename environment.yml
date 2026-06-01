@@ -14,10 +14,9 @@ dependencies:
     - ocp_vscode
     - pytest==9.0.3
     - halo
-    - html_sanitizer
     - pytest-xdist
     - pydantic-changedetect
-    - pydantic-settings      # Added back for Pydantic v2 settings support
+    - pydantic-settings
     - pytest-mock 
     - numpy
     - scipy
