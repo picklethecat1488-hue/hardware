@@ -11,11 +11,6 @@ class TubeProvider(Provider):
     """Provides tube geometry and configuration."""
 
     @property
-    def name(self) -> str:
-        """Return the provider name."""
-        return "tube"
-
-    @property
     def default_config(self) -> TubeConfig:
         """Return the default tube configuration."""
         return TubeConfig(measurements_path=str(Path(__file__).parent / "tube_measurements.yaml"))

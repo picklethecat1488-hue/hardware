@@ -33,10 +33,9 @@ class Provider(ABC):
         self.orchestrator = self.orchestrator_type(self, executor=executor)
 
     @property
-    @abstractmethod
     def name(self) -> str:
-        """Return the name of the provider."""
-        pass
+        """Return the name of the provider, defaulting to the class name in lowercase."""
+        return self.__class__.__name__.lower().removesuffix("provider")
 
     @property
     @abstractmethod

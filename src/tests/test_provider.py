@@ -20,11 +20,6 @@ class MockProvider(Provider):
     """Concrete implementation of Provider for testing."""
 
     @property
-    def name(self) -> str:
-        """Return the mock provider name."""
-        return "mock"
-
-    @property
     def default_config(self) -> MockConfig:
         """Return a mock config."""
         return MockConfig()
