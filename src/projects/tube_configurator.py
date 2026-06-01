@@ -82,7 +82,7 @@ class TubeConfigurator:
         if not self.shapes_overlap(c_box, o_box):
             return True
         else:
-            return len((c_shape & o_shape).solids()) == 0
+            return len(cast(Part | Solid, (c_shape & o_shape)).solids()) == 0
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def angle_window(self, center, radius, step):

@@ -131,12 +131,6 @@ class TestTubeProvider:
             # build_diagram casts the list of targets to names
             mock.assert_called_once_with(names=["driver"])
 
-    def test_run_view_placeholder(self, provider):
-        """Verify executing a VIEW action returns the skeleton room data."""
-        targets = TargetList(provider, ["part_positions"], action=Action.VIEW)
-        results = provider.run(targets)
-        assert results == [("part_positions", [])]
-
     def test_run_config_execution(self, provider):
         """Verify executing a CONFIG action returns None."""
         targets = provider.targets.supporting(Action.CONFIG).for_modes([Mode.DEFAULT])
@@ -455,3 +449,45 @@ class TestTubeConfigurator:
             mock_clamp.reset_mock()
             configurator.config_text("driver", None)
             assert mock_text.call_count == 1
+
+
+class TestTubeViewer:
+    """Manifold viewer unit tests."""
+
+    @pytest.fixture
+    def viewer(self):
+        """Return the tube viewer fixture."""
+        config = AppConfig()
+        provider = TubeProvider(config=config)
+        return provider.viewer
+
+    def test_get_rgba(self, viewer):
+        """Verify RGBA color conversion."""
+        # Known color
+        assert viewer._get_rgba("red", 0.5) == (1.0, 0.0, 0.0, 0.5)
+        # Default fallback
+        assert viewer._get_rgba("unknown", 1.0) == (1.0, 1.0, 1.0, 1.0)
+
+    def test_build_markers(self, viewer):
+        """Verify marker creation methods return valid geometry."""
+        # Sphere marker
+        assert viewer.create_part_position_point("driver", 0.5, right=False).volume > 0
+        # Cone marker
+        assert viewer.create_solid_center_point("passenger", right=True).volume > 0
+
+    def test_room_logic(self, viewer):
+        """Verify room dictionary generation logic."""
+        for room_fn in [viewer.show_positions_room, viewer.show_overlay_room, viewer.show_profiles_room]:
+            data = room_fn()
+            assert isinstance(data, dict)
+            assert len(data) > 0
+            for val in data.values():
+                assert len(val) == 3  # (obj, color_name, alpha)
+
+    def test_view_interfaces(self, viewer):
+        """Verify orchestrator-compatible view interfaces."""
+        for view_fn in [viewer.view_part_positions, viewer.view_overlay, viewer.view_tube_profile]:
+            results = view_fn()
+            assert isinstance(results, list)
+            for _, rgba in results:
+                assert len(rgba) == 4
