@@ -1,7 +1,10 @@
 """Unit tests for the TubeProvider class."""
 
+import math
 import pytest
+import numpy as np
 from unittest.mock import patch
+from build123d import *
 from model import AppConfig
 from projects_config import TubeConfig
 from projects import TubeProvider
@@ -22,9 +25,10 @@ class TestTubeProvider:
             "driver": {
                 Action.CONFIG: {"modes": [Mode.DEFAULT, Mode.MOUNT, Mode.TEXT, Mode.BARE]},
                 Action.PART: {
-                    "modes": [Mode.DEFAULT, Mode.BARE],
+                    "modes": [Mode.DEFAULT, Mode.BARE, Mode.PRINT],
                     "subassemblies": [Subassembly.LEFT, Subassembly.RIGHT],
                 },
+                Action.SKETCH: {"modes": [Mode.DEFAULT], "subassemblies": [Subassembly.LEFT, Subassembly.RIGHT]},
                 Action.WIRE: {"modes": [Mode.DEFAULT]},
                 Action.DIAGRAM: {"modes": [Mode.DEFAULT]},
             },
@@ -73,24 +77,59 @@ class TestTubeProvider:
         assert "part_positions" in provider.view
         assert "overlay" in provider.view
 
-    def test_run_part_placeholder(self, provider):
-        """Verify executing a PART action returns the skeleton placeholder."""
-        targets = provider.targets.supporting(Action.PART)
-        results = provider.run(targets)
-        # Provider returns namespaced results: [(name, result)]
-        assert results == [("driver", "part_placeholder")]
+    def test_run_part_default(self, provider):
+        """Verify executing a PART action in DEFAULT mode calls create_part."""
+        with patch.object(provider.builder, "create_part", return_value="part_obj") as mock:
+            targets = provider.targets.supporting(Action.PART).for_subassemblies([Subassembly.LEFT])
+            results = provider.run(targets)
+            assert results == [("driver", "part_obj")]
+            mock.assert_called_once_with("driver", right=False, tube_only=False)
 
-    def test_run_wire_placeholder(self, provider):
-        """Verify executing a WIRE action returns the skeleton placeholder."""
-        targets = provider.targets.supporting(Action.WIRE)
-        results = provider.run(targets)
-        assert results == [("driver", "wire_placeholder")]
+    def test_run_part_bare(self, provider):
+        """Verify executing a PART action in BARE mode calls create_part with tube_only=True."""
+        with patch.object(provider.builder, "create_part", return_value="bare_obj") as mock:
+            targets = (
+                provider.targets.supporting(Action.PART).for_modes([Mode.BARE]).for_subassemblies([Subassembly.LEFT])
+            )
+            results = provider.run(targets)
+            assert results == [("driver", "bare_obj")]
+            mock.assert_called_with("driver", right=False, tube_only=True)
 
-    def test_run_diagram_placeholder(self, provider):
-        """Verify executing a DIAGRAM action returns a single placeholder object."""
-        targets = provider.targets.supporting(Action.DIAGRAM)
-        result = provider.run(targets)
-        assert result == "diagram_placeholder"
+    def test_run_part_print(self, provider):
+        """Verify executing a PART action in PRINT mode calls create_prepared_part."""
+        with patch.object(provider.builder, "create_prepared_part", return_value="print_obj") as mock:
+            targets = (
+                provider.targets.supporting(Action.PART).for_modes([Mode.PRINT]).for_subassemblies([Subassembly.LEFT])
+            )
+            results = provider.run(targets)
+            assert results == [("driver", "print_obj")]
+            mock.assert_called_with("driver", right=False)
+
+    def test_run_part_no_subassembly(self, provider):
+        """Verify executing a PART action without a subassembly calls create_tube."""
+        with patch.object(provider.builder, "create_tube", return_value="tube_obj") as mock:
+            # Manually construct TargetList without subassemblies
+            targets = TargetList(provider, ["driver"], action=Action.PART)
+            results = provider.run(targets)
+            assert results == [("driver", "tube_obj")]
+            mock.assert_called_once_with("driver")
+
+    def test_run_wire(self, provider):
+        """Verify executing a WIRE action calls create_wire."""
+        with patch.object(provider.builder, "create_wire", return_value="wire_obj") as mock:
+            targets = provider.targets.supporting(Action.WIRE)
+            results = provider.run(targets)
+            assert results == [("driver", "wire_obj")]
+            mock.assert_called_once_with("driver")
+
+    def test_run_diagram(self, provider):
+        """Verify executing a DIAGRAM action calls create_diagram."""
+        with patch.object(provider.builder, "create_diagram", return_value="diag_obj") as mock:
+            targets = provider.targets.supporting(Action.DIAGRAM)
+            result = provider.run(targets)
+            assert result == "diag_obj"
+            # build_diagram casts the list of targets to names
+            mock.assert_called_once_with(names=["driver"])
 
     def test_run_view_placeholder(self, provider):
         """Verify executing a VIEW action returns the skeleton room data."""
@@ -104,9 +143,231 @@ class TestTubeProvider:
         result = provider.run(targets)
         assert result is None
 
+    def test_run_sketch(self, provider):
+        """Verify executing a SKETCH action calls create_profile."""
+        with patch.object(provider.builder, "create_profile", return_value="sketch_obj") as mock:
+            targets = provider.targets.supporting(Action.SKETCH).for_subassemblies([Subassembly.RIGHT])
+            results = provider.run(targets)
+            assert results == [("driver", "sketch_obj")]
+            mock.assert_called_once_with(center_deg=90, angle_deg=180)
+
     def test_unsupported_config_mode_error(self, provider):
         """Verify that requesting an unregistered config mode raises a ValueError."""
         # Mode.BARE is in manifest but not in TubeProvider.config registry skeleton
         targets = TargetList(provider, ["driver"], action=Action.CONFIG, modes=[Mode.BARE])
         with pytest.raises(ValueError, match="No config handler registered for mode 'bare' in tube"):
             provider.run(targets)
+
+
+class TestTubeBuilder:
+    """Manifold builder unit tests."""
+
+    @pytest.fixture
+    def builder(self):
+        """Return the tube builder fixture."""
+        config = AppConfig()
+        provider = TubeProvider(config=config)
+        return provider.builder
+
+    @pytest.fixture(scope="class", params=["driver", "passenger"])
+    def name(self, request):
+        """Return a test part name."""
+        return request.param
+
+    @pytest.fixture(scope="class", params=[False, True])
+    def right(self, request):
+        """Return a side selection fixture."""
+        return request.param
+
+    def test_wire(self, name, builder):
+        """Verify wire path and clamp endpoints."""
+
+        def calc_point_err(v, p):
+            return abs((v - Vector(p)).length)
+
+        wire = builder.create_wire(name)
+        length = wire.length
+        inlet_clamp_start = wire.position_at(0.0)
+        inlet_clamp_end = wire.position_at(builder.config.tube.clamp_lengths[0] / length)
+        outlet_clamp_start = wire.position_at((length - builder.config.tube.clamp_lengths[-1]) / length)
+        outlet_clamp_end = wire.position_at(1.0)
+        inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
+
+        # Make sure the clamp starts are correct
+        assert calc_point_err(inlet_clamp_start, builder.config.tube.P[inlet_key]) == pytest.approx(0)
+        assert calc_point_err(outlet_clamp_start, builder.config.tube.P[outlet_key]) == pytest.approx(0)
+
+        # Check clamp direction and length
+        assert calc_point_err(
+            (inlet_clamp_end - inlet_clamp_start).normalized(), builder.config.tube.V[inlet_key]
+        ) == pytest.approx(0)
+        assert calc_point_err(
+            (outlet_clamp_end - outlet_clamp_start).normalized(), builder.config.tube.V[outlet_key]
+        ) == pytest.approx(0)
+        assert (inlet_clamp_end - inlet_clamp_start).length == pytest.approx(builder.config.tube.clamp_lengths[0])
+        assert (outlet_clamp_end - outlet_clamp_start).length == pytest.approx(builder.config.tube.clamp_lengths[-1])
+
+    def test_create_profile(self, builder):
+        """Test profile sketch generation for a valid center/angle profile."""
+        sketch = builder.create_profile(45, 90, outer_radius=10, inner_radius=5, joint_space=0)
+        # Area of a quarter annulus: (90/360) * pi * (R^2 - r^2)
+        expected_area = math.pi * (10**2 - 5**2) / 4
+        assert sketch.area == pytest.approx(expected_area)
+
+    def test_create_profile_invalid_inner_radius(self, builder):
+        """Ensure invalid profile radii raise ValueError."""
+        with pytest.raises(ValueError):
+            builder.create_profile(45, 90, outer_radius=10, inner_radius=10)
+
+    def test_build_clean_tool(self, name, builder):
+        """Test clean tool creation for a given part name."""
+        clean_tool = builder.create_clean_tool(name)
+        assert clean_tool is not None
+        assert clean_tool.volume > 0
+
+    def test_part_fits_together(self, builder, name, right):
+        """Test that mirrored parts do not intersect."""
+        # Make sure parts do not self intersect
+        part = builder.create_part(name, right=right)
+        other_part = builder.create_part(name, right=(not right))
+        intersection = part.intersect(other_part)
+        assert (intersection.volume if intersection else 0) == pytest.approx(0), (
+            f"intersection detected between {name} parts"
+        )
+
+    def test_part_doesnt_overlap(self, builder, name, right):
+        """Ensure parts from different assemblies do not intersect."""
+        part = builder.create_part(name, right=right)
+        other_name = next(x for x in builder.tube_config.names if x != name)
+        other_part = builder.create_part(other_name, right=not right)
+        intersection = part.intersect(other_part)
+        assert (intersection.volume if intersection else 0) == pytest.approx(0), (
+            f"intersection detected between {name},right={right} and {other_name},right={not right}"
+        )
+
+    def test_in_bounds(self, builder, name, right):
+        """Verify part fits inside bound box volume."""
+        part = builder.create_part(name, right=right)
+        proj_bounds = builder.config.bound_box
+        volume = part.cut(proj_bounds).volume
+
+        assert volume == pytest.approx(0)
+
+    def test_can_clamp(self, name, right, builder):
+        """Test if a representative clamp bed satisfies the clamp property."""
+        clamp_idx = 1
+        path = builder.create_wire(name)
+        length = path.length
+
+        # Map clamp_idx to clamp parameters
+        offsets = (
+            [0]
+            + [clamp_pos[0] for clamp_pos in builder.tube_config.clamp_positions[name][1:-1] if clamp_pos is not None]
+            + [(length - builder.tube_config.clamp_lengths[-1]) / length]
+        )
+        expected = np.array(builder.tube_config.clamp_diameters) / 2
+        """Test if manifold clamps satisfy fitment requirements."""
+        part = builder.create_part(name, right=right)
+        pos, len, expected = (
+            offsets[clamp_idx],
+            builder.tube_config.clamp_lengths[clamp_idx],
+            expected[clamp_idx],
+        )
+
+        # Check if we can move clamp over section
+        clamp_off = builder.create_ring(
+            name, pos, len, outer_radius=expected + builder.config.tube.wall_thickness, inner_radius=expected
+        )
+        intersection_off = part.intersect(clamp_off)
+        assert (intersection_off.volume if intersection_off else 0) == pytest.approx(0)
+
+        # Check if we can push clamp onto section
+        clamp_on = builder.create_ring(
+            name, pos, len, outer_radius=expected + builder.config.tube.wall_thickness, inner_radius=expected - 0.01
+        )
+        intersection_on = part.intersect(clamp_on)
+        assert intersection_on is not None and intersection_on.volume > 0
+
+    def test_part(self, name, right, builder):
+        """Verify rebuilt part geometry matches manifold volume."""
+        if name != "driver" and name != "passenger":
+            raise ValueError(f"Invalid name: {name}")
+        manifold = builder.create_tube(name, right=right, half_tube=True)
+        part = builder.create_part(name, right=right)
+        manifold_vol = manifold.volume
+        intersection = part.intersect(manifold)
+        manifold_from_parts_vol = intersection.volume if intersection else 0
+
+        error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
+        # less than 0.5% error for each rebuilt part.
+        assert error_pct < 0.5
+
+    def test_prepared_part(self, name, right, builder):
+        """Verify the prepared part is printable and stable."""
+        orig_part = builder.create_part(name, right=right)
+        part = builder.create_prepared_part(name, right=right)
+
+        # Ensure the part is a watertight solid
+        assert part.is_valid
+        assert part.volume > 0
+
+        # Ensure the part is touching the print bed
+        bottom_faces = part.faces().sort_by(Axis.Z)[:1]
+        face_area = sum(f.area for f in bottom_faces)
+        assert face_area > 0
+
+        # Run a few more checks to see if the part was mutated during preparation
+        error_pct = abs(orig_part.volume - part.volume) / (orig_part.volume + part.volume) / 2 * 100
+        assert error_pct < 1e-2, "Volume changed"
+
+        error_pct = abs(orig_part.area - part.area) / (orig_part.area + part.area) / 2 * 100
+        assert error_pct < 1e-3, "Surface area changed"
+
+    def test_end_angle(self, builder, name):
+        """Verify inlet and outlet angles for each part."""
+
+        def get_angle(key):
+            """Compute the vertical angle of an exhaust end vector."""
+            z_axis = Vector(0, 0, 1)
+            v_test = Vector(builder.tube_config.V[key])
+            angle = 90 - v_test.get_angle(z_axis)
+            return angle
+
+        # Horizontal magnitude (distance in XY plane)
+        inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
+
+        # Test inlet angle
+        angle = get_angle(inlet_key)
+        expected_angle = 14.09 if name == "driver" else 0
+        assert round(angle, 2) == pytest.approx(expected_angle)
+
+        # Test outlet angle
+        angle = get_angle(outlet_key)
+        expected_angle = 0
+        assert round(angle, 2) == pytest.approx(expected_angle)
+
+    def test_overall_bounds(self, builder, name):
+        """Verify assembly bounding box dimensions."""
+        part = Compound(builder.create_part(name).fuse(builder.create_part(name, right=True)))
+        bbox = part.bounding_box()
+
+        if name == "driver":
+            xmin, xlen = 150, 227
+            ymin, ylen = -32, 324
+            zmin, zlen = 319, 203
+        elif name == "passenger":
+            xmin, xlen = 558, 387
+            ymin, ylen = -32, 419
+            zmin, zlen = 288, 234
+        else:
+            raise ValueError("Invalid part name")
+
+        # Make sure the overall dimensions of the part haven't changed since last revision.
+        assert round(bbox.min.X) == xmin
+        assert round(bbox.size.X) == xlen
+
+        assert round(bbox.min.Y) == ymin
+        assert round(bbox.size.Y) == ylen
+
+        assert round(bbox.min.Z) == zmin
+        assert round(bbox.size.Z) == zlen
