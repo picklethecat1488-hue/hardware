@@ -173,8 +173,10 @@ def main():
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
     viewer = Viewer(builder, configurator, logger)
-    viewer.show_view(args.scene, name=args.name, show_bounds=args.bounds)
-    logger.done()
+    try:
+        viewer.show_view(args.scene, name=args.name, show_bounds=args.bounds)
+    finally:
+        logger.done()
 
 
 if __name__ == "__main__":

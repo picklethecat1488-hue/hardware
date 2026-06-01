@@ -385,11 +385,12 @@ class TestTubeConfigurator:
 
     def test_get_orientation_normal(self, configurator):
         """Verify orientation detection logic identifies the peak correctly."""
-        # Setup a tube centered at Z=2. Path is at Z=0.
+        path = configurator.builder.create_wire("driver")
+        pos = path.position_at(0.5)
+        # Setup a tube centered above the actual path position.
         with BuildPart() as tube:
             Box(10, 10, 10)
-        tube_obj = tube.part.moved(Location(Vector(0, 0, 2)))  # type: ignore
-        path = configurator.builder.create_wire("driver")
+        tube_obj = tube.part.moved(Location(pos + Vector(0, 0, 2)))  # type: ignore
 
         # Manually populate caches since methods use id(obj)
         configurator._tube_cache[id(tube_obj)] = tube_obj
@@ -401,10 +402,12 @@ class TestTubeConfigurator:
 
     def test_get_part_position(self, configurator):
         """Verify get_part_position calculates the correct attachment vector."""
+        path = configurator.builder.create_wire("driver")
+        pos = path.position_at(0.5)
+        # Setup a tube centered above the actual path position.
         with BuildPart() as tube:
             Box(10, 10, 10)
-        tube_obj = tube.part.moved(Location(Vector(0, 0, 2)))  # type: ignore
-        path = configurator.builder.create_wire("driver")
+        tube_obj = tube.part.moved(Location(pos + Vector(0, 0, 2)))  # type: ignore
 
         radius = min(configurator.tube_config.clamp_diameters) / 2
         result = configurator.get_part_position(tube_obj, path, 0.5)
