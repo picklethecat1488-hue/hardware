@@ -19,24 +19,22 @@ There are two manifolds, driver and passenger. The manifolds are further separat
 
 *Exploded assembly diagram.*
 
-## Source Files
+## Source Paths
 
-- **src/measurements.yml** \- contains raw measurements used to construct the manifolds.
-- **src/build.py** \- build the project outputs.
-- **src/config.py** \- do any application configuration.
-- **src/view.py** \- view and debug project assets.
-- **src/exhaust\_manifolds.ipynb** \- contains examples of using the `Builder` class in Jupyter Lab.
-- **src/model/\*\*** \- contains model library code.
-- **src/provider/\*\*** \- contains provider library code.
-- **src/projects/\*\*** \- contains project code.
-- **src/projects_config/\*\*** \- contains project model configuration.
+ - **src/build.py** - Orchestrates the generation and export of 3D-printable geometry.
+ - **src/config.py** - Automated utility for part placement and geometry optimization.
+ - **src/view.py** - Interactive CAD visualization tool for inspection and debugging.
+ - **src/model/** - Core application data models and configuration schemas.
+ - **src/provider/** - Framework for geometry generation and build orchestration.
+ - **src/projects/** - Specific geometry provider implementations.
+ - **src/projects_config/** - Configuration models specific to individual projects.
 
 ## Build Files
 
 After running `build.py`, you should see these files in your build output:
 
 - **build/\*\*** \- contains output from the last build.
-- **build/exhaust\_manifolds\_v{x}\_diagram** \- an exploded diagram of the manifolds assembly lrpcess.  
+- **build/exhaust\_manifolds\_v{x}\_diagram** \- an exploded diagram of the manifolds assembly process.  
 - **build/exhaust\_manifolds\_v{x}\_driver\_left.stl** \- the left side of the driver manifold.  
 - **build/exhaust\_manifolds\_v{x}\_driver\_right.stl** \- the right side of the driver manifold.  
 - **build/exhaust\_manifolds\_v{x}\_passenger\_left.stl** \- the left side of the passenger manifold.  
