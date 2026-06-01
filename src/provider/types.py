@@ -11,8 +11,6 @@ COLOR = "color"
 class Action(StrEnum):
     """Build actions for shapes."""
 
-    WIRE = "wire"
-    SKETCH = "sketch"
     PART = "part"
     DIAGRAM = "diagram"
     CONFIG = "config"
@@ -31,6 +29,4 @@ class Mode(StrEnum):
 
     DEFAULT = "default"
     BARE = "bare"
-    TEXT = "text"
-    MOUNT = "mount"
     PRINT = "print"

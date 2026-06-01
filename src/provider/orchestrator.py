@@ -30,7 +30,7 @@ class Orchestrator(ABC):
         targets: tuple[str, ...],
         action: Action,
         subassemblies: tuple[Subassembly, ...] = (),  # noqa: B006
-        modes: tuple[Mode, ...] = (Mode.DEFAULT,),
+        modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:
         """Perform a build action."""
         pass
@@ -56,7 +56,7 @@ class ProviderOrchestrator(Orchestrator):
         targets: tuple[str, ...],
         action: Action,
         subassemblies: tuple[Subassembly, ...] = (),
-        modes: tuple[Mode, ...] = (Mode.DEFAULT,),
+        modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:
         """Perform the requested build action."""
         # Diagram action does not use subassemblies during build execution
@@ -64,7 +64,8 @@ class ProviderOrchestrator(Orchestrator):
         self.pre_handler(targets, action, handler_subs, modes)
 
         if action == Action.DIAGRAM:
-            handler = self.provider.build[Action.DIAGRAM]
+            # Diagrams operate on all targets at once. We pick the handler for the first target.
+            handler = self.provider.diagram[targets[0]]
             # Diagrams operate on all targets at once and ignore subassemblies.
             result = handler(list(targets), modes[0])
             results = [result]
@@ -91,14 +92,16 @@ class ProviderOrchestrator(Orchestrator):
             list(self.executor.map(config_task, work))
             self.post_handler(targets, None, action)
             return None
-        else:
-            handler = self.provider.build[action]
+        elif action == Action.PART:
 
             def build_task(item: tuple[str, Optional[Subassembly], Mode]) -> Any:
                 target, sa, m = item
+                handler = self.provider.part[target]
                 return handler(target, sa, m)
 
             raw_results = list(self.executor.map(build_task, work))
+        else:
+            raise ValueError(f"Unsupported action: {action}")
 
         # Group results back by target for VIEW and BUILD
         results = []
@@ -115,11 +118,17 @@ class ProviderOrchestrator(Orchestrator):
         targets: tuple[str, ...],
         action: Action,
         subassemblies: tuple[Subassembly, ...],
-        modes: tuple[Mode, ...],
+        modes: tuple[Mode | str, ...],
     ) -> None:
         """Validate input parameters before the handler execution."""
-        if action != Action.VIEW and action != Action.CONFIG and action not in self.provider.build:
+        # Ensure the action is recognized by the orchestrator
+        if action not in [Action.VIEW, Action.CONFIG, Action.PART, Action.DIAGRAM]:
             raise ValueError(f"No handler registered for action '{action}' in {self.provider.__class__.__name__}")
+
+        # Diagrams operate on all targets at once, so we validate the first target has a handler.
+        if action == Action.DIAGRAM:
+            if targets[0] not in self.provider.diagram:
+                raise ValueError(f"No diagram handler registered for '{targets[0]}' in {self.provider.name}")
 
         valid_targets = self.provider.targets
         manifest = self.provider.manifest
@@ -128,22 +137,26 @@ class ProviderOrchestrator(Orchestrator):
             if name not in valid_targets:
                 raise ValueError(f"Unsupported part name: '{name}'. Supported: {valid_targets}")
 
-            if action == Action.VIEW and name not in self.provider.view:
-                raise ValueError(f"No view function registered for room '{name}' in {self.provider.name}")
-
-            if action == Action.CONFIG:
-                for mode in modes:
-                    if mode not in self.provider.config:
-                        raise ValueError(f"No config handler registered for mode '{mode}' in {self.provider.name}")
-
             actions_config = manifest.get(name, {})
             if action not in actions_config:
                 raise ValueError(
                     f"Action '{action}' is not supported for part '{name}'. Supported: {list(actions_config.keys())}"
                 )
 
+            if action == Action.VIEW and name not in self.provider.view:
+                raise ValueError(f"No view function registered for room '{name}' in {self.provider.name}")
+
+            if action == Action.PART and name not in self.provider.part:
+                raise ValueError(f"No part handler registered for '{name}' in {self.provider.name}")
+
+            if action == Action.CONFIG:
+                for mode in modes:
+                    if mode not in self.provider.config:
+                        raise ValueError(f"No config handler registered for mode '{mode}' in {self.provider.name}")
+
             action_config = actions_config[action]
             supported_modes = action_config.get(MODES, [])
+
             for mode in modes:
                 if mode not in supported_modes:
                     raise ValueError(
@@ -239,7 +252,7 @@ class ProviderRouterOrchestrator(Orchestrator):
         targets: tuple[str, ...],
         action: Action,
         subassemblies: tuple[Subassembly, ...] = (),
-        modes: tuple[Mode, ...] = (Mode.DEFAULT,),
+        modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:
         """Route targets to their respective providers and merge results."""
         groups = self.collect(targets)

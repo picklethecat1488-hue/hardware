@@ -14,13 +14,16 @@ def mock_provider():
     provider.manifest = {
         "part_a": {
             Action.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.LEFT]},
-            Action.CONFIG: {MODES: [Mode.DEFAULT]},
+            Action.CONFIG: {MODES: ["mount"]},
         }
     }
     provider.targets = ["part_a"]
-    provider.build = {
-        Action.PART: MagicMock(return_value="geom"),
-        Action.CONFIG: MagicMock(return_value=None),
+    provider.part = {
+        "part_a": MagicMock(return_value="geom"),
+    }
+    provider.diagram = {}
+    provider.config = {
+        "mount": MagicMock(return_value=None),
     }
     return provider
 
@@ -33,7 +36,7 @@ class TestProviderOrchestrator:
         orch = ProviderOrchestrator(mock_provider)
 
         # Unsupported mode
-        with pytest.raises(ValueError, match="Mode 'bare' is not supported"):
+        with pytest.raises(ValueError, match="Mode 'bare' is not supported for action 'part'"):
             orch.pre_handler(("part_a",), Action.PART, (Subassembly.LEFT,), (Mode.BARE,))
 
         # Unsupported subassembly

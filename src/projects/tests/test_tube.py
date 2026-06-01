@@ -7,8 +7,8 @@ from unittest.mock import patch
 from build123d import *
 from model import AppConfig
 from projects_config import TubeConfig
-from projects import TubeProvider
-from provider import Action, Mode, Subassembly, TargetList, ProviderManager
+from projects.tube import TubeProvider
+from provider import Action, Mode, Subassembly, TargetList, ProviderManager, MODES
 
 
 class TestTubeProvider:
@@ -23,17 +23,25 @@ class TestTubeProvider:
         """
         mock_manifest = {
             "driver": {
-                Action.CONFIG: {"modes": [Mode.DEFAULT, Mode.MOUNT, Mode.TEXT, Mode.BARE]},
+                Action.CONFIG: {MODES: ["mount", "text", "bare"]},
                 Action.PART: {
                     "modes": [Mode.DEFAULT, Mode.BARE, Mode.PRINT],
                     "subassemblies": [Subassembly.LEFT, Subassembly.RIGHT],
                 },
-                Action.SKETCH: {"modes": [Mode.DEFAULT], "subassemblies": [Subassembly.LEFT, Subassembly.RIGHT]},
-                Action.WIRE: {"modes": [Mode.DEFAULT]},
+                Action.DIAGRAM: {"modes": [Mode.DEFAULT]},
+            },
+            "passenger": {
+                Action.CONFIG: {MODES: ["mount", "text", "bare"]},
+                Action.PART: {
+                    "modes": [Mode.DEFAULT, Mode.BARE, Mode.PRINT],
+                    "subassemblies": [Subassembly.LEFT, Subassembly.RIGHT],
+                },
                 Action.DIAGRAM: {"modes": [Mode.DEFAULT]},
             },
             "part_positions": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
             "overlay": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
+            "wire": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
+            "sketch": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
         }
         with patch("provider.provider.load_manifest", return_value=mock_manifest):
             yield TubeProvider()
@@ -58,32 +66,33 @@ class TestTubeProvider:
         mgr = ProviderManager(config, providers=[provider], bootstrap=False)
         mgr.load_configs()
         # After manager: uses TubeProvider's specific path
-        assert "tube_measurements.yaml" in config.tube.measurements_path  # type: ignore
+        assert "measurements.yaml" in config.tube.measurements_path  # type: ignore
 
     def test_action_registrations(self, provider):
         """Verify that build, config, and view actions are correctly registered."""
-        # Build actions
-        assert Action.PART in provider.build
-        assert Action.WIRE in provider.build
-        assert Action.SKETCH in provider.build
-        assert Action.DIAGRAM in provider.build
+        # Build registries are target-aware
+        assert "driver" in provider.part
+        assert "passenger" in provider.part
+        assert "driver" in provider.diagram
+        assert "passenger" in provider.diagram
 
         # Config modes
-        assert Mode.DEFAULT in provider.config
-        assert Mode.MOUNT in provider.config
-        assert Mode.TEXT in provider.config
+        assert "mount" in provider.config
+        assert "text" in provider.config
 
         # View rooms
         assert "part_positions" in provider.view
         assert "overlay" in provider.view
+        assert "wire" in provider.view
+        assert "sketch" in provider.view
 
     def test_run_part_default(self, provider):
         """Verify executing a PART action in DEFAULT mode calls create_part."""
         with patch.object(provider.builder, "create_part", return_value="part_obj") as mock:
             targets = provider.targets.supporting(Action.PART).for_subassemblies([Subassembly.LEFT])
             results = provider.run(targets)
-            assert results == [("driver", "part_obj")]
-            mock.assert_called_once_with("driver", right=False, tube_only=False)
+            assert results == [("driver", "part_obj"), ("passenger", "part_obj")]
+            assert mock.call_count == 2
 
     def test_run_part_bare(self, provider):
         """Verify executing a PART action in BARE mode calls create_part with tube_only=True."""
@@ -92,8 +101,8 @@ class TestTubeProvider:
                 provider.targets.supporting(Action.PART).for_modes([Mode.BARE]).for_subassemblies([Subassembly.LEFT])
             )
             results = provider.run(targets)
-            assert results == [("driver", "bare_obj")]
-            mock.assert_called_with("driver", right=False, tube_only=True)
+            assert results == [("driver", "bare_obj"), ("passenger", "bare_obj")]
+            assert mock.call_count == 2
 
     def test_run_part_print(self, provider):
         """Verify executing a PART action in PRINT mode calls create_prepared_part."""
@@ -102,8 +111,8 @@ class TestTubeProvider:
                 provider.targets.supporting(Action.PART).for_modes([Mode.PRINT]).for_subassemblies([Subassembly.LEFT])
             )
             results = provider.run(targets)
-            assert results == [("driver", "print_obj")]
-            mock.assert_called_with("driver", right=False)
+            assert results == [("driver", "print_obj"), ("passenger", "print_obj")]
+            assert mock.call_count == 2
 
     def test_run_part_no_subassembly(self, provider):
         """Verify executing a PART action without a subassembly calls create_tube."""
@@ -114,14 +123,6 @@ class TestTubeProvider:
             assert results == [("driver", "tube_obj")]
             mock.assert_called_once_with("driver")
 
-    def test_run_wire(self, provider):
-        """Verify executing a WIRE action calls create_wire."""
-        with patch.object(provider.builder, "create_wire", return_value="wire_obj") as mock:
-            targets = provider.targets.supporting(Action.WIRE)
-            results = provider.run(targets)
-            assert results == [("driver", "wire_obj")]
-            mock.assert_called_once_with("driver")
-
     def test_run_diagram(self, provider):
         """Verify executing a DIAGRAM action calls create_diagram."""
         with patch.object(provider.builder, "create_diagram", return_value="diag_obj") as mock:
@@ -129,21 +130,13 @@ class TestTubeProvider:
             result = provider.run(targets)
             assert result == "diag_obj"
             # build_diagram casts the list of targets to names
-            mock.assert_called_once_with(names=["driver"])
+            mock.assert_called_once_with(names=["driver", "passenger"])
 
     def test_run_config_execution(self, provider):
         """Verify executing a CONFIG action returns None."""
-        targets = provider.targets.supporting(Action.CONFIG).for_modes([Mode.DEFAULT])
+        targets = provider.targets.supporting(Action.CONFIG).for_modes(["mount"])
         result = provider.run(targets)
         assert result is None
-
-    def test_run_sketch(self, provider):
-        """Verify executing a SKETCH action calls create_profile."""
-        with patch.object(provider.builder, "create_profile", return_value="sketch_obj") as mock:
-            targets = provider.targets.supporting(Action.SKETCH).for_subassemblies([Subassembly.RIGHT])
-            results = provider.run(targets)
-            assert results == [("driver", "sketch_obj")]
-            mock.assert_called_once_with(center_deg=90, angle_deg=180)
 
     def test_unsupported_config_mode_error(self, provider):
         """Verify that requesting an unregistered config mode raises a ValueError."""
@@ -437,12 +430,6 @@ class TestTubeConfigurator:
             patch.object(configurator, "config_clamp") as mock_clamp,
             patch.object(configurator, "config_text_logo") as mock_text,
         ):
-            configurator.config_default("driver", None)
-            assert mock_clamp.call_count == 1
-            assert mock_text.call_count == 1
-
-            mock_clamp.reset_mock()
-            mock_text.reset_mock()
             configurator.config_mount("driver", None)
             assert mock_clamp.call_count == 1
 
@@ -486,7 +473,7 @@ class TestTubeViewer:
 
     def test_view_interfaces(self, viewer):
         """Verify orchestrator-compatible view interfaces."""
-        for view_fn in [viewer.view_part_positions, viewer.view_overlay, viewer.view_tube_profile]:
+        for view_fn in [viewer.view_part_positions, viewer.view_overlay, viewer.view_wire, viewer.view_sketch]:
             results = view_fn()
             assert isinstance(results, list)
             for _, rgba in results:

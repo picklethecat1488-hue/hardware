@@ -3,32 +3,22 @@ driver:
     left: [1.0, 0.0, 0.0, 1.0]
     right: [0.0, 1.0, 0.0, 1.0]
   config:
-    modes: [default, mount, text]
+    modes: [mount, text]
   diagram:
     modes: [default]
   part:
     modes: [default, bare, print]
-    subassemblies: [left, right]
-  wire:
-    modes: [default]
-  sketch:
-    modes: [default]
     subassemblies: [left, right]
 passenger:
   color:
     left: [1.0, 0.0, 0.0, 1.0]
     right: [0.0, 1.0, 0.0, 1.0]
   config:
-    modes: [default, mount, text]
+    modes: [mount, text]
   diagram:
     modes: [default]
   part:
     modes: [default, bare, print]
-    subassemblies: [left, right]
-  wire:
-    modes: [default]
-  sketch:
-    modes: [default]
     subassemblies: [left, right]
 part_positions:
   view:
@@ -36,6 +26,9 @@ part_positions:
 overlay:
   view:
     modes: [default]
-tube_profile:
+wire:
+  view:
+    modes: [default]
+sketch:
   view:
     modes: [default]

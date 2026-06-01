@@ -5,9 +5,9 @@ from typing import Any, Callable, Optional, TYPE_CHECKING
 from model.app_config import AppConfig
 from projects_config import TubeConfig
 from provider import Provider, Action, Mode, Subassembly, discover_provider
-from .tube_builder import TubeBuilder
-from .tube_configurator import TubeConfigurator
-from .tube_viewer import TubeViewer
+from .builder import TubeBuilder
+from .configurator import TubeConfigurator
+from .viewer import TubeViewer
 
 
 @discover_provider
@@ -37,25 +37,24 @@ class TubeProvider(Provider):
     @property
     def default_config(self) -> TubeConfig:
         """Return the default tube configuration."""
-        return TubeConfig(measurements_path=str(Path(__file__).parent / "tube_measurements.yaml"))
+        return TubeConfig(measurements_path=str(Path(__file__).parent / "measurements.yaml"))
 
     @property
-    def build(self) -> dict[Action, Callable[..., Any]]:
-        """A mapping of Actions to their handler methods."""
-        return {
-            Action.PART: self.builder.build_part,
-            Action.WIRE: self.builder.build_wire,
-            Action.SKETCH: self.builder.build_sketch,
-            Action.DIAGRAM: self.builder.build_diagram,
-        }
+    def part(self) -> dict[str, Callable[..., Any]]:
+        """A mapping of part names to their build handler methods."""
+        return {name: self.builder.build_part for name in self.targets.supporting(Action.PART)}
 
     @property
-    def config(self) -> dict[Mode, Callable[[str, Optional[Subassembly]], Any]]:
+    def diagram(self) -> dict[str, Callable[..., Any]]:
+        """A mapping of diagram names to their build handler methods."""
+        return {name: self.builder.build_diagram for name in self.targets.supporting(Action.DIAGRAM)}
+
+    @property
+    def config(self) -> dict[str, Callable[[str, Optional[Subassembly]], Any]]:
         """A mapping of Modes to configuration handler methods."""
         return {
-            Mode.DEFAULT: self.configurator.config_default,
-            Mode.MOUNT: self.configurator.config_mount,
-            Mode.TEXT: self.configurator.config_text,
+            "mount": self.configurator.config_mount,
+            "text": self.configurator.config_text,
         }
 
     @property
@@ -64,5 +63,6 @@ class TubeProvider(Provider):
         return {
             "part_positions": self.viewer.view_part_positions,
             "overlay": self.viewer.view_overlay,
-            "tube_profile": self.viewer.view_tube_profile,
+            "wire": self.viewer.view_wire,
+            "sketch": self.viewer.view_sketch,
         }
