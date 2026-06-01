@@ -50,11 +50,13 @@ class TestTubeProvider:
         """Verify that ProviderManager syncs the provider's specific measurements path."""
         config = AppConfig()
         # Before manager: uses AppConfig default
-        assert "measurements.yml" in config.tube.measurements_path
-        
-        _ = ProviderManager(config, providers=[provider], bootstrap=False)
+        assert "measurements.yml" in config.tube.measurements_path # type: ignore
+
+        mgr = ProviderManager(config, providers=[provider], bootstrap=False)
+        mgr.load_configs()
         # After manager: uses TubeProvider's specific path
-        assert "tube_measurements.yaml" in config.tube.measurements_path
+        assert "tube_measurements.yaml" in config.tube.measurements_path # type: ignore
+
 
     def test_action_registrations(self, provider):
         """Verify that build, config, and view actions are correctly registered."""

@@ -1,0 +1,23 @@
+# p[1] -> p[2] valve controller bottom plane
+- [443, 152, 521]
+- [652, 205, 500]
+
+# p(3) passenger exhaust input inlet start
+- [565, 356, 352]
+
+# p(4) -> p(5) direction of passenger exhaust input
+- [555, 327, 0]
+- [480, 343, 0]
+
+# p(6) driver exhaust input inlet start
+- [347, 279, 382]
+
+# p(7) -> p(8) direction of driver exhaust input
+- [0, 0, 0]
+- [-0.33871947, -0.90882745, 0.24351958]
+
+# p(9) driver exhaust output inlet start
+- [200, 0, 522.5]
+
+# p(10) passenger exhaust output inlet start
+- [895, 0, 522.5]
