@@ -30,10 +30,10 @@ class TubeConfigurator:
         self._tube_cache = {}
         self._path_cache = {}
         self.executor = executor or ThreadPoolExecutor()
-        self.logger = logger or Logger()
+        self.logger = logger or Logger(enabled=False)
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def get_part_position(self, tube: Part, path: Wire, off: float):
+    def get_part_position(self, tube: Part | Solid, path: Wire, off: float):
         """Get a suitable attachment position on the tube."""
         radius = min(self.tube_config.clamp_diameters) / 2
         self._tube_cache[id(tube)] = tube
@@ -44,7 +44,7 @@ class TubeConfigurator:
     @validate_call(config={"arbitrary_types_allowed": True})
     def get_orientation_normal(self, tube_id, path_id):
         """Return True if we should use midpoint_up, False if we should use midpoint_down."""
-        tube: Part = self._tube_cache[tube_id]
+        tube: Part | Solid = self._tube_cache[tube_id]
         path: Wire = self._path_cache[path_id]
         pos = path.position_at(0.5)
         midpoint_up = pos + Vector(0, 0, 1)
@@ -76,7 +76,7 @@ class TubeConfigurator:
         )
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def parts_not_touching(self, c_shape: Part, o_shape: Part, c_box: BoundBox, o_box: BoundBox):
+    def parts_not_touching(self, c_shape: Part | Solid, o_shape: Part | Solid, c_box: BoundBox, o_box: BoundBox):
         """Return True if the candidate does not intersect the other object."""
         # Bail early checks here before doing expensive boolean thing.
         if not self.shapes_overlap(c_box, o_box):
@@ -92,7 +92,7 @@ class TubeConfigurator:
         return [(angle % 360) for angle in range(start, end + 1, step)]
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def scan_angles(self, angles, candidate_factory, other_obj: Part, center: Vector):
+    def scan_angles(self, angles, candidate_factory, other_obj: Part | Solid, center: Vector):
         """Scan angle candidates and return the best angle based on distance."""
         best_angle = None
         best_distance = float("inf")

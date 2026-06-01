@@ -173,7 +173,7 @@ class Builder:
         center_deg: Annotated[float, Field(ge=0, le=360)] = 0,
         angle_deg: Annotated[float, Field(ge=0, le=360)] = 360,
         joint_space: Optional[float] = None,
-    ) -> Part:
+    ) -> Part | Solid:
         """Create a ring-shaped tube segment."""
         path = self.create_wire(name)
         p1, p2 = path.position_at(off), path.position_at(off + length / path.length)
@@ -202,7 +202,7 @@ class Builder:
         right: bool = False,
         offset_deg: Optional[float] = None,
         joint_space: Optional[float] = None,
-    ) -> Part:
+    ) -> Part | Solid:
         """Create a clamp bed on the tube."""
         length = self.config.tube.clamp_lengths[clamp_idx]
         outer_radius = self.config.tube.clamp_diameters[clamp_idx] / 2
@@ -250,7 +250,7 @@ class Builder:
         text: str,
         right: bool = False,
         offset_deg: Optional[float] = None,
-    ) -> Part:
+    ) -> Part | Solid:
         """Generate text geometry wrapped to the tube surface."""
         path = self.create_wire(name)
         off, angle_offset = self.config.tube.logo_text_positions[name]
@@ -283,7 +283,7 @@ class Builder:
         name: str,
         radius: Annotated[float | None, Field(ge=0)] = None,
         chamfer_radius: Annotated[float | None, Field(ge=0)] = None,
-    ) -> Part:
+    ) -> Part | Solid:
         """Build a cutting tool used to clean the internal tube volume."""
         path = self.create_wire(name)
         if radius is None:
@@ -549,22 +549,23 @@ def main(logger, args):
     config = AppConfig()
     manager = ProviderManager(config, logger=logger)
     builder = Builder(config, logger)
+    try:
+        if not args.env is None:
+            builder.config.dump_env(args.env)
+            logger.print(f"Saved environment to {args.env}", symbol="⚙️ ")
 
-    if not args.env is None:
-        builder.config.dump_env(args.env)
-        logger.print(f"Saved environment to {args.env}", symbol="⚙️ ")
-
-    if not args.diagram is None:
-        if not args.diagram is True:
-            gen_args["names"] = [args.diagram]
-        builder.generate_diagram(**gen_args)
-    elif not args.output is None:
-        if args.output:
-            gen_args["names"] = [args.output]
-        builder.generate_parts(**gen_args)
-    else:
-        builder.generate_all(**gen_args)
-    logger.done()
+        if not args.diagram is None:
+            if not args.diagram is True:
+                gen_args["names"] = [args.diagram]
+            builder.generate_diagram(**gen_args)
+        elif not args.output is None:
+            if args.output:
+                gen_args["names"] = [args.output]
+            builder.generate_parts(**gen_args)
+        else:
+            builder.generate_all(**gen_args)
+    finally:
+        logger.done()
 
 
 if __name__ == "__main__":

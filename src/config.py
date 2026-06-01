@@ -24,7 +24,7 @@ class Configurator:
         self._path_cache = {}
         self.executor = ThreadPoolExecutor()
 
-    def get_part_position(self, tube: Part, path: Wire, off: float):
+    def get_part_position(self, tube: Part | Solid, path: Wire, off: float):
         """Get a suitable attachment position on the tube."""
         radius = min(self.builder.config.tube.clamp_diameters) / 2
         self._tube_cache[id(tube)] = tube
@@ -34,7 +34,7 @@ class Configurator:
     @method_cache()
     def get_orientation_normal(self, tube_id, path_id):
         """Return True if we should use midpoint_up, False if we should use midpoint_down."""
-        tube: Part = self._tube_cache[tube_id]
+        tube: Part | Solid = self._tube_cache[tube_id]
         path: Wire = self._path_cache[path_id]
         pos = path.position_at(0.5)
         midpoint_up = pos + Vector(0, 0, 1)
@@ -211,20 +211,21 @@ def main(logger, args):
     manager = ProviderManager(config, logger=logger)
     builder = Builder(config, logger)
     configurator = Configurator(builder, config, logger)
+    try:
+        # Perform requested configurations, output the model, and exit.
+        if args.clamps:
+            configurator.configure_clamps(**gen_args)
+        elif args.logo_text:
+            configurator.configure_text_logos(**gen_args)
+        else:
+            configurator.configure_all(**gen_args)
 
-    # Perform requested configurations, output the model, and exit.
-    if args.clamps:
-        configurator.configure_clamps(**gen_args)
-    elif args.logo_text:
-        configurator.configure_text_logos(**gen_args)
-    else:
-        configurator.configure_all(**gen_args)
-
-    # Output the changed items only and exit.
-    if args.env:
-        config.dump_env(args.env)
-        logger.print(f"Saved environment to {args.env}", symbol="⚙️ ")
-    logger.done()
+        # Output the changed items only and exit.
+        if args.env:
+            config.dump_env(args.env)
+            logger.print(f"Saved environment to {args.env}", symbol="⚙️ ")
+    finally:
+        logger.done()
 
 
 if __name__ == "__main__":

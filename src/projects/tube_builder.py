@@ -164,7 +164,7 @@ class TubeBuilder:
         center_deg: Annotated[float, Field(ge=0, le=360)] = 0,
         angle_deg: Annotated[float, Field(ge=0, le=360)] = 360,
         joint_space: Optional[float] = None,
-    ) -> Part:
+    ) -> Part | Solid:
         """Create a ring-shaped tube segment."""
         path = self.create_wire(name)
         p1, p2 = path.position_at(off), path.position_at(off + length / path.length)
@@ -193,7 +193,7 @@ class TubeBuilder:
         right: bool = False,
         offset_deg: Optional[float] = None,
         joint_space: Optional[float] = None,
-    ) -> Part:
+    ) -> Part | Solid:
         """Create a clamp bed on the tube."""
         length = self.tube_config.clamp_lengths[clamp_idx]
         outer_radius = self.tube_config.clamp_diameters[clamp_idx] / 2
@@ -241,7 +241,7 @@ class TubeBuilder:
         text: str,
         right: bool = False,
         offset_deg: Optional[float] = None,
-    ) -> Part:
+    ) -> Part | Solid:
         """Generate text geometry wrapped to the tube surface."""
         path = self.create_wire(name)
         off, angle_offset = self.tube_config.logo_text_positions[name]
@@ -274,7 +274,7 @@ class TubeBuilder:
         name: str,
         radius: Annotated[float | None, Field(ge=0)] = None,
         chamfer_radius: Annotated[float | None, Field(ge=0)] = None,
-    ) -> Part:
+    ) -> Part | Solid:
         """Build a cutting tool used to clean the internal tube volume."""
         path = self.create_wire(name)
         if radius is None:
@@ -298,7 +298,7 @@ class TubeBuilder:
         name: Literal["driver", "passenger"],
         right: bool = False,
         tube_only: bool = False,
-    ) -> Part:
+    ) -> Part | Solid:
         """Build one half of the manifold assembly."""
         # Determine part parameters based on mode
         lap_joint = not tube_only
@@ -331,7 +331,7 @@ class TubeBuilder:
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
-    def create_prepared_part(self, name: Literal["driver", "passenger"], right: bool = False) -> Part:
+    def create_prepared_part(self, name: Literal["driver", "passenger"], right: bool = False) -> Part | Solid:
         """Prepare a part for STL export."""
 
         def facing_up(part):
