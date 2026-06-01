@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from typing import Any, TYPE_CHECKING, Optional, Dict
 from concurrent.futures import ThreadPoolExecutor
 from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES
-from model import method_cache
 from pydantic import validate_call
 from .target_list import TargetList
 
@@ -59,35 +58,10 @@ class ProviderOrchestrator(Orchestrator):
         subassemblies: tuple[Subassembly, ...] = (),
         modes: tuple[Mode, ...] = (Mode.DEFAULT,),
     ) -> Any:
-        """Perform a build action, routing through the cache if appropriate."""
+        """Perform the requested build action."""
         # Diagram action does not use subassemblies during build execution
-        exec_subs = () if action == Action.DIAGRAM else subassemblies
-
-        if action == Action.CONFIG:
-            return self._execute_uncached(targets, action, exec_subs, modes)
-
-        return self._execute_cached(targets, action, exec_subs, modes)
-
-    @method_cache()
-    def _execute_cached(
-        self,
-        targets: tuple[str, ...],
-        action: Action,
-        subassemblies: tuple[Subassembly, ...] = (),
-        modes: tuple[Mode, ...] = (Mode.DEFAULT,),
-    ) -> Any:
-        """Perform a cached build action."""
-        return self._execute_uncached(targets, action, subassemblies, modes)
-
-    def _execute_uncached(
-        self,
-        targets: tuple[str, ...],
-        action: Action,
-        subassemblies: tuple[Subassembly, ...] = (),
-        modes: tuple[Mode, ...] = (Mode.DEFAULT,),
-    ) -> Any:
-        """Perform the actual build action without caching."""
-        self.pre_handler(targets, action, subassemblies, modes)
+        handler_subs = () if action == Action.DIAGRAM else subassemblies
+        self.pre_handler(targets, action, handler_subs, modes)
 
         if action == Action.DIAGRAM:
             handler = self.provider.build[Action.DIAGRAM]
@@ -98,8 +72,8 @@ class ProviderOrchestrator(Orchestrator):
             return results[0]
 
         # Flatten units of work into (target, subassembly, mode) triples
-        exec_subs = list(subassemblies) if subassemblies else [None]
-        work = [(t, sa, m) for t in targets for sa in exec_subs for m in modes]
+        work_subs = list(subassemblies) if subassemblies else [None]
+        work = [(t, sa, m) for t in targets for sa in work_subs for m in modes]
 
         if action == Action.VIEW:
 
@@ -128,7 +102,7 @@ class ProviderOrchestrator(Orchestrator):
 
         # Group results back by target for VIEW and BUILD
         results = []
-        group_size = len(exec_subs) * len(modes)
+        group_size = len(work_subs) * len(modes)
         for i in range(len(targets)):
             group = raw_results[i * group_size : (i + 1) * group_size]
             results.append(group[0] if group_size == 1 else group)
