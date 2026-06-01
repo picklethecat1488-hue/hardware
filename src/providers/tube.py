@@ -37,7 +37,7 @@ class TubeProvider(Provider):
         """A mapping of Modes to configuration handler methods."""
         return {
             Mode.DEFAULT: self._config_default,
-            Mode.BARE: self._config_bare,
+            Mode.MOUNT: self._config_mount,
             Mode.TEXT: self._config_text,
         }
 
@@ -69,8 +69,8 @@ class TubeProvider(Provider):
         """Skeleton for default configuration logic."""
         pass
 
-    def _config_bare(self, target: str, subassemblies: list[Subassembly]) -> None:
-        """Skeleton for bare configuration logic."""
+    def _config_mount(self, target: str, subassemblies: list[Subassembly]) -> None:
+        """Skeleton for mount configuration logic."""
         pass
 
     def _config_text(self, target: str, subassemblies: list[Subassembly]) -> None:
