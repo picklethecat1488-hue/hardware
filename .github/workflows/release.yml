@@ -21,6 +21,8 @@ jobs:
           channels: conda-forge
           environment-file: environment.yml
           activate-environment: cq
+          use-mamba: true
+          cache-environment: true
 
       - name: Run tests
         # Set PYTHONPATH so pytest can find modules in src/

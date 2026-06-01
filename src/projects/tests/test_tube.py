@@ -52,7 +52,7 @@ class TestTubeProvider:
     def test_measurements_path_override(self, provider):
         """Verify that ProviderManager syncs the provider's specific measurements path."""
         config = AppConfig()
-        # Before manager: uses AppConfig default
+        # Before manager: uses TubeConfig default
         assert "measurements.yml" in config.tube.measurements_path  # type: ignore
 
         mgr = ProviderManager(config, providers=[provider], bootstrap=False)

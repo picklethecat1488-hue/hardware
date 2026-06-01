@@ -1,0 +1,52 @@
+name: CI Gate Validation
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Combined setup, mamba activation, and automated caching
+      - name: Setup Mambaforge & Cache Environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          mamba-version: "*"
+          channels: conda-forge
+          environment-file: environment.yml
+          activate-environment: cq
+          use-mamba: true
+          cache-environment: true # <--- Enables automated caching based on environment.yml hash
+
+      - name: Install Linting Tools
+        shell: bash -el {0}
+        run: pip install ruff
+
+      - name: Check Python Syntax Errors
+        shell: bash -el {0}
+        run: |
+          echo "Checking for compilation and syntax errors..."
+          python -m compileall -q .
+
+      - name: Check Code Formatting
+        shell: bash -el {0}
+        run: |
+          echo "Checking formatting rules via Ruff..."
+          ruff format --check .
+
+      - name: Run Ruff Check
+        shell: bash -el {0}
+        run: ruff check .
+
+      - name: Run Pytest
+        shell: bash -el {0}
+        env:
+          PYTHONPATH: src
+        run: |
+          set -o pipefail
+          pytest

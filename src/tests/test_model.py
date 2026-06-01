@@ -148,8 +148,6 @@ class TestModel:
     def test_tube_measurements_default_load(self):
         """Verify that the default tube measurements file loads correctly."""
         config = AppConfig()
-        # Verify the path defaults to the standard measurements.yml
-        assert "measurements.yml" in config.tube.measurements_path
         # Verify measurements are loaded and contain expected keys (e.g. 6 for driver inlet)
         assert 6 in config.tube.measurements
         assert isinstance(config.tube.measurements[6], np.ndarray)
@@ -178,8 +176,3 @@ class TestModel:
         measurements = config.tube.measurements
         assert measurements[1][2] == pytest.approx(100)
         assert measurements[6][2] == pytest.approx(100 - 31.75)
-
-        # Test fallback to AppConfig default
-        config_fallback = AppConfig(measurements_path=str(yml_file), _env_file=None)  # type: ignore
-        assert config_fallback.tube.measurements_path == str(yml_file)
-        assert config_fallback.tube.measurements[6][2] == pytest.approx(100 - 31.75)
