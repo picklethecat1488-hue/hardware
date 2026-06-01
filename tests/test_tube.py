@@ -21,7 +21,7 @@ class TestTubeProvider:
         """
         mock_manifest = {
             "driver": {
-                Action.CONFIG: {"modes": [Mode.DEFAULT, Mode.MOUNT, Mode.TEXT]},
+                Action.CONFIG: {"modes": [Mode.DEFAULT, Mode.MOUNT, Mode.TEXT, Mode.BARE]},
                 Action.PART: {
                     "modes": [Mode.DEFAULT, Mode.BARE],
                     "subassemblies": [Subassembly.LEFT, Subassembly.RIGHT],
@@ -50,13 +50,12 @@ class TestTubeProvider:
         """Verify that ProviderManager syncs the provider's specific measurements path."""
         config = AppConfig()
         # Before manager: uses AppConfig default
-        assert "measurements.yml" in config.tube.measurements_path # type: ignore
+        assert "measurements.yml" in config.tube.measurements_path  # type: ignore
 
         mgr = ProviderManager(config, providers=[provider], bootstrap=False)
         mgr.load_configs()
         # After manager: uses TubeProvider's specific path
-        assert "tube_measurements.yaml" in config.tube.measurements_path # type: ignore
-
+        assert "tube_measurements.yaml" in config.tube.measurements_path  # type: ignore
 
     def test_action_registrations(self, provider):
         """Verify that build, config, and view actions are correctly registered."""
@@ -68,7 +67,7 @@ class TestTubeProvider:
 
         # Config modes
         assert Mode.DEFAULT in provider.config
-        assert Mode.BARE in provider.config
+        assert Mode.MOUNT in provider.config
         assert Mode.TEXT in provider.config
 
         # View rooms
@@ -108,7 +107,7 @@ class TestTubeProvider:
 
     def test_unsupported_config_mode_error(self, provider):
         """Verify that requesting an unregistered config mode raises a ValueError."""
-        # Mode.MOUNT is in manifest but not in TubeProvider.config registry skeleton
-        targets = TargetList(provider, ["driver"], action=Action.CONFIG, modes=[Mode.MOUNT])
-        with pytest.raises(ValueError, match="No config handler registered for mode 'mount' in tube"):
+        # Mode.BARE is in manifest but not in TubeProvider.config registry skeleton
+        targets = TargetList(provider, ["driver"], action=Action.CONFIG, modes=[Mode.BARE])
+        with pytest.raises(ValueError, match="No config handler registered for mode 'bare' in tube"):
             provider.run(targets)

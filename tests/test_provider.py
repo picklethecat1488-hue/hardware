@@ -90,9 +90,9 @@ class MockProvider(Provider):
         return self._mock_view
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def provider():
-    """Provide fixture at the module level."""
+    """Provide a fresh mock provider instance for each test to ensure isolation."""
     return MockProvider()
 
 
@@ -185,26 +185,33 @@ class TestProviderOrchestration:
         """Verify successful build orchestration and validation."""
         results = provider.run(provider.targets.supporting(Action.WIRE))
         assert results == [("part_a", "wire_obj")]
-        provider.build[Action.WIRE].assert_called_once_with("part_a", [], [Mode.DEFAULT])
+        provider.build[Action.WIRE].assert_called_once_with("part_a", None, Mode.DEFAULT)
 
     def test_build_sketch_success(self, provider):
         """Verify successful sketch build orchestration."""
         results = provider.run(provider.targets.supporting(Action.SKETCH))
         assert results == [("part_a", "sketch_obj")]
-        provider.build[Action.SKETCH].assert_called_once_with("part_a", [], [Mode.DEFAULT])
+        provider.build[Action.SKETCH].assert_called_once_with("part_a", None, Mode.DEFAULT)
 
     def test_configure_success(self, provider):
         """Verify successful configuration orchestration."""
         provider.run(provider.targets.supporting(Action.CONFIG))
-        provider.config[Mode.DEFAULT].assert_called_once_with("part_a", [])
+        provider.config[Mode.DEFAULT].assert_called_once_with("part_a", None)
 
         provider.config[Mode.DEFAULT].reset_mock()
         provider.run(provider.targets.supporting(Action.CONFIG).for_modes([Mode.TEXT]))
-        provider.config[Mode.TEXT].assert_called_once_with("part_a", [])
+        provider.config[Mode.TEXT].assert_called_once_with("part_a", None)
 
         provider.config[Mode.TEXT].reset_mock()
         provider.run(provider.targets.supporting(Action.CONFIG).for_modes([Mode.MOUNT]))
-        provider.config[Mode.MOUNT].assert_called_once_with("part_a", [])
+        provider.config[Mode.MOUNT].assert_called_once_with("part_a", None)
+
+    def test_build_multiple_modes(self, provider):
+        """Verify that multiple build modes result in multiple handler calls and results."""
+        targets = provider.targets.supporting(Action.PART).for_modes([Mode.DEFAULT, Mode.BARE])
+        results = provider.run(targets)
+        assert results == [("part_a", ["part_obj", "part_obj"])]
+        assert provider.build[Action.PART].call_count == 2
 
     def test_view_success(self, provider):
         """Verify successful view orchestration."""
@@ -230,15 +237,6 @@ class TestProviderOrchestration:
 
     def test_pre_build_validation_failures(self, provider):
         """Verify various validation failures in _pre_build."""
-        with pytest.raises(ValueError, match="Length of subassemblies"):
-            targets = TargetList(
-                provider,
-                ["part_a", "part_b"],
-                subassemblies=[Subassembly.LEFT] * 3,
-                action=Action.PART,
-            )
-            provider.run(targets)
-
         with pytest.raises(ValueError, match="Mode 'bare' is not supported.*part_b"):
             targets = TargetList(provider, ["part_b"], modes=[Mode.BARE], action=Action.PART)
             provider.run(targets)

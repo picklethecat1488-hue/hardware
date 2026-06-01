@@ -29,8 +29,17 @@ class TargetList(list[str]):
     def __str__(self) -> str:
         """Return a string representation of the target list for logging."""
         p_name = getattr(self.provider, "name", self.provider.__class__.__name__.lower())
-        name = f"{p_name.title()}Targets"
-        return f"{name}(targets={super().__repr__()}, action={self.action}, subassemblies={self.subassemblies}, modes={self.modes})"
+
+        paths = []
+        for i, target in enumerate(self):
+            # Router targets are already "provider/target"
+            path = target if "/" in target else f"{p_name}/{target}"
+            if self.subassemblies:
+                sub = self.subassemblies[i] if len(self.subassemblies) == len(self) else self.subassemblies[0]
+                path = f"{path}/{sub}"
+            paths.append(path)
+
+        return f"Targets({paths}, modes={self.modes})"
 
     def __repr__(self) -> str:
         """Return a string representation for debugging."""
@@ -47,12 +56,19 @@ class TargetList(list[str]):
         )
 
     def for_subassemblies(self, subassemblies: list[Subassembly]) -> "TargetList":
-        """Filter targets that support any of the specified subassemblies."""
+        """Filter targets that support all of the specified subassemblies."""
 
         def target_supports_subs(t: str) -> bool:
-            actions_dict = self.provider.manifest.get(t, {})
-            for action_cfg in actions_dict.values():
-                if isinstance(action_cfg, dict) and any(s in action_cfg.get(SUBASSEMBLIES, []) for s in subassemblies):
+            manifest = self.provider.manifest.get(t, {})
+            if self.action:
+                action_cfg = manifest.get(self.action)
+                if not isinstance(action_cfg, dict):
+                    return False
+                supported = action_cfg.get(SUBASSEMBLIES, [])
+                return all(s in supported for s in subassemblies)
+
+            for action_cfg in manifest.values():
+                if isinstance(action_cfg, dict) and all(s in action_cfg.get(SUBASSEMBLIES, []) for s in subassemblies):
                     return True
             return False
 
@@ -65,13 +81,19 @@ class TargetList(list[str]):
         )
 
     def for_modes(self, modes: list[Mode]) -> "TargetList":
-        """Filter targets that support any of the specified modes."""
+        """Filter targets that support all of the specified modes."""
 
         def target_supports_modes(t: str) -> bool:
-            actions_dict = self.provider.manifest.get(t, {})
-            # Check if any supported action for this target offers any of the requested modes
-            for action_cfg in actions_dict.values():
-                if isinstance(action_cfg, dict) and any(m in action_cfg.get(MODES, []) for m in modes):
+            manifest = self.provider.manifest.get(t, {})
+            if self.action:
+                action_cfg = manifest.get(self.action)
+                if not isinstance(action_cfg, dict):
+                    return False
+                supported = action_cfg.get(MODES, [])
+                return all(m in supported for m in modes)
+
+            for action_cfg in manifest.values():
+                if isinstance(action_cfg, dict) and all(m in action_cfg.get(MODES, []) for m in modes):
                     return True
             return False
 
