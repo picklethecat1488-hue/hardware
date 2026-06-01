@@ -2,6 +2,7 @@
 
 from typing import Any, Literal, cast, Optional
 from functools import cached_property
+from pathlib import Path
 import numpy as np
 from pydantic import BaseModel, Field
 from build123d import Vector
