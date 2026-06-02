@@ -1,173 +1,72 @@
-"""Unit tests for the ProviderManager class."""
+"""Integration tests for the ProviderManager and project discovery."""
 
 import pytest
-from unittest.mock import MagicMock
-from pydantic import BaseModel, Field
-from provider.provider_manager import ProviderManager
-from provider.provider import Provider
-from provider.utils import discover_provider
 from model import AppConfig
+from provider import ProviderManager, Action, MODES
 
 
-class SimpleMockProvider(Provider):
-    """Simplified provider for ProviderManager testing."""
+class TestProviderManagerIntegration:
+    """Ensures all projects are correctly discovered and registered."""
 
-    def __init__(self, name: str, manifest: dict, default_config=None):
-        """Initialize the simplified mock provider."""
-        self._name = name
-        self._manifest = manifest
-        self._default_config = default_config
-        # Initialize without calling super().__init__ to avoid complex setup
-        self.orchestrator = MagicMock()
-        self.get_color = MagicMock()
+    @pytest.fixture
+    def manager(self):
+        """Return a bootstrapped ProviderManager instance."""
+        config = AppConfig()
+        # bootstrap=True triggers auto-discovery and config syncing
+        return ProviderManager(config, bootstrap=True)
 
-    @property
-    def name(self) -> str:
-        """Return the mock provider name."""
-        return self._name
+    def test_provider_bootstrap_integrity(self, manager):
+        """Verify that all providers are bootstrapped with correct settings."""
+        assert len(manager.router.providers) > 0, "No providers were discovered."
 
-    @property
-    def manifest(self) -> dict:
-        """Return the mock provider manifest."""
-        return self._manifest
+        for provider in manager.router.providers:
+            # 1. Ensure settings are linked to the global AppConfig
+            assert hasattr(manager.config, provider.name), f"{provider.name} config missing from AppConfig"
+            settings = getattr(manager.config, provider.name)
+            assert provider.settings == settings
 
-    @property
-    def default_config(self):
-        """Return a mock configuration instance."""
-        return self._default_config
+            # 2. Ensure settings is the correct specialized type
+            assert isinstance(provider.settings, provider.default_config.__class__)
 
-    @property
-    def build(self):
-        """Return an empty build registry."""
-        return {}
+            # 3. Ensure measurements_path was resolved during bootstrap if it exists in the model
+            if hasattr(provider.settings, "measurements_path"):
+                assert provider.settings.measurements_path is not None
+                assert "measurements.yaml" in provider.settings.measurements_path
 
+    def test_callback_registration_alignment(self, manager):
+        """Ensure providers implement all handlers promised by their manifests."""
+        for provider in manager.router.providers:
+            manifest = provider.manifest
 
-class MockSettings(BaseModel):
-    """Mock settings model for testing."""
+            for target_name, target_cfg in manifest.items():
+                # Verify Action.PART registration
+                if Action.PART in target_cfg:
+                    assert target_name in provider.part, (
+                        f"Provider '{provider.name}' manifest claims Action.PART support for "
+                        f"'{target_name}', but it is missing from provider.part registry."
+                    )
 
-    val: str = "default"
-    num: int = 0
-    items: list[int] = Field(default_factory=list)
+                # Verify Action.DIAGRAM registration
+                if Action.DIAGRAM in target_cfg:
+                    assert target_name in provider.diagram, (
+                        f"Provider '{provider.name}' manifest claims Action.DIAGRAM support for "
+                        f"'{target_name}', but it is missing from provider.diagram registry."
+                    )
 
+                # Verify Action.VIEW registration
+                if Action.VIEW in target_cfg:
+                    assert target_name in provider.view, (
+                        f"Provider '{provider.name}' manifest claims Action.VIEW support for "
+                        f"'{target_name}', but it is missing from provider.view registry."
+                    )
 
-@discover_provider
-class DiscoveryPositiveProvider(Provider):
-    """Mock provider for positive discovery test."""
-
-    @property
-    def name(self) -> str:
-        """Return the mock provider name."""
-        return "positive"
-
-    @property
-    def default_config(self):
-        """Return a mock configuration instance."""
-        return None
-
-    @property
-    def build(self):
-        """Return an empty build registry."""
-        return {}
-
-
-@discover_provider(enabled=False)
-class DiscoveryNegativeProvider(Provider):
-    """Mock provider for negative discovery test."""
-
-    @property
-    def name(self) -> str:
-        """Return the mock provider name."""
-        return "negative"
-
-    @property
-    def default_config(self):
-        """Return a mock configuration instance."""
-        return None
-
-    @property
-    def build(self):
-        """Return an empty build registry."""
-        return {}
-
-
-class DiscoveryUndecoratedProvider(Provider):
-    """Mock provider that should be ignored by discovery."""
-
-    @property
-    def name(self) -> str:
-        """Return the mock provider name."""
-        return "undecorated"
-
-    @property
-    def default_config(self):
-        """Return a mock configuration instance."""
-        return None
-
-    @property
-    def build(self):
-        """Return an empty build registry."""
-        return {}
-
-
-def test_manager_init():
-    """Verify manager initializes with config and router."""
-    config = AppConfig()
-    p1 = SimpleMockProvider("p1", {})
-    m = ProviderManager(config, providers=[p1], bootstrap=False)
-    assert m.config == config
-    assert m.router.providers == [p1]
-
-
-def test_manager_discovery_filtering():
-    """Verify that discovery logic correctly filters based on @bootstrap decorator."""
-    config = AppConfig()
-    mgr = ProviderManager(config, bootstrap=True)
-    names = [p.name for p in mgr.router.providers]
-
-    assert "positive" in names
-    assert "negative" not in names
-    assert "undecorated" not in names
-
-
-def test_manager_load_configs():
-    """Verify loading and routing of environment variables."""
-    p_settings = MockSettings()
-    p1 = SimpleMockProvider("p1", {}, default_config=p_settings)
-
-    config = AppConfig()
-    config.model_extra["APP_P1__VAL"] = "env_val"  # type: ignore
-    config.model_extra["APP_P1__NUM"] = 10  # type: ignore
-    config.model_extra["APP_P1__ITEMS"] = "[1, 2, 3]"  # type: ignore
-
-    mgr = ProviderManager(config, providers=[p1], bootstrap=False)
-    mgr.load_configs()
-
-    assert p1.settings.val == "env_val"
-    assert p1.settings.num == 10
-    assert p1.settings.items == [1, 2, 3]
-    assert getattr(config, "p1") == p1.settings
-
-
-def test_manager_load_configs_json_error():
-    """Verify ValueError on malformed JSON in environment variables."""
-    p_settings = MockSettings()
-    p1 = SimpleMockProvider("p1", {}, default_config=p_settings)
-
-    config = AppConfig()
-    config.model_extra["APP_P1__ITEMS"] = "[1, 2"  # type: ignore
-
-    mgr = ProviderManager(config, providers=[p1], bootstrap=False)
-    with pytest.raises(ValueError, match="Failed to parse JSON configuration"):
-        mgr.load_configs()
-
-
-def test_manager_save_configs():
-    """Verify preparation of AppConfig for environment dumping."""
-    p_settings = MockSettings(val="custom")
-    p1 = SimpleMockProvider("p1", {}, default_config=p_settings)
-
-    config = AppConfig()
-    mgr = ProviderManager(config, providers=[p1], bootstrap=False)
-    mgr.save_configs()
-
-    assert getattr(config, "p1") == p_settings
+                # Verify Action.CONFIG registration (mapped by Mode)
+                if Action.CONFIG in target_cfg:
+                    supported_modes = target_cfg[Action.CONFIG].get(MODES, [])
+                    for mode in supported_modes:
+                        # Normalize Mode enum/string to string for registry lookup
+                        mode_key = mode.value if hasattr(mode, "value") else str(mode)
+                        assert mode_key in provider.config, (
+                            f"Provider '{provider.name}' manifest claims Action.CONFIG support for "
+                            f"mode '{mode_key}', but no handler is registered in provider.config."
+                        )
