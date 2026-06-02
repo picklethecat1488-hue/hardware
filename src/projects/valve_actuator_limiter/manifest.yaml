@@ -1,0 +1,7 @@
+limiter_plate:
+  part:
+    modes: [default]
+    subassemblies: [left, right]
+  color: [0.3, 0.3, 0.8, 1.0]
+  diagram:
+    modes: [default]
