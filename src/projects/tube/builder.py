@@ -358,6 +358,11 @@ class TubeBuilder:
             return (0, 0, -part.bounding_box().min.Z)
 
         part = self.create_part(name, right=right)
+
+        # Ensure we have a single manipulatable object if the part is fragmented
+        if isinstance(part, ShapeList):
+            part = Compound(part.solids())
+
         if not facing_up(part):
             part = part.rotate(Axis.X, 180)
         axis, angle_deg = rotation(part)

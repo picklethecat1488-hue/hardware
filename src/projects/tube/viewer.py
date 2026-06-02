@@ -7,6 +7,7 @@ from build123d import *  # type: ignore
 from model.app_config import AppConfig
 from projects_config import TubeConfig
 from .builder import TubeBuilder
+from .configurator import TubeConfigurator
 
 
 class TubeViewer:
@@ -15,12 +16,14 @@ class TubeViewer:
     def __init__(
         self,
         builder: TubeBuilder,
+        configurator: TubeConfigurator,
         config: AppConfig,
         tube_config: TubeConfig,
         executor: Optional[ThreadPoolExecutor] = None,
     ):
         """Initialize the viewer with a builder and config."""
         self.builder = builder
+        self.configurator = configurator
         self.config = config
         self.tube_config = tube_config
         self.executor = executor or ThreadPoolExecutor()
@@ -41,15 +44,27 @@ class TubeViewer:
         rgb = color_map.get(color_name, (1.0, 1.0, 1.0))
         return (*rgb, alpha)
 
+    @property
+    def bound_box(self) -> Part:
+        """Return the axis-aligned build bounding box."""
+        x_len = max(self.tube_config.x_bounds) - min(self.tube_config.x_bounds)
+        y_len = max(self.tube_config.y_bounds) - min(self.tube_config.y_bounds)
+        z_len = max(self.tube_config.z_bounds) - min(self.tube_config.z_bounds)
+        center = (
+            min(self.tube_config.x_bounds) + x_len / 2,
+            min(self.tube_config.y_bounds) + y_len / 2,
+            min(self.tube_config.z_bounds) + z_len / 2,
+        )
+        with BuildPart() as bounds:
+            Box(x_len, y_len, z_len)
+            cast(Part, bounds.part).move(Location(center))
+        return cast(Part, bounds.part)
+
     def create_part_position_point(self, name: str, offset: float, right: bool = False):
         """Build a part position point marker at the given offset."""
         tube = self.builder.create_part(name, right=right, tube_only=True)
         path = self.builder.create_wire(name)
-        radius = min(self.tube_config.clamp_diameters) / 2
-        pos = path.position_at(offset)
-        # Orientation is normal (up) if midpoint_up is closer to solid center than path position.
-        normal = (tube.center() - (pos + Vector(0, 0, 1))).length < (tube.center() - pos).length
-        center = pos + (Vector(0, 0, radius) if normal else Vector(0, 0, -radius))
+        center = self.configurator.get_part_position(tube, path, offset)
         return Pos(center) * Sphere(radius=10)
 
     def create_solid_center_point(self, name: str, right: bool = False):
@@ -75,6 +90,7 @@ class TubeViewer:
                         1.0,
                     )
                 to_show[f"{name}_{side}_center"] = (self.create_solid_center_point(name, right=right), "blue", 1.0)
+        to_show["bounds"] = (self.bound_box, "grey", 0.2)
         return to_show
 
     def show_overlay_room(self):
@@ -87,6 +103,7 @@ class TubeViewer:
                 side = "right" if right else "left"
                 color = ("red" if right else "green") if name == "driver" else ("blue" if right else "orange")
                 to_show[f"{name}_{side}"] = (self.builder.create_part(name, right=right, tube_only=False), color, 1.0)
+        to_show["bounds"] = (self.bound_box, "grey", 0.2)
         return to_show
 
     def show_profiles_room(self):

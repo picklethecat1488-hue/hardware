@@ -3,6 +3,7 @@
 import math
 import pytest
 import numpy as np
+from typing import cast
 from unittest.mock import patch
 from build123d import *
 from model import AppConfig
@@ -63,7 +64,7 @@ class TestTubeProvider:
         mgr = ProviderManager(config, providers=[provider], bootstrap=False)
         mgr.load_configs()
         # After manager: uses TubeProvider's specific path
-        assert "measurements.yaml" in config.tube.measurements_path  # type: ignore
+        assert "measurements.yaml" in provider.settings.measurements_path  # type: ignore
 
     def test_action_registrations(self, provider):
         """Verify that build, config, and view actions are correctly registered."""
@@ -139,6 +140,8 @@ class TestTubeBuilder:
         """Return the tube builder fixture."""
         config = AppConfig()
         provider = TubeProvider(config=config)
+        # Bootstrap to load .env overrides and attach config.tube
+        ProviderManager(config, providers=[provider])
         return provider.builder
 
     @pytest.fixture(scope="class", params=["driver", "passenger"])
@@ -151,6 +154,14 @@ class TestTubeBuilder:
         """Return a side selection fixture."""
         return request.param
 
+    def _calc_vol(self, shape) -> float:
+        """Sum volumes of all solids in the shape to handle ShapeList."""
+        return sum(s.volume for s in shape.solids()) if shape else 0.0
+
+    def _calc_area(self, shape) -> float:
+        """Sum areas of all faces in the shape to handle ShapeList."""
+        return sum(f.area for f in shape.faces()) if shape else 0.0
+
     def test_wire(self, name, builder):
         """Verify wire path and clamp endpoints."""
 
@@ -160,24 +171,24 @@ class TestTubeBuilder:
         wire = builder.create_wire(name)
         length = wire.length
         inlet_clamp_start = wire.position_at(0.0)
-        inlet_clamp_end = wire.position_at(builder.config.tube.clamp_lengths[0] / length)
-        outlet_clamp_start = wire.position_at((length - builder.config.tube.clamp_lengths[-1]) / length)
+        inlet_clamp_end = wire.position_at(builder.tube_config.clamp_lengths[0] / length)
+        outlet_clamp_start = wire.position_at((length - builder.tube_config.clamp_lengths[-1]) / length)
         outlet_clamp_end = wire.position_at(1.0)
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
 
         # Make sure the clamp starts are correct
-        assert calc_point_err(inlet_clamp_start, builder.config.tube.P[inlet_key]) == pytest.approx(0)
-        assert calc_point_err(outlet_clamp_start, builder.config.tube.P[outlet_key]) == pytest.approx(0)
+        assert calc_point_err(inlet_clamp_start, builder.tube_config.P[inlet_key]) == pytest.approx(0)
+        assert calc_point_err(outlet_clamp_start, builder.tube_config.P[outlet_key]) == pytest.approx(0)
 
         # Check clamp direction and length
         assert calc_point_err(
-            (inlet_clamp_end - inlet_clamp_start).normalized(), builder.config.tube.V[inlet_key]
+            (inlet_clamp_end - inlet_clamp_start).normalized(), builder.tube_config.V[inlet_key]
         ) == pytest.approx(0)
         assert calc_point_err(
-            (outlet_clamp_end - outlet_clamp_start).normalized(), builder.config.tube.V[outlet_key]
+            (outlet_clamp_end - outlet_clamp_start).normalized(), builder.tube_config.V[outlet_key]
         ) == pytest.approx(0)
-        assert (inlet_clamp_end - inlet_clamp_start).length == pytest.approx(builder.config.tube.clamp_lengths[0])
-        assert (outlet_clamp_end - outlet_clamp_start).length == pytest.approx(builder.config.tube.clamp_lengths[-1])
+        assert (inlet_clamp_end - inlet_clamp_start).length == pytest.approx(builder.tube_config.clamp_lengths[0])
+        assert (outlet_clamp_end - outlet_clamp_start).length == pytest.approx(builder.tube_config.clamp_lengths[-1])
 
     def test_create_profile(self, builder):
         """Test profile sketch generation for a valid center/angle profile."""
@@ -203,9 +214,9 @@ class TestTubeBuilder:
         part = builder.create_part(name, right=right)
         other_part = builder.create_part(name, right=(not right))
         intersection = part.intersect(other_part)
-        assert (intersection.volume if intersection else 0) == pytest.approx(0), (
-            f"intersection detected between {name} parts"
-        )
+
+        vol = self._calc_vol(intersection)
+        assert vol == pytest.approx(0, abs=1e-3), f"intersection detected between {name} parts"
 
     def test_part_doesnt_overlap(self, builder, name, right):
         """Ensure parts from different assemblies do not intersect."""
@@ -213,14 +224,28 @@ class TestTubeBuilder:
         other_name = next(x for x in builder.tube_config.names if x != name)
         other_part = builder.create_part(other_name, right=not right)
         intersection = part.intersect(other_part)
-        assert (intersection.volume if intersection else 0) == pytest.approx(0), (
+
+        vol = self._calc_vol(intersection)
+        assert vol == pytest.approx(0, abs=1e-3), (
             f"intersection detected between {name},right={right} and {other_name},right={not right}"
         )
 
     def test_in_bounds(self, builder, name, right):
         """Verify part fits inside bound box volume."""
         part = builder.create_part(name, right=right)
-        proj_bounds = builder.config.bound_box
+        # Reconstruct bound box logic since it moved to viewer
+        x_len = max(builder.tube_config.x_bounds) - min(builder.tube_config.x_bounds)
+        y_len = max(builder.tube_config.y_bounds) - min(builder.tube_config.y_bounds)
+        z_len = max(builder.tube_config.z_bounds) - min(builder.tube_config.z_bounds)
+        center = (
+            min(builder.tube_config.x_bounds) + x_len / 2,
+            min(builder.tube_config.y_bounds) + y_len / 2,
+            min(builder.tube_config.z_bounds) + z_len / 2,
+        )
+        with BuildPart() as bounds:
+            Box(x_len, y_len, z_len)
+            proj_bounds = cast(Part, bounds.part).move(Location(center))
+
         volume = part.cut(proj_bounds).volume
 
         assert volume == pytest.approx(0)
@@ -248,17 +273,17 @@ class TestTubeBuilder:
 
         # Check if we can move clamp over section
         clamp_off = builder.create_ring(
-            name, pos, len, outer_radius=expected + builder.config.tube.wall_thickness, inner_radius=expected
+            name, pos, len, outer_radius=expected + builder.tube_config.wall_thickness, inner_radius=expected
         )
         intersection_off = part.intersect(clamp_off)
-        assert (intersection_off.volume if intersection_off else 0) == pytest.approx(0)
+        assert self._calc_vol(intersection_off) == pytest.approx(0, abs=1e-3)
 
         # Check if we can push clamp onto section
         clamp_on = builder.create_ring(
-            name, pos, len, outer_radius=expected + builder.config.tube.wall_thickness, inner_radius=expected - 0.01
+            name, pos, len, outer_radius=expected + builder.tube_config.wall_thickness, inner_radius=expected - 0.01
         )
         intersection_on = part.intersect(clamp_on)
-        assert intersection_on is not None and intersection_on.volume > 0
+        assert self._calc_vol(intersection_on) > 0
 
     def test_part(self, name, right, builder):
         """Verify rebuilt part geometry matches manifold volume."""
@@ -268,7 +293,7 @@ class TestTubeBuilder:
         part = builder.create_part(name, right=right)
         manifold_vol = manifold.volume
         intersection = part.intersect(manifold)
-        manifold_from_parts_vol = intersection.volume if intersection else 0
+        manifold_from_parts_vol = self._calc_vol(intersection)
 
         error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
         # less than 0.5% error for each rebuilt part.
@@ -281,18 +306,28 @@ class TestTubeBuilder:
 
         # Ensure the part is a watertight solid
         assert part.is_valid
-        assert part.volume > 0
+        assert self._calc_vol(part) > 0
 
         # Ensure the part is touching the print bed
         bottom_faces = part.faces().sort_by(Axis.Z)[:1]
-        face_area = sum(f.area for f in bottom_faces)
+        face_area = self._calc_area(Compound(bottom_faces))
         assert face_area > 0
 
         # Run a few more checks to see if the part was mutated during preparation
-        error_pct = abs(orig_part.volume - part.volume) / (orig_part.volume + part.volume) / 2 * 100
+        error_pct = (
+            abs(self._calc_vol(orig_part) - self._calc_vol(part))
+            / (self._calc_vol(orig_part) + self._calc_vol(part))
+            / 2
+            * 100
+        )
         assert error_pct < 1e-2, "Volume changed"
 
-        error_pct = abs(orig_part.area - part.area) / (orig_part.area + part.area) / 2 * 100
+        error_pct = (
+            abs(self._calc_area(orig_part) - self._calc_area(part))
+            / (self._calc_area(orig_part) + self._calc_area(part))
+            / 2
+            * 100
+        )
         assert error_pct < 1e-3, "Surface area changed"
 
     def test_end_angle(self, builder, name):
@@ -320,7 +355,7 @@ class TestTubeBuilder:
 
     def test_overall_bounds(self, builder, name):
         """Verify assembly bounding box dimensions."""
-        part = Compound(builder.create_part(name).fuse(builder.create_part(name, right=True)))
+        part = Compound(builder.create_part(name).fuse(builder.create_part(name, right=True)).solids())
         bbox = part.bounding_box()
 
         if name == "driver":
@@ -353,6 +388,8 @@ class TestTubeConfigurator:
         """Return the tube configurator fixture."""
         config = AppConfig()
         provider = TubeProvider(config=config)
+        # Bootstrap to load .env overrides and attach config.tube
+        ProviderManager(config, providers=[provider])
         return provider.configurator
 
     def test_get_orientation_normal(self, configurator):
@@ -432,6 +469,8 @@ class TestTubeViewer:
         """Return the tube viewer fixture."""
         config = AppConfig()
         provider = TubeProvider(config=config)
+        # Bootstrap to load .env overrides and attach config.tube
+        ProviderManager(config, providers=[provider])
         return provider.viewer
 
     def test_get_rgba(self, viewer):

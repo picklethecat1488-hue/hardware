@@ -1,5 +1,6 @@
 """Unit tests for geometry and data provider."""
 
+import os
 import pytest
 import yaml
 from unittest.mock import MagicMock, patch, PropertyMock
@@ -136,11 +137,13 @@ class TestProviderMetadata:
         assert provider.get_color("part_b", "left") == provider.app_config.color
 
     def test_provider_default_manifest_path(self, monkeypatch):
-        """Verify that Provider.manifest defaults to loading a YAML file by provider name."""
+        """Verify that Provider.manifest defaults to loading a YAML file."""
         import provider.provider
 
         mock_load = MagicMock(return_value={"test": "data"})
         monkeypatch.setattr(provider.provider, "load_manifest", mock_load)
+        # Mock os.path.exists to return True so the provider attempts to load the manifest
+        monkeypatch.setattr(os.path, "exists", lambda x: True)
 
         class MinimalProvider(Provider):
             @property
@@ -153,7 +156,8 @@ class TestProviderMetadata:
 
         p = MinimalProvider()
         assert p.manifest == {"test": "data"}
-        mock_load.assert_called_once_with("manifest.yaml")
+        assert mock_load.call_count == 1
+        assert mock_load.call_args[0][0].endswith("manifest.yaml")
 
     def test_load_manifest(self, tmp_path, provider):
         """Verify that load_manifest correctly parses Enum keys and values."""

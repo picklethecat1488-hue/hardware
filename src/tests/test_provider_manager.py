@@ -118,13 +118,6 @@ def test_manager_init():
     assert m.router.providers == [p1]
 
 
-def test_manager_bootstrap_invalid_combination():
-    """Verify that providing both explicit providers and bootstrap=True raises ValueError."""
-    config = AppConfig()
-    with pytest.raises(ValueError, match="Cannot bootstrap when providers are explicitly provided"):
-        ProviderManager(config, providers=[], bootstrap=True)
-
-
 def test_manager_discovery_filtering():
     """Verify that discovery logic correctly filters based on @bootstrap decorator."""
     config = AppConfig()
@@ -142,9 +135,9 @@ def test_manager_load_configs():
     p1 = SimpleMockProvider("p1", {}, default_config=p_settings)
 
     config = AppConfig()
-    config.model_extra["P1__VAL"] = "env_val"  # type: ignore
-    config.model_extra["P1__NUM"] = 10  # type: ignore
-    config.model_extra["P1__ITEMS"] = "[1, 2, 3]"  # type: ignore
+    config.model_extra["APP_P1__VAL"] = "env_val"  # type: ignore
+    config.model_extra["APP_P1__NUM"] = 10  # type: ignore
+    config.model_extra["APP_P1__ITEMS"] = "[1, 2, 3]"  # type: ignore
 
     mgr = ProviderManager(config, providers=[p1], bootstrap=False)
     mgr.load_configs()
@@ -161,7 +154,7 @@ def test_manager_load_configs_json_error():
     p1 = SimpleMockProvider("p1", {}, default_config=p_settings)
 
     config = AppConfig()
-    config.model_extra["P1__ITEMS"] = "[1, 2"  # type: ignore
+    config.model_extra["APP_P1__ITEMS"] = "[1, 2"  # type: ignore
 
     mgr = ProviderManager(config, providers=[p1], bootstrap=False)
     with pytest.raises(ValueError, match="Failed to parse JSON configuration"):

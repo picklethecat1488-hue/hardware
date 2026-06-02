@@ -19,6 +19,8 @@ _default_executor: Optional[ThreadPoolExecutor] = None
 class Orchestrator(ABC):
     """Base class for orchestrators."""
 
+    executor: ThreadPoolExecutor
+
     @abstractmethod
     def __init__(self, context: Any, executor: Optional[ThreadPoolExecutor] = None):
         """Initialize the orchestrator."""

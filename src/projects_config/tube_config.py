@@ -17,6 +17,25 @@ class TubeConfig(BaseModel):
         description="Optional override for the measurements YAML file path. Defaults to AppConfig.measurements_path.",
     )
 
+    x_bounds: list[float] = Field(
+        default_factory=lambda: [145, 950],
+        description="The project x boundaries",
+        min_length=2,
+        max_length=2,
+    )
+    y_bounds: list[float] = Field(
+        default_factory=lambda: [-32, 390],
+        description="The project y boundaries",
+        min_length=2,
+        max_length=2,
+    )
+    z_bounds: list[float] = Field(
+        default_factory=lambda: [145, 530],
+        description="The project z boundaries",
+        min_length=2,
+        max_length=2,
+    )
+
     wall_thickness: float = Field(default=3.0, description="Wall thickness ~3mm", gt=0)
     clamp_diameters: list[float] = Field(
         default_factory=lambda: [63.5, 76.2, 63.5],

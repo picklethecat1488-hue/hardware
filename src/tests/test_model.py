@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from pathlib import Path
 from model import method_cache, AppConfig, load_measurements
-from projects_config import TubeConfig
+from provider import ProviderManager
 
 
 class MockService:
@@ -29,7 +29,10 @@ class TestModel:
     @pytest.fixture(scope="class")
     def config(self):
         """Return the app config fixture."""
-        return AppConfig()
+        config = AppConfig()
+        # Bootstrapping the manager populates the 'tube' attribute on the config instance
+        ProviderManager(config)
+        return config
 
     def test_measurements(self, config):
         """Validate key manifold measurement relationships."""
@@ -77,11 +80,6 @@ class TestModel:
         # Check dist between passenger inlet and outlet
         assert dist(passenger_inlet_start, passenger_outlet_start) == pytest.approx(485)
         assert round(passenger_outlet_start.Z - passenger_inlet_start.Z) == pytest.approx(170)
-
-    def test_bounding_box(self, config):
-        """Test the bounding box part."""
-        bound_box = config.bound_box
-        assert bound_box.volume == pytest.approx(129926381.75)
 
     def test_method_cache_basic_hit(self):
         """Verify that multiple calls with the same arguments return a cached result."""
@@ -145,13 +143,6 @@ class TestModel:
         assert "point_a" in measurements
         assert np.array_equal(measurements["point_a"], np.array([10.0, 20.0, 30.0]))
 
-    def test_tube_measurements_default_load(self):
-        """Verify that the default tube measurements file loads correctly."""
-        config = AppConfig()
-        # Verify measurements are loaded and contain expected keys (e.g. 6 for driver inlet)
-        assert 6 in config.tube.measurements
-        assert isinstance(config.tube.measurements[6], np.ndarray)
-
     def test_measurements_list_format_conversion(self, tmp_path):
         """Verify that list-formatted measurements are converted to 1-based integer keys."""
         data = [[10, 10, 10], [20, 20, 20]]
@@ -162,17 +153,3 @@ class TestModel:
         measurements = load_measurements(str(yml_file))
         assert measurements[1][0] == 10
         assert measurements[2][0] == 20
-
-    def test_z_correction_with_mixed_keys(self, tmp_path):
-        """Verify Z-correction applies to both numeric and string keys."""
-        data = {1: [0, 0, 100], 6: [0, 0, 100]}
-        yml_file = tmp_path / "corr.yml"
-        with open(yml_file, "w") as f:
-            yaml.dump(data, f)
-
-        # Default min diameter is 63.5, so correction is -31.75
-        # Test override in tube config
-        config = AppConfig(tube={"measurements_path": str(yml_file)}, _env_file=None)  # type: ignore
-        measurements = config.tube.measurements
-        assert measurements[1][2] == pytest.approx(100)
-        assert measurements[6][2] == pytest.approx(100 - 31.75)

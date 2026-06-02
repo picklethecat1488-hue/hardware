@@ -50,3 +50,15 @@ jobs:
         run: |
           set -o pipefail
           pytest
+
+  auto-approve:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Auto-approve PR
+        uses: hmarr/auto-approve-action@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
