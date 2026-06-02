@@ -2,19 +2,15 @@
 
 import os
 import json
-from functools import cached_property
 from pathlib import Path
 from typing import Any, cast
 
-import numpy as np
 from pydantic import Field
 from pydantic_changedetect import ChangeDetectionMixin
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from build123d import BuildPart, Box, Part, Location, Mode, add
 
 from .text_args import TextArgs
 from .diagram_options import DiagramOptions
-from projects_config import TubeConfig
 from .utils import method_cache, load_measurements
 
 
@@ -27,25 +23,6 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         default=str(Path(__file__).parent.parent / "measurements.yml"),
         description="Path to the measurements YAML file.",
     )
-    x_bounds: list[float] = Field(
-        default_factory=lambda: [145, 950],
-        description="The project x boundaries",
-        min_length=2,
-        max_length=2,
-    )
-    y_bounds: list[float] = Field(
-        default_factory=lambda: [-32, 390],
-        description="The project y boundaries",
-        min_length=2,
-        max_length=2,
-    )
-    z_bounds: list[float] = Field(
-        default_factory=lambda: [145, 530],
-        description="The project z boundaries",
-        min_length=2,
-        max_length=2,
-    )
-    tube: TubeConfig = Field(default_factory=TubeConfig, description="Tube and part configuration")
     diagram_options: DiagramOptions = Field(default_factory=DiagramOptions, description="Diagram export options")
     diagram_part_offset: int = Field(default=60, description="Distance between manifold assemblies in the diagram")
     diagram_part_dist: int = Field(default=120, description="Distance between exploded halves in the diagram")
@@ -67,11 +44,6 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         extra="allow",
     )
 
-    def model_post_init(self, __context: Any) -> None:
-        """Sync global settings to sub-models after initialization."""
-        if self.tube.measurements_path is None:
-            self.tube.measurements_path = self.measurements_path
-
     def dump_env(self, path: str | Path):
         """Dump the configuration to a .env file with flattened nested keys."""
         env_prefix = cast(str, self.model_config.get("env_prefix", ""))
@@ -81,7 +53,12 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         def write_recursive(f, data, prefix=""):
             for k, v in data.items():
                 k_upper = k.upper()
-                full_key = f"{prefix}{k_upper}"
+                # If the key already contains the global prefix (likely from model_extra), don't double it.
+                if prefix == env_prefix and k_upper.startswith(env_prefix):
+                    full_key = k_upper
+                else:
+                    full_key = f"{prefix}{k_upper}"
+
                 if k_upper in self._env_flattened_keys and isinstance(v, dict):
                     write_recursive(f, v, f"{full_key}__")
                 else:
@@ -97,30 +74,3 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
 
         with open(path, "w") as f:
             write_recursive(f, dump, prefix=env_prefix)
-
-    @cached_property
-    def bound_box(self) -> Part:
-        """Return the axis-aligned build bounding box."""
-        x_len = np.max(self.x_bounds) - np.min(self.x_bounds)
-        y_len = np.max(self.y_bounds) - np.min(self.y_bounds)
-        z_len = np.max(self.z_bounds) - np.min(self.z_bounds)
-        center = (
-            np.min(self.x_bounds) + x_len / 2,
-            np.min(self.y_bounds) + y_len / 2,
-            np.min(self.z_bounds) + z_len / 2,
-        )
-
-        with BuildPart() as bounds:
-            Box(x_len, y_len, z_len)
-            cast(Part, bounds.part).move(Location(center))
-            vx_len = self.tube.measurements[2][0] - self.tube.measurements[1][0]
-            vy_len = np.max(self.y_bounds) - np.mean([self.tube.measurements[2][1], self.tube.measurements[1][1]])
-            vz_len = np.max(self.z_bounds) - np.mean([self.tube.measurements[2][2], self.tube.measurements[1][2]])
-            v_center = (
-                np.min([self.tube.measurements[2][0], self.tube.measurements[1][0]]) + vx_len / 2,
-                np.min([self.tube.measurements[2][1], self.tube.measurements[1][1]]) + vy_len / 2,
-                np.min([self.tube.measurements[2][2], self.tube.measurements[1][2]]) + vz_len / 2,
-            )
-            with BuildPart(mode=Mode.SUBTRACT):
-                add(Box(vx_len, vy_len, vz_len).moved(Location(v_center)))
-        return cast(Part, bounds.part)

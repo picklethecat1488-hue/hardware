@@ -30,9 +30,6 @@ class ProviderManager:
         self.config = config
         self.logger = logger
 
-        if providers is not None and bootstrap:
-            raise ValueError("Cannot bootstrap when providers are explicitly provided.")
-
         if providers is None and bootstrap:
             providers = self._discover_providers(executor)
 
@@ -49,23 +46,22 @@ class ProviderManager:
     def _discover_providers(self, executor: Optional[ThreadPoolExecutor]) -> list[Provider]:
         """Automatically discover and instantiate Provider subclasses in the package."""
         # Scan both the library providers and the project providers
-        import provider.provider as lib_base
+        import provider
 
-        try:
-            import projects as project_base
+        # Resolve the source root (src/) relative to the provider package
+        provider_file = os.path.abspath(provider.__file__)
+        src_dir = os.path.dirname(os.path.dirname(provider_file))
 
-            search_targets = [lib_base, project_base]
-        except ImportError:
-            search_targets = [lib_base]
-
-        for base_module in search_targets:
-            if hasattr(base_module, "__file__") and base_module.__file__:
-                package_path = os.path.dirname(base_module.__file__)
-                for _, name, is_pkg in pkgutil.iter_modules([package_path]):
-                    if not is_pkg:
-                        module_name = f"{base_module.__package__}.{name}"
-                        if module_name not in sys.modules:
-                            importlib.import_module(module_name)
+        # Scan 'projects' directory for Provider subclasses
+        pkg_name = "projects"
+        pkg_path = os.path.join(src_dir, pkg_name)
+        if os.path.isdir(pkg_path):
+            # walk_packages recursively traverses the directory tree, ensuring that
+            # providers in sub-directories (like projects/tube/) are correctly imported.
+            prefix = f"{pkg_name}."
+            for _, name, _ in pkgutil.walk_packages([pkg_path], prefix):
+                if name not in sys.modules:
+                    importlib.import_module(name)
 
         discovered: list[Provider] = []
 
@@ -86,28 +82,54 @@ class ProviderManager:
         """Route environment variables from AppConfig extra fields to provider settings."""
         config = self.config
         delimiter = cast(str, config.model_config.get("env_nested_delimiter", "__"))
+        env_prefix = cast(str, config.model_config.get("env_prefix", ""))
 
         for provider in self.router.providers:
             name = provider.name.lower()
             provider_config = provider.default_config
             if provider_config is None:
                 continue
-            env_key = name.upper()
 
-            # ROUTING: Extract values loaded by BaseSettings into model_extra and apply to sub-model
-            prefix_with_delim = f"{env_key}{delimiter}"
+            # The search prefix should include the global app prefix and the provider name
+            # e.g., 'APP_TUBE__'
+            prefix_with_delim = f"{env_prefix}{name}{delimiter}".upper()
+
+            provider_updates = {}
             if config.model_extra:
+                consumed_keys = []
                 for k, v in config.model_extra.items():
-                    if k.startswith(prefix_with_delim):
-                        attr_name = k[len(prefix_with_delim) :].lower()
-                        if hasattr(provider_config, attr_name):
-                            # Handle potential JSON strings for complex types (lists/dicts)
-                            if isinstance(v, str) and v.strip().startswith(("{", "[")):
-                                try:
-                                    v = json.loads(v)
-                                except json.JSONDecodeError as e:
-                                    raise ValueError(f"Failed to parse JSON configuration for '{k}': {v}") from e
-                            setattr(provider_config, attr_name, v)
+                    if k.upper().startswith(prefix_with_delim):
+                        consumed_keys.append(k)
+                        # Reconstruct the nested path within the provider settings
+                        # e.g. 'LOGO_TEXT_POSITIONS__DRIVER' -> ['logo_text_positions', 'driver']
+                        path = k[len(prefix_with_delim) :].lower().split(delimiter)
+
+                        curr = provider_updates
+                        for part in path[:-1]:
+                            curr = curr.setdefault(part, {})
+
+                        # Values in model_extra are typically strings from the environment.
+                        # Handle potential JSON strings for complex types (lists/dicts).
+                        val = v
+                        if isinstance(val, str) and val.strip().startswith(("{", "[")):
+                            try:
+                                val = json.loads(val)
+                            except json.JSONDecodeError as e:
+                                raise ValueError(f"Failed to parse JSON configuration for '{k}': {v}") from e
+                        curr[path[-1]] = val
+
+                # Remove keys that have been successfully routed to the provider model
+                # to prevent double-prefixing and duplicates in dump_env.
+                for k in consumed_keys:
+                    del config.model_extra[k]
+
+            if provider_updates:
+                # Leverage Pydantic to validate and coerce the reconstructed nested dictionary.
+                merged = provider_config.model_dump() | provider_updates
+                coerced_model = provider_config.__class__.model_validate(merged)
+                for attr_name in provider_updates.keys():
+                    if hasattr(provider_config, attr_name):
+                        setattr(provider_config, attr_name, getattr(coerced_model, attr_name))
 
             # Ensure the config instance is attached to AppConfig as an extra field
             setattr(config, name, provider_config)

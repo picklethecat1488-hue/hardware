@@ -107,8 +107,15 @@ class TargetList(list[str]):
 
     def for_targets(self, names: Iterable[str]) -> "TargetList":
         """Filter the target list to include only the specified names."""
-        # Allow matching against the full namespaced name or just the target part.
-        filtered_targets = [t for t in self if t in names or any(t.endswith(f"/{n}") for n in names)]
+        import fnmatch
+
+        filtered_targets = []
+        for n in names:
+            for t in self:
+                # Standardized shell-style wildcard matching (e.g. tube/*, *driver)
+                if fnmatch.fnmatch(t, n) or fnmatch.fnmatch(t, f"*/{n}"):
+                    filtered_targets.append(t)
+
         return TargetList(
             self.provider, filtered_targets, action=self.action, subassemblies=self.subassemblies, modes=self.modes
         )

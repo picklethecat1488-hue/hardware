@@ -74,7 +74,7 @@ def load_manifest(path: str) -> dict[str, dict[Any, Any]]:
             action_cfg = {}
             if isinstance(val, dict):
                 if MODES in val:
-                    action_cfg[MODES] = [Mode(m) for m in val[MODES]]
+                    action_cfg[MODES] = [str(m) if action_key == Action.CONFIG else Mode(m) for m in val[MODES]]
                 if SUBASSEMBLIES in val:
                     action_cfg[SUBASSEMBLIES] = [str(s) for s in val[SUBASSEMBLIES]]
             target_cfg[action_key] = action_cfg

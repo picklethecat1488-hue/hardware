@@ -61,16 +61,11 @@ class Provider(ABC):
 
         By default, attempts to load "manifest.yaml" relative to the provider module.
         """
-        try:
-            # Resolve path relative to the module defining the concrete provider class
-            base_dir = os.path.dirname(os.path.abspath(inspect.getfile(self.__class__)))
-            manifest_path = os.path.join(base_dir, "manifest.yaml")
-            if os.path.exists(manifest_path):
-                return load_manifest(manifest_path)
-        except (TypeError, ValueError, OSError):
-            pass
-
-        return load_manifest("manifest.yaml")
+        base_dir = os.path.dirname(os.path.abspath(inspect.getfile(self.__class__)))
+        manifest_path = os.path.join(base_dir, "manifest.yaml")
+        if os.path.exists(manifest_path):
+            return load_manifest(manifest_path)
+        return {}
 
     @property
     def part(self) -> dict[str, Callable[..., Any]]:

@@ -45,6 +45,7 @@ The provider acts as the interface between your builder and the application's or
 
 ```python
 # src/projects/bracket/provider.py
+from functools import cached_property
 from build123d import *
 from pathlib import Path
 from provider import Provider, Action, Mode, discover_provider
@@ -52,9 +53,8 @@ from projects_config import TubeConfig # Or a custom Pydantic model
 
 @discover_provider
 class BracketProvider(Provider):
-    @property
+    @cached_property
     def default_config(self):
-        # Define where to find measurements
         return TubeConfig(
             measurements_path=str(Path(__file__).parent / "measurements.yaml")
         )
@@ -89,6 +89,12 @@ from .bracket import BracketProvider
 ```
 
 ## Core Concepts
+
+### Lazy Initialization
+Always use `@cached_property` for `default_config` and any sub-tools (Builders, Configurators). This ensures:
+1.  **Reference Integrity**: The `ProviderManager` can swap the `default_config` for a bootstrapped version without your tools holding onto a stale instance.
+2.  **Orchestration Timing**: Sub-tools are only created after the `orchestrator` and `app_config` are fully initialized.
+3.  **Performance**: Expensive CAD resources are only allocated if the specific project is actually invoked.
 
 ### TargetList
 When you call `provider.targets`, it returns a `TargetList` helper. You can chain filters like:

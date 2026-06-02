@@ -1,6 +1,7 @@
 """Provider for manifold tube geometry."""
 
 from pathlib import Path
+from functools import cached_property
 from typing import Any, Callable, Optional, TYPE_CHECKING
 from model.app_config import AppConfig
 from projects_config import TubeConfig
@@ -14,30 +15,37 @@ from .viewer import TubeViewer
 class TubeProvider(Provider):
     """Provides tube geometry and configuration."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the provider and its builder."""
-        super().__init__(*args, **kwargs)
-        # The orchestrator handles the thread pool lifecycle, so we extract it here.
-        executor = getattr(self.orchestrator, "executor", None)
-        self.builder = TubeBuilder(config=self.app_config, tube_config=self.settings, executor=executor)
-        self.configurator = TubeConfigurator(
-            builder=self.builder,
-            config=self.app_config,
-            tube_config=self.settings,
-            executor=executor,
-            logger=self.logger,
-        )
-        self.viewer = TubeViewer(
-            builder=self.builder,
-            config=self.app_config,
-            tube_config=self.settings,
-            executor=executor,
-        )
-
-    @property
+    @cached_property
     def default_config(self) -> TubeConfig:
         """Return the default tube configuration."""
         return TubeConfig(measurements_path=str(Path(__file__).parent / "measurements.yaml"))
+
+    @cached_property
+    def builder(self) -> TubeBuilder:
+        """Return the tube builder."""
+        return TubeBuilder(config=self.app_config, tube_config=self.settings, executor=self.orchestrator.executor)
+
+    @cached_property
+    def configurator(self) -> TubeConfigurator:
+        """Return the tube configurator."""
+        return TubeConfigurator(
+            builder=self.builder,
+            config=self.app_config,
+            tube_config=self.settings,
+            executor=self.orchestrator.executor,
+            logger=self.logger,
+        )
+
+    @cached_property
+    def viewer(self) -> TubeViewer:
+        """Return the tube viewer."""
+        return TubeViewer(
+            builder=self.builder,
+            configurator=self.configurator,
+            config=self.app_config,
+            tube_config=self.settings,
+            executor=self.orchestrator.executor,
+        )
 
     @property
     def part(self) -> dict[str, Callable[..., Any]]:

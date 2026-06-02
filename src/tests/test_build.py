@@ -1,235 +1,193 @@
-"""Contains Build system unit tests."""
+"""Contains Build main unit tests."""
 
-from build import Builder
-from build123d import *
-import math
-import numpy as np
-import pytest
-import zipfile
+import argparse
+from build import Builder, main, get_args, str2bool
 from pathlib import Path
+import pytest
+from unittest.mock import MagicMock, patch
+from provider import Action, Mode, TargetList
 
 
-class TestBuilder:
-    """Manifold builder unit tests."""
+class TestBuildMain:
+    """Build main unit tests."""
 
-    @pytest.fixture(scope="class")
+    @pytest.fixture
+    def mock_logger(self):
+        """Return a mock logger fixture."""
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_builder(self, mocker):
+        """Patch Builder in the build module."""
+        return mocker.patch("build.Builder")
+
+    def test_get_args_parsing(self, mocker):
+        """Test the argparse configuration directly."""
+        mocker.patch("sys.argv", ["script.py", "-e", "foo.env", "-out", "tmp", "-d", "-s", "left", "part1"])
+        args = get_args()
+        assert args.env == "foo.env"
+        assert args.outdir == "tmp"
+        assert args.diagram is True
+        assert args.targets == ["part1"]
+        assert args.subassembly == "left"
+
+    def test_main_diagram_path(self, mock_logger, mock_builder, tmp_path):
+        """Check if generate_diagram was called with correct unpacked gen_args."""
+        args = argparse.Namespace(
+            outdir=tmp_path, env=None, diagram=True, parts=False, targets=["schema"], subassembly=None
+        )
+        main(mock_logger, args)
+        mock_builder.return_value.generate_diagram.assert_called_once_with(out_dir=tmp_path, names=["schema"])
+
+        assert Path(tmp_path).exists()
+        mock_logger.done.assert_called_once()
+
+        mock_builder.return_value.generate_diagram.reset_mock()
+        args = argparse.Namespace(
+            outdir=tmp_path, env=None, diagram=True, parts=False, targets=["schema"], subassembly="left"
+        )
+        main(mock_logger, args)
+        mock_builder.return_value.generate_diagram.assert_called_once_with(out_dir=tmp_path, names=["schema"])
+
+        mock_builder.return_value.generate_diagram.reset_mock()
+        args = argparse.Namespace(
+            outdir=tmp_path, env=None, diagram=True, parts=False, targets=["schema"], subassembly="right"
+        )
+        main(mock_logger, args)
+        mock_builder.return_value.generate_diagram.assert_called_once_with(out_dir=tmp_path, names=["schema"])
+
+    def test_main_output_path(self, mock_logger, mock_builder, tmp_path):
+        """Test positional targets."""
+        args = argparse.Namespace(
+            outdir=tmp_path, env=None, diagram=False, parts=True, targets=["part1"], subassembly="left", mode=None
+        )
+        main(mock_logger, args)
+        mock_builder.return_value.generate_parts.assert_called_once_with(
+            out_dir=tmp_path, names=["part1"], subassembly="left", mode=None
+        )
+
+        mock_logger.done.assert_called_once()
+
+        mock_builder.return_value.generate_parts.reset_mock()
+        args = argparse.Namespace(
+            outdir=tmp_path, env=None, diagram=False, parts=True, targets=["part1"], subassembly="right", mode=None
+        )
+        main(mock_logger, args)
+        mock_builder.return_value.generate_parts.assert_called_once_with(
+            out_dir=tmp_path, names=["part1"], subassembly="right", mode=None
+        )
+
+        mock_builder.return_value.generate_parts.reset_mock()
+        args = argparse.Namespace(
+            outdir=tmp_path, env=None, diagram=False, parts=True, targets=["part1"], subassembly=None, mode=None
+        )
+        main(mock_logger, args)
+        mock_builder.return_value.generate_parts.assert_called_once_with(
+            out_dir=tmp_path, names=["part1"], subassembly=None, mode=None
+        )
+
+    def test_main_output_env_path(self, mock_logger, mock_builder, tmp_path):
+        """Check if generate_diagram was called with correct unpacked gen_args."""
+        args = argparse.Namespace(
+            outdir=tmp_path, env=f"{tmp_path}.env", diagram=True, parts=True, targets=[], subassembly=None
+        )
+        main(mock_logger, args)
+        mock_builder.return_value.config.dump_env.assert_called_once_with(f"{tmp_path}.env")
+        mock_logger.done.assert_called_once()
+
+    def test_main_generate_all_fallback(self, mock_logger, mock_builder, tmp_path):
+        """Test the else block when no flags are provided."""
+        args = argparse.Namespace(outdir=tmp_path, env=None, diagram=True, parts=True, targets=[], subassembly=None)
+
+        main(mock_logger, args)
+
+        mock_builder.return_value.generate_all.assert_called_once_with(out_dir=tmp_path, subassembly=None)
+
+        mock_logger.done.assert_called_once()
+
+    def test_validation_error(self, mocker):
+        """Verify that providing both flags as False raises a SystemExit (via parser.error)."""
+        mocker.patch("sys.argv", ["script.py", "--diagram=false", "--parts=false"])
+        with pytest.raises(SystemExit):
+            get_args()
+
+
+def test_str2bool():
+    """Verify boolean string conversion."""
+    assert str2bool("true") is True
+    assert str2bool("yes") is True
+    assert str2bool("1") is True
+    assert str2bool("false") is False
+    assert str2bool("no") is False
+    assert str2bool("0") is False
+    with pytest.raises(argparse.ArgumentTypeError):
+        str2bool("invalid")
+
+
+class TestBuilderLogic:
+    """Unit tests for Builder internal logic."""
+
+    @pytest.fixture
     def builder(self):
-        """Return the manifold builder fixture."""
-        return Builder()
+        """Return a builder instance with a mocked manager."""
+        manager = MagicMock()
+        manager.config = MagicMock()
+        return Builder(manager, logger=MagicMock())
 
-    @pytest.fixture(scope="class", params=["driver", "passenger"])
-    def name(self, request):
-        """Return a test part name."""
-        return request.param
+    def test_get_summary(self, builder):
+        """Verify target list truncation in log summary."""
+        assert builder._get_summary(["a", "b"]) == "a, b"
+        long_list = [str(i) for i in range(10)]
+        summary = builder._get_summary(long_list)
+        assert "..." in summary
+        assert "(10 items)" in summary
 
-    @pytest.fixture(scope="class", params=[False, True])
-    def right(self, request):
-        """Return a side selection fixture."""
-        return request.param
+    def test_resolve_mode_fallback(self, builder):
+        """Verify mode fallback logic when PRINT is unsupported."""
+        # Setup manifest once for all cases to prevent subsequent overwrites
+        builder.manager.router.manifest = {
+            "t1": {Action.PART: {"modes": [Mode.PRINT, Mode.DEFAULT]}},
+            "t2": {Action.PART: {"modes": [Mode.DEFAULT]}},
+        }
 
-    def test_wire(self, name, builder):
-        """Verify wire path and clamp endpoints."""
+        # Case 1: Target supports PRINT
+        assert builder._resolve_modes("t1") == ["print"]
 
-        def calc_point_err(v, p):
-            return abs((v - Vector(p)).length)
+        # Case 2: Target does NOT support PRINT, fallback to DEFAULT
+        assert builder._resolve_modes("t2") == ["default"]
 
-        wire = builder.create_wire(name)
-        length = wire.length
-        inlet_clamp_start = wire.position_at(0.0)
-        inlet_clamp_end = wire.position_at(builder.config.tube.clamp_lengths[0] / length)
-        outlet_clamp_start = wire.position_at((length - builder.config.tube.clamp_lengths[-1]) / length)
-        outlet_clamp_end = wire.position_at(1.0)
-        inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
+        # Case 3: Specific override provided
+        assert builder._resolve_modes("t1", mode_override="custom") == ["custom"]
 
-        # Make sure the clamp starts are correct
-        assert calc_point_err(inlet_clamp_start, builder.config.tube.P[inlet_key]) == pytest.approx(0)
-        assert calc_point_err(outlet_clamp_start, builder.config.tube.P[outlet_key]) == pytest.approx(0)
+        # Case 4: Wildcard mode override
+        assert builder._resolve_modes("t1", mode_override="p*") == ["print"]
 
-        # Check clamp direction and length
-        assert calc_point_err(
-            (inlet_clamp_end - inlet_clamp_start).normalized(), builder.config.tube.V[inlet_key]
-        ) == pytest.approx(0)
-        assert calc_point_err(
-            (outlet_clamp_end - outlet_clamp_start).normalized(), builder.config.tube.V[outlet_key]
-        ) == pytest.approx(0)
-        assert (inlet_clamp_end - inlet_clamp_start).length == pytest.approx(builder.config.tube.clamp_lengths[0])
-        assert (outlet_clamp_end - outlet_clamp_start).length == pytest.approx(builder.config.tube.clamp_lengths[-1])
+    def test_resolve_subassemblies(self, builder):
+        """Verify subassembly resolution from manifest or override."""
+        builder.manager.router.manifest = {
+            "t1": {Action.PART: {"subassemblies": ["left", "right"]}},
+            "t2": {Action.PART: {}},
+        }
+        # Case 1: Manifest defines subassemblies
+        assert list(builder._resolve_subassemblies("t1")) == ["left", "right"]
 
-    def test_create_profile(self, builder):
-        """Test profile sketch generation for a valid center/angle profile."""
-        sketch = builder.create_profile(45, 90, outer_radius=10, inner_radius=5, joint_space=0)
-        # Area of a quarter annulus: (90/360) * pi * (R^2 - r^2)
-        expected_area = math.pi * (10**2 - 5**2) / 4
-        assert sketch.area == pytest.approx(expected_area)
+        # Case 2: Manifest has no subassemblies, defaults to [None] (whole part)
+        assert builder._resolve_subassemblies("t2") == [None]
 
-    def test_create_profile_invalid_inner_radius(self, builder):
-        """Ensure invalid profile radii raise ValueError."""
-        with pytest.raises(ValueError):
-            builder.create_profile(45, 90, outer_radius=10, inner_radius=10)
+        # Case 3: Override provided
+        assert builder._resolve_subassemblies("t1", subassembly_override="left") == ["left"]
 
-    def test_build_clean_tool(self, name, builder):
-        """Test clean tool creation for a given part name."""
-        clean_tool = builder.build_clean_tool(name)
-        assert clean_tool is not None
-        assert clean_tool.volume > 0
+        # Case 4: Wildcard subassembly override
+        assert builder._resolve_subassemblies("t1", subassembly_override="r*") == ["right"]
 
-    def test_part_fits_together(self, builder, name, right):
-        """Test that mirrored parts do not intersect."""
-        # Make sure parts do not self intersect
-        part = builder.build_part(name, right=right)
-        other_part = builder.build_part(name, right=(not right))
-        intersection = part.intersect(other_part)
-        assert (intersection.volume if intersection else 0) == pytest.approx(0), (
-            f"intersection detected between {name} parts"
-        )
+    def test_generate_parts_wildcard_error(self, builder):
+        """Verify that an empty wildcard match for parts results in an error."""
+        # Mock supporting to return a TargetList-like object (mock) that is empty
+        mock_targets = MagicMock(spec=TargetList)
+        mock_targets.__len__.return_value = 0
+        mock_targets.for_targets.return_value = mock_targets
+        builder.manager.router.targets.supporting.return_value = mock_targets
 
-    def test_part_doesnt_overlap(self, builder, name, right):
-        """Ensure parts from different assemblies do not intersect."""
-        part = builder.build_part(name, right=right)
-        other_name = next(x for x in builder.config.tube.names if x != name)
-        other_part = builder.build_part(other_name, right=not right)
-        intersection = part.intersect(other_part)
-        assert (intersection.volume if intersection else 0) == pytest.approx(0), (
-            f"intersection detected between {name},right={right} and {other_name},right={not right}"
-        )
-
-    def test_in_bounds(self, builder, name, right):
-        """Verify part fits inside bound box volume."""
-        part = builder.build_part(name, right=right)
-        proj_bounds = builder.config.bound_box
-        volume = part.cut(proj_bounds).volume
-
-        assert volume == pytest.approx(0)
-
-    def test_can_clamp(self, name, right, builder):
-        """Test if a representative clamp bed satisfies the clamp property."""
-        clamp_idx = 1
-        path = builder.create_wire(name)
-        length = path.length
-
-        # Map clamp_idx to clamp parameters
-        offsets = (
-            [0]
-            + [clamp_pos[0] for clamp_pos in builder.config.tube.clamp_positions[name][1:-1] if clamp_pos is not None]
-            + [(length - builder.config.tube.clamp_lengths[-1]) / length]
-        )
-        expected = np.array(builder.config.tube.clamp_diameters) / 2
-        """Test if manifold clamps satisfy fitment requirements."""
-        part = builder.build_part(name, right=right)
-        pos, len, expected = (
-            offsets[clamp_idx],
-            builder.config.tube.clamp_lengths[clamp_idx],
-            expected[clamp_idx],
-        )
-
-        # Check if we can move clamp over section
-        clamp_off = builder.create_ring(
-            name, pos, len, outer_radius=expected + builder.config.tube.wall_thickness, inner_radius=expected
-        )
-        intersection_off = part.intersect(clamp_off)
-        assert (intersection_off.volume if intersection_off else 0) == pytest.approx(0)
-
-        # Check if we can push clamp onto section
-        clamp_on = builder.create_ring(
-            name, pos, len, outer_radius=expected + builder.config.tube.wall_thickness, inner_radius=expected - 0.01
-        )
-        intersection_on = part.intersect(clamp_on)
-        assert intersection_on is not None and intersection_on.volume > 0
-
-    def test_part(self, name, right, builder):
-        """Verify rebuilt part geometry matches manifold volume."""
-        if name != "driver" and name != "passenger":
-            raise ValueError(f"Invalid name: {name}")
-        manifold = builder.build_tube(name, right=right, half_tube=True)
-        part = builder.build_part(name, right=right)
-        manifold_vol = manifold.volume
-        intersection = part.intersect(manifold)
-        manifold_from_parts_vol = intersection.volume if intersection else 0
-
-        error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
-        # less than 0.5% error for each rebuilt part.
-        assert error_pct < 0.5
-
-    def test_prepared_part(self, name, right, builder):
-        """Verify the prepared part is printable and stable."""
-        orig_part = builder.build_part(name, right=right)
-        part = builder.build_prepared_part(name, right=right)
-
-        # Ensure the part is a watertight solid
-        assert part.is_valid
-        assert part.volume > 0
-
-        # Ensure the part is touching the print bed
-        bottom_faces = part.faces().sort_by(Axis.Z)[:1]
-        face_area = sum(f.area for f in bottom_faces)
-        assert face_area > 0
-
-        # Run a few more checks to see if the part was mutated during preparation
-        error_pct = abs(orig_part.volume - part.volume) / (orig_part.volume + part.volume) / 2 * 100
-        assert error_pct < 1e-2, "Volume changed"
-
-        error_pct = abs(orig_part.area - part.area) / (orig_part.area + part.area) / 2 * 100
-        assert error_pct < 1e-3, "Surface area changed"
-
-    def test_generate_all(self, builder, tmp_path):
-        """Test generate_all exports expected build artifacts."""
-        builder.generate_all(out_dir=tmp_path, zip_name="build.zip")
-        zip_path = tmp_path / "build.zip"
-        assert zip_path.exists()
-
-        # Open the resulting zip and verify its contents.
-        with zipfile.ZipFile(zip_path, "r") as z:
-            contents = z.namelist()
-            assert f"{builder.config.project_name}_v{builder.config.ver}_diagram.svg" in contents
-            for name in builder.config.tube.names:
-                for side in ["left", "right"]:
-                    assert f"{builder.config.project_name}_v{builder.config.ver}_{name}_{side}.stl" in contents
-
-    def test_end_angle(self, builder, name):
-        """Verify inlet and outlet angles for each part."""
-
-        def get_angle(key):
-            """Compute the vertical angle of an exhaust end vector."""
-            z_axis = Vector(0, 0, 1)
-            v_test = Vector(builder.config.tube.V[key])
-            angle = 90 - v_test.get_angle(z_axis)
-            return angle
-
-        # Horizontal magnitude (distance in XY plane)
-        inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
-
-        # Test inlet angle
-        angle = get_angle(inlet_key)
-        expected_angle = 14.09 if name == "driver" else 0
-        assert round(angle, 2) == pytest.approx(expected_angle)
-
-        # Test outlet angle
-        angle = get_angle(outlet_key)
-        expected_angle = 0
-        assert round(angle, 2) == pytest.approx(expected_angle)
-
-    def test_overall_bounds(self, builder, name):
-        """Verify assembly bounding box dimensions."""
-        part = Compound(builder.build_part(name).fuse(builder.build_part(name, right=True)))
-        bbox = part.bounding_box()
-
-        if name == "driver":
-            xmin, xlen = 150, 227
-            ymin, ylen = -32, 324
-            zmin, zlen = 319, 203
-        elif name == "passenger":
-            xmin, xlen = 558, 387
-            ymin, ylen = -32, 419
-            zmin, zlen = 288, 234
-        else:
-            raise ValueError("Invalid part name")
-
-        # Make sure the overall dimensions of the part haven't changed since last revision.
-        assert round(bbox.min.X) == xmin
-        assert round(bbox.size.X) == xlen
-
-        assert round(bbox.min.Y) == ymin
-        assert round(bbox.size.Y) == ylen
-
-        assert round(bbox.min.Z) == zmin
-        assert round(bbox.size.Z) == zlen
+        # This should raise a ValueError because names contains a wildcard
+        with pytest.raises(ValueError, match="No part targets matched wildcard pattern"):
+            builder.generate_parts("out", names=["tube/*"])
