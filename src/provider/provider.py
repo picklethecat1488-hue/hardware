@@ -9,7 +9,7 @@ from build123d import Part, Sketch, Wire
 import cadquery as cq
 from pydantic import validate_call, BaseModel
 from model.utils import method_cache
-from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES, COLOR
+from .types import Mode, Action, MODES, SUBASSEMBLIES, COLOR
 from .target_list import TargetList
 from .orchestrator import Orchestrator, ProviderOrchestrator
 from .utils import load_manifest
@@ -83,7 +83,7 @@ class Provider(ABC):
         return {}
 
     @property
-    def config(self) -> dict[str, Callable[[str, Optional[Subassembly]], Any]]:
+    def config(self) -> dict[str, Callable[[str, Optional[str]], Any]]:
         """A mapping of Modes to configuration handler methods."""
         return {}
 
@@ -98,7 +98,7 @@ class Provider(ABC):
         return TargetList(self, self.manifest.keys())
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def get_color(self, target: str, subassembly: Optional[Subassembly] = None) -> tuple[float, float, float, float]:
+    def get_color(self, target: str, subassembly: Optional[str] = None) -> tuple[float, float, float, float]:
         """Resolve the color for a specific target and subassembly."""
         target_cfg = self.manifest.get(target, {})
         color = target_cfg.get(COLOR)

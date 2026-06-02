@@ -5,7 +5,6 @@ from typing import Optional, Literal, cast
 from build123d import *  # type: ignore
 from pydantic import validate_call
 from model.utils import method_cache
-from provider import Subassembly
 from model.app_config import AppConfig
 from projects_config import TubeConfig
 from shell import Logger
@@ -171,12 +170,12 @@ class TubeConfigurator:
         self.tube_config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
         self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
 
-    def config_mount(self, target: str, subassembly: Optional[Subassembly]) -> None:
+    def config_mount(self, target: str, subassembly: Optional[str]) -> None:
         """Configure mounting hardware positions."""
         name = cast(Literal["driver", "passenger"], target)
         self.config_clamp(name)
 
-    def config_text(self, target: str, subassembly: Optional[Subassembly]) -> None:
+    def config_text(self, target: str, subassembly: Optional[str]) -> None:
         """Configure text logo positions."""
         name = cast(Literal["driver", "passenger"], target)
         self.config_text_logo(name)

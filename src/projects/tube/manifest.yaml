@@ -7,7 +7,7 @@ driver:
   diagram:
     modes: [default]
   part:
-    modes: [default, bare, print]
+    modes: [default, print]
     subassemblies: [left, right]
 passenger:
   color:
@@ -18,7 +18,7 @@ passenger:
   diagram:
     modes: [default]
   part:
-    modes: [default, bare, print]
+    modes: [default, print]
     subassemblies: [left, right]
 part_positions:
   view:

@@ -7,7 +7,7 @@ from model import AppConfig
 from provider.provider_router import ProviderRouter
 from provider.provider_manager import ProviderManager
 from provider.provider import Provider
-from provider.types import Action, Mode, Subassembly, MODES, SUBASSEMBLIES
+from provider.types import Action, Mode, MODES, SUBASSEMBLIES
 from provider.target_list import TargetList
 
 
@@ -114,9 +114,9 @@ def test_router_get_color():
     p1.get_color.return_value = (1.0, 0.0, 0.0, 1.0)  # type: ignore
     c = ProviderRouter(providers=[p1])
 
-    color = c.get_color("p1/part_a", Subassembly.LEFT)
+    color = c.get_color("p1/part_a", "left")
     assert color == (1.0, 0.0, 0.0, 1.0)
-    p1.get_color.assert_called_once_with("part_a", Subassembly.LEFT)  # type: ignore
+    p1.get_color.assert_called_once_with("part_a", "left")  # type: ignore
 
     with pytest.raises(ValueError, match="Target 'missing' not found"):
         c.get_color("missing")

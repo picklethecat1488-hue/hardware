@@ -24,7 +24,7 @@ Create a `manifest.yaml` file in your project folder. This file tells the orches
 # src/projects/bracket/manifest.yaml
 main_plate:
   part:
-    modes: [default, bare]
+    modes: [default]
     subassemblies: [left, right]
   config:
     modes: [default]
@@ -47,7 +47,7 @@ The provider acts as the interface between your builder and the application's or
 # src/projects/bracket/provider.py
 from build123d import *
 from pathlib import Path
-from provider import Provider, Action, Mode, Subassembly, discover_provider
+from provider import Provider, Action, Mode, discover_provider
 from projects_config import TubeConfig # Or a custom Pydantic model
 
 @discover_provider
@@ -63,10 +63,10 @@ class BracketProvider(Provider):
     def part(self):
         return {name: self.build_part for name in self.targets.supporting(Action.PART)}
 
-    def build_part(self, target: str, subassembly: Subassembly, mode: Mode) -> Part:
+    def build_part(self, target: str, subassembly: str, mode: Mode) -> Part:
         with BuildPart() as p:
             Box(10, 20, 5)
-            if subassembly == Subassembly.RIGHT:
+            if subassembly == "right":
                 mirror(about=Plane.YZ)
         return p.part
 ```
@@ -92,7 +92,7 @@ from .bracket import BracketProvider
 
 ### TargetList
 When you call `provider.targets`, it returns a `TargetList` helper. You can chain filters like:
-`provider.targets.supporting(Action.PART).for_subassemblies([Subassembly.LEFT])`
+`provider.targets.supporting(Action.PART).for_subassemblies(["left"])`
 
 ### Orchestration
 The `ProviderOrchestrator` handles the execution of tasks. It manages:
@@ -111,7 +111,7 @@ Add validation tests in `src/projects/tests/`. Your tests should:
 - Ensure mirrored parts do not intersect unexpectedly.
 - Validate that configuration updates correctly modify the `settings` model.
 
-Run tests for your provider using:
+Run tests for your provider from the repo root using:
 ```bash
 pytest src/projects/tests/test_your_project.py
 ```

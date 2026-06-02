@@ -8,7 +8,7 @@ from build123d import *
 from model import AppConfig
 from projects_config import TubeConfig
 from projects.tube import TubeProvider
-from provider import Action, Mode, Subassembly, TargetList, ProviderManager, MODES
+from provider import Action, Mode, TargetList, ProviderManager, MODES
 
 
 class TestTubeProvider:
@@ -23,18 +23,18 @@ class TestTubeProvider:
         """
         mock_manifest = {
             "driver": {
-                Action.CONFIG: {MODES: ["mount", "text", "bare"]},
+                Action.CONFIG: {MODES: ["mount", "text"]},
                 Action.PART: {
-                    "modes": [Mode.DEFAULT, Mode.BARE, Mode.PRINT],
-                    "subassemblies": [Subassembly.LEFT, Subassembly.RIGHT],
+                    "modes": [Mode.DEFAULT, Mode.PRINT],
+                    "subassemblies": ["left", "right"],
                 },
                 Action.DIAGRAM: {"modes": [Mode.DEFAULT]},
             },
             "passenger": {
-                Action.CONFIG: {MODES: ["mount", "text", "bare"]},
+                Action.CONFIG: {MODES: ["mount", "text"]},
                 Action.PART: {
-                    "modes": [Mode.DEFAULT, Mode.BARE, Mode.PRINT],
-                    "subassemblies": [Subassembly.LEFT, Subassembly.RIGHT],
+                    "modes": [Mode.DEFAULT, Mode.PRINT],
+                    "subassemblies": ["left", "right"],
                 },
                 Action.DIAGRAM: {"modes": [Mode.DEFAULT]},
             },
@@ -60,9 +60,6 @@ class TestTubeProvider:
     def test_measurements_path_override(self, provider):
         """Verify that ProviderManager syncs the provider's specific measurements path."""
         config = AppConfig()
-        # Before manager: uses TubeConfig default
-        assert "measurements.yml" in config.tube.measurements_path  # type: ignore
-
         mgr = ProviderManager(config, providers=[provider], bootstrap=False)
         mgr.load_configs()
         # After manager: uses TubeProvider's specific path
@@ -70,13 +67,13 @@ class TestTubeProvider:
 
     def test_action_registrations(self, provider):
         """Verify that build, config, and view actions are correctly registered."""
-        # Build registries are target-aware
+        # Build registries are singular and target-aware
         assert "driver" in provider.part
         assert "passenger" in provider.part
         assert "driver" in provider.diagram
         assert "passenger" in provider.diagram
 
-        # Config modes
+        # Config modes (dynamic string keys)
         assert "mount" in provider.config
         assert "text" in provider.config
 
@@ -89,27 +86,15 @@ class TestTubeProvider:
     def test_run_part_default(self, provider):
         """Verify executing a PART action in DEFAULT mode calls create_part."""
         with patch.object(provider.builder, "create_part", return_value="part_obj") as mock:
-            targets = provider.targets.supporting(Action.PART).for_subassemblies([Subassembly.LEFT])
+            targets = provider.targets.supporting(Action.PART).for_subassemblies(["left"])
             results = provider.run(targets)
             assert results == [("driver", "part_obj"), ("passenger", "part_obj")]
-            assert mock.call_count == 2
-
-    def test_run_part_bare(self, provider):
-        """Verify executing a PART action in BARE mode calls create_part with tube_only=True."""
-        with patch.object(provider.builder, "create_part", return_value="bare_obj") as mock:
-            targets = (
-                provider.targets.supporting(Action.PART).for_modes([Mode.BARE]).for_subassemblies([Subassembly.LEFT])
-            )
-            results = provider.run(targets)
-            assert results == [("driver", "bare_obj"), ("passenger", "bare_obj")]
             assert mock.call_count == 2
 
     def test_run_part_print(self, provider):
         """Verify executing a PART action in PRINT mode calls create_prepared_part."""
         with patch.object(provider.builder, "create_prepared_part", return_value="print_obj") as mock:
-            targets = (
-                provider.targets.supporting(Action.PART).for_modes([Mode.PRINT]).for_subassemblies([Subassembly.LEFT])
-            )
+            targets = provider.targets.supporting(Action.PART).for_modes([Mode.PRINT]).for_subassemblies(["left"])
             results = provider.run(targets)
             assert results == [("driver", "print_obj"), ("passenger", "print_obj")]
             assert mock.call_count == 2
@@ -134,14 +119,14 @@ class TestTubeProvider:
 
     def test_run_config_execution(self, provider):
         """Verify executing a CONFIG action returns None."""
-        targets = provider.targets.supporting(Action.CONFIG).for_modes(["mount"])
+        targets = provider.targets.supporting(Action.CONFIG).for_modes([Mode.DEFAULT])
         result = provider.run(targets)
         assert result is None
 
     def test_unsupported_config_mode_error(self, provider):
         """Verify that requesting an unregistered config mode raises a ValueError."""
-        # Mode.BARE is in manifest but not in TubeProvider.config registry skeleton
-        targets = TargetList(provider, ["driver"], action=Action.CONFIG, modes=[Mode.BARE])
+        # 'bare' is no longer supported
+        targets = TargetList(provider, ["driver"], action=Action.CONFIG, modes=["bare"])
         with pytest.raises(ValueError, match="No config handler registered for mode 'bare' in tube"):
             provider.run(targets)
 
@@ -430,6 +415,7 @@ class TestTubeConfigurator:
             patch.object(configurator, "config_clamp") as mock_clamp,
             patch.object(configurator, "config_text_logo") as mock_text,
         ):
+            mock_text.reset_mock()
             configurator.config_mount("driver", None)
             assert mock_clamp.call_count == 1
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, TYPE_CHECKING, Optional, Dict
 from concurrent.futures import ThreadPoolExecutor
-from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES
+from .types import Mode, Action, MODES, SUBASSEMBLIES
 from pydantic import validate_call
 from .target_list import TargetList
 
@@ -29,7 +29,7 @@ class Orchestrator(ABC):
         self,
         targets: tuple[str, ...],
         action: Action,
-        subassemblies: tuple[Subassembly, ...] = (),  # noqa: B006
+        subassemblies: tuple[str | None, ...] = (),  # noqa: B006
         modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:
         """Perform a build action."""
@@ -55,7 +55,7 @@ class ProviderOrchestrator(Orchestrator):
         self,
         targets: tuple[str, ...],
         action: Action,
-        subassemblies: tuple[Subassembly, ...] = (),
+        subassemblies: tuple[str | None, ...] = (),
         modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:
         """Perform the requested build action."""
@@ -78,14 +78,14 @@ class ProviderOrchestrator(Orchestrator):
 
         if action == Action.VIEW:
 
-            def view_task(item: tuple[str, Optional[Subassembly], Mode]) -> Any:
+            def view_task(item: tuple[str, Optional[str], Mode]) -> Any:
                 target, _, _ = item
                 return self.provider.view[target]()
 
             raw_results = list(self.executor.map(view_task, work))
         elif action == Action.CONFIG:
 
-            def config_task(item: tuple[str, Optional[Subassembly], Mode]) -> None:
+            def config_task(item: tuple[str, Optional[str], Mode]) -> None:
                 target, sa, m = item
                 self.provider.config[m](target, sa)
 
@@ -94,7 +94,7 @@ class ProviderOrchestrator(Orchestrator):
             return None
         elif action == Action.PART:
 
-            def build_task(item: tuple[str, Optional[Subassembly], Mode]) -> Any:
+            def build_task(item: tuple[str, Optional[str], Mode]) -> Any:
                 target, sa, m = item
                 handler = self.provider.part[target]
                 return handler(target, sa, m)
@@ -117,7 +117,7 @@ class ProviderOrchestrator(Orchestrator):
         self,
         targets: tuple[str, ...],
         action: Action,
-        subassemblies: tuple[Subassembly, ...],
+        subassemblies: tuple[str | None, ...],
         modes: tuple[Mode | str, ...],
     ) -> None:
         """Validate input parameters before the handler execution."""
@@ -251,7 +251,7 @@ class ProviderRouterOrchestrator(Orchestrator):
         self,
         targets: tuple[str, ...],
         action: Action,
-        subassemblies: tuple[Subassembly, ...] = (),
+        subassemblies: tuple[str | None, ...] = (),
         modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:
         """Route targets to their respective providers and merge results."""

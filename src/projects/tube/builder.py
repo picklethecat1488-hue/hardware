@@ -7,7 +7,7 @@ from build123d import *  # type: ignore
 import cadquery as cq  # type: ignore
 from pydantic import validate_call, Field
 from model.utils import method_cache
-from provider import Mode as ProviderMode, Subassembly
+from provider import Mode as ProviderMode
 from model.app_config import AppConfig
 from projects_config import TubeConfig
 
@@ -365,16 +365,16 @@ class TubeBuilder:
         part = part.translate(translation(part))
         return part
 
-    def build_part(self, target: str, subassembly: Optional[Subassembly], mode: ProviderMode) -> Any:
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def build_part(self, target: str, subassembly: Optional[str], mode: ProviderMode) -> Any:
         """Build part geometry supporting subassemblies and various modes."""
         name = cast(Literal["driver", "passenger"], target)
         if subassembly is None:
             return self.create_tube(name)
-        right = subassembly == Subassembly.RIGHT
+        right = subassembly == "right"
         if mode == ProviderMode.PRINT:
             return self.create_prepared_part(name, right=right)
-        tube_only = mode == ProviderMode.BARE
-        return self.create_part(name, right=right, tube_only=tube_only)
+        return self.create_part(name, right=right, tube_only=False)
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def create_diagram(

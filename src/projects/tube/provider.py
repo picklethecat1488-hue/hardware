@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional, TYPE_CHECKING
 from model.app_config import AppConfig
 from projects_config import TubeConfig
-from provider import Provider, Action, Mode, Subassembly, discover_provider
+from provider import Provider, Action, Mode, discover_provider
 from .builder import TubeBuilder
 from .configurator import TubeConfigurator
 from .viewer import TubeViewer
@@ -50,7 +50,7 @@ class TubeProvider(Provider):
         return {name: self.builder.build_diagram for name in self.targets.supporting(Action.DIAGRAM)}
 
     @property
-    def config(self) -> dict[str, Callable[[str, Optional[Subassembly]], Any]]:
+    def config(self) -> dict[str, Callable[[str, Optional[str]], Any]]:
         """A mapping of Modes to configuration handler methods."""
         return {
             "mount": self.configurator.config_mount,
