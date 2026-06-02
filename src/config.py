@@ -1,10 +1,7 @@
 """Run manifold configuration steps before building."""
 
 import argparse
-import importlib
 import fnmatch
-import sys
-from pathlib import Path
 from typing import Optional, Sequence
 from model import AppConfig
 from shell import Logger
@@ -73,10 +70,7 @@ class Configurator:
 
 
 def get_args():
-    """Get parsed arguments for the program.
-
-    :return _type_: Parsed arguments.
-    """
+    """Get parsed arguments for the program."""
     parser = argparse.ArgumentParser(description="Configuration Utility.")
     parser.add_argument("-e", "--env", required=False, default=".env", help="Output environment to file and exit.")
     parser.add_argument("-m", "--mode", required=False, default=None, help="Specific configuration mode to run.")
@@ -91,19 +85,7 @@ def get_args():
 
 
 def main(logger, args):
-    """Initialize the build environment and perform build actions.
-
-    :param _type_ args: The program arguments.
-    """
-    # Ensure the projects package is imported so subclasses are registered for discovery.
-    try:
-        src_path = str(Path(__file__).resolve().parent)
-        if src_path not in sys.path:
-            sys.path.insert(0, src_path)
-        importlib.import_module("projects")
-    except ImportError:
-        pass
-
+    """Initialize the build environment and perform build actions."""
     config = AppConfig()
     manager = ProviderManager(config, logger=logger)
     configurator = Configurator(manager, logger)
@@ -121,8 +103,7 @@ def main(logger, args):
 
 
 if __name__ == "__main__":
-    """Program entry point.
-    """
+    """Program entry point."""
     logger = Logger(text="Configuring...")
     args = get_args()
     main(logger, args)

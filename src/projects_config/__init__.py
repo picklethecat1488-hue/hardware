@@ -1,3 +1,3 @@
 """Project configuration models."""
 
-from .tube_config import TubeConfig
+from .exhaust_manifolds_config import ExhaustManifoldsConfig

@@ -152,8 +152,3 @@ class ProviderManager:
 
             # Attach the config instance to AppConfig as an extra field for dumping
             setattr(config, name, provider_config)
-
-            # Add to flattened keys so dump_env expands the nested Pydantic model into KEY__SUBKEY format
-            env_key = name.upper()
-            if env_key not in config._env_flattened_keys:
-                config._env_flattened_keys.append(env_key)

@@ -30,7 +30,7 @@ class TestModel:
     def config(self):
         """Return the app config fixture."""
         config = AppConfig()
-        # Bootstrapping the manager populates the 'tube' attribute on the config instance
+        # Bootstrapping the manager populates the 'exhaust_manifolds' attribute on the config instance
         ProviderManager(config)
         return config
 
@@ -48,13 +48,15 @@ class TestModel:
             inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
             return (
                 # Inlet start
-                config.tube.P[inlet_key],
+                config.exhaust_manifolds.P[inlet_key],
                 # Inlet end
-                config.tube.P[inlet_key] + config.tube.V[inlet_key] * config.tube.clamp_lengths[0],
+                config.exhaust_manifolds.P[inlet_key]
+                + config.exhaust_manifolds.V[inlet_key] * config.exhaust_manifolds.clamp_lengths[0],
                 # Outlet start
-                config.tube.P[outlet_key],
+                config.exhaust_manifolds.P[outlet_key],
                 # Outlet end
-                config.tube.P[outlet_key] + config.tube.V[outlet_key] * config.tube.clamp_lengths[-1],
+                config.exhaust_manifolds.P[outlet_key]
+                + config.exhaust_manifolds.V[outlet_key] * config.exhaust_manifolds.clamp_lengths[-1],
             )
 
         driver_inlet_start, driver_inlet_end, driver_outlet_start, _ = get_end_points("driver")

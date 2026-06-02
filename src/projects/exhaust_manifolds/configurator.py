@@ -6,26 +6,26 @@ from build123d import *  # type: ignore
 from pydantic import validate_call
 from model.utils import method_cache
 from model.app_config import AppConfig
-from projects_config import TubeConfig
+from projects_config import ExhaustManifoldsConfig
 from shell import Logger
-from .builder import TubeBuilder
+from .builder import ExhaustManifoldsBuilder
 
 
-class TubeConfigurator:
-    """Configurator for tube geometry."""
+class ExhaustManifoldsConfigurator:
+    """Configurator for exhaust manifold geometry."""
 
     def __init__(
         self,
-        builder: TubeBuilder,
+        builder: ExhaustManifoldsBuilder,
         config: AppConfig,
-        tube_config: TubeConfig,
+        exhaust_manifolds_config: ExhaustManifoldsConfig,
         executor: Optional[ThreadPoolExecutor] = None,
         logger: Optional[Logger] = None,
     ):
         """Initialize the configurator with a builder and config."""
         self.builder = builder
         self.config = config
-        self.tube_config = tube_config
+        self.exhaust_manifolds_config = exhaust_manifolds_config
         self._tube_cache = {}
         self._path_cache = {}
         self.executor = executor or ThreadPoolExecutor()
@@ -34,7 +34,7 @@ class TubeConfigurator:
     @validate_call(config={"arbitrary_types_allowed": True})
     def get_part_position(self, tube: Part | Solid, path: Wire, off: float):
         """Get a suitable attachment position on the tube."""
-        radius = min(self.tube_config.clamp_diameters) / 2
+        radius = min(self.exhaust_manifolds_config.clamp_diameters) / 2
         self._tube_cache[id(tube)] = tube
         self._path_cache[id(path)] = path
         return self.get_part_position_cached(id(tube), id(path), off, radius)
@@ -133,8 +133,8 @@ class TubeConfigurator:
         other_tube = self.builder.create_part(name, right=True, tube_only=True)
         path = self.builder.create_wire(name)
 
-        for idx in range(1, len(self.tube_config.clamp_positions[name]) - 1):
-            pos_info = self.tube_config.clamp_positions[name][idx]
+        for idx in range(1, len(self.exhaust_manifolds_config.clamp_positions[name]) - 1):
+            pos_info = self.exhaust_manifolds_config.clamp_positions[name][idx]
             if pos_info is not None:
                 clamp_offset, _ = pos_info
                 center = self.get_part_position(tube, path, clamp_offset)
@@ -147,7 +147,10 @@ class TubeConfigurator:
                 # Update the clamp offset
                 if offset_deg is None:
                     raise ValueError(f"failed to configure {name} clamp") from None
-                self.tube_config.clamp_positions[name][idx] = (cast(float, clamp_offset), float(offset_deg))
+                self.exhaust_manifolds_config.clamp_positions[name][idx] = (
+                    cast(float, clamp_offset),
+                    float(offset_deg),
+                )
                 self.logger.print(f"angle offset for {name} clamp {idx} updated to {offset_deg}°", symbol="📐")
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -156,7 +159,7 @@ class TubeConfigurator:
         tube = self.builder.create_part(name, right=True, tube_only=True)
         other_tube = self.builder.create_part(name, tube_only=True)
         path = self.builder.create_wire(name)
-        text_offset, _ = self.tube_config.logo_text_positions[name]
+        text_offset, _ = self.exhaust_manifolds_config.logo_text_positions[name]
         center = self.get_part_position(tube, path, text_offset)
         offset_deg = self.find_best_angle(
             lambda angle: self.builder.create_text(name, "FHB", right=True, offset_deg=angle),
@@ -167,7 +170,7 @@ class TubeConfigurator:
         # Update the text offset
         if offset_deg is None:
             raise ValueError(f"failed to configure {name} text logo") from None
-        self.tube_config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
+        self.exhaust_manifolds_config.logo_text_positions[name] = (cast(float, text_offset), float(offset_deg))
         self.logger.print(f"angle offset for {name} text logo updated to {offset_deg}°", symbol="📐")
 
     def config_mount(self, target: str, subassembly: Optional[str]) -> None:

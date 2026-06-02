@@ -66,7 +66,6 @@ class Builder:
 
     def generate_parts(self, out_dir, names=None, subassembly=None, mode=None):
         """Export STL files for generated parts."""
-        file_prefix = f"{self.config.project_name}_v{self.config.ver}"
         base_targets = self.manager.router.targets.supporting(Action.PART)
         if names:
             base_targets = base_targets.for_targets(names)
@@ -98,10 +97,20 @@ class Builder:
                 # Results is either a single geometry or a list of geometries
                 res_list = results if isinstance(results, list) else [results]
                 for i, geom in enumerate(res_list):
+                    if "/" in name:
+                        p_name, t_name = name.split("/", 1)
+                    else:
+                        p_name, t_name = "default", name
+
+                    # Create provider-specific subdirectory
+                    target_dir = Path(out_dir) / p_name
+                    target_dir.mkdir(parents=True, exist_ok=True)
+
                     sub = target_subs[i]
                     side_suffix = f"_{sub}" if sub else ""
-                    mesh_file_name = f"{file_prefix}_{name}{side_suffix}.stl"
-                    path_str = str(Path(out_dir) / mesh_file_name)
+
+                    mesh_file_name = f"{t_name}{side_suffix}.stl"
+                    path_str = str(target_dir / mesh_file_name)
                     export_stl(geom, path_str)
                     self.logger.print(f"Saved {path_str}", symbol="📄")
 
@@ -121,9 +130,17 @@ class Builder:
 
         results = self.manager.router.run(targets)
         for p_name, assy in results or []:
-            diagram_name = f"{self.config.project_name}_v{self.config.ver}_{p_name}_diagram.svg"
-            path_str = str(Path(out_dir) / diagram_name)
-            assy.toCompound().export(path_str, opt=self.config.diagram_options.model_dump(by_alias=True))
+            # Create provider-specific subdirectory
+            target_dir = Path(out_dir) / p_name
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            diagram_name = f"{p_name}_diagram.svg"
+            path_str = str(target_dir / diagram_name)
+
+            provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
+            options = getattr(provider.settings, "diagram_options", None) if provider else None
+            opt_dict = options.model_dump(by_alias=True) if options else {}
+            assy.toCompound().export(path_str, opt=opt_dict)
             self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_all(self, out_dir, subassembly=None, zip_name="build.zip"):
@@ -132,11 +149,12 @@ class Builder:
         def zip_build(zip_file_str):
             """Write generated files into a zip archive."""
             with zipfile.ZipFile(zip_file_str, "w", zipfile.ZIP_DEFLATED) as zipf:
-                for _, _, files in os.walk(out_dir):
+                for root, _, files in os.walk(out_dir):
                     for file in files:
-                        file_str = str(Path(out_dir) / file)
-                        if not os.path.samefile(zip_file_str, file_str):
-                            zipf.write(file_str, file)
+                        file_path = Path(root) / file
+                        if not os.path.samefile(zip_file_str, str(file_path)):
+                            # Preserve directory structure in zip
+                            zipf.write(str(file_path), str(file_path.relative_to(out_dir)))
 
         # Export the diagram and files
         if not self.manager.router.providers:
