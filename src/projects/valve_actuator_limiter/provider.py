@@ -1,54 +1,163 @@
 """Valve actuator limiter geometry provider."""
 
+import math
 from functools import cached_property
-from build123d import *
+from build123d import *  # type: ignore
 import cadquery as cq
-from model import method_cache
+import numpy as np
+from model import method_cache, DiagramOptions
 from pathlib import Path
-from provider import Provider, Action, Mode, discover_provider
+from provider import Provider, Action, Mode as ProviderMode, discover_provider
 from projects_config.valve_actuator_limiter_config import ValveActuatorLimiterConfig
 from typing import Any, cast, Callable
 
 
 @discover_provider
 class ValveActuatorLimiterProvider(Provider):
-    """Provider for valve actuator limiter geometry.
-
-    This provider manages the creation of mechanical stops used to limit the rotation
-    of exhaust valve actuators, typically used when aftermarket exhaust components
-    interfere with OEM actuator sweep ranges.
-    """
+    """Provider for valve actuator limiter geometry."""
 
     @cached_property
     def default_config(self) -> ValveActuatorLimiterConfig:
         """Return the default configuration for the limiter project."""
-        return ValveActuatorLimiterConfig(measurements_path=str(Path(__file__).parent / "measurements.yaml"))
+        return ValveActuatorLimiterConfig(
+            measurements_path=str(Path(__file__).parent / "measurements.yaml"),
+            diagram_options=DiagramOptions(line_weight=0.5, projection_dir=(0, 0, 1)),
+        )
+
+    @property
+    def settings(self) -> ValveActuatorLimiterConfig:
+        """Return the typed configuration settings."""
+        return cast(ValveActuatorLimiterConfig, super().settings)
+
+    @cached_property
+    def hull_center(self) -> Vector:
+        """Calculate the geometric center of the plate's base hull."""
+        with BuildSketch() as s:
+            with Locations(self.settings.bolt_holes):
+                Circle(radius=self.settings.bolt_radius + self.settings.wall_thickness)
+            make_hull()
+        return s.sketch.center()
 
     @property
     def part(self) -> dict[str, Callable[..., Part]]:
         """A mapping of part names to their build handler methods."""
-        return {name: self.build_part for name in self.targets.supporting(Action.PART)}
+        return {"limiter": self.build_limiter, "plate": self.build_plate, "limiter_plate": self.build_limiter_plate}
 
     @property
     def diagram(self) -> dict[str, Callable[..., Any]]:
         """A mapping of diagram names to their build handler methods."""
         return {name: self.build_diagram for name in self.targets.supporting(Action.DIAGRAM)}
 
-    def build_part(self, target: str, subassembly: str, mode: Mode) -> Part:
+    @method_cache
+    def build_limiter(self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT) -> Part:
+        """Create a 3D sector (limiter) solid using only 3D primitives."""
+        start_angle = 180 if subassembly == "0deg" else 90 if subassembly == "90deg" else 270
+        cutter_size = self.settings.pocket_radius * 3
+
+        with BuildPart() as limiter_gen:
+            Cylinder(
+                radius=self.settings.pocket_radius + self.settings.wall_thickness,
+                height=self.settings.pocket_depth,
+                align=(Align.CENTER, Align.CENTER, Align.MIN),
+            )
+            # Use two rotated boxes as half-plane cutters to isolate the stop_angle sector
+            with Locations(Rot(0, 0, start_angle - 90)):
+                Box(
+                    cutter_size,
+                    cutter_size,
+                    self.settings.pocket_depth - self.settings.wall_thickness,
+                    align=(Align.MIN, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
+            with Locations(Rot(0, 0, start_angle + self.settings.stop_angle + 90)):
+                Box(
+                    cutter_size,
+                    cutter_size,
+                    self.settings.pocket_depth - self.settings.wall_thickness,
+                    align=(Align.MIN, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
+        return cast(Part, limiter_gen.part)
+
+    @method_cache
+    def build_plate(self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT) -> Part:
         """Build the geometry for a limiter plate."""
         with BuildPart() as p:
-            Box(20, 30, self.settings.base_thickness)
-            if subassembly == "right":
-                mirror(about=Plane.YZ)
-        if p.part is None:
-            raise ValueError(f"Failed to build part for target '{target}'")
-        return p.part
+            # Generate the structural outer profile
+            with BuildSketch():
+                with Locations(self.settings.bolt_holes):
+                    Circle(radius=self.settings.bolt_radius + self.settings.wall_thickness)
+                make_hull()
+            extrude(amount=self.settings.wall_thickness)
 
-    def build_diagram(self, targets: list[str], mode: Mode) -> Any:
+            with Locations((self.hull_center.X, self.hull_center.Y, 0)):
+                Cylinder(
+                    radius=self.settings.pocket_radius + self.settings.wall_thickness,
+                    height=self.settings.pocket_depth,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    mode=Mode.ADD,
+                )
+
+            # Cut back the plate between holes 2 and 3 to clear the obstruction
+            # (Assumes holes are indices 1 and 2 in the bolt_holes list)
+            holes = self.settings.bolt_holes
+            if len(holes) >= 3:
+                h2, h3 = holes[1], holes[2]
+                edge_vec = h3 - h2
+                midpoint = (h2 + h3) * 0.5
+                # Compute a normal pointing outwards from the part center
+                outward_normal = Vector(edge_vec.Y, -edge_vec.X).normalized()
+                cylinder_offset = self.settings.pocket_radius + self.settings.wall_thickness
+                half_dist = edge_vec.length / 2
+                boss_radius = self.settings.bolt_radius + self.settings.wall_thickness
+                scallop_radius = math.sqrt(half_dist**2 + cylinder_offset**2) - boss_radius
+
+                # Place a large cylinder to create a concave scalloped cut along the edge
+                with Locations(midpoint + outward_normal * cylinder_offset):
+                    Cylinder(
+                        radius=scallop_radius,
+                        height=1000,
+                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                        mode=Mode.SUBTRACT,
+                    )
+
+            # Subtract the center pocket for the actuator drive mechanism
+            with Locations((self.hull_center.X, self.hull_center.Y, 0)):
+                Cylinder(
+                    radius=self.settings.pocket_radius,
+                    height=self.settings.wall_thickness + self.settings.pocket_depth,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
+
+            # Drill M6 bolt alignment holes through the entire part
+            with Locations([(v.X, v.Y, 0) for v in self.settings.bolt_holes]):
+                Cylinder(
+                    radius=self.settings.bolt_radius,
+                    height=self.settings.wall_thickness + self.settings.pocket_depth,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
+        return cast(Part, p.part)
+
+    @method_cache
+    def build_limiter_plate(
+        self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT
+    ) -> Part:
+        """Build the geometry for a limiter plate."""
+        with BuildPart() as p:
+            plate = self.build_plate("_plate", subassembly=subassembly, mode=mode)
+            add(plate)
+            with Locations((self.hull_center.X, self.hull_center.Y, 0)):
+                add(self.build_limiter("_limiter", subassembly=subassembly, mode=mode))
+        return cast(Part, p.part)
+
+    @method_cache
+    def build_diagram(self, targets: list[str], mode: ProviderMode) -> Any:
         """Build an assembly diagram for the limiter plates."""
         assy = cq.Assembly()
         # Build the left subassembly for the diagram view
-        plate = self.build_part("limiter_plate", "left", mode=mode)
+        plate = self.build_limiter_plate("limiter_plate")
 
         # Pylance fix: Ensure the wrapped OCCT shape is not None before casting to CadQuery
         if plate.wrapped is not None:

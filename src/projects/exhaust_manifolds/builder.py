@@ -2,7 +2,7 @@
 
 import math
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Optional, cast, Annotated, Literal
+from typing import Any, Optional, cast, Annotated, Literal, Sequence
 from build123d import *  # type: ignore
 import cadquery as cq  # type: ignore
 from pydantic import validate_call, Field
@@ -402,7 +402,7 @@ class ExhaustManifoldsBuilder:
     @validate_call(config={"arbitrary_types_allowed": True})
     def create_diagram(
         self,
-        names: Optional[list[Literal["driver", "passenger"]]] = None,
+        names: Optional[Sequence[Literal["driver", "passenger"]]] = None,
         right_vals: tuple[bool, ...] = (False, True),
     ) -> Any:
         """Build an exploded diagram for the parts."""
@@ -461,7 +461,7 @@ class ExhaustManifoldsBuilder:
                 assy.add(to_cq_shape(cast(Part, label_gen.part)))
         return assy
 
-    def build_diagram(self, targets: list[str], mode: ProviderMode) -> Any:
+    def build_diagram(self, targets: Sequence[str], mode: ProviderMode) -> Any:
         """Build assembly diagrams."""
-        names = cast(list[Literal["driver", "passenger"]], targets)
+        names = cast(Sequence[Literal["driver", "passenger"]], targets)
         return self.create_diagram(names=names)

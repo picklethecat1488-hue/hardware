@@ -11,6 +11,15 @@ import yaml
 T = TypeVar("T", bound=Callable[..., Any])
 
 
+def _make_hashable(obj: Any) -> Any:
+    """Recursively convert unhashable types into hashable ones."""
+    if isinstance(obj, (list, tuple)):
+        return tuple(_make_hashable(i) for i in obj)
+    if isinstance(obj, dict):
+        return tuple(sorted((k, _make_hashable(v)) for k, v in obj.items()))
+    return obj
+
+
 @overload
 def method_cache(func: Callable[..., Any]) -> Callable[..., Any]: ...
 
@@ -29,7 +38,7 @@ def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128) 
             if not hasattr(self, cache_attr):
                 setattr(self, cache_attr, OrderedDict())
             cache = getattr(self, cache_attr)
-            key = (args, tuple(sorted(kwargs.items())))
+            key = (_make_hashable(args), _make_hashable(kwargs))
             if key in cache:
                 cache.move_to_end(key)
                 return cache[key]

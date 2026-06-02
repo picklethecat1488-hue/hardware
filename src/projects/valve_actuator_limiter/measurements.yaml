@@ -1,2 +1,16 @@
-mounting_hole_spacing: 45.0
-limiter_height: 10.0
+# Wall thickness
+wall_thickness: 3.0
+# Clean clearance for the 14.0mm gear protrusion
+pocket_depth: 15.5          
+# 17.5mm pocket radius (1.5mm wall clearance)
+pocket_radius: 25
+# M6 bolt alignment radius
+bolt_radius: 3.2
+# Valve travel span
+stop_angle: 75.0                                      
+# Exact Asymmetric Bolt Hole Coordinates (Centroid-aligned)
+bolt_holes: [
+    [-30.38, -25.20],
+    [34.62, -25.20],
+    [-4.23, 50.40]
+]
