@@ -1,4 +1,4 @@
-"""Tube geometry configuration and measurement processing logic."""
+"""Exhaust manifolds geometry configuration and measurement processing logic."""
 
 from typing import Any, Literal, cast, Optional
 from functools import cached_property
@@ -9,12 +9,12 @@ from build123d import Vector
 from model import TextArgs, load_measurements, DiagramOptions
 
 
-class TubeConfig(BaseModel):
-    """Tube and part configuration."""
+class ExhaustManifoldsConfig(BaseModel):
+    """Exhaust manifold and part configuration."""
 
     measurements_path: Optional[str] = Field(
         default=None,
-        description="Optional override for the measurements YAML file path. Defaults to AppConfig.measurements_path.",
+        description="Optional override for the measurements YAML file path.",
     )
 
     diagram_options: DiagramOptions = Field(default_factory=DiagramOptions, description="Diagram export options")

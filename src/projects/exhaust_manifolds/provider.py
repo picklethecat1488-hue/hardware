@@ -4,46 +4,48 @@ from pathlib import Path
 from functools import cached_property
 from typing import Any, Callable, Optional, TYPE_CHECKING
 from model.app_config import AppConfig
-from projects_config import TubeConfig
+from projects_config import ExhaustManifoldsConfig
 from provider import Provider, Action, Mode, discover_provider
-from .builder import TubeBuilder
-from .configurator import TubeConfigurator
-from .viewer import TubeViewer
+from .builder import ExhaustManifoldsBuilder
+from .configurator import ExhaustManifoldsConfigurator
+from .viewer import ExhaustManifoldsViewer
 
 
 @discover_provider
-class TubeProvider(Provider):
-    """Provides tube geometry and configuration."""
+class ExhaustManifoldsProvider(Provider):
+    """Provides exhaust manifold geometry and configuration."""
 
     @cached_property
-    def default_config(self) -> TubeConfig:
-        """Return the default tube configuration."""
-        return TubeConfig(measurements_path=str(Path(__file__).parent / "measurements.yaml"))
+    def default_config(self) -> ExhaustManifoldsConfig:
+        """Return the default exhaust manifolds configuration."""
+        return ExhaustManifoldsConfig(measurements_path=str(Path(__file__).parent / "measurements.yaml"))
 
     @cached_property
-    def builder(self) -> TubeBuilder:
-        """Return the tube builder."""
-        return TubeBuilder(config=self.app_config, tube_config=self.settings, executor=self.orchestrator.executor)
+    def builder(self) -> ExhaustManifoldsBuilder:
+        """Return the exhaust manifolds builder."""
+        return ExhaustManifoldsBuilder(
+            config=self.app_config, exhaust_manifolds_config=self.settings, executor=self.orchestrator.executor
+        )
 
     @cached_property
-    def configurator(self) -> TubeConfigurator:
-        """Return the tube configurator."""
-        return TubeConfigurator(
+    def configurator(self) -> ExhaustManifoldsConfigurator:
+        """Return the exhaust manifolds configurator."""
+        return ExhaustManifoldsConfigurator(
             builder=self.builder,
             config=self.app_config,
-            tube_config=self.settings,
+            exhaust_manifolds_config=self.settings,
             executor=self.orchestrator.executor,
             logger=self.logger,
         )
 
     @cached_property
-    def viewer(self) -> TubeViewer:
-        """Return the tube viewer."""
-        return TubeViewer(
+    def viewer(self) -> ExhaustManifoldsViewer:
+        """Return the exhaust manifolds viewer."""
+        return ExhaustManifoldsViewer(
             builder=self.builder,
             configurator=self.configurator,
             config=self.app_config,
-            tube_config=self.settings,
+            exhaust_manifolds_config=self.settings,
             executor=self.orchestrator.executor,
         )
 

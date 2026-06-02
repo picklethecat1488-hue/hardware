@@ -5,29 +5,29 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, Literal, cast
 from build123d import *  # type: ignore
 from model.app_config import AppConfig
-from projects_config import TubeConfig
-from .builder import TubeBuilder
-from .configurator import TubeConfigurator
+from projects_config import ExhaustManifoldsConfig
+from .builder import ExhaustManifoldsBuilder
+from .configurator import ExhaustManifoldsConfigurator
 
 
-class TubeViewer:
-    """Viewer for tube geometry."""
+class ExhaustManifoldsViewer:
+    """Viewer for exhaust manifold geometry."""
 
     def __init__(
         self,
-        builder: TubeBuilder,
-        configurator: TubeConfigurator,
+        builder: ExhaustManifoldsBuilder,
+        configurator: ExhaustManifoldsConfigurator,
         config: AppConfig,
-        tube_config: TubeConfig,
+        exhaust_manifolds_config: ExhaustManifoldsConfig,
         executor: Optional[ThreadPoolExecutor] = None,
     ):
         """Initialize the viewer with a builder and config."""
         self.builder = builder
         self.configurator = configurator
         self.config = config
-        self.tube_config = tube_config
+        self.exhaust_manifolds_config = exhaust_manifolds_config
         self.executor = executor or ThreadPoolExecutor()
-        self.names = self.tube_config.names
+        self.names = self.exhaust_manifolds_config.names
 
     def _get_rgba(self, color_name: str, alpha: float) -> tuple[float, float, float, float]:
         """Convert a color name to an RGBA tuple."""
@@ -47,13 +47,13 @@ class TubeViewer:
     @property
     def bound_box(self) -> Part:
         """Return the axis-aligned build bounding box."""
-        x_len = max(self.tube_config.x_bounds) - min(self.tube_config.x_bounds)
-        y_len = max(self.tube_config.y_bounds) - min(self.tube_config.y_bounds)
-        z_len = max(self.tube_config.z_bounds) - min(self.tube_config.z_bounds)
+        x_len = max(self.exhaust_manifolds_config.x_bounds) - min(self.exhaust_manifolds_config.x_bounds)
+        y_len = max(self.exhaust_manifolds_config.y_bounds) - min(self.exhaust_manifolds_config.y_bounds)
+        z_len = max(self.exhaust_manifolds_config.z_bounds) - min(self.exhaust_manifolds_config.z_bounds)
         center = (
-            min(self.tube_config.x_bounds) + x_len / 2,
-            min(self.tube_config.y_bounds) + y_len / 2,
-            min(self.tube_config.z_bounds) + z_len / 2,
+            min(self.exhaust_manifolds_config.x_bounds) + x_len / 2,
+            min(self.exhaust_manifolds_config.y_bounds) + y_len / 2,
+            min(self.exhaust_manifolds_config.z_bounds) + z_len / 2,
         )
         with BuildPart() as bounds:
             Box(x_len, y_len, z_len)
@@ -98,7 +98,7 @@ class TubeViewer:
         to_show = {}
         for name in self.names:
             color = "cyan" if name == "driver" else "yellow"
-            to_show[f"{name}_full_tube"] = (self.builder.create_tube(name), color, 0.2)
+            to_show[f"{name}_full_tube"] = (self.builder.create_manifold(name), color, 0.2)
             for right in [False, True]:
                 side = "right" if right else "left"
                 color = ("red" if right else "green") if name == "driver" else ("blue" if right else "orange")

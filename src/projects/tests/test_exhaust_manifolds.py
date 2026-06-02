@@ -1,4 +1,4 @@
-"""Unit tests for the TubeProvider class."""
+"""Unit tests for the ExhaustManifoldsProvider class."""
 
 import math
 import pytest
@@ -7,17 +7,17 @@ from typing import cast
 from unittest.mock import patch
 from build123d import *
 from model import AppConfig
-from projects_config import TubeConfig
-from projects.tube import TubeProvider
+from projects_config import ExhaustManifoldsConfig
+from projects.exhaust_manifolds import ExhaustManifoldsProvider
 from provider import Action, Mode, TargetList, ProviderManager, MODES
 
 
-class TestTubeProvider:
-    """Tests for TubeProvider implementation."""
+class TestExhaustManifoldsProvider:
+    """Tests for ExhaustManifoldsProvider implementation."""
 
     @pytest.fixture
     def provider(self):
-        """Fixture for TubeProvider.
+        """Fixture for ExhaustManifoldsProvider.
 
         Note: We patch load_manifest to avoid file IO and ensure the manifest
         is aligned with our testing expectations for the skeleton.
@@ -45,17 +45,17 @@ class TestTubeProvider:
             "sketch": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
         }
         with patch("provider.provider.load_manifest", return_value=mock_manifest):
-            yield TubeProvider()
+            yield ExhaustManifoldsProvider()
 
     def test_identity(self, provider):
         """Verify provider name and configuration type."""
-        assert provider.name == "tube"
-        assert isinstance(provider.default_config, TubeConfig)
+        assert provider.name == "exhaust_manifolds"
+        assert isinstance(provider.default_config, ExhaustManifoldsConfig)
 
     def test_settings_resolution(self, provider):
-        """Verify settings property correctly retrieves TubeConfig from app_config."""
-        assert isinstance(provider.settings, TubeConfig)
-        # Ensure it reflects the defaults from TubeConfig
+        """Verify settings property correctly retrieves ExhaustManifoldsConfig from app_config."""
+        assert isinstance(provider.settings, ExhaustManifoldsConfig)
+        # Ensure it reflects the defaults from ExhaustManifoldsConfig
         assert provider.settings.wall_thickness == provider.default_config.wall_thickness
 
     def test_measurements_path_override(self, provider):
@@ -63,7 +63,7 @@ class TestTubeProvider:
         config = AppConfig()
         mgr = ProviderManager(config, providers=[provider], bootstrap=False)
         mgr.load_configs()
-        # After manager: uses TubeProvider's specific path
+        # After manager: uses ExhaustManifoldsProvider's specific path
         assert "measurements.yaml" in provider.settings.measurements_path  # type: ignore
 
     def test_action_registrations(self, provider):
@@ -101,12 +101,12 @@ class TestTubeProvider:
             assert mock.call_count == 2
 
     def test_run_part_no_subassembly(self, provider):
-        """Verify executing a PART action without a subassembly calls create_tube."""
-        with patch.object(provider.builder, "create_tube", return_value="tube_obj") as mock:
+        """Verify executing a PART action without a subassembly calls create_manifold."""
+        with patch.object(provider.builder, "create_manifold", return_value="manifold_obj") as mock:
             # Manually construct TargetList without subassemblies
             targets = TargetList(provider, ["driver"], action=Action.PART)
             results = provider.run(targets)
-            assert results == [("driver", "tube_obj")]
+            assert results == [("driver", "manifold_obj")]
             mock.assert_called_once_with("driver")
 
     def test_run_diagram(self, provider):
@@ -128,19 +128,19 @@ class TestTubeProvider:
         """Verify that requesting an unregistered config mode raises a ValueError."""
         # 'bare' is no longer supported
         targets = TargetList(provider, ["driver"], action=Action.CONFIG, modes=["bare"])
-        with pytest.raises(ValueError, match="No config handler registered for mode 'bare' in tube"):
+        with pytest.raises(ValueError, match="No config handler registered for mode 'bare' in exhaust_manifolds"):
             provider.run(targets)
 
 
-class TestTubeBuilder:
+class TestExhaustManifoldsBuilder:
     """Manifold builder unit tests."""
 
     @pytest.fixture
     def builder(self):
-        """Return the tube builder fixture."""
+        """Return the exhaust_manifolds builder fixture."""
         config = AppConfig()
-        provider = TubeProvider(config=config)
-        # Bootstrap to load .env overrides and attach config.tube
+        provider = ExhaustManifoldsProvider(config=config)
+        # Bootstrap to load .env overrides and attach config.exhaust_manifolds
         ProviderManager(config, providers=[provider])
         return provider.builder
 
@@ -171,24 +171,28 @@ class TestTubeBuilder:
         wire = builder.create_wire(name)
         length = wire.length
         inlet_clamp_start = wire.position_at(0.0)
-        inlet_clamp_end = wire.position_at(builder.tube_config.clamp_lengths[0] / length)
-        outlet_clamp_start = wire.position_at((length - builder.tube_config.clamp_lengths[-1]) / length)
+        inlet_clamp_end = wire.position_at(builder.exhaust_manifolds_config.clamp_lengths[0] / length)
+        outlet_clamp_start = wire.position_at((length - builder.exhaust_manifolds_config.clamp_lengths[-1]) / length)
         outlet_clamp_end = wire.position_at(1.0)
         inlet_key, outlet_key = f"{name}_inlet", f"{name}_outlet"
 
         # Make sure the clamp starts are correct
-        assert calc_point_err(inlet_clamp_start, builder.tube_config.P[inlet_key]) == pytest.approx(0)
-        assert calc_point_err(outlet_clamp_start, builder.tube_config.P[outlet_key]) == pytest.approx(0)
+        assert calc_point_err(inlet_clamp_start, builder.exhaust_manifolds_config.P[inlet_key]) == pytest.approx(0)
+        assert calc_point_err(outlet_clamp_start, builder.exhaust_manifolds_config.P[outlet_key]) == pytest.approx(0)
 
         # Check clamp direction and length
         assert calc_point_err(
-            (inlet_clamp_end - inlet_clamp_start).normalized(), builder.tube_config.V[inlet_key]
+            (inlet_clamp_end - inlet_clamp_start).normalized(), builder.exhaust_manifolds_config.V[inlet_key]
         ) == pytest.approx(0)
         assert calc_point_err(
-            (outlet_clamp_end - outlet_clamp_start).normalized(), builder.tube_config.V[outlet_key]
+            (outlet_clamp_end - outlet_clamp_start).normalized(), builder.exhaust_manifolds_config.V[outlet_key]
         ) == pytest.approx(0)
-        assert (inlet_clamp_end - inlet_clamp_start).length == pytest.approx(builder.tube_config.clamp_lengths[0])
-        assert (outlet_clamp_end - outlet_clamp_start).length == pytest.approx(builder.tube_config.clamp_lengths[-1])
+        assert (inlet_clamp_end - inlet_clamp_start).length == pytest.approx(
+            builder.exhaust_manifolds_config.clamp_lengths[0]
+        )
+        assert (outlet_clamp_end - outlet_clamp_start).length == pytest.approx(
+            builder.exhaust_manifolds_config.clamp_lengths[-1]
+        )
 
     def test_create_profile(self, builder):
         """Test profile sketch generation for a valid center/angle profile."""
@@ -221,7 +225,7 @@ class TestTubeBuilder:
     def test_part_doesnt_overlap(self, builder, name, right):
         """Ensure parts from different assemblies do not intersect."""
         part = builder.create_part(name, right=right)
-        other_name = next(x for x in builder.tube_config.names if x != name)
+        other_name = next(x for x in builder.exhaust_manifolds_config.names if x != name)
         other_part = builder.create_part(other_name, right=not right)
         intersection = part.intersect(other_part)
 
@@ -234,13 +238,13 @@ class TestTubeBuilder:
         """Verify part fits inside bound box volume."""
         part = builder.create_part(name, right=right)
         # Reconstruct bound box logic since it moved to viewer
-        x_len = max(builder.tube_config.x_bounds) - min(builder.tube_config.x_bounds)
-        y_len = max(builder.tube_config.y_bounds) - min(builder.tube_config.y_bounds)
-        z_len = max(builder.tube_config.z_bounds) - min(builder.tube_config.z_bounds)
+        x_len = max(builder.exhaust_manifolds_config.x_bounds) - min(builder.exhaust_manifolds_config.x_bounds)
+        y_len = max(builder.exhaust_manifolds_config.y_bounds) - min(builder.exhaust_manifolds_config.y_bounds)
+        z_len = max(builder.exhaust_manifolds_config.z_bounds) - min(builder.exhaust_manifolds_config.z_bounds)
         center = (
-            min(builder.tube_config.x_bounds) + x_len / 2,
-            min(builder.tube_config.y_bounds) + y_len / 2,
-            min(builder.tube_config.z_bounds) + z_len / 2,
+            min(builder.exhaust_manifolds_config.x_bounds) + x_len / 2,
+            min(builder.exhaust_manifolds_config.y_bounds) + y_len / 2,
+            min(builder.exhaust_manifolds_config.z_bounds) + z_len / 2,
         )
         with BuildPart() as bounds:
             Box(x_len, y_len, z_len)
@@ -259,28 +263,40 @@ class TestTubeBuilder:
         # Map clamp_idx to clamp parameters
         offsets = (
             [0]
-            + [clamp_pos[0] for clamp_pos in builder.tube_config.clamp_positions[name][1:-1] if clamp_pos is not None]
-            + [(length - builder.tube_config.clamp_lengths[-1]) / length]
+            + [
+                clamp_pos[0]
+                for clamp_pos in builder.exhaust_manifolds_config.clamp_positions[name][1:-1]
+                if clamp_pos is not None
+            ]
+            + [(length - builder.exhaust_manifolds_config.clamp_lengths[-1]) / length]
         )
-        expected = np.array(builder.tube_config.clamp_diameters) / 2
+        expected = np.array(builder.exhaust_manifolds_config.clamp_diameters) / 2
         """Test if manifold clamps satisfy fitment requirements."""
         part = builder.create_part(name, right=right)
         pos, len, expected = (
             offsets[clamp_idx],
-            builder.tube_config.clamp_lengths[clamp_idx],
+            builder.exhaust_manifolds_config.clamp_lengths[clamp_idx],
             expected[clamp_idx],
         )
 
         # Check if we can move clamp over section
         clamp_off = builder.create_ring(
-            name, pos, len, outer_radius=expected + builder.tube_config.wall_thickness, inner_radius=expected
+            name,
+            pos,
+            len,
+            outer_radius=expected + builder.exhaust_manifolds_config.wall_thickness,
+            inner_radius=expected,
         )
         intersection_off = part.intersect(clamp_off)
         assert self._calc_vol(intersection_off) == pytest.approx(0, abs=1e-3)
 
         # Check if we can push clamp onto section
         clamp_on = builder.create_ring(
-            name, pos, len, outer_radius=expected + builder.tube_config.wall_thickness, inner_radius=expected - 0.01
+            name,
+            pos,
+            len,
+            outer_radius=expected + builder.exhaust_manifolds_config.wall_thickness,
+            inner_radius=expected - 0.01,
         )
         intersection_on = part.intersect(clamp_on)
         assert self._calc_vol(intersection_on) > 0
@@ -289,7 +305,7 @@ class TestTubeBuilder:
         """Verify rebuilt part geometry matches manifold volume."""
         if name != "driver" and name != "passenger":
             raise ValueError(f"Invalid name: {name}")
-        manifold = builder.create_tube(name, right=right, half_tube=True)
+        manifold = builder.create_manifold(name, right=right, half_tube=True)
         part = builder.create_part(name, right=right)
         manifold_vol = manifold.volume
         intersection = part.intersect(manifold)
@@ -336,7 +352,7 @@ class TestTubeBuilder:
         def get_angle(key):
             """Compute the vertical angle of an exhaust end vector."""
             z_axis = Vector(0, 0, 1)
-            v_test = Vector(builder.tube_config.V[key])
+            v_test = Vector(builder.exhaust_manifolds_config.V[key])
             angle = 90 - v_test.get_angle(z_axis)
             return angle
 
@@ -380,15 +396,15 @@ class TestTubeBuilder:
         assert round(bbox.size.Z) == zlen
 
 
-class TestTubeConfigurator:
+class TestExhaustManifoldsConfigurator:
     """Manifold configurator unit tests."""
 
     @pytest.fixture
     def configurator(self):
-        """Return the tube configurator fixture."""
+        """Return the exhaust_manifolds configurator fixture."""
         config = AppConfig()
-        provider = TubeProvider(config=config)
-        # Bootstrap to load .env overrides and attach config.tube
+        provider = ExhaustManifoldsProvider(config=config)
+        # Bootstrap to load .env overrides and attach config.exhaust_manifolds
         ProviderManager(config, providers=[provider])
         return provider.configurator
 
@@ -418,14 +434,14 @@ class TestTubeConfigurator:
             Box(10, 10, 10)
         tube_obj = tube.part.moved(Location(pos + Vector(0, 0, 2)))  # type: ignore
 
-        radius = min(configurator.tube_config.clamp_diameters) / 2
+        radius = min(configurator.exhaust_manifolds_config.clamp_diameters) / 2
         result = configurator.get_part_position(tube_obj, path, 0.5)
 
         expected = path.position_at(0.5) + Vector(0, 0, radius)
         assert result == expected
 
     def test_config_clamp_updates_config(self, configurator, monkeypatch):
-        """Verify that config_clamp updates the underlying TubeConfig."""
+        """Verify that config_clamp updates the underlying ExhaustManifoldsConfig."""
         name = "driver"
         # Mock find_best_angle to avoid expensive CAD collision scanning
         monkeypatch.setattr(configurator, "find_best_angle", lambda *args, **kwargs: 45.0)
@@ -433,17 +449,17 @@ class TestTubeConfigurator:
         configurator.config_clamp(name)
 
         # Verify that the angle for the middle clamp (index 1) was updated
-        _, angle = configurator.tube_config.clamp_positions[name][1]
+        _, angle = configurator.exhaust_manifolds_config.clamp_positions[name][1]
         assert angle == 45.0
 
     def test_config_text_logo_updates_config(self, configurator, monkeypatch):
-        """Verify that config_text_logo updates the underlying TubeConfig."""
+        """Verify that config_text_logo updates the underlying ExhaustManifoldsConfig."""
         name = "passenger"
         monkeypatch.setattr(configurator, "find_best_angle", lambda *args, **kwargs: 180.0)
 
         configurator.config_text_logo(name)
 
-        _, angle = configurator.tube_config.logo_text_positions[name]
+        _, angle = configurator.exhaust_manifolds_config.logo_text_positions[name]
         assert angle == 180.0
 
     def test_config_routing(self, configurator):
@@ -461,15 +477,15 @@ class TestTubeConfigurator:
             assert mock_text.call_count == 1
 
 
-class TestTubeViewer:
+class TestExhaustManifoldsViewer:
     """Manifold viewer unit tests."""
 
     @pytest.fixture
     def viewer(self):
-        """Return the tube viewer fixture."""
+        """Return the exhaust_manifolds viewer fixture."""
         config = AppConfig()
-        provider = TubeProvider(config=config)
-        # Bootstrap to load .env overrides and attach config.tube
+        provider = ExhaustManifoldsProvider(config=config)
+        # Bootstrap to load .env overrides and attach config.exhaust_manifolds
         ProviderManager(config, providers=[provider])
         return provider.viewer
 

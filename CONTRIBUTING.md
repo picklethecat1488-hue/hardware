@@ -15,7 +15,7 @@
 Projects are self-contained packages located in `src/projects/`. They define how specific geometry is built, configured, and visualized. To add a new project, follow these steps:
 
 ### 1. Create the Project Directory
-Create a new directory under `src/projects/` (e.g., `src/projects/bracket/`).
+Create a new directory under `src/projects/` (e.g., `src/projects/exhaust_manifolds/`).
 
 ### 2. Define the Manifest
 Create a `manifest.yaml` file in your project folder. This file tells the orchestrator what parts are available and what actions (part, diagram, config, view) they support.
@@ -49,13 +49,13 @@ from functools import cached_property
 from build123d import *
 from pathlib import Path
 from provider import Provider, Action, Mode, discover_provider
-from projects_config import TubeConfig # Or a custom Pydantic model
+from projects_config import ExhaustManifoldsConfig # Or a custom Pydantic model
 
 @discover_provider
 class BracketProvider(Provider):
     @cached_property
     def default_config(self):
-        return TubeConfig(
+        return ExhaustManifoldsConfig(
             measurements_path=str(Path(__file__).parent / "measurements.yaml")
         )
 
@@ -84,7 +84,7 @@ Finally, add the import to the top-level projects init file.
 
 ```python
 # src/projects/__init__.py
-from .tube import TubeProvider
+from .exhaust_manifolds import ExhaustManifoldsProvider
 from .bracket import BracketProvider
 ```
 
@@ -108,7 +108,7 @@ The `ProviderOrchestrator` handles the execution of tasks. It manages:
 
 ### Configuration Lifecycle
 1.  **Discovery**: `ProviderManager` finds all decorated providers.
-2.  **Config Sync**: `ProviderManager.load_configs()` takes environment variables (e.g., `TUBE__WALL_THICKNESS`) and applies them to the provider's `settings`.
+2.  **Config Sync**: `ProviderManager.load_configs()` takes environment variables (e.g., `EXHAUST_MANIFOLDS__WALL_THICKNESS`) and applies them to the provider's `settings`.
 3.  **Execution**: `provider.run(target_list)` triggers the orchestrator.
 
 ## Testing

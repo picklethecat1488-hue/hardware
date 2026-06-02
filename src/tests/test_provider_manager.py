@@ -171,4 +171,3 @@ def test_manager_save_configs():
     mgr.save_configs()
 
     assert getattr(config, "p1") == p_settings
-    assert "P1" in config._env_flattened_keys

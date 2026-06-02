@@ -15,16 +15,16 @@ I'm not anticipating any more releases of the manifolds tubing after V4 complete
 
 There are two manifolds, driver and passenger. The manifolds are further separated into left and right sides, and must be sealed together with a high temperature adhesive or gasket sealer to prevent leaks:
 
-![Diagram](tube_diagram.svg)
+![Diagram](exhaust_manifolds_diagram.svg)
 
 *Exploded assembly diagram.*
 
 ## Build Files
 
-After running `build.py`, you should see these files in your build output:
+After running `build.py`, you should see these files in your build output organized by project subdirectories:
 
-- **build/exhaust\_manifolds\_v{x}\_diagram** \- an exploded diagram of the manifolds assembly process.  
-- **build/exhaust\_manifolds\_v{x}\_driver\_left.stl** \- the left side of the driver manifold.  
-- **build/exhaust\_manifolds\_v{x}\_driver\_right.stl** \- the right side of the driver manifold.  
-- **build/exhaust\_manifolds\_v{x}\_passenger\_left.stl** \- the left side of the passenger manifold.  
-- **build/exhaust\_manifolds\_v{x}\_passenger\_right.stl** \- the right side of the passenger manifold.
+- **build/exhaust_manifolds/exhaust_manifolds_diagram.svg** - An exploded diagram of the manifolds assembly process.  
+- **build/exhaust_manifolds/driver_left.stl** - The left side of the driver manifold.  
+- **build/exhaust_manifolds/driver_right.stl** - The right side of the driver manifold.  
+- **build/exhaust_manifolds/passenger_left.stl** - The left side of the passenger manifold.  
+- **build/exhaust_manifolds/passenger_right.stl** - The right side of the passenger manifold.

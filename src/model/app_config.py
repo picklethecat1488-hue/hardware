@@ -9,30 +9,15 @@ from pydantic import Field
 from pydantic_changedetect import ChangeDetectionMixin
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .text_args import TextArgs
-from .diagram_options import DiagramOptions
-from .utils import method_cache, load_measurements
+from .utils import method_cache
 
 
 class AppConfig(ChangeDetectionMixin, BaseSettings):
     """Application build configuration."""
 
-    project_name: str = Field(default="exhaust_manifolds", description="The project name")
-    ver: int = Field(default=4, gt=0, description="Build version")
-    measurements_path: str = Field(
-        default=str(Path(__file__).parent.parent / "measurements.yml"),
-        description="Path to the measurements YAML file.",
-    )
-    diagram_options: DiagramOptions = Field(default_factory=DiagramOptions, description="Diagram export options")
-    diagram_part_offset: int = Field(default=60, description="Distance between manifold assemblies in the diagram")
-    diagram_part_dist: int = Field(default=120, description="Distance between exploded halves in the diagram")
-    diagram_label_dist: int = Field(default=120, description="Distance of the labels from the parts in the diagram")
-
     color: tuple[float, float, float, float] = Field(
         default=(1.0, 0.0, 1.0, 1.0), description="The default object color"
     )
-
-    _env_flattened_keys: list[str] = ["TUBE", "LOGO_TEXT_ARGS", "LOGO_TEXT_POSITIONS", "DIAGRAM_OPTIONS"]
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -59,7 +44,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
                 else:
                     full_key = f"{prefix}{k_upper}"
 
-                if k_upper in self._env_flattened_keys and isinstance(v, dict):
+                if isinstance(v, dict):
                     write_recursive(f, v, f"{full_key}__")
                 else:
                     val = v

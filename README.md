@@ -15,11 +15,11 @@ The build command will build project files. This (and all commands below) suppor
 ```bash
 python src/build.py
 
-# Build all parts from the tube project
-python src/build.py 'tube/*'
+# Build all parts from the exhaust_manifolds project
+python src/build.py 'exhaust_manifolds/*'
 
-# Build the tube project diagram
-python src/build.py -pno 'tube/*'
+# Build the exhaust_manifolds project diagram
+python src/build.py -pno 'exhaust_manifolds/*'
 ```
 
 ### Configuration
@@ -30,7 +30,7 @@ If project measurements or parameters have changed, run the configuration utilit
 python src/config.py
 
 # Configure only the driver manifold
-python src/config.py tube/driver
+python src/config.py exhaust_manifolds/driver
 
 # Run only text logo placement optimization
 python src/config.py -m text
@@ -44,11 +44,11 @@ Use the viewer to inspect geometry in VS Code using the `ocp_vscode` extension.
 python src/view.py --list
 
 # View the driver manifold part
-python src/view.py tube/driver
+python src/view.py exhaust_manifolds/driver
 
 # View only the left side wire path
-python src/view.py tube/wire/view/left
+python src/view.py exhaust_manifolds/wire/view/left
 
 # View all printable parts for all manifolds 
-python src/view.py 'tube/*/part/*'
+python src/view.py 'exhaust_manifolds/*/part/*'
 ```

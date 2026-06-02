@@ -2,13 +2,14 @@
 
 import os
 import inspect
-from abc import ABC, abstractmethod
 from typing import Optional, Any, Callable, Iterable, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor
 from build123d import Part, Sketch, Wire
 import cadquery as cq
 from pydantic import validate_call, BaseModel
 from model.utils import method_cache
+from model.app_config import AppConfig
+import re
 from .types import Mode, Action, MODES, SUBASSEMBLIES, COLOR
 from .target_list import TargetList
 from .orchestrator import Orchestrator, ProviderOrchestrator
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from shell import Logger
 
 
-class Provider(ABC):
+class Provider:
     """Base class for all build providers."""
 
     orchestrator_type: type[Orchestrator] = ProviderOrchestrator
@@ -32,8 +33,6 @@ class Provider(ABC):
     ):
         """Initialize the provider."""
         if config is None:
-            from model.app_config import AppConfig
-
             config = AppConfig()
         self.app_config = config
         self.logger = logger
@@ -41,14 +40,16 @@ class Provider(ABC):
 
     @property
     def name(self) -> str:
-        """Return the name of the provider, defaulting to the class name in lowercase."""
-        return self.__class__.__name__.lower().removesuffix("provider")
+        """Infers the provider name from the class name (snake_case, minus 'Provider')."""
+        cls_name = self.__class__.__name__
+        if cls_name.endswith("Provider"):
+            cls_name = cls_name.removesuffix("Provider")
+        return re.sub(r"(?<!^)(?=[A-Z])", "_", cls_name).lower()
 
     @property
-    @abstractmethod
     def default_config(self) -> BaseModel:
-        """Return a default instance of the provider's configuration."""
-        pass
+        """Return a default instance of the provider's configuration (an empty BaseModel)."""
+        return BaseModel()
 
     @property
     def settings(self) -> Any:
