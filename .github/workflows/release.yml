@@ -33,7 +33,7 @@ jobs:
           set -o pipefail
           pytest | tee pytest_report.txt
 
-      - name: Build manifolds
+      - name: Build Hardware
         shell: bash -el {0}
         run: |
           python src/build.py -out build
