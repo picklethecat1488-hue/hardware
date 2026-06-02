@@ -1,0 +1,62 @@
+name: Nightly Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * *'  # Runs at 00:00 UTC every day
+  workflow_dispatch:      # Allows manual triggering
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Mambaforge & Cache Environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          mamba-version: "*"
+          channels: conda-forge
+          environment-file: environment.yml
+          use-mamba: true
+          cache-environment: true # <--- Enables automated caching based on environment.yml hash
+          activate-environment: cq
+
+      - name: Run tests
+        shell: bash -el {0}
+        env:
+          PYTHONPATH: src
+        run: |
+          set -o pipefail
+          pytest | tee pytest_report.txt
+
+  build:
+    name: Build Hardware
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Mambaforge
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          mamba-version: "*"
+          channels: conda-forge
+          environment-file: environment.yml
+          activate-environment: cq
+          use-mamba: true
+
+      - name: Build Hardware
+        shell: bash -el {0}
+        run: |
+          python src/build.py -out build
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-build
+          path: build/
