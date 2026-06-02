@@ -2,7 +2,7 @@
 
 from typing import Any, TypeVar, Callable, overload
 import yaml
-from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES, COLOR
+from .types import Mode, Action, MODES, SUBASSEMBLIES, COLOR
 
 T = TypeVar("T", bound=type)
 
@@ -59,7 +59,7 @@ def load_manifest(path: str) -> dict[str, dict[Any, Any]]:
             # Handle Color metadata
             if key == "color":
                 if isinstance(val, dict):
-                    target_cfg[COLOR] = {Subassembly(k): tuple(v) for k, v in val.items()}
+                    target_cfg[COLOR] = {str(k): tuple(v) for k, v in val.items()}
                 else:
                     target_cfg[COLOR] = tuple(val)
                 continue
@@ -76,7 +76,7 @@ def load_manifest(path: str) -> dict[str, dict[Any, Any]]:
                 if MODES in val:
                     action_cfg[MODES] = [Mode(m) for m in val[MODES]]
                 if SUBASSEMBLIES in val:
-                    action_cfg[SUBASSEMBLIES] = [Subassembly(s) for s in val[SUBASSEMBLIES]]
+                    action_cfg[SUBASSEMBLIES] = [str(s) for s in val[SUBASSEMBLIES]]
             target_cfg[action_key] = action_cfg
 
         manifest[target] = target_cfg

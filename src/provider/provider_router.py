@@ -3,7 +3,7 @@
 from typing import Any, Optional
 from .provider import Provider
 from .target_list import TargetList
-from .types import Action, Mode, Subassembly
+from .types import Action, Mode
 from .orchestrator import Orchestrator, ProviderRouterOrchestrator
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import validate_call
@@ -49,7 +49,7 @@ class ProviderRouter:
         return TargetList(self, self.manifest.keys())
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def get_color(self, target: str, subassembly: Optional[Subassembly] = None) -> tuple[float, float, float, float]:
+    def get_color(self, target: str, subassembly: Optional[str] = None) -> tuple[float, float, float, float]:
         """Resolve the color for a specific target and subassembly."""
         if "/" in target:
             p_name, t_name = target.split("/", 1)

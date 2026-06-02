@@ -17,16 +17,8 @@ class Action(StrEnum):
     VIEW = "view"
 
 
-class Subassembly(StrEnum):
-    """Side identifiers for shapes."""
-
-    LEFT = "left"
-    RIGHT = "right"
-
-
 class Mode(StrEnum):
     """Build modes for shapes."""
 
     DEFAULT = "default"
-    BARE = "bare"
     PRINT = "print"

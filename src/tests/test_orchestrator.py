@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from provider.orchestrator import ProviderOrchestrator, ProviderRouterOrchestrator
-from provider.types import Action, Mode, Subassembly, MODES, SUBASSEMBLIES
+from provider.types import Action, Mode, MODES, SUBASSEMBLIES
 
 
 @pytest.fixture
@@ -13,7 +13,7 @@ def mock_provider():
     provider.name = "mock_p"
     provider.manifest = {
         "part_a": {
-            Action.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.LEFT]},
+            Action.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["left"]},
             Action.CONFIG: {MODES: ["mount"]},
         }
     }
@@ -36,12 +36,12 @@ class TestProviderOrchestrator:
         orch = ProviderOrchestrator(mock_provider)
 
         # Unsupported mode
-        with pytest.raises(ValueError, match="Mode 'bare' is not supported for action 'part'"):
-            orch.pre_handler(("part_a",), Action.PART, (Subassembly.LEFT,), (Mode.BARE,))
+        with pytest.raises(ValueError, match="Mode 'print' is not supported for action 'part'"):
+            orch.pre_handler(("part_a",), Action.PART, ("left",), (Mode.PRINT,))
 
         # Unsupported subassembly
         with pytest.raises(ValueError, match="Subassembly 'right' is not supported"):
-            orch.pre_handler(("part_a",), Action.PART, (Subassembly.RIGHT,), (Mode.DEFAULT,))
+            orch.pre_handler(("part_a",), Action.PART, ("right",), (Mode.DEFAULT,))
 
 
 class TestProviderRouterOrchestrator:

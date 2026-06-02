@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from provider.provider import Provider
 from provider.target_list import TargetList
 from provider.utils import load_manifest
-from provider.types import Action, Subassembly, Mode, MODES, SUBASSEMBLIES, COLOR
+from provider.types import Action, Mode, MODES, SUBASSEMBLIES, COLOR
 
 
 class MockConfig(BaseModel):
@@ -30,20 +30,20 @@ class MockProvider(Provider):
         return {
             "part_a": {
                 Action.PART: {
-                    MODES: [Mode.DEFAULT, Mode.BARE],
-                    SUBASSEMBLIES: [Subassembly.LEFT],
+                    MODES: [Mode.DEFAULT, Mode.PRINT],
+                    SUBASSEMBLIES: ["left"],
                 },
                 Action.CONFIG: {MODES: ["text", "mount"]},
-                Action.VIEW: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.LEFT]},
+                Action.VIEW: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["left"]},
                 COLOR: (0.8, 0.8, 0.8, 1.0),
             },
             "part_b": {
-                Action.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: [Subassembly.RIGHT]},
+                Action.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["right"]},
                 Action.DIAGRAM: {
                     MODES: [Mode.DEFAULT],
-                    SUBASSEMBLIES: [Subassembly.RIGHT],
+                    SUBASSEMBLIES: ["right"],
                 },
-                COLOR: {Subassembly.RIGHT: (0.9, 0.9, 0.9, 1.0)},
+                COLOR: {"right": (0.9, 0.9, 0.9, 1.0)},
             },
         }
 
@@ -104,15 +104,15 @@ class TestTargetList:
 
     def test_for_subassemblies_filter(self, provider):
         """Verify for_subassemblies() filters targets correctly."""
-        targets = provider.targets.for_subassemblies([Subassembly.LEFT])
+        targets = provider.targets.for_subassemblies(["left"])
         assert list(targets) == ["part_a"]
 
-        targets = provider.targets.for_subassemblies([Subassembly.RIGHT])
+        targets = provider.targets.for_subassemblies(["right"])
         assert list(targets) == ["part_b"]
 
     def test_for_modes_filter(self, provider):
         """Verify for_modes() filters targets correctly."""
-        targets = provider.targets.for_modes([Mode.BARE])
+        targets = provider.targets.for_modes([Mode.PRINT])
         assert list(targets) == ["part_a"]
 
 
@@ -125,7 +125,7 @@ class TestProviderMetadata:
 
     def test_get_color_dict_specific(self, provider):
         """Verify get_color returns the specific subassembly color from a dict."""
-        assert provider.get_color("part_b", Subassembly.RIGHT) == (0.9, 0.9, 0.9, 1.0)
+        assert provider.get_color("part_b", "right") == (0.9, 0.9, 0.9, 1.0)
 
     def test_get_color_dict_fallback_first(self, provider):
         """Verify get_color returns the first dict color when no subassembly is specified."""
@@ -133,7 +133,7 @@ class TestProviderMetadata:
 
     def test_get_color_fallback_config(self, provider):
         """Verify get_color falls back to config color when missing."""
-        assert provider.get_color("part_b", Subassembly.LEFT) == provider.app_config.color
+        assert provider.get_color("part_b", "left") == provider.app_config.color
 
     def test_provider_default_manifest_path(self, monkeypatch):
         """Verify that Provider.manifest defaults to loading a YAML file by provider name."""
@@ -191,7 +191,7 @@ class TestProviderOrchestration:
 
     def test_build_multiple_modes(self, provider):
         """Verify that multiple build modes result in multiple handler calls and results."""
-        targets = provider.targets.supporting(Action.PART).for_modes([Mode.DEFAULT, Mode.BARE])
+        targets = provider.targets.supporting(Action.PART).for_modes([Mode.DEFAULT, Mode.PRINT])
         results = provider.run(targets)
         assert results == [("part_a", ["part_obj", "part_obj"])]
         assert provider.part["part_a"].call_count == 2
@@ -223,8 +223,8 @@ class TestProviderOrchestration:
 
     def test_pre_build_validation_failures(self, provider):
         """Verify various validation failures in _pre_build."""
-        with pytest.raises(ValueError, match="Mode 'bare' is not supported.*part_b"):
-            targets = TargetList(provider, ["part_b"], modes=[Mode.BARE], action=Action.PART)
+        with pytest.raises(ValueError, match="Mode 'print' is not supported.*part_b"):
+            targets = TargetList(provider, ["part_b"], modes=[Mode.PRINT], action=Action.PART)
             provider.run(targets)
 
     def test_post_build_length_validation(self, provider):

@@ -1,7 +1,7 @@
 """Specialized list for build targets."""
 
-from typing import Iterable, Optional, TYPE_CHECKING, Union
-from .types import Subassembly, Mode, Action, MODES, SUBASSEMBLIES
+from typing import Iterable, Optional, TYPE_CHECKING, Union, Sequence
+from .types import Mode, Action, MODES, SUBASSEMBLIES
 
 if TYPE_CHECKING:
     from .provider import Provider
@@ -15,8 +15,8 @@ class TargetList(list[str]):
         self,
         provider: Union["Provider", "ProviderRouter"],
         targets: Iterable[str] = (),
-        subassemblies: Optional[list[Subassembly]] = None,
-        modes: Optional[list[Mode]] = None,
+        subassemblies: Optional[list[str | None]] = None,
+        modes: Optional[list[Mode | str]] = None,
         action: Optional[Action] = None,
     ):
         """Initialize the TargetList."""
@@ -55,7 +55,7 @@ class TargetList(list[str]):
             action=action,
         )
 
-    def for_subassemblies(self, subassemblies: list[Subassembly]) -> "TargetList":
+    def for_subassemblies(self, subassemblies: Sequence[str | None]) -> "TargetList":
         """Filter targets that support all of the specified subassemblies."""
 
         def target_supports_subs(t: str) -> bool:
@@ -80,7 +80,7 @@ class TargetList(list[str]):
             action=self.action,
         )
 
-    def for_modes(self, modes: list[Mode]) -> "TargetList":
+    def for_modes(self, modes: Sequence[Mode | str]) -> "TargetList":
         """Filter targets that support all of the specified modes."""
 
         def target_supports_modes(t: str) -> bool:
@@ -103,4 +103,12 @@ class TargetList(list[str]):
             self.subassemblies,
             modes,
             action=self.action,
+        )
+
+    def for_targets(self, names: Iterable[str]) -> "TargetList":
+        """Filter the target list to include only the specified names."""
+        # Allow matching against the full namespaced name or just the target part.
+        filtered_targets = [t for t in self if t in names or any(t.endswith(f"/{n}") for n in names)]
+        return TargetList(
+            self.provider, filtered_targets, action=self.action, subassemblies=self.subassemblies, modes=self.modes
         )
