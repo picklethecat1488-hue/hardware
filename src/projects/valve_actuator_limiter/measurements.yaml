@@ -8,6 +8,12 @@ pocket_radius: 25
 bolt_radius: 3.2
 # Valve travel span
 stop_angle: 75.0                                      
+# Distance from bolt hole center to zip tie notch
+zip_tie_hole_offset: 10.0
+# Width of the zip tie notch cut
+zip_tie_cut_width: 8.0
+# Depth of the zip tie slot
+zip_tie_cut_height: 3.2
 # Exact Asymmetric Bolt Hole Coordinates (Centroid-aligned)
 bolt_holes: [
     [-30.38, -25.20],

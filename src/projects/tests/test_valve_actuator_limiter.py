@@ -63,6 +63,9 @@ class TestValveActuatorLimiterProvider:
         assert provider.settings.pocket_radius == 25.0
         assert provider.settings.wall_thickness == 3.0
         assert provider.settings.bolt_radius == 3.2
+        assert provider.settings.zip_tie_hole_offset == 10.0
+        assert provider.settings.zip_tie_cut_width == 8.0
+        assert provider.settings.zip_tie_cut_height == 3.2
 
     def test_bolt_hole_spacing(self, provider):
         """Verify the distances between the asymmetric bolt holes match spec.
