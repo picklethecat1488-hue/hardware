@@ -22,3 +22,16 @@ class Mode(StrEnum):
 
     DEFAULT = "default"
     PRINT = "print"
+
+
+class ColorType(StrEnum):
+    """Standard color names for visualization."""
+
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+    ORANGE = "orange"
+    CYAN = "cyan"
+    YELLOW = "yellow"
+    MAGENTA = "magenta"
+    GREY = "grey"

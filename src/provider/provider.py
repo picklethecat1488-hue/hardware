@@ -105,7 +105,16 @@ class Provider:
                 color = color.get(subassembly)
             else:
                 color = next(iter(color.values())) if color else None
-        return color or self.app_config.color
+
+        if color is None:
+            return self.app_config.color
+
+        if isinstance(color, (tuple, list)):
+            return tuple(color)  # type: ignore
+
+        from .utils import get_rgba_color
+
+        return get_rgba_color(color, 1.0, self.app_config.color[:3])
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def run(self, targets: TargetList) -> Any:

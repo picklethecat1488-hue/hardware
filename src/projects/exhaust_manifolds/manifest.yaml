@@ -1,7 +1,7 @@
 driver:
   color:
-    left: [1.0, 0.0, 0.0, 1.0]
-    right: [0.0, 1.0, 0.0, 1.0]
+    left: red
+    right: green
   config:
     modes: [mount, text]
   diagram:
@@ -11,8 +11,8 @@ driver:
     subassemblies: [left, right]
 passenger:
   color:
-    left: [1.0, 0.0, 0.0, 1.0]
-    right: [0.0, 1.0, 0.0, 1.0]
+    left: blue
+    right: magenta
   config:
     modes: [mount, text]
   diagram:
