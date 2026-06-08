@@ -10,6 +10,7 @@ if not hasattr(OCP.TopoDS.TopoDS_Shape, "HashCode"):
 from .provider import Provider
 from .types import Mode, Action, MODES
 from .target_list import TargetList
+from .room import Room
 from .provider_router import ProviderRouter
 from .provider_manager import ProviderManager
 from .utils import load_manifest, discover_provider

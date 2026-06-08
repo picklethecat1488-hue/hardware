@@ -84,11 +84,14 @@ def load_manifest(path: str) -> dict[str, dict[Any, Any]]:
 
 
 def get_rgba_color(
-    color: Union[str, ColorType],
+    color: Union[str, ColorType, tuple[float, float, float]],
     alpha: float,
     default_rgb: tuple[float, float, float] = (1.0, 1.0, 1.0),
 ) -> tuple[float, float, float, float]:
     """Convert a color name (or ColorType enum) to an RGBA tuple."""
+    if isinstance(color, (tuple, list)):
+        return (*color, alpha)  # type: ignore
+
     color_map = {
         ColorType.RED: (1.0, 0.0, 0.0),
         ColorType.GREEN: (0.0, 1.0, 0.0),
