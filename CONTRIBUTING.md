@@ -145,6 +145,12 @@ Releases are automated via GitHub Actions and are triggered by pushing a version
    ```bash
    gh release create v0.0.0 --generate-notes -p
    ```
+   
+   For quick experimental releases, you can use a timestamp to ensure a unique tag:
+   ```bash
+   gh release create v0.0.$(date +%s) --generate-notes -p
+   ```
+   
    Use `v4.0.x` for V4:
    ```bash
    gh release create v4.0.1 --generate-notes
