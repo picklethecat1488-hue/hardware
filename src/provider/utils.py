@@ -1,8 +1,8 @@
 """Utility functions for build providers."""
 
-from typing import Any, TypeVar, Callable, overload
+from typing import Any, TypeVar, Callable, overload, Union, cast
 import yaml
-from .types import Mode, Action, MODES, SUBASSEMBLIES, COLOR
+from .types import Mode, Action, ColorType, MODES, SUBASSEMBLIES, COLOR
 
 T = TypeVar("T", bound=type)
 
@@ -59,9 +59,9 @@ def load_manifest(path: str) -> dict[str, dict[Any, Any]]:
             # Handle Color metadata
             if key == "color":
                 if isinstance(val, dict):
-                    target_cfg[COLOR] = {str(k): tuple(v) for k, v in val.items()}
+                    target_cfg[COLOR] = {str(k): ColorType(v) for k, v in val.items()}
                 else:
-                    target_cfg[COLOR] = tuple(val)
+                    target_cfg[COLOR] = ColorType(val)
                 continue
 
             # Map string keys to Action Enums
@@ -81,3 +81,24 @@ def load_manifest(path: str) -> dict[str, dict[Any, Any]]:
 
         manifest[target] = target_cfg
     return manifest
+
+
+def get_rgba_color(
+    color: Union[str, ColorType],
+    alpha: float,
+    default_rgb: tuple[float, float, float] = (1.0, 1.0, 1.0),
+) -> tuple[float, float, float, float]:
+    """Convert a color name (or ColorType enum) to an RGBA tuple."""
+    color_map = {
+        ColorType.RED: (1.0, 0.0, 0.0),
+        ColorType.GREEN: (0.0, 1.0, 0.0),
+        ColorType.BLUE: (0.0, 0.0, 1.0),
+        ColorType.ORANGE: (1.0, 0.65, 0.0),
+        ColorType.CYAN: (0.0, 1.0, 1.0),
+        ColorType.YELLOW: (1.0, 1.0, 0.0),
+        ColorType.MAGENTA: (1.0, 0.0, 1.0),
+        ColorType.GREY: (0.5, 0.5, 0.5),
+    }
+    name = str(color)
+    rgb = color_map.get(cast(ColorType, name), default_rgb)
+    return (*rgb, alpha)

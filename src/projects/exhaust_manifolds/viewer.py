@@ -7,6 +7,7 @@ from build123d import *  # type: ignore
 from model.app_config import AppConfig
 from projects_config import ExhaustManifoldsConfig
 from .builder import ExhaustManifoldsBuilder
+from provider.utils import get_rgba_color
 from .configurator import ExhaustManifoldsConfigurator
 
 
@@ -29,21 +30,6 @@ class ExhaustManifoldsViewer:
         self.executor = executor or ThreadPoolExecutor()
         self.names = self.exhaust_manifolds_config.names
 
-    def _get_rgba(self, color_name: str, alpha: float) -> tuple[float, float, float, float]:
-        """Convert a color name to an RGBA tuple."""
-        color_map = {
-            "red": (1.0, 0.0, 0.0),
-            "green": (0.0, 1.0, 0.0),
-            "blue": (0.0, 0.0, 1.0),
-            "orange": (1.0, 0.65, 0.0),
-            "cyan": (0.0, 1.0, 1.0),
-            "yellow": (1.0, 1.0, 0.0),
-            "magenta": (1.0, 0.0, 1.0),
-            "grey": (0.5, 0.5, 0.5),
-        }
-        rgb = color_map.get(color_name, (1.0, 1.0, 1.0))
-        return (*rgb, alpha)
-
     @property
     def bound_box(self) -> Part:
         """Return the axis-aligned build bounding box."""
@@ -65,7 +51,7 @@ class ExhaustManifoldsViewer:
         tube = self.builder.create_part(name, right=right, tube_only=True).part
         path = self.builder.create_wire(name)
         center = self.configurator.get_part_position(tube, path, offset)
-        return Pos(center) * Sphere(radius=10)
+        return Pos(center) * Sphere(radius=10)  # Sphere is a Part, not a BuildPart
 
     def create_solid_center_point(self, name: str, right: bool = False):
         """Build a solid center point marker for the part."""
@@ -93,7 +79,11 @@ class ExhaustManifoldsViewer:
                         color,
                         1.0,
                     )
-                to_show[f"{name}_{side}_center"] = (self.create_solid_center_point(name, right=right), "blue", 1.0)
+                to_show[f"{name}_{side}_center"] = (
+                    self.create_solid_center_point(name, right=right),
+                    "blue",
+                    1.0,
+                )  # "blue" is a string, not a ColorType
         to_show["bounds"] = (self.bound_box, "grey", 0.2)
         return to_show
 
@@ -104,7 +94,7 @@ class ExhaustManifoldsViewer:
             color = "cyan" if name == "driver" else "yellow"
             to_show[f"{name}_full_tube"] = (self.builder.create_manifold(name), color, 0.2)
             for right in [False, True]:
-                side = "right" if right else "left"
+                side = "right" if right else "left"  # Unused variable
                 color = ("red" if right else "green") if name == "driver" else ("blue" if right else "orange")
                 to_show[f"{name}_{side}"] = (
                     self.builder.create_part(name, right=right, tube_only=False),
@@ -124,18 +114,22 @@ class ExhaustManifoldsViewer:
     def view_part_positions(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
         """Return visualization data for part positions."""
         room_data = self.show_positions_room()
-        return [(obj, self._get_rgba(color, alpha)) for obj, color, alpha in room_data.values()]
+        default_rgb = self.config.color[:3]
+        return [(obj, get_rgba_color(color, alpha, default_rgb)) for obj, color, alpha in room_data.values()]
 
     def view_overlay(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
         """Return visualization data for the overlay view."""
         room_data = self.show_overlay_room()
-        return [(obj, self._get_rgba(color, alpha)) for obj, color, alpha in room_data.values()]
+        default_rgb = self.config.color[:3]
+        return [(obj, get_rgba_color(color, alpha, default_rgb)) for obj, color, alpha in room_data.values()]
 
     def view_wire(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
         """Return visualization data for path wires."""
-        return [(self.builder.create_wire(name), self._get_rgba("magenta", 1.0)) for name in self.names]
+        default_rgb = self.config.color[:3]
+        return [(self.builder.create_wire(name), get_rgba_color("magenta", 1.0, default_rgb)) for name in self.names]
 
     def view_sketch(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
         """Return visualization data for the profile sketches."""
         room_data = self.show_profiles_room()
-        return [(obj, self._get_rgba(color, alpha)) for obj, color, alpha in room_data.values()]
+        default_rgb = self.config.color[:3]
+        return [(obj, get_rgba_color(color, alpha, default_rgb)) for obj, color, alpha in room_data.values()]

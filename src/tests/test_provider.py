@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 from pydantic import BaseModel
 from provider.provider import Provider
 from provider.target_list import TargetList
-from provider.utils import load_manifest
+from provider.utils import load_manifest, ColorType
 from model.utils import method_cache
 from provider.types import Action, Mode, MODES, SUBASSEMBLIES, COLOR
 
@@ -163,16 +163,14 @@ class TestProviderMetadata:
     def test_load_manifest(self, tmp_path, provider):
         """Verify that load_manifest correctly parses Enum keys and values."""
         manifest_path = tmp_path / "manifest.yml"
-        yaml_content = {
-            "part_c": {"part": {"modes": ["default"], "subassemblies": ["left"]}, "color": [1.0, 1.0, 1.0, 1.0]}
-        }
+        yaml_content = {"part_c": {"part": {"modes": ["default"], "subassemblies": ["left"]}, "color": "grey"}}
         manifest_path.write_text(yaml.dump(yaml_content))
 
         loaded = load_manifest(str(manifest_path))
         assert "part_c" in loaded
         assert Action.PART in loaded["part_c"]
         assert loaded["part_c"][Action.PART][MODES] == [Mode.DEFAULT]
-        assert loaded["part_c"][COLOR] == (1.0, 1.0, 1.0, 1.0)
+        assert loaded["part_c"][COLOR] == ColorType.GREY
 
 
 class TestProviderOrchestration:

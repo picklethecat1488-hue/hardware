@@ -492,9 +492,12 @@ class TestExhaustManifoldsViewer:
     def test_get_rgba(self, viewer):
         """Verify RGBA color conversion."""
         # Known color
-        assert viewer._get_rgba("red", 0.5) == (1.0, 0.0, 0.0, 0.5)
+        from provider.utils import get_rgba_color
+
+        assert get_rgba_color("red", 0.5) == (1.0, 0.0, 0.0, 0.5)
         # Default fallback
-        assert viewer._get_rgba("unknown", 1.0) == (1.0, 1.0, 1.0, 1.0)
+        default_rgb = viewer.config.color[:3]
+        assert get_rgba_color("unknown", 1.0, default_rgb) == (*default_rgb, 1.0)
 
     def test_build_markers(self, viewer):
         """Verify marker creation methods return valid geometry."""
