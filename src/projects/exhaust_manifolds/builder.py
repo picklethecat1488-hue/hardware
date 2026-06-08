@@ -50,7 +50,7 @@ class ExhaustManifoldsBuilder:
         inner_radius: Annotated[float | None, Field(ge=0)] = None,
         lap_joint: bool = False,
         joint_space: Annotated[float | None, Field(ge=0)] = None,
-    ) -> Sketch:
+    ) -> BuildSketch:
         """Create a circular tube profile sketch."""
         if outer_radius is None:
             outer_radius = min(self.exhaust_manifolds_config.clamp_diameters) / 2
@@ -120,7 +120,7 @@ class ExhaustManifoldsBuilder:
                     Circle(self.exhaust_manifolds_config.joint_radius)
                 with Locations(c_right):
                     Circle(self.exhaust_manifolds_config.joint_radius + joint_space, mode=Mode.SUBTRACT)
-        return sketch.sketch
+        return sketch
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -132,13 +132,15 @@ class ExhaustManifoldsBuilder:
         inner_radius: Annotated[float | None, Field(ge=0)] = None,
         lap_joint: bool = False,
         joint_space: Annotated[float | None, Field(ge=0)] = None,
-    ) -> Sketch:
+    ) -> BuildSketch:
         """Create a circular tube profile sketch with rotation applied."""
-        sketch = self.create_profile_sketch(angle_deg, outer_radius, inner_radius, lap_joint, joint_space)
-        return sketch.moved(Rotation(0, 0, center_deg))
+        with BuildSketch() as sketch_builder:
+            with Locations(Rotation(0, 0, center_deg)):
+                add(self.create_profile_sketch(angle_deg, outer_radius, inner_radius, lap_joint, joint_space))
+        return sketch_builder
 
     @method_cache
-    def create_manifold(self, name, right=False, lap_joint=False, half_tube=False, joint_space=None) -> Part:
+    def create_manifold(self, name, right=False, lap_joint=False, half_tube=False, joint_space=None) -> BuildPart:
         """Build a manifold part."""
         path = self.create_wire(name)
 
@@ -155,7 +157,7 @@ class ExhaustManifoldsBuilder:
             with BuildSketch(path.location_at(0)):
                 add(profile_sketch)
             sweep(path=path, transition=Transition.ROUND)
-        return cast(Part, tube.part)
+        return tube
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -169,7 +171,7 @@ class ExhaustManifoldsBuilder:
         center_deg: Annotated[float, Field(ge=0, le=360)] = 0,
         angle_deg: Annotated[float, Field(ge=0, le=360)] = 360,
         joint_space: Optional[float] = None,
-    ) -> Part | Solid | Compound:
+    ) -> BuildPart:
         """Create a ring-shaped tube segment."""
         path = self.create_wire(name)
         p1, p2 = path.position_at(off), path.position_at(off + length / path.length)
@@ -187,7 +189,7 @@ class ExhaustManifoldsBuilder:
             with BuildSketch(path.location_at(off)):
                 add(profile_sketch)
             sweep(path=ring_path.line)
-        return cast(Part, ring.part)
+        return ring
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -198,7 +200,7 @@ class ExhaustManifoldsBuilder:
         right: bool = False,
         offset_deg: Optional[float] = None,
         joint_space: Optional[float] = None,
-    ) -> Part | Solid | Compound:
+    ) -> BuildPart:
         """Create a clamp bed on the tube."""
         length = self.exhaust_manifolds_config.clamp_lengths[clamp_idx]
         outer_radius = self.exhaust_manifolds_config.clamp_diameters[clamp_idx] / 2
@@ -229,7 +231,7 @@ class ExhaustManifoldsBuilder:
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
-    def create_text_shape(self, text: Annotated[str, Field(min_length=1)]) -> Sketch:
+    def create_text_shape(self, text: Annotated[str, Field(min_length=1)]) -> BuildSketch:
         """Return a cached logo text shape."""
         args = self.exhaust_manifolds_config.logo_text_args
         with BuildSketch() as s:
@@ -240,7 +242,7 @@ class ExhaustManifoldsBuilder:
                 font_style=args.font_style,
                 align=args.align,
             )
-        return s.sketch
+        return s
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -250,7 +252,7 @@ class ExhaustManifoldsBuilder:
         text: str,
         right: bool = False,
         offset_deg: Optional[float] = None,
-    ) -> Part | Solid | Compound:
+    ) -> BuildPart:
         """Generate text geometry wrapped to the tube surface."""
         path = self.create_wire(name)
         off, angle_offset = self.exhaust_manifolds_config.logo_text_positions[name]
@@ -271,13 +273,15 @@ class ExhaustManifoldsBuilder:
             extrude(amount=args.height)
 
         transformation = loc * Rotation(0, 90, 0) * Rotation(angle_deg, 0, 0) * Pos(0, 0, outer_radius)
-        return cast(Part, text_part.part).moved(transformation)
+        text_part.part = cast(Part, text_part.part).moved(transformation)
+        return text_part
 
-    def create_chamfer_cone(self, origin: VectorLike, normal: VectorLike, radius: float) -> Part:
+    def create_chamfer_cone(self, origin: VectorLike, normal: VectorLike, radius: float) -> BuildPart:
         """Create a cone used for chamfering."""
         with BuildPart() as cone:
             Cone(radius, 0, radius, align=(Align.CENTER, Align.CENTER, Align.MIN))
-        return cast(Part, cone.part).moved(Plane(origin=origin, z_dir=normal).location)
+        cone.part = cast(Part, cone.part).moved(Plane(origin=origin, z_dir=normal).location)
+        return cone
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -286,7 +290,7 @@ class ExhaustManifoldsBuilder:
         name: str,
         radius: Annotated[float | None, Field(ge=0)] = None,
         chamfer_radius: Annotated[float | None, Field(ge=0)] = None,
-    ) -> Part | Solid | Compound:
+    ) -> BuildPart:
         """Build a cutting tool used to clean the internal tube volume."""
         path = self.create_wire(name)
         if radius is None:
@@ -303,7 +307,7 @@ class ExhaustManifoldsBuilder:
             if chamfer_radius is not None and chamfer_radius > 0:
                 add(self.create_chamfer_cone(path.position_at(0), path.tangent_at(0), chamfer_radius))
                 add(self.create_chamfer_cone(path.position_at(1), path.tangent_at(1) * -1, chamfer_radius))
-        return cast(Part, clean_tool.part)
+        return clean_tool
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
@@ -312,51 +316,47 @@ class ExhaustManifoldsBuilder:
         name: Literal["driver", "passenger"],
         right: bool = False,
         tube_only: bool = False,
-    ) -> Part | Solid | Compound:
+    ) -> BuildPart:
         """Build one half of the manifold assembly."""
         # Determine part parameters based on mode
         lap_joint = not tube_only
         joint_space = 0 if tube_only else self.exhaust_manifolds_config.joint_space
 
-        # Create the main part body.
-        part = self.create_manifold(
-            name,
-            right=right,
-            lap_joint=lap_joint,
-            half_tube=True,
-            joint_space=joint_space,
-        )
-        if not tube_only:
-            to_fuse = []
-            for idx in range(1, len(self.exhaust_manifolds_config.clamp_positions[name]) - 1):
-                to_fuse.append(self.create_clamp_bed(name, idx, right=right))
+        with BuildPart() as p:
+            add(
+                self.create_manifold(
+                    name,
+                    right=right,
+                    lap_joint=lap_joint,
+                    half_tube=True,
+                    joint_space=joint_space,
+                )
+            )
+            if not tube_only:
+                for idx in range(1, len(self.exhaust_manifolds_config.clamp_positions[name]) - 1):
+                    add(self.create_clamp_bed(name, idx, right=right))
+                label = "R" if right else ("L" if (name == "driver") else "R")
+                add(self.create_text(name, text=label, right=right))
 
-            label = "R" if right else ("L" if (name == "driver") else "R")
-            to_fuse.append(self.create_text(name, text=label, right=right))
+            # Clean the inner part volume and chamfer the ends
+            chamfer_radius = (
+                min(self.exhaust_manifolds_config.clamp_diameters) - self.exhaust_manifolds_config.wall_thickness
+            ) / 2
+            clean_tool_gen = self.create_clean_tool(name, chamfer_radius=chamfer_radius)
+            add(clean_tool_gen, mode=Mode.SUBTRACT)
 
-            if to_fuse:
-                part = part.fuse(*to_fuse)
-
-        # Clean the inner part volume and chamfer the ends
-        chamfer_radius = (
-            min(self.exhaust_manifolds_config.clamp_diameters) - self.exhaust_manifolds_config.wall_thickness
-        ) / 2
-        clean_tool = self.create_clean_tool(name, chamfer_radius=chamfer_radius)
-        part = part.cut(clean_tool)
-        return part
+        return p
 
     @validate_call(config={"arbitrary_types_allowed": True})
     @method_cache
-    def create_prepared_part(
-        self, name: Literal["driver", "passenger"], right: bool = False
-    ) -> Part | Solid | Compound:
+    def create_prepared_part(self, name: Literal["driver", "passenger"], right: bool = False) -> BuildPart:
         """Prepare a part for STL export."""
 
         def facing_up(part):
             """Return whether the part is oriented upward."""
             full_part = self.create_manifold(name)
             center_part = part.center()
-            center_full = full_part.center()
+            center_full = full_part.part.center()
             diff = center_part - center_full
             normal = diff.normalized()
             return normal.Z > 0
@@ -375,7 +375,8 @@ class ExhaustManifoldsBuilder:
             """Compute the Z translation to flatten the part."""
             return (0, 0, -part.bounding_box().min.Z)
 
-        part = self.create_part(name, right=right)
+        part_gen = self.create_part(name, right=right)
+        part = part_gen.part
 
         # Ensure we have a single manipulatable object if the part is fragmented
         if isinstance(part, ShapeList):
@@ -386,7 +387,9 @@ class ExhaustManifoldsBuilder:
         axis, angle_deg = rotation(part)
         part = part.rotate(Axis((0, 0, 0), axis), angle_deg)
         part = part.translate(translation(part))
-        return part
+        with BuildPart() as prepared:
+            add(part)
+        return prepared
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def build_part(self, target: str, subassembly: Optional[str], mode: ProviderMode) -> Any:
@@ -404,7 +407,7 @@ class ExhaustManifoldsBuilder:
         self,
         names: Optional[Sequence[Literal["driver", "passenger"]]] = None,
         right_vals: tuple[bool, ...] = (False, True),
-    ) -> Any:
+    ) -> cq.Assembly:
         """Build an exploded diagram for the parts."""
 
         def get_part_location(part, full_part, offset=0, dist=0):
@@ -435,13 +438,13 @@ class ExhaustManifoldsBuilder:
             locs = {}
             for right in right_vals:
                 loc_vec = get_part_location(
-                    parts[right],
-                    full_part,
+                    parts[right].part,
+                    full_part.part,
                     offset=(i * self.exhaust_manifolds_config.diagram_part_offset),
                     dist=self.exhaust_manifolds_config.diagram_part_dist,
                 )
                 locs[right] = loc_vec
-                assy.add(to_cq_shape(parts[right].translate(loc_vec)))
+                assy.add(to_cq_shape(parts[right].part.translate(loc_vec)))
             if True in locs and False in locs:
                 mid_point = wire_obj.position_at(0.5)
                 connector = Line(locs[True] + mid_point, locs[False] + mid_point)
@@ -461,7 +464,7 @@ class ExhaustManifoldsBuilder:
                 assy.add(to_cq_shape(cast(Part, label_gen.part)))
         return assy
 
-    def build_diagram(self, targets: Sequence[str], mode: ProviderMode) -> Any:
+    def build_diagram(self, targets: Sequence[str], mode: ProviderMode) -> cq.Assembly:
         """Build assembly diagrams."""
         names = cast(Sequence[Literal["driver", "passenger"]], targets)
         return self.create_diagram(names=names)

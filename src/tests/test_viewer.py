@@ -3,7 +3,7 @@
 import fnmatch
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock, call
-from view import Viewer
+from view import Viewer, BuildPart, BuildSketch, BuildLine, Part, Sketch, Wire
 from provider import Action, TargetList, Mode
 
 
@@ -228,6 +228,49 @@ class TestViewer:
         viewer.manager.router.targets.for_targets.return_value = []
         with pytest.raises(ValueError, match="not found in any registered provider"):
             viewer.show_view(["missing"])
+
+    @patch("view.show")
+    def test_show_view_unpacks_builders(self, mock_show, viewer):
+        """Verify show_view unpacks BuildPart, BuildSketch, BuildLine objects."""
+        # Mock BuildPart, BuildSketch, BuildLine and their .part/.sketch/.line attributes
+        mock_part_obj = MagicMock(spec=Part)
+        mock_build_part = MagicMock(spec=BuildPart)
+        mock_build_part.part = mock_part_obj
+
+        mock_sketch_obj = MagicMock(spec=Sketch)
+        mock_build_sketch = MagicMock(spec=BuildSketch)
+        mock_build_sketch.sketch = mock_sketch_obj
+
+        mock_line_obj = MagicMock(spec=Wire)
+        mock_build_line = MagicMock(spec=BuildLine)
+        mock_build_line.line = mock_line_obj
+
+        # Mock a provider that returns these builder objects
+        target_name = "mock/builders"
+        viewer.manager.router.targets.__iter__.return_value = iter([target_name])
+        viewer.manager.router.targets.__getitem__.return_value = target_name
+        viewer.manager.router.manifest = {target_name: {Action.VIEW: {}}}
+
+        # Simulate _get_view_items returning builder objects
+        viewer.manager.router.run.return_value = [
+            (
+                target_name,
+                [
+                    (mock_build_part, (1, 0, 0, 1)),
+                    (mock_build_sketch, (0, 1, 0, 1)),
+                    (mock_build_line, (0, 0, 1, 1)),
+                ],
+            )
+        ]
+
+        viewer.show_view([target_name])
+
+        mock_show.assert_called_once()
+        args, _ = mock_show.call_args
+        # Assert that the unpacked .part, .sketch, .line objects were passed to show
+        assert args[0] == mock_part_obj
+        assert args[1] == mock_sketch_obj
+        assert args[2] == mock_line_obj
 
     def test_show_view_unsupported_action(self, viewer):
         """Verify error when target supports no visual actions."""

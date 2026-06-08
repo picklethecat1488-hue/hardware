@@ -3,6 +3,7 @@
 import argparse
 from build import Builder, main, get_args, str2bool
 from pathlib import Path
+from build123d import BuildPart
 import pytest
 from unittest.mock import MagicMock, patch
 from provider import Action, Mode, TargetList
@@ -191,3 +192,51 @@ class TestBuilderLogic:
         # This should raise a ValueError because names contains a wildcard
         with pytest.raises(ValueError, match="No part targets matched wildcard pattern"):
             builder.generate_parts("out", names=["tube/*"])
+
+    def test_generate_parts_buildpart_handling(self, builder):
+        """Verify that generate_parts correctly extracts .part from a BuildPart for export."""
+        with patch("build.export_stl") as mock_export:
+            # Setup mock BuildPart and Part
+            mock_part = MagicMock()
+            mock_buildpart = MagicMock()
+            mock_buildpart.part = mock_part
+
+            # Configure the router to return our mock BuildPart
+            builder.manager.router.run.return_value = [("p1/t1", [mock_buildpart])]
+
+            # Mock resolution helpers to satisfy the build path
+            builder._resolve_modes = MagicMock(return_value=["print"])
+            builder._resolve_subassemblies = MagicMock(return_value=[None])
+            builder.manager.router.targets.supporting.return_value.for_targets.return_value = ["p1/t1"]
+
+            builder.generate_parts("build_dir", names=["p1/t1"])
+
+            # Verify that export_stl received the extracted Part object
+            mock_export.assert_called_once()
+            args, _ = mock_export.call_args
+            assert args[0] == mock_part
+
+    def test_generate_diagram_buildpart_handling(self, builder):
+        """Verify that generate_diagram correctly handles BuildPart objects."""
+        # Setup mock BuildPart and its .part attribute
+        mock_part = MagicMock()
+        mock_buildpart = MagicMock(spec=BuildPart)
+        mock_buildpart.part = mock_part
+
+        # Configure manager/router mocks
+        mock_targets = MagicMock(spec=TargetList)
+        mock_targets.for_targets.return_value = mock_targets
+        mock_targets.__len__.return_value = 1
+        mock_targets.__iter__.return_value = iter(["p1/diag"])
+        builder.manager.router.targets.supporting.return_value = mock_targets
+        builder.manager.router.run.return_value = [("p1", mock_buildpart)]
+
+        # Mock the provider settings for options
+        mock_provider = MagicMock()
+        mock_provider.name = "p1"
+        mock_provider.settings.diagram_options = None
+        builder.manager.router.providers = [mock_provider]
+
+        with patch("pathlib.Path.mkdir"), patch("cadquery.Assembly") as mock_assy_cls, patch("cadquery.Shape"):
+            builder.generate_diagram("out_dir", names=["p1/diag"])
+            mock_assy_cls.return_value.toCompound.return_value.export.assert_called_once()

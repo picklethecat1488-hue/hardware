@@ -177,8 +177,18 @@ class Viewer:
         summary = self.get_summary(display_names)
         self.logger.print(f"Showing {summary}", symbol="👁️ ")
 
-        # Extract aligned lists for ocp_vscode
-        values = [v[0] for v in display_items]
+        # Extract aligned lists for ocp_vscode. Unpack builders if necessary.
+        values = []
+        for v in display_items:
+            obj = v[0]
+            if isinstance(obj, BuildPart):
+                values.append(obj.part)
+            elif isinstance(obj, BuildSketch):
+                values.append(obj.sketch)
+            elif isinstance(obj, BuildLine):
+                values.append(obj.line)
+            else:
+                values.append(obj)
         names = [v[1] for v in display_items]
 
         # Ensure colors and alphas are valid lists.
