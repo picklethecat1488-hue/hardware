@@ -21,7 +21,7 @@ class ValveActuatorLimiterProvider(Provider):
         """Return the default configuration for the limiter project."""
         return ValveActuatorLimiterConfig(
             measurements_path=str(Path(__file__).parent / "measurements.yaml"),
-            diagram_options=DiagramOptions(line_weight=0.5, projection_dir=(0, 0, 1)),
+            diagram_options=DiagramOptions(line_weight=0.5, projection_dir=(0, 0, -1)),
         )
 
     @property
@@ -63,14 +63,15 @@ class ValveActuatorLimiterProvider(Provider):
 
             # Use two rotated boxes as half-plane cutters to isolate the stop_angle sector
             with Locations(Rot(0, 0, start_angle - 90)):
-                Box(
-                    cutter_size, cutter_size, h * 1.2, align=(Align.MIN, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT
-                )
-
+                Box(cutter_size, cutter_size, h, align=(Align.MIN, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
             with Locations(Rot(0, 0, start_angle + self.settings.stop_angle + 90)):
-                Box(
-                    cutter_size, cutter_size, h * 1.2, align=(Align.MIN, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT
-                )
+                Box(cutter_size, cutter_size, h, align=(Align.MIN, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
+
+            # Blunt the sharp tip of the wedge
+            angle = start_angle + self.settings.stop_angle / 2
+            with Locations(Rot(0, 0, angle)):
+                Box(2.0, 2.0, h, mode=Mode.SUBTRACT)
+
         return limiter_gen
 
     @method_cache
@@ -116,6 +117,27 @@ class ValveActuatorLimiterProvider(Provider):
                         align=(Align.CENTER, Align.CENTER, Align.CENTER),
                         mode=Mode.SUBTRACT,
                     )
+
+                # Add zip tie notches to the remaining two edges (Edge 0-1 and 2-0)
+                for i, j in [(0, 1), (2, 0)]:
+                    h_i, h_j = holes[i], holes[j]
+                    v_edge = h_j - h_i
+                    v_unit = v_edge.normalized()
+                    v_out = Vector(v_edge.Y, -v_edge.X).normalized()
+                    v_angle = math.degrees(math.atan2(v_edge.Y, v_edge.X))
+
+                    for dist in [self.settings.zip_tie_hole_offset, v_edge.length - self.settings.zip_tie_hole_offset]:
+                        # Ensure wall of 'wall_thickness' remains between the outer edge and the cut
+                        cut_h = self.settings.zip_tie_cut_height
+                        cut_pos = boss_radius - self.settings.wall_thickness - (cut_h / 2)
+                        with Locations(h_i + v_unit * dist + v_out * cut_pos):
+                            with Locations(Rot(0, 0, v_angle)):
+                                Box(
+                                    self.settings.zip_tie_cut_width,
+                                    cut_h,
+                                    100.0,
+                                    mode=Mode.SUBTRACT,
+                                )
 
             # Subtract the center pocket for the actuator drive mechanism
             with Locations((self.hull_center.X, self.hull_center.Y, 0)):
