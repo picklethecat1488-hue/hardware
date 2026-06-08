@@ -6,7 +6,7 @@ The design features a lightweight aluminum or stainless steel plate that mounts 
 
 ![Diagram](valve_actuator_limiter_diagram.svg)
 
-*Assembly diagram.*
+*Wire diagram.*
 
 ## Releases
 
@@ -16,7 +16,10 @@ The design features a lightweight aluminum or stainless steel plate that mounts 
 
 After running `build.py`, you should see these files in your build output organized by project subdirectories:
 
-- **build/valve_actuator_limiter/limiter_plate.stl** - The limiter plate for the left-side actuator.
+- **build/valve_actuator_limiter/limiter_plate_0deg.stl** - The limiter plate with a 0deg wedge offset.
+- **build/valve_actuator_limiter/limiter_plate_90deg.stl** - The limiter plate with a 90deg wedge offset.
+- **build/valve_actuator_limiter/limiter_plate_180deg.stl** - The limiter plate with a 180deg wedge offset.
+- **build/valve_actuator_limiter/valve_actuator_limiter_diagram.svg** - The limiter plate diagram.
 
 ## Visualization
 
