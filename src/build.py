@@ -42,9 +42,10 @@ class Builder:
                 return fnmatch.filter(supported_strs, mode_override)
             return [mode_override]
 
-        # Default logic: PRINT if supported, else DEFAULT
-        m = Mode.PRINT if Mode.PRINT in supported else Mode.DEFAULT
-        return [m.value if hasattr(m, "value") else str(m)]
+        # Default logic: only export targets that support PRINT mode
+        if Mode.PRINT in supported:
+            return [Mode.PRINT.value if hasattr(Mode.PRINT, "value") else str(Mode.PRINT)]
+        return []
 
     def _resolve_subassemblies(self, target: str, subassembly_override: Optional[str] = None) -> Sequence[str | None]:
         """Determine which subassemblies should be built for a target."""

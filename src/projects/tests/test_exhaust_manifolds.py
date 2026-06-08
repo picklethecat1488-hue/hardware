@@ -116,7 +116,7 @@ class TestExhaustManifoldsProvider:
             result = provider.run(targets)
             assert result == "diag_obj"
             # build_diagram casts the list of targets to names
-            mock.assert_called_once_with(names=["driver", "passenger"])
+            mock.assert_called_once_with(names=("driver", "passenger"))
 
     def test_run_config_execution(self, provider):
         """Verify executing a CONFIG action returns None."""

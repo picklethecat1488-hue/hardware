@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from provider.provider import Provider
 from provider.target_list import TargetList
 from provider.utils import load_manifest
+from model.utils import method_cache
 from provider.types import Action, Mode, MODES, SUBASSEMBLIES, COLOR
 
 
@@ -239,3 +240,17 @@ class TestProviderOrchestration:
         assert results == [("part_a", "part_obj"), ("part_b", "part_obj")]
         assert provider.part["part_a"].call_count == 1
         assert provider.part["part_b"].call_count == 1
+
+
+def test_method_cache_unhashable_args():
+    """Verify that method_cache can handle unhashable arguments like lists."""
+
+    class TestClass:
+        @method_cache
+        def run(self, data: list[int]) -> int:
+            return sum(data)
+
+    obj = TestClass()
+    # This would raise TypeError: unhashable type: 'list' without the fix
+    assert obj.run([1, 2, 3]) == 6
+    assert obj.run([1, 2, 3]) == 6

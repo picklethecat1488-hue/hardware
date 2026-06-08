@@ -153,8 +153,8 @@ class TestBuilderLogic:
         # Case 1: Target supports PRINT
         assert builder._resolve_modes("t1") == ["print"]
 
-        # Case 2: Target does NOT support PRINT, fallback to DEFAULT
-        assert builder._resolve_modes("t2") == ["default"]
+        # Case 2: Target does NOT support PRINT, returns empty list
+        assert builder._resolve_modes("t2") == []
 
         # Case 3: Specific override provided
         assert builder._resolve_modes("t1", mode_override="custom") == ["custom"]

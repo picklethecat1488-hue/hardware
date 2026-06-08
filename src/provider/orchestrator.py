@@ -69,7 +69,7 @@ class ProviderOrchestrator(Orchestrator):
             # Diagrams operate on all targets at once. We pick the handler for the first target.
             handler = self.provider.diagram[targets[0]]
             # Diagrams operate on all targets at once and ignore subassemblies.
-            result = handler(list(targets), modes[0])
+            result = handler(targets, modes[0])
             results = [result]
             self.post_handler(targets, results, action)
             return results[0]

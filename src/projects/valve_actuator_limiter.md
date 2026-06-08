@@ -1,8 +1,12 @@
 # Valve Actuator Limiter
 
-This project addresses issues where exhaust valve actuators rotate beyond their intended range when aftermarket exhaust components are installed. The limiter plate provides a mechanical stop to prevent diagnostic trouble codes (DTCs) and dashboard warning lights.
+This project addresses issues where exhaust valve actuators rotate beyond their intended range when [aftermarket exhaust components](exhaust_manifolds.md) are installed. The limiter plate provides a mechanical stop to prevent diagnostic trouble codes (DTCs) and dashboard warning lights.
 
 The design features a lightweight aluminum or stainless steel plate that mounts between the actuator and the mounting bracket, restricting the sweep of the actuator arm to the OEM specification.
+
+![Diagram](valve_actuator_diagram.svg)
+
+*Assembly diagram.*
 
 ## Releases
 
@@ -12,8 +16,7 @@ The design features a lightweight aluminum or stainless steel plate that mounts 
 
 After running `build.py`, you should see these files in your build output organized by project subdirectories:
 
-- **build/valve_actuator_limiter/limiter_plate_left.stl** - The limiter plate for the left-side actuator.
-- **build/valve_actuator_limiter/limiter_plate_right.stl** - The limiter plate for the right-side actuator.
+- **build/valve_actuator_limiter/limiter_plate.stl** - The limiter plate for the left-side actuator.
 
 ## Visualization
 

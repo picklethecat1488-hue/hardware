@@ -155,3 +155,25 @@ class TestModel:
         measurements = load_measurements(str(yml_file))
         assert measurements[1][0] == 10
         assert measurements[2][0] == 20
+
+    def test_load_signed_float_measurements(self, tmp_path):
+        """Verify that signed floating point measurements are loaded correctly."""
+        data = {"offset": -15.5, "scale": 1.2}
+        yml_file = tmp_path / "floats.yml"
+        with open(yml_file, "w") as f:
+            yaml.dump(data, f)
+
+        measurements = load_measurements(str(yml_file))
+        assert measurements["offset"] == -15.5
+        assert measurements["scale"] == 1.2
+
+    def test_load_2d_point_measurements(self, tmp_path):
+        """Verify that 2D point measurements are loaded correctly."""
+        data = {"point_2d": [1.5, 2.5]}
+        yml_file = tmp_path / "points2d.yml"
+        with open(yml_file, "w") as f:
+            yaml.dump(data, f)
+
+        measurements = load_measurements(str(yml_file))
+        assert "point_2d" in measurements
+        assert np.array_equal(measurements["point_2d"], np.array([1.5, 2.5]))
