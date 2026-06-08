@@ -57,19 +57,19 @@ class ExhaustManifoldsViewer:
         )
         with BuildPart() as bounds:
             Box(x_len, y_len, z_len)
-            cast(Part, bounds.part).move(Location(center))
+            bounds.part = cast(Part, bounds.part).move(Location(center))
         return cast(Part, bounds.part)
 
     def create_part_position_point(self, name: str, offset: float, right: bool = False):
         """Build a part position point marker at the given offset."""
-        tube = self.builder.create_part(name, right=right, tube_only=True)
+        tube = self.builder.create_part(name, right=right, tube_only=True).part
         path = self.builder.create_wire(name)
         center = self.configurator.get_part_position(tube, path, offset)
         return Pos(center) * Sphere(radius=10)
 
     def create_solid_center_point(self, name: str, right: bool = False):
         """Build a solid center point marker for the part."""
-        tube = self.builder.create_part(name, right=right, tube_only=True)
+        tube = self.builder.create_part(name, right=right, tube_only=True).part
         return Pos(tube.center()) * Cone(
             bottom_radius=10, top_radius=0, height=10, align=(Align.CENTER, Align.CENTER, Align.MIN)
         )
@@ -81,7 +81,11 @@ class ExhaustManifoldsViewer:
             for right in [False, True]:
                 side = "right" if right else "left"
                 color = ("red" if right else "green") if name == "driver" else ("blue" if right else "orange")
-                to_show[f"{name}_{side}"] = (self.builder.create_part(name, right=right, tube_only=False), color, 0.5)
+                to_show[f"{name}_{side}"] = (
+                    self.builder.create_part(name, right=right, tube_only=False),
+                    color,
+                    0.5,
+                )
 
                 for i in range(10):
                     to_show[f"{name}_{side}_pos_{i}"] = (
@@ -102,7 +106,11 @@ class ExhaustManifoldsViewer:
             for right in [False, True]:
                 side = "right" if right else "left"
                 color = ("red" if right else "green") if name == "driver" else ("blue" if right else "orange")
-                to_show[f"{name}_{side}"] = (self.builder.create_part(name, right=right, tube_only=False), color, 1.0)
+                to_show[f"{name}_{side}"] = (
+                    self.builder.create_part(name, right=right, tube_only=False),
+                    color,
+                    1.0,
+                )
         to_show["bounds"] = (self.bound_box, "grey", 0.2)
         return to_show
 

@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch
-from build123d import Part
+from build123d import Part, BuildPart
 import cadquery as cq
 from projects_config.valve_actuator_limiter_config import ValveActuatorLimiterConfig
 from projects.valve_actuator_limiter import ValveActuatorLimiterProvider
@@ -40,20 +40,21 @@ class TestValveActuatorLimiterProvider:
     def test_build_part_geometry(self, provider):
         """Verify that build_part produces valid geometry for both subassemblies."""
         for side in ["left", "right"]:
-            part = provider.build_limiter_plate("limiter_plate", side, Mode.DEFAULT)
+            res = provider.build_limiter_plate("limiter_plate", side, Mode.DEFAULT)
+            part = res.part
             assert isinstance(part, Part)
             assert part.volume > 0
             assert part.is_valid
 
     def test_build_diagram(self, provider):
-        """Verify that build_diagram returns a valid CadQuery assembly."""
+        """Verify that build_diagram returns a valid diagram object."""
         assy = provider.build_diagram("limiter_plate", Mode.DEFAULT)
-        assert isinstance(assy, cq.Assembly)
+        assert isinstance(assy, BuildPart)
 
     def test_volumes_match(self, provider):
         """Verify that mirroring maintains volume consistency."""
-        left_part = provider.build_limiter_plate("limiter_plate", "left", Mode.DEFAULT)
-        right_part = provider.build_limiter_plate("limiter_plate", "right", Mode.DEFAULT)
+        left_part = provider.build_limiter_plate("limiter_plate", "left", Mode.DEFAULT).part
+        right_part = provider.build_limiter_plate("limiter_plate", "right", Mode.DEFAULT).part
 
         assert left_part.volume == pytest.approx(right_part.volume)
 

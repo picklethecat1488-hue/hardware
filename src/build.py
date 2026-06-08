@@ -8,6 +8,7 @@ import importlib
 from model import AppConfig
 import cadquery as cq  # type: ignore
 from build123d import *  # type: ignore
+from build123d import export_stl
 from typing import Optional, Any, Sequence
 from pydantic import validate_call
 from provider import ProviderManager, Action, Mode
@@ -112,7 +113,9 @@ class Builder:
 
                     mesh_file_name = f"{t_name}{side_suffix}.stl"
                     path_str = str(target_dir / mesh_file_name)
-                    export_stl(geom, path_str)
+                    # Extract the geometry from the BuildPart before exporting
+                    if geom.part:
+                        export_stl(geom.part, path_str)
                     self.logger.print(f"Saved {path_str}", symbol="📄")
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -140,8 +143,29 @@ class Builder:
 
             provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
             options = getattr(provider.settings, "diagram_options", None) if provider else None
-            opt_dict = options.model_dump(by_alias=True) if options else {}
-            assy.toCompound().export(path_str, opt=opt_dict)
+            all_opts = options.model_dump(by_alias=True) if options else {}
+
+            # Use duck typing to check for cq.Assembly, as isinstance fails when classes are mocked in tests
+            if not hasattr(assy, "toCompound"):
+                # Extract geometry from build123d builders and wrap in a cq.Assembly
+                geom = None
+                if isinstance(assy, BuildPart):
+                    geom = assy.part
+                elif isinstance(assy, BuildSketch):
+                    geom = assy.sketch
+                elif isinstance(assy, BuildLine):
+                    geom = assy.line
+                else:
+                    geom = assy
+
+                if geom and hasattr(geom, "wrapped") and geom.wrapped is not None:
+                    new_assy = cq.Assembly()
+                    new_assy.add(cq.Shape.cast(geom.wrapped))
+                    assy = new_assy
+                else:
+                    raise ValueError(f"Unsupported object type: {type(assy)} for {p_name}")
+
+            assy.toCompound().export(path_str, opt=all_opts)
             self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_all(self, out_dir, subassembly=None, zip_name="build.zip"):

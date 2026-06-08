@@ -199,7 +199,7 @@ class TestExhaustManifoldsBuilder:
         sketch = builder.create_profile(45, 90, outer_radius=10, inner_radius=5, joint_space=0)
         # Area of a quarter annulus: (90/360) * pi * (R^2 - r^2)
         expected_area = math.pi * (10**2 - 5**2) / 4
-        assert sketch.area == pytest.approx(expected_area)
+        assert sketch.sketch.area == pytest.approx(expected_area)
 
     def test_create_profile_invalid_inner_radius(self, builder):
         """Ensure invalid profile radii raise ValueError."""
@@ -209,14 +209,14 @@ class TestExhaustManifoldsBuilder:
     def test_build_clean_tool(self, name, builder):
         """Test clean tool creation for a given part name."""
         clean_tool = builder.create_clean_tool(name)
-        assert clean_tool is not None
-        assert clean_tool.volume > 0
+        assert clean_tool.part is not None
+        assert clean_tool.part.volume > 0
 
     def test_part_fits_together(self, builder, name, right):
         """Test that mirrored parts do not intersect."""
         # Make sure parts do not self intersect
-        part = builder.create_part(name, right=right)
-        other_part = builder.create_part(name, right=(not right))
+        part = builder.create_part(name, right=right).part
+        other_part = builder.create_part(name, right=(not right)).part
         intersection = part.intersect(other_part)
 
         vol = self._calc_vol(intersection)
@@ -224,9 +224,9 @@ class TestExhaustManifoldsBuilder:
 
     def test_part_doesnt_overlap(self, builder, name, right):
         """Ensure parts from different assemblies do not intersect."""
-        part = builder.create_part(name, right=right)
+        part = builder.create_part(name, right=right).part
         other_name = next(x for x in builder.exhaust_manifolds_config.names if x != name)
-        other_part = builder.create_part(other_name, right=not right)
+        other_part = builder.create_part(other_name, right=not right).part
         intersection = part.intersect(other_part)
 
         vol = self._calc_vol(intersection)
@@ -236,7 +236,7 @@ class TestExhaustManifoldsBuilder:
 
     def test_in_bounds(self, builder, name, right):
         """Verify part fits inside bound box volume."""
-        part = builder.create_part(name, right=right)
+        part = builder.create_part(name, right=right).part
         # Reconstruct bound box logic since it moved to viewer
         x_len = max(builder.exhaust_manifolds_config.x_bounds) - min(builder.exhaust_manifolds_config.x_bounds)
         y_len = max(builder.exhaust_manifolds_config.y_bounds) - min(builder.exhaust_manifolds_config.y_bounds)
@@ -272,14 +272,14 @@ class TestExhaustManifoldsBuilder:
         )
         expected = np.array(builder.exhaust_manifolds_config.clamp_diameters) / 2
         """Test if manifold clamps satisfy fitment requirements."""
-        part = builder.create_part(name, right=right)
+        part = builder.create_part(name, right=right).part
         pos, len, expected = (
             offsets[clamp_idx],
             builder.exhaust_manifolds_config.clamp_lengths[clamp_idx],
             expected[clamp_idx],
         )
 
-        # Check if we can move clamp over section
+        # Check if we can move clamp over section (clamp_off is BuildPart)
         clamp_off = builder.create_ring(
             name,
             pos,
@@ -287,10 +287,10 @@ class TestExhaustManifoldsBuilder:
             outer_radius=expected + builder.exhaust_manifolds_config.wall_thickness,
             inner_radius=expected,
         )
-        intersection_off = part.intersect(clamp_off)
+        intersection_off = part.intersect(clamp_off.part)  # part is Part, clamp_off.part is Part
         assert self._calc_vol(intersection_off) == pytest.approx(0, abs=1e-3)
 
-        # Check if we can push clamp onto section
+        # Check if we can push clamp onto section (clamp_on is BuildPart)
         clamp_on = builder.create_ring(
             name,
             pos,
@@ -298,7 +298,7 @@ class TestExhaustManifoldsBuilder:
             outer_radius=expected + builder.exhaust_manifolds_config.wall_thickness,
             inner_radius=expected - 0.01,
         )
-        intersection_on = part.intersect(clamp_on)
+        intersection_on = part.intersect(clamp_on.part)  # part is Part, clamp_on.part is Part
         assert self._calc_vol(intersection_on) > 0
 
     def test_part(self, name, right, builder):
@@ -306,9 +306,9 @@ class TestExhaustManifoldsBuilder:
         if name != "driver" and name != "passenger":
             raise ValueError(f"Invalid name: {name}")
         manifold = builder.create_manifold(name, right=right, half_tube=True)
-        part = builder.create_part(name, right=right)
-        manifold_vol = manifold.volume
-        intersection = part.intersect(manifold)
+        part = builder.create_part(name, right=right).part
+        manifold_vol = manifold.part.volume
+        intersection = part.intersect(manifold.part)
         manifold_from_parts_vol = self._calc_vol(intersection)
 
         error_pct = abs(manifold_vol - manifold_from_parts_vol) / (manifold_vol + manifold_from_parts_vol) / 2 * 100
@@ -317,8 +317,8 @@ class TestExhaustManifoldsBuilder:
 
     def test_prepared_part(self, name, right, builder):
         """Verify the prepared part is printable and stable."""
-        orig_part = builder.create_part(name, right=right)
-        part = builder.create_prepared_part(name, right=right)
+        orig_part = builder.create_part(name, right=right).part
+        part = builder.create_prepared_part(name, right=right).part
 
         # Ensure the part is a watertight solid
         assert part.is_valid
@@ -371,7 +371,7 @@ class TestExhaustManifoldsBuilder:
 
     def test_overall_bounds(self, builder, name):
         """Verify assembly bounding box dimensions."""
-        part = Compound(builder.create_part(name).fuse(builder.create_part(name, right=True)).solids())
+        part = Compound(builder.create_part(name).part.fuse(builder.create_part(name, right=True).part).solids())
         bbox = part.bounding_box()
 
         if name == "driver":
@@ -413,9 +413,9 @@ class TestExhaustManifoldsConfigurator:
         path = configurator.builder.create_wire("driver")
         pos = path.position_at(0.5)
         # Setup a tube centered above the actual path position.
-        with BuildPart() as tube:
+        with BuildPart() as tube_builder:
             Box(10, 10, 10)
-        tube_obj = tube.part.moved(Location(pos + Vector(0, 0, 2)))  # type: ignore
+        tube_obj = cast(Part, tube_builder.part).moved(Location(pos + Vector(0, 0, 2)))
 
         # Manually populate caches since methods use id(obj)
         configurator._tube_cache[id(tube_obj)] = tube_obj
@@ -430,9 +430,9 @@ class TestExhaustManifoldsConfigurator:
         path = configurator.builder.create_wire("driver")
         pos = path.position_at(0.5)
         # Setup a tube centered above the actual path position.
-        with BuildPart() as tube:
+        with BuildPart() as tube_builder:
             Box(10, 10, 10)
-        tube_obj = tube.part.moved(Location(pos + Vector(0, 0, 2)))  # type: ignore
+        tube_obj = cast(Part, tube_builder.part).moved(Location(pos + Vector(0, 0, 2)))
 
         radius = min(configurator.exhaust_manifolds_config.clamp_diameters) / 2
         result = configurator.get_part_position(tube_obj, path, 0.5)

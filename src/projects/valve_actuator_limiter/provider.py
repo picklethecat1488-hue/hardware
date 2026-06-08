@@ -9,7 +9,7 @@ from model import method_cache, DiagramOptions
 from pathlib import Path
 from provider import Provider, Action, Mode as ProviderMode, discover_provider
 from projects_config.valve_actuator_limiter_config import ValveActuatorLimiterConfig
-from typing import Any, cast, Callable
+from typing import Any, cast, Callable, Sequence
 
 
 @discover_provider
@@ -49,38 +49,34 @@ class ValveActuatorLimiterProvider(Provider):
         return {name: self.build_diagram for name in self.targets.supporting(Action.DIAGRAM)}
 
     @method_cache
-    def build_limiter(self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT) -> Part:
+    def build_limiter(
+        self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT
+    ) -> BuildPart:
         """Create a 3D sector (limiter) solid using only 3D primitives."""
+        r = self.settings.pocket_radius
+        h = self.settings.pocket_depth
         start_angle = 180 if subassembly == "0deg" else 90 if subassembly == "90deg" else 270
-        cutter_size = self.settings.pocket_radius * 3
+        cutter_size = r * 3
 
         with BuildPart() as limiter_gen:
-            Cylinder(
-                radius=self.settings.pocket_radius + self.settings.wall_thickness,
-                height=self.settings.pocket_depth,
-                align=(Align.CENTER, Align.CENTER, Align.MIN),
-            )
+            Cylinder(radius=r, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
             # Use two rotated boxes as half-plane cutters to isolate the stop_angle sector
             with Locations(Rot(0, 0, start_angle - 90)):
                 Box(
-                    cutter_size,
-                    cutter_size,
-                    self.settings.pocket_depth - self.settings.wall_thickness,
-                    align=(Align.MIN, Align.CENTER, Align.MIN),
-                    mode=Mode.SUBTRACT,
+                    cutter_size, cutter_size, h * 1.2, align=(Align.MIN, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT
                 )
+
             with Locations(Rot(0, 0, start_angle + self.settings.stop_angle + 90)):
                 Box(
-                    cutter_size,
-                    cutter_size,
-                    self.settings.pocket_depth - self.settings.wall_thickness,
-                    align=(Align.MIN, Align.CENTER, Align.MIN),
-                    mode=Mode.SUBTRACT,
+                    cutter_size, cutter_size, h * 1.2, align=(Align.MIN, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT
                 )
-        return cast(Part, limiter_gen.part)
+        return limiter_gen
 
     @method_cache
-    def build_plate(self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT) -> Part:
+    def build_plate(
+        self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT
+    ) -> BuildPart:
         """Build the geometry for a limiter plate."""
         with BuildPart() as p:
             # Generate the structural outer profile
@@ -125,7 +121,7 @@ class ValveActuatorLimiterProvider(Provider):
             with Locations((self.hull_center.X, self.hull_center.Y, 0)):
                 Cylinder(
                     radius=self.settings.pocket_radius,
-                    height=self.settings.wall_thickness + self.settings.pocket_depth,
+                    height=self.settings.wall_thickness + self.settings.pocket_depth + 2.0,
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                     mode=Mode.SUBTRACT,
                 )
@@ -134,33 +130,27 @@ class ValveActuatorLimiterProvider(Provider):
             with Locations([(v.X, v.Y, 0) for v in self.settings.bolt_holes]):
                 Cylinder(
                     radius=self.settings.bolt_radius,
-                    height=self.settings.wall_thickness + self.settings.pocket_depth,
+                    height=self.settings.wall_thickness + self.settings.pocket_depth + 2.0,
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                     mode=Mode.SUBTRACT,
                 )
-        return cast(Part, p.part)
+        return p
 
     @method_cache
     def build_limiter_plate(
         self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT
-    ) -> Part:
+    ) -> BuildPart:
         """Build the geometry for a limiter plate."""
         with BuildPart() as p:
             plate = self.build_plate("_plate", subassembly=subassembly, mode=mode)
             add(plate)
             with Locations((self.hull_center.X, self.hull_center.Y, 0)):
                 add(self.build_limiter("_limiter", subassembly=subassembly, mode=mode))
-        return cast(Part, p.part)
+        return p
 
     @method_cache
-    def build_diagram(self, targets: list[str], mode: ProviderMode) -> Any:
+    def build_diagram(self, targets: Sequence[str], mode: ProviderMode) -> BuildPart:
         """Build an assembly diagram for the limiter plates."""
-        assy = cq.Assembly()
-        # Build the left subassembly for the diagram view
+        # Build only the limiter plate for diagram viewing
         plate = self.build_limiter_plate("limiter_plate")
-
-        # Pylance fix: Ensure the wrapped OCCT shape is not None before casting to CadQuery
-        if plate.wrapped is not None:
-            assy.add(cq.Shape.cast(plate.wrapped), name="plate")
-
-        return assy
+        return plate

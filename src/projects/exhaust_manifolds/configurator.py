@@ -98,10 +98,11 @@ class ExhaustManifoldsConfigurator:
         o_box = other_obj.bounding_box()
 
         def check_angle(angle):
-            candidate = candidate_factory(float(angle))
-            c_box = candidate.bounding_box()
-            if self.parts_not_touching(candidate, other_obj, c_box, o_box):
-                candidate_center = candidate.center()
+            candidate_builder = candidate_factory(float(angle))
+            candidate_part = candidate_builder.part
+            c_box = candidate_part.bounding_box()
+            if self.parts_not_touching(candidate_part, other_obj, c_box, o_box):
+                candidate_center = candidate_part.center()
                 distance = (candidate_center - center).length
                 return angle, distance
             return None, None
@@ -129,8 +130,8 @@ class ExhaustManifoldsConfigurator:
     @validate_call(config={"arbitrary_types_allowed": True})
     def config_clamp(self, name: Literal["driver", "passenger"]):
         """Tune clamp positions for a part."""
-        tube = self.builder.create_part(name, tube_only=True)
-        other_tube = self.builder.create_part(name, right=True, tube_only=True)
+        tube = self.builder.create_part(name, tube_only=True).part
+        other_tube = self.builder.create_part(name, right=True, tube_only=True).part
         path = self.builder.create_wire(name)
 
         for idx in range(1, len(self.exhaust_manifolds_config.clamp_positions[name]) - 1):
@@ -156,8 +157,8 @@ class ExhaustManifoldsConfigurator:
     @validate_call(config={"arbitrary_types_allowed": True})
     def config_text_logo(self, name: Literal["driver", "passenger"]):
         """Tune logo text placement for a part."""
-        tube = self.builder.create_part(name, right=True, tube_only=True)
-        other_tube = self.builder.create_part(name, tube_only=True)
+        tube = self.builder.create_part(name, right=True, tube_only=True).part
+        other_tube = self.builder.create_part(name, tube_only=True).part
         path = self.builder.create_wire(name)
         text_offset, _ = self.exhaust_manifolds_config.logo_text_positions[name]
         center = self.get_part_position(tube, path, text_offset)
