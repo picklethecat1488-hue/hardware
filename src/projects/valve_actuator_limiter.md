@@ -4,7 +4,7 @@ This project addresses issues where exhaust valve actuators rotate beyond their 
 
 The design features a lightweight aluminum or stainless steel plate that mounts between the actuator and the mounting bracket, restricting the sweep of the actuator arm to the OEM specification.
 
-![Diagram](valve_actuator_diagram.svg)
+![Diagram](valve_actuator_limiter_diagram.svg)
 
 *Assembly diagram.*
 
