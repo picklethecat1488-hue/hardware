@@ -7,7 +7,7 @@ import cadquery as cq
 import numpy as np
 from model import method_cache, DiagramOptions
 from pathlib import Path
-from provider import Provider, Action, Mode as ProviderMode, discover_provider
+from provider import Provider, Action, Mode as ProviderMode, discover_provider, Room
 from projects_config.valve_actuator_limiter_config import ValveActuatorLimiterConfig
 from typing import Any, cast, Callable, Sequence
 
@@ -44,7 +44,7 @@ class ValveActuatorLimiterProvider(Provider):
         return {"limiter": self.build_limiter, "plate": self.build_plate, "limiter_plate": self.build_limiter_plate}
 
     @property
-    def diagram(self) -> dict[str, Callable[..., Any]]:
+    def diagram(self) -> dict[str, Callable[[Room, Sequence[str], ProviderMode], None]]:
         """A mapping of diagram names to their build handler methods."""
         return {name: self.build_diagram for name in self.targets.supporting(Action.DIAGRAM)}
 
@@ -171,8 +171,8 @@ class ValveActuatorLimiterProvider(Provider):
         return p
 
     @method_cache
-    def build_diagram(self, targets: Sequence[str], mode: ProviderMode) -> BuildPart:
+    def build_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build an assembly diagram for the limiter plates."""
         # Build only the limiter plate for diagram viewing
         plate = self.build_limiter_plate("limiter_plate")
-        return plate
+        room.add("limiter_plate", plate)

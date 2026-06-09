@@ -9,7 +9,7 @@ from build123d import *
 from model import AppConfig
 from projects_config import ExhaustManifoldsConfig
 from projects.exhaust_manifolds import ExhaustManifoldsProvider
-from provider import Action, Mode, TargetList, ProviderManager, MODES
+from provider import Action, Mode, TargetList, ProviderManager, MODES, Room
 
 
 class TestExhaustManifoldsProvider:
@@ -110,13 +110,15 @@ class TestExhaustManifoldsProvider:
             mock.assert_called_once_with("driver")
 
     def test_run_diagram(self, provider):
-        """Verify executing a DIAGRAM action calls create_diagram."""
-        with patch.object(provider.builder, "create_diagram", return_value="diag_obj") as mock:
+        """Verify executing a DIAGRAM action calls build_diagram."""
+        with patch.object(provider.builder, "build_diagram") as mock:
             targets = provider.targets.supporting(Action.DIAGRAM)
-            result = provider.run(targets)
-            assert result == "diag_obj"
-            # build_diagram casts the list of targets to names
-            mock.assert_called_once_with(names=("driver", "passenger"))
+            room = provider.run(targets)
+            assert isinstance(room, Room)
+            mock.assert_called_once()
+            # Verify orchestrator passed the right arguments to the handler
+            args, _ = mock.call_args
+            assert args[1] == ("driver", "passenger")
 
     def test_run_config_execution(self, provider):
         """Verify executing a CONFIG action returns None."""
@@ -508,17 +510,15 @@ class TestExhaustManifoldsViewer:
 
     def test_room_logic(self, viewer):
         """Verify room dictionary generation logic."""
-        for room_fn in [viewer.show_positions_room, viewer.show_overlay_room, viewer.show_profiles_room]:
-            data = room_fn()
-            assert isinstance(data, dict)
-            assert len(data) > 0
-            for val in data.values():
-                assert len(val) == 3  # (obj, color_name, alpha)
+        for room_fn in [viewer.view_part_positions, viewer.view_overlay, viewer.view_sketch]:
+            room = Room()
+            room_fn(room)
+            assert len(room) > 0
 
     def test_view_interfaces(self, viewer):
         """Verify orchestrator-compatible view interfaces."""
         for view_fn in [viewer.view_part_positions, viewer.view_overlay, viewer.view_wire, viewer.view_sketch]:
-            results = view_fn()
-            assert isinstance(results, list)
-            for _, rgba in results:
+            room = Room()
+            view_fn(room)
+            for _, rgba in room.values():
                 assert len(rgba) == 4

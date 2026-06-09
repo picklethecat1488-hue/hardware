@@ -28,7 +28,9 @@ main_plate:
     subassemblies: [left, right]
   config:
     modes: [default]
-  color: [0.7, 0.7, 0.7, 1.0]
+  color:
+    left: grey
+    right: [0.7, 0.7, 0.7, 1.0]
 ```
 
 ### 3. Create a Measurements File (Optional)
@@ -48,7 +50,7 @@ The provider acts as the interface between your builder and the application's or
 from functools import cached_property
 from build123d import *
 from pathlib import Path
-from provider import Provider, Action, Mode, discover_provider
+from provider import Provider, Action, Mode, discover_provider, Room
 from projects_config import ExhaustManifoldsConfig # Or a custom Pydantic model
 
 @discover_provider
@@ -63,12 +65,29 @@ class BracketProvider(Provider):
     def part(self):
         return {name: self.build_part for name in self.targets.supporting(Action.PART)}
 
-    def build_part(self, target: str, subassembly: str, mode: Mode) -> Part:
+    @property
+    def diagram(self):
+        return {name: self.build_diagram for name in self.targets.supporting(Action.DIAGRAM)}
+
+    @property
+    def view(self):
+        return {name: self.build_view for name in self.targets.supporting(Action.VIEW)}
+
+    def build_diagram(self, room: Room, targets: list[str], mode: Mode) -> None:
+        # Diagrams populate a Room instead of returning geometry
+        plate = self.build_part("main_plate", "left", mode)
+        room.add("main_plate", plate)
+
+    def build_part(self, target: str, subassembly: str, mode: Mode) -> BuildPart:
         with BuildPart() as p:
             Box(10, 20, 5)
             if subassembly == "right":
                 mirror(about=Plane.YZ)
-        return p.part
+        return p
+
+    def build_view(self, room: Room) -> None:
+        # Views populate a Room similarly to diagrams
+        room.add("plate", self.build_part("main_plate", "left", Mode.DEFAULT), color="blue")
 ```
 
 ### 5. Export the Provider
@@ -104,7 +123,7 @@ When you call `provider.targets`, it returns a `TargetList` helper. You can chai
 The `ProviderOrchestrator` handles the execution of tasks. It manages:
 1.  **Validation**: Ensuring requested modes and subassemblies exist in the manifest.
 2.  **Parallelization**: Running CAD generation tasks across a thread pool.
-3.  **Mapping**: Routing `Action.PART` to the `part` registry and `Action.VIEW` to the `view` registry.
+3.  **Mapping**: Routing `Action.PART` to handlers returning geometry, while `Action.DIAGRAM` and `Action.VIEW` route to handlers that populate a `Room` container.
 
 ### Configuration Lifecycle
 1.  **Discovery**: `ProviderManager` finds all decorated providers.

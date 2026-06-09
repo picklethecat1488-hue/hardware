@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from provider.orchestrator import ProviderOrchestrator, ProviderRouterOrchestrator
 from provider.types import Action, Mode, MODES, SUBASSEMBLIES
+from provider.room import Room
 
 
 @pytest.fixture
@@ -76,10 +77,11 @@ class TestProviderRouterOrchestrator:
         """Verify diagram merging returns provider-named tuples."""
         orch = ProviderRouterOrchestrator(controller_context)
 
-        raw_results = [(mock_provider, [0], "diag_obj")]
+        mock_room = MagicMock(spec=Room)
+        raw_results = [(mock_provider, [0], mock_room)]
         merged = orch.merge(Action.DIAGRAM, ("mock_p/part_a",), raw_results)
 
-        assert merged == [("mock_p", "diag_obj")]
+        assert merged == [("mock_p", mock_room)]
 
     def test_missing_result_detection(self, controller_context, mock_provider):
         """Verify error if a result is unexpectedly None after merge."""

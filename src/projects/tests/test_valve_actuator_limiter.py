@@ -6,7 +6,7 @@ from build123d import Part, BuildPart
 import cadquery as cq
 from projects_config.valve_actuator_limiter_config import ValveActuatorLimiterConfig
 from projects.valve_actuator_limiter import ValveActuatorLimiterProvider
-from provider import Action, Mode
+from provider import Action, Mode, Room
 
 
 class TestValveActuatorLimiterProvider:
@@ -47,9 +47,12 @@ class TestValveActuatorLimiterProvider:
             assert part.is_valid
 
     def test_build_diagram(self, provider):
-        """Verify that build_diagram returns a valid diagram object."""
-        assy = provider.build_diagram("limiter_plate", Mode.DEFAULT)
-        assert isinstance(assy, BuildPart)
+        """Verify that build_diagram populates the room with geometry."""
+        room = Room()
+        provider.build_diagram(room, ["limiter_plate"], Mode.DEFAULT)
+        assert "limiter_plate" in room
+        geom, _ = room["limiter_plate"]
+        assert isinstance(geom, BuildPart)
 
     def test_volumes_match(self, provider):
         """Verify that mirroring maintains volume consistency."""

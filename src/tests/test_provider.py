@@ -10,6 +10,7 @@ from provider.target_list import TargetList
 from provider.utils import load_manifest, ColorType
 from model.utils import method_cache
 from provider.types import Action, Mode, MODES, SUBASSEMBLIES, COLOR
+from provider.room import Room
 
 
 class MockConfig(BaseModel):
@@ -64,7 +65,7 @@ class MockProvider(Provider):
         """Return a mock diagram registry."""
         if not hasattr(self, "_mock_diagram"):
             self._mock_diagram = {
-                "part_b": MagicMock(return_value="diag_obj"),
+                "part_b": MagicMock(side_effect=lambda room, targets, mode: room.add("diag", "diag_obj")),
             }
         return self._mock_diagram
 
@@ -83,7 +84,7 @@ class MockProvider(Provider):
         """Return a mock view registry."""
         if not hasattr(self, "_mock_view"):
             self._mock_view = {
-                "part_a": MagicMock(return_value=[("shape", "color")]),
+                "part_a": MagicMock(side_effect=lambda room: room.add("item", "shape", color="grey")),
             }
         return self._mock_view
 
@@ -202,7 +203,8 @@ class TestProviderOrchestration:
     def test_view_success(self, provider):
         """Verify successful view orchestration."""
         results = provider.run(provider.targets.supporting(Action.VIEW))
-        assert results == [("part_a", [("shape", "color")])]
+        assert len(results) == 1
+        assert isinstance(results[0][1], Room)
         provider.view["part_a"].assert_called_once()
 
     def test_view_unregistered_room(self, provider):
@@ -221,8 +223,10 @@ class TestProviderOrchestration:
 
     def test_build_diagram_special_case(self, provider):
         """Verify diagram build returns a single object and validates differently."""
-        result = provider.run(TargetList(provider, ["part_b"], action=Action.DIAGRAM))
-        assert result == "diag_obj"
+        room = provider.run(TargetList(provider, ["part_b"], action=Action.DIAGRAM))
+        assert isinstance(room, Room)
+        assert "diag" in room
+        assert room["diag"][0] == "diag_obj"
 
     def test_pre_build_validation_failures(self, provider):
         """Verify various validation failures in _pre_build."""

@@ -133,7 +133,7 @@ class Builder:
         self.logger.print(f"Building {Action.DIAGRAM}s: {self._get_summary(list(targets))}", symbol="🛠️ ")
 
         results = self.manager.router.run(targets)
-        for p_name, assy in results or []:
+        for p_name, room in results or []:
             # Create provider-specific subdirectory
             target_dir = Path(out_dir) / p_name
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -143,29 +143,7 @@ class Builder:
 
             provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
             options = getattr(provider.settings, "diagram_options", None) if provider else None
-            all_opts = options.model_dump(by_alias=True) if options else {}
-
-            # Use duck typing to check for cq.Assembly, as isinstance fails when classes are mocked in tests
-            if not hasattr(assy, "toCompound"):
-                # Extract geometry from build123d builders and wrap in a cq.Assembly
-                geom = None
-                if isinstance(assy, BuildPart):
-                    geom = assy.part
-                elif isinstance(assy, BuildSketch):
-                    geom = assy.sketch
-                elif isinstance(assy, BuildLine):
-                    geom = assy.line
-                else:
-                    geom = assy
-
-                if geom and hasattr(geom, "wrapped") and geom.wrapped is not None:
-                    new_assy = cq.Assembly()
-                    new_assy.add(cq.Shape.cast(geom.wrapped))
-                    assy = new_assy
-                else:
-                    raise ValueError(f"Unsupported object type: {type(assy)} for {p_name}")
-
-            assy.toCompound().export(path_str, opt=all_opts)
+            room.export_svg(path_str, options)
             self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_all(self, out_dir, subassembly=None, zip_name="build.zip"):
