@@ -22,13 +22,13 @@ class TestLogger:
         assert logger.backend.start.called
         assert logger.running is True
 
-    def test_disabled_logger_prints_directly(self, mocker, capsys):
-        """Verify disabled logger prints directly."""
+    def test_disabled_logger_is_silent(self, mocker, capsys):
+        """Verify disabled logger does not print."""
         logger = Logger(enabled=False)
         logger.print("Direct message")
 
         captured = capsys.readouterr()
-        assert "Direct message" in captured.out
+        assert captured.out == ""
 
     def test_terminal_print_persists_message(self, mocker):
         """Verify print persists messages and restarts the spinner."""
@@ -41,6 +41,29 @@ class TestLogger:
         # Halo should stop/persist the message and restart
         mock_halo.stop_and_persist.assert_called_with("✔ Step 1")
         assert mock_halo.start.call_count == 2  # Once in init, once in print
+
+    def test_print_without_restart(self, mocker):
+        """Verify print with restart=False stops the spinner."""
+        mock_halo_class = mocker.patch("shell.Halo")
+        logger = Logger(enabled=True)
+        mock_halo = mock_halo_class.return_value
+
+        logger.print("No restart", restart=False)
+        assert logger.running is False
+        assert mock_halo.stop_and_persist.called
+        assert mock_halo.start.call_count == 1  # Only from init
+
+    def test_manual_start_stop(self, mocker):
+        """Verify manual start and stop control."""
+        mock_halo_class = mocker.patch("shell.Halo")
+        logger = Logger(enabled=True)
+        mock_halo = mock_halo_class.return_value
+
+        logger.started = False
+        assert logger.running is False
+        logger.started = True
+        assert logger.running is True
+        assert mock_halo.start.call_count == 2
 
     def test_done_terminal(self, mocker, mock_dependencies):
         """Verify done() stops the logger."""

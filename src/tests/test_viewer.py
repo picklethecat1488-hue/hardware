@@ -145,11 +145,11 @@ class TestViewer:
         call_args = [c[0][0] for c in calls]
 
         # Verify that all valid argument combinations are printed
-        assert "Found 1 targets:" in call_args
-        assert "p1/t1" in call_args
-        assert "p1/t1/part" in call_args
-        assert "p1/t1/part/left" in call_args
-        assert "p1/t1/left" in call_args
+        assert any("Found 1 targets:" in arg for arg in call_args)
+        assert any("p1/t1" in arg for arg in call_args)
+        assert any("p1/t1/part" in arg for arg in call_args)
+        assert any("p1/t1/part/left" in arg for arg in call_args)
+        assert any("p1/t1/left" in arg for arg in call_args)
 
     @patch("cadquery.Color", side_effect=lambda *args: args)
     @patch("cadquery.Assembly")

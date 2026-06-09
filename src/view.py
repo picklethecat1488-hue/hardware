@@ -194,6 +194,7 @@ class Viewer:
         targets = sorted(manifest.keys())
 
         self.logger.print(f"Found {len(targets)} targets:", symbol="📋")
+        all_valid_args = []
         for t in targets:
             target_cfg = manifest[t]
             supported_actions = [a for a in [Action.VIEW, Action.PART, Action.DIAGRAM] if a in target_cfg]
@@ -201,7 +202,7 @@ class Viewer:
             if not supported_actions:
                 continue
 
-            # Generate and print all valid argument combinations for this target
+            # Generate all valid argument combinations for this target
             valid_args = {t}
             for i, action in enumerate(supported_actions):
                 act_val = action.value
@@ -214,8 +215,14 @@ class Viewer:
                         # Shorthand for the primary visual action
                         valid_args.add(f"{t}/{sub}")
 
-            for arg in sorted(list(valid_args)):
-                self.logger.print(arg)
+            all_valid_args.extend(sorted(list(valid_args)))
+
+        if all_valid_args:
+            # Use manual control to avoid Halo spinner overhead during long lists
+            self.logger.started = False
+            for arg in all_valid_args:
+                self.logger.print(arg, restart=False)
+            self.logger.started = True
 
 
 def get_args():
