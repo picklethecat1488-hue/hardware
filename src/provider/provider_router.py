@@ -1,12 +1,98 @@
 """Routes build targets to multiple providers."""
 
-from typing import Any, Optional
+from __future__ import annotations
+from typing import Any, Optional, Dict
 from .provider import Provider
 from .target_list import TargetList
 from .types import Action, Mode
-from .orchestrator import Orchestrator, ProviderRouterOrchestrator
+from .orchestrator import Orchestrator
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import validate_call
+
+
+_router_default_executor: Optional[ThreadPoolExecutor] = None
+
+
+class ProviderRouterOrchestrator(Orchestrator):
+    """Handles routing and merging for multiple providers."""
+
+    def __init__(self, controller: ProviderRouter, executor: Optional[ThreadPoolExecutor] = None):
+        """Initialize the orchestrator with a controller reference."""
+        self.controller = controller
+        if executor is not None:
+            self.executor = executor
+        else:
+            global _router_default_executor
+            if _router_default_executor is None:
+                _router_default_executor = ThreadPoolExecutor()
+            self.executor = _router_default_executor
+
+    def collect(self, targets: tuple[str, ...]) -> Dict[Provider, list[int]]:
+        """Map target names to providers and group indices by provider."""
+        p_map = {p.name: p for p in self.controller.providers}
+
+        groups: Dict[Provider, list[int]] = {}
+        for i, target in enumerate(targets):
+            if "/" not in target:
+                raise ValueError(f"Target '{target}' must use 'provider/target' syntax.")
+            p_name, _ = target.split("/", 1)
+            provider = p_map.get(p_name)
+            if not provider:
+                raise ValueError(f"No provider found for target '{target}'")
+            groups.setdefault(provider, []).append(i)
+        return groups
+
+    def merge(self, action: Action, targets: tuple[str, ...], results: list[Any]) -> Any:
+        """Merge results from multiple providers based on the action."""
+        if action == Action.CONFIG:
+            return None
+
+        indexed_results = [None] * len(targets)
+        diagram_results = []
+
+        for provider, indices, res in results:
+            if action == Action.DIAGRAM:
+                diagram_results.append((provider.name, res))
+            else:
+                for local_idx, global_idx in enumerate(indices):
+                    # Store only the result object in indexed_results for merging
+                    indexed_results[global_idx] = res[local_idx][1]
+
+        if action == Action.DIAGRAM:
+            if any(r is None for _, r in diagram_results):
+                raise ValueError("Orchestration failed: one or more diagram results were None.")
+            return diagram_results
+
+        if any(r is None for r in indexed_results):
+            missing = [targets[i] for i, r in enumerate(indexed_results) if r is None]
+            raise ValueError(
+                f"Orchestration failed in ProviderRouter: results for targets {missing} were not collected."
+            )
+
+        return list(zip(targets, indexed_results))
+
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def execute(
+        self,
+        targets: tuple[str, ...],
+        action: Action,
+        subassemblies: tuple[str | None, ...] = (),
+        modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
+    ) -> Any:
+        """Route targets to their respective providers and merge results."""
+        groups = self.collect(targets)
+
+        def provider_task(item: tuple[Provider, list[int]]) -> tuple[Provider, list[int], Any]:
+            p, indices = item
+            # Extract the leaf target name (e.g., 'p/t' -> 't')
+            p_targets = [targets[i].split("/", 1)[1] for i in indices]
+            p_subs = [subassemblies[i] for i in indices] if len(subassemblies) == len(targets) else list(subassemblies)
+            sub_list = TargetList(p, p_targets, subassemblies=p_subs, modes=list(modes), action=action)
+            return p, indices, p.run(sub_list)
+
+        # Execute all provider runs in parallel across the thread pool
+        results = list(self.executor.map(provider_task, groups.items()))
+        return self.merge(action, targets, results)
 
 
 class ProviderRouter:

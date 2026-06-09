@@ -2,7 +2,8 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from provider.orchestrator import ProviderOrchestrator, ProviderRouterOrchestrator
+from provider.provider import ProviderOrchestrator
+from provider.provider_router import ProviderRouterOrchestrator
 from provider.types import Action, Mode, MODES, SUBASSEMBLIES
 from provider.room import Room
 

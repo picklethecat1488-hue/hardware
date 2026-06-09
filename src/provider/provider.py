@@ -1,5 +1,6 @@
 """Base definitions for geometry and data providers."""
 
+from __future__ import annotations
 import os
 import inspect
 from typing import Optional, Any, Callable, Iterable, TYPE_CHECKING
@@ -12,13 +13,171 @@ from model.app_config import AppConfig
 import re
 from .types import Mode, Action, MODES, SUBASSEMBLIES, COLOR
 from .target_list import TargetList
-from .orchestrator import Orchestrator, ProviderOrchestrator
+from .orchestrator import Orchestrator
 from .utils import load_manifest
 from .room import Room
 
 if TYPE_CHECKING:
     from model.app_config import AppConfig
     from shell import Logger
+
+
+_default_executor: Optional[ThreadPoolExecutor] = None
+
+
+class ProviderOrchestrator(Orchestrator):
+    """Handles the validation and execution strategy for build actions."""
+
+    def __init__(self, provider: Provider, executor: Optional[ThreadPoolExecutor] = None):
+        """Initialize the orchestrator with a provider reference."""
+        self.provider = provider
+        if executor is not None:
+            self.executor = executor
+        else:
+            global _default_executor
+            if _default_executor is None:
+                _default_executor = ThreadPoolExecutor()
+            self.executor = _default_executor
+
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def execute(
+        self,
+        targets: tuple[str, ...],
+        action: Action,
+        subassemblies: tuple[str | None, ...] = (),
+        modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
+    ) -> Any:
+        """Perform the requested build action."""
+        # Diagram action does not use subassemblies during build execution
+        handler_subs = () if action == Action.DIAGRAM else subassemblies
+        self.pre_handler(targets, action, handler_subs, modes)
+
+        if action == Action.DIAGRAM:
+            # Diagrams operate on all targets at once. We pick the handler for the first target.
+            handler = self.provider.diagram[targets[0]]
+            # Diagrams operate on all targets at once and return content in a Room.
+            room = Room(config=self.provider.app_config)
+            handler(room, targets, modes[0])
+            results = [room]
+            self.post_handler(targets, results, action)
+            return results[0]
+
+        # Flatten units of work into (target, subassembly, mode) triples
+        work_subs = list(subassemblies) if subassemblies else [None]
+        work = [(t, sa, m) for t in targets for sa in work_subs for m in modes]
+
+        if action == Action.VIEW:
+
+            def view_task(item: tuple[str, Optional[str], Mode]) -> Room:
+                target, _, _ = item
+                room = Room(config=self.provider.app_config)
+                self.provider.view[target](room)
+                return room
+
+            raw_results = list(self.executor.map(view_task, work))
+        elif action == Action.CONFIG:
+
+            def config_task(item: tuple[str, Optional[str], Mode]) -> None:
+                target, sa, m = item
+                self.provider.config[m](target, sa)
+
+            list(self.executor.map(config_task, work))
+            self.post_handler(targets, None, action)
+            return None
+        elif action == Action.PART:
+
+            def build_task(item: tuple[str, Optional[str], Mode]) -> Any:
+                target, sa, m = item
+                handler = self.provider.part[target]
+                return handler(target, sa, m)
+
+            raw_results = list(self.executor.map(build_task, work))
+        else:
+            raise ValueError(f"Unsupported action: {action}")
+
+        # Group results back by target for VIEW and BUILD
+        results = []
+        group_size = len(work_subs) * len(modes)
+        for i in range(len(targets)):
+            group = raw_results[i * group_size : (i + 1) * group_size]
+            results.append(group[0] if group_size == 1 else group)
+
+        self.post_handler(targets, results, action)
+        return list(zip(targets, results))
+
+    def pre_handler(
+        self,
+        targets: tuple[str, ...],
+        action: Action,
+        subassemblies: tuple[str | None, ...],
+        modes: tuple[Mode | str, ...],
+    ) -> None:
+        """Validate input parameters before the handler execution."""
+        # Ensure the action is recognized by the orchestrator
+        if action not in [Action.VIEW, Action.CONFIG, Action.PART, Action.DIAGRAM]:
+            raise ValueError(f"No handler registered for action '{action}' in {self.provider.__class__.__name__}")
+
+        # Diagrams operate on all targets at once, so we validate the first target has a handler.
+        if action == Action.DIAGRAM:
+            if targets[0] not in self.provider.diagram:
+                raise ValueError(f"No diagram handler registered for '{targets[0]}' in {self.provider.name}")
+
+        valid_targets = self.provider.targets
+        manifest = self.provider.manifest
+
+        for i, name in enumerate(targets):
+            if name not in valid_targets:
+                raise ValueError(f"Unsupported part name: '{name}'. Supported: {valid_targets}")
+
+            actions_config = manifest.get(name, {})
+            if action not in actions_config:
+                raise ValueError(
+                    f"Action '{action}' is not supported for part '{name}'. Supported: {list(actions_config.keys())}"
+                )
+
+            if action == Action.VIEW and name not in self.provider.view:
+                raise ValueError(f"No view function registered for room '{name}' in {self.provider.name}")
+
+            if action == Action.PART and name not in self.provider.part:
+                raise ValueError(f"No part handler registered for '{name}' in {self.provider.name}")
+
+            if action == Action.CONFIG:
+                for mode in modes:
+                    if mode not in self.provider.config:
+                        raise ValueError(f"No config handler registered for mode '{mode}' in {self.provider.name}")
+
+            action_config = actions_config[action]
+            supported_modes = action_config.get(MODES, [])
+
+            for mode in modes:
+                if mode not in supported_modes:
+                    raise ValueError(
+                        f"Mode '{mode}' is not supported for action '{action}' on part '{name}'. "
+                        f"Supported modes: {supported_modes}"
+                    )
+
+            if subassemblies:
+                supported_subs = action_config.get(SUBASSEMBLIES, [])
+                for sa in subassemblies:
+                    if sa not in supported_subs:
+                        raise ValueError(
+                            f"Subassembly '{sa}' is not supported for part '{name}'. "
+                            f"Supported subassemblies: {supported_subs}"
+                        )
+
+    def post_handler(self, targets: tuple[str, ...], results: Optional[list[Any]], action: Action) -> None:
+        """Validate build results after the handler execution."""
+        if action == Action.CONFIG:
+            return
+
+        expected_len = 1 if action == Action.DIAGRAM else len(targets)
+        if results is None or len(results) != expected_len:
+            raise ValueError(
+                f"Orchestration failed: expected {expected_len} items, got {len(results) if results else 0}."
+            )
+
+        if any(r is None for r in results):
+            raise ValueError(f"Orchestration failed: one or more results for action '{action}' were None.")
 
 
 class Provider:
