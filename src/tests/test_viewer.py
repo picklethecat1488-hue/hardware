@@ -142,12 +142,14 @@ class TestViewer:
 
         # Check that logger was called with expected formatted strings
         calls = viewer.logger.print.call_args_list
+        call_args = [c[0][0] for c in calls]
 
-        # Verify consolidated output format: p1/t1 [part(modes=['print'], subassemblies=['left'])]
-        target_call = next(str(c) for c in calls if "p1/t1" in str(c))
-        assert "part" in target_call
-        assert "modes=['print']" in target_call
-        assert "subassemblies=['left']" in target_call
+        # Verify that all valid argument combinations are printed
+        assert "Found 1 targets:" in call_args
+        assert "p1/t1" in call_args
+        assert "p1/t1/part" in call_args
+        assert "p1/t1/part/left" in call_args
+        assert "p1/t1/left" in call_args
 
     @patch("cadquery.Color", side_effect=lambda *args: args)
     @patch("cadquery.Assembly")

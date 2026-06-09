@@ -188,18 +188,6 @@ class Viewer:
         self.logger.print(f"Showing {summary}", symbol="👁️ ")
         show(room.assembly, names=["View"], collapse=Collapse.ALL, reset_camera=Camera.RESET)
 
-    def _get_action_summary(self, action: Action, cfg: dict) -> str:
-        """Create a formatted summary string for a specific build action."""
-        details = [
-            f"{k}={[x.value if hasattr(x, 'value') else x for x in v]}"
-            for k, v in cfg.items()
-            if k in ["modes", "subassemblies"]
-        ]
-        summary = action.value
-        if details:
-            summary += f"({', '.join(details)})"
-        return summary
-
     def list_targets(self):
         """List all available targets and their supported actions."""
         manifest = self.manager.router.manifest
@@ -208,14 +196,26 @@ class Viewer:
         self.logger.print(f"Found {len(targets)} targets:", symbol="📋")
         for t in targets:
             target_cfg = manifest[t]
-            action_info = [
-                self._get_action_summary(action, target_cfg[action])
-                for action in [Action.VIEW, Action.PART, Action.DIAGRAM]
-                if action in target_cfg
-            ]
+            supported_actions = [a for a in [Action.VIEW, Action.PART, Action.DIAGRAM] if a in target_cfg]
 
-            if action_info:
-                self.logger.print(f"{t} [{' | '.join(action_info)}]")
+            if not supported_actions:
+                continue
+
+            # Generate and print all valid argument combinations for this target
+            valid_args = {t}
+            for i, action in enumerate(supported_actions):
+                act_val = action.value
+                valid_args.add(f"{t}/{act_val}")
+
+                subs = target_cfg[action].get("subassemblies", [])
+                for sub in subs:
+                    valid_args.add(f"{t}/{act_val}/{sub}")
+                    if i == 0:
+                        # Shorthand for the primary visual action
+                        valid_args.add(f"{t}/{sub}")
+
+            for arg in sorted(list(valid_args)):
+                self.logger.print(arg)
 
 
 def get_args():
