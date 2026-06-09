@@ -7,7 +7,7 @@ from build123d import *  # type: ignore
 from model.app_config import AppConfig
 from projects_config import ExhaustManifoldsConfig
 from .builder import ExhaustManifoldsBuilder
-from provider.utils import get_rgba_color
+from provider import Room, ColorType
 from .configurator import ExhaustManifoldsConfigurator
 
 
@@ -60,76 +60,59 @@ class ExhaustManifoldsViewer:
             bottom_radius=10, top_radius=0, height=10, align=(Align.CENTER, Align.CENTER, Align.MIN)
         )
 
-    def show_positions_room(self):
-        """Build geometry for the positions room."""
-        to_show = {}
+    def view_part_positions(self, room: Room) -> None:
+        """Return visualization data for part positions."""
         for name in self.names:
             for right in [False, True]:
                 side = "right" if right else "left"
-                color = ("red" if right else "green") if name == "driver" else ("blue" if right else "orange")
-                to_show[f"{name}_{side}"] = (
+                color = (
+                    (ColorType.RED if right else ColorType.GREEN)
+                    if name == "driver"
+                    else (ColorType.BLUE if right else ColorType.ORANGE)
+                )
+                room.add(
+                    f"{name}_{side}",
                     self.builder.create_part(name, right=right, tube_only=False),
-                    color,
-                    0.5,
+                    color=color,
+                    alpha=0.5,
                 )
 
                 for i in range(10):
-                    to_show[f"{name}_{side}_pos_{i}"] = (
+                    room.add(
+                        f"{name}_{side}_pos_{i}",
                         self.create_part_position_point(name, i / 10, right=right),
-                        color,
-                        1.0,
+                        color=color,
                     )
-                to_show[f"{name}_{side}_center"] = (
-                    self.create_solid_center_point(name, right=right),
-                    "blue",
-                    1.0,
-                )  # "blue" is a string, not a ColorType
-        to_show["bounds"] = (self.bound_box, "grey", 0.2)
-        return to_show
-
-    def show_overlay_room(self):
-        """Build geometry for the overlay room."""
-        to_show = {}
-        for name in self.names:
-            color = "cyan" if name == "driver" else "yellow"
-            to_show[f"{name}_full_tube"] = (self.builder.create_manifold(name), color, 0.2)
-            for right in [False, True]:
-                side = "right" if right else "left"  # Unused variable
-                color = ("red" if right else "green") if name == "driver" else ("blue" if right else "orange")
-                to_show[f"{name}_{side}"] = (
-                    self.builder.create_part(name, right=right, tube_only=False),
-                    color,
-                    1.0,
+                room.add(
+                    f"{name}_{side}_center", self.create_solid_center_point(name, right=right), color=ColorType.BLUE
                 )
-        to_show["bounds"] = (self.bound_box, "grey", 0.2)
-        return to_show
+        room.add("bounds", self.bound_box, color=ColorType.GREY, alpha=0.2)
 
-    def show_profiles_room(self):
-        """Build geometry for the profiles room."""
-        return {
-            "lap_joint_sketch": (self.builder.create_profile_sketch(180, lap_joint=True), "magenta", 1.0),
-            "full_sketch": (self.builder.create_profile_sketch(360), "magenta", 1.0),
-        }
-
-    def view_part_positions(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
-        """Return visualization data for part positions."""
-        room_data = self.show_positions_room()
-        default_rgb = self.config.color[:3]
-        return [(obj, get_rgba_color(color, alpha, default_rgb)) for obj, color, alpha in room_data.values()]
-
-    def view_overlay(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
+    def view_overlay(self, room: Room) -> None:
         """Return visualization data for the overlay view."""
-        room_data = self.show_overlay_room()
-        default_rgb = self.config.color[:3]
-        return [(obj, get_rgba_color(color, alpha, default_rgb)) for obj, color, alpha in room_data.values()]
+        for name in self.names:
+            color = ColorType.CYAN if name == "driver" else ColorType.YELLOW
+            room.add(f"{name}_full_tube", self.builder.create_manifold(name), color=color, alpha=0.2)
+            for right in [False, True]:
+                side = "right" if right else "left"
+                color = (
+                    (ColorType.RED if right else ColorType.GREEN)
+                    if name == "driver"
+                    else (ColorType.BLUE if right else ColorType.ORANGE)
+                )
+                room.add(
+                    f"{name}_{side}",
+                    self.builder.create_part(name, right=right, tube_only=False),
+                    color=color,
+                )
+        room.add("bounds", self.bound_box, color=ColorType.GREY, alpha=0.2)
 
-    def view_wire(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
+    def view_wire(self, room: Room) -> None:
         """Return visualization data for path wires."""
-        default_rgb = self.config.color[:3]
-        return [(self.builder.create_wire(name), get_rgba_color("magenta", 1.0, default_rgb)) for name in self.names]
+        for name in self.names:
+            room.add(f"{name}_wire", self.builder.create_wire(name), color=ColorType.MAGENTA)
 
-    def view_sketch(self) -> list[tuple[Any, tuple[float, float, float, float]]]:
+    def view_sketch(self, room: Room) -> None:
         """Return visualization data for the profile sketches."""
-        room_data = self.show_profiles_room()
-        default_rgb = self.config.color[:3]
-        return [(obj, get_rgba_color(color, alpha, default_rgb)) for obj, color, alpha in room_data.values()]
+        room.add("lap_joint_sketch", self.builder.create_profile_sketch(180, lap_joint=True), color=ColorType.MAGENTA)
+        room.add("full_sketch", self.builder.create_profile_sketch(360), color=ColorType.MAGENTA)

@@ -4,7 +4,7 @@ import fnmatch
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock, call
 from view import Viewer, BuildPart, BuildSketch, BuildLine, Part, Sketch, Wire
-from provider import Action, TargetList, Mode
+from provider import Action, TargetList, Mode, Room
 
 
 class TestViewer:
@@ -86,8 +86,11 @@ class TestViewer:
         subs = viewer._resolve_subassemblies("missing", manifest, Action.PART, "t1", has_wildcards=True)
         assert subs is None
 
+    @patch("cadquery.Color", side_effect=lambda *args: args)
+    @patch("cadquery.Assembly")
+    @patch("cadquery.Shape.cast")
     @patch("view.show")
-    def test_show_view_metadata_alignment(self, mock_show, viewer):
+    def test_show_view_metadata_alignment(self, mock_show, mock_cast, mock_assy_cls, mock_color, viewer):
         """Verify color/alpha lists are aligned even with mixed metadata."""
         t1, t2 = "p1/part", "p1/diagram"
 
@@ -106,21 +109,31 @@ class TestViewer:
         viewer.manager.router.manifest = {t1: {Action.PART: {}}, t2: {Action.DIAGRAM: {}}}
 
         # Part has color, Diagram does not (None)
+        mock_geom_1 = MagicMock(spec=Part)
+        mock_geom_1.wrapped = "fake_wrapped_1"
+        mock_diag_room = Room()
+        mock_diag_room.add("diagram", MagicMock(spec=Part, wrapped="fake_wrapped_diag"))
+
         viewer.manager.router.run.side_effect = [
-            [(t1, MagicMock())],  # Result for t1
-            [("p1", MagicMock())],  # Result for t2
+            [(t1, mock_geom_1)],  # Result for t1
+            [("p1", mock_diag_room)],  # Result for t2
         ]
         viewer.manager.router.get_color.return_value = (1, 0, 0, 0.5)
 
         viewer.show_view([t1, t2])
 
-        kwargs = mock_show.call_args[1]
-        # Colors/Alphas should have 2 entries each to match the 2 objects
-        assert len(kwargs["colors"]) == 2
-        assert len(kwargs["alphas"]) == 2
-        # Diagram index should have default values
-        assert kwargs["colors"][1] == (1.0, 1.0, 1.0)
-        assert kwargs["alphas"][1] == 1.0
+        mock_assy = mock_assy_cls.return_value
+        # 3 calls: 1 for internal diagram item, 1 for p1_part, 1 for p1_diagram
+        assert mock_assy.add.call_count == 3
+
+        # Verify p1_part color/alignment
+        c1_args, c1_kwargs = mock_assy.add.call_args_list[1]
+        assert c1_kwargs["name"] == "p1_part"
+        assert c1_kwargs["color"] == (1.0, 0.0, 0.0, 0.5)
+
+        # Verify p1_diagram (Diagrams return an assembly/compound which handles its own color)
+        c2_args, c2_kwargs = mock_assy.add.call_args_list[2]
+        assert c2_kwargs["name"] == "p1_diagram"
 
     def test_list_targets(self, viewer):
         """Verify list_targets formatting and Enum coercion."""
@@ -136,8 +149,11 @@ class TestViewer:
         assert "modes=['print']" in target_call
         assert "subassemblies=['left']" in target_call
 
+    @patch("cadquery.Color", side_effect=lambda *args: args)
+    @patch("cadquery.Assembly")
+    @patch("cadquery.Shape.cast")
     @patch("view.show")
-    def test_show_view_room(self, mock_show, viewer):
+    def test_show_view_room(self, mock_show, mock_cast, mock_assy_cls, mock_color, viewer):
         """Verify show_view handles Action.VIEW targets."""
         target_name = "tube/wire"
         viewer.manager.router.targets.__iter__.return_value = iter([target_name])
@@ -145,57 +161,78 @@ class TestViewer:
         viewer.manager.router.manifest = {target_name: {Action.VIEW: {}}}
 
         mock_geom = MagicMock()
-        viewer.manager.router.run.return_value = [(target_name, [(mock_geom, (1, 0, 1, 1))])]
+        del mock_geom.toCompound
+        mock_geom.wrapped = "fake_wrapped"
+        # VIEW actions return a list of (target, Room) tuples
+        mock_room = Room()
+        mock_room.add("item_0", mock_geom, color=(1, 0, 1))
+        viewer.manager.router.run.return_value = [(target_name, mock_room)]
 
         viewer.show_view([target_name])
 
         mock_show.assert_called_once()
-        args, kwargs = mock_show.call_args
-        assert args[0] == mock_geom
-        assert kwargs["names"] == [f"{target_name}/item_0"]
-        assert kwargs["colors"] == [(1, 0, 1)]
-        assert kwargs["alphas"] == [1]
+        mock_assy = mock_assy_cls.return_value
+        mock_assy.add.assert_called_once()
+        args, kwargs = mock_assy.add.call_args
+        assert args[0] == mock_cast.return_value
+        assert kwargs["name"] == "tube_wire_item_0"
+        assert kwargs["color"] == (1, 0, 1, 1)
 
+    @patch("cadquery.Color", side_effect=lambda *args: args)
+    @patch("cadquery.Assembly")
+    @patch("cadquery.Shape.cast")
     @patch("view.show")
-    def test_show_view_part(self, mock_show, viewer):
+    def test_show_view_part(self, mock_show, mock_cast, mock_assy_cls, mock_color, viewer):
         """Verify show_view handles Action.PART targets."""
         target_name = "tube/driver"
         viewer.manager.router.targets.__iter__.return_value = iter([target_name])
         viewer.manager.router.targets.__getitem__.return_value = target_name
         viewer.manager.router.manifest = {target_name: {Action.PART: {}}}
 
-        mock_geom = MagicMock()
+        mock_geom = MagicMock(spec=Part)
+        mock_geom.wrapped = "fake_wrapped"
         viewer.manager.router.run.return_value = [(target_name, mock_geom)]
         viewer.manager.router.get_color.return_value = (1, 0, 0, 1)
 
         viewer.show_view([target_name])
 
         mock_show.assert_called_once()
-        args, kwargs = mock_show.call_args
-        assert args[0] == mock_geom
-        assert kwargs["names"] == [target_name]
-        assert kwargs["colors"] == [(1, 0, 0)]
+        mock_assy = mock_assy_cls.return_value
+        mock_assy.add.assert_called_once()
+        args, kwargs = mock_assy.add.call_args
+        assert args[0] == mock_cast.return_value
+        assert kwargs["name"] == "tube_driver"
+        assert kwargs["color"] == (1, 0, 0, 1)
 
+    @patch("cadquery.Color", side_effect=lambda *args: args)
+    @patch("cadquery.Assembly")
+    @patch("cadquery.Shape.cast")
     @patch("view.show")
-    def test_show_view_diagram(self, mock_show, viewer):
+    def test_show_view_diagram(self, mock_show, mock_cast, mock_assy_cls, mock_color, viewer):
         """Verify show_view handles Action.DIAGRAM targets."""
         target_name = "tube/diagram"
         viewer.manager.router.targets.__iter__.return_value = iter([target_name])
         viewer.manager.router.targets.__getitem__.return_value = target_name
         viewer.manager.router.manifest = {target_name: {Action.DIAGRAM: {}}}
 
-        mock_assy = MagicMock()
-        viewer.manager.router.run.return_value = [("tube", mock_assy)]
+        mock_diag_room = Room()
+        mock_diag_room.add("item", MagicMock(spec=Part, wrapped="fake_wrapped_diag"))
+        viewer.manager.router.run.return_value = [("tube", mock_diag_room)]
 
         viewer.show_view([target_name])
 
         mock_show.assert_called_once()
-        args, kwargs = mock_show.call_args
-        assert args[0] == mock_assy
-        assert kwargs["names"] == ["tube_diagram"]
+        mock_assy = mock_assy_cls.return_value
+        # 2 calls: 1 for item inside diagram room, 1 for tube_diagram itself
+        assert mock_assy.add.call_count == 2
+        args, kwargs = mock_assy.add.call_args_list[1]
+        assert kwargs["name"] == "tube_diagram"
 
+    @patch("cadquery.Color", side_effect=lambda *args: args)
+    @patch("cadquery.Assembly")
+    @patch("cadquery.Shape.cast")
     @patch("view.show")
-    def test_show_view_multiple_targets(self, mock_show, viewer):
+    def test_show_view_multiple_targets(self, mock_show, mock_cast, mock_assy_cls, mock_color, viewer):
         """Verify show_view handles multiple targets at once."""
         t1, t2 = "tube/driver", "tube/passenger"
         viewer.manager.router.targets.__iter__.side_effect = [iter([t1]), iter([t2])]
@@ -212,16 +249,52 @@ class TestViewer:
         viewer.manager.router.manifest = {t1: {Action.PART: {}}, t2: {Action.PART: {}}}
 
         # Return one geom for each target run
-        viewer.manager.router.run.side_effect = [[(t1, MagicMock())], [(t2, MagicMock())]]
+        g1, g2 = MagicMock(spec=Part), MagicMock(spec=Part)
+        g1.wrapped, g2.wrapped = "w1", "w2"
+        viewer.manager.router.run.side_effect = [[(t1, g1)], [(t2, g2)]]
         viewer.manager.router.get_color.return_value = (1, 1, 1, 1)
 
         viewer.show_view([t1, t2])
 
         assert mock_show.call_count == 1
-        kwargs = mock_show.call_args[1]
-        assert len(kwargs["names"]) == 2
-        assert t1 in kwargs["names"]
-        assert t2 in kwargs["names"]
+        mock_assy = mock_assy_cls.return_value
+        assert mock_assy.add.call_count == 2
+        names = [c[1]["name"] for c in mock_assy.add.call_args_list]
+        assert "tube_driver" in names
+        assert "tube_passenger" in names
+
+    @patch("cadquery.Color", side_effect=lambda *args: args)
+    @patch("cadquery.Assembly")
+    @patch("cadquery.Shape.cast")
+    @patch("view.show")
+    def test_show_view_name_collision_deduplication(self, mock_show, mock_cast, mock_assy_cls, mock_color, viewer):
+        """Verify that items with colliding names are de-duplicated with suffixes."""
+        t1, t2 = "p1/t1", "p2/t1"
+
+        # Mocking for_targets
+        m1 = MagicMock(spec=TargetList, provider=viewer.manager.router.targets.provider, modes=[Mode.DEFAULT])
+        m1.__iter__.return_value = iter([t1])
+        m1.__len__.return_value = 1
+        m2 = MagicMock(spec=TargetList, provider=viewer.manager.router.targets.provider, modes=[Mode.DEFAULT])
+        m2.__iter__.return_value = iter([t2])
+        m2.__len__.return_value = 1
+        viewer.manager.router.targets.for_targets.side_effect = [m1, m2]
+
+        viewer.manager.router.manifest = {t1: {Action.PART: {}}, t2: {Action.PART: {}}}
+
+        # Return one geom for each target run, forcing a name collision on "duplicate"
+        g1, g2 = MagicMock(spec=Part), MagicMock(spec=Part)
+        g1.wrapped, g2.wrapped = "w1", "w2"
+        viewer.manager.router.run.side_effect = [[("duplicate", g1)], [("duplicate", g2)]]
+        viewer.manager.router.get_color.return_value = (1, 1, 1, 1)
+
+        viewer.show_view([t1, t2])
+
+        mock_assy = mock_assy_cls.return_value
+        assert mock_assy.add.call_count == 2
+        names = [c[1]["name"] for c in mock_assy.add.call_args_list]
+        assert "duplicate" in names
+        assert "duplicate_1" in names
 
     def test_show_view_not_found(self, viewer):
         """Verify error when target is not found."""
@@ -229,19 +302,25 @@ class TestViewer:
         with pytest.raises(ValueError, match="not found in any registered provider"):
             viewer.show_view(["missing"])
 
+    @patch("cadquery.Color", side_effect=lambda *args: args)
+    @patch("cadquery.Assembly")
+    @patch("cadquery.Shape.cast")
     @patch("view.show")
-    def test_show_view_unpacks_builders(self, mock_show, viewer):
+    def test_show_view_unpacks_builders(self, mock_show, mock_cast, mock_assy_cls, mock_color, viewer):
         """Verify show_view unpacks BuildPart, BuildSketch, BuildLine objects."""
         # Mock BuildPart, BuildSketch, BuildLine and their .part/.sketch/.line attributes
         mock_part_obj = MagicMock(spec=Part)
+        mock_part_obj.wrapped = "wp"
         mock_build_part = MagicMock(spec=BuildPart)
         mock_build_part.part = mock_part_obj
 
         mock_sketch_obj = MagicMock(spec=Sketch)
+        mock_sketch_obj.wrapped = "ws"
         mock_build_sketch = MagicMock(spec=BuildSketch)
         mock_build_sketch.sketch = mock_sketch_obj
 
         mock_line_obj = MagicMock(spec=Wire)
+        mock_line_obj.wrapped = "wl"
         mock_build_line = MagicMock(spec=BuildLine)
         mock_build_line.line = mock_line_obj
 
@@ -251,26 +330,20 @@ class TestViewer:
         viewer.manager.router.targets.__getitem__.return_value = target_name
         viewer.manager.router.manifest = {target_name: {Action.VIEW: {}}}
 
-        # Simulate _get_view_items returning builder objects
-        viewer.manager.router.run.return_value = [
-            (
-                target_name,
-                [
-                    (mock_build_part, (1, 0, 0, 1)),
-                    (mock_build_sketch, (0, 1, 0, 1)),
-                    (mock_build_line, (0, 0, 1, 1)),
-                ],
-            )
-        ]
+        # Simulate _get_view_items returning builder objects inside a Room
+        mock_room = Room()
+        mock_room.add("part", mock_build_part, color=(1, 0, 0))
+        mock_room.add("sketch", mock_build_sketch, color=(0, 1, 0))
+        mock_room.add("line", mock_build_line, color=(0, 0, 1))
+        viewer.manager.router.run.return_value = [(target_name, mock_room)]
 
         viewer.show_view([target_name])
 
         mock_show.assert_called_once()
-        args, _ = mock_show.call_args
-        # Assert that the unpacked .part, .sketch, .line objects were passed to show
-        assert args[0] == mock_part_obj
-        assert args[1] == mock_sketch_obj
-        assert args[2] == mock_line_obj
+        mock_assy = mock_assy_cls.return_value
+        assert mock_assy.add.call_count == 3
+        names = [c[1]["name"] for c in mock_assy.add.call_args_list]
+        assert names == ["mock_builders_part", "mock_builders_sketch", "mock_builders_line"]
 
     def test_show_view_unsupported_action(self, viewer):
         """Verify error when target supports no visual actions."""

@@ -8,9 +8,9 @@ from model import AppConfig
 from pathlib import Path
 from typing import Sequence, Optional, List, Any, cast, Iterable
 from build123d import *  # type: ignore
-from provider import ProviderManager, Action, TargetList
+from provider import ProviderManager, Action, TargetList, Room
 from shell import Logger
-from ocp_vscode import show, set_port, Collapse, Camera  # type: ignore
+from ocp_vscode import set_port, Collapse, Camera, show  # type: ignore
 
 
 class Viewer:
@@ -31,9 +31,9 @@ class Viewer:
         """Collect items from a VIEW room."""
         items = []
         results = self.manager.router.run(targets)
-        for name, room_items in results:
-            for i, (geom, rgba) in enumerate(room_items):
-                items.append((geom, f"{name}/item_{i}", rgba[:3], rgba[3]))
+        for room_name, room in results:
+            for item_name, (geom, rgba) in room.items():
+                items.append((geom, f"{room_name}/{item_name}", rgba[:3], rgba[3]))
         return items
 
     def _get_part_items(self, targets: Any) -> List[tuple[Any, str, tuple[float, float, float], float]]:
@@ -59,8 +59,8 @@ class Viewer:
         """Collect an assembly from a DIAGRAM build."""
         items = []
         results = self.manager.router.run(targets)
-        for p_name, assy in results:
-            items.append((assy, f"{p_name}_diagram", None, 1.0))
+        for p_name, room in results:
+            items.append((room.assembly, f"{p_name}_diagram", None, 1.0))
         return items
 
     def _resolve_targets(self, raw_target: str) -> tuple[TargetList, Optional[str], Optional[str]]:
@@ -173,41 +173,20 @@ class Viewer:
         if not display_items:
             raise ValueError("No geometry generated for the specified targets.")
 
-        display_names = [v[1].replace("/", "_") for v in display_items]
-        summary = self.get_summary(display_names)
+        room = Room(config=self.manager.config)
+        for obj, name, color, alpha in display_items:
+            # Assembly names cannot contain slashes as they are path delimiters
+            base_name = name.replace("/", "_")
+            safe_name = base_name
+            counter = 1
+            while safe_name in room:
+                safe_name = f"{base_name}_{counter}"
+                counter += 1
+            room.add(safe_name, obj, color=color, alpha=alpha)
+
+        summary = self.get_summary(list(room.keys()))
         self.logger.print(f"Showing {summary}", symbol="👁️ ")
-
-        # Extract aligned lists for ocp_vscode. Unpack builders if necessary.
-        values = []
-        for v in display_items:
-            obj = v[0]
-            if isinstance(obj, BuildPart):
-                values.append(obj.part)
-            elif isinstance(obj, BuildSketch):
-                values.append(obj.sketch)
-            elif isinstance(obj, BuildLine):
-                values.append(obj.line)
-            else:
-                values.append(obj)
-        names = [v[1] for v in display_items]
-
-        # Ensure colors and alphas are valid lists.
-        # If metadata is partially missing (e.g. diagrams), we provide defaults to keep lists aligned.
-        colors = [v[2] if v[2] is not None else (1.0, 1.0, 1.0) for v in display_items]
-        alphas = [v[3] if v[3] is not None else 1.0 for v in display_items]
-
-        # Clear metadata if they contain only default values
-        final_colors = colors if any(v[2] is not None for v in display_items) else None
-        final_alphas = alphas if any(v[3] is not None for v in display_items) else None
-
-        show(
-            *values,
-            names=names,
-            colors=final_colors,
-            alphas=final_alphas,
-            collapse=Collapse.LEAVES,
-            reset_camera=Camera.RESET,
-        )
+        show(room.assembly, names=["View"], collapse=Collapse.ALL, reset_camera=Camera.RESET)
 
     def _get_action_summary(self, action: Action, cfg: dict) -> str:
         """Create a formatted summary string for a specific build action."""

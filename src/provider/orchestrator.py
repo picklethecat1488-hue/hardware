@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from .types import Mode, Action, MODES, SUBASSEMBLIES
 from pydantic import validate_call
 from .target_list import TargetList
+from .room import Room
 
 if TYPE_CHECKING:
     from .provider import Provider
@@ -68,9 +69,10 @@ class ProviderOrchestrator(Orchestrator):
         if action == Action.DIAGRAM:
             # Diagrams operate on all targets at once. We pick the handler for the first target.
             handler = self.provider.diagram[targets[0]]
-            # Diagrams operate on all targets at once and ignore subassemblies.
-            result = handler(targets, modes[0])
-            results = [result]
+            # Diagrams operate on all targets at once and return content in a Room.
+            room = Room(config=self.provider.app_config)
+            handler(room, targets, modes[0])
+            results = [room]
             self.post_handler(targets, results, action)
             return results[0]
 
@@ -80,9 +82,11 @@ class ProviderOrchestrator(Orchestrator):
 
         if action == Action.VIEW:
 
-            def view_task(item: tuple[str, Optional[str], Mode]) -> Any:
+            def view_task(item: tuple[str, Optional[str], Mode]) -> Room:
                 target, _, _ = item
-                return self.provider.view[target]()
+                room = Room(config=self.provider.app_config)
+                self.provider.view[target](room)
+                return room
 
             raw_results = list(self.executor.map(view_task, work))
         elif action == Action.CONFIG:

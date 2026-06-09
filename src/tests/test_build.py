@@ -5,8 +5,8 @@ from build import Builder, main, get_args, str2bool
 from pathlib import Path
 from build123d import BuildPart
 import pytest
-from unittest.mock import MagicMock, patch
-from provider import Action, Mode, TargetList
+from unittest.mock import MagicMock, patch, PropertyMock
+from provider import Action, Mode, TargetList, Room
 
 
 class TestBuildMain:
@@ -218,10 +218,10 @@ class TestBuilderLogic:
 
     def test_generate_diagram_buildpart_handling(self, builder):
         """Verify that generate_diagram correctly handles BuildPart objects."""
-        # Setup mock BuildPart and its .part attribute
-        mock_part = MagicMock()
-        mock_buildpart = MagicMock(spec=BuildPart)
-        mock_buildpart.part = mock_part
+        # Setup mock Assembly
+        mock_assy = MagicMock()
+
+        room = Room()
 
         # Configure manager/router mocks
         mock_targets = MagicMock(spec=TargetList)
@@ -229,7 +229,7 @@ class TestBuilderLogic:
         mock_targets.__len__.return_value = 1
         mock_targets.__iter__.return_value = iter(["p1/diag"])
         builder.manager.router.targets.supporting.return_value = mock_targets
-        builder.manager.router.run.return_value = [("p1", mock_buildpart)]
+        builder.manager.router.run.return_value = [("p1", room)]
 
         # Mock the provider settings for options
         mock_provider = MagicMock()
@@ -237,6 +237,8 @@ class TestBuilderLogic:
         mock_provider.settings.diagram_options = None
         builder.manager.router.providers = [mock_provider]
 
-        with patch("pathlib.Path.mkdir"), patch("cadquery.Assembly") as mock_assy_cls, patch("cadquery.Shape"):
-            builder.generate_diagram("out_dir", names=["p1/diag"])
-            mock_assy_cls.return_value.toCompound.return_value.export.assert_called_once()
+        with patch("pathlib.Path.mkdir"), patch("cadquery.Assembly"), patch("cadquery.Shape"):
+            with patch("provider.room.Room.assembly", new_callable=PropertyMock) as mock_assy_prop:
+                mock_assy_prop.return_value = mock_assy
+                builder.generate_diagram("out_dir", names=["p1/diag"])
+                mock_assy.toCompound.return_value.export.assert_called_once()

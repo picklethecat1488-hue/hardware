@@ -7,7 +7,7 @@ from build123d import *  # type: ignore
 import cadquery as cq  # type: ignore
 from pydantic import validate_call, Field
 from model.utils import method_cache
-from provider import Mode as ProviderMode
+from provider import Mode as ProviderMode, Room
 from model.app_config import AppConfig
 from projects_config import ExhaustManifoldsConfig
 
@@ -403,11 +403,12 @@ class ExhaustManifoldsBuilder:
         return self.create_part(name, right=right, tube_only=False)
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def create_diagram(
+    def build_diagram(
         self,
-        names: Optional[Sequence[Literal["driver", "passenger"]]] = None,
-        right_vals: tuple[bool, ...] = (False, True),
-    ) -> cq.Assembly:
+        room: Room,
+        targets: Sequence[str],
+        mode: ProviderMode,
+    ) -> None:
         """Build an exploded diagram for the parts."""
 
         def get_part_location(part, full_part, offset=0, dist=0):
@@ -417,14 +418,8 @@ class ExhaustManifoldsBuilder:
             move_dir = (center_part - center_full).normalized()
             return move_dir * dist + Vector(0, offset, 0)
 
-        def to_cq_shape(b123d_obj) -> cq.Shape:
-            """Convert a build123d shape to a CadQuery shape."""
-            return cq.Shape.cast(b123d_obj.wrapped)
-
-        if names is None:
-            names = cast(list[Literal["driver", "passenger"]], self.exhaust_manifolds_config.names)
-
-        assy = cq.Assembly()
+        names = cast(Sequence[Literal["driver", "passenger"]], targets)
+        right_vals = (False, True)
         results = []
         for i, name in enumerate(names):
             full_f = self.executor.submit(self.create_manifold, name)
@@ -436,7 +431,9 @@ class ExhaustManifoldsBuilder:
             parts = {r: f.result() for r, f in parts_fs.items()}
             wire_obj = self.create_wire(name)
             locs = {}
+
             for right in right_vals:
+                side = "right" if right else "left"
                 loc_vec = get_part_location(
                     parts[right].part,
                     full_part.part,
@@ -444,11 +441,13 @@ class ExhaustManifoldsBuilder:
                     dist=self.exhaust_manifolds_config.diagram_part_dist,
                 )
                 locs[right] = loc_vec
-                assy.add(to_cq_shape(parts[right].part.translate(loc_vec)))
+                room.add(f"{name}_{side}", parts[right].part.translate(loc_vec))
+
             if True in locs and False in locs:
                 mid_point = wire_obj.position_at(0.5)
                 connector = Line(locs[True] + mid_point, locs[False] + mid_point)
-                assy.add(to_cq_shape(connector))
+                room.add(f"{name}_connector", connector)
+
             projection_dir = self.exhaust_manifolds_config.diagram_options.projection_dir
             text_pos = wire_obj.position_at(1)
             label_loc = text_pos + Vector(
@@ -461,10 +460,10 @@ class ExhaustManifoldsBuilder:
                 with BuildSketch(Plane(origin=label_loc, z_dir=projection_dir)):
                     Text(label_text, font_size=45)
                 extrude(amount=5)
-                assy.add(to_cq_shape(cast(Part, label_gen.part)))
-        return assy
+                room.add(f"{name}_label", label_gen)
 
-    def build_diagram(self, targets: Sequence[str], mode: ProviderMode) -> cq.Assembly:
-        """Build assembly diagrams."""
-        names = cast(Sequence[Literal["driver", "passenger"]], targets)
-        return self.create_diagram(names=names)
+    def create_diagram(self, targets: Sequence[str], mode: ProviderMode) -> cq.Assembly:
+        """Compatibility wrapper for tests."""
+        room = Room(config=self.config)
+        self.build_diagram(room, targets, mode)
+        return room.assembly

@@ -1,6 +1,6 @@
 """Unit tests for the Room container."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 import pytest
 import cadquery as cq
 from model.app_config import AppConfig
@@ -65,3 +65,36 @@ def test_room_assembly_property():
         assy = room.assembly
         assert isinstance(assy, cq.Assembly)
         assert "item1" in [c.name for c in assy.children]
+
+
+def test_room_export_svg():
+    """Verify that export_svg correctly maps options and calls export."""
+    room = Room()
+
+    # We mock the assembly property to avoid building a real assembly in this test
+    with patch("provider.room.Room.assembly", new_callable=PropertyMock) as mock_assy_prop:
+        mock_assy = MagicMock()
+        mock_compound = MagicMock()
+        mock_assy.toCompound.return_value = mock_compound
+        mock_assy_prop.return_value = mock_assy
+
+        # Define a mock options object with snake_case attributes
+        class MockOptions:
+            width = 800
+            projection_dir = (0, 0, -1)
+            stroke_width = 0.5
+            show_hidden = True
+            margin_left = None  # Should be ignored if None
+
+        options = MockOptions()
+        room.export_svg("test_output.svg", options)
+
+        # Verify the explicit mapping from snake_case to camelCase
+        expected_opts = {
+            "width": 800,
+            "projectionDir": (0, 0, -1),
+            "strokeWidth": 0.5,
+            "showHidden": True,
+        }
+
+        mock_compound.export.assert_called_once_with("test_output.svg", opt=expected_opts)

@@ -14,6 +14,7 @@ from .types import Mode, Action, MODES, SUBASSEMBLIES, COLOR
 from .target_list import TargetList
 from .orchestrator import Orchestrator, ProviderOrchestrator
 from .utils import load_manifest
+from .room import Room
 
 if TYPE_CHECKING:
     from model.app_config import AppConfig
@@ -84,7 +85,7 @@ class Provider:
         return {}
 
     @property
-    def view(self) -> dict[str, Callable[[], list[tuple[Any, tuple[float, float, float, float]]]]]:
+    def view(self) -> dict[str, Callable[[Room], None]]:
         """A mapping of room names to view functions."""
         return {}
 
