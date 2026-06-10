@@ -3,7 +3,6 @@
 import pytest
 from unittest.mock import patch
 from build123d import Part, BuildPart
-import cadquery as cq
 from projects_config.valve_actuator_limiter_config import ValveActuatorLimiterConfig
 from projects.valve_actuator_limiter import ValveActuatorLimiterProvider
 from provider import Action, Mode, Room
@@ -52,7 +51,7 @@ class TestValveActuatorLimiterProvider:
         provider.build_diagram(room, ["limiter_plate"], Mode.DEFAULT)
         assert "limiter_plate" in room
         geom, _ = room["limiter_plate"]
-        assert isinstance(geom, BuildPart)
+        assert isinstance(geom, Part)
 
     def test_volumes_match(self, provider):
         """Verify that mirroring maintains volume consistency."""

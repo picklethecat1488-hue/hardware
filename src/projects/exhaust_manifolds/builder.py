@@ -4,11 +4,10 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, cast, Annotated, Literal, Sequence
 from build123d import *  # type: ignore
-import cadquery as cq  # type: ignore
 from pydantic import validate_call, Field
 from model.utils import method_cache
 from provider import Mode as ProviderMode, Room
-from model.app_config import AppConfig
+from model import AppConfig, TextArgs
 from projects_config import ExhaustManifoldsConfig
 
 
@@ -448,7 +447,6 @@ class ExhaustManifoldsBuilder:
                 connector = Line(locs[True] + mid_point, locs[False] + mid_point)
                 room.add(f"{name}_connector", connector)
 
-            projection_dir = self.exhaust_manifolds_config.diagram_options.projection_dir
             text_pos = wire_obj.position_at(1)
             label_loc = text_pos + Vector(
                 self.exhaust_manifolds_config.diagram_label_dist,
@@ -456,14 +454,4 @@ class ExhaustManifoldsBuilder:
                 self.exhaust_manifolds_config.diagram_part_dist,
             )
             label_text = f"{name.upper()} ({'L' if (name == 'driver') else 'R'})"
-            with BuildPart() as label_gen:
-                with BuildSketch(Plane(origin=label_loc, z_dir=projection_dir)):
-                    Text(label_text, font_size=45)
-                extrude(amount=5)
-                room.add(f"{name}_label", label_gen)
-
-    def create_diagram(self, targets: Sequence[str], mode: ProviderMode) -> cq.Assembly:
-        """Compatibility wrapper for tests."""
-        room = Room(config=self.config)
-        self.build_diagram(room, targets, mode)
-        return room.assembly
+            room.add_label(f"{name}_label", label_text, label_loc, options=TextArgs(font_size=45))

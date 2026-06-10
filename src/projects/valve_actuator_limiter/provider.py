@@ -3,7 +3,6 @@
 import math
 from functools import cached_property
 from build123d import *  # type: ignore
-import cadquery as cq
 import numpy as np
 from model import method_cache, DiagramOptions
 from pathlib import Path
@@ -19,10 +18,7 @@ class ValveActuatorLimiterProvider(Provider):
     @cached_property
     def default_config(self) -> ValveActuatorLimiterConfig:
         """Return the default configuration for the limiter project."""
-        return ValveActuatorLimiterConfig(
-            measurements_path=str(Path(__file__).parent / "measurements.yaml"),
-            diagram_options=DiagramOptions(line_weight=0.5, projection_dir=(0, 0, -1)),
-        )
+        return ValveActuatorLimiterConfig(measurements_path=str(Path(__file__).parent / "measurements.yaml"))
 
     @property
     def settings(self) -> ValveActuatorLimiterConfig:
@@ -167,7 +163,7 @@ class ValveActuatorLimiterProvider(Provider):
             plate = self.build_plate("_plate", subassembly=subassembly, mode=mode)
             add(plate)
             with Locations((self.hull_center.X, self.hull_center.Y, 0)):
-                add(self.build_limiter("_limiter", subassembly=subassembly, mode=mode))
+                add(self.build_limiter("_limiter", subassembly=subassembly, mode=mode).part)
         return p
 
     @method_cache
