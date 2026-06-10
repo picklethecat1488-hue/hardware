@@ -77,6 +77,7 @@ class BracketProvider(Provider):
         # Diagrams populate a Room instead of returning geometry
         plate = self.build_part("main_plate", "left", mode)
         room.add("main_plate", plate)
+        room.add_label("main_label", "Bracket Plate", (0, 0, 10))
 
     def build_part(self, target: str, subassembly: str, mode: Mode) -> BuildPart:
         with BuildPart() as p:
@@ -123,7 +124,7 @@ When you call `provider.targets`, it returns a `TargetList` helper. You can chai
 The `ProviderOrchestrator` handles the execution of tasks. It manages:
 1.  **Validation**: Ensuring requested modes and subassemblies exist in the manifest.
 2.  **Parallelization**: Running CAD generation tasks across a thread pool.
-3.  **Mapping**: Routing `Action.PART` to handlers returning geometry, while `Action.DIAGRAM` and `Action.VIEW` route to handlers that populate a `Room` container.
+3.  **Mapping**: Routing `Action.PART` to handlers returning geometry (Builders or Parts), while `Action.DIAGRAM` and `Action.VIEW` route to handlers that populate a `Room` container using `add()` or `add_label()`.
 
 ### Configuration Lifecycle
 1.  **Discovery**: `ProviderManager` finds all decorated providers.

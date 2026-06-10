@@ -43,10 +43,18 @@ jobs:
         shell: bash -el {0}
         run: ruff check .
 
-      - name: Run Pytest
+      - name: Run Unit Tests
         shell: bash -el {0}
         env:
           PYTHONPATH: src
         run: |
           set -o pipefail
           pytest
+
+      - name: Run Smoke Tests
+        shell: bash -el {0}
+        env:
+          PYTHONPATH: src
+        run: |
+          set -o pipefail
+          python src/smoke.py

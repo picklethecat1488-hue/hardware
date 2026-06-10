@@ -3,6 +3,7 @@
 import argparse
 import importlib
 import fnmatch
+import os
 import sys
 from model import AppConfig
 from pathlib import Path
@@ -10,7 +11,14 @@ from typing import Sequence, Optional, List, Any, cast, Iterable
 from build123d import *  # type: ignore
 from provider import ProviderManager, Action, TargetList, Room
 from shell import Logger
-from ocp_vscode import set_port, Collapse, Camera, show  # type: ignore
+from ocp_vscode import set_port, Collapse, Camera, show as ocp_show  # type: ignore
+
+
+def show(*args, **kwargs):
+    """Bypass ocp_vscode visualization during smoke tests."""
+    if os.environ.get("SMOKE_TEST") == "1":
+        return
+    return ocp_show(*args, **kwargs)
 
 
 class Viewer:
@@ -243,6 +251,12 @@ def get_args():
 def main():
     """Build and show the requested geometry in ocp_vscode."""
     args = get_args()
+
+    # Allow overriding the OCP Viewer port for testing environments
+    ocp_port = os.environ.get("OCP_PORT")
+    if ocp_port:
+        set_port(int(ocp_port))
+
     logger = Logger(text="Visualizing...")
 
     config = AppConfig()
