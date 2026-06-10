@@ -52,7 +52,7 @@ class TestValveActuatorLimiterProvider:
         provider.build_diagram(room, ["limiter_plate"], Mode.DEFAULT)
         assert "limiter_plate" in room
         geom, _ = room["limiter_plate"]
-        assert isinstance(geom, BuildPart)
+        assert isinstance(geom, Part)
 
     def test_volumes_match(self, provider):
         """Verify that mirroring maintains volume consistency."""

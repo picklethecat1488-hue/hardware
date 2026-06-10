@@ -6,7 +6,6 @@ import inspect
 from typing import Optional, Any, Callable, Iterable, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor
 from build123d import Part, Sketch, Wire
-import cadquery as cq
 from pydantic import validate_call, BaseModel
 from model.utils import method_cache
 from model.app_config import AppConfig

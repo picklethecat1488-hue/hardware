@@ -6,7 +6,6 @@ from pathlib import Path
 import fnmatch
 import importlib
 from model import AppConfig
-import cadquery as cq  # type: ignore
 from build123d import *  # type: ignore
 from build123d import export_stl
 from typing import Optional, Any, Sequence
@@ -143,7 +142,7 @@ class Builder:
 
             provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
             options = getattr(provider.settings, "diagram_options", None) if provider else None
-            room.export_svg(path_str, options)
+            room.export_diagram(path_str, options)
             self.logger.print(f"Saved {path_str}", symbol="📄")
 
     def generate_all(self, out_dir, subassembly=None, zip_name="build.zip"):

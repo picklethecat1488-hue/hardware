@@ -1,9 +1,9 @@
 """Unit tests for the Room container."""
 
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 import pytest
-import cadquery as cq
-from model.app_config import AppConfig
+from build123d import Compound, Box, Vector
+from model import AppConfig, TextArgs
 from provider.room import Room
 from provider.types import ColorType
 
@@ -49,52 +49,68 @@ def test_room_add_with_rgb_tuple():
     assert room["item"] == ("geom", (0.5, 0.5, 0.5, 1.0))
 
 
-def test_room_assembly_property():
-    """Verify that the room can be converted to a cq.Assembly."""
+def test_room_compound_property():
+    """Verify that the room can be converted to a single build123d Compound."""
     room = Room()
-    with patch("cadquery.Shape.cast") as mock_cast:
-        # Setup mock return for cast to avoid CadQuery internal validation
-        mock_shape = MagicMock(spec=cq.Shape)
-        mock_cast.return_value = mock_shape
+    box = Box(1, 1, 1)
+    room.add("item1", box, color=ColorType.RED)
 
-        # Create a mock object that looks like build123d geometry (has .wrapped)
-        mock_geom = MagicMock()
-        mock_geom.wrapped = MagicMock()
-        room.add("item1", mock_geom, color=ColorType.RED)
-
-        assy = room.assembly
-        assert isinstance(assy, cq.Assembly)
-        assert "item1" in [c.name for c in assy.children]
+    assy = room.compound
+    assert isinstance(assy, Compound)
+    # build123d Compound children are identified by labels
+    assert any(child.label == "item1" for child in assy.children)
 
 
-def test_room_export_svg():
-    """Verify that export_svg correctly maps options and calls export."""
+def test_room_export_diagram():
+    """Verify that export_diagram correctly maps options and calls ExportSVG for SVG paths."""
     room = Room()
 
-    # We mock the assembly property to avoid building a real assembly in this test
-    with patch("provider.room.Room.assembly", new_callable=PropertyMock) as mock_assy_prop:
-        mock_assy = MagicMock()
-        mock_compound = MagicMock()
-        mock_assy.toCompound.return_value = mock_compound
-        mock_assy_prop.return_value = mock_assy
+    with patch("provider.room.ExportSVG") as mock_exporter_cls:
+        mock_instance = mock_exporter_cls.return_value
 
         # Define a mock options object with snake_case attributes
         class MockOptions:
-            width = 800
-            projection_dir = (0, 0, -1)
+            width = 1000
+            show_axes = False
             stroke_width = 0.5
-            show_hidden = True
-            margin_left = None  # Should be ignored if None
+            margin = 10
 
         options = MockOptions()
-        room.export_svg("test_output.svg", options)
 
-        # Verify the explicit mapping from snake_case to camelCase
+        # Add geometry to trigger scale calculation
+        from build123d import Box
+
+        room.add("item1", Box(100, 100, 100))
+
+        room.export_diagram("test_output.svg", options)  # type: ignore
+
+        # Verify that width is converted to scale and unsupported fields are removed
         expected_opts = {
-            "width": 800,
-            "projectionDir": (0, 0, -1),
-            "strokeWidth": 0.5,
-            "showHidden": True,
+            "scale": 10.0,  # 1000 / 100
+            "line_weight": 0.5,
+            "margin": 10,
         }
 
-        mock_compound.export.assert_called_once_with("test_output.svg", opt=expected_opts)
+        mock_exporter_cls.assert_called_once_with(**expected_opts)
+        mock_instance.write.assert_called_once_with("test_output.svg")
+
+        # Verify add_shape was called with a Compound containing our item.
+        # We check the captured argument directly to avoid calling room.compound
+        # again, which would deparent the children from the recorded call.
+        mock_instance.add_shape.assert_called_once()
+        passed_compound = mock_instance.add_shape.call_args[0][0]
+        assert isinstance(passed_compound, Compound)
+        # One child for the manifold lines
+        assert len(passed_compound.children) == 1
+
+
+def test_room_add_label():
+    """Verify annotations can be added to the room."""
+    room = Room()
+    loc = (10, 20, 30)
+    room.add_label("label1", "Hello", loc, options=TextArgs(font_size=12))
+    assert len(room._labels) == 1
+    name, text, pos, opts = room._labels[0]
+    assert text == "Hello"
+    assert pos == Vector(10, 20, 30)
+    assert opts.font_size == 12
