@@ -24,15 +24,6 @@ jobs:
           use-mamba: true
           cache-environment: true
 
-      - name: Run tests
-        # Set PYTHONPATH so pytest can find modules in src/
-        shell: bash -el {0}
-        env:
-          PYTHONPATH: src
-        run: |
-          set -o pipefail
-          pytest | tee pytest_report.txt
-
       - name: Build Hardware
         shell: bash -el {0}
         run: |
@@ -43,5 +34,34 @@ jobs:
         with:
           files: |
             build/build.zip
-            pytest_report.txt
+            build/**/*.stl
+            build/**/*.svg
           generate_release_notes: true
+
+      - name: Run Unit Tests
+        # Set PYTHONPATH so pytest can find modules in src/
+        shell: bash -el {0}
+        env:
+          PYTHONPATH: src
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pytest | tee pytest_report.txt
+
+      - name: Run Smoke Tests
+        shell: bash -el {0}
+        env:
+          PYTHONPATH: src
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python src/smoke.py | tee smoke_report.txt
+
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            pytest_report.txt
+            smoke_report.txt

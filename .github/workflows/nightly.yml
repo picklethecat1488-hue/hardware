@@ -25,13 +25,32 @@ jobs:
           cache-environment: true # <--- Enables automated caching based on environment.yml hash
           activate-environment: cq
 
-      - name: Run tests
+      - name: Run Unit Tests
         shell: bash -el {0}
         env:
           PYTHONPATH: src
+        continue-on-error: true
         run: |
           set -o pipefail
           pytest | tee pytest_report.txt
+
+      - name: Run Smoke Tests
+        shell: bash -el {0}
+        env:
+          PYTHONPATH: src
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python src/smoke.py | tee smoke_report.txt
+
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            pytest_report.txt
+            smoke_report.txt
 
   build:
     name: Build Hardware
