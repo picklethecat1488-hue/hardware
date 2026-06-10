@@ -3,7 +3,6 @@
 import math
 from functools import cached_property
 from build123d import *  # type: ignore
-import cadquery as cq
 import numpy as np
 from model import method_cache, DiagramOptions
 from pathlib import Path
