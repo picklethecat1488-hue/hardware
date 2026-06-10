@@ -237,8 +237,17 @@ class TestBuilderLogic:
         mock_provider.settings.diagram_options = None
         builder.manager.router.providers = [mock_provider]
 
-        with patch("pathlib.Path.mkdir"), patch("cadquery.Assembly"), patch("cadquery.Shape"):
-            with patch("provider.room.Room.assembly", new_callable=PropertyMock) as mock_assy_prop:
+        with patch("pathlib.Path.mkdir"):
+            with patch("provider.room.Room.compound", new_callable=PropertyMock) as mock_assy_prop:
                 mock_assy_prop.return_value = mock_assy
-                builder.generate_diagram("out_dir", names=["p1/diag"])
-                mock_assy.toCompound.return_value.export.assert_called_once()
+                with patch("provider.room.Drawing") as mock_drawing_cls:
+                    # Mock Drawing to return real geometry to avoid OCP errors with mocks
+                    from build123d import Box
+
+                    mock_drawing = mock_drawing_cls.return_value
+                    mock_drawing.visible_lines = Box(10, 10, 10)
+                    mock_drawing.hidden_lines = Box(10, 10, 10)
+
+                    with patch("provider.room.ExportSVG") as mock_export_cls:
+                        builder.generate_diagram("out_dir", names=["p1/diag"])
+                        mock_export_cls.return_value.write.assert_called_once()

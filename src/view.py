@@ -56,11 +56,11 @@ class Viewer:
     def _get_diagram_items(
         self, targets: TargetList
     ) -> List[tuple[Any, str, Optional[tuple[float, float, float]], float]]:
-        """Collect an assembly from a DIAGRAM build."""
+        """Collect a compound from a DIAGRAM build."""
         items = []
         results = self.manager.router.run(targets)
         for p_name, room in results:
-            items.append((room.assembly, f"{p_name}_diagram", None, 1.0))
+            items.append((room.compound, f"{p_name}_diagram", None, 1.0))
         return items
 
     def _resolve_targets(self, raw_target: str) -> tuple[TargetList, Optional[str], Optional[str]]:
@@ -186,7 +186,7 @@ class Viewer:
 
         summary = self.get_summary(list(room.keys()))
         self.logger.print(f"Showing {summary}", symbol="👁️ ")
-        show(room.assembly, names=["View"], collapse=Collapse.ALL, reset_camera=Camera.RESET)
+        show(room.compound, names=["View"], collapse=Collapse.ALL, reset_camera=Camera.RESET)
 
     def list_targets(self):
         """List all available targets and their supported actions."""

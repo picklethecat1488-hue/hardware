@@ -17,7 +17,10 @@ class ExhaustManifoldsConfig(BaseModel):
         description="Optional override for the measurements YAML file path.",
     )
 
-    diagram_options: DiagramOptions = Field(default_factory=DiagramOptions, description="Diagram export options")
+    diagram_options: DiagramOptions = Field(
+        default_factory=lambda: DiagramOptions(projection_origin=(-1.0, -1.0, -1.0), show_axes=True),
+        description="Diagram export options",
+    )
     diagram_part_offset: int = Field(default=60, description="Distance between manifold assemblies in the diagram")
     diagram_part_dist: int = Field(default=120, description="Distance between exploded halves in the diagram")
     diagram_label_dist: int = Field(default=120, description="Distance of the labels from the parts in the diagram")

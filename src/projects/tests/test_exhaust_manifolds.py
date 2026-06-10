@@ -390,10 +390,8 @@ class TestExhaustManifoldsBuilder:
         # Make sure the overall dimensions of the part haven't changed since last revision.
         assert round(bbox.min.X) == xmin
         assert round(bbox.size.X) == xlen
-
         assert round(bbox.min.Y) == ymin
         assert round(bbox.size.Y) == ylen
-
         assert round(bbox.min.Z) == zmin
         assert round(bbox.size.Z) == zlen
 

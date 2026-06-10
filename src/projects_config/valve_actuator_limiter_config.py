@@ -18,7 +18,10 @@ class ValveActuatorLimiterConfig(BaseModel):
 
     base_thickness: float = Field(default=5.0, description="The thickness of the limiter plate base.", gt=0)
 
-    diagram_options: DiagramOptions = Field(default_factory=DiagramOptions, description="Diagram export options")
+    diagram_options: DiagramOptions = Field(
+        default_factory=lambda: DiagramOptions(line_weight=0.5, projection_origin=(0, 0, -1), show_hidden=True),
+        description="Diagram export options",
+    )
 
     @cached_property
     def _raw_data(self) -> dict[Union[int, str], Any]:
