@@ -50,3 +50,11 @@ jobs:
         run: |
           set -o pipefail
           pytest
+
+      - name: Run Smoke Tests
+        shell: bash -el {0}
+        env:
+          PYTHONPATH: src
+        run: |
+          set -o pipefail
+          pytest src/smoke.py

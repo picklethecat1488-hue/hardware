@@ -46,8 +46,8 @@ python src/view.py --list
 # View the driver manifold part
 python src/view.py exhaust_manifolds/driver
 
-# View only the left side wire path
-python src/view.py exhaust_manifolds/wire/view/left
+# View the global wire path for all manifold assemblies
+python src/view.py exhaust_manifolds/wire
 
 # View all printable parts for all manifolds 
 python src/view.py 'exhaust_manifolds/*/part/*'

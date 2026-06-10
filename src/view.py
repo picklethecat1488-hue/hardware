@@ -3,6 +3,7 @@
 import argparse
 import importlib
 import fnmatch
+import os
 import sys
 from model import AppConfig
 from pathlib import Path
@@ -243,6 +244,12 @@ def get_args():
 def main():
     """Build and show the requested geometry in ocp_vscode."""
     args = get_args()
+
+    # Allow overriding the OCP Viewer port for testing environments
+    ocp_port = os.environ.get("OCP_PORT")
+    if ocp_port:
+        set_port(int(ocp_port))
+
     logger = Logger(text="Visualizing...")
 
     config = AppConfig()
