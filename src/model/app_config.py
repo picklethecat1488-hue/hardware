@@ -32,7 +32,7 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
     def dump_env(self, path: str | Path):
         """Dump the configuration to a .env file with flattened nested keys."""
         env_prefix = cast(str, self.model_config.get("env_prefix", ""))
-        dump = self.model_dump(by_alias=True, mode="json")
+        dump = self.model_dump(by_alias=True, mode="json", exclude_defaults=True)
         env_dir = Path(path).parent.absolute()
 
         def write_recursive(f, data, prefix=""):
