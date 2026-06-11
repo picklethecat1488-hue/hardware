@@ -105,11 +105,17 @@ class Builder:
     @validate_call(config={"arbitrary_types_allowed": True})
     def generate_parts(self, out_dir, names: list[str] | None = None):
         """Export STL files for generated parts."""
-        target_lists = (
-            [self.target_parser.resolve(name, Action.PART) for name in names]
-            if names
-            else [self.manager.router.targets.supporting(Action.PART).for_modes([Mode.PRINT])]
-        )
+        if names:
+            target_lists = []
+            for name in names:
+                # Only resolve targets that are intended for the PART action
+                if self.target_parser.parse(name, Action.PART):
+                    target_lists.append(self.target_parser.resolve(name, Action.PART))
+        else:
+            target_lists = [self.manager.router.targets.supporting(Action.PART).for_modes([Mode.PRINT])]
+
+        if not target_lists:
+            return
 
         for base_targets in target_lists:
             self.logger.print(
@@ -153,11 +159,17 @@ class Builder:
     @validate_call(config={"arbitrary_types_allowed": True})
     def generate_diagram(self, out_dir, names: list[str] | None = None):
         """Export an exploded diagram for the parts."""
-        target_lists = (
-            [self.target_parser.resolve(name, Action.DIAGRAM) for name in names]
-            if names
-            else [self.manager.router.targets.supporting(Action.DIAGRAM).for_modes([Mode.DEFAULT])]
-        )
+        if names:
+            target_lists = []
+            for name in names:
+                # Only resolve targets that are intended for the DIAGRAM action
+                if self.target_parser.parse(name, Action.DIAGRAM):
+                    target_lists.append(self.target_parser.resolve(name, Action.DIAGRAM))
+        else:
+            target_lists = [self.manager.router.targets.supporting(Action.DIAGRAM).for_modes([Mode.DEFAULT])]
+
+        if not target_lists:
+            return
 
         for base_targets in target_lists:
             self.logger.print(
