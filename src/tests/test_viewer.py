@@ -44,48 +44,6 @@ class TestViewer:
         assert summary.startswith("0, 1, 2, 3, 4, 5, 6, 7")
         assert "(20 items)" in summary
 
-    def test_resolve_targets_parsing(self, viewer):
-        """Verify parsing of provider/target/action/subassembly strings."""
-        target_path = "p1/t1"
-        viewer.manager.router.manifest = {target_path: {Action.PART: {}}}
-
-        # Mock for_targets to return a list containing the matched target
-        viewer.manager.router.targets.for_targets.side_effect = lambda names: (
-            [target_path] if names[0] in [target_path, "t1"] else []
-        )
-
-        # Case 1: Full hierarchy
-        targets, action, sub = viewer._resolve_targets("p1/t1/part/left")
-        assert list(targets) == [target_path]
-        assert action == "part"
-        assert sub == "left"
-
-        # Case 2: Implicit action (target/sub)
-        targets, action, sub = viewer._resolve_targets("p1/t1/right")
-        assert action is None
-        assert sub == "right"
-
-        # Case 3: Action override (target/action)
-        targets, action, sub = viewer._resolve_targets("p1/t1/view")
-        assert action == "view"
-        assert sub is None
-
-    def test_resolve_subassemblies_wildcards(self, viewer):
-        """Verify wildcard resolution for subassemblies."""
-        manifest = {Action.PART: {"subassemblies": ["left", "right", "center"]}}
-
-        # Wildcard match
-        subs = viewer._resolve_subassemblies("*t", manifest, Action.PART, "t1", has_wildcards=True)
-        assert subs == ["left", "right"]
-
-        # Literal match
-        subs = viewer._resolve_subassemblies("left", manifest, Action.PART, "t1", has_wildcards=False)
-        assert subs == ["left"]
-
-        # No match (warning case)
-        subs = viewer._resolve_subassemblies("missing", manifest, Action.PART, "t1", has_wildcards=True)
-        assert subs is None
-
     @patch("view.show")
     def test_show_view_metadata_alignment(self, mock_show, viewer):
         """Verify color/alpha lists are aligned even with mixed metadata."""
@@ -96,13 +54,15 @@ class TestViewer:
         m1.__iter__.return_value = iter([t1])
         m1.__len__.return_value = 1
         m1.__getitem__.return_value = t1
+        m1.subassemblies = []
 
         m2 = MagicMock(spec=TargetList, provider=viewer.manager.router.targets.provider, modes=[Mode.DEFAULT])
         m2.__iter__.return_value = iter([t2])
         m2.__len__.return_value = 1
         m2.__getitem__.return_value = t2
+        m2.subassemblies = []
 
-        viewer.manager.router.targets.for_targets.side_effect = [m1, m2]
+        viewer.target_parser.resolve = MagicMock(side_effect=[None, m1, m2])
         viewer.manager.router.manifest = {t1: {Action.PART: {}}, t2: {Action.DIAGRAM: {}}}
 
         with patch("provider.room.Compound", side_effect=lambda children: MagicMock(children=children)):
@@ -138,18 +98,21 @@ class TestViewer:
         call_args = [c[0][0] for c in calls]
 
         # Verify that all valid argument combinations are printed
-        assert any("Found 1 targets:" in arg for arg in call_args)
+        assert any("Found 6 targets:" in arg for arg in call_args)
         assert any("p1/t1" in arg for arg in call_args)
-        assert any("p1/t1/part" in arg for arg in call_args)
-        assert any("p1/t1/part/left" in arg for arg in call_args)
-        assert any("p1/t1/left" in arg for arg in call_args)
+        assert any("p1/t1:part" in arg for arg in call_args)
+        assert any("p1/t1_left:part" in arg for arg in call_args)
+        assert any("p1/t1_left" in arg for arg in call_args)
 
     @patch("view.show")
     def test_show_view_room(self, mock_show, viewer):
         """Verify show_view handles Action.VIEW targets."""
         target_name = "tube/wire"
-        viewer.manager.router.targets.__iter__.return_value = iter([target_name])
-        viewer.manager.router.targets.__getitem__.return_value = target_name
+        mock_targets = MagicMock(spec=TargetList)
+        mock_targets.__iter__.return_value = iter([target_name])
+        mock_targets.__len__.return_value = 1
+        mock_targets.subassemblies = []
+        viewer.target_parser.resolve = MagicMock(side_effect=[mock_targets, None, None])
         viewer.manager.router.manifest = {target_name: {Action.VIEW: {}}}
 
         with patch("provider.room.Compound", side_effect=lambda children: MagicMock(children=children)):
@@ -171,8 +134,11 @@ class TestViewer:
     def test_show_view_part(self, mock_show, viewer):
         """Verify show_view handles Action.PART targets."""
         target_name = "tube/driver"
-        viewer.manager.router.targets.__iter__.return_value = iter([target_name])
-        viewer.manager.router.targets.__getitem__.return_value = target_name
+        mock_targets = MagicMock(spec=TargetList)
+        mock_targets.__iter__.return_value = iter([target_name])
+        mock_targets.__len__.return_value = 1
+        mock_targets.subassemblies = []
+        viewer.target_parser.resolve = MagicMock(side_effect=[None, mock_targets, None])
         viewer.manager.router.manifest = {target_name: {Action.PART: {}}}
 
         with patch("provider.room.Compound", side_effect=lambda children: MagicMock(children=children)):
@@ -191,8 +157,10 @@ class TestViewer:
     def test_show_view_diagram(self, mock_show, viewer):
         """Verify show_view handles Action.DIAGRAM targets."""
         target_name = "tube/diagram"
-        viewer.manager.router.targets.__iter__.return_value = iter([target_name])
-        viewer.manager.router.targets.__getitem__.return_value = target_name
+        mock_targets = MagicMock(spec=TargetList)
+        mock_targets.__iter__.return_value = iter([target_name])
+        mock_targets.__len__.return_value = 1
+        viewer.target_parser.resolve = MagicMock(side_effect=[None, None, mock_targets])
         viewer.manager.router.manifest = {target_name: {Action.DIAGRAM: {}}}
 
         with patch("provider.room.Compound", side_effect=lambda children: MagicMock(children=children)):
@@ -212,16 +180,14 @@ class TestViewer:
     def test_show_view_multiple_targets(self, mock_show, viewer):
         """Verify show_view handles multiple targets at once."""
         t1, t2 = "tube/driver", "tube/passenger"
-        viewer.manager.router.targets.__iter__.side_effect = [iter([t1]), iter([t2])]
 
         # Return configured mocks from for_targets to satisfy iteration and attribute access
-        m1 = MagicMock(
-            __iter__=lambda x: iter([t1]), provider=viewer.manager.router.targets.provider, modes=[Mode.DEFAULT]
-        )
-        m2 = MagicMock(
-            __iter__=lambda x: iter([t2]), provider=viewer.manager.router.targets.provider, modes=[Mode.DEFAULT]
-        )
-        viewer.manager.router.targets.for_targets.side_effect = [m1, m2]
+        m1 = MagicMock(spec=TargetList, provider=viewer.manager.router.targets.provider, modes=[Mode.DEFAULT])
+        m1.__iter__.return_value = iter([t1, t2])
+        m1.__len__.return_value = 2
+        m1.subassemblies = []
+
+        viewer.target_parser.resolve = MagicMock(side_effect=[None, m1, None, m1])
 
         viewer.manager.router.manifest = {t1: {Action.PART: {}}, t2: {Action.PART: {}}}
 
@@ -229,7 +195,7 @@ class TestViewer:
             # Return one geom for each target run
             g1, g2 = MagicMock(spec=Part, label=None), MagicMock(spec=Part, label=None)
             g1.wrapped, g2.wrapped = "w1", "w2"
-            viewer.manager.router.run.side_effect = [[(t1, g1)], [(t2, g2)]]
+            viewer.manager.router.run.return_value = [(t1, g1), (t2, g2)]
             viewer.manager.router.get_color.return_value = (1, 1, 1, 1)
 
             viewer.show_view([t1, t2])
@@ -245,14 +211,12 @@ class TestViewer:
         """Verify that items with colliding names are de-duplicated with suffixes."""
         t1, t2 = "p1/t1", "p2/t1"
 
-        # Mocking for_targets
         m1 = MagicMock(spec=TargetList, provider=viewer.manager.router.targets.provider, modes=[Mode.DEFAULT])
-        m1.__iter__.return_value = iter([t1])
-        m1.__len__.return_value = 1
-        m2 = MagicMock(spec=TargetList, provider=viewer.manager.router.targets.provider, modes=[Mode.DEFAULT])
-        m2.__iter__.return_value = iter([t2])
-        m2.__len__.return_value = 1
-        viewer.manager.router.targets.for_targets.side_effect = [m1, m2]
+        m1.__iter__.return_value = iter([t1, t2])
+        m1.__len__.return_value = 2
+        m1.subassemblies = []
+
+        viewer.target_parser.resolve = MagicMock(side_effect=[None, m1, None, m1])
 
         viewer.manager.router.manifest = {t1: {Action.PART: {}}, t2: {Action.PART: {}}}
 
@@ -260,7 +224,7 @@ class TestViewer:
             # Return one geom for each target run, forcing a name collision on "duplicate"
             g1, g2 = MagicMock(spec=Part, label=None), MagicMock(spec=Part, label=None)
             g1.wrapped, g2.wrapped = "w1", "w2"
-            viewer.manager.router.run.side_effect = [[("duplicate", g1)], [("duplicate", g2)]]
+            viewer.manager.router.run.return_value = [("duplicate", g1), ("duplicate", g2)]
             viewer.manager.router.get_color.return_value = (1, 1, 1, 1)
 
             viewer.show_view([t1, t2])
@@ -272,8 +236,10 @@ class TestViewer:
 
     def test_show_view_not_found(self, viewer):
         """Verify error when target is not found."""
-        viewer.manager.router.targets.for_targets.return_value = []
-        with pytest.raises(ValueError, match="not found in any registered provider"):
+        viewer.target_parser.resolve = MagicMock(
+            side_effect=ValueError("No geometry generated for the specified targets.")
+        )
+        with pytest.raises(ValueError, match="No geometry generated for the specified targets."):
             viewer.show_view(["missing"])
 
     @patch("view.show")
@@ -298,8 +264,10 @@ class TestViewer:
 
             # Mock a provider that returns these builder objects
             target_name = "mock/builders"
-            viewer.manager.router.targets.__iter__.return_value = iter([target_name])
-            viewer.manager.router.targets.__getitem__.return_value = target_name
+            mock_targets = MagicMock(spec=TargetList)
+            mock_targets.__iter__.return_value = iter([target_name])
+            mock_targets.__len__.return_value = 1
+            viewer.target_parser.resolve = MagicMock(side_effect=[mock_targets, None, None])
             viewer.manager.router.manifest = {target_name: {Action.VIEW: {}}}
 
             # Simulate _get_view_items returning builder objects inside a Room

@@ -4,8 +4,9 @@ import argparse
 import fnmatch
 from typing import Optional, Sequence
 from model import AppConfig
+from target_parser import TargetParser
 from shell import Logger
-from provider import ProviderManager, Action, TargetList
+from provider import ProviderManager, Action, TargetList, MODES, Mode
 
 
 class Configurator:
@@ -16,6 +17,7 @@ class Configurator:
         self.manager = manager
         self.config = manager.config
         self.logger = logger or Logger(text="Configuring...", enabled=False)
+        self.target_parser = TargetParser(manager.router)
 
     def _get_summary(self, names: Sequence[str]) -> str:
         """Return a truncated summary string of the target names."""
@@ -24,48 +26,35 @@ class Configurator:
             return f"{', '.join(names[:8])} ... ({count} items)"
         return ", ".join(names)
 
-    def _resolve_targets(self, names: Optional[list[str]] = None) -> TargetList:
-        """Resolve the list of targets to configure."""
-        base_targets = self.manager.router.targets.supporting(Action.CONFIG)
-        if names:
-            base_targets = base_targets.for_targets(names)
-
-        if not base_targets and names:
-            msg = "No matching configuration targets found."
-            if any(any(c in n for c in "*?[]") for n in names):
-                msg = "No targets matched wildcard pattern."
-            raise ValueError(msg)
-        return base_targets
-
-    def _resolve_modes(self, targets: TargetList, mode_override: Optional[str] = None) -> Sequence[str]:
+    def resolve_modes(self, targets: TargetList, base_modes: list[Mode]) -> list[Mode]:
         """Determine the set of configuration modes to run."""
-        all_supported = set()
-        for t in list(targets):
-            manifest = self.manager.router.manifest.get(t, {})
-            all_supported.update(manifest.get(Action.CONFIG, {}).get("modes", []))
-
-        if mode_override:
-            if any(c in mode_override for c in "*?[]"):
-                modes = fnmatch.filter(list(all_supported), mode_override)
-            else:
-                modes = [mode_override]
+        # If MODES hasn't been overridden, we need to figure out which modes to run
+        if Mode.DEFAULT not in base_modes:
+            return base_modes
         else:
-            modes = list(all_supported)
-
-        if not modes and targets:
-            raise ValueError("No configuration modes found for the selected targets.")
-
-        return sorted(list(modes))
+            all_supported = set()
+            for t in list(targets):
+                manifest = self.manager.router.manifest.get(t, {})
+                all_supported.update(manifest.get(Action.CONFIG, {}).get(MODES, []))
+            return sorted(list(all_supported))
 
     def configure(self, names: Optional[list[str]] = None, mode: Optional[str] = None):
         """Perform configuration tasks for specified targets."""
-        base_targets = self._resolve_targets(names)
-        modes_to_run = self._resolve_modes(base_targets, mode)
+        target_lists = (
+            [self.target_parser.resolve(name, Action.CONFIG) for name in names]
+            if names
+            else [self.manager.router.targets.supporting(Action.CONFIG)]
+        )
 
-        for m in modes_to_run:
-            run_targets = base_targets.for_modes([m])
-            if run_targets:
-                self.logger.print(f"Configuring {m}s for {self._get_summary(list(run_targets))}", symbol="⚙️ ")
+        for base_targets in target_lists:
+            self.logger.print(
+                f"Configuring {self._get_summary(list(base_targets))}",
+                symbol="⚙️ ",
+            )
+
+            # Batch each configuration step to support geometric configuration dependencies.
+            for mode in self.resolve_modes(base_targets, base_targets.modes):
+                run_targets = base_targets.for_modes([mode])
                 self.manager.router.run(run_targets)
 
 
@@ -73,12 +62,11 @@ def get_args():
     """Get parsed arguments for the program."""
     parser = argparse.ArgumentParser(description="Configuration Utility.")
     parser.add_argument("-e", "--env", required=False, default=".env", help="Output environment to file and exit.")
-    parser.add_argument("-m", "--mode", required=False, default=None, help="Specific configuration mode to run.")
 
     parser.add_argument(
         "targets",
         nargs="*",
-        help="Specific targets to configure. Usage: config.py part1 part2. If omitted, all targets are processed.",
+        help="Specific targets to configure (e.g. tube/driver, tube/driver_left). If omitted, all targets are processed.",
     )
     args = parser.parse_args()
     return args
@@ -91,7 +79,7 @@ def main(logger, args):
     configurator = Configurator(manager, logger)
     try:
         # Perform requested configurations
-        configurator.configure(names=args.targets or None, mode=args.mode)
+        configurator.configure(names=args.targets or None)
 
         # Output the changed items only and exit.
         if args.env:

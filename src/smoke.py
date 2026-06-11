@@ -51,9 +51,14 @@ class TestSmoke:
         self.run_command(["src/build.py", "exhaust_manifolds/*"])
         assert (self.build_dir / "exhaust_manifolds" / "driver_left.stl").exists()
 
+    def test_build_fully_qualified_target(self):
+        """Verify building a specific subassembly and mode via string format."""
+        self.run_command(["src/build.py", "exhaust_manifolds/driver_left:part/print"])
+        assert (self.build_dir / "exhaust_manifolds" / "driver_left.stl").exists()
+
     def test_build_diagram_only(self):
         """Verify diagram-only building with the -pno flag."""
-        self.run_command(["src/build.py", "-pno", "exhaust_manifolds/*"])
+        self.run_command(["src/build.py", "--parts=false", "exhaust_manifolds/*"])
         assert (self.build_dir / "exhaust_manifolds" / "exhaust_manifolds_diagram.svg").exists()
         assert not (self.build_dir / "exhaust_manifolds" / "driver_left.stl").exists()
 
@@ -71,7 +76,7 @@ class TestSmoke:
         env_file = self.build_dir / ".test.env"
         self.run_command(["src/config.py", "-e", str(env_file)])
         self.run_command(["src/config.py", "exhaust_manifolds/driver", "-e", str(env_file)])
-        self.run_command(["src/config.py", "-m", "text", "-e", str(env_file)])
+        self.run_command(["src/config.py", "exhaust_manifolds/driver:config/text", "-e", str(env_file)])
 
     def test_view_commands(self):
         """Verify view.py commands execute correctly."""
@@ -83,7 +88,7 @@ class TestSmoke:
         # Check target visualization (Note: ocp_vscode may warn if no listener is active, but should return 0)
         self.run_command(["src/view.py", "exhaust_manifolds/driver"], extra_env=env)
         self.run_command(["src/view.py", "exhaust_manifolds/wire"], extra_env=env)
-        self.run_command(["src/view.py", "exhaust_manifolds/*/part/*"], extra_env=env)
+        self.run_command(["src/view.py", "exhaust_manifolds/*:part/print"], extra_env=env)
 
 
 if __name__ == "__main__":

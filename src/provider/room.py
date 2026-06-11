@@ -87,10 +87,13 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         """Return the room contents as a single build123d Compound."""
         children = []
 
-        for name, (obj, _) in self.items():
+        for name, (obj, rgba) in self.items():
             if hasattr(obj, "label"):
                 # Setting the label allows visualization tools like ocp_vscode to identify parts.
                 setattr(obj, "label", name)
+                # Setting the color metadata for visualization.
+                if hasattr(obj, "color"):
+                    setattr(obj, "color", rgba)
                 children.append(obj)
             else:
                 raise ValueError(f"Item '{name}' in Room could not be converted to a build123d object.")
