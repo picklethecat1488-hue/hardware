@@ -57,15 +57,15 @@ class TestSmoke:
         assert (self.build_dir / "exhaust_manifolds" / "driver_left.stl").exists()
 
     def test_build_diagram_only(self):
-        """Verify diagram-only building with the -pno flag."""
-        self.run_command(["src/build.py", "--parts=false", "exhaust_manifolds/*"])
+        """Verify diagram-only building using the :diagram action suffix."""
+        self.run_command(["src/build.py", "exhaust_manifolds/*:diagram"])
         assert (self.build_dir / "exhaust_manifolds" / "exhaust_manifolds_diagram.svg").exists()
         assert not (self.build_dir / "exhaust_manifolds" / "driver_left.stl").exists()
 
     def test_diagram_options_integration(self):
         """Verify diagram options like show_hidden work via environment variables."""
         extra_env = {"VALVE_ACTUATOR_LIMITER__DIAGRAM_OPTIONS__SHOW_HIDDEN": "True"}
-        self.run_command(["src/build.py", "valve_actuator_limiter/*", "-pno"], extra_env=extra_env)
+        self.run_command(["src/build.py", "valve_actuator_limiter/*:diagram"], extra_env=extra_env)
 
         diag_path = self.build_dir / "valve_actuator_limiter" / "valve_actuator_limiter_diagram.svg"
         assert diag_path.exists()

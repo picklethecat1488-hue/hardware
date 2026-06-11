@@ -1,5 +1,7 @@
 """Specialized container for visualization items."""
 
+import io
+from pathlib import Path
 from typing import Any, Union, Optional, TYPE_CHECKING, cast
 from build123d import (
     BoundBox,
@@ -100,9 +102,9 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         return Compound(children=children)
 
-    def export_diagram(self, path: str, options: Optional["DiagramOptions"] = None) -> None:
+    def export_diagram(self, path: Union[str, Path, io.BytesIO], options: Optional["DiagramOptions"] = None) -> None:
         """Export the room contents to a file, inferring format from extension."""
-        if not path.lower().endswith(".svg"):
+        if isinstance(path, (str, Path)) and not str(path).lower().endswith(".svg"):
             raise ValueError(f"Unsupported diagram format for '{path}'. Only .svg is supported.")
 
         svg_opts = self._parse_options(options)
