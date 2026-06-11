@@ -6,7 +6,7 @@ from pathlib import Path
 from build123d import BuildPart
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
-from provider import Action, Mode, TargetList, Room
+from provider import Action, Mode, TargetList, Room, SUBASSEMBLIES
 
 
 class TestBuildMain:
@@ -101,3 +101,24 @@ class TestBuilderLogic:
         summary = builder._get_summary(long_list)
         assert "..." in summary
         assert "(10 items)" in summary
+
+    def test_resolve_subassemblies(self, builder):
+        """Verify subassembly resolution logic."""
+        # Case 1: base_subs is provided explicitly
+        assert builder.resolve_subassemblies(MagicMock(spec=TargetList), ["left"]) == ["left"]
+
+        # Case 2: base_subs is empty, resolve from manifest for multiple targets
+        mock_targets = MagicMock(spec=TargetList)
+        mock_targets.__iter__.return_value = iter(["t1", "t2"])
+        builder.manager.router.manifest = {
+            "t1": {Action.PART: {SUBASSEMBLIES: ["a", "b"]}},
+            "t2": {Action.PART: {SUBASSEMBLIES: ["b", "c"]}},
+        }
+        res = builder.resolve_subassemblies(mock_targets, [])
+        assert res == ["a", "b", "c"]
+
+        # Case 3: No subassemblies found in manifest
+        mock_targets_empty = MagicMock(spec=TargetList)
+        mock_targets_empty.__iter__.return_value = iter(["t1"])
+        builder.manager.router.manifest = {"t1": {Action.PART: {}}}
+        assert builder.resolve_subassemblies(mock_targets_empty, []) == [None]
