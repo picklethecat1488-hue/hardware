@@ -1,17 +1,20 @@
 """Orchestrate geometry generation and export for discovered projects."""
 
 import argparse
+import io
+import hashlib
+import json
 import os
 from pathlib import Path
 import fnmatch
 import importlib
 from model import AppConfig
 from build123d import *  # type: ignore
-from build123d import export_stl
+from build123d import export_stl, export_brep
 from target_parser import TargetParser
-from typing import Optional, Any, Sequence
+from typing import Optional, Any, Sequence, Callable
 from pydantic import validate_call
-from provider import ProviderManager, Action, Mode, SUBASSEMBLIES, TargetList
+from provider import ProviderManager, Action, Mode, SUBASSEMBLIES, TargetList, Room
 import zipfile
 from shell import Logger
 
@@ -25,6 +28,7 @@ class Builder:
         self.config = manager.config
         self.logger = logger or Logger(enabled=False)
         self.target_parser = TargetParser(manager.router)
+        self.build_manifest: dict[str, str] = {}
 
     def _get_summary(self, names: Sequence[str]) -> str:
         """Return a truncated summary string of the target names."""
@@ -32,6 +36,57 @@ class Builder:
         if count > 8:
             return f"{', '.join(names[:8])} ... ({count} items)"
         return ", ".join(names)
+
+    def _load_manifest(self, out_dir: str):
+        """Load an existing build manifest from the output directory if not already loaded."""
+        if getattr(self, "_manifest_out_dir", None) == str(out_dir):
+            return
+        manifest_path = Path(out_dir) / "build_manifest.json"
+        if manifest_path.exists():
+            try:
+                with open(manifest_path, "r") as f:
+                    self.build_manifest = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                pass
+        self._manifest_out_dir = str(out_dir)
+
+    def _save_manifest(self, out_dir: str):
+        """Write the current build manifest to a JSON file in the output directory."""
+        manifest_path = Path(out_dir) / "build_manifest.json"
+        with open(manifest_path, "w") as f:
+            json.dump(self.build_manifest, f, indent=4)
+        self.logger.print(f"Saved build manifest to {manifest_path}", symbol="📜")
+
+    def _get_part_hash(self, part: Part) -> str:
+        """Calculate a stable hash for a build123d Part using its BREP representation."""
+        # Use BREP for hashing because it is faster to generate and
+        # provides a more stable geometric identity than a mesh.
+        with io.BytesIO() as brep_stream:
+            export_brep(part, brep_stream)
+            return hashlib.sha1(brep_stream.getvalue()).hexdigest()
+
+    def _get_diagram_hash(self, room: Room, options: Any) -> str:
+        """Calculate a hash for the diagram based on its SVG output."""
+        with io.BytesIO() as svg_stream:
+            room.export_diagram(svg_stream, options)
+            return hashlib.sha1(svg_stream.getvalue()).hexdigest()
+
+    def _export_if_changed(
+        self,
+        path: Path,
+        manifest_key: str,
+        current_hash: str,
+        export_fn: Callable[[], Any],
+        force_update: bool = False,
+    ):
+        """Register hash in manifest and export content only if it has changed."""
+        # Return early if the hash matches the manifest and the file exists.
+        if not force_update and self.build_manifest.get(manifest_key) == current_hash and path.exists():
+            return
+
+        export_fn()
+        self.build_manifest[manifest_key] = current_hash
+        self.logger.print(f"Saved {path}", symbol="📄")
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def resolve_subassemblies(self, targets: TargetList, base_subs: list[str]) -> Sequence[str | None]:
@@ -81,11 +136,19 @@ class Builder:
                         side_suffix = f"_{sub}" if sub else ""
 
                         mesh_file_name = f"{t_name}{side_suffix}.stl"
-                        path_str = str(target_dir / mesh_file_name)
-                        # Extract the geometry from the BuildPart before exporting
+                        # Correctly form the path using Path objects
+                        path_obj = target_dir / mesh_file_name
+                        path_str = str(path_obj)
+
                         if geom.part:
-                            export_stl(geom.part, path_str)
-                        self.logger.print(f"Saved {path_str}", symbol="📄")
+                            current_hash = self._get_part_hash(geom.part)
+                            self._export_if_changed(
+                                path_obj,
+                                f"{p_name}/{mesh_file_name}",
+                                current_hash,
+                                lambda: export_stl(geom.part, path_str),
+                                force_update=bool(names),
+                            )
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def generate_diagram(self, out_dir, names: list[str] | None = None):
@@ -109,12 +172,20 @@ class Builder:
                 target_dir.mkdir(parents=True, exist_ok=True)
 
                 diagram_name = f"{p_name}_diagram.svg"
-                path_str = str(target_dir / diagram_name)
+                path_obj = target_dir / diagram_name
+                path_str = str(path_obj)
 
                 provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
                 options = getattr(provider.settings, "diagram_options", None) if provider else None
-                room.export_diagram(path_str, options)
-                self.logger.print(f"Saved {path_str}", symbol="📄")
+
+                current_hash = self._get_diagram_hash(room, options)
+                self._export_if_changed(
+                    path_obj,
+                    f"{p_name}/{diagram_name}",
+                    current_hash,
+                    lambda: room.export_diagram(path_str, options),
+                    force_update=bool(names),
+                )
 
     def generate_all(self, out_dir, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
@@ -136,22 +207,12 @@ class Builder:
         self.generate_parts(out_dir=out_dir)
         self.generate_diagram(out_dir=out_dir)
 
+        self._save_manifest(out_dir)
+
         # Compress the build
         zip_file_str = str(Path(out_dir) / zip_name)
         zip_build(zip_file_str)
         self.logger.print(f"Done writing {zip_file_str}", symbol="📦")
-
-
-def str2bool(v: Any) -> bool:
-    """Convert various string representations to boolean."""
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
 def get_args():
@@ -162,35 +223,12 @@ def get_args():
     parser.add_argument("-out", "--outdir", default="build", help="Target directory for outputs")
 
     parser.add_argument(
-        "-d",
-        "--diagram",
-        type=str2bool,
-        nargs="?",
-        const=True,
-        default=True,
-        help="Generate diagrams. Defaults to True.",
-    )
-    parser.add_argument(
-        "-p",
-        "--parts",
-        type=str2bool,
-        nargs="?",
-        const=True,
-        default=True,
-        help="Generate parts. Defaults to True.",
-    )
-
-    parser.add_argument(
         "targets",
         nargs="*",
         help="Specific targets to build. Usage: build.py part1 part2. If omitted, all targets are built.",
     )
 
     args = parser.parse_args()
-
-    if not args.diagram and not args.parts:
-        parser.error("At least one of --diagram or --parts must be True.")
-
     return args
 
 
@@ -208,12 +246,14 @@ def main(logger, args):
         if not args.env is None:
             builder.config.dump_env(args.env)
             logger.print(f"Saved environment to {args.env}", symbol="⚙️ ")
-        elif args.diagram and args.parts and not args.targets:
-            builder.generate_all(out_dir=args.outdir)
-        elif args.parts:
-            builder.generate_parts(out_dir=args.outdir, names=args.targets or None)
-        elif args.diagram:
-            builder.generate_diagram(out_dir=args.outdir, names=args.targets or None)
+        else:
+            builder._load_manifest(args.outdir)
+            if not args.targets:
+                builder.generate_all(out_dir=args.outdir)
+            else:
+                builder.generate_parts(out_dir=args.outdir, names=args.targets)
+                builder.generate_diagram(out_dir=args.outdir, names=args.targets)
+            builder._save_manifest(args.outdir)
 
     finally:
         logger.done()

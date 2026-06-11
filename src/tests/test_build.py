@@ -1,9 +1,12 @@
 """Contains Build main unit tests."""
 
 import argparse
-from build import Builder, main, get_args, str2bool
+import hashlib
+import io
+import json
+from build import Builder, main, get_args
 from pathlib import Path
-from build123d import BuildPart
+from build123d import BuildPart, Box
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 from provider import Action, Mode, TargetList, Room, SUBASSEMBLIES
@@ -24,64 +27,35 @@ class TestBuildMain:
 
     def test_get_args_parsing(self, mocker):
         """Test the argparse configuration directly."""
-        mocker.patch("sys.argv", ["script.py", "-e", "foo.env", "-out", "tmp", "-d", "--", "part1/left"])
+        mocker.patch("sys.argv", ["script.py", "-e", "foo.env", "-out", "tmp", "--", "part1/left"])
         args = get_args()
         assert args.env == "foo.env"
         assert args.outdir == "tmp"
-        assert args.diagram is True
         assert args.targets == ["part1/left"]
 
-    def test_main_diagram_path(self, mock_logger, mock_builder, tmp_path):
-        """Check if generate_diagram was called with correct unpacked gen_args."""
-        args = argparse.Namespace(outdir=tmp_path, env=None, diagram=True, parts=False, targets=["schema"])
+    def test_main_with_targets(self, mock_logger, mock_builder, tmp_path):
+        """Verify that specific targets trigger both parts and diagram generation."""
+        args = argparse.Namespace(outdir=tmp_path, env=None, targets=["part1"])
         main(mock_logger, args)
-        mock_builder.return_value.generate_diagram.assert_called_once_with(out_dir=tmp_path, names=["schema"])
 
-        assert Path(tmp_path).exists()
-        mock_logger.done.assert_called_once()
-
-    def test_main_output_path(self, mock_logger, mock_builder, tmp_path):
-        """Test positional targets."""
-        args = argparse.Namespace(outdir=tmp_path, env=None, diagram=False, parts=True, targets=["part1"])
-        main(mock_logger, args)
         mock_builder.return_value.generate_parts.assert_called_once_with(out_dir=tmp_path, names=["part1"])
-
-        mock_logger.done.assert_called_once()
+        mock_builder.return_value.generate_diagram.assert_called_once_with(out_dir=tmp_path, names=["part1"])
+        mock_builder.return_value._save_manifest.assert_called_once()
 
     def test_main_output_env_path(self, mock_logger, mock_builder, tmp_path):
         """Check if generate_diagram was called with correct unpacked gen_args."""
-        args = argparse.Namespace(outdir=tmp_path, env=f"{tmp_path}.env", diagram=True, parts=True, targets=[])
+        args = argparse.Namespace(outdir=tmp_path, env=f"{tmp_path}.env", targets=[])
         main(mock_logger, args)
         mock_builder.return_value.config.dump_env.assert_called_once_with(f"{tmp_path}.env")
         mock_logger.done.assert_called_once()
 
     def test_main_generate_all_fallback(self, mock_logger, mock_builder, tmp_path):
         """Test the else block when no flags are provided."""
-        args = argparse.Namespace(outdir=tmp_path, env=None, diagram=True, parts=True, targets=[])
-
+        args = argparse.Namespace(outdir=tmp_path, env=None, targets=[])
         main(mock_logger, args)
-
         mock_builder.return_value.generate_all.assert_called_once_with(out_dir=tmp_path)
-
+        mock_builder.return_value._save_manifest.assert_called_once()
         mock_logger.done.assert_called_once()
-
-    def test_validation_error(self, mocker):
-        """Verify that providing both flags as False raises a SystemExit (via parser.error)."""
-        mocker.patch("sys.argv", ["script.py", "--diagram=false", "--parts=false"])
-        with pytest.raises(SystemExit):
-            get_args()
-
-
-def test_str2bool():
-    """Verify boolean string conversion."""
-    assert str2bool("true") is True
-    assert str2bool("yes") is True
-    assert str2bool("1") is True
-    assert str2bool("false") is False
-    assert str2bool("no") is False
-    assert str2bool("0") is False
-    with pytest.raises(argparse.ArgumentTypeError):
-        str2bool("invalid")
 
 
 class TestBuilderLogic:
@@ -122,3 +96,73 @@ class TestBuilderLogic:
         mock_targets_empty.__iter__.return_value = iter(["t1"])
         builder.manager.router.manifest = {"t1": {Action.PART: {}}}
         assert builder.resolve_subassemblies(mock_targets_empty, []) == [None]
+
+    def test_get_part_hash(self, builder):
+        """Verify part hashing logic."""
+        part = Box(1, 1, 1)
+        h1 = builder._get_part_hash(part)
+        assert len(h1) == 40  # SHA1 length
+
+        h2 = builder._get_part_hash(Box(1, 1, 1))
+        assert h1 == h2
+
+    def test_get_diagram_hash(self, builder):
+        """Verify diagram hashing logic."""
+        room = MagicMock(spec=Room)
+        # Mock export_diagram to write something to the BytesIO stream
+        room.export_diagram.side_effect = lambda s, o: s.write(b"svg_data")
+
+        h = builder._get_diagram_hash(room, None)
+        assert h == hashlib.sha1(b"svg_data").hexdigest()
+
+    def test_load_manifest(self, builder, tmp_path):
+        """Verify loading existing manifest from disk."""
+        manifest_file = tmp_path / "build_manifest.json"
+        data = {"p/t": "hash1"}
+        manifest_file.write_text(json.dumps(data))
+
+        builder._load_manifest(str(tmp_path))
+        assert builder.build_manifest == data
+        assert builder._manifest_out_dir == str(tmp_path)
+
+        # Verify it doesn't reload if directory is the same
+        builder.build_manifest = {"manual": "edit"}
+        builder._load_manifest(str(tmp_path))
+        assert builder.build_manifest == {"manual": "edit"}
+
+    def test_save_manifest(self, builder, tmp_path):
+        """Verify saving manifest to disk."""
+        builder.build_manifest = {"p/t": "hash1"}
+        builder._save_manifest(str(tmp_path))
+
+        manifest_file = tmp_path / "build_manifest.json"
+        assert manifest_file.exists()
+        assert json.loads(manifest_file.read_text()) == {"p/t": "hash1"}
+
+    def test_export_if_changed(self, builder, tmp_path):
+        """Verify hash-based export skip logic."""
+        path = tmp_path / "part.stl"
+        manifest_key = "p/t"
+        current_hash = "h1"
+        export_fn = MagicMock()
+
+        # 1. No manifest, no file -> Export
+        builder._export_if_changed(path, manifest_key, current_hash, export_fn)
+        export_fn.assert_called_once()
+        assert builder.build_manifest[manifest_key] == current_hash
+
+        # 2. Manifest matches and file exists -> Skip
+        path.touch()
+        export_fn.reset_mock()
+        builder._export_if_changed(path, manifest_key, current_hash, export_fn)
+        export_fn.assert_not_called()
+
+        # 3. Hash mismatch -> Export
+        export_fn.reset_mock()
+        builder._export_if_changed(path, manifest_key, "h2", export_fn)
+        export_fn.assert_called_once()
+
+        # 4. Force update -> Export
+        export_fn.reset_mock()
+        builder._export_if_changed(path, manifest_key, "h2", export_fn, force_update=True)
+        export_fn.assert_called_once()
