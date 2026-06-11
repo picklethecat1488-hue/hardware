@@ -15,8 +15,8 @@ class TargetList(list[str]):
         self,
         provider: Union["Provider", "ProviderRouter"],
         targets: Iterable[str] = (),
-        subassemblies: Optional[list[str | None]] = None,
-        modes: Optional[list[Mode | str]] = None,
+        subassemblies: Optional[list[str]] = None,
+        modes: Optional[list[Mode]] = None,
         action: Optional[Action] = None,
     ):
         """Initialize the TargetList."""
@@ -36,7 +36,7 @@ class TargetList(list[str]):
             path = target if "/" in target else f"{p_name}/{target}"
             if self.subassemblies:
                 sub = self.subassemblies[i] if len(self.subassemblies) == len(self) else self.subassemblies[0]
-                path = f"{path}/{sub}"
+                path = f"{path}_{sub}"
             paths.append(path)
 
         return f"Targets({paths}, modes={self.modes})"
@@ -55,7 +55,7 @@ class TargetList(list[str]):
             action=action,
         )
 
-    def for_subassemblies(self, subassemblies: Sequence[str | None]) -> "TargetList":
+    def for_subassemblies(self, subassemblies: Sequence[str]) -> "TargetList":
         """Filter targets that support all of the specified subassemblies."""
 
         def target_supports_subs(t: str) -> bool:
@@ -75,12 +75,12 @@ class TargetList(list[str]):
         return TargetList(
             self.provider,
             [t for t in self if target_supports_subs(t)],
-            subassemblies,
+            list(subassemblies),
             self.modes,
             action=self.action,
         )
 
-    def for_modes(self, modes: Sequence[Mode | str]) -> "TargetList":
+    def for_modes(self, modes: Sequence[Mode]) -> "TargetList":
         """Filter targets that support all of the specified modes."""
 
         def target_supports_modes(t: str) -> bool:
@@ -101,20 +101,15 @@ class TargetList(list[str]):
             self.provider,
             [t for t in self if target_supports_modes(t)],
             self.subassemblies,
-            modes,
+            list(modes),
             action=self.action,
         )
 
     def for_targets(self, names: Iterable[str]) -> "TargetList":
         """Filter the target list to include only the specified names."""
-        import fnmatch
-
-        filtered_targets = []
-        for n in names:
-            for t in self:
-                # Standardized shell-style wildcard matching (e.g. tube/*, *driver)
-                if fnmatch.fnmatch(t, n) or fnmatch.fnmatch(t, f"*/{n}"):
-                    filtered_targets.append(t)
+        # Now names are expected to be exact matches (resolved by TargetParser)
+        target_set = set(names)
+        filtered_targets = [t for t in self if t in target_set]
 
         return TargetList(
             self.provider, filtered_targets, action=self.action, subassemblies=self.subassemblies, modes=self.modes

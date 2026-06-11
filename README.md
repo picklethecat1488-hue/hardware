@@ -11,18 +11,29 @@ Detailed development information can be found in [CONTRIBUTING](CONTRIBUTING.md)
 
 ## Building and Running
 
-The build command will build project files. This (and all commands below) support wildcards for target resolution. Note that all commands should be run from the repository root:
+All utilities use a standardized target specification format:
+`[provider/target][_subassembly][:action[/mode]]`
+
+*   **Target**: The project and part name (e.g., `tube/driver`). Wildcards like `tube/*` are supported.
+*   **Subassembly**: Optional variant (e.g., `tube/driver_left`).
+*   **Action/Mode**: Optional overrides (e.g., `tube/driver:part/print`).
+
+All commands should be run from the repository root.
+
+### Building Geometry
+
+The build command generates geometry and diagrams:
 ```bash
 python src/build.py
 
 # Build all parts from the exhaust_manifolds project
 python src/build.py 'exhaust_manifolds/*'
 
-# Build the exhaust_manifolds project diagram
-python src/build.py -pno 'exhaust_manifolds/*'
+# Build only diagrams for all manifolds
+python src/build.py --parts=false 'exhaust_manifolds/*'
 ```
 
-### Configuration
+### Geometry Configuration
 
 If project measurements or parameters have changed, run the configuration utility to optimize part placement and geometry:
 ```bash
@@ -36,7 +47,7 @@ python src/config.py exhaust_manifolds/driver
 python src/config.py -m text
 ```
 
-### Visualization
+### Geometry Visualization
 Use the viewer to inspect geometry in VS Code using the `ocp_vscode` extension.
 
 ```bash
@@ -50,5 +61,5 @@ python src/view.py exhaust_manifolds/driver
 python src/view.py exhaust_manifolds/wire
 
 # View all printable parts for all manifolds 
-python src/view.py 'exhaust_manifolds/*/part/*'
+python src/view.py 'exhaust_manifolds/*:part/print'
 ```
