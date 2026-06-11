@@ -79,23 +79,48 @@ class TestBuilderLogic:
     def test_resolve_subassemblies(self, builder):
         """Verify subassembly resolution logic."""
         # Case 1: base_subs is provided explicitly
-        assert builder.resolve_subassemblies(MagicMock(spec=TargetList), ["left"]) == ["left"]
+        assert builder._resolve_subassemblies(MagicMock(spec=TargetList), ["left"]) == ["left"]
 
         # Case 2: base_subs is empty, resolve from manifest for multiple targets
         mock_targets = MagicMock(spec=TargetList)
-        mock_targets.__iter__.return_value = iter(["t1", "t2"])
+        mock_targets.__iter__.side_effect = lambda: iter(["t1", "t2"])
         builder.manager.router.manifest = {
             "t1": {Action.PART: {SUBASSEMBLIES: ["a", "b"]}},
             "t2": {Action.PART: {SUBASSEMBLIES: ["b", "c"]}},
         }
-        res = builder.resolve_subassemblies(mock_targets, [])
+        res = builder._resolve_subassemblies(mock_targets, [])
         assert res == ["a", "b", "c"]
 
         # Case 3: No subassemblies found in manifest
         mock_targets_empty = MagicMock(spec=TargetList)
-        mock_targets_empty.__iter__.return_value = iter(["t1"])
+        mock_targets_empty.__iter__.side_effect = lambda: iter(["t1"])
         builder.manager.router.manifest = {"t1": {Action.PART: {}}}
-        assert builder.resolve_subassemblies(mock_targets_empty, []) == [None]
+        assert builder._resolve_subassemblies(mock_targets_empty, []) == []
+
+    def test_generate_parts_mixed_subassemblies(self, builder):
+        """Verify that generate_parts handles a mix of subassembly and base targets."""
+        # Setup mock base targets
+        base_targets = MagicMock(spec=TargetList)
+        base_targets.__iter__.side_effect = lambda: iter(["t_sub", "t_base"])
+        base_targets.subassemblies = []
+        # Mock subassembly filtering: "left" returns t_sub, others return empty
+        base_targets.for_subassemblies.side_effect = lambda s: ["t_sub"] if "left" in s else []
+        base_targets.for_targets.side_effect = lambda names: list(names)
+
+        # Mock the resolver and router
+        builder.target_parser = MagicMock()
+        builder.target_parser.parse.return_value = MagicMock()
+        builder.target_parser.resolve.return_value = base_targets
+        builder.manager.router.manifest = {
+            "t_sub": {Action.PART: {SUBASSEMBLIES: ["left"]}},
+            "t_base": {Action.PART: {}},
+        }
+        builder.manager.router.run.return_value = []
+
+        with patch.object(builder, "_export_parts"):
+            builder.generate_parts("out", names=["test_target"])
+            # Should have run "left" subassembly and then the remaining base target
+            assert builder.manager.router.run.call_count == 2
 
     def test_get_part_hash(self, builder):
         """Verify part hashing logic."""

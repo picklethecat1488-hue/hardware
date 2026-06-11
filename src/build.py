@@ -88,8 +88,7 @@ class Builder:
         self.build_manifest[manifest_key] = current_hash
         self.logger.print(f"Saved {path}", symbol="📄")
 
-    @validate_call(config={"arbitrary_types_allowed": True})
-    def resolve_subassemblies(self, targets: TargetList, base_subs: list[str]) -> Sequence[str | None]:
+    def _resolve_subassemblies(self, targets: Any, base_subs: Any) -> Sequence[str]:
         """Determine which subassemblies should be built for a target."""
         if base_subs:
             return base_subs
@@ -100,7 +99,39 @@ class Builder:
                 action_cfg = manifest.get(Action.PART, {})
                 target_subs = action_cfg.get(SUBASSEMBLIES, [])
                 all_subs.update(target_subs)
-            return sorted(list(all_subs)) if all_subs else [None]
+            return sorted(list(all_subs))
+
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def _export_parts(self, out_dir: str, batch_results: Any, sub: Optional[str] = None, force_update: bool = False):
+        """Export parts from a batch run."""
+        for name, results in batch_results:
+            # Results is either a single geometry or a list of geometries
+            res_list = results if isinstance(results, list) else [results]
+            for geom in res_list:
+                if "/" in name:
+                    p_name, t_name = name.split("/", 1)
+                else:
+                    p_name, t_name = "default", name
+
+                # Create provider-specific subdirectory
+                target_dir = Path(out_dir) / p_name
+                target_dir.mkdir(parents=True, exist_ok=True)
+                side_suffix = f"_{sub}" if sub else ""
+
+                mesh_file_name = f"{t_name}{side_suffix}.stl"
+                # Correctly form the path using Path objects
+                path_obj = target_dir / mesh_file_name
+                path_str = str(path_obj)
+
+                if geom.part:
+                    current_hash = self._get_part_hash(geom.part)
+                    self._export_if_changed(
+                        path_obj,
+                        f"{p_name}/{mesh_file_name}",
+                        current_hash,
+                        lambda: export_stl(geom.part, path_str),
+                        force_update=force_update,
+                    )
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def generate_parts(self, out_dir, names: list[str] | None = None):
@@ -122,39 +153,19 @@ class Builder:
                 f"Building {Action.PART}s: {self._get_summary(list(base_targets))}",
                 symbol="🛠️ ",
             )
+            has_base_targets: set[str] = set(base_targets)
 
-            for sub in self.resolve_subassemblies(base_targets, base_targets.subassemblies):
-                run_targets = base_targets.for_subassemblies([sub]) if sub else base_targets
+            # Run targets which have subassemblies, then run any remaining base targets.
+            for sub in self._resolve_subassemblies(base_targets, base_targets.subassemblies):
+                run_targets = base_targets.for_subassemblies([sub])
                 batch_results = self.manager.router.run(run_targets)
+                self._export_parts(out_dir, batch_results, sub=sub, force_update=bool(names))
+                for t in run_targets:
+                    has_base_targets.discard(t)
 
-                for name, results in batch_results:
-                    # Results is either a single geometry or a list of geometries
-                    res_list = results if isinstance(results, list) else [results]
-                    for geom in res_list:
-                        if "/" in name:
-                            p_name, t_name = name.split("/", 1)
-                        else:
-                            p_name, t_name = "default", name
-
-                        # Create provider-specific subdirectory
-                        target_dir = Path(out_dir) / p_name
-                        target_dir.mkdir(parents=True, exist_ok=True)
-                        side_suffix = f"_{sub}" if sub else ""
-
-                        mesh_file_name = f"{t_name}{side_suffix}.stl"
-                        # Correctly form the path using Path objects
-                        path_obj = target_dir / mesh_file_name
-                        path_str = str(path_obj)
-
-                        if geom.part:
-                            current_hash = self._get_part_hash(geom.part)
-                            self._export_if_changed(
-                                path_obj,
-                                f"{p_name}/{mesh_file_name}",
-                                current_hash,
-                                lambda: export_stl(geom.part, path_str),
-                                force_update=bool(names),
-                            )
+            if has_base_targets:
+                batch_results = self.manager.router.run(base_targets.for_targets(has_base_targets))
+                self._export_parts(out_dir, batch_results, force_update=bool(names))
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def generate_diagram(self, out_dir, names: list[str] | None = None):
@@ -218,8 +229,6 @@ class Builder:
 
         self.generate_parts(out_dir=out_dir)
         self.generate_diagram(out_dir=out_dir)
-
-        self._save_manifest(out_dir)
 
         # Compress the build
         zip_file_str = str(Path(out_dir) / zip_name)

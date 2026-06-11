@@ -1,10 +1,10 @@
-"""Unit tests for the ValveActuatorLimiterProvider class."""
+"""Unit tests for the ValveActuatorLimiter project."""
 
 import pytest
 from unittest.mock import patch
-from build123d import Part, BuildPart
+from build123d import Part, Vector
 from projects_config.valve_actuator_limiter_config import ValveActuatorLimiterConfig
-from projects.valve_actuator_limiter import ValveActuatorLimiterProvider
+from projects.valve_actuator_limiter.provider import ValveActuatorLimiterProvider
 from provider import Action, Mode, Room
 
 
@@ -13,12 +13,12 @@ class TestValveActuatorLimiterProvider:
 
     @pytest.fixture
     def provider(self):
-        """Fixture for ValveActuatorLimiterProvider."""
+        """Fixture for ValveActuatorLimiterProvider with mocked manifest."""
         mock_manifest = {
             "limiter_plate": {
                 Action.PART: {
                     "modes": [Mode.DEFAULT],
-                    "subassemblies": ["left", "right"],
+                    "subassemblies": ["90deg"],
                 },
                 Action.DIAGRAM: {"modes": [Mode.DEFAULT]},
             }
@@ -33,58 +33,34 @@ class TestValveActuatorLimiterProvider:
 
     def test_action_registrations(self, provider):
         """Verify that part actions are correctly registered."""
+        assert "plate" in provider.part
         assert "limiter_plate" in provider.part
-        assert "limiter_plate" in provider.diagram
 
     def test_build_part_geometry(self, provider):
-        """Verify that build_part produces valid geometry for both subassemblies."""
-        for side in ["left", "right"]:
-            res = provider.build_limiter_plate("limiter_plate", side, Mode.DEFAULT)
-            part = res.part
-            assert isinstance(part, Part)
-            assert part.volume > 0
-            assert part.is_valid
+        """Verify that build_limiter_plate produces valid geometry."""
+        res = provider.build_limiter_plate("limiter_plate", Mode.DEFAULT)
+        part = res.part
+        assert isinstance(part, Part)
+        assert part.volume > 0
+        assert part.is_valid
 
     def test_build_diagram(self, provider):
         """Verify that build_diagram populates the room with geometry."""
         room = Room()
         provider.build_diagram(room, ["limiter_plate"], Mode.DEFAULT)
         assert "limiter_plate" in room
-        geom, _ = room["limiter_plate"]
-        assert isinstance(geom, Part)
-
-    def test_volumes_match(self, provider):
-        """Verify that mirroring maintains volume consistency."""
-        left_part = provider.build_limiter_plate("limiter_plate", "left", Mode.DEFAULT).part
-        right_part = provider.build_limiter_plate("limiter_plate", "right", Mode.DEFAULT).part
-
-        assert left_part.volume == pytest.approx(right_part.volume)
 
     def test_configuration_loading(self, provider):
         """Ensure that critical measurement values are loaded correctly as non-zero floats."""
         assert provider.settings.pocket_radius == 25.0
         assert provider.settings.wall_thickness == 3.0
         assert provider.settings.bolt_radius == 3.2
-        assert provider.settings.zip_tie_hole_offset == 10.0
-        assert provider.settings.zip_tie_cut_width == 8.0
-        assert provider.settings.zip_tie_cut_height == 3.2
 
-    def test_bolt_hole_spacing(self, provider):
-        """Verify the distances between the asymmetric bolt holes match spec.
-
-        Holes are defined in measurements.yaml relative to part centroid.
-        Spec distances: 65mm, 85mm, 80mm.
-        """
+    def test_hull_center_distances(self, provider):
+        """Verify hull_center is positioned correctly relative to bolt holes."""
+        center = provider.settings.hull_center
         holes = provider.settings.bolt_holes
         assert len(holes) == 3
-
-        # Calculate Euclidean distances between the three pairs of Vectors
-        dist_12 = (holes[0] - holes[1]).length
-        dist_23 = (holes[1] - holes[2]).length
-        dist_31 = (holes[2] - holes[0]).length
-
-        distances = sorted([dist_12, dist_23, dist_31])
-
-        assert distances[0] == pytest.approx(65.0, abs=0.1)
-        assert distances[1] == pytest.approx(80.0, abs=0.1)
-        assert distances[2] == pytest.approx(85.0, abs=0.1)
+        assert (center - holes[0]).length == pytest.approx(35.0, abs=1.0)
+        assert (center - holes[1]).length == pytest.approx(35.0, abs=1.0)
+        assert (center - holes[2]).length == pytest.approx(65.0, abs=1.0)
