@@ -156,6 +156,40 @@ python build.py
 
 **Note:** All CI gates (tests, linting, and build checks) must pass successfully in the GitHub Actions workflow before a pull request can be merged.
 
+## Debugging
+
+The workspace includes a `.vscode/launch.json` file with pre-configured profiles to help debug scripts and tests.
+
+### Debugging Scripts from the Terminal
+
+If you need to debug a script while passing specific CLI arguments: 
+1. Ensure debugpy is installed in your environment (`pip install debugpy`).
+2. Start the script using the debugpy wrapper:
+
+```bash
+python -m debugpy --listen 5678 --wait-for-client src/build.py 'exhaust_manifolds/*'
+```
+
+3. In VS Code, go to the Run and Debug sidebar, select "Python: Attach via Port", and press F5. The script will pause at the start and wait for the debugger to connect. 
+
+### Debugging Unit Tests 
+
+There are two primary ways to debug tests: 
+
+1. Run and Debug Sidebar: Open the test file you want to debug, select the "Python: Debug Unit Tests" configuration, and press F5. This will execute pytest on the currently active file.
+2. Testing UI: Use the VS Code Testing panel (beaker icon). You can hover over any detected test and click the Debug Test icon to start a session with breakpoints enabled.
+
+### Attaching to a Running Process
+
+If a script is already executing and you want to inspect its state:
+
+1. Select "Python: Attach using Process ID" from the debug configurations.
+2. A list of active processes will appear; select the Python process running your script to attach the debugger immediately.
+
+### Environment Variables
+
+To debug with specific environment overrides, you can add an "env" block or an "envFile": "${workspaceFolder}/.env" entry to your configurations in launch.json.
+
 ## Creating a Release
 
 Releases are automated via GitHub Actions and are triggered by pushing a version tag.
