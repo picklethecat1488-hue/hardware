@@ -3,7 +3,7 @@
 import argparse
 import io
 import hashlib
-import json
+import yaml
 import os
 from pathlib import Path
 import fnmatch
@@ -28,7 +28,7 @@ class Builder:
         self.config = manager.config
         self.logger = logger or Logger(enabled=False)
         self.target_parser = TargetParser(manager.router)
-        self.build_manifest: dict[str, str] = {}
+        self.build_manifest: dict[str, dict[str, str]] = {"brep": {}, "file": {}}
 
     def _get_summary(self, names: Sequence[str]) -> str:
         """Return a truncated summary string of the target names."""
@@ -41,20 +41,30 @@ class Builder:
         """Load an existing build manifest from the output directory if not already loaded."""
         if getattr(self, "_manifest_out_dir", None) == str(out_dir):
             return
-        manifest_path = Path(out_dir) / "build_manifest.json"
+        manifest_path = Path(out_dir) / "build_manifest.yaml"
         if manifest_path.exists():
             try:
                 with open(manifest_path, "r") as f:
-                    self.build_manifest = json.load(f)
-            except (json.JSONDecodeError, OSError):
+                    data = yaml.safe_load(f)
+                    # Migrate old flat manifest format to nested format
+                    if "brep" not in data and "sha1" not in data and "stl" not in data and "file" not in data:
+                        self.build_manifest = {"brep": data, "file": {}}
+                    else:
+                        # Migrate legacy keys to 'file' if present in nested format
+                        if "sha1" in data:
+                            data["file"] = data.pop("sha1")
+                        if "stl" in data:
+                            data["file"] = data.pop("stl")
+                        self.build_manifest = data
+            except (yaml.YAMLError, OSError):
                 pass
         self._manifest_out_dir = str(out_dir)
 
     def _save_manifest(self, out_dir: str):
-        """Write the current build manifest to a JSON file in the output directory."""
-        manifest_path = Path(out_dir) / "build_manifest.json"
+        """Write the current build manifest to a YAML file in the output directory."""
+        manifest_path = Path(out_dir) / "build_manifest.yaml"
         with open(manifest_path, "w") as f:
-            json.dump(self.build_manifest, f, indent=4)
+            yaml.dump(self.build_manifest, f, sort_keys=False)
         self.logger.print(f"Saved build manifest to {manifest_path}", symbol="📜")
 
     def _get_part_hash(self, part: Part) -> str:
@@ -71,6 +81,10 @@ class Builder:
             room.export_diagram(svg_stream, options)
             return hashlib.sha1(svg_stream.getvalue()).hexdigest()
 
+    def _get_file_hash(self, path: Path) -> str:
+        """Calculate the SHA1 hash of a file on disk."""
+        return hashlib.sha1(path.read_bytes()).hexdigest()
+
     def _export_if_changed(
         self,
         path: Path,
@@ -81,11 +95,17 @@ class Builder:
     ):
         """Register hash in manifest and export content only if it has changed."""
         # Return early if the hash matches the manifest and the file exists.
-        if not force_update and self.build_manifest.get(manifest_key) == current_hash and path.exists():
+        brep_manifest = self.build_manifest.setdefault("brep", {})
+        file_manifest = self.build_manifest.setdefault("file", {})
+
+        if not force_update and brep_manifest.get(manifest_key) == current_hash and path.exists():
+            if manifest_key not in file_manifest:
+                file_manifest[manifest_key] = self._get_file_hash(path)
             return
 
         export_fn()
-        self.build_manifest[manifest_key] = current_hash
+        brep_manifest[manifest_key] = current_hash
+        file_manifest[manifest_key] = self._get_file_hash(path)
         self.logger.print(f"Saved {path}", symbol="📄")
 
     def _resolve_subassemblies(self, targets: Any, base_subs: Any) -> Sequence[str]:

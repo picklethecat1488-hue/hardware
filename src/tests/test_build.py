@@ -3,7 +3,7 @@
 import argparse
 import hashlib
 import io
-import json
+import yaml
 from build import Builder, main, get_args
 from pathlib import Path
 from build123d import BuildPart, Box
@@ -142,12 +142,14 @@ class TestBuilderLogic:
 
     def test_load_manifest(self, builder, tmp_path):
         """Verify loading existing manifest from disk."""
-        manifest_file = tmp_path / "build_manifest.json"
-        data = {"p/t": "hash1"}
-        manifest_file.write_text(json.dumps(data))
+        manifest_file = tmp_path / "build_manifest.yaml"
+
+        # Test migration from flat format
+        flat_data = {"p/t": "hash1"}
+        manifest_file.write_text(yaml.dump(flat_data))
 
         builder._load_manifest(str(tmp_path))
-        assert builder.build_manifest == data
+        assert builder.build_manifest == {"brep": flat_data, "file": {}}
         assert builder._manifest_out_dir == str(tmp_path)
 
         # Verify it doesn't reload if directory is the same
@@ -155,39 +157,69 @@ class TestBuilderLogic:
         builder._load_manifest(str(tmp_path))
         assert builder.build_manifest == {"manual": "edit"}
 
+        # Test migration from old nested formats (sha1/stl -> file)
+        old_nested_data = {"brep": {"p/t": "h1"}, "sha1": {"p/t": "s1"}}
+        manifest_file.write_text(yaml.dump(old_nested_data))
+        builder._manifest_out_dir = None  # Reset to force reload
+        builder._load_manifest(str(tmp_path))
+        assert builder.build_manifest == {"brep": {"p/t": "h1"}, "file": {"p/t": "s1"}}
+
+        old_nested_data_stl = {"brep": {"p/t": "h1"}, "stl": {"p/t": "s1"}}
+        manifest_file.write_text(yaml.dump(old_nested_data_stl))
+        builder._manifest_out_dir = None
+        builder._load_manifest(str(tmp_path))
+        assert builder.build_manifest == {"brep": {"p/t": "h1"}, "file": {"p/t": "s1"}}
+
+        # Test loading nested format
+        nested_data = {"brep": {"p/t": "h1"}, "file": {"p/t": "s1"}}
+        manifest_file.write_text(yaml.dump(nested_data))
+        builder._manifest_out_dir = None  # Reset to force reload
+        builder._load_manifest(str(tmp_path))
+        assert builder.build_manifest == nested_data
+
     def test_save_manifest(self, builder, tmp_path):
         """Verify saving manifest to disk."""
-        builder.build_manifest = {"p/t": "hash1"}
+        builder.build_manifest = {"brep": {"p/t": "h1"}, "file": {"p/t": "s1"}}
         builder._save_manifest(str(tmp_path))
 
-        manifest_file = tmp_path / "build_manifest.json"
+        manifest_file = tmp_path / "build_manifest.yaml"
         assert manifest_file.exists()
-        assert json.loads(manifest_file.read_text()) == {"p/t": "hash1"}
+        assert yaml.safe_load(manifest_file.read_text()) == builder.build_manifest
 
     def test_export_if_changed(self, builder, tmp_path):
         """Verify hash-based export skip logic."""
         path = tmp_path / "part.stl"
         manifest_key = "p/t"
         current_hash = "h1"
+        file_hash = "f1"
         export_fn = MagicMock()
 
-        # 1. No manifest, no file -> Export
-        builder._export_if_changed(path, manifest_key, current_hash, export_fn)
-        export_fn.assert_called_once()
-        assert builder.build_manifest[manifest_key] == current_hash
+        # Mock _get_file_hash since export_fn doesn't actually write a file
+        with patch.object(builder, "_get_file_hash", return_value=file_hash):
+            # 1. No manifest, no file -> Export
+            builder._export_if_changed(path, manifest_key, current_hash, export_fn)
+            export_fn.assert_called_once()
+            assert builder.build_manifest["brep"][manifest_key] == current_hash
+            assert builder.build_manifest["file"][manifest_key] == file_hash
 
         # 2. Manifest matches and file exists -> Skip
         path.touch()
+        builder.build_manifest["file"].pop(manifest_key, None)  # Ensure it's missing to test backfill
         export_fn.reset_mock()
-        builder._export_if_changed(path, manifest_key, current_hash, export_fn)
-        export_fn.assert_not_called()
+        with patch.object(builder, "_get_file_hash", return_value=file_hash):
+            builder._export_if_changed(path, manifest_key, current_hash, export_fn)
+            export_fn.assert_not_called()
+            assert builder.build_manifest["file"][manifest_key] == file_hash
 
         # 3. Hash mismatch -> Export
         export_fn.reset_mock()
-        builder._export_if_changed(path, manifest_key, "h2", export_fn)
-        export_fn.assert_called_once()
+        with patch.object(builder, "_get_file_hash", return_value=file_hash):
+            builder._export_if_changed(path, manifest_key, "h2", export_fn)
+            export_fn.assert_called_once()
+            assert builder.build_manifest["brep"][manifest_key] == "h2"
 
         # 4. Force update -> Export
         export_fn.reset_mock()
-        builder._export_if_changed(path, manifest_key, "h2", export_fn, force_update=True)
-        export_fn.assert_called_once()
+        with patch.object(builder, "_get_file_hash", return_value=file_hash):
+            builder._export_if_changed(path, manifest_key, "h2", export_fn, force_update=True)
+            export_fn.assert_called_once()
