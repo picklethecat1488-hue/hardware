@@ -1,7 +1,6 @@
 limiter:
   part:
     modes: [default]
-    subassemblies: [0deg, 90deg, 180deg]
   color: red
 plate:
   part:
@@ -10,7 +9,6 @@ plate:
 limiter_plate:
   part:
     modes: [default, print]
-    subassemblies: [0deg, 90deg, 180deg]
   color: blue
   diagram:
     modes: [default]

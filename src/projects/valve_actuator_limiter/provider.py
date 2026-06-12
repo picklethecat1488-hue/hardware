@@ -4,7 +4,7 @@ import math
 from functools import cached_property
 from build123d import *  # type: ignore
 import numpy as np
-from model import method_cache, DiagramOptions
+from model import method_cache, DiagramOptions, TextArgs
 from pathlib import Path
 from provider import Provider, Action, Mode as ProviderMode, discover_provider, Room
 from projects_config.valve_actuator_limiter_config import ValveActuatorLimiterConfig
@@ -25,15 +25,6 @@ class ValveActuatorLimiterProvider(Provider):
         """Return the typed configuration settings."""
         return cast(ValveActuatorLimiterConfig, super().settings)
 
-    @cached_property
-    def hull_center(self) -> Vector:
-        """Calculate the geometric center of the plate's base hull."""
-        with BuildSketch() as s:
-            with Locations(self.settings.bolt_holes):
-                Circle(radius=self.settings.bolt_radius + self.settings.wall_thickness)
-            make_hull()
-        return s.sketch.center()
-
     @property
     def part(self) -> dict[str, Callable[..., Part]]:
         """A mapping of part names to their build handler methods."""
@@ -50,23 +41,23 @@ class ValveActuatorLimiterProvider(Provider):
     ) -> BuildPart:
         """Create a 3D sector (limiter) solid using only 3D primitives."""
         r = self.settings.pocket_radius
-        h = self.settings.pocket_depth
-        start_angle = 180 if subassembly == "0deg" else 90 if subassembly == "90deg" else 270
+        h = self.settings.pocket_depth + self.settings.wall_thickness
+        start_angle = 90
         cutter_size = r * 3
 
         with BuildPart() as limiter_gen:
-            Cylinder(radius=r, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            Cylinder(radius=r, height=h, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
             # Use two rotated boxes as half-plane cutters to isolate the stop_angle sector
             with Locations(Rot(0, 0, start_angle - 90)):
-                Box(cutter_size, cutter_size, h, align=(Align.MIN, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
+                Box(cutter_size, cutter_size, h, align=(Align.MIN, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
             with Locations(Rot(0, 0, start_angle + self.settings.stop_angle + 90)):
-                Box(cutter_size, cutter_size, h, align=(Align.MIN, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
+                Box(cutter_size, cutter_size, h, align=(Align.MIN, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
             # Blunt the sharp tip of the wedge
             angle = start_angle + self.settings.stop_angle / 2
             with Locations(Rot(0, 0, angle)):
-                Box(2.0, 2.0, h, mode=Mode.SUBTRACT)
+                Box(2.0, 2.0, h, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
         return limiter_gen
 
@@ -83,11 +74,11 @@ class ValveActuatorLimiterProvider(Provider):
                 make_hull()
             extrude(amount=self.settings.wall_thickness)
 
-            with Locations((self.hull_center.X, self.hull_center.Y, 0)):
+            with Locations((self.settings.hull_center.X, self.settings.hull_center.Y, 0)):
                 Cylinder(
                     radius=self.settings.pocket_radius + self.settings.wall_thickness,
                     height=self.settings.pocket_depth,
-                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    align=(Align.CENTER, Align.CENTER, Align.MAX),
                     mode=Mode.ADD,
                 )
 
@@ -114,15 +105,19 @@ class ValveActuatorLimiterProvider(Provider):
                         mode=Mode.SUBTRACT,
                     )
 
-                # Add zip tie notches to the remaining two edges (Edge 0-1 and 2-0)
-                for i, j in [(0, 1), (2, 0)]:
+                # Add zip tie notches to whichever edges can accommodate them
+                for i, j in [(2, 0)]:
                     h_i, h_j = holes[i], holes[j]
                     v_edge = h_j - h_i
                     v_unit = v_edge.normalized()
                     v_out = Vector(v_edge.Y, -v_edge.X).normalized()
                     v_angle = math.degrees(math.atan2(v_edge.Y, v_edge.X))
 
-                    for dist in [self.settings.zip_tie_hole_offset, v_edge.length - self.settings.zip_tie_hole_offset]:
+                    start = self.settings.zip_tie_hole_offset
+                    mid = v_edge.length / 2
+                    end = v_edge.length - self.settings.zip_tie_hole_offset
+
+                    for dist in [start, mid, end]:
                         # Ensure wall of 'wall_thickness' remains between the outer edge and the cut
                         cut_h = self.settings.zip_tie_cut_height
                         cut_pos = boss_radius - self.settings.wall_thickness - (cut_h / 2)
@@ -136,20 +131,35 @@ class ValveActuatorLimiterProvider(Provider):
                                 )
 
             # Subtract the center pocket for the actuator drive mechanism
-            with Locations((self.hull_center.X, self.hull_center.Y, 0)):
+            with Locations((self.settings.hull_center.X, self.settings.hull_center.Y, self.settings.wall_thickness)):
                 Cylinder(
                     radius=self.settings.pocket_radius,
-                    height=self.settings.wall_thickness + self.settings.pocket_depth + 2.0,
-                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    height=self.settings.pocket_depth,
+                    align=(Align.CENTER, Align.CENTER, Align.MAX),
                     mode=Mode.SUBTRACT,
                 )
 
+            # Add standoffs to both sides to provide clean mating surfaces and fix geometry corruption
+            for z_base, z_align in [(self.settings.wall_thickness, Align.MIN), (0, Align.MAX)]:
+                with Locations([(v.X, v.Y, z_base) for v in self.settings.bolt_holes]):
+                    Cylinder(
+                        radius=self.settings.bolt_radius + self.settings.wall_thickness,
+                        height=self.settings.standoff_height,
+                        align=(Align.CENTER, Align.CENTER, z_align),
+                        mode=Mode.ADD,
+                    )
+
             # Drill M6 bolt alignment holes through the entire part
-            with Locations([(v.X, v.Y, 0) for v in self.settings.bolt_holes]):
+            with Locations(
+                [
+                    (v.X, v.Y, self.settings.wall_thickness + self.settings.standoff_height)
+                    for v in self.settings.bolt_holes
+                ]
+            ):
                 Cylinder(
                     radius=self.settings.bolt_radius,
-                    height=self.settings.wall_thickness + self.settings.pocket_depth + 2.0,
-                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    height=self.settings.wall_thickness + self.settings.pocket_depth + self.settings.standoff_height,
+                    align=(Align.CENTER, Align.CENTER, Align.MAX),
                     mode=Mode.SUBTRACT,
                 )
         return p
@@ -160,10 +170,10 @@ class ValveActuatorLimiterProvider(Provider):
     ) -> BuildPart:
         """Build the geometry for a limiter plate."""
         with BuildPart() as p:
-            plate = self.build_plate("_plate", subassembly=subassembly, mode=mode)
+            plate = self.build_plate("_plate", mode=mode)
             add(plate)
-            with Locations((self.hull_center.X, self.hull_center.Y, 0)):
-                add(self.build_limiter("_limiter", subassembly=subassembly, mode=mode).part)
+            with Locations((self.settings.hull_center.X, self.settings.hull_center.Y, self.settings.wall_thickness)):
+                add(self.build_limiter("_limiter", mode=mode).part)
         return p
 
     @method_cache
@@ -172,3 +182,13 @@ class ValveActuatorLimiterProvider(Provider):
         # Build only the limiter plate for diagram viewing
         plate = self.build_limiter_plate("limiter_plate")
         room.add("limiter_plate", plate)
+
+        # Label each bolt hole
+        for i, hole_pos in enumerate(self.settings.bolt_holes):
+            # Position the label slightly above the hole for visibility
+            room.add_label(
+                name=f"hole_{i + 1}_label",
+                text=str(i + 1),
+                location=hole_pos + Vector(0, 0, self.settings.wall_thickness + self.settings.standoff_height + 2),
+                options=TextArgs(font_size=8),
+            )
