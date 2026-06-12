@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 import pytest
 from build123d import Compound, Box, Vector
-from model import AppConfig, TextArgs
+from model import AppConfig, TextArgs, DiagramOptions
 from provider.room import Room
 from provider.types import ColorType
 
@@ -74,6 +74,7 @@ def test_room_export_diagram():
             show_axes = False
             stroke_width = 0.5
             margin = 10
+            view_from = "front"
 
         options = MockOptions()
 
@@ -114,3 +115,48 @@ def test_room_add_label():
     assert text == "Hello"
     assert pos == Vector(10, 20, 30)
     assert opts.font_size == 12
+
+
+def test_room_parse_options_view_from():
+    """Verify that view_from is correctly parsed from DiagramOptions."""
+    room = Room()
+    options = DiagramOptions(view_from="top rear")
+    opts = room._parse_options(options)
+    assert opts["view_from"] == "top rear"
+
+
+def test_room_get_projection_vectors_named_views():
+    """Verify that named view expressions map to correct direction vectors."""
+    room = Room()
+    room.add("box", Box(1, 1, 1))  # Centered at (0,0,0)
+
+    # Test simple 'top' view
+    look_from, look_at, _ = room._get_projection_vectors({"view_from": "top"})
+    assert look_at == Vector(0, 0, 0)
+    assert (look_from - look_at).normalized() == Vector(0, 0, 1)
+
+    # Test composite 'top rear' view: top (0,0,1) + rear (0,1,0) -> (0,1,1)
+    look_from, look_at, _ = room._get_projection_vectors({"view_from": "top rear"})
+    expected_dir = Vector(0, 1, 1).normalized()
+    assert (look_from - look_at).normalized() == expected_dir
+
+
+def test_room_get_projection_vectors_dynamic_distance():
+    """Verify that the camera distance is calculated based on the bounding box diagonal."""
+    room = Room()
+    room.add("box", Box(100, 100, 100))
+    bb = room.compound.bounding_box()
+    expected_distance = bb.diagonal * 2
+
+    look_from, look_at, _ = room._get_projection_vectors({"view_from": "top"})
+    assert (look_from - look_at).length == pytest.approx(expected_distance)
+
+
+def test_room_get_projection_vectors_overrides():
+    """Verify that projection_origin and projection_dir override automatic calculations."""
+    room = Room()
+    room.add("box", Box(1, 1, 1))
+    opts = {"projection_origin": (10, 10, 10), "projection_dir": (1, 1, 1)}
+    look_from, look_at, _ = room._get_projection_vectors(opts)
+    assert look_from == Vector(10, 10, 10)
+    assert look_at == Vector(1, 1, 1)
