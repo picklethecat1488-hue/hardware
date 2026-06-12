@@ -33,6 +33,11 @@ class ValveActuatorLimiterConfig(BaseModel):
         return {int(k) if isinstance(k, int) or (isinstance(k, str) and k.isdigit()) else k: v for k, v in raw.items()}
 
     @property
+    def hull_center(self) -> Vector:
+        """Return the part wall thickness."""
+        return self._ndarray2vec(np.array(self._raw_data.get("hull_center", [])))
+
+    @property
     def wall_thickness(self) -> float:
         """Return the part wall thickness."""
         return float(self._raw_data.get("wall_thickness", 0.0))
@@ -71,6 +76,11 @@ class ValveActuatorLimiterConfig(BaseModel):
     def zip_tie_cut_height(self) -> float:
         """Return the height of the zip tie notch cut (radial depth)."""
         return float(self._raw_data.get("zip_tie_cut_height", 0.0))
+
+    @property
+    def standoff_height(self) -> float:
+        """Return the height of the zip tie notch cut (radial depth)."""
+        return float(self._raw_data.get("standoff_height", 0.0))
 
     @property
     def bolt_holes(self) -> List[Vector]:

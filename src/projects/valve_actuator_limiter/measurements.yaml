@@ -1,3 +1,5 @@
+# Center of the cutout
+hull_center: [2.12, -14.29]
 # Wall thickness
 wall_thickness: 3.0
 # Clean clearance for the 14.0mm gear protrusion
@@ -14,6 +16,8 @@ zip_tie_hole_offset: 10.0
 zip_tie_cut_width: 8.0
 # Depth of the zip tie slot
 zip_tie_cut_height: 3.2
+# Bolt hole standoff height
+standoff_height: 3.0
 # Exact Asymmetric Bolt Hole Coordinates (Centroid-aligned)
 bolt_holes: [
     [-30.38, -25.20],
