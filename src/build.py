@@ -65,7 +65,6 @@ class Builder:
         manifest_path = Path(out_dir) / "build_manifest.yaml"
         with open(manifest_path, "w") as f:
             yaml.dump(self.build_manifest, f, sort_keys=False)
-        self.logger.print(f"Saved build manifest to {manifest_path}", symbol="📜")
 
     def _get_part_hash(self, part: Part) -> str:
         """Calculate a stable hash for a build123d Part using its BREP representation."""
