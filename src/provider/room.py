@@ -9,6 +9,7 @@ from build123d import (
     BuildSketch,
     BuildLine,
     Compound,
+    Edge,
     Vector,
     Plane,
     Text,
@@ -143,10 +144,12 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         bb = final_drawing.bounding_box()
 
         # ExportSVG uses 'scale' to determine physical dimensions from model units.
-        if "width" in svg_opts and bb.size.X > 0:
-            svg_opts["scale"] = svg_opts.pop("width") / bb.size.X
-        elif "height" in svg_opts and bb.size.Y > 0:
-            svg_opts["scale"] = svg_opts.pop("height") / bb.size.Y
+        width = bb.max.X - bb.min.X
+        height = bb.max.Y - bb.min.Y
+        if "width" in svg_opts and width > 0:
+            svg_opts["scale"] = svg_opts.pop("width") / width
+        elif "height" in svg_opts and height > 0:
+            svg_opts["scale"] = svg_opts.pop("height") / height
 
         # Filter for fields explicitly supported by build123d's ExportSVG class.
         supported_fields = {
@@ -165,7 +168,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         exporter = ExportSVG(**filtered_opts)
         exporter.add_shape(final_drawing)
-        exporter.write(path)
+        exporter.write(cast(Any, path))
 
     def _parse_options(self, options: Optional["DiagramOptions"]) -> dict[str, Any]:
         """Extract and normalize diagram options from Pydantic models or mock objects."""
@@ -183,6 +186,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             "stroke_width",
             "stroke_color",
             "margin",
+            "view_from",
             "projection_dir",
             "projection_origin",
             "show_axes",
@@ -206,21 +210,45 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
     def _get_projection_vectors(self, svg_opts: dict[str, Any]) -> tuple[Vector, Vector, Vector]:
         # Calculate the camera projection direction and a stable "up" vector.
-        look_from_val = svg_opts.get("projection_origin")
-        if look_from_val is None:
-            look_from_val = DiagramOptions.model_fields["projection_origin"].default
-        look_from = Vector(look_from_val)
+        look_at = Vector(self.compound.center())
+        if svg_opts.get("projection_dir") is not None:
+            look_at = Vector(svg_opts["projection_dir"])
 
-        look_at_val = svg_opts.get("projection_dir")
-        if look_at_val is None:
-            look_at_val = DiagramOptions.model_fields["projection_dir"].default
-        look_at = Vector(look_at_val)
+        view_dir = Vector(-1, -1, 1)  # Default ISO
+        view_from = svg_opts.get("view_from", "iso").lower()
 
-        view_dir = (look_from - look_at).normalized()
+        mapping = {
+            "top": Vector(0, 0, 1),
+            "bottom": Vector(0, 0, -1),
+            "front": Vector(0, -1, 0),
+            "rear": Vector(0, 1, 0),
+            "left": Vector(-1, 0, 0),
+            "right": Vector(1, 0, 0),
+            "iso": Vector(-1, -1, 1),
+        }
+
+        if view_from != "iso":
+            parts = view_from.replace(",", " ").split()
+            combined = Vector(0, 0, 0)
+            for p in parts:
+                if p in mapping:
+                    combined += mapping[p]
+            if combined.length > 0:
+                view_dir = combined
+
+        # Scale the view direction based on the bounding box to ensure the camera
+        # is outside the model. Using 2x the diagonal provides a safe distance.
+        bb = self.compound.bounding_box()
+        distance = bb.diagonal * 2 if bb.diagonal > 0 else 1000.0
+        look_from = look_at + (view_dir.normalized() * distance)
+        if svg_opts.get("projection_origin") is not None:
+            look_from = Vector(svg_opts["projection_origin"])
+
+        view_dir_norm = (look_from - look_at).normalized()
 
         z_axis = Vector(0, 0, 1)
         up_vector = Vector(svg_opts.get("look_up", z_axis))
-        if abs(view_dir.dot(up_vector)) > 0.99 and "look_up" not in svg_opts:
+        if abs(view_dir_norm.dot(up_vector)) > 0.99 and "look_up" not in svg_opts:
             up_vector = Vector(0, 1, 0)
         return look_from, look_at, up_vector
 
@@ -229,6 +257,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         projected_sketches = []
         for _, text, loc, opts in self._labels:
             local_loc = cast(Vector, view_plane.to_local_coords(loc))
+            l_loc = cast(Vector, local_loc)
             with BuildSketch() as s:
                 Text(
                     text,
@@ -239,7 +268,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 )
 
             # Place the 2D text at the projected X/Y coordinates.
-            projected_sketches.append(s.sketch.moved(Location((local_loc.X, local_loc.Y))))
+            projected_sketches.append(s.sketch.moved(Location((l_loc.X, l_loc.Y))))
         return projected_sketches
 
     def _create_debug_axes(
@@ -250,26 +279,95 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         up_vector: Vector,
     ) -> Optional[Any]:
         """Create a projected coordinate system triad scaled and positioned for the viewpane."""
-        # Create and project the triad separately to keep it in a corner.
-        axes_triad = Compound.make_triad(axes_scale=1.0)
+        # Create our own axes and arrows to ensure correct orientation and avoid issues with make_triad.
+        # The base_axis_length will be scaled later by axes_scale.
+        base_axis_length = 1.0
+        arrow_length_factor = 0.15
+        arrow_width_factor = 0.07
+
+        axes = [Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)]
+        custom_triad_parts = []
+        for direction in axes:
+            tip = direction * base_axis_length
+            custom_triad_parts.append(Edge.make_line(Vector(0, 0, 0), tip))
+            custom_triad_parts.extend(self._create_arrowhead(tip, direction, arrow_length_factor, arrow_width_factor))
+
+        axes_triad = Compound(children=custom_triad_parts).moved(Location(look_at))
         axes_drawing = Drawing(axes_triad, look_from=look_from, look_at=look_at, look_up=up_vector)
         projected_axes = axes_drawing.visible_lines
 
-        # Scale to ~9% of the model's larger dimension.
-        model_dim = max(model_bb.size.X, model_bb.size.Y)
+        # Calculate projection for labels to ensure they face the camera.
+        view_dir = (look_from - look_at).normalized()
+        view_x = up_vector.cross(view_dir).normalized()
+        view_plane = Plane(origin=look_at, x_dir=view_x, z_dir=view_dir)
+
+        def project_to_2d(p3d: Vector) -> Vector:
+            # Project world vectors (relative to triad origin) to the view plane.
+            local = cast(Vector, view_plane.to_local_coords(look_at + p3d))
+            return Vector(local.X, local.Y)
+
+        # Create 2D text labels at the projected endpoints of the 3D unit vectors.
+        # This ensures they are always flat to the viewpane (facing the camera).
+        labels = []
+        label_margin_factor = 0.1  # Small margin beyond the arrow tip
+        label_offset_for_direct_view = 0.5  # Offset factor relative to font_size
+        label_font_size = 0.2  # From Text constructor
+
+        for text, vec in [
+            ("X", Vector(base_axis_length + label_margin_factor, 0, 0)),
+            ("Y", Vector(0, base_axis_length + label_margin_factor, 0)),
+            ("Z", Vector(0, 0, base_axis_length + label_margin_factor)),
+        ]:
+            p2d = cast(Vector, project_to_2d(vec))
+            # If the axis is pointing almost directly at the camera, apply a small 2D offset
+            if view_dir.dot(vec.normalized()) > 0.95:  # Check 3D vector alignment with view direction
+                p2d += Vector(
+                    label_font_size * label_offset_for_direct_view, label_font_size * label_offset_for_direct_view, 0
+                )
+
+            with BuildSketch() as s:
+                Text(text, font_size=label_font_size, align=(Align.CENTER, Align.CENTER))
+            labels.append(s.sketch.moved(Location((p2d.X, p2d.Y))))
+
+        # Combine the projected lines with the camera-facing labels.
+        projected_axes = Compound(children=[projected_axes] + labels)
+
+        # Scale to ~15% of the model's larger dimension.
+        m_width = model_bb.max.X - model_bb.min.X
+        m_height = model_bb.max.Y - model_bb.min.Y
+        model_dim = max(m_width, m_height)
+
         axes_bb = projected_axes.bounding_box()
-        axes_dim = max(axes_bb.size.X, axes_bb.size.Y)
+        a_width = axes_bb.max.X - axes_bb.min.X
+        a_height = axes_bb.max.Y - axes_bb.min.Y
+        axes_dim = max(a_width, a_height)
+
+        # Size of the debug axes as a ratio of model size
+        projection_scale = 0.15
 
         if axes_dim > 0:
-            axes_scale = (model_dim * 0.09) / axes_dim
+            axes_scale = (model_dim * projection_scale) / axes_dim
             projected_axes = projected_axes.scale(axes_scale)
 
-            # Move to bottom-left corner with margin.
-            margin = model_dim * 0.05
+            # Move to bottom-left corner.
             new_axes_bb = projected_axes.bounding_box()
             offset = Vector(
-                model_bb.min.X - new_axes_bb.min.X - margin,
-                model_bb.min.Y - new_axes_bb.min.Y - margin,
+                model_bb.min.X - new_axes_bb.min.X,
+                model_bb.min.Y - new_axes_bb.min.Y,
             )
             return projected_axes.translate(offset)
         return None
+
+    def _create_arrowhead(self, tip: Vector, direction: Vector, length: float, width: float) -> list[Edge]:
+        """Create a V-shaped arrowhead pointing along direction at tip."""
+        # Find a vector perpendicular to direction to define the 'width' of the V.
+        # We try (0,0,1) first, unless direction is also along Z.
+        z_axis = Vector(0, 0, 1)
+        cross_p = z_axis.cross(direction)
+        if cross_p.length < 1e-5:
+            cross_p = Vector(0, 1, 0).cross(direction)
+        perp = cross_p.normalized()
+
+        p1 = tip - (direction * length) + (perp * width)
+        p2 = tip - (direction * length) - (perp * width)
+        return [Edge.make_line(tip, p1), Edge.make_line(tip, p2)]
