@@ -1,0 +1,30 @@
+# Print Materials Configuration
+#
+# Density is defined in grams per cubic centimeter (g/cm³).
+# In build123d, geometry calculations are in millimeters (mm), so volumes are in mm³.
+# To calculate actual mass in grams from a build123d volume:
+#   mass (g) = volume (mm³) * density (g/cm³) * 1e-3
+#
+# These material properties are used for:
+# 1. Total mass calculations of printed parts.
+# 2. Centroid/center of mass calculation.
+# 3. 3x3 inertia tensor calculations (e.g. for physics simulation or load calculations).
+
+material:
+  # Polylactic Acid (PLA)
+  # A biodegradable thermoplastic polyester derived from renewable resources like corn starch.
+  # Easy to print, stiff, but has low temperature resistance.
+  pla:
+    density: 1.24
+
+  # Polyethylene Terephthalate Glycol-modified (PETG)
+  # A thermoplastic polyester that provides significant chemical resistance, durability,
+  # and formability for manufacturing. Sturdier than PLA and more heat-resistant.
+  petg:
+    density: 1.27
+
+  # Acrylonitrile Butadiene Styrene (ABS)
+  # An impact-resistant engineering plastic. Strong, tough, and heat-resistant,
+  # but prone to warping during printing and requires a heated enclosure.
+  abs:
+    density: 1.04

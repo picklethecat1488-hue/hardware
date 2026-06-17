@@ -2,7 +2,7 @@
 
 import pytest
 from model import AppConfig
-from provider import ProviderManager, Action, MODES
+from provider import ProviderManager, Section, MODES
 
 
 class TestProviderManagerIntegration:
@@ -39,34 +39,34 @@ class TestProviderManagerIntegration:
             manifest = provider.manifest
 
             for target_name, target_cfg in manifest.items():
-                # Verify Action.PART registration
-                if Action.PART in target_cfg:
+                # Verify Section.PART registration
+                if Section.PART in target_cfg:
                     assert target_name in provider.part, (
-                        f"Provider '{provider.name}' manifest claims Action.PART support for "
+                        f"Provider '{provider.name}' manifest claims Section.PART support for "
                         f"'{target_name}', but it is missing from provider.part registry."
                     )
 
-                # Verify Action.DIAGRAM registration
-                if Action.DIAGRAM in target_cfg:
+                # Verify Section.DIAGRAM registration
+                if Section.DIAGRAM in target_cfg:
                     assert target_name in provider.diagram, (
-                        f"Provider '{provider.name}' manifest claims Action.DIAGRAM support for "
+                        f"Provider '{provider.name}' manifest claims Section.DIAGRAM support for "
                         f"'{target_name}', but it is missing from provider.diagram registry."
                     )
 
-                # Verify Action.VIEW registration
-                if Action.VIEW in target_cfg:
+                # Verify Section.VIEW registration
+                if Section.VIEW in target_cfg:
                     assert target_name in provider.view, (
-                        f"Provider '{provider.name}' manifest claims Action.VIEW support for "
+                        f"Provider '{provider.name}' manifest claims Section.VIEW support for "
                         f"'{target_name}', but it is missing from provider.view registry."
                     )
 
-                # Verify Action.CONFIG registration (mapped by Mode)
-                if Action.CONFIG in target_cfg:
-                    supported_modes = target_cfg[Action.CONFIG].get(MODES, [])
+                # Verify Section.CONFIG registration (mapped by Mode)
+                if Section.CONFIG in target_cfg:
+                    supported_modes = target_cfg[Section.CONFIG].get(MODES, [])
                     for mode in supported_modes:
                         # Normalize Mode enum/string to string for registry lookup
                         mode_key = mode.value if hasattr(mode, "value") else str(mode)
                         assert mode_key in provider.config, (
-                            f"Provider '{provider.name}' manifest claims Action.CONFIG support for "
+                            f"Provider '{provider.name}' manifest claims Section.CONFIG support for "
                             f"mode '{mode_key}', but no handler is registered in provider.config."
                         )

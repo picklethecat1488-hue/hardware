@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from provider.provider import ProviderOrchestrator
 from provider.provider_router import ProviderRouterOrchestrator
-from provider.types import Action, Mode, MODES, SUBASSEMBLIES
+from provider.types import Section, Mode, MODES, SUBASSEMBLIES
 from provider.room import Room
 
 
@@ -15,8 +15,8 @@ def mock_provider():
     provider.name = "mock_p"
     provider.manifest = {
         "part_a": {
-            Action.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["left"]},
-            Action.CONFIG: {MODES: ["mount"]},
+            Section.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["left"]},
+            Section.CONFIG: {MODES: ["mount"]},
         }
     }
     provider.targets = ["part_a"]
@@ -39,11 +39,11 @@ class TestProviderOrchestrator:
 
         # Unsupported mode
         with pytest.raises(ValueError, match="Mode 'print' is not supported for action 'part'"):
-            orch.pre_handler(("part_a",), Action.PART, ("left",), (Mode.PRINT,))
+            orch.pre_handler(("part_a",), Section.PART, ("left",), (Mode.PRINT,))
 
         # Unsupported subassembly
         with pytest.raises(ValueError, match="Subassembly 'right' is not supported"):
-            orch.pre_handler(("part_a",), Action.PART, ("right",), (Mode.DEFAULT,))
+            orch.pre_handler(("part_a",), Section.PART, ("right",), (Mode.DEFAULT,))
 
 
 class TestProviderRouterOrchestrator:
@@ -71,7 +71,7 @@ class TestProviderRouterOrchestrator:
         # simulate return from provider runs: (provider, indices, provider_results)
         raw_results = [(mock_provider, [0], [("part_a", "geom_obj")])]
 
-        merged = orch.merge(Action.PART, ("mock_p/part_a",), raw_results)
+        merged = orch.merge(Section.PART, ("mock_p/part_a",), raw_results)
         assert merged == [("mock_p/part_a", "geom_obj")]
 
     def test_merge_diagram_special_case(self, controller_context, mock_provider):
@@ -80,7 +80,7 @@ class TestProviderRouterOrchestrator:
 
         mock_room = MagicMock(spec=Room)
         raw_results = [(mock_provider, [0], mock_room)]
-        merged = orch.merge(Action.DIAGRAM, ("mock_p/part_a",), raw_results)
+        merged = orch.merge(Section.DIAGRAM, ("mock_p/part_a",), raw_results)
 
         assert merged == [("mock_p", mock_room)]
 
@@ -91,7 +91,7 @@ class TestProviderRouterOrchestrator:
         # raw_results missing index 0
         raw_results = []
         with pytest.raises(ValueError, match="results for targets.*were not collected"):
-            orch.merge(Action.PART, ("mock_p/part_a",), raw_results)
+            orch.merge(Section.PART, ("mock_p/part_a",), raw_results)
 
     @patch("concurrent.futures.ThreadPoolExecutor.map")
     def test_execute_parallel_call(self, mock_map, controller_context):
@@ -101,5 +101,5 @@ class TestProviderRouterOrchestrator:
         provider = controller_context.providers[0]
         mock_map.return_value = [(provider, [0], [("part_a", "geom")])]
 
-        orch.execute(("mock_p/part_a",), Action.PART)
+        orch.execute(("mock_p/part_a",), Section.PART)
         assert mock_map.called

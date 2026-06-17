@@ -5,7 +5,7 @@ from unittest.mock import patch
 from build123d import Part, Vector
 from projects_config.valve_actuator_limiter_config import ValveActuatorLimiterConfig
 from projects.valve_actuator_limiter.provider import ValveActuatorLimiterProvider
-from provider import Action, Mode, Room
+from provider import Section, Mode, Room
 
 
 class TestValveActuatorLimiterProvider:
@@ -16,11 +16,11 @@ class TestValveActuatorLimiterProvider:
         """Fixture for ValveActuatorLimiterProvider with mocked manifest."""
         mock_manifest = {
             "limiter_plate": {
-                Action.PART: {
+                Section.PART: {
                     "modes": [Mode.DEFAULT],
                     "subassemblies": ["90deg"],
                 },
-                Action.DIAGRAM: {"modes": [Mode.DEFAULT]},
+                Section.DIAGRAM: {"modes": [Mode.DEFAULT]},
             }
         }
         with patch("provider.provider.load_manifest", return_value=mock_manifest):

@@ -5,6 +5,7 @@ dependencies:
   - python=3.13
   - matplotlib=3.10
   - build123d
+  - pybullet
   - pip
   - pip:
     - ocp-vscode==2.7.1
