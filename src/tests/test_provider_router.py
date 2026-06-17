@@ -7,7 +7,7 @@ from model import AppConfig
 from provider.provider_router import ProviderRouter
 from provider.provider_manager import ProviderManager
 from provider.provider import Provider
-from provider.types import Action, Mode, MODES, SUBASSEMBLIES
+from provider.types import Section, Mode, MODES, SUBASSEMBLIES
 from provider.target_list import TargetList
 
 
@@ -66,8 +66,8 @@ def test_router_init():
 
 def test_router_manifest_aggregation():
     """Verify manifest merging from multiple providers."""
-    p1 = SimpleMockProvider("p1", {"a": {Action.PART: {}}})
-    p2 = SimpleMockProvider("p2", {"b": {Action.PART: {}}})
+    p1 = SimpleMockProvider("p1", {"a": {Section.PART: {}}})
+    p2 = SimpleMockProvider("p2", {"b": {Section.PART: {}}})
     c = ProviderRouter(providers=[p1, p2])
 
     manifest = c.manifest
@@ -88,14 +88,14 @@ def test_router_path_syntax_avoids_collision():
 
 def test_router_run_delegation():
     """Verify run calls the orchestrator with correct types."""
-    p1 = SimpleMockProvider("p1", {"part_a": {Action.PART: {}}})
+    p1 = SimpleMockProvider("p1", {"part_a": {Section.PART: {}}})
     c = ProviderRouter(providers=[p1])
     c.orchestrator = MagicMock()
 
-    targets = TargetList(c, ["p1/part_a"], action=Action.PART)
+    targets = TargetList(c, ["p1/part_a"], action=Section.PART)
     c.run(targets)
 
-    c.orchestrator.execute.assert_called_once_with(("p1/part_a",), Action.PART, (), (Mode.DEFAULT,))
+    c.orchestrator.execute.assert_called_once_with(("p1/part_a",), Section.PART, (), (Mode.DEFAULT,))
 
 
 def test_router_default_configs():

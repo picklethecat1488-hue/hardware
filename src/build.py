@@ -10,13 +10,15 @@ import fnmatch
 import importlib
 from model import AppConfig
 from build123d import *  # type: ignore
-from build123d import export_stl, export_brep
+from build123d import export_stl, export_brep, Shape  # type: ignore
 from target_parser import TargetParser
 from typing import Optional, Any, Sequence, Callable
 from pydantic import validate_call
-from provider import ProviderManager, Action, Mode, SUBASSEMBLIES, TargetList, Room
+from provider import ProviderManager, Section, Mode, SUBASSEMBLIES, TargetList, Room, MATERIAL
 import zipfile
 from shell import Logger
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
 
 class Builder:
@@ -29,6 +31,11 @@ class Builder:
         self.logger = logger or Logger(enabled=False)
         self.target_parser = TargetParser(manager.router)
         self.build_manifest: dict[str, dict[str, str]] = {"brep": {}, "file": {}}
+        self.lock = threading.Lock()
+        self.executor = ThreadPoolExecutor()
+        template_path = Path(__file__).parent / "urdf_template.xml"
+        with open(template_path, "r") as f:
+            self.urdf_template = f.read()
 
     def _get_summary(self, names: Sequence[str]) -> str:
         """Return a truncated summary string of the target names."""
@@ -39,7 +46,7 @@ class Builder:
 
     def _load_manifest(self, out_dir: str):
         """Load an existing build manifest from the output directory if not already loaded."""
-        if getattr(self, "_manifest_out_dir", None) == str(out_dir):
+        if getattr(self, "manifest_out_dir", None) == str(out_dir):
             return
         manifest_path = Path(out_dir) / "build_manifest.yaml"
         if manifest_path.exists():
@@ -58,7 +65,7 @@ class Builder:
                         self.build_manifest = data
             except (yaml.YAMLError, OSError):
                 pass
-        self._manifest_out_dir = str(out_dir)
+        self.manifest_out_dir = str(out_dir)
 
     def _save_manifest(self, out_dir: str):
         """Write the current build manifest to a YAML file in the output directory."""
@@ -84,6 +91,57 @@ class Builder:
         """Calculate the SHA1 hash of a file on disk."""
         return hashlib.sha1(path.read_bytes()).hexdigest()
 
+    def _export_obj(self, shape: Shape, file_path: str, tolerance: float = 0.1, scale: float = 1.0) -> bool:
+        """Export build123d shape to OBJ format."""
+        vertices, triangles = shape.tessellate(tolerance)
+        with open(file_path, "w") as f:
+            f.write("# Exported by build.py\n")
+            for v in vertices:
+                f.write(f"v {v.X * scale:.6f} {v.Y * scale:.6f} {v.Z * scale:.6f}\n")
+            for t in triangles:
+                f.write(f"f {t[0] + 1} {t[1] + 1} {t[2] + 1}\n")
+        return True
+
+    def _export_urdf(self, shape: Shape, urdf_path: str, obj_filename: str, density_g_cm3: float) -> bool:
+        """Export a URDF XML file matching the physical properties of the shape."""
+        density_g_mm3 = density_g_cm3 * 1e-3
+        volume_mm3 = shape.volume  # type: ignore
+        mass_kg = volume_mm3 * density_g_mm3 * 1e-3
+
+        com = shape.center(CenterOf.MASS)  # type: ignore
+        com_m = [com.X * 0.001, com.Y * 0.001, com.Z * 0.001]
+
+        raw_inertia = shape.matrix_of_inertia
+        scale_factor = density_g_cm3 * 1e-12
+
+        ixx = raw_inertia[0][0] * scale_factor
+        ixy = raw_inertia[0][1] * scale_factor
+        ixz = raw_inertia[0][2] * scale_factor
+        iyy = raw_inertia[1][1] * scale_factor
+        iyz = raw_inertia[1][2] * scale_factor
+        izz = raw_inertia[2][2] * scale_factor
+
+        link_name = Path(urdf_path).stem
+
+        urdf_data = {
+            "link_name": link_name,
+            "com_x": com_m[0],
+            "com_y": com_m[1],
+            "com_z": com_m[2],
+            "mass_kg": mass_kg,
+            "ixx": ixx,
+            "ixy": ixy,
+            "ixz": ixz,
+            "iyy": iyy,
+            "iyz": iyz,
+            "izz": izz,
+            "obj_filename": obj_filename,
+        }
+        urdf_content = self.urdf_template.format(**urdf_data)
+        with open(urdf_path, "w") as f:
+            f.write(urdf_content)
+        return True
+
     def _export_if_changed(
         self,
         path: Path,
@@ -94,18 +152,25 @@ class Builder:
     ):
         """Register hash in manifest and export content only if it has changed."""
         # Return early if the hash matches the manifest and the file exists.
-        brep_manifest = self.build_manifest.setdefault("brep", {})
-        file_manifest = self.build_manifest.setdefault("file", {})
+        with self.lock:
+            brep_manifest = self.build_manifest.setdefault("brep", {})
+            file_manifest = self.build_manifest.setdefault("file", {})
 
-        if not force_update and brep_manifest.get(manifest_key) == current_hash and path.exists():
-            if manifest_key not in file_manifest:
-                file_manifest[manifest_key] = self._get_file_hash(path)
-            return
+            if not force_update and brep_manifest.get(manifest_key) == current_hash and path.exists():
+                if manifest_key not in file_manifest:
+                    file_manifest[manifest_key] = self._get_file_hash(path)
+                return
 
+        # Perform the actual export (heavy meshing/writing) outside the lock
         export_fn()
-        brep_manifest[manifest_key] = current_hash
-        file_manifest[manifest_key] = self._get_file_hash(path)
-        self.logger.print(f"Saved {path}", symbol="📄")
+
+        # Update the manifest and print to log inside the lock
+        with self.lock:
+            brep_manifest = self.build_manifest.setdefault("brep", {})
+            file_manifest = self.build_manifest.setdefault("file", {})
+            brep_manifest[manifest_key] = current_hash
+            file_manifest[manifest_key] = self._get_file_hash(path)
+            self.logger.print(f"Saved {path}", symbol="📄")
 
     def _resolve_subassemblies(self, targets: Any, base_subs: Any) -> Sequence[str]:
         """Determine which subassemblies should be built for a target."""
@@ -115,7 +180,7 @@ class Builder:
             all_subs = set()
             for target in targets:
                 manifest = self.manager.router.manifest.get(target, {})
-                action_cfg = manifest.get(Action.PART, {})
+                action_cfg = manifest.get(Section.PART, {})
                 target_subs = action_cfg.get(SUBASSEMBLIES, [])
                 all_subs.update(target_subs)
             return sorted(list(all_subs))
@@ -123,6 +188,7 @@ class Builder:
     @validate_call(config={"arbitrary_types_allowed": True})
     def _export_parts(self, out_dir: str, batch_results: Any, sub: Optional[str] = None, force_update: bool = False):
         """Export parts from a batch run."""
+        futures = []
         for name, results in batch_results:
             # Results is either a single geometry or a list of geometries
             res_list = results if isinstance(results, list) else [results]
@@ -137,20 +203,88 @@ class Builder:
                 target_dir.mkdir(parents=True, exist_ok=True)
                 side_suffix = f"_{sub}" if sub else ""
 
-                mesh_file_name = f"{t_name}{side_suffix}.stl"
-                # Correctly form the path using Path objects
-                path_obj = target_dir / mesh_file_name
-                path_str = str(path_obj)
+                # Resolve export types from manifest
+                export_types = self.manager.router.get_export_types(name, sub)
 
                 if geom.part:
                     current_hash = self._get_part_hash(geom.part)
-                    self._export_if_changed(
-                        path_obj,
-                        f"{p_name}/{mesh_file_name}",
-                        current_hash,
-                        lambda: export_stl(geom.part, path_str),
-                        force_update=force_update,
-                    )
+
+                    for export_type in export_types:
+                        if export_type == "urdf":
+                            obj_file_name = f"{t_name}{side_suffix}.obj"
+                            urdf_file_name = f"{t_name}{side_suffix}.urdf"
+
+                            obj_path = target_dir / obj_file_name
+                            urdf_path = target_dir / urdf_file_name
+
+                            provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
+                            material_name = provider.get_material(t_name, sub) if provider else None
+                            density = 1.0
+                            if material_name and provider:
+                                materials_cfg = provider.manifest.get(MATERIAL, {})
+                                material_def = materials_cfg.get(material_name, {})
+                                density = material_def.get("density", 1.0)
+
+                            # Export OBJ in meters for URDF/simulation compatibility
+                            futures.append(
+                                self.executor.submit(
+                                    self._export_if_changed,
+                                    obj_path,
+                                    f"{p_name}/{obj_file_name}",
+                                    current_hash,
+                                    lambda g=geom.part, p=obj_path: self._export_obj(g, str(p), scale=0.001),
+                                    force_update,
+                                )
+                            )
+
+                            # Export URDF XML referencing the OBJ file
+                            futures.append(
+                                self.executor.submit(
+                                    self._export_if_changed,
+                                    urdf_path,
+                                    f"{p_name}/{urdf_file_name}",
+                                    current_hash,
+                                    lambda g=geom.part, p=urdf_path, fn=obj_file_name, d=density: self._export_urdf(
+                                        g, str(p), fn, d
+                                    ),
+                                    force_update,
+                                )
+                            )
+
+                        elif export_type == "obj":
+                            obj_file_name = f"{t_name}{side_suffix}.obj"
+                            obj_path = target_dir / obj_file_name
+
+                            # Export OBJ in standard mm scale
+                            futures.append(
+                                self.executor.submit(
+                                    self._export_if_changed,
+                                    obj_path,
+                                    f"{p_name}/{obj_file_name}",
+                                    current_hash,
+                                    lambda g=geom.part, p=obj_path: self._export_obj(g, str(p), scale=1.0),
+                                    force_update,
+                                )
+                            )
+
+                        elif export_type == "stl":
+                            mesh_file_name = f"{t_name}{side_suffix}.stl"
+                            path_obj = target_dir / mesh_file_name
+                            path_str = str(path_obj)
+                            futures.append(
+                                self.executor.submit(
+                                    self._export_if_changed,
+                                    path_obj,
+                                    f"{p_name}/{mesh_file_name}",
+                                    current_hash,
+                                    lambda g=geom.part, ps=path_str: export_stl(g, ps),
+                                    force_update,
+                                )
+                            )
+
+        # Wait for all submitted exports to complete
+        for fut in futures:
+            fut.result()
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def generate_parts(self, out_dir, names: list[str] | None = None):
@@ -159,17 +293,17 @@ class Builder:
             target_lists = []
             for name in names:
                 # Only resolve targets that are intended for the PART action
-                if self.target_parser.parse(name, Action.PART):
-                    target_lists.append(self.target_parser.resolve(name, Action.PART))
+                if self.target_parser.parse(name, Section.PART):
+                    target_lists.append(self.target_parser.resolve(name, Section.PART))
         else:
-            target_lists = [self.manager.router.targets.supporting(Action.PART).for_modes([Mode.PRINT])]
+            target_lists = [self.manager.router.targets.supporting(Section.PART).for_modes([Mode.PRINT])]
 
         if not target_lists:
             return
 
         for base_targets in target_lists:
             self.logger.print(
-                f"Building {Action.PART}s: {self._get_summary(list(base_targets))}",
+                f"Building {Section.PART}s: {self._get_summary(list(base_targets))}",
                 symbol="🛠️ ",
             )
             has_base_targets: set[str] = set(base_targets)
@@ -193,17 +327,18 @@ class Builder:
             target_lists = []
             for name in names:
                 # Only resolve targets that are intended for the DIAGRAM action
-                if self.target_parser.parse(name, Action.DIAGRAM):
-                    target_lists.append(self.target_parser.resolve(name, Action.DIAGRAM))
+                if self.target_parser.parse(name, Section.DIAGRAM):
+                    target_lists.append(self.target_parser.resolve(name, Section.DIAGRAM))
         else:
-            target_lists = [self.manager.router.targets.supporting(Action.DIAGRAM).for_modes([Mode.DEFAULT])]
+            target_lists = [self.manager.router.targets.supporting(Section.DIAGRAM).for_modes([Mode.DEFAULT])]
 
         if not target_lists:
             return
 
+        futures = []
         for base_targets in target_lists:
             self.logger.print(
-                f"Building {Action.DIAGRAM}s: {self._get_summary(list(base_targets))}",
+                f"Building {Section.DIAGRAM}s: {self._get_summary(list(base_targets))}",
                 symbol="🛠️ ",
             )
             results = self.manager.router.run(base_targets)
@@ -221,13 +356,20 @@ class Builder:
                 options = getattr(provider.settings, "diagram_options", None) if provider else None
 
                 current_hash = self._get_diagram_hash(room, options)
-                self._export_if_changed(
-                    path_obj,
-                    f"{p_name}/{diagram_name}",
-                    current_hash,
-                    lambda: room.export_diagram(path_str, options),
-                    force_update=bool(names),
+                futures.append(
+                    self.executor.submit(
+                        self._export_if_changed,
+                        path_obj,
+                        f"{p_name}/{diagram_name}",
+                        current_hash,
+                        lambda r=room, ps=path_str, o=options: r.export_diagram(ps, o),
+                        bool(names),
+                    )
                 )
+
+        # Wait for all submitted diagram exports to complete
+        for fut in futures:
+            fut.result()
 
     def generate_all(self, out_dir, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""

@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Optional, Dict
 from .provider import Provider
 from .target_list import TargetList
-from .types import Action, Mode
+from .types import Section, Mode
 from .orchestrator import Orchestrator
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import validate_call
@@ -42,23 +42,23 @@ class ProviderRouterOrchestrator(Orchestrator):
             groups.setdefault(provider, []).append(i)
         return groups
 
-    def merge(self, action: Action, targets: tuple[str, ...], results: list[Any]) -> Any:
+    def merge(self, action: Section, targets: tuple[str, ...], results: list[Any]) -> Any:
         """Merge results from multiple providers based on the action."""
-        if action == Action.CONFIG:
+        if action == Section.CONFIG:
             return None
 
         indexed_results = [None] * len(targets)
         diagram_results = []
 
         for provider, indices, res in results:
-            if action == Action.DIAGRAM:
+            if action == Section.DIAGRAM:
                 diagram_results.append((provider.name, res))
             else:
                 for local_idx, global_idx in enumerate(indices):
                     # Store only the result object in indexed_results for merging
                     indexed_results[global_idx] = res[local_idx][1]
 
-        if action == Action.DIAGRAM:
+        if action == Section.DIAGRAM:
             if any(r is None for _, r in diagram_results):
                 raise ValueError("Orchestration failed: one or more diagram results were None.")
             return diagram_results
@@ -75,7 +75,7 @@ class ProviderRouterOrchestrator(Orchestrator):
     def execute(
         self,
         targets: tuple[str, ...],
-        action: Action,
+        action: Section,
         subassemblies: tuple[str | None, ...] = (),
         modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:
@@ -142,6 +142,26 @@ class ProviderRouter:
             for provider in self.providers:
                 if provider.name == p_name:
                     return provider.get_color(t_name, subassembly)
+        raise ValueError(f"Target '{target}' not found in any registered provider.")
+
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def get_material(self, target: str, subassembly: Optional[str] = None) -> Optional[str]:
+        """Resolve the material for a specific target and subassembly."""
+        if "/" in target:
+            p_name, t_name = target.split("/", 1)
+            for provider in self.providers:
+                if provider.name == p_name:
+                    return provider.get_material(t_name, subassembly)
+        raise ValueError(f"Target '{target}' not found in any registered provider.")
+
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def get_export_types(self, target: str, subassembly: Optional[str] = None) -> list[str]:
+        """Resolve the export formats for a specific target and subassembly."""
+        if "/" in target:
+            p_name, t_name = target.split("/", 1)
+            for provider in self.providers:
+                if provider.name == p_name:
+                    return provider.get_export_types(t_name, subassembly)
         raise ValueError(f"Target '{target}' not found in any registered provider.")
 
     def run(self, targets: TargetList) -> Any:

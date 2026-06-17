@@ -4,7 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 from concurrent.futures import ThreadPoolExecutor
-from .types import Mode, Action
+from .types import Mode, Section
 
 
 class Orchestrator(ABC):
@@ -21,7 +21,7 @@ class Orchestrator(ABC):
     def execute(
         self,
         targets: tuple[str, ...],
-        action: Action,
+        action: Section,
         subassemblies: tuple[str | None, ...] = (),  # noqa: B006
         modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:

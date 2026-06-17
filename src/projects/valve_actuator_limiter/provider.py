@@ -6,7 +6,7 @@ from build123d import *  # type: ignore
 import numpy as np
 from model import method_cache, DiagramOptions, TextArgs
 from pathlib import Path
-from provider import Provider, Action, Mode as ProviderMode, discover_provider, Room
+from provider import Provider, Section, Mode as ProviderMode, discover_provider, Room
 from projects_config.valve_actuator_limiter_config import ValveActuatorLimiterConfig
 from typing import Any, cast, Callable, Sequence
 
@@ -33,7 +33,7 @@ class ValveActuatorLimiterProvider(Provider):
     @property
     def diagram(self) -> dict[str, Callable[[Room, Sequence[str], ProviderMode], None]]:
         """A mapping of diagram names to their build handler methods."""
-        return {name: self.build_diagram for name in self.targets.supporting(Action.DIAGRAM)}
+        return {name: self.build_diagram for name in self.targets.supporting(Section.DIAGRAM)}
 
     @method_cache
     def build_limiter(

@@ -2,7 +2,7 @@
 
 import fnmatch
 from typing import Sequence, Optional, List, Tuple, cast
-from provider import Action, TargetList, ProviderRouter, Mode, SUBASSEMBLIES, MODES
+from provider import Section, TargetList, ProviderRouter, Mode, SUBASSEMBLIES, MODES
 
 
 class TargetInfo:
@@ -12,7 +12,7 @@ class TargetInfo:
         self,
         target: str,
         subassembly: Optional[str],
-        action: Action,
+        action: Section,
         mode: Mode,
     ):
         """Initialize the TargetInfo class."""
@@ -29,7 +29,7 @@ class TargetParser:
         """Initialize the parser with a router for manifest lookups."""
         self.router = router
 
-    def parse(self, raw_target: str, default_action: Action) -> Optional[TargetInfo]:
+    def parse(self, raw_target: str, default_action: Section) -> Optional[TargetInfo]:
         """Parse a target string into components and match against manifest."""
         # Target format: target[_subassembly][:action[/mode]]
         groups = raw_target.split(":", 1)
@@ -40,7 +40,7 @@ class TargetParser:
         action_str = action_tokens[0] if action_tokens else None
 
         # Default to the expected action if none is specified
-        action = Action(action_str) if action_str else default_action
+        action = Section(action_str) if action_str else default_action
 
         # Only process if this info matches the requested action type
         if action != default_action:
@@ -62,7 +62,7 @@ class TargetParser:
 
         return TargetInfo(target, subassembly, action, mode)
 
-    def resolve_targets(self, pattern: str, action: Action, mode: Mode) -> Optional[List[str]]:
+    def resolve_targets(self, pattern: str, action: Section, mode: Mode) -> Optional[List[str]]:
         """Resolve all targets supporting action and mode against the manifest."""
         manifest_keys = self.router.manifest.keys()
         matches = []
@@ -78,7 +78,7 @@ class TargetParser:
                 matches.append(target_name)
         return matches if matches else None
 
-    def resolve_subassemblies(self, pattern: str, target_names: List[str], action: Action) -> Optional[List[str]]:
+    def resolve_subassemblies(self, pattern: str, target_names: List[str], action: Section) -> Optional[List[str]]:
         """Resolve a subassembly pattern against the manifest's supported subassemblies."""
         subs: set[str] = set()
 
@@ -100,7 +100,7 @@ class TargetParser:
     def resolve(
         self,
         raw_target: str,
-        action: Action,
+        action: Section,
     ) -> TargetList:
         """Resolve a raw target string into a single target list."""
         # Create the raw target lists.
@@ -142,7 +142,7 @@ class TargetParser:
             raise ValueError(msg)
         return res
 
-    def get_names(self, supported_actions: Sequence[Action]) -> List[str]:
+    def get_names(self, supported_actions: Sequence[Section]) -> List[str]:
         """List the target names supporting actions."""
         manifest = self.router.manifest
         valid_args = set()

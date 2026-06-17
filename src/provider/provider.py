@@ -10,7 +10,7 @@ from pydantic import validate_call, BaseModel
 from model.utils import method_cache
 from model.app_config import AppConfig
 import re
-from .types import Mode, Action, MODES, SUBASSEMBLIES, COLOR
+from .types import Mode, Section, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT
 from .target_list import TargetList
 from .orchestrator import Orchestrator
 from .utils import load_manifest
@@ -42,16 +42,16 @@ class ProviderOrchestrator(Orchestrator):
     def execute(
         self,
         targets: tuple[str, ...],
-        action: Action,
+        action: Section,
         subassemblies: tuple[str | None, ...] = (),
         modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:
         """Perform the requested build action."""
         # Diagram action does not use subassemblies during build execution
-        handler_subs = () if action == Action.DIAGRAM else subassemblies
+        handler_subs = () if action == Section.DIAGRAM else subassemblies
         self.pre_handler(targets, action, handler_subs, modes)
 
-        if action == Action.DIAGRAM:
+        if action == Section.DIAGRAM:
             # Diagrams operate on all targets at once. We pick the handler for the first target.
             handler = self.provider.diagram[targets[0]]
             # Diagrams operate on all targets at once and return content in a Room.
@@ -65,7 +65,7 @@ class ProviderOrchestrator(Orchestrator):
         work_subs = list(subassemblies) if subassemblies else [None]
         work = [(t, sa, m) for t in targets for sa in work_subs for m in modes]
 
-        if action == Action.VIEW:
+        if action == Section.VIEW:
 
             def view_task(item: tuple[str, Optional[str], Mode]) -> Room:
                 target, _, _ = item
@@ -74,7 +74,7 @@ class ProviderOrchestrator(Orchestrator):
                 return room
 
             raw_results = list(self.executor.map(view_task, work))
-        elif action == Action.CONFIG:
+        elif action == Section.CONFIG:
 
             def config_task(item: tuple[str, Optional[str], Mode]) -> None:
                 target, sa, m = item
@@ -83,7 +83,7 @@ class ProviderOrchestrator(Orchestrator):
             list(self.executor.map(config_task, work))
             self.post_handler(targets, None, action)
             return None
-        elif action == Action.PART:
+        elif action == Section.PART:
 
             def build_task(item: tuple[str, Optional[str], Mode]) -> Any:
                 target, sa, m = item
@@ -107,17 +107,17 @@ class ProviderOrchestrator(Orchestrator):
     def pre_handler(
         self,
         targets: tuple[str, ...],
-        action: Action,
+        action: Section,
         subassemblies: tuple[str | None, ...],
         modes: tuple[Mode | str, ...],
     ) -> None:
         """Validate input parameters before the handler execution."""
         # Ensure the action is recognized by the orchestrator
-        if action not in [Action.VIEW, Action.CONFIG, Action.PART, Action.DIAGRAM]:
+        if action not in [Section.VIEW, Section.CONFIG, Section.PART, Section.DIAGRAM]:
             raise ValueError(f"No handler registered for action '{action}' in {self.provider.__class__.__name__}")
 
         # Diagrams operate on all targets at once, so we validate the first target has a handler.
-        if action == Action.DIAGRAM:
+        if action == Section.DIAGRAM:
             if targets[0] not in self.provider.diagram:
                 raise ValueError(f"No diagram handler registered for '{targets[0]}' in {self.provider.name}")
 
@@ -134,13 +134,13 @@ class ProviderOrchestrator(Orchestrator):
                     f"Action '{action}' is not supported for part '{name}'. Supported: {list(actions_config.keys())}"
                 )
 
-            if action == Action.VIEW and name not in self.provider.view:
+            if action == Section.VIEW and name not in self.provider.view:
                 raise ValueError(f"No view function registered for room '{name}' in {self.provider.name}")
 
-            if action == Action.PART and name not in self.provider.part:
+            if action == Section.PART and name not in self.provider.part:
                 raise ValueError(f"No part handler registered for '{name}' in {self.provider.name}")
 
-            if action == Action.CONFIG:
+            if action == Section.CONFIG:
                 for mode in modes:
                     if mode not in self.provider.config:
                         raise ValueError(f"No config handler registered for mode '{mode}' in {self.provider.name}")
@@ -164,12 +164,12 @@ class ProviderOrchestrator(Orchestrator):
                             f"Supported subassemblies: {supported_subs}"
                         )
 
-    def post_handler(self, targets: tuple[str, ...], results: Optional[list[Any]], action: Action) -> None:
+    def post_handler(self, targets: tuple[str, ...], results: Optional[list[Any]], action: Section) -> None:
         """Validate build results after the handler execution."""
-        if action == Action.CONFIG:
+        if action == Section.CONFIG:
             return
 
-        expected_len = 1 if action == Action.DIAGRAM else len(targets)
+        expected_len = 1 if action == Section.DIAGRAM else len(targets)
         if results is None or len(results) != expected_len:
             raise ValueError(
                 f"Orchestration failed: expected {expected_len} items, got {len(results) if results else 0}."
@@ -276,15 +276,53 @@ class Provider:
         return get_rgba_color(color, 1.0, self.app_config.color[:3])
 
     @validate_call(config={"arbitrary_types_allowed": True})
+    def get_material(self, target: str, subassembly: Optional[str] = None) -> Optional[str]:
+        """Resolve the material for a specific target and subassembly."""
+        target_cfg = self.manifest.get(target, {})
+        material = target_cfg.get(MATERIAL)
+
+        if isinstance(material, dict):
+            # If MATERIAL is a dict, resolve by subassembly key.
+            if subassembly:
+                material = material.get(subassembly)
+            else:
+                material = next(iter(material.values())) if material else None
+
+        if material is None:
+            return None
+
+        return str(material)
+
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def get_export_types(self, target: str, subassembly: Optional[str] = None) -> list[str]:
+        """Resolve the export formats for a specific target and subassembly."""
+        target_cfg = self.manifest.get(target, {})
+        export_val = target_cfg.get(EXPORT)
+
+        if isinstance(export_val, dict):
+            # If EXPORT is a dict, resolve by subassembly key.
+            if subassembly:
+                export_val = export_val.get(subassembly)
+            else:
+                export_val = next(iter(export_val.values())) if export_val else None
+
+        if export_val is None:
+            return ["stl"]
+
+        if isinstance(export_val, list):
+            return [str(e).lower() for e in export_val]
+        return [str(export_val).lower()]
+
+    @validate_call(config={"arbitrary_types_allowed": True})
     def run(self, targets: TargetList) -> Any:
         """Perform the requested provider-specific build action based on TargetList."""
         action = targets.action
         if action is None:
             raise ValueError(f"No action specified for {targets}. You must call .supporting(action) before running.")
 
-        if action == Action.DIAGRAM and targets.subassemblies:
+        if action == Section.DIAGRAM and targets.subassemblies:
             raise ValueError(
-                f"Subassemblies cannot be specified for Action.DIAGRAM in '{self.name}'. "
+                f"Subassemblies cannot be specified for Section.DIAGRAM in '{self.name}'. "
                 "Diagrams are global assembly views."
             )
 
