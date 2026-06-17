@@ -68,8 +68,9 @@ class ProviderOrchestrator(Orchestrator):
         if action == Section.VIEW:
 
             def view_task(item: tuple[str, Optional[str], Mode]) -> Room:
-                target, _, _ = item
+                target, _, m = item
                 room = Room(config=self.provider.app_config)
+                room.mode = m
                 self.provider.view[target](room)
                 return room
 

@@ -40,7 +40,7 @@ class MockProvider(Provider):
                 Section.VIEW: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["left"]},
                 COLOR: (0.8, 0.8, 0.8, 1.0),
                 MATERIAL: "pla",
-                EXPORT: ["stl", "urdf"],
+                EXPORT: ["stl", "obj"],
             },
             "part_b": {
                 Section.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["right"]},
@@ -161,7 +161,7 @@ class TestProviderMetadata:
 
     def test_get_export_types_single(self, provider):
         """Verify get_export_types returns resolved export formats as a list of strings."""
-        assert provider.get_export_types("part_a") == ["stl", "urdf"]
+        assert provider.get_export_types("part_a") == ["stl", "obj"]
 
     def test_get_export_types_dict_specific(self, provider):
         """Verify get_export_types resolves subassembly-specific format from dict."""

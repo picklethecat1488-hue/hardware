@@ -20,7 +20,8 @@ class TestCatFountainProvider:
                     "modes": [Mode.DEFAULT, Mode.PRINT],
                 },
                 Section.DIAGRAM: {"modes": [Mode.DEFAULT]},
-            }
+            },
+            "product": {Section.VIEW: {"modes": [Mode.DEFAULT, Mode.SIMULATE]}},
         }
         with patch("provider.provider.load_manifest", return_value=mock_manifest):
             yield CatFountainProvider()
@@ -51,6 +52,31 @@ class TestCatFountainProvider:
         room = Room()
         provider.build_diagram(room, ["fountain"], Mode.DEFAULT)
         assert "fountain" in room
+
+    def test_build_product(self, provider):
+        """Verify that build_product populates the room with all fountain parts and their URDF attributes."""
+        room = Room()
+        provider.build_product(room)
+
+        # Verify all parts are placed
+        assert "bowl" in room
+        assert "impeller" in room
+        assert "tube" in room
+        assert "spout" in room
+
+        # Verify attributes on bowl
+        bowl_shape = room["bowl"][0]
+        assert bowl_shape.urdf_label == "bowl"
+        assert bowl_shape.urdf_material == "petg"
+        assert bowl_shape.urdf_parent is None
+        assert bowl_shape.urdf_joint_type is None
+
+        # Verify attributes on impeller
+        impeller_shape = room["impeller"][0]
+        assert impeller_shape.urdf_label == "impeller"
+        assert impeller_shape.urdf_parent == "bowl"
+        assert impeller_shape.urdf_joint_type == "revolute"
+        assert impeller_shape.urdf_joint_axis == "0 0 1"
 
     def test_configuration_loading(self, provider):
         """Ensure that critical measurement values are loaded correctly."""

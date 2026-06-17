@@ -25,6 +25,7 @@ class Mode(StrEnum):
 
     DEFAULT = "default"
     PRINT = "print"
+    SIMULATE = "simulate"
 
 
 class ColorType(StrEnum):
