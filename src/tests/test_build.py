@@ -150,7 +150,7 @@ class TestBuilderLogic:
 
         builder._load_manifest(str(tmp_path))
         assert builder.build_manifest == {"brep": flat_data, "file": {}}
-        assert builder._manifest_out_dir == str(tmp_path)
+        assert builder.manifest_out_dir == str(tmp_path)
 
         # Verify it doesn't reload if directory is the same
         builder.build_manifest = {"manual": "edit"}
@@ -160,20 +160,20 @@ class TestBuilderLogic:
         # Test migration from old nested formats (sha1/stl -> file)
         old_nested_data = {"brep": {"p/t": "h1"}, "sha1": {"p/t": "s1"}}
         manifest_file.write_text(yaml.dump(old_nested_data))
-        builder._manifest_out_dir = None  # Reset to force reload
+        builder.manifest_out_dir = None  # Reset to force reload
         builder._load_manifest(str(tmp_path))
         assert builder.build_manifest == {"brep": {"p/t": "h1"}, "file": {"p/t": "s1"}}
 
         old_nested_data_stl = {"brep": {"p/t": "h1"}, "stl": {"p/t": "s1"}}
         manifest_file.write_text(yaml.dump(old_nested_data_stl))
-        builder._manifest_out_dir = None
+        builder.manifest_out_dir = None
         builder._load_manifest(str(tmp_path))
         assert builder.build_manifest == {"brep": {"p/t": "h1"}, "file": {"p/t": "s1"}}
 
         # Test loading nested format
         nested_data = {"brep": {"p/t": "h1"}, "file": {"p/t": "s1"}}
         manifest_file.write_text(yaml.dump(nested_data))
-        builder._manifest_out_dir = None  # Reset to force reload
+        builder.manifest_out_dir = None  # Reset to force reload
         builder._load_manifest(str(tmp_path))
         assert builder.build_manifest == nested_data
 
