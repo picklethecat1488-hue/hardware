@@ -6,7 +6,7 @@ from typing import Optional, Sequence
 from model import AppConfig
 from target_parser import TargetParser
 from shell import Logger
-from provider import ProviderManager, Action, TargetList, MODES, Mode
+from provider import ProviderManager, Section, TargetList, MODES, Mode
 
 
 class Configurator:
@@ -35,15 +35,15 @@ class Configurator:
             all_supported = set()
             for t in list(targets):
                 manifest = self.manager.router.manifest.get(t, {})
-                all_supported.update(manifest.get(Action.CONFIG, {}).get(MODES, []))
+                all_supported.update(manifest.get(Section.CONFIG, {}).get(MODES, []))
             return sorted(list(all_supported))
 
     def configure(self, names: Optional[list[str]] = None, mode: Optional[str] = None):
         """Perform configuration tasks for specified targets."""
         target_lists = (
-            [self.target_parser.resolve(name, Action.CONFIG) for name in names]
+            [self.target_parser.resolve(name, Section.CONFIG) for name in names]
             if names
-            else [self.manager.router.targets.supporting(Action.CONFIG)]
+            else [self.manager.router.targets.supporting(Section.CONFIG)]
         )
 
         for base_targets in target_lists:

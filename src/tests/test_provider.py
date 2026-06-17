@@ -9,7 +9,7 @@ from provider.provider import Provider
 from provider.target_list import TargetList
 from provider.utils import load_manifest, ColorType
 from model.utils import method_cache
-from provider.types import Action, Mode, MODES, SUBASSEMBLIES, COLOR
+from provider.types import Section, Mode, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT
 from provider.room import Room
 
 
@@ -32,21 +32,25 @@ class MockProvider(Provider):
         """Return a mock manifest."""
         return {
             "part_a": {
-                Action.PART: {
+                Section.PART: {
                     MODES: [Mode.DEFAULT, Mode.PRINT],
                     SUBASSEMBLIES: ["left"],
                 },
-                Action.CONFIG: {MODES: ["text", "mount"]},
-                Action.VIEW: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["left"]},
+                Section.CONFIG: {MODES: ["text", "mount"]},
+                Section.VIEW: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["left"]},
                 COLOR: (0.8, 0.8, 0.8, 1.0),
+                MATERIAL: "pla",
+                EXPORT: ["stl", "urdf"],
             },
             "part_b": {
-                Action.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["right"]},
-                Action.DIAGRAM: {
+                Section.PART: {MODES: [Mode.DEFAULT], SUBASSEMBLIES: ["right"]},
+                Section.DIAGRAM: {
                     MODES: [Mode.DEFAULT],
                     SUBASSEMBLIES: ["right"],
                 },
                 COLOR: {"right": (0.9, 0.9, 0.9, 1.0)},
+                MATERIAL: {"right": "petg"},
+                EXPORT: {"right": "obj"},
             },
         }
 
@@ -100,7 +104,7 @@ class TestTargetList:
 
     def test_supporting_filter(self, provider):
         """Verify supporting() filters targets correctly."""
-        targets = provider.targets.supporting(Action.PART)
+        targets = provider.targets.supporting(Section.PART)
         assert list(targets) == ["part_a", "part_b"]
         assert isinstance(targets, TargetList)
         assert targets.provider == provider
@@ -138,6 +142,39 @@ class TestProviderMetadata:
         """Verify get_color falls back to config color when missing."""
         assert provider.get_color("part_b", "left") == provider.app_config.color
 
+    def test_get_material_single(self, provider):
+        """Verify get_material returns a single defined material."""
+        assert provider.get_material("part_a") == "pla"
+
+    def test_get_material_dict_specific(self, provider):
+        """Verify get_material returns the specific subassembly material from a dict."""
+        assert provider.get_material("part_b", "right") == "petg"
+
+    def test_get_material_dict_fallback_first(self, provider):
+        """Verify get_material returns the first dict material when no subassembly is specified."""
+        assert provider.get_material("part_b") == "petg"
+
+    def test_get_material_fallback_config(self, provider):
+        """Verify get_material returns None when missing and no default exists."""
+        # 'left' is not in the material dict, so it should fall back to None
+        assert provider.get_material("part_b", "left") is None
+
+    def test_get_export_types_single(self, provider):
+        """Verify get_export_types returns resolved export formats as a list of strings."""
+        assert provider.get_export_types("part_a") == ["stl", "urdf"]
+
+    def test_get_export_types_dict_specific(self, provider):
+        """Verify get_export_types resolves subassembly-specific format from dict."""
+        assert provider.get_export_types("part_b", "right") == ["obj"]
+
+    def test_get_export_types_dict_fallback(self, provider):
+        """Verify get_export_types falls back to first format if no subassembly specified."""
+        assert provider.get_export_types("part_b") == ["obj"]
+
+    def test_get_export_types_missing_fallback(self, provider):
+        """Verify get_export_types returns default ['stl'] when export is missing or None."""
+        assert provider.get_export_types("part_b", "left") == ["stl"]
+
     def test_provider_default_manifest_path(self, monkeypatch):
         """Verify that Provider.manifest defaults to loading a YAML file."""
         import provider.provider
@@ -164,14 +201,39 @@ class TestProviderMetadata:
     def test_load_manifest(self, tmp_path, provider):
         """Verify that load_manifest correctly parses Enum keys and values."""
         manifest_path = tmp_path / "manifest.yml"
-        yaml_content = {"part_c": {"part": {"modes": ["default"], "subassemblies": ["left"]}, "color": "grey"}}
+        yaml_content = {
+            "part_c": {
+                "part": {"modes": ["default"], "subassemblies": ["left"]},
+                "color": "grey",
+                "material": "abs",
+            }
+        }
         manifest_path.write_text(yaml.dump(yaml_content))
 
         loaded = load_manifest(str(manifest_path))
         assert "part_c" in loaded
-        assert Action.PART in loaded["part_c"]
-        assert loaded["part_c"][Action.PART][MODES] == [Mode.DEFAULT]
+        assert Section.PART in loaded["part_c"]
+        assert loaded["part_c"][Section.PART][MODES] == [Mode.DEFAULT]
         assert loaded["part_c"][COLOR] == ColorType.GREY
+        assert loaded["part_c"][MATERIAL] == "abs"
+
+    def test_load_manifest_recursive_imports(self, tmp_path):
+        """Verify that load_manifest correctly handles recursive imports and merges material definitions."""
+        parent_path = tmp_path / "parent.yml"
+        parent_content = {"material": {"pla": {"density": 1.24}, "petg": {"density": 1.27}}}
+        parent_path.write_text(yaml.dump(parent_content))
+
+        child_path = tmp_path / "child.yml"
+        child_content = {"imports": ["parent.yml"], "part_d": {"part": {"modes": ["default"]}, "material": "pla"}}
+        child_path.write_text(yaml.dump(child_content))
+
+        loaded = load_manifest(str(child_path))
+        assert "part_d" in loaded
+        assert Section.PART in loaded["part_d"]
+        assert loaded["part_d"][MATERIAL] == "pla"
+        assert MATERIAL in loaded
+        assert loaded[MATERIAL]["pla"]["density"] == 1.24
+        assert loaded[MATERIAL]["petg"]["density"] == 1.27
 
 
 class TestProviderOrchestration:
@@ -179,30 +241,30 @@ class TestProviderOrchestration:
 
     def test_build_success(self, provider):
         """Verify successful build orchestration and validation."""
-        results = provider.run(provider.targets.supporting(Action.PART))
+        results = provider.run(provider.targets.supporting(Section.PART))
         assert results == [("part_a", "part_obj"), ("part_b", "part_obj")]
         provider.part["part_a"].assert_called_once_with("part_a", None, Mode.DEFAULT)
         provider.part["part_b"].assert_called_once_with("part_b", None, Mode.DEFAULT)
 
     def test_configure_success(self, provider):
         """Verify successful configuration orchestration."""
-        provider.run(provider.targets.supporting(Action.CONFIG).for_modes(["text"]))
+        provider.run(provider.targets.supporting(Section.CONFIG).for_modes(["text"]))
         provider.config["text"].assert_called_once_with("part_a", None)
 
         provider.config["text"].reset_mock()
-        provider.run(provider.targets.supporting(Action.CONFIG).for_modes(["mount"]))
+        provider.run(provider.targets.supporting(Section.CONFIG).for_modes(["mount"]))
         provider.config["mount"].assert_called_once_with("part_a", None)
 
     def test_build_multiple_modes(self, provider):
         """Verify that multiple build modes result in multiple handler calls and results."""
-        targets = provider.targets.supporting(Action.PART).for_modes([Mode.DEFAULT, Mode.PRINT])
+        targets = provider.targets.supporting(Section.PART).for_modes([Mode.DEFAULT, Mode.PRINT])
         results = provider.run(targets)
         assert results == [("part_a", ["part_obj", "part_obj"])]
         assert provider.part["part_a"].call_count == 2
 
     def test_view_success(self, provider):
         """Verify successful view orchestration."""
-        results = provider.run(provider.targets.supporting(Action.VIEW))
+        results = provider.run(provider.targets.supporting(Section.VIEW))
         assert len(results) == 1
         assert isinstance(results[0][1], Room)
         provider.view["part_a"].assert_called_once()
@@ -210,20 +272,20 @@ class TestProviderOrchestration:
     def test_view_unregistered_room(self, provider):
         """Verify error when a target supports VIEW in manifest but lacks a function in view registry."""
         m = provider.manifest
-        m["part_b"][Action.VIEW] = {MODES: [Mode.DEFAULT]}
+        m["part_b"][Section.VIEW] = {MODES: [Mode.DEFAULT]}
         with patch.object(MockProvider, "manifest", new_callable=PropertyMock) as mock_manifest:
             mock_manifest.return_value = m
             with pytest.raises(ValueError, match="No view function registered for room 'part_b'"):
-                provider.run(TargetList(provider, ["part_b"], action=Action.VIEW))
+                provider.run(TargetList(provider, ["part_b"], action=Section.VIEW))
 
     def test_build_action_unsupported(self, provider):
         """Verify ValueError when a target does not support an action."""
         with pytest.raises(ValueError, match="Action 'config' is not supported for part 'part_b'"):
-            provider.run(TargetList(provider, ["part_b"], action=Action.CONFIG))
+            provider.run(TargetList(provider, ["part_b"], action=Section.CONFIG))
 
     def test_build_diagram_special_case(self, provider):
         """Verify diagram build returns a single object and validates differently."""
-        room = provider.run(TargetList(provider, ["part_b"], action=Action.DIAGRAM))
+        room = provider.run(TargetList(provider, ["part_b"], action=Section.DIAGRAM))
         assert isinstance(room, Room)
         assert "diag" in room
         assert room["diag"][0] == "diag_obj"
@@ -231,14 +293,14 @@ class TestProviderOrchestration:
     def test_pre_build_validation_failures(self, provider):
         """Verify various validation failures in _pre_build."""
         with pytest.raises(ValueError, match="Mode 'print' is not supported.*part_b"):
-            targets = TargetList(provider, ["part_b"], modes=[Mode.PRINT], action=Action.PART)
+            targets = TargetList(provider, ["part_b"], modes=[Mode.PRINT], action=Section.PART)
             provider.run(targets)
 
     def test_post_build_length_validation(self, provider):
         """Verify build result length validation."""
         # This test is less relevant now as _run guarantees length by construction,
         # but we keep it to ensure _post_build still executes correctly.
-        results = provider.run(TargetList(provider, ["part_a", "part_b"], action=Action.PART))
+        results = provider.run(TargetList(provider, ["part_a", "part_b"], action=Section.PART))
         assert results == [("part_a", "part_obj"), ("part_b", "part_obj")]
         assert provider.part["part_a"].call_count == 1
         assert provider.part["part_b"].call_count == 1

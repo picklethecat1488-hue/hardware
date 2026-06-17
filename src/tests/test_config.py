@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 import pytest
 from config import Configurator
-from provider import Action, Mode, MODES, TargetList
+from provider import Section, Mode, MODES, TargetList
 
 
 class TestConfiguratorLogic:
@@ -24,8 +24,8 @@ class TestConfiguratorLogic:
         mock_targets = MagicMock(spec=TargetList)
         mock_targets.__iter__.return_value = iter(["t1", "t2"])
         configurator.manager.router.manifest = {
-            "t1": {Action.CONFIG: {MODES: ["m1", "m2"]}},
-            "t2": {Action.CONFIG: {MODES: ["m2", "m3"]}},
+            "t1": {Section.CONFIG: {MODES: ["m1", "m2"]}},
+            "t2": {Section.CONFIG: {MODES: ["m2", "m3"]}},
         }
         res = configurator.resolve_modes(mock_targets, [Mode.DEFAULT])
         assert res == ["m1", "m2", "m3"]

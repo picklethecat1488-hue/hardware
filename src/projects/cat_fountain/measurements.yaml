@@ -1,0 +1,16 @@
+# Cat Fountain Parametric Dimensions
+bowl_radius: 80.0
+bowl_height: 40.0
+bowl_thickness: 4.0
+
+tube_radius: 8.0
+tube_thickness: 2.0
+tube_height: 100.0
+
+impeller_radius: 12.0
+impeller_height: 15.0
+impeller_shaft_radius: 2.5
+impeller_blades: 6
+
+spout_length: 30.0
+spout_angle: 45.0

@@ -9,7 +9,7 @@ from pathlib import Path
 from build123d import BuildPart, Box
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
-from provider import Action, Mode, TargetList, Room, SUBASSEMBLIES
+from provider import Section, Mode, TargetList, Room, SUBASSEMBLIES
 
 
 class TestBuildMain:
@@ -85,8 +85,8 @@ class TestBuilderLogic:
         mock_targets = MagicMock(spec=TargetList)
         mock_targets.__iter__.side_effect = lambda: iter(["t1", "t2"])
         builder.manager.router.manifest = {
-            "t1": {Action.PART: {SUBASSEMBLIES: ["a", "b"]}},
-            "t2": {Action.PART: {SUBASSEMBLIES: ["b", "c"]}},
+            "t1": {Section.PART: {SUBASSEMBLIES: ["a", "b"]}},
+            "t2": {Section.PART: {SUBASSEMBLIES: ["b", "c"]}},
         }
         res = builder._resolve_subassemblies(mock_targets, [])
         assert res == ["a", "b", "c"]
@@ -94,7 +94,7 @@ class TestBuilderLogic:
         # Case 3: No subassemblies found in manifest
         mock_targets_empty = MagicMock(spec=TargetList)
         mock_targets_empty.__iter__.side_effect = lambda: iter(["t1"])
-        builder.manager.router.manifest = {"t1": {Action.PART: {}}}
+        builder.manager.router.manifest = {"t1": {Section.PART: {}}}
         assert builder._resolve_subassemblies(mock_targets_empty, []) == []
 
     def test_generate_parts_mixed_subassemblies(self, builder):
@@ -112,8 +112,8 @@ class TestBuilderLogic:
         builder.target_parser.parse.return_value = MagicMock()
         builder.target_parser.resolve.return_value = base_targets
         builder.manager.router.manifest = {
-            "t_sub": {Action.PART: {SUBASSEMBLIES: ["left"]}},
-            "t_base": {Action.PART: {}},
+            "t_sub": {Section.PART: {SUBASSEMBLIES: ["left"]}},
+            "t_base": {Section.PART: {}},
         }
         builder.manager.router.run.return_value = []
 
@@ -223,3 +223,64 @@ class TestBuilderLogic:
         with patch.object(builder, "_get_file_hash", return_value=file_hash):
             builder._export_if_changed(path, manifest_key, "h2", export_fn, force_update=True)
             export_fn.assert_called_once()
+
+    def test_export_obj(self, builder, tmp_path):
+        """Verify that export_obj correctly writes an OBJ file from a Box."""
+        box = Box(10, 20, 30)
+        obj_file = tmp_path / "test.obj"
+
+        # Test standard scale
+        res = builder._export_obj(box, str(obj_file), scale=1.0)
+        assert res is True
+        assert obj_file.exists()
+
+        content = obj_file.read_text()
+        assert content.startswith("# Exported by build.py")
+        assert "v " in content
+        assert "f " in content
+
+    def test_export_urdf(self, builder, tmp_path):
+        """Verify that export_urdf correctly writes a URDF file with inertial properties."""
+        box = Box(10, 20, 30)
+        urdf_file = tmp_path / "test.urdf"
+        density = 1.24  # pla
+
+        res = builder._export_urdf(box, str(urdf_file), "test.obj", density)
+        assert res is True
+        assert urdf_file.exists()
+
+        content = urdf_file.read_text()
+        assert '<robot name="test">' in content
+        assert '<link name="test">' in content
+        assert "<inertial>" in content
+        assert '<mass value="' in content
+        assert "<inertia " in content
+
+    def test_export_parts_custom_formats(self, builder, tmp_path):
+        """Verify that _export_parts respects the export: urdf/obj overrides."""
+        # 1. Setup mock run results with geometry
+        mock_geom = MagicMock()
+        mock_geom.part = Box(10, 20, 30)
+        batch_results = [("p_name/t_name", mock_geom)]
+
+        # 2. Configure mock router get_export_types to return ["urdf"]
+        builder.manager.router.get_export_types.return_value = ["urdf"]
+
+        # 3. Configure mock providers/materials list
+        mock_provider = MagicMock()
+        mock_provider.name = "p_name"
+        mock_provider.get_material.return_value = "pla"
+        mock_provider.manifest = {Section.MATERIAL: {"pla": {"density": 1.24}}}
+        builder.manager.router.providers = [mock_provider]
+
+        # Run export and check that both URDF and OBJ are written
+        with patch.object(builder, "_export_if_changed") as mock_export:
+            builder._export_parts(str(tmp_path), batch_results)
+            # Should call export_if_changed twice (once for obj in meters, once for urdf)
+            assert mock_export.call_count == 2
+
+            # Check paths: first arg is path_obj
+            calls = mock_export.call_args_list
+            paths = [str(call[0][0]) for call in calls]
+            assert any(p.endswith("t_name.obj") for p in paths)
+            assert any(p.endswith("t_name.urdf") for p in paths)

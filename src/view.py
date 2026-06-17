@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Sequence, Optional, List, Any, cast, Iterable
 from build123d import *  # type: ignore
 from target_parser import TargetParser
-from provider import ProviderManager, Action, TargetList, Room
+from provider import ProviderManager, Section, TargetList, Room
 from pydantic import validate_call
 from shell import Logger
 from ocp_vscode import set_port, Collapse, Camera, show as ocp_show  # type: ignore
@@ -26,7 +26,7 @@ def show(*args, **kwargs):
 class Viewer:
     """Builds and displays geometry rooms for visualization."""
 
-    VISUAL_ACTIONS = [Action.VIEW, Action.PART, Action.DIAGRAM]
+    VISUAL_ACTIONS = [Section.VIEW, Section.PART, Section.DIAGRAM]
 
     def __init__(self, manager: ProviderManager, logger: Logger):
         """Initialize the viewer."""
@@ -87,13 +87,13 @@ class Viewer:
                     targets = self.target_parser.resolve(target, action)
                     if not targets:
                         continue
-                    if action == Action.VIEW:
+                    if action == Section.VIEW:
                         display_items.extend(self._get_view_items(targets))
                         break
-                    elif action == Action.PART:
+                    elif action == Section.PART:
                         display_items.extend(self._get_part_items(targets))
                         break
-                    elif action == Action.DIAGRAM:
+                    elif action == Section.DIAGRAM:
                         display_items.extend(self._get_diagram_items(targets))
                         break
                 except ValueError:
