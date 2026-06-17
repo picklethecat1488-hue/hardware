@@ -3,11 +3,9 @@
 from __future__ import annotations
 import os
 import inspect
-from typing import Optional, Any, Callable, Iterable, TYPE_CHECKING
+from typing import Optional, Any, Callable, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor
-from build123d import Part, Sketch, Wire
 from pydantic import validate_call, BaseModel
-from model.utils import method_cache
 from model.app_config import AppConfig
 import re
 from .types import Mode, Section, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT
@@ -68,8 +66,9 @@ class ProviderOrchestrator(Orchestrator):
         if action == Section.VIEW:
 
             def view_task(item: tuple[str, Optional[str], Mode]) -> Room:
-                target, _, _ = item
+                target, _, m = item
                 room = Room(config=self.provider.app_config)
+                setattr(room, "mode", m)
                 self.provider.view[target](room)
                 return room
 
@@ -124,7 +123,7 @@ class ProviderOrchestrator(Orchestrator):
         valid_targets = self.provider.targets
         manifest = self.provider.manifest
 
-        for i, name in enumerate(targets):
+        for name in targets:
             if name not in valid_targets:
                 raise ValueError(f"Unsupported part name: '{name}'. Supported: {valid_targets}")
 
