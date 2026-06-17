@@ -6,15 +6,18 @@ from enum import StrEnum
 MODES = "modes"
 SUBASSEMBLIES = "subassemblies"
 COLOR = "color"
+MATERIAL = "material"
+EXPORT = "export"
 
 
-class Action(StrEnum):
-    """Build actions for shapes."""
+class Section(StrEnum):
+    """Manifest sections."""
 
     PART = "part"
     DIAGRAM = "diagram"
     CONFIG = "config"
     VIEW = "view"
+    MATERIAL = "material"
 
 
 class Mode(StrEnum):

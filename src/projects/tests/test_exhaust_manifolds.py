@@ -9,7 +9,7 @@ from build123d import *
 from model import AppConfig
 from projects_config import ExhaustManifoldsConfig
 from projects.exhaust_manifolds import ExhaustManifoldsProvider
-from provider import Action, Mode, TargetList, ProviderManager, MODES, Room
+from provider import Section, Mode, TargetList, ProviderManager, MODES, Room
 
 
 class TestExhaustManifoldsProvider:
@@ -24,25 +24,25 @@ class TestExhaustManifoldsProvider:
         """
         mock_manifest = {
             "driver": {
-                Action.CONFIG: {MODES: ["mount", "text"]},
-                Action.PART: {
+                Section.CONFIG: {MODES: ["mount", "text"]},
+                Section.PART: {
                     "modes": [Mode.DEFAULT, Mode.PRINT],
                     "subassemblies": ["left", "right"],
                 },
-                Action.DIAGRAM: {"modes": [Mode.DEFAULT]},
+                Section.DIAGRAM: {"modes": [Mode.DEFAULT]},
             },
             "passenger": {
-                Action.CONFIG: {MODES: ["mount", "text"]},
-                Action.PART: {
+                Section.CONFIG: {MODES: ["mount", "text"]},
+                Section.PART: {
                     "modes": [Mode.DEFAULT, Mode.PRINT],
                     "subassemblies": ["left", "right"],
                 },
-                Action.DIAGRAM: {"modes": [Mode.DEFAULT]},
+                Section.DIAGRAM: {"modes": [Mode.DEFAULT]},
             },
-            "part_positions": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
-            "overlay": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
-            "wire": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
-            "sketch": {Action.VIEW: {"modes": [Mode.DEFAULT]}},
+            "part_positions": {Section.VIEW: {"modes": [Mode.DEFAULT]}},
+            "overlay": {Section.VIEW: {"modes": [Mode.DEFAULT]}},
+            "wire": {Section.VIEW: {"modes": [Mode.DEFAULT]}},
+            "sketch": {Section.VIEW: {"modes": [Mode.DEFAULT]}},
         }
         with patch("provider.provider.load_manifest", return_value=mock_manifest):
             yield ExhaustManifoldsProvider()
@@ -87,7 +87,7 @@ class TestExhaustManifoldsProvider:
     def test_run_part_default(self, provider):
         """Verify executing a PART action in DEFAULT mode calls create_part."""
         with patch.object(provider.builder, "create_part", return_value="part_obj") as mock:
-            targets = provider.targets.supporting(Action.PART).for_subassemblies(["left"])
+            targets = provider.targets.supporting(Section.PART).for_subassemblies(["left"])
             results = provider.run(targets)
             assert results == [("driver", "part_obj"), ("passenger", "part_obj")]
             assert mock.call_count == 2
@@ -95,7 +95,7 @@ class TestExhaustManifoldsProvider:
     def test_run_part_print(self, provider):
         """Verify executing a PART action in PRINT mode calls create_prepared_part."""
         with patch.object(provider.builder, "create_prepared_part", return_value="print_obj") as mock:
-            targets = provider.targets.supporting(Action.PART).for_modes([Mode.PRINT]).for_subassemblies(["left"])
+            targets = provider.targets.supporting(Section.PART).for_modes([Mode.PRINT]).for_subassemblies(["left"])
             results = provider.run(targets)
             assert results == [("driver", "print_obj"), ("passenger", "print_obj")]
             assert mock.call_count == 2
@@ -104,7 +104,7 @@ class TestExhaustManifoldsProvider:
         """Verify executing a PART action without a subassembly calls create_manifold."""
         with patch.object(provider.builder, "create_manifold", return_value="manifold_obj") as mock:
             # Manually construct TargetList without subassemblies
-            targets = TargetList(provider, ["driver"], action=Action.PART)
+            targets = TargetList(provider, ["driver"], action=Section.PART)
             results = provider.run(targets)
             assert results == [("driver", "manifold_obj")]
             mock.assert_called_once_with("driver")
@@ -112,7 +112,7 @@ class TestExhaustManifoldsProvider:
     def test_run_diagram(self, provider):
         """Verify executing a DIAGRAM action calls build_diagram."""
         with patch.object(provider.builder, "build_diagram") as mock:
-            targets = provider.targets.supporting(Action.DIAGRAM)
+            targets = provider.targets.supporting(Section.DIAGRAM)
             room = provider.run(targets)
             assert isinstance(room, Room)
             mock.assert_called_once()
@@ -122,14 +122,14 @@ class TestExhaustManifoldsProvider:
 
     def test_run_config_execution(self, provider):
         """Verify executing a CONFIG action returns None."""
-        targets = provider.targets.supporting(Action.CONFIG).for_modes([Mode.DEFAULT])
+        targets = provider.targets.supporting(Section.CONFIG).for_modes([Mode.DEFAULT])
         result = provider.run(targets)
         assert result is None
 
     def test_unsupported_config_mode_error(self, provider):
         """Verify that requesting an unregistered config mode raises a ValueError."""
         # 'bare' is no longer supported
-        targets = TargetList(provider, ["driver"], action=Action.CONFIG, modes=["bare"])
+        targets = TargetList(provider, ["driver"], action=Section.CONFIG, modes=["bare"])
         with pytest.raises(ValueError, match="No config handler registered for mode 'bare' in exhaust_manifolds"):
             provider.run(targets)
 

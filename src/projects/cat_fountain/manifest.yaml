@@ -1,0 +1,39 @@
+imports:
+  - ../print_materials.yaml
+
+bowl:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj, urdf]
+  color: grey
+
+impeller:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj, urdf]
+  color: red
+
+tube:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj, urdf]
+  color: blue
+
+spout:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj, urdf]
+  color: cyan
+
+fountain:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj, urdf]
+  color: green
+  diagram:
+    modes: [default]

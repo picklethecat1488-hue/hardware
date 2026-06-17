@@ -5,7 +5,7 @@ from functools import cached_property
 from typing import Any, Callable, Optional, TYPE_CHECKING
 from model.app_config import AppConfig
 from projects_config import ExhaustManifoldsConfig
-from provider import Provider, Action, Mode, discover_provider
+from provider import Provider, Section, Mode, discover_provider
 from .builder import ExhaustManifoldsBuilder
 from .configurator import ExhaustManifoldsConfigurator
 from .viewer import ExhaustManifoldsViewer
@@ -52,12 +52,12 @@ class ExhaustManifoldsProvider(Provider):
     @property
     def part(self) -> dict[str, Callable[..., Any]]:
         """A mapping of part names to their build handler methods."""
-        return {name: self.builder.build_part for name in self.targets.supporting(Action.PART)}
+        return {name: self.builder.build_part for name in self.targets.supporting(Section.PART)}
 
     @property
     def diagram(self) -> dict[str, Callable[..., Any]]:
         """A mapping of diagram names to their build handler methods."""
-        return {name: self.builder.build_diagram for name in self.targets.supporting(Action.DIAGRAM)}
+        return {name: self.builder.build_diagram for name in self.targets.supporting(Section.DIAGRAM)}
 
     @property
     def config(self) -> dict[str, Callable[[str, Optional[str]], Any]]:

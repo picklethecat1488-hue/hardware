@@ -1,7 +1,7 @@
 """Specialized list for build targets."""
 
 from typing import Iterable, Optional, TYPE_CHECKING, Union, Sequence
-from .types import Mode, Action, MODES, SUBASSEMBLIES
+from .types import Mode, Section, MODES, SUBASSEMBLIES
 
 if TYPE_CHECKING:
     from .provider import Provider
@@ -17,7 +17,7 @@ class TargetList(list[str]):
         targets: Iterable[str] = (),
         subassemblies: Optional[list[str]] = None,
         modes: Optional[list[Mode]] = None,
-        action: Optional[Action] = None,
+        action: Optional[Section] = None,
     ):
         """Initialize the TargetList."""
         super().__init__(targets)
@@ -45,7 +45,7 @@ class TargetList(list[str]):
         """Return a string representation for debugging."""
         return self.__str__()
 
-    def supporting(self, action: Action) -> "TargetList":
+    def supporting(self, action: Section) -> "TargetList":
         """Filter targets that support the specified action."""
         return TargetList(
             self.provider,
