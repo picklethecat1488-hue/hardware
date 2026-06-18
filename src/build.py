@@ -6,15 +6,13 @@ import hashlib
 import yaml
 import os
 from pathlib import Path
-import fnmatch
-import importlib
 from model import AppConfig
 from build123d import *  # type: ignore
 from build123d import export_stl, export_brep, Shape  # type: ignore
 from target_parser import TargetParser
 from typing import Optional, Any, Sequence, Callable
 from pydantic import validate_call
-from provider import ProviderManager, Section, Mode, SUBASSEMBLIES, TargetList, Room, MATERIAL
+from provider import ProviderManager, Section, Mode, SUBASSEMBLIES, Room
 import zipfile
 from shell import Logger
 from concurrent.futures import ThreadPoolExecutor
@@ -365,11 +363,11 @@ class Builder:
             fut.result()
 
     def _export_combined_urdf_from_room(
-        self, room: Room, target_dir: Path, p_name: str, target_name: str, force_update: bool = False
+        self, room: Room, target_dir: Path, p_name: str, target_name: str, _: bool = False
     ):
         """Export a combined URDF and individual OBJ links from a Room object."""
         links_info = []
-        for name, (geom, rgba) in room.items():
+        for geom, rgba in room.values():
             label = getattr(geom, "urdf_label", None)
             if not label:
                 continue
