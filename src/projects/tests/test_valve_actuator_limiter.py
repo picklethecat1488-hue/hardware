@@ -61,6 +61,6 @@ class TestValveActuatorLimiterProvider:
         center = provider.settings.hull_center
         holes = provider.settings.bolt_holes
         assert len(holes) == 3
-        assert (center - holes[0]).length == pytest.approx(35.0, abs=1.0)
-        assert (center - holes[1]).length == pytest.approx(35.0, abs=1.0)
+        assert (center - holes[0]).length == pytest.approx(33.3, abs=1.0)
+        assert (center - holes[1]).length == pytest.approx(33.3, abs=1.0)
         assert (center - holes[2]).length == pytest.approx(65.0, abs=1.0)

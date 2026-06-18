@@ -37,25 +37,25 @@ class ValveActuatorLimiterProvider(Provider):
 
     @method_cache
     def build_limiter(
-        self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT
+        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Create a 3D sector (limiter) solid using only 3D primitives."""
         r = self.settings.pocket_radius
-        h = self.settings.pocket_depth + self.settings.wall_thickness
-        start_angle = 90
+        h = self.settings.pocket_depth
         cutter_size = r * 3
 
         with BuildPart() as limiter_gen:
-            Cylinder(radius=r, height=h, align=(Align.CENTER, Align.CENTER, Align.MAX))
+            with Locations((0, 0, -self.settings.wall_thickness)):
+                Cylinder(radius=r, height=h, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
             # Use two rotated boxes as half-plane cutters to isolate the stop_angle sector
-            with Locations(Rot(0, 0, start_angle - 90)):
+            with Locations(Rot(0, 0, self.settings.start_angle - 90)):
                 Box(cutter_size, cutter_size, h, align=(Align.MIN, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
-            with Locations(Rot(0, 0, start_angle + self.settings.stop_angle + 90)):
+            with Locations(Rot(0, 0, self.settings.start_angle + self.settings.stop_angle + 90)):
                 Box(cutter_size, cutter_size, h, align=(Align.MIN, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
             # Blunt the sharp tip of the wedge
-            angle = start_angle + self.settings.stop_angle / 2
+            angle = self.settings.start_angle + self.settings.stop_angle / 2
             with Locations(Rot(0, 0, angle)):
                 Box(2.0, 2.0, h, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
@@ -63,14 +63,18 @@ class ValveActuatorLimiterProvider(Provider):
 
     @method_cache
     def build_plate(
-        self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT
+        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Build the geometry for a limiter plate."""
+        slot_tolerance = 3.0
         with BuildPart() as p:
             # Generate the structural outer profile
             with BuildSketch():
                 with Locations(self.settings.bolt_holes):
-                    Circle(radius=self.settings.bolt_radius + self.settings.wall_thickness)
+                    SlotOverall(
+                        width=2 * (self.settings.bolt_radius + self.settings.wall_thickness) + slot_tolerance,
+                        height=2 * (self.settings.bolt_radius + self.settings.wall_thickness),
+                    )
                 make_hull()
             extrude(amount=self.settings.wall_thickness)
 
@@ -91,7 +95,7 @@ class ValveActuatorLimiterProvider(Provider):
                 midpoint = (h2 + h3) * 0.5
                 # Compute a normal pointing outwards from the part center
                 outward_normal = Vector(edge_vec.Y, -edge_vec.X).normalized()
-                cylinder_offset = self.settings.pocket_radius + self.settings.wall_thickness
+                cylinder_offset = self.settings.pocket_radius
                 half_dist = edge_vec.length / 2
                 boss_radius = self.settings.bolt_radius + self.settings.wall_thickness
                 scallop_radius = math.sqrt(half_dist**2 + cylinder_offset**2) - boss_radius
@@ -141,32 +145,28 @@ class ValveActuatorLimiterProvider(Provider):
 
             # Add standoffs to both sides to provide clean mating surfaces and fix geometry corruption
             for z_base, z_align in [(self.settings.wall_thickness, Align.MIN), (0, Align.MAX)]:
-                with Locations([(v.X, v.Y, z_base) for v in self.settings.bolt_holes]):
-                    Cylinder(
-                        radius=self.settings.bolt_radius + self.settings.wall_thickness,
-                        height=self.settings.standoff_height,
-                        align=(Align.CENTER, Align.CENTER, z_align),
-                        mode=Mode.ADD,
-                    )
+                with BuildSketch(Plane.XY.offset(z_base)):
+                    with Locations([(v.X, v.Y) for v in self.settings.bolt_holes]):
+                        SlotOverall(
+                            width=2 * (self.settings.bolt_radius + self.settings.wall_thickness) + 3.0,
+                            height=2 * (self.settings.bolt_radius + self.settings.wall_thickness),
+                        )
+                amount = self.settings.standoff_height if z_align == Align.MIN else -self.settings.standoff_height
+                extrude(amount=amount, mode=Mode.ADD)
 
             # Drill M6 bolt alignment holes through the entire part
-            with Locations(
-                [
-                    (v.X, v.Y, self.settings.wall_thickness + self.settings.standoff_height)
-                    for v in self.settings.bolt_holes
-                ]
-            ):
-                Cylinder(
-                    radius=self.settings.bolt_radius,
-                    height=self.settings.wall_thickness + self.settings.pocket_depth + self.settings.standoff_height,
-                    align=(Align.CENTER, Align.CENTER, Align.MAX),
-                    mode=Mode.SUBTRACT,
-                )
+            with BuildSketch(Plane.XY.offset(self.settings.wall_thickness + self.settings.standoff_height)):
+                with Locations([(v.X, v.Y) for v in self.settings.bolt_holes]):
+                    SlotOverall(width=2 * self.settings.bolt_radius + 3.0, height=2 * self.settings.bolt_radius)
+            extrude(
+                amount=-(self.settings.wall_thickness + self.settings.pocket_depth + self.settings.standoff_height),
+                mode=Mode.SUBTRACT,
+            )
         return p
 
     @method_cache
     def build_limiter_plate(
-        self, target: str, subassembly: str = "90deg", mode: ProviderMode = ProviderMode.DEFAULT
+        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Build the geometry for a limiter plate."""
         with BuildPart() as p:

@@ -83,6 +83,11 @@ class ValveActuatorLimiterConfig(BaseModel):
         return float(self._raw_data.get("standoff_height", 0.0))
 
     @property
+    def start_angle(self) -> float:
+        """Return the height of the zip tie notch cut (radial depth)."""
+        return float(self._raw_data.get("start_angle", 0.0))
+
+    @property
     def bolt_holes(self) -> List[Vector]:
         """Return the list of asymmetric bolt hole coordinates."""
         return [self._ndarray2vec(np.array(p)) for p in self._raw_data.get("bolt_holes", [])]

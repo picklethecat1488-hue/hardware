@@ -18,9 +18,11 @@ zip_tie_cut_width: 8.0
 zip_tie_cut_height: 3.2
 # Bolt hole standoff height
 standoff_height: 3.0
+# Start angle of limiter wedge in deg
+start_angle: 200
 # Exact Asymmetric Bolt Hole Coordinates (Centroid-aligned)
 bolt_holes: [
-    [-30.38, -25.20],
-    [34.62, -25.20],
+    [-29.38, -25.20],
+    [33.62, -25.20],
     [-4.23, 50.40]
 ]
