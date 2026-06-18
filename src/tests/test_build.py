@@ -34,12 +34,11 @@ class TestBuildMain:
         assert args.targets == ["part1/left"]
 
     def test_main_with_targets(self, mock_logger, mock_builder, tmp_path):
-        """Verify that specific targets trigger both parts and diagram generation."""
+        """Verify that specific targets trigger generate_all with names."""
         args = argparse.Namespace(outdir=tmp_path, env=None, targets=["part1"])
         main(mock_logger, args)
 
-        mock_builder.return_value.generate_parts.assert_called_once_with(out_dir=tmp_path, names=["part1"])
-        mock_builder.return_value.generate_diagram.assert_called_once_with(out_dir=tmp_path, names=["part1"])
+        mock_builder.return_value.generate_all.assert_called_once_with(out_dir=tmp_path, names=["part1"])
         mock_builder.return_value._save_manifest.assert_called_once()
 
     def test_main_output_env_path(self, mock_logger, mock_builder, tmp_path):
@@ -53,7 +52,7 @@ class TestBuildMain:
         """Test the else block when no flags are provided."""
         args = argparse.Namespace(outdir=tmp_path, env=None, targets=[])
         main(mock_logger, args)
-        mock_builder.return_value.generate_all.assert_called_once_with(out_dir=tmp_path)
+        mock_builder.return_value.generate_all.assert_called_once_with(out_dir=tmp_path, names=None)
         mock_builder.return_value._save_manifest.assert_called_once()
         mock_logger.done.assert_called_once()
 
@@ -239,48 +238,33 @@ class TestBuilderLogic:
         assert "v " in content
         assert "f " in content
 
-    def test_export_urdf(self, builder, tmp_path):
-        """Verify that export_urdf correctly writes a URDF file with inertial properties."""
-        box = Box(10, 20, 30)
-        urdf_file = tmp_path / "test.urdf"
-        density = 1.24  # pla
+    def test_export_combined_urdf(self, builder, tmp_path):
+        """Verify that _export_combined_urdf_from_room correctly generates a combined URDF from a Room."""
+        room = Room()
 
-        res = builder._export_urdf(box, str(urdf_file), "test.obj", density)
-        assert res is True
+        # Add a part with metadata attributes
+        geom = Box(10, 20, 30)
+        geom.urdf_label = "base"
+        geom.urdf_material = "petg"
+        geom.urdf_density = 1.27
+        geom.urdf_parent = None
+        geom.urdf_joint_type = None
+
+        room.add("base", geom)
+
+        # Pre-create the OBJ file and register the hash in the manifest to simulate up-to-date output
+        obj_path = tmp_path / "base.obj"
+        obj_path.touch()
+        current_hash = builder._get_part_hash(geom.location.inverse() * geom)
+        builder.build_manifest = {"brep": {"test_proj/base.obj": current_hash}}
+
+        builder._export_combined_urdf_from_room(room, tmp_path, "test_proj", "product")
+
+        urdf_file = tmp_path / "product.urdf"
         assert urdf_file.exists()
 
         content = urdf_file.read_text()
-        assert '<robot name="test">' in content
-        assert '<link name="test">' in content
-        assert "<inertial>" in content
+        assert '<robot name="test_proj">' in content
+        assert '<link name="base">' in content
         assert '<mass value="' in content
         assert "<inertia " in content
-
-    def test_export_parts_custom_formats(self, builder, tmp_path):
-        """Verify that _export_parts respects the export: urdf/obj overrides."""
-        # 1. Setup mock run results with geometry
-        mock_geom = MagicMock()
-        mock_geom.part = Box(10, 20, 30)
-        batch_results = [("p_name/t_name", mock_geom)]
-
-        # 2. Configure mock router get_export_types to return ["urdf"]
-        builder.manager.router.get_export_types.return_value = ["urdf"]
-
-        # 3. Configure mock providers/materials list
-        mock_provider = MagicMock()
-        mock_provider.name = "p_name"
-        mock_provider.get_material.return_value = "pla"
-        mock_provider.manifest = {Section.MATERIAL: {"pla": {"density": 1.24}}}
-        builder.manager.router.providers = [mock_provider]
-
-        # Run export and check that both URDF and OBJ are written
-        with patch.object(builder, "_export_if_changed") as mock_export:
-            builder._export_parts(str(tmp_path), batch_results)
-            # Should call export_if_changed twice (once for obj in meters, once for urdf)
-            assert mock_export.call_count == 2
-
-            # Check paths: first arg is path_obj
-            calls = mock_export.call_args_list
-            paths = [str(call[0][0]) for call in calls]
-            assert any(p.endswith("t_name.obj") for p in paths)
-            assert any(p.endswith("t_name.urdf") for p in paths)
