@@ -6,15 +6,13 @@ import hashlib
 import yaml
 import os
 from pathlib import Path
-import fnmatch
-import importlib
 from model import AppConfig
 from build123d import *  # type: ignore
 from build123d import export_stl, export_brep, Shape  # type: ignore
 from target_parser import TargetParser
 from typing import Optional, Any, Sequence, Callable
 from pydantic import validate_call
-from provider import ProviderManager, Section, Mode, SUBASSEMBLIES, TargetList, Room, MATERIAL
+from provider import ProviderManager, Section, Mode, SUBASSEMBLIES, Room
 import zipfile
 from shell import Logger
 from concurrent.futures import ThreadPoolExecutor
@@ -98,12 +96,40 @@ class Builder:
     def _export_obj(self, shape: Shape, file_path: str, tolerance: float = 0.1, scale: float = 1.0) -> bool:
         """Export build123d shape to OBJ format."""
         vertices, triangles = shape.tessellate(tolerance)
+
         with open(file_path, "w") as f:
             f.write("# Exported by build.py\n")
+            f.write(f"# Vertices: {len(vertices)}, Triangles: {len(triangles)}\n")
+
+            # Write scaled vertices
             for v in vertices:
                 f.write(f"v {v.X * scale:.6f} {v.Y * scale:.6f} {v.Z * scale:.6f}\n")
+
+            # OBJ syntax links normals directly to face formatting: f v1//vn1 v2//vn2 v3//vn3
             for t in triangles:
-                f.write(f"f {t[0] + 1} {t[1] + 1} {t[2] + 1}\n")
+                # Get the 3 vertices for the triangle face
+                v0 = vertices[t[0]]
+                v1 = vertices[t[1]]
+                v2 = vertices[t[2]]
+
+                # Cross product to find face perpendicular normal vector
+                edge1 = Vector(v1.X - v0.X, v1.Y - v0.Y, v1.Z - v0.Z)
+                edge2 = Vector(v2.X - v0.X, v2.Y - v0.Y, v2.Z - v0.Z)
+                normal = edge1.cross(edge2)
+
+                if normal.length > 1e-6:
+                    normal = normal.normalized()
+
+                f.write(f"vn {normal.X:.6f} {normal.Y:.6f} {normal.Z:.6f}\n")
+
+            # Write faces referencing 1-based indexing
+            for i, t in enumerate(triangles):
+                norm_idx = i + 1  # 1-based indexing for normals
+                v1 = t[0] + 1
+                v2 = t[1] + 1
+                v3 = t[2] + 1
+                f.write(f"f {v1}//{norm_idx} {v2}//{norm_idx} {v3}//{norm_idx}\n")
+
         return True
 
     def _export_if_changed(
@@ -337,11 +363,11 @@ class Builder:
             fut.result()
 
     def _export_combined_urdf_from_room(
-        self, room: Room, target_dir: Path, p_name: str, target_name: str, force_update: bool = False
+        self, room: Room, target_dir: Path, p_name: str, target_name: str, _: bool = False
     ):
         """Export a combined URDF and individual OBJ links from a Room object."""
         links_info = []
-        for name, (geom, rgba) in room.items():
+        for geom, rgba in room.values():
             label = getattr(geom, "urdf_label", None)
             if not label:
                 continue
