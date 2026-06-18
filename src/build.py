@@ -33,9 +33,13 @@ class Builder:
         self.build_manifest: dict[str, dict[str, str]] = {"brep": {}, "file": {}}
         self.lock = threading.Lock()
         self.executor = ThreadPoolExecutor()
-        template_path = Path(__file__).parent / "urdf_template.xml"
+        template_path = Path(__file__).parent / "urdf_template.yaml"
         with open(template_path, "r") as f:
-            self.urdf_template = f.read()
+            templates = yaml.safe_load(f)
+        self.robot_template = templates["robot_template"].strip()
+        self.link_template = templates["link_template"].strip()
+        self.joint_template = templates["joint_template"].strip()
+        self.axis_limit_template = templates["axis_limit_template"].strip()
 
     def _get_summary(self, names: Sequence[str]) -> str:
         """Return a truncated summary string of the target names."""
@@ -100,46 +104,6 @@ class Builder:
                 f.write(f"v {v.X * scale:.6f} {v.Y * scale:.6f} {v.Z * scale:.6f}\n")
             for t in triangles:
                 f.write(f"f {t[0] + 1} {t[1] + 1} {t[2] + 1}\n")
-        return True
-
-    def _export_urdf(self, shape: Shape, urdf_path: str, obj_filename: str, density_g_cm3: float) -> bool:
-        """Export a URDF XML file matching the physical properties of the shape."""
-        density_g_mm3 = density_g_cm3 * 1e-3
-        volume_mm3 = shape.volume  # type: ignore
-        mass_kg = volume_mm3 * density_g_mm3 * 1e-3
-
-        com = shape.center(CenterOf.MASS)  # type: ignore
-        com_m = [com.X * 0.001, com.Y * 0.001, com.Z * 0.001]
-
-        raw_inertia = shape.matrix_of_inertia
-        scale_factor = density_g_cm3 * 1e-12
-
-        ixx = raw_inertia[0][0] * scale_factor
-        ixy = raw_inertia[0][1] * scale_factor
-        ixz = raw_inertia[0][2] * scale_factor
-        iyy = raw_inertia[1][1] * scale_factor
-        iyz = raw_inertia[1][2] * scale_factor
-        izz = raw_inertia[2][2] * scale_factor
-
-        link_name = Path(urdf_path).stem
-
-        urdf_data = {
-            "link_name": link_name,
-            "com_x": com_m[0],
-            "com_y": com_m[1],
-            "com_z": com_m[2],
-            "mass_kg": mass_kg,
-            "ixx": ixx,
-            "ixy": ixy,
-            "ixz": ixz,
-            "iyy": iyy,
-            "iyz": iyz,
-            "izz": izz,
-            "obj_filename": obj_filename,
-        }
-        urdf_content = self.urdf_template.format(**urdf_data)
-        with open(urdf_path, "w") as f:
-            f.write(urdf_content)
         return True
 
     def _export_if_changed(
@@ -210,48 +174,7 @@ class Builder:
                     current_hash = self._get_part_hash(geom.part)
 
                     for export_type in export_types:
-                        if export_type == "urdf":
-                            obj_file_name = f"{t_name}{side_suffix}.obj"
-                            urdf_file_name = f"{t_name}{side_suffix}.urdf"
-
-                            obj_path = target_dir / obj_file_name
-                            urdf_path = target_dir / urdf_file_name
-
-                            provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
-                            material_name = provider.get_material(t_name, sub) if provider else None
-                            density = 1.0
-                            if material_name and provider:
-                                materials_cfg = provider.manifest.get(MATERIAL, {})
-                                material_def = materials_cfg.get(material_name, {})
-                                density = material_def.get("density", 1.0)
-
-                            # Export OBJ in meters for URDF/simulation compatibility
-                            futures.append(
-                                self.executor.submit(
-                                    self._export_if_changed,
-                                    obj_path,
-                                    f"{p_name}/{obj_file_name}",
-                                    current_hash,
-                                    lambda g=geom.part, p=obj_path: self._export_obj(g, str(p), scale=0.001),
-                                    force_update,
-                                )
-                            )
-
-                            # Export URDF XML referencing the OBJ file
-                            futures.append(
-                                self.executor.submit(
-                                    self._export_if_changed,
-                                    urdf_path,
-                                    f"{p_name}/{urdf_file_name}",
-                                    current_hash,
-                                    lambda g=geom.part, p=urdf_path, fn=obj_file_name, d=density: self._export_urdf(
-                                        g, str(p), fn, d
-                                    ),
-                                    force_update,
-                                )
-                            )
-
-                        elif export_type == "obj":
+                        if export_type == "obj":
                             obj_file_name = f"{t_name}{side_suffix}.obj"
                             obj_path = target_dir / obj_file_name
 
@@ -371,7 +294,190 @@ class Builder:
         for fut in futures:
             fut.result()
 
-    def generate_all(self, out_dir, zip_name="build.zip"):
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def generate_urdfs(self, out_dir, names: list[str] | None = None):
+        """Export combined URDF/OBJ assets from views that support simulate mode."""
+        if names:
+            target_lists = []
+            for name in names:
+                if self.target_parser.parse(name, Section.VIEW):
+                    target_lists.append(self.target_parser.resolve(name, Section.VIEW))
+        else:
+            target_lists = [self.manager.router.targets.supporting(Section.VIEW).for_modes([Mode.SIMULATE])]
+
+        if not target_lists:
+            return
+
+        futures = []
+        for base_targets in target_lists:
+            simulate_targets = base_targets.for_modes([Mode.SIMULATE])
+            if not simulate_targets:
+                continue
+
+            results = self.manager.router.run(simulate_targets)
+            for fq_target, room in results or []:
+                parts = fq_target.split("/", 1)
+                proj_name = parts[0]
+                target_name = parts[1] if len(parts) > 1 else proj_name
+                target_dir = Path(out_dir) / proj_name
+                target_dir.mkdir(parents=True, exist_ok=True)
+
+                futures.append(
+                    self.executor.submit(
+                        self._export_combined_urdf_from_room,
+                        room,
+                        target_dir,
+                        proj_name,
+                        target_name,
+                        bool(names),
+                    )
+                )
+
+        for fut in futures:
+            fut.result()
+
+    def _export_combined_urdf_from_room(
+        self, room: Room, target_dir: Path, p_name: str, target_name: str, force_update: bool = False
+    ):
+        """Export a combined URDF and individual OBJ links from a Room object."""
+        links_info = []
+        for name, (geom, rgba) in room.items():
+            label = getattr(geom, "urdf_label", None)
+            if not label:
+                continue
+
+            parent = getattr(geom, "urdf_parent", None)
+            joint_type = getattr(geom, "urdf_joint_type", "fixed")
+            joint_axis = getattr(geom, "urdf_joint_axis", "0 0 1")
+            density = getattr(geom, "urdf_density", 1.0)
+
+            # Extract location
+            pos = geom.location.position
+            xyz = [pos.X * 0.001, pos.Y * 0.001, pos.Z * 0.001]
+            rpy = [0.0, 0.0, 0.0]
+
+            # Invert the translation to get the local shape centered at local origin
+            local_shape = geom.location.inverse() * geom
+
+            # Export local shape to OBJ
+            obj_file_name = f"{label}.obj"
+            obj_path = target_dir / obj_file_name
+            current_hash = self._get_part_hash(local_shape)
+
+            # Validate that the OBJ file exists and is up to date
+            if not obj_path.exists():
+                raise ValueError(f"OBJ file for link '{label}' does not exist: {obj_path}. ")
+
+            with self.lock:
+                brep_manifest = self.build_manifest.setdefault("brep", {})
+                manifest_hash = brep_manifest.get(f"{p_name}/{obj_file_name}")
+
+            if manifest_hash != current_hash:
+                raise ValueError(f"OBJ file for link '{label}' is out of date. ")
+
+            # Mass and inertia calculations using local shape and density
+            density_g_mm3 = density * 1e-3
+            volume_mm3 = local_shape.volume  # type: ignore
+            mass_kg = volume_mm3 * density_g_mm3 * 1e-3
+
+            com = local_shape.center(CenterOf.MASS)  # type: ignore
+            com_m = [com.X * 0.001, com.Y * 0.001, com.Z * 0.001]
+
+            raw_inertia = local_shape.matrix_of_inertia
+            scale_factor = density * 1e-12
+
+            ixx = raw_inertia[0][0] * scale_factor
+            ixy = raw_inertia[0][1] * scale_factor
+            ixz = raw_inertia[0][2] * scale_factor
+            iyy = raw_inertia[1][1] * scale_factor
+            iyz = raw_inertia[1][2] * scale_factor
+            izz = raw_inertia[2][2] * scale_factor
+
+            # Format RGBA
+            rgba_str = f"{rgba[0]:.6f} {rgba[1]:.6f} {rgba[2]:.6f} {rgba[3]:.6f}"
+
+            links_info.append(
+                {
+                    "name": label,
+                    "parent": parent,
+                    "joint_type": joint_type,
+                    "joint_axis": joint_axis,
+                    "xyz": xyz,
+                    "rpy": rpy,
+                    "mass_kg": mass_kg,
+                    "com_x": com_m[0],
+                    "com_y": com_m[1],
+                    "com_z": com_m[2],
+                    "ixx": ixx,
+                    "ixy": ixy,
+                    "ixz": ixz,
+                    "iyy": iyy,
+                    "iyz": iyz,
+                    "izz": izz,
+                    "obj_filename": obj_file_name,
+                    "rgba_str": rgba_str,
+                }
+            )
+
+        if not links_info:
+            return
+
+        # Build combined URDF XML representation using templates
+        links_strings = []
+        for link in links_info:
+            link_str = self.link_template.format(
+                link_name=link["name"],
+                com_x=link["com_x"],
+                com_y=link["com_y"],
+                com_z=link["com_z"],
+                mass_kg=link["mass_kg"],
+                ixx=link["ixx"],
+                ixy=link["ixy"],
+                ixz=link["ixz"],
+                iyy=link["iyy"],
+                iyz=link["iyz"],
+                izz=link["izz"],
+                project_name=p_name,
+                obj_filename=link["obj_filename"],
+                rgba=link["rgba_str"],
+            )
+            links_strings.append(link_str)
+
+        joints_strings = []
+        for link in links_info:
+            if link["parent"] is not None:
+                axis_limit_str = ""
+                if link["joint_type"] in ("revolute", "prismatic"):
+                    axis_limit_str = self.axis_limit_template.format(joint_axis=link["joint_axis"]) + "\n  "
+
+                joint_str = self.joint_template.format(
+                    parent_name=link["parent"],
+                    child_name=link["name"],
+                    joint_type=link["joint_type"],
+                    xyz_x=link["xyz"][0],
+                    xyz_y=link["xyz"][1],
+                    xyz_z=link["xyz"][2],
+                    rpy_r=link["rpy"][0],
+                    rpy_p=link["rpy"][1],
+                    rpy_y=link["rpy"][2],
+                    axis_limit=axis_limit_str,
+                )
+                joints_strings.append(joint_str)
+
+        urdf_content = self.robot_template.format(
+            robot_name=p_name,
+            links="\n".join(links_strings),
+            joints="\n".join(joints_strings),
+        )
+
+        urdf_file_name = f"{target_name}.urdf"
+        urdf_path = target_dir / urdf_file_name
+
+        with open(urdf_path, "w") as f:
+            f.write(urdf_content)
+        self.logger.print(f"Saved {urdf_path}", symbol="📄")
+
+    def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
 
         def zip_build(zip_file_str):
@@ -388,8 +494,9 @@ class Builder:
         if not self.manager.router.providers:
             raise ValueError("No projects discovered. Nothing to build.")
 
-        self.generate_parts(out_dir=out_dir)
-        self.generate_diagram(out_dir=out_dir)
+        self.generate_parts(out_dir=out_dir, names=names)
+        self.generate_diagram(out_dir=out_dir, names=names)
+        self.generate_urdfs(out_dir=out_dir, names=names)
 
         # Compress the build
         zip_file_str = str(Path(out_dir) / zip_name)
@@ -430,11 +537,8 @@ def main(logger, args):
             logger.print(f"Saved environment to {args.env}", symbol="⚙️ ")
         else:
             builder._load_manifest(args.outdir)
-            if not args.targets:
-                builder.generate_all(out_dir=args.outdir)
-            else:
-                builder.generate_parts(out_dir=args.outdir, names=args.targets)
-                builder.generate_diagram(out_dir=args.outdir, names=args.targets)
+            targets = args.targets if args.targets else None
+            builder.generate_all(out_dir=args.outdir, names=targets)
             builder._save_manifest(args.outdir)
 
     finally:

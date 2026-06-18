@@ -1,0 +1,40 @@
+robot_template: |
+  <robot name="{robot_name}">
+  {links}
+  {joints}
+  </robot>
+
+link_template: |
+  <link name="{link_name}">
+    <inertial>
+      <origin xyz="{com_x:.6f} {com_y:.6f} {com_z:.6f}" rpy="0 0 0"/>
+      <mass value="{mass_kg:.6f}"/>
+      <inertia ixx="{ixx:.12f}" ixy="{ixy:.12f}" ixz="{ixz:.12f}" iyy="{iyy:.12f}" iyz="{iyz:.12f}" izz="{izz:.12f}"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://{project_name}/{obj_filename}" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="{link_name}_material">
+        <color rgba="{rgba}"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://{project_name}/{obj_filename}" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+  </link>
+
+joint_template: |
+  <joint name="{parent_name}_to_{child_name}" type="{joint_type}">
+    <parent link="{parent_name}"/>
+    <child link="{child_name}"/>
+    <origin xyz="{xyz_x:.6f} {xyz_y:.6f} {xyz_z:.6f}" rpy="{rpy_r:.6f} {rpy_p:.6f} {rpy_y:.6f}"/>
+  {axis_limit}  </joint>
+
+axis_limit_template: |
+  <axis xyz="{joint_axis}"/>
+    <limit effort="10.0" lower="-3.14159" upper="3.14159" velocity="1.0"/>

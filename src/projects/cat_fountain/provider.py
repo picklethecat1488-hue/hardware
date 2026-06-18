@@ -2,7 +2,7 @@
 
 from functools import cached_property
 from build123d import *  # type: ignore
-from model import method_cache, TextArgs
+from model import method_cache
 from pathlib import Path
 from provider import Provider, Section, Mode as ProviderMode, discover_provider, Room
 from projects_config.cat_fountain_config import CatFountainConfig
@@ -24,6 +24,12 @@ class CatFountainProvider(Provider):
         return cast(CatFountainConfig, super().settings)
 
     @property
+    def petg_density(self) -> float:
+        """Return the density of PETG material dynamically from manifest configuration."""
+        materials_cfg = self.manifest.get("material", {})
+        return float(materials_cfg.get("petg", {}).get("density", 1.27))
+
+    @property
     def part(self) -> dict[str, Callable[..., BuildPart]]:
         """A mapping of part names to their build handler methods."""
         return {
@@ -38,6 +44,13 @@ class CatFountainProvider(Provider):
     def diagram(self) -> dict[str, Callable[[Room, Sequence[str], ProviderMode], None]]:
         """A mapping of diagram names to their build handler methods."""
         return {name: self.build_diagram for name in self.targets.supporting(Section.DIAGRAM)}
+
+    @property
+    def view(self) -> dict[str, Callable[[Room], None]]:
+        """A mapping of room names to view functions."""
+        return {
+            "product": self.build_product,
+        }
 
     @method_cache
     def build_bowl(
@@ -74,6 +87,13 @@ class CatFountainProvider(Provider):
                     mode=Mode.SUBTRACT,
                 )
 
+        # Attach metadata for URDF/simulation export
+        bowl.part.urdf_label = "bowl"
+        bowl.part.urdf_material = "petg"
+        bowl.part.urdf_density = self.petg_density
+        bowl.part.urdf_parent = None
+        bowl.part.urdf_joint_type = None
+
         return bowl
 
     @method_cache
@@ -103,6 +123,14 @@ class CatFountainProvider(Provider):
                     with Locations((hub_r + blade_w / 2.0, 0, 0)):
                         Box(blade_w, blade_t, h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
+        # Attach metadata for URDF/simulation export
+        impeller.part.urdf_label = "impeller"
+        impeller.part.urdf_material = "petg"
+        impeller.part.urdf_density = self.petg_density
+        impeller.part.urdf_parent = "bowl"
+        impeller.part.urdf_joint_type = "revolute"
+        impeller.part.urdf_joint_axis = "0 0 1"
+
         return impeller
 
     @method_cache
@@ -119,6 +147,13 @@ class CatFountainProvider(Provider):
             Cylinder(radius=r, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
             # Hollow inner cylinder
             Cylinder(radius=r - t, height=h + 2.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+        # Attach metadata for URDF/simulation export
+        tube.part.urdf_label = "tube"
+        tube.part.urdf_material = "petg"
+        tube.part.urdf_density = self.petg_density
+        tube.part.urdf_parent = "bowl"
+        tube.part.urdf_joint_type = "fixed"
 
         return tube
 
@@ -147,6 +182,13 @@ class CatFountainProvider(Provider):
                 )
             # Hollow the main collar
             Cylinder(radius=r - t, height=16.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+        # Attach metadata for URDF/simulation export
+        spout.part.urdf_label = "spout"
+        spout.part.urdf_material = "petg"
+        spout.part.urdf_density = self.petg_density
+        spout.part.urdf_parent = "bowl"
+        spout.part.urdf_joint_type = "fixed"
 
         return spout
 
@@ -184,3 +226,28 @@ class CatFountainProvider(Provider):
         """Build an assembly diagram for the cat fountain."""
         fountain = self.build_fountain("fountain", mode=mode)
         room.add("fountain", fountain)
+
+    @method_cache
+    def build_product(self, room: Room) -> None:
+        """Place all parts of the cat fountain in the room for visualization/simulation."""
+        t = self.settings.bowl_thickness
+        tube_y = self.settings.bowl_radius - self.settings.tube_radius - 15.0
+
+        # 1. Add bowl at (0, 0, 0)
+        bowl = self.build_bowl("bowl")
+        room.add("bowl", bowl, color="grey")
+
+        # 2. Add impeller at (0, 0, t + 1.0)
+        impeller = self.build_impeller("impeller")
+        moved_impeller = Location((0, 0, t + 1.0)) * impeller.part
+        room.add("impeller", moved_impeller, color="red")
+
+        # 3. Add tube at (0, tube_y, t + 5.0)
+        tube = self.build_tube("tube")
+        moved_tube = Location((0, tube_y, t + 5.0)) * tube.part
+        room.add("tube", moved_tube, color="blue")
+
+        # 4. Add spout at the top of the tube
+        spout = self.build_spout("spout")
+        moved_spout = Location((0, tube_y, t + 5.0 + self.settings.tube_height - 10.0)) * spout.part
+        room.add("spout", moved_spout, color="cyan")

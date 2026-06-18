@@ -5,35 +5,39 @@ bowl:
   part:
     modes: [default, print]
   material: petg
-  export: [stl, obj, urdf]
+  export: [stl, obj]
   color: grey
 
 impeller:
   part:
     modes: [default, print]
   material: petg
-  export: [stl, obj, urdf]
+  export: [stl, obj]
   color: red
 
 tube:
   part:
     modes: [default, print]
   material: petg
-  export: [stl, obj, urdf]
+  export: [stl, obj]
   color: blue
 
 spout:
   part:
     modes: [default, print]
   material: petg
-  export: [stl, obj, urdf]
+  export: [stl, obj]
   color: cyan
 
 fountain:
   part:
     modes: [default, print]
   material: petg
-  export: [stl, obj, urdf]
+  export: [stl, obj]
   color: green
   diagram:
     modes: [default]
+
+product:
+  view:
+    modes: [default, simulate]
