@@ -20,6 +20,7 @@ from build123d import (
     RigidJoint,
     RevoluteJoint,
     LinearJoint,
+    BallJoint,
 )
 from build123d.exporters import ExportSVG, Drawing
 from model import DiagramOptions, TextArgs
@@ -431,29 +432,55 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                         child_joint = joint.connected_to
 
                         # Map joint types and attributes
-                        match child_joint:
-                            case RigidJoint():
-                                child_geom.urdf_joint_type = "fixed"
-                            case RevoluteJoint():
-                                child_geom.urdf_joint_type = "revolute"
-                                if getattr(child_joint, "relative_axis", None) is not None:
-                                    dir_vec = child_joint.relative_axis.direction
-                                    child_geom.urdf_joint_axis = (
-                                        f"{format_coord(dir_vec.X)} {format_coord(dir_vec.Y)} {format_coord(dir_vec.Z)}"
-                                    )
-                                if getattr(child_joint, "angular_range", None) is not None:
-                                    child_geom.urdf_joint_lower = math.radians(child_joint.angular_range[0])
-                                    child_geom.urdf_joint_upper = math.radians(child_joint.angular_range[1])
-                            case LinearJoint():
-                                child_geom.urdf_joint_type = "prismatic"
-                                if getattr(child_joint, "relative_axis", None) is not None:
-                                    dir_vec = child_joint.relative_axis.direction
-                                    child_geom.urdf_joint_axis = (
-                                        f"{format_coord(dir_vec.X)} {format_coord(dir_vec.Y)} {format_coord(dir_vec.Z)}"
-                                    )
-                                if getattr(child_joint, "linear_range", None) is not None:
-                                    child_geom.urdf_joint_lower = child_joint.linear_range[0] * 0.001
-                                    child_geom.urdf_joint_upper = child_joint.linear_range[1] * 0.001
+                        self._map_joint_properties(child_geom, child_joint, format_coord)
+
+    def _map_joint_properties(self, child_geom: URDFShape, child_joint: Any, format_coord: Any) -> None:
+        """Map build123d joint attributes or custom overrides to child geometry properties."""
+        if hasattr(child_joint, "urdf_joint_type"):
+            u_joint = cast(URDFShape, child_joint)
+            child_geom.urdf_joint_type = u_joint.urdf_joint_type
+            if hasattr(u_joint, "urdf_joint_axis"):
+                child_geom.urdf_joint_axis = u_joint.urdf_joint_axis
+            if hasattr(u_joint, "urdf_joint_lower"):
+                child_geom.urdf_joint_lower = u_joint.urdf_joint_lower
+            if hasattr(u_joint, "urdf_joint_upper"):
+                child_geom.urdf_joint_upper = u_joint.urdf_joint_upper
+        else:
+            match child_joint:
+                case RigidJoint():
+                    child_geom.urdf_joint_type = "fixed"
+                case RevoluteJoint():
+                    is_continuous = False
+                    if getattr(child_joint, "angular_range", None) is not None:
+                        lower, upper = child_joint.angular_range
+                        if abs(upper - lower) >= 360.0:
+                            is_continuous = True
+
+                    if is_continuous:
+                        child_geom.urdf_joint_type = "continuous"
+                    else:
+                        child_geom.urdf_joint_type = "revolute"
+                        if getattr(child_joint, "angular_range", None) is not None:
+                            child_geom.urdf_joint_lower = math.radians(child_joint.angular_range[0])
+                            child_geom.urdf_joint_upper = math.radians(child_joint.angular_range[1])
+
+                    if getattr(child_joint, "relative_axis", None) is not None:
+                        dir_vec = child_joint.relative_axis.direction
+                        child_geom.urdf_joint_axis = (
+                            f"{format_coord(dir_vec.X)} {format_coord(dir_vec.Y)} {format_coord(dir_vec.Z)}"
+                        )
+                case LinearJoint():
+                    child_geom.urdf_joint_type = "prismatic"
+                    if getattr(child_joint, "relative_axis", None) is not None:
+                        dir_vec = child_joint.relative_axis.direction
+                        child_geom.urdf_joint_axis = (
+                            f"{format_coord(dir_vec.X)} {format_coord(dir_vec.Y)} {format_coord(dir_vec.Z)}"
+                        )
+                    if getattr(child_joint, "linear_range", None) is not None:
+                        child_geom.urdf_joint_lower = child_joint.linear_range[0] * 0.001
+                        child_geom.urdf_joint_upper = child_joint.linear_range[1] * 0.001
+                case BallJoint():
+                    child_geom.urdf_joint_type = "spherical"
 
     def export_urdf(self, path: Union[str, Path, io.StringIO], project_name: str) -> None:
         """Export a combined URDF from a Room object."""

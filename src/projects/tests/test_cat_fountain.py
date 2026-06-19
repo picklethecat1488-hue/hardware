@@ -76,7 +76,7 @@ class TestCatFountainProvider:
         impeller_shape = room["impeller"][0]
         assert impeller_shape.urdf_label == "impeller"
         assert impeller_shape.urdf_parent == "bowl"
-        assert impeller_shape.urdf_joint_type == "revolute"
+        assert impeller_shape.urdf_joint_type == "continuous"
         assert impeller_shape.urdf_joint_axis == "0 0 1"
 
     def test_configuration_loading(self, provider):
