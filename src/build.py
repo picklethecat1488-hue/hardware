@@ -17,6 +17,7 @@ import zipfile
 from shell import Logger
 from concurrent.futures import ThreadPoolExecutor
 import threading
+from list import Lister
 
 
 class Builder:
@@ -28,6 +29,7 @@ class Builder:
         self.config = manager.config
         self.logger = logger or Logger(enabled=False)
         self.target_parser = TargetParser(manager.router)
+        self.lister = Lister(manager, self.logger)
         self.build_manifest: dict[str, dict[str, str]] = {"brep": {}, "file": {}}
         self.lock = threading.Lock()
         self.executor = ThreadPoolExecutor()
@@ -190,32 +192,32 @@ class Builder:
             res_list = results if isinstance(results, list) else [results]
             for geom in res_list:
                 if "/" in name:
-                    p_name, t_name = name.split("/", 1)
+                    p_name, _ = name.split("/", 1)
                 else:
-                    p_name, t_name = "default", name
+                    p_name, _ = "default", name
 
                 # Create provider-specific subdirectory
                 target_dir = Path(out_dir) / p_name
                 target_dir.mkdir(parents=True, exist_ok=True)
-                side_suffix = f"_{sub}" if sub else ""
 
                 # Resolve export types from manifest
                 export_types = self.manager.router.get_export_types(name, sub)
 
                 if geom.part:
                     current_hash = self._get_part_hash(geom.part)
+                    part_outputs = self.lister.get_part_outputs(name, sub)
 
                     for export_type in export_types:
                         if export_type == "obj":
-                            obj_file_name = f"{t_name}{side_suffix}.obj"
-                            obj_path = target_dir / obj_file_name
+                            obj_file_name = next(p for p in part_outputs if p.endswith(".obj"))
+                            obj_path = Path(out_dir) / obj_file_name
 
                             # Export OBJ in standard mm scale
                             futures.append(
                                 self.executor.submit(
                                     self._export_if_changed,
                                     obj_path,
-                                    f"{p_name}/{obj_file_name}",
+                                    obj_file_name,
                                     current_hash,
                                     lambda g=geom.part, p=obj_path: self._export_obj(g, str(p), scale=1.0),
                                     force_update,
@@ -223,14 +225,14 @@ class Builder:
                             )
 
                         elif export_type == "stl":
-                            mesh_file_name = f"{t_name}{side_suffix}.stl"
-                            path_obj = target_dir / mesh_file_name
+                            mesh_file_name = next(p for p in part_outputs if p.endswith(".stl"))
+                            path_obj = Path(out_dir) / mesh_file_name
                             path_str = str(path_obj)
                             futures.append(
                                 self.executor.submit(
                                     self._export_if_changed,
                                     path_obj,
-                                    f"{p_name}/{mesh_file_name}",
+                                    mesh_file_name,
                                     current_hash,
                                     lambda g=geom.part, ps=path_str: export_stl(g, ps),
                                     force_update,
@@ -258,7 +260,7 @@ class Builder:
 
         for base_targets in target_lists:
             self.logger.print(
-                f"Building {Section.PART}s: {self._get_summary(list(base_targets))}",
+                f"Compiling {Section.PART}s: {self._get_summary(list(base_targets))}",
                 symbol="🛠️ ",
             )
             has_base_targets: set[str] = set(base_targets)
@@ -293,18 +295,15 @@ class Builder:
         futures = []
         for base_targets in target_lists:
             self.logger.print(
-                f"Building {Section.DIAGRAM}s: {self._get_summary(list(base_targets))}",
+                f"Compiling {Section.DIAGRAM}s: {self._get_summary(list(base_targets))}",
                 symbol="🛠️ ",
             )
             results = self.manager.router.run(base_targets)
 
             for p_name, room in results or []:
-                # Create provider-specific subdirectory
-                target_dir = Path(out_dir) / p_name
-                target_dir.mkdir(parents=True, exist_ok=True)
-
-                diagram_name = f"{p_name}_diagram.svg"
-                path_obj = target_dir / diagram_name
+                diagram_file = self.lister.get_diagram_output(p_name)
+                path_obj = Path(out_dir) / diagram_file
+                path_obj.parent.mkdir(parents=True, exist_ok=True)
                 path_str = str(path_obj)
 
                 provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
@@ -315,7 +314,7 @@ class Builder:
                     self.executor.submit(
                         self._export_if_changed,
                         path_obj,
-                        f"{p_name}/{diagram_name}",
+                        diagram_file,
                         current_hash,
                         lambda r=room, ps=path_str, o=options: r.export_diagram(ps, o),
                         bool(names),
@@ -342,20 +341,25 @@ class Builder:
 
         futures = []
         for base_targets in target_lists:
+            self.logger.print(
+                f"Compiling URDFs: {self._get_summary(list(base_targets))}",
+                symbol="🤖",
+            )
+
             simulate_targets = base_targets.for_modes([Mode.SIMULATE])
             if not simulate_targets:
                 continue
 
             results = self.manager.router.run(simulate_targets)
             for fq_target, room in results or []:
-                parts = fq_target.split("/", 1)
-                proj_name = parts[0]
-                target_name = parts[1] if len(parts) > 1 else proj_name
-                target_dir = Path(out_dir) / proj_name
-                target_dir.mkdir(parents=True, exist_ok=True)
+                if "/" in fq_target:
+                    proj_name, _ = fq_target.split("/", 1)
+                else:
+                    proj_name = "default"
 
-                urdf_file_name = f"{target_name}.urdf"
-                urdf_path = target_dir / urdf_file_name
+                urdf_file = self.lister.get_urdf_output(fq_target)
+                urdf_path = Path(out_dir) / urdf_file
+                urdf_path.parent.mkdir(parents=True, exist_ok=True)
                 path_str = str(urdf_path)
 
                 # Validate OBJ links
@@ -364,15 +368,19 @@ class Builder:
                     if not label:
                         continue
                     local_shape = geom.location.inverse() * geom
-                    obj_file_name = f"{label}.obj"
-                    obj_path = target_dir / obj_file_name
+
+                    fq_label = f"{proj_name}/{label}" if "/" not in label else label
+                    part_outputs = self.lister.get_part_outputs(fq_label, None)
+                    obj_file_name = next(p for p in part_outputs if p.endswith(".obj"))
+                    obj_path = Path(out_dir) / obj_file_name
+
                     current_hash = self._get_part_hash(local_shape)
 
                     if not obj_path.exists():
                         raise ValueError(f"OBJ file for link '{label}' does not exist: {obj_path}. ")
                     with self.lock:
                         brep_manifest = self.build_manifest.setdefault("brep", {})
-                        manifest_hash = brep_manifest.get(f"{proj_name}/{obj_file_name}")
+                        manifest_hash = brep_manifest.get(obj_file_name)
                     if manifest_hash != current_hash:
                         raise ValueError(f"OBJ file for link '{label}' is out of date. ")
 
@@ -381,7 +389,7 @@ class Builder:
                     self.executor.submit(
                         self._export_if_changed,
                         urdf_path,
-                        f"{proj_name}/{urdf_file_name}",
+                        urdf_file,
                         current_hash,
                         lambda r=room, ps=path_str, pn=proj_name: r.export_urdf(ps, pn),
                         bool(names),
@@ -394,15 +402,36 @@ class Builder:
     def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
 
-        def zip_build(zip_file_str):
+        def zip_build(zip_file_str, outputs):
             """Write generated files into a zip archive."""
             with zipfile.ZipFile(zip_file_str, "w", zipfile.ZIP_DEFLATED) as zipf:
-                for root, _, files in os.walk(out_dir):
-                    for file in files:
-                        file_path = Path(root) / file
-                        if not os.path.samefile(zip_file_str, str(file_path)):
-                            # Preserve directory structure in zip
-                            zipf.write(str(file_path), str(file_path.relative_to(out_dir)))
+                for output in outputs:
+                    file_path = Path(out_dir) / output
+                    if file_path.exists():
+                        zipf.write(str(file_path), output)
+
+        def needs_zip(zip_path, outputs) -> bool:
+            """Check if the zip archive needs to be rebuilt."""
+            if not zip_path.exists():
+                return True
+
+            zip_mtime = zip_path.stat().st_mtime
+            for output in outputs:
+                file_path = Path(out_dir) / output
+                if file_path.exists() and file_path.stat().st_mtime > zip_mtime:
+                    return True
+
+            try:
+                with zipfile.ZipFile(zip_path, "r") as zipf:
+                    namelist = zipf.namelist()
+                    for output in outputs:
+                        file_path = Path(out_dir) / output
+                        if file_path.exists() and output not in namelist:
+                            return True
+            except Exception:
+                return True
+
+            return False
 
         # Export the diagram and files
         if not self.manager.router.providers:
@@ -413,9 +442,15 @@ class Builder:
         self.generate_urdfs(out_dir=out_dir, names=names)
 
         # Compress the build
-        zip_file_str = str(Path(out_dir) / zip_name)
-        zip_build(zip_file_str)
-        self.logger.print(f"Done writing {zip_file_str}", symbol="📦")
+        zip_path = Path(out_dir) / zip_name
+        zip_file_str = str(zip_path)
+        outputs = self.lister.get_outputs(names)
+
+        if needs_zip(zip_path, outputs):
+            zip_build(zip_file_str, outputs)
+            self.logger.print(f"Done writing {zip_file_str}", symbol="📦")
+        else:
+            self.logger.print(f"{zip_name} is already up-to-date", symbol="📦")
 
 
 def get_args():

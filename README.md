@@ -47,11 +47,26 @@ python src/config.py exhaust_manifolds/driver
 python src/config.py -m text
 ```
 
+### Listing Targets and Outputs
+
+Use the list utility to list available targets or predict the exact files that the build process will export:
+
+```bash
+# List all valid targets across all actions and modes
+python src/list.py targets
+
+# List all files the build will export without actually building them
+python src/list.py outputs
+
+# List build outputs for specific targets
+python src/list.py outputs 'exhaust_manifolds/*'
+```
+
 ### Geometry Visualization
 Use the viewer to inspect geometry in VS Code using the `ocp_vscode` extension.
 
 ```bash
-# List all available targets and their supported actions:
+# List all available targets and their supported visual actions:
 python src/view.py --list
 
 # View the driver manifold part

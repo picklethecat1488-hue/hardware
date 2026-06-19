@@ -90,6 +90,16 @@ class TestSmoke:
         self.run_command(["src/view.py", "exhaust_manifolds/wire"], extra_env=env)
         self.run_command(["src/view.py", "exhaust_manifolds/*:part/print"], extra_env=env)
 
+    def test_list_commands(self):
+        """Verify list.py commands execute correctly."""
+        # Check target listing
+        self.run_command(["src/list.py", "targets"])
+        self.run_command(["src/list.py", "targets", "exhaust_manifolds/*"])
+
+        # Check outputs listing
+        self.run_command(["src/list.py", "outputs"])
+        self.run_command(["src/list.py", "outputs", "exhaust_manifolds/*"])
+
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-s", "-v"]))
