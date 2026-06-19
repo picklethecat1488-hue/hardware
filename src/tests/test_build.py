@@ -5,11 +5,14 @@ import hashlib
 import io
 import yaml
 from build import Builder, main, get_args
+import math
 from pathlib import Path
-from build123d import BuildPart, Box
+from build123d import BuildPart, Box, RigidJoint, RevoluteJoint, Axis, Location
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 from provider import Section, Mode, TargetList, Room, SUBASSEMBLIES
+from typing import cast
+from provider.types import URDFShape
 
 
 class TestBuildMain:
@@ -244,11 +247,12 @@ class TestBuilderLogic:
 
         # Add a part with metadata attributes
         geom = Box(10, 20, 30)
-        geom.urdf_label = "base"
-        geom.urdf_material = "petg"
-        geom.urdf_density = 1.27
-        geom.urdf_parent = None
-        geom.urdf_joint_type = None
+        u_geom = cast(URDFShape, geom)
+        u_geom.urdf_label = "base"
+        u_geom.urdf_material = "petg"
+        u_geom.urdf_density = 1.27
+        u_geom.urdf_parent = None
+        u_geom.urdf_joint_type = None
 
         room.add("base", geom)
 
@@ -262,6 +266,52 @@ class TestBuilderLogic:
         assert '<link name="base">' in content
         assert '<mass value="' in content
         assert "<inertia " in content
+
+    def test_joint_mapping_translation_layer(self, tmp_path):
+        """Verify that translate_joints correctly maps build123d joints to URDF attributes and outputs correct URDF."""
+        room = Room()
+
+        # Create parent shape
+        parent = Box(10, 10, 10)
+        u_parent = cast(URDFShape, parent)
+        u_parent.urdf_label = "parent_link"
+        room.add("parent_link", parent)
+
+        # Create child shape
+        child = Box(5, 5, 5)
+        u_child = cast(URDFShape, child)
+        u_child.urdf_label = "child_link"
+        room.add("child_link", child)
+
+        # Define joints and connect them
+        pj = RigidJoint("joint_p", parent, Location((0, 0, 5)))
+        cj = RevoluteJoint("joint_c", child, Axis((0, 0, 0), (0, 1, 0)), angular_range=(0, 180))
+        pj.connect_to(cj)
+
+        # Before translation, child has no joint metadata
+        assert getattr(u_child, "urdf_parent", None) is None
+
+        # Run translation
+        room.translate_joints()
+
+        # After translation, joint metadata should be populated
+        assert u_child.urdf_parent == "parent_link"
+        assert u_child.urdf_joint_type == "revolute"
+        assert u_child.urdf_joint_axis == "0 1 0"
+        assert math.isclose(u_child.urdf_joint_lower, 0.0)
+        assert math.isclose(u_child.urdf_joint_upper, math.radians(180))
+
+        # Verify URDF output
+        urdf_file = tmp_path / "robot.urdf"
+        room.export_urdf(urdf_file, "joint_test")
+
+        assert urdf_file.exists()
+        content = urdf_file.read_text()
+        assert '<joint name="parent_link_to_child_link" type="revolute">' in content
+        assert '<parent link="parent_link"/>' in content
+        assert '<child link="child_link"/>' in content
+        assert '<axis xyz="0 1 0"/>' in content
+        assert 'lower="0.000000" upper="3.141593"' in content
 
     def test_generate_all_zip_skip_logic(self, builder, tmp_path):
         """Verify build.zip creation and skipping logic."""

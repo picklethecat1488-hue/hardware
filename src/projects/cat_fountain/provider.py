@@ -5,6 +5,7 @@ from build123d import *  # type: ignore
 from model import method_cache
 from pathlib import Path
 from provider import Provider, Section, Mode as ProviderMode, discover_provider, Room
+from provider.types import URDFShape
 from projects_config.cat_fountain_config import CatFountainConfig
 from typing import cast, Callable, Sequence
 
@@ -88,11 +89,15 @@ class CatFountainProvider(Provider):
                 )
 
         # Attach metadata for URDF/simulation export
-        bowl.part.urdf_label = "bowl"
-        bowl.part.urdf_material = "petg"
-        bowl.part.urdf_density = self.petg_density
-        bowl.part.urdf_parent = None
-        bowl.part.urdf_joint_type = None
+        bowl_part = cast(URDFShape, bowl.part)
+        bowl_part.urdf_label = "bowl"
+        bowl_part.urdf_material = "petg"
+        bowl_part.urdf_density = self.petg_density
+        bowl_part.urdf_parent = None
+        bowl_part.urdf_joint_type = None
+
+        # Define RigidJoint for the central shaft
+        RigidJoint("shaft", bowl.part, Location((0, 0, t + 1.0)))
 
         return bowl
 
@@ -124,12 +129,13 @@ class CatFountainProvider(Provider):
                         Box(blade_w, blade_t, h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
         # Attach metadata for URDF/simulation export
-        impeller.part.urdf_label = "impeller"
-        impeller.part.urdf_material = "petg"
-        impeller.part.urdf_density = self.petg_density
-        impeller.part.urdf_parent = "bowl"
-        impeller.part.urdf_joint_type = "revolute"
-        impeller.part.urdf_joint_axis = "0 0 1"
+        impeller_part = cast(URDFShape, impeller.part)
+        impeller_part.urdf_label = "impeller"
+        impeller_part.urdf_material = "petg"
+        impeller_part.urdf_density = self.petg_density
+
+        # Define RevoluteJoint for the impeller motor connection
+        RevoluteJoint(label="motor", to_part=impeller.part, axis=Axis((0, 0, 0), (0, 0, 1)), angular_range=(0, 360))
 
         return impeller
 
@@ -149,11 +155,12 @@ class CatFountainProvider(Provider):
             Cylinder(radius=r - t, height=h + 2.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
         # Attach metadata for URDF/simulation export
-        tube.part.urdf_label = "tube"
-        tube.part.urdf_material = "petg"
-        tube.part.urdf_density = self.petg_density
-        tube.part.urdf_parent = "bowl"
-        tube.part.urdf_joint_type = "fixed"
+        tube_part = cast(URDFShape, tube.part)
+        tube_part.urdf_label = "tube"
+        tube_part.urdf_material = "petg"
+        tube_part.urdf_density = self.petg_density
+        tube_part.urdf_parent = "bowl"
+        tube_part.urdf_joint_type = "fixed"
 
         return tube
 
@@ -184,11 +191,12 @@ class CatFountainProvider(Provider):
             Cylinder(radius=r - t, height=16.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
         # Attach metadata for URDF/simulation export
-        spout.part.urdf_label = "spout"
-        spout.part.urdf_material = "petg"
-        spout.part.urdf_density = self.petg_density
-        spout.part.urdf_parent = "bowl"
-        spout.part.urdf_joint_type = "fixed"
+        spout_part = cast(URDFShape, spout.part)
+        spout_part.urdf_label = "spout"
+        spout_part.urdf_material = "petg"
+        spout_part.urdf_density = self.petg_density
+        spout_part.urdf_parent = "bowl"
+        spout_part.urdf_joint_type = "fixed"
 
         return spout
 
@@ -205,8 +213,8 @@ class CatFountainProvider(Provider):
             # 2. Add impeller
             t = self.settings.bowl_thickness
             impeller = self.build_impeller("impeller", mode=mode)
-            with Locations((0, 0, t + 1.0)):
-                add(impeller.part)
+            bowl.part.joints["shaft"].connect_to(impeller.part.joints["motor"])
+            add(impeller.part)
 
             # 3. Add tube
             tube_y = self.settings.bowl_radius - self.settings.tube_radius - 15.0
@@ -237,10 +245,10 @@ class CatFountainProvider(Provider):
         bowl = self.build_bowl("bowl")
         room.add("bowl", bowl, color="grey")
 
-        # 2. Add impeller at (0, 0, t + 1.0)
+        # 2. Add impeller connected via joint to the bowl
         impeller = self.build_impeller("impeller")
-        moved_impeller = Location((0, 0, t + 1.0)) * impeller.part
-        room.add("impeller", moved_impeller, color="red")
+        bowl.part.joints["shaft"].connect_to(impeller.part.joints["motor"])
+        room.add("impeller", impeller, color="red")
 
         # 3. Add tube at (0, tube_y, t + 5.0)
         tube = self.build_tube("tube")

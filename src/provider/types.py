@@ -1,6 +1,24 @@
 """Common types and enums for build providers."""
 
 from enum import StrEnum
+from typing import Protocol, Optional, Any
+
+
+class URDFShape(Protocol):
+    """Protocol for build123d shapes with attached URDF properties."""
+
+    urdf_label: Optional[str]
+    urdf_parent: Optional[str]
+    urdf_joint_type: Optional[str]
+    urdf_joint_axis: Optional[str]
+    urdf_joint_lower: Optional[float]
+    urdf_joint_upper: Optional[float]
+    urdf_material: Optional[str]
+    urdf_density: Optional[float]
+
+    def __getattr__(self, name: str) -> Any:
+        """Get an attribute from the object."""
+        ...
 
 
 MODES = "modes"

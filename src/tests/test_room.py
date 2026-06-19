@@ -1,11 +1,17 @@
 """Unit tests for the Room container."""
 
+import os
+import shutil
+import tempfile
 from unittest.mock import MagicMock, patch
+import math
+from typing import cast, Any
+import pybullet as p
 import pytest
-from build123d import Compound, Box, Vector
+from build123d import Compound, Box, Vector, RigidJoint, RevoluteJoint, Axis, Location, LinearJoint, BallJoint
 from model import AppConfig, TextArgs, DiagramOptions
 from provider.room import Room
-from provider.types import ColorType
+from provider.types import ColorType, URDFShape
 
 
 def test_room_add_success():
@@ -160,3 +166,211 @@ def test_room_get_projection_vectors_overrides():
     look_from, look_at, _ = room._get_projection_vectors(opts)
     assert look_from == Vector(10, 10, 10)
     assert look_at == Vector(1, 1, 1)
+
+
+def test_room_translate_joints():
+    """Verify that translate_joints correctly maps build123d joints to URDF attributes on shapes."""
+    room = Room()
+
+    parent = Box(10, 10, 10)
+    parent_shape = cast(URDFShape, parent)
+    parent_shape.urdf_label = "parent_link"
+    room.add("parent_link", parent)
+
+    child = Box(5, 5, 5)
+    child_shape = cast(URDFShape, child)
+    child_shape.urdf_label = "child_link"
+    room.add("child_link", child)
+
+    pj = RigidJoint("joint_p", parent, Location((0, 0, 5)))
+    cj = RevoluteJoint("joint_c", child, Axis((0, 0, 0), (0, 1, 0)), angular_range=(0, 180))
+    pj.connect_to(cj)
+
+    assert getattr(child, "urdf_parent", None) is None
+
+    room.translate_joints()
+
+    assert child_shape.urdf_parent == "parent_link"
+    assert child_shape.urdf_joint_type == "revolute"
+    assert child_shape.urdf_joint_axis == "0 1 0"
+    assert child_shape.urdf_joint_lower is not None
+    assert math.isclose(child_shape.urdf_joint_lower, 0.0)
+    assert child_shape.urdf_joint_upper is not None
+    assert math.isclose(child_shape.urdf_joint_upper, math.radians(180))
+
+
+def test_room_disconnect_joints():
+    """Verify that disconnect_joints clears all URDF joint connection properties on shapes."""
+    room = Room()
+
+    child = Box(5, 5, 5)
+    child_shape = cast(URDFShape, child)
+    child_shape.urdf_parent = "parent_link"
+    child_shape.urdf_joint_type = "revolute"
+    child_shape.urdf_joint_axis = "0 1 0"
+    child_shape.urdf_joint_lower = 0.0
+    child_shape.urdf_joint_upper = 3.14
+    room.add("child", child)
+
+    assert child_shape.urdf_parent == "parent_link"
+
+    room.disconnect_joints()
+
+    assert child_shape.urdf_parent is None
+    assert child_shape.urdf_joint_type is None
+    assert child_shape.urdf_joint_axis is None
+    assert child_shape.urdf_joint_lower is None
+    assert child_shape.urdf_joint_upper is None
+
+
+def test_room_urdf_pybullet_integration():
+    """Verify that PyBullet can successfully load the exported URDF and parses all joint types correctly."""
+    room = Room()
+
+    # Create parent link
+    parent = Box(10, 10, 10)
+    p_shape = cast(URDFShape, parent)
+    p_shape.urdf_label = "parent_link"
+    room.add("parent_link", parent)
+
+    temp_dir = tempfile.mkdtemp()
+    proj_dir = os.path.join(temp_dir, "test_robot")
+    os.makedirs(proj_dir, exist_ok=True)
+
+    try:
+        # Mock .obj files
+        with open(os.path.join(proj_dir, "parent_link.obj"), "w") as f:
+            f.write("# empty obj\n")
+
+        # 1. Fixed (RigidJoint)
+        child_fixed = Box(2, 2, 2)
+        room.add("child_fixed", child_fixed)
+        with open(os.path.join(proj_dir, "child_fixed.obj"), "w") as f:
+            f.write("# empty obj\n")
+        pj_fixed = RigidJoint("j_p_fixed", parent, Location((15, 0, 0)))
+        cj_fixed = RigidJoint("j_c_fixed", child_fixed, Location((0, 0, 0)))
+        pj_fixed.connect_to(cj_fixed)
+
+        # 2. Revolute
+        child_rev = Box(2, 2, 2)
+        room.add("child_rev", child_rev)
+        with open(os.path.join(proj_dir, "child_rev.obj"), "w") as f:
+            f.write("# empty obj\n")
+        pj_rev = RigidJoint("j_p_rev", parent, Location((30, 0, 0)))
+        cj_rev = RevoluteJoint("j_c_rev", child_rev, Axis((0, 0, 0), (0, 1, 0)), angular_range=(0, 180))
+        pj_rev.connect_to(cj_rev)
+
+        # 3. Continuous (RevoluteJoint with >= 360 angular range)
+        child_cont = Box(2, 2, 2)
+        room.add("child_cont", child_cont)
+        with open(os.path.join(proj_dir, "child_cont.obj"), "w") as f:
+            f.write("# empty obj\n")
+        pj_cont = RigidJoint("j_p_cont", parent, Location((45, 0, 0)))
+        cj_cont = RevoluteJoint("j_c_cont", child_cont, Axis((0, 0, 0), (0, 1, 0)), angular_range=(0, 360))
+        pj_cont.connect_to(cj_cont)
+
+        # 4. Prismatic (LinearJoint)
+        child_prism = Box(2, 2, 2)
+        room.add("child_prism", child_prism)
+        with open(os.path.join(proj_dir, "child_prism.obj"), "w") as f:
+            f.write("# empty obj\n")
+        pj_prism = RigidJoint("j_p_prism", parent, Location((60, 0, 0)))
+        cj_prism = LinearJoint("j_c_prism", child_prism, Axis((0, 0, 0), (0, 0, 1)), linear_range=(0, 100))
+        pj_prism.connect_to(cj_prism)
+
+        # 5. Ball/Spherical (BallJoint)
+        child_ball = Box(2, 2, 2)
+        room.add("child_ball", child_ball)
+        with open(os.path.join(proj_dir, "child_ball.obj"), "w") as f:
+            f.write("# empty obj\n")
+        pj_ball = RigidJoint("j_p_ball", parent, Location((75, 0, 0)))
+        cj_ball = BallJoint("j_c_ball", child_ball, Location((0, 0, 0)))
+        pj_ball.connect_to(cj_ball)
+
+        # 6. Planar (using RigidJoint + urdf_joint_type override)
+        child_planar = Box(2, 2, 2)
+        room.add("child_planar", child_planar)
+        with open(os.path.join(proj_dir, "child_planar.obj"), "w") as f:
+            f.write("# empty obj\n")
+        pj_planar = RigidJoint("j_p_planar", parent, Location((90, 0, 0)))
+        cj_planar = RigidJoint("j_c_planar", child_planar, Location((0, 0, 0)))
+        cast(Any, cj_planar).urdf_joint_type = "planar"
+        cast(Any, cj_planar).urdf_joint_axis = "0 1 1"
+        pj_planar.connect_to(cj_planar)
+
+        # 7. Floating (using RigidJoint + urdf_joint_type override)
+        child_float = Box(2, 2, 2)
+        room.add("child_float", child_float)
+        with open(os.path.join(proj_dir, "child_float.obj"), "w") as f:
+            f.write("# empty obj\n")
+        pj_float = RigidJoint("j_p_float", parent, Location((105, 0, 0)))
+        cj_float = RigidJoint("j_c_float", child_float, Location((0, 0, 0)))
+        cast(Any, cj_float).urdf_joint_type = "floating"
+        pj_float.connect_to(cj_float)
+
+        urdf_path = os.path.join(temp_dir, "test.urdf")
+        room.export_urdf(urdf_path, "test_robot")
+
+        # Load in PyBullet
+        physics_client = p.connect(p.DIRECT)
+        try:
+            body_id = p.loadURDF(urdf_path)
+            assert body_id >= 0, "PyBullet failed to load the URDF file"
+
+            num_joints = p.getNumJoints(body_id)
+            assert num_joints == 7, f"Expected 7 joints, found {num_joints}"
+
+            # Verify each joint type
+            joints_info = {}
+            for i in range(num_joints):
+                info = p.getJointInfo(body_id, i)
+                name = info[1].decode("utf-8")
+                j_type = info[2]
+                lower = info[8]
+                upper = info[9]
+                axis = info[13]
+                joints_info[name] = {"type": j_type, "lower": lower, "upper": upper, "axis": axis}
+
+            # 1. Fixed
+            fixed_info = joints_info["parent_link_to_child_fixed"]
+            assert fixed_info["type"] == p.JOINT_FIXED
+
+            # 2. Revolute
+            rev_info = joints_info["parent_link_to_child_rev"]
+            assert rev_info["type"] == p.JOINT_REVOLUTE
+            assert math.isclose(rev_info["lower"], 0.0, abs_tol=1e-5)
+            assert math.isclose(rev_info["upper"], math.radians(180), abs_tol=1e-5)
+            assert rev_info["axis"] == (0.0, 1.0, 0.0)
+
+            # 3. Continuous
+            cont_info = joints_info["parent_link_to_child_cont"]
+            assert cont_info["type"] == p.JOINT_REVOLUTE
+            # Continuous joints do not have upper/lower limits in PyBullet
+            assert cont_info["lower"] == 0.0
+            assert cont_info["upper"] == -1.0
+            assert cont_info["axis"] == (0.0, 1.0, 0.0)
+
+            # 4. Prismatic
+            prism_info = joints_info["parent_link_to_child_prism"]
+            assert prism_info["type"] == p.JOINT_PRISMATIC
+            assert math.isclose(prism_info["lower"], 0.0, abs_tol=1e-5)
+            assert math.isclose(prism_info["upper"], 0.1, abs_tol=1e-5)  # 100mm = 0.1m
+            assert prism_info["axis"] == (0.0, 0.0, 1.0)
+
+            # 5. Ball/Spherical
+            ball_info = joints_info["parent_link_to_child_ball"]
+            assert ball_info["type"] == p.JOINT_SPHERICAL
+
+            # 6. Planar
+            planar_info = joints_info["parent_link_to_child_planar"]
+            assert planar_info["type"] == p.JOINT_PLANAR
+
+            # 7. Floating (loaded as fixed by PyBullet internally but parsed without error)
+            float_info = joints_info["parent_link_to_child_float"]
+            assert float_info["type"] == p.JOINT_FIXED
+
+        finally:
+            p.disconnect(physicsClientId=physics_client)
+
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
