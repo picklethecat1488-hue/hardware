@@ -4,10 +4,11 @@ from functools import cached_property
 from build123d import *  # type: ignore
 from model import method_cache
 from pathlib import Path
-from provider import Provider, Section, Mode as ProviderMode, discover_provider, Room
+import pybullet as p
+from provider import Provider, Section, Mode as ProviderMode, discover_provider, Room, Simulate
 from provider.types import URDFShape
 from projects_config.cat_fountain_config import CatFountainConfig
-from typing import cast, Callable, Sequence
+from typing import cast, Callable, Sequence, Any
 
 
 @discover_provider
@@ -259,3 +260,45 @@ class CatFountainProvider(Provider):
         spout = self.build_spout("spout")
         moved_spout = Location((0, tube_y, t + 5.0 + self.settings.tube_height - 10.0)) * spout.part
         room.add("spout", moved_spout, color="cyan")
+
+    @property
+    def simulate(self) -> dict[Simulate, Callable[..., Any]]:
+        """A mapping of simulation hook names to handler methods for the cat fountain."""
+        return {
+            Simulate.SETUP: self.setup_simulation,
+            Simulate.STEP: self.step_simulation,
+            Simulate.TEARDOWN: self.teardown_simulation,
+        }
+
+    def get_impeller_idx(self, body_id: int, physics_client: int) -> int | None:
+        """Get the motor index of the impeller."""
+        num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
+        motor_idx = None
+        for i in range(num_joints):
+            info = p.getJointInfo(body_id, i, physicsClientId=physics_client)
+            joint_name = info[1].decode("utf-8")
+            if "impeller" in joint_name or "motor" in joint_name:
+                return motor_idx
+        return None
+
+    def setup_simulation(self, body_id: int, physics_client: int) -> None:
+        """Configure velocity motor control for the impeller."""
+        motor_idx = self.get_impeller_idx(body_id, physics_client)
+
+        if motor_idx is not None:
+            p.setJointMotorControl2(
+                bodyUniqueId=body_id,
+                jointIndex=motor_idx,
+                controlMode=p.VELOCITY_CONTROL,
+                targetVelocity=10.0,
+                force=5.0,
+                physicsClientId=physics_client,
+            )
+
+    def step_simulation(self, body_id: int, physics_client: int, step_index: int) -> float:
+        """Step hook for simulation tracking. Returns wait time in seconds."""
+        return 1.0 / 60.0
+
+    def teardown_simulation(self, body_id: int, physics_client: int) -> None:
+        """Teardown simulation hook."""
+        pass
