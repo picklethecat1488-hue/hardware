@@ -371,3 +371,136 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         p1 = tip - (direction * length) + (perp * width)
         p2 = tip - (direction * length) - (perp * width)
         return [Edge.make_line(tip, p1), Edge.make_line(tip, p2)]
+
+    def export_urdf(self, path: Union[str, Path, io.StringIO], project_name: str) -> None:
+        """Export a combined URDF from a Room object."""
+        import yaml
+        from build123d import CenterOf
+
+        template_path = Path(__file__).parent.parent / "urdf_template.yaml"
+        with open(template_path, "r") as f:
+            templates = yaml.safe_load(f)
+        robot_template = templates["robot_template"].strip()
+        link_template = templates["link_template"].strip()
+        joint_template = templates["joint_template"].strip()
+        axis_limit_template = templates["axis_limit_template"].strip()
+
+        links_info = []
+        for geom, rgba in self.values():
+            label = getattr(geom, "urdf_label", None)
+            if not label:
+                continue
+
+            parent = getattr(geom, "urdf_parent", None)
+            joint_type = getattr(geom, "urdf_joint_type", "fixed")
+            joint_axis = getattr(geom, "urdf_joint_axis", "0 0 1")
+            density = getattr(geom, "urdf_density", 1.0)
+
+            # Extract location
+            pos = geom.location.position
+            xyz = [pos.X * 0.001, pos.Y * 0.001, pos.Z * 0.001]
+            rpy = [0.0, 0.0, 0.0]
+
+            # Invert the translation to get the local shape centered at local origin
+            local_shape = geom.location.inverse() * geom
+
+            # Mass and inertia calculations using local shape and density
+            density_g_mm3 = density * 1e-3
+            volume_mm3 = local_shape.volume
+            mass_kg = volume_mm3 * density_g_mm3 * 1e-3
+
+            com = local_shape.center(CenterOf.MASS)
+            com_m = [com.X * 0.001, com.Y * 0.001, com.Z * 0.001]
+
+            raw_inertia = local_shape.matrix_of_inertia
+            scale_factor = density * 1e-12
+
+            ixx = raw_inertia[0][0] * scale_factor
+            ixy = raw_inertia[0][1] * scale_factor
+            ixz = raw_inertia[0][2] * scale_factor
+            iyy = raw_inertia[1][1] * scale_factor
+            iyz = raw_inertia[1][2] * scale_factor
+            izz = raw_inertia[2][2] * scale_factor
+
+            rgba_str = f"{rgba[0]:.6f} {rgba[1]:.6f} {rgba[2]:.6f} {rgba[3]:.6f}"
+
+            links_info.append(
+                {
+                    "name": label,
+                    "parent": parent,
+                    "joint_type": joint_type,
+                    "joint_axis": joint_axis,
+                    "xyz": xyz,
+                    "rpy": rpy,
+                    "mass_kg": mass_kg,
+                    "com_x": com_m[0],
+                    "com_y": com_m[1],
+                    "com_z": com_m[2],
+                    "ixx": ixx,
+                    "ixy": ixy,
+                    "ixz": ixz,
+                    "iyy": iyy,
+                    "iyz": iyz,
+                    "izz": izz,
+                    "obj_filename": f"{label}.obj",
+                    "rgba_str": rgba_str,
+                }
+            )
+
+        if not links_info:
+            return
+
+        links_strings = []
+        for link in links_info:
+            links_strings.append(
+                link_template.format(
+                    link_name=link["name"],
+                    com_x=link["com_x"],
+                    com_y=link["com_y"],
+                    com_z=link["com_z"],
+                    mass_kg=link["mass_kg"],
+                    ixx=link["ixx"],
+                    ixy=link["ixy"],
+                    ixz=link["ixz"],
+                    iyy=link["iyy"],
+                    iyz=link["iyz"],
+                    izz=link["izz"],
+                    project_name=project_name,
+                    obj_filename=link["obj_filename"],
+                    rgba=link["rgba_str"],
+                )
+            )
+
+        joints_strings = []
+        for link in links_info:
+            if link["parent"] is not None:
+                axis_limit_str = ""
+                if link["joint_type"] in ("revolute", "prismatic"):
+                    axis_limit_str = axis_limit_template.format(joint_axis=link["joint_axis"]) + "\n  "
+
+                joints_strings.append(
+                    joint_template.format(
+                        parent_name=link["parent"],
+                        child_name=link["name"],
+                        joint_type=link["joint_type"],
+                        xyz_x=link["xyz"][0],
+                        xyz_y=link["xyz"][1],
+                        xyz_z=link["xyz"][2],
+                        rpy_r=link["rpy"][0],
+                        rpy_p=link["rpy"][1],
+                        rpy_y=link["rpy"][2],
+                        axis_limit=axis_limit_str,
+                    )
+                )
+
+        urdf_content = robot_template.format(
+            robot_name=project_name,
+            links="\n".join(links_strings),
+            joints="\n".join(joints_strings),
+        )
+
+        if isinstance(path, (str, Path)):
+            with open(path, "w") as f:
+                f.write(urdf_content)
+        else:
+            path.write(urdf_content)
