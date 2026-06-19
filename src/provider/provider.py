@@ -8,10 +8,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pydantic import validate_call, BaseModel
 from model.app_config import AppConfig
 import re
-from .types import Mode, Section, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT
+from .types import Mode, Section, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT, Simulate
 from .target_list import TargetList
 from .orchestrator import Orchestrator
-from .utils import load_manifest
+from .utils import load_manifest, get_rgba_color
 from .room import Room
 
 if TYPE_CHECKING:
@@ -247,6 +247,11 @@ class Provider:
         return {}
 
     @property
+    def simulate(self) -> dict[Simulate, Callable[..., Any]]:
+        """A mapping of simulation hook names to lists of registered hook handler methods."""
+        return {}
+
+    @property
     def targets(self) -> TargetList:
         """List of supported build targets derived from the manifest keys."""
         return TargetList(self, self.manifest.keys())
@@ -269,8 +274,6 @@ class Provider:
 
         if isinstance(color, (tuple, list)):
             return tuple(color)  # type: ignore
-
-        from .utils import get_rgba_color
 
         return get_rgba_color(color, 1.0, self.app_config.color[:3])
 
