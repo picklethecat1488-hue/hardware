@@ -14,6 +14,7 @@ from provider import ProviderManager, Section, TargetList, Room
 from pydantic import validate_call
 from shell import Logger
 from ocp_vscode import set_port, Collapse, Camera, show as ocp_show  # type: ignore
+from list import Lister
 
 
 def show(*args, **kwargs):
@@ -117,18 +118,6 @@ class Viewer:
         self.logger.print(f"Showing {summary}", symbol="👁️ ")
         show(room.compound, names=["View"], collapse=Collapse.ALL, reset_camera=Camera.RESET)
 
-    def list_targets(self):
-        """List all available targets and their supported actions."""
-        target_names = self.target_parser.get_names(self.VISUAL_ACTIONS)
-        self.logger.print(f"Found {len(target_names)} targets:", symbol="📋")
-
-        if target_names:
-            # Use manual control to avoid Halo spinner overhead during long lists
-            self.logger.started = False
-            for arg in target_names:
-                self.logger.print(arg, restart=False)
-            self.logger.started = True
-
 
 def get_args():
     """Get parsed arguments for the viewer."""
@@ -136,7 +125,7 @@ def get_args():
     parser.add_argument(
         "targets", nargs="*", help="The targets to visualize (e.g. tube/driver, tube/wire, tube/driver_left)."
     )
-    parser.add_argument("-l", "--list", action="store_true", help="List available targets")
+    parser.add_argument("-l", "--list", action="store_true", help="List available visual targets")
     args = parser.parse_args()
 
     if not args.list and not args.targets:
@@ -162,7 +151,7 @@ def main():
     try:
         if args.list:
             logger.text = "Listing targets..."
-            viewer.list_targets()
+            Lister(manager, logger).list_targets(Viewer.VISUAL_ACTIONS)
         else:
             viewer.show_view(cast(Sequence[str], args.targets))
     finally:

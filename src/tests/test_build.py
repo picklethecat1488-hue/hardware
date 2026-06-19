@@ -262,3 +262,83 @@ class TestBuilderLogic:
         assert '<link name="base">' in content
         assert '<mass value="' in content
         assert "<inertia " in content
+
+    def test_generate_all_zip_skip_logic(self, builder, tmp_path):
+        """Verify build.zip creation and skipping logic."""
+        import zipfile
+        import time
+
+        builder.generate_parts = MagicMock()
+        builder.generate_diagram = MagicMock()
+        builder.generate_urdfs = MagicMock()
+        builder.manager.router.providers = [MagicMock()]
+
+        # Setup expected outputs
+        outputs = ["default/part1.stl", "default/part2.obj"]
+        builder.lister.get_outputs = MagicMock(return_value=outputs)
+
+        # Create output directory structure
+        out_dir = tmp_path / "build"
+        for out in outputs:
+            path = out_dir / out
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("dummy")
+
+        zip_name = "build.zip"
+        zip_path = out_dir / zip_name
+
+        # Case 1: Zip file does not exist -> Should create it
+        with patch("zipfile.ZipFile", wraps=zipfile.ZipFile) as mock_zip:
+            builder.generate_all(out_dir=str(out_dir), zip_name=zip_name)
+            assert zip_path.exists()
+            mock_zip.assert_called_with(str(zip_path), "w", zipfile.ZIP_DEFLATED)
+
+        # Case 2: Zip exists and is newer than files -> Should skip creation
+        time.sleep(0.01)
+        for out in outputs:
+            (out_dir / out).touch()
+        time.sleep(0.01)
+        zip_path.touch()
+
+        with patch("zipfile.ZipFile", wraps=zipfile.ZipFile) as mock_zip:
+            builder.logger.reset_mock()
+            builder.generate_all(out_dir=str(out_dir), zip_name=zip_name)
+            # Should have skipped writing, meaning ZipFile was opened only for reading
+            # but not for writing ('w').
+            for call in mock_zip.call_args_list:
+                assert call[0][1] != "w"
+            builder.logger.print.assert_any_call("build.zip is already up-to-date", symbol="📦")
+
+        # Case 3: One file is newer than zip -> Should recreate
+        time.sleep(0.01)
+        (out_dir / "default/part1.stl").touch()
+
+        with patch("zipfile.ZipFile", wraps=zipfile.ZipFile) as mock_zip:
+            builder.logger.reset_mock()
+            builder.generate_all(out_dir=str(out_dir), zip_name=zip_name)
+            # ZipFile should be opened with 'w'
+            assert any(call[0][1] == "w" for call in mock_zip.call_args_list)
+            builder.logger.print.assert_any_call(f"Done writing {zip_path}", symbol="📦")
+
+        # Case 4: One expected file is missing from zip -> Should recreate
+        # Touch all files to make zip newer
+        time.sleep(0.01)
+        for out in outputs:
+            (out_dir / out).touch()
+        time.sleep(0.01)
+        zip_path.touch()
+
+        # Let's manually write a zip file missing default/part2.obj
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(str(out_dir / "default/part1.stl"), "default/part1.stl")
+
+        # Touch the zip file again to make it newer than outputs
+        time.sleep(0.01)
+        zip_path.touch()
+
+        with patch("zipfile.ZipFile", wraps=zipfile.ZipFile) as mock_zip:
+            builder.logger.reset_mock()
+            builder.generate_all(out_dir=str(out_dir), zip_name=zip_name)
+            # ZipFile should be opened with 'w'
+            assert any(call[0][1] == "w" for call in mock_zip.call_args_list)
+            builder.logger.print.assert_any_call(f"Done writing {zip_path}", symbol="📦")

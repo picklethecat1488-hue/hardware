@@ -168,12 +168,16 @@ class TargetParser:
             for action in actions:
                 valid_args.add(f"{target_name}:{action}")
 
-                subs = target_cfg[action].get(SUBASSEMBLIES, [])
+                action_cfg = target_cfg[action]
+                if not isinstance(action_cfg, dict):
+                    continue
+
+                subs = action_cfg.get(SUBASSEMBLIES, [])
                 for sub in subs:
                     valid_args.add(f"{target_name}_{sub}")
                     valid_args.add(f"{target_name}_{sub}:{action}")
 
-                modes = target_cfg[action].get(MODES, [])
+                modes = action_cfg.get(MODES, [])
                 for mode in modes:
                     valid_args.add(f"{target_name}:{action}/{mode}")
                     for sub in subs:
