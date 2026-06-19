@@ -1,11 +1,13 @@
 """Unit tests for the Room container."""
 
 from unittest.mock import MagicMock, patch
+import math
+from typing import cast
 import pytest
-from build123d import Compound, Box, Vector
+from build123d import Compound, Box, Vector, RigidJoint, RevoluteJoint, Axis, Location
 from model import AppConfig, TextArgs, DiagramOptions
 from provider.room import Room
-from provider.types import ColorType
+from provider.types import ColorType, URDFShape
 
 
 def test_room_add_success():
@@ -160,3 +162,58 @@ def test_room_get_projection_vectors_overrides():
     look_from, look_at, _ = room._get_projection_vectors(opts)
     assert look_from == Vector(10, 10, 10)
     assert look_at == Vector(1, 1, 1)
+
+
+def test_room_translate_joints():
+    """Verify that translate_joints correctly maps build123d joints to URDF attributes on shapes."""
+    room = Room()
+
+    parent = Box(10, 10, 10)
+    parent_shape = cast(URDFShape, parent)
+    parent_shape.urdf_label = "parent_link"
+    room.add("parent_link", parent)
+
+    child = Box(5, 5, 5)
+    child_shape = cast(URDFShape, child)
+    child_shape.urdf_label = "child_link"
+    room.add("child_link", child)
+
+    pj = RigidJoint("joint_p", parent, Location((0, 0, 5)))
+    cj = RevoluteJoint("joint_c", child, Axis((0, 0, 0), (0, 1, 0)), angular_range=(0, 180))
+    pj.connect_to(cj)
+
+    assert getattr(child, "urdf_parent", None) is None
+
+    room.translate_joints()
+
+    assert child_shape.urdf_parent == "parent_link"
+    assert child_shape.urdf_joint_type == "revolute"
+    assert child_shape.urdf_joint_axis == "0 1 0"
+    assert child_shape.urdf_joint_lower is not None
+    assert math.isclose(child_shape.urdf_joint_lower, 0.0)
+    assert child_shape.urdf_joint_upper is not None
+    assert math.isclose(child_shape.urdf_joint_upper, math.radians(180))
+
+
+def test_room_disconnect_joints():
+    """Verify that disconnect_joints clears all URDF joint connection properties on shapes."""
+    room = Room()
+
+    child = Box(5, 5, 5)
+    child_shape = cast(URDFShape, child)
+    child_shape.urdf_parent = "parent_link"
+    child_shape.urdf_joint_type = "revolute"
+    child_shape.urdf_joint_axis = "0 1 0"
+    child_shape.urdf_joint_lower = 0.0
+    child_shape.urdf_joint_upper = 3.14
+    room.add("child", child)
+
+    assert child_shape.urdf_parent == "parent_link"
+
+    room.disconnect_joints()
+
+    assert child_shape.urdf_parent is None
+    assert child_shape.urdf_joint_type is None
+    assert child_shape.urdf_joint_axis is None
+    assert child_shape.urdf_joint_lower is None
+    assert child_shape.urdf_joint_upper is None

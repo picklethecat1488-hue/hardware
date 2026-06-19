@@ -1,6 +1,7 @@
 """Specialized container for visualization items."""
 
 import io
+import math
 from pathlib import Path
 from typing import Any, Union, Optional, TYPE_CHECKING, cast
 from build123d import (
@@ -16,10 +17,13 @@ from build123d import (
     Align,
     Location,
     Sketch,
+    RigidJoint,
+    RevoluteJoint,
+    LinearJoint,
 )
 from build123d.exporters import ExportSVG, Drawing
 from model import DiagramOptions, TextArgs
-from .types import ColorType
+from .types import ColorType, URDFShape
 from .utils import get_rgba_color
 
 if TYPE_CHECKING:
@@ -372,10 +376,91 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         p2 = tip - (direction * length) - (perp * width)
         return [Edge.make_line(tip, p1), Edge.make_line(tip, p2)]
 
+    def disconnect_joints(self) -> None:
+        """Clear all URDF joint properties from shapes in the room as a precautionary step."""
+        for geom, _ in self.values():
+            u_geom = cast(URDFShape, geom)
+            if hasattr(u_geom, "urdf_parent"):
+                u_geom.urdf_parent = None
+            if hasattr(u_geom, "urdf_joint_type"):
+                u_geom.urdf_joint_type = None
+            if hasattr(u_geom, "urdf_joint_axis"):
+                u_geom.urdf_joint_axis = None
+            if hasattr(u_geom, "urdf_joint_lower"):
+                u_geom.urdf_joint_lower = None
+            if hasattr(u_geom, "urdf_joint_upper"):
+                u_geom.urdf_joint_upper = None
+
+    def translate_joints(self) -> None:
+        """Map build123d joints defined on shapes in the room to URDF-compatible properties."""
+        self.disconnect_joints()
+
+        def format_coord(v: float) -> str:
+            return str(int(v)) if v.is_integer() else f"{v:.6f}".rstrip("0").rstrip(".")
+
+        # Map from python object id of geometry to its label/name in the room
+        geom_to_label = {}
+        for name, (geom, _) in self.items():
+            u_geom = cast(URDFShape, geom)
+            label = getattr(u_geom, "urdf_label", name)
+            geom_to_label[id(u_geom)] = label
+
+        # Also populate urdf_label for all room geometries if not already set, to make sure
+        # they are recognized as URDF links.
+        for name, (geom, _) in self.items():
+            u_geom = cast(URDFShape, geom)
+            if not getattr(u_geom, "urdf_label", None):
+                u_geom.urdf_label = name
+
+        for name, (geom, _) in self.items():
+            u_geom = cast(URDFShape, geom)
+            joints = getattr(u_geom, "joints", None)
+            if not isinstance(joints, dict):
+                continue
+
+            for joint in joints.values():
+                if getattr(joint, "connected_to", None) is not None:
+                    parent_geom = u_geom
+                    child_geom = cast(URDFShape, joint.connected_to.parent)
+
+                    parent_label = geom_to_label.get(id(parent_geom))
+                    child_label = geom_to_label.get(id(child_geom))
+
+                    if parent_label is not None and child_label is not None:
+                        child_geom.urdf_parent = parent_label
+                        child_joint = joint.connected_to
+
+                        # Map joint types and attributes
+                        match child_joint:
+                            case RigidJoint():
+                                child_geom.urdf_joint_type = "fixed"
+                            case RevoluteJoint():
+                                child_geom.urdf_joint_type = "revolute"
+                                if getattr(child_joint, "relative_axis", None) is not None:
+                                    dir_vec = child_joint.relative_axis.direction
+                                    child_geom.urdf_joint_axis = (
+                                        f"{format_coord(dir_vec.X)} {format_coord(dir_vec.Y)} {format_coord(dir_vec.Z)}"
+                                    )
+                                if getattr(child_joint, "angular_range", None) is not None:
+                                    child_geom.urdf_joint_lower = math.radians(child_joint.angular_range[0])
+                                    child_geom.urdf_joint_upper = math.radians(child_joint.angular_range[1])
+                            case LinearJoint():
+                                child_geom.urdf_joint_type = "prismatic"
+                                if getattr(child_joint, "relative_axis", None) is not None:
+                                    dir_vec = child_joint.relative_axis.direction
+                                    child_geom.urdf_joint_axis = (
+                                        f"{format_coord(dir_vec.X)} {format_coord(dir_vec.Y)} {format_coord(dir_vec.Z)}"
+                                    )
+                                if getattr(child_joint, "linear_range", None) is not None:
+                                    child_geom.urdf_joint_lower = child_joint.linear_range[0] * 0.001
+                                    child_geom.urdf_joint_upper = child_joint.linear_range[1] * 0.001
+
     def export_urdf(self, path: Union[str, Path, io.StringIO], project_name: str) -> None:
         """Export a combined URDF from a Room object."""
         import yaml
         from build123d import CenterOf
+
+        self.translate_joints()
 
         template_path = Path(__file__).parent.parent / "urdf_template.yaml"
         with open(template_path, "r") as f:
@@ -387,22 +472,23 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         links_info = []
         for geom, rgba in self.values():
-            label = getattr(geom, "urdf_label", None)
+            u_geom = cast(URDFShape, geom)
+            label = getattr(u_geom, "urdf_label", None)
             if not label:
                 continue
 
-            parent = getattr(geom, "urdf_parent", None)
-            joint_type = getattr(geom, "urdf_joint_type", "fixed")
-            joint_axis = getattr(geom, "urdf_joint_axis", "0 0 1")
-            density = getattr(geom, "urdf_density", 1.0)
+            parent = getattr(u_geom, "urdf_parent", None)
+            joint_type = getattr(u_geom, "urdf_joint_type", "fixed")
+            joint_axis = getattr(u_geom, "urdf_joint_axis", "0 0 1")
+            density = getattr(u_geom, "urdf_density", 1.0)
 
             # Extract location
-            pos = geom.location.position
+            pos = u_geom.location.position
             xyz = [pos.X * 0.001, pos.Y * 0.001, pos.Z * 0.001]
             rpy = [0.0, 0.0, 0.0]
 
             # Invert the translation to get the local shape centered at local origin
-            local_shape = geom.location.inverse() * geom
+            local_shape = u_geom.location.inverse() * u_geom
 
             # Mass and inertia calculations using local shape and density
             density_g_mm3 = density * 1e-3
@@ -423,6 +509,8 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             izz = raw_inertia[2][2] * scale_factor
 
             rgba_str = f"{rgba[0]:.6f} {rgba[1]:.6f} {rgba[2]:.6f} {rgba[3]:.6f}"
+            joint_lower = getattr(u_geom, "urdf_joint_lower", -3.14159)
+            joint_upper = getattr(u_geom, "urdf_joint_upper", 3.14159)
 
             links_info.append(
                 {
@@ -430,6 +518,8 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     "parent": parent,
                     "joint_type": joint_type,
                     "joint_axis": joint_axis,
+                    "joint_lower": joint_lower,
+                    "joint_upper": joint_upper,
                     "xyz": xyz,
                     "rpy": rpy,
                     "mass_kg": mass_kg,
@@ -476,7 +566,14 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             if link["parent"] is not None:
                 axis_limit_str = ""
                 if link["joint_type"] in ("revolute", "prismatic"):
-                    axis_limit_str = axis_limit_template.format(joint_axis=link["joint_axis"]) + "\n  "
+                    axis_limit_str = (
+                        axis_limit_template.format(
+                            joint_axis=link["joint_axis"], lower=link["joint_lower"], upper=link["joint_upper"]
+                        )
+                        + "\n  "
+                    )
+                elif link["joint_type"] in ("continuous", "planar"):
+                    axis_limit_str = f'  <axis xyz="{link["joint_axis"]}"/>\n  '
 
                 joints_strings.append(
                     joint_template.format(

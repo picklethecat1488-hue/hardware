@@ -37,4 +37,4 @@ joint_template: |
 
 axis_limit_template: |
   <axis xyz="{joint_axis}"/>
-    <limit effort="10.0" lower="-3.14159" upper="3.14159" velocity="1.0"/>
+    <limit effort="10.0" lower="{lower:.6f}" upper="{upper:.6f}" velocity="1.0"/>
