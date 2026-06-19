@@ -239,7 +239,7 @@ class TestBuilderLogic:
         assert "f " in content
 
     def test_export_combined_urdf(self, builder, tmp_path):
-        """Verify that _export_combined_urdf_from_room correctly generates a combined URDF from a Room."""
+        """Verify that Room.export_urdf correctly generates a combined URDF from a Room."""
         room = Room()
 
         # Add a part with metadata attributes
@@ -252,15 +252,9 @@ class TestBuilderLogic:
 
         room.add("base", geom)
 
-        # Pre-create the OBJ file and register the hash in the manifest to simulate up-to-date output
-        obj_path = tmp_path / "base.obj"
-        obj_path.touch()
-        current_hash = builder._get_part_hash(geom.location.inverse() * geom)
-        builder.build_manifest = {"brep": {"test_proj/base.obj": current_hash}}
-
-        builder._export_combined_urdf_from_room(room, tmp_path, "test_proj", "product")
-
         urdf_file = tmp_path / "product.urdf"
+        room.export_urdf(urdf_file, "test_proj")
+
         assert urdf_file.exists()
 
         content = urdf_file.read_text()

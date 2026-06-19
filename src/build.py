@@ -89,6 +89,12 @@ class Builder:
             room.export_diagram(svg_stream, options)
             return hashlib.sha1(svg_stream.getvalue()).hexdigest()
 
+    def _get_urdf_hash(self, room: Room, p_name: str) -> str:
+        """Calculate a hash for the URDF output."""
+        with io.StringIO() as urdf_stream:
+            room.export_urdf(urdf_stream, p_name)
+            return hashlib.sha1(urdf_stream.getvalue().encode("utf-8")).hexdigest()
+
     def _get_file_hash(self, path: Path) -> str:
         """Calculate the SHA1 hash of a file on disk."""
         return hashlib.sha1(path.read_bytes()).hexdigest()
@@ -348,160 +354,42 @@ class Builder:
                 target_dir = Path(out_dir) / proj_name
                 target_dir.mkdir(parents=True, exist_ok=True)
 
+                urdf_file_name = f"{target_name}.urdf"
+                urdf_path = target_dir / urdf_file_name
+                path_str = str(urdf_path)
+
+                # Validate OBJ links
+                for geom, _ in room.values():
+                    label = getattr(geom, "urdf_label", None)
+                    if not label:
+                        continue
+                    local_shape = geom.location.inverse() * geom
+                    obj_file_name = f"{label}.obj"
+                    obj_path = target_dir / obj_file_name
+                    current_hash = self._get_part_hash(local_shape)
+
+                    if not obj_path.exists():
+                        raise ValueError(f"OBJ file for link '{label}' does not exist: {obj_path}. ")
+                    with self.lock:
+                        brep_manifest = self.build_manifest.setdefault("brep", {})
+                        manifest_hash = brep_manifest.get(f"{proj_name}/{obj_file_name}")
+                    if manifest_hash != current_hash:
+                        raise ValueError(f"OBJ file for link '{label}' is out of date. ")
+
+                current_hash = self._get_urdf_hash(room, proj_name)
                 futures.append(
                     self.executor.submit(
-                        self._export_combined_urdf_from_room,
-                        room,
-                        target_dir,
-                        proj_name,
-                        target_name,
+                        self._export_if_changed,
+                        urdf_path,
+                        f"{proj_name}/{urdf_file_name}",
+                        current_hash,
+                        lambda r=room, ps=path_str, pn=proj_name: r.export_urdf(ps, pn),
                         bool(names),
                     )
                 )
 
         for fut in futures:
             fut.result()
-
-    def _export_combined_urdf_from_room(
-        self, room: Room, target_dir: Path, p_name: str, target_name: str, _: bool = False
-    ):
-        """Export a combined URDF and individual OBJ links from a Room object."""
-        links_info = []
-        for geom, rgba in room.values():
-            label = getattr(geom, "urdf_label", None)
-            if not label:
-                continue
-
-            parent = getattr(geom, "urdf_parent", None)
-            joint_type = getattr(geom, "urdf_joint_type", "fixed")
-            joint_axis = getattr(geom, "urdf_joint_axis", "0 0 1")
-            density = getattr(geom, "urdf_density", 1.0)
-
-            # Extract location
-            pos = geom.location.position
-            xyz = [pos.X * 0.001, pos.Y * 0.001, pos.Z * 0.001]
-            rpy = [0.0, 0.0, 0.0]
-
-            # Invert the translation to get the local shape centered at local origin
-            local_shape = geom.location.inverse() * geom
-
-            # Export local shape to OBJ
-            obj_file_name = f"{label}.obj"
-            obj_path = target_dir / obj_file_name
-            current_hash = self._get_part_hash(local_shape)
-
-            # Validate that the OBJ file exists and is up to date
-            if not obj_path.exists():
-                raise ValueError(f"OBJ file for link '{label}' does not exist: {obj_path}. ")
-
-            with self.lock:
-                brep_manifest = self.build_manifest.setdefault("brep", {})
-                manifest_hash = brep_manifest.get(f"{p_name}/{obj_file_name}")
-
-            if manifest_hash != current_hash:
-                raise ValueError(f"OBJ file for link '{label}' is out of date. ")
-
-            # Mass and inertia calculations using local shape and density
-            density_g_mm3 = density * 1e-3
-            volume_mm3 = local_shape.volume  # type: ignore
-            mass_kg = volume_mm3 * density_g_mm3 * 1e-3
-
-            com = local_shape.center(CenterOf.MASS)  # type: ignore
-            com_m = [com.X * 0.001, com.Y * 0.001, com.Z * 0.001]
-
-            raw_inertia = local_shape.matrix_of_inertia
-            scale_factor = density * 1e-12
-
-            ixx = raw_inertia[0][0] * scale_factor
-            ixy = raw_inertia[0][1] * scale_factor
-            ixz = raw_inertia[0][2] * scale_factor
-            iyy = raw_inertia[1][1] * scale_factor
-            iyz = raw_inertia[1][2] * scale_factor
-            izz = raw_inertia[2][2] * scale_factor
-
-            # Format RGBA
-            rgba_str = f"{rgba[0]:.6f} {rgba[1]:.6f} {rgba[2]:.6f} {rgba[3]:.6f}"
-
-            links_info.append(
-                {
-                    "name": label,
-                    "parent": parent,
-                    "joint_type": joint_type,
-                    "joint_axis": joint_axis,
-                    "xyz": xyz,
-                    "rpy": rpy,
-                    "mass_kg": mass_kg,
-                    "com_x": com_m[0],
-                    "com_y": com_m[1],
-                    "com_z": com_m[2],
-                    "ixx": ixx,
-                    "ixy": ixy,
-                    "ixz": ixz,
-                    "iyy": iyy,
-                    "iyz": iyz,
-                    "izz": izz,
-                    "obj_filename": obj_file_name,
-                    "rgba_str": rgba_str,
-                }
-            )
-
-        if not links_info:
-            return
-
-        # Build combined URDF XML representation using templates
-        links_strings = []
-        for link in links_info:
-            link_str = self.link_template.format(
-                link_name=link["name"],
-                com_x=link["com_x"],
-                com_y=link["com_y"],
-                com_z=link["com_z"],
-                mass_kg=link["mass_kg"],
-                ixx=link["ixx"],
-                ixy=link["ixy"],
-                ixz=link["ixz"],
-                iyy=link["iyy"],
-                iyz=link["iyz"],
-                izz=link["izz"],
-                project_name=p_name,
-                obj_filename=link["obj_filename"],
-                rgba=link["rgba_str"],
-            )
-            links_strings.append(link_str)
-
-        joints_strings = []
-        for link in links_info:
-            if link["parent"] is not None:
-                axis_limit_str = ""
-                if link["joint_type"] in ("revolute", "prismatic"):
-                    axis_limit_str = self.axis_limit_template.format(joint_axis=link["joint_axis"]) + "\n  "
-
-                joint_str = self.joint_template.format(
-                    parent_name=link["parent"],
-                    child_name=link["name"],
-                    joint_type=link["joint_type"],
-                    xyz_x=link["xyz"][0],
-                    xyz_y=link["xyz"][1],
-                    xyz_z=link["xyz"][2],
-                    rpy_r=link["rpy"][0],
-                    rpy_p=link["rpy"][1],
-                    rpy_y=link["rpy"][2],
-                    axis_limit=axis_limit_str,
-                )
-                joints_strings.append(joint_str)
-
-        urdf_content = self.robot_template.format(
-            robot_name=p_name,
-            links="\n".join(links_strings),
-            joints="\n".join(joints_strings),
-        )
-
-        urdf_file_name = f"{target_name}.urdf"
-        urdf_path = target_dir / urdf_file_name
-
-        with open(urdf_path, "w") as f:
-            f.write(urdf_content)
-        self.logger.print(f"Saved {urdf_path}", symbol="📄")
 
     def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
