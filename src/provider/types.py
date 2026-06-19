@@ -15,6 +15,9 @@ class URDFShape(Protocol):
     urdf_joint_upper: Optional[float]
     urdf_material: Optional[str]
     urdf_density: Optional[float]
+    urdf_motor_type: Optional[str]
+    urdf_motor_target: Optional[float]
+    urdf_motor_force: Optional[float]
 
     def __getattr__(self, name: str) -> Any:
         """Get an attribute from the object."""
@@ -44,6 +47,14 @@ class Mode(StrEnum):
     DEFAULT = "default"
     PRINT = "print"
     SIMULATE = "simulate"
+
+
+class Simulate(StrEnum):
+    """Simulation hook types."""
+
+    SETUP = "setup"
+    STEP = "step"
+    TEARDOWN = "teardown"
 
 
 class ColorType(StrEnum):

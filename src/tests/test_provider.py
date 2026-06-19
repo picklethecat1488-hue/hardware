@@ -9,7 +9,7 @@ from provider.provider import Provider
 from provider.target_list import TargetList
 from provider.utils import load_manifest, ColorType
 from model.utils import method_cache
-from provider.types import Section, Mode, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT
+from provider.types import Section, Mode, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT, Simulate
 from provider.room import Room
 
 
@@ -315,6 +315,10 @@ def test_method_cache_unhashable_args():
             return sum(data)
 
     obj = TestClass()
-    # This would raise TypeError: unhashable type: 'list' without the fix
     assert obj.run([1, 2, 3]) == 6
     assert obj.run([1, 2, 3]) == 6
+
+
+def test_provider_simulate_property(provider):
+    """Verify that provider.simulate returns an empty dict by default."""
+    assert provider.simulate == {}
