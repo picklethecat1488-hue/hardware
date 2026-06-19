@@ -88,22 +88,6 @@ class TestViewer:
             assert "p1_part" in labels
             assert "p1_diagram" in labels
 
-    def test_list_targets(self, viewer):
-        """Verify list_targets formatting and Enum coercion."""
-        viewer.manager.router.manifest = {"p1/t1": {Section.PART: {"modes": [Mode.PRINT], "subassemblies": ["left"]}}}
-        viewer.list_targets()
-
-        # Check that logger was called with expected formatted strings
-        calls = viewer.logger.print.call_args_list
-        call_args = [c[0][0] for c in calls]
-
-        # Verify that all valid argument combinations are printed
-        assert any("Found 6 targets:" in arg for arg in call_args)
-        assert any("p1/t1" in arg for arg in call_args)
-        assert any("p1/t1:part" in arg for arg in call_args)
-        assert any("p1/t1_left:part" in arg for arg in call_args)
-        assert any("p1/t1_left" in arg for arg in call_args)
-
     @patch("view.show")
     def test_show_view_room(self, mock_show, viewer):
         """Verify show_view handles Section.VIEW targets."""

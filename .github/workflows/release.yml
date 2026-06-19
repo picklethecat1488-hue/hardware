@@ -34,8 +34,6 @@ jobs:
         with:
           files: |
             build/build.zip
-            build/**/*.stl
-            build/**/*.svg
           generate_release_notes: true
 
       - name: Run Unit Tests
