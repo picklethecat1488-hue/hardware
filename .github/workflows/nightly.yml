@@ -66,8 +66,9 @@ jobs:
           mamba-version: "*"
           channels: conda-forge
           environment-file: environment.yml
-          activate-environment: cq
           use-mamba: true
+          cache-environment: true # <--- Enables automated caching based on environment.yml hash
+          activate-environment: cq
 
       - name: Build Hardware
         shell: bash -el {0}
