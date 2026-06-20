@@ -66,13 +66,19 @@ jobs:
           mamba-version: "*"
           channels: conda-forge
           environment-file: environment.yml
-          activate-environment: cq
           use-mamba: true
+          cache-environment: true # <--- Enables automated caching based on environment.yml hash
+          activate-environment: cq
 
       - name: Build Hardware
         shell: bash -el {0}
         run: |
           python src/build.py -out build
+
+      - name: Configure Hardware
+        shell: bash -el {0}
+        run: |
+          python src/config.py -e build/.env
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
