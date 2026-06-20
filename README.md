@@ -1,3 +1,13 @@
+# Hardware Projects
+
+This repository contains CAD models and designs for various hardware projects:
+
+- [Cat Water Fountain](src/projects/cat_fountain.md) - A 3D-printable automatic pet cat water fountain with an impeller, delivery tube, and spout.
+- [Exhaust Manifolds](src/projects/exhaust_manifolds.md) - Custom exhaust manifolds to connect the midpipe section of the kit to exhaust tips.
+- [Valve Actuator Limiter](src/projects/valve_actuator_limiter.md) - A mechanical stop to restrict the sweep of the exhaust valve actuator arm.
+
+---
+
 ## Getting Started
 
 This project uses [conda](https://conda-forge.org/download/) for dependency management. You can easily setup the build environment using these commands:

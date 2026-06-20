@@ -2,7 +2,7 @@
 
 from functools import cached_property
 from build123d import *  # type: ignore
-from model import method_cache
+from model import method_cache, TextArgs
 from pathlib import Path
 import pybullet as p
 from provider import Provider, Section, Mode as ProviderMode, discover_provider, Room, Simulate
@@ -238,33 +238,69 @@ class CatFountainProvider(Provider):
         return f
 
     def build_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
-        """Build an assembly diagram for the cat fountain."""
-        fountain = self.build_fountain("fountain", mode=mode)
-        room.add("fountain", fountain)
+        """Build an exploded assembly diagram for the cat fountain."""
+        bowl_part = self.build_bowl("bowl").part
+        impeller_part = self.build_impeller("impeller").part
+        tube_part = self.build_tube("tube").part
+        spout_part = self.build_spout("spout").part
+
+        # 2. Position them in their standard assembled configuration using joints
+        bowl_part.joints["shaft"].connect_to(impeller_part.joints["motor"])
+        bowl_part.joints["tube_socket"].connect_to(tube_part.joints["base"])
+        tube_part.joints["top"].connect_to(spout_part.joints["base"])
+
+        # 3. Explode the parts by translating their .location attributes
+        impeller_part.location = Location((0, 0, 50)) * impeller_part.location
+        tube_part.location = Location((0, 50, 25)) * tube_part.location
+        spout_part.location = Location((0, 100, 60)) * spout_part.location
+
+        # 4. Add the exploded parts to the room
+        room.add("bowl", bowl_part, color="grey")
+        room.add("impeller", impeller_part, color="red")
+        room.add("tube", tube_part, color="blue")
+        room.add("spout", spout_part, color="cyan")
+
+        # 5. Add connector lines indicating assembly paths
+        impeller_conn = Line(
+            bowl_part.joints["shaft"].location.position, impeller_part.joints["motor"].location.position
+        )
+        room.add("impeller_connector", impeller_conn)
+
+        tube_conn = Line(bowl_part.joints["tube_socket"].location.position, tube_part.joints["base"].location.position)
+        room.add("tube_connector", tube_conn)
+
+        spout_conn = Line(tube_part.joints["top"].location.position, spout_part.joints["base"].location.position)
+        room.add("spout_connector", spout_conn)
+
+        # 6. Add labels for each part
+        room.add_label("bowl_label", "BOWL", bowl_part.center() + Vector(-100, -20, 10), options=TextArgs(font_size=16))
+        room.add_label(
+            "impeller_label", "IMPELLER", impeller_part.center() + Vector(-50, -10, 10), options=TextArgs(font_size=16)
+        )
+        room.add_label("tube_label", "TUBE", tube_part.center() + Vector(40, 10, 10), options=TextArgs(font_size=16))
+        room.add_label("spout_label", "SPOUT", spout_part.center() + Vector(40, 10, 10), options=TextArgs(font_size=16))
 
     def build_product(self, room: Room) -> None:
         """Place all parts of the cat fountain in the room for visualization/simulation."""
-        t = self.settings.bowl_thickness
-        tube_y = self.settings.bowl_radius - self.settings.tube_radius - 15.0
+        bowl_part = self.build_bowl("bowl").part
+        impeller_part = self.build_impeller("impeller").part
+        tube_part = self.build_tube("tube").part
+        spout_part = self.build_spout("spout").part
 
-        # 1. Add bowl at (0, 0, 0)
-        bowl = self.build_bowl("bowl")
-        room.add("bowl", bowl, color="grey")
+        # 2. Add bowl at (0, 0, 0)
+        room.add("bowl", bowl_part, color="grey")
 
-        # 2. Add impeller connected via joint to the bowl
-        impeller = self.build_impeller("impeller")
-        bowl.part.joints["shaft"].connect_to(impeller.part.joints["motor"])
-        room.add("impeller", impeller, color="red")
+        # 3. Add impeller connected via joint to the bowl
+        bowl_part.joints["shaft"].connect_to(impeller_part.joints["motor"])
+        room.add("impeller", impeller_part, color="red")
 
-        # 3. Add tube connected to the bowl via joint
-        tube = self.build_tube("tube")
-        bowl.part.joints["tube_socket"].connect_to(tube.part.joints["base"])
-        room.add("tube", tube, color="blue")
+        # 4. Add tube connected to the bowl via joint
+        bowl_part.joints["tube_socket"].connect_to(tube_part.joints["base"])
+        room.add("tube", tube_part, color="blue")
 
-        # 4. Add spout connected to the tube via joint
-        spout = self.build_spout("spout")
-        tube.part.joints["top"].connect_to(spout.part.joints["base"])
-        room.add("spout", spout, color="cyan")
+        # 5. Add spout connected to the tube via joint
+        tube_part.joints["top"].connect_to(spout_part.joints["base"])
+        room.add("spout", spout_part, color="cyan")
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
         """Map simulation hook names to handler methods for the cat fountain."""

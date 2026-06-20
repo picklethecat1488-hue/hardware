@@ -1,5 +1,6 @@
 """Utility functions for method caching and coordinate data parsing."""
 
+import copy
 from functools import wraps
 import inspect
 from collections import OrderedDict
@@ -20,15 +21,74 @@ def _make_hashable(obj: Any) -> Any:
     return obj
 
 
+def deep_copy_shape_or_builder(obj: Any, memo: Any = None) -> Any:
+    """Safely deep copy build123d objects, handling frames and context tokens in Builders."""
+    if memo is None:
+        memo = {}
+
+    obj_id = id(obj)
+    if obj_id in memo:
+        return memo[obj_id]
+
+    match obj:
+        case _ if hasattr(obj, "__dict__") and any(
+            k in obj.__dict__ for k in ("_python_frame", "parent_frame", "_reset_tok", "workplanes_context")
+        ):
+            copied_obj = copy.copy(obj)
+            memo[obj_id] = copied_obj
+            copied_obj.__dict__ = {}
+            for k, v in obj.__dict__.items():
+                if k in ("_python_frame", "parent_frame", "_reset_tok", "workplanes_context"):
+                    copied_obj.__dict__[k] = None
+                else:
+                    copied_obj.__dict__[k] = deep_copy_shape_or_builder(v, memo)
+            return copied_obj
+        case list():
+            copied_list: list[Any] = []
+            memo[obj_id] = copied_list
+            copied_list.extend(deep_copy_shape_or_builder(x, memo) for x in obj)
+            return copied_list
+        case tuple():
+            copied_tuple = tuple(deep_copy_shape_or_builder(x, memo) for x in obj)
+            memo[obj_id] = copied_tuple
+            return copied_tuple
+        case dict():
+            copied_dict: dict[Any, Any] = {}
+            memo[obj_id] = copied_dict
+            for k, v in obj.items():
+                copied_dict[deep_copy_shape_or_builder(k, memo)] = deep_copy_shape_or_builder(v, memo)
+            return copied_dict
+        case set():
+            copied_set: set[Any] = set()
+            memo[obj_id] = copied_set
+            copied_set.update(deep_copy_shape_or_builder(x, memo) for x in obj)
+            return copied_set
+
+    try:
+        res = copy.deepcopy(obj, memo)
+        memo[obj_id] = res
+        return res
+    except Exception:
+        try:
+            res = copy.copy(obj)
+            memo[obj_id] = res
+            return res
+        except Exception:
+            memo[obj_id] = obj
+            return obj
+
+
 @overload
 def method_cache(func: Callable[..., Any]) -> Callable[..., Any]: ...
 
 
 @overload
-def method_cache(*, maxsize: int = 128) -> Callable[[Callable[..., Any]], Callable[..., Any]]: ...
+def method_cache(
+    *, maxsize: int = 128, deepcopy: bool = True
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]: ...
 
 
-def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128) -> Any:
+def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128, deepcopy: bool = True) -> Any:
     """Create per-instance cache to avoid memory leaks and Pydantic @validate_call conflicts."""
 
     def decorator(f: T) -> T:
@@ -41,12 +101,12 @@ def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128) 
             key = (_make_hashable(args), _make_hashable(kwargs))
             if key in cache:
                 cache.move_to_end(key)
-                return cache[key]
+                return deep_copy_shape_or_builder(cache[key]) if deepcopy else cache[key]
             result = f(self, *args, **kwargs)
             cache[key] = result
             if len(cache) > maxsize:
                 cache.popitem(last=False)
-            return result
+            return deep_copy_shape_or_builder(result) if deepcopy else result
 
         try:
             setattr(wrapper, "__signature__", inspect.signature(f))
