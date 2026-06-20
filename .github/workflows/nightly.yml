@@ -85,3 +85,4 @@ jobs:
         with:
           name: nightly-build
           path: build/
+          include-hidden-files: true
