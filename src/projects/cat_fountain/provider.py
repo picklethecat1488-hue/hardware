@@ -33,7 +33,7 @@ class CatFountainProvider(Provider):
 
     @property
     def part(self) -> dict[str, Callable[..., BuildPart]]:
-        """A mapping of part names to their build handler methods."""
+        """Map part names to their build handler methods."""
         return {
             "bowl": self.build_bowl,
             "impeller": self.build_impeller,
@@ -44,12 +44,12 @@ class CatFountainProvider(Provider):
 
     @property
     def diagram(self) -> dict[str, Callable[[Room, Sequence[str], ProviderMode], None]]:
-        """A mapping of diagram names to their build handler methods."""
+        """Map diagram names to their build handler methods."""
         return {name: self.build_diagram for name in self.targets.supporting(Section.DIAGRAM)}
 
     @property
     def view(self) -> dict[str, Callable[[Room], None]]:
-        """A mapping of room names to view functions."""
+        """Map room names to view functions."""
         return {
             "product": self.build_product,
         }
@@ -99,6 +99,10 @@ class CatFountainProvider(Provider):
 
         # Define RigidJoint for the central shaft
         RigidJoint("shaft", bowl.part, Location((0, 0, t + 1.0)))
+
+        # Define RigidJoint for the tube socket
+        tube_y = self.settings.bowl_radius - self.settings.tube_radius - 15.0
+        RigidJoint("tube_socket", bowl.part, Location((0, tube_y, t + 5.0)))
 
         return bowl
 
@@ -160,8 +164,10 @@ class CatFountainProvider(Provider):
         tube_part.urdf_label = "tube"
         tube_part.urdf_material = "petg"
         tube_part.urdf_density = self.petg_density
-        tube_part.urdf_parent = "bowl"
-        tube_part.urdf_joint_type = "fixed"
+
+        # Define joints for relative positioning and URDF linkage
+        RigidJoint("base", tube.part, Location((0, 0, 0)))
+        RigidJoint("top", tube.part, Location((0, 0, h - 10.0)))
 
         return tube
 
@@ -196,8 +202,9 @@ class CatFountainProvider(Provider):
         spout_part.urdf_label = "spout"
         spout_part.urdf_material = "petg"
         spout_part.urdf_density = self.petg_density
-        spout_part.urdf_parent = "bowl"
-        spout_part.urdf_joint_type = "fixed"
+
+        # Define RigidJoint for connecting to the tube
+        RigidJoint("base", spout.part, Location((0, 0, 0)))
 
         return spout
 
@@ -230,13 +237,11 @@ class CatFountainProvider(Provider):
 
         return f
 
-    @method_cache
     def build_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build an assembly diagram for the cat fountain."""
         fountain = self.build_fountain("fountain", mode=mode)
         room.add("fountain", fountain)
 
-    @method_cache
     def build_product(self, room: Room) -> None:
         """Place all parts of the cat fountain in the room for visualization/simulation."""
         t = self.settings.bowl_thickness
@@ -251,19 +256,18 @@ class CatFountainProvider(Provider):
         bowl.part.joints["shaft"].connect_to(impeller.part.joints["motor"])
         room.add("impeller", impeller, color="red")
 
-        # 3. Add tube at (0, tube_y, t + 5.0)
+        # 3. Add tube connected to the bowl via joint
         tube = self.build_tube("tube")
-        moved_tube = Location((0, tube_y, t + 5.0)) * tube.part
-        room.add("tube", moved_tube, color="blue")
+        bowl.part.joints["tube_socket"].connect_to(tube.part.joints["base"])
+        room.add("tube", tube, color="blue")
 
-        # 4. Add spout at the top of the tube
+        # 4. Add spout connected to the tube via joint
         spout = self.build_spout("spout")
-        moved_spout = Location((0, tube_y, t + 5.0 + self.settings.tube_height - 10.0)) * spout.part
-        room.add("spout", moved_spout, color="cyan")
+        tube.part.joints["top"].connect_to(spout.part.joints["base"])
+        room.add("spout", spout, color="cyan")
 
-    @property
-    def simulate(self) -> dict[Simulate, Callable[..., Any]]:
-        """A mapping of simulation hook names to handler methods for the cat fountain."""
+    def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+        """Map simulation hook names to handler methods for the cat fountain."""
         return {
             Simulate.SETUP: self.setup_simulation,
             Simulate.STEP: self.step_simulation,
@@ -281,7 +285,7 @@ class CatFountainProvider(Provider):
                 return motor_idx
         return None
 
-    def setup_simulation(self, body_id: int, physics_client: int) -> None:
+    def setup_simulation(self, body_id: int, physics_client: int, sim_name: str) -> None:
         """Configure velocity motor control for the impeller."""
         motor_idx = self.get_impeller_idx(body_id, physics_client)
 
@@ -295,10 +299,10 @@ class CatFountainProvider(Provider):
                 physicsClientId=physics_client,
             )
 
-    def step_simulation(self, body_id: int, physics_client: int, step_index: int) -> float:
+    def step_simulation(self, body_id: int, physics_client: int, step_index: int, sim_name: str) -> float:
         """Step hook for simulation tracking. Returns wait time in seconds."""
         return 1.0 / 60.0
 
-    def teardown_simulation(self, body_id: int, physics_client: int) -> None:
+    def teardown_simulation(self, body_id: int, physics_client: int, sim_name: str) -> None:
         """Teardown simulation hook."""
         pass

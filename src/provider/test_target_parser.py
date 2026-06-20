@@ -101,3 +101,19 @@ class TestTargetParser:
 
         with pytest.raises(ValueError, match="No part targets matched wildcard pattern"):
             parser.resolve("ghost/*", Section.PART)
+
+    def test_get_base_target(self):
+        """Verify get_base_target static helper."""
+        assert TargetParser.get_base_target("tube/driver:part/print") == "tube/driver"
+        assert TargetParser.get_base_target("tube/driver") == "tube/driver"
+
+    def test_get_project_name_static(self):
+        """Verify get_project_name static helper."""
+        assert TargetParser.get_project_name("tube/driver:part/print") == "tube"
+        assert TargetParser.get_project_name("tube/driver") == "tube"
+        assert TargetParser.get_project_name("driver") == "default"
+
+    def test_split_target_static(self):
+        """Verify split_target static helper."""
+        assert TargetParser.split_target("tube/driver:part/print") == ("tube", "driver")
+        assert TargetParser.split_target("driver") == ("default", "driver")

@@ -319,6 +319,40 @@ def test_method_cache_unhashable_args():
     assert obj.run([1, 2, 3]) == 6
 
 
-def test_provider_simulate_property(provider):
-    """Verify that provider.simulate returns an empty dict by default."""
-    assert provider.simulate == {}
+def test_provider_get_simulate_hooks_default(provider):
+    """Verify that provider.get_simulate_hooks returns an empty dict by default."""
+    assert provider.get_simulate_hooks("default") == {}
+
+
+def test_provider_simulate_validation(provider):
+    """Verify that simulate hooks validation checks hooks configuration and signatures."""
+    # 1. Invalid keys type
+    provider.get_simulate_hooks_impl = MagicMock(return_value={"setup": lambda: None})
+    with pytest.raises(TypeError, match="Simulation hook key must be a Simulate enum"):
+        _ = provider.get_simulate_hooks("default")
+
+    # 2. Non-callable value
+    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.SETUP: "not_a_callable"})
+    with pytest.raises(TypeError, match="Simulation hook value must be callable"):
+        _ = provider.get_simulate_hooks("default")
+
+    # 3. Invalid signature for SETUP (must accept at least 3 arguments)
+    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.SETUP: lambda a, b: None})
+    with pytest.raises(ValueError, match="must accept at least 3 parameters"):
+        _ = provider.get_simulate_hooks("default")
+
+    # 4. Invalid signature for STEP (must accept at least 4 arguments)
+    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.STEP: lambda a, b, c: None})
+    with pytest.raises(ValueError, match="must accept at least 4 parameters"):
+        _ = provider.get_simulate_hooks("default")
+
+    # 5. Invalid signature for SETUP with too many required arguments
+    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.SETUP: lambda a, b, c, d: None})
+    with pytest.raises(ValueError, match="requires 4 parameters, but only 3 will be provided"):
+        _ = provider.get_simulate_hooks("default")
+
+    # 6. Valid setup with *args
+    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.SETUP: lambda *args: None})
+    assert provider.get_simulate_hooks("default") == {
+        Simulate.SETUP: provider.get_simulate_hooks_impl.return_value[Simulate.SETUP]
+    }

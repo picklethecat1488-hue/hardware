@@ -295,8 +295,8 @@ class TestViewer:
         with pytest.raises(ValueError, match="No geometry generated for the specified targets"):
             viewer.show_view([target_name])
 
-    @patch("view.os.path.exists")
-    @patch("view.shutil.copy")
+    @patch("provider.room.os.path.exists")
+    @patch("provider.room.shutil.copy")
     @patch("pybullet.connect")
     @patch("pybullet.loadURDF")
     @patch("pybullet.getNumJoints")
@@ -359,15 +359,23 @@ class TestViewer:
         cj = RevoluteJoint("j_c", child, Axis((0, 0, 0), (0, 0, 1)))
         pj.connect_to(cj)
 
-        # 4. Execute show_simulation with SMOKE_TEST enabled to run 10 steps
-        viewer.show_simulation(room, mock_provider, "mock", "mock/target", 10)
+        # 4. Execute room.simulate with SMOKE_TEST enabled to run 10 steps
+        room.simulate(
+            provider_hooks=mock_provider.simulate,
+            gui_mode=42,
+            proj_name="mock",
+            sim_target="mock/target",
+            steps=10,
+            manager=viewer.manager,
+            logger=viewer.logger,
+        )
 
         # 5. Assertions
         mock_exists.assert_any_call("build/mock/parent.obj")
         mock_exists.assert_any_call("build/mock/child.obj")
         mock_exists.assert_any_call("build/mock/target.urdf")
         assert mock_copy.call_count == 3
-        mock_connect.assert_called_once()
+        mock_connect.assert_called_once_with(42)
         mock_load_urdf.assert_called_once()
         mock_get_num_joints.assert_called_once_with(100, physicsClientId=42)
         mock_set_gravity.assert_called_once_with(0, 0, -9.81, physicsClientId=42)
@@ -383,16 +391,16 @@ class TestViewer:
         )
 
         # Verify hooks were called
-        mock_setup.assert_called_once_with(100, 42)
+        mock_setup.assert_called_once_with(100, 42, "mock/target")
         assert mock_step.call_count == 10
         actual_calls = [call.args for call in mock_step.call_args_list]
-        expected_calls = [(100, 42, i) for i in range(10)]
+        expected_calls = [(100, 42, i, "mock/target") for i in range(10)]
         assert actual_calls == expected_calls
-        mock_teardown.assert_called_once_with(100, 42)
+        mock_teardown.assert_called_once_with(100, 42, "mock/target")
         mock_disconnect.assert_called_once_with(physicsClientId=42)
 
-    @patch("view.os.path.exists")
-    @patch("view.shutil.copy")
+    @patch("provider.room.os.path.exists")
+    @patch("provider.room.shutil.copy")
     @patch("pybullet.connect")
     @patch("pybullet.loadURDF")
     @patch("pybullet.getNumJoints")
@@ -456,15 +464,23 @@ class TestViewer:
         cj = RevoluteJoint("j_c", child, Axis((0, 0, 0), (0, 0, 1)))
         pj.connect_to(cj)
 
-        # 4. Execute show_simulation with SMOKE_TEST enabled to run 10 steps
-        viewer.show_simulation(room, mock_provider, "mock", "mock/target", 10)
+        # 4. Execute room.simulate with SMOKE_TEST enabled to run 10 steps
+        room.simulate(
+            provider_hooks=mock_provider.simulate,
+            gui_mode=42,
+            proj_name="mock",
+            sim_target="mock/target",
+            steps=10,
+            manager=viewer.manager,
+            logger=viewer.logger,
+        )
 
         # 5. Assertions
         mock_exists.assert_any_call("build/mock/parent.obj")
         mock_exists.assert_any_call("build/mock/child.obj")
         mock_exists.assert_any_call("build/mock/target.urdf")
         assert mock_copy.call_count == 3
-        mock_connect.assert_called_once()
+        mock_connect.assert_called_once_with(42)
         mock_load_urdf.assert_called_once()
         mock_get_num_joints.assert_called_once_with(100, physicsClientId=42)
         mock_set_gravity.assert_called_once_with(0, 0, -9.81, physicsClientId=42)
@@ -480,17 +496,18 @@ class TestViewer:
         )
 
         # Verify hooks were called with early termination
-        mock_setup.assert_called_once_with(100, 42)
+        mock_setup.assert_called_once_with(100, 42, "mock/target")
         assert mock_step.call_count == 3
         actual_calls = [call.args for call in mock_step.call_args_list]
-        expected_calls = [(100, 42, i) for i in range(3)]
+        expected_calls = [(100, 42, i, "mock/target") for i in range(3)]
         assert actual_calls == expected_calls
-        mock_teardown.assert_called_once_with(100, 42)
+        mock_teardown.assert_called_once_with(100, 42, "mock/target")
         mock_disconnect.assert_called_once_with(physicsClientId=42)
 
     @patch("view.show")
     @patch("view.Builder")
-    def test_show_view_runs_simulation_in_simulate_mode(self, mock_builder_class, mock_show, viewer):
+    @patch("view.Room.simulate")
+    def test_show_view_runs_simulation_in_simulate_mode(self, mock_simulate, mock_builder_class, mock_show, viewer):
         """Verify show_view runs simulation instead of standard view when SIMULATE mode is resolved."""
         target_name = "mock/target"
         m1 = MagicMock(spec=TargetList, provider=viewer.manager.router.targets.provider, modes=[Mode.SIMULATE])
@@ -503,9 +520,6 @@ class TestViewer:
         viewer.target_parser.resolve = MagicMock(side_effect=[m1, None, None])
         viewer.manager.router.manifest = {target_name: {Section.VIEW: {}}}
 
-        # Stub show_simulation to prevent actually launching pybullet
-        viewer.show_simulation = MagicMock()
-
         # Simulate getting room from VIEW
         mock_room = Room()
         mock_geom = MagicMock(spec=Part, label=None, wrapped="fake_geom")
@@ -514,24 +528,25 @@ class TestViewer:
 
         viewer.show_view([target_name])
 
-        # Verify standard ocp_vscode show is NOT called, but show_simulation IS called
+        # Verify standard ocp_vscode show is NOT called, but Room.simulate IS called
         mock_show.assert_not_called()
-        viewer.show_simulation.assert_called_once()
-        actual_room = viewer.show_simulation.call_args[0][0]
-        assert "mock_target_part" in actual_room
-        assert viewer.show_simulation.call_args[0][1] == m1.provider
-        assert viewer.show_simulation.call_args[0][2] == "mock"
-        assert viewer.show_simulation.call_args[1].get("sim_target") == "mock/target"
+        mock_simulate.assert_called_once()
+        kwargs = mock_simulate.call_args[1]
+        assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
+        assert kwargs.get("proj_name") == "mock"
+        assert kwargs.get("sim_target") == "mock/target"
+        assert kwargs.get("steps") == 1000
 
         # Verify Builder compiles parts and URDFs prior to simulating
         mock_builder_class.assert_called_once_with(viewer.manager, viewer.logger)
         mock_builder = mock_builder_class.return_value
-        mock_builder.generate_parts.assert_called_once_with("build", names=["mock"])
-        mock_builder.generate_urdfs.assert_called_once_with("build", names=["mock"])
+        mock_builder.generate_parts.assert_called_once_with("build", names=["mock/*"])
+        mock_builder.generate_urdfs.assert_called_once_with("build", names=["mock/*"])
 
     @patch("view.show")
     @patch("view.Builder")
-    def test_show_view_simulation_no_build(self, mock_builder_class, mock_show, viewer):
+    @patch("view.Room.simulate")
+    def test_show_view_simulation_no_build(self, mock_simulate, mock_builder_class, mock_show, viewer):
         """Verify show_view skips compilation when no_build=True is specified."""
         target_name = "mock/target"
         m1 = MagicMock(spec=TargetList, provider=viewer.manager.router.targets.provider, modes=[Mode.SIMULATE])
@@ -544,9 +559,6 @@ class TestViewer:
         viewer.target_parser.resolve = MagicMock(side_effect=[m1, None, None])
         viewer.manager.router.manifest = {target_name: {Section.VIEW: {}}}
 
-        # Stub show_simulation
-        viewer.show_simulation = MagicMock()
-
         # Simulate getting room from VIEW
         mock_room = Room()
         mock_geom = MagicMock(spec=Part, label=None, wrapped="fake_geom")
@@ -555,18 +567,19 @@ class TestViewer:
 
         viewer.show_view([target_name], no_build=True)
 
-        # Verify show_simulation is called but Builder is never instantiated or run
-        viewer.show_simulation.assert_called_once()
-        actual_room = viewer.show_simulation.call_args[0][0]
-        assert "mock_target_part" in actual_room
-        assert viewer.show_simulation.call_args[0][1] == m1.provider
-        assert viewer.show_simulation.call_args[0][2] == "mock"
-        assert viewer.show_simulation.call_args[1].get("sim_target") == "mock/target"
+        # Verify simulate is called but Builder is never instantiated or run
+        mock_simulate.assert_called_once()
+        kwargs = mock_simulate.call_args[1]
+        assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
+        assert kwargs.get("proj_name") == "mock"
+        assert kwargs.get("sim_target") == "mock/target"
+        assert kwargs.get("steps") == 1000
         mock_builder_class.assert_not_called()
 
     @patch("view.show")
     @patch("view.Builder")
-    def test_show_view_simulation_custom_build_dir(self, mock_builder_class, mock_show, viewer):
+    @patch("view.Room.simulate")
+    def test_show_view_simulation_custom_build_dir(self, mock_simulate, mock_builder_class, mock_show, viewer):
         """Verify show_view runs compilation in the specified custom build directory."""
         target_name = "mock/target"
         m1 = MagicMock(spec=TargetList, provider=viewer.manager.router.targets.provider, modes=[Mode.SIMULATE])
@@ -579,9 +592,6 @@ class TestViewer:
         viewer.target_parser.resolve = MagicMock(side_effect=[m1, None, None])
         viewer.manager.router.manifest = {target_name: {Section.VIEW: {}}}
 
-        # Stub show_simulation
-        viewer.show_simulation = MagicMock()
-
         # Simulate getting room from VIEW
         mock_room = Room()
         mock_geom = MagicMock(spec=Part, label=None, wrapped="fake_geom")
@@ -593,24 +603,32 @@ class TestViewer:
         # Verify Builder compiles parts and URDFs in custom_build
         mock_builder_class.assert_called_once_with(viewer.manager, viewer.logger)
         mock_builder = mock_builder_class.return_value
-        mock_builder.generate_parts.assert_called_once_with("custom_build", names=["mock"])
-        mock_builder.generate_urdfs.assert_called_once_with("custom_build", names=["mock"])
+        mock_builder.generate_parts.assert_called_once_with("custom_build", names=["mock/*"])
+        mock_builder.generate_urdfs.assert_called_once_with("custom_build", names=["mock/*"])
 
-        # Verify show_simulation is called with build_dir="custom_build"
-        viewer.show_simulation.assert_called_once()
-        actual_room = viewer.show_simulation.call_args[0][0]
-        assert "mock_target_part" in actual_room
-        assert viewer.show_simulation.call_args[0][1] == m1.provider
-        assert viewer.show_simulation.call_args[0][2] == "mock"
-        assert viewer.show_simulation.call_args[1].get("sim_target") == "mock/target"
-        assert viewer.show_simulation.call_args[1].get("build_dir") == "custom_build"
+        # Verify simulate is called with build_dir="custom_build"
+        mock_simulate.assert_called_once()
+        kwargs = mock_simulate.call_args[1]
+        assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
+        assert kwargs.get("proj_name") == "mock"
+        assert kwargs.get("sim_target") == "mock/target"
+        assert kwargs.get("steps") == 1000
+        assert kwargs.get("build_dir") == "custom_build"
 
     def test_show_simulation_empty_room(self, viewer):
         """Verify show_simulation raises ValueError when room is empty."""
         room = Room()
         mock_provider = MagicMock()
         with pytest.raises(ValueError, match="Cannot simulate an empty Room."):
-            viewer.show_simulation(room, mock_provider, "mock", "mock/target", 10)
+            room.simulate(
+                provider_hooks=mock_provider.simulate,
+                gui_mode=42,
+                proj_name="mock",
+                sim_target="mock/target",
+                steps=10,
+                manager=viewer.manager,
+                logger=viewer.logger,
+            )
 
     def test_show_simulation_missing_urdf_file(self, viewer):
         """Verify show_simulation raises FileNotFoundError when URDF file is missing."""
@@ -622,11 +640,19 @@ class TestViewer:
 
         mock_provider = MagicMock()
         with (
-            patch("view.shutil.copy"),
-            patch("view.os.path.exists", side_effect=lambda path: not path.endswith(".urdf")),
+            patch("provider.room.shutil.copy"),
+            patch("provider.room.os.path.exists", side_effect=lambda path: not path.endswith(".urdf")),
         ):
             with pytest.raises(FileNotFoundError, match="Required URDF file not found for simulation"):
-                viewer.show_simulation(room, mock_provider, "mock", "mock/target", 10)
+                room.simulate(
+                    provider_hooks=mock_provider.simulate,
+                    gui_mode=42,
+                    proj_name="mock",
+                    sim_target="mock/target",
+                    steps=10,
+                    manager=viewer.manager,
+                    logger=viewer.logger,
+                )
 
     def test_show_simulation_missing_obj_file(self, viewer):
         """Verify show_simulation raises FileNotFoundError when an OBJ file is missing."""
@@ -637,12 +663,20 @@ class TestViewer:
         room.add("parent", parent)
 
         mock_provider = MagicMock()
-        with patch("view.shutil.copy"), patch("view.os.path.exists", return_value=False):
+        with patch("provider.room.shutil.copy"), patch("provider.room.os.path.exists", return_value=False):
             with pytest.raises(FileNotFoundError, match="Required OBJ file not found for simulation"):
-                viewer.show_simulation(room, mock_provider, "mock", "mock/target", 10)
+                room.simulate(
+                    provider_hooks=mock_provider.simulate,
+                    gui_mode=42,
+                    proj_name="mock",
+                    sim_target="mock/target",
+                    steps=10,
+                    manager=viewer.manager,
+                    logger=viewer.logger,
+                )
 
-    @patch("view.os.path.exists")
-    @patch("view.shutil.copy")
+    @patch("provider.room.os.path.exists")
+    @patch("provider.room.shutil.copy")
     @patch("pybullet.connect")
     @patch("pybullet.loadURDF")
     @patch("pybullet.getNumJoints")
@@ -679,6 +713,14 @@ class TestViewer:
         room.add("parent", parent)
 
         mock_provider = MagicMock()
-        viewer.show_simulation(room, mock_provider, "mock", "mock/target", 10)
+        room.simulate(
+            provider_hooks=mock_provider.simulate,
+            gui_mode=42,
+            proj_name="mock",
+            sim_target="mock/target",
+            steps=10,
+            manager=viewer.manager,
+            logger=viewer.logger,
+        )
 
         mock_set_gravity.assert_called_once_with(1.0, 2.0, -3.0, physicsClientId=42)

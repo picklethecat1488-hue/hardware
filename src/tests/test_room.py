@@ -374,3 +374,25 @@ def test_room_urdf_pybullet_integration():
 
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_export_urdf_multiple_root_links():
+    """Verify that export_urdf raises ValueError if multiple root links are found."""
+    room = Room()
+    # Create two disconnected shapes, each with an urdf_label
+    box1 = Box(1, 1, 1)
+    box1_part = cast(URDFShape, box1)
+    box1_part.urdf_label = "link1"
+
+    box2 = Box(1, 1, 1)
+    box2_part = cast(URDFShape, box2)
+    box2_part.urdf_label = "link2"
+
+    room.add("box1", box1)
+    room.add("box2", box2)
+
+    import io
+
+    output = io.StringIO()
+    with pytest.raises(ValueError, match="URDF file with multiple root links found: link1 link2"):
+        room.export_urdf(output, "test_project")
