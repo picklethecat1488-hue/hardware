@@ -90,6 +90,21 @@ class TestSmoke:
         self.run_command(["src/view.py", "exhaust_manifolds/wire"], extra_env=env)
         self.run_command(["src/view.py", "exhaust_manifolds/*:part/print"], extra_env=env)
 
+    def test_view_simulation(self):
+        """Verify view.py simulation mode runs without error using a temporary build directory."""
+        env = {"SMOKE_TEST": "1"}
+        self.run_command(
+            [
+                "src/view.py",
+                "cat_fountain/product:view/simulate",
+                "--build-dir",
+                str(self.build_dir),
+                "-s",
+                "10",
+            ],
+            extra_env=env,
+        )
+
     def test_list_commands(self):
         """Verify list.py commands execute correctly."""
         # Check target listing

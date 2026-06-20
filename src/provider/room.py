@@ -2,8 +2,13 @@
 
 import io
 import math
+import os
+import shutil
+import tempfile
+import time
+import pybullet as p
 from pathlib import Path
-from typing import Any, Union, Optional, TYPE_CHECKING, cast
+from typing import Any, Union, Optional, TYPE_CHECKING, cast, Callable
 from build123d import (
     BoundBox,
     BuildPart,
@@ -24,7 +29,7 @@ from build123d import (
 )
 from build123d.exporters import ExportSVG, Drawing
 from model import DiagramOptions, TextArgs
-from .types import ColorType, URDFShape
+from .types import ColorType, URDFShape, Simulate
 from .utils import get_rgba_color
 
 if TYPE_CHECKING:
@@ -568,6 +573,13 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         if not links_info:
             return
 
+        # Validate that the URDF has exactly one root link
+        roots = [link["name"] for link in links_info if link["parent"] is None]
+        if len(roots) > 1:
+            raise ValueError(f"URDF file with multiple root links found: {' '.join(roots)}")
+        elif len(roots) == 0:
+            raise ValueError("URDF file with no root links found (contains cycles).")
+
         links_strings = []
         for link in links_info:
             links_strings.append(
@@ -629,3 +641,149 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 f.write(urdf_content)
         else:
             path.write(urdf_content)
+
+    def simulate(
+        self,
+        provider_hooks: dict[Simulate, Callable[..., Any]],
+        gui_mode: int,
+        proj_name: str,
+        sim_target: str,
+        steps: int,
+        manager: Any,
+        logger: Any,
+        build_dir: str = "build",
+    ) -> None:
+        """Run a PyBullet physics simulation for the room geometries."""
+        from provider import Provider
+        from list import Lister
+
+        logger.print("Running Simulation...", symbol="🤖")
+
+        if not self:
+            raise ValueError("Cannot simulate an empty Room.")
+
+        Provider.validate_simulate_hooks(provider_hooks)
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            proj_dir = os.path.join(temp_dir, proj_name)
+            os.makedirs(proj_dir, exist_ok=True)
+
+            build_proj_dir = os.path.join(build_dir, proj_name)
+
+            # Map to determine names of room geometries
+            self.translate_joints()
+
+            for geom, _ in self.values():
+                u_geom = cast(URDFShape, geom)
+                label = getattr(u_geom, "urdf_label", None)
+                if label:
+                    real_obj_path = os.path.join(build_proj_dir, f"{label}.obj")
+                    temp_obj_path = os.path.join(proj_dir, f"{label}.obj")
+                    if os.path.exists(real_obj_path):
+                        shutil.copy(real_obj_path, temp_obj_path)
+                    else:
+                        raise FileNotFoundError(f"Required OBJ file not found for simulation: {real_obj_path}")
+
+            # Determine URDF filename using Lister
+            lister = Lister(manager, logger)
+            urdf_rel_path = lister.get_urdf_output(sim_target)
+            real_urdf_path = os.path.join(build_dir, urdf_rel_path)
+            temp_urdf_filename = os.path.basename(urdf_rel_path)
+            urdf_path = os.path.join(temp_dir, temp_urdf_filename)
+
+            if os.path.exists(real_urdf_path):
+                shutil.copy(real_urdf_path, urdf_path)
+            else:
+                raise FileNotFoundError(f"Required URDF file not found for simulation: {real_urdf_path}")
+
+            physics_client = p.connect(gui_mode)
+            try:
+                p.setGravity(*self.gravity, physicsClientId=physics_client)
+
+                body_id = p.loadURDF(urdf_path, physicsClientId=physics_client)
+                if body_id < 0:
+                    raise RuntimeError("PyBullet failed to load the URDF.")
+
+                num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
+                joint_name_to_index = {}
+                for i in range(num_joints):
+                    info = p.getJointInfo(body_id, i, physicsClientId=physics_client)
+                    joint_name = info[1].decode("utf-8")
+                    joint_name_to_index[joint_name] = i
+
+                for geom, _ in self.values():
+                    u_geom = cast(URDFShape, geom)
+                    label = getattr(u_geom, "urdf_label", None)
+                    parent_label = getattr(u_geom, "urdf_parent", None)
+                    if label and parent_label:
+                        joint_name = f"{parent_label}_to_{label}"
+                        if joint_name in joint_name_to_index:
+                            idx = joint_name_to_index[joint_name]
+                            motor_type = getattr(u_geom, "urdf_motor_type", None)
+                            if motor_type:
+                                target = getattr(u_geom, "urdf_motor_target", 0.0)
+                                force = getattr(u_geom, "urdf_motor_force", 10.0)
+                                if motor_type == "velocity":
+                                    p.setJointMotorControl2(
+                                        bodyUniqueId=body_id,
+                                        jointIndex=idx,
+                                        controlMode=p.VELOCITY_CONTROL,
+                                        targetVelocity=target,
+                                        force=force,
+                                        physicsClientId=physics_client,
+                                    )
+                                elif motor_type == "torque":
+                                    p.setJointMotorControl2(
+                                        bodyUniqueId=body_id,
+                                        jointIndex=idx,
+                                        controlMode=p.TORQUE_CONTROL,
+                                        force=target,
+                                        physicsClientId=physics_client,
+                                    )
+                            else:
+                                p.setJointMotorControl2(
+                                    bodyUniqueId=body_id,
+                                    jointIndex=idx,
+                                    controlMode=p.VELOCITY_CONTROL,
+                                    force=0,
+                                    physicsClientId=physics_client,
+                                )
+
+                # Setup Hooks
+                setup_hook = provider_hooks.get(Simulate.SETUP, None)
+                if setup_hook:
+                    setup_hook(body_id, physics_client, sim_target)
+
+                loop_start = time.perf_counter()
+                for step_idx in range(steps):
+                    # Step Hooks
+                    step_hook = provider_hooks.get(Simulate.STEP, None)
+                    sleep_t = float("inf") if step_hook else 0
+                    if step_hook:
+                        res = step_hook(body_id, physics_client, step_idx, sim_target)
+                        if isinstance(res, (int, float)):
+                            sleep_t = float(res)
+
+                    p.stepSimulation(physicsClientId=physics_client)
+
+                    if sleep_t == float("inf"):
+                        # Simulation early termination conditions met.
+                        break
+                    elif sleep_t > 0:
+                        # Lock simulation speed.
+                        elapsed = time.perf_counter() - loop_start
+                        remaining_t = sleep_t - elapsed
+                        if gui_mode == p.GUI and remaining_t > 0:
+                            time.sleep(remaining_t)
+                    loop_start = time.perf_counter()
+
+                # Teardown Hooks
+                teardown_hook = provider_hooks.get(Simulate.TEARDOWN, None)
+                if teardown_hook:
+                    teardown_hook(body_id, physics_client, sim_target)
+            finally:
+                p.disconnect(physicsClientId=physics_client)
+
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)

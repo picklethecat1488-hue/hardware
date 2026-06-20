@@ -191,10 +191,7 @@ class Builder:
             # Results is either a single geometry or a list of geometries
             res_list = results if isinstance(results, list) else [results]
             for geom in res_list:
-                if "/" in name:
-                    p_name, _ = name.split("/", 1)
-                else:
-                    p_name, _ = "default", name
+                p_name, _ = TargetParser.split_target(name)
 
                 # Create provider-specific subdirectory
                 target_dir = Path(out_dir) / p_name
@@ -352,10 +349,7 @@ class Builder:
 
             results = self.manager.router.run(simulate_targets)
             for fq_target, room in results or []:
-                if "/" in fq_target:
-                    proj_name, _ = fq_target.split("/", 1)
-                else:
-                    proj_name = "default"
+                proj_name = TargetParser.get_project_name(fq_target)
 
                 urdf_file = self.lister.get_urdf_output(fq_target)
                 urdf_path = Path(out_dir) / urdf_file

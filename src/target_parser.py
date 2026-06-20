@@ -25,6 +25,26 @@ class TargetInfo:
 class TargetParser:
     """Parses target strings into resolved TargetList objects."""
 
+    @staticmethod
+    def get_base_target(target: str) -> str:
+        """Get the base target name without action or mode suffix."""
+        return target.split(":", 1)[0]
+
+    @staticmethod
+    def get_project_name(target: str) -> str:
+        """Extract the project/provider name from a target string."""
+        base = TargetParser.get_base_target(target)
+        return base.split("/", 1)[0] if "/" in base else "default"
+
+    @staticmethod
+    def split_target(target: str) -> tuple[str, str]:
+        """Split a target string into (project/provider, leaf_target_name)."""
+        base = TargetParser.get_base_target(target)
+        if "/" in base:
+            p_name, t_name = base.split("/", 1)
+            return p_name, t_name
+        return "default", base
+
     def __init__(self, router: ProviderRouter):
         """Initialize the parser with a router for manifest lookups."""
         self.router = router
@@ -32,9 +52,8 @@ class TargetParser:
     def parse(self, raw_target: str, default_action: Section) -> Optional[TargetInfo]:
         """Parse a target string into components and match against manifest."""
         # Target format: target[_subassembly][:action[/mode]]
-        groups = raw_target.split(":", 1)
-        target_part = groups[0]
-        action_part = groups[1] if len(groups) > 1 else ""
+        target_part = self.get_base_target(raw_target)
+        action_part = raw_target.split(":", 1)[1] if ":" in raw_target else ""
 
         action_tokens = action_part.split("/") if action_part else []
         action_str = action_tokens[0] if action_tokens else None

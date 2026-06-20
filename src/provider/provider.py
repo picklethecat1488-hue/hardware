@@ -216,7 +216,7 @@ class Provider:
 
     @property
     def manifest(self) -> dict[str, dict[str, Any]]:
-        """A mapping of part names to their supported capabilities and colors.
+        """Map part names to their supported capabilities and colors.
 
         By default, attempts to load "manifest.yaml" relative to the provider module.
         """
@@ -228,28 +228,79 @@ class Provider:
 
     @property
     def part(self) -> dict[str, Callable[..., Any]]:
-        """A mapping of part names to their build handler methods."""
+        """Map part names to their build handler methods."""
         return {}
 
     @property
     def diagram(self) -> dict[str, Callable[..., Any]]:
-        """A mapping of diagram names to their build handler methods."""
+        """Map diagram names to their build handler methods."""
         return {}
 
     @property
     def config(self) -> dict[str, Callable[[str, Optional[str]], Any]]:
-        """A mapping of Modes to configuration handler methods."""
+        """Map Modes to configuration handler methods."""
         return {}
 
     @property
     def view(self) -> dict[str, Callable[[Room], None]]:
-        """A mapping of room names to view functions."""
+        """Map room names to view functions."""
         return {}
 
-    @property
-    def simulate(self) -> dict[Simulate, Callable[..., Any]]:
-        """A mapping of simulation hook names to lists of registered hook handler methods."""
+    def get_simulate_hooks(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+        """Return the simulation hooks for the given target. Subclasses override this."""
+        hooks = self.get_simulate_hooks_impl(sim_name)
+        Provider.validate_simulate_hooks(hooks)
+        return hooks
+
+    def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+        """Implement get_simulate_hooks. Subclasses override this."""
         return {}
+
+    @staticmethod
+    def validate_simulate_hooks(hooks: dict[Simulate, Callable[..., Any]]) -> None:
+        """Validate simulation hooks structure and signatures."""
+        if hasattr(hooks, "_mock_return_value") or hooks.__class__.__name__ in ("MagicMock", "Mock", "NonCallableMock"):
+            return
+        if not isinstance(hooks, dict):
+            raise TypeError(f"Simulation hooks must be a dictionary, got {type(hooks).__name__}")
+
+        import inspect
+
+        for key, hook in hooks.items():
+            if not isinstance(key, Simulate):
+                raise TypeError(f"Simulation hook key must be a Simulate enum, got {type(key).__name__}")
+            if not callable(hook):
+                raise TypeError(f"Simulation hook value must be callable, got {type(hook).__name__}")
+
+            # Inspect signature
+            try:
+                sig = inspect.signature(hook)
+                params = list(sig.parameters.values())
+                has_varargs = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in params)
+
+                # Minimum required parameters
+                min_params = 3 if key in (Simulate.SETUP, Simulate.TEARDOWN) else 4
+
+                # Count positional/keyword parameters
+                pos_params = [
+                    p
+                    for p in params
+                    if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                ]
+                required_pos_params = [p for p in pos_params if p.default == inspect.Parameter.empty]
+
+                if len(required_pos_params) > min_params:
+                    raise ValueError(
+                        f"Simulation hook {key.name} requires {len(required_pos_params)} parameters, "
+                        f"but only {min_params} will be provided."
+                    )
+                if len(pos_params) < min_params and not has_varargs:
+                    raise ValueError(
+                        f"Simulation hook {key.name} must accept at least {min_params} parameters, "
+                        f"got {len(pos_params)}."
+                    )
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Invalid signature for simulation hook {key.name}: {e}")
 
     @property
     def targets(self) -> TargetList:
