@@ -15,7 +15,7 @@ class CatFountainConfig(BaseModel):
     )
 
     diagram_options: DiagramOptions = Field(
-        default_factory=lambda: DiagramOptions(line_weight=0.5, view_from="top", show_hidden=True),
+        default_factory=lambda: DiagramOptions(line_weight=1, view_from="iso", show_hidden=True),
         description="Diagram export options",
     )
 

@@ -51,7 +51,10 @@ class TestCatFountainProvider:
         """Verify that build_diagram populates the room with geometry."""
         room = Room()
         provider.build_diagram(room, ["fountain"], Mode.DEFAULT)
-        assert "fountain" in room
+        assert "bowl" in room
+        assert "impeller" in room
+        assert "tube" in room
+        assert "spout" in room
 
     def test_build_product(self, provider):
         """Verify that build_product populates the room with all fountain parts and their URDF attributes."""
