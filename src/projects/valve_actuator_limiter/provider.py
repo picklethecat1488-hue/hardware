@@ -176,7 +176,6 @@ class ValveActuatorLimiterProvider(Provider):
                 add(self.build_limiter("_limiter", mode=mode).part)
         return p
 
-    @method_cache
     def build_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build an assembly diagram for the limiter plates."""
         # Build only the limiter plate for diagram viewing

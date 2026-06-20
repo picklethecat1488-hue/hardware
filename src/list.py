@@ -29,7 +29,7 @@ class Lister:
             filtered = set()
             for name in names:
                 for t in target_names:
-                    base = t.split(":")[0]
+                    base = TargetParser.get_base_target(t)
                     if fnmatch.fnmatch(base, name) or fnmatch.fnmatch(t, name):
                         filtered.add(t)
             target_names = sorted(list(filtered))
@@ -44,10 +44,7 @@ class Lister:
 
     def get_part_outputs(self, target: str, sub: str | None) -> list[str]:
         """Get output paths for a part."""
-        if "/" in target:
-            p_name, t_name = target.split("/", 1)
-        else:
-            p_name, t_name = "default", target
+        p_name, t_name = TargetParser.split_target(target)
 
         side_suffix = f"_{sub}" if sub else ""
         export_types = self.manager.router.get_export_types(target, sub)
@@ -55,19 +52,16 @@ class Lister:
 
     def get_diagram_output(self, target: str) -> str:
         """Get output path for a diagram."""
-        if "/" in target:
-            p_name = target.split("/")[0]
+        known_providers = {p.name for p in self.manager.router.providers}
+        if target in known_providers:
+            p_name = target
         else:
-            known_providers = {p.name for p in self.manager.router.providers}
-            p_name = target if target in known_providers else "default"
+            p_name = TargetParser.get_project_name(target)
         return f"{p_name}/{p_name}_diagram.svg"
 
     def get_urdf_output(self, target: str) -> str:
         """Get output path for a URDF view."""
-        if "/" in target:
-            p_name, t_name = target.split("/", 1)
-        else:
-            p_name, t_name = "default", target
+        p_name, t_name = TargetParser.split_target(target)
         return f"{p_name}/{t_name}.urdf"
 
     def _resolve_targets(self, names: list[str] | None, section: Section, default_mode: Mode):
@@ -118,7 +112,7 @@ class Lister:
                 continue
             p_names = set()
             for target in base_targets:
-                p_names.add(target.split("/")[0] if "/" in target else "default")
+                p_names.add(TargetParser.get_project_name(target))
             for p_name in p_names:
                 outputs.append(self.get_diagram_output(p_name))
 

@@ -74,6 +74,11 @@ jobs:
         run: |
           python src/build.py -out build
 
+      - name: Configure Hardware
+        shell: bash -el {0}
+        run: |
+          python src/config.py -e build/.env
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
