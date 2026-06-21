@@ -2,6 +2,7 @@
 
 from functools import cached_property
 from build123d import *  # type: ignore
+import math
 from model import method_cache, TextArgs
 from pathlib import Path
 import pybullet as p
@@ -315,11 +316,6 @@ class CatFountainProvider(Provider):
 
     def setup_simulation(self, body_id: int, physics_client: int, sim_name: str) -> None:
         """Configure velocity motor control and pour 0.5L of water."""
-        import math
-
-        # Temporarily disable rendering to make particle spawning fast
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0, physicsClientId=physics_client)
-
         motor_idx = self.get_impeller_idx(body_id, physics_client)
         if motor_idx is not None:
             p.setJointMotorControl2(
@@ -334,17 +330,6 @@ class CatFountainProvider(Provider):
         # Apply top rear camera view using the room helper
         if hasattr(self, "room") and self.room:
             self.room.reset_camera(physics_client, view_from="top rear")
-
-        # Add robust invisible floor box to prevent tunneling through thin bowl
-        floor_col = p.createCollisionShape(
-            p.GEOM_BOX, halfExtents=[0.080, 0.080, 0.010], physicsClientId=physics_client
-        )
-        p.createMultiBody(
-            baseMass=0,
-            baseCollisionShapeIndex=floor_col,
-            basePosition=[0.0, 0.0, -0.006],
-            physicsClientId=physics_client,
-        )
 
         r_s = 0.003
         self.vol_s = (4 / 3) * math.pi * (r_s**3)
@@ -404,34 +389,11 @@ class CatFountainProvider(Provider):
             )
             self.water_body_ids.append(bid)
 
-    def step_simulation(self, body_id: int, physics_client: int, step_index: int, sim_name: str) -> float:
-        """Step simulation, apply pump/suction forces, check termination."""
-        import math
-
+    def step_simulation(self, body_id: int, physics_client: int, step_index: int, sim_name: str) -> str | None:
+        """Step simulation, check termination."""
         for w_id in self.water_body_ids:
             pos, _ = p.getBasePositionAndOrientation(w_id, physicsClientId=physics_client)
             x, y, z = pos
-
-            tube_y = 0.057
-            dx = x - 0.0
-            dy = y - tube_y
-            dist_sq = dx * dx + dy * dy
-
-            in_tube = (dist_sq < 0.008**2) and (0.009 <= z <= 0.109)
-
-            if in_tube:
-                p.resetBaseVelocity(w_id, linearVelocity=[0.0, 0.0, 1.8], physicsClientId=physics_client)
-            elif z > 0.100 and y > 0.035:
-                p.resetBaseVelocity(w_id, linearVelocity=[0.0, -1.8, -0.2], physicsClientId=physics_client)
-            elif z < 0.020:
-                # Suction force in the bowl to draw particles towards the tube inlet
-                dir_x = 0.0 - x
-                dir_y = tube_y - y
-                dir_z = 0.009 - z
-                d = math.sqrt(dir_x**2 + dir_y**2 + dir_z**2)
-                if d > 0.001:
-                    force = [2.0 * dir_x / d, 2.0 * dir_y / d, 0.5 * dir_z / d]
-                    p.applyExternalForce(w_id, -1, force, pos, p.WORLD_FRAME, physicsClientId=physics_client)
 
             if z >= 0.095 and y < 0.030:
                 self.spout_water_ids.add(w_id)
@@ -443,7 +405,9 @@ class CatFountainProvider(Provider):
         fallen_vol = len(self.fallen_out_water_ids) * self.vol_s * 1000
 
         # Terminate early if 0.1L falls out of bowl or spout
-        if spout_vol >= 0.1 or fallen_vol >= 0.1:
-            return float("inf")
+        if spout_vol >= 0.1:
+            return "0.1L of water spout volume reached"
+        if fallen_vol >= 0.1:
+            return "0.1L of water fell out of bowl"
 
-        return 1.0 / 60.0
+        return None

@@ -103,7 +103,13 @@ class Viewer:
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def show_view(
-        self, input_targets: Sequence[str], build_dir: str = "build", no_build: bool = False, sim_steps: int = 1000
+        self,
+        input_targets: Sequence[str],
+        build_dir: str = "build",
+        no_build: bool = False,
+        sim_steps: int = 1000,
+        save_rrd: Optional[str] = None,
+        rerun_port: Optional[int] = None,
     ):
         """Build and show the requested geometry in ocp_vscode."""
         display_items = []
@@ -162,16 +168,16 @@ class Viewer:
                 builder.generate_parts(build_dir, names=base_targets)
                 builder.generate_urdfs(build_dir, names=base_targets)
 
-            gui_mode = p.DIRECT if os.environ.get("SMOKE_TEST") == "1" else p.GUI
             room.simulate(
                 provider_hooks=provider.get_simulate_hooks(sim_target or "default"),
-                gui_mode=gui_mode,
                 proj_name=proj_name,
                 sim_target=sim_target or "default",
                 steps=sim_steps,
                 manager=self.manager,
                 logger=self.logger,
                 build_dir=build_dir,
+                save_rrd=save_rrd,
+                rerun_port=rerun_port,
             )
         else:
             summary = self.get_summary(list(room.keys()))
@@ -197,6 +203,15 @@ def get_args():
         default=10000,
         required=False,
         help="Maximum number of steps to take before stopping the simulation.",
+    )
+    parser.add_argument(
+        "--save-rrd",
+        help="Path to save the rerun (.rrd) recording file.",
+    )
+    parser.add_argument(
+        "--rerun-port",
+        type=int,
+        help="Port number to run the Rerun Viewer on.",
     )
     args = parser.parse_args()
 
@@ -230,6 +245,8 @@ def main():
                 build_dir=args.build_dir,
                 no_build=args.no_build,
                 sim_steps=args.sim_steps,
+                save_rrd=args.save_rrd,
+                rerun_port=args.rerun_port,
             )
     finally:
         logger.done()
