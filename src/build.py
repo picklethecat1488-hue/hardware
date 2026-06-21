@@ -241,8 +241,10 @@ class Builder:
             fut.result()
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def generate_parts(self, out_dir, names: list[str] | None = None):
+    def generate_parts(self, out_dir, names: list[str] | None = None, force_update: Optional[bool] = None):
         """Export STL files for generated parts."""
+        if force_update is None:
+            force_update = bool(names)
         if names:
             target_lists = []
             for name in names:
@@ -266,17 +268,19 @@ class Builder:
             for sub in self._resolve_subassemblies(base_targets, base_targets.subassemblies):
                 run_targets = base_targets.for_subassemblies([sub])
                 batch_results = self.manager.router.run(run_targets)
-                self._export_parts(out_dir, batch_results, sub=sub, force_update=bool(names))
+                self._export_parts(out_dir, batch_results, sub=sub, force_update=force_update)
                 for t in run_targets:
                     has_base_targets.discard(t)
 
             if has_base_targets:
                 batch_results = self.manager.router.run(base_targets.for_targets(has_base_targets))
-                self._export_parts(out_dir, batch_results, force_update=bool(names))
+                self._export_parts(out_dir, batch_results, force_update=force_update)
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def generate_diagram(self, out_dir, names: list[str] | None = None):
+    def generate_diagram(self, out_dir, names: list[str] | None = None, force_update: Optional[bool] = None):
         """Export an exploded diagram for the parts."""
+        if force_update is None:
+            force_update = bool(names)
         if names:
             target_lists = []
             for name in names:
@@ -314,7 +318,7 @@ class Builder:
                         diagram_file,
                         current_hash,
                         lambda r=room, ps=path_str, o=options: r.export_diagram(ps, o),
-                        bool(names),
+                        force_update,
                     )
                 )
 
@@ -323,8 +327,10 @@ class Builder:
             fut.result()
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def generate_urdfs(self, out_dir, names: list[str] | None = None):
+    def generate_urdfs(self, out_dir, names: list[str] | None = None, force_update: Optional[bool] = None):
         """Export combined URDF/OBJ assets from views that support simulate mode."""
+        if force_update is None:
+            force_update = bool(names)
         if names:
             target_lists = []
             for name in names:
@@ -386,7 +392,7 @@ class Builder:
                         urdf_file,
                         current_hash,
                         lambda r=room, ps=path_str, pn=proj_name: r.export_urdf(ps, pn),
-                        bool(names),
+                        force_update,
                     )
                 )
 
