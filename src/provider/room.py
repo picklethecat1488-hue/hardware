@@ -488,6 +488,53 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 case BallJoint():
                     child_geom.urdf_joint_type = "spherical"
 
+    def reset_camera(self, physics_client: int, view_from: str = "iso") -> None:
+        """Reset the PyBullet visualizer camera based on a view string."""
+        bb = self.compound.bounding_box()
+        center_m = [
+            bb.center().X * 0.001,
+            bb.center().Y * 0.001,
+            bb.center().Z * 0.001,
+        ]
+        max_dim = max(
+            (bb.max.X - bb.min.X) * 0.001,
+            (bb.max.Y - bb.min.Y) * 0.001,
+            (bb.max.Z - bb.min.Z) * 0.001,
+        )
+        camera_distance = max(max_dim * 2.0, 0.3)
+
+        mapping = {
+            "iso": (45.0, -30.0),
+            "top": (0.0, -89.0),
+            "bottom": (0.0, 89.0),
+            "front": (0.0, 0.0),
+            "rear": (180.0, 0.0),
+            "left": (270.0, 0.0),
+            "right": (90.0, 0.0),
+        }
+
+        view_from_lower = view_from.lower()
+        yaw, pitch = mapping.get(view_from_lower, (45.0, -30.0))
+        parts = view_from_lower.replace(",", " ").split()
+        if len(parts) > 1:
+            yaws = []
+            pitches = []
+            for part in parts:
+                if part in mapping:
+                    yaws.append(mapping[part][0])
+                    pitches.append(mapping[part][1])
+            if yaws and pitches:
+                yaw = sum(yaws) / len(yaws)
+                pitch = sum(pitches) / len(pitches)
+
+        p.resetDebugVisualizerCamera(
+            cameraDistance=camera_distance,
+            cameraYaw=yaw,
+            cameraPitch=pitch,
+            cameraTargetPosition=center_m,
+            physicsClientId=physics_client,
+        )
+
     def export_urdf(self, path: Union[str, Path, io.StringIO], project_name: str) -> None:
         """Export a combined URDF from a Room object."""
         import yaml
@@ -706,21 +753,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     raise RuntimeError("PyBullet failed to load the URDF.")
 
                 if gui_mode == p.GUI:
-                    bb = self.compound.bounding_box()
-                    center_m = [bb.center().X * 0.001, bb.center().Y * 0.001, bb.center().Z * 0.001]
-                    max_dim = max(
-                        (bb.max.X - bb.min.X) * 0.001,
-                        (bb.max.Y - bb.min.Y) * 0.001,
-                        (bb.max.Z - bb.min.Z) * 0.001,
-                    )
-                    camera_distance = max(max_dim * 2.0, 0.3)
-                    p.resetDebugVisualizerCamera(
-                        cameraDistance=camera_distance,
-                        cameraYaw=45,
-                        cameraPitch=-30,
-                        cameraTargetPosition=center_m,
-                        physicsClientId=physics_client,
-                    )
+                    self.reset_camera(physics_client, view_from="iso")
 
                 num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
                 joint_name_to_index = {}
@@ -774,6 +807,10 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                         setup_hook(body_id, physics_client, sim_target)
                     except p.error as e:
                         raise RuntimeError("PyBullet Setup hook failed. The engine might have exited") from e
+
+                # Re-enable rendering before starting the simulation loop
+                if gui_mode == p.GUI:
+                    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1, physicsClientId=physics_client)
 
                 loop_start = time.perf_counter()
                 for step_idx in range(steps):

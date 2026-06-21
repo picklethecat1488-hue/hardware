@@ -294,13 +294,13 @@ class CatFountainProvider(Provider):
         # 5. Add spout connected to the tube via joint
         tube_part.joints["top"].connect_to(spout_part.joints["base"])
         room.add("spout", spout_part, color="cyan")
+        self.room = room
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
         """Map simulation hook names to handler methods for the cat fountain."""
         return {
             Simulate.SETUP: self.setup_simulation,
             Simulate.STEP: self.step_simulation,
-            Simulate.TEARDOWN: self.teardown_simulation,
         }
 
     def get_impeller_idx(self, body_id: int, physics_client: int) -> int | None:
@@ -314,23 +314,144 @@ class CatFountainProvider(Provider):
         return None
 
     def setup_simulation(self, body_id: int, physics_client: int, sim_name: str) -> None:
-        """Configure velocity motor control for the impeller."""
-        motor_idx = self.get_impeller_idx(body_id, physics_client)
+        """Configure velocity motor control and pour 0.5L of water."""
+        import math
 
+        # Temporarily disable rendering to make particle spawning fast
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0, physicsClientId=physics_client)
+
+        motor_idx = self.get_impeller_idx(body_id, physics_client)
         if motor_idx is not None:
             p.setJointMotorControl2(
                 bodyUniqueId=body_id,
                 jointIndex=motor_idx,
                 controlMode=p.VELOCITY_CONTROL,
-                targetVelocity=10.0,
-                force=5.0,
+                targetVelocity=15.0,
+                force=10.0,
                 physicsClientId=physics_client,
             )
 
-    def step_simulation(self, body_id: int, physics_client: int, step_index: int, sim_name: str) -> float:
-        """Step hook for simulation tracking. Returns wait time in seconds."""
-        return 1.0 / 60.0
+        # Apply top rear camera view using the room helper
+        if hasattr(self, "room") and self.room:
+            self.room.reset_camera(physics_client, view_from="top rear")
 
-    def teardown_simulation(self, body_id: int, physics_client: int, sim_name: str) -> None:
-        """Teardown simulation hook."""
-        pass
+        # Add robust invisible floor box to prevent tunneling through thin bowl
+        floor_col = p.createCollisionShape(
+            p.GEOM_BOX, halfExtents=[0.080, 0.080, 0.010], physicsClientId=physics_client
+        )
+        p.createMultiBody(
+            baseMass=0,
+            baseCollisionShapeIndex=floor_col,
+            basePosition=[0.0, 0.0, -0.006],
+            physicsClientId=physics_client,
+        )
+
+        r_s = 0.003
+        self.vol_s = (4 / 3) * math.pi * (r_s**3)
+        target_vol = 0.0005
+        N = int(round(target_vol / self.vol_s))
+
+        positions = []
+        step = 2.0 * r_s
+        z_val = 0.004 + r_s
+        while len(positions) < N and z_val < 0.120:
+            x_val = -0.076 + r_s
+            while x_val < 0.076 - r_s:
+                y_val = -0.076 + r_s
+                while y_val < 0.076 - r_s:
+                    if len(positions) >= N:
+                        break
+                    if x_val * x_val + y_val * y_val > (0.076 - r_s) ** 2:
+                        y_val += step
+                        continue
+                    if x_val * x_val + y_val * y_val < (0.015 + r_s) ** 2:
+                        y_val += step
+                        continue
+                    tube_y = 0.057
+                    if x_val * x_val + (y_val - tube_y) ** 2 < (0.010 + r_s) ** 2:
+                        y_val += step
+                        continue
+                    positions.append((x_val, y_val, z_val))
+                    y_val += step
+                x_val += step
+            z_val += step
+
+        sphere_col = p.createCollisionShape(p.GEOM_SPHERE, radius=r_s, physicsClientId=physics_client)
+        sphere_vis = p.createVisualShape(
+            p.GEOM_SPHERE, radius=r_s, rgbaColor=[0.0, 0.5, 1.0, 0.8], physicsClientId=physics_client
+        )
+
+        self.water_body_ids = []
+        self.spout_water_ids = set()
+        self.fallen_out_water_ids = set()
+
+        for pos in positions:
+            bid = p.createMultiBody(
+                baseMass=0.001,
+                baseCollisionShapeIndex=sphere_col,
+                baseVisualShapeIndex=sphere_vis,
+                basePosition=pos,
+                physicsClientId=physics_client,
+            )
+            p.changeDynamics(
+                bid,
+                -1,
+                linearDamping=0.05,
+                angularDamping=0.05,
+                lateralFriction=0.1,
+                restitution=0.0,
+                physicsClientId=physics_client,
+            )
+            # Group 2, Mask 1: collides with environment, but NOT other particles
+            p.setCollisionFilterGroupMask(
+                bid,
+                -1,
+                collisionFilterGroup=2,
+                collisionFilterMask=1,
+                physicsClientId=physics_client,
+            )
+            self.water_body_ids.append(bid)
+
+    def step_simulation(self, body_id: int, physics_client: int, step_index: int, sim_name: str) -> float:
+        """Step simulation, apply pump/suction forces, check termination."""
+        import math
+
+        for w_id in self.water_body_ids:
+            pos, _ = p.getBasePositionAndOrientation(w_id, physicsClientId=physics_client)
+            x, y, z = pos
+
+            tube_y = 0.057
+            dx = x - 0.0
+            dy = y - tube_y
+            dist_sq = dx * dx + dy * dy
+
+            in_tube = (dist_sq < 0.008**2) and (0.009 <= z <= 0.109)
+
+            if in_tube:
+                p.resetBaseVelocity(w_id, linearVelocity=[0.0, 0.0, 1.8], physicsClientId=physics_client)
+            elif z > 0.100 and y > 0.035:
+                p.resetBaseVelocity(w_id, linearVelocity=[0.0, -1.8, -0.2], physicsClientId=physics_client)
+            elif z < 0.020:
+                # Suction force in the bowl to draw particles towards the tube inlet
+                dir_x = 0.0 - x
+                dir_y = tube_y - y
+                dir_z = 0.009 - z
+                d = math.sqrt(dir_x**2 + dir_y**2 + dir_z**2)
+                if d > 0.001:
+                    force = [2.0 * dir_x / d, 2.0 * dir_y / d, 0.5 * dir_z / d]
+                    p.applyExternalForce(w_id, -1, force, pos, p.WORLD_FRAME, physicsClientId=physics_client)
+
+            if z >= 0.095 and y < 0.030:
+                self.spout_water_ids.add(w_id)
+
+            if z < 0.0 or (x**2 + y**2 > 0.090**2):
+                self.fallen_out_water_ids.add(w_id)
+
+        spout_vol = len(self.spout_water_ids) * self.vol_s * 1000
+        fallen_vol = len(self.fallen_out_water_ids) * self.vol_s * 1000
+
+        # Terminate early if 0.5L falls out of bowl or spout
+        if spout_vol >= 0.5 or fallen_vol >= 0.5:
+            return float("inf")
+
+        return 1.0 / 60.0
