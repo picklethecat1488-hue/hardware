@@ -701,9 +701,26 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             try:
                 p.setGravity(*self.gravity, physicsClientId=physics_client)
 
-                body_id = p.loadURDF(urdf_path, physicsClientId=physics_client)
+                body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
                 if body_id < 0:
                     raise RuntimeError("PyBullet failed to load the URDF.")
+
+                if gui_mode == p.GUI:
+                    bb = self.compound.bounding_box()
+                    center_m = [bb.center().X * 0.001, bb.center().Y * 0.001, bb.center().Z * 0.001]
+                    max_dim = max(
+                        (bb.max.X - bb.min.X) * 0.001,
+                        (bb.max.Y - bb.min.Y) * 0.001,
+                        (bb.max.Z - bb.min.Z) * 0.001,
+                    )
+                    camera_distance = max(max_dim * 2.0, 0.3)
+                    p.resetDebugVisualizerCamera(
+                        cameraDistance=camera_distance,
+                        cameraYaw=45,
+                        cameraPitch=-30,
+                        cameraTargetPosition=center_m,
+                        physicsClientId=physics_client,
+                    )
 
                 num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
                 joint_name_to_index = {}
@@ -753,19 +770,25 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 # Setup Hooks
                 setup_hook = provider_hooks.get(Simulate.SETUP, None)
                 if setup_hook:
-                    setup_hook(body_id, physics_client, sim_target)
+                    try:
+                        setup_hook(body_id, physics_client, sim_target)
+                    except p.error as e:
+                        raise RuntimeError("PyBullet Setup hook failed. The engine might have exited") from e
 
                 loop_start = time.perf_counter()
                 for step_idx in range(steps):
-                    # Step Hooks
-                    step_hook = provider_hooks.get(Simulate.STEP, None)
-                    sleep_t = float("inf") if step_hook else 0
-                    if step_hook:
-                        res = step_hook(body_id, physics_client, step_idx, sim_target)
-                        if isinstance(res, (int, float)):
-                            sleep_t = float(res)
+                    try:
+                        # Step Hooks
+                        step_hook = provider_hooks.get(Simulate.STEP, None)
+                        sleep_t = float("inf") if step_hook else 0
+                        if step_hook:
+                            res = step_hook(body_id, physics_client, step_idx, sim_target)
+                            if isinstance(res, (int, float)):
+                                sleep_t = float(res)
 
-                    p.stepSimulation(physicsClientId=physics_client)
+                        p.stepSimulation(physicsClientId=physics_client)
+                    except p.error as e:
+                        raise RuntimeError("PyBullet step hook failed. The engine might have exited") from e
 
                     if sleep_t == float("inf"):
                         # Simulation early termination conditions met.
@@ -781,9 +804,15 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 # Teardown Hooks
                 teardown_hook = provider_hooks.get(Simulate.TEARDOWN, None)
                 if teardown_hook:
-                    teardown_hook(body_id, physics_client, sim_target)
+                    try:
+                        teardown_hook(body_id, physics_client, sim_target)
+                    except p.error as e:
+                        raise RuntimeError("PyBullet Teardown hook failed. The engine might have exited") from e
             finally:
-                p.disconnect(physicsClientId=physics_client)
+                try:
+                    p.disconnect(physicsClientId=physics_client)
+                except Exception:
+                    pass
 
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
