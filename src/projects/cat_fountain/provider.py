@@ -404,7 +404,7 @@ class CatFountainProvider(Provider):
             )
             self.water_body_ids.append(bid)
 
-    def step_simulation(self, body_id: int, physics_client: int, step_index: int, sim_name: str) -> float:
+    def step_simulation(self, body_id: int, physics_client: int, step_index: int, sim_name: str) -> str | None:
         """Step simulation, apply pump/suction forces, check termination."""
         import math
 
@@ -443,7 +443,9 @@ class CatFountainProvider(Provider):
         fallen_vol = len(self.fallen_out_water_ids) * self.vol_s * 1000
 
         # Terminate early if 0.1L falls out of bowl or spout
-        if spout_vol >= 0.1 or fallen_vol >= 0.1:
-            return float("inf")
+        if spout_vol >= 0.1:
+            return "0.1L of water spout volume reached"
+        if fallen_vol >= 0.1:
+            return "0.1L of water fell out of bowl"
 
-        return 1.0 / 60.0
+        return None

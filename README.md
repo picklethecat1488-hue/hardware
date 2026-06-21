@@ -88,3 +88,21 @@ python src/view.py exhaust_manifolds/wire
 # View all printable parts for all manifolds 
 python src/view.py 'exhaust_manifolds/*:part/print'
 ```
+
+### Simulating Rooms and Visualizing in Rerun
+
+For targets that support simulation (e.g., the cat water fountain room), you can run a PyBullet physics simulation and visualize it in real-time using Rerun. Rerun runs headless under DIRECT physics client mode and spawns the visualization automatically.
+
+```bash
+# Run the simulation and spawn the Rerun visualizer:
+python src/view.py cat_fountain/product:view/simulate
+
+# Run the simulation for a specific number of steps:
+python src/view.py cat_fountain/product:view/simulate -s 500
+
+# Skip compiling parts and URDFs prior to starting the simulation:
+python src/view.py cat_fountain/product:view/simulate --no-build
+
+# Save the simulation recording to a (.rrd) file to upload to rerun.io:
+python src/view.py cat_fountain/product:view/simulate --save-rrd output.rrd
+```

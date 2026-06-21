@@ -416,3 +416,123 @@ def test_room_reset_camera():
             assert len(kwargs["cameraTargetPosition"]) == 3
     finally:
         p.disconnect(physicsClientId=physics_client)
+
+
+def test_room_copy_project_assets():
+    """Verify that _copy_project_assets successfully copies existing OBJ files or raises FileNotFoundError."""
+    room = Room()
+    parent = Box(1, 1, 1)
+    cast(Any, parent).urdf_label = "parent"
+    room.add("parent", parent)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        build_proj_dir = os.path.join(temp_dir, "build")
+        proj_dir = os.path.join(temp_dir, "proj")
+        os.makedirs(build_proj_dir, exist_ok=True)
+        os.makedirs(proj_dir, exist_ok=True)
+
+        # 1. Raises FileNotFoundError if OBJ does not exist
+        with pytest.raises(FileNotFoundError, match="Required OBJ file not found"):
+            room._copy_project_assets(build_proj_dir, proj_dir)
+
+        # 2. Successfully copies if OBJ exists
+        real_obj_path = os.path.join(build_proj_dir, "parent.obj")
+        with open(real_obj_path, "w") as f:
+            f.write("# parent obj")
+
+        room._copy_project_assets(build_proj_dir, proj_dir)
+        temp_obj_path = os.path.join(proj_dir, "parent.obj")
+        assert os.path.exists(temp_obj_path)
+        with open(temp_obj_path, "r") as f:
+            assert f.read() == "# parent obj"
+
+
+@patch("rerun.init")
+@patch("rerun.spawn")
+@patch("rerun.connect_grpc")
+def test_room_init_rerun(mock_connect_grpc, mock_spawn, mock_init):
+    """Verify Rerun connection initialization logic."""
+    room = Room()
+
+    # 1. spawn_viewer is False -> just call init
+    room._init_rerun("test_proj", spawn_viewer=False)
+    mock_init.assert_called_once_with("test_proj")
+    mock_spawn.assert_not_called()
+    mock_connect_grpc.assert_not_called()
+
+    mock_init.reset_mock()
+    mock_spawn.reset_mock()
+    mock_connect_grpc.reset_mock()
+
+    # Mock is_port_in_use to simulate free port
+    with patch("socket.socket") as mock_sock:
+        # connect_ex returns 1 (meaning port is NOT in use)
+        mock_sock.return_value.__enter__.return_value.connect_ex.return_value = 1
+
+        # 2. spawn_viewer is True, port is free -> spawn
+        room._init_rerun("test_proj", spawn_viewer=True, rerun_port=9876)
+        mock_init.assert_called_once_with("test_proj")
+        mock_spawn.assert_called_once_with(port=9876)
+        mock_connect_grpc.assert_not_called()
+
+    mock_init.reset_mock()
+    mock_spawn.reset_mock()
+    mock_connect_grpc.reset_mock()
+
+    # Mock is_port_in_use to simulate busy port
+    with patch("socket.socket") as mock_sock:
+        # connect_ex returns 0 (meaning port IS in use)
+        mock_sock.return_value.__enter__.return_value.connect_ex.return_value = 0
+
+        # 3. spawn_viewer is True, port is busy -> connect
+        room._init_rerun("test_proj", spawn_viewer=True, rerun_port=9876)
+        mock_init.assert_called_once_with("test_proj")
+        mock_spawn.assert_not_called()
+        mock_connect_grpc.assert_called_once_with("rerun+http://127.0.0.1:9876/proxy")
+
+
+def test_room_get_bullet_state():
+    """Verify that _get_bullet_state fetches states and particle colors from PyBullet."""
+    room = Room()
+    parent = Box(1, 1, 1)
+    cast(Any, parent).urdf_label = "parent"
+    room.add("parent", parent)
+
+    physics_client = p.connect(p.DIRECT)
+    try:
+        # Create a sphere visual shape to test color extraction
+        sphere_vis = p.createVisualShape(
+            p.GEOM_SPHERE, radius=0.003, rgbaColor=[1.0, 0.0, 0.0, 1.0], physicsClientId=physics_client
+        )
+        body_id = p.createMultiBody(
+            baseMass=0.0,
+            baseVisualShapeIndex=sphere_vis,
+            physicsClientId=physics_client,
+        )
+
+        # Create a particle body with positive mass
+        particle_col = p.createCollisionShape(p.GEOM_SPHERE, radius=0.003, physicsClientId=physics_client)
+        particle_vis = p.createVisualShape(
+            p.GEOM_SPHERE, radius=0.003, rgbaColor=[0.0, 0.5, 1.0, 0.8], physicsClientId=physics_client
+        )
+        particle_id = p.createMultiBody(
+            baseMass=0.001,
+            baseCollisionShapeIndex=particle_col,
+            baseVisualShapeIndex=particle_vis,
+            physicsClientId=physics_client,
+        )
+
+        label_to_link_idx = {"parent": -1}
+        transforms, positions, colors = room._get_bullet_state(body_id, physics_client, label_to_link_idx)
+
+        assert "parent" in transforms
+        assert len(positions) == 1
+        assert len(colors) == 1
+        # Extract rgbaColor from visual data list (floats)
+        assert math.isclose(colors[0][0], 0.0, abs_tol=1e-5)
+        assert math.isclose(colors[0][1], 0.5, abs_tol=1e-5)
+        assert math.isclose(colors[0][2], 1.0, abs_tol=1e-5)
+        assert math.isclose(colors[0][3], 0.8, abs_tol=1e-5)
+
+    finally:
+        p.disconnect(physicsClientId=physics_client)

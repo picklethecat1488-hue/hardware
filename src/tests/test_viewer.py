@@ -2,6 +2,7 @@
 
 import fnmatch
 import pytest
+import pybullet
 from unittest.mock import MagicMock, patch, PropertyMock, call
 from view import Viewer, BuildPart, BuildSketch, BuildLine, Part, Sketch, Wire
 from provider import Section, TargetList, Mode, Simulate, Room
@@ -38,6 +39,18 @@ class TestViewer:
     def viewer(self, mock_manager, mock_logger):
         """Viewer fixture."""
         return Viewer(mock_manager, mock_logger)
+
+    @pytest.fixture(autouse=True)
+    def mock_pybullet_rerun_functions(self):
+        """Mock Rerun-related Room state-querying/logging functions to avoid connection errors."""
+        with (
+            patch.object(Room, "_get_bullet_state", return_value=({}, [], [])),
+            patch.object(Room, "_log_rerun"),
+            patch.object(Room, "_init_rerun"),
+            patch("rerun.log"),
+            patch("rerun.Asset3D"),
+        ):
+            yield
 
     def test_get_summary_truncation(self, viewer):
         """Verify summary logic for short and long lists."""
@@ -331,7 +344,7 @@ class TestViewer:
         # 2. Setup mock provider with hooks
         mock_provider = MagicMock()
         mock_setup = MagicMock()
-        mock_step = MagicMock(return_value=0.02)
+        mock_step = MagicMock(return_value=None)
         mock_teardown = MagicMock()
         mock_provider.simulate = {
             Simulate.SETUP: mock_setup,
@@ -362,7 +375,6 @@ class TestViewer:
         # 4. Execute room.simulate with SMOKE_TEST enabled to run 10 steps
         room.simulate(
             provider_hooks=mock_provider.simulate,
-            gui_mode=42,
             proj_name="mock",
             sim_target="mock/target",
             steps=10,
@@ -375,7 +387,7 @@ class TestViewer:
         mock_exists.assert_any_call("build/mock/child.obj")
         mock_exists.assert_any_call("build/mock/target.urdf")
         assert mock_copy.call_count == 3
-        mock_connect.assert_called_once_with(42)
+        mock_connect.assert_called_once_with(pybullet.DIRECT)
         mock_load_urdf.assert_called_once()
         mock_get_num_joints.assert_called_once_with(100, physicsClientId=42)
         mock_set_gravity.assert_called_once_with(0, 0, -9.81, physicsClientId=42)
@@ -435,8 +447,8 @@ class TestViewer:
         # 2. Setup mock provider with hooks
         mock_provider = MagicMock()
         mock_setup = MagicMock()
-        mock_step = MagicMock(return_value=0.2)
-        mock_step.side_effect = [0.2, 0.2] + [float("inf")] * 100
+        mock_step = MagicMock(return_value=None)
+        mock_step.side_effect = [None, None] + ["terminated early"] * 100
         mock_teardown = MagicMock()
         mock_provider.simulate = {
             Simulate.SETUP: mock_setup,
@@ -467,7 +479,6 @@ class TestViewer:
         # 4. Execute room.simulate with SMOKE_TEST enabled to run 10 steps
         room.simulate(
             provider_hooks=mock_provider.simulate,
-            gui_mode=42,
             proj_name="mock",
             sim_target="mock/target",
             steps=10,
@@ -480,7 +491,7 @@ class TestViewer:
         mock_exists.assert_any_call("build/mock/child.obj")
         mock_exists.assert_any_call("build/mock/target.urdf")
         assert mock_copy.call_count == 3
-        mock_connect.assert_called_once_with(42)
+        mock_connect.assert_called_once_with(pybullet.DIRECT)
         mock_load_urdf.assert_called_once()
         mock_get_num_joints.assert_called_once_with(100, physicsClientId=42)
         mock_set_gravity.assert_called_once_with(0, 0, -9.81, physicsClientId=42)
@@ -622,7 +633,6 @@ class TestViewer:
         with pytest.raises(ValueError, match="Cannot simulate an empty Room."):
             room.simulate(
                 provider_hooks=mock_provider.simulate,
-                gui_mode=42,
                 proj_name="mock",
                 sim_target="mock/target",
                 steps=10,
@@ -646,7 +656,6 @@ class TestViewer:
             with pytest.raises(FileNotFoundError, match="Required URDF file not found for simulation"):
                 room.simulate(
                     provider_hooks=mock_provider.simulate,
-                    gui_mode=42,
                     proj_name="mock",
                     sim_target="mock/target",
                     steps=10,
@@ -667,7 +676,6 @@ class TestViewer:
             with pytest.raises(FileNotFoundError, match="Required OBJ file not found for simulation"):
                 room.simulate(
                     provider_hooks=mock_provider.simulate,
-                    gui_mode=42,
                     proj_name="mock",
                     sim_target="mock/target",
                     steps=10,
@@ -715,7 +723,6 @@ class TestViewer:
         mock_provider = MagicMock()
         room.simulate(
             provider_hooks=mock_provider.simulate,
-            gui_mode=42,
             proj_name="mock",
             sim_target="mock/target",
             steps=10,
