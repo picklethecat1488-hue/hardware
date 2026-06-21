@@ -213,27 +213,20 @@ class CatFountainProvider(Provider):
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Assemble all parts of the cat fountain."""
+        bowl = self.build_bowl("bowl", mode=mode)
+        impeller = self.build_impeller("impeller", mode=mode)
+        bowl.part.joints["shaft"].connect_to(impeller.part.joints["motor"])
+
+        t = self.settings.bowl_thickness
+        tube_y = self.settings.bowl_radius - self.settings.tube_radius - 15.0
+        tube = self.build_tube("tube", mode=mode)
+        tube.part.locate(Location((0, tube_y, t + 5.0)))
+
+        spout = self.build_spout("spout", mode=mode)
+        spout.part.locate(Location((0, tube_y, t + 5.0 + self.settings.tube_height - 10.0)))
+
         with BuildPart() as f:
-            # 1. Add bowl
-            bowl = self.build_bowl("bowl", mode=mode)
-            add(bowl.part)
-
-            # 2. Add impeller
-            t = self.settings.bowl_thickness
-            impeller = self.build_impeller("impeller", mode=mode)
-            bowl.part.joints["shaft"].connect_to(impeller.part.joints["motor"])
-            add(impeller.part)
-
-            # 3. Add tube
-            tube_y = self.settings.bowl_radius - self.settings.tube_radius - 15.0
-            tube = self.build_tube("tube", mode=mode)
-            with Locations((0, tube_y, t + 5.0)):
-                add(tube.part)
-
-            # 4. Add spout
-            spout = self.build_spout("spout", mode=mode)
-            with Locations((0, tube_y, t + 5.0 + self.settings.tube_height - 10.0)):
-                add(spout.part)
+            f._obj = Part(children=[bowl.part, impeller.part, tube.part, spout.part])
 
         return f
 
@@ -313,12 +306,11 @@ class CatFountainProvider(Provider):
     def get_impeller_idx(self, body_id: int, physics_client: int) -> int | None:
         """Get the motor index of the impeller."""
         num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
-        motor_idx = None
         for i in range(num_joints):
             info = p.getJointInfo(body_id, i, physicsClientId=physics_client)
             joint_name = info[1].decode("utf-8")
             if "impeller" in joint_name or "motor" in joint_name:
-                return motor_idx
+                return i
         return None
 
     def setup_simulation(self, body_id: int, physics_client: int, sim_name: str) -> None:
