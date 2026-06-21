@@ -396,3 +396,23 @@ def test_export_urdf_multiple_root_links():
     output = io.StringIO()
     with pytest.raises(ValueError, match="URDF file with multiple root links found: link1 link2"):
         room.export_urdf(output, "test_project")
+
+
+def test_room_reset_camera():
+    """Verify that reset_camera successfully calls resetDebugVisualizerCamera."""
+    room = Room()
+    box = Box(10, 10, 10)
+    room.add("box", box)
+
+    physics_client = p.connect(p.DIRECT)
+    try:
+        with patch("pybullet.resetDebugVisualizerCamera") as mock_reset:
+            room.reset_camera(physics_client, view_from="top rear")
+            mock_reset.assert_called_once()
+            args, kwargs = mock_reset.call_args
+            assert kwargs["cameraDistance"] > 0
+            assert math.isclose(kwargs["cameraYaw"], 90.0)
+            assert math.isclose(kwargs["cameraPitch"], -44.5)
+            assert len(kwargs["cameraTargetPosition"]) == 3
+    finally:
+        p.disconnect(physicsClientId=physics_client)
