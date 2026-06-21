@@ -28,6 +28,8 @@ from build123d import (
     BallJoint,
 )
 from build123d.exporters import ExportSVG, Drawing
+import rerun as rr
+import socket
 from model import DiagramOptions, TextArgs
 from .types import ColorType, URDFShape, Simulate
 from .utils import get_rgba_color
@@ -488,6 +490,53 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 case BallJoint():
                     child_geom.urdf_joint_type = "spherical"
 
+    def reset_camera(self, physics_client: int, view_from: str = "iso") -> None:
+        """Reset the PyBullet visualizer camera based on a view string."""
+        bb = self.compound.bounding_box()
+        center_m = [
+            bb.center().X * 0.001,
+            bb.center().Y * 0.001,
+            bb.center().Z * 0.001,
+        ]
+        max_dim = max(
+            (bb.max.X - bb.min.X) * 0.001,
+            (bb.max.Y - bb.min.Y) * 0.001,
+            (bb.max.Z - bb.min.Z) * 0.001,
+        )
+        camera_distance = max(max_dim * 2.0, 0.3)
+
+        mapping = {
+            "iso": (45.0, -30.0),
+            "top": (0.0, -89.0),
+            "bottom": (0.0, 89.0),
+            "front": (0.0, 0.0),
+            "rear": (180.0, 0.0),
+            "left": (270.0, 0.0),
+            "right": (90.0, 0.0),
+        }
+
+        view_from_lower = view_from.lower()
+        yaw, pitch = mapping.get(view_from_lower, (45.0, -30.0))
+        parts = view_from_lower.replace(",", " ").split()
+        if len(parts) > 1:
+            yaws = []
+            pitches = []
+            for part in parts:
+                if part in mapping:
+                    yaws.append(mapping[part][0])
+                    pitches.append(mapping[part][1])
+            if yaws and pitches:
+                yaw = sum(yaws) / len(yaws)
+                pitch = sum(pitches) / len(pitches)
+
+        p.resetDebugVisualizerCamera(
+            cameraDistance=camera_distance,
+            cameraYaw=yaw,
+            cameraPitch=pitch,
+            cameraTargetPosition=center_m,
+            physicsClientId=physics_client,
+        )
+
     def export_urdf(self, path: Union[str, Path, io.StringIO], project_name: str) -> None:
         """Export a combined URDF from a Room object."""
         import yaml
@@ -642,22 +691,209 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         else:
             path.write(urdf_content)
 
+    def _get_bullet_state(
+        self,
+        body_id: int,
+        physics_client: int,
+        label_to_link_idx: dict[str, int],
+    ) -> tuple[
+        dict[str, tuple[list[float], list[float]]],
+        list[list[float]],
+        list[list[float]],
+    ]:
+        """Fetch the current transforms, particle positions, and colors from PyBullet."""
+        transforms = {}
+        for label, idx in label_to_link_idx.items():
+            if idx == -1:
+                pos, orn = p.getBasePositionAndOrientation(body_id, physicsClientId=physics_client)
+            else:
+                state = p.getLinkState(body_id, idx, physicsClientId=physics_client)
+                pos, orn = state[0], state[1]
+            transforms[label] = (pos, orn)
+
+        num_bodies = p.getNumBodies(physicsClientId=physics_client)
+        particle_positions = []
+        particle_colors = []
+        for i in range(num_bodies):
+            if i == body_id:
+                continue
+            dynamics = p.getDynamicsInfo(i, -1, physicsClientId=physics_client)
+            mass = dynamics[0]
+            if mass > 0.0:
+                pos, _ = p.getBasePositionAndOrientation(i, physicsClientId=physics_client)
+                particle_positions.append(pos)
+                visual_data = p.getVisualShapeData(i, physicsClientId=physics_client)
+                color = [0.0, 0.5, 1.0, 0.8]  # Default fallback color
+                if visual_data:
+                    color = list(visual_data[0][7])
+                particle_colors.append(color)
+
+        return transforms, particle_positions, particle_colors
+
+    def _log_rerun(
+        self,
+        transforms: dict[str, tuple[list[float], list[float]]],
+        particle_positions: list[list[float]],
+        particle_colors: Optional[list[list[float]]] = None,
+        step_idx: Optional[int] = None,
+    ) -> None:
+        """Log the given state data to Rerun."""
+        if step_idx is not None:
+            rr.set_time("step", sequence=step_idx)
+
+        # Log link transforms
+        for label, (pos, orn) in transforms.items():
+            rr.log(
+                f"world/{label}",
+                rr.Transform3D(
+                    translation=pos,
+                    rotation=rr.Quaternion(xyzw=orn),
+                    scale=0.001,
+                ),
+            )
+
+        # Log particles
+        if particle_positions:
+            rr.log(
+                "world/particles",
+                rr.Points3D(
+                    positions=particle_positions,
+                    radii=0.003,
+                    colors=particle_colors if particle_colors else [0, 128, 255, 204],
+                ),
+            )
+
+    def _copy_project_assets(self, build_proj_dir: str, proj_dir: str) -> None:
+        """Copy required OBJ files for the room geometries to the temporary directory."""
+        for geom, _ in self.values():
+            u_geom = cast(URDFShape, geom)
+            label = getattr(u_geom, "urdf_label", None)
+            if label:
+                real_obj_path = os.path.join(build_proj_dir, f"{label}.obj")
+                temp_obj_path = os.path.join(proj_dir, f"{label}.obj")
+                if os.path.exists(real_obj_path):
+                    shutil.copy(real_obj_path, temp_obj_path)
+                else:
+                    raise FileNotFoundError(f"Required OBJ file not found for simulation: {real_obj_path}")
+
+    def _init_simulation_objects(
+        self,
+        physics_client: int,
+        body_id: int,
+        proj_dir: str,
+    ) -> dict[str, int]:
+        """Configure motor controls and log static assets for Room simulation."""
+        rr.log("world", rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)
+        num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
+        joint_name_to_index = {}
+        for i in range(num_joints):
+            info = p.getJointInfo(body_id, i, physicsClientId=physics_client)
+            joint_name = info[1].decode("utf-8")
+            joint_name_to_index[joint_name] = i
+
+        label_to_link_idx = {}
+        for geom, _ in self.values():
+            u_geom = cast(URDFShape, geom)
+            label = getattr(u_geom, "urdf_label", None)
+            if label:
+                parent_label = getattr(u_geom, "urdf_parent", None)
+                if not parent_label:
+                    label_to_link_idx[label] = -1
+                else:
+                    joint_name = f"{parent_label}_to_{label}"
+                    if joint_name in joint_name_to_index:
+                        label_to_link_idx[label] = joint_name_to_index[joint_name]
+
+        for geom, _ in self.values():
+            u_geom = cast(URDFShape, geom)
+            label = getattr(u_geom, "urdf_label", None)
+            parent_label = getattr(u_geom, "urdf_parent", None)
+            if label and parent_label:
+                joint_name = f"{parent_label}_to_{label}"
+                if joint_name in joint_name_to_index:
+                    idx = joint_name_to_index[joint_name]
+                    motor_type = getattr(u_geom, "urdf_motor_type", None)
+                    if motor_type:
+                        target = getattr(u_geom, "urdf_motor_target", 0.0)
+                        force = getattr(u_geom, "urdf_motor_force", 10.0)
+                        if motor_type == "velocity":
+                            p.setJointMotorControl2(
+                                bodyUniqueId=body_id,
+                                jointIndex=idx,
+                                controlMode=p.VELOCITY_CONTROL,
+                                targetVelocity=target,
+                                force=force,
+                                physicsClientId=physics_client,
+                            )
+                        elif motor_type == "torque":
+                            p.setJointMotorControl2(
+                                bodyUniqueId=body_id,
+                                jointIndex=idx,
+                                controlMode=p.TORQUE_CONTROL,
+                                force=target,
+                                physicsClientId=physics_client,
+                            )
+                    else:
+                        p.setJointMotorControl2(
+                            bodyUniqueId=body_id,
+                            jointIndex=idx,
+                            controlMode=p.VELOCITY_CONTROL,
+                            force=0,
+                            physicsClientId=physics_client,
+                        )
+
+        for geom, _ in self.values():
+            u_geom = cast(URDFShape, geom)
+            label = getattr(u_geom, "urdf_label", None)
+            if label:
+                temp_obj_path = os.path.join(proj_dir, f"{label}.obj")
+                if os.path.exists(temp_obj_path):
+                    rr.log(f"world/{label}", rr.Asset3D(path=temp_obj_path), static=True)
+
+        return label_to_link_idx
+
+    def _init_rerun(
+        self,
+        proj_name: str,
+        spawn_viewer: bool,
+        rerun_port: Optional[int] = None,
+    ) -> None:
+        """Initialize Rerun connection, connecting to an existing viewer or spawning a new one."""
+        rr.init(proj_name or "pybullet_simulation")
+        if not spawn_viewer:
+            return
+
+        def is_port_in_use(port: int) -> bool:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(0.1)
+                    return s.connect_ex(("127.0.0.1", port)) == 0
+            except Exception:
+                return False
+
+        target_port = rerun_port if rerun_port is not None else 9876
+        if is_port_in_use(target_port):
+            rr.connect_grpc(f"rerun+http://127.0.0.1:{target_port}/proxy")
+        else:
+            rr.spawn(port=target_port)
+
     def simulate(
         self,
         provider_hooks: dict[Simulate, Callable[..., Any]],
-        gui_mode: int,
         proj_name: str,
         sim_target: str,
         steps: int,
         manager: Any,
         logger: Any,
         build_dir: str = "build",
+        save_rrd: Optional[str] = None,
+        rerun_port: Optional[int] = None,
     ) -> None:
         """Run a PyBullet physics simulation for the room geometries."""
         from provider import Provider
         from list import Lister
 
-        logger.print("Running Simulation...", symbol="🤖")
+        logger.print("Running Simulation (Ctrl-C to exit)...", symbol="🤖")
 
         if not self:
             raise ValueError("Cannot simulate an empty Room.")
@@ -666,24 +902,12 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         temp_dir = tempfile.mkdtemp()
         try:
+            # Create the simulation project assets
             proj_dir = os.path.join(temp_dir, proj_name)
             os.makedirs(proj_dir, exist_ok=True)
-
             build_proj_dir = os.path.join(build_dir, proj_name)
-
-            # Map to determine names of room geometries
             self.translate_joints()
-
-            for geom, _ in self.values():
-                u_geom = cast(URDFShape, geom)
-                label = getattr(u_geom, "urdf_label", None)
-                if label:
-                    real_obj_path = os.path.join(build_proj_dir, f"{label}.obj")
-                    temp_obj_path = os.path.join(proj_dir, f"{label}.obj")
-                    if os.path.exists(real_obj_path):
-                        shutil.copy(real_obj_path, temp_obj_path)
-                    else:
-                        raise FileNotFoundError(f"Required OBJ file not found for simulation: {real_obj_path}")
+            self._copy_project_assets(build_proj_dir, proj_dir)
 
             # Determine URDF filename using Lister
             lister = Lister(manager, logger)
@@ -697,93 +921,79 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             else:
                 raise FileNotFoundError(f"Required URDF file not found for simulation: {real_urdf_path}")
 
-            physics_client = p.connect(gui_mode)
+            physics_client = p.connect(p.DIRECT)
+            spawn_viewer = os.environ.get("SMOKE_TEST") != "1"
+
+            self._init_rerun(proj_name, spawn_viewer, rerun_port)
+
+            if save_rrd:
+                rr.save(save_rrd)
+
             try:
                 p.setGravity(*self.gravity, physicsClientId=physics_client)
 
-                body_id = p.loadURDF(urdf_path, physicsClientId=physics_client)
+                body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
                 if body_id < 0:
                     raise RuntimeError("PyBullet failed to load the URDF.")
 
-                num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
-                joint_name_to_index = {}
-                for i in range(num_joints):
-                    info = p.getJointInfo(body_id, i, physicsClientId=physics_client)
-                    joint_name = info[1].decode("utf-8")
-                    joint_name_to_index[joint_name] = i
+                label_to_link_idx = self._init_simulation_objects(physics_client, body_id, proj_dir)
 
-                for geom, _ in self.values():
-                    u_geom = cast(URDFShape, geom)
-                    label = getattr(u_geom, "urdf_label", None)
-                    parent_label = getattr(u_geom, "urdf_parent", None)
-                    if label and parent_label:
-                        joint_name = f"{parent_label}_to_{label}"
-                        if joint_name in joint_name_to_index:
-                            idx = joint_name_to_index[joint_name]
-                            motor_type = getattr(u_geom, "urdf_motor_type", None)
-                            if motor_type:
-                                target = getattr(u_geom, "urdf_motor_target", 0.0)
-                                force = getattr(u_geom, "urdf_motor_force", 10.0)
-                                if motor_type == "velocity":
-                                    p.setJointMotorControl2(
-                                        bodyUniqueId=body_id,
-                                        jointIndex=idx,
-                                        controlMode=p.VELOCITY_CONTROL,
-                                        targetVelocity=target,
-                                        force=force,
-                                        physicsClientId=physics_client,
-                                    )
-                                elif motor_type == "torque":
-                                    p.setJointMotorControl2(
-                                        bodyUniqueId=body_id,
-                                        jointIndex=idx,
-                                        controlMode=p.TORQUE_CONTROL,
-                                        force=target,
-                                        physicsClientId=physics_client,
-                                    )
-                            else:
-                                p.setJointMotorControl2(
-                                    bodyUniqueId=body_id,
-                                    jointIndex=idx,
-                                    controlMode=p.VELOCITY_CONTROL,
-                                    force=0,
-                                    physicsClientId=physics_client,
-                                )
+                # Temporarily disable rendering to make particle spawning fast
+                try:
+                    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0, physicsClientId=physics_client)
+                except p.error:
+                    pass
 
                 # Setup Hooks
                 setup_hook = provider_hooks.get(Simulate.SETUP, None)
                 if setup_hook:
                     setup_hook(body_id, physics_client, sim_target)
 
-                loop_start = time.perf_counter()
+                # Re-enable rendering
+                try:
+                    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1, physicsClientId=physics_client)
+                except p.error:
+                    pass
+
                 for step_idx in range(steps):
                     # Step Hooks
                     step_hook = provider_hooks.get(Simulate.STEP, None)
-                    sleep_t = float("inf") if step_hook else 0
+                    terminated = False
                     if step_hook:
                         res = step_hook(body_id, physics_client, step_idx, sim_target)
-                        if isinstance(res, (int, float)):
-                            sleep_t = float(res)
+                        if isinstance(res, str):
+                            logger.print(f"Simulation terminated: {res}", symbol="🛑")
+                            terminated = True
 
-                    p.stepSimulation(physicsClientId=physics_client)
+                    # Fetch state data of step_idx
+                    transforms, particle_positions, particle_colors = self._get_bullet_state(
+                        body_id, physics_client, label_to_link_idx
+                    )
 
-                    if sleep_t == float("inf"):
+                    # Step physics
+                    if not terminated:
+                        p.stepSimulation(physicsClientId=physics_client)
+                    self._log_rerun(transforms, particle_positions, particle_colors, step_idx=step_idx)
+
+                    if terminated:
                         # Simulation early termination conditions met.
                         break
-                    elif sleep_t > 0:
-                        # Lock simulation speed.
-                        elapsed = time.perf_counter() - loop_start
-                        remaining_t = sleep_t - elapsed
-                        if gui_mode == p.GUI and remaining_t > 0:
-                            time.sleep(remaining_t)
-                    loop_start = time.perf_counter()
 
                 # Teardown Hooks
                 teardown_hook = provider_hooks.get(Simulate.TEARDOWN, None)
                 if teardown_hook:
                     teardown_hook(body_id, physics_client, sim_target)
+            except KeyboardInterrupt:
+                logger.print("Simulation stopped.", symbol="💥")
             finally:
-                p.disconnect(physicsClientId=physics_client)
+                try:
+                    p.disconnect(physicsClientId=physics_client)
+                except Exception:
+                    pass
+                try:
+                    rr.disconnect()
+                except Exception:
+                    pass
 
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)

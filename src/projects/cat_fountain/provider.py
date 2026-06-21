@@ -2,6 +2,7 @@
 
 from functools import cached_property
 from build123d import *  # type: ignore
+import math
 from model import method_cache, TextArgs
 from pathlib import Path
 import pybullet as p
@@ -213,27 +214,20 @@ class CatFountainProvider(Provider):
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Assemble all parts of the cat fountain."""
+        bowl = self.build_bowl("bowl", mode=mode)
+        impeller = self.build_impeller("impeller", mode=mode)
+        bowl.part.joints["shaft"].connect_to(impeller.part.joints["motor"])
+
+        t = self.settings.bowl_thickness
+        tube_y = self.settings.bowl_radius - self.settings.tube_radius - 15.0
+        tube = self.build_tube("tube", mode=mode)
+        tube.part.locate(Location((0, tube_y, t + 5.0)))
+
+        spout = self.build_spout("spout", mode=mode)
+        spout.part.locate(Location((0, tube_y, t + 5.0 + self.settings.tube_height - 10.0)))
+
         with BuildPart() as f:
-            # 1. Add bowl
-            bowl = self.build_bowl("bowl", mode=mode)
-            add(bowl.part)
-
-            # 2. Add impeller
-            t = self.settings.bowl_thickness
-            impeller = self.build_impeller("impeller", mode=mode)
-            bowl.part.joints["shaft"].connect_to(impeller.part.joints["motor"])
-            add(impeller.part)
-
-            # 3. Add tube
-            tube_y = self.settings.bowl_radius - self.settings.tube_radius - 15.0
-            tube = self.build_tube("tube", mode=mode)
-            with Locations((0, tube_y, t + 5.0)):
-                add(tube.part)
-
-            # 4. Add spout
-            spout = self.build_spout("spout", mode=mode)
-            with Locations((0, tube_y, t + 5.0 + self.settings.tube_height - 10.0)):
-                add(spout.part)
+            f._obj = Part(children=[bowl.part, impeller.part, tube.part, spout.part])
 
         return f
 
@@ -301,44 +295,119 @@ class CatFountainProvider(Provider):
         # 5. Add spout connected to the tube via joint
         tube_part.joints["top"].connect_to(spout_part.joints["base"])
         room.add("spout", spout_part, color="cyan")
+        self.room = room
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
         """Map simulation hook names to handler methods for the cat fountain."""
         return {
             Simulate.SETUP: self.setup_simulation,
             Simulate.STEP: self.step_simulation,
-            Simulate.TEARDOWN: self.teardown_simulation,
         }
 
     def get_impeller_idx(self, body_id: int, physics_client: int) -> int | None:
         """Get the motor index of the impeller."""
         num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
-        motor_idx = None
         for i in range(num_joints):
             info = p.getJointInfo(body_id, i, physicsClientId=physics_client)
             joint_name = info[1].decode("utf-8")
             if "impeller" in joint_name or "motor" in joint_name:
-                return motor_idx
+                return i
         return None
 
     def setup_simulation(self, body_id: int, physics_client: int, sim_name: str) -> None:
-        """Configure velocity motor control for the impeller."""
+        """Configure velocity motor control and pour 0.5L of water."""
         motor_idx = self.get_impeller_idx(body_id, physics_client)
-
         if motor_idx is not None:
             p.setJointMotorControl2(
                 bodyUniqueId=body_id,
                 jointIndex=motor_idx,
                 controlMode=p.VELOCITY_CONTROL,
-                targetVelocity=10.0,
-                force=5.0,
+                targetVelocity=15.0,
+                force=10.0,
                 physicsClientId=physics_client,
             )
 
-    def step_simulation(self, body_id: int, physics_client: int, step_index: int, sim_name: str) -> float:
-        """Step hook for simulation tracking. Returns wait time in seconds."""
-        return 1.0 / 60.0
+        # Apply top rear camera view using the room helper
+        if hasattr(self, "room") and self.room:
+            self.room.reset_camera(physics_client, view_from="top rear")
 
-    def teardown_simulation(self, body_id: int, physics_client: int, sim_name: str) -> None:
-        """Teardown simulation hook."""
-        pass
+        r_s = 0.003
+        self.vol_s = (4 / 3) * math.pi * (r_s**3)
+        target_vol = 0.0001
+        N = int(round(target_vol / self.vol_s))
+
+        positions = []
+        step = 2.2 * r_s
+        z_val = 0.004 + r_s
+        while len(positions) < N and z_val < 0.120:
+            x_val = -0.076 + r_s
+            while x_val < 0.076 - r_s:
+                y_val = -0.076 + r_s
+                while y_val < 0.076 - r_s:
+                    if len(positions) >= N:
+                        break
+                    if x_val * x_val + y_val * y_val > (0.076 - r_s) ** 2:
+                        y_val += step
+                        continue
+                    if x_val * x_val + y_val * y_val < (0.015 + r_s) ** 2:
+                        y_val += step
+                        continue
+                    tube_y = 0.057
+                    if x_val * x_val + (y_val - tube_y) ** 2 < (0.010 + r_s) ** 2:
+                        y_val += step
+                        continue
+                    positions.append((x_val, y_val, z_val))
+                    y_val += step
+                x_val += step
+            z_val += step
+
+        sphere_col = p.createCollisionShape(p.GEOM_SPHERE, radius=r_s, physicsClientId=physics_client)
+        sphere_vis = p.createVisualShape(
+            p.GEOM_SPHERE, radius=r_s, rgbaColor=[0.0, 0.5, 1.0, 0.8], physicsClientId=physics_client
+        )
+
+        self.water_body_ids = []
+        self.spout_water_ids = set()
+        self.fallen_out_water_ids = set()
+
+        for pos in positions:
+            bid = p.createMultiBody(
+                baseMass=0.001,
+                baseCollisionShapeIndex=sphere_col,
+                baseVisualShapeIndex=sphere_vis,
+                basePosition=pos,
+                physicsClientId=physics_client,
+            )
+            p.changeDynamics(
+                bid,
+                -1,
+                linearDamping=0.05,
+                angularDamping=0.05,
+                lateralFriction=0.1,
+                restitution=0.0,
+                physicsClientId=physics_client,
+            )
+            self.water_body_ids.append(bid)
+
+    def step_simulation(self, body_id: int, physics_client: int, step_index: int, sim_name: str) -> str | None:
+        """Step simulation, check termination."""
+        for w_id in self.water_body_ids:
+            pos, _ = p.getBasePositionAndOrientation(w_id, physicsClientId=physics_client)
+            x, y, z = pos
+
+            if z >= 0.095 and y < 0.030:
+                self.spout_water_ids.add(w_id)
+
+            if z < 0.0 or (x**2 + y**2 > 0.090**2):
+                self.fallen_out_water_ids.add(w_id)
+
+        spout_vol = len(self.spout_water_ids) * self.vol_s * 1000
+        fallen_vol = len(self.fallen_out_water_ids) * self.vol_s * 1000
+
+        # Terminate early if 0.1L falls out of bowl or spout
+        if spout_vol >= 0.1:
+            return "0.1L of water spout volume reached"
+        if fallen_vol >= 0.1:
+            return "0.1L of water fell out of bowl"
+
+        return None
