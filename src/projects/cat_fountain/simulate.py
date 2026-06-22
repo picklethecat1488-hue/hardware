@@ -4,14 +4,15 @@ import math
 import random
 from typing import Any
 import pybullet as p
-import jax
 import jax.numpy as jnp
+import numpy as np
+from scipy.spatial import cKDTree  # type: ignore
 from projects.fluid import Fluid
 from provider.types import CollisionGroup, CollisionMask
 
 # Simulation Target & Motor Constants
 PARTICLE_RADIUS = 0.0015
-TARGET_VOLUME = 0.000015  # 15ml, approx 1060 particles
+TARGET_VOLUME = 0.0005  # 500ml, approx 35360 particles
 VOLUME_THRESHOLD_LITERS = 0.002  # 2ml target for spout volume
 FALLEN_THRESHOLD_LITERS = 0.010  # 10ml target for water falling out of bowl
 BOWL_WALL_BUFFER = 0.002
@@ -97,15 +98,50 @@ class WaterSpawner:
         self.active_count += to_activate
         return to_activate
 
-    def get_positions_and_velocities(self) -> tuple[list[tuple[float, float, float]], list[tuple[float, float, float]]]:
+    def spawn_all_at_positions(self, positions: list[tuple[float, float, float]]) -> None:
+        """Spawn all water particles at specified 3D positions."""
+        for pos in positions:
+            w_id = p.createMultiBody(
+                baseMass=self.particle_mass,
+                baseCollisionShapeIndex=self.sphere_col,
+                baseVisualShapeIndex=self.circle_vis,
+                basePosition=pos,
+                physicsClientId=self.physics_client,
+            )
+            p.changeDynamics(
+                w_id,
+                -1,
+                linearDamping=self.linear_damping,
+                angularDamping=self.angular_damping,
+                lateralFriction=self.lateral_friction,
+                restitution=self.restitution,
+                physicsClientId=self.physics_client,
+            )
+            p.setCollisionFilterGroupMask(
+                w_id, -1, CollisionGroup.PARTICLE, CollisionMask.CONTAINER, physicsClientId=self.physics_client
+            )
+            p.resetBaseVelocity(w_id, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], physicsClientId=self.physics_client)
+            self.water_body_ids.append(w_id)
+        self.active_count = len(self.water_body_ids)
+
+    def get_positions_and_velocities(
+        self, fallen_ids: set[int] | None = None
+    ) -> tuple[list[tuple[float, float, float]], list[tuple[float, float, float]]]:
         """Return positions and velocities of all particles, padding unspawned ones to keep constant JAX shapes."""
         positions = []
         velocities = []
+        if fallen_ids is None:
+            fallen_ids = set()
+
         for w_id in self.water_body_ids:
-            pos, _ = p.getBasePositionAndOrientation(w_id, physicsClientId=self.physics_client)
-            vel, _ = p.getBaseVelocity(w_id, physicsClientId=self.physics_client)
-            positions.append(pos)
-            velocities.append(vel)
+            if w_id in fallen_ids:
+                positions.append((0.0, 0.0, 1000.0))
+                velocities.append((0.0, 0.0, 0.0))
+            else:
+                pos, _ = p.getBasePositionAndOrientation(w_id, physicsClientId=self.physics_client)
+                vel, _ = p.getBaseVelocity(w_id, physicsClientId=self.physics_client)
+                positions.append(pos)
+                velocities.append(vel)
 
         unspawned_count = self.n_particles - len(self.water_body_ids)
         if unspawned_count > 0:
@@ -287,15 +323,9 @@ class WaterSimulator:
         if not self.fluid or not self.spawner:
             return
 
-        # Dynamically spawn water particles only when ready to drop them
-        spawn_batch = 5
-        if self.active_count < self.n_particles:
-            bowl_rim_height = self.provider.settings.bowl_height * 0.001
-            spawn_z = bowl_rim_height + 0.050
-            spacing = 0.004
-            self.spawner.spawn_batch(spawn_z=spawn_z, batch_size=spawn_batch, spacing=spacing)
-
-        positions, velocities = self.spawner.get_positions_and_velocities()
+        fallen_ids = self.provider.fallen_out_water_ids
+        positions, velocities = self.spawner.get_positions_and_velocities(fallen_ids)
+        self.last_positions = positions
 
         scale_factor = self.particle_mass / self.fluid.mass
 
@@ -303,28 +333,57 @@ class WaterSimulator:
         pos_jax = jnp.array(positions, dtype=jnp.float32)
         vel_jax = jnp.array(velocities, dtype=jnp.float32)
 
-        # Compute SPH forces directly as a JAX array
-        sph_forces_jax = self.fluid.compute_forces_jax(pos_jax, vel_jax)
+        # Build neighbor list in a vectorized way using cKDTree (excluding inactive/deactivated particles)
+        n_all = self.n_particles
+        max_neighbors = 64
+        sim_indices = [idx for idx, w_id in enumerate(self.water_body_ids) if w_id not in fallen_ids]
+
+        idx_map = self.default_idx_map.copy()
+
+        if len(sim_indices) > 0:
+            pos_np = np.array(positions)
+            sim_pos = pos_np[sim_indices]
+            tree = cKDTree(sim_pos)
+            k_query = min(max_neighbors + 1, len(sim_indices))
+            dists, indices = tree.query(sim_pos, k=k_query, distance_upper_bound=self.fluid.h)
+
+            neigh_indices = indices[:, 1:] if k_query > 1 else indices[:, :0]
+
+            mapper = np.empty(len(sim_indices) + 1, dtype=np.int32)
+            mapper[:-1] = sim_indices
+            mapper[-1] = n_all
+
+            mapped_neighs = mapper[neigh_indices]
+            self_sim_indices = np.array(sim_indices)[:, None]
+            mapped_neighs = np.where(mapped_neighs == n_all, self_sim_indices, mapped_neighs)
+
+            cols = mapped_neighs.shape[1]
+            idx_map[sim_indices, :cols] = mapped_neighs
+            idx_map_jax = jnp.array(idx_map)
+        else:
+            idx_map_jax = None
+
+        # Compute SPH forces directly as a JAX array using the neighbor list
+        sph_forces_jax = self.fluid.compute_forces_jax(pos_jax, vel_jax, idx_map=idx_map_jax)
         scaled_forces_jax = sph_forces_jax * scale_factor
 
-        final_forces = scaled_forces_jax.tolist()
-
-        # Clamp SPH forces to prevent numerical explosions (max acceleration of 30.0 m/s^2)
+        # Clamp SPH forces to prevent numerical explosions (max acceleration of 30.0 m/s^2) in JAX
         max_accel = 30.0
         max_force = self.particle_mass * max_accel
+        mags = jnp.linalg.norm(scaled_forces_jax, axis=1, keepdims=True)
+        mags_safe = jnp.maximum(mags, 1e-8)
+        scales = jnp.minimum(max_force / mags_safe, 1.0)
+        clamped_forces_jax = scaled_forces_jax * scales
 
-        # Apply standard physics SPH forces only to spawned particles in PyBullet
-        for idx, w_id in enumerate(self.water_body_ids):
-            f = final_forces[idx]
-            f_mag = math.sqrt(sum(x**2 for x in f))
-            if f_mag > max_force:
-                scale = max_force / f_mag
-                f = [x * scale for x in f]
+        final_forces = clamped_forces_jax.tolist()
 
+        # Apply standard physics SPH forces only to active/simulated particles in PyBullet
+        for idx in sim_indices:
+            w_id = self.water_body_ids[idx]
             p.applyExternalForce(
                 w_id,
                 -1,
-                f,
+                final_forces[idx],
                 [0.0, 0.0, 0.0],
                 p.WORLD_FRAME,
                 physicsClientId=physics_client,
@@ -376,6 +435,49 @@ class WaterSimulator:
             stiffness=self.STIFFNESS,
         )
 
+        # Pre-allocate default SPH neighbor list index map template
+        self.default_idx_map = np.arange(self.n_particles)[:, None]
+        self.default_idx_map = np.repeat(self.default_idx_map, 64, axis=1)
+
+        # Generate grid points to initially fill the bowl
+        grid_points = []
+        spacing = 2.1 * r_s
+
+        tube_x, tube_y = 0.0, 0.0
+        tube_idx = self.tube_link_idx
+        if tube_idx is not None:
+            info = p.getJointInfo(self.body_id, tube_idx, physicsClientId=physics_client)
+            tube_x, tube_y = info[14][0], info[14][1]
+
+        bowl_radius = self.provider.settings.bowl_radius * 0.001
+        bowl_thickness = self.provider.settings.bowl_thickness * 0.001
+        bowl_inner_radius = bowl_radius - bowl_thickness
+        tube_r = self.tube_outer_radius
+
+        max_r_sq = (bowl_inner_radius - BOWL_WALL_BUFFER) ** 2
+        min_r_sq = (tube_r + BOWL_WALL_BUFFER) ** 2
+
+        xy_coords = []
+        lim = int(math.ceil(bowl_inner_radius / spacing))
+        for ix in range(-lim, lim + 1):
+            for iy in range(-lim, lim + 1):
+                x = ix * spacing
+                y = iy * spacing
+                if x**2 + y**2 < max_r_sq and (x - tube_x) ** 2 + (y - tube_y) ** 2 > min_r_sq:
+                    xy_coords.append((x, y))
+
+        xy_coords.sort(key=lambda pt: pt[0] ** 2 + pt[1] ** 2)
+
+        z = r_s + 0.002
+        while len(grid_points) < self.n_particles:
+            for x, y in xy_coords:
+                if len(grid_points) >= self.n_particles:
+                    break
+                grid_points.append((x, y, z))
+            z += spacing
+
+        self.spawner.spawn_all_at_positions(grid_points)
+
     def step_simulation(
         self,
         body_id: int,
@@ -388,16 +490,29 @@ class WaterSimulator:
         self.physics_client = physics_client
 
         self.update_water(physics_client)
-        # Classify active particle positions based on cat fountain specific geometry
-        for idx in range(self.active_count):
-            w_id = self.water_body_ids[idx]
-            pos, _ = p.getBasePositionAndOrientation(w_id, physicsClientId=physics_client)
-            x, y, z = pos
-            if z >= 100.0:
-                continue
-            if z >= self.spout_min_height and y < self.spout_max_y:
-                self.provider.spout_water_ids.add(w_id)
-            if z < FALLEN_MIN_HEIGHT or (x**2 + y**2 > self.fallen_max_radius**2):
+
+        # Classify active particle positions based on cat fountain specific geometry using NumPy for speed
+        positions = self.last_positions
+        pos_np = np.array(positions[: self.active_count])
+        if len(pos_np) > 0:
+            xs = pos_np[:, 0]
+            ys = pos_np[:, 1]
+            zs = pos_np[:, 2]
+
+            # Active (not deactivated) mask: zs < 100.0
+            active_mask = zs < 100.0
+
+            # Spout indices
+            spout_indices = np.where(active_mask & (zs >= self.spout_min_height) & (ys < self.spout_max_y))[0]
+            for idx in spout_indices:
+                self.provider.spout_water_ids.add(self.water_body_ids[idx])
+
+            # Fallen indices
+            fallen_indices = np.where(
+                active_mask & ((zs < FALLEN_MIN_HEIGHT) | (xs**2 + ys**2 > self.fallen_max_radius**2))
+            )[0]
+            for idx in fallen_indices:
+                w_id = self.water_body_ids[idx]
                 self.provider.fallen_out_water_ids.add(w_id)
                 # Deactivate the particle in PyBullet to stop infinite falling and save CPU
                 p.resetBasePositionAndOrientation(

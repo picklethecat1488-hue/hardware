@@ -1,7 +1,7 @@
 """Fluid simulation class using Smoothed Particle Hydrodynamics (SPH)."""
 
 import math
-from typing import Any
+from typing import Any, Optional
 import jax
 import jax.numpy as jnp
 
@@ -87,6 +87,70 @@ def _compute_forces_jax(
     return f_press_scaled + f_visc_scaled
 
 
+# JIT compiled SPH force computation using a precomputed neighbor list
+@jax.jit
+def _compute_forces_neighbor_list_jax(
+    positions: jnp.ndarray,
+    velocities: jnp.ndarray,
+    idx_map: jnp.ndarray,
+    mass: float,
+    h: float,
+    rest_density: float,
+    viscosity: float,
+    stiffness: float,
+    poly6_factor: float,
+    spiky_grad_factor: float,
+    visc_lap_factor: float,
+    pressure_avg_factor: float,
+    min_dist_threshold: float,
+) -> jnp.ndarray:
+    """Compute SPH forces (pressure + viscosity) using a neighbor list."""
+    n = positions.shape[0]
+    h2 = h * h
+
+    # Gather neighbor states
+    neigh_positions = positions[idx_map]  # Shape (N, M, 3)
+    neigh_velocities = velocities[idx_map]  # Shape (N, M, 3)
+
+    diff = positions[:, None, :] - neigh_positions  # Shape (N, M, 3)
+    r2 = jnp.sum(diff * diff, axis=-1)  # Shape (N, M)
+
+    # Exclude padded and self interactions (both map to own index i)
+    neigh_mask = idx_map != jnp.arange(n)[:, None]
+
+    # 1. Densities
+    w = poly6_factor * (jnp.maximum(h2 - r2, 0.0) ** 3) * neigh_mask
+    self_density = mass * poly6_factor * (h2**3)
+    densities = jnp.sum(mass * w, axis=1) + self_density
+    densities = jnp.maximum(densities, rest_density)
+    pressures = stiffness * (densities - rest_density)
+
+    # 2. Forces
+    r = jnp.sqrt(r2 + min_dist_threshold * min_dist_threshold)
+    hr = jnp.maximum(h - r, 0.0)
+    grad_coeff = spiky_grad_factor * (hr**2) * neigh_mask
+
+    neigh_densities = densities[idx_map]
+    p_term = mass * (pressures[:, None] + pressures[idx_map]) / (pressure_avg_factor * neigh_densities)
+    direction = diff / r[:, :, None]
+
+    f_press = -p_term[:, :, None] * grad_coeff[:, :, None] * direction
+    f_press_total = jnp.sum(f_press, axis=1)
+
+    lap_coeff = visc_lap_factor * hr * neigh_mask
+    v_diff = neigh_velocities - velocities[:, None, :]
+    v_term = viscosity * mass / neigh_densities[:, :, None] * lap_coeff[:, :, None]
+
+    f_visc = v_term * v_diff
+    f_visc_total = jnp.sum(f_visc, axis=1)
+
+    vol_factor = (mass / densities)[:, None]
+    f_press_scaled = f_press_total * vol_factor
+    f_visc_scaled = f_visc_total * vol_factor
+
+    return f_press_scaled + f_visc_scaled
+
+
 class Fluid:
     """Handles SPH fluid dynamics simulation for fluid particles in PyBullet using JAX."""
 
@@ -153,10 +217,27 @@ class Fluid:
         self,
         pos_jax: jnp.ndarray,
         vel_jax: jnp.ndarray,
+        idx_map: Optional[jnp.ndarray] = None,
     ) -> jnp.ndarray:
         """
         Compute SPH forces (pressure + viscosity) for all particles returning a JAX array.
         """
+        if idx_map is not None:
+            return _compute_forces_neighbor_list_jax(
+                pos_jax,
+                vel_jax,
+                idx_map,
+                self.mass,
+                self.h,
+                self.rest_density,
+                self.viscosity,
+                self.k,
+                self.poly6_factor,
+                self.spiky_grad_factor,
+                self.visc_lap_factor,
+                self.PRESSURE_AVG_FACTOR,
+                self.MIN_DISTANCE_THRESHOLD,
+            )
         return _compute_forces_jax(
             pos_jax,
             vel_jax,

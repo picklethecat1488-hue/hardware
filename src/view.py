@@ -107,7 +107,7 @@ class Viewer:
         input_targets: Sequence[str],
         build_dir: str = "build",
         no_build: bool = False,
-        sim_steps: int = 1000,
+        sim_steps: int = 2000,
         save_rrd: Optional[str] = None,
         rerun_port: Optional[int] = None,
         no_gui: bool = False,
@@ -204,7 +204,7 @@ def get_args():
         "-s",
         "--sim-steps",
         type=int,
-        default=10000,
+        default=20000,
         required=False,
         help="Maximum number of steps to take before stopping the simulation.",
     )
@@ -213,9 +213,10 @@ def get_args():
         help="Path to save the rerun (.rrd) recording file.",
     )
     parser.add_argument(
-        "--rerun-port",
+        "-p",
+        "--port",
         type=int,
-        help="Port number to run the Rerun Viewer on.",
+        help="Port number for the visualization viewer (ocp_vscode or Rerun viewer).",
     )
     parser.add_argument(
         "--no-gui",
@@ -232,12 +233,21 @@ def get_args():
 
 def main():
     """Build and show the requested geometry in ocp_vscode."""
+    # Enable experimental async dispatch for MPS backend (can be much faster on Apple Silicon)
+    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "1"
+    try:
+        import jax
+
+        # Enable compilation caching to avoid JIT compile latency on subsequent runs
+        jax.config.update("jax_compilation_cache_dir", "build/jax_cache")
+    except ImportError:
+        pass
+
     args = get_args()
 
-    # Allow overriding the OCP Viewer port for testing environments
-    ocp_port = os.environ.get("OCP_PORT")
-    if ocp_port:
-        set_port(int(ocp_port))
+    # Allow overriding the OCP Viewer port
+    if args.port:
+        set_port(args.port)
 
     logger = Logger(text="Visualizing...")
 
@@ -255,7 +265,7 @@ def main():
                 no_build=args.no_build,
                 sim_steps=args.sim_steps,
                 save_rrd=args.save_rrd,
-                rerun_port=args.rerun_port,
+                rerun_port=args.port,
                 no_gui=args.no_gui,
             )
     finally:
