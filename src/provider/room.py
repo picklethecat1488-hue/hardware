@@ -1124,9 +1124,8 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 raise FileNotFoundError(f"Required URDF file not found for simulation: {real_urdf_path}")
 
             physics_client = p.connect(p.DIRECT)
-            should_spawn = (os.environ.get("SMOKE_TEST") != "1") and spawn_viewer
 
-            self._init_rerun(proj_name, should_spawn, rerun_port)
+            self._init_rerun(proj_name, spawn_viewer, rerun_port)
 
             if save_rrd:
                 rr.save(save_rrd)
@@ -1156,7 +1155,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 if is_real:
                     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1, physicsClientId=physics_client)
 
-                is_logging_enabled = should_spawn or (save_rrd is not None)
+                is_logging_enabled = spawn_viewer or (save_rrd is not None)
 
                 for step_idx in range(steps):
                     # Step Hooks
