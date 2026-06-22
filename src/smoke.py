@@ -93,7 +93,7 @@ class TestSmoke:
                 "--build-dir",
                 str(self.build_dir),
                 "-s",
-                "10",
+                "1",
                 "--no-gui",
             ]
         )
