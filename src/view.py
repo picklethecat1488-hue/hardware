@@ -24,8 +24,8 @@ from list import Lister
 
 
 def show(*args, **kwargs):
-    """Bypass ocp_vscode visualization during smoke tests."""
-    if os.environ.get("SMOKE_TEST") == "1":
+    """Bypass ocp_vscode visualization during smoke tests or headless runs."""
+    if os.environ.get("SMOKE_TEST") == "1" or "--no-gui" in sys.argv:
         return
     return ocp_show(*args, **kwargs)
 
@@ -110,6 +110,7 @@ class Viewer:
         sim_steps: int = 1000,
         save_rrd: Optional[str] = None,
         rerun_port: Optional[int] = None,
+        no_gui: bool = False,
     ):
         """Build and show the requested geometry in ocp_vscode."""
         display_items = []
@@ -143,7 +144,7 @@ class Viewer:
         if not display_items:
             raise ValueError("No geometry generated for the specified targets.")
 
-        room = Room(config=self.manager.config)
+        room = Room(config=self.manager.config, is_simulate=is_simulate)
         for obj, name, color, alpha in display_items:
             # Assembly names cannot contain slashes as they are path delimiters
             base_name = name.replace("/", "_")
@@ -154,7 +155,7 @@ class Viewer:
                 counter += 1
             room.add(safe_name, obj, color=color, alpha=alpha)
 
-        if is_simulate and provider:
+        if room.is_simulate and provider:
             proj_name = "default"
             for target in input_targets:
                 proj_name = TargetParser.get_project_name(target)
@@ -180,6 +181,7 @@ class Viewer:
                 build_dir=build_dir,
                 save_rrd=save_rrd,
                 rerun_port=rerun_port,
+                spawn_viewer=not no_gui,
             )
         else:
             summary = self.get_summary(list(room.keys()))
@@ -215,6 +217,11 @@ def get_args():
         type=int,
         help="Port number to run the Rerun Viewer on.",
     )
+    parser.add_argument(
+        "--no-gui",
+        action="store_true",
+        help="Prevent spawning local visualization windows (ocp_vscode or Rerun viewer).",
+    )
     args = parser.parse_args()
 
     if not args.list and not args.targets:
@@ -249,6 +256,7 @@ def main():
                 sim_steps=args.sim_steps,
                 save_rrd=args.save_rrd,
                 rerun_port=args.rerun_port,
+                no_gui=args.no_gui,
             )
     finally:
         logger.done()
