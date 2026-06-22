@@ -44,7 +44,7 @@ class TestViewer:
     def mock_pybullet_rerun_functions(self):
         """Mock Rerun-related Room state-querying/logging functions to avoid connection errors."""
         with (
-            patch.object(Room, "_get_bullet_state", return_value=({}, [], [])),
+            patch("provider.room.BulletStateTracker.update_state"),
             patch.object(Room, "_log_rerun"),
             patch.object(Room, "_init_rerun"),
             patch("rerun.log"),
@@ -731,3 +731,45 @@ class TestViewer:
         )
 
         mock_set_gravity.assert_called_once_with(1.0, 2.0, -3.0, physicsClientId=42)
+
+    @patch("view.show")
+    @patch("view.Builder")
+    @patch("view.Room.simulate")
+    def test_show_view_no_gui_parameter(self, mock_simulate, mock_builder_class, mock_show, viewer):
+        """Verify show_view passes spawn_viewer=False when no_gui=True is specified."""
+        target_name = "p1/product:view/simulate"
+        m1 = MagicMock(spec=TargetList, provider=viewer.manager.router.targets.provider, modes=[Mode.SIMULATE])
+        m1.__iter__.return_value = iter([target_name])
+        m1.__len__.return_value = 1
+        m1.__getitem__.return_value = target_name
+        m1.subassemblies = []
+
+        viewer.target_parser.resolve = MagicMock(return_value=m1)
+        viewer.manager.router.manifest = {target_name: {Section.VIEW: {}}}
+
+        mock_room = Room()
+        mock_geom = MagicMock(spec=Part)
+        mock_room.add("geom", mock_geom, color=(1, 0, 0, 0.5))
+        viewer.manager.router.run.return_value = [("product", mock_room)]
+
+        viewer.show_view([target_name], no_gui=True, no_build=True)
+
+        mock_simulate.assert_called_once()
+        kwargs = mock_simulate.call_args[1]
+        assert kwargs.get("spawn_viewer") is False
+
+    def test_view_cli_no_gui(self):
+        """Verify view.py CLI parses --no-gui flag correctly."""
+        import sys
+        from unittest.mock import patch
+        from view import get_args
+
+        test_args = ["view.py", "cat_fountain/product:view/simulate", "--no-gui"]
+        with patch.object(sys, "argv", test_args):
+            args = get_args()
+            assert args.no_gui is True
+
+        test_args_default = ["view.py", "cat_fountain/product:view/simulate"]
+        with patch.object(sys, "argv", test_args_default):
+            args = get_args()
+            assert args.no_gui is False

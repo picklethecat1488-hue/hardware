@@ -12,6 +12,7 @@ import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 from provider import Section, Mode, TargetList, Room, SUBASSEMBLIES
 from typing import cast
+import trimesh
 from provider.types import URDFShape
 
 
@@ -298,6 +299,8 @@ class TestBuilderLogic:
         assert u_child.urdf_parent == "parent_link"
         assert u_child.urdf_joint_type == "revolute"
         assert u_child.urdf_joint_axis == "0 1 0"
+        assert u_child.urdf_joint_lower is not None
+        assert u_child.urdf_joint_upper is not None
         assert math.isclose(u_child.urdf_joint_lower, 0.0)
         assert math.isclose(u_child.urdf_joint_upper, math.radians(180))
 
@@ -392,3 +395,89 @@ class TestBuilderLogic:
             # ZipFile should be opened with 'w'
             assert any(call[0][1] == "w" for call in mock_zip.call_args_list)
             builder.logger.print.assert_any_call(f"Done writing {zip_path}", symbol="📦")
+
+
+def test_compiled_aabb_alignment(tmp_path):
+    """Verify that the AABB coordinates of compiled OBJ and STL files are aligned."""
+    import os
+    import struct
+    from model import AppConfig
+    from shell import Logger
+    from provider import ProviderManager
+    from provider.provider import Provider
+    from provider.types import Section, Mode, MODES, EXPORT, COLOR, MATERIAL
+    from build import Builder
+    from build123d import BuildPart, Box
+
+    from pydantic import BaseModel
+
+    class TestAABBConfig(BaseModel):
+        pass
+
+    class TestAABBProvider(Provider):
+        @property
+        def name(self) -> str:
+            return "test_aabb"
+
+        @property
+        def default_config(self) -> TestAABBConfig:
+            return TestAABBConfig()
+
+        @property
+        def manifest(self) -> dict:
+            return {
+                "test_part": {
+                    Section.PART: {
+                        MODES: [Mode.DEFAULT],
+                    },
+                    COLOR: (0.8, 0.8, 0.8, 1.0),
+                    MATERIAL: "pla",
+                    EXPORT: ["stl", "obj"],
+                }
+            }
+
+        @property
+        def part(self) -> dict:
+            return {"test_part": self.build_test_part}
+
+        def build_test_part(self, target: str, subassembly: str = "default", mode: Mode = Mode.DEFAULT) -> BuildPart:
+            # Build an asymmetric part to verify that OBJ and STL outputs align
+            with BuildPart() as bp:
+                Box(12.3, 45.6, 78.9)
+            return bp
+
+    logger = Logger(enabled=False)
+    config = AppConfig()
+    test_provider = TestAABBProvider(config=config, logger=logger)
+    manager = ProviderManager(config, providers=[test_provider], logger=logger)
+    builder = Builder(manager, logger=logger)
+
+    # Compile the test part to a temp directory
+    out_dir = tmp_path / "build"
+    names = ["test_aabb/test_part"]
+    builder.generate_parts(str(out_dir), names=names)
+
+    expected_min = [-6.15, -22.8, -39.45]
+    expected_max = [6.15, 22.8, 39.45]
+
+    for name in names:
+        part_name = name.split("/")[-1]
+        proj_name = name.split("/")[0]
+        stl_path = out_dir / f"{proj_name}/{part_name}.stl"
+        obj_path = out_dir / f"{proj_name}/{part_name}.obj"
+
+        assert stl_path.exists()
+        assert obj_path.exists()
+
+        for path in [stl_path, obj_path]:
+            mesh = trimesh.load(str(path))
+            bounds = mesh.bounds
+            mesh_min = bounds[0]
+            mesh_max = bounds[1]
+
+            # Compare AABB against known expected constants
+            for m_min, e_min in zip(mesh_min, expected_min):
+                assert math.isclose(m_min, e_min, abs_tol=1e-4)
+
+            for m_max, e_max in zip(mesh_max, expected_max):
+                assert math.isclose(m_max, e_max, abs_tol=1e-4)

@@ -21,3 +21,6 @@ dependencies:
     - numpy
     - scipy
     - rerun-sdk
+    - trimesh
+    - jax
+    - jaxlib
