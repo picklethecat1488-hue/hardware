@@ -24,8 +24,8 @@ from list import Lister
 
 
 def show(*args, **kwargs):
-    """Bypass ocp_vscode visualization during smoke tests or headless runs."""
-    if os.environ.get("SMOKE_TEST") == "1" or "--no-gui" in sys.argv:
+    """Bypass ocp_vscode visualization during headless runs."""
+    if "--no-gui" in sys.argv:
         return
     return ocp_show(*args, **kwargs)
 
