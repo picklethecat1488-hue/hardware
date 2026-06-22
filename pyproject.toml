@@ -5,7 +5,10 @@ version = "0.1.0"
 [tool.pytest.ini_options]
 testpaths = ["src/tests", "src/projects/tests"]
 pythonpath = ["src"]
-addopts = "-qq -n auto --maxfail=1 --max-worker-restart=2"
+addopts = "-qq -n auto --maxfail=1 --max-worker-restart=2 -m \"not slow\""
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
