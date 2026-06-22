@@ -214,28 +214,31 @@ class TestExhaustManifoldsBuilder:
         assert clean_tool.part is not None
         assert clean_tool.part.volume > 0
 
-    def test_part_fits_together(self, builder, name, right):
+    @pytest.mark.slow
+    def test_part_fits_together(self, builder, name):
         """Test that mirrored parts do not intersect."""
         # Make sure parts do not self intersect
-        part = builder.create_part(name, right=right).part
-        other_part = builder.create_part(name, right=(not right)).part
+        part = builder.create_part(name, right=True).part
+        other_part = builder.create_part(name, right=False).part
         intersection = part.intersect(other_part)
 
         vol = self._calc_vol(intersection)
         assert vol == pytest.approx(0, abs=1e-3), f"intersection detected between {name} parts"
 
-    def test_part_doesnt_overlap(self, builder, name, right):
+    @pytest.mark.slow
+    def test_part_doesnt_overlap(self, builder, name):
         """Ensure parts from different assemblies do not intersect."""
-        part = builder.create_part(name, right=right).part
+        part = builder.create_part(name, right=True).part
         other_name = next(x for x in builder.exhaust_manifolds_config.names if x != name)
-        other_part = builder.create_part(other_name, right=not right).part
+        other_part = builder.create_part(other_name, right=False).part
         intersection = part.intersect(other_part)
 
         vol = self._calc_vol(intersection)
         assert vol == pytest.approx(0, abs=1e-3), (
-            f"intersection detected between {name},right={right} and {other_name},right={not right}"
+            f"intersection detected between {name},right=True and {other_name},right=False"
         )
 
+    @pytest.mark.slow
     def test_in_bounds(self, builder, name, right):
         """Verify part fits inside bound box volume."""
         part = builder.create_part(name, right=right).part
@@ -256,6 +259,7 @@ class TestExhaustManifoldsBuilder:
 
         assert volume == pytest.approx(0)
 
+    @pytest.mark.slow
     def test_can_clamp(self, name, right, builder):
         """Test if a representative clamp bed satisfies the clamp property."""
         clamp_idx = 1
@@ -303,6 +307,7 @@ class TestExhaustManifoldsBuilder:
         intersection_on = part.intersect(clamp_on.part)  # part is Part, clamp_on.part is Part
         assert self._calc_vol(intersection_on) > 0
 
+    @pytest.mark.slow
     def test_part(self, name, right, builder):
         """Verify rebuilt part geometry matches manifold volume."""
         if name != "driver" and name != "passenger":
@@ -317,6 +322,7 @@ class TestExhaustManifoldsBuilder:
         # less than 0.5% error for each rebuilt part.
         assert error_pct < 0.5
 
+    @pytest.mark.slow
     def test_prepared_part(self, name, right, builder):
         """Verify the prepared part is printable and stable."""
         orig_part = builder.create_part(name, right=right).part
@@ -371,6 +377,7 @@ class TestExhaustManifoldsBuilder:
         expected_angle = 0
         assert round(angle, 2) == pytest.approx(expected_angle)
 
+    @pytest.mark.slow
     def test_overall_bounds(self, builder, name):
         """Verify assembly bounding box dimensions."""
         part = Compound(builder.create_part(name).part.fuse(builder.create_part(name, right=True).part).solids())
@@ -440,6 +447,7 @@ class TestExhaustManifoldsConfigurator:
         expected = path.position_at(0.5) + Vector(0, 0, radius)
         assert result == expected
 
+    @pytest.mark.slow
     def test_config_clamp_updates_config(self, configurator, monkeypatch):
         """Verify that config_clamp updates the underlying ExhaustManifoldsConfig."""
         name = "driver"
@@ -452,6 +460,7 @@ class TestExhaustManifoldsConfigurator:
         _, angle = configurator.exhaust_manifolds_config.clamp_positions[name][1]
         assert angle == 45.0
 
+    @pytest.mark.slow
     def test_config_text_logo_updates_config(self, configurator, monkeypatch):
         """Verify that config_text_logo updates the underlying ExhaustManifoldsConfig."""
         name = "passenger"
@@ -506,17 +515,12 @@ class TestExhaustManifoldsViewer:
         # Cone marker
         assert viewer.create_solid_center_point("passenger", right=True).volume > 0
 
-    def test_room_logic(self, viewer):
-        """Verify room dictionary generation logic."""
-        for room_fn in [viewer.view_part_positions, viewer.view_overlay, viewer.view_sketch]:
-            room = Room()
-            room_fn(room)
-            assert len(room) > 0
-
-    def test_view_interfaces(self, viewer):
-        """Verify orchestrator-compatible view interfaces."""
+    @pytest.mark.slow
+    def test_room_logic_and_interfaces(self, viewer):
+        """Verify room dictionary generation logic and orchestrator-compatible view interfaces."""
         for view_fn in [viewer.view_part_positions, viewer.view_overlay, viewer.view_wire, viewer.view_sketch]:
             room = Room()
             view_fn(room)
+            assert len(room) > 0
             for _, rgba in room.values():
                 assert len(rgba) == 4

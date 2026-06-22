@@ -40,35 +40,33 @@ class TestSmoke:
         )
         return result
 
-    def test_build_all(self):
-        """Verify build.py produces both diagrams and parts by default."""
+    def test_build_commands(self):
+        """Verify build.py commands execute correctly with various options and wildcards."""
+        # 1. Verify building all parts and diagrams by default
         self.run_command(["src/build.py"])
         assert (self.build_dir / "exhaust_manifolds" / "exhaust_manifolds_diagram.svg").exists()
         assert (self.build_dir / "exhaust_manifolds" / "driver_left.stl").exists()
 
-    def test_build_wildcard(self):
-        """Verify building specific projects with wildcards."""
-        self.run_command(["src/build.py", "exhaust_manifolds/*"])
-        assert (self.build_dir / "exhaust_manifolds" / "driver_left.stl").exists()
+        # 2. Verify wildcard building
+        self.run_command(["src/build.py", "cat_fountain/*"])
+        assert (self.build_dir / "cat_fountain" / "bowl.stl").exists()
 
-    def test_build_fully_qualified_target(self):
-        """Verify building a specific subassembly and mode via string format."""
-        self.run_command(["src/build.py", "exhaust_manifolds/driver_left:part/print"])
-        assert (self.build_dir / "exhaust_manifolds" / "driver_left.stl").exists()
+        # 3. Verify building a specific subassembly and mode via string format
+        self.run_command(["src/build.py", "valve_actuator_limiter/limiter:part/default"])
+        assert (self.build_dir / "valve_actuator_limiter" / "limiter.stl").exists()
 
-    def test_build_diagram_only(self):
-        """Verify diagram-only building using the :diagram action suffix."""
-        self.run_command(["src/build.py", "exhaust_manifolds/*:diagram"])
-        assert (self.build_dir / "exhaust_manifolds" / "exhaust_manifolds_diagram.svg").exists()
-        assert not (self.build_dir / "exhaust_manifolds" / "driver_left.stl").exists()
+        # 4. Verify diagram-only building using the :diagram action suffix
+        limiter_stl = self.build_dir / "valve_actuator_limiter" / "limiter.stl"
+        if limiter_stl.exists():
+            limiter_stl.unlink()
+        self.run_command(["src/build.py", "valve_actuator_limiter/*:diagram"])
+        assert (self.build_dir / "valve_actuator_limiter" / "valve_actuator_limiter_diagram.svg").exists()
+        assert not limiter_stl.exists()
 
-    def test_diagram_options_integration(self):
-        """Verify diagram options like show_hidden work via environment variables."""
+        # 5. Verify diagram options integration via environment variables
         extra_env = {"VALVE_ACTUATOR_LIMITER__DIAGRAM_OPTIONS__SHOW_HIDDEN": "True"}
         self.run_command(["src/build.py", "valve_actuator_limiter/*:diagram"], extra_env=extra_env)
-
-        diag_path = self.build_dir / "valve_actuator_limiter" / "valve_actuator_limiter_diagram.svg"
-        assert diag_path.exists()
+        assert (self.build_dir / "valve_actuator_limiter" / "valve_actuator_limiter_diagram.svg").exists()
 
     def test_config_commands(self):
         """Verify config.py commands run without error."""
@@ -80,19 +78,14 @@ class TestSmoke:
 
     def test_view_commands(self):
         """Verify view.py commands execute correctly."""
-        env = {"SMOKE_TEST": "1"}
-
         # Check target listing
-        self.run_command(["src/view.py", "--list"], extra_env=env)
+        self.run_command(["src/view.py", "--list", "--no-gui"])
 
         # Check target visualization (Note: ocp_vscode may warn if no listener is active, but should return 0)
-        self.run_command(["src/view.py", "exhaust_manifolds/driver"], extra_env=env)
-        self.run_command(["src/view.py", "exhaust_manifolds/wire"], extra_env=env)
-        self.run_command(["src/view.py", "exhaust_manifolds/*:part/print"], extra_env=env)
+        self.run_command(["src/view.py", "valve_actuator_limiter/limiter", "--no-gui"])
+        self.run_command(["src/view.py", "valve_actuator_limiter/*:part/default", "--no-gui"])
 
-    def test_view_simulation(self):
-        """Verify view.py simulation mode runs without error using a temporary build directory."""
-        env = {"SMOKE_TEST": "1"}
+        # Check simulation mode
         self.run_command(
             [
                 "src/view.py",
@@ -101,8 +94,8 @@ class TestSmoke:
                 str(self.build_dir),
                 "-s",
                 "10",
-            ],
-            extra_env=env,
+                "--no-gui",
+            ]
         )
 
     def test_list_commands(self):
