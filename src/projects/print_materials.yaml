@@ -16,15 +16,21 @@ material:
   # Easy to print, stiff, but has low temperature resistance.
   pla:
     density: 1.24
+    boundary_friction: 0.30
+    contact_angle: 68.0
 
   # Polyethylene Terephthalate Glycol-modified (PETG)
   # A thermoplastic polyester that provides significant chemical resistance, durability,
   # and formability for manufacturing. Sturdier than PLA and more heat-resistant.
   petg:
     density: 1.27
+    boundary_friction: 0.20
+    contact_angle: 75.0
 
   # Acrylonitrile Butadiene Styrene (ABS)
   # An impact-resistant engineering plastic. Strong, tough, and heat-resistant,
   # but prone to warping during printing and requires a heated enclosure.
   abs:
     density: 1.04
+    boundary_friction: 0.25
+    contact_angle: 80.0

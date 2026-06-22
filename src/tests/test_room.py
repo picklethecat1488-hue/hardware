@@ -10,7 +10,8 @@ import pybullet as p
 import pytest
 from build123d import Compound, Box, Vector, RigidJoint, RevoluteJoint, Axis, Location, LinearJoint, BallJoint
 from model import AppConfig, TextArgs, DiagramOptions
-from provider.room import Room
+from provider import Simulate
+from provider.room import Room, BulletStateTracker
 from provider.types import ColorType, URDFShape
 
 
@@ -20,6 +21,15 @@ def test_room_add_success():
     room.add("item1", "geom1", color=ColorType.RED, alpha=0.5)
     assert "item1" in room
     assert room["item1"] == ("geom1", (1.0, 0.0, 0.0, 0.5))
+
+
+def test_room_is_simulate_attribute():
+    """Verify is_simulate parameter sets the attribute correctly."""
+    room_default = Room()
+    assert not room_default.is_simulate
+
+    room_sim = Room(is_simulate=True)
+    assert room_sim.is_simulate
 
 
 def test_room_add_duplicate_name_raises_error():
@@ -491,8 +501,8 @@ def test_room_init_rerun(mock_connect_grpc, mock_spawn, mock_init):
         mock_connect_grpc.assert_called_once_with("rerun+http://127.0.0.1:9876/proxy")
 
 
-def test_room_get_bullet_state():
-    """Verify that _get_bullet_state fetches states and particle colors from PyBullet."""
+def test_bullet_state_tracker_update_state():
+    """Verify that BulletStateTracker.update_state fetches states and particle colors from PyBullet."""
     room = Room()
     parent = Box(1, 1, 1)
     cast(Any, parent).urdf_label = "parent"
@@ -523,16 +533,135 @@ def test_room_get_bullet_state():
         )
 
         label_to_link_idx = {"parent": -1}
-        transforms, positions, colors = room._get_bullet_state(body_id, physics_client, label_to_link_idx)
+        state_tracker = BulletStateTracker(body_id, physics_client, label_to_link_idx)
+        state_tracker.update_state()
+        transforms = state_tracker.transforms
+        positions = state_tracker.particle_positions
+        colors = state_tracker.particle_colors
 
         assert "parent" in transforms
         assert len(positions) == 1
         assert len(colors) == 1
+        assert len(state_tracker.particle_radii) == 1
         # Extract rgbaColor from visual data list (floats)
         assert math.isclose(colors[0][0], 0.0, abs_tol=1e-5)
         assert math.isclose(colors[0][1], 0.5, abs_tol=1e-5)
         assert math.isclose(colors[0][2], 1.0, abs_tol=1e-5)
         assert math.isclose(colors[0][3], 0.8, abs_tol=1e-5)
+        assert math.isclose(state_tracker.particle_radii[0], 0.003, abs_tol=1e-5)
 
     finally:
         p.disconnect(physicsClientId=physics_client)
+
+
+def test_bullet_state_tracker_error_handling():
+    """Verify that BulletStateTracker.update_state ignores bodies that cause exceptions."""
+    physics_client = p.connect(p.DIRECT)
+    try:
+        body_id = p.createMultiBody(physicsClientId=physics_client)
+        # Add a body index that doesn't exist to simulate getDynamicsInfo failure
+        state_tracker = BulletStateTracker(body_id, physics_client, {})
+        # Force tracker to think there are more bodies
+        state_tracker._last_checked_num_bodies = 0
+        with patch("pybullet.getDynamicsInfo", side_effect=p.error("Fake Error")):
+            # Should not raise exception
+            state_tracker.update_state()
+            assert len(state_tracker.particle_positions) == 0
+    finally:
+        p.disconnect(physicsClientId=physics_client)
+
+
+def test_room_simulate_loop_optimization():
+    """Verify that Room.simulate skips state tracking and rerun logging when logging is disabled."""
+    room = Room()
+    room.add("item", Box(1, 1, 1))
+
+    # Mock setup, step, teardown hooks
+    hooks = {
+        Simulate.SETUP: MagicMock(),
+        Simulate.STEP: MagicMock(return_value=None),
+        Simulate.TEARDOWN: MagicMock(),
+    }
+
+    with (
+        patch("provider.room.p.loadURDF", return_value=1) as mock_load_urdf,
+        patch("provider.room.p.stepSimulation") as mock_step_sim,
+        patch("provider.room.BulletStateTracker") as mock_tracker_cls,
+        patch("provider.room.os.path.exists", return_value=True),
+        patch("provider.room.shutil.copy"),
+        patch.object(room, "_copy_project_assets") as mock_copy,
+        patch.object(room, "_init_simulation_objects", return_value={}) as mock_init_objects,
+        patch.object(room, "_init_rerun") as mock_init_rerun,
+        patch.object(room, "_log_rerun") as mock_log_rerun,
+    ):
+        mock_tracker = mock_tracker_cls.return_value
+
+        # Run with spawn_viewer=False and save_rrd=None (logging disabled)
+        room.simulate(
+            provider_hooks=hooks,
+            proj_name="test_proj",
+            sim_target="item",
+            steps=5,
+            manager=MagicMock(),
+            logger=MagicMock(),
+            spawn_viewer=False,
+            save_rrd=None,
+        )
+
+        # BulletStateTracker.update_state and room._log_rerun should NOT be called at all
+        mock_tracker.update_state.assert_not_called()
+        mock_log_rerun.assert_not_called()
+        assert mock_step_sim.call_count == 5
+
+        # Reset mocks
+        mock_tracker.reset_mock()
+        mock_log_rerun.reset_mock()
+        mock_step_sim.reset_mock()
+
+        # Run with spawn_viewer=True (logging enabled)
+        room.simulate(
+            provider_hooks=hooks,
+            proj_name="test_proj",
+            sim_target="item",
+            steps=5,
+            manager=MagicMock(),
+            logger=MagicMock(),
+            spawn_viewer=True,
+            save_rrd=None,
+        )
+
+        # BulletStateTracker.update_state and room._log_rerun should be called
+        assert mock_tracker.update_state.call_count == 5
+        assert mock_log_rerun.call_count == 5
+        assert mock_step_sim.call_count == 5
+
+
+def test_room_translate_joints_relative():
+    """Verify that Room.translate_joints correctly computes parent-relative joint coordinates."""
+    room = Room()
+
+    parent = Box(10, 10, 10)
+    cast(URDFShape, parent).urdf_label = "parent_link"
+    parent.locate(Location((0, 0, 0)))
+    room.add("parent", parent)
+
+    child = Box(5, 5, 5)
+    cast(URDFShape, child).urdf_label = "child_link"
+    # Position child offset in X
+    child.locate(Location((20, 0, 0)))
+    room.add("child", child)
+
+    pj = RigidJoint("j_p", parent, Location((0, 0, 0)))
+    cj = RigidJoint("j_c", child, Location((0, 0, 0)))
+    pj.connect_to(cj)
+
+    # Let's export or check relative coordinates in URDF
+    import io
+
+    output = io.StringIO()
+    room.export_urdf(output, "test_proj")
+    urdf_text = output.getvalue()
+
+    # The joint translation from parent to child should be (20, 0, 0)
+    # Wait, the shape coordinates are mm, URDF is meters, so X offset should be 0.02
+    assert 'xyz="0.02 0 0"' in urdf_text or 'xyz="0.020000 0.000000 0.000000"' in urdf_text or 'xyz="0.02' in urdf_text

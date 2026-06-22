@@ -20,13 +20,16 @@ link_template: |
         <color rgba="{rgba}"/>
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <mesh filename="package://{project_name}/{obj_filename}" scale="0.001 0.001 0.001"/>
-      </geometry>
-    </collision>
-  </link>
+  {collision_section}</link>
+
+collision_template: |
+  <collision>
+    <collision_type>{collision_type}</collision_type>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://{project_name}/{obj_filename}" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
 
 joint_template: |
   <joint name="{parent_name}_to_{child_name}" type="{joint_type}">

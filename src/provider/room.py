@@ -31,11 +31,94 @@ from build123d.exporters import ExportSVG, Drawing
 import rerun as rr
 import socket
 from model import DiagramOptions, TextArgs
-from .types import ColorType, URDFShape, Simulate
+from .types import ColorType, URDFShape, Simulate, CollisionGroup, CollisionMask
 from .utils import get_rgba_color
 
 if TYPE_CHECKING:
     from model.app_config import AppConfig
+
+
+def _is_real_physics_client(physics_client: Any) -> bool:
+    """Check if the given physics client ID is connected to a real physics server."""
+    if not isinstance(physics_client, int) or physics_client < 0:
+        return False
+    try:
+        info = p.getConnectionInfo(physicsClientId=physics_client)
+        return bool(info.get("isConnected", False))
+    except Exception:
+        return False
+
+
+class BulletStateTracker:
+    """Helper class to track and query PyBullet body and particle states efficiently."""
+
+    def __init__(self, body_id: int, physics_client: int, label_to_link_idx: dict[str, int]):
+        """Initialize the Tracker."""
+        self.body_id = body_id
+        self.physics_client = physics_client
+        self.label_to_link_idx = label_to_link_idx
+        self.particle_body_ids: list[int] = []
+        self.particle_colors: list[list[float]] = []
+        self.particle_radii: list[float] = []
+        self.transforms: dict[str, tuple[list[float], list[float]]] = {}
+        self.particle_positions: list[list[float]] = []
+        self._last_checked_num_bodies = 0
+
+    def _discover_new_particles(self) -> None:
+        """Scan for newly created bodies since the last check and add them to particles."""
+        is_real = _is_real_physics_client(self.physics_client)
+        if not is_real:
+            return
+
+        num_bodies = p.getNumBodies(physicsClientId=self.physics_client)
+        if num_bodies <= self._last_checked_num_bodies:
+            return
+
+        for i in range(self._last_checked_num_bodies, num_bodies):
+            if i == self.body_id:
+                continue
+            dynamics = p.getDynamicsInfo(i, -1, physicsClientId=self.physics_client)
+            mass = dynamics[0]
+            if mass > 0.0:
+                self.particle_body_ids.append(i)
+                visual_data = p.getVisualShapeData(i, physicsClientId=self.physics_client)
+                color = [0.5, 0.8, 1.0, 0.7]  # Default fallback color
+                if visual_data:
+                    color = list(visual_data[0][7])
+                self.particle_colors.append(color)
+
+                shape_data = p.getCollisionShapeData(i, -1, physicsClientId=self.physics_client)
+                radius = 0.003  # Default fallback
+                if shape_data:
+                    radius = shape_data[0][3][0]
+                self.particle_radii.append(radius)
+        self._last_checked_num_bodies = num_bodies
+
+    def update_state(self) -> None:
+        """Query and update internal state properties from PyBullet."""
+        self._discover_new_particles()
+
+        self.transforms = {}
+        for label, idx in self.label_to_link_idx.items():
+            if idx == -1:
+                base_pos, base_orn = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.physics_client)
+                try:
+                    dynamics = p.getDynamicsInfo(self.body_id, -1, physicsClientId=self.physics_client)
+                    local_inertia_pos = dynamics[3]
+                    local_inertia_orn = dynamics[4]
+                    inv_inertia_pos, inv_inertia_orn = p.invertTransform(local_inertia_pos, local_inertia_orn)
+                    pos, orn = p.multiplyTransforms(base_pos, base_orn, inv_inertia_pos, inv_inertia_orn)
+                except Exception:
+                    pos, orn = base_pos, base_orn
+            else:
+                state = p.getLinkState(self.body_id, idx, physicsClientId=self.physics_client)
+                pos, orn = state[4], state[5]
+            self.transforms[label] = (pos, orn)
+
+        self.particle_positions = []
+        for i in self.particle_body_ids:
+            pos, _ = p.getBasePositionAndOrientation(i, physicsClientId=self.physics_client)
+            self.particle_positions.append(pos)
 
 
 class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
@@ -45,10 +128,11 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
     Keys are unique names for the items, and values are tuples of (geometry, rgba_tuple).
     """
 
-    def __init__(self, config: Optional["AppConfig"] = None):
+    def __init__(self, config: Optional["AppConfig"] = None, is_simulate: bool = False):
         """Initialize the room with an optional application configuration."""
         super().__init__()
         self.config = config
+        self.is_simulate = is_simulate
         self._labels: list[tuple[str, str, Any, TextArgs]] = []
         self.gravity: tuple[float, float, float] = (0.0, 0.0, -9.81)
 
@@ -544,6 +628,14 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         self.translate_joints()
 
+        # Build map of labels to geometries to resolve relative joint coordinates
+        label_to_geom = {}
+        for geom, _ in self.values():
+            u_geom = cast(URDFShape, geom)
+            label = getattr(u_geom, "urdf_label", None)
+            if label:
+                label_to_geom[label] = u_geom
+
         template_path = Path(__file__).parent.parent / "urdf_template.yaml"
         with open(template_path, "r") as f:
             templates = yaml.safe_load(f)
@@ -551,6 +643,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         link_template = templates["link_template"].strip()
         joint_template = templates["joint_template"].strip()
         axis_limit_template = templates["axis_limit_template"].strip()
+        collision_template = templates["collision_template"].strip()
 
         links_info = []
         for geom, rgba in self.values():
@@ -563,13 +656,26 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             joint_type = getattr(u_geom, "urdf_joint_type", "fixed")
             joint_axis = getattr(u_geom, "urdf_joint_axis", "0 0 1")
             density = getattr(u_geom, "urdf_density", 1.0)
+            collision_type = getattr(u_geom, "urdf_collision_type", "convex")
 
-            # Extract location
-            pos = u_geom.location.position
+            # Compute relative location if the link has a parent
+            parent_label = getattr(u_geom, "urdf_parent", None)
+            if parent_label and parent_label in label_to_geom:
+                parent_geom = label_to_geom[parent_label]
+                rel_loc = parent_geom.location.inverse() * u_geom.location
+            else:
+                rel_loc = u_geom.location
+
+            pos = rel_loc.position
             xyz = [pos.X * 0.001, pos.Y * 0.001, pos.Z * 0.001]
-            rpy = [0.0, 0.0, 0.0]
+            rpy = [
+                math.radians(rel_loc.orientation.X),
+                math.radians(rel_loc.orientation.Y),
+                math.radians(rel_loc.orientation.Z),
+            ]
 
             # Invert the translation to get the local shape centered at local origin
+
             local_shape = u_geom.location.inverse() * u_geom
 
             # Mass and inertia calculations using local shape and density
@@ -578,6 +684,11 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             mass_kg = volume_mm3 * density_g_mm3 * 1e-3
 
             com = local_shape.center(CenterOf.MASS)
+            com_m = [com.X * 0.001, com.Y * 0.001, com.Z * 0.001]
+
+            raw_inertia = local_shape.matrix_of_inertia
+            scale_factor = density * 1e-12
+
             com_m = [com.X * 0.001, com.Y * 0.001, com.Z * 0.001]
 
             raw_inertia = local_shape.matrix_of_inertia
@@ -616,6 +727,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     "izz": izz,
                     "obj_filename": f"{label}.obj",
                     "rgba_str": rgba_str,
+                    "collision_type": collision_type,
                 }
             )
 
@@ -631,6 +743,19 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         links_strings = []
         for link in links_info:
+            c_type = link["collision_type"]
+            if c_type == "none":
+                collision_section = ""
+            else:
+                collision_section = (
+                    collision_template.format(
+                        project_name=project_name,
+                        obj_filename=link["obj_filename"],
+                        collision_type=c_type,
+                    )
+                    + "\n"
+                )
+
             links_strings.append(
                 link_template.format(
                     link_name=link["name"],
@@ -647,6 +772,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     project_name=project_name,
                     obj_filename=link["obj_filename"],
                     rgba=link["rgba_str"],
+                    collision_section=collision_section,
                 )
             )
 
@@ -691,50 +817,12 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         else:
             path.write(urdf_content)
 
-    def _get_bullet_state(
-        self,
-        body_id: int,
-        physics_client: int,
-        label_to_link_idx: dict[str, int],
-    ) -> tuple[
-        dict[str, tuple[list[float], list[float]]],
-        list[list[float]],
-        list[list[float]],
-    ]:
-        """Fetch the current transforms, particle positions, and colors from PyBullet."""
-        transforms = {}
-        for label, idx in label_to_link_idx.items():
-            if idx == -1:
-                pos, orn = p.getBasePositionAndOrientation(body_id, physicsClientId=physics_client)
-            else:
-                state = p.getLinkState(body_id, idx, physicsClientId=physics_client)
-                pos, orn = state[0], state[1]
-            transforms[label] = (pos, orn)
-
-        num_bodies = p.getNumBodies(physicsClientId=physics_client)
-        particle_positions = []
-        particle_colors = []
-        for i in range(num_bodies):
-            if i == body_id:
-                continue
-            dynamics = p.getDynamicsInfo(i, -1, physicsClientId=physics_client)
-            mass = dynamics[0]
-            if mass > 0.0:
-                pos, _ = p.getBasePositionAndOrientation(i, physicsClientId=physics_client)
-                particle_positions.append(pos)
-                visual_data = p.getVisualShapeData(i, physicsClientId=physics_client)
-                color = [0.0, 0.5, 1.0, 0.8]  # Default fallback color
-                if visual_data:
-                    color = list(visual_data[0][7])
-                particle_colors.append(color)
-
-        return transforms, particle_positions, particle_colors
-
     def _log_rerun(
         self,
         transforms: dict[str, tuple[list[float], list[float]]],
         particle_positions: list[list[float]],
         particle_colors: Optional[list[list[float]]] = None,
+        particle_radii: Optional[list[float]] = None,
         step_idx: Optional[int] = None,
     ) -> None:
         """Log the given state data to Rerun."""
@@ -754,14 +842,31 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         # Log particles
         if particle_positions:
-            rr.log(
-                "world/particles",
-                rr.Points3D(
-                    positions=particle_positions,
-                    radii=0.003,
-                    colors=particle_colors if particle_colors else [0, 128, 255, 204],
-                ),
-            )
+            active_indices = [idx for idx, pos in enumerate(particle_positions) if pos[2] < 100.0]
+            if active_indices:
+                filtered_positions = [particle_positions[idx] for idx in active_indices]
+                filtered_radii = (
+                    [particle_radii[idx] for idx in active_indices] if particle_radii is not None else 0.003
+                )
+                colors_arg = [128, 204, 255, 178]
+                if particle_colors:
+                    colors_arg = []
+                    for idx in active_indices:
+                        col = particle_colors[idx]
+                        is_float = any(isinstance(c, float) for c in col) or all(c <= 1.0 for c in col)
+                        if is_float:
+                            colors_arg.append([int(round(c * 255.0)) for c in col])
+                        else:
+                            colors_arg.append([int(c) for c in col])
+
+                rr.log(
+                    "world/particles",
+                    rr.Points3D(
+                        positions=filtered_positions,
+                        radii=filtered_radii,
+                        colors=colors_arg,
+                    ),
+                )
 
     def _copy_project_assets(self, build_proj_dir: str, proj_dir: str) -> None:
         """Copy required OBJ files for the room geometries to the temporary directory."""
@@ -781,10 +886,22 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         physics_client: int,
         body_id: int,
         proj_dir: str,
+        urdf_path: str,
     ) -> dict[str, int]:
-        """Configure motor controls and log static assets for Room simulation."""
+        """Configure motor controls, log static assets, and setup concave collisions for Room simulation."""
         rr.log("world", rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)
         num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
+        is_real = _is_real_physics_client(physics_client)
+        # Configure collision filter for base and all links to group CONTAINER, mask ALL to allow particle collision
+        if is_real:
+            p.setCollisionFilterGroupMask(
+                body_id, -1, CollisionGroup.CONTAINER, CollisionMask.ALL, physicsClientId=physics_client
+            )
+            for i in range(num_joints):
+                p.setCollisionFilterGroupMask(
+                    body_id, i, CollisionGroup.CONTAINER, CollisionMask.ALL, physicsClientId=physics_client
+                )
+
         joint_name_to_index = {}
         for i in range(num_joints):
             info = p.getJointInfo(body_id, i, physicsClientId=physics_client)
@@ -803,6 +920,90 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     joint_name = f"{parent_label}_to_{label}"
                     if joint_name in joint_name_to_index:
                         label_to_link_idx[label] = joint_name_to_index[joint_name]
+
+        # Parse URDF XML to find concave collision links
+        import xml.etree.ElementTree as ET
+
+        concave_links = set()
+        if urdf_path and os.path.exists(urdf_path):
+            try:
+                tree = ET.parse(urdf_path)
+                root = tree.getroot()
+                for link_node in root.findall(".//link"):
+                    link_name = link_node.attrib.get("name")
+                    col_type_node = link_node.find(".//collision/collision_type")
+                    if col_type_node is not None and col_type_node.text == "concave":
+                        concave_links.add(link_name)
+            except Exception:
+                pass
+
+        # Configure concave trimeshes for links marked concave
+        for link_name in concave_links:
+            if link_name in label_to_link_idx:
+                link_idx = label_to_link_idx[link_name]
+                # Disable default collision in PyBullet
+                p.setCollisionFilterGroupMask(body_id, link_idx, 0, 0, physicsClientId=physics_client)
+
+                # Fetch shape details from PyBullet
+                shapes = p.getCollisionShapeData(body_id, link_idx, physicsClientId=physics_client)
+                for shape in shapes:
+                    geom_type = shape[2]
+                    if geom_type == p.GEOM_MESH:
+                        mesh_scale = shape[3]
+
+                        # Locate local mesh OBJ file in proj_dir
+                        local_mesh_path = os.path.join(proj_dir, f"{link_name}.obj")
+                        if not os.path.exists(local_mesh_path):
+                            shape_filename = shape[4].decode("utf-8")
+                            base_filename = os.path.basename(shape_filename)
+                            local_mesh_path = os.path.join(proj_dir, base_filename)
+
+                        if os.path.exists(local_mesh_path):
+                            # Get link world position and orientation (inertial frame)
+                            if link_idx == -1:
+                                link_pos, link_orn = p.getBasePositionAndOrientation(
+                                    body_id, physicsClientId=physics_client
+                                )
+                            else:
+                                state = p.getLinkState(body_id, link_idx, physicsClientId=physics_client)
+                                link_pos = state[0]
+                                link_orn = state[1]
+
+                            # Account for shape local offset relative to the link's inertial frame
+                            local_pos = shape[5]
+                            local_orn = shape[6]
+                            world_pos, world_orn = p.multiplyTransforms(link_pos, link_orn, local_pos, local_orn)
+
+                            # Create concave trimesh static body at correct world coordinates
+                            col_id = p.createCollisionShape(
+                                shapeType=p.GEOM_MESH,
+                                fileName=local_mesh_path,
+                                flags=p.GEOM_FORCE_CONCAVE_TRIMESH,
+                                meshScale=mesh_scale,
+                                physicsClientId=physics_client,
+                            )
+                            static_body_id = p.createMultiBody(
+                                baseMass=0.0,
+                                baseCollisionShapeIndex=col_id,
+                                basePosition=world_pos,
+                                baseOrientation=world_orn,
+                                physicsClientId=physics_client,
+                            )
+                            # Enable collision with particles (group PARTICLE, mask CONTAINER)
+                            if is_real:
+                                p.setCollisionFilterGroupMask(
+                                    static_body_id,
+                                    -1,
+                                    CollisionGroup.CONTAINER,
+                                    CollisionMask.ALL,
+                                    physicsClientId=physics_client,
+                                )
+                            # Disable collisions between all links of the main body and this separate static collision body
+                            p.setCollisionFilterPair(body_id, static_body_id, -1, -1, 0, physicsClientId=physics_client)
+                            for l_idx in range(num_joints):
+                                p.setCollisionFilterPair(
+                                    body_id, static_body_id, l_idx, -1, 0, physicsClientId=physics_client
+                                )
 
         for geom, _ in self.values():
             u_geom = cast(URDFShape, geom)
@@ -888,6 +1089,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         build_dir: str = "build",
         save_rrd: Optional[str] = None,
         rerun_port: Optional[int] = None,
+        spawn_viewer: bool = True,
     ) -> None:
         """Run a PyBullet physics simulation for the room geometries."""
         from provider import Provider
@@ -922,27 +1124,28 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 raise FileNotFoundError(f"Required URDF file not found for simulation: {real_urdf_path}")
 
             physics_client = p.connect(p.DIRECT)
-            spawn_viewer = os.environ.get("SMOKE_TEST") != "1"
+            should_spawn = (os.environ.get("SMOKE_TEST") != "1") and spawn_viewer
 
-            self._init_rerun(proj_name, spawn_viewer, rerun_port)
+            self._init_rerun(proj_name, should_spawn, rerun_port)
 
             if save_rrd:
                 rr.save(save_rrd)
 
             try:
-                p.setGravity(*self.gravity, physicsClientId=physics_client)
+                is_real = _is_real_physics_client(physics_client)
+                # Temporarily disable rendering to make particle spawning fast
+                if is_real:
+                    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0, physicsClientId=physics_client)
 
+                p.setGravity(*self.gravity, physicsClientId=physics_client)
+                if is_real:
+                    p.setPhysicsEngineParameter(numSubSteps=4, physicsClientId=physics_client)
                 body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
                 if body_id < 0:
                     raise RuntimeError("PyBullet failed to load the URDF.")
 
-                label_to_link_idx = self._init_simulation_objects(physics_client, body_id, proj_dir)
-
-                # Temporarily disable rendering to make particle spawning fast
-                try:
-                    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0, physicsClientId=physics_client)
-                except p.error:
-                    pass
+                label_to_link_idx = self._init_simulation_objects(physics_client, body_id, proj_dir, urdf_path)
+                state_tracker = BulletStateTracker(body_id, physics_client, label_to_link_idx)
 
                 # Setup Hooks
                 setup_hook = provider_hooks.get(Simulate.SETUP, None)
@@ -950,10 +1153,10 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     setup_hook(body_id, physics_client, sim_target)
 
                 # Re-enable rendering
-                try:
+                if is_real:
                     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1, physicsClientId=physics_client)
-                except p.error:
-                    pass
+
+                is_logging_enabled = should_spawn or (save_rrd is not None)
 
                 for step_idx in range(steps):
                     # Step Hooks
@@ -966,14 +1169,21 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                             terminated = True
 
                     # Fetch state data of step_idx
-                    transforms, particle_positions, particle_colors = self._get_bullet_state(
-                        body_id, physics_client, label_to_link_idx
-                    )
+                    if is_logging_enabled:
+                        state_tracker.update_state()
 
                     # Step physics
                     if not terminated:
                         p.stepSimulation(physicsClientId=physics_client)
-                    self._log_rerun(transforms, particle_positions, particle_colors, step_idx=step_idx)
+
+                    if is_logging_enabled:
+                        self._log_rerun(
+                            state_tracker.transforms,
+                            state_tracker.particle_positions,
+                            state_tracker.particle_colors,
+                            particle_radii=state_tracker.particle_radii,
+                            step_idx=step_idx,
+                        )
 
                     if terminated:
                         # Simulation early termination conditions met.
