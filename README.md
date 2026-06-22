@@ -105,4 +105,26 @@ python src/view.py cat_fountain/product:view/simulate --no-build
 
 # Save the simulation recording to a (.rrd) file to upload to rerun.io:
 python src/view.py cat_fountain/product:view/simulate --save-rrd output.rrd
+
+---
+
+## Running Tests
+
+This project uses `pytest` for testing.
+
+To run the default test suite (skips slow tests for a fast local feedback loop):
+```bash
+pytest
+```
+
+To run only the slow geometry validation tests (which perform expensive 3D CAD boolean checks):
+```bash
+pytest -m "slow"
+```
+
+To run all tests (both fast and slow):
+```bash
+pytest -m "slow or not slow"
+```
+
 ```
