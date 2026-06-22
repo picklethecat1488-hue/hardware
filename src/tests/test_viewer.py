@@ -403,7 +403,7 @@ class TestViewer:
         )
 
         # Verify hooks were called
-        mock_setup.assert_called_once_with(100, 42, "mock/target")
+        mock_setup.assert_called_once_with(100, 42, "mock/target", {})
         assert mock_step.call_count == 10
         actual_calls = [call.args for call in mock_step.call_args_list]
         expected_calls = [(100, 42, i, "mock/target") for i in range(10)]
@@ -507,7 +507,7 @@ class TestViewer:
         )
 
         # Verify hooks were called with early termination
-        mock_setup.assert_called_once_with(100, 42, "mock/target")
+        mock_setup.assert_called_once_with(100, 42, "mock/target", {})
         assert mock_step.call_count == 3
         actual_calls = [call.args for call in mock_step.call_args_list]
         expected_calls = [(100, 42, i, "mock/target") for i in range(3)]

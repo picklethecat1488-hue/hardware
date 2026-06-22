@@ -12,7 +12,7 @@ from build123d import Compound, Box, Vector, RigidJoint, RevoluteJoint, Axis, Lo
 from model import AppConfig, TextArgs, DiagramOptions
 from provider import Simulate
 from provider.room import Room, BulletStateTracker
-from provider.types import ColorType, URDFShape
+from provider.types import ColorType, URDFShape, URDFCollisionType, URDFCollisionShapeType
 
 
 def test_room_add_success():
@@ -665,3 +665,72 @@ def test_room_translate_joints_relative():
     # The joint translation from parent to child should be (20, 0, 0)
     # Wait, the shape coordinates are mm, URDF is meters, so X offset should be 0.02
     assert 'xyz="0.02 0 0"' in urdf_text or 'xyz="0.020000 0.000000 0.000000"' in urdf_text or 'xyz="0.02' in urdf_text
+
+
+def test_room_export_urdf_primitive_collisions():
+    """Verify that Room.export_urdf exports primitive collision tags when collision_primitives is set."""
+    room = Room()
+
+    bowl = Box(10, 10, 10)
+    u_bowl = cast(URDFShape, bowl)
+    u_bowl.urdf_label = "bowl"
+    u_bowl.urdf_collision_type = URDFCollisionType.COMPOUND
+    u_bowl.urdf_collision_primitives = [
+        {
+            "type": URDFCollisionShapeType.BOX,
+            "size": [0.152, 0.152, 0.004],
+            "xyz": [0.0, 0.0, 0.002],
+            "rpy": [0.0, 0.0, 0.0],
+        },
+        {
+            "type": URDFCollisionShapeType.CYLINDER,
+            "radius": 0.008,
+            "length": 0.100,
+            "xyz": [0.0, 0.0, 0.05],
+            "rpy": [0.0, 0.0, 1.57],
+        },
+        {"type": URDFCollisionShapeType.SPHERE, "radius": 0.005, "xyz": [0.0, 0.0, 0.0], "rpy": [0.0, 0.0, 0.0]},
+    ]
+    u_bowl.locate(Location((0, 0, 0)))
+    room.add("bowl_part", bowl)
+
+    import io
+
+    output = io.StringIO()
+    room.export_urdf(output, "test_proj")
+    urdf_text = output.getvalue()
+
+    # Verify that collision type is compound
+    assert "<collision_type>compound</collision_type>" in urdf_text
+
+    # Verify that box geom is exported
+    assert '<box size="0.152000 0.152000 0.004000"/>' in urdf_text
+    assert 'xyz="0.000000 0.000000 0.002000"' in urdf_text
+
+    # Verify that cylinder geom is exported
+    assert '<cylinder radius="0.008000" length="0.100000"/>' in urdf_text
+    assert 'xyz="0.000000 0.000000 0.050000"' in urdf_text
+    assert 'rpy="0.000000 0.000000 1.570000"' in urdf_text
+
+    # Verify that sphere geom is exported
+    assert '<sphere radius="0.005000"/>' in urdf_text
+
+
+def test_cat_fountain_provider_bowl_collision_types():
+    """Verify that CatFountainProvider sets bowl collision type depending on simulation mode."""
+    from projects.cat_fountain.provider import CatFountainProvider
+    from provider.types import Mode
+
+    provider = CatFountainProvider()
+
+    # 1. Test simulation mode (analytical)
+    bowl_sim = provider.build_bowl("bowl", mode=Mode.SIMULATE)
+    u_bowl_sim = cast(URDFShape, bowl_sim.part)
+    assert u_bowl_sim.urdf_collision_type == URDFCollisionType.ANALYTICAL
+    assert len(u_bowl_sim.urdf_collision_primitives) > 0  # type: ignore
+    assert u_bowl_sim.urdf_collision_primitives[0]["type"] == URDFCollisionShapeType.BOX  # type: ignore
+
+    # 2. Test default/other mode (also analytical)
+    bowl_def = provider.build_bowl("bowl", mode=Mode.DEFAULT)
+    u_bowl_def = cast(URDFShape, bowl_def.part)
+    assert u_bowl_def.urdf_collision_type == URDFCollisionType.ANALYTICAL

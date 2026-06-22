@@ -279,7 +279,7 @@ class Provider:
                 has_varargs = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in params)
 
                 # Minimum required parameters
-                min_params = 3 if key in (Simulate.SETUP, Simulate.TEARDOWN) else 4
+                min_params = 3 if key == Simulate.TEARDOWN else 4
 
                 # Count positional/keyword parameters
                 pos_params = [
