@@ -546,7 +546,7 @@ class TestViewer:
         assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
         assert kwargs.get("proj_name") == "mock"
         assert kwargs.get("sim_target") == "mock/target"
-        assert kwargs.get("steps") == 1000
+        assert kwargs.get("steps") == 2000
 
         # Verify Builder compiles parts and URDFs prior to simulating
         mock_builder_class.assert_called_once_with(viewer.manager, viewer.logger)
@@ -584,7 +584,7 @@ class TestViewer:
         assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
         assert kwargs.get("proj_name") == "mock"
         assert kwargs.get("sim_target") == "mock/target"
-        assert kwargs.get("steps") == 1000
+        assert kwargs.get("steps") == 2000
         mock_builder_class.assert_not_called()
 
     @patch("view.show")
@@ -623,7 +623,7 @@ class TestViewer:
         assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
         assert kwargs.get("proj_name") == "mock"
         assert kwargs.get("sim_target") == "mock/target"
-        assert kwargs.get("steps") == 1000
+        assert kwargs.get("steps") == 2000
         assert kwargs.get("build_dir") == "custom_build"
 
     def test_show_simulation_empty_room(self, viewer):
@@ -773,3 +773,26 @@ class TestViewer:
         with patch.object(sys, "argv", test_args_default):
             args = get_args()
             assert args.no_gui is False
+
+    def test_view_cli_port(self):
+        """Verify view.py CLI parses -p/--port correctly and rejects --rerun-port."""
+        import sys
+        from unittest.mock import patch
+        from view import get_args
+
+        # Test -p / --port parsing
+        test_args = ["view.py", "cat_fountain/product:view/simulate", "-p", "1234"]
+        with patch.object(sys, "argv", test_args):
+            args = get_args()
+            assert args.port == 1234
+
+        test_args_long = ["view.py", "cat_fountain/product:view/simulate", "--port", "5678"]
+        with patch.object(sys, "argv", test_args_long):
+            args = get_args()
+            assert args.port == 5678
+
+        # Test that --rerun-port is consolidated/removed and raises an error
+        test_args_removed = ["view.py", "cat_fountain/product:view/simulate", "--rerun-port", "1234"]
+        with patch.object(sys, "argv", test_args_removed):
+            with pytest.raises(SystemExit):
+                get_args()

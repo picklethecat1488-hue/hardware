@@ -1138,7 +1138,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
                 p.setGravity(*self.gravity, physicsClientId=physics_client)
                 if is_real:
-                    p.setPhysicsEngineParameter(numSubSteps=4, physicsClientId=physics_client)
+                    p.setPhysicsEngineParameter(numSubSteps=2, physicsClientId=physics_client)
                 body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
                 if body_id < 0:
                     raise RuntimeError("PyBullet failed to load the URDF.")
@@ -1192,6 +1192,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 teardown_hook = provider_hooks.get(Simulate.TEARDOWN, None)
                 if teardown_hook:
                     teardown_hook(body_id, physics_client, sim_target)
+
             except KeyboardInterrupt:
                 logger.print("Simulation stopped.", symbol="💥")
             finally:
