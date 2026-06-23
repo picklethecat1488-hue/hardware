@@ -28,6 +28,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             config=FluidConfig.water(
                 sim_name=name,
                 boundaries=boundaries,
+                recycle_fluid=True,
             ),
             provider=self,
             body_id=body_id,
@@ -46,14 +47,13 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         vane_obj = cast(URDFShape, self.room["impeller"][0])
         target_omega = float(getattr(vane_obj, "urdf_motor_target", 15.0))
         max_force = float(getattr(vane_obj, "urdf_motor_force", 10.0))
-        damping = DampingType.DYNAMIC if step_idx >= 40 else DampingType.STABILIZE
         omega = target_omega if step_idx >= 40 else 0.0
         self.water_sim.update(
             body_id,
             client,
             step_idx,
             name,
-            damping=damping,
+            damping=DampingType.STABILIZE,
             motor_config=FluidMotorConfig(target_omega=omega, max_force=max_force),
         )
         if (
