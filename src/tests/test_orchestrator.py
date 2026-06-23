@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from provider.provider import ProviderOrchestrator
 from provider.provider_router import ProviderRouterOrchestrator
-from provider.types import Section, Mode, MODES, SUBASSEMBLIES
+from provider import Section, Mode, MODES, SUBASSEMBLIES
 from provider.room import Room
 
 

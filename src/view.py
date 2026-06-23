@@ -14,8 +14,7 @@ from pathlib import Path
 from typing import Sequence, Optional, List, Any, cast, Iterable
 from build123d import *  # type: ignore
 from target_parser import TargetParser
-from provider import ProviderManager, Section, TargetList, Room, Simulate, Mode, Provider
-from provider.types import URDFShape
+from provider import ProviderManager, Section, TargetList, Room, Simulate, Mode, Provider, URDFShape
 from pydantic import validate_call
 from shell import Logger
 from ocp_vscode import set_port, Collapse, Camera, show as ocp_show  # type: ignore

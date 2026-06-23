@@ -10,10 +10,9 @@ from pathlib import Path
 from build123d import BuildPart, Box, RigidJoint, RevoluteJoint, Axis, Location
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
-from provider import Section, Mode, TargetList, Room, SUBASSEMBLIES
+from provider import Section, Mode, TargetList, Room, SUBASSEMBLIES, URDFShape
 from typing import cast
 import trimesh
-from provider.types import URDFShape
 
 
 class TestBuildMain:
@@ -405,7 +404,7 @@ def test_compiled_aabb_alignment(tmp_path):
     from shell import Logger
     from provider import ProviderManager
     from provider.provider import Provider
-    from provider.types import Section, Mode, MODES, EXPORT, COLOR, MATERIAL
+    from provider import Section, Mode, MODES, EXPORT, COLOR, MATERIAL
     from build import Builder
     from build123d import BuildPart, Box
 

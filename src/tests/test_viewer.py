@@ -5,8 +5,7 @@ import pytest
 import pybullet
 from unittest.mock import MagicMock, patch, PropertyMock, call
 from view import Viewer, BuildPart, BuildSketch, BuildLine, Part, Sketch, Wire
-from provider import Section, TargetList, Mode, Simulate, Room
-from provider.types import URDFShape
+from provider import Section, TargetList, Mode, Simulate, Room, URDFShape
 from build123d import Box, RigidJoint, RevoluteJoint, Location, Axis
 from typing import cast
 
