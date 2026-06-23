@@ -222,7 +222,7 @@ def _compute_boundary_forces_jax(
     r_c = jnp.maximum(r_c, 1e-8)
     r_limit_c = cavity_radius - r_s
     pen_c_side = r_c - r_limit_c
-    side_mask = pen_c_side > 0.0
+    side_mask = (pen_c_side > 0.0) & (pos_c[:, 2] <= cavity_z_offset + cavity_height)
 
     nx_c = -pos_c[:, 0] / r_c
     ny_c = -pos_c[:, 1] / r_c
@@ -247,9 +247,11 @@ def _compute_boundary_forces_jax(
     pos_hc = q_rotate(hollow_cyl_orn_inv, pos - hollow_cyl_pos)
     vel_hc = q_rotate(hollow_cyl_orn_inv, vel)
 
+    # Active vertically within the physical tube height bounds (0 to hollow_cyl_height)
+    height_mask = (pos_hc[:, 2] >= 0.0) & (pos_hc[:, 2] <= hollow_cyl_height)
     # Cutout slot at bottom: ry < 0 and rz < 15mm
     cutout_mask = (pos_hc[:, 2] < 0.015) & (pos_hc[:, 1] < 0.0)
-    hollow_cyl_active_mask = ~cutout_mask
+    hollow_cyl_active_mask = height_mask & (~cutout_mask)
 
     r_hc = jnp.sqrt(pos_hc[:, 0] ** 2 + pos_hc[:, 1] ** 2)
     r_hc = jnp.maximum(r_hc, 1e-8)
