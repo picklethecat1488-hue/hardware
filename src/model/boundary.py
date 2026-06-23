@@ -1,7 +1,9 @@
 """Boundary configuration data models."""
 
 from typing import Literal, Optional, Tuple, Union
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from provider.bullet import LinkType
 
 
 class BoundaryConfig(BaseModel):
@@ -13,6 +15,7 @@ class BoundaryConfig(BaseModel):
     type: Optional[Literal["cavity", "solid", "solid_cavity"]] = Field(
         default=None, description="Collision type (cavity container, solid obstacle, or solid cavity)"
     )
+    link_type: Optional[LinkType] = Field(default=None, description="Enum type of the link")
     radius: Optional[float] = Field(default=None, description="Radius parameter (applicable for cylinders)")
     height: Optional[float] = Field(default=None, description="Height parameter (applicable for cylinders or boxes)")
     xyz: Tuple[float, float, float] = Field(default=(0.0, 0.0, 0.0), description="Local translation offset [x, y, z]")
@@ -38,3 +41,15 @@ class BoundaryConfig(BaseModel):
                 raise ValueError("xyz/rpy must have exactly 3 values")
             return (float(v[0]), float(v[1]), float(v[2]))
         return v
+
+    @model_validator(mode="after")
+    def populate_link_type(self) -> "BoundaryConfig":
+        """Populate link_type from collision type if not explicitly set."""
+        if self.link_type is None and self.type is not None:
+            if self.type == "cavity":
+                self.link_type = LinkType.BASE
+            elif self.type == "solid_cavity":
+                self.link_type = LinkType.TUBE
+            elif self.type == "solid":
+                self.link_type = LinkType.IMPELLER
+        return self

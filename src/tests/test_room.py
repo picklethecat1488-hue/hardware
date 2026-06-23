@@ -592,7 +592,6 @@ def test_room_simulate_loop_optimization():
     hooks = {
         Simulate.SETUP: MagicMock(),
         Simulate.STEP: MagicMock(return_value=None),
-        Simulate.TEARDOWN: MagicMock(),
     }
 
     from provider.bullet import Bullet
