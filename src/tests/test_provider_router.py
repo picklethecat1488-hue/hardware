@@ -7,7 +7,7 @@ from model import AppConfig
 from provider.provider_router import ProviderRouter
 from provider.provider_manager import ProviderManager
 from provider.provider import Provider
-from provider.types import Section, Mode, MODES, SUBASSEMBLIES
+from provider import Section, Mode, MODES, SUBASSEMBLIES
 from provider.target_list import TargetList
 
 

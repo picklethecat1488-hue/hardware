@@ -4,7 +4,7 @@ import pytest
 import math
 from unittest.mock import patch
 from build123d import Part
-from projects_config.cat_fountain_config import CatFountainConfig
+from projects_config import CatFountainConfig
 from projects.cat_fountain.provider import CatFountainProvider
 from provider import Section, Mode, Room
 

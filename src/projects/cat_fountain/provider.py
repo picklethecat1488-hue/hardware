@@ -5,9 +5,19 @@ from build123d import *  # type: ignore
 import math
 from model import method_cache, TextArgs, FluidConfig, FluidMotorConfig
 from pathlib import Path
-from provider import Provider, Section, Mode as ProviderMode, discover_provider, Room, Simulate
-from provider.types import URDFShape, URDFCollisionType, URDFCollisionShapeType, URDFBoundaryType
-from projects_config.cat_fountain_config import CatFountainConfig
+from provider import (
+    Provider,
+    Section,
+    Mode as ProviderMode,
+    discover_provider,
+    Room,
+    Simulate,
+    URDFShape,
+    URDFCollisionType,
+    URDFCollisionShapeType,
+    URDFBoundaryType,
+)
+from projects_config import CatFountainConfig
 from typing import cast, Callable, Sequence, Any
 
 
