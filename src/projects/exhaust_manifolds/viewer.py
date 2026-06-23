@@ -7,7 +7,7 @@ from build123d import *  # type: ignore
 from model.app_config import AppConfig
 from projects_config import ExhaustManifoldsConfig
 from .builder import ExhaustManifoldsBuilder
-from provider import Room, ColorType
+from provider import Room, ColorType, Mode
 from .configurator import ExhaustManifoldsConfigurator
 
 
@@ -60,7 +60,7 @@ class ExhaustManifoldsViewer:
             bottom_radius=10, top_radius=0, height=10, align=(Align.CENTER, Align.CENTER, Align.MIN)
         )
 
-    def view_part_positions(self, room: Room) -> None:
+    def view_part_positions(self, room: Room, mode: Mode) -> None:
         """Return visualization data for part positions."""
         for name in self.names:
             for right in [False, True]:
@@ -88,7 +88,7 @@ class ExhaustManifoldsViewer:
                 )
         room.add("bounds", self.bound_box, color=ColorType.GREY, alpha=0.2)
 
-    def view_overlay(self, room: Room) -> None:
+    def view_overlay(self, room: Room, mode: Mode) -> None:
         """Return visualization data for the overlay view."""
         for name in self.names:
             color = ColorType.CYAN if name == "driver" else ColorType.YELLOW
@@ -107,12 +107,12 @@ class ExhaustManifoldsViewer:
                 )
         room.add("bounds", self.bound_box, color=ColorType.GREY, alpha=0.2)
 
-    def view_wire(self, room: Room) -> None:
+    def view_wire(self, room: Room, mode: Mode) -> None:
         """Return visualization data for path wires."""
         for name in self.names:
             room.add(f"{name}_wire", self.builder.create_wire(name), color=ColorType.MAGENTA)
 
-    def view_sketch(self, room: Room) -> None:
+    def view_sketch(self, room: Room, mode: Mode) -> None:
         """Return visualization data for the profile sketches."""
         room.add("lap_joint_sketch", self.builder.create_profile_sketch(180, lap_joint=True), color=ColorType.MAGENTA)
         room.add("full_sketch", self.builder.create_profile_sketch(360), color=ColorType.MAGENTA)

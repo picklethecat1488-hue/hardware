@@ -69,7 +69,7 @@ class ProviderOrchestrator(Orchestrator):
                 target, _, m = item
                 room = Room(config=self.provider.app_config)
                 setattr(room, "mode", m)
-                self.provider.view[target](room)
+                self.provider.view[target](room, m)
                 return room
 
             raw_results = list(self.executor.map(view_task, work))
@@ -242,7 +242,7 @@ class Provider:
         return {}
 
     @property
-    def view(self) -> dict[str, Callable[[Room], None]]:
+    def view(self) -> dict[str, Callable[[Room, Mode], None]]:
         """Map room names to view functions."""
         return {}
 
