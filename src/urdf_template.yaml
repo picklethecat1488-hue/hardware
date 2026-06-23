@@ -41,3 +41,23 @@ joint_template: |
 axis_limit_template: |
   <axis xyz="{joint_axis}"/>
     <limit effort="10.0" lower="{lower:.6f}" upper="{upper:.6f}" velocity="1.0"/>
+
+primitive_collision_template: |
+  <collision>
+    <collision_type>{collision_type}</collision_type>
+    <origin xyz="{xyz}" rpy="{rpy}"/>
+    <geometry>
+      {geometry}
+    </geometry>
+  </collision>
+
+analytical_boundary_template: |
+  <analytical_boundary>
+    <boundary_shape>{boundary_shape}</boundary_shape>
+    <boundary_type>{boundary_type}</boundary_type>
+    <boundary_radius>{boundary_radius:.6f}</boundary_radius>
+    <boundary_height>{boundary_height:.6f}</boundary_height>
+    <boundary_xyz>{boundary_xyz}</boundary_xyz>
+    <boundary_rpy>{boundary_rpy}</boundary_rpy>
+  </analytical_boundary>
+

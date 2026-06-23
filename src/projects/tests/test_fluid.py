@@ -1,7 +1,7 @@
 """Unit tests for SPH Fluid simulation class."""
 
 import math
-from projects.fluid import Fluid
+from provider.fluid import Fluid
 
 
 def test_fluid_initialization():
@@ -194,3 +194,252 @@ def test_compute_forces_jax_direct():
     for i in range(len(positions)):
         for j in range(3):
             assert math.isclose(float(forces_jax[i, j]), forces_list[i][j], abs_tol=1e-4)
+
+
+def test_fluid_spawner_padding_and_jitter():
+    """Verify that FluidSpawner spawns batches with jitter and pads arrays correctly."""
+    import pybullet as p
+    from provider.fluid import FluidSpawner
+
+    physics_client = p.connect(p.DIRECT)
+    try:
+        spawner = FluidSpawner(
+            physics_client=physics_client,
+            r_s=0.003,
+            n_particles=10,
+            particle_mass=0.002,
+            particle_color=[0, 0, 1, 1],
+            particle_visual_length=0.0001,
+            linear_damping=0.05,
+            angular_damping=0.05,
+            lateral_friction=0.1,
+            restitution=0.0,
+        )
+
+        # Initial state
+        assert spawner.active_count == 0
+        assert len(spawner.water_body_ids) == 0
+
+        # 1. Spawn a batch of 4 particles
+        newly_spawned = spawner.spawn_batch(spawn_z=0.100, batch_size=4, spacing=0.008)
+        assert newly_spawned == 4
+        assert spawner.active_count == 4
+        assert len(spawner.water_body_ids) == 4
+
+        # Verify positions and velocities are padded up to n_particles (10)
+        positions, velocities = spawner.get_positions_and_velocities()
+        assert len(positions) == 10
+        assert len(velocities) == 10
+
+        # First 4 positions should be active particles (z < 100)
+        for i in range(4):
+            assert positions[i][2] < 100.0
+            assert abs(positions[i][0]) <= 0.006
+            assert abs(positions[i][1]) <= 0.006
+
+        # Remaining 6 should be padded to 1000.0
+        for i in range(4, 10):
+            assert math.isclose(positions[i][2], 1000.0)
+            assert positions[i][0] == 0.0
+            assert positions[i][1] == 0.0
+
+        # Spawn more than n_particles capacity
+        newly_spawned_2 = spawner.spawn_batch(spawn_z=0.100, batch_size=10, spacing=0.008)
+        assert newly_spawned_2 == 6  # Spawner caps at n_particles (10)
+        assert spawner.active_count == 10
+
+    finally:
+        p.disconnect(physicsClientId=physics_client)
+
+
+def test_fluid_simulator_dynamic_properties():
+    """Verify that Fluid reads target velocity, force, and offset from shape metadata and PyBullet."""
+    from unittest.mock import patch, MagicMock
+    from provider.fluid import Fluid
+    from provider.room import Room
+
+    # Mock provider
+    provider = MagicMock()
+    provider.settings.bowl_radius = 80.0
+    provider.settings.bowl_thickness = 3.5
+    provider.settings.tube_thickness = 1.5
+    provider.settings.impeller_shaft_radius = 1.5
+
+    sim = Fluid(provider=provider)
+    sim.body_id = 42
+    sim.physics_client = 1
+
+    # Mock PyBullet functions
+    def mock_get_num_joints(body_id, physicsClientId):
+        return 3
+
+    def mock_get_joint_info(body_id, joint_idx, physicsClientId):
+        # idx 0: impeller, idx 1: tube, idx 2: spout
+        if joint_idx == 0:
+            return (
+                0,
+                b"joint0",
+                0,
+                0,
+                0,
+                0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                b"impeller",
+                (0, 0, 0),
+                (0, 0, 0),
+                (0, 0, 0, 1),
+                -1,
+            )
+        elif joint_idx == 1:
+            return (
+                1,
+                b"joint1",
+                0,
+                0,
+                0,
+                0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                b"tube",
+                (0, 0, 0),
+                (0.0, 0.057, 0.0),
+                (0, 0, 0, 1),
+                -1,
+            )
+        else:
+            return (
+                2,
+                b"joint2",
+                0,
+                0,
+                0,
+                0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                b"spout",
+                (0, 0, 0),
+                (0, 0, 0),
+                (0, 0, 0, 1),
+                -1,
+            )
+
+    def mock_get_aabb(body_id, link_idx, physicsClientId):
+        if link_idx == -1:
+            return ((-0.080, -0.080, 0.0), (0.080, 0.080, 0.040))
+        elif link_idx == 1:
+            return ((-0.008, 0.049, 0.0), (0.008, 0.065, 0.100))
+        return ((0, 0, 0), (0, 0, 0))
+
+    def mock_get_link_state(body_id, link_idx, physicsClientId):
+        if link_idx == 2:
+            return (None, None, None, None, (0.0, 0.0, 0.100), (0.0, 0.0, 0.0, 1.0))
+        return (None, None, None, None, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
+
+    with (
+        patch("pybullet.getNumJoints", side_effect=mock_get_num_joints),
+        patch("pybullet.getJointInfo", side_effect=mock_get_joint_info),
+        patch("pybullet.getAABB", side_effect=mock_get_aabb),
+        patch("pybullet.getLinkState", side_effect=mock_get_link_state),
+    ):
+        # Verify dynamic properties using the refactored field names
+        assert sim.link_indices == [2, 1, 0]
+        assert sim.motor_settings == [15.0, 10.0]
+        assert math.isclose(sim.radii[0], 0.008, abs_tol=1e-5)
+        assert math.isclose(sim.radii[1], 0.080, abs_tol=1e-5)
+        assert math.isclose(sim.radii[2], 0.003, abs_tol=1e-5)
+        assert math.isclose(sim.radii[3], 0.090, abs_tol=1e-5)
+        assert math.isclose(sim.thresholds[0], 0.095, abs_tol=1e-5)
+        assert math.isclose(sim.thresholds[1], 0.005, abs_tol=1e-5)
+        assert math.isclose(sim.thresholds[2], 15.0, abs_tol=1e-5)
+
+
+def test_fluid_parameter_overrides():
+    """Verify that Fluid correctly accepts parameter overrides via the constructor."""
+    from provider.fluid import Fluid
+
+    # Create a dummy settings and provider
+    class DummySettings:
+        pass
+
+    class DummyProvider:
+        def __init__(self):
+            self.settings = DummySettings()
+
+    provider = DummyProvider()
+
+    # Set overridable simulation constants
+    provider.settings.PARTICLE_RADIUS = 0.0025
+    provider.settings.TARGET_VOLUME = 0.001
+    provider.settings.VOLUME_THRESHOLD_LITERS = 0.600
+    provider.settings.FALLEN_THRESHOLD_LITERS = 0.100
+    provider.settings.BOWL_WALL_BUFFER = 0.005
+
+    # Set overridable physical settings
+    provider.settings.REST_DENSITY = 800.0
+    provider.settings.VISCOSITY = 0.12
+    provider.settings.STIFFNESS = 150.0
+
+    # Set overridable SPH constants
+    provider.settings.SMOOTHING_FACTOR = 4.0
+    provider.settings.SPHERE_VOL_FACTOR = 1.333
+    provider.settings.POLY6_COEFF_NUMERATOR = 300.0
+    provider.settings.POLY6_COEFF_DENOMINATOR = 50.0
+    provider.settings.SPIKY_GRAD_COEFF = -40.0
+    provider.settings.VISC_LAP_COEFF = 40.0
+    provider.settings.PRESSURE_AVG_FACTOR = 3.0
+    provider.settings.MIN_DISTANCE_THRESHOLD = 1e-5
+
+    # Initialize Fluid with custom parameters directly
+    fluid = Fluid(
+        provider=provider,
+        particle_radius=provider.settings.PARTICLE_RADIUS,
+        target_volume=provider.settings.TARGET_VOLUME,
+        volume_threshold_liters=provider.settings.VOLUME_THRESHOLD_LITERS,
+        fallen_threshold_liters=provider.settings.FALLEN_THRESHOLD_LITERS,
+        bowl_wall_buffer=provider.settings.BOWL_WALL_BUFFER,
+        rest_density=provider.settings.REST_DENSITY,
+        viscosity=provider.settings.VISCOSITY,
+        stiffness=provider.settings.STIFFNESS,
+        smoothing_factor=provider.settings.SMOOTHING_FACTOR,
+        sphere_vol_factor=provider.settings.SPHERE_VOL_FACTOR,
+        poly6_coeff_numerator=provider.settings.POLY6_COEFF_NUMERATOR,
+        poly6_coeff_denominator=provider.settings.POLY6_COEFF_DENOMINATOR,
+        spiky_grad_coeff=provider.settings.SPIKY_GRAD_COEFF,
+        visc_lap_coeff=provider.settings.VISC_LAP_COEFF,
+        pressure_avg_factor=provider.settings.PRESSURE_AVG_FACTOR,
+        min_distance_threshold=provider.settings.MIN_DISTANCE_THRESHOLD,
+    )
+
+    # Assert Fluid constants are overridden
+    assert fluid.particle_radius == 0.0025
+    assert fluid.target_volume == 0.001
+    assert fluid.volume_threshold_liters == 0.600
+    assert fluid.fallen_threshold_liters == 0.100
+    assert fluid.bowl_wall_buffer == 0.005
+    assert fluid.rest_density == 800.0
+    assert fluid.viscosity == 0.12
+    assert fluid.stiffness == 150.0
+    assert fluid.k == 150.0
+    assert fluid.smoothing_factor == 4.0
+    assert fluid.sphere_vol_factor == 1.333
+    assert fluid.pressure_avg_factor == 3.0
+    assert fluid.min_distance_threshold == 1e-5
+    assert fluid.r_s == 0.0025
+
+    # Test default constructor arguments
+    fluid_default = Fluid(provider=provider)
+    assert fluid_default.r_s == 0.003
+    assert fluid_default.rest_density == 1000.0

@@ -6,7 +6,7 @@ import math
 from model import method_cache, TextArgs
 from pathlib import Path
 from provider import Provider, Section, Mode as ProviderMode, discover_provider, Room, Simulate
-from provider.types import URDFShape
+from provider.types import URDFShape, URDFCollisionType, URDFCollisionShapeType, URDFBoundaryType
 from projects_config.cat_fountain_config import CatFountainConfig
 from typing import cast, Callable, Sequence, Any
 
@@ -101,7 +101,51 @@ class CatFountainProvider(Provider):
         bowl_part.urdf_contact_angle = self.settings.contact_angle
         bowl_part.urdf_parent = None
         bowl_part.urdf_joint_type = None
-        bowl_part.urdf_collision_type = "concave"
+        bowl_part.urdf_collision_type = URDFCollisionType.ANALYTICAL
+        bowl_part.urdf_boundary_shape = "cylinder"
+        bowl_part.urdf_boundary_type = URDFBoundaryType.CAVITY
+        bowl_part.urdf_boundary_radius = (r - t) * 0.001
+        bowl_part.urdf_boundary_height = (h - t) * 0.001
+        bowl_part.urdf_boundary_xyz = f"0.0 0.0 {t * 0.001}"
+        bowl_part.urdf_boundary_rpy = "0.0 0.0 0.0"
+
+        # Dimensions in meters
+        R = r * 0.001
+        H = h * 0.001
+        thickness = t * 0.001
+        R_i = R - thickness
+        H_w = H - thickness
+
+        primitives = []
+
+        # 1. Bottom plate box
+        primitives.append(
+            {
+                "type": URDFCollisionShapeType.BOX,
+                "size": [R_i * 2.0, R_i * 2.0, thickness],
+                "xyz": [0.0, 0.0, thickness / 2.0],
+                "rpy": [0.0, 0.0, 0.0],
+            }
+        )
+
+        # 2. Side walls segments (12 boxes)
+        N_segments = 12
+        R_mid = R_i + thickness / 2.0
+        circ = 2.0 * math.pi * R_mid
+        seg_width = circ / N_segments + 0.003  # Add 3mm overlap to prevent gaps
+
+        for i in range(N_segments):
+            theta = i * (2.0 * math.pi / N_segments)
+            primitives.append(
+                {
+                    "type": URDFCollisionShapeType.BOX,
+                    "size": [thickness, seg_width, H_w],
+                    "xyz": [R_mid * math.cos(theta), R_mid * math.sin(theta), thickness + H_w / 2.0],
+                    "rpy": [0.0, 0.0, theta],
+                }
+            )
+
+        bowl_part.urdf_collision_primitives = primitives
 
         # Define RigidJoint for the central shaft (concentric with tube_socket)
         RigidJoint("shaft", bowl.part, Location((0, tube_y, t + 1.0)))
@@ -149,6 +193,13 @@ class CatFountainProvider(Provider):
         impeller_part.urdf_motor_type = "velocity"
         impeller_part.urdf_motor_target = 15.0
         impeller_part.urdf_motor_force = 10.0
+        impeller_part.urdf_collision_type = URDFCollisionType.ANALYTICAL
+        impeller_part.urdf_boundary_shape = "impeller"
+        impeller_part.urdf_boundary_type = URDFBoundaryType.SOLID
+        impeller_part.urdf_boundary_radius = r * 0.001
+        impeller_part.urdf_boundary_height = h * 0.001
+        impeller_part.urdf_boundary_xyz = "0.0 0.0 0.0"
+        impeller_part.urdf_boundary_rpy = "0.0 0.0 0.0"
 
         # Define RevoluteJoint for the impeller motor connection
         RevoluteJoint(label="motor", to_part=impeller.part, axis=Axis((0, 0, 0), (0, 0, 1)), angular_range=(0, 360))
@@ -186,7 +237,13 @@ class CatFountainProvider(Provider):
         tube_part.urdf_density = self.settings.density
         tube_part.urdf_boundary_friction = self.settings.boundary_friction
         tube_part.urdf_contact_angle = self.settings.contact_angle
-        tube_part.urdf_collision_type = "concave"
+        tube_part.urdf_collision_type = URDFCollisionType.ANALYTICAL
+        tube_part.urdf_boundary_shape = "tube"
+        tube_part.urdf_boundary_type = URDFBoundaryType.SOLID_CAVITY
+        tube_part.urdf_boundary_radius = r * 0.001
+        tube_part.urdf_boundary_height = h * 0.001
+        tube_part.urdf_boundary_xyz = "0.0 0.0 0.0"
+        tube_part.urdf_boundary_rpy = "0.0 0.0 0.0"
 
         # Define joints for relative positioning and URDF linkage
         RigidJoint("base", tube.part, Location((0, 0, 0)))
@@ -297,10 +354,12 @@ class CatFountainProvider(Provider):
 
     def build_product(self, room: Room) -> None:
         """Place all parts of the cat fountain in the room for visualization/simulation."""
-        bowl_part = self.build_bowl("bowl").part
-        impeller_part = self.build_impeller("impeller").part
-        tube_part = self.build_tube("tube").part
-        spout_part = self.build_spout("spout").part
+        is_sim = getattr(room, "is_simulate", False) or (getattr(room, "mode", None) == ProviderMode.SIMULATE)
+        mode = ProviderMode.SIMULATE if is_sim else ProviderMode.DEFAULT
+        bowl_part = self.build_bowl("bowl", mode=mode).part
+        impeller_part = self.build_impeller("impeller", mode=mode).part
+        tube_part = self.build_tube("tube", mode=mode).part
+        spout_part = self.build_spout("spout", mode=mode).part
 
         # 2. Position them in their standard assembled configuration using joints
         bowl_part.joints["shaft"].connect_to(impeller_part.joints["motor"])
@@ -319,13 +378,35 @@ class CatFountainProvider(Provider):
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
         """Return simulation hooks for the cat fountain."""
-        from .simulate import WaterSimulator
+        from provider.fluid import Fluid
 
-        self.water_sim = WaterSimulator(self)
+        self.water_sim = None
+
+        def setup_simulation(body_id, client, name, boundaries, state_tracker=None):
+            self.water_sim = Fluid(
+                provider=self,
+                r_s=0.0015,
+                target_volume=0.0005,
+                viscosity=0.02,
+                stiffness=100.0,
+                volume_threshold_liters=0.400,
+                fallen_threshold_liters=0.050,
+                bowl_wall_buffer=0.002,
+                body_id=body_id,
+                physics_client=client,
+                sim_name=name,
+                boundaries=boundaries,
+                state_tracker=state_tracker,
+            )
 
         return {
-            Simulate.SETUP: lambda body_id, client, name: self.water_sim.setup_simulation(body_id, client, name),
-            Simulate.STEP: lambda body_id, client, step_idx, name: self.water_sim.step_simulation(
-                body_id, client, step_idx, name
-            ),
+            Simulate.SETUP: setup_simulation,
+            Simulate.STEP: lambda body_id, client, step_idx, name: (
+                self.water_sim.update(body_id, client, step_idx, name),
+                f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl"
+                if len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0
+                >= self.water_sim.fallen_threshold_liters
+                else None,
+            )[1],
+            Simulate.TEARDOWN: lambda body_id, client, name: None,
         }
