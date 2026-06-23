@@ -60,7 +60,7 @@ class TestCatFountainProvider:
     def test_build_product(self, provider):
         """Verify that build_product populates the room with all fountain parts and their URDF attributes."""
         room = Room()
-        provider.build_product(room)
+        provider.build_product(room, Mode.DEFAULT)
         room.translate_joints()
 
         # Verify all parts are placed
