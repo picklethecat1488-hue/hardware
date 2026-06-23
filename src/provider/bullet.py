@@ -431,6 +431,7 @@ class Bullet:
                                 "type": getattr(u_geom, "urdf_boundary_type", None),
                                 "radius": getattr(u_geom, "urdf_boundary_radius", None),
                                 "height": getattr(u_geom, "urdf_boundary_height", None),
+                                "thickness": getattr(u_geom, "urdf_boundary_thickness", None),
                                 "xyz": [float(x) for x in xyz_str.split()] if isinstance(xyz_str, str) else xyz_str,
                                 "rpy": [float(x) for x in rpy_str.split()] if isinstance(rpy_str, str) else rpy_str,
                             }
