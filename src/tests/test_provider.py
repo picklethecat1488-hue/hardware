@@ -336,9 +336,9 @@ def test_provider_simulate_validation(provider):
     with pytest.raises(TypeError, match="Simulation hook value must be callable"):
         _ = provider.get_simulate_hooks("default")
 
-    # 3. Invalid signature for SETUP (must accept at least 3 arguments)
-    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.SETUP: lambda a, b: None})
-    with pytest.raises(ValueError, match="must accept at least 3 parameters"):
+    # 3. Invalid signature for SETUP (must accept at least 4 arguments)
+    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.SETUP: lambda a, b, c: None})
+    with pytest.raises(ValueError, match="must accept at least 4 parameters"):
         _ = provider.get_simulate_hooks("default")
 
     # 4. Invalid signature for STEP (must accept at least 4 arguments)
@@ -347,8 +347,8 @@ def test_provider_simulate_validation(provider):
         _ = provider.get_simulate_hooks("default")
 
     # 5. Invalid signature for SETUP with too many required arguments
-    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.SETUP: lambda a, b, c, d: None})
-    with pytest.raises(ValueError, match="requires 4 parameters, but only 3 will be provided"):
+    provider.get_simulate_hooks_impl = MagicMock(return_value={Simulate.SETUP: lambda a, b, c, d, e: None})
+    with pytest.raises(ValueError, match="requires 5 parameters, but only 4 will be provided"):
         _ = provider.get_simulate_hooks("default")
 
     # 6. Valid setup with *args
