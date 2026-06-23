@@ -408,8 +408,10 @@ def test_export_urdf_multiple_root_links():
         room.export_urdf(output, "test_project")
 
 
-def test_room_reset_camera():
+def test_bullet_reset_camera():
     """Verify that reset_camera successfully calls resetDebugVisualizerCamera."""
+    from provider.bullet import Bullet
+
     room = Room()
     box = Box(10, 10, 10)
     room.add("box", box)
@@ -417,7 +419,8 @@ def test_room_reset_camera():
     physics_client = p.connect(p.DIRECT)
     try:
         with patch("pybullet.resetDebugVisualizerCamera") as mock_reset:
-            room.reset_camera(physics_client, view_from="top rear")
+            bullet_sim = Bullet(room, {}, "", "", 0, None, None)
+            bullet_sim.reset_camera(physics_client, view_from="top rear")
             mock_reset.assert_called_once()
             args, kwargs = mock_reset.call_args
             assert kwargs["cameraDistance"] > 0
@@ -428,8 +431,10 @@ def test_room_reset_camera():
         p.disconnect(physicsClientId=physics_client)
 
 
-def test_room_copy_project_assets():
-    """Verify that _copy_project_assets successfully copies existing OBJ files or raises FileNotFoundError."""
+def test_bullet_copy_project_assets():
+    """Verify that copy_project_assets successfully copies existing OBJ files or raises FileNotFoundError."""
+    from provider.bullet import Bullet
+
     room = Room()
     parent = Box(1, 1, 1)
     cast(Any, parent).urdf_label = "parent"
@@ -441,16 +446,18 @@ def test_room_copy_project_assets():
         os.makedirs(build_proj_dir, exist_ok=True)
         os.makedirs(proj_dir, exist_ok=True)
 
+        bullet_sim = Bullet(room, {}, "test_proj", "parent", 0, None, None)
+
         # 1. Raises FileNotFoundError if OBJ does not exist
         with pytest.raises(FileNotFoundError, match="Required OBJ file not found"):
-            room._copy_project_assets(build_proj_dir, proj_dir)
+            bullet_sim._copy_project_assets(build_proj_dir, proj_dir)
 
         # 2. Successfully copies if OBJ exists
         real_obj_path = os.path.join(build_proj_dir, "parent.obj")
         with open(real_obj_path, "w") as f:
             f.write("# parent obj")
 
-        room._copy_project_assets(build_proj_dir, proj_dir)
+        bullet_sim._copy_project_assets(build_proj_dir, proj_dir)
         temp_obj_path = os.path.join(proj_dir, "parent.obj")
         assert os.path.exists(temp_obj_path)
         with open(temp_obj_path, "r") as f:
@@ -460,12 +467,15 @@ def test_room_copy_project_assets():
 @patch("rerun.init")
 @patch("rerun.spawn")
 @patch("rerun.connect_grpc")
-def test_room_init_rerun(mock_connect_grpc, mock_spawn, mock_init):
+def test_bullet_init_rerun(mock_connect_grpc, mock_spawn, mock_init):
     """Verify Rerun connection initialization logic."""
+    from provider.bullet import Bullet
+
     room = Room()
 
     # 1. spawn_viewer is False -> just call init
-    room._init_rerun("test_proj", spawn_viewer=False)
+    bullet_sim = Bullet(room, {}, "test_proj", "", 0, None, None, spawn_viewer=False)
+    bullet_sim._init_rerun()
     mock_init.assert_called_once_with("test_proj")
     mock_spawn.assert_not_called()
     mock_connect_grpc.assert_not_called()
@@ -480,7 +490,8 @@ def test_room_init_rerun(mock_connect_grpc, mock_spawn, mock_init):
         mock_sock.return_value.__enter__.return_value.connect_ex.return_value = 1
 
         # 2. spawn_viewer is True, port is free -> spawn
-        room._init_rerun("test_proj", spawn_viewer=True, rerun_port=9876)
+        bullet_sim = Bullet(room, {}, "test_proj", "", 0, None, None, spawn_viewer=True, rerun_port=9876)
+        bullet_sim._init_rerun()
         mock_init.assert_called_once_with("test_proj")
         mock_spawn.assert_called_once_with(port=9876)
         mock_connect_grpc.assert_not_called()
@@ -495,7 +506,8 @@ def test_room_init_rerun(mock_connect_grpc, mock_spawn, mock_init):
         mock_sock.return_value.__enter__.return_value.connect_ex.return_value = 0
 
         # 3. spawn_viewer is True, port is busy -> connect
-        room._init_rerun("test_proj", spawn_viewer=True, rerun_port=9876)
+        bullet_sim = Bullet(room, {}, "test_proj", "", 0, None, None, spawn_viewer=True, rerun_port=9876)
+        bullet_sim._init_rerun()
         mock_init.assert_called_once_with("test_proj")
         mock_spawn.assert_not_called()
         mock_connect_grpc.assert_called_once_with("rerun+http://127.0.0.1:9876/proxy")
@@ -583,15 +595,17 @@ def test_room_simulate_loop_optimization():
         Simulate.TEARDOWN: MagicMock(),
     }
 
+    from provider.bullet import Bullet
+
     with (
-        patch("provider.room.p.loadURDF", return_value=1) as mock_load_urdf,
-        patch("provider.room.p.stepSimulation") as mock_step_sim,
-        patch("provider.room.BulletStateTracker") as mock_tracker_cls,
-        patch("provider.room.os.path.exists", return_value=True),
-        patch("provider.room.shutil.copy"),
-        patch.object(room, "_copy_project_assets") as mock_copy,
-        patch.object(room, "_init_simulation_objects", return_value={}) as mock_init_objects,
-        patch.object(room, "_init_rerun") as mock_init_rerun,
+        patch("provider.bullet.p.loadURDF", return_value=1) as mock_load_urdf,
+        patch("provider.bullet.p.stepSimulation") as mock_step_sim,
+        patch("provider.bullet.BulletStateTracker") as mock_tracker_cls,
+        patch("provider.bullet.os.path.exists", return_value=True),
+        patch("provider.bullet.shutil.copy"),
+        patch.object(Bullet, "_copy_project_assets") as mock_copy,
+        patch.object(Bullet, "_init_simulation_objects", return_value={}) as mock_init_objects,
+        patch.object(Bullet, "_init_rerun") as mock_init_rerun,
         patch.object(room, "_log_rerun") as mock_log_rerun,
     ):
         mock_tracker = mock_tracker_cls.return_value

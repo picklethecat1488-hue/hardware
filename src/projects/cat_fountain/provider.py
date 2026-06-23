@@ -378,16 +378,35 @@ class CatFountainProvider(Provider):
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
         """Return simulation hooks for the cat fountain."""
-        from .simulate import WaterSimulator
+        from provider.fluid import Fluid
 
-        self.water_sim = WaterSimulator(self)
+        self.water_sim = None
+
+        def setup_simulation(body_id, client, name, boundaries, state_tracker=None):
+            self.water_sim = Fluid(
+                provider=self,
+                r_s=0.0015,
+                target_volume=0.0005,
+                viscosity=0.02,
+                stiffness=100.0,
+                volume_threshold_liters=0.400,
+                fallen_threshold_liters=0.050,
+                bowl_wall_buffer=0.002,
+                body_id=body_id,
+                physics_client=client,
+                sim_name=name,
+                boundaries=boundaries,
+                state_tracker=state_tracker,
+            )
 
         return {
-            Simulate.SETUP: lambda body_id, client, name, boundaries: self.water_sim.setup_simulation(
-                body_id, client, name, boundaries
-            ),
-            Simulate.STEP: lambda body_id, client, step_idx, name: self.water_sim.step_simulation(
-                body_id, client, step_idx, name
-            ),
-            Simulate.TEARDOWN: lambda body_id, client, name: self.water_sim.teardown_simulation(body_id, client, name),
+            Simulate.SETUP: setup_simulation,
+            Simulate.STEP: lambda body_id, client, step_idx, name: (
+                self.water_sim.update(body_id, client, step_idx, name),
+                f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl"
+                if len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0
+                >= self.water_sim.fallen_threshold_liters
+                else None,
+            )[1],
+            Simulate.TEARDOWN: lambda body_id, client, name: None,
         }

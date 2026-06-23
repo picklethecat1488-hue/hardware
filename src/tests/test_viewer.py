@@ -44,9 +44,9 @@ class TestViewer:
     def mock_pybullet_rerun_functions(self):
         """Mock Rerun-related Room state-querying/logging functions to avoid connection errors."""
         with (
-            patch("provider.room.BulletStateTracker.update_state"),
+            patch("provider.bullet.BulletStateTracker.update_state"),
             patch.object(Room, "_log_rerun"),
-            patch.object(Room, "_init_rerun"),
+            patch("provider.bullet.Bullet._init_rerun"),
             patch("rerun.log"),
             patch("rerun.Asset3D"),
         ):
