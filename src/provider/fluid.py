@@ -222,7 +222,7 @@ def _compute_boundary_forces_jax(
     r_c = jnp.maximum(r_c, 1e-8)
     r_limit_c = cavity_radius - r_s
     pen_c_side = r_c - r_limit_c
-    side_mask = (pen_c_side > 0.0) & (pos_c[:, 2] <= cavity_z_offset + cavity_height)
+    side_mask = pen_c_side > 0.0
 
     nx_c = -pos_c[:, 0] / r_c
     ny_c = -pos_c[:, 1] / r_c
@@ -643,6 +643,7 @@ class Fluid:
         self.characteristic_length = config.characteristic_length
         self.volume_threshold_liters = config.volume_threshold_liters
         self.fallen_threshold_liters = config.fallen_threshold_liters
+        self.recycle_fluid = config.recycle_fluid
 
         # SPH values computed from settings
         self.h = self.smoothing_factor * self.r_s
@@ -745,6 +746,7 @@ class Fluid:
                         xy_coords.append((x, y))
 
             xy_coords.sort(key=lambda pt: pt[0] ** 2 + pt[1] ** 2)
+            self.spawn_xy_coords = xy_coords
 
             # Spawn particles above bottom plate
             z = cavity_z_offset + self.r_s + self.bowl_wall_buffer
@@ -1108,9 +1110,20 @@ class Fluid:
                 pos_arr = np.array(self.pos_jax)
                 vel_arr = np.array(self.vel_jax)
                 for idx in fallen_indices:
-                    self.fallen_out_water_ids.add(idx)
-                    pos_arr[idx] = [0.0, 0.0, 1000.0]
-                    vel_arr[idx] = [0.0, 0.0, 0.0]
+                    if self.recycle_fluid:
+                        # Select a random coordinate from pre-calculated grid
+                        if hasattr(self, "spawn_xy_coords") and self.spawn_xy_coords:
+                            x, y = random.choice(self.spawn_xy_coords)
+                        else:
+                            x, y = 0.0, 0.0
+                        z_local = cavity_z_offset + self.r_s + self.bowl_wall_buffer + random.uniform(0.0, 0.010)
+                        wpt, _ = p.multiplyTransforms(cavity_pos, cavity_orn, [x, y, z_local], [0.0, 0.0, 0.0, 1.0])
+                        pos_arr[idx] = wpt
+                        vel_arr[idx] = [0.0, 0.0, 0.0]
+                    else:
+                        self.fallen_out_water_ids.add(idx)
+                        pos_arr[idx] = [0.0, 0.0, 1000.0]
+                        vel_arr[idx] = [0.0, 0.0, 0.0]
                 self.pos_jax = jnp.array(pos_arr)
                 self.vel_jax = jnp.array(vel_arr)
                 self.last_positions = self.pos_jax.tolist()

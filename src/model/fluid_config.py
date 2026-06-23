@@ -57,6 +57,7 @@ class FluidConfig(BaseModel):
     boundaries: Optional[dict[str, Any]] = Field(
         default=None, description="Dictionary of physical boundary definitions."
     )
+    recycle_fluid: bool = Field(default=False, description="Enable recycling of fallen particles back into the bowl.")
     sim_name: str = Field(default="", description="User-defined simulation run name tag.")
 
     @staticmethod
