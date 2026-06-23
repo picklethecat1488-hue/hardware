@@ -8,7 +8,21 @@ if not hasattr(OCP.TopoDS.TopoDS_Shape, "HashCode"):
     OCP.TopoDS.TopoDS_Shape.HashCode = lambda self, upper: id(self) % upper  # type: ignore
 
 from .provider import Provider
-from .types import Mode, Section, MODES, ColorType, SUBASSEMBLIES, MATERIAL, EXPORT, Simulate, URDFShape
+from .types import (
+    Mode,
+    Section,
+    MODES,
+    ColorType,
+    SUBASSEMBLIES,
+    MATERIAL,
+    EXPORT,
+    Simulate,
+    URDFShape,
+    URDFCollisionType,
+    URDFCollisionShapeType,
+    URDFBoundaryType,
+    COLOR,
+)
 from .target_list import TargetList
 from .room import Room
 from .bullet import Bullet, LinkType

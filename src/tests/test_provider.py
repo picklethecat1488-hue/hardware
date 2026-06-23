@@ -9,7 +9,7 @@ from provider.provider import Provider
 from provider.target_list import TargetList
 from provider.utils import load_manifest, ColorType
 from model.utils import method_cache
-from provider.types import Section, Mode, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT, Simulate
+from provider import Section, Mode, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT, Simulate
 from provider.room import Room
 
 
@@ -88,7 +88,7 @@ class MockProvider(Provider):
         """Return a mock view registry."""
         if not hasattr(self, "_mock_view"):
             self._mock_view = {
-                "part_a": MagicMock(side_effect=lambda room: room.add("item", "shape", color="grey")),
+                "part_a": MagicMock(side_effect=lambda room, mode: room.add("item", "shape", color="grey")),
             }
         return self._mock_view
 

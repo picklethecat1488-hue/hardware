@@ -5,7 +5,7 @@ from functools import cached_property
 from typing import Any, Callable, Optional, TYPE_CHECKING
 from model.app_config import AppConfig
 from projects_config import ExhaustManifoldsConfig
-from provider import Provider, Section, Mode, discover_provider
+from provider import Provider, Section, Mode, discover_provider, Room
 from .builder import ExhaustManifoldsBuilder
 from .configurator import ExhaustManifoldsConfigurator
 from .viewer import ExhaustManifoldsViewer
@@ -68,7 +68,7 @@ class ExhaustManifoldsProvider(Provider):
         }
 
     @property
-    def view(self) -> dict[str, Callable[[], list[tuple[Any, tuple[float, float, float, float]]]]]:
+    def view(self) -> dict[str, Callable[[Room, Mode], None]]:
         """A mapping of room names to view functions."""
         return {
             "part_positions": self.viewer.view_part_positions,

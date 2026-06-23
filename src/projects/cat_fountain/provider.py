@@ -5,9 +5,19 @@ from build123d import *  # type: ignore
 import math
 from model import method_cache, TextArgs, FluidConfig, FluidMotorConfig
 from pathlib import Path
-from provider import Provider, Section, Mode as ProviderMode, discover_provider, Room, Simulate
-from provider.types import URDFShape, URDFCollisionType, URDFCollisionShapeType, URDFBoundaryType
-from projects_config.cat_fountain_config import CatFountainConfig
+from provider import (
+    Provider,
+    Section,
+    Mode as ProviderMode,
+    discover_provider,
+    Room,
+    Simulate,
+    URDFShape,
+    URDFCollisionType,
+    URDFCollisionShapeType,
+    URDFBoundaryType,
+)
+from projects_config import CatFountainConfig
 from typing import cast, Callable, Sequence, Any
 
 
@@ -42,7 +52,7 @@ class CatFountainProvider(Provider):
         return {name: self.build_diagram for name in self.targets.supporting(Section.DIAGRAM)}
 
     @property
-    def view(self) -> dict[str, Callable[[Room], None]]:
+    def view(self) -> dict[str, Callable[[Room, ProviderMode], None]]:
         """Map room names to view functions."""
         return {
             "product": self.build_product,
@@ -318,8 +328,6 @@ class CatFountainProvider(Provider):
 
     def build_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build an exploded assembly diagram for the cat fountain."""
-        import copy
-
         bowl_part = self.build_bowl("bowl").part
         impeller_part = self.build_impeller("impeller").part
         tube_part = self.build_tube("tube").part
@@ -355,10 +363,8 @@ class CatFountainProvider(Provider):
         room.add_label("tube_label", "TUBE", tube_part.center() + Vector(40, 10, 10), options=TextArgs(font_size=16))
         room.add_label("spout_label", "SPOUT", spout_part.center() + Vector(40, 10, 10), options=TextArgs(font_size=16))
 
-    def build_product(self, room: Room) -> None:
+    def build_product(self, room: Room, mode: ProviderMode) -> None:
         """Place all parts of the cat fountain in the room for visualization/simulation."""
-        is_sim = getattr(room, "is_simulate", False) or (getattr(room, "mode", None) == ProviderMode.SIMULATE)
-        mode = ProviderMode.SIMULATE if is_sim else ProviderMode.DEFAULT
         bowl_part = self.build_bowl("bowl", mode=mode).part
         impeller_part = self.build_impeller("impeller", mode=mode).part
         tube_part = self.build_tube("tube", mode=mode).part
@@ -372,7 +378,7 @@ class CatFountainProvider(Provider):
         # 3. Add the positioned parts directly to the room
         room.add("bowl", bowl_part, color="grey")
         room.add("impeller", impeller_part, color="red")
-        if getattr(room, "is_simulate", False):
+        if mode == ProviderMode.SIMULATE:
             room.add("tube", tube_part, color="blue", alpha=0.4)
         else:
             room.add("tube", tube_part, color="blue")

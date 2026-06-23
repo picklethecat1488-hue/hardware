@@ -108,6 +108,32 @@ from .exhaust_manifolds import ExhaustManifoldsProvider
 from .bracket import BracketProvider
 ```
 
+### 7. Registering Simulation Hooks (Optional)
+If your project supports physical simulation (`Mode.SIMULATE`), you should register custom simulation callbacks to manage initialization, joint control, and fluid behavior:
+
+```python
+# src/projects/bracket/provider.py
+def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+    """Return simulation callbacks mapped to execution hooks."""
+    from .simulate_hooks import get_simulate_hooks_impl as impl
+    return impl(self, sim_name)
+```
+
+Create a `simulate_hooks.py` file within your project package to specify hooks for `Simulate.INIT`, `Simulate.PRE_STEP`, etc.:
+
+```python
+# src/projects/bracket/simulate_hooks.py
+from provider import Simulate, Room, Bullet, Fluid, DampingType
+
+def get_simulate_hooks_impl(provider, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+    def on_init(bullet: Bullet, fluid: Fluid) -> None:
+        bullet.set_motor_velocity("motor_joint", velocity=10.0)
+        
+    return {
+        Simulate.INIT: on_init,
+    }
+```
+
 ## Core Concepts
 
 ### Lazy Initialization
@@ -130,6 +156,45 @@ The `ProviderOrchestrator` handles the execution of tasks. It manages:
 1.  **Discovery**: `ProviderManager` finds all decorated providers.
 2.  **Config Sync**: `ProviderManager.load_configs()` takes environment variables (e.g., `EXHAUST_MANIFOLDS__WALL_THICKNESS`) and applies them to the provider's `settings`.
 3.  **Execution**: `provider.run(target_list)` triggers the orchestrator.
+
+### Physical Simulation & URDF Export
+For parts that participate in physics simulation, you must attach URDF/simulation metadata attributes to the shapes returned by the builders. These properties map to physics behaviors in the PyBullet simulator and JAX fluid engine:
+
+- **Core Physical Attributes**:
+  - `urdf_label` (`str`): Unique label for the link in the URDF representation.
+  - `urdf_material` (`str`): Material name (e.g., `"petg"`, `"acrylic"`).
+  - `urdf_density` (`float`): Density in $\text{kg/m}^3$ used to calculate link mass and inertia.
+  - `urdf_parent` (`Optional[str]`): Parent link name in the kinematic tree (`None` for the base/root).
+  - `urdf_joint_type` (`Optional[str]`): Joint type connecting to the parent (e.g., `"revolute"`, `"fixed"`, `"prismatic"`).
+
+- **Boundary & Fluid Interaction**:
+  - `urdf_boundary_friction` (`float`): Coulomb friction coefficient for fluid-boundary interactions.
+  - `urdf_contact_angle` (`float`): Fluid contact angle (wetting angle) in degrees.
+  - `urdf_collision_type` (`URDFCollisionType`): Collision model. Can be:
+    - `URDFCollisionType.ANALYTICAL` (uses idealized geometric boundaries like cylinders or boxes).
+    - `URDFCollisionType.CONCAVE` (uses the full triangular mesh).
+  - `urdf_boundary_shape` (`str`): Shape identifier (e.g., `"cylinder"`, `"tube"`, `"impeller"`).
+  - `urdf_boundary_type` (`URDFBoundaryType`): Boundary role for JAX SPH simulator:
+    - `URDFBoundaryType.CAVITY` (hollow interior boundary/container).
+    - `URDFBoundaryType.SOLID` (solid obstacle).
+    - `URDFBoundaryType.SOLID_CAVITY` (dual solid/cavity interaction, e.g. tubes).
+  - `urdf_collision_primitives` (`list[dict]`): A list of analytical shapes (boxes, cylinders) used for rigid-body collision detection instead of complex meshes.
+
+## Simulation & Physics Best Practices
+
+When designing parts or writing simulation hooks, adhere to these dynamic stability guidelines:
+
+- **SPH Particle Containment**:
+  - Always prefer analytical boundaries (`URDFCollisionType.ANALYTICAL`) over concave meshes (`URDFCollisionType.CONCAVE`) for JAX SPH boundaries. They provide significantly faster collision resolution and zero boundary leakage.
+  - When defining a cylinder cavity boundary, treat the height as infinite along the local Z axis where possible to prevent particle tunneling under high pressure or tipping angles.
+- **Fluid Recycling**:
+  - Use `fluid.recycle_fluid = True` when simulating steady-state flows (such as fountains or recirculating pumps).
+  - Make sure the recycling boundary coordinates match the physical limits of the container.
+- **Numeric Damping**:
+  - For long-running simulation validations, use `DampingType.STABILIZE` to minimize numeric velocity buildup and unphysical particle ejection.
+  - Keep simulation step tolerances loose enough to account for natural numeric sloshing while enforcing volume conservation constraints.
+- **Test Markers**:
+  - Heavy PyBullet and JAX fluid tests should be marked with `@pytest.mark.slow` so they are excluded from the fast CLI validation pass.
 
 ## Testing
 Add validation tests in `src/projects/tests/`. Your tests should:

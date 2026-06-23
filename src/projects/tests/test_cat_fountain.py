@@ -4,7 +4,7 @@ import pytest
 import math
 from unittest.mock import patch
 from build123d import Part
-from projects_config.cat_fountain_config import CatFountainConfig
+from projects_config import CatFountainConfig
 from projects.cat_fountain.provider import CatFountainProvider
 from provider import Section, Mode, Room
 
@@ -60,7 +60,7 @@ class TestCatFountainProvider:
     def test_build_product(self, provider):
         """Verify that build_product populates the room with all fountain parts and their URDF attributes."""
         room = Room()
-        provider.build_product(room)
+        provider.build_product(room, Mode.DEFAULT)
         room.translate_joints()
 
         # Verify all parts are placed

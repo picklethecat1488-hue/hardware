@@ -10,9 +10,8 @@ import pybullet as p
 import pytest
 from build123d import Compound, Box, Vector, RigidJoint, RevoluteJoint, Axis, Location, LinearJoint, BallJoint
 from model import AppConfig, TextArgs, DiagramOptions
-from provider import Simulate
+from provider import Simulate, ColorType, URDFShape, URDFCollisionType, URDFCollisionShapeType, Mode
 from provider.room import Room, BulletStateTracker
-from provider.types import ColorType, URDFShape, URDFCollisionType, URDFCollisionShapeType
 
 
 def test_room_add_success():
@@ -732,7 +731,6 @@ def test_room_export_urdf_primitive_collisions():
 def test_cat_fountain_provider_bowl_collision_types():
     """Verify that CatFountainProvider sets bowl collision type depending on simulation mode."""
     from projects.cat_fountain.provider import CatFountainProvider
-    from provider.types import Mode
 
     provider = CatFountainProvider()
 
