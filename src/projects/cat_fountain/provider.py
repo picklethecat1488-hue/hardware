@@ -3,7 +3,7 @@
 from functools import cached_property
 from build123d import *  # type: ignore
 import math
-from model import method_cache, TextArgs
+from model import method_cache, TextArgs, FluidConfig, FluidMotorConfig
 from pathlib import Path
 from provider import Provider, Section, Mode as ProviderMode, discover_provider, Room, Simulate
 from provider.types import URDFShape, URDFCollisionType, URDFCollisionShapeType, URDFBoundaryType
@@ -106,6 +106,7 @@ class CatFountainProvider(Provider):
         bowl_part.urdf_boundary_type = URDFBoundaryType.CAVITY
         bowl_part.urdf_boundary_radius = (r - t) * 0.001
         bowl_part.urdf_boundary_height = (h - t) * 0.001
+        bowl_part.urdf_boundary_thickness = t * 0.001
         bowl_part.urdf_boundary_xyz = f"0.0 0.0 {t * 0.001}"
         bowl_part.urdf_boundary_rpy = "0.0 0.0 0.0"
 
@@ -198,6 +199,7 @@ class CatFountainProvider(Provider):
         impeller_part.urdf_boundary_type = URDFBoundaryType.SOLID
         impeller_part.urdf_boundary_radius = r * 0.001
         impeller_part.urdf_boundary_height = h * 0.001
+        impeller_part.urdf_boundary_thickness = shaft_r * 0.001
         impeller_part.urdf_boundary_xyz = "0.0 0.0 0.0"
         impeller_part.urdf_boundary_rpy = "0.0 0.0 0.0"
 
@@ -242,6 +244,7 @@ class CatFountainProvider(Provider):
         tube_part.urdf_boundary_type = URDFBoundaryType.SOLID_CAVITY
         tube_part.urdf_boundary_radius = r * 0.001
         tube_part.urdf_boundary_height = h * 0.001
+        tube_part.urdf_boundary_thickness = t * 0.001
         tube_part.urdf_boundary_xyz = "0.0 0.0 0.0"
         tube_part.urdf_boundary_rpy = "0.0 0.0 0.0"
 
@@ -383,30 +386,77 @@ class CatFountainProvider(Provider):
         self.water_sim = None
 
         def setup_simulation(body_id, client, name, boundaries, state_tracker=None):
+            import pybullet as p
+
+            outlet_idx = None
+            hc_idx = None
+            vanes_idx = None
+            try:
+                for i in range(p.getNumJoints(body_id, physicsClientId=client)):
+                    info = p.getJointInfo(body_id, i, physicsClientId=client)
+                    link_name = info[12].decode("utf-8")
+                    if "outlet" in link_name or "spout" in link_name:
+                        outlet_idx = i
+                    elif "hollow_cylinder" in link_name or "tube" in link_name:
+                        hc_idx = i
+                    elif "rotary_vanes" in link_name or "impeller" in link_name:
+                        vanes_idx = i
+            except Exception:
+                pass
+
             self.water_sim = Fluid(
+                config=FluidConfig(
+                    r_s=0.0015,
+                    target_volume=0.0005,
+                    viscosity=0.02,
+                    stiffness=100.0,
+                    volume_threshold_liters=0.400,
+                    fallen_threshold_liters=0.050,
+                    bowl_wall_buffer=0.002,
+                    sim_name=name,
+                    boundaries=boundaries,
+                ),
                 provider=self,
-                r_s=0.0015,
-                target_volume=0.0005,
-                viscosity=0.02,
-                stiffness=100.0,
-                volume_threshold_liters=0.400,
-                fallen_threshold_liters=0.050,
-                bowl_wall_buffer=0.002,
                 body_id=body_id,
                 physics_client=client,
-                sim_name=name,
-                boundaries=boundaries,
                 state_tracker=state_tracker,
+                link_indices=[outlet_idx, hc_idx, vanes_idx],
             )
+
+            if hasattr(self, "room") and self.room:
+                from provider.bullet import Bullet
+
+                bullet_sim = Bullet(self.room, {}, "", "", 0, None, None)
+                bullet_sim.reset_camera(client, view_from="top rear")
+
+        def step_simulation(body_id, client, step_idx, name):
+            target_omega = 15.0
+            max_force = 10.0
+            if self.room:
+                for name_key in ("rotary_vanes", "impeller"):
+                    if name_key in self.room:
+                        vane_obj = cast(URDFShape, self.room[name_key][0])
+                        target_omega = float(getattr(vane_obj, "urdf_motor_target", 15.0))
+                        max_force = float(getattr(vane_obj, "urdf_motor_force", 10.0))
+            damping = 0.998 if step_idx >= 40 else 0.95
+            omega = target_omega if step_idx >= 40 else 0.0
+            self.water_sim.update(
+                body_id,
+                client,
+                step_idx,
+                name,
+                damping=damping,
+                motor_config=FluidMotorConfig(target_omega=omega, max_force=max_force),
+            )
+            if (
+                len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0
+                >= self.water_sim.fallen_threshold_liters
+            ):
+                return f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl"
+            return None
 
         return {
             Simulate.SETUP: setup_simulation,
-            Simulate.STEP: lambda body_id, client, step_idx, name: (
-                self.water_sim.update(body_id, client, step_idx, name),
-                f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl"
-                if len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0
-                >= self.water_sim.fallen_threshold_liters
-                else None,
-            )[1],
+            Simulate.STEP: step_simulation,
             Simulate.TEARDOWN: lambda body_id, client, name: None,
         }

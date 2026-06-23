@@ -1,16 +1,36 @@
 """Fluid simulation classes and JAX solvers for SPH based fluid dynamics with boundary rejection."""
 
 import math
+from enum import IntEnum
 import random
-from typing import Any, Optional
+from typing import Any, Optional, cast
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pybullet as p
 from scipy.spatial import cKDTree  # type: ignore
 
-from provider.types import CollisionGroup, CollisionMask
+from provider.types import CollisionGroup, CollisionMask, URDFShape
 from provider.room import BulletStateTracker
+from provider.bullet import _is_real_physics_client
+from model import BoundaryConfig, FluidConfig, FluidMotorConfig
+
+
+class LinkIndex(IntEnum):
+    """Bullet link types."""
+
+    BASE = -1
+    OUTLET = 0
+    TUBE = 1
+    IMPELLER = 2
+    FALLEN = -2
+    OUTLET_MAX_Y = -3
+
+
+CAVITY_NAMES = ("cylinder_cavity", "bowl")
+TUBE_NAMES = ("hollow_cylinder", "tube")
+IMPELLER_NAMES = ("rotary_vanes", "impeller")
+OUTLET_NAMES = ("outlet", "spout")
 
 
 @jax.jit
@@ -202,7 +222,7 @@ def _compute_boundary_forces_jax(
     pos_c = q_rotate(cavity_orn_inv, pos - cavity_pos)
     vel_c = q_rotate(cavity_orn_inv, vel)
 
-    # 1. Cavity side wall
+    # 1. Cavity side wall (finite-height cup wall with containment active for r_c < cavity_radius + r_s)
     r_c = jnp.sqrt(pos_c[:, 0] ** 2 + pos_c[:, 1] ** 2)
     r_c = jnp.maximum(r_c, 1e-8)
     r_limit_c = cavity_radius - r_s
@@ -481,7 +501,7 @@ class FluidSpawner:
         self.lateral_friction = lateral_friction
         self.restitution = restitution
 
-        self.water_body_ids: list[int] = []
+        self.particle_body_ids: list[int] = []
         self.active_count: int = 0
 
     def spawn_batch(self, spawn_z: float, batch_size: int, spacing: float) -> int:
@@ -512,7 +532,7 @@ class FluidSpawner:
                 w_id, -1, CollisionGroup.PARTICLE, CollisionMask.CONTAINER, physicsClientId=self.physics_client
             )
             p.resetBaseVelocity(w_id, [0.0, 0.0, -1.0], [0.0, 0.0, 0.0], physicsClientId=self.physics_client)
-            self.water_body_ids.append(w_id)
+            self.particle_body_ids.append(w_id)
         self.active_count += to_activate
         return to_activate
 
@@ -539,8 +559,8 @@ class FluidSpawner:
                 w_id, -1, CollisionGroup.PARTICLE, CollisionMask.CONTAINER, physicsClientId=self.physics_client
             )
             p.resetBaseVelocity(w_id, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], physicsClientId=self.physics_client)
-            self.water_body_ids.append(w_id)
-        self.active_count = len(self.water_body_ids)
+            self.particle_body_ids.append(w_id)
+        self.active_count = len(self.particle_body_ids)
 
     def get_positions_and_velocities(
         self, fallen_ids: set[int] | None = None
@@ -551,7 +571,7 @@ class FluidSpawner:
         if fallen_ids is None:
             fallen_ids = set()
 
-        for w_id in self.water_body_ids:
+        for w_id in self.particle_body_ids:
             if w_id in fallen_ids:
                 positions.append((0.0, 0.0, 1000.0))
                 velocities.append((0.0, 0.0, 0.0))
@@ -561,7 +581,7 @@ class FluidSpawner:
                 positions.append(pos)
                 velocities.append(vel)
 
-        unspawned_count = self.n_particles - len(self.water_body_ids)
+        unspawned_count = self.n_particles - len(self.particle_body_ids)
         if unspawned_count > 0:
             positions.extend([(0.0, 0.0, 1000.0)] * unspawned_count)
             velocities.extend([(0.0, 0.0, 0.0)] * unspawned_count)
@@ -584,60 +604,44 @@ class Fluid:
 
     def __init__(
         self,
+        config: Optional[FluidConfig] = None,
         provider: Any = None,
-        r_s: Optional[float] = None,
-        particle_radius: float = 0.003,
-        target_volume: float = 0.0005,
-        bowl_wall_buffer: float = 0.002,
-        rest_density: float = 1000.0,
-        viscosity: float = 0.5,
-        stiffness: float = 2000.0,
-        k: Optional[float] = None,
-        smoothing_factor: float = 3.0,
-        sphere_vol_factor: float = 4.0 / 3.0,
-        poly6_coeff_numerator: float = 315.0,
-        poly6_coeff_denominator: float = 64.0,
-        spiky_grad_coeff: float = -45.0,
-        visc_lap_coeff: float = 45.0,
-        pressure_avg_factor: float = 2.0,
-        min_distance_threshold: float = 1e-6,
-        characteristic_length: float = 0.076,
-        volume_threshold_liters: float = 0.400,
-        fallen_threshold_liters: float = 0.050,
         body_id: Optional[int] = None,
         physics_client: Optional[int] = None,
-        sim_name: str = "",
-        boundaries: Optional[dict[str, Any]] = None,
         state_tracker: Optional[Any] = None,
-        gravity: Optional[tuple[float, float, float]] = None,
+        link_indices: Optional[list[Optional[int]]] = None,
     ):
-        """Initialize the fluid simulation constants and state."""
+        """Initialize the fluid simulation constants and state using a FluidConfig."""
+        if config is None:
+            config = FluidConfig()
+
         self.provider = provider
-        if r_s is not None:
-            self.particle_radius = r_s
-        else:
-            self.particle_radius = particle_radius
+
+        particle_rad = config.r_s if config.r_s is not None else config.particle_radius
+        self.particle_radius = particle_rad
         self.r_s = self.particle_radius
-        self.target_volume = target_volume
-        self.bowl_wall_buffer = bowl_wall_buffer
-        self.rest_density = rest_density
-        self.viscosity = viscosity
-        if k is not None:
-            self.stiffness = k
-        else:
-            self.stiffness = stiffness
+
+        self.target_volume = config.target_volume
+        self.bowl_wall_buffer = config.bowl_wall_buffer
+        self.rest_density = config.rest_density
+        self.viscosity = config.viscosity
+
+        stiff = config.k if config.k is not None else config.stiffness
+        self.stiffness = stiff
         self.k = self.stiffness
-        self.smoothing_factor = smoothing_factor
-        self.sphere_vol_factor = sphere_vol_factor
-        self.poly6_coeff_numerator = poly6_coeff_numerator
-        self.poly6_coeff_denominator = poly6_coeff_denominator
-        self.spiky_grad_coeff = spiky_grad_coeff
-        self.visc_lap_coeff = visc_lap_coeff
-        self.pressure_avg_factor = pressure_avg_factor
-        self.min_distance_threshold = min_distance_threshold
-        self.characteristic_length = characteristic_length
-        self.volume_threshold_liters = volume_threshold_liters
-        self.fallen_threshold_liters = fallen_threshold_liters
+
+        self.smoothing_factor = config.smoothing_factor
+        self.sphere_vol_factor = config.sphere_vol_factor
+        self.poly6_coeff_numerator = config.poly6_coeff_numerator
+        self.poly6_coeff_denominator = config.poly6_coeff_denominator
+        self.spiky_grad_coeff = config.spiky_grad_coeff
+        self.visc_lap_coeff = config.visc_lap_coeff
+        self.pressure_avg_factor = config.pressure_avg_factor
+        self.min_distance_threshold = config.min_distance_threshold
+
+        self.characteristic_length = config.characteristic_length
+        self.volume_threshold_liters = config.volume_threshold_liters
+        self.fallen_threshold_liters = config.fallen_threshold_liters
 
         # SPH values computed from settings
         self.h = self.smoothing_factor * self.r_s
@@ -652,7 +656,7 @@ class Fluid:
         self.spawner = None
         self.body_id = body_id
         self.physics_client = physics_client
-        self.boundaries = {}
+        self.boundaries: dict[str, BoundaryConfig] = {}
         self.pos_jax = None
         self.vel_jax = None
         vol_s = (4.0 / 3.0) * math.pi * (self.r_s**3)
@@ -660,33 +664,26 @@ class Fluid:
         self.last_positions: list[list[float]] = []
         self.current_sim_time = 0.0
         self.torques: list[float] = []
+        self.motor_config = FluidMotorConfig()
         self.spout_water_ids: set[int] = set()
         self.fallen_out_water_ids: set[int] = set()
         self.state_tracker = state_tracker
 
-        if gravity is not None:
-            self.gravity = gravity
+        self.link_indices = link_indices if link_indices is not None else [None, None, None]
+
+        if config.gravity is not None:
+            self.gravity = config.gravity
         elif hasattr(self.provider, "room") and self.provider.room and hasattr(self.provider.room, "gravity"):
             self.gravity = self.provider.room.gravity
         else:
             self.gravity = (0.0, 0.0, -9.81)
 
-        if physics_client is not None and body_id is not None and boundaries is not None:
+        if physics_client is not None and body_id is not None and config.boundaries is not None:
             if state_tracker is not None:
                 state_tracker.has_fluid_simulator = True
                 state_tracker.particle_positions = self.get_particle_positions()
                 state_tracker.particle_colors = self.get_particle_colors()
                 state_tracker.particle_radii = self.get_particle_radii()
-
-            if hasattr(self.provider, "room") and self.provider.room:
-                from provider.bullet import Bullet
-
-                bullet_sim = Bullet(self.provider.room, {}, "", "", 0, None, None)
-                bullet_sim.reset_camera(physics_client, view_from="top rear")
-
-            if self.provider is not None:
-                self.provider.spout_water_ids = self.spout_water_ids
-                self.provider.fallen_out_water_ids = self.fallen_out_water_ids
 
             self.spawner = FluidSpawner(
                 physics_client=physics_client,
@@ -705,41 +702,42 @@ class Fluid:
             self.default_idx_map = np.arange(self.n_particles)[:, None]
             self.default_idx_map = np.repeat(self.default_idx_map, 64, axis=1)
 
-            # Parse boundaries metadata
-            for b_name, v in boundaries.items():
-                b_info = dict(v)
-                xyz_val = b_info.get("xyz")
-                b_info["xyz"] = (
-                    [float(x) for x in xyz_val.split()] if isinstance(xyz_val, str) else xyz_val or [0.0, 0.0, 0.0]
-                )
-                rpy_val = b_info.get("rpy")
-                b_info["rpy"] = (
-                    [float(x) for x in rpy_val.split()] if isinstance(rpy_val, str) else rpy_val or [0.0, 0.0, 0.0]
-                )
-                self.boundaries[b_name] = b_info
+            # Parse boundaries metadata using BoundaryConfig Pydantic model
+            for b_name, v in config.boundaries.items():
+                if isinstance(v, BoundaryConfig):
+                    self.boundaries[b_name] = v
+                else:
+                    self.boundaries[b_name] = BoundaryConfig.model_validate(v)
 
             # Dynamically link named URDF boundaries to PyBullet body link indices
             for link_name, b_info in self.boundaries.items():
-                if link_name in ("cylinder_cavity", "bowl"):
-                    b_info["link_idx"] = -1
+                if link_name in CAVITY_NAMES:
+                    b_info.link_idx = -1
+                elif link_name in TUBE_NAMES:
+                    b_info.link_idx = self.link_indices[LinkIndex.TUBE]
+                elif link_name in IMPELLER_NAMES:
+                    b_info.link_idx = self.link_indices[LinkIndex.IMPELLER]
+                elif link_name in OUTLET_NAMES:
+                    b_info.link_idx = self.link_indices[LinkIndex.OUTLET]
                 else:
-                    b_info["link_idx"] = self._get_link_index(body_id, physics_client, link_name)
+                    b_info.link_idx = -1
 
             # Generate grid points to initially fill the cavity
             grid_points: list[tuple[float, float, float]] = []
             spacing = 1.6 * self.r_s
 
-            hc_idx = self._get_link_index(self.body_id, self.physics_client, "hollow_cylinder")
+            hc_idx = self.link_indices[LinkIndex.TUBE]
             hc_x, hc_y = (
                 (p.getJointInfo(self.body_id, hc_idx, physicsClientId=physics_client)[14][:2])
                 if hc_idx is not None
                 else (0.0, 0.0)
             )
 
-            cavity_radius = 0.080
-            cavity_thickness = 0.0035
-            cavity_inner_radius = cavity_radius - cavity_thickness
-            hc_r = self.radii[0]
+            bounds_dict = config.boundaries if config.boundaries is not None else {}
+            cavity_info = next((bounds_dict[name] for name in CAVITY_NAMES if name in bounds_dict), {})
+            cavity_inner_radius = cavity_info.get("radius", 0.076)
+            cavity_z_offset = cavity_info.get("xyz", [0.0, 0.0, 0.004])[2]
+            hc_r = self.radii[LinkIndex.TUBE]
 
             max_r_sq = (cavity_inner_radius - self.bowl_wall_buffer) ** 2
             min_r_sq = (hc_r + self.bowl_wall_buffer) ** 2
@@ -756,7 +754,7 @@ class Fluid:
             xy_coords.sort(key=lambda pt: pt[0] ** 2 + pt[1] ** 2)
 
             # Spawn particles above bottom plate
-            z = cavity_thickness + self.r_s
+            z = cavity_z_offset + self.r_s + self.bowl_wall_buffer
             while len(grid_points) < self.n_particles:
                 for x, y in xy_coords:
                     if len(grid_points) >= self.n_particles:
@@ -782,7 +780,7 @@ class Fluid:
         return float(vol_s * self.rest_density)
 
     @property
-    def water_body_ids(self) -> list[int]:
+    def particle_body_ids(self) -> list[int]:
         """Return dummy IDs for compatibility."""
         return list(range(self.n_particles))
 
@@ -890,132 +888,73 @@ class Fluid:
 
         return float(mean_free_path / characteristic_length)
 
-    def _get_link_index(self, body_id: int | None, physics_client: int | None, name_substring: str) -> int | None:
-        """Find the link index containing the given substring."""
-        if body_id is None or physics_client is None:
-            return None
-        try:
-            num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
-            for i in range(num_joints):
-                info = p.getJointInfo(body_id, i, physicsClientId=physics_client)
-                link_name = info[12].decode("utf-8")
-                if name_substring in link_name:
-                    return i
-        except Exception:
-            pass
-        return None
-
     @property
-    def link_indices(self) -> list[Optional[int]]:
-        """Return link indices [outlet_link_idx, hollow_cyl_link_idx, vanes_link_idx]."""
-        if self.body_id is None or self.physics_client is None:
-            return [None, None, None]
-        outlet_idx = self._get_link_index(self.body_id, self.physics_client, "outlet")
-        if outlet_idx is None:
-            outlet_idx = self._get_link_index(self.body_id, self.physics_client, "spout")
-        hc_idx = self._get_link_index(self.body_id, self.physics_client, "hollow_cylinder")
-        if hc_idx is None:
-            hc_idx = self._get_link_index(self.body_id, self.physics_client, "tube")
-        vanes_idx = self._get_link_index(self.body_id, self.physics_client, "rotary_vanes")
-        if vanes_idx is None:
-            vanes_idx = self._get_link_index(self.body_id, self.physics_client, "impeller")
-        return [outlet_idx, hc_idx, vanes_idx]
-
-    @property
-    def radii(self) -> list[float]:
-        """Return radii [hollow_cyl_outer_radius, cavity_outer_radius, vanes_clearance_radius, fallen_max_radius]."""
-        hc_idx = self.link_indices[1]
+    def radii(self) -> dict[LinkIndex, float]:
+        """Return dict mapping LinkIndex keys to their float radius values."""
+        hc_idx = self.link_indices[LinkIndex.TUBE]
         hc_r = 0.008
-        if hc_idx is not None and self.body_id is not None and self.physics_client is not None:
-            try:
-                aabb = p.getAABB(self.body_id, hc_idx, physicsClientId=self.physics_client)
-                hc_r = float((aabb[1][0] - aabb[0][0]) / 2.0)
-            except Exception:
-                pass
+        if hc_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
+            aabb = p.getAABB(self.body_id, hc_idx, physicsClientId=self.physics_client)
+            hc_r = float((aabb[1][0] - aabb[0][0]) / 2.0)
 
         cavity_r = 0.080
         found_cavity = False
-        for name in ("cylinder_cavity", "bowl"):
+        for name in CAVITY_NAMES:
             if name in self.boundaries:
-                r_inner = self.boundaries[name].get("radius", 0.0725)
-                t = 0.0035
-                if hasattr(self.provider, "settings"):
-                    for field in ("cylinder_cavity_thickness", "bowl_thickness"):
-                        if hasattr(self.provider.settings, field):
-                            t = getattr(self.provider.settings, field) * 0.001
-                            break
+                b_info = self.boundaries[name]
+                r_inner = b_info.radius if b_info.radius is not None else 0.0725
+                t = b_info.thickness if b_info.thickness is not None else 0.0035
                 cavity_r = float(r_inner + t)
                 found_cavity = True
                 break
-        if not found_cavity and self.body_id is not None and self.physics_client is not None:
-            try:
-                aabb = p.getAABB(self.body_id, -1, physicsClientId=self.physics_client)
-                cavity_r = float((aabb[1][0] - aabb[0][0]) / 2.0)
-            except Exception:
-                pass
+        if not found_cavity and self.body_id is not None and _is_real_physics_client(self.physics_client):
+            aabb = p.getAABB(self.body_id, -1, physicsClientId=self.physics_client)
+            cavity_r = float((aabb[1][0] - aabb[0][0]) / 2.0)
 
         vanes_clearance = 0.015
-        vanes_idx = self.link_indices[2]
-        if vanes_idx is not None and self.body_id is not None and self.physics_client is not None:
-            try:
-                aabb = p.getAABB(self.body_id, vanes_idx, physicsClientId=self.physics_client)
-                vanes_r = (aabb[1][0] - aabb[0][0]) / 2.0
-                vanes_clearance = float(vanes_r + 0.003)
-            except Exception:
-                pass
+        vanes_idx = self.link_indices[LinkIndex.IMPELLER]
+        if vanes_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
+            aabb = p.getAABB(self.body_id, vanes_idx, physicsClientId=self.physics_client)
+            vanes_r = (aabb[1][0] - aabb[0][0]) / 2.0
+            vanes_clearance = float(vanes_r + 0.003)
 
         fallen_r = cavity_r + 0.010
-        return [hc_r, cavity_r, vanes_clearance, fallen_r]
+        return {
+            LinkIndex.TUBE: hc_r,
+            LinkIndex.BASE: cavity_r,
+            LinkIndex.IMPELLER: vanes_clearance,
+            LinkIndex.FALLEN: fallen_r,
+        }
 
     @property
-    def thresholds(self) -> list[float]:
-        """Return thresholds [outlet_min_height, outlet_max_y, hollow_cyl_offset_mm]."""
-        outlet_idx = self.link_indices[0]
+    def thresholds(self) -> dict[LinkIndex, float]:
+        """Return dict mapping LinkIndex keys to their float thresholds."""
+        outlet_idx = self.link_indices[LinkIndex.OUTLET]
         min_h = 0.095
-        if outlet_idx is not None and self.body_id is not None and self.physics_client is not None:
-            try:
-                state = p.getLinkState(self.body_id, outlet_idx, physicsClientId=self.physics_client)
-                min_h = float(state[4][2] - 0.005)
-            except Exception:
-                pass
+        if outlet_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
+            state = p.getLinkState(self.body_id, outlet_idx, physicsClientId=self.physics_client)
+            min_h = float(state[4][2] - 0.005)
 
         max_y = 0.030
-        if outlet_idx is not None and self.body_id is not None and self.physics_client is not None:
-            try:
-                aabb = p.getAABB(self.body_id, outlet_idx, physicsClientId=self.physics_client)
-                max_y = float(aabb[1][1] + 0.005)
-            except Exception:
-                pass
+        if outlet_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
+            aabb = p.getAABB(self.body_id, outlet_idx, physicsClientId=self.physics_client)
+            max_y = float(aabb[1][1] + 0.005)
 
         offset_mm = 15.0
-        hc_idx = self.link_indices[1]
-        if hc_idx is not None and self.body_id is not None and self.physics_client is not None:
-            try:
-                info = p.getJointInfo(self.body_id, hc_idx, physicsClientId=self.physics_client)
-                hc_y = info[14][1]
-                cavity_r_mm = self.radii[1] * 1000.0
-                hc_r_mm = self.radii[0] * 1000.0
-                hc_y_mm = hc_y * 1000.0
-                offset_mm = float(cavity_r_mm - hc_r_mm - hc_y_mm)
-            except Exception:
-                pass
+        hc_idx = self.link_indices[LinkIndex.TUBE]
+        if hc_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
+            info = p.getJointInfo(self.body_id, hc_idx, physicsClientId=self.physics_client)
+            hc_y = info[14][1]
+            cavity_r_mm = self.radii[LinkIndex.BASE] * 1000.0
+            hc_r_mm = self.radii[LinkIndex.TUBE] * 1000.0
+            hc_y_mm = hc_y * 1000.0
+            offset_mm = float(cavity_r_mm - hc_r_mm - hc_y_mm)
 
-        return [min_h, max_y, offset_mm]
-
-    @property
-    def motor_settings(self) -> list[float]:
-        """Return motor settings [vanes_target_velocity, vanes_force]."""
-        target_vel = 15.0
-        max_force = 10.0
-        if hasattr(self.provider, "room") and self.provider.room:
-            room = self.provider.room
-            for name in ("rotary_vanes", "impeller"):
-                if name in room:
-                    vanes_shape = room[name][0]
-                    target_vel = float(getattr(vanes_shape, "urdf_motor_target", 15.0))
-                    max_force = float(getattr(vanes_shape, "urdf_motor_force", 10.0))
-                    break
-        return [target_vel, max_force]
+        return {
+            LinkIndex.OUTLET: min_h,
+            LinkIndex.OUTLET_MAX_Y: max_y,
+            LinkIndex.TUBE: offset_mm,
+        }
 
     def update(
         self,
@@ -1023,10 +962,14 @@ class Fluid:
         physics_client: int,
         step_index: int,
         sim_name: str,
+        damping: float = 0.998,
+        motor_config: Optional[FluidMotorConfig] = None,
     ) -> None:
         """Step simulation and manage deactivation."""
         self.body_id = body_id
         self.physics_client = physics_client
+        if motor_config is not None:
+            self.motor_config = motor_config
 
         if not self.spawner:
             return
@@ -1063,53 +1006,44 @@ class Fluid:
             idx_map_jax = jnp.array(idx_map)
 
         cavity_pos, cavity_orn = p.getBasePositionAndOrientation(self.body_id, physicsClientId=physics_client)
-        cavity_info = self.boundaries.get("cylinder_cavity", self.boundaries.get("bowl", {}))
-        cavity_radius = cavity_info.get("radius", 0.076)
-        cavity_height = cavity_info.get("height", 0.096)
-        cavity_z_offset = cavity_info.get("xyz", [0.0, 0.0, 0.004])[2]
+        cavity_info = next((self.boundaries[name] for name in CAVITY_NAMES if name in self.boundaries), None)
+        cavity_radius = cavity_info.radius if cavity_info and cavity_info.radius is not None else 0.076
+        cavity_height = cavity_info.height if cavity_info and cavity_info.height is not None else 0.096
+        cavity_z_offset = cavity_info.xyz[2] if cavity_info else 0.004
 
-        hc_info = self.boundaries.get("hollow_cylinder", self.boundaries.get("tube", {}))
-        hc_idx = hc_info.get("link_idx")
+        hc_info = next((self.boundaries[name] for name in TUBE_NAMES if name in self.boundaries), None)
+        hc_idx = hc_info.link_idx if hc_info else None
         if hc_idx is not None and hc_idx != -1:
             state = p.getLinkState(self.body_id, hc_idx, physicsClientId=physics_client)
             hc_pos, hc_orn = state[4], state[5]
         else:
             hc_pos, hc_orn = [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]
-        hc_outer_radius = hc_info.get("radius", 0.008)
-        hc_thickness = 0.0015
-        if hasattr(self.provider, "settings"):
-            for field in ("hollow_cylinder_thickness", "tube_thickness"):
-                if hasattr(self.provider.settings, field):
-                    hc_thickness = getattr(self.provider.settings, field) * 0.001
-                    break
-        hc_inner_radius = hc_outer_radius - hc_thickness
-        hc_height = hc_info.get("height", 0.120)
+        if hc_info:
+            hc_outer_radius = hc_info.radius if hc_info.radius is not None else 0.008
+            hc_thickness = hc_info.thickness if hc_info.thickness is not None else 0.0015
+            hc_inner_radius = hc_outer_radius - hc_thickness
+            hc_height = hc_info.height if hc_info.height is not None else 0.120
+        else:
+            hc_outer_radius = 0.0
+            hc_inner_radius = 0.0
+            hc_height = 0.0
 
-        vanes_info = self.boundaries.get("rotary_vanes", self.boundaries.get("impeller", {}))
-        v_idx = vanes_info.get("link_idx")
+        vanes_info = next((self.boundaries[name] for name in IMPELLER_NAMES if name in self.boundaries), None)
+        v_idx = vanes_info.link_idx if vanes_info else None
         if v_idx is not None and v_idx != -1:
             state = p.getLinkState(self.body_id, v_idx, physicsClientId=physics_client)
             v_pos, v_orn = state[4], state[5]
         else:
             v_pos, v_orn = [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]
-        vanes_radius = vanes_info.get("radius", 0.005)
-        v_shaft_r = 0.0015
-        if hasattr(self.provider, "settings"):
-            for field in ("rotary_vanes_shaft_radius", "impeller_shaft_radius"):
-                if hasattr(self.provider.settings, field):
-                    v_shaft_r = getattr(self.provider.settings, field) * 0.001
-                    break
-        vanes_hub_radius = v_shaft_r + 0.001
-        vanes_height = vanes_info.get("height", 0.015)
-
-        target_omega = 15.0
-        if hasattr(self.provider, "room") and self.provider.room:
-            for name in ("rotary_vanes", "impeller"):
-                if name in self.provider.room:
-                    target_omega = float(getattr(self.provider.room[name][0], "urdf_motor_target", 15.0))
-
-        damping = 0.998 if step_index >= 40 else 0.95
-        omega = (min(1.0, (step_index - 40) / 50) * target_omega) if step_index >= 40 else 0.0
+        if vanes_info:
+            vanes_radius = vanes_info.radius if vanes_info.radius is not None else 0.005
+            v_shaft_r = vanes_info.thickness if vanes_info.thickness is not None else 0.0015
+            vanes_hub_radius = v_shaft_r + 0.001
+            vanes_height = vanes_info.height if vanes_info.height is not None else 0.015
+        else:
+            vanes_radius = 0.0
+            vanes_hub_radius = 0.0
+            vanes_height = 0.0
 
         self.pos_jax, self.vel_jax, torque_accum = _physics_step_jax(
             self.pos_jax,
@@ -1141,7 +1075,7 @@ class Fluid:
             vanes_radius,
             vanes_hub_radius,
             vanes_height,
-            omega,
+            self.motor_config.target_omega,
             self.current_sim_time,
             0.0015,
             4.0,
@@ -1167,12 +1101,16 @@ class Fluid:
             active_mask = zs < 100.0
 
             # Spout/outlet indices
-            spout_indices = np.where(active_mask & (zs >= self.thresholds[0]) & (ys < self.thresholds[1]))[0]
+            spout_indices = np.where(
+                active_mask & (zs >= self.thresholds[LinkIndex.OUTLET]) & (ys < self.thresholds[LinkIndex.OUTLET_MAX_Y])
+            )[0]
             for idx in spout_indices:
                 self.spout_water_ids.add(idx)
 
             # Fallen indices
-            fallen_indices = np.where(active_mask & ((zs < 0.0) | (xs**2 + ys**2 > (self.radii[3]) ** 2)))[0]
+            fallen_indices = np.where(
+                active_mask & ((zs < 0.0) | (xs**2 + ys**2 > (self.radii[LinkIndex.FALLEN]) ** 2))
+            )[0]
 
             if len(fallen_indices) > 0:
                 pos_arr = np.array(self.pos_jax)
