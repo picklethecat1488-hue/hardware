@@ -1,9 +1,10 @@
 """Fluid simulation classes and JAX solvers for SPH based fluid dynamics with boundary rejection."""
 
+from __future__ import annotations
 import math
-from enum import IntEnum
+from enum import Enum, IntEnum
 import random
-from typing import Any, Optional, cast
+from typing import Any, Optional, cast, TYPE_CHECKING
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -12,25 +13,19 @@ from scipy.spatial import cKDTree  # type: ignore
 
 from provider.types import CollisionGroup, CollisionMask, URDFShape
 from provider.room import BulletStateTracker
-from provider.bullet import _is_real_physics_client
-from model import BoundaryConfig, FluidConfig, FluidMotorConfig
+from provider.bullet import LinkType, _is_real_physics_client
+
+if TYPE_CHECKING:
+    from model import BoundaryConfig, FluidConfig, FluidMotorConfig
 
 
-class LinkIndex(IntEnum):
-    """Bullet link types."""
+class DampingType(float, Enum):
+    """Damping coefficients for different fluid simulation phases."""
 
-    BASE = -1
-    OUTLET = 0
-    TUBE = 1
-    IMPELLER = 2
-    FALLEN = -2
-    OUTLET_MAX_Y = -3
-
-
-CAVITY_NAMES = ("cylinder_cavity", "bowl")
-TUBE_NAMES = ("hollow_cylinder", "tube")
-IMPELLER_NAMES = ("rotary_vanes", "impeller")
-OUTLET_NAMES = ("outlet", "spout")
+    UNDAMPED = 1.0  # 1.0: No damping, for conservation of energy validation
+    DYNAMIC = 0.998  # 0.998: Minimal damping, standard dynamic simulation
+    STABILIZE = 0.95  # 0.95: Moderate damping, to stabilize fluid dynamics under coupling
+    SETTLE = 0.90  # 0.90: High damping, to quickly settle fluid from grid spawn
 
 
 @jax.jit
@@ -262,7 +257,7 @@ def _compute_boundary_forces_jax(
 
     # 1. Inner cavity collision (r_hc < r_hc_mid)
     pen_hc_in = r_hc - (hollow_cyl_inner_radius - r_s)
-    in_mask = hollow_cyl_active_mask & (r_hc < r_hc_mid) & (pen_hc_in > 0.0)
+    in_mask = hollow_cyl_active_mask & (hollow_cyl_inner_radius > 0.0) & (r_hc < r_hc_mid) & (pen_hc_in > 0.0)
     nx_hc_in = -pos_hc[:, 0] / r_hc
     ny_hc_in = -pos_hc[:, 1] / r_hc
     v_n_hc_in = vel_hc[:, 0] * (-nx_hc_in) + vel_hc[:, 1] * (-ny_hc_in)
@@ -272,7 +267,7 @@ def _compute_boundary_forces_jax(
 
     # 2. Outer solid cylinder collision (r_hc >= r_hc_mid)
     pen_hc_out = (hollow_cyl_outer_radius + r_s) - r_hc
-    out_mask = hollow_cyl_active_mask & (r_hc >= r_hc_mid) & (pen_hc_out > 0.0)
+    out_mask = hollow_cyl_active_mask & (hollow_cyl_outer_radius > 0.0) & (r_hc >= r_hc_mid) & (pen_hc_out > 0.0)
     nx_hc_out = pos_hc[:, 0] / r_hc
     ny_hc_out = pos_hc[:, 1] / r_hc
     v_n_hc_out = vel_hc[:, 0] * nx_hc_out + vel_hc[:, 1] * ny_hc_out
@@ -294,7 +289,7 @@ def _compute_boundary_forces_jax(
 
     # 1. Hub solid cylinder
     pen_v_hub = (vanes_hub_radius + r_s) - r_v
-    hub_mask = vanes_height_mask & (pen_v_hub > 0.0)
+    hub_mask = vanes_height_mask & (vanes_hub_radius > 0.0) & (pen_v_hub > 0.0)
     nx_v_hub = pos_v[:, 0] / r_v
     ny_v_hub = pos_v[:, 1] / r_v
     v_n_v_hub = vel_v[:, 0] * nx_v_hub + vel_v[:, 1] * ny_v_hub
@@ -314,7 +309,9 @@ def _compute_boundary_forces_jax(
     vane_threshold = vane_thickness / 2.0 + r_s
     pen_vane = vane_threshold - jnp.abs(dist_to_vane)
 
-    vane_collision_mask = vanes_height_mask & (r_v >= vanes_hub_radius) & (r_v <= vanes_radius) & (pen_vane > 0.0)
+    vane_collision_mask = (
+        vanes_height_mask & (vanes_radius > 0.0) & (r_v >= vanes_hub_radius) & (r_v <= vanes_radius) & (pen_vane > 0.0)
+    )
 
     sign_dist = jnp.sign(d_phi_wrapped)
     normal_tx = -sign_dist * jnp.sin(phi)
@@ -609,9 +606,11 @@ class Fluid:
         body_id: Optional[int] = None,
         physics_client: Optional[int] = None,
         state_tracker: Optional[Any] = None,
-        link_indices: Optional[list[Optional[int]]] = None,
+        link_indices: Optional[dict[LinkType, Optional[int]]] = None,
     ):
         """Initialize the fluid simulation constants and state using a FluidConfig."""
+        from model import BoundaryConfig, FluidConfig, FluidMotorConfig
+
         if config is None:
             config = FluidConfig()
 
@@ -656,7 +655,7 @@ class Fluid:
         self.spawner = None
         self.body_id = body_id
         self.physics_client = physics_client
-        self.boundaries: dict[str, BoundaryConfig] = {}
+        self.boundaries: dict[LinkType, BoundaryConfig] = {}
         self.pos_jax = None
         self.vel_jax = None
         vol_s = (4.0 / 3.0) * math.pi * (self.r_s**3)
@@ -669,7 +668,7 @@ class Fluid:
         self.fallen_out_water_ids: set[int] = set()
         self.state_tracker = state_tracker
 
-        self.link_indices = link_indices if link_indices is not None else [None, None, None]
+        self.link_indices = link_indices if link_indices is not None else {}
 
         if config.gravity is not None:
             self.gravity = config.gravity
@@ -702,42 +701,34 @@ class Fluid:
             self.default_idx_map = np.arange(self.n_particles)[:, None]
             self.default_idx_map = np.repeat(self.default_idx_map, 64, axis=1)
 
-            # Parse boundaries metadata using BoundaryConfig Pydantic model
+            # Parse boundaries metadata using BoundaryConfig Pydantic model and link indices
             for b_name, v in config.boundaries.items():
                 if isinstance(v, BoundaryConfig):
-                    self.boundaries[b_name] = v
+                    b_info = v
                 else:
-                    self.boundaries[b_name] = BoundaryConfig.model_validate(v)
+                    b_info = BoundaryConfig.model_validate(v)
 
-            # Dynamically link named URDF boundaries to PyBullet body link indices
-            for link_name, b_info in self.boundaries.items():
-                if link_name in CAVITY_NAMES:
-                    b_info.link_idx = -1
-                elif link_name in TUBE_NAMES:
-                    b_info.link_idx = self.link_indices[LinkIndex.TUBE]
-                elif link_name in IMPELLER_NAMES:
-                    b_info.link_idx = self.link_indices[LinkIndex.IMPELLER]
-                elif link_name in OUTLET_NAMES:
-                    b_info.link_idx = self.link_indices[LinkIndex.OUTLET]
-                else:
-                    b_info.link_idx = -1
+                if b_info.link_type is not None:
+                    b_info.link_idx = (
+                        -1 if b_info.link_type == LinkType.BASE else self.link_indices.get(b_info.link_type)
+                    )
+                    self.boundaries[b_info.link_type] = b_info
 
             # Generate grid points to initially fill the cavity
             grid_points: list[tuple[float, float, float]] = []
             spacing = 1.6 * self.r_s
 
-            hc_idx = self.link_indices[LinkIndex.TUBE]
+            hc_idx = self.link_indices.get(LinkType.TUBE)
             hc_x, hc_y = (
                 (p.getJointInfo(self.body_id, hc_idx, physicsClientId=physics_client)[14][:2])
                 if hc_idx is not None
                 else (0.0, 0.0)
             )
 
-            bounds_dict = config.boundaries if config.boundaries is not None else {}
-            cavity_info = next((bounds_dict[name] for name in CAVITY_NAMES if name in bounds_dict), {})
-            cavity_inner_radius = cavity_info.get("radius", 0.076)
-            cavity_z_offset = cavity_info.get("xyz", [0.0, 0.0, 0.004])[2]
-            hc_r = self.radii[LinkIndex.TUBE]
+            cavity_info = self.boundaries.get(LinkType.BASE)
+            cavity_inner_radius = cavity_info.radius if cavity_info and cavity_info.radius is not None else 0.076
+            cavity_z_offset = cavity_info.xyz[2] if cavity_info else 0.004
+            hc_r = self.radii[LinkType.TUBE]
 
             max_r_sq = (cavity_inner_radius - self.bowl_wall_buffer) ** 2
             min_r_sq = (hc_r + self.bowl_wall_buffer) ** 2
@@ -889,9 +880,9 @@ class Fluid:
         return float(mean_free_path / characteristic_length)
 
     @property
-    def radii(self) -> dict[LinkIndex, float]:
-        """Return dict mapping LinkIndex keys to their float radius values."""
-        hc_idx = self.link_indices[LinkIndex.TUBE]
+    def radii(self) -> dict[LinkType, float]:
+        """Return dict mapping LinkType keys to their float radius values."""
+        hc_idx = self.link_indices.get(LinkType.TUBE)
         hc_r = 0.008
         if hc_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
             aabb = p.getAABB(self.body_id, hc_idx, physicsClientId=self.physics_client)
@@ -899,20 +890,19 @@ class Fluid:
 
         cavity_r = 0.080
         found_cavity = False
-        for name in CAVITY_NAMES:
-            if name in self.boundaries:
-                b_info = self.boundaries[name]
-                r_inner = b_info.radius if b_info.radius is not None else 0.0725
-                t = b_info.thickness if b_info.thickness is not None else 0.0035
-                cavity_r = float(r_inner + t)
-                found_cavity = True
-                break
+        if LinkType.BASE in self.boundaries:
+            b_info = self.boundaries[LinkType.BASE]
+            r_inner = b_info.radius if b_info.radius is not None else 0.0725
+            t = b_info.thickness if b_info.thickness is not None else 0.0035
+            cavity_r = float(r_inner + t)
+            found_cavity = True
+
         if not found_cavity and self.body_id is not None and _is_real_physics_client(self.physics_client):
             aabb = p.getAABB(self.body_id, -1, physicsClientId=self.physics_client)
             cavity_r = float((aabb[1][0] - aabb[0][0]) / 2.0)
 
         vanes_clearance = 0.015
-        vanes_idx = self.link_indices[LinkIndex.IMPELLER]
+        vanes_idx = self.link_indices.get(LinkType.IMPELLER)
         if vanes_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
             aabb = p.getAABB(self.body_id, vanes_idx, physicsClientId=self.physics_client)
             vanes_r = (aabb[1][0] - aabb[0][0]) / 2.0
@@ -920,16 +910,16 @@ class Fluid:
 
         fallen_r = cavity_r + 0.010
         return {
-            LinkIndex.TUBE: hc_r,
-            LinkIndex.BASE: cavity_r,
-            LinkIndex.IMPELLER: vanes_clearance,
-            LinkIndex.FALLEN: fallen_r,
+            LinkType.TUBE: hc_r,
+            LinkType.BASE: cavity_r,
+            LinkType.IMPELLER: vanes_clearance,
+            LinkType.FALLEN: fallen_r,
         }
 
     @property
-    def thresholds(self) -> dict[LinkIndex, float]:
-        """Return dict mapping LinkIndex keys to their float thresholds."""
-        outlet_idx = self.link_indices[LinkIndex.OUTLET]
+    def thresholds(self) -> dict[LinkType, float]:
+        """Return dict mapping LinkType keys to their float thresholds."""
+        outlet_idx = self.link_indices.get(LinkType.OUTLET)
         min_h = 0.095
         if outlet_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
             state = p.getLinkState(self.body_id, outlet_idx, physicsClientId=self.physics_client)
@@ -941,19 +931,19 @@ class Fluid:
             max_y = float(aabb[1][1] + 0.005)
 
         offset_mm = 15.0
-        hc_idx = self.link_indices[LinkIndex.TUBE]
+        hc_idx = self.link_indices.get(LinkType.TUBE)
         if hc_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
             info = p.getJointInfo(self.body_id, hc_idx, physicsClientId=self.physics_client)
             hc_y = info[14][1]
-            cavity_r_mm = self.radii[LinkIndex.BASE] * 1000.0
-            hc_r_mm = self.radii[LinkIndex.TUBE] * 1000.0
+            cavity_r_mm = self.radii[LinkType.BASE] * 1000.0
+            hc_r_mm = self.radii[LinkType.TUBE] * 1000.0
             hc_y_mm = hc_y * 1000.0
             offset_mm = float(cavity_r_mm - hc_r_mm - hc_y_mm)
 
         return {
-            LinkIndex.OUTLET: min_h,
-            LinkIndex.OUTLET_MAX_Y: max_y,
-            LinkIndex.TUBE: offset_mm,
+            LinkType.OUTLET: min_h,
+            LinkType.OUTLET_MAX_Y: max_y,
+            LinkType.TUBE: offset_mm,
         }
 
     def update(
@@ -962,7 +952,7 @@ class Fluid:
         physics_client: int,
         step_index: int,
         sim_name: str,
-        damping: float = 0.998,
+        damping: DampingType | float = DampingType.DYNAMIC,
         motor_config: Optional[FluidMotorConfig] = None,
     ) -> None:
         """Step simulation and manage deactivation."""
@@ -972,7 +962,7 @@ class Fluid:
             self.motor_config = motor_config
 
         if not self.spawner:
-            return
+            raise RuntimeError("Fluid spawner is not initialized.")
 
         pos_np = np.array(self.pos_jax)
         vel_np = np.array(self.vel_jax)
@@ -1006,13 +996,13 @@ class Fluid:
             idx_map_jax = jnp.array(idx_map)
 
         cavity_pos, cavity_orn = p.getBasePositionAndOrientation(self.body_id, physicsClientId=physics_client)
-        cavity_info = next((self.boundaries[name] for name in CAVITY_NAMES if name in self.boundaries), None)
+        cavity_info = self.boundaries.get(LinkType.BASE)
         cavity_radius = cavity_info.radius if cavity_info and cavity_info.radius is not None else 0.076
         cavity_height = cavity_info.height if cavity_info and cavity_info.height is not None else 0.096
         cavity_z_offset = cavity_info.xyz[2] if cavity_info else 0.004
 
-        hc_info = next((self.boundaries[name] for name in TUBE_NAMES if name in self.boundaries), None)
-        hc_idx = hc_info.link_idx if hc_info else None
+        hc_info = self.boundaries.get(LinkType.TUBE)
+        hc_idx = self.link_indices.get(LinkType.TUBE) if hc_info else None
         if hc_idx is not None and hc_idx != -1:
             state = p.getLinkState(self.body_id, hc_idx, physicsClientId=physics_client)
             hc_pos, hc_orn = state[4], state[5]
@@ -1028,8 +1018,8 @@ class Fluid:
             hc_inner_radius = 0.0
             hc_height = 0.0
 
-        vanes_info = next((self.boundaries[name] for name in IMPELLER_NAMES if name in self.boundaries), None)
-        v_idx = vanes_info.link_idx if vanes_info else None
+        vanes_info = self.boundaries.get(LinkType.IMPELLER)
+        v_idx = self.link_indices.get(LinkType.IMPELLER) if vanes_info else None
         if v_idx is not None and v_idx != -1:
             state = p.getLinkState(self.body_id, v_idx, physicsClientId=physics_client)
             v_pos, v_orn = state[4], state[5]
@@ -1102,14 +1092,14 @@ class Fluid:
 
             # Spout/outlet indices
             spout_indices = np.where(
-                active_mask & (zs >= self.thresholds[LinkIndex.OUTLET]) & (ys < self.thresholds[LinkIndex.OUTLET_MAX_Y])
+                active_mask & (zs >= self.thresholds[LinkType.OUTLET]) & (ys < self.thresholds[LinkType.OUTLET_MAX_Y])
             )[0]
             for idx in spout_indices:
                 self.spout_water_ids.add(idx)
 
             # Fallen indices
             fallen_indices = np.where(
-                active_mask & ((zs < 0.0) | (xs**2 + ys**2 > (self.radii[LinkIndex.FALLEN]) ** 2))
+                active_mask & ((zs < 0.0) | (xs**2 + ys**2 > (self.radii[LinkType.FALLEN]) ** 2))
             )[0]
 
             if len(fallen_indices) > 0:
@@ -1121,7 +1111,6 @@ class Fluid:
                     vel_arr[idx] = [0.0, 0.0, 0.0]
                 self.pos_jax = jnp.array(pos_arr)
                 self.vel_jax = jnp.array(vel_arr)
-                assert self.pos_jax is not None
                 self.last_positions = self.pos_jax.tolist()
 
         if self.state_tracker is not None:

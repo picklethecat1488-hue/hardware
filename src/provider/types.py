@@ -69,6 +69,7 @@ class URDFShape(Protocol):
     urdf_boundary_height: Optional[float]
     urdf_boundary_xyz: Optional[str]
     urdf_boundary_rpy: Optional[str]
+    urdf_boundary_thickness: Optional[float]
 
     def __getattr__(self, name: str) -> Any:
         """Get an attribute from the object."""
@@ -105,7 +106,6 @@ class Simulate(StrEnum):
 
     SETUP = "setup"
     STEP = "step"
-    TEARDOWN = "teardown"
 
 
 class ColorType(StrEnum):
