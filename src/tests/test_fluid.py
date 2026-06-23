@@ -1,7 +1,8 @@
 """Unit tests for SPH Fluid simulation class."""
 
 import math
-from provider.fluid import Fluid, LinkIndex
+from provider.fluid import Fluid
+from provider.bullet import LinkType
 from model import FluidConfig
 
 
@@ -266,7 +267,16 @@ def test_fluid_simulator_dynamic_properties():
     provider.settings.tube_thickness = 1.5
     provider.settings.impeller_shaft_radius = 1.5
 
-    sim = Fluid(provider=provider, body_id=42, physics_client=1, link_indices=[2, 1, 0])
+    sim = Fluid(
+        provider=provider,
+        body_id=42,
+        physics_client=1,
+        link_indices={
+            LinkType.OUTLET: 2,
+            LinkType.TUBE: 1,
+            LinkType.IMPELLER: 0,
+        },
+    )
 
     # Mock PyBullet functions
     def mock_get_num_joints(body_id, physicsClientId):
@@ -355,16 +365,20 @@ def test_fluid_simulator_dynamic_properties():
         patch("pybullet.getConnectionInfo", return_value={"isConnected": True}),
     ):
         # Verify dynamic properties using the refactored field names
-        assert sim.link_indices == [2, 1, 0]
+        assert sim.link_indices == {
+            LinkType.OUTLET: 2,
+            LinkType.TUBE: 1,
+            LinkType.IMPELLER: 0,
+        }
         assert sim.motor_config.target_omega == 15.0
         assert sim.motor_config.max_force == 10.0
-        assert math.isclose(sim.radii[LinkIndex.TUBE], 0.008, abs_tol=1e-5)
-        assert math.isclose(sim.radii[LinkIndex.BASE], 0.080, abs_tol=1e-5)
-        assert math.isclose(sim.radii[LinkIndex.IMPELLER], 0.003, abs_tol=1e-5)
-        assert math.isclose(sim.radii[LinkIndex.FALLEN], 0.090, abs_tol=1e-5)
-        assert math.isclose(sim.thresholds[LinkIndex.OUTLET], 0.095, abs_tol=1e-5)
-        assert math.isclose(sim.thresholds[LinkIndex.OUTLET_MAX_Y], 0.005, abs_tol=1e-5)
-        assert math.isclose(sim.thresholds[LinkIndex.TUBE], 15.0, abs_tol=1e-5)
+        assert math.isclose(sim.radii[LinkType.TUBE], 0.008, abs_tol=1e-5)
+        assert math.isclose(sim.radii[LinkType.BASE], 0.080, abs_tol=1e-5)
+        assert math.isclose(sim.radii[LinkType.IMPELLER], 0.003, abs_tol=1e-5)
+        assert math.isclose(sim.radii[LinkType.FALLEN], 0.090, abs_tol=1e-5)
+        assert math.isclose(sim.thresholds[LinkType.OUTLET], 0.095, abs_tol=1e-5)
+        assert math.isclose(sim.thresholds[LinkType.OUTLET_MAX_Y], 0.005, abs_tol=1e-5)
+        assert math.isclose(sim.thresholds[LinkType.TUBE], 15.0, abs_tol=1e-5)
 
 
 def test_fluid_parameter_overrides():

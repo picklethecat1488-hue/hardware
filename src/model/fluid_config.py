@@ -58,3 +58,22 @@ class FluidConfig(BaseModel):
         default=None, description="Dictionary of physical boundary definitions."
     )
     sim_name: str = Field(default="", description="User-defined simulation run name tag.")
+
+    @staticmethod
+    def water(**kwargs: Any) -> "FluidConfig":
+        """Create a FluidConfig for water with default values.
+
+        Args:
+            **kwargs: Overrides for the default fluid configuration parameters.
+
+        Returns:
+            FluidConfig: A configuration object for water.
+        """
+        params: dict[str, Any] = {
+            "rest_density": 1000.0,
+            "r_s": 0.003,
+            "viscosity": 0.02,
+            "stiffness": 100.0,
+        }
+        params.update(kwargs)
+        return FluidConfig(**params)

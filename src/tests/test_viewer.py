@@ -345,11 +345,9 @@ class TestViewer:
         mock_provider = MagicMock()
         mock_setup = MagicMock()
         mock_step = MagicMock(return_value=None)
-        mock_teardown = MagicMock()
         mock_provider.simulate = {
             Simulate.SETUP: mock_setup,
             Simulate.STEP: mock_step,
-            Simulate.TEARDOWN: mock_teardown,
         }
 
         # 3. Setup room with parent and child geometry
@@ -408,7 +406,6 @@ class TestViewer:
         actual_calls = [call.args for call in mock_step.call_args_list]
         expected_calls = [(100, 42, i, "mock/target") for i in range(10)]
         assert actual_calls == expected_calls
-        mock_teardown.assert_called_once_with(100, 42, "mock/target")
         mock_disconnect.assert_called_once_with(physicsClientId=42)
 
     @patch("provider.room.os.path.exists")
@@ -449,11 +446,9 @@ class TestViewer:
         mock_setup = MagicMock()
         mock_step = MagicMock(return_value=None)
         mock_step.side_effect = [None, None] + ["terminated early"] * 100
-        mock_teardown = MagicMock()
         mock_provider.simulate = {
             Simulate.SETUP: mock_setup,
             Simulate.STEP: mock_step,
-            Simulate.TEARDOWN: mock_teardown,
         }
 
         # 3. Setup room with parent and child geometry
@@ -512,7 +507,6 @@ class TestViewer:
         actual_calls = [call.args for call in mock_step.call_args_list]
         expected_calls = [(100, 42, i, "mock/target") for i in range(3)]
         assert actual_calls == expected_calls
-        mock_teardown.assert_called_once_with(100, 42, "mock/target")
         mock_disconnect.assert_called_once_with(physicsClientId=42)
 
     @patch("view.show")

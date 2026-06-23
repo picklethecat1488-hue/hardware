@@ -1,6 +1,7 @@
 """PyBullet simulation engine lifecycle manager."""
 
 import os
+from enum import IntEnum
 import shutil
 import tempfile
 import pybullet as p
@@ -10,6 +11,17 @@ from typing import Any, Optional, Callable, cast
 import rerun as rr
 
 from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFCollisionType, Simulate
+
+
+class LinkType(IntEnum):
+    """Bullet link types."""
+
+    BASE = -1
+    OUTLET = 0
+    TUBE = 1
+    IMPELLER = 2
+    FALLEN = -2
+    OUTLET_MAX_Y = -3
 
 
 def _is_real_physics_client(physics_client: Any) -> bool:
@@ -480,11 +492,6 @@ class Bullet:
 
                     if terminated:
                         break
-
-                # Teardown Hooks
-                teardown_hook = self.provider_hooks.get(Simulate.TEARDOWN, None)
-                if teardown_hook:
-                    teardown_hook(body_id, physics_client, self.sim_target)
 
             except KeyboardInterrupt:
                 self.logger.print("Simulation stopped.", symbol="💥")
