@@ -1,12 +1,13 @@
 """Unit tests for SPH Fluid simulation class."""
 
 import math
-from provider.fluid import Fluid
+from provider.fluid import Fluid, LinkIndex
+from model import FluidConfig
 
 
 def test_fluid_initialization():
     """Verify that Fluid class initializes with the correct constants."""
-    fluid = Fluid(r_s=0.003, rest_density=1000.0, viscosity=0.5, stiffness=2000.0)
+    fluid = Fluid(config=FluidConfig(r_s=0.003, rest_density=1000.0, viscosity=0.5, stiffness=2000.0))
     assert math.isclose(fluid.r_s, 0.003)
     assert math.isclose(fluid.h, 0.009)
     assert fluid.rest_density == 1000.0
@@ -21,7 +22,7 @@ def test_zero_shear_strength():
 
     If we apply a sideways force to a block of particles, they should flow and deform.
     """
-    fluid = Fluid(r_s=0.003, viscosity=0.1)
+    fluid = Fluid(config=FluidConfig(r_s=0.003, viscosity=0.1))
 
     # Place particles in a vertical column to represent a fluid block
     positions = [
@@ -55,7 +56,7 @@ def test_zero_shear_strength():
 
 def test_knudsen_number():
     """Verify that the fluid acts as a continuous regime with Kn < 0.1."""
-    fluid = Fluid(r_s=0.003)
+    fluid = Fluid(config=FluidConfig(r_s=0.003))
 
     # Create a dense grid of particles resembling a fluid continuum
     positions = []
@@ -74,7 +75,7 @@ def test_knudsen_number():
 
 def test_newtonian_viscosity():
     """Verify that viscosity force acts to reduce relative velocity linearly (Newtonian)."""
-    fluid = Fluid(r_s=0.003, viscosity=0.5)
+    fluid = Fluid(config=FluidConfig(r_s=0.003, viscosity=0.5))
 
     # Two adjacent particles with relative velocity
     positions = [
@@ -100,7 +101,7 @@ def test_newtonian_viscosity():
 
 def test_momentum_conservation():
     """Verify Newton's Third Law (action/reaction forces sum to zero)."""
-    fluid = Fluid(r_s=0.003, viscosity=0.5, stiffness=1000.0)
+    fluid = Fluid(config=FluidConfig(r_s=0.003, viscosity=0.5, stiffness=1000.0))
 
     # 3 asymmetric particles to create complex internal forces
     positions = [
@@ -129,7 +130,7 @@ def test_momentum_conservation():
 
 def test_incompressibility_repulsion():
     """Verify that compressed particles experience repulsive pressure forces."""
-    fluid = Fluid(r_s=0.003, stiffness=2000.0, viscosity=0.1)
+    fluid = Fluid(config=FluidConfig(r_s=0.003, stiffness=2000.0, viscosity=0.1))
 
     # Place 16 particles in two tight clusters separated along the Z-axis
     positions = []
@@ -158,7 +159,7 @@ def test_incompressibility_repulsion():
 
 def test_single_particle_forces():
     """Verify that a single isolated particle experiences zero internal force."""
-    fluid = Fluid(r_s=0.003)
+    fluid = Fluid(config=FluidConfig(r_s=0.003))
 
     positions = [(0.0, 0.0, 0.0)]
     velocities = [(1.0, 2.0, -3.0)]
@@ -172,7 +173,7 @@ def test_compute_forces_jax_direct():
     """Verify that compute_forces_jax produces the same output as compute_forces but as a JAX array."""
     import jax.numpy as jnp
 
-    fluid = Fluid(r_s=0.003)
+    fluid = Fluid(config=FluidConfig(r_s=0.003))
     positions = [
         (0.0, 0.0, 0.0),
         (0.0, 0.0, 0.004),
@@ -218,13 +219,13 @@ def test_fluid_spawner_padding_and_jitter():
 
         # Initial state
         assert spawner.active_count == 0
-        assert len(spawner.water_body_ids) == 0
+        assert len(spawner.particle_body_ids) == 0
 
         # 1. Spawn a batch of 4 particles
         newly_spawned = spawner.spawn_batch(spawn_z=0.100, batch_size=4, spacing=0.008)
         assert newly_spawned == 4
         assert spawner.active_count == 4
-        assert len(spawner.water_body_ids) == 4
+        assert len(spawner.particle_body_ids) == 4
 
         # Verify positions and velocities are padded up to n_particles (10)
         positions, velocities = spawner.get_positions_and_velocities()
@@ -265,9 +266,7 @@ def test_fluid_simulator_dynamic_properties():
     provider.settings.tube_thickness = 1.5
     provider.settings.impeller_shaft_radius = 1.5
 
-    sim = Fluid(provider=provider)
-    sim.body_id = 42
-    sim.physics_client = 1
+    sim = Fluid(provider=provider, body_id=42, physics_client=1, link_indices=[2, 1, 0])
 
     # Mock PyBullet functions
     def mock_get_num_joints(body_id, physicsClientId):
@@ -353,17 +352,19 @@ def test_fluid_simulator_dynamic_properties():
         patch("pybullet.getJointInfo", side_effect=mock_get_joint_info),
         patch("pybullet.getAABB", side_effect=mock_get_aabb),
         patch("pybullet.getLinkState", side_effect=mock_get_link_state),
+        patch("pybullet.getConnectionInfo", return_value={"isConnected": True}),
     ):
         # Verify dynamic properties using the refactored field names
         assert sim.link_indices == [2, 1, 0]
-        assert sim.motor_settings == [15.0, 10.0]
-        assert math.isclose(sim.radii[0], 0.008, abs_tol=1e-5)
-        assert math.isclose(sim.radii[1], 0.080, abs_tol=1e-5)
-        assert math.isclose(sim.radii[2], 0.003, abs_tol=1e-5)
-        assert math.isclose(sim.radii[3], 0.090, abs_tol=1e-5)
-        assert math.isclose(sim.thresholds[0], 0.095, abs_tol=1e-5)
-        assert math.isclose(sim.thresholds[1], 0.005, abs_tol=1e-5)
-        assert math.isclose(sim.thresholds[2], 15.0, abs_tol=1e-5)
+        assert sim.motor_config.target_omega == 15.0
+        assert sim.motor_config.max_force == 10.0
+        assert math.isclose(sim.radii[LinkIndex.TUBE], 0.008, abs_tol=1e-5)
+        assert math.isclose(sim.radii[LinkIndex.BASE], 0.080, abs_tol=1e-5)
+        assert math.isclose(sim.radii[LinkIndex.IMPELLER], 0.003, abs_tol=1e-5)
+        assert math.isclose(sim.radii[LinkIndex.FALLEN], 0.090, abs_tol=1e-5)
+        assert math.isclose(sim.thresholds[LinkIndex.OUTLET], 0.095, abs_tol=1e-5)
+        assert math.isclose(sim.thresholds[LinkIndex.OUTLET_MAX_Y], 0.005, abs_tol=1e-5)
+        assert math.isclose(sim.thresholds[LinkIndex.TUBE], 15.0, abs_tol=1e-5)
 
 
 def test_fluid_parameter_overrides():
@@ -404,23 +405,25 @@ def test_fluid_parameter_overrides():
 
     # Initialize Fluid with custom parameters directly
     fluid = Fluid(
+        config=FluidConfig(
+            particle_radius=provider.settings.PARTICLE_RADIUS,
+            target_volume=provider.settings.TARGET_VOLUME,
+            volume_threshold_liters=provider.settings.VOLUME_THRESHOLD_LITERS,
+            fallen_threshold_liters=provider.settings.FALLEN_THRESHOLD_LITERS,
+            bowl_wall_buffer=provider.settings.BOWL_WALL_BUFFER,
+            rest_density=provider.settings.REST_DENSITY,
+            viscosity=provider.settings.VISCOSITY,
+            stiffness=provider.settings.STIFFNESS,
+            smoothing_factor=provider.settings.SMOOTHING_FACTOR,
+            sphere_vol_factor=provider.settings.SPHERE_VOL_FACTOR,
+            poly6_coeff_numerator=provider.settings.POLY6_COEFF_NUMERATOR,
+            poly6_coeff_denominator=provider.settings.POLY6_COEFF_DENOMINATOR,
+            spiky_grad_coeff=provider.settings.SPIKY_GRAD_COEFF,
+            visc_lap_coeff=provider.settings.VISC_LAP_COEFF,
+            pressure_avg_factor=provider.settings.PRESSURE_AVG_FACTOR,
+            min_distance_threshold=provider.settings.MIN_DISTANCE_THRESHOLD,
+        ),
         provider=provider,
-        particle_radius=provider.settings.PARTICLE_RADIUS,
-        target_volume=provider.settings.TARGET_VOLUME,
-        volume_threshold_liters=provider.settings.VOLUME_THRESHOLD_LITERS,
-        fallen_threshold_liters=provider.settings.FALLEN_THRESHOLD_LITERS,
-        bowl_wall_buffer=provider.settings.BOWL_WALL_BUFFER,
-        rest_density=provider.settings.REST_DENSITY,
-        viscosity=provider.settings.VISCOSITY,
-        stiffness=provider.settings.STIFFNESS,
-        smoothing_factor=provider.settings.SMOOTHING_FACTOR,
-        sphere_vol_factor=provider.settings.SPHERE_VOL_FACTOR,
-        poly6_coeff_numerator=provider.settings.POLY6_COEFF_NUMERATOR,
-        poly6_coeff_denominator=provider.settings.POLY6_COEFF_DENOMINATOR,
-        spiky_grad_coeff=provider.settings.SPIKY_GRAD_COEFF,
-        visc_lap_coeff=provider.settings.VISC_LAP_COEFF,
-        pressure_avg_factor=provider.settings.PRESSURE_AVG_FACTOR,
-        min_distance_threshold=provider.settings.MIN_DISTANCE_THRESHOLD,
     )
 
     # Assert Fluid constants are overridden
@@ -443,3 +446,23 @@ def test_fluid_parameter_overrides():
     fluid_default = Fluid(provider=provider)
     assert fluid_default.r_s == 0.003
     assert fluid_default.rest_density == 1000.0
+
+
+def test_fluid_config_object():
+    """Verify that Fluid correctly parses settings from a flat FluidConfig object."""
+    from model import FluidConfig
+
+    config = FluidConfig(
+        viscosity=0.77,
+        rest_density=920.0,
+        smoothing_factor=4.5,
+        target_volume=0.0008,
+        sim_name="config_test",
+    )
+
+    # Initialize purely from config
+    fluid = Fluid(config=config)
+    assert fluid.viscosity == 0.77
+    assert fluid.rest_density == 920.0
+    assert fluid.smoothing_factor == 4.5
+    assert fluid.target_volume == 0.0008
