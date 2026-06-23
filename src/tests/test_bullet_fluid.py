@@ -414,12 +414,6 @@ class TestBulletFluid:
             vol_s = (4.0 / 3.0) * math.pi * (fluid.r_s**3)
             remaining_volume = active_count * vol_s
 
-            print(
-                f"\n[Angle: {angle_deg:2d}°] Expected volume: {expected_volume:.1e} m³ ({expected_volume * 1e6:.2f} mL) | "
-                f"Actual volume: {remaining_volume:.1e} m³ ({remaining_volume * 1e6:.2f} mL) | "
-                f"Active particles remaining inside: {active_count}/{fluid.n_particles}"
-            )
-
             # Assert they match within a tolerance of 4 mL (accounts for SPH surface discretization & pressure expansion)
             assert math.isclose(remaining_volume, expected_volume, abs_tol=4.0e-6), (
                 f"Remaining volume {remaining_volume} did not match expected volume {expected_volume}"
@@ -655,5 +649,344 @@ class TestBulletFluid:
                 assert math.isclose(avg_vel[2], 0.0, abs_tol=0.45), (
                     f"Fluid speed Z was {avg_vel[2]}, expected ~0.0 at step {step}"
                 )
+        finally:
+            p.disconnect(physicsClientId=physics_client)
+
+    @pytest.mark.parametrize("mode", ["fast", pytest.param("slow", marks=pytest.mark.slow)])
+    def test_fluid_buoyancy(self, mode: str):
+        """Verify buoyancy forces on plastic spheres of different densities (HDPE vs Nylon 6-6)."""
+        physics_client = p.connect(p.DIRECT)
+        try:
+            p.setGravity(0, 0, -9.81, physicsClientId=physics_client)
+
+            # Create bowl
+            body_id = self.create_test_body(physics_client, mass=0.0)
+
+            provider = self.DummyProvider()
+            fluid = self.ConservationFluid(
+                config=FluidConfig(
+                    r_s=0.003,
+                    target_volume=0.0005,  # 500 mL of water
+                    viscosity=0.5,
+                    stiffness=1000.0,
+                    bowl_wall_buffer=0.002,
+                    boundaries={"bowl": self.get_boundaries()["bowl"]},
+                    gravity=(0.0, 0.0, -9.81),
+                ),
+                provider=provider,
+                body_id=body_id,
+                physics_client=physics_client,
+                link_indices=[None, 0, 1],
+            )
+            self.disable_pybullet_particle_collisions(physics_client, body_id, fluid)
+
+            # Settle parameters based on mode
+            settle_steps = 40 if mode == "fast" else 50
+            run_steps = 60 if mode == "fast" else 120
+            diff_threshold = 0.001 if mode == "fast" else 0.002
+
+            # 1. Let the fluid settle to form a pool
+            for step in range(settle_steps):
+                fluid.update(body_id, physics_client, step, "buoyancy_settling", damping=0.90)
+                p.stepSimulation(physicsClientId=physics_client)
+
+            # Query settled water height (90th percentile)
+            positions = np.array(fluid.pos_jax)
+            active_mask = positions[:, 2] < 100.0
+            active_zs = positions[active_mask, 2]
+            z_water = np.percentile(active_zs, 90)
+            initial_active_count = len(active_zs)
+
+            # 2. Spawn HDPE and Nylon spheres (Radius = 6 mm)
+            r_sphere = 0.006
+            v_sphere = (4.0 / 3.0) * math.pi * (r_sphere**3)
+
+            # Density values: HDPE (950 kg/m^3), Nylon 6-6 (1140 kg/m^3)
+            mass_hdpe = 950.0 * v_sphere
+            mass_nylon = 1140.0 * v_sphere
+
+            col_id = p.createCollisionShape(p.GEOM_SPHERE, radius=r_sphere, physicsClientId=physics_client)
+
+            # Spawn partially submerged
+            z_spawn = z_water - r_sphere / 2.0
+            body_hdpe = p.createMultiBody(
+                baseMass=mass_hdpe,
+                baseCollisionShapeIndex=col_id,
+                basePosition=[-0.03, 0.0, z_spawn],
+                physicsClientId=physics_client,
+            )
+            body_nylon = p.createMultiBody(
+                baseMass=mass_nylon,
+                baseCollisionShapeIndex=col_id,
+                basePosition=[0.03, 0.0, z_spawn],
+                physicsClientId=physics_client,
+            )
+
+            # Make spheres frictionless and dampless to prevent numerical stickiness
+            for body in [body_hdpe, body_nylon]:
+                p.changeDynamics(
+                    body,
+                    -1,
+                    linearDamping=0.0,
+                    angularDamping=0.0,
+                    lateralFriction=0.0,
+                    spinningFriction=0.0,
+                    rollingFriction=0.0,
+                    physicsClientId=physics_client,
+                )
+
+            # Disable collisions with fluid particles
+            if fluid.spawner:
+                for w_id in fluid.spawner.particle_body_ids:
+                    p.setCollisionFilterPair(body_hdpe, w_id, -1, -1, enableCollision=0, physicsClientId=physics_client)
+                    p.setCollisionFilterPair(
+                        body_nylon, w_id, -1, -1, enableCollision=0, physicsClientId=physics_client
+                    )
+
+            # 3. Simulate and apply SPH coupling buoyancy forces
+            for step in range(run_steps):
+                fluid.update(body_id, physics_client, step + settle_steps, "buoyancy_run", damping=0.95)
+
+                positions = np.array(fluid.pos_jax)
+                active_mask = positions[:, 2] < 100.0
+                active_zs = positions[active_mask, 2]
+                z_water_current = np.percentile(active_zs, 90)
+
+                for body in [body_hdpe, body_nylon]:
+                    pos, _ = p.getBasePositionAndOrientation(body, physicsClientId=physics_client)
+                    z_b = pos[2]
+                    h_sub = z_water_current - (z_b - r_sphere)
+                    h_sub = np.clip(h_sub, 0.0, 2 * r_sphere)
+                    v_sub = (np.pi / 3.0) * (h_sub**2) * (3 * r_sphere - h_sub)
+
+                    # Buoyant force = rho_fluid * v_sub * g
+                    f_buoyancy = 1000.0 * v_sub * 9.81
+                    p.applyExternalForce(
+                        body,
+                        -1,
+                        forceObj=[0.0, 0.0, f_buoyancy],
+                        posObj=pos,
+                        flags=p.WORLD_FRAME,
+                        physicsClientId=physics_client,
+                    )
+
+                p.stepSimulation(physicsClientId=physics_client)
+
+            pos_hdpe, _ = p.getBasePositionAndOrientation(body_hdpe, physicsClientId=physics_client)
+            pos_nylon, _ = p.getBasePositionAndOrientation(body_nylon, physicsClientId=physics_client)
+
+            diff = pos_hdpe[2] - pos_nylon[2]
+
+            # 4. Mathematically derive the expected physical displacement and buoyancy values
+            # Nylon is fully submerged (density > water), HDPE floats at 95% submerged volume (density 950 kg/m^3)
+            v_nylon = (4.0 / 3.0) * math.pi * (r_sphere**3)
+            v_sub_hdpe = 0.95 * v_nylon
+            v_displaced = v_nylon + v_sub_hdpe
+            r_bowl = 0.076  # Bowl cavity radius from get_boundaries()
+            expected_rise = v_displaced / (math.pi * r_bowl**2)
+
+            # Solve for the submerged height of HDPE sphere h_sub using bisection:
+            # (pi / 3) * h^2 * (3 * R - h) = 0.95 * (4/3) * pi * R^3 => h^2 * (3 * R - h) = 3.8 * R^3
+            def solve_submerged_height(r: float, density_ratio: float) -> float:
+                low, high = 0.0, 2.0 * r
+                target = 4.0 * (r**3) * density_ratio
+                for _ in range(50):
+                    mid = (low + high) / 2.0
+                    val = (mid**2) * (3.0 * r - mid)
+                    if val < target:
+                        low = mid
+                    else:
+                        high = mid
+                return (low + high) / 2.0
+
+            h_sub_hdpe = solve_submerged_height(r_sphere, 0.95)
+
+            # Expected Z height of spheres in physical equilibrium
+            expected_nylon_z = 0.01 + r_sphere  # Sunk on the base plate (top is at z=0.01)
+            # HDPE floats on the displaced water surface
+            expected_hdpe_z = (z_water + expected_rise) + r_sphere - h_sub_hdpe
+            expected_diff = expected_hdpe_z - expected_nylon_z
+
+            # Verify displacement effect (Archimedes' Principle)
+            measured_rise = z_water_current - z_water
+            assert measured_rise >= expected_rise, (
+                f"Displacement check failed: measured water level rise ({measured_rise:.6f} m) "
+                f"should be at least the theoretical expected rise ({expected_rise:.6f} m)."
+            )
+
+            # Verify buoyancy difference
+            # SPH discrete support and pressure expansion might float the HDPE sphere slightly higher
+            # than continuous fluid theory. We verify that the simulated difference matches the
+            # expected physical difference within a reasonable tolerance (e.g., SPH particle radius).
+            assert diff > 0.8 * expected_diff, (
+                f"Buoyancy test failed: Z difference ({diff:.4f} m) was less than 80% of "
+                f"the theoretical expected difference ({expected_diff:.4f} m)."
+            )
+            assert abs(diff - expected_diff) < 0.003, (
+                f"Buoyancy test failed: Z difference ({diff:.4f} m) deviates from "
+                f"the theoretical expected difference ({expected_diff:.4f} m) by more than particle radius."
+            )
+        finally:
+            p.disconnect(physicsClientId=physics_client)
+
+    @pytest.mark.parametrize("mode", ["fast", pytest.param("slow", marks=pytest.mark.slow)])
+    def test_fluid_terminal_velocity(self, mode: str) -> None:
+        """Verify that a heavy sinking sphere in SPH fluid reaches a stable terminal velocity."""
+        physics_client = p.connect(p.DIRECT)
+        try:
+            p.setGravity(0, 0, -9.81, physicsClientId=physics_client)
+
+            # Create bowl (using narrow tall cylinder)
+            bowl_col = p.createCollisionShape(
+                p.GEOM_BOX, halfExtents=[0.05, 0.05, 0.01], physicsClientId=physics_client
+            )
+            tube_col = p.createCollisionShape(
+                p.GEOM_CYLINDER, radius=0.002, height=0.05, physicsClientId=physics_client
+            )
+            vane_col = p.createCollisionShape(
+                p.GEOM_CYLINDER, radius=0.002, height=0.01, physicsClientId=physics_client
+            )
+            body_id = p.createMultiBody(
+                baseMass=0.0,
+                baseCollisionShapeIndex=bowl_col,
+                basePosition=[0.0, 0.0, 0.0],
+                linkMasses=[0.0, 0.0],
+                linkCollisionShapeIndices=[tube_col, vane_col],
+                linkVisualShapeIndices=[-1, -1],
+                linkPositions=[[0.0, 0.02, 0.03], [0.0, 0.0, -1.0]],
+                linkOrientations=[[0, 0, 0, 1], [0, 0, 0, 1]],
+                linkInertialFramePositions=[[0, 0, 0], [0, 0, 0]],
+                linkInertialFrameOrientations=[[0, 0, 0, 1], [0, 0, 0, 1]],
+                linkParentIndices=[0, 0],
+                linkJointTypes=[p.JOINT_FIXED, p.JOINT_REVOLUTE],
+                linkJointAxis=[[0, 0, 1], [0, 0, 1]],
+                physicsClientId=physics_client,
+            )
+
+            # 1.5 cm radius, 15 cm height cylinder cavity
+            bowl_boundary = {
+                "shape": "cylinder",
+                "type": "cavity",
+                "radius": 0.018,
+                "height": 0.150,
+                "xyz": [0.0, 0.0, 0.0],
+                "rpy": [0.0, 0.0, 0.0],
+            }
+
+            fluid = self.ConservationFluid(
+                config=FluidConfig(
+                    r_s=0.0025,
+                    target_volume=0.00007,  # 70 mL of water (deep narrow column)
+                    viscosity=0.5,
+                    stiffness=1000.0,
+                    bowl_wall_buffer=0.001,
+                    boundaries={"bowl": bowl_boundary},
+                    gravity=(0.0, 0.0, -9.81),
+                ),
+                provider=None,
+                body_id=body_id,
+                physics_client=physics_client,
+                link_indices=[None, 0, 1],
+            )
+
+            # Disable collisions
+            self.disable_pybullet_particle_collisions(physics_client, body_id, fluid)
+
+            settle_steps = 40 if mode == "fast" else 60
+            for step in range(settle_steps):
+                fluid.update(body_id, physics_client, step, "settle", damping=0.90)
+                p.stepSimulation(physicsClientId=physics_client)
+
+            # Get initial water height
+            positions = np.array(fluid.pos_jax)
+            active_mask = positions[:, 2] < 100.0
+            active_zs = positions[active_mask, 2]
+            z_water = np.percentile(active_zs, 90)
+
+            # Spawn steel sphere (Radius = 4 mm, density = 7850 kg/m^3)
+            r_sphere = 0.004
+            v_sphere = (4.0 / 3.0) * math.pi * (r_sphere**3)
+            mass_steel = 7850.0 * v_sphere
+            col_id = p.createCollisionShape(p.GEOM_SPHERE, radius=r_sphere, physicsClientId=physics_client)
+
+            # Spawn at the top of the settled water level
+            body_steel = p.createMultiBody(
+                baseMass=mass_steel,
+                baseCollisionShapeIndex=col_id,
+                basePosition=[0.0, 0.0, z_water - r_sphere],
+                physicsClientId=physics_client,
+            )
+
+            p.changeDynamics(
+                body_steel,
+                -1,
+                linearDamping=0.0,
+                angularDamping=0.0,
+                lateralFriction=0.0,
+                spinningFriction=0.0,
+                rollingFriction=0.0,
+                physicsClientId=physics_client,
+            )
+
+            # Disable collisions with particles
+            if fluid.spawner:
+                for w_id in fluid.spawner.particle_body_ids:
+                    p.setCollisionFilterPair(
+                        body_steel, w_id, -1, -1, enableCollision=0, physicsClientId=physics_client
+                    )
+
+            velocities = []
+            positions_z = []
+            run_steps = 60 if mode == "fast" else 120
+            for step in range(run_steps):
+                fluid.update(body_id, physics_client, step + settle_steps, "run", damping=0.95)
+
+                pos, _ = p.getBasePositionAndOrientation(body_steel, physicsClientId=physics_client)
+                vel, _ = p.getBaseVelocity(body_steel, physicsClientId=physics_client)
+                z_sphere = pos[2]
+                v_z = vel[2]
+
+                curr_pos = np.array(fluid.pos_jax)
+                curr_active = curr_pos[:, 2] < 100.0
+                z_water_current = np.percentile(curr_pos[curr_active, 2], 90)
+
+                h_sub = np.clip(z_water_current - (z_sphere - r_sphere), 0.0, 2 * r_sphere)
+                v_sub = (np.pi / 3.0) * (h_sub**2) * (3 * r_sphere - h_sub)
+
+                f_buoyancy = 1000.0 * v_sub * 9.81
+                f_drag_linear = -6.0 * np.pi * 0.5 * r_sphere * v_z
+                f_drag_quad = -0.5 * 0.47 * 1000.0 * (np.pi * r_sphere**2) * v_z * abs(v_z)
+                f_drag = (f_drag_linear + f_drag_quad) * (v_sub / v_sphere)
+
+                p.applyExternalForce(
+                    body_steel,
+                    -1,
+                    forceObj=[0.0, 0.0, f_buoyancy + f_drag],
+                    posObj=pos,
+                    flags=p.WORLD_FRAME,
+                    physicsClientId=physics_client,
+                )
+
+                p.stepSimulation(physicsClientId=physics_client)
+
+                vel_new, _ = p.getBaseVelocity(body_steel, physicsClientId=physics_client)
+                velocities.append(vel_new[2])
+                positions_z.append(pos[2])
+
+            v_z_arr = np.array(velocities)
+            bottom_z = 0.01 + r_sphere + 0.002
+            hit_bottom_indices = np.where(np.array(positions_z) <= bottom_z)[0]
+            fall_end = hit_bottom_indices[0] if len(hit_bottom_indices) > 0 else run_steps
+
+            # Take velocities during the fall phase
+            fall_vels = np.abs(v_z_arr[:fall_end])
+            terminal_speed = np.mean(fall_vels[len(fall_vels) // 2 :])
+
+            # Check acceleration decay:
+            diff_1 = abs(np.abs(v_z_arr[20]) - np.abs(v_z_arr[10]))
+            diff_2 = abs(np.abs(v_z_arr[30]) - np.abs(v_z_arr[20]))
+
+            assert terminal_speed < 1.0, f"Terminal speed {terminal_speed:.4f} is too fast."
+            assert diff_2 < diff_1, f"Drag is not causing deceleration: diff_2 ({diff_2:.4f}) >= diff_1 ({diff_1:.4f})"
         finally:
             p.disconnect(physicsClientId=physics_client)
