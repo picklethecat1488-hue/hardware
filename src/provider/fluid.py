@@ -609,6 +609,7 @@ class Fluid:
         sim_name: str = "",
         boundaries: Optional[dict[str, Any]] = None,
         state_tracker: Optional[Any] = None,
+        gravity: Optional[tuple[float, float, float]] = None,
     ):
         """Initialize the fluid simulation constants and state."""
         self.provider = provider
@@ -662,6 +663,13 @@ class Fluid:
         self.spout_water_ids: set[int] = set()
         self.fallen_out_water_ids: set[int] = set()
         self.state_tracker = state_tracker
+
+        if gravity is not None:
+            self.gravity = gravity
+        elif hasattr(self.provider, "room") and self.provider.room and hasattr(self.provider.room, "gravity"):
+            self.gravity = self.provider.room.gravity
+        else:
+            self.gravity = (0.0, 0.0, -9.81)
 
         if physics_client is not None and body_id is not None and boundaries is not None:
             if state_tracker is not None:
@@ -1035,7 +1043,10 @@ class Fluid:
             k_query = min(64 + 1, len(active_indices))
             dists, indices = tree.query(active_pos, k=k_query, distance_upper_bound=self.h)
 
-            neigh_indices = indices[:, 1:] if k_query > 1 else indices[:, :0]
+            if k_query > 1:
+                neigh_indices = indices[:, 1:]
+            else:
+                neigh_indices = np.empty((len(active_indices), 0), dtype=np.int32)
 
             mapper = np.empty(len(active_indices) + 1, dtype=np.int32)
             mapper[:-1] = active_indices
@@ -1114,7 +1125,7 @@ class Fluid:
             self.visc_lap_factor,
             1.0 / (240.0 * 5),
             5,
-            jnp.array([0.0, 0.0, -9.81], dtype=jnp.float32),
+            jnp.array(self.gravity, dtype=jnp.float32),
             jnp.array(cavity_pos, dtype=jnp.float32),
             jnp.array(cavity_orn, dtype=jnp.float32),
             cavity_radius,
