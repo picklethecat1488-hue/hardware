@@ -480,6 +480,32 @@ class Bullet:
 
                 is_logging_enabled = self.spawn_viewer or (self.save_rrd is not None)
 
+                if is_logging_enabled:
+                    import queue
+                    import threading
+                    import copy
+
+                    log_queue = queue.Queue()
+
+                    def logging_worker():
+                        while True:
+                            item = log_queue.get()
+                            if item is None:
+                                log_queue.task_done()
+                                break
+                            transforms, particle_positions, particle_colors, particle_radii, step_idx = item
+                            self.room._log_rerun(
+                                transforms,
+                                particle_positions,
+                                particle_colors,
+                                particle_radii=particle_radii,
+                                step_idx=step_idx,
+                            )
+                            log_queue.task_done()
+
+                    log_thread = threading.Thread(target=logging_worker, daemon=True)
+                    log_thread.start()
+
                 for step_idx in range(self.steps):
                     step_hook = self.provider_hooks.get(Simulate.STEP, None)
                     terminated = False
@@ -496,16 +522,22 @@ class Bullet:
                         p.stepSimulation(physicsClientId=physics_client)
 
                     if is_logging_enabled:
-                        self.room._log_rerun(
-                            state_tracker.transforms,
-                            state_tracker.particle_positions,
-                            state_tracker.particle_colors,
-                            particle_radii=state_tracker.particle_radii,
-                            step_idx=step_idx,
+                        log_queue.put(
+                            (
+                                state_tracker.transforms,
+                                state_tracker.particle_positions,
+                                state_tracker.particle_colors,
+                                state_tracker.particle_radii,
+                                step_idx,
+                            )
                         )
 
                     if terminated:
                         break
+
+                if is_logging_enabled:
+                    log_queue.put(None)
+                    log_thread.join()
 
             except KeyboardInterrupt:
                 self.logger.print("Simulation stopped.", symbol="💥")

@@ -123,7 +123,7 @@ Create a `simulate_hooks.py` file within your project package to specify hooks f
 
 ```python
 # src/projects/bracket/simulate_hooks.py
-from provider import Simulate, Room, Bullet, Fluid, DampingType
+from provider import Simulate, Room, Bullet, Fluid
 
 def get_simulate_hooks_impl(provider, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
     def on_init(bullet: Bullet, fluid: Fluid) -> None:
@@ -191,7 +191,7 @@ When designing parts or writing simulation hooks, adhere to these dynamic stabil
   - Use `fluid.recycle_fluid = True` when simulating steady-state flows (such as fountains or recirculating pumps).
   - Make sure the recycling boundary coordinates match the physical limits of the container.
 - **Numeric Damping**:
-  - For long-running simulation validations, use `DampingType.STABILIZE` to minimize numeric velocity buildup and unphysical particle ejection.
+  - For long-running simulation validations, use a stabilization damping value (e.g. 0.95) to minimize numeric velocity buildup and unphysical particle ejection.
   - Keep simulation step tolerances loose enough to account for natural numeric sloshing while enforcing volume conservation constraints.
 - **Test Markers**:
   - Heavy PyBullet and JAX fluid tests should be marked with `@pytest.mark.slow` so they are excluded from the fast CLI validation pass.

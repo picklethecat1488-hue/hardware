@@ -6,7 +6,7 @@ from typing import Any, Optional
 import numpy as np
 import pybullet as p
 import pytest
-from provider.fluid import Fluid, DampingType
+from provider.fluid import Fluid
 from provider.bullet import LinkType
 from model import FluidConfig, FluidMotorConfig
 import jax.numpy as jnp
@@ -266,7 +266,7 @@ class TestBulletFluid:
             max_allowed_energy = initial_e + max_pe_change
 
             for step in range(max_steps):
-                fluid.update(body_id, physics_client, step, "rest_test")
+                fluid.update(body_id, physics_client, damping=0.998)
                 p.stepSimulation(physicsClientId=physics_client)
 
                 # Check energy conservation at every step
@@ -398,7 +398,7 @@ class TestBulletFluid:
             max_steps = self.SLOW_STEPS if mode == "slow" else self.FAST_STEPS
 
             for step in range(max_steps):
-                fluid.update(body_id, physics_client, step, "tipped_test")
+                fluid.update(body_id, physics_client, damping=0.998)
                 p.stepSimulation(physicsClientId=physics_client)
 
             expected_volume = self.get_expected_remaining_volume(theta, R=R, H=H, initial_volume=fluid.target_volume)
@@ -480,8 +480,8 @@ class TestBulletFluid:
 
             # Step simulation to let damping work
             for step in range(max_steps):
-                damp_val = DampingType.DYNAMIC if step >= 40 else DampingType.STABILIZE
-                fluid.update(body_id, physics_client, step, "force_test", damping=damp_val)
+                damp_val = 0.998 if step >= 40 else 0.95
+                fluid.update(body_id, physics_client, damping=damp_val)
                 p.stepSimulation(physicsClientId=physics_client)
                 e = self.get_system_energy(physics_client, body_id, fluid, -9.81)
                 # Allow a tiny tolerance for numerical elastic contact solver energy fluctuations during collision
@@ -551,7 +551,10 @@ class TestBulletFluid:
             # Run for the steps (passing step_index >= 40 so rotation is active in Fluid update)
             for step in range(max_steps):
                 fluid.update(
-                    body_id, physics_client, step + 40, "rotation_test", motor_config=FluidMotorConfig(target_omega=5.0)
+                    body_id,
+                    physics_client,
+                    damping=0.998,
+                    motor_config=FluidMotorConfig(target_omega=5.0),
                 )
                 p.stepSimulation(physicsClientId=physics_client)
                 e = self.get_fluid_energy(fluid, -9.81)
@@ -629,7 +632,7 @@ class TestBulletFluid:
                     body_id, [bowl_x, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], physicsClientId=physics_client
                 )
                 p.resetBaseVelocity(body_id, linearVelocity=target_velocity, physicsClientId=physics_client)
-                fluid.update(body_id, physics_client, step, "drag_test", damping=DampingType.UNDAMPED)
+                fluid.update(body_id, physics_client, damping=1.0)
                 p.stepSimulation(physicsClientId=physics_client)
                 e = self.get_fluid_energy(fluid, -9.81)
 
@@ -696,7 +699,7 @@ class TestBulletFluid:
 
             # 1. Let the fluid settle to form a pool
             for step in range(settle_steps):
-                fluid.update(body_id, physics_client, step, "buoyancy_settling", damping=DampingType.SETTLE)
+                fluid.update(body_id, physics_client, damping=0.90)
                 p.stepSimulation(physicsClientId=physics_client)
 
             # Query settled water height (90th percentile)
@@ -754,9 +757,7 @@ class TestBulletFluid:
 
             # 3. Simulate and apply SPH coupling buoyancy forces
             for step in range(run_steps):
-                fluid.update(
-                    body_id, physics_client, step + settle_steps, "buoyancy_run", damping=DampingType.STABILIZE
-                )
+                fluid.update(body_id, physics_client, damping=0.95)
 
                 positions = np.array(fluid.pos_jax)
                 active_mask = positions[:, 2] < 100.0
@@ -906,7 +907,7 @@ class TestBulletFluid:
 
             settle_steps = 40 if mode == "fast" else 60
             for step in range(settle_steps):
-                fluid.update(body_id, physics_client, step, "settle", damping=DampingType.SETTLE)
+                fluid.update(body_id, physics_client, damping=0.90)
                 p.stepSimulation(physicsClientId=physics_client)
 
             # Get initial water height
@@ -951,7 +952,7 @@ class TestBulletFluid:
             positions_z = []
             run_steps = 60 if mode == "fast" else 120
             for step in range(run_steps):
-                fluid.update(body_id, physics_client, step + settle_steps, "run", damping=DampingType.STABILIZE)
+                fluid.update(body_id, physics_client, damping=0.95)
 
                 pos, _ = p.getBasePositionAndOrientation(body_steel, physicsClientId=physics_client)
                 vel, _ = p.getBaseVelocity(body_steel, physicsClientId=physics_client)
@@ -1032,7 +1033,7 @@ class TestBulletFluid:
 
             # Settle the fluid first
             for step in range(20):
-                fluid.update(body_id, physics_client, step, "settle", damping=DampingType.SETTLE)
+                fluid.update(body_id, physics_client, damping=0.90)
                 p.stepSimulation(physicsClientId=physics_client)
 
             # Move a few particles below z = 0 to trigger recycling
@@ -1044,7 +1045,7 @@ class TestBulletFluid:
             fluid.pos_jax = jnp.array(pos_arr)
 
             # Update simulation step - this should trigger recycling
-            fluid.update(body_id, physics_client, 21, "recycle_check")
+            fluid.update(body_id, physics_client, damping=0.998)
             p.stepSimulation(physicsClientId=physics_client)
 
             # Verify that they are recycled (i.e. relocated back above z = 0, and not added to fallen_out_water_ids)
@@ -1059,7 +1060,7 @@ class TestBulletFluid:
             pos_arr[0] = [0.0, 0.0, -5.0]
             fluid.pos_jax = jnp.array(pos_arr)
 
-            fluid.update(body_id, physics_client, 22, "norecycle_check")
+            fluid.update(body_id, physics_client, damping=0.998)
             p.stepSimulation(physicsClientId=physics_client)
 
             updated_pos = np.array(fluid.pos_jax)
