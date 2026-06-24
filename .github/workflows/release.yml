@@ -22,7 +22,6 @@ jobs:
           environment-file: environment.yml
           activate-environment: cq
           use-mamba: true
-          cache-environment: true
 
       - name: Build Hardware
         shell: bash -el {0}
