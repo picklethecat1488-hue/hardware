@@ -18,6 +18,7 @@ dependencies:
     - pydantic-changedetect
     - pydantic-settings
     - pytest-mock 
+    - pytest-timeout
     - numpy
     - scipy
     - rerun-sdk
