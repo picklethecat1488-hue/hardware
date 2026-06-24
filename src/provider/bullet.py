@@ -305,13 +305,27 @@ class Bullet:
                             physicsClientId=physics_client,
                         )
 
-        for geom, _ in self.room.values():
+        # Apply exact RGBA colors (including alpha transparency) from the room to PyBullet visual shapes
+        if is_real:
+            for name, (geom, rgba) in self.room.items():
+                u_geom = cast(URDFShape, geom)
+                label = getattr(u_geom, "urdf_label", None)
+                if label and label in label_to_link_idx:
+                    link_idx = label_to_link_idx[label]
+                    p.changeVisualShape(body_id, link_idx, rgbaColor=rgba, physicsClientId=physics_client)
+
+        for geom, rgba in self.room.values():
             u_geom = cast(URDFShape, geom)
             label = getattr(u_geom, "urdf_label", None)
             if label:
                 temp_obj_path = os.path.join(proj_dir, f"{label}.obj")
                 if os.path.exists(temp_obj_path):
-                    rr.log(f"world/{label}", rr.Asset3D(path=temp_obj_path), static=True)
+                    rgba_255 = [int(round(c * 255.0)) for c in rgba]
+                    rr.log(
+                        f"world/{label}",
+                        rr.Asset3D(path=temp_obj_path, albedo_factor=rgba_255),
+                        static=True,
+                    )
 
         return label_to_link_idx
 
