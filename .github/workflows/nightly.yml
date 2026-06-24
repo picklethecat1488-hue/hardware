@@ -25,14 +25,23 @@ jobs:
           cache-environment: true # <--- Enables automated caching based on environment.yml hash
           activate-environment: cq
 
-      - name: Run Unit Tests
+      - name: Run Fast Tests
         shell: bash -el {0}
         env:
           PYTHONPATH: src
         continue-on-error: true
         run: |
           set -o pipefail
-          pytest -m "slow or not slow" | tee pytest_report.txt
+          pytest -n 2 src/tests/ -m "not slow" | tee pytest_report.txt
+
+      - name: Run Slow Tests
+        shell: bash -el {0}
+        env:
+          PYTHONPATH: src
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pytest -n 1 --timeout=600 src/tests/ -m "slow" | tee -a pytest_report.txt
 
       - name: Run Smoke Tests
         shell: bash -el {0}
