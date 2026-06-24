@@ -9,7 +9,8 @@ import socket
 import xml.etree.ElementTree as ET
 from typing import Any, Optional, Callable, cast
 import rerun as rr
-
+import queue
+import threading
 from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFCollisionType, Simulate
 
 
@@ -481,17 +482,12 @@ class Bullet:
                 is_logging_enabled = self.spawn_viewer or (self.save_rrd is not None)
 
                 if is_logging_enabled:
-                    import queue
-                    import threading
-                    import copy
-
-                    log_queue = queue.Queue()
+                    log_queue = queue.Queue(maxsize=128)
 
                     def logging_worker():
                         while True:
                             item = log_queue.get()
                             if item is None:
-                                log_queue.task_done()
                                 break
                             transforms, particle_positions, particle_colors, particle_radii, step_idx = item
                             self.room._log_rerun(
@@ -501,7 +497,6 @@ class Bullet:
                                 particle_radii=particle_radii,
                                 step_idx=step_idx,
                             )
-                            log_queue.task_done()
 
                     log_thread = threading.Thread(target=logging_worker, daemon=True)
                     log_thread.start()
@@ -522,15 +517,18 @@ class Bullet:
                         p.stepSimulation(physicsClientId=physics_client)
 
                     if is_logging_enabled:
-                        log_queue.put(
-                            (
-                                state_tracker.transforms,
-                                state_tracker.particle_positions,
-                                state_tracker.particle_colors,
-                                state_tracker.particle_radii,
-                                step_idx,
+                        try:
+                            log_queue.put_nowait(
+                                (
+                                    state_tracker.transforms,
+                                    state_tracker.particle_positions,
+                                    state_tracker.particle_colors,
+                                    state_tracker.particle_radii,
+                                    step_idx,
+                                )
                             )
-                        )
+                        except queue.Full:
+                            pass
 
                     if terminated:
                         break
