@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pybullet as p
-from jax_md import space, partition
+from scipy.spatial import cKDTree  # type: ignore
 
 from provider.types import CollisionGroup, CollisionMask, URDFShape
 from provider.room import BulletStateTracker
@@ -686,8 +686,10 @@ class Fluid:
         self.spout_water_ids = set()
         self.fallen_out_water_ids = set()
         self.state_tracker = state_tracker
-        self.capacity_multiplier = 1.25
-        self.reference_pos_cpu = None
+
+        self._cached_active_indices = None
+        self._cached_mapper = None
+        self._cached_self_active_indices = None
 
         self.link_indices = link_indices if link_indices is not None else {}
 
@@ -784,15 +786,6 @@ class Fluid:
             self.pos_jax = jnp.array(world_grid_points, dtype=jnp.float32)
             self.vel_jax = jnp.zeros((self.n_particles, 3), dtype=jnp.float32)
             self.last_positions = world_grid_points
-
-            pos_jax = self.pos_jax
-            if pos_jax is not None:
-                half_box = self.neighbor_list_box / 2.0
-                limit = half_box - 0.01
-                is_deactivated = (pos_jax[:, 2] > (self.neighbor_list_box * self.DEACTIVATION_BOX_FACTOR))[:, None]
-                clipped_pos = jnp.clip(pos_jax, -limit, limit)
-                safe_pos = jnp.where(is_deactivated, limit, clipped_pos) + half_box
-                self._allocate_neighbor_list(safe_pos)
 
     @property
     def particle_mass(self) -> float:
@@ -989,51 +982,6 @@ class Fluid:
             LinkType.TUBE: offset_mm,
         }
 
-    def _allocate_neighbor_list(self, safe_pos: jnp.ndarray) -> None:
-        """Create neighbor function and allocate neighbor list on device."""
-        from jax_md import space, partition
-
-        displacement, _ = space.free()
-        self.neighbor_fn = partition.neighbor_list(
-            displacement,
-            self.neighbor_list_box,  # type: ignore
-            self.h,
-            dr_threshold=self.h * 0.1,
-            capacity_multiplier=self.capacity_multiplier,
-            format=partition.NeighborListFormat.Dense,
-        )
-        self.nbrs = self.neighbor_fn.allocate(safe_pos)
-        self.reference_pos_cpu = np.array(safe_pos)
-
-    def _check_and_update_neighbor_capacity(
-        self,
-        limit: float,
-        half_box: float,
-        safe_pos: jnp.ndarray,
-    ) -> None:
-        """Predict if JAX-MD will rebuild the neighbor list and update capacity if overflow occurs."""
-        rebuilt = False
-        if self.reference_pos_cpu is None:
-            rebuilt = True
-        else:
-            pos_np = np.array(self.last_positions)
-            if len(pos_np) > 0:
-                is_deactivated_cpu = pos_np[:, 2] > (self.neighbor_list_box * self.DEACTIVATION_BOX_FACTOR)
-                clipped_pos_cpu = np.clip(pos_np, -limit, limit)
-                safe_pos_cpu = np.where(is_deactivated_cpu[:, None], limit, clipped_pos_cpu) + half_box
-
-                displacements_sq = np.sum((safe_pos_cpu - self.reference_pos_cpu) ** 2, axis=-1)
-                max_disp = np.max(displacements_sq)
-                dr_threshold = self.h * 0.1
-                if max_disp > (dr_threshold / 2.0) ** 2:
-                    rebuilt = True
-                    self.reference_pos_cpu = safe_pos_cpu
-
-        if rebuilt:
-            if self.nbrs.did_buffer_overflow:
-                self.capacity_multiplier = min(2.0, self.capacity_multiplier + 0.15)
-                self._allocate_neighbor_list(safe_pos)
-
     def update(
         self,
         body_id: int,
@@ -1052,27 +1000,44 @@ class Fluid:
 
         damping_val = damping if damping is not None else -1.0
 
-        pos_jax = self.pos_jax
-        if pos_jax is None:
-            raise ValueError("self.pos_jax must be initialized before update.")
+        pos_np = np.array(self.pos_jax)
+        active_indices = np.where(pos_np[:, 2] < 100.0)[0]
 
-        half_box = self.neighbor_list_box / 2.0
-        limit = half_box - 0.01
+        idx_map = self.default_idx_map.copy()
+        if len(active_indices) > 0:
+            active_pos = pos_np[active_indices]
+            tree = cKDTree(active_pos)
+            k_query = min(64 + 1, len(active_indices))
+            _, indices = tree.query(active_pos, k=k_query, distance_upper_bound=self.h, workers=-1)
 
-        if not hasattr(self, "neighbor_fn") or self.neighbor_fn is None:
-            is_deactivated = (pos_jax[:, 2] > (self.neighbor_list_box * self.DEACTIVATION_BOX_FACTOR))[:, None]
-            clipped_pos = jnp.clip(pos_jax, -limit, limit)
-            safe_pos = jnp.where(is_deactivated, limit, clipped_pos) + half_box
-            self._allocate_neighbor_list(safe_pos)
+            if k_query > 1:
+                neigh_indices = indices[:, 1:]
+            else:
+                neigh_indices = np.empty((len(active_indices), 0), dtype=np.int32)
 
-        is_deactivated = (pos_jax[:, 2] > (self.neighbor_list_box * self.DEACTIVATION_BOX_FACTOR))[:, None]
-        clipped_pos = jnp.clip(pos_jax, -limit, limit)
-        safe_pos = jnp.where(is_deactivated, limit, clipped_pos) + half_box
-        self.nbrs = self.neighbor_fn.update(safe_pos, self.nbrs)
+            if self._cached_active_indices is not None and np.array_equal(self._cached_active_indices, active_indices):
+                mapper = self._cached_mapper
+                self_active_indices = self._cached_self_active_indices
+            else:
+                mapper = np.empty(len(active_indices) + 1, dtype=np.int32)
+                mapper[:-1] = active_indices
+                mapper[-1] = self.n_particles
 
-        self._check_and_update_neighbor_capacity(limit, half_box, safe_pos)
+                self_active_indices = np.array(active_indices)[:, None]
 
-        idx_map_jax = self.nbrs.idx
+                self._cached_active_indices = active_indices
+                self._cached_mapper = mapper
+                self._cached_self_active_indices = self_active_indices
+
+            if mapper is not None and self_active_indices is not None:
+                mapped_neighs = mapper[neigh_indices]
+                mapped_neighs = np.where(mapped_neighs == self.n_particles, self_active_indices, mapped_neighs)
+
+                cols = mapped_neighs.shape[1]
+                idx_map[active_indices, :cols] = mapped_neighs
+                idx_map_jax = jnp.array(idx_map)
+        else:
+            idx_map_jax = jnp.array(idx_map)
 
         cavity_pos, cavity_orn = self._get_base_link_origin(self.body_id, physics_client)
         cavity_info = self.boundaries.get(LinkType.BASE)

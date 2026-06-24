@@ -520,7 +520,7 @@ class TestExhaustManifoldsViewer:
         """Verify room dictionary generation logic and orchestrator-compatible view interfaces."""
         for view_fn in [viewer.view_part_positions, viewer.view_overlay, viewer.view_wire, viewer.view_sketch]:
             room = Room()
-            view_fn(room)
+            view_fn(room, Mode.DEFAULT)
             assert len(room) > 0
             for _, rgba in room.values():
                 assert len(rgba) == 4

@@ -43,13 +43,21 @@ jobs:
         shell: bash -el {0}
         run: ruff check .
 
-      - name: Run Unit Tests
+      - name: Run Fast Tests
         shell: bash -el {0}
         env:
           PYTHONPATH: src
         run: |
           set -o pipefail
-          pytest
+          pytest -n 2 src/tests/ -m "not slow"
+
+      - name: Run Slow Tests
+        shell: bash -el {0}
+        env:
+          PYTHONPATH: src
+        run: |
+          set -o pipefail
+          pytest -n 1 --timeout=600 src/tests/ -m "slow"
 
       - name: Run Smoke Tests
         shell: bash -el {0}
