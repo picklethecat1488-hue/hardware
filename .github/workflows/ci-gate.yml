@@ -21,7 +21,6 @@ jobs:
           environment-file: environment.yml
           activate-environment: cq
           use-mamba: true
-          cache-environment: true # <--- Enables automated caching based on environment.yml hash
 
       - name: Install Linting Tools
         shell: bash -el {0}
