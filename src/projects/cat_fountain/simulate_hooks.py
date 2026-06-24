@@ -14,6 +14,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
     def setup_simulation(body_id, client, name, boundaries, state_tracker=None):
         link_indices = {}
         if _is_real_physics_client(client):
+            p.setGravity(0.0, 0.0, -9.81, physicsClientId=client)
             for i in range(p.getNumJoints(body_id, physicsClientId=client)):
                 info = p.getJointInfo(body_id, i, physicsClientId=client)
                 link_name = info[12].decode("utf-8")
@@ -29,6 +30,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 sim_name=name,
                 boundaries=boundaries,
                 recycle_fluid=True,
+                gravity=(0.0, 0.0, -9.81),
             ),
             provider=self,
             body_id=body_id,

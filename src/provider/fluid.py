@@ -488,9 +488,8 @@ class FluidSpawner:
 
         self.sphere_col = p.createCollisionShape(p.GEOM_SPHERE, radius=r_s, physicsClientId=physics_client)
         self.circle_vis = p.createVisualShape(
-            shapeType=p.GEOM_CYLINDER,
+            shapeType=p.GEOM_SPHERE,
             radius=r_s,
-            length=particle_visual_length,
             rgbaColor=particle_color,
             physicsClientId=physics_client,
         )
@@ -591,7 +590,7 @@ class FluidSpawner:
 class Fluid:
     """Handles SPH fluid dynamics simulation for fluid particles in PyBullet using JAX."""
 
-    PARTICLE_COLOR = [0.5, 0.8, 1.0, 0.7]
+    PARTICLE_COLOR = [0.5, 0.8, 1.0, 1.0]
     PARTICLE_VISUAL_LENGTH = 0.0001
     LINEAR_DAMPING = 0.05
     ANGULAR_DAMPING = 0.05
@@ -758,7 +757,7 @@ class Fluid:
                 z += spacing
 
             # Transform spawned points from local coordinates to world coordinates
-            bowl_pos, bowl_orn = p.getBasePositionAndOrientation(body_id, physicsClientId=physics_client)
+            bowl_pos, bowl_orn = self._get_base_link_origin(body_id, physics_client)
             world_grid_points = []
             for pt in grid_points:
                 wpt, _ = p.multiplyTransforms(bowl_pos, bowl_orn, pt, [0.0, 0.0, 0.0, 1.0])
@@ -788,6 +787,19 @@ class Fluid:
     def vol_s(self) -> float:
         """Return volume of a particle."""
         return (4.0 / 3.0) * math.pi * (self.r_s**3)
+
+    def _get_base_link_origin(
+        self, body_id: int, physics_client: int
+    ) -> tuple[tuple[float, float, float], tuple[float, float, float, float]]:
+        """Get the true base link origin by subtracting the local inertia offset."""
+        if _is_real_physics_client(physics_client):
+            base_pos, base_orn = p.getBasePositionAndOrientation(body_id, physicsClientId=physics_client)
+            dynamics = p.getDynamicsInfo(body_id, -1, physicsClientId=physics_client)
+            local_inertia_pos = dynamics[3]
+            local_inertia_orn = dynamics[4]
+            inv_inertia_pos, inv_inertia_orn = p.invertTransform(local_inertia_pos, local_inertia_orn)
+            return p.multiplyTransforms(base_pos, base_orn, inv_inertia_pos, inv_inertia_orn)
+        return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)
 
     def get_particle_positions(self) -> list[list[float]]:
         """Return particle positions for logger."""
@@ -999,7 +1011,7 @@ class Fluid:
         else:
             idx_map_jax = jnp.array(idx_map)
 
-        cavity_pos, cavity_orn = p.getBasePositionAndOrientation(self.body_id, physicsClientId=physics_client)
+        cavity_pos, cavity_orn = self._get_base_link_origin(self.body_id, physics_client)
         cavity_info = self.boundaries.get(LinkType.BASE)
         cavity_radius = cavity_info.radius if cavity_info and cavity_info.radius is not None else 0.076
         cavity_height = cavity_info.height if cavity_info and cavity_info.height is not None else 0.096

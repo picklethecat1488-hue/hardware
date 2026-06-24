@@ -376,13 +376,15 @@ class CatFountainProvider(Provider):
         tube_part.joints["top"].connect_to(spout_part.joints["base"])
 
         # 3. Add the positioned parts directly to the room
-        room.add("bowl", bowl_part, color="grey")
-        room.add("impeller", impeller_part, color="red")
         if mode == ProviderMode.SIMULATE:
-            room.add("tube", tube_part, color="blue", alpha=0.4)
+            room.add("bowl", bowl_part, color="grey", alpha=0.4)
+            room.add("tube", tube_part, color="blue", alpha=0.7)
+            room.add("spout", spout_part, color="cyan", alpha=0.4)
         else:
+            room.add("bowl", bowl_part, color="grey")
             room.add("tube", tube_part, color="blue")
-        room.add("spout", spout_part, color="cyan")
+            room.add("spout", spout_part, color="cyan")
+        room.add("impeller", impeller_part, color="red")
         self.room = room
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
