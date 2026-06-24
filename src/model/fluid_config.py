@@ -1,7 +1,7 @@
 """Fluid simulation configuration models."""
 
 from typing import Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class FluidConfig(BaseModel):
@@ -59,6 +59,19 @@ class FluidConfig(BaseModel):
     )
     recycle_fluid: bool = Field(default=False, description="Enable recycling of fallen particles back into the bowl.")
     sim_name: str = Field(default="", description="User-defined simulation run name tag.")
+    neighbor_list_box: float = Field(default=0.3, description="Box size (meters) for JAX-MD neighbor search.")
+
+    @field_validator("neighbor_list_box")
+    @classmethod
+    def validate_neighbor_list_box(cls, v: float) -> float:
+        """Validate box size is within safe bounds to prevent GPU memory overflow."""
+        if v <= 0.0:
+            raise ValueError("neighbor_list_box must be positive.")
+        if v > 1.5:
+            raise ValueError(
+                f"neighbor_list_box is too large ({v}m). The maximum safe box size is 1.5m to prevent memory exhaustion."
+            )
+        return v
 
     @staticmethod
     def water(**kwargs: Any) -> "FluidConfig":

@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pybullet as p
-from scipy.spatial import cKDTree  # type: ignore
+from jax_md import space, partition
 
 from provider.types import CollisionGroup, CollisionMask, URDFShape
 from provider.room import BulletStateTracker
@@ -17,15 +17,6 @@ from provider.bullet import LinkType, _is_real_physics_client
 
 if TYPE_CHECKING:
     from model import BoundaryConfig, FluidConfig, FluidMotorConfig
-
-
-class DampingType(float, Enum):
-    """Damping coefficients for different fluid simulation phases."""
-
-    UNDAMPED = 1.0  # 1.0: No damping, for conservation of energy validation
-    DYNAMIC = 0.998  # 0.998: Minimal damping, standard dynamic simulation
-    STABILIZE = 0.95  # 0.95: Moderate damping, to stabilize fluid dynamics under coupling
-    SETTLE = 0.90  # 0.90: High damping, to quickly settle fluid from grid spawn
 
 
 @jax.jit
@@ -138,13 +129,18 @@ def _compute_forces_neighbor_list_jax(
     n = positions.shape[0]
     h2 = h * h
 
-    neigh_positions = positions[idx_map]  # Shape (N, M, 3)
-    neigh_velocities = velocities[idx_map]  # Shape (N, M, 3)
+    # Pad positions and velocities with a dummy particle at index n
+    padded_positions = jnp.vstack([positions, jnp.array([[0.0, 0.0, 1000.0]])])
+    padded_velocities = jnp.vstack([velocities, jnp.zeros((1, 3))])
+
+    neigh_positions = padded_positions[idx_map]  # Shape (N, M, 3)
+    neigh_velocities = padded_velocities[idx_map]  # Shape (N, M, 3)
 
     diff = positions[:, None, :] - neigh_positions  # Shape (N, M, 3)
     r2 = jnp.sum(diff * diff, axis=-1)  # Shape (N, M)
 
-    neigh_mask = idx_map != jnp.arange(n)[:, None]
+    # Mask out self-interaction and padding elements (indices matching self or equal to n)
+    neigh_mask = (idx_map != jnp.arange(n)[:, None]) & (idx_map != n)
 
     # 1. Densities
     w = poly6_factor * (jnp.maximum(h2 - r2, 0.0) ** 3) * neigh_mask
@@ -158,8 +154,14 @@ def _compute_forces_neighbor_list_jax(
     hr = jnp.maximum(h - r, 0.0)
     grad_coeff = spiky_grad_factor * (hr**2) * neigh_mask
 
-    neigh_densities = densities[idx_map]
-    p_term = mass * (pressures[:, None] + pressures[idx_map]) / (pressure_avg_factor * neigh_densities)
+    # Pad densities and pressures to index them safely using idx_map
+    padded_densities = jnp.append(densities, rest_density)
+    padded_pressures = jnp.append(pressures, 0.0)
+
+    neigh_densities = padded_densities[idx_map]
+    neigh_pressures = padded_pressures[idx_map]
+
+    p_term = mass * (pressures[:, None] + neigh_pressures) / (pressure_avg_factor * neigh_densities)
     direction = diff / r[:, :, None]
 
     f_press = -p_term[:, :, None] * grad_coeff[:, :, None] * direction
@@ -380,7 +382,7 @@ def _physics_step_jax(
     r_s: float,
     pressure_avg_factor: float = 2.0,
     min_dist_threshold: float = 1e-6,
-    damping: float = 1.0,
+    damping: float = -1.0,
 ) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     """Perform a substepped JAX update step integrating forces and resolving boundary collisions."""
 
@@ -452,7 +454,22 @@ def _physics_step_jax(
 
         # Integrate only active particles (z < 100.0)
         active = (pos_curr[:, 2] < 100.0)[:, None]
-        vel_next = jnp.where(active, (vel_curr + accel * dt_sub) * damping, 0.0)
+        active_mask = pos_curr[:, 2] < 100.0
+        speeds = jnp.linalg.norm(vel_curr, axis=1)
+        num_active = jnp.sum(active_mask)
+        total_speed = jnp.sum(speeds * active_mask)
+        avg_speed = jnp.where(num_active > 0.0, total_speed / num_active, 0.0)
+
+        v_target = jnp.abs(omega) * 0.015
+        gamma_base = jnp.where(jnp.abs(omega) > 0.0, 0.95, 0.998)
+
+        v_excess = jnp.maximum(0.0, avg_speed - v_target)
+        dynamic_damping = gamma_base - 0.16 * v_excess
+        dynamic_damping = jnp.maximum(0.90, jnp.minimum(gamma_base, dynamic_damping))
+
+        damping_val = jnp.where(damping >= 0.0, damping, dynamic_damping)
+
+        vel_next = jnp.where(active, (vel_curr + accel * dt_sub) * damping_val, 0.0)
         pos_next = jnp.where(active, pos_curr + vel_next * dt_sub, pos_curr)
 
         # Accumulate torque
@@ -473,7 +490,6 @@ class FluidSpawner:
         n_particles: int,
         particle_mass: float,
         particle_color: list[float],
-        particle_visual_length: float,
         linear_damping: float,
         angular_damping: float,
         lateral_friction: float,
@@ -591,7 +607,6 @@ class Fluid:
     """Handles SPH fluid dynamics simulation for fluid particles in PyBullet using JAX."""
 
     PARTICLE_COLOR = [0.5, 0.8, 1.0, 1.0]
-    PARTICLE_VISUAL_LENGTH = 0.0001
     LINEAR_DAMPING = 0.05
     ANGULAR_DAMPING = 0.05
     LATERAL_FRICTION = 0.1
@@ -599,6 +614,7 @@ class Fluid:
     REST_DENSITY = 1000.0
     VISCOSITY = 0.02
     STIFFNESS = 100.0
+    DEACTIVATION_BOX_FACTOR = 50.0
 
     def __init__(
         self,
@@ -643,6 +659,7 @@ class Fluid:
         self.volume_threshold_liters = config.volume_threshold_liters
         self.fallen_threshold_liters = config.fallen_threshold_liters
         self.recycle_fluid = config.recycle_fluid
+        self.neighbor_list_box = config.neighbor_list_box
 
         # SPH values computed from settings
         self.h = self.smoothing_factor * self.r_s
@@ -666,9 +683,11 @@ class Fluid:
         self.current_sim_time = 0.0
         self.torques: list[float] = []
         self.motor_config = FluidMotorConfig()
-        self.spout_water_ids: set[int] = set()
-        self.fallen_out_water_ids: set[int] = set()
+        self.spout_water_ids = set()
+        self.fallen_out_water_ids = set()
         self.state_tracker = state_tracker
+        self.capacity_multiplier = 1.25
+        self.reference_pos_cpu = None
 
         self.link_indices = link_indices if link_indices is not None else {}
 
@@ -692,7 +711,6 @@ class Fluid:
                 n_particles=self.n_particles,
                 particle_mass=self.particle_mass,
                 particle_color=self.PARTICLE_COLOR,
-                particle_visual_length=self.PARTICLE_VISUAL_LENGTH,
                 linear_damping=0.05,
                 angular_damping=0.05,
                 lateral_friction=0.1,
@@ -704,7 +722,7 @@ class Fluid:
             self.default_idx_map = np.repeat(self.default_idx_map, 64, axis=1)
 
             # Parse boundaries metadata using BoundaryConfig Pydantic model and link indices
-            for b_name, v in config.boundaries.items():
+            for _, v in config.boundaries.items():
                 if isinstance(v, BoundaryConfig):
                     b_info = v
                 else:
@@ -766,6 +784,15 @@ class Fluid:
             self.pos_jax = jnp.array(world_grid_points, dtype=jnp.float32)
             self.vel_jax = jnp.zeros((self.n_particles, 3), dtype=jnp.float32)
             self.last_positions = world_grid_points
+
+            pos_jax = self.pos_jax
+            if pos_jax is not None:
+                half_box = self.neighbor_list_box / 2.0
+                limit = half_box - 0.01
+                is_deactivated = (pos_jax[:, 2] > (self.neighbor_list_box * self.DEACTIVATION_BOX_FACTOR))[:, None]
+                clipped_pos = jnp.clip(pos_jax, -limit, limit)
+                safe_pos = jnp.where(is_deactivated, limit, clipped_pos) + half_box
+                self._allocate_neighbor_list(safe_pos)
 
     @property
     def particle_mass(self) -> float:
@@ -962,13 +989,56 @@ class Fluid:
             LinkType.TUBE: offset_mm,
         }
 
+    def _allocate_neighbor_list(self, safe_pos: jnp.ndarray) -> None:
+        """Create neighbor function and allocate neighbor list on device."""
+        from jax_md import space, partition
+
+        displacement, _ = space.free()
+        self.neighbor_fn = partition.neighbor_list(
+            displacement,
+            self.neighbor_list_box,  # type: ignore
+            self.h,
+            dr_threshold=self.h * 0.1,
+            capacity_multiplier=self.capacity_multiplier,
+            format=partition.NeighborListFormat.Dense,
+        )
+        self.nbrs = self.neighbor_fn.allocate(safe_pos)
+        self.reference_pos_cpu = np.array(safe_pos)
+
+    def _check_and_update_neighbor_capacity(
+        self,
+        limit: float,
+        half_box: float,
+        safe_pos: jnp.ndarray,
+    ) -> None:
+        """Predict if JAX-MD will rebuild the neighbor list and update capacity if overflow occurs."""
+        rebuilt = False
+        if self.reference_pos_cpu is None:
+            rebuilt = True
+        else:
+            pos_np = np.array(self.last_positions)
+            if len(pos_np) > 0:
+                is_deactivated_cpu = pos_np[:, 2] > (self.neighbor_list_box * self.DEACTIVATION_BOX_FACTOR)
+                clipped_pos_cpu = np.clip(pos_np, -limit, limit)
+                safe_pos_cpu = np.where(is_deactivated_cpu[:, None], limit, clipped_pos_cpu) + half_box
+
+                displacements_sq = np.sum((safe_pos_cpu - self.reference_pos_cpu) ** 2, axis=-1)
+                max_disp = np.max(displacements_sq)
+                dr_threshold = self.h * 0.1
+                if max_disp > (dr_threshold / 2.0) ** 2:
+                    rebuilt = True
+                    self.reference_pos_cpu = safe_pos_cpu
+
+        if rebuilt:
+            if self.nbrs.did_buffer_overflow:
+                self.capacity_multiplier = min(2.0, self.capacity_multiplier + 0.15)
+                self._allocate_neighbor_list(safe_pos)
+
     def update(
         self,
         body_id: int,
         physics_client: int,
-        step_index: int,
-        sim_name: str,
-        damping: DampingType | float = DampingType.DYNAMIC,
+        damping: Optional[float] = None,
         motor_config: Optional[FluidMotorConfig] = None,
     ) -> None:
         """Step simulation and manage deactivation."""
@@ -980,36 +1050,29 @@ class Fluid:
         if not self.spawner:
             raise RuntimeError("Fluid spawner is not initialized.")
 
-        pos_np = np.array(self.pos_jax)
-        vel_np = np.array(self.vel_jax)
+        damping_val = damping if damping is not None else -1.0
 
-        active_indices = np.where(pos_np[:, 2] < 100.0)[0]
+        pos_jax = self.pos_jax
+        if pos_jax is None:
+            raise ValueError("self.pos_jax must be initialized before update.")
 
-        idx_map = self.default_idx_map.copy()
-        if len(active_indices) > 0:
-            active_pos = pos_np[active_indices]
-            tree = cKDTree(active_pos)
-            k_query = min(64 + 1, len(active_indices))
-            dists, indices = tree.query(active_pos, k=k_query, distance_upper_bound=self.h)
+        half_box = self.neighbor_list_box / 2.0
+        limit = half_box - 0.01
 
-            if k_query > 1:
-                neigh_indices = indices[:, 1:]
-            else:
-                neigh_indices = np.empty((len(active_indices), 0), dtype=np.int32)
+        if not hasattr(self, "neighbor_fn") or self.neighbor_fn is None:
+            is_deactivated = (pos_jax[:, 2] > (self.neighbor_list_box * self.DEACTIVATION_BOX_FACTOR))[:, None]
+            clipped_pos = jnp.clip(pos_jax, -limit, limit)
+            safe_pos = jnp.where(is_deactivated, limit, clipped_pos) + half_box
+            self._allocate_neighbor_list(safe_pos)
 
-            mapper = np.empty(len(active_indices) + 1, dtype=np.int32)
-            mapper[:-1] = active_indices
-            mapper[-1] = self.n_particles
+        is_deactivated = (pos_jax[:, 2] > (self.neighbor_list_box * self.DEACTIVATION_BOX_FACTOR))[:, None]
+        clipped_pos = jnp.clip(pos_jax, -limit, limit)
+        safe_pos = jnp.where(is_deactivated, limit, clipped_pos) + half_box
+        self.nbrs = self.neighbor_fn.update(safe_pos, self.nbrs)
 
-            mapped_neighs = mapper[neigh_indices]
-            self_active_indices = np.array(active_indices)[:, None]
-            mapped_neighs = np.where(mapped_neighs == self.n_particles, self_active_indices, mapped_neighs)
+        self._check_and_update_neighbor_capacity(limit, half_box, safe_pos)
 
-            cols = mapped_neighs.shape[1]
-            idx_map[active_indices, :cols] = mapped_neighs
-            idx_map_jax = jnp.array(idx_map)
-        else:
-            idx_map_jax = jnp.array(idx_map)
+        idx_map_jax = self.nbrs.idx
 
         cavity_pos, cavity_orn = self._get_base_link_origin(self.body_id, physics_client)
         cavity_info = self.boundaries.get(LinkType.BASE)
@@ -1090,7 +1153,7 @@ class Fluid:
             self.r_s,
             self.pressure_avg_factor,
             self.min_distance_threshold,
-            damping,
+            damping_val,
         )
         avg_step_torque = float(torque_accum) / 5
         self.torques.append(avg_step_torque)
