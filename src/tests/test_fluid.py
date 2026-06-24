@@ -211,7 +211,6 @@ def test_fluid_spawner_padding_and_jitter():
             n_particles=10,
             particle_mass=0.002,
             particle_color=[0, 0, 1, 1],
-            particle_visual_length=0.0001,
             linear_damping=0.05,
             angular_damping=0.05,
             lateral_friction=0.1,

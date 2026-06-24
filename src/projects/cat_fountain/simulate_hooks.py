@@ -3,7 +3,7 @@
 import pybullet as p
 from provider.bullet import _is_real_physics_client
 from typing import Any, Callable, cast
-from provider import Bullet, LinkType, Fluid, Simulate, URDFShape, DampingType
+from provider import Bullet, LinkType, Fluid, Simulate, URDFShape
 from model import FluidConfig, FluidMotorConfig
 
 
@@ -31,6 +31,8 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 boundaries=boundaries,
                 recycle_fluid=True,
                 gravity=(0.0, 0.0, -9.81),
+                r_s=0.0015,
+                particle_radius=0.0015,
             ),
             provider=self,
             body_id=body_id,
@@ -53,9 +55,6 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         self.water_sim.update(
             body_id,
             client,
-            step_idx,
-            name,
-            damping=DampingType.STABILIZE,
             motor_config=FluidMotorConfig(target_omega=omega, max_force=max_force),
         )
         if (
