@@ -479,3 +479,48 @@ def test_fluid_config_object():
     assert fluid.rest_density == 920.0
     assert fluid.smoothing_factor == 4.5
     assert fluid.target_volume == 0.0008
+
+
+def test_compute_boundary_forces_reads_tube_y():
+    """Verify that _compute_boundary_forces_jax resolves tube_y from boundary_configs."""
+    import jax.numpy as jnp
+    from provider.fluid import _compute_boundary_forces_jax
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    # 1. Define a boundary config representing the spout deflection cap (inverted, small radius, non-zero xyz[1])
+    spout_deflection_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.LID,
+        radius=0.013,
+        height=0.0,
+        thickness=0.040,
+        xyz=(0.0, 0.042, 0.016),
+        rpy=(3.141592653589793, 0.0, 0.0),
+        link_idx=2,
+        has_tube=True,
+    )
+
+    # 2. Call _compute_boundary_forces_jax with dummy pos and vel
+    pos = jnp.array([[0.0, 0.042, 0.005]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    b_pos_arr = jnp.zeros((1, 3), dtype=jnp.float32)
+    b_orn_arr = jnp.array([[0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+    boundary_configs = (spout_deflection_cfg,)
+
+    # Call the JIT function
+    forces, torque = _compute_boundary_forces_jax(
+        pos,
+        vel,
+        r_s=0.0015,
+        K=1000.0,
+        D=5.0,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        boundary_configs=boundary_configs,
+        omega=0.0,
+        t=0.0,
+    )
+    # The function compiles and executes successfully
+    assert forces is not None

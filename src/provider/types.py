@@ -61,6 +61,7 @@ class URDFShape(Protocol):
     urdf_motor_force: Optional[float]
     urdf_collision_type: Optional[str]
     urdf_collision_primitives: Optional[list[dict[str, Any]]]
+    urdf_boundaries: Optional[list[dict[str, Any]]]
     urdf_boundary_friction: Optional[float]
     urdf_contact_angle: Optional[float]
     urdf_boundary_shape: Optional[str]

@@ -23,6 +23,7 @@ class LinkType(IntEnum):
     IMPELLER = 2
     FALLEN = -2
     OUTLET_MAX_Y = -3
+    LID = 3
 
 
 def _is_real_physics_client(physics_client: Any) -> bool:
@@ -400,6 +401,8 @@ class Bullet:
     def run(self) -> None:
         """Execute the PyBullet simulation run loop."""
         temp_dir = tempfile.mkdtemp()
+        log_queue = None
+        log_thread = None
         try:
             # Create the simulation project assets
             proj_dir = os.path.join(temp_dir, self.proj_name)
@@ -449,21 +452,25 @@ class Bullet:
                     u_geom = cast(URDFShape, geom)
                     label = getattr(u_geom, "urdf_label", None)
                     if label:
-                        c_type = getattr(u_geom, "urdf_collision_type", None)
-                        if c_type == URDFCollisionType.ANALYTICAL:
-                            xyz_str = getattr(u_geom, "urdf_boundary_xyz", None)
-                            rpy_str = getattr(u_geom, "urdf_boundary_rpy", None)
-                            boundaries_metadata[label] = {
-                                "shape": getattr(u_geom, "urdf_boundary_shape", None),
-                                "type": getattr(u_geom, "urdf_boundary_type", None),
-                                "radius": getattr(u_geom, "urdf_boundary_radius", None),
-                                "height": getattr(u_geom, "urdf_boundary_height", None),
-                                "thickness": getattr(u_geom, "urdf_boundary_thickness", None),
-                            }
-                            if isinstance(xyz_str, str):
-                                boundaries_metadata[label]["xyz"] = [float(x) for x in xyz_str.split()]
-                            if isinstance(rpy_str, str):
-                                boundaries_metadata[label]["rpy"] = [float(x) for x in rpy_str.split()]
+                        geom_boundaries = getattr(u_geom, "urdf_boundaries", None)
+                        if geom_boundaries:
+                            boundaries_metadata[label] = geom_boundaries
+                        else:
+                            c_type = getattr(u_geom, "urdf_collision_type", None)
+                            if c_type == URDFCollisionType.ANALYTICAL:
+                                xyz_str = getattr(u_geom, "urdf_boundary_xyz", None)
+                                rpy_str = getattr(u_geom, "urdf_boundary_rpy", None)
+                                boundaries_metadata[label] = {
+                                    "shape": getattr(u_geom, "urdf_boundary_shape", None),
+                                    "type": getattr(u_geom, "urdf_boundary_type", None),
+                                    "radius": getattr(u_geom, "urdf_boundary_radius", None),
+                                    "height": getattr(u_geom, "urdf_boundary_height", None),
+                                    "thickness": getattr(u_geom, "urdf_boundary_thickness", None),
+                                }
+                                if isinstance(xyz_str, str):
+                                    boundaries_metadata[label]["xyz"] = [float(x) for x in xyz_str.split()]
+                                if isinstance(rpy_str, str):
+                                    boundaries_metadata[label]["rpy"] = [float(x) for x in rpy_str.split()]
 
                 # Setup Hooks
                 setup_hook = self.provider_hooks.get(Simulate.SETUP, None)
@@ -481,14 +488,17 @@ class Bullet:
                 if is_real:
                     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1, physicsClientId=physics_client)
 
+                log_queue = None
+                log_thread = None
                 is_logging_enabled = self.spawn_viewer or (self.save_rrd is not None)
 
                 if is_logging_enabled:
-                    log_queue = queue.Queue(maxsize=128)
+                    q = queue.Queue(maxsize=128)
+                    log_queue = q
 
                     def logging_worker():
                         while True:
-                            item = log_queue.get()
+                            item = q.get()
                             if item is None:
                                 break
                             transforms, particle_positions, particle_colors, particle_radii, step_idx = item
@@ -500,8 +510,9 @@ class Bullet:
                                 step_idx=step_idx,
                             )
 
-                    log_thread = threading.Thread(target=logging_worker, daemon=True)
-                    log_thread.start()
+                    t = threading.Thread(target=logging_worker, daemon=True)
+                    log_thread = t
+                    t.start()
 
                 for step_idx in range(self.steps):
                     step_hook = self.provider_hooks.get(Simulate.STEP, None)
@@ -518,7 +529,7 @@ class Bullet:
                     if not terminated:
                         p.stepSimulation(physicsClientId=physics_client)
 
-                    if is_logging_enabled:
+                    if is_logging_enabled and log_queue is not None:
                         try:
                             log_queue.put_nowait(
                                 (
@@ -535,7 +546,7 @@ class Bullet:
                     if terminated:
                         break
 
-                if is_logging_enabled:
+                if is_logging_enabled and log_queue is not None and log_thread is not None:
                     log_queue.put(None)
                     log_thread.join()
 

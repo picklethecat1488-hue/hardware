@@ -3,16 +3,28 @@ bowl_radius: 100.0
 bowl_height: 95.0
 bowl_thickness: 4.0
 
-tube_radius: 8.0
+tube_radius: 10.0
 tube_thickness: 2.0
 tube_height: 70.0
-slot_height: 15.0
+slot_height: 6.0
 
 impeller_radius: 12.0
 impeller_height: 73.0
 impeller_shaft_radius: 2.5
 impeller_blades: 2
-vane_twist: -1080.0
+vane_twist: -2512.5
 
 spout_length: 30.0
 spout_angle: 45.0
+
+# Lid pocket & Spout deflection boundaries
+lid_pocket_radius: 80.0
+lid_pocket_cavity_height: 10.0
+lid_pocket_thickness: 4.0
+lid_pocket_z_offset: 3.0
+drain_hole_y: 65.0
+drain_hole_radius: 15.0
+spout_deflection_radius: 13.0
+spout_deflection_height: 0.0
+spout_deflection_thickness: 40.0
+spout_deflection_z_offset: 16.0

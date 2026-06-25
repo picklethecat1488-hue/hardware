@@ -16,7 +16,7 @@ After running `build.py`, you should see these files in your build output organi
 - **build/cat_fountain/bowl.stl** / **bowl.obj** - The main bottom water bowl.
 - **build/cat_fountain/impeller.stl** / **impeller.obj** - The spinning impeller blades.
 - **build/cat_fountain/tube.stl** / **tube.obj** - The vertical water delivery tube.
-- **build/cat_fountain/spout.stl** / **spout.obj** - The water spout nozzle.
+- **build/cat_fountain/drain_cover.stl** / **drain_cover.obj** - The removable circular drain cover with locking tabs for the filter compartment.
 - **build/cat_fountain/fountain.stl** / **fountain.obj** - The compiled full assembly.
 - **build/cat_fountain/product.urdf** - The URDF definition file for visualization/simulation.
 

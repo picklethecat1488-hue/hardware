@@ -1,6 +1,6 @@
 """Cat fountain geometry provider."""
 
-from functools import cached_property
+# No longer using cached_property
 from build123d import *  # type: ignore
 import math
 from model import method_cache, TextArgs, FluidConfig, FluidMotorConfig
@@ -27,10 +27,14 @@ class CatFountainProvider(Provider):
 
     water_sim: Optional[Any] = None
 
-    @cached_property
+    @property
     def default_config(self) -> CatFountainConfig:
         """Return the default configuration for the cat fountain project."""
-        return CatFountainConfig(measurements_path=str(Path(__file__).parent / "measurements.yaml"))
+        if not hasattr(self, "_cached_default_config"):
+            self._cached_default_config = CatFountainConfig(
+                measurements_path=str(Path(__file__).parent / "measurements.yaml")
+            )
+        return self._cached_default_config
 
     @property
     def settings(self) -> CatFountainConfig:
@@ -72,7 +76,7 @@ class CatFountainProvider(Provider):
         t = self.settings.bowl_thickness
         pin_r = self.settings.impeller_shaft_radius
         floor_z = 25.0
-        tube_y = -(r - self.settings.tube_radius - 25.0)
+        tube_y = 0.0
 
         with BuildPart() as bowl:
             # Outer bowl body
@@ -354,12 +358,13 @@ class CatFountainProvider(Provider):
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Build the Archimedes screw impeller."""
-        # Snug fit clearance of 0.2mm relative to the straight tube inner wall
-        r = self.settings.tube_radius - self.settings.tube_thickness - 0.2
+        # Snug fit clearance of 0.1mm relative to the straight tube inner wall (16.0mm ID tube)
+        r = self.settings.tube_radius - self.settings.tube_thickness - 0.1
         h = self.settings.impeller_height
         shaft_r = self.settings.impeller_shaft_radius
         num_blades = self.settings.impeller_blades
-        hub_r = shaft_r + 1.0
+        # Core shaft diameter is 9.6mm, so radius is 4.8mm
+        hub_r = 4.8
 
         with BuildPart() as impeller:
             # Main hub body
@@ -377,25 +382,32 @@ class CatFountainProvider(Provider):
             blade_t = 1.5
             total_twist = self.settings.vane_twist
             num_rotations = abs(total_twist) / 360.0
+            z_start = 6.0
+            helix_height = h - z_start
             if num_rotations > 0:
-                pitch = h / num_rotations
+                pitch = helix_height / num_rotations
                 for i in range(num_blades):
                     angle = i * (360.0 / num_blades)
-                    path = Rot(0, 0, angle) * Helix(
-                        pitch=pitch,
-                        height=h,
-                        radius=hub_r,
-                        lefthand=(total_twist < 0),
+                    path = cast(
+                        Wire,
+                        Location((0, 0, z_start))
+                        * Rot(0, 0, angle)
+                        * Helix(
+                            pitch=pitch,
+                            height=helix_height,
+                            radius=hub_r,
+                            lefthand=(total_twist < 0),
+                        ),
                     )
                     with BuildSketch(path ^ 0) as profile:
                         Rectangle(blade_w, blade_t, align=(Align.MAX, Align.CENTER))
-                    sweep(profile.sketch, path=path, is_frenet=True)
+                    sweep(profile.sketch, path=path, is_frenet=False)
             else:
                 for i in range(num_blades):
                     angle = i * (360.0 / num_blades)
                     with Locations(Rot(0, 0, angle)):
-                        with Locations((hub_r + blade_w / 2.0, 0, 0)):
-                            Box(blade_w, blade_t, h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                        with Locations((hub_r + blade_w / 2.0, 0, z_start)):
+                            Box(blade_w, blade_t, helix_height, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
         impeller_part = cast(URDFShape, impeller.part)
         impeller_part.urdf_label = "impeller"
@@ -404,7 +416,7 @@ class CatFountainProvider(Provider):
         impeller_part.urdf_boundary_friction = self.settings.boundary_friction
         impeller_part.urdf_contact_angle = self.settings.contact_angle
         impeller_part.urdf_motor_type = "velocity"
-        impeller_part.urdf_motor_target = 150.0
+        impeller_part.urdf_motor_target = 120.0
         impeller_part.urdf_motor_force = 10.0
         impeller_part.urdf_collision_type = URDFCollisionType.ANALYTICAL
         impeller_part.urdf_boundary_shape = "impeller"
@@ -548,7 +560,7 @@ class CatFountainProvider(Provider):
         r = self.settings.bowl_radius
         h = self.settings.bowl_height
         t = self.settings.bowl_thickness
-        tube_y = -(r - self.settings.tube_radius - 25.0)
+        tube_y = 0.0
 
         # Dimensions for the lid
         lid_r = r - t - 0.5  # 0.5mm clearance from inner bowl wall
@@ -605,12 +617,29 @@ class CatFountainProvider(Provider):
                 Cylinder(radius=18.0, height=1.5, align=(Align.CENTER, Align.CENTER, Align.MIN))
                 Cylinder(radius=16.0, height=1.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
-            # --- integrated tube cover / spout cap at (0, tube_y) ---
+            # --- integrated tube cover / convex grate & cap at (0, tube_y) ---
             with Locations((0, tube_y, 0)):
-                Cylinder(radius=13.0, height=20.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                Cylinder(radius=8.2, height=14.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-                with Locations((0, 13.0, 6.0)):
-                    Box(24.0, 10.0, 5.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                # 1. Tube socket pocket (clearance fit for tube)
+                socket_r = self.settings.tube_radius + 0.2
+                Cylinder(radius=socket_r, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                # 2. Add the convex dome starting flush with the terrace top platform at z = 6.0
+                with Locations((0, 0, 6.0)):
+                    dome_out_r = socket_r
+                    dome_in_r = self.settings.tube_radius - self.settings.tube_thickness + 0.2
+                    Sphere(radius=dome_out_r)
+                    # Hollow the inside of the dome
+                    Sphere(radius=dome_in_r, mode=Mode.SUBTRACT)
+                    # 3. Cut grate slots in the dome ONLY up to the inner dome peak
+                    # This leaves the top portion of the dome as a solid cap.
+                    for angle in [0, 45, 90, 135]:
+                        with Locations(Rot(0, 0, angle)):
+                            Box(
+                                2.0,
+                                dome_out_r * 2.0,
+                                dome_in_r,
+                                align=(Align.CENTER, Align.CENTER, Align.MIN),
+                                mode=Mode.SUBTRACT,
+                            )
 
             # --- DRAIN HOLE & BAYONET MOUNT ---
             with Locations((0, 65.0, 0)):
@@ -661,6 +690,46 @@ class CatFountainProvider(Provider):
         lid_part.urdf_collision_type = URDFCollisionType.ANALYTICAL
         lid_part.urdf_parent = "bowl"
         lid_part.urdf_joint_type = "fixed"
+
+        # Define multiple boundaries for the lid (recessed pocket cavity, solid spout deflection cap, and reservoir ceiling)
+        lid_part.urdf_boundaries = [
+            {
+                "shape": "cylinder",
+                "type": "cavity",
+                "radius": self.settings.lid_pocket_radius * 0.001,
+                "height": self.settings.lid_pocket_cavity_height * 0.001,
+                "thickness": self.settings.lid_pocket_thickness * 0.001,
+                "xyz": [0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001],
+                "rpy": [0.0, 0.0, 0.0],
+                "drain_hole_y": self.settings.drain_hole_y * 0.001,
+                "drain_hole_radius": self.settings.drain_hole_radius * 0.001,
+                "has_drain": True,
+                "has_tube": True,
+            },
+            {
+                "shape": "cylinder",
+                "type": "cavity",
+                "radius": self.settings.spout_deflection_radius * 0.001,
+                "height": self.settings.spout_deflection_height * 0.001,
+                "thickness": self.settings.spout_deflection_thickness * 0.001,
+                "xyz": [0.0, tube_y * 0.001, self.settings.spout_deflection_z_offset * 0.001],
+                "rpy": [3.141592653589793, 0.0, 0.0],
+                "has_tube": True,
+            },
+            {
+                "shape": "cylinder",
+                "type": "cavity",
+                "radius": (self.settings.bowl_radius - self.settings.bowl_thickness) * 0.001,
+                "height": 0.0,
+                "thickness": self.settings.bowl_thickness * 0.001,
+                "xyz": [0.0, 0.0, 0.0],
+                "rpy": [3.141592653589793, 0.0, 0.0],
+                "drain_hole_y": -self.settings.drain_hole_y * 0.001,
+                "drain_hole_radius": self.settings.drain_hole_radius * 0.001,
+                "has_drain": True,
+                "has_tube": True,
+            },
+        ]
 
         # Define joint at the base of the lid for positioning
         RigidJoint("mount", lid.part, Location((0, 0, 0)))
@@ -731,7 +800,7 @@ class CatFountainProvider(Provider):
         bowl_part.joints["shaft"].connect_to(impeller_part.joints["motor"])
 
         floor_z = 25.0
-        tube_y = -(self.settings.bowl_radius - self.settings.tube_radius - 25.0)
+        tube_y = 0.0
         tube_part = self.build_tube("tube", mode=mode).part
         tube_part.locate(Location((0, tube_y, floor_z + 5.0)))
 
@@ -796,20 +865,20 @@ class CatFountainProvider(Provider):
         room.add("impeller_connector", impeller_conn)
 
         # 6. Add labels for each part
-        room.add_label("bowl_label", "BOWL", bowl_part.center() + Vector(-120, -20, 10), options=TextArgs(font_size=16))
+        room.add_label("bowl_label", "BOWL", bowl_part.center() + Vector(-120, -20, 10), options=TextArgs(font_size=10))
         room.add_label(
-            "impeller_label", "IMPELLER", impeller_part.center() + Vector(-50, -10, 10), options=TextArgs(font_size=16)
+            "impeller_label", "IMPELLER", impeller_part.center() + Vector(-50, -10, 10), options=TextArgs(font_size=10)
         )
-        room.add_label("tube_label", "TUBE", tube_part.center() + Vector(40, 10, 10), options=TextArgs(font_size=16))
+        room.add_label("tube_label", "TUBE", tube_part.center() + Vector(40, 10, 10), options=TextArgs(font_size=10))
         room.add_label(
-            "cover_label", "COVER", bottom_cover_part.center() + Vector(-80, 0, -10), options=TextArgs(font_size=16)
+            "cover_label", "COVER", bottom_cover_part.center() + Vector(-80, 0, -10), options=TextArgs(font_size=10)
         )
-        room.add_label("lid_label", "LID", lid_part.center() + Vector(-50, -10, 20), options=TextArgs(font_size=16))
+        room.add_label("lid_label", "LID", lid_part.center() + Vector(-50, -10, 20), options=TextArgs(font_size=10))
         room.add_label(
             "drain_cover_label",
             "DRAIN COVER",
             drain_cover_part.center() + Vector(40, -10, 10),
-            options=TextArgs(font_size=16),
+            options=TextArgs(font_size=10),
         )
 
     def build_product(self, room: Room, mode: ProviderMode) -> None:
@@ -831,15 +900,18 @@ class CatFountainProvider(Provider):
         # 3. Add the positioned parts directly to the room
         if mode == ProviderMode.SIMULATE:
             room.add("bowl", bowl_part, color="grey", alpha=0.4)
-            room.add("tube", tube_part, color="blue", alpha=0.7)
-            # Remove lid and drain cover from simulation to avoid confusion
+            room.add("tube", tube_part, color="grey", alpha=0.4)
+            room.add("lid", lid_part, color="grey")
+            room.add("drain_cover", drain_cover_part, color="grey")
+            room.add("impeller", impeller_part, color="grey")
+            room.add("bottom_cover", bottom_cover_part, color="grey")
         else:
             room.add("bowl", bowl_part, color="grey")
             room.add("tube", tube_part, color="blue")
             room.add("lid", lid_part, color="green")
             room.add("drain_cover", drain_cover_part, color="light_grey")
-        room.add("impeller", impeller_part, color="red")
-        room.add("bottom_cover", bottom_cover_part, color="black")
+            room.add("impeller", impeller_part, color="red")
+            room.add("bottom_cover", bottom_cover_part, color="black")
         self.room = room
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
