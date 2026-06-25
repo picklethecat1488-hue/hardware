@@ -22,13 +22,6 @@ tube:
   export: [stl, obj]
   color: blue
 
-spout:
-  part:
-    modes: [default, print]
-  material: petg
-  export: [stl, obj]
-  color: cyan
-
 fountain:
   part:
     modes: [default, print]
@@ -37,6 +30,27 @@ fountain:
   color: green
   diagram:
     modes: [default]
+
+bottom_cover:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj]
+  color: grey
+
+lid:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj]
+  color: green
+
+drain_cover:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj]
+  color: grey
 
 product:
   view:

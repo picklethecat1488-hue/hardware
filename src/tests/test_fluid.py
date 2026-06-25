@@ -353,7 +353,7 @@ def test_fluid_simulator_dynamic_properties():
 
     def mock_get_link_state(body_id, link_idx, physicsClientId):
         if link_idx == 2:
-            return (None, None, None, None, (0.0, 0.0, 0.100), (0.0, 0.0, 0.0, 1.0))
+            return (None, None, None, None, (0.0, 0.0, 0.025), (0.0, 0.0, 0.0, 1.0))
         return (None, None, None, None, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
 
     with (

@@ -95,6 +95,11 @@ class CatFountainConfig(BaseModel):
         """Return the tube height."""
         return float(self._raw_data.get("tube_height", 100.0))
 
+    @cached_property
+    def slot_height(self) -> float:
+        """Return the vertical tube intake slot height in millimeters."""
+        return float(self._raw_data.get("slot_height", 15.0))
+
     # =========================================================================
     # Impeller Parameters
     # =========================================================================
@@ -118,6 +123,11 @@ class CatFountainConfig(BaseModel):
     def impeller_blades(self) -> int:
         """Return the number of impeller blades."""
         return int(self._raw_data.get("impeller_blades", 6))
+
+    @cached_property
+    def vane_twist(self) -> float:
+        """Return the total twist angle of the impeller blades in degrees."""
+        return float(self._raw_data.get("vane_twist", -1080.0))
 
     # =========================================================================
     # Spout Parameters
