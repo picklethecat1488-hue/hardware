@@ -58,6 +58,10 @@ class FluidConfig(BaseModel):
         default=None, description="Dictionary of physical boundary definitions."
     )
     recycle_fluid: bool = Field(default=False, description="Enable recycling of fallen particles back into the bowl.")
+    vane_twist: float = Field(
+        default=-1080.0, description="Total twist angle of the rotary vanes (impeller blades) in degrees."
+    )
+    slot_height: float = Field(default=0.015, description="Intake slot height (meters).")
     sim_name: str = Field(default="", description="User-defined simulation run name tag.")
     neighbor_list_box: float = Field(default=0.3, description="Box size (meters) for JAX-MD neighbor search.")
 
