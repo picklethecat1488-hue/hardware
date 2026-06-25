@@ -200,6 +200,7 @@ def _compute_boundary_forces_jax(
     hollow_cyl_outer_radius: float,
     hollow_cyl_inner_radius: float,
     hollow_cyl_height: float,
+    slot_height: float,
     # Rotary Vanes (formerly impeller)
     vanes_pos: jnp.ndarray,
     vanes_orn: jnp.ndarray,
@@ -210,6 +211,7 @@ def _compute_boundary_forces_jax(
     t: float,
     vane_thickness: float,
     num_vanes: float,
+    vane_twist_rad: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Compute mathematical penalty forces from cylinder cavity, hollow cylinder, and rotary vanes in JAX."""
     forces = jnp.zeros_like(pos)
@@ -251,8 +253,8 @@ def _compute_boundary_forces_jax(
 
     # Active vertically within the physical tube height bounds (0 to hollow_cyl_height)
     height_mask = (pos_hc[:, 2] >= 0.0) & (pos_hc[:, 2] <= hollow_cyl_height)
-    # Cutout slot at bottom: ry < 0 and rz < 15mm
-    cutout_mask = (pos_hc[:, 2] < 0.015) & (pos_hc[:, 1] < 0.0)
+    # Cutout slot at bottom: ry > 0 and rz < slot_height
+    cutout_mask = (pos_hc[:, 2] < slot_height) & (pos_hc[:, 1] > 0.0)
     hollow_cyl_active_mask = height_mask & (~cutout_mask)
 
     r_hc = jnp.sqrt(pos_hc[:, 0] ** 2 + pos_hc[:, 1] ** 2)
@@ -302,7 +304,10 @@ def _compute_boundary_forces_jax(
     force_v_hub = jnp.where((hub_mask[:, None]) & (f_mag_v_hub[:, None] > 0.0), force_v_hub, 0.0)
 
     # 2. Rotating Vanes (Blades)
-    theta_t = 0.0
+    total_twist_rad = vane_twist_rad
+    safe_height = jnp.where(vanes_height > 0.0, vanes_height, 1.0)
+    pitch = total_twist_rad / safe_height
+    theta_t = pos_v[:, 2] * pitch
     phi = jnp.arctan2(pos_v[:, 1], pos_v[:, 0])
     d_phi = phi - theta_t
 
@@ -318,16 +323,25 @@ def _compute_boundary_forces_jax(
     )
 
     sign_dist = jnp.sign(d_phi_wrapped)
-    normal_tx = -sign_dist * jnp.sin(phi)
-    normal_ty = sign_dist * jnp.cos(phi)
+    normal_tx = -sign_dist * jnp.sin(phi - d_phi_wrapped)
+    normal_ty = sign_dist * jnp.cos(phi - d_phi_wrapped)
+    normal_tz = -sign_dist * r_v * pitch
+
+    norm = jnp.sqrt(normal_tx**2 + normal_ty**2 + normal_tz**2)
+    norm_safe = jnp.maximum(norm, 1e-8)
+    normal_tx /= norm_safe
+    normal_ty /= norm_safe
+    normal_tz /= norm_safe
 
     v_vane_x = omega * r_v * (-jnp.sin(phi))
     v_vane_y = omega * r_v * jnp.cos(phi)
 
-    v_rel_n_vane = (vel_v[:, 0] - v_vane_x) * normal_tx + (vel_v[:, 1] - v_vane_y) * normal_ty
+    v_rel_n_vane = (
+        (vel_v[:, 0] - v_vane_x) * normal_tx + (vel_v[:, 1] - v_vane_y) * normal_ty + (vel_v[:, 2] - 0.0) * normal_tz
+    )
 
     f_mag_vane = K * pen_vane - D * v_rel_n_vane
-    force_vane = jnp.stack([f_mag_vane * normal_tx, f_mag_vane * normal_ty, jnp.zeros_like(r_v)], axis=-1)
+    force_vane = jnp.stack([f_mag_vane * normal_tx, f_mag_vane * normal_ty, f_mag_vane * normal_tz], axis=-1)
     force_vane = jnp.where((vane_collision_mask[:, None]) & (f_mag_vane[:, None] > 0.0), force_vane, 0.0)
 
     forces += q_rotate(vanes_orn, force_v_hub + force_vane)
@@ -367,6 +381,7 @@ def _physics_step_jax(
     hollow_cyl_outer_radius: float,
     hollow_cyl_inner_radius: float,
     hollow_cyl_height: float,
+    slot_height: float,
     # Rotary Vanes
     vanes_pos: jnp.ndarray,
     vanes_orn: jnp.ndarray,
@@ -377,6 +392,7 @@ def _physics_step_jax(
     t_start: float,
     vane_thickness: float,
     num_vanes: float,
+    vane_twist_rad: float,
     K_boundary: float,
     D_boundary: float,
     r_s: float,
@@ -424,6 +440,7 @@ def _physics_step_jax(
             hollow_cyl_outer_radius,
             hollow_cyl_inner_radius,
             hollow_cyl_height,
+            slot_height,
             vanes_pos,
             vanes_orn,
             vanes_radius,
@@ -433,6 +450,7 @@ def _physics_step_jax(
             t_curr,
             vane_thickness,
             num_vanes,
+            vane_twist_rad,
         )
 
         # SPH acceleration
@@ -660,6 +678,8 @@ class Fluid:
         self.fallen_threshold_liters = config.fallen_threshold_liters
         self.recycle_fluid = config.recycle_fluid
         self.neighbor_list_box = config.neighbor_list_box
+        self.vane_twist = config.vane_twist
+        self.slot_height = config.slot_height
 
         # SPH values computed from settings
         self.h = self.smoothing_factor * self.r_s
@@ -959,7 +979,9 @@ class Fluid:
         min_h = 0.095
         if outlet_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
             state = p.getLinkState(self.body_id, outlet_idx, physicsClientId=self.physics_client)
-            min_h = float(state[4][2] - 0.005)
+            hc_info = self.boundaries.get(LinkType.TUBE)
+            hc_height = hc_info.height if hc_info and hc_info.height is not None else 0.075
+            min_h = float(state[4][2] + hc_height - 0.005)
 
         max_y = 0.030
         if outlet_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
@@ -1104,6 +1126,7 @@ class Fluid:
             hc_outer_radius,
             hc_inner_radius,
             hc_height,
+            self.slot_height,
             jnp.array(v_pos, dtype=jnp.float32),
             jnp.array(v_orn, dtype=jnp.float32),
             vanes_radius,
@@ -1113,6 +1136,7 @@ class Fluid:
             self.current_sim_time,
             0.0015,
             4.0,
+            jnp.radians(self.vane_twist),
             1000.0,
             0.3,
             self.r_s,

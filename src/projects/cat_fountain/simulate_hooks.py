@@ -18,10 +18,9 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             for i in range(p.getNumJoints(body_id, physicsClientId=client)):
                 info = p.getJointInfo(body_id, i, physicsClientId=client)
                 link_name = info[12].decode("utf-8")
-                if "spout" in link_name:
-                    link_indices[LinkType.OUTLET] = i
-                elif "tube" in link_name:
+                if "tube" in link_name:
                     link_indices[LinkType.TUBE] = i
+                    link_indices[LinkType.OUTLET] = i
                 elif "impeller" in link_name:
                     link_indices[LinkType.IMPELLER] = i
 
@@ -32,7 +31,9 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 recycle_fluid=True,
                 gravity=(0.0, 0.0, -9.81),
                 r_s=0.0015,
-                particle_radius=0.0015,
+                target_volume=0.00025,
+                vane_twist=self.settings.vane_twist,
+                slot_height=self.settings.slot_height * 0.001,
             ),
             provider=self,
             body_id=body_id,
@@ -52,6 +53,27 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         target_omega = float(getattr(vane_obj, "urdf_motor_target", 15.0))
         max_force = float(getattr(vane_obj, "urdf_motor_force", 10.0))
         omega = target_omega if step_idx >= 40 else 0.0
+
+        # Update physical joint speed in PyBullet
+        if not hasattr(self, "_impeller_joint_idx"):
+            self._impeller_joint_idx = -1
+            if _is_real_physics_client(client):
+                for i in range(p.getNumJoints(body_id, physicsClientId=client)):
+                    info = p.getJointInfo(body_id, i, physicsClientId=client)
+                    if "impeller" in info[12].decode("utf-8"):
+                        self._impeller_joint_idx = i
+                        break
+
+        if self._impeller_joint_idx != -1 and _is_real_physics_client(client):
+            p.setJointMotorControl2(
+                bodyUniqueId=body_id,
+                jointIndex=self._impeller_joint_idx,
+                controlMode=p.VELOCITY_CONTROL,
+                targetVelocity=omega,
+                force=max_force,
+                physicsClientId=client,
+            )
+
         self.water_sim.update(
             body_id,
             client,
