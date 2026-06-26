@@ -179,6 +179,16 @@ For parts that participate in physics simulation, you must attach URDF/simulatio
     - `URDFBoundaryType.SOLID` (solid obstacle).
     - `URDFBoundaryType.SOLID_CAVITY` (dual solid/cavity interaction, e.g. tubes).
   - `urdf_collision_primitives` (`list[dict]`): A list of analytical shapes (boxes, cylinders) used for rigid-body collision detection instead of complex meshes.
+  - `urdf_boundaries` (`list[dict]`): A list of boundary configurations used when a single link contains multiple analytical boundaries (e.g. recessed pocket cavity, deflection cap, and reservoir ceiling). Each boundary dict can contain:
+    - `shape` (`str`): Geometry shape type (e.g., `"cylinder"`, `"tube"`).
+    - `type` (`str`): Boundary collision role (e.g., `"cavity"`, `"solid"`).
+    - `radius` (`float`): Radius in meters (for cylinders/tubes).
+    - `height` (`float`): Height/length in meters (for cylinders).
+    - `thickness` (`float`): Thickness in meters (for walls/plates).
+    - `xyz` (`list[float]`): Local offset relative to the link coordinate origin.
+    - `rpy` (`list[float]`): Local orientation in roll-pitch-yaw.
+    - `drain_hole_y` (`float`): Optional. Y coordinate of a drain hole in a cavity ceiling/floor.
+    - `drain_hole_radius` (`float`): Optional. Radius of the drain hole.
 
 ## Simulation & Physics Best Practices
 

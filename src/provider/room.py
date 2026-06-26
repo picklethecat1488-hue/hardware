@@ -25,8 +25,10 @@ from build123d import (
     RevoluteJoint,
     LinearJoint,
     BallJoint,
+    LineType,
 )
 from build123d.exporters import ExportSVG, Drawing
+from ezdxf.colors import RGB
 import rerun as rr
 import socket
 from model import DiagramOptions, TextArgs
@@ -141,10 +143,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             look_up=up_vector,
             with_hidden=svg_opts.get("show_hidden", False),
         )
-        export_shapes = [drawing.visible_lines]
-
-        if svg_opts.get("show_hidden"):
-            export_shapes.append(drawing.hidden_lines)
+        visible_shapes = [drawing.visible_lines]
 
         # Get the bounding box of the projected geometry to calculate triad placement.
         model_bb = drawing.visible_lines.bounding_box()
@@ -153,7 +152,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         if svg_opts.get("show_axes"):
             axes = self._create_debug_axes(model_bb, look_from, look_at, up_vector)
             if axes:
-                export_shapes.append(axes)
+                visible_shapes.append(axes)
 
         # Define the view plane for projecting annotations to match the Drawing's 2D space.
         # The view direction is the vector from the target back to the camera.
@@ -161,10 +160,14 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         view_x = up_vector.cross(view_dir).normalized()
         view_plane = Plane(origin=look_at, x_dir=view_x, z_dir=view_dir)
 
-        export_shapes.extend(self._project_labels(view_plane))
+        visible_shapes.extend(self._project_labels(view_plane))
 
-        # Combine projected geometry and flat annotations for final scaling and export.
-        final_drawing = Compound(children=export_shapes)
+        # Include hidden lines in bounding box calculations if they are shown
+        all_shapes = list(visible_shapes)
+        if svg_opts.get("show_hidden"):
+            all_shapes.append(drawing.hidden_lines)
+
+        final_drawing = Compound(children=all_shapes)
         bb = final_drawing.bounding_box()
 
         # ExportSVG uses 'scale' to determine physical dimensions from model units.
@@ -191,7 +194,32 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         filtered_opts = {k: v for k, v in svg_opts.items() if k in supported_fields}
 
         exporter = ExportSVG(**filtered_opts)
-        exporter.add_shape(final_drawing)
+
+        if svg_opts.get("show_hidden"):
+            visible_color = filtered_opts.get("line_color", (0, 0, 0))
+            if isinstance(visible_color, tuple):
+                visible_color = RGB(*visible_color)
+            visible_weight = filtered_opts.get("line_weight", 1.0)
+
+            # Base hidden color off visible color (e.g. blend with white to make it lighter)
+            if visible_color.r == 0 and visible_color.g == 0 and visible_color.b == 0:
+                hidden_color = RGB(180, 180, 180)  # Lighter grey
+            else:
+                hidden_color = RGB(
+                    int(visible_color.r + (255 - visible_color.r) * 0.5),
+                    int(visible_color.g + (255 - visible_color.g) * 0.5),
+                    int(visible_color.b + (255 - visible_color.b) * 0.5),
+                )
+            hidden_weight = visible_weight * 0.5  # Thinner line weight
+
+            exporter.add_layer("Visible", line_color=visible_color, line_weight=visible_weight)
+            exporter.add_layer("Hidden", line_color=hidden_color, line_weight=hidden_weight, line_type=LineType.ISO_DOT)
+
+            exporter.add_shape(Compound(children=visible_shapes), layer="Visible")
+            exporter.add_shape(drawing.hidden_lines, layer="Hidden")
+        else:
+            exporter.add_shape(Compound(children=visible_shapes))
+
         exporter.write(cast(Any, path))
 
     def _parse_options(self, options: Optional["DiagramOptions"]) -> dict[str, Any]:
@@ -823,7 +851,8 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         """
         Run a PyBullet physics simulation for the room geometries.
         """
-        from provider import Provider, Bullet
+        from .provider import Provider
+        from .bullet import Bullet
 
         logger.print("Running Simulation (Ctrl-C to exit)...", symbol="🤖")
 

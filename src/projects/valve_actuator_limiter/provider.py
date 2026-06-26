@@ -1,7 +1,8 @@
 """Valve actuator limiter geometry provider."""
 
 import math
-from functools import cached_property
+
+# No longer using cached_property
 from build123d import *  # type: ignore
 import numpy as np
 from model import method_cache, DiagramOptions, TextArgs
@@ -15,10 +16,14 @@ from typing import Any, cast, Callable, Sequence
 class ValveActuatorLimiterProvider(Provider):
     """Provider for valve actuator limiter geometry."""
 
-    @cached_property
+    @property
     def default_config(self) -> ValveActuatorLimiterConfig:
         """Return the default configuration for the limiter project."""
-        return ValveActuatorLimiterConfig(measurements_path=str(Path(__file__).parent / "measurements.yaml"))
+        if not hasattr(self, "_cached_default_config"):
+            self._cached_default_config = ValveActuatorLimiterConfig(
+                measurements_path=str(Path(__file__).parent / "measurements.yaml")
+            )
+        return self._cached_default_config
 
     @property
     def settings(self) -> ValveActuatorLimiterConfig:
