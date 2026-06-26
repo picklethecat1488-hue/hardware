@@ -3,7 +3,7 @@
 # No longer using cached_property
 from build123d import *  # type: ignore
 import math
-from model import method_cache, TextArgs, FluidConfig, FluidMotorConfig
+from model import method_cache, TextArgs, FluidConfig
 from pathlib import Path
 from provider import (
     Provider,
@@ -292,7 +292,7 @@ class CatFountainProvider(Provider):
         bowl_part.urdf_boundary_shape = "cylinder"
         bowl_part.urdf_boundary_type = URDFBoundaryType.CAVITY
         bowl_part.urdf_boundary_radius = (r - t) * 0.001
-        bowl_part.urdf_boundary_height = (h - floor_z) * 0.001
+        bowl_part.urdf_boundary_height = (h - floor_z + 30.0) * 0.001
         bowl_part.urdf_boundary_thickness = t * 0.001
         bowl_part.urdf_boundary_xyz = f"0.0 0.0 {floor_z * 0.001}"
         bowl_part.urdf_boundary_rpy = "0.0 0.0 0.0"
@@ -424,6 +424,7 @@ class CatFountainProvider(Provider):
         impeller_part.urdf_boundary_radius = r * 0.001
         impeller_part.urdf_boundary_height = h * 0.001
         impeller_part.urdf_boundary_thickness = shaft_r * 0.001
+        impeller_part.urdf_boundary_vane_twist = self.settings.vane_twist
         impeller_part.urdf_boundary_xyz = "0.0 0.0 0.0"
         impeller_part.urdf_boundary_rpy = "0.0 0.0 0.0"
 
@@ -473,6 +474,7 @@ class CatFountainProvider(Provider):
         tube_part.urdf_boundary_radius = r * 0.001
         tube_part.urdf_boundary_height = h * 0.001
         tube_part.urdf_boundary_thickness = t * 0.001
+        tube_part.urdf_boundary_slot_height = self.settings.slot_height * 0.001
         tube_part.urdf_boundary_xyz = "0.0 0.0 0.0"
         tube_part.urdf_boundary_rpy = "0.0 0.0 0.0"
 
@@ -691,21 +693,25 @@ class CatFountainProvider(Provider):
         lid_part.urdf_parent = "bowl"
         lid_part.urdf_joint_type = "fixed"
 
-        # Define multiple boundaries for the lid (recessed pocket cavity, solid spout deflection cap, and reservoir ceiling)
         lid_part.urdf_boundaries = [
+            # 1. Lid pocket cavity boundary: models the upper drinking shelf/recessed pocket where water collects.
+            # Contains water within the pocket radius and floor height, with openings for the tube and the drain.
             {
                 "shape": "cylinder",
                 "type": "cavity",
                 "radius": self.settings.lid_pocket_radius * 0.001,
                 "height": self.settings.lid_pocket_cavity_height * 0.001,
-                "thickness": self.settings.lid_pocket_thickness * 0.001,
+                "thickness": 3.0 * 0.001,
                 "xyz": [0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001],
                 "rpy": [0.0, 0.0, 0.0],
                 "drain_hole_y": self.settings.drain_hole_y * 0.001,
                 "drain_hole_radius": self.settings.drain_hole_radius * 0.001,
                 "has_drain": True,
                 "has_tube": True,
+                "tube_radius": (self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             },
+            # 2. Spout deflection cap boundary: models the inside of the convex dome that covers the tube outlet.
+            # Deflects rising water downwards onto the terrace. Inverted (rpy points down) and has no side walls.
             {
                 "shape": "cylinder",
                 "type": "cavity",
@@ -714,20 +720,36 @@ class CatFountainProvider(Provider):
                 "thickness": self.settings.spout_deflection_thickness * 0.001,
                 "xyz": [0.0, tube_y * 0.001, self.settings.spout_deflection_z_offset * 0.001],
                 "rpy": [3.141592653589793, 0.0, 0.0],
-                "has_tube": True,
+                "has_tube": False,
             },
+            # 3. Lid bottom cavity boundary: models the bottom face of the lid facing the bowl reservoir.
+            # Prevents water in the reservoir from passing upwards through the lid solid body (except through the tube/drain).
             {
                 "shape": "cylinder",
                 "type": "cavity",
                 "radius": (self.settings.bowl_radius - self.settings.bowl_thickness) * 0.001,
                 "height": 0.0,
-                "thickness": self.settings.bowl_thickness * 0.001,
-                "xyz": [0.0, 0.0, 0.0],
+                "thickness": 2.0 * 0.001,
+                "xyz": [0.0, 0.0, -0.002],
                 "rpy": [3.141592653589793, 0.0, 0.0],
                 "drain_hole_y": -self.settings.drain_hole_y * 0.001,
                 "drain_hole_radius": self.settings.drain_hole_radius * 0.001,
                 "has_drain": True,
                 "has_tube": True,
+                "tube_radius": (self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
+            },
+            # 4. Circular terrace boundary: models the flat circular shelf level around the tube outlet inside the lip.
+            # Prevents water from sinking below the terrace level until it flows radially outward past the terrace radius.
+            {
+                "shape": "cylinder",
+                "type": "cavity",
+                "radius": 28.0 * 0.001,
+                "height": 0.0,
+                "thickness": 3.0 * 0.001,
+                "xyz": [0.0, tube_y * 0.001, 6.0 * 0.001],
+                "rpy": [0.0, 0.0, 0.0],
+                "has_tube": True,
+                "tube_radius": (self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             },
         ]
 

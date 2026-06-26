@@ -8,7 +8,7 @@ import pybullet as p
 import pytest
 from provider.fluid import Fluid
 from provider.bullet import LinkType
-from model import FluidConfig, FluidMotorConfig, ShapeType
+from model import FluidConfig, ShapeType
 import jax.numpy as jnp
 
 
@@ -242,7 +242,7 @@ class TestBulletFluid:
                     # Increased viscosity (0.5) to damp settling oscillations under gravity
                     viscosity=0.5,
                     target_volume=0.00001,
-                    bowl_wall_buffer=0.004,  # Clear hollow cylinder boundary at spawn
+                    spawn_buffer=0.004,  # Clear hollow cylinder boundary at spawn
                     boundaries=self.get_boundaries(),
                     gravity=(0.0, 0.0, -9.81),
                 ),
@@ -393,7 +393,7 @@ class TestBulletFluid:
                 config=FluidConfig.water(
                     target_volume=0.00001,
                     viscosity=0.5,
-                    bowl_wall_buffer=0.004,
+                    spawn_buffer=0.004,
                     boundaries=boundaries,
                     gravity=(0.0, 0.0, -9.81),
                 ),
@@ -469,7 +469,7 @@ class TestBulletFluid:
                 config=FluidConfig.water(
                     target_volume=0.00001,
                     viscosity=2.0,
-                    bowl_wall_buffer=0.004,
+                    spawn_buffer=0.004,
                     boundaries=self.get_boundaries(),
                     gravity=(0.0, 0.0, -9.81),
                 ),
@@ -544,6 +544,7 @@ class TestBulletFluid:
             # Make the rotary blades the same diameter (radius) as the bowl and infinite height
             boundaries["rotary_vanes"]["radius"] = boundaries["bowl"]["radius"]
             boundaries["rotary_vanes"]["height"] = float("inf")
+            boundaries["rotary_vanes"]["vane_twist"] = -720.0
             # And the bowl should have infinite height
             boundaries["bowl"]["height"] = float("inf")
 
@@ -552,10 +553,9 @@ class TestBulletFluid:
                 config=FluidConfig.water(
                     target_volume=0.00001,
                     viscosity=0.40,
-                    bowl_wall_buffer=0.004,
+                    spawn_buffer=0.004,
                     boundaries=boundaries,
                     gravity=(0.0, 0.0, -9.81),
-                    vane_twist=-720.0,
                 ),
                 provider=provider,
                 body_id=body_id,
@@ -581,7 +581,7 @@ class TestBulletFluid:
                     body_id,
                     physics_client,
                     damping=0.998,
-                    motor_config=FluidMotorConfig(target_omega=5.0),
+                    target_omega=5.0,
                 )
                 p.stepSimulation(physicsClientId=physics_client)
                 e = self.get_fluid_energy(fluid, -9.81)
@@ -630,7 +630,7 @@ class TestBulletFluid:
                 config=FluidConfig.water(
                     target_volume=0.00001,
                     viscosity=5.0,
-                    bowl_wall_buffer=0.0,
+                    spawn_buffer=0.0,
                     boundaries={"bowl": self.get_boundaries()["bowl"]},
                     gravity=(0.0, 0.0, -9.81),
                 ),
@@ -705,7 +705,7 @@ class TestBulletFluid:
                 config=FluidConfig.water(
                     target_volume=0.0005,  # 500 mL of water
                     stiffness=1000.0,
-                    bowl_wall_buffer=0.002,
+                    spawn_buffer=0.002,
                     boundaries={"bowl": self.get_boundaries()["bowl"]},
                     gravity=(0.0, 0.0, -9.81),
                 ),
@@ -918,7 +918,7 @@ class TestBulletFluid:
                 config=FluidConfig.water(
                     target_volume=0.00007,  # 70 mL of water (deep narrow column)
                     stiffness=1000.0,
-                    bowl_wall_buffer=0.001,
+                    spawn_buffer=0.001,
                     boundaries={"bowl": bowl_boundary},
                     gravity=(0.0, 0.0, -9.81),
                 ),
@@ -1045,7 +1045,7 @@ class TestBulletFluid:
                 config=FluidConfig.water(
                     viscosity=0.5,
                     target_volume=0.00001,
-                    bowl_wall_buffer=0.004,
+                    spawn_buffer=0.004,
                     boundaries=self.get_boundaries(),
                     gravity=(0.0, 0.0, -9.81),
                     recycle_fluid=True,

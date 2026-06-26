@@ -71,6 +71,8 @@ class URDFShape(Protocol):
     urdf_boundary_xyz: Optional[str]
     urdf_boundary_rpy: Optional[str]
     urdf_boundary_thickness: Optional[float]
+    urdf_boundary_slot_height: Optional[float]
+    urdf_boundary_vane_twist: Optional[float]
 
     def __getattr__(self, name: str) -> Any:
         """Get an attribute from the object."""
