@@ -325,6 +325,8 @@ class TestCatFountainProvider:
                         for b in test_boundaries["lid"]
                         if abs(b.get("radius", 0.0) - provider.settings.spout_deflection_radius * 0.001) > 1e-6
                     ]
+                if "bowl" in test_boundaries:
+                    test_boundaries["bowl"]["height"] = (provider.settings.bowl_height - 25.0) * 0.001
 
                 hooks = provider.get_simulate_hooks("product:view/simulate")
                 setup_fn = hooks[Simulate.SETUP]

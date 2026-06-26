@@ -17,7 +17,7 @@ from provider.room import BulletStateTracker
 from provider.bullet import LinkType, _is_real_physics_client
 
 if TYPE_CHECKING:
-    from model import BoundaryConfig, FluidConfig, FluidMotorConfig
+    from model import BoundaryConfig, FluidConfig
 
 
 @jax.jit
@@ -51,7 +51,25 @@ def _compute_forces_jax(
     pressure_avg_factor: float,
     min_dist_threshold: float,
 ) -> jnp.ndarray:
-    """Compute SPH forces (pressure + viscosity) using vectorized JAX."""
+    """Compute SPH forces (pressure and viscosity) using vectorized JAX.
+
+    Args:
+        positions: (N, 3) array of SPH particle positions (meters).
+        velocities: (N, 3) array of SPH particle velocities (m/s).
+        mass: Mass of a single SPH particle (kg).
+        h: SPH kernel smoothing radius (meters).
+        rest_density: Target rest density of the fluid (kg/m^3).
+        viscosity: SPH viscosity coefficient.
+        stiffness: SPH pressure stiffness parameter.
+        poly6_factor: Precomputed coefficient factor for the Poly6 SPH density kernel.
+        spiky_grad_factor: Precomputed coefficient factor for the Spiky kernel gradient.
+        visc_lap_factor: Precomputed coefficient factor for the viscosity Laplacian kernel.
+        pressure_avg_factor: Coefficient for averaging pairwise particle pressures.
+        min_dist_threshold: Minimum squared distance to prevent divide-by-zero errors.
+
+    Returns:
+        (N, 3) array of SPH forces acting on each particle.
+    """
     n = positions.shape[0]
     h2 = h * h
 
@@ -126,7 +144,26 @@ def _compute_forces_neighbor_list_jax(
     pressure_avg_factor: float,
     min_dist_threshold: float,
 ) -> jnp.ndarray:
-    """Compute SPH forces (pressure + viscosity) using a neighbor list."""
+    """Compute SPH forces (pressure and viscosity) using a precomputed neighbor list.
+
+    Args:
+        positions: (N, 3) array of SPH particle positions (meters).
+        velocities: (N, 3) array of SPH particle velocities (m/s).
+        idx_map: (N, M) mapping of particle indices to their respective neighbors.
+        mass: Mass of a single SPH particle (kg).
+        h: SPH kernel smoothing radius (meters).
+        rest_density: Target rest density of the fluid (kg/m^3).
+        viscosity: SPH viscosity coefficient.
+        stiffness: SPH pressure stiffness parameter.
+        poly6_factor: Precomputed coefficient factor for the Poly6 SPH density kernel.
+        spiky_grad_factor: Precomputed coefficient factor for the Spiky kernel gradient.
+        visc_lap_factor: Precomputed coefficient factor for the viscosity Laplacian kernel.
+        pressure_avg_factor: Coefficient for averaging pairwise particle pressures.
+        min_dist_threshold: Minimum squared distance to prevent divide-by-zero errors.
+
+    Returns:
+        (N, 3) array of SPH forces acting on each particle.
+    """
     n = positions.shape[0]
     h2 = h * h
 
@@ -195,18 +232,29 @@ def _compute_boundary_forces_jax(
     omega: float,
     t: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Compute boundary collision and friction forces using penalty-based methods.
+
+    Args:
+        pos: (N, 3) array of SPH particle positions in world coordinates (meters).
+        vel: (N, 3) array of SPH particle velocities in world coordinates (m/s).
+        r_s: SPH particle radius/search scale (meters).
+        K: Boundary collision penalty stiffness coefficient.
+        D: Boundary collision penalty damping coefficient.
+        b_pos_arr: (B, 3) array of boundary element positions.
+        b_orn_arr: (B, 4) array of boundary element orientation quaternions.
+        boundary_configs: Tuple of static boundary configurations defining geometry/colliders.
+        omega: Target impeller angular speed (rad/s).
+        t: Current simulation time (seconds).
+
+    Returns:
+        A tuple containing:
+            - forces: (N, 3) array of boundary forces acting on each particle in world coordinates.
+            - vanes_torque: Reaction torque acting on the rotary vanes (impeller).
+    """
     from model import ShapeType, BoundaryType
 
     forces = jnp.zeros_like(pos)
     vanes_torque = jnp.array(0.0)
-
-    # Resolve tube_y from boundary configs
-    tube_y = -0.065
-    for cfg in boundary_configs:
-        if cfg.has_tube:
-            if cfg.xyz is not None and len(cfg.xyz) >= 2:
-                tube_y = cfg.xyz[1]
-                break
 
     for i, cfg in enumerate(boundary_configs):
         b_pos = b_pos_arr[i]
@@ -217,16 +265,16 @@ def _compute_boundary_forces_jax(
 
         shape = cfg.shape
         b_type = cfg.type
-        radius = cfg.radius if cfg.radius is not None else 0.0
-        height = cfg.height if cfg.height is not None else 0.0
-        thickness = cfg.thickness if cfg.thickness is not None else 0.0
-        z_offset = cfg.z_offset if cfg.z_offset is not None else 0.0
-        slot_height = cfg.slot_height if cfg.slot_height is not None else 0.0
-        vane_thickness = cfg.vane_thickness if cfg.vane_thickness is not None else 0.0015
-        num_vanes = cfg.num_vanes if cfg.num_vanes is not None else 4.0
-        vane_twist_rad = cfg.vane_twist_rad if cfg.vane_twist_rad is not None else 0.0
-        drain_hole_y = cfg.drain_hole_y if cfg.drain_hole_y is not None else 0.0
-        drain_hole_radius = cfg.drain_hole_radius if cfg.drain_hole_radius is not None else 0.0
+        radius = cfg.radius
+        height = cfg.height
+        thickness = cfg.thickness
+        z_offset = cfg.z_offset
+        slot_height = cfg.slot_height
+        vane_thickness = cfg.vane_thickness
+        num_vanes = cfg.num_vanes
+        vane_twist_rad = cfg.vane_twist_rad
+        drain_hole_y = cfg.drain_hole_y
+        drain_hole_radius = cfg.drain_hole_radius
 
         match shape:
             case ShapeType.CYLINDER:
@@ -248,10 +296,13 @@ def _compute_boundary_forces_jax(
                     # 2. Cavity bottom
                     z_limit_c = z_offset + r_s
                     pen_c_bottom = z_limit_c - pos_local[:, 2]
-                    bottom_limit = z_offset - jnp.maximum(thickness, 0.010)
+                    bottom_limit = z_offset - jnp.maximum(thickness, 0.002)
                     has_tube = cfg.has_tube
                     has_drain = cfg.has_drain
-                    in_tube_hole = has_tube & (pos_local[:, 0] ** 2 + (pos_local[:, 1] - tube_y) ** 2 < 0.008**2)
+                    tube_y = cfg.xyz[1]
+                    in_tube_hole = has_tube & (
+                        pos_local[:, 0] ** 2 + (pos_local[:, 1] - tube_y) ** 2 < cfg.tube_radius**2
+                    )
                     in_drain_hole = (
                         (has_drain & (drain_hole_radius > 0.0))
                         & (pos_local[:, 0] ** 2 + (pos_local[:, 1] - drain_hole_y) ** 2 < drain_hole_radius**2)
@@ -385,7 +436,7 @@ def _compute_boundary_forces_jax(
     return forces, vanes_torque
 
 
-@partial(jax.jit, static_argnums=(13,))
+@partial(jax.jit, static_argnums=(13, 22))
 def _physics_step_jax(
     pos: jnp.ndarray,
     vel: jnp.ndarray,
@@ -409,13 +460,49 @@ def _physics_step_jax(
     K_boundary: float,
     D_boundary: float,
     r_s: float,
+    base_idx: int,
     pressure_avg_factor: float = 2.0,
     min_dist_threshold: float = 1e-6,
     damping: float = -1.0,
-    damping_height_threshold: float = 0.090,
     high_damping_value: float = 0.998,
 ) -> tuple[jnp.ndarray, jnp.ndarray, float]:
-    """Perform a substepped JAX update step integrating forces and resolving boundary collisions."""
+    """Perform a substepped SPH simulation update integrating forces and boundary collisions.
+
+    Args:
+        pos: (N, 3) array of current SPH particle positions (meters).
+        vel: (N, 3) array of current SPH particle velocities (m/s).
+        idx_map: (N, M) mapping of particle indices to their respective neighbors.
+        mass: SPH particle mass (kg).
+        h: SPH kernel smoothing radius (meters).
+        rest_density: Target rest density of the fluid (kg/m^3).
+        viscosity: Dynamic viscosity coefficient.
+        stiffness: SPH pressure stiffness parameter.
+        poly6_factor: Precomputed Poly6 density kernel coefficient.
+        spiky_grad_factor: Precomputed Spiky pressure gradient kernel coefficient.
+        visc_lap_factor: Precomputed viscosity Laplacian kernel coefficient.
+        dt_sub: Solver substep time increment (seconds).
+        n_substeps: Number of integration substeps per step invocation.
+        boundary_configs: Tuple of static boundary configurations defining shapes.
+        gravity: Gravity acceleration vector (3,).
+        b_pos_arr: (B, 3) array of boundary positions in world coordinates.
+        b_orn_arr: (B, 4) array of boundary orientations in world coordinates.
+        omega: Target impeller angular speed (rad/s).
+        t_start: Starting simulation time (seconds) for this substepped update.
+        K_boundary: Boundary collision penalty stiffness coefficient.
+        D_boundary: Boundary collision penalty damping coefficient.
+        r_s: SPH particle radius/search scale (meters).
+        base_idx: Cached index of the base boundary config in boundary_configs tuple.
+        pressure_avg_factor: Coefficient for averaging pairwise particle pressures.
+        min_dist_threshold: Minimum squared distance to prevent divide-by-zero errors.
+        damping: Explicit damping value. If negative, defaults to dynamic speed-adaptive damping.
+        high_damping_value: Damping value applied to particles outside the base boundaries.
+
+    Returns:
+        A tuple containing:
+            - pos_next: (N, 3) updated particle positions array.
+            - vel_next: (N, 3) updated particle velocities array.
+            - torque_accum: Accumulated reaction torque on the impeller vanes.
+    """
 
     def body_fun(i, val):
         pos_curr, vel_curr, torque_accum = val
@@ -484,12 +571,25 @@ def _physics_step_jax(
         dynamic_damping = gamma_base - 0.16 * v_excess
         dynamic_damping = jnp.maximum(0.90, jnp.minimum(gamma_base, dynamic_damping))
 
-        damping_val = jnp.where(damping >= 0.0, damping, dynamic_damping)
-        damping_by_height = jnp.where(
-            (damping >= 0.0) | (pos_curr[:, 2] < damping_height_threshold), damping_val, high_damping_value
-        )[:, None]
+        if base_idx != -1:
+            base_cfg = boundary_configs[base_idx]
+            base_pos = b_pos_arr[base_idx]
+            base_orn = b_orn_arr[base_idx]
+            base_orn_inv = q_inv(base_orn)
+            pos_local = q_rotate(base_orn_inv, pos_curr - base_pos)
+            r_local = jnp.sqrt(pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2)
+            outside_base = (
+                (r_local > base_cfg.radius)
+                | (pos_local[:, 2] < base_cfg.z_offset)
+                | (pos_local[:, 2] > base_cfg.height)
+            )
+        else:
+            outside_base = jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_)
 
-        vel_next = jnp.where(active, (vel_curr + accel * dt_sub) * damping_by_height, 0.0)
+        damping_val = jnp.where(damping >= 0.0, damping, dynamic_damping)
+        damping_by_zone = jnp.where((damping >= 0.0) | (~outside_base), damping_val, high_damping_value)[:, None]
+
+        vel_next = jnp.where(active, (vel_curr + accel * dt_sub) * damping_by_zone, 0.0)
         pos_next = jnp.where(active, pos_curr + vel_next * dt_sub, pos_curr)
 
         # Accumulate torque
@@ -646,24 +746,22 @@ class Fluid:
         link_indices: Optional[dict[LinkType, Optional[int]]] = None,
     ):
         """Initialize the fluid simulation constants and state using a FluidConfig."""
-        from model import BoundaryConfig, FluidConfig, FluidMotorConfig
+        from model import BoundaryConfig, FluidConfig
 
         if config is None:
             config = FluidConfig()
 
         self.provider = provider
 
-        particle_rad = config.r_s if config.r_s is not None else config.particle_radius
-        self.particle_radius = particle_rad
-        self.r_s = self.particle_radius
+        self.r_s = config.r_s
+        self.particle_radius = config.particle_radius
 
         self.target_volume = config.target_volume
-        self.bowl_wall_buffer = config.bowl_wall_buffer
+        self.spawn_buffer = config.spawn_buffer
         self.rest_density = config.rest_density
         self.viscosity = config.viscosity
 
-        stiff = config.k if config.k is not None else config.stiffness
-        self.stiffness = stiff
+        self.stiffness = config.stiffness
         self.k = self.stiffness
 
         self.smoothing_factor = config.smoothing_factor
@@ -675,14 +773,9 @@ class Fluid:
         self.pressure_avg_factor = config.pressure_avg_factor
         self.min_distance_threshold = config.min_distance_threshold
 
-        self.characteristic_length = config.characteristic_length
         self.volume_threshold_liters = config.volume_threshold_liters
         self.fallen_threshold_liters = config.fallen_threshold_liters
         self.recycle_fluid = config.recycle_fluid
-        self.neighbor_list_box = config.neighbor_list_box
-        self.vane_twist = config.vane_twist
-        self.slot_height = config.slot_height
-        self.damping_height_threshold = config.damping_height_threshold
         self.high_damping_value = config.high_damping_value
 
         # SPH values computed from settings
@@ -707,7 +800,7 @@ class Fluid:
         self.last_positions: list[list[float]] = []
         self.current_sim_time = 0.0
         self.torques: list[float] = []
-        self.motor_config = FluidMotorConfig()
+        # Motor configurations are consolidated into BoundaryConfig
         self.spout_water_ids = set()
         self.fallen_out_water_ids = set()
         self.state_tracker = state_tracker
@@ -715,15 +808,44 @@ class Fluid:
         self._cached_active_indices = None
         self._cached_mapper = None
         self._cached_self_active_indices = None
+        self.spawn_xy_coords: list[tuple[float, float]] = []
 
         self.link_indices = link_indices if link_indices is not None else {}
 
-        if config.gravity is not None:
-            self.gravity = config.gravity
-        elif hasattr(self.provider, "room") and self.provider.room and hasattr(self.provider.room, "gravity"):
-            self.gravity = self.provider.room.gravity
-        else:
-            self.gravity = (0.0, 0.0, -9.81)
+        self.gravity = config.gravity
+
+        # Parse boundaries metadata using BoundaryConfig Pydantic model
+        self.boundary_list = []
+        if config.boundaries is not None:
+            for label, val in config.boundaries.items():
+                vals = val if isinstance(val, list) else [val]
+                for item in vals:
+                    b_info = item if isinstance(item, BoundaryConfig) else BoundaryConfig.model_validate(item)
+                    b_info._label = label
+                    self.boundary_list.append(b_info)
+
+        self.boundaries = {}
+        for b in self.boundary_list:
+            match b.link_type:
+                case LinkType.BASE:
+                    self.boundaries[LinkType.BASE] = b
+                case LinkType.TUBE:
+                    self.boundaries[LinkType.TUBE] = b
+                case LinkType.IMPELLER:
+                    self.boundaries[LinkType.IMPELLER] = b
+
+        # Derive characteristic length from base boundary radius LinkType.BASE (enforced to be present in every model)
+        base_info = self.boundaries[LinkType.BASE]
+        self.characteristic_length = base_info.radius
+
+        # Derive neighbor list box size from boundaries (2x the base boundary radius)
+        self.neighbor_list_box = 2.0 * base_info.radius
+
+        self.base_idx = -1
+        for idx, b in enumerate(self.boundary_list):
+            if b.link_type == LinkType.BASE:
+                self.base_idx = idx
+                break
 
         if physics_client is not None and body_id is not None and config.boundaries is not None:
             if state_tracker is not None:
@@ -748,25 +870,6 @@ class Fluid:
             self.default_idx_map = np.arange(self.n_particles)[:, None]
             self.default_idx_map = np.repeat(self.default_idx_map, 64, axis=1)
 
-            # Parse boundaries metadata using BoundaryConfig Pydantic model
-            self.boundary_list = []
-            for label, val in config.boundaries.items():
-                vals = val if isinstance(val, list) else [val]
-                for item in vals:
-                    b_info = item if isinstance(item, BoundaryConfig) else BoundaryConfig.model_validate(item)
-                    b_info._label = label
-                    self.boundary_list.append(b_info)
-
-            self.boundaries = {}
-            for b in self.boundary_list:
-                match b.link_type:
-                    case LinkType.BASE:
-                        self.boundaries[LinkType.BASE] = b
-                    case LinkType.TUBE:
-                        self.boundaries[LinkType.TUBE] = b
-                    case LinkType.IMPELLER:
-                        self.boundaries[LinkType.IMPELLER] = b
-
             # Generate grid points to initially fill the cavity
             grid_points: list[tuple[float, float, float]] = []
             spacing = 1.3 * self.r_s
@@ -779,12 +882,12 @@ class Fluid:
             )
 
             cavity_info = self.boundaries.get(LinkType.BASE)
-            cavity_inner_radius = cavity_info.radius if cavity_info and cavity_info.radius is not None else 0.076
-            cavity_z_offset = cavity_info.xyz[2] if cavity_info else 0.004
+            cavity_inner_radius = cavity_info.radius if cavity_info is not None else 0.0
+            cavity_z_offset = cavity_info.xyz[2] if cavity_info is not None else 0.0
             hc_r = self.radii[LinkType.TUBE]
 
-            max_r_sq = (cavity_inner_radius - self.bowl_wall_buffer) ** 2
-            min_r_sq = (hc_r + self.bowl_wall_buffer) ** 2
+            max_r_sq = (cavity_inner_radius - self.spawn_buffer) ** 2
+            min_r_sq = (hc_r + self.spawn_buffer) ** 2
 
             xy_coords = []
             lim = int(math.ceil(cavity_inner_radius / spacing))
@@ -799,7 +902,7 @@ class Fluid:
             self.spawn_xy_coords = xy_coords
 
             # Spawn particles above bottom plate
-            z = cavity_z_offset + self.r_s + self.bowl_wall_buffer
+            z = cavity_z_offset + self.r_s + self.spawn_buffer
             while len(grid_points) < self.n_particles:
                 for x, y in xy_coords:
                     if len(grid_points) >= self.n_particles:
@@ -949,35 +1052,14 @@ class Fluid:
     @property
     def radii(self) -> dict[LinkType, float]:
         """Return dict mapping LinkType keys to their float radius values."""
-        hc_idx = self.link_indices.get(LinkType.TUBE)
-        hc_r = 0.008
-        if LinkType.TUBE in self.boundaries:
-            b_info = self.boundaries[LinkType.TUBE]
-            if b_info.radius is not None:
-                hc_r = b_info.radius
-        elif hc_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
-            aabb = p.getAABB(self.body_id, hc_idx, physicsClientId=self.physics_client)
-            hc_r = float((aabb[1][0] - aabb[0][0]) / 2.0)
+        hc_info = self.boundaries.get(LinkType.TUBE)
+        hc_r = hc_info.radius if hc_info is not None else 0.0
 
-        cavity_r = 0.080
-        found_cavity = False
-        if LinkType.BASE in self.boundaries:
-            b_info = self.boundaries[LinkType.BASE]
-            r_inner = b_info.radius if b_info.radius is not None else 0.0725
-            t = b_info.thickness if b_info.thickness is not None else 0.0035
-            cavity_r = float(r_inner + t)
-            found_cavity = True
+        base_info = self.boundaries.get(LinkType.BASE)
+        cavity_r = float(base_info.radius + base_info.thickness) if base_info is not None else 0.0
 
-        if not found_cavity and self.body_id is not None and _is_real_physics_client(self.physics_client):
-            aabb = p.getAABB(self.body_id, -1, physicsClientId=self.physics_client)
-            cavity_r = float((aabb[1][0] - aabb[0][0]) / 2.0)
-
-        vanes_clearance = 0.015
-        vanes_idx = self.link_indices.get(LinkType.IMPELLER)
-        if vanes_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
-            aabb = p.getAABB(self.body_id, vanes_idx, physicsClientId=self.physics_client)
-            vanes_r = (aabb[1][0] - aabb[0][0]) / 2.0
-            vanes_clearance = float(vanes_r + 0.003)
+        impeller_info = self.boundaries.get(LinkType.IMPELLER)
+        vanes_clearance = float(impeller_info.radius + 0.003) if impeller_info is not None else 0.0
 
         fallen_r = cavity_r + 0.010
         return {
@@ -991,19 +1073,19 @@ class Fluid:
     def thresholds(self) -> dict[LinkType, float]:
         """Return dict mapping LinkType keys to their float thresholds."""
         outlet_idx = self.link_indices.get(LinkType.OUTLET)
-        min_h = 0.095
+        min_h = 0.0
         if outlet_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
             state = p.getLinkState(self.body_id, outlet_idx, physicsClientId=self.physics_client)
             hc_info = self.boundaries.get(LinkType.TUBE)
-            hc_height = hc_info.height if hc_info and hc_info.height is not None else 0.075
+            hc_height = hc_info.height if hc_info is not None else 0.0
             min_h = float(state[4][2] + hc_height - 0.005)
 
-        max_y = 0.030
+        max_y = 0.0
         if outlet_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
             aabb = p.getAABB(self.body_id, outlet_idx, physicsClientId=self.physics_client)
             max_y = float(aabb[1][1] + 0.005)
 
-        offset_mm = 15.0
+        offset_mm = 0.0
         hc_idx = self.link_indices.get(LinkType.TUBE)
         if hc_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
             info = p.getJointInfo(self.body_id, hc_idx, physicsClientId=self.physics_client)
@@ -1024,13 +1106,18 @@ class Fluid:
         body_id: int,
         physics_client: int,
         damping: Optional[float] = None,
-        motor_config: Optional[FluidMotorConfig] = None,
+        target_omega: Optional[float] = None,
+        max_force: Optional[float] = None,
     ) -> None:
         """Step simulation and manage deactivation."""
         self.body_id = body_id
         self.physics_client = physics_client
-        if motor_config is not None:
-            self.motor_config = motor_config
+        impeller_b = self.boundaries.get(LinkType.IMPELLER)
+        if impeller_b is not None:
+            if target_omega is not None:
+                impeller_b.target_omega = target_omega
+            if max_force is not None:
+                impeller_b.max_force = max_force
 
         if not self.spawner:
             raise RuntimeError("Fluid spawner is not initialized.")
@@ -1078,20 +1165,15 @@ class Fluid:
 
         cavity_pos, cavity_orn = self._get_base_link_origin(self.body_id, physics_client)
         cavity_info = self.boundaries.get(LinkType.BASE)
-        cavity_z_offset = cavity_info.xyz[2] if cavity_info else 0.004
+        cavity_z_offset = cavity_info.xyz[2] if cavity_info is not None else 0.0
 
         b_pos_list = []
         b_orn_list = []
         b_static_list = []
 
         for b in self.boundary_list:
-            link_idx = getattr(b, "link_idx", None)
-            if (
-                link_idx is not None
-                and link_idx != -1
-                and self.body_id is not None
-                and _is_real_physics_client(physics_client)
-            ):
+            link_idx = b.link_idx
+            if link_idx != -1 and self.body_id is not None and _is_real_physics_client(physics_client):
                 state = p.getLinkState(self.body_id, link_idx, physicsClientId=physics_client)
                 parent_pos, parent_orn = state[4], state[5]
             elif link_idx == -1 and self.body_id is not None and _is_real_physics_client(physics_client):
@@ -1099,9 +1181,9 @@ class Fluid:
             else:
                 parent_pos, parent_orn = [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]
 
-            local_xyz = getattr(b, "xyz", None) or [0.0, 0.0, 0.0]
-            local_rpy = getattr(b, "rpy", None) or [0.0, 0.0, 0.0]
-            if local_xyz != [0.0, 0.0, 0.0] or local_rpy != [0.0, 0.0, 0.0]:
+            local_xyz = b.xyz
+            local_rpy = b.rpy
+            if local_xyz != (0.0, 0.0, 0.0) or local_rpy != (0.0, 0.0, 0.0):
                 local_orn = p.getQuaternionFromEuler(local_rpy)
                 b_pos, b_orn = p.multiplyTransforms(parent_pos, parent_orn, local_xyz, local_orn)
             else:
@@ -1109,20 +1191,7 @@ class Fluid:
 
             b_pos_list.append(b_pos)
             b_orn_list.append(b_orn)
-
-            cfg_obj = b.model_copy(
-                update={
-                    "radius": b.radius if b.radius is not None else 0.0,
-                    "height": b.height if b.height is not None else 0.0,
-                    "thickness": b.thickness if b.thickness is not None else 0.0,
-                    "z_offset": 0.0,
-                    "slot_height": float(getattr(self, "slot_height", 0.0)),
-                    "vane_thickness": 0.0015,
-                    "num_vanes": 4.0,
-                    "vane_twist_rad": float(math.radians(getattr(self, "vane_twist", 0.0))),
-                }
-            )
-            b_static_list.append(cfg_obj)
+            b_static_list.append(b)
 
         b_pos_arr = jnp.array(b_pos_list, dtype=jnp.float32)
         b_orn_arr = jnp.array(b_orn_list, dtype=jnp.float32)
@@ -1146,15 +1215,15 @@ class Fluid:
             jnp.array(self.gravity, dtype=jnp.float32),
             b_pos_arr,
             b_orn_arr,
-            self.motor_config.target_omega,
+            impeller_b.target_omega if impeller_b is not None else 0.0,
             self.current_sim_time,
             1000.0,
             5.0,
             self.r_s,
+            self.base_idx,
             self.pressure_avg_factor,
             self.min_distance_threshold,
             damping_val,
-            self.damping_height_threshold,
             self.high_damping_value,
         )
         avg_step_torque = float(torque_accum) / 5
@@ -1189,11 +1258,11 @@ class Fluid:
                 for idx in fallen_indices:
                     if self.recycle_fluid:
                         # Select a random coordinate from pre-calculated grid
-                        if hasattr(self, "spawn_xy_coords") and self.spawn_xy_coords:
+                        if self.spawn_xy_coords:
                             x, y = random.choice(self.spawn_xy_coords)
                         else:
                             x, y = 0.0, 0.0
-                        z_local = cavity_z_offset + self.r_s + self.bowl_wall_buffer + random.uniform(0.0, 0.010)
+                        z_local = cavity_z_offset + self.r_s + self.spawn_buffer + random.uniform(0.0, 0.010)
                         wpt, _ = p.multiplyTransforms(cavity_pos, cavity_orn, [x, y, z_local], [0.0, 0.0, 0.0, 1.0])
                         pos_arr[idx] = wpt
                         vel_arr[idx] = [0.0, 0.0, 0.0]

@@ -4,7 +4,7 @@ import pybullet as p
 from provider.bullet import _is_real_physics_client
 from typing import Any, Callable, cast
 from provider import Bullet, LinkType, Fluid, Simulate, URDFShape
-from model import FluidConfig, FluidMotorConfig, BoundaryConfig
+from model import FluidConfig, BoundaryConfig
 
 
 def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
@@ -53,19 +53,6 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 resolved_vals.append(item_dict)
             resolved_boundaries[label] = resolved_vals
 
-        # Determine damping_height_threshold dynamically from bowl and lid boundaries
-        damping_height_threshold = 0.101
-        if boundaries and "bowl" in boundaries and "lid" in boundaries:
-            bowl_b = boundaries["bowl"]
-            lid_b_list = boundaries["lid"]
-            lid_b = lid_b_list[0] if isinstance(lid_b_list, list) and len(lid_b_list) > 0 else lid_b_list
-            if isinstance(bowl_b, dict) and isinstance(lid_b, dict):
-                bowl_xyz = bowl_b.get("xyz", [0.0, 0.0, 0.0])
-                bowl_height_val = bowl_b.get("height", 0.0)
-                lid_xyz = lid_b.get("xyz", [0.0, 0.0, 0.0])
-                if len(bowl_xyz) >= 3 and len(lid_xyz) >= 3 and bowl_height_val:
-                    damping_height_threshold = bowl_xyz[2] + bowl_height_val + lid_xyz[2] + 0.003
-
         self.water_sim = Fluid(
             config=FluidConfig.water(
                 sim_name=name,
@@ -74,10 +61,8 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 gravity=(0.0, 0.0, -9.81),
                 r_s=0.0015,
                 target_volume=0.00020,
-                vane_twist=self.settings.vane_twist,
                 slot_height=self.settings.slot_height * 0.001,
                 fallen_threshold_liters=0.001,
-                damping_height_threshold=damping_height_threshold,
             ),
             provider=self,
             body_id=body_id,
@@ -121,13 +106,14 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         self.water_sim.update(
             body_id,
             client,
-            motor_config=FluidMotorConfig(target_omega=omega, max_force=max_force),
+            target_omega=omega,
+            max_force=max_force,
         )
         if (
             len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0
             >= self.water_sim.fallen_threshold_liters
         ):
-            return f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl"
+            return f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl at step {step_idx}"
         return None
 
     return {
