@@ -67,11 +67,105 @@ def test_knudsen_number():
                 positions.append((x * 0.006, y * 0.006, z * 0.006))
 
     kn = fluid.compute_knudsen_number(positions, characteristic_length=0.076)
+    kn_fallback = fluid.compute_knudsen_number(positions)
 
     # For a dense fluid packing, Kn should be strictly less than 0.1
     # demonstrating that it operates in the continuum fluid dynamics regime.
     assert kn < 0.1
     assert kn > 0.0
+    assert kn == kn_fallback
+
+    # Verify that when boundaries are configured, we derive it from LinkType.BASE boundary radius
+    from model.boundary_config import BoundaryConfig
+
+    boundaries_config = {
+        "bowl": BoundaryConfig(
+            link_type=LinkType.BASE,
+            radius=0.1,
+            link_idx=-1,
+        )
+    }
+    fluid_with_boundary = Fluid(config=FluidConfig(r_s=0.003, boundaries=boundaries_config))
+    assert fluid_with_boundary.characteristic_length == 0.1
+    kn_boundary = fluid_with_boundary.compute_knudsen_number(positions)
+    # The characteristic length is larger (0.1 vs 0.076), so Knudsen number should be smaller
+    assert kn_boundary < kn
+
+
+def test_fluid_config_boundary_validation():
+    """Verify that FluidConfig enforces boundaries containing a BASE LinkType boundary."""
+    import pytest
+    from pydantic import ValidationError
+    from model.boundary_config import BoundaryConfig
+
+    # Empty boundaries dictionary should raise ValidationError
+    with pytest.raises(ValidationError, match="Boundaries dictionary is required and cannot be empty"):
+        FluidConfig(boundaries={})
+
+    # Boundaries dictionary without a BASE LinkType should raise ValidationError
+    invalid_boundaries = {
+        "tube": BoundaryConfig(
+            link_type=LinkType.TUBE,
+            radius=0.008,
+            link_idx=1,
+        )
+    }
+    with pytest.raises(ValidationError, match="Every fluid configuration model must contain a BASE LinkType boundary"):
+        FluidConfig(boundaries=invalid_boundaries)
+
+    # ShapeType cylinder with invalid radius
+    from model.boundary_config import ShapeType
+
+    with pytest.raises(ValidationError, match="CYLINDER shape requires a positive radius"):
+        BoundaryConfig(
+            shape=ShapeType.CYLINDER,
+            link_type=LinkType.BASE,
+            radius=0.0,
+            height=0.1,
+            link_idx=-1,
+        )
+
+    # ShapeType cylinder with unsupported fields (e.g. num_vanes)
+    with pytest.raises(ValidationError, match="is not supported for shape type 'cylinder'"):
+        BoundaryConfig(
+            shape=ShapeType.CYLINDER,
+            link_type=LinkType.BASE,
+            radius=0.076,
+            height=0.1,
+            num_vanes=4.0,
+            link_idx=-1,
+        )
+
+
+def test_boundary_config_vane_twist_rad():
+    """Verify that vane_twist_rad is computed as a read-only property and not present in serialized fields."""
+    from model.boundary_config import BoundaryConfig, ShapeType
+    from provider.bullet import LinkType
+
+    # Default twist is -1080.0 degrees
+    cfg = BoundaryConfig(
+        shape=ShapeType.IMPELLER,
+        link_type=LinkType.IMPELLER,
+        radius=0.03,
+        link_idx=0,
+    )
+    assert math.isclose(cfg.vane_twist, -1080.0)
+    assert math.isclose(cfg.vane_twist_rad, -6.0 * math.pi)
+
+    # Custom twist
+    cfg_custom = BoundaryConfig(
+        shape=ShapeType.IMPELLER,
+        link_type=LinkType.IMPELLER,
+        radius=0.03,
+        vane_twist=180.0,
+        link_idx=0,
+    )
+    assert math.isclose(cfg_custom.vane_twist, 180.0)
+    assert math.isclose(cfg_custom.vane_twist_rad, math.pi)
+
+    # Verify vane_twist_rad is not part of model_fields or serialized dict
+    assert "vane_twist_rad" not in cfg.model_fields
+    assert "vane_twist_rad" not in cfg.model_dump()
 
 
 def test_newtonian_viscosity():
@@ -258,6 +352,7 @@ def test_fluid_simulator_dynamic_properties():
     from unittest.mock import patch, MagicMock
     from provider.fluid import Fluid
     from provider.room import Room
+    from model import BoundaryConfig, FluidConfig
 
     # Mock provider
     provider = MagicMock()
@@ -266,16 +361,25 @@ def test_fluid_simulator_dynamic_properties():
     provider.settings.tube_thickness = 1.5
     provider.settings.impeller_shaft_radius = 1.5
 
-    sim = Fluid(
-        provider=provider,
-        body_id=42,
-        physics_client=1,
-        link_indices={
-            LinkType.OUTLET: 2,
-            LinkType.TUBE: 1,
-            LinkType.IMPELLER: 0,
-        },
-    )
+    boundaries = {
+        "bowl": BoundaryConfig(
+            link_type=LinkType.BASE,
+            radius=0.0765,
+            thickness=0.0035,
+            link_idx=-1,
+        ),
+        "tube": BoundaryConfig(
+            link_type=LinkType.TUBE,
+            radius=0.008,
+            height=0.100,
+            link_idx=1,
+        ),
+        "impeller": BoundaryConfig(
+            link_type=LinkType.IMPELLER,
+            radius=0.0,
+            link_idx=0,
+        ),
+    }
 
     # Mock PyBullet functions
     def mock_get_num_joints(body_id, physicsClientId):
@@ -356,28 +460,57 @@ def test_fluid_simulator_dynamic_properties():
             return (None, None, None, None, (0.0, 0.0, 0.025), (0.0, 0.0, 0.0, 1.0))
         return (None, None, None, None, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
 
+    def mock_get_base_position_and_orientation(body_id, physicsClientId):
+        return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)
+
+    def mock_get_dynamics_info(body_id, link_idx, physicsClientId):
+        return [None, None, None, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)]
+
     with (
         patch("pybullet.getNumJoints", side_effect=mock_get_num_joints),
         patch("pybullet.getJointInfo", side_effect=mock_get_joint_info),
         patch("pybullet.getAABB", side_effect=mock_get_aabb),
         patch("pybullet.getLinkState", side_effect=mock_get_link_state),
         patch("pybullet.getConnectionInfo", return_value={"isConnected": True}),
+        patch("pybullet.createCollisionShape", return_value=0),
+        patch("pybullet.createVisualShape", return_value=0),
+        patch("pybullet.getBasePositionAndOrientation", side_effect=mock_get_base_position_and_orientation),
+        patch("pybullet.getDynamicsInfo", side_effect=mock_get_dynamics_info),
     ):
+        sim = Fluid(
+            config=FluidConfig(boundaries=boundaries),
+            provider=provider,
+            body_id=42,
+            physics_client=1,
+            link_indices={
+                LinkType.OUTLET: 2,
+                LinkType.TUBE: 1,
+                LinkType.IMPELLER: 0,
+            },
+        )
         # Verify dynamic properties using the refactored field names
         assert sim.link_indices == {
             LinkType.OUTLET: 2,
             LinkType.TUBE: 1,
             LinkType.IMPELLER: 0,
         }
-        assert sim.motor_config.target_omega == 15.0
-        assert sim.motor_config.max_force == 10.0
+        assert sim.boundaries[LinkType.IMPELLER].target_omega == 15.0
+        assert sim.boundaries[LinkType.IMPELLER].max_force == 10.0
         assert math.isclose(sim.radii[LinkType.TUBE], 0.008, abs_tol=1e-5)
         assert math.isclose(sim.radii[LinkType.BASE], 0.080, abs_tol=1e-5)
         assert math.isclose(sim.radii[LinkType.IMPELLER], 0.003, abs_tol=1e-5)
         assert math.isclose(sim.radii[LinkType.FALLEN], 0.090, abs_tol=1e-5)
-        assert math.isclose(sim.thresholds[LinkType.OUTLET], 0.095, abs_tol=1e-5)
+        assert math.isclose(sim.thresholds[LinkType.OUTLET], 0.120, abs_tol=1e-5)
         assert math.isclose(sim.thresholds[LinkType.OUTLET_MAX_Y], 0.005, abs_tol=1e-5)
         assert math.isclose(sim.thresholds[LinkType.TUBE], 15.0, abs_tol=1e-5)
+
+
+def test_fluid_default_thresholds():
+    """Verify that fluid thresholds default correctly when physics client is not connected."""
+    sim = Fluid(config=FluidConfig(r_s=0.003))
+    assert sim.thresholds[LinkType.TUBE] == 0.0
+    assert sim.thresholds[LinkType.OUTLET] == 0.0
+    assert sim.thresholds[LinkType.OUTLET_MAX_Y] == 0.0
 
 
 def test_fluid_parameter_overrides():
@@ -399,7 +532,7 @@ def test_fluid_parameter_overrides():
     provider.settings.TARGET_VOLUME = 0.001
     provider.settings.VOLUME_THRESHOLD_LITERS = 0.600
     provider.settings.FALLEN_THRESHOLD_LITERS = 0.100
-    provider.settings.BOWL_WALL_BUFFER = 0.005
+    provider.settings.SPAWN_BUFFER = 0.005
 
     # Set overridable physical settings
     provider.settings.REST_DENSITY = 800.0
@@ -423,7 +556,7 @@ def test_fluid_parameter_overrides():
             target_volume=provider.settings.TARGET_VOLUME,
             volume_threshold_liters=provider.settings.VOLUME_THRESHOLD_LITERS,
             fallen_threshold_liters=provider.settings.FALLEN_THRESHOLD_LITERS,
-            bowl_wall_buffer=provider.settings.BOWL_WALL_BUFFER,
+            spawn_buffer=provider.settings.SPAWN_BUFFER,
             rest_density=provider.settings.REST_DENSITY,
             viscosity=provider.settings.VISCOSITY,
             stiffness=provider.settings.STIFFNESS,
@@ -444,7 +577,7 @@ def test_fluid_parameter_overrides():
     assert fluid.target_volume == 0.001
     assert fluid.volume_threshold_liters == 0.600
     assert fluid.fallen_threshold_liters == 0.100
-    assert fluid.bowl_wall_buffer == 0.005
+    assert fluid.spawn_buffer == 0.005
     assert fluid.rest_density == 800.0
     assert fluid.viscosity == 0.12
     assert fluid.stiffness == 150.0

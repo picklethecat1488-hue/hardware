@@ -164,21 +164,49 @@ For parts that participate in physics simulation, you must attach URDF/simulatio
   - `urdf_label` (`str`): Unique label for the link in the URDF representation.
   - `urdf_material` (`str`): Material name (e.g., `"petg"`, `"acrylic"`).
   - `urdf_density` (`float`): Density in $\text{kg/m}^3$ used to calculate link mass and inertia.
+
+- **Kinematic & Joint Attributes**:
   - `urdf_parent` (`Optional[str]`): Parent link name in the kinematic tree (`None` for the base/root).
-  - `urdf_joint_type` (`Optional[str]`): Joint type connecting to the parent (e.g., `"revolute"`, `"fixed"`, `"prismatic"`).
+  - `urdf_joint_type` (`Optional[str]`): Joint type connecting to the parent. Allowed values: `"fixed"`, `"revolute"`, `"continuous"`, `"prismatic"`, `"planar"`, or `"spherical"`.
+  - `urdf_joint_axis` (`Optional[str]`): Joint axis of motion (formatted as a space-separated string e.g., `"0 0 1"`, `"0 1 0"`, default is `"0 0 1"`).
+  - `urdf_joint_lower` (`Optional[float]`): Lower limit for joint motion (in radians or meters, default is `-3.14159`).
+  - `urdf_joint_upper` (`Optional[float]`): Upper limit for joint motion (in radians or meters, default is `3.14159`).
+
+- **Motor & Actuation Attributes**:
+  - `urdf_motor_type` (`Optional[str]`): Motor control type (e.g., `"velocity"`, `"torque"`).
+  - `urdf_motor_target` (`Optional[float]`): Target motor velocity (in rad/s) or torque (in N·m) depending on `urdf_motor_type`.
+  - `urdf_motor_force` (`Optional[float]`): Maximum force/torque applied by the motor (default is `10.0`).
+
+- **Rigid-Body Collision Attributes**:
+  - `urdf_collision_type` (`URDFCollisionType`): Collision model. Can be:
+    - `URDFCollisionType.CONVEX` (`"convex"`): Uses a convex hull representation of the geometry for collision detection.
+    - `URDFCollisionType.CONCAVE` (`"concave"`): Uses the full triangular mesh of the geometry.
+    - `URDFCollisionType.COMPOUND` (`"compound"`): Uses compound collision shapes.
+    - `URDFCollisionType.ANALYTICAL` (`"analytical"`): Uses idealized analytical shapes.
+    - `URDFCollisionType.NONE` (`"none"`): Disables collision detection for the link.
+  - `urdf_collision_primitives` (`list[dict]`): A list of analytical shapes used for rigid-body collision detection instead of complex meshes. Each dictionary must contain `type` (`URDFCollisionShapeType`) and parameters depending on the type:
+    - For `URDFCollisionShapeType.BOX` (`"box"`): `size` (`list[float]`) representing the width, depth, and height.
+    - For `URDFCollisionShapeType.CYLINDER` (`"cylinder"`): `radius` (`float`) and `length` (`float`).
+    - For `URDFCollisionShapeType.SPHERE` (`"sphere"`): `radius` (`float`).
+    - Optional offset keys: `xyz` (`list[float]`) and `rpy` (`list[float]`).
 
 - **Boundary & Fluid Interaction**:
   - `urdf_boundary_friction` (`float`): Coulomb friction coefficient for fluid-boundary interactions.
   - `urdf_contact_angle` (`float`): Fluid contact angle (wetting angle) in degrees.
-  - `urdf_collision_type` (`URDFCollisionType`): Collision model. Can be:
-    - `URDFCollisionType.ANALYTICAL` (uses idealized geometric boundaries like cylinders or boxes).
-    - `URDFCollisionType.CONCAVE` (uses the full triangular mesh).
   - `urdf_boundary_shape` (`str`): Shape identifier (e.g., `"cylinder"`, `"tube"`, `"impeller"`).
   - `urdf_boundary_type` (`URDFBoundaryType`): Boundary role for JAX SPH simulator:
-    - `URDFBoundaryType.CAVITY` (hollow interior boundary/container).
-    - `URDFBoundaryType.SOLID` (solid obstacle).
-    - `URDFBoundaryType.SOLID_CAVITY` (dual solid/cavity interaction, e.g. tubes).
-  - `urdf_collision_primitives` (`list[dict]`): A list of analytical shapes (boxes, cylinders) used for rigid-body collision detection instead of complex meshes.
+    - `URDFBoundaryType.CAVITY` (`"cavity"`): Hollow interior boundary/container.
+    - `URDFBoundaryType.SOLID` (`"solid"`): Solid obstacle.
+    - `URDFBoundaryType.SOLID_CAVITY` (`"solid_cavity"`): Dual solid/cavity interaction, e.g. tubes.
+  - `urdf_boundary_radius` (`Optional[float]`): Radius in meters for the analytical boundary shape.
+  - `urdf_boundary_height` (`Optional[float]`): Height/length in meters for the analytical boundary shape.
+  - `urdf_boundary_thickness` (`Optional[float]`): Thickness in meters for the boundary shape.
+  - `urdf_boundary_xyz` (`Optional[str]`): Space-separated local offset coordinates relative to the origin for the boundary shape (formatted as `"x y z"`).
+  - `urdf_boundary_rpy` (`Optional[str]`): Space-separated local orientation coordinates relative to the origin for the boundary shape (formatted as `"r p y"`).
+  - `urdf_boundary_slot_height` (`Optional[float]`): Slot height in meters for specific boundary shapes.
+  - `urdf_boundary_vane_twist` (`Optional[float]`): Vane/impeller twist parameter.
+  - `urdf_boundary_target_omega` (`Optional[float]`): Target angular velocity of the boundary.
+  - `urdf_boundary_max_force` (`Optional[float]`): Maximum force applied to the boundary.
   - `urdf_boundaries` (`list[dict]`): A list of boundary configurations used when a single link contains multiple analytical boundaries (e.g. recessed pocket cavity, deflection cap, and reservoir ceiling). Each boundary dict can contain:
     - `shape` (`str`): Geometry shape type (e.g., `"cylinder"`, `"tube"`).
     - `type` (`str`): Boundary collision role (e.g., `"cavity"`, `"solid"`).

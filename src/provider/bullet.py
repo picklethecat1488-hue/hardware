@@ -467,6 +467,18 @@ class Bullet:
                                     "height": getattr(u_geom, "urdf_boundary_height", None),
                                     "thickness": getattr(u_geom, "urdf_boundary_thickness", None),
                                 }
+                                twist = getattr(u_geom, "urdf_boundary_vane_twist", None)
+                                if twist is not None:
+                                    boundaries_metadata[label]["vane_twist"] = twist
+                                slot_h = getattr(u_geom, "urdf_boundary_slot_height", None)
+                                if slot_h is not None:
+                                    boundaries_metadata[label]["slot_height"] = slot_h
+                                omega = getattr(u_geom, "urdf_boundary_target_omega", None)
+                                if omega is not None:
+                                    boundaries_metadata[label]["target_omega"] = omega
+                                force = getattr(u_geom, "urdf_boundary_max_force", None)
+                                if force is not None:
+                                    boundaries_metadata[label]["max_force"] = force
                                 if isinstance(xyz_str, str):
                                     boundaries_metadata[label]["xyz"] = [float(x) for x in xyz_str.split()]
                                 if isinstance(rpy_str, str):
