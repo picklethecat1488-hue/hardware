@@ -15,10 +15,14 @@ from .viewer import ExhaustManifoldsViewer
 class ExhaustManifoldsProvider(Provider):
     """Provides exhaust manifold geometry and configuration."""
 
-    @cached_property
+    @property
     def default_config(self) -> ExhaustManifoldsConfig:
         """Return the default exhaust manifolds configuration."""
-        return ExhaustManifoldsConfig(measurements_path=str(Path(__file__).parent / "measurements.yaml"))
+        if not hasattr(self, "_cached_default_config"):
+            self._cached_default_config = ExhaustManifoldsConfig(
+                measurements_path=str(Path(__file__).parent / "measurements.yaml")
+            )
+        return self._cached_default_config
 
     @cached_property
     def builder(self) -> ExhaustManifoldsBuilder:

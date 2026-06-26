@@ -62,6 +62,12 @@ class FluidConfig(BaseModel):
         default=-1080.0, description="Total twist angle of the rotary vanes (impeller blades) in degrees."
     )
     slot_height: float = Field(default=0.015, description="Intake slot height (meters).")
+    damping_height_threshold: float = Field(
+        default=0.090, description="Height threshold below which SPH velocity damping is active (meters)."
+    )
+    high_damping_value: float = Field(
+        default=0.998, description="Damping value applied to particles above the threshold (fraction)."
+    )
     sim_name: str = Field(default="", description="User-defined simulation run name tag.")
     neighbor_list_box: float = Field(default=0.3, description="Box size (meters) for JAX-MD neighbor search.")
 

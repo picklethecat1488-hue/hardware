@@ -178,6 +178,60 @@ class CatFountainConfig(BaseModel):
         return float(self._material_data.get(self.material, {}).get("contact_angle", 75.0))
 
     # =========================================================================
+    # Lid & Spout Deflection Boundary Parameters
+    # =========================================================================
+
+    @cached_property
+    def lid_pocket_radius(self) -> float:
+        """Return the lid pocket radius in millimeters."""
+        return float(self._raw_data.get("lid_pocket_radius", 80.0))
+
+    @cached_property
+    def lid_pocket_cavity_height(self) -> float:
+        """Return the lid pocket cavity height in millimeters."""
+        return float(self._raw_data.get("lid_pocket_cavity_height", 10.0))
+
+    @cached_property
+    def lid_pocket_thickness(self) -> float:
+        """Return the lid pocket wall thickness in millimeters."""
+        return float(self._raw_data.get("lid_pocket_thickness", 4.0))
+
+    @cached_property
+    def lid_pocket_z_offset(self) -> float:
+        """Return the lid pocket Z offset in millimeters."""
+        return float(self._raw_data.get("lid_pocket_z_offset", 3.0))
+
+    @cached_property
+    def drain_hole_y(self) -> float:
+        """Return the drain hole Y coordinate in millimeters."""
+        return float(self._raw_data.get("drain_hole_y", 65.0))
+
+    @cached_property
+    def drain_hole_radius(self) -> float:
+        """Return the drain hole radius in millimeters."""
+        return float(self._raw_data.get("drain_hole_radius", 15.0))
+
+    @cached_property
+    def spout_deflection_radius(self) -> float:
+        """Return the spout deflection cap radius in millimeters."""
+        return float(self._raw_data.get("spout_deflection_radius", 13.0))
+
+    @cached_property
+    def spout_deflection_height(self) -> float:
+        """Return the spout deflection cap cavity height in millimeters."""
+        return float(self._raw_data.get("spout_deflection_height", 0.0))
+
+    @cached_property
+    def spout_deflection_thickness(self) -> float:
+        """Return the spout deflection cap thickness in millimeters."""
+        return float(self._raw_data.get("spout_deflection_thickness", 40.0))
+
+    @cached_property
+    def spout_deflection_z_offset(self) -> float:
+        """Return the spout deflection cap Z offset in millimeters."""
+        return float(self._raw_data.get("spout_deflection_z_offset", 16.0))
+
+    # =========================================================================
     # Simulation Parameters
     # =========================================================================
 
