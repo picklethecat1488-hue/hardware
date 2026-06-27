@@ -63,20 +63,6 @@ class URDFShape(Protocol):
     urdf_collision_primitives: Optional[list[dict[str, Any]]]
     urdf_boundaries: Optional[list[dict[str, Any]]]
     urdf_boundary_friction: Optional[float]
-    urdf_contact_angle: Optional[float]
-    urdf_boundary_shape: Optional[str]
-    urdf_boundary_type: Optional[str]
-    urdf_boundary_radius: Optional[float]
-    urdf_boundary_height: Optional[float]
-    urdf_boundary_xyz: Optional[str]
-    urdf_boundary_rpy: Optional[str]
-    urdf_boundary_thickness: Optional[float]
-    urdf_boundary_slot_height: Optional[float]
-    urdf_boundary_vane_twist: Optional[float]
-
-    def __getattr__(self, name: str) -> Any:
-        """Get an attribute from the object."""
-        ...
 
 
 MODES = "modes"

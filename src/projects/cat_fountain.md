@@ -73,7 +73,7 @@ To build the cat fountain with I2C communication across all peripheral subsystem
 | **Microcontroller Board** | **Raspberry Pi Pico W** | Main controller running MicroPython/C++. Controls the I2C bus, reads sensors, and drives motor speed. | *Host Controller* | Dual ARM Cortex-M0+, built-in Wi-Fi/Bluetooth, two hardware I2C buses (I2C0, I2C1). |
 | **IR Proximity Sensors (Qty: 3)** | **Adafruit VL53L0X Time-of-Flight (ToF)** | Long-range laser distance sensor used for cat proximity detection in North, East, and West directions. | `0x29` (default)<br>*Re-addressed to `0x30`, `0x31`, `0x32` at boot* | Measures precise distances up to 2m, unaffected by ambient light. Uses shutdown pin (XSHUT) for startup addressing. |
 | **RGB LED Indicator** | **Adafruit NeoPixel Driver (ATtiny816)** | High-brightness status LED to indicate battery capacity and device state over I2C. | `0x60` | Interfaces standard WS2812B/NeoPixels to an I2C bus via a pre-programmed ATtiny microcontroller. |
-| **USBC Charger & Boost** | **Adafruit BQ24195 Charger & Boost** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | `0x6B` | I2C-controlled charging rate, input current limits, and telemetry. Outputs stable 5.1V at up to 2.1A. |
+| **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | `0x6B` | I2C-controlled charging rate, input current limits, and telemetry. Outputs stable 5.1V at up to 1A. |
 | **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Uses ModelGauge algorithm for accurate state of charge without battery calibration. |
 | **Battery** | **Standard 18650 3.7V Li-ion Cell** | Main energy source (e.g. Samsung 30Q or Panasonic NCR18650B, 3000+ mAh). | *N/A (Analog)* | Rechargeable lithium-ion cell to fit the internal battery storage area. |
 | **DC Motor Driver** | **Grove - I2C Motor Driver (DRV8830)** | Low-voltage motor controller to drive and speed-regulate the N20 gear motor driving the Archimedes screw. | `0x60` to `0x65` (configurable via bridges) | H-Bridge driver with output voltage feedback for speed control, overcurrent protection. |
@@ -98,7 +98,11 @@ These fasteners and seal components are required to assemble the 3D-printed body
 | **Bottom Cover Screws** | 4 | M3 x 10mm (Flat Head/Countersunk) | Secures the controller compartment cover. Fits flush into the bottom countersinks. |
 | **DC Motor Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the DC motor to the dry compartment ceiling mount (17mm spacing). |
 | **Proximity Sensor Screws** | 6 | M2 x 6mm or 8mm (Self-Tapping or Machine) | Mounts the three proximity sensors to the North, East, and West walls. |
-| **Charging Port Screws** | 2 | M2 x 6mm or 8mm (Self-Tapping or Machine) | Secures the USB-C charging port board to the back wall of the bowl. |
+| **Charger Board Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit BQ25185 board to the dry compartment ceiling. |
+| **Fuel Gauge Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit MAX17048 board to the dry compartment ceiling. |
+| **Pico W Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Raspberry Pi Pico W to the dry compartment ceiling. |
+| **Motor Driver Screws** | 3 | M2 x 4mm or 5mm (Machine Screws) | Secures the Grove - Mini I2C Motor Driver board to the dry compartment ceiling. |
+| **LED Controller Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit NeoDriver LED board to the dry compartment ceiling. |
 | **Shaft Seal O-Ring** | 1 | 4.5 mm to 5.0 mm ID x 1.5 mm CS (Nitrile/NBR) | Fits into the sealing groove under the impeller shaft to prevent water leaking into the dry motor compartment. |
 
 ## Battery Life Estimation

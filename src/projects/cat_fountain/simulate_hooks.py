@@ -32,7 +32,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             vals = val if isinstance(val, list) else [val]
             resolved_vals = []
             for item in vals:
-                item_dict = dict(item)
+                item_dict = item.model_dump(exclude_defaults=True) if hasattr(item, "model_dump") else dict(item)
                 match label:
                     case "bowl":
                         item_dict["link_type"] = LinkType.BASE
@@ -63,6 +63,8 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 target_volume=0.00020,
                 slot_height=self.settings.slot_height * 0.001,
                 fallen_threshold_liters=0.001,
+                high_damping_value=0.998,
+                damping_boundary=25.0,
             ),
             provider=self,
             body_id=body_id,
