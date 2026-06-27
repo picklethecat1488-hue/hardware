@@ -455,34 +455,6 @@ class Bullet:
                         geom_boundaries = getattr(u_geom, "urdf_boundaries", None)
                         if geom_boundaries:
                             boundaries_metadata[label] = geom_boundaries
-                        else:
-                            c_type = getattr(u_geom, "urdf_collision_type", None)
-                            if c_type == URDFCollisionType.ANALYTICAL:
-                                xyz_str = getattr(u_geom, "urdf_boundary_xyz", None)
-                                rpy_str = getattr(u_geom, "urdf_boundary_rpy", None)
-                                boundaries_metadata[label] = {
-                                    "shape": getattr(u_geom, "urdf_boundary_shape", None),
-                                    "type": getattr(u_geom, "urdf_boundary_type", None),
-                                    "radius": getattr(u_geom, "urdf_boundary_radius", None),
-                                    "height": getattr(u_geom, "urdf_boundary_height", None),
-                                    "thickness": getattr(u_geom, "urdf_boundary_thickness", None),
-                                }
-                                twist = getattr(u_geom, "urdf_boundary_vane_twist", None)
-                                if twist is not None:
-                                    boundaries_metadata[label]["vane_twist"] = twist
-                                slot_h = getattr(u_geom, "urdf_boundary_slot_height", None)
-                                if slot_h is not None:
-                                    boundaries_metadata[label]["slot_height"] = slot_h
-                                omega = getattr(u_geom, "urdf_boundary_target_omega", None)
-                                if omega is not None:
-                                    boundaries_metadata[label]["target_omega"] = omega
-                                force = getattr(u_geom, "urdf_boundary_max_force", None)
-                                if force is not None:
-                                    boundaries_metadata[label]["max_force"] = force
-                                if isinstance(xyz_str, str):
-                                    boundaries_metadata[label]["xyz"] = [float(x) for x in xyz_str.split()]
-                                if isinstance(rpy_str, str):
-                                    boundaries_metadata[label]["rpy"] = [float(x) for x in rpy_str.split()]
 
                 # Setup Hooks
                 setup_hook = self.provider_hooks.get(Simulate.SETUP, None)

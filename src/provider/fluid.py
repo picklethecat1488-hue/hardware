@@ -772,6 +772,8 @@ class Fluid:
         self.visc_lap_coeff = config.visc_lap_coeff
         self.pressure_avg_factor = config.pressure_avg_factor
         self.min_distance_threshold = config.min_distance_threshold
+        self.stiffness_boundary = config.stiffness_boundary
+        self.damping_boundary = config.damping_boundary
 
         self.volume_threshold_liters = config.volume_threshold_liters
         self.fallen_threshold_liters = config.fallen_threshold_liters
@@ -1217,8 +1219,8 @@ class Fluid:
             b_orn_arr,
             impeller_b.target_omega if impeller_b is not None else 0.0,
             self.current_sim_time,
-            1000.0,
-            5.0,
+            self.stiffness_boundary,
+            self.damping_boundary,
             self.r_s,
             self.base_idx,
             self.pressure_avg_factor,

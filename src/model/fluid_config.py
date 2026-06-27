@@ -51,6 +51,10 @@ class FluidConfig(BaseModel):
         default=1e-6, description="Minimum distance threshold to prevent numerical divide-by-zero errors."
     )
 
+    # --- Boundary Collision Properties ---
+    stiffness_boundary: float = Field(default=1000.0, description="Boundary collision penalty stiffness coefficient.")
+    damping_boundary: float = Field(default=5.0, description="Boundary collision penalty damping coefficient.")
+
     # --- Simulation Domain & Volumes ---
     target_volume: float = Field(default=0.0005, description="Target total fluid volume to spawn (m^3).")
     spawn_buffer: float = Field(

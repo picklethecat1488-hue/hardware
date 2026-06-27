@@ -206,9 +206,9 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 hidden_color = RGB(180, 180, 180)  # Lighter grey
             else:
                 hidden_color = RGB(
-                    int(visible_color.r + (255 - visible_color.r) * 0.5),
-                    int(visible_color.g + (255 - visible_color.g) * 0.5),
-                    int(visible_color.b + (255 - visible_color.b) * 0.5),
+                    int(visible_color.r + (255 - visible_color.r) * 0.71),
+                    int(visible_color.g + (255 - visible_color.g) * 0.71),
+                    int(visible_color.b + (255 - visible_color.b) * 0.71),
                 )
             hidden_weight = visible_weight * 0.5  # Thinner line weight
 
@@ -647,12 +647,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     "rgba_str": rgba_str,
                     "collision_type": collision_type,
                     "collision_primitives": getattr(u_geom, "urdf_collision_primitives", None),
-                    "boundary_shape": getattr(u_geom, "urdf_boundary_shape", None),
-                    "boundary_type": getattr(u_geom, "urdf_boundary_type", None),
-                    "boundary_radius": getattr(u_geom, "urdf_boundary_radius", None),
-                    "boundary_height": getattr(u_geom, "urdf_boundary_height", None),
-                    "boundary_xyz": getattr(u_geom, "urdf_boundary_xyz", None),
-                    "boundary_rpy": getattr(u_geom, "urdf_boundary_rpy", None),
+                    "boundaries": getattr(u_geom, "urdf_boundaries", None),
                 }
             )
 
@@ -673,17 +668,34 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             if c_type == URDFCollisionType.NONE:
                 collision_section = ""
             elif c_type == URDFCollisionType.ANALYTICAL:
-                collision_section = (
-                    analytical_boundary_template.format(
-                        boundary_shape=link.get("boundary_shape") or "cylinder",
-                        boundary_type=link.get("boundary_type") or "cavity",
-                        boundary_radius=link.get("boundary_radius") or 0.0,
-                        boundary_height=link.get("boundary_height") or 0.0,
-                        boundary_xyz=link.get("boundary_xyz") or "0.0 0.0 0.0",
-                        boundary_rpy=link.get("boundary_rpy") or "0.0 0.0 0.0",
-                    )
-                    + "\n"
-                )
+                boundaries_list = link.get("boundaries")
+                if boundaries_list:
+                    collision_strings = []
+                    for b in boundaries_list:
+                        b_shape = b.shape if hasattr(b, "shape") else b.get("shape", "cylinder")
+                        b_type = b.type if hasattr(b, "type") else b.get("type", "cavity")
+                        b_radius = b.radius if hasattr(b, "radius") else b.get("radius", 0.0)
+                        b_height = b.height if hasattr(b, "height") else b.get("height", 0.0)
+
+                        b_xyz = b.xyz if hasattr(b, "xyz") else b.get("xyz", (0.0, 0.0, 0.0))
+                        b_rpy = b.rpy if hasattr(b, "rpy") else b.get("rpy", (0.0, 0.0, 0.0))
+
+                        xyz_str = f"{b_xyz[0]:.6f} {b_xyz[1]:.6f} {b_xyz[2]:.6f}"
+                        rpy_str = f"{b_rpy[0]:.6f} {b_rpy[1]:.6f} {b_rpy[2]:.6f}"
+
+                        collision_strings.append(
+                            analytical_boundary_template.format(
+                                boundary_shape=b_shape,
+                                boundary_type=b_type,
+                                boundary_radius=b_radius,
+                                boundary_height=b_height,
+                                boundary_xyz=xyz_str,
+                                boundary_rpy=rpy_str,
+                            )
+                        )
+                    collision_section = "\n".join(collision_strings) + "\n"
+                else:
+                    collision_section = ""
             elif c_prims is not None:
                 collision_strings = []
                 for prim in c_prims:
@@ -875,3 +887,87 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             spawn_viewer,
         )
         bullet_sim.run()
+
+    @staticmethod
+    def make_boundary_config(
+        part: Any, link_type: Any, link_idx: int = -1, shape: Optional[Any] = None, type: Optional[Any] = None, **kwargs
+    ) -> Any:
+        """Build a BoundaryConfig from a build123d Part/Shape by extracting its physical dimensions."""
+        from model.boundary_config import BoundaryConfig, ShapeType
+        import math
+
+        if hasattr(part, "part"):
+            solid = part.part
+        else:
+            solid = part
+
+        bbox = solid.bounding_box()
+        dx = bbox.max.X - bbox.min.X
+        dy = bbox.max.Y - bbox.min.Y
+        dz = bbox.max.Z - bbox.min.Z
+
+        center_x = (bbox.max.X + bbox.min.X) * 0.5
+        center_y = (bbox.max.Y + bbox.min.Y) * 0.5
+        center_z = (bbox.max.Z + bbox.min.Z) * 0.5
+
+        # Determine default shape from geometry if not provided
+        if shape is None:
+            # Default to cylinder if circular-ish, box otherwise
+            if abs(dx - dy) < 1e-3:
+                shape = ShapeType.CYLINDER
+            else:
+                shape = ShapeType.BOX
+
+        # Compute default radius and height in meters (CAD is in mm)
+        default_radius = 0.0
+        default_height = 0.0
+        default_thickness = 0.0
+        default_xyz = (0.0, 0.0, 0.0)
+
+        match shape:
+            case ShapeType.CYLINDER | ShapeType.TUBE | ShapeType.IMPELLER:
+                default_radius = float(max(dx, dy) / 2.0 * 0.001)
+                default_height = float(dz * 0.001)
+                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(bbox.min.Z * 0.001))
+            case ShapeType.BOX:
+                default_height = float(dz * 0.001)
+                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(bbox.min.Z * 0.001))
+            case ShapeType.SPHERE:
+                default_radius = float(max(dx, dy, dz) / 2.0 * 0.001)
+                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(center_z * 0.001))
+            case ShapeType.PLANE:
+                default_thickness = float(dz * 0.001)
+                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(bbox.min.Z * 0.001))
+
+        # Compute default local orientation RPY in radians
+        if hasattr(solid, "location") and solid.location is not None:
+            orientation = solid.location.orientation
+            default_rpy = (
+                float(math.radians(orientation.X)),
+                float(math.radians(orientation.Y)),
+                float(math.radians(orientation.Z)),
+            )
+        else:
+            default_rpy = (0.0, 0.0, 0.0)
+
+        # Use overrides if provided in kwargs
+        radius = kwargs.pop("radius", default_radius)
+        height = kwargs.pop("height", default_height)
+        thickness = kwargs.pop("thickness", default_thickness)
+        xyz = kwargs.pop("xyz", default_xyz)
+        rpy = kwargs.pop("rpy", default_rpy)
+
+        config_dict = {
+            "link_type": link_type,
+            "link_idx": link_idx,
+            "shape": shape,
+            "type": type,
+            "radius": radius,
+            "height": height,
+            "thickness": thickness,
+            "xyz": xyz,
+            "rpy": rpy,
+            **kwargs,
+        }
+
+        return BoundaryConfig.model_validate(config_dict)

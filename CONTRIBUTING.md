@@ -192,27 +192,29 @@ For parts that participate in physics simulation, you must attach URDF/simulatio
 
 - **Boundary & Fluid Interaction**:
   - `urdf_boundary_friction` (`float`): Coulomb friction coefficient for fluid-boundary interactions.
-  - `urdf_contact_angle` (`float`): Fluid contact angle (wetting angle) in degrees.
-  - `urdf_boundary_shape` (`str`): Shape identifier (e.g., `"cylinder"`, `"tube"`, `"impeller"`).
-  - `urdf_boundary_type` (`URDFBoundaryType`): Boundary role for JAX SPH simulator:
-    - `URDFBoundaryType.CAVITY` (`"cavity"`): Hollow interior boundary/container.
-    - `URDFBoundaryType.SOLID` (`"solid"`): Solid obstacle.
-    - `URDFBoundaryType.SOLID_CAVITY` (`"solid_cavity"`): Dual solid/cavity interaction, e.g. tubes.
-  - `urdf_boundary_radius` (`Optional[float]`): Radius in meters for the analytical boundary shape.
-  - `urdf_boundary_height` (`Optional[float]`): Height/length in meters for the analytical boundary shape.
-  - `urdf_boundary_thickness` (`Optional[float]`): Thickness in meters for the boundary shape.
-  - `urdf_boundary_xyz` (`Optional[str]`): Space-separated local offset coordinates relative to the origin for the boundary shape (formatted as `"x y z"`).
-  - `urdf_boundary_rpy` (`Optional[str]`): Space-separated local orientation coordinates relative to the origin for the boundary shape (formatted as `"r p y"`).
-  - `urdf_boundary_slot_height` (`Optional[float]`): Slot height in meters for specific boundary shapes.
-  - `urdf_boundary_vane_twist` (`Optional[float]`): Vane/impeller twist parameter.
-  - `urdf_boundary_target_omega` (`Optional[float]`): Target angular velocity of the boundary.
-  - `urdf_boundary_max_force` (`Optional[float]`): Maximum force applied to the boundary.
-  - `urdf_boundaries` (`list[dict]`): A list of boundary configurations used when a single link contains multiple analytical boundaries (e.g. recessed pocket cavity, deflection cap, and reservoir ceiling). Each boundary dict can contain:
-    - `shape` (`str`): Geometry shape type (e.g., `"cylinder"`, `"tube"`).
-    - `type` (`str`): Boundary collision role (e.g., `"cavity"`, `"solid"`).
-    - `radius` (`float`): Radius in meters (for cylinders/tubes).
-    - `height` (`float`): Height/length in meters (for cylinders).
-    - `thickness` (`float`): Thickness in meters (for walls/plates).
+  - `urdf_boundaries` (`list[BoundaryConfig]`): A list of boundary configurations representing the analytical boundaries of the link.
+    This array should be built using the `Room.make_boundary_config` static helper method in `src/provider/room.py` whenever an analytical boundary needs to be defined. The helper function automatically extracts physical dimensions (radius, height, xyz translation, rpy orientation) from the CAD `BuildPart` or shape:
+    ```python
+    from provider import Room
+    
+    part.urdf_boundaries = [
+        Room.make_boundary_config(
+            shape_or_part,
+            link_type=LinkType.BASE,
+            shape=ShapeType.CYLINDER,
+            type=BoundaryType.CAVITY,
+            # Custom overrides if needed (e.g. adding extensions, thickness, slots, etc.)
+            height=new_height_m,
+            thickness=thickness_m,
+        )
+    ]
+    ```
+    Each boundary configuration in the array specifies:
+    - `shape` (`str`): Geometry shape type (e.g., `"cylinder"`, `"tube"`, `"impeller"`, `"box"`, `"sphere"`, `"plane"`).
+    - `type` (`str`): Boundary collision role (e.g., `"cavity"`, `"solid"`, `"solid_cavity"`).
+    - `radius` (`float`): Radius in meters.
+    - `height` (`float`): Height/length in meters.
+    - `thickness` (`float`): Thickness in meters.
     - `xyz` (`list[float]`): Local offset relative to the link coordinate origin.
     - `rpy` (`list[float]`): Local orientation in roll-pitch-yaw.
     - `drain_hole_y` (`float`): Optional. Y coordinate of a drain hole in a cavity ceiling/floor.
