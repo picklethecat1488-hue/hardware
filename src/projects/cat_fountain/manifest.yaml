@@ -22,15 +22,6 @@ tube:
   export: [stl, obj]
   color: blue
 
-fountain:
-  part:
-    modes: [default, print]
-  material: petg
-  export: [stl, obj]
-  color: green
-  diagram:
-    modes: [default]
-
 bottom_cover:
   part:
     modes: [default, print]
@@ -52,6 +43,22 @@ drain_cover:
   export: [stl, obj]
   color: grey
 
+sensor_cover:
+  part:
+    modes: [default, print]
+  material: tpu
+  export: [stl, obj]
+  color: grey
+  
+led_cover:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj]
+  color: grey
+
 product:
+  diagram:
+    modes: [default]
   view:
     modes: [default, simulate]
