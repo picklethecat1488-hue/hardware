@@ -52,12 +52,12 @@ primitive_collision_template: |
   </collision>
 
 analytical_boundary_template: |
-  <analytical_boundary>
-    <boundary_shape>{boundary_shape}</boundary_shape>
-    <boundary_type>{boundary_type}</boundary_type>
-    <boundary_radius>{boundary_radius:.6f}</boundary_radius>
-    <boundary_height>{boundary_height:.6f}</boundary_height>
-    <boundary_xyz>{boundary_xyz}</boundary_xyz>
-    <boundary_rpy>{boundary_rpy}</boundary_rpy>
-  </analytical_boundary>
+    <analytical_boundary>
+      <boundary_shape>{boundary_shape}</boundary_shape>
+      <boundary_type>{boundary_type}</boundary_type>
+      <boundary_radius>{boundary_radius:.6f}</boundary_radius>
+      <boundary_height>{boundary_height:.6f}</boundary_height>
+      <boundary_xyz>{boundary_xyz}</boundary_xyz>
+      <boundary_rpy>{boundary_rpy}</boundary_rpy>
+    </analytical_boundary>
 

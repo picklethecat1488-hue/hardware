@@ -82,7 +82,9 @@ class TestCatFountainProvider:
         assert bowl_shape.urdf_parent is None
         assert bowl_shape.urdf_joint_type is None
         assert bowl_shape.urdf_boundary_friction == 0.20
-        assert bowl_shape.urdf_contact_angle == 75.0
+        assert len(bowl_shape.urdf_boundaries) == 1
+        assert bowl_shape.urdf_boundaries[0].shape == "cylinder"
+        assert bowl_shape.urdf_boundaries[0].type == "cavity"
 
         # Verify attributes on impeller
         impeller_shape = room["impeller"][0]
@@ -183,20 +185,6 @@ class TestCatFountainProvider:
                         geom_boundaries = getattr(u_geom, "urdf_boundaries", None)
                         if geom_boundaries:
                             boundaries[label] = geom_boundaries
-                        else:
-                            c_type = getattr(u_geom, "urdf_collision_type", None)
-                            if c_type == "analytical" or str(c_type) == "URDFCollisionType.ANALYTICAL":
-                                xyz_str = getattr(u_geom, "urdf_boundary_xyz", None)
-                                rpy_str = getattr(u_geom, "urdf_boundary_rpy", None)
-                                boundaries[label] = {
-                                    "shape": getattr(u_geom, "urdf_boundary_shape", None),
-                                    "type": getattr(u_geom, "urdf_boundary_type", None),
-                                    "radius": getattr(u_geom, "urdf_boundary_radius", None),
-                                    "height": getattr(u_geom, "urdf_boundary_height", None),
-                                    "thickness": getattr(u_geom, "urdf_boundary_thickness", None),
-                                    "xyz": [float(x) for x in xyz_str.split()] if xyz_str else [0.0, 0.0, 0.0],
-                                    "rpy": [float(x) for x in rpy_str.split()] if rpy_str else [0.0, 0.0, 0.0],
-                                }
 
                 hooks = provider.get_simulate_hooks("product:view/simulate")
                 setup_fn = hooks[Simulate.SETUP]
@@ -302,20 +290,6 @@ class TestCatFountainProvider:
                         geom_boundaries = getattr(u_geom, "urdf_boundaries", None)
                         if geom_boundaries:
                             boundaries[label] = geom_boundaries
-                        else:
-                            c_type = getattr(u_geom, "urdf_collision_type", None)
-                            if c_type == "analytical" or str(c_type) == "URDFCollisionType.ANALYTICAL":
-                                xyz_str = getattr(u_geom, "urdf_boundary_xyz", None)
-                                rpy_str = getattr(u_geom, "urdf_boundary_rpy", None)
-                                boundaries[label] = {
-                                    "shape": getattr(u_geom, "urdf_boundary_shape", None),
-                                    "type": getattr(u_geom, "urdf_boundary_type", None),
-                                    "radius": getattr(u_geom, "urdf_boundary_radius", None),
-                                    "height": getattr(u_geom, "urdf_boundary_height", None),
-                                    "thickness": getattr(u_geom, "urdf_boundary_thickness", None),
-                                    "xyz": [float(x) for x in xyz_str.split()] if xyz_str else [0.0, 0.0, 0.0],
-                                    "rpy": [float(x) for x in rpy_str.split()] if rpy_str else [0.0, 0.0, 0.0],
-                                }
 
                 # Remove the spout deflection cap to force water to shoot out of the spout into space
                 test_boundaries = copy.deepcopy(boundaries)
@@ -323,10 +297,25 @@ class TestCatFountainProvider:
                     test_boundaries["lid"] = [
                         b
                         for b in test_boundaries["lid"]
-                        if abs(b.get("radius", 0.0) - provider.settings.spout_deflection_radius * 0.001) > 1e-6
+                        if abs(
+                            (b.radius if hasattr(b, "radius") else b.get("radius", 0.0))
+                            - provider.settings.spout_deflection_radius * 0.001
+                        )
+                        > 1e-6
                     ]
                 if "bowl" in test_boundaries:
-                    test_boundaries["bowl"]["height"] = (provider.settings.bowl_height - 25.0) * 0.001
+                    bowl_list = test_boundaries["bowl"]
+                    if isinstance(bowl_list, list):
+                        new_bowl_list = []
+                        for b in bowl_list:
+                            b_dict = b.model_dump(exclude_defaults=True) if hasattr(b, "model_dump") else dict(b)
+                            b_dict["height"] = (provider.settings.bowl_height - 25.0) * 0.001
+                            from model.boundary_config import BoundaryConfig
+
+                            new_bowl_list.append(BoundaryConfig.model_validate(b_dict))
+                        test_boundaries["bowl"] = new_bowl_list
+                    else:
+                        test_boundaries["bowl"]["height"] = (provider.settings.bowl_height - 25.0) * 0.001
 
                 hooks = provider.get_simulate_hooks("product:view/simulate")
                 setup_fn = hooks[Simulate.SETUP]
