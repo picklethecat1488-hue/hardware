@@ -209,6 +209,7 @@ class Builder:
                         if export_type == "obj":
                             obj_file_name = next(p for p in part_outputs if p.endswith(".obj"))
                             obj_path = Path(out_dir) / obj_file_name
+                            obj_path.parent.mkdir(parents=True, exist_ok=True)
 
                             # Export OBJ in standard mm scale
                             futures.append(
@@ -225,6 +226,7 @@ class Builder:
                         elif export_type == "stl":
                             mesh_file_name = next(p for p in part_outputs if p.endswith(".stl"))
                             path_obj = Path(out_dir) / mesh_file_name
+                            path_obj.parent.mkdir(parents=True, exist_ok=True)
                             path_str = str(path_obj)
                             futures.append(
                                 self.executor.submit(

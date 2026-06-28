@@ -462,8 +462,8 @@ def test_compiled_aabb_alignment(tmp_path):
     for name in names:
         part_name = name.split("/")[-1]
         proj_name = name.split("/")[0]
-        stl_path = out_dir / f"{proj_name}/{part_name}.stl"
-        obj_path = out_dir / f"{proj_name}/{part_name}.obj"
+        stl_path = out_dir / f"stl/{proj_name}/{part_name}.stl"
+        obj_path = out_dir / f"obj/{proj_name}/{part_name}.obj"
 
         assert stl_path.exists()
         assert obj_path.exists()

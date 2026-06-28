@@ -175,7 +175,10 @@ class Bullet:
 
     def _copy_project_assets(self, build_proj_dir: str, proj_dir: str) -> None:
         """Copy required OBJ files referenced in the URDF to the temporary directory."""
-        link_to_obj = self._parse_urdf_meshes(build_proj_dir)
+        build_urdf_dir = build_proj_dir.replace("/obj/", "/urdf/").replace("/obj", "/urdf")
+        if not os.path.exists(build_urdf_dir):
+            build_urdf_dir = build_proj_dir
+        link_to_obj = self._parse_urdf_meshes(build_urdf_dir)
         if not link_to_obj:
             # Fallback for unit tests where no compiled URDF exists on disk
             for geom, _ in self.room.values():
@@ -458,7 +461,9 @@ class Bullet:
             # Create the simulation project assets
             proj_dir = os.path.join(temp_dir, self.proj_name)
             os.makedirs(proj_dir, exist_ok=True)
-            build_proj_dir = os.path.join(self.build_dir, self.proj_name)
+            build_proj_dir = os.path.join(self.build_dir, "obj", self.proj_name)
+            if not os.path.exists(build_proj_dir):
+                build_proj_dir = os.path.join(self.build_dir, self.proj_name)
             self.room.translate_joints()
             self._copy_project_assets(build_proj_dir, proj_dir)
 
