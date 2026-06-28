@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,12 +29,18 @@ jobs:
         run: |
           python src/build.py -out build
 
+      - name: Draft Release Notes
+        id: release-drafter
+        uses: release-drafter/release-drafter@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body: ${{ steps.release-drafter.outputs.body }}
           files: |
             build/build.zip
-          generate_release_notes: true
 
       - name: Run Unit Tests
         # Set PYTHONPATH so pytest can find modules in src/
