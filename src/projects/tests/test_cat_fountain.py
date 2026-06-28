@@ -2,6 +2,7 @@
 
 import pytest
 import math
+import shutil
 from unittest.mock import patch
 from build123d import Part
 from projects_config import CatFountainConfig
@@ -165,6 +166,13 @@ class TestCatFountainProvider:
             builder.generate_parts(temp_dir, names=None)
             builder.generate_urdfs(temp_dir, names=None)
 
+            # Copy compiled OBJ assets into the URDF folder so PyBullet can locate them relative to the URDF
+            obj_dir = os.path.join(temp_dir, "obj/cat_fountain")
+            urdf_proj_dir = os.path.join(temp_dir, "urdf/cat_fountain")
+            for f in os.listdir(obj_dir):
+                if f.endswith(".obj"):
+                    shutil.copy(os.path.join(obj_dir, f), os.path.join(urdf_proj_dir, f))
+
             room = Room()
             provider.build_product(room, mode=Mode.SIMULATE)
             room.translate_joints()
@@ -175,7 +183,7 @@ class TestCatFountainProvider:
             try:
                 p.setGravity(0, 0, -9.81, physicsClientId=physics_client)
 
-                urdf_path = os.path.join(temp_dir, "cat_fountain/product.urdf")
+                urdf_path = os.path.join(temp_dir, "urdf/cat_fountain/product.urdf")
                 body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
                 assert body_id >= 0, "Failed to load URDF in PyBullet"
 
@@ -270,6 +278,13 @@ class TestCatFountainProvider:
             builder.generate_parts(temp_dir, names=None)
             builder.generate_urdfs(temp_dir, names=None)
 
+            # Copy compiled OBJ assets into the URDF folder so PyBullet can locate them relative to the URDF
+            obj_dir = os.path.join(temp_dir, "obj/cat_fountain")
+            urdf_proj_dir = os.path.join(temp_dir, "urdf/cat_fountain")
+            for f in os.listdir(obj_dir):
+                if f.endswith(".obj"):
+                    shutil.copy(os.path.join(obj_dir, f), os.path.join(urdf_proj_dir, f))
+
             room = Room()
             provider.build_product(room, mode=Mode.SIMULATE)
             room.translate_joints()
@@ -280,7 +295,7 @@ class TestCatFountainProvider:
             try:
                 p.setGravity(0, 0, -9.81, physicsClientId=physics_client)
 
-                urdf_path = os.path.join(temp_dir, "cat_fountain/product.urdf")
+                urdf_path = os.path.join(temp_dir, "urdf/cat_fountain/product.urdf")
                 body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
                 assert body_id >= 0, "Failed to load URDF in PyBullet"
 

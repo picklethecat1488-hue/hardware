@@ -44,29 +44,29 @@ class TestSmoke:
         """Verify build.py commands execute correctly with various options and wildcards."""
         # 1. Verify building all parts and diagrams by default
         self.run_command(["src/build.py"])
-        assert (self.build_dir / "exhaust_manifolds" / "exhaust_manifolds_diagram.svg").exists()
-        assert (self.build_dir / "exhaust_manifolds" / "driver_left.stl").exists()
+        assert (self.build_dir / "svg/exhaust_manifolds/exhaust_manifolds_diagram.svg").exists()
+        assert (self.build_dir / "stl/exhaust_manifolds/driver_left.stl").exists()
 
         # 2. Verify wildcard building
         self.run_command(["src/build.py", "cat_fountain/*"])
-        assert (self.build_dir / "cat_fountain" / "bowl.stl").exists()
+        assert (self.build_dir / "stl/cat_fountain/bowl.stl").exists()
 
         # 3. Verify building a specific subassembly and mode via string format
         self.run_command(["src/build.py", "valve_actuator_limiter/limiter:part/default"])
-        assert (self.build_dir / "valve_actuator_limiter" / "limiter.stl").exists()
+        assert (self.build_dir / "stl/valve_actuator_limiter/limiter.stl").exists()
 
         # 4. Verify diagram-only building using the :diagram action suffix
-        limiter_stl = self.build_dir / "valve_actuator_limiter" / "limiter.stl"
+        limiter_stl = self.build_dir / "stl/valve_actuator_limiter/limiter.stl"
         if limiter_stl.exists():
             limiter_stl.unlink()
         self.run_command(["src/build.py", "valve_actuator_limiter/*:diagram"])
-        assert (self.build_dir / "valve_actuator_limiter" / "valve_actuator_limiter_diagram.svg").exists()
+        assert (self.build_dir / "svg/valve_actuator_limiter/valve_actuator_limiter_diagram.svg").exists()
         assert not limiter_stl.exists()
 
         # 5. Verify diagram options integration via environment variables
         extra_env = {"VALVE_ACTUATOR_LIMITER__DIAGRAM_OPTIONS__SHOW_HIDDEN": "True"}
         self.run_command(["src/build.py", "valve_actuator_limiter/*:diagram"], extra_env=extra_env)
-        assert (self.build_dir / "valve_actuator_limiter" / "valve_actuator_limiter_diagram.svg").exists()
+        assert (self.build_dir / "svg/valve_actuator_limiter/valve_actuator_limiter_diagram.svg").exists()
 
     def test_config_commands(self):
         """Verify config.py commands run without error."""

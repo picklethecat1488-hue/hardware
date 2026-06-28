@@ -10,15 +10,12 @@ The design utilizes precise build123d joint placement to ensure alignment of the
 
 ## Build Files
 
-After running `build.py`, you should see these files in your build output organized by project subdirectories:
+After running `build.py`, you should see these files in your build output organized by subdirectories under the build folder:
 
-- **build/cat_fountain/cat_fountain_diagram.svg** - An exploded assembly diagram of the cat fountain.
-- **build/cat_fountain/bowl.stl** / **bowl.obj** - The main bottom water bowl.
-- **build/cat_fountain/impeller.stl** / **impeller.obj** - The spinning impeller blades.
-- **build/cat_fountain/tube.stl** / **tube.obj** - The vertical water delivery tube.
-- **build/cat_fountain/drain_cover.stl** / **drain_cover.obj** - The removable circular drain cover with locking tabs for the filter compartment.
-- **build/cat_fountain/fountain.stl** / **fountain.obj** - The compiled full assembly.
-- **build/cat_fountain/product.urdf** - The URDF definition file for visualization/simulation.
+- **build/svg/cat_fountain/cat_fountain_diagram.svg** - An exploded assembly diagram of the cat fountain.
+- **build/stl/cat_fountain/bowl.stl** / **impeller.stl** / etc. - The 3D printable STL files (in standard millimeters scale).
+- **build/obj/cat_fountain/bowl.obj** / **impeller.obj** / etc. - The 3D visual OBJ files (in standard meters scale).
+- **build/urdf/cat_fountain/product.urdf** - The URDF definition file for visualization/simulation.
 
 ## Visualization & Simulation
 
@@ -88,26 +85,32 @@ To build the cat fountain with I2C communication across all peripheral subsystem
    Since all three `VL53L0X` sensors share the same default I2C address (`0x29`), you must connect the `XSHUT` (shutdown) pin of each sensor to a separate GPIO pin on the Pico. At boot, pull all `XSHUT` pins LOW to disable the sensors. Then, enable them one by one (pull `XSHUT` HIGH) and send an I2C command to assign a unique address (`0x30`, `0x31`, `0x32`) to the active sensor.
 2. **I2C Bus Voltage & Pull-Ups**:
    The Raspberry Pi Pico operates at 3.3V logic. Ensure all boards are powered at 3.3V (or have 3.3V level-shifting built-in). Add `4.7kΩ` pull-up resistors to the `SDA` and `SCL` lines of each active I2C bus.
-3. **Motor Speed Control**:
-   The DRV8830 driver allows adjusting the output voltage in 64 steps over I2C. This can be modulated depending on cat proximity to dynamically speed up the Archimedes screw pump when a cat approaches, and slow down or enter standby when idle.
+3. **Motor Speed & Torque Control**:
+   * The DRV8830 driver allows adjusting the output voltage in 64 steps over I2C. This can be modulated depending on cat proximity to dynamically speed up the Archimedes screw pump when a cat approaches, and slow down or enter standby when idle.
+   * **Water Level / Refill Detection**: The DRV8830 features a current sense / diagnostics register. When the water level in the bowl runs low, the impeller spins in air rather than water, causing motor load torque and current draw to drop significantly. The RP2040 can monitor this current drop over I2C, trigger a "low water" alert, and pulse the RGB NeoPixel status LED to notify the user.
 4. **Debug SWD & UART Pins**:
    * **SWD Debugging**: The separate 3-pin debug header at the bottom edge of the Pico W provides **SWCLK**, **GND**, and **SWDIO** for hardware debugging (e.g., using a Raspberry Pi Debug Probe or Picoprobe). These do not occupy standard GPIO pins.
    * **UART Console / Printf Debugging**: **GP0 (TX)** and **GP1 (RX)** are reserved as the default debug UART0 port, leaving them completely free from control or sensor connections.
 
 ### 3D-Printed Parts & Materials
 
-The following parts are 3D printed to form the physical structure and assembly of the cat fountain:
+The following parts are manufactured to form the physical structure and assembly of the cat fountain:
 
 | Part Name | Qty | Recommended Material | Description / Use Case |
 | :--- | :--- | :--- | :--- |
-| **Bowl** | 1 | PETG (Food-Safe) | The main water reservoir (2L capacity) and enclosure base. |
-| **Lid** | 1 | PETG (Food-Safe) | Top cover acting as a drinking shelf and stabilizing the delivery tube. |
-| **Tube** | 1 | PETG (Food-Safe) | Vertical water delivery tube feeding the drinking shelf. |
-| **Impeller** | 1 | PETG (Food-Safe) | The spinning Archimedes screw / vortex impeller pump. |
-| **Drain Cover** | 1 | PETG (Food-Safe) | Removable cover with locking tabs for the filter compartment. |
+| **Bowl** | 1 | PETG (Food-Safe Coating) | The main water reservoir (2L capacity) and enclosure base. |
+| **Lid** | 1 | PETG (Food-Safe Coating) | Top cover acting as a drinking shelf and stabilizing the delivery tube. |
+| **Tube** | 1 | PETG (Food-Safe Coating) | Vertical water delivery tube feeding the drinking shelf. |
+| **Impeller** | 1 | PETG (Food-Safe Coating) | The spinning Archimedes screw / vortex impeller pump. |
+| **Drain Cover** | 1 | PETG (Food-Safe Coating) | Removable cover with locking tabs for the filter compartment. |
 | **Bottom Cover** | 1 | PETG or PLA | Bottom enclosure cover protecting the electronics compartment. |
-| **Sensor Cover** | 3 | TPU (Flexible Elastomer) | Push-fit protective covers for the three proximity sensor ports. |
-| **LED Cover** | 1 | PETG (Translucent/Clear) | Push-fit diffuser plug for the status RGB LED. |
+| **Sensor Cover** | 3 | UTR-8100 Translucent (SLA) | Translucent push-fit protective covers for the three proximity sensor ports. |
+| **LED Cover** | 1 | UTR-8100 Translucent (SLA) | Translucent push-fit diffuser plug for the status RGB LED. |
+
+> [!NOTE]
+> **Manufacturing & Post-Processing Details**:
+> 1. **Translucent Covers**: Since PCBWay does not offer transparent PETG, both the LED Cover and Sensor Covers should be SLA-printed using UTR-8100 translucent resin to ensure light/IR transparency.
+> 2. **Food Safety Post-Processing**: Standard FDM 3D printed parts have micro-grooves that can harbor bacteria. All PETG components in contact with water (Bowl, Lid, Tube, Impeller, Drain Cover) must be coated with a food-grade epoxy (e.g., Max CLR or similar FDA-compliant epoxy coating) as a post-processing step before use.
 
 ### Fasteners & O-Rings
 
