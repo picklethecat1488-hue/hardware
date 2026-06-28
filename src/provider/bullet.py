@@ -142,18 +142,66 @@ class Bullet:
         self.rerun_port = rerun_port
         self.spawn_viewer = spawn_viewer
 
+    def _parse_urdf_meshes(self, build_proj_dir: str) -> dict[str, str]:
+        """Parse URDF files to map link names to their OBJ filenames."""
+        link_to_obj = {}
+        if not os.path.exists(build_proj_dir):
+            return link_to_obj
+        try:
+            urdf_files = [f for f in os.listdir(build_proj_dir) if f.endswith(".urdf")]
+        except OSError:
+            return link_to_obj
+
+        for urdf_file in urdf_files:
+            urdf_path = os.path.join(build_proj_dir, urdf_file)
+            try:
+                tree = ET.parse(urdf_path)
+            except (OSError, ET.ParseError):
+                continue
+            root = tree.getroot()
+            for link in root.findall(".//link"):
+                link_name = link.attrib.get("name")
+                if not link_name:
+                    continue
+                mesh = link.find(".//visual/geometry/mesh")
+                if mesh is None:
+                    mesh = link.find(".//collision/geometry/mesh")
+                if mesh is not None:
+                    filename = mesh.attrib.get("filename", "")
+                    if filename.startswith("package://"):
+                        obj_name = os.path.basename(filename[len("package://") :])
+                        link_to_obj[link_name] = obj_name
+        return link_to_obj
+
     def _copy_project_assets(self, build_proj_dir: str, proj_dir: str) -> None:
-        """Copy required OBJ files for the room geometries to the temporary directory."""
-        for geom, _ in self.room.values():
-            u_geom = cast(URDFShape, geom)
-            label = getattr(u_geom, "urdf_label", None)
-            if label:
-                real_obj_path = os.path.join(build_proj_dir, f"{label}.obj")
-                temp_obj_path = os.path.join(proj_dir, f"{label}.obj")
-                if os.path.exists(real_obj_path):
-                    shutil.copy(real_obj_path, temp_obj_path)
-                else:
-                    raise FileNotFoundError(f"Required OBJ file not found for simulation: {real_obj_path}")
+        """Copy required OBJ files referenced in the URDF to the temporary directory."""
+        link_to_obj = self._parse_urdf_meshes(build_proj_dir)
+        if not link_to_obj:
+            # Fallback for unit tests where no compiled URDF exists on disk
+            for geom, _ in self.room.values():
+                u_geom = cast(URDFShape, geom)
+                label = getattr(u_geom, "urdf_label", None)
+                if label:
+                    obj_filename = getattr(u_geom, "urdf_obj_filename", f"{label}.obj")
+                    real_obj_path = os.path.join(build_proj_dir, obj_filename)
+                    temp_obj_path = os.path.join(proj_dir, obj_filename)
+                    if os.path.exists(real_obj_path):
+                        shutil.copy(real_obj_path, temp_obj_path)
+                    else:
+                        raise FileNotFoundError(f"Required OBJ file not found for simulation: {real_obj_path}")
+            return
+
+        copied = set()
+        for obj_filename in link_to_obj.values():
+            if obj_filename in copied:
+                continue
+            real_obj_path = os.path.join(build_proj_dir, obj_filename)
+            temp_obj_path = os.path.join(proj_dir, obj_filename)
+            if os.path.exists(real_obj_path):
+                shutil.copy(real_obj_path, temp_obj_path)
+                copied.add(obj_filename)
+            else:
+                raise FileNotFoundError(f"Required OBJ file not found for simulation: {real_obj_path}")
 
     def _init_simulation_objects(
         self,
@@ -316,11 +364,14 @@ class Bullet:
                     link_idx = label_to_link_idx[label]
                     p.changeVisualShape(body_id, link_idx, rgbaColor=rgba, physicsClientId=physics_client)
 
+        urdf_dir = os.path.dirname(urdf_path) if urdf_path else proj_dir
+        link_to_obj = self._parse_urdf_meshes(urdf_dir)
         for geom, rgba in self.room.values():
             u_geom = cast(URDFShape, geom)
             label = getattr(u_geom, "urdf_label", None)
             if label:
-                temp_obj_path = os.path.join(proj_dir, f"{label}.obj")
+                obj_filename = link_to_obj.get(label, getattr(u_geom, "urdf_obj_filename", f"{label}.obj"))
+                temp_obj_path = os.path.join(proj_dir, obj_filename)
                 if os.path.exists(temp_obj_path):
                     rgba_255 = [int(round(c * 255.0)) for c in rgba]
                     rr.log(

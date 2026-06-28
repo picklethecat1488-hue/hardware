@@ -34,3 +34,11 @@ material:
     density: 1.04
     boundary_friction: 0.25
     contact_angle: 80.0
+
+  # Thermoplastic Polyurethane (TPU)
+  # A flexible, elastic copolymer with high abrasion resistance, rubber-like elasticity,
+  # and excellent layer adhesion. Perfect for flexible push-fit seals and covers.
+  tpu:
+    density: 1.20
+    boundary_friction: 0.50
+    contact_angle: 85.0

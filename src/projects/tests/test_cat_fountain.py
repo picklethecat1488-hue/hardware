@@ -40,20 +40,22 @@ class TestCatFountainProvider:
         assert "bottom_cover" in provider.part
         assert "lid" in provider.part
         assert "drain_cover" in provider.part
-        assert "fountain" in provider.part
+        assert "sensor_cover" in provider.part
+        assert "led_cover" in provider.part
 
     def test_build_part_geometry(self, provider):
         """Verify that build_fountain produces valid geometry."""
-        res = provider.build_fountain("fountain", Mode.DEFAULT)
-        part = res.part
-        assert isinstance(part, Part)
-        assert part.volume > 0
-        assert part.is_valid
+        for key, item in provider.part.items():
+            res = item(key, Mode.DEFAULT)
+            part = res.part
+            assert isinstance(part, Part)
+            assert part.volume > 0
+            assert part.is_valid
 
     def test_build_diagram(self, provider):
         """Verify that build_diagram populates the room with geometry."""
         room = Room()
-        provider.build_diagram(room, ["fountain"], Mode.DEFAULT)
+        provider.build_diagram(room, ["product"], Mode.DEFAULT)
         assert "bowl" in room
         assert "impeller" in room
         assert "tube" in room
@@ -340,6 +342,7 @@ class TestCatFountainProvider:
             finally:
                 p.disconnect(physics_client)
 
+    @pytest.mark.slow
     def test_cat_fountain_water_escaping_termination(self, provider):
         """Verify that the cat fountain simulation terminates when water escapes/falls out of bounds."""
         import pybullet as p
@@ -517,3 +520,19 @@ class TestCatFountainProvider:
 
         finally:
             p.disconnect(client)
+
+    def test_no_intersecting_parts(self, provider):
+        """Verify that no parts intersect each other in the assembled configuration."""
+        room = Room()
+        provider.build_product(room, Mode.DEFAULT)
+        room.translate_joints()
+
+        parts = {name: geom[0] for name, geom in room.items()}
+        for name1, part1 in parts.items():
+            for name2, part2 in parts.items():
+                if name1 < name2:
+                    intersection = part1.intersect(part2)
+                    vol = sum(s.volume for s in intersection.solids()) if intersection else 0.0
+                    assert vol == pytest.approx(0, abs=1e-3), (
+                        f"Intersection detected between {name1} and {name2}: {vol:.3f} mm3"
+                    )

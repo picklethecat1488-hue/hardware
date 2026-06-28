@@ -55,9 +55,12 @@ graph TD
     I2CBus <--> TOF3["VL53L0X ToF (West)"]
     
     %% Control Lines
-    PICO -->|GPIO 1: XSHUT| TOF1
-    PICO -->|GPIO 2: XSHUT| TOF2
-    PICO -->|GPIO 3: XSHUT| TOF3
+    PICO -->|GP2: XSHUT| TOF1
+    PICO -->|GP3: XSHUT| TOF2
+    PICO -->|GP4: XSHUT| TOF3
+    TOF1 -->|GP5: INT| PICO
+    TOF2 -->|GP6: INT| PICO
+    TOF3 -->|GP7: INT| PICO
     
     %% Output Connections
     DRV -->|Driven Power| MOTOR["N20 Gear Motor"]
@@ -87,6 +90,24 @@ To build the cat fountain with I2C communication across all peripheral subsystem
    The Raspberry Pi Pico operates at 3.3V logic. Ensure all boards are powered at 3.3V (or have 3.3V level-shifting built-in). Add `4.7kΩ` pull-up resistors to the `SDA` and `SCL` lines of each active I2C bus.
 3. **Motor Speed Control**:
    The DRV8830 driver allows adjusting the output voltage in 64 steps over I2C. This can be modulated depending on cat proximity to dynamically speed up the Archimedes screw pump when a cat approaches, and slow down or enter standby when idle.
+4. **Debug SWD & UART Pins**:
+   * **SWD Debugging**: The separate 3-pin debug header at the bottom edge of the Pico W provides **SWCLK**, **GND**, and **SWDIO** for hardware debugging (e.g., using a Raspberry Pi Debug Probe or Picoprobe). These do not occupy standard GPIO pins.
+   * **UART Console / Printf Debugging**: **GP0 (TX)** and **GP1 (RX)** are reserved as the default debug UART0 port, leaving them completely free from control or sensor connections.
+
+### 3D-Printed Parts & Materials
+
+The following parts are 3D printed to form the physical structure and assembly of the cat fountain:
+
+| Part Name | Qty | Recommended Material | Description / Use Case |
+| :--- | :--- | :--- | :--- |
+| **Bowl** | 1 | PETG (Food-Safe) | The main water reservoir (2L capacity) and enclosure base. |
+| **Lid** | 1 | PETG (Food-Safe) | Top cover acting as a drinking shelf and stabilizing the delivery tube. |
+| **Tube** | 1 | PETG (Food-Safe) | Vertical water delivery tube feeding the drinking shelf. |
+| **Impeller** | 1 | PETG (Food-Safe) | The spinning Archimedes screw / vortex impeller pump. |
+| **Drain Cover** | 1 | PETG (Food-Safe) | Removable cover with locking tabs for the filter compartment. |
+| **Bottom Cover** | 1 | PETG or PLA | Bottom enclosure cover protecting the electronics compartment. |
+| **Sensor Cover** | 3 | TPU (Flexible Elastomer) | Push-fit protective covers for the three proximity sensor ports. |
+| **LED Cover** | 1 | PETG (Translucent/Clear) | Push-fit diffuser plug for the status RGB LED. |
 
 ### Fasteners & O-Rings
 
@@ -97,7 +118,7 @@ These fasteners and seal components are required to assemble the 3D-printed body
 | **Lid Mounting Screws** | 4 | M3 x 10mm (Socket or Button Head) | Secures the top cover lid to the bowl tabs. Fits into the 3mm counterbores. |
 | **Bottom Cover Screws** | 4 | M3 x 10mm (Flat Head/Countersunk) | Secures the controller compartment cover. Fits flush into the bottom countersinks. |
 | **DC Motor Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the DC motor to the dry compartment ceiling mount (17mm spacing). |
-| **Proximity Sensor Screws** | 6 | M2 x 6mm or 8mm (Self-Tapping or Machine) | Mounts the three proximity sensors to the North, East, and West walls. |
+| **Proximity Sensor Screws** | 6 | M2 x 6mm (Machine Screws) | Mounts the three proximity sensors to the internal bosses. |
 | **Charger Board Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit BQ25185 board to the dry compartment ceiling. |
 | **Fuel Gauge Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit MAX17048 board to the dry compartment ceiling. |
 | **Pico W Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Raspberry Pi Pico W to the dry compartment ceiling. |

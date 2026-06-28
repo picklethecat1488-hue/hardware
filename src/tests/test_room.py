@@ -9,7 +9,7 @@ from typing import cast, Any
 import pybullet as p
 import pytest
 from build123d import Compound, Box, Vector, RigidJoint, RevoluteJoint, Axis, Location, LinearJoint, BallJoint
-from model import AppConfig, TextArgs, DiagramOptions
+from model import AppConfig, TextArgs, DiagramOptions, BoundaryType
 from provider import Simulate, ColorType, URDFShape, URDFCollisionType, URDFCollisionShapeType, Mode
 from provider.room import Room, BulletStateTracker
 
@@ -738,10 +738,22 @@ def test_cat_fountain_provider_bowl_collision_types():
     bowl_sim = provider.build_bowl("bowl", mode=Mode.SIMULATE)
     u_bowl_sim = cast(URDFShape, bowl_sim.part)
     assert u_bowl_sim.urdf_collision_type == URDFCollisionType.ANALYTICAL
-    assert len(u_bowl_sim.urdf_collision_primitives) > 0  # type: ignore
-    assert u_bowl_sim.urdf_collision_primitives[0]["type"] == URDFCollisionShapeType.BOX  # type: ignore
+    assert len(u_bowl_sim.urdf_boundaries) > 0  # type: ignore
+    assert u_bowl_sim.urdf_boundaries[0].type == BoundaryType.CAVITY  # type: ignore
 
     # 2. Test default/other mode (also analytical)
     bowl_def = provider.build_bowl("bowl", mode=Mode.DEFAULT)
     u_bowl_def = cast(URDFShape, bowl_def.part)
     assert u_bowl_def.urdf_collision_type == URDFCollisionType.ANALYTICAL
+
+
+def test_urdf_shape_derived_properties():
+    """Verify that build123d.Shape classes have derived urdf_height and urdf_thickness properties."""
+    box = Box(10.0, 20.0, 30.0)
+    u_box = cast(URDFShape, box)
+
+    # height should be Z dimension (30.0) in meters -> 0.03
+    assert math.isclose(u_box.urdf_height, 0.03, abs_tol=1e-6)
+
+    # thickness should be minimum dimension (10.0) in meters -> 0.01
+    assert math.isclose(u_box.urdf_thickness, 0.01, abs_tol=1e-6)

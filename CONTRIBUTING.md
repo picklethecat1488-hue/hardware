@@ -190,26 +190,32 @@ For parts that participate in physics simulation, you must attach URDF/simulatio
     - For `URDFCollisionShapeType.SPHERE` (`"sphere"`): `radius` (`float`).
     - Optional offset keys: `xyz` (`list[float]`) and `rpy` (`list[float]`).
 
+- **Derived Geometry Properties**:
+  - `urdf_height` (`float`): Derived height of the shape in meters (calculated from the shape's Z-axis bounding box dimensions).
+  - `urdf_thickness` (`float`): Derived minimum thickness of the shape in meters (calculated from the minimum bounding box dimension).
+  - These properties are dynamically attached to the build123d `Shape` class, making them queryable directly on any shape or geometry object (e.g., `shape.urdf_height`).
+
 - **Boundary & Fluid Interaction**:
   - `urdf_boundary_friction` (`float`): Coulomb friction coefficient for fluid-boundary interactions.
-  - `urdf_boundaries` (`list[BoundaryConfig]`): A list of boundary configurations representing the analytical boundaries of the link.
-    This array should be built using the `Room.make_boundary_config` static helper method in `src/provider/room.py` whenever an analytical boundary needs to be defined. The helper function automatically extracts physical dimensions (radius, height, xyz translation, rpy orientation) from the CAD `BuildPart` or shape:
+  - `urdf_boundaries` (`list[BoundaryConfig]`): A list of boundary configurations representing the analytical boundaries of the link. Instead of manually constructing these via `Room.make_boundary_config`, you can now use the `URDFBoundary` helper within a `URDFMetadata` block. `URDFBoundary` automatically extracts geometry dimensions and registers the resulting `BoundaryConfig` with the active metadata.
     ```python
-    from provider import Room
-    
-    part.urdf_boundaries = [
-        Room.make_boundary_config(
-            shape_or_part,
+    from provider import URDFMetadata, URDFBoundary, LinkType, ShapeType, BoundaryType, URDFCollisionType
+
+    with URDFMetadata(
+        label=target,
+        material=self.settings.material,
+        density=self.settings.density,
+        boundary_friction=self.settings.boundary_friction,
+        collision_type=URDFCollisionType.ANALYTICAL,
+    ) as meta:
+        URDFBoundary(
+            part=meta.geometry,
             link_type=LinkType.BASE,
             shape=ShapeType.CYLINDER,
             type=BoundaryType.CAVITY,
-            # Custom overrides if needed (e.g. adding extensions, thickness, slots, etc.)
-            height=new_height_m,
-            thickness=thickness_m,
         )
-    ]
     ```
-    Each boundary configuration in the array specifies:
+  - Each `BoundaryConfig` includes fields such as `shape`, `type`, `radius`, `height`, `thickness`, `xyz`, `rpy`, etc.
     - `shape` (`str`): Geometry shape type (e.g., `"cylinder"`, `"tube"`, `"impeller"`, `"box"`, `"sphere"`, `"plane"`).
     - `type` (`str`): Boundary collision role (e.g., `"cavity"`, `"solid"`, `"solid_cavity"`).
     - `radius` (`float`): Radius in meters.
