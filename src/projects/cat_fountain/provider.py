@@ -282,8 +282,17 @@ class CatFountainProvider(Provider):
                                     rotation=(0, 90, 0),
                                 )
 
-                        # The sensor pocket (depth 10 along local X, width 8 along local Y)
-                        Box(10.0, 8.0, 8.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
+                        # Flat sensor cover boss on the OUTSIDE (extends from local X = -5.0 to X = 5.0)
+                        # Centered at local X = 0.0, height 10.0
+                        Cylinder(
+                            radius=7.5,
+                            height=10.0,
+                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            rotation=(0, 90, 0),
+                        )
+
+                        # Subtract the sensor pocket (through hole to dry compartment, width 8 along local Y)
+                        Box(14.0, 8.0, 8.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
 
                         # Blind mounting holes starting from the inside (X = -4.0) and going 5.0mm deep to X = 1.0
                         # These are completely blind and not visible on the exterior of the bowl (outer wall is at X = 2.0)
@@ -320,17 +329,17 @@ class CatFountainProvider(Provider):
         RigidJoint(
             "sensor_port_east",
             bowl.part,
-            Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.3, 0, 0)),
+            Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.2, 0, 0)),
         )
         RigidJoint(
             "sensor_port_north",
             bowl.part,
-            Location(Rot(0, 0, 90.0)) * Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.3, 0, 0)),
+            Location(Rot(0, 0, 90.0)) * Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.2, 0, 0)),
         )
         RigidJoint(
             "sensor_port_west",
             bowl.part,
-            Location(Rot(0, 0, 180.0)) * Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.3, 0, 0)),
+            Location(Rot(0, 0, 180.0)) * Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.2, 0, 0)),
         )
         RigidJoint(
             "led_port",
