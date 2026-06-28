@@ -104,11 +104,12 @@ class CatFountainProvider(Provider):
                 )
 
             # Add bottom controller cover mounting tabs inside the dry compartment (at z = 4.0)
+            tab_height = (floor_z - t) - 4.0
             for angle in [45, 135, 225, 315]:
                 with Locations(Rot(0, 0, angle)):
                     with Locations((r - t - 5.0, 0, 4.0)):
-                        # Mounting tab
-                        Cylinder(radius=5.0, height=8.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                        # Mounting tab (extends up to ceiling at floor_z - t)
+                        Cylinder(radius=5.0, height=tab_height, align=(Align.CENTER, Align.CENTER, Align.MIN))
                         # Screw hole for self-drilling M3 plastic screw (1.2mm radius)
                         Cylinder(
                             radius=1.2, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
@@ -231,11 +232,16 @@ class CatFountainProvider(Provider):
                             radius=1.0, height=2.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                         )
 
-            # Blind screw holes for mounting the Grove - Mini I2C Motor Driver (DRV8830) to the dry compartment ceiling (M2 screws)
-            # Centered at (50.0, 0.0), rotated 90 degrees (holes at local x=-15 y=±10 and x=15 y=0), starts at z = floor_z - t and goes up 2.5 mm (completely blind)
-            grove_holes = [(50.0 - 10.0, -15.0), (50.0 + 10.0, -15.0), (50.0, 15.0)]
-            for x_pos, y_pos in grove_holes:
-                with Locations((x_pos, y_pos, floor_z - t)):
+            # Blind screw holes for mounting the L9110S DC Motor Driver to the dry compartment ceiling (M2 screws, spacing 20.0mm in X)
+            # Centered at (50.0, 15.0), starts at z = floor_z - t and goes up 2.5 mm (completely blind)
+            for x_offset in [50.0 - 10.0, 50.0 + 10.0]:
+                with Locations((x_offset, 15.0, floor_z - t)):
+                    Cylinder(radius=1.0, height=2.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+            # Blind screw holes for mounting the Adafruit INA219 Current Sensor to the dry compartment ceiling (M2 screws, spacing 20.32mm in X)
+            # Centered at (50.0, -15.0), starts at z = floor_z - t and goes up 2.5 mm (completely blind)
+            for x_offset in [50.0 - 10.16, 50.0 + 10.16]:
+                with Locations((x_offset, -15.0, floor_z - t)):
                     Cylinder(radius=1.0, height=2.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
             # Blind screw holes for mounting the Adafruit MAX17048 LiPo Fuel Gauge to the dry compartment ceiling (M2 screws, spacing 20.32mm in X)
@@ -277,8 +283,12 @@ class CatFountainProvider(Provider):
                                     rotation=(0, 90, 0),
                                 )
 
-                        # The sensor pocket (depth 10 along local X, width 8 along local Y)
-                        Box(10.0, 8.0, 8.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
+                        # Flat sensor cover boss on the OUTSIDE (extends from local X = -5.0 to X = 5.0)
+                        # Centered at local X = 0.0, height 10.0
+                        Box(10.0, 10.0, 10.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+
+                        # Subtract the sensor pocket (through hole to dry compartment, width 8 along local Y)
+                        Box(14.0, 8.0, 8.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
 
                         # Blind mounting holes starting from the inside (X = -4.0) and going 5.0mm deep to X = 1.0
                         # These are completely blind and not visible on the exterior of the bowl (outer wall is at X = 2.0)
@@ -315,17 +325,17 @@ class CatFountainProvider(Provider):
         RigidJoint(
             "sensor_port_east",
             bowl.part,
-            Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.3, 0, 0)),
+            Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.2, 0, 0)),
         )
         RigidJoint(
             "sensor_port_north",
             bowl.part,
-            Location(Rot(0, 0, 90.0)) * Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.3, 0, 0)),
+            Location(Rot(0, 0, 90.0)) * Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.2, 0, 0)),
         )
         RigidJoint(
             "sensor_port_west",
             bowl.part,
-            Location(Rot(0, 0, 180.0)) * Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.3, 0, 0)),
+            Location(Rot(0, 0, 180.0)) * Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.2, 0, 0)),
         )
         RigidJoint(
             "led_port",
@@ -815,6 +825,9 @@ class CatFountainProvider(Provider):
             # Outer flange (10.0mm x 10.0mm square, 1.5mm thick)
             # Aligned MIN along X so it starts at X=0 and goes to X=1.5
             Box(1.5, 10.0, 10.0, align=(Align.MIN, Align.CENTER, Align.CENTER))
+            # Fillet the four outer corners of the flange
+            fillet(cover.edges().filter_by(Axis.X), radius=2.0)
+
             # Plug insert (7.6mm x 7.6mm square to fit the 8.0mm x 8.0mm pocket with clearance, 6.0mm long)
             # Aligned MAX along X so it starts at X=0 and goes to X=-6.0
             Box(6.0, 7.6, 7.6, align=(Align.MAX, Align.CENTER, Align.CENTER))
