@@ -303,22 +303,36 @@ To debug with specific environment overrides, you can add an "env" block or an "
 
 ## Creating a Release
 
-Releases are automated via GitHub Actions and are triggered by pushing a version tag.
+Releases are automated via GitHub Actions and are triggered by pushing a version tag. Release notes are automatically compiled by **release-drafter** using merged pull request details.
 
 1. Ensure your changes are committed and tests pass locally.
-2. Create a new release using the `v*` format. Use `v0.0.0` for main:
-   ```bash
-   gh release create v0.0.0 --generate-notes -p
-   ```
-   
-   For quick experimental releases, you can use a timestamp to ensure a unique tag:
-   ```bash
-   gh release create v0.0.$(date +%s) --generate-notes -p
-   ```
-   
-   Use `v4.0.x` for V4:
-   ```bash
-   gh release create v4.0.1 --generate-notes
-   ```
+2. Create and push a new tag, or create a release via the GitHub CLI.
+
+### Option A: Using Git Tags
+Create and push the version tag directly. The workflow will automatically compile the release notes and draft/publish the release.
+
+```bash
+# For main:
+git tag v0.0.0
+git push origin v0.0.0
+
+# For quick experimental releases (using a timestamp):
+git tag v0.0.$(date +%s)
+git push origin v0.0.$(date +%s)
+```
+
+### Option B: Using GitHub CLI (`gh`)
+Create a release using `gh`. Note that you do not need the `--generate-notes` flag, as the CI release workflow will use **release-drafter** to populate the release body.
+
+```bash
+# For main (prerelease):
+gh release create v0.0.0 -p
+
+# For quick experimental releases:
+gh release create v0.0.$(date +%s) -p
+
+# For V4:
+gh release create v4.0.1
+```
 
 To verify the release process, check the "Actions" tab on your GitHub repository after pushing a tag. You can view the progress, logs, and download the generated artifacts from there.
