@@ -104,11 +104,12 @@ class CatFountainProvider(Provider):
                 )
 
             # Add bottom controller cover mounting tabs inside the dry compartment (at z = 4.0)
+            tab_height = (floor_z - t) - 4.0
             for angle in [45, 135, 225, 315]:
                 with Locations(Rot(0, 0, angle)):
                     with Locations((r - t - 5.0, 0, 4.0)):
-                        # Mounting tab
-                        Cylinder(radius=5.0, height=8.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                        # Mounting tab (extends up to ceiling at floor_z - t)
+                        Cylinder(radius=5.0, height=tab_height, align=(Align.CENTER, Align.CENTER, Align.MIN))
                         # Screw hole for self-drilling M3 plastic screw (1.2mm radius)
                         Cylinder(
                             radius=1.2, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
@@ -284,12 +285,7 @@ class CatFountainProvider(Provider):
 
                         # Flat sensor cover boss on the OUTSIDE (extends from local X = -5.0 to X = 5.0)
                         # Centered at local X = 0.0, height 10.0
-                        Cylinder(
-                            radius=7.5,
-                            height=10.0,
-                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                            rotation=(0, 90, 0),
-                        )
+                        Box(10.0, 10.0, 10.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
 
                         # Subtract the sensor pocket (through hole to dry compartment, width 8 along local Y)
                         Box(14.0, 8.0, 8.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
@@ -829,6 +825,9 @@ class CatFountainProvider(Provider):
             # Outer flange (10.0mm x 10.0mm square, 1.5mm thick)
             # Aligned MIN along X so it starts at X=0 and goes to X=1.5
             Box(1.5, 10.0, 10.0, align=(Align.MIN, Align.CENTER, Align.CENTER))
+            # Fillet the four outer corners of the flange
+            fillet(cover.edges().filter_by(Axis.X), radius=2.0)
+
             # Plug insert (7.6mm x 7.6mm square to fit the 8.0mm x 8.0mm pocket with clearance, 6.0mm long)
             # Aligned MAX along X so it starts at X=0 and goes to X=-6.0
             Box(6.0, 7.6, 7.6, align=(Align.MAX, Align.CENTER, Align.CENTER))
