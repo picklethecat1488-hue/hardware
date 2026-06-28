@@ -580,21 +580,34 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             parent_label = getattr(u_geom, "urdf_parent", None)
             if parent_label and parent_label in label_to_geom:
                 parent_geom = label_to_geom[parent_label]
-                rel_loc = parent_geom.location.inverse() * u_geom.location
+                rel_loc = parent_geom.location.inverse() * geom.location
             else:
-                rel_loc = u_geom.location
+                rel_loc = geom.location
 
             pos = rel_loc.position
             xyz = [pos.X * 0.001, pos.Y * 0.001, pos.Z * 0.001]
-            rpy = [
-                math.radians(rel_loc.orientation.X),
-                math.radians(rel_loc.orientation.Y),
-                math.radians(rel_loc.orientation.Z),
+
+            # Convert build123d rotation matrix (extrinsic ZYX) to URDF extrinsic XYZ (roll, pitch, yaw)
+            trsf = rel_loc.wrapped.Transformation().VectorialPart()
+            m = [
+                [trsf.Value(1, 1), trsf.Value(1, 2), trsf.Value(1, 3)],
+                [trsf.Value(2, 1), trsf.Value(2, 2), trsf.Value(2, 3)],
+                [trsf.Value(3, 1), trsf.Value(3, 2), trsf.Value(3, 3)],
             ]
+            sin_theta = -m[2][0]
+            sin_theta = max(-1.0, min(1.0, sin_theta))
+            theta = math.asin(sin_theta)
+            if abs(math.cos(theta)) > 1e-6:
+                phi = math.atan2(m[2][1], m[2][2])
+                psi = math.atan2(m[1][0], m[0][0])
+            else:
+                phi = math.atan2(-m[1][2], m[1][1])
+                psi = 0.0
+            rpy = [phi, theta, psi]
 
             # Invert the translation to get the local shape centered at local origin
 
-            local_shape = u_geom.location.inverse() * u_geom
+            local_shape = geom.location.inverse() * u_geom
 
             # Mass and inertia calculations using local shape and density
             density_g_mm3 = density * 1e-3
@@ -643,7 +656,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     "iyy": iyy,
                     "iyz": iyz,
                     "izz": izz,
-                    "obj_filename": f"{label}.obj",
+                    "obj_filename": getattr(u_geom, "urdf_obj_filename", None) or f"{label}.obj",
                     "rgba_str": rgba_str,
                     "collision_type": collision_type,
                     "collision_primitives": getattr(u_geom, "urdf_collision_primitives", None),
@@ -887,87 +900,3 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             spawn_viewer,
         )
         bullet_sim.run()
-
-    @staticmethod
-    def make_boundary_config(
-        part: Any, link_type: Any, link_idx: int = -1, shape: Optional[Any] = None, type: Optional[Any] = None, **kwargs
-    ) -> Any:
-        """Build a BoundaryConfig from a build123d Part/Shape by extracting its physical dimensions."""
-        from model.boundary_config import BoundaryConfig, ShapeType
-        import math
-
-        if hasattr(part, "part"):
-            solid = part.part
-        else:
-            solid = part
-
-        bbox = solid.bounding_box()
-        dx = bbox.max.X - bbox.min.X
-        dy = bbox.max.Y - bbox.min.Y
-        dz = bbox.max.Z - bbox.min.Z
-
-        center_x = (bbox.max.X + bbox.min.X) * 0.5
-        center_y = (bbox.max.Y + bbox.min.Y) * 0.5
-        center_z = (bbox.max.Z + bbox.min.Z) * 0.5
-
-        # Determine default shape from geometry if not provided
-        if shape is None:
-            # Default to cylinder if circular-ish, box otherwise
-            if abs(dx - dy) < 1e-3:
-                shape = ShapeType.CYLINDER
-            else:
-                shape = ShapeType.BOX
-
-        # Compute default radius and height in meters (CAD is in mm)
-        default_radius = 0.0
-        default_height = 0.0
-        default_thickness = 0.0
-        default_xyz = (0.0, 0.0, 0.0)
-
-        match shape:
-            case ShapeType.CYLINDER | ShapeType.TUBE | ShapeType.IMPELLER:
-                default_radius = float(max(dx, dy) / 2.0 * 0.001)
-                default_height = float(dz * 0.001)
-                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(bbox.min.Z * 0.001))
-            case ShapeType.BOX:
-                default_height = float(dz * 0.001)
-                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(bbox.min.Z * 0.001))
-            case ShapeType.SPHERE:
-                default_radius = float(max(dx, dy, dz) / 2.0 * 0.001)
-                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(center_z * 0.001))
-            case ShapeType.PLANE:
-                default_thickness = float(dz * 0.001)
-                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(bbox.min.Z * 0.001))
-
-        # Compute default local orientation RPY in radians
-        if hasattr(solid, "location") and solid.location is not None:
-            orientation = solid.location.orientation
-            default_rpy = (
-                float(math.radians(orientation.X)),
-                float(math.radians(orientation.Y)),
-                float(math.radians(orientation.Z)),
-            )
-        else:
-            default_rpy = (0.0, 0.0, 0.0)
-
-        # Use overrides if provided in kwargs
-        radius = kwargs.pop("radius", default_radius)
-        height = kwargs.pop("height", default_height)
-        thickness = kwargs.pop("thickness", default_thickness)
-        xyz = kwargs.pop("xyz", default_xyz)
-        rpy = kwargs.pop("rpy", default_rpy)
-
-        config_dict = {
-            "link_type": link_type,
-            "link_idx": link_idx,
-            "shape": shape,
-            "type": type,
-            "radius": radius,
-            "height": height,
-            "thickness": thickness,
-            "xyz": xyz,
-            "rpy": rpy,
-            **kwargs,
-        }
-
-        return BoundaryConfig.model_validate(config_dict)

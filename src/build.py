@@ -5,6 +5,7 @@ import io
 import hashlib
 import yaml
 import os
+from typing import cast
 from pathlib import Path
 from model import AppConfig
 from build123d import *  # type: ignore
@@ -12,7 +13,7 @@ from build123d import export_stl, export_brep, Shape  # type: ignore
 from target_parser import TargetParser
 from typing import Optional, Any, Sequence, Callable
 from pydantic import validate_call
-from provider import ProviderManager, Section, Mode, SUBASSEMBLIES, Room
+from provider import ProviderManager, Section, Mode, SUBASSEMBLIES, Room, URDFShape
 import zipfile
 from shell import Logger
 from concurrent.futures import ThreadPoolExecutor
@@ -369,15 +370,32 @@ class Builder:
                         continue
                     local_shape = geom.location.inverse() * geom
 
-                    fq_label = f"{proj_name}/{label}" if "/" not in label else label
-                    part_outputs = self.lister.get_part_outputs(fq_label, None)
-                    obj_file_name = next(p for p in part_outputs if p.endswith(".obj"))
+                    # Try progressive fallback on label to locate correct part outputs
+                    obj_file_name = None
+                    parts = label.split("_")
+                    for i in range(len(parts), 0, -1):
+                        candidate_label = "_".join(parts[:i])
+                        candidate_fq = (
+                            f"{proj_name}/{candidate_label}" if "/" not in candidate_label else candidate_label
+                        )
+                        part_outputs = self.lister.get_part_outputs(candidate_fq, None)
+                        found = next((p for p in part_outputs if p.endswith(".obj")), None)
+                        if found:
+                            obj_file_name = found
+                            break
+
+                    if not obj_file_name:
+                        raise ValueError(f"OBJ file for link '{label}' could not be resolved.")
+
                     obj_path = Path(out_dir) / obj_file_name
-
-                    current_hash = self._get_part_hash(local_shape)
-
                     if not obj_path.exists():
                         raise ValueError(f"OBJ file for link '{label}' does not exist: {obj_path}. ")
+
+                    # Save resolved filename on geom so export_urdf can use it
+                    u_geom = cast(URDFShape, geom)
+                    u_geom.urdf_obj_filename = os.path.basename(obj_file_name)
+                    current_hash = self._get_part_hash(local_shape)
+
                     with self.lock:
                         brep_manifest = self.build_manifest.setdefault("brep", {})
                         manifest_hash = brep_manifest.get(obj_file_name)

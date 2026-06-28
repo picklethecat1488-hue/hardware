@@ -3,7 +3,7 @@
 # No longer using cached_property
 from build123d import *  # type: ignore
 import math
-from model import method_cache, TextArgs, FluidConfig, ShapeType, BoundaryType
+from model import method_cache, TextArgs, FluidConfig, ShapeType, BoundaryType, BoundaryConfig
 from pathlib import Path
 from provider import (
     Provider,
@@ -12,10 +12,14 @@ from provider import (
     discover_provider,
     Room,
     Simulate,
+    URDFBoundary,
+    URDFMetadata,
     URDFShape,
     URDFCollisionType,
     URDFCollisionShapeType,
     URDFBoundaryType,
+    URDFJointType,
+    URDFMotorType,
     LinkType,
 )
 from projects_config import CatFountainConfig
@@ -52,7 +56,11 @@ class CatFountainProvider(Provider):
             "bottom_cover": self.build_bottom_cover,
             "lid": self.build_lid,
             "drain_cover": self.build_drain_cover,
-            "fountain": self.build_fountain,
+            "sensor_cover": self.build_sensor_cover,
+            "sensor_cover_east": self.build_sensor_cover,
+            "sensor_cover_north": self.build_sensor_cover,
+            "sensor_cover_west": self.build_sensor_cover,
+            "led_cover": self.build_led_cover,
         }
 
     @property
@@ -255,107 +263,75 @@ class CatFountainProvider(Provider):
                     )
 
             # Proximity sensor mounts / cutouts at East (0), North (90), West (180)
-            for angle in [0.0, 90.0, 180.0]:
-                with Locations(Rot(0, 0, angle)):
+            for s_angle in [0.0, 90.0, 180.0]:
+                with Locations(Rot(0, 0, s_angle)):
                     with Locations(Location((r - t / 2.0, 0, 12.0), (0, -30, 0))):
-                        # Flat mounting bosses around the holes (so screw heads sit on flat faces perpendicular to the holes)
+                        # Flat mounting bosses on the INSIDE (dry compartment side) of the bowl wall
+                        # Centered at X = -3.0 so they extend from X = -4.0 (boss face) to X = -2.0 (inner wall face)
                         for y_offset in [-10.16, 10.16]:
-                            with Locations((0, y_offset, 0)):
+                            with Locations((-3.0, y_offset, 0)):
                                 Cylinder(
                                     radius=2.2,
-                                    height=8.0,
+                                    height=2.0,
                                     align=(Align.CENTER, Align.CENTER, Align.CENTER),
                                     rotation=(0, 90, 0),
                                 )
+
                         # The sensor pocket (depth 10 along local X, width 8 along local Y)
                         Box(10.0, 8.0, 8.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
-                        # Mounting holes
+
+                        # Blind mounting holes starting from the inside (X = -4.0) and going 5.0mm deep to X = 1.0
+                        # These are completely blind and not visible on the exterior of the bowl (outer wall is at X = 2.0)
                         for y_offset in [-10.16, 10.16]:
-                            with Locations((0, y_offset, 0)):
+                            with Locations((-1.5, y_offset, 0)):
                                 Cylinder(
                                     radius=0.9,
-                                    height=10.0,
+                                    height=5.0,
                                     align=(Align.CENTER, Align.CENTER, Align.CENTER),
                                     mode=Mode.SUBTRACT,
                                     rotation=(0, 90, 0),
                                 )
 
-            # Drainage notch at the bottom rim of the outer wall
-            with Locations((0, -r, 0.0)):
-                Cylinder(radius=3.0, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-
-        # Attach metadata for URDF/simulation export
-        bowl_part = cast(URDFShape, bowl.part)
-        bowl_part.urdf_label = "bowl"
-        bowl_part.urdf_material = self.settings.material
-        bowl_part.urdf_density = self.settings.density
-        bowl_part.urdf_boundary_friction = self.settings.boundary_friction
-        bowl_part.urdf_parent = None
-        bowl_part.urdf_joint_type = None
-        bowl_part.urdf_collision_type = URDFCollisionType.ANALYTICAL
-        bowl_part.urdf_boundaries = [
-            Room.make_boundary_config(
-                reservoir_shape,
-                link_type=LinkType.BASE,
-                type=BoundaryType.CAVITY,
-                height=(h - floor_z + self.settings.spout_length) * 0.001,
-                thickness=t * 0.001,
-            )
-        ]
-
-        # Dimensions in meters
-        R = r * 0.001
-        H = h * 0.001
-        thickness = t * 0.001
-        R_i = R - thickness
-        H_w = H - thickness
-
-        primitives = []
-
-        # 1. Base plate box (bottom of the dry compartment)
-        primitives.append(
-            {
-                "type": URDFCollisionShapeType.BOX,
-                "size": [R_i * 2.0, R_i * 2.0, thickness],
-                "xyz": [0.0, 0.0, thickness / 2.0],
-                "rpy": [0.0, 0.0, 0.0],
-            }
-        )
-
-        # 2. Reservoir floor plate box (at z = floor_z)
-        primitives.append(
-            {
-                "type": URDFCollisionShapeType.BOX,
-                "size": [R_i * 2.0, R_i * 2.0, thickness],
-                "xyz": [0.0, 0.0, floor_z * 0.001 - thickness / 2.0],
-                "rpy": [0.0, 0.0, 0.0],
-            }
-        )
-
-        # 3. Side walls segments (12 boxes)
-        N_segments = 12
-        R_mid = R_i + thickness / 2.0
-        circ = 2.0 * math.pi * R_mid
-        seg_width = circ / N_segments + 0.003  # Add 3mm overlap to prevent gaps
-
-        for i in range(N_segments):
-            theta = i * (2.0 * math.pi / N_segments)
-            primitives.append(
-                {
-                    "type": URDFCollisionShapeType.BOX,
-                    "size": [thickness, seg_width, H_w],
-                    "xyz": [R_mid * math.cos(theta), R_mid * math.sin(theta), thickness + H_w / 2.0],
-                    "rpy": [0.0, 0.0, theta],
-                }
-            )
-
-        bowl_part.urdf_collision_primitives = primitives
+            with URDFMetadata(
+                label=target,
+                material=self.settings.material,
+                density=self.settings.density,
+                boundary_friction=self.settings.boundary_friction,
+                collision_type=URDFCollisionType.ANALYTICAL,
+            ):
+                URDFBoundary(
+                    reservoir_shape,
+                    link_type=LinkType.BASE,
+                    type=BoundaryType.CAVITY,
+                    height=(h - floor_z + self.settings.spout_length) * 0.001,
+                    thickness=t * 0.001,
+                )
 
         # Define joints
         RigidJoint("shaft", bowl.part, Location((0, tube_y, floor_z + 2.0)))
         RigidJoint("tube_socket", bowl.part, Location((0, tube_y, floor_z + 5.0)))
         RigidJoint("lid_seat", bowl.part, Location((0, 0, h)))
         RigidJoint("cover_seat", bowl.part, Location((0, 0, 0)))
+        RigidJoint(
+            "sensor_port_east",
+            bowl.part,
+            Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.3, 0, 0)),
+        )
+        RigidJoint(
+            "sensor_port_north",
+            bowl.part,
+            Location(Rot(0, 0, 90.0)) * Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.3, 0, 0)),
+        )
+        RigidJoint(
+            "sensor_port_west",
+            bowl.part,
+            Location(Rot(0, 0, 180.0)) * Location((r - t / 2.0, 0, 12.0), (0, -30, 0)) * Location((5.3, 0, 0)),
+        )
+        RigidJoint(
+            "led_port",
+            bowl.part,
+            Location(Rot(0, 0, 75.0)) * Location((r - t / 2.0, 0, 8.0), (0, 90, 0)) * Location((0, 0, 2.0)),
+        )
 
         return bowl
 
@@ -415,27 +391,27 @@ class CatFountainProvider(Provider):
                         with Locations((hub_r + blade_w / 2.0, 0, z_start)):
                             Box(blade_w, blade_t, helix_height, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-        impeller_part = cast(URDFShape, impeller.part)
-        impeller_part.urdf_label = "impeller"
-        impeller_part.urdf_material = self.settings.material
-        impeller_part.urdf_density = self.settings.density
-        impeller_part.urdf_boundary_friction = self.settings.boundary_friction
-        impeller_part.urdf_motor_type = "velocity"
-        impeller_part.urdf_motor_target = 120.0
-        impeller_part.urdf_motor_force = 10.0
-        impeller_part.urdf_collision_type = URDFCollisionType.ANALYTICAL
-        impeller_part.urdf_boundaries = [
-            Room.make_boundary_config(
-                impeller.part,
-                link_type=LinkType.IMPELLER,
-                shape=ShapeType.IMPELLER,
-                type=BoundaryType.SOLID,
-                thickness=shaft_r * 0.001,
-                vane_twist=self.settings.vane_twist,
-                vane_thickness=blade_t * 0.001,
-                num_vanes=self.settings.impeller_blades,
-            )
-        ]
+            with URDFMetadata(
+                label=target,
+                material=self.settings.material,
+                density=self.settings.density,
+                boundary_friction=self.settings.boundary_friction,
+                collision_type=URDFCollisionType.ANALYTICAL,
+                motor_type=URDFMotorType.VELOCITY,
+                motor_target=120.0,
+                motor_force=10.0,
+            ):
+                URDFBoundary(
+                    impeller,
+                    link_type=LinkType.IMPELLER,
+                    shape=ShapeType.IMPELLER,
+                    type=BoundaryType.SOLID,
+                    height=cast(URDFShape, impeller.part).urdf_height,
+                    thickness=shaft_r * 0.001,
+                    vane_twist=self.settings.vane_twist,
+                    vane_thickness=blade_t * 0.001,
+                    num_vanes=self.settings.impeller_blades,
+                )
 
         RevoluteJoint(label="motor", to_part=impeller.part, axis=Axis((0, 0, 0), (0, 0, 1)), angular_range=(0, 360))
 
@@ -471,22 +447,22 @@ class CatFountainProvider(Provider):
                 mode=Mode.SUBTRACT,
             )
 
-        tube_part = cast(URDFShape, tube.part)
-        tube_part.urdf_label = "tube"
-        tube_part.urdf_material = self.settings.material
-        tube_part.urdf_density = self.settings.density
-        tube_part.urdf_boundary_friction = self.settings.boundary_friction
-        tube_part.urdf_collision_type = URDFCollisionType.ANALYTICAL
-        tube_part.urdf_boundaries = [
-            Room.make_boundary_config(
-                tube.part,
-                link_type=LinkType.TUBE,
-                shape=ShapeType.TUBE,
-                type=BoundaryType.SOLID_CAVITY,
-                thickness=t * 0.001,
-                slot_height=self.settings.slot_height * 0.001,
-            )
-        ]
+            with URDFMetadata(
+                label=target,
+                material=self.settings.material,
+                density=self.settings.density,
+                boundary_friction=self.settings.boundary_friction,
+                collision_type=URDFCollisionType.ANALYTICAL,
+            ):
+                URDFBoundary(
+                    tube,
+                    link_type=LinkType.TUBE,
+                    shape=ShapeType.TUBE,
+                    type=BoundaryType.SOLID_CAVITY,
+                    height=cast(URDFShape, tube.part).urdf_height,
+                    thickness=t * 0.001,
+                    slot_height=self.settings.slot_height * 0.001,
+                )
 
         RigidJoint("base", tube.part, Location((0, 0, 0)))
         RigidJoint("top", tube.part, Location((0, 0, h)))
@@ -518,7 +494,7 @@ class CatFountainProvider(Provider):
                 )
 
             # Drainage hole in the center
-            Cylinder(radius=3.0, height=6.0, mode=Mode.SUBTRACT)
+            Cylinder(radius=8.0, height=6.0, mode=Mode.SUBTRACT)
 
             # Notch for charging port access (at y = -cover_r, matching bowl's charging port)
             with Locations((0, -cover_r, 0.0)):
@@ -548,15 +524,15 @@ class CatFountainProvider(Provider):
                             mode=Mode.SUBTRACT,
                         )
 
-        # Attach metadata for URDF/simulation export
-        cover_part = cast(URDFShape, cover.part)
-        cover_part.urdf_label = "bottom_cover"
-        cover_part.urdf_material = self.settings.material
-        cover_part.urdf_density = self.settings.density
-        cover_part.urdf_boundary_friction = self.settings.boundary_friction
-        cover_part.urdf_collision_type = URDFCollisionType.CONVEX
-        cover_part.urdf_parent = "bowl"
-        cover_part.urdf_joint_type = "fixed"
+            URDFMetadata(
+                label=target,
+                material=self.settings.material,
+                density=self.settings.density,
+                boundary_friction=self.settings.boundary_friction,
+                collision_type=URDFCollisionType.CONVEX,
+                parent="bowl",
+                joint_type=URDFJointType.FIXED,
+            )
 
         # Define joint
         RigidJoint("mount", cover.part, Location((0, 0, 0)))
@@ -630,17 +606,15 @@ class CatFountainProvider(Provider):
 
             # --- integrated tube cover / convex grate & cap at (0, tube_y) ---
             with Locations((0, tube_y, 0)):
-                # 1. Tube socket pocket (clearance fit for tube)
-                socket_r = self.settings.tube_radius + 0.2
-                Cylinder(radius=socket_r, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-                # 2. Add the convex dome starting flush with the terrace top platform at z = 6.0
+                # 1. Add the convex dome starting flush with the terrace top platform at z = 6.0
                 with Locations((0, 0, 6.0)):
+                    socket_r = self.settings.tube_radius + 0.2
                     dome_out_r = socket_r
                     dome_in_r = self.settings.tube_radius - self.settings.tube_thickness + 0.2
                     outer_dome = Sphere(radius=dome_out_r)
                     # Hollow the inside of the dome
                     Sphere(radius=dome_in_r, mode=Mode.SUBTRACT)
-                    # 3. Cut grate slots in the dome ONLY up to the inner dome peak
+                    # 2. Cut grate slots in the dome ONLY up to the inner dome peak
                     # This leaves the top portion of the dome as a solid cap.
                     for angle in [0, 45, 90, 135]:
                         with Locations(Rot(0, 0, angle)):
@@ -651,6 +625,15 @@ class CatFountainProvider(Provider):
                                 align=(Align.CENTER, Align.CENTER, Align.MIN),
                                 mode=Mode.SUBTRACT,
                             )
+                # 3. Tube socket pocket (clearance fit for tube)
+                # Starts at z = -10.0 to cut away the spherical bulge of the dome extending below z = 0.0
+                with Locations((0, 0, -10.0)):
+                    Cylinder(
+                        radius=socket_r,
+                        height=16.0,
+                        align=(Align.CENTER, Align.CENTER, Align.MIN),
+                        mode=Mode.SUBTRACT,
+                    )
 
             # --- DRAIN HOLE & BAYONET MOUNT ---
             with Locations((0, 65.0, 0)):
@@ -691,83 +674,76 @@ class CatFountainProvider(Provider):
             with Locations((0, -105.5, 0)):
                 Box(120.0, 20.0, 30.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
 
-        # Attach metadata for URDF/simulation export
-        lid_part = cast(URDFShape, lid.part)
-        lid_part.urdf_label = "lid"
-        lid_part.urdf_material = self.settings.material
-        lid_part.urdf_density = self.settings.density
-        lid_part.urdf_boundary_friction = self.settings.boundary_friction
-        lid_part.urdf_collision_type = URDFCollisionType.ANALYTICAL
-        lid_part.urdf_parent = "bowl"
-        lid_part.urdf_joint_type = "fixed"
+        # Construct analytical boundary configurations
+        with URDFMetadata(
+            geometry=lid,
+            label=target,
+            material=self.settings.material,
+            density=self.settings.density,
+            boundary_friction=self.settings.boundary_friction,
+            collision_type=URDFCollisionType.ANALYTICAL,
+            parent="bowl",
+            joint_type=URDFJointType.FIXED,
+        ):
+            URDFBoundary(
+                pocket_tool.part,
+                link_type=LinkType.LID,
+                shape=ShapeType.CYLINDER,
+                type=BoundaryType.CAVITY,
+                radius=self.settings.lid_pocket_radius * 0.001,
+                height=self.settings.lid_pocket_cavity_height * 0.001,
+                thickness=3.0 * 0.001,
+                xyz=(0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001),
+                rpy=(0.0, 0.0, 0.0),
+                has_drain=True,
+                drain_hole_y=self.settings.drain_hole_y * 0.001,
+                drain_hole_radius=self.settings.drain_hole_radius * 0.001,
+                has_tube=True,
+                tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
+            )
 
-        # Construct analytical boundary configurations using helper function
-        pocket_boundary = Room.make_boundary_config(
-            pocket_tool.part,
-            link_type=LinkType.LID,
-            shape=ShapeType.CYLINDER,
-            type=BoundaryType.CAVITY,
-            radius=self.settings.lid_pocket_radius * 0.001,
-            height=self.settings.lid_pocket_cavity_height * 0.001,
-            thickness=3.0 * 0.001,
-            xyz=(0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001),
-            rpy=(0.0, 0.0, 0.0),
-            has_drain=True,
-            drain_hole_y=self.settings.drain_hole_y * 0.001,
-            drain_hole_radius=self.settings.drain_hole_radius * 0.001,
-            has_tube=True,
-            tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
-        )
+            dome_top_z = outer_dome.bounding_box().max.Z
+            URDFBoundary(
+                outer_dome,
+                link_type=LinkType.LID,
+                shape=ShapeType.CYLINDER,
+                type=BoundaryType.CAVITY,
+                radius=self.settings.spout_deflection_radius * 0.001,
+                height=self.settings.spout_deflection_height * 0.001,
+                thickness=self.settings.spout_deflection_thickness * 0.001,
+                xyz=(0.0, tube_y * 0.001, dome_top_z * 0.001),
+                rpy=(math.pi, 0.0, 0.0),
+                has_tube=False,
+            )
 
-        dome_top_z = outer_dome.bounding_box().max.Z
-        deflection_boundary = Room.make_boundary_config(
-            outer_dome,
-            link_type=LinkType.LID,
-            shape=ShapeType.CYLINDER,
-            type=BoundaryType.CAVITY,
-            radius=self.settings.spout_deflection_radius * 0.001,
-            height=self.settings.spout_deflection_height * 0.001,
-            thickness=self.settings.spout_deflection_thickness * 0.001,
-            xyz=(0.0, tube_y * 0.001, dome_top_z * 0.001),
-            rpy=(math.pi, 0.0, 0.0),
-            has_tube=False,
-        )
+            URDFBoundary(
+                lid_disk,
+                link_type=LinkType.LID,
+                shape=ShapeType.CYLINDER,
+                type=BoundaryType.CAVITY,
+                height=0.0,
+                thickness=2.0 * 0.001,
+                xyz=(0.0, 0.0, -2.0 * 0.001),
+                rpy=(math.pi, 0.0, 0.0),
+                has_drain=True,
+                drain_hole_y=-self.settings.drain_hole_y * 0.001,
+                drain_hole_radius=self.settings.drain_hole_radius * 0.001,
+                has_tube=True,
+                tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
+            )
 
-        lid_bottom_boundary = Room.make_boundary_config(
-            lid_disk,
-            link_type=LinkType.LID,
-            shape=ShapeType.CYLINDER,
-            type=BoundaryType.CAVITY,
-            height=0.0,
-            thickness=2.0 * 0.001,
-            xyz=(0.0, 0.0, -2.0 * 0.001),
-            rpy=(math.pi, 0.0, 0.0),
-            has_drain=True,
-            drain_hole_y=-self.settings.drain_hole_y * 0.001,
-            drain_hole_radius=self.settings.drain_hole_radius * 0.001,
-            has_tube=True,
-            tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
-        )
-
-        terrace_boundary = Room.make_boundary_config(
-            terrace_shelf,
-            link_type=LinkType.LID,
-            shape=ShapeType.CYLINDER,
-            type=BoundaryType.CAVITY,
-            radius=(terrace_shelf.bounding_box().max.X - 2.0) * 0.001,
-            height=0.0,
-            thickness=3.0 * 0.001,
-            xyz=(0.0, tube_y * 0.001, terrace_shelf.bounding_box().max.Z * 0.001),
-            has_tube=True,
-            tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
-        )
-
-        lid_part.urdf_boundaries = [
-            pocket_boundary,
-            deflection_boundary,
-            lid_bottom_boundary,
-            terrace_boundary,
-        ]
+            URDFBoundary(
+                terrace_shelf,
+                link_type=LinkType.LID,
+                shape=ShapeType.CYLINDER,
+                type=BoundaryType.CAVITY,
+                radius=(terrace_shelf.bounding_box().max.X - 2.0) * 0.001,
+                height=0.0,
+                thickness=3.0 * 0.001,
+                xyz=(0.0, tube_y * 0.001, terrace_shelf.bounding_box().max.Z * 0.001),
+                has_tube=True,
+                tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
+            )
 
         # Define joint at the base of the lid for positioning
         RigidJoint("mount", lid.part, Location((0, 0, 0)))
@@ -794,6 +770,9 @@ class CatFountainProvider(Provider):
                 with Locations((x_offset, 0, 0)):
                     Box(3.8, 10.0, 1.2, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
+            # Trim the outer corners of the tabs to fit within the 17.0mm radius undercut pocket with clearance
+            Cylinder(radius=16.9, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.INTERSECT)
+
             # Subtract central finger pull hole (radius 6.0mm)
             Cylinder(radius=6.0, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
@@ -812,15 +791,15 @@ class CatFountainProvider(Provider):
                             mode=Mode.SUBTRACT,
                         )
 
-        # Attach metadata for URDF/simulation export
-        cover_part = cast(URDFShape, cover.part)
-        cover_part.urdf_label = "drain_cover"
-        cover_part.urdf_material = self.settings.material
-        cover_part.urdf_density = self.settings.density
-        cover_part.urdf_boundary_friction = self.settings.boundary_friction
-        cover_part.urdf_collision_type = URDFCollisionType.CONVEX
-        cover_part.urdf_parent = "bowl"
-        cover_part.urdf_joint_type = "fixed"
+            URDFMetadata(
+                label=target,
+                material=self.settings.material,
+                density=self.settings.density,
+                boundary_friction=self.settings.boundary_friction,
+                collision_type=URDFCollisionType.CONVEX,
+                parent="bowl",
+                joint_type=URDFJointType.FIXED,
+            )
 
         # Define joint at bottom center
         RigidJoint("mount", cover.part, Location((0, 0, 0)))
@@ -828,41 +807,60 @@ class CatFountainProvider(Provider):
         return cover
 
     @method_cache
-    def build_fountain(
+    def build_sensor_cover(
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Assemble all parts of the cat fountain."""
-        bowl_part = self.build_bowl("bowl", mode=mode).part
-        impeller_part = self.build_impeller("impeller", mode=mode).part
-        bowl_part.joints["shaft"].connect_to(impeller_part.joints["motor"])
+        """Build a push-fit flexible TPU cover for the proximity sensor port."""
+        with BuildPart() as cover:
+            # Outer flange (10.0mm x 10.0mm square, 1.5mm thick)
+            # Aligned MIN along X so it starts at X=0 and goes to X=1.5
+            Box(1.5, 10.0, 10.0, align=(Align.MIN, Align.CENTER, Align.CENTER))
+            # Plug insert (7.6mm x 7.6mm square to fit the 8.0mm x 8.0mm pocket with clearance, 6.0mm long)
+            # Aligned MAX along X so it starts at X=0 and goes to X=-6.0
+            Box(6.0, 7.6, 7.6, align=(Align.MAX, Align.CENTER, Align.CENTER))
 
-        floor_z = 25.0
-        tube_y = 0.0
-        tube_part = self.build_tube("tube", mode=mode).part
-        tube_part.locate(Location((0, tube_y, floor_z + 5.0)))
-
-        bottom_cover_part = self.build_bottom_cover("bottom_cover", mode=mode).part
-        bowl_part.joints["cover_seat"].connect_to(bottom_cover_part.joints["mount"])
-
-        lid_part = self.build_lid("lid", mode=mode).part
-        bowl_part.joints["lid_seat"].connect_to(lid_part.joints["mount"])
-
-        drain_cover_part = self.build_drain_cover("drain_cover", mode=mode).part
-        lid_part.joints["drain_socket"].connect_to(drain_cover_part.joints["mount"])
-
-        with BuildPart() as f:
-            f._obj = Part(
-                children=[
-                    bowl_part,
-                    impeller_part,
-                    tube_part,
-                    bottom_cover_part,
-                    lid_part,
-                    drain_cover_part,
-                ]
+            URDFMetadata(
+                label=target,
+                material="tpu",
+                density=1.20,
+                boundary_friction=0.50,
+                collision_type=URDFCollisionType.CONVEX,
+                parent="bowl",
+                joint_type=URDFJointType.FIXED,
             )
 
-        return f
+        # Define mount joint at the interface plane
+        RigidJoint("mount", cover.part, Location((0, 0, 0)))
+
+        return cover
+
+    @method_cache
+    def build_led_cover(
+        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    ) -> BuildPart:
+        """Build a translucent push-fit cover/diffuser for the RGB status LED."""
+        with BuildPart() as cover:
+            # Outer flange (7.0mm diameter, 1.0mm thick)
+            # Aligned MIN along Z so it goes from Z = 0 to Z = 1.0
+            Cylinder(radius=3.5, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            # Plug insert (4.6mm diameter to fit 5.0mm hole with clearance, 3.0mm long)
+            # Aligned MAX along Z so it goes from Z = 0 to Z = -3.0
+            Cylinder(radius=2.3, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MAX))
+
+            URDFMetadata(
+                label=target,
+                material="petg",
+                density=1.27,
+                boundary_friction=0.20,
+                collision_type=URDFCollisionType.CONVEX,
+                parent="bowl",
+                joint_type=URDFJointType.FIXED,
+            )
+
+        # Define mount joint at the interface plane (where flange meets plug insert)
+        RigidJoint("mount", cover.part, Location((0, 0, 0)))
+
+        return cover
 
     def build_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build an exploded assembly diagram for the cat fountain."""
@@ -873,6 +871,15 @@ class CatFountainProvider(Provider):
         lid_part = self.build_lid("lid").part
         drain_cover_part = self.build_drain_cover("drain_cover").part
 
+        assert (
+            bowl_part is not None
+            and impeller_part is not None
+            and tube_part is not None
+            and bottom_cover_part is not None
+            and lid_part is not None
+            and drain_cover_part is not None
+        )
+
         # 2. Position them in their standard assembled configuration using joints
         bowl_part.joints["shaft"].connect_to(impeller_part.joints["motor"])
         bowl_part.joints["tube_socket"].connect_to(tube_part.joints["base"])
@@ -880,7 +887,39 @@ class CatFountainProvider(Provider):
         bowl_part.joints["lid_seat"].connect_to(lid_part.joints["mount"])
         lid_part.joints["drain_socket"].connect_to(drain_cover_part.joints["mount"])
 
+        # Build and connect the three sensor covers using joints
+        sensor_cover_east = self.build_sensor_cover("sensor_cover_east").part
+        sensor_cover_north = self.build_sensor_cover("sensor_cover_north").part
+        sensor_cover_west = self.build_sensor_cover("sensor_cover_west").part
+        assert sensor_cover_east is not None and sensor_cover_north is not None and sensor_cover_west is not None
+
+        bowl_part.joints["sensor_port_east"].connect_to(sensor_cover_east.joints["mount"])
+        bowl_part.joints["sensor_port_north"].connect_to(sensor_cover_north.joints["mount"])
+        bowl_part.joints["sensor_port_west"].connect_to(sensor_cover_west.joints["mount"])
+
+        # Build and connect the LED cover
+        led_cover = self.build_led_cover("led_cover").part
+        assert led_cover is not None
+        bowl_part.joints["led_port"].connect_to(led_cover.joints["mount"])
+
+        # Explode outwards by translating 30.0 mm along local X axis for sensor covers, and Z axis for LED cover
+        assert sensor_cover_east.location is not None
+        assert sensor_cover_north.location is not None
+        assert sensor_cover_west.location is not None
+        assert led_cover.location is not None
+
+        sensor_cover_east.location = sensor_cover_east.location * Location((30.0, 0, 0))
+        sensor_cover_north.location = sensor_cover_north.location * Location((30.0, 0, 0))
+        sensor_cover_west.location = sensor_cover_west.location * Location((30.0, 0, 0))
+        led_cover.location = led_cover.location * Location((0, 0, 30.0))
+
         # 3. Explode the parts by translating their .location attributes
+        assert impeller_part.location is not None
+        assert tube_part.location is not None
+        assert bottom_cover_part.location is not None
+        assert lid_part.location is not None
+        assert drain_cover_part.location is not None
+
         impeller_part.location = Location((0, 0, 50)) * impeller_part.location
         tube_part.location = Location((0, 50, 25)) * tube_part.location
         bottom_cover_part.location = Location((0, 0, -40)) * bottom_cover_part.location
@@ -894,6 +933,10 @@ class CatFountainProvider(Provider):
         room.add("bottom_cover", bottom_cover_part, color="black")
         room.add("lid", lid_part, color="green")
         room.add("drain_cover", drain_cover_part, color="light_grey")
+        room.add("sensor_cover_east", sensor_cover_east, color="grey")
+        room.add("sensor_cover_north", sensor_cover_north, color="grey")
+        room.add("sensor_cover_west", sensor_cover_west, color="grey")
+        room.add("led_cover", led_cover, color="grey")
 
         # 5. Add connector lines indicating assembly paths
         impeller_conn = Line(
@@ -917,6 +960,19 @@ class CatFountainProvider(Provider):
             drain_cover_part.center() + Vector(40, -10, 10),
             options=TextArgs(font_size=10),
         )
+        # Label the first sensor cover and LED cover
+        room.add_label(
+            "sensor_cover_label",
+            "SENSOR COVER",
+            sensor_cover_east.center() + Vector(30, 0, 10),
+            options=TextArgs(font_size=10),
+        )
+        room.add_label(
+            "led_cover_label",
+            "LED COVER",
+            led_cover.center() + Vector(30, 0, 10),
+            options=TextArgs(font_size=10),
+        )
 
     def build_product(self, room: Room, mode: ProviderMode) -> None:
         """Place all parts of the cat fountain in the room for visualization/simulation."""
@@ -927,12 +983,36 @@ class CatFountainProvider(Provider):
         lid_part = self.build_lid("lid", mode=mode).part
         drain_cover_part = self.build_drain_cover("drain_cover", mode=mode).part
 
+        assert (
+            bowl_part is not None
+            and impeller_part is not None
+            and tube_part is not None
+            and bottom_cover_part is not None
+            and lid_part is not None
+            and drain_cover_part is not None
+        )
+
         # 2. Position them in their standard assembled configuration using joints
         bowl_part.joints["shaft"].connect_to(impeller_part.joints["motor"])
         bowl_part.joints["tube_socket"].connect_to(tube_part.joints["base"])
         bowl_part.joints["cover_seat"].connect_to(bottom_cover_part.joints["mount"])
         bowl_part.joints["lid_seat"].connect_to(lid_part.joints["mount"])
         lid_part.joints["drain_socket"].connect_to(drain_cover_part.joints["mount"])
+
+        # Build and connect the three sensor covers using joints
+        sensor_cover_east = self.build_sensor_cover("sensor_cover_east", mode=mode).part
+        sensor_cover_north = self.build_sensor_cover("sensor_cover_north", mode=mode).part
+        sensor_cover_west = self.build_sensor_cover("sensor_cover_west", mode=mode).part
+        assert sensor_cover_east is not None and sensor_cover_north is not None and sensor_cover_west is not None
+
+        bowl_part.joints["sensor_port_east"].connect_to(sensor_cover_east.joints["mount"])
+        bowl_part.joints["sensor_port_north"].connect_to(sensor_cover_north.joints["mount"])
+        bowl_part.joints["sensor_port_west"].connect_to(sensor_cover_west.joints["mount"])
+
+        # Build and connect the LED cover using joints
+        led_cover = self.build_led_cover("led_cover", mode=mode).part
+        assert led_cover is not None
+        bowl_part.joints["led_port"].connect_to(led_cover.joints["mount"])
 
         # 3. Add the positioned parts directly to the room
         if mode == ProviderMode.SIMULATE:
@@ -942,6 +1022,10 @@ class CatFountainProvider(Provider):
             room.add("drain_cover", drain_cover_part, color="grey")
             room.add("impeller", impeller_part, color="grey")
             room.add("bottom_cover", bottom_cover_part, color="grey")
+            room.add("sensor_cover_east", sensor_cover_east, color="grey", alpha=0.4)
+            room.add("sensor_cover_north", sensor_cover_north, color="grey", alpha=0.4)
+            room.add("sensor_cover_west", sensor_cover_west, color="grey", alpha=0.4)
+            room.add("led_cover", led_cover, color="grey", alpha=0.4)
         else:
             room.add("bowl", bowl_part, color="grey")
             room.add("tube", tube_part, color="blue")
@@ -949,6 +1033,10 @@ class CatFountainProvider(Provider):
             room.add("drain_cover", drain_cover_part, color="light_grey")
             room.add("impeller", impeller_part, color="red")
             room.add("bottom_cover", bottom_cover_part, color="black")
+            room.add("sensor_cover_east", sensor_cover_east, color="grey")
+            room.add("sensor_cover_north", sensor_cover_north, color="grey")
+            room.add("sensor_cover_west", sensor_cover_west, color="grey")
+            room.add("led_cover", led_cover, color="grey")
         self.room = room
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:

@@ -3,16 +3,48 @@
 from __future__ import annotations
 import os
 import inspect
+import math
+from contextvars import ContextVar
 from typing import Optional, Any, Callable, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import validate_call, BaseModel
+from typing import cast
 from model.app_config import AppConfig
 import re
-from .types import Mode, Section, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT, Simulate
+from .types import (
+    Mode,
+    Section,
+    MODES,
+    SUBASSEMBLIES,
+    COLOR,
+    MATERIAL,
+    EXPORT,
+    Simulate,
+    URDFCollisionType,
+    URDFJointType,
+    URDFMotorType,
+)
 from .target_list import TargetList
 from .orchestrator import Orchestrator
 from .utils import load_manifest, get_rgba_color
 from .room import Room
+
+# Monkeypatch build123d.BuildPart.__exit__ to copy urdf_* attributes to the final part
+from build123d import BuildPart  # type: ignore
+
+_original_buildpart_exit = BuildPart.__exit__
+
+
+def _custom_buildpart_exit(self: Any, exc_type: Any, exc_val: Any, exc_tb: Any) -> Any:
+    res = _original_buildpart_exit(self, exc_type, exc_val, exc_tb)
+    if hasattr(self, "part") and self.part is not None:
+        for attr in dir(self):
+            if attr.startswith("urdf_"):
+                setattr(self.part, attr, getattr(self, attr))
+    return res
+
+
+BuildPart.__exit__ = _custom_buildpart_exit
 
 if TYPE_CHECKING:
     from model.app_config import AppConfig
@@ -380,3 +412,222 @@ class Provider:
             )
 
         return self.orchestrator.execute(tuple(targets), action, tuple(targets.subassemblies), tuple(targets.modes))
+
+
+class URDFMetadata:
+    """Context manager and builder utility for attaching URDF metadata to CAD shapes."""
+
+    _current: ContextVar[Optional[URDFMetadata]] = ContextVar("URDFMetadata._current", default=None)
+
+    def __init__(
+        self,
+        label: str,
+        material: str,
+        density: float,
+        boundary_friction: float,
+        collision_type: URDFCollisionType,
+        parent: Optional[str] = None,
+        joint_type: Optional[URDFJointType | str] = None,
+        boundaries: Optional[list[Any]] = None,
+        collision_primitives: Optional[list[Any]] = None,
+        motor_type: Optional[URDFMotorType | str] = None,
+        motor_target: Optional[float] = None,
+        motor_force: Optional[float] = None,
+        geometry: Optional[Any] = None,
+    ) -> None:
+        """Initialize URDFMetadata and attach properties to geometry."""
+        from build123d import Builder  # type: ignore
+
+        # If geometry is not explicitly provided, fetch the active builder from build123d context
+        if geometry is None:
+            builder = Builder._get_context()
+            if builder is None:
+                raise ValueError(
+                    "URDFMetadata must be instantiated within a build123d builder context or have geometry provided explicitly."
+                )
+            geometry = builder
+
+        self.geometry = geometry
+        self.label = label
+        self.material = material
+        self.density = density
+        self.boundary_friction = boundary_friction
+        self.collision_type = collision_type
+        self.parent = parent
+        self.joint_type = joint_type
+        self.collision_primitives = collision_primitives
+        self.motor_type = motor_type
+        self.motor_target = motor_target
+        self.motor_force = motor_force
+
+        # Initialize boundaries list with any provided boundaries
+        self.boundaries: list[Any] = list(boundaries) if boundaries is not None else []
+        self._token: Any = None
+
+        self._apply()
+
+    def _apply(self) -> None:
+        """Apply collected metadata properties to the geometry."""
+        from typing import cast
+        from .types import URDFShape
+
+        target_geom = self.geometry
+        if hasattr(target_geom, "part") and target_geom.part is not None:
+            target_geom = target_geom.part
+
+        u_geom = cast(URDFShape, target_geom)
+        u_geom.urdf_label = self.label
+        u_geom.urdf_material = self.material
+        u_geom.urdf_density = self.density
+        u_geom.urdf_boundary_friction = self.boundary_friction
+        u_geom.urdf_collision_type = self.collision_type
+
+        u_geom.urdf_parent = self.parent
+        u_geom.urdf_joint_type = self.joint_type
+
+        if self.boundaries:
+            u_geom.urdf_boundaries = self.boundaries
+        if self.collision_primitives is not None:
+            u_geom.urdf_collision_primitives = self.collision_primitives
+
+        if self.motor_type is not None:
+            u_geom.urdf_motor_type = self.motor_type
+        if self.motor_target is not None:
+            u_geom.urdf_motor_target = self.motor_target
+        if self.motor_force is not None:
+            u_geom.urdf_motor_force = self.motor_force
+
+    def __enter__(self) -> "URDFMetadata":
+        """Enter context manager."""
+        self._token = self._current.set(self)
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context manager."""
+        if self._token is not None:
+            self._current.reset(self._token)
+        self._apply()
+
+
+class URDFBoundary:
+    """Builder utility for attaching analytical boundaries within a URDFMetadata block."""
+
+    def __init__(
+        self,
+        part: Any,
+        link_type: Any,
+        link_idx: int = -1,
+        shape: Optional[Any] = None,
+        type: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize URDFBoundary and register it to the active URDFMetadata context."""
+        from model import BoundaryConfig, ShapeType
+
+        # Get active URDFMetadata context
+        metadata = URDFMetadata._current.get()
+        if metadata is None:
+            raise ValueError("URDFBoundary must be instantiated within a URDFMetadata context block.")
+
+        # Extract solid geometry similar to previous from_part logic
+        if hasattr(part, "part") and part.part is not None:
+            solid = part.part
+        elif hasattr(part, "solid") and callable(part.solid) and part.solid() is not None:
+            solid = part.solid()
+        elif hasattr(part, "part"):
+            solid = part.part
+        else:
+            solid = part
+
+        from provider.types import URDFShape
+
+        u_solid = cast(URDFShape, solid)
+
+        solid_any: Any = solid
+        bbox = solid_any.bounding_box()
+        dx = bbox.max.X - bbox.min.X
+        dy = bbox.max.Y - bbox.min.Y
+        dz = bbox.max.Z - bbox.min.Z
+
+        center_x = (bbox.max.X + bbox.min.X) * 0.5
+        center_y = (bbox.max.Y + bbox.min.Y) * 0.5
+        center_z = (bbox.max.Z + bbox.min.Z) * 0.5
+
+        # Determine default shape from geometry if not provided
+        if shape is None:
+            if abs(dx - dy) < 1e-3:
+                shape = ShapeType.CYLINDER
+            else:
+                shape = ShapeType.BOX
+
+        # Compute defaults
+        default_radius = 0.0
+        default_height = 0.0
+        default_thickness = 0.0
+        default_xyz = (0.0, 0.0, 0.0)
+
+        match shape:
+            case ShapeType.CYLINDER | ShapeType.TUBE | ShapeType.IMPELLER:
+                default_radius = float(max(dx, dy) / 2.0 * 0.001)
+                default_height = u_solid.urdf_height
+                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(bbox.min.Z * 0.001))
+            case ShapeType.BOX:
+                default_height = u_solid.urdf_height
+                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(bbox.min.Z * 0.001))
+            case ShapeType.SPHERE:
+                default_radius = float(max(dx, dy, dz) / 2.0 * 0.001)
+                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(center_z * 0.001))
+            case ShapeType.PLANE:
+                default_thickness = u_solid.urdf_thickness
+                default_xyz = (float(center_x * 0.001), float(center_y * 0.001), float(bbox.min.Z * 0.001))
+
+        solid_location = getattr(solid, "location", None)
+        if solid_location is not None:
+            trsf = solid_location.wrapped.Transformation().VectorialPart()
+            m = [
+                [trsf.Value(1, 1), trsf.Value(1, 2), trsf.Value(1, 3)],
+                [trsf.Value(2, 1), trsf.Value(2, 2), trsf.Value(2, 3)],
+                [trsf.Value(3, 1), trsf.Value(3, 2), trsf.Value(3, 3)],
+            ]
+            sin_theta = -m[2][0]
+            sin_theta = max(-1.0, min(1.0, sin_theta))
+            theta = math.asin(sin_theta)
+            if abs(math.cos(theta)) > 1e-6:
+                phi = math.atan2(m[2][1], m[2][2])
+                psi = math.atan2(m[1][0], m[0][0])
+            else:
+                phi = math.atan2(-m[1][2], m[1][1])
+                psi = 0.0
+            default_rpy = (float(phi), float(theta), float(psi))
+        else:
+            default_rpy = (0.0, 0.0, 0.0)
+
+        radius = kwargs.pop("radius", default_radius)
+        height = kwargs.pop("height", default_height)
+        thickness = kwargs.pop("thickness", default_thickness)
+        xyz = kwargs.pop("xyz", default_xyz)
+        rpy = kwargs.pop("rpy", default_rpy)
+
+        config_dict = {
+            "link_type": link_type,
+            "link_idx": link_idx,
+            "shape": shape,
+            "type": type,
+            "radius": radius,
+            "height": height,
+            "thickness": thickness,
+            "xyz": xyz,
+            "rpy": rpy,
+            **kwargs,
+        }
+        boundary = BoundaryConfig.model_validate(config_dict)
+        # Append to active metadata's boundaries list
+        metadata.boundaries.append(boundary)
+
+    def __enter__(self) -> "URDFBoundary":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context manager."""
+        pass
