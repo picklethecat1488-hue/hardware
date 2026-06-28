@@ -231,11 +231,16 @@ class CatFountainProvider(Provider):
                             radius=1.0, height=2.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                         )
 
-            # Blind screw holes for mounting the Grove - Mini I2C Motor Driver (DRV8830) to the dry compartment ceiling (M2 screws)
-            # Centered at (50.0, 0.0), rotated 90 degrees (holes at local x=-15 y=±10 and x=15 y=0), starts at z = floor_z - t and goes up 2.5 mm (completely blind)
-            grove_holes = [(50.0 - 10.0, -15.0), (50.0 + 10.0, -15.0), (50.0, 15.0)]
-            for x_pos, y_pos in grove_holes:
-                with Locations((x_pos, y_pos, floor_z - t)):
+            # Blind screw holes for mounting the L9110S DC Motor Driver to the dry compartment ceiling (M2 screws, spacing 20.0mm in X)
+            # Centered at (50.0, 15.0), starts at z = floor_z - t and goes up 2.5 mm (completely blind)
+            for x_offset in [50.0 - 10.0, 50.0 + 10.0]:
+                with Locations((x_offset, 15.0, floor_z - t)):
+                    Cylinder(radius=1.0, height=2.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+            # Blind screw holes for mounting the Adafruit INA219 Current Sensor to the dry compartment ceiling (M2 screws, spacing 20.32mm in X)
+            # Centered at (50.0, -15.0), starts at z = floor_z - t and goes up 2.5 mm (completely blind)
+            for x_offset in [50.0 - 10.16, 50.0 + 10.16]:
+                with Locations((x_offset, -15.0, floor_z - t)):
                     Cylinder(radius=1.0, height=2.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
             # Blind screw holes for mounting the Adafruit MAX17048 LiPo Fuel Gauge to the dry compartment ceiling (M2 screws, spacing 20.32mm in X)
