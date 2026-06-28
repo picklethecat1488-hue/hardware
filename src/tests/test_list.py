@@ -75,22 +75,22 @@ class TestListerLogic:
 
         # Test with no subassembly
         outputs = lister.get_part_outputs("proj/part", None)
-        assert outputs == ["proj/part.obj", "proj/part.stl"]
+        assert outputs == ["obj/proj/part.obj", "stl/proj/part.stl"]
 
         # Test with subassembly
         outputs = lister.get_part_outputs("proj/part", "sub")
-        assert outputs == ["proj/part_sub.obj", "proj/part_sub.stl"]
+        assert outputs == ["obj/proj/part_sub.obj", "stl/proj/part_sub.stl"]
 
         # Test without proj slash
         outputs = lister.get_part_outputs("part", None)
-        assert outputs == ["default/part.obj", "default/part.stl"]
+        assert outputs == ["obj/default/part.obj", "stl/default/part.stl"]
 
     def test_get_diagram_output(self, lister):
         """Test computing output for a diagram."""
-        assert lister.get_diagram_output("proj/part") == "proj/proj_diagram.svg"
-        assert lister.get_diagram_output("part") == "default/default_diagram.svg"
+        assert lister.get_diagram_output("proj/part") == "svg/proj/proj_diagram.svg"
+        assert lister.get_diagram_output("part") == "svg/default/default_diagram.svg"
 
     def test_get_urdf_output(self, lister):
         """Test computing output for a URDF."""
-        assert lister.get_urdf_output("proj/part") == "proj/part.urdf"
-        assert lister.get_urdf_output("part") == "default/part.urdf"
+        assert lister.get_urdf_output("proj/part") == "urdf/proj/part.urdf"
+        assert lister.get_urdf_output("part") == "urdf/default/part.urdf"

@@ -14,10 +14,10 @@ The design features a lightweight aluminum or stainless steel plate that mounts 
 
 ## Build Files
 
-After running `build.py`, you should see these files in your build output organized by project subdirectories:
+After running `build.py`, you should see these files in your build output:
 
-- **build/valve_actuator_limiter/limiter_plate.stl** - The limiter plate with a 90deg wedge offset.
-- **build/valve_actuator_limiter/valve_actuator_limiter_diagram.svg** - The limiter plate diagram.
+- **build/stl/valve_actuator_limiter/limiter_plate.stl** - The limiter plate with a 90deg wedge offset.
+- **build/svg/valve_actuator_limiter/valve_actuator_limiter_diagram.svg** - The limiter plate diagram.
 
 ## Visualization
 
