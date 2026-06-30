@@ -59,6 +59,7 @@ graph TD
     TOF1 -->|GP5: INT| PICO
     TOF2 -->|GP6: INT| PICO
     TOF3 -->|GP7: INT| PICO
+    MAX -->|GP10: ALRT| PICO
     PICO -->|GP14, GP15: PWM| DRV
     
     %% Output Connections
@@ -76,7 +77,7 @@ To build the cat fountain with I2C communication across all peripheral subsystem
 | **IR Proximity Sensors (Qty: 3)** | **Adafruit VL53L0X Time-of-Flight (ToF)** | Long-range laser distance sensor used for cat proximity detection in North, East, and West directions. | `0x29` (default)<br>*Re-addressed to `0x30`, `0x31`, `0x32` at boot* | Measures precise distances up to 2m, unaffected by ambient light. Uses shutdown pin (XSHUT) for startup addressing. |
 | **RGB LED Indicator** | **Adafruit NeoPixel Driver (ATtiny816)** | High-brightness status LED to indicate battery capacity and device state over I2C. | `0x60` | Interfaces standard WS2812B/NeoPixels to an I2C bus via a pre-programmed ATtiny microcontroller. |
 | **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | `0x6B` | I2C-controlled charging rate, input current limits, and telemetry. Outputs stable 5.1V at up to 1A. |
-| **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Uses ModelGauge algorithm for accurate state of charge without battery calibration. |
+| **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Uses ModelGauge algorithm for accurate state of charge without battery calibration. Includes configurable alert interrupt (ALRT) pin connected to GP10. |
 | **Battery** | **Standard 18650 3.7V Li-ion Cell** | Main energy source (e.g. Samsung 30Q or Panasonic NCR18650B, 3000+ mAh). | *N/A (Analog)* | Rechargeable lithium-ion cell to fit the internal battery storage area. |
 | **DC Motor Driver** | **L9110S Dual-Channel H-Bridge** | Low-voltage motor driver to drive and speed-regulate the N20 gear motor. | *N/A (Driven by GPIO PWM)* | Dual H-bridge, support for 2.5V-12V motors, up to 800mA continuous. Controlled via GP14 and GP15. |
 | **DC Motor** | **N20 Micro Metal Gear Motor (3V - 6V)** | High-torque micro geared DC motor to drive the Archimedes screw shaft. | *N/A (Driven by L9110S)* | Operates at 3-6V (e.g. 50:1 or 100:1 ratio). Fits inside the dry motor compartment and mounts to the ceiling socket. |
@@ -96,6 +97,8 @@ To build the cat fountain with I2C communication across all peripheral subsystem
    * **UART Console / Printf Debugging**: **GP0 (TX)** and **GP1 (RX)** are reserved as the default debug UART0 port, leaving them completely free from control or sensor connections.
 5. **Passive Battery Temperature Monitoring**:
    * To ensure battery health and safety inside the sealed dry electronics compartment, the firmware should passively monitor the battery's temperature over I2C using the Adafruit MAX17048 fuel gauge's built-in temperature sensor and the Adafruit BQ25185 charger telemetry. If the battery temperature exceeds 45°C during operation or charging, the Pico W should immediately enter a low-power shutdown mode, cut power to the motor driver, and command the BQ25185 to suspend charging to prevent thermal runaway.
+6. **Fuel Gauge Alert Interrupt**:
+   * The active-low `ALRT` (Alert) pin of the MAX17048 fuel gauge is wired to Pico GPIO `GP10`. The firmware configures this pin with an internal pull-up and attaches an interrupt service routine (ISR). This enables the MAX17048 to asynchronously wake the microcontroller or trigger an interrupt on low-battery (e.g. State of Charge falls below 10%) or battery voltage alerts, rather than requiring the Pico W to constantly wake up to poll the fuel gauge, optimizing overall system power efficiency.
 
 ### 3D-Printed Parts & Materials
 
@@ -168,5 +171,7 @@ To achieve this estimate, the firmware and hardware must be configured with the 
    * Wake up the INA219 only when active pumping is triggered.
 4. **Status LED Duty Cycling**:
    * The RGB NeoPixel status LED should remain **OFF** during sleep mode. For battery level indication, blink the LED briefly (e.g. 50ms pulse) once every 10 seconds rather than leaving it on continuously.
+5. **Asynchronous Battery Monitoring**:
+   * By utilizing the MAX17048 `ALRT` hardware interrupt wired to `GP10`, the Pico W avoids waking up periodically to poll the battery state of charge over I2C. The microcontroller can remain in a low-power state and receive battery alerts asynchronously.
 
 
