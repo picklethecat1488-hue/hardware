@@ -34,7 +34,7 @@ python src/view.py cat_fountain/product:view/simulate -s 1000
 ```mermaid
 graph TD
     %% Power Subsystem
-    USBC["USB-C Charger Port"] -->|5V Power In| BQ["BQ24195 Charger & Boost"]
+    USBC["USB-C Charger Port"] -->|5V Power In| BQ["BQ25185 Charger & Boost"]
     BAT[("18650 Li-ion Battery")] <-->|Analog Cell Connection| BQ
     BAT <-->|Analog Cell Connection| MAX["MAX17048 Fuel Gauge"]
     
@@ -61,6 +61,8 @@ graph TD
     TOF3 -->|GP7: INT| PICO
     MAX -->|GP10: ALRT| PICO
     PICO -->|GP14, GP15: PWM| DRV
+    BQ -->|S1: GP12| PICO
+    BQ -->|S2: GP13| PICO
     
     %% Output Connections
     DRV -->|Driven Power| MOTOR["N20 Gear Motor"]
@@ -69,14 +71,14 @@ graph TD
 
 ## Bill of Materials (BOM)
 
-To build the cat fountain with I2C communication across all peripheral subsystems, here are the recommended components to purchase. All selected parts are highly standard in the electronics maker ecosystem (Adafruit, SparkFun, TI, Raspberry Pi).
+To build the cat fountain with I2C communication across key monitoring subsystems (fuel gauge, current sensor, LED controller, proximity sensors), here are the recommended components to purchase. All selected parts are highly standard in the electronics maker ecosystem (Adafruit, SparkFun, TI, Raspberry Pi).
 
 | Component | Recommended Part | Description | I2C Address (Hex) | Key Features |
 | :--- | :--- | :--- | :--- | :--- |
 | **Microcontroller Board** | **Raspberry Pi Pico W** | Main controller running MicroPython/C++. Controls the I2C bus, reads sensors, and drives motor speed. | *Host Controller* | Dual ARM Cortex-M0+, built-in Wi-Fi/Bluetooth, two hardware I2C buses (I2C0, I2C1). |
 | **IR Proximity Sensors (Qty: 3)** | **Adafruit VL53L0X Time-of-Flight (ToF)** | Long-range laser distance sensor used for cat proximity detection in North, East, and West directions. | `0x29` (default)<br>*Re-addressed to `0x30`, `0x31`, `0x32` at boot* | Measures precise distances up to 2m, unaffected by ambient light. Uses shutdown pin (XSHUT) for startup addressing. |
 | **RGB LED Indicator** | **Adafruit NeoPixel Driver (ATtiny816)** | High-brightness status LED to indicate battery capacity and device state over I2C. | `0x60` | Interfaces standard WS2812B/NeoPixels to an I2C bus via a pre-programmed ATtiny microcontroller. |
-| **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | `0x6B` | I2C-controlled charging rate, input current limits, and telemetry. Outputs stable 5.1V at up to 1A. |
+| **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | *N/A (Standalone)* | Standalone linear charger. Uses jumpers/resistors to configure chemistry/current. S1 (FAULT) & S2 (CHG) pads provide digital status to GP12/GP13. |
 | **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Uses ModelGauge algorithm for accurate state of charge without battery calibration. Includes configurable alert interrupt (ALRT) pin connected to GP10. |
 | **Battery** | **Standard 18650 3.7V Li-ion Cell** | Main energy source (e.g. Samsung 30Q or Panasonic NCR18650B, 3000+ mAh). | *N/A (Analog)* | Rechargeable lithium-ion cell to fit the internal battery storage area. |
 | **DC Motor Driver** | **L9110S Dual-Channel H-Bridge** | Low-voltage motor driver to drive and speed-regulate the N20 gear motor. | *N/A (Driven by GPIO PWM)* | Dual H-bridge, support for 2.5V-12V motors, up to 800mA continuous. Controlled via GP14 and GP15. |
@@ -96,9 +98,19 @@ To build the cat fountain with I2C communication across all peripheral subsystem
    * **SWD Debugging**: The separate 3-pin debug header at the bottom edge of the Pico W provides **SWCLK**, **GND**, and **SWDIO** for hardware debugging (e.g., using a Raspberry Pi Debug Probe or Picoprobe). These do not occupy standard GPIO pins.
    * **UART Console / Printf Debugging**: **GP0 (TX)** and **GP1 (RX)** are reserved as the default debug UART0 port, leaving them completely free from control or sensor connections.
 5. **Passive Battery Temperature Monitoring**:
-   * To ensure battery health and safety inside the sealed dry electronics compartment, the firmware should passively monitor the battery's temperature over I2C using the Adafruit MAX17048 fuel gauge's built-in temperature sensor and the Adafruit BQ25185 charger telemetry. If the battery temperature exceeds 45°C during operation or charging, the Pico W should immediately enter a low-power shutdown mode, cut power to the motor driver, and command the BQ25185 to suspend charging to prevent thermal runaway.
+   * The Adafruit BQ25185 board operates as a standalone charger without I2C control, and its /CE (Charge Enable) pin is hard-wired to GND, meaning the Pico W cannot programmatically disable charging.
+   * To ensure battery safety inside the sealed dry electronics compartment, the BQ25185's built-in hardware temperature protection should be used: cut the TH trace jumper on the back of the board and connect a 10kΩ NTC thermistor (attached to the battery cell) between the TH pad and GND. This allows the BQ25185 to automatically suspend charging in hardware if the battery exceeds safe temperature limits.
+   * The Pico W can passively monitor the internal ambient temperature of the electronics compartment using the RP2040's built-in internal temperature sensor (on ADC channel 4). If the temperature exceeds 45°C, the Pico W should enter a low-power sleep mode and cut power to the motor driver.
 6. **Fuel Gauge Alert Interrupt**:
    * The active-low `ALRT` (Alert) pin of the MAX17048 fuel gauge is wired to Pico GPIO `GP10`. The firmware configures this pin with an internal pull-up and attaches an interrupt service routine (ISR). This enables the MAX17048 to asynchronously wake the microcontroller or trigger an interrupt on low-battery (e.g. State of Charge falls below 10%) or battery voltage alerts, rather than requiring the Pico W to constantly wake up to poll the fuel gauge, optimizing overall system power efficiency.
+7. **Charger Status Monitoring**:
+   * The status outputs S1 (FAULT/STAT1) and S2 (CHG/STAT2) are connected to Pico GPIOs GP12 and GP13 (configured as inputs with internal pull-ups).
+   * The Pico W can decode the charging state using the following logic:
+     - S1 = HIGH, S2 = LOW: Normal charging in progress.
+     - S1 = HIGH, S2 = HIGH: Charging completed, standby, or input power disconnected.
+     - S1 = LOW, S2 = HIGH: Recoverable fault (e.g. over-temperature).
+     - S1 = LOW, S2 = LOW: Non-recoverable fault (e.g. 6-hour safety timer expired).
+   * If a non-recoverable fault is detected (both S1 and S2 LOW), the user must cycle the input power (VIN) to reset the BQ25185's safety timer, as the hard-wired /CE pin cannot be toggled by the microcontroller.
 
 ### 3D-Printed Parts & Materials
 
