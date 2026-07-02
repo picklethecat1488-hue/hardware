@@ -609,7 +609,7 @@ class CatFountainProvider(Provider):
                 # 1. Add the convex dome starting flush with the terrace top platform at z = 6.0
                 with Locations((0, 0, 6.0)):
                     socket_r = self.settings.tube_radius + 0.2
-                    dome_out_r = socket_r
+                    dome_out_r = socket_r + 1.0
                     dome_in_r = self.settings.tube_radius - self.settings.tube_thickness + 0.2
                     outer_dome = Sphere(radius=dome_out_r)
                     # Hollow the inside of the dome
@@ -777,7 +777,7 @@ class CatFountainProvider(Provider):
             Cylinder(radius=6.0, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
             # Add flush finger crossbar across the central hole
-            Box(12.0, 2.5, cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            Box(15.0, 2.5, cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
             # Pattern of drainage holes: 6 holes of radius 1.2mm at radius 10.5mm
             for i in range(6):
