@@ -8,6 +8,7 @@ pythonpath = ["src"]
 addopts = "-qq -n auto --maxfail=1 --max-worker-restart=2 -m \"not slow\""
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "timeout: test timeout limit in seconds",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
