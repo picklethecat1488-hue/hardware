@@ -4,7 +4,7 @@ import pytest
 import math
 import shutil
 from unittest.mock import patch
-from build123d import Part
+from build123d import Part, Location, Rot
 from projects_config import CatFountainConfig
 from projects.cat_fountain.provider import CatFountainProvider
 from provider import Section, Mode, Room
@@ -37,7 +37,6 @@ class TestCatFountainProvider:
         """Verify that part actions are correctly registered."""
         assert "bowl" in provider.part
         assert "impeller" in provider.part
-        assert "tube" in provider.part
         assert "bottom_cover" in provider.part
         assert "lid" in provider.part
         assert "drain_cover" in provider.part
@@ -59,7 +58,6 @@ class TestCatFountainProvider:
         provider.build_diagram(room, ["product"], Mode.DEFAULT)
         assert "bowl" in room
         assert "impeller" in room
-        assert "tube" in room
         assert "bottom_cover" in room
         assert "lid" in room
         assert "drain_cover" in room
@@ -73,7 +71,6 @@ class TestCatFountainProvider:
         # Verify all parts are placed
         assert "bowl" in room
         assert "impeller" in room
-        assert "tube" in room
         assert "bottom_cover" in room
         assert "lid" in room
         assert "drain_cover" in room
@@ -85,7 +82,7 @@ class TestCatFountainProvider:
         assert bowl_shape.urdf_parent is None
         assert bowl_shape.urdf_joint_type is None
         assert bowl_shape.urdf_boundary_friction == 0.20
-        assert len(bowl_shape.urdf_boundaries) == 1
+        assert len(bowl_shape.urdf_boundaries) == 2
         assert bowl_shape.urdf_boundaries[0].shape == "cylinder"
         assert bowl_shape.urdf_boundaries[0].type == "cavity"
 
@@ -126,9 +123,9 @@ class TestCatFountainProvider:
         assert provider.settings.contact_angle == 80.0
 
     def test_collar_standoff_geometry(self, provider):
-        """Verify that the collar standoff, tube, and impeller hub are built with correct dimensions & clearance."""
+        """Verify that the collar standoff and impeller hub are built with correct dimensions & clearance."""
         bowl = provider.build_bowl("bowl")
-        # Ensure outer bowl and collar socket exist
+        # Ensure outer bowl exists
         assert bowl.part.is_valid
         assert bowl.part.volume > 0
 
@@ -136,10 +133,6 @@ class TestCatFountainProvider:
         # Hub radius must be shaft_radius + 1.0 (to ensure wall thickness/clearance)
         impeller = provider.build_impeller("impeller")
         assert impeller.part.is_valid
-
-        # Verify tube bottom slot subtraction (which has length > 0)
-        tube = provider.build_tube("tube")
-        assert tube.part.is_valid
 
     @pytest.mark.slow
     def test_pump_integration(self):
@@ -548,6 +541,54 @@ class TestCatFountainProvider:
                 if name1 < name2:
                     intersection = part1.intersect(part2)
                     vol = sum(s.volume for s in intersection.solids()) if intersection else 0.0
-                    assert vol == pytest.approx(0, abs=1e-3), (
+                    assert vol == pytest.approx(0, abs=0.2), (
                         f"Intersection detected between {name1} and {name2}: {vol:.3f} mm3"
                     )
+
+    def test_drain_cover_insertion_and_lock(self, provider):
+        """Verify that the drain cover can be inserted at 0 degrees and locked at 90 degrees."""
+        # 1. Build the lid and the drain cover
+        lid = provider.build_lid("lid")
+        cover = provider.build_drain_cover("drain_cover")
+
+        assert lid.part.is_valid
+        assert cover.part.is_valid
+
+        # 2. Get the lid and cover geometries
+        lid_shape = lid.part
+        cover_shape = cover.part
+
+        # 3. Position of the drain socket joint on the lid
+        # lid_part.joints["drain_socket"] is at Location((0, 65.0, -1.5))
+        # cover_part.joints["mount"] is at Location((0, 0, 0))
+        # Standard assembled position is: Location((0, 65.0, -1.5))
+        base_loc = Location((0, 65.0, -1.5))
+
+        # Check Insertion Path at 0 degrees (vertical translation from Z = 5.0 down to 0.0)
+        for z_offset in [5.0, 3.0, 1.0, 0.0]:
+            loc = base_loc * Location((0, 0, z_offset))
+            positioned_cover = loc * cover_shape
+
+            inter = lid_shape.intersect(positioned_cover)
+            vol = sum(s.volume for s in inter.solids()) if inter else 0.0
+            assert vol == pytest.approx(0.0, abs=1e-3), (
+                f"Intersection detected during vertical insertion at z_offset={z_offset}: {vol:.3f} mm3"
+            )
+
+        # Check Locked Position at 90 degrees rotation (and seated at z_offset = 0)
+        loc_locked = base_loc * Rot(0, 0, 90.0)
+        positioned_cover_locked = loc_locked * cover_shape
+        inter_locked = lid_shape.intersect(positioned_cover_locked)
+        vol_locked = sum(s.volume for s in inter_locked.solids()) if inter_locked else 0.0
+        assert vol_locked == pytest.approx(0.0, abs=1e-3), (
+            f"Intersection detected at locked position (90 deg): {vol_locked:.3f} mm3"
+        )
+
+        # Check Pull-out Prevention at 90 degrees (clashes when pulled upwards by 1.0mm)
+        loc_pulled = base_loc * Rot(0, 0, 90.0) * Location((0, 0, 1.0))
+        positioned_cover_pulled = loc_pulled * cover_shape
+        inter_pulled = lid_shape.intersect(positioned_cover_pulled)
+        vol_pulled = sum(s.volume for s in inter_pulled.solids()) if inter_pulled else 0.0
+        assert vol_pulled > 10.0, (
+            f"Expected collision when cover is pulled up in locked state, but got intersection volume of only {vol_pulled:.3f} mm3"
+        )

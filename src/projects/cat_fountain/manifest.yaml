@@ -15,13 +15,6 @@ impeller:
   export: [stl, obj]
   color: red
 
-tube:
-  part:
-    modes: [default, print]
-  material: petg
-  export: [stl, obj]
-  color: blue
-
 bottom_cover:
   part:
     modes: [default, print]
