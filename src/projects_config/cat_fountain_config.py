@@ -264,3 +264,207 @@ class CatFountainConfig(BaseModel):
     def spout_max_y(self) -> float:
         """Return the spout max Y limit."""
         return float(self._raw_data.get("spout_max_y", 0.030))
+
+    # =========================================================================
+    # Refinement Clearances & Dimensions
+    # =========================================================================
+
+    @cached_property
+    def lid_clearance(self) -> float:
+        """Return the lid fitment clearance."""
+        return float(self._raw_data.get("lid_clearance", 0.15))
+
+    @cached_property
+    def lid_step_depth(self) -> float:
+        """Return the lid step depth."""
+        return float(self._raw_data.get("lid_step_depth", 5.0))
+
+    @cached_property
+    def lid_step_width(self) -> float:
+        """Return the lid step width."""
+        return float(self._raw_data.get("lid_step_width", 2.0))
+
+    @cached_property
+    def tube_lid_clearance(self) -> float:
+        """Return the clearance between the tube and the lid socket."""
+        return float(self._raw_data.get("tube_lid_clearance", 0.1))
+
+    @cached_property
+    def bottom_cover_clearance(self) -> float:
+        """Return the bottom cover clearance."""
+        return float(self._raw_data.get("bottom_cover_clearance", 0.2))
+
+    @cached_property
+    def bottom_cover_drain_radius(self) -> float:
+        """Return the bottom cover central drainage hole radius."""
+        return float(self._raw_data.get("bottom_cover_drain_radius", 8.0))
+
+    @cached_property
+    def pcb_hole_radius(self) -> float:
+        """Return the mounting hole radius for PCBs."""
+        return float(self._raw_data.get("pcb_hole_radius", 1.0))
+
+    @cached_property
+    def pcb_boss_radius(self) -> float:
+        """Return the outer boss radius for PCB mounting posts."""
+        return float(self._raw_data.get("pcb_boss_radius", 2.2))
+
+    # Fuel Gauge
+    @cached_property
+    def fuel_gauge_spacing_x(self) -> float:
+        """Return X hole spacing for the Fuel Gauge."""
+        return float(self._raw_data.get("fuel_gauge_spacing_x", 20.0))
+
+    @cached_property
+    def fuel_gauge_spacing_y(self) -> float:
+        """Return Y hole spacing for the Fuel Gauge."""
+        return float(self._raw_data.get("fuel_gauge_spacing_y", 16.0))
+
+    @cached_property
+    def fuel_gauge_standoff_height(self) -> float:
+        """Return standoff height for the Fuel Gauge."""
+        return float(self._raw_data.get("fuel_gauge_standoff_height", 4.0))
+
+    # Proximity Sensor
+    @cached_property
+    def proximity_sensor_spacing_x(self) -> float:
+        """Return X hole spacing for the proximity sensor."""
+        return float(self._raw_data.get("proximity_sensor_spacing_x", 21.0))
+
+    @cached_property
+    def proximity_sensor_spacing_y(self) -> float:
+        """Return Y hole spacing for the proximity sensor."""
+        return float(self._raw_data.get("proximity_sensor_spacing_y", 13.5))
+
+    @cached_property
+    def proximity_sensor_standoff_height(self) -> float:
+        """Return standoff height for the proximity sensor."""
+        return float(self._raw_data.get("proximity_sensor_standoff_height", 4.0))
+
+    # Raspberry Pi Pico
+    @cached_property
+    def pico_spacing_x(self) -> float:
+        """Return X hole spacing for Raspberry Pi Pico W."""
+        return float(self._raw_data.get("pico_spacing_x", 13.0))
+
+    @cached_property
+    def pico_spacing_y(self) -> float:
+        """Return Y hole spacing for Raspberry Pi Pico W."""
+        return float(self._raw_data.get("pico_spacing_y", 48.0))
+
+    @cached_property
+    def pico_standoff_height(self) -> float:
+        """Return standoff height for Raspberry Pi Pico W."""
+        return float(self._raw_data.get("pico_standoff_height", 4.0))
+
+    # Charger
+    @cached_property
+    def charger_spacing_x(self) -> float:
+        """Return X hole spacing for Charger."""
+        return float(self._raw_data.get("charger_spacing_x", 14.0))
+
+    @cached_property
+    def charger_spacing_y(self) -> float:
+        """Return Y hole spacing for Charger."""
+        return float(self._raw_data.get("charger_spacing_y", 25.0))
+
+    @cached_property
+    def charger_standoff_height(self) -> float:
+        """Return standoff height for Charger."""
+        return float(self._raw_data.get("charger_standoff_height", 2.0))
+
+    # NeoDriver
+    @cached_property
+    def neodriver_spacing_x(self) -> float:
+        """Return X hole spacing for NeoDriver."""
+        return float(self._raw_data.get("neodriver_spacing_x", 21.0))
+
+    @cached_property
+    def neodriver_spacing_y(self) -> float:
+        """Return Y hole spacing for NeoDriver."""
+        return float(self._raw_data.get("neodriver_spacing_y", 14.0))
+
+    @cached_property
+    def neodriver_standoff_height(self) -> float:
+        """Return standoff height for NeoDriver."""
+        return float(self._raw_data.get("neodriver_standoff_height", 4.0))
+
+    # Current Monitor
+    @cached_property
+    def current_monitor_spacing_x(self) -> float:
+        """Return X hole spacing for current monitor."""
+        return float(self._raw_data.get("current_monitor_spacing_x", 21.0))
+
+    @cached_property
+    def current_monitor_spacing_y(self) -> float:
+        """Return Y hole spacing for current monitor."""
+        return float(self._raw_data.get("current_monitor_spacing_y", 17.5))
+
+    @cached_property
+    def current_monitor_standoff_height(self) -> float:
+        """Return standoff height for current monitor."""
+        return float(self._raw_data.get("current_monitor_standoff_height", 4.0))
+
+    # Motor Driver
+    @cached_property
+    def motor_driver_spacing_x(self) -> float:
+        """Return X hole spacing for motor driver."""
+        return float(self._raw_data.get("motor_driver_spacing_x", 20.0))
+
+    @cached_property
+    def motor_driver_spacing_y(self) -> float:
+        """Return Y hole spacing for motor driver."""
+        return float(self._raw_data.get("motor_driver_spacing_y", 15.0))
+
+    @cached_property
+    def motor_driver_standoff_height(self) -> float:
+        """Return standoff height for motor driver."""
+        return float(self._raw_data.get("motor_driver_standoff_height", 4.0))
+
+    # Motor mount
+    @cached_property
+    def motor_spacing_x(self) -> float:
+        """Return mounting screw spacing for N20 Motor."""
+        return float(self._raw_data.get("motor_spacing_x", 17.0))
+
+    # LED Button / hole
+    @cached_property
+    def led_hole_width(self) -> float:
+        """Return the side width of the square LED hole."""
+        return float(self._raw_data.get("led_hole_width", 5.0))
+
+    @cached_property
+    def led_plug_width(self) -> float:
+        """Return the side width of the LED plug insert."""
+        return float(self._raw_data.get("led_plug_width", 4.8))
+
+    @cached_property
+    def led_flange_width(self) -> float:
+        """Return the side width of the LED cover flange."""
+        return float(self._raw_data.get("led_flange_width", 7.0))
+
+    @cached_property
+    def led_flange_thickness(self) -> float:
+        """Return the thickness of the LED cover flange."""
+        return float(self._raw_data.get("led_flange_thickness", 1.0))
+
+    @cached_property
+    def led_plug_length(self) -> float:
+        """Return the length/depth of the LED plug insert."""
+        return float(self._raw_data.get("led_plug_length", 3.0))
+
+    # Sensor Port Boss
+    @cached_property
+    def sensor_boss_x(self) -> float:
+        """Return X size of sensor outer boss."""
+        return float(self._raw_data.get("sensor_boss_x", 12.0))
+
+    @cached_property
+    def sensor_boss_y(self) -> float:
+        """Return Y size of sensor outer boss."""
+        return float(self._raw_data.get("sensor_boss_y", 14.0))
+
+    @cached_property
+    def sensor_boss_z(self) -> float:
+        """Return Z size of sensor outer boss."""
+        return float(self._raw_data.get("sensor_boss_z", 14.0))

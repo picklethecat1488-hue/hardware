@@ -48,7 +48,7 @@ class Lister:
 
         side_suffix = f"_{sub}" if sub else ""
         export_types = self.manager.router.get_export_types(target, sub)
-        return [f"{p_name}/{t_name}{side_suffix}.{et}" for et in export_types]
+        return [f"{et}/{p_name}/{t_name}{side_suffix}.{et}" for et in export_types]
 
     def get_diagram_output(self, target: str) -> str:
         """Get output path for a diagram."""
@@ -57,12 +57,12 @@ class Lister:
             p_name = target
         else:
             p_name = TargetParser.get_project_name(target)
-        return f"{p_name}/{p_name}_diagram.svg"
+        return f"svg/{p_name}/{p_name}_diagram.svg"
 
     def get_urdf_output(self, target: str) -> str:
         """Get output path for a URDF view."""
         p_name, t_name = TargetParser.split_target(target)
-        return f"{p_name}/{t_name}.urdf"
+        return f"urdf/{p_name}/{t_name}.urdf"
 
     def _resolve_targets(self, names: list[str] | None, section: Section, default_mode: Mode):
         """Resolve targets for a specific section and default mode."""

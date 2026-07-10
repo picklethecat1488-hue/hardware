@@ -380,9 +380,9 @@ class TestViewer:
         )
 
         # 5. Assertions
-        mock_exists.assert_any_call("build/mock/parent.obj")
-        mock_exists.assert_any_call("build/mock/child.obj")
-        mock_exists.assert_any_call("build/mock/target.urdf")
+        mock_exists.assert_any_call("build/obj/mock/parent.obj")
+        mock_exists.assert_any_call("build/obj/mock/child.obj")
+        mock_exists.assert_any_call("build/urdf/mock/target.urdf")
         assert mock_copy.call_count == 3
         mock_connect.assert_called_once_with(pybullet.DIRECT)
         mock_load_urdf.assert_called_once()
@@ -481,9 +481,9 @@ class TestViewer:
         )
 
         # 5. Assertions
-        mock_exists.assert_any_call("build/mock/parent.obj")
-        mock_exists.assert_any_call("build/mock/child.obj")
-        mock_exists.assert_any_call("build/mock/target.urdf")
+        mock_exists.assert_any_call("build/obj/mock/parent.obj")
+        mock_exists.assert_any_call("build/obj/mock/child.obj")
+        mock_exists.assert_any_call("build/urdf/mock/target.urdf")
         assert mock_copy.call_count == 3
         mock_connect.assert_called_once_with(pybullet.DIRECT)
         mock_load_urdf.assert_called_once()

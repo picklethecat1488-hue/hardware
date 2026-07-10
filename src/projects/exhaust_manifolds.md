@@ -21,10 +21,10 @@ There are two manifolds, driver and passenger. The manifolds are further separat
 
 ## Build Files
 
-After running `build.py`, you should see these files in your build output organized by project subdirectories:
+After running `build.py`, you should see these files in your build output:
 
-- **build/exhaust_manifolds/exhaust_manifolds_diagram.svg** - An exploded diagram of the manifolds assembly process.  
-- **build/exhaust_manifolds/driver_left.stl** - The left side of the driver manifold.  
-- **build/exhaust_manifolds/driver_right.stl** - The right side of the driver manifold.  
-- **build/exhaust_manifolds/passenger_left.stl** - The left side of the passenger manifold.  
-- **build/exhaust_manifolds/passenger_right.stl** - The right side of the passenger manifold.
+- **build/svg/exhaust_manifolds/exhaust_manifolds_diagram.svg** - An exploded diagram of the manifolds assembly process.  
+- **build/stl/exhaust_manifolds/driver_left.stl** - The left side of the driver manifold.  
+- **build/stl/exhaust_manifolds/driver_right.stl** - The right side of the driver manifold.  
+- **build/stl/exhaust_manifolds/passenger_left.stl** - The left side of the passenger manifold.  
+- **build/stl/exhaust_manifolds/passenger_right.stl** - The right side of the passenger manifold.
