@@ -64,7 +64,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 recycle_fluid=False,
                 gravity=(0.0, 0.0, -9.81),
                 r_s=0.0015,
-                target_volume=0.00020,
+                target_volume=self.settings.target_volume,
                 slot_height=self.settings.slot_height * 0.001,
                 fallen_threshold_liters=0.001,
                 high_damping_value=0.998,
