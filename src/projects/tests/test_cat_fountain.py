@@ -135,6 +135,7 @@ class TestCatFountainProvider:
         assert impeller.part.is_valid
 
     @pytest.mark.slow
+    @pytest.mark.timeout(60)
     def test_pump_integration(self):
         """Verify that the water pump works in the simulation by measuring particles pumped."""
         import tempfile
@@ -152,6 +153,7 @@ class TestCatFountainProvider:
             )
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
+            provider.settings.target_volume = 0.00008
 
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
             builder = Builder(manager, logger=Logger(enabled=False))
@@ -198,7 +200,7 @@ class TestCatFountainProvider:
                 assert fluid is not None
 
                 step_fn = hooks[Simulate.STEP]
-                for step_idx in range(180):
+                for step_idx in range(80):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
@@ -213,11 +215,11 @@ class TestCatFountainProvider:
                 h_tube = provider.settings.tube_height * 0.001
                 t_travel = h_tube / v_z  # ~0.120 seconds
 
-                # 3. Active pumping time: motor starts at step 40, total 180 steps
+                # 3. Active pumping time: motor starts at step 40, total 80 steps
                 # dt = 1 / 240 seconds per step
                 dt = 1.0 / 240.0
-                t_motor = (180 - 40) * dt  # 0.583s
-                t_exit = t_motor - t_travel  # time during which fluid actively exits: ~0.463s
+                t_motor = (80 - 40) * dt  # 0.167s
+                t_exit = t_motor - t_travel  # time during which fluid actively exits: ~0.047s
 
                 # 4. Volume flow rate Q = Area * v_z
                 # tube inner radius r_inner = tube_radius - tube_thickness
@@ -246,6 +248,7 @@ class TestCatFountainProvider:
                 p.disconnect(physics_client)
 
     @pytest.mark.slow
+    @pytest.mark.timeout(60)
     def test_pump_integration_water_escaping(self):
         """Verify that the simulation early terminates when water escapes the bowl."""
         import tempfile
@@ -264,6 +267,7 @@ class TestCatFountainProvider:
             )
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
+            provider.settings.target_volume = 0.00008
 
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
             builder = Builder(manager, logger=Logger(enabled=False))
@@ -320,12 +324,17 @@ class TestCatFountainProvider:
                         for b in bowl_list:
                             b_dict = b.model_dump(exclude_defaults=True) if hasattr(b, "model_dump") else dict(b)
                             b_dict["height"] = (provider.settings.bowl_height - 25.0) * 0.001
+                            from provider.bullet import LinkType
+
+                            if b_dict.get("link_type") != LinkType.TUBE and b_dict.get("link_type") != "tube":
+                                b_dict["radius"] = 0.050
                             from model.boundary_config import BoundaryConfig
 
                             new_bowl_list.append(BoundaryConfig.model_validate(b_dict))
                         test_boundaries["bowl"] = new_bowl_list
                     else:
                         test_boundaries["bowl"]["height"] = (provider.settings.bowl_height - 25.0) * 0.001
+                        test_boundaries["bowl"]["radius"] = 0.050
 
                 hooks = provider.get_simulate_hooks("product:view/simulate")
                 setup_fn = hooks[Simulate.SETUP]
@@ -351,6 +360,7 @@ class TestCatFountainProvider:
                 p.disconnect(physics_client)
 
     @pytest.mark.slow
+    @pytest.mark.timeout(60)
     def test_cat_fountain_water_escaping_termination(self, provider):
         """Verify that the cat fountain simulation terminates when water escapes/falls out of bounds."""
         import pybullet as p

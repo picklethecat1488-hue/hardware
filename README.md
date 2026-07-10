@@ -105,7 +105,7 @@ python src/view.py cat_fountain/product:view/simulate --no-build
 
 # Save the simulation recording to a (.rrd) file to upload to rerun.io:
 python src/view.py cat_fountain/product:view/simulate --save-rrd output.rrd
-
+```
 ---
 
 ## Running Tests
@@ -125,6 +125,4 @@ pytest -m "slow"
 To run all tests (both fast and slow):
 ```bash
 pytest -m "slow or not slow"
-```
-
 ```

@@ -25,6 +25,11 @@ class CatFountainConfig(BaseModel):
         description="The material name to use for the cat fountain parts (e.g. petg, pla, abs).",
     )
 
+    target_volume: float = Field(
+        default=0.00020,
+        description="Target total fluid volume to spawn (m^3).",
+    )
+
     # =========================================================================
     # Internal & Helper Properties
     # =========================================================================
