@@ -1,15 +1,15 @@
 # Cat Fountain Parametric Dimensions
 bowl_radius: 100.0
-bowl_height: 95.0
+bowl_height: 107.0
 bowl_thickness: 4.0
 
 tube_radius: 10.0
 tube_thickness: 2.0
-tube_height: 70.0
+tube_height: 75.0
 slot_height: 6.0
 
 impeller_radius: 12.0
-impeller_height: 73.0
+impeller_height: 80.0
 impeller_shaft_radius: 2.5
 impeller_blades: 2
 vane_twist: -2512.5
@@ -23,8 +23,71 @@ lid_pocket_cavity_height: 10.0
 lid_pocket_thickness: 4.0
 lid_pocket_z_offset: 3.0
 drain_hole_y: 65.0
-drain_hole_radius: 15.0
+drain_hole_radius: 15.4
 spout_deflection_radius: 13.0
 spout_deflection_height: 0.0
 spout_deflection_thickness: 40.0
 spout_deflection_z_offset: 16.0
+
+# Fit and tolerance clearances
+lid_clearance: 0.15
+lid_step_depth: 5.0
+lid_step_width: 2.0
+tube_lid_clearance: 0.1
+bottom_cover_clearance: 0.2
+bottom_cover_drain_radius: 8.0
+
+# PCB mounting standoffs & holes
+pcb_hole_radius: 1.0
+pcb_boss_radius: 2.2
+
+# Fuel Gauge (MAX17048) footprint
+fuel_gauge_spacing_x: 20.0
+fuel_gauge_spacing_y: 16.0
+fuel_gauge_standoff_height: 4.0
+
+# Proximity Sensor (VL53L0X) footprint
+proximity_sensor_spacing_x: 21.0
+proximity_sensor_spacing_y: 13.5
+proximity_sensor_standoff_height: 4.0
+
+# Pico (RP2040) footprint
+pico_spacing_x: 13.0
+pico_spacing_y: 48.0
+pico_standoff_height: 4.0
+
+# Charger (BQ25185) footprint
+charger_spacing_x: 14.0
+charger_spacing_y: 25.0
+charger_standoff_height: 2.0
+
+# NeoDriver footprint
+neodriver_spacing_x: 21.0
+neodriver_spacing_y: 14.0
+neodriver_standoff_height: 4.0
+
+# Current Monitor (INA219) footprint
+current_monitor_spacing_x: 21.0
+current_monitor_spacing_y: 17.5
+current_monitor_standoff_height: 4.0
+
+# Motor Driver (L9110S) footprint
+motor_driver_spacing_x: 20.0
+motor_driver_spacing_y: 15.0
+motor_driver_standoff_height: 4.0
+
+# Motor (N20) mount
+motor_spacing_x: 17.0
+
+# LED Hole and Diffuser Cover dimensions
+led_hole_width: 5.0
+led_plug_width: 4.8
+led_flange_width: 7.0
+led_flange_thickness: 1.0
+led_plug_length: 3.0
+
+# Sensor Outer Boss dimensions
+sensor_boss_x: 15.0
+sensor_boss_y: 14.0
+sensor_boss_z: 18.0
+

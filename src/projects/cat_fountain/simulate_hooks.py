@@ -35,8 +35,12 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 item_dict = item.model_dump(exclude_defaults=True) if hasattr(item, "model_dump") else dict(item)
                 match label:
                     case "bowl":
-                        item_dict["link_type"] = LinkType.BASE
-                        item_dict["link_idx"] = -1
+                        if item_dict.get("link_type") == LinkType.TUBE or item_dict.get("link_type") == "tube":
+                            item_dict["link_type"] = LinkType.TUBE
+                            item_dict["link_idx"] = -1
+                        else:
+                            item_dict["link_type"] = LinkType.BASE
+                            item_dict["link_idx"] = -1
                     case "tube":
                         item_dict["link_type"] = LinkType.TUBE
                         item_dict["link_idx"] = link_indices.get(LinkType.TUBE, -1)
