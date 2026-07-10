@@ -126,5 +126,3 @@ To run all tests (both fast and slow):
 ```bash
 pytest -m "slow or not slow"
 ```
-
-```
