@@ -96,6 +96,11 @@ class CatFountainProvider(Provider):
             # Outer bowl body
             Cylinder(radius=r, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
+            # Create the global outer cylinder for trimming standoffs (recessed by 0.3mm to prevent protrusions)
+            outer_cylinder = Cylinder(
+                radius=r - 0.3, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.PRIVATE
+            )
+
             # Subtract inner water reservoir (enclosed storage tank area above floor_z)
             # Make a step at the top rim of the bowl inner wall for the lid seat
             with Locations((0, 0, floor_z)):
@@ -404,21 +409,62 @@ class CatFountainProvider(Provider):
                                 mode=Mode.SUBTRACT,
                             )
 
-                        # Flat mounting standoff posts on the INSIDE (dry compartment side) of the bowl wall
-                        locs = []
-                        for dy in [-tof_spacing_x / 2.0, tof_spacing_x / 2.0]:
-                            for dz in [-tof_spacing_y / 2.0, tof_spacing_y / 2.0]:
-                                locs.append(Location((-4.0, dy, dz), (0, 90, 0)))
+                        # Flat mounting standoff posts on the INSIDE of the bowl wall
+                        # Build in a private block in local coordinates
+                        with BuildPart(mode=Mode.PRIVATE) as standoffs_part:
+                            # Bottom standoffs (dz = -tof_spacing_y / 2.0)
+                            locs_bottom = []
+                            for dy in [-tof_spacing_x / 2.0, tof_spacing_x / 2.0]:
+                                dz = -tof_spacing_y / 2.0
+                                locs_bottom.append(Location((-4.0, dy, dz), (0, 90, 0)))
 
-                        add_standoffs(
-                            locations=locs,
-                            boss_radius=boss_r,
-                            standoff_height=tof_standoff,
-                            hole_radius=hole_r,
-                            hole_depth=7.0,
-                            boss_align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                            hole_align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                        )
+                            add_standoffs(
+                                locations=locs_bottom,
+                                boss_radius=boss_r,
+                                standoff_height=tof_standoff,
+                                hole_radius=hole_r,
+                                hole_depth=7.0,
+                                boss_align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                hole_align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            )
+
+                            # Top standoffs (dz = tof_spacing_y / 2.0) extended to merge with the wall
+                            locs_top = []
+                            for dy in [-tof_spacing_x / 2.0, tof_spacing_x / 2.0]:
+                                dz = tof_spacing_y / 2.0
+                                locs_top.append(Location((-4.0, dy, dz), (0, 90, 0)) * Location((0, 0, 5.0)))
+
+                            add_standoffs(
+                                locations=locs_top,
+                                boss_radius=boss_r,
+                                standoff_height=14.0,  # 4.0 original + 10.0 extension towards wall
+                                hole_radius=hole_r,
+                                hole_depth=7.0,
+                                boss_align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                hole_align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                hole_z_offset=-5.0,  # Shift hole back to original centering
+                            )
+
+                        # Transform local standoffs to global coordinates using active locations
+                        from build123d import LocationList
+
+                        combined_loc = Location()
+                        ctx = LocationList._get_context()
+                        if ctx is not None:
+                            for loc_list in ctx.locations:
+                                combined_loc = combined_loc * loc_list
+
+                        if standoffs_part.part is not None:
+                            global_standoffs = combined_loc * standoffs_part.part
+
+                            # Trim any protrusions extending past the outer cylinder
+                            trimmed_standoffs = global_standoffs.intersect(outer_cylinder)
+
+                            # Add trimmed standoffs directly to the bowl part (bypassing locations list)
+                            if bowl.part is not None:
+                                merged_shape = bowl.part + trimmed_standoffs
+                                # Ensure final returned shape is a Part object, wrapping the internal Solid
+                                bowl.part = Part(children=merged_shape.solids(), label=target)
 
             with URDFMetadata(
                 label=target,
@@ -688,7 +734,7 @@ class CatFountainProvider(Provider):
             with Locations((0, tube_y, 0)):
                 with Locations((0, 0, 6.0)):
                     socket_r = self.settings.tube_radius + self.settings.tube_lid_clearance
-                    dome_out_r = socket_r + 1.0
+                    dome_out_r = socket_r + 1.5
                     dome_in_r = (
                         self.settings.tube_radius - self.settings.tube_thickness + self.settings.tube_lid_clearance
                     )
@@ -726,7 +772,7 @@ class CatFountainProvider(Provider):
                 with Locations((0, 0, -1.5)):
                     Cylinder(radius=17.0, height=1.3, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
                 with Locations((0, 0, -0.2)):
-                    Cylinder(radius=15.6, height=2.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                    Cylinder(radius=15.6, height=3.2, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
                     for x_offset in [-15.5, 15.5]:
                         with Locations((x_offset, 0, 0)):
                             Box(5.0, 12.0, 10.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
