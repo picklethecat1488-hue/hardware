@@ -302,28 +302,30 @@ class Builder:
                 f"Compiling {Section.DIAGRAM}s: {self._get_summary(list(base_targets))}",
                 symbol="🛠️ ",
             )
-            results = self.manager.router.run(base_targets)
+            for target in base_targets:
+                single_target_list = base_targets.for_targets([target])
+                results = self.manager.router.run(single_target_list)
 
-            for p_name, room in results or []:
-                diagram_file = self.lister.get_diagram_output(p_name)
-                path_obj = Path(out_dir) / diagram_file
-                path_obj.parent.mkdir(parents=True, exist_ok=True)
-                path_str = str(path_obj)
+                for p_name, room in results or []:
+                    diagram_file = self.lister.get_diagram_output(target)
+                    path_obj = Path(out_dir) / diagram_file
+                    path_obj.parent.mkdir(parents=True, exist_ok=True)
+                    path_str = str(path_obj)
 
-                provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
-                options = getattr(provider.settings, "diagram_options", None) if provider else None
+                    provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
+                    options = getattr(provider.settings, "diagram_options", None) if provider else None
 
-                current_hash = self._get_diagram_hash(room, options)
-                futures.append(
-                    self.executor.submit(
-                        self._export_if_changed,
-                        path_obj,
-                        diagram_file,
-                        current_hash,
-                        lambda r=room, ps=path_str, o=options: r.export_diagram(ps, o),
-                        force_update,
+                    current_hash = self._get_diagram_hash(room, options)
+                    futures.append(
+                        self.executor.submit(
+                            self._export_if_changed,
+                            path_obj,
+                            diagram_file,
+                            current_hash,
+                            lambda r=room, ps=path_str, o=options: r.export_diagram(ps, o),
+                            force_update,
+                        )
                     )
-                )
 
         # Wait for all submitted diagram exports to complete
         for fut in futures:

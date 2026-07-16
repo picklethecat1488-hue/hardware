@@ -20,8 +20,10 @@ class TestValveActuatorLimiterProvider:
                     "modes": [Mode.DEFAULT],
                     "subassemblies": ["90deg"],
                 },
+            },
+            "product": {
                 Section.DIAGRAM: {"modes": [Mode.DEFAULT]},
-            }
+            },
         }
         with patch("provider.provider.load_manifest", return_value=mock_manifest):
             yield ValveActuatorLimiterProvider()
@@ -47,7 +49,7 @@ class TestValveActuatorLimiterProvider:
     def test_build_diagram(self, provider):
         """Verify that build_diagram populates the room with geometry."""
         room = Room()
-        provider.build_diagram(room, ["limiter_plate"], Mode.DEFAULT)
+        provider.build_diagram(room, ["product"], Mode.DEFAULT)
         assert "limiter_plate" in room
 
     def test_configuration_loading(self, provider):
