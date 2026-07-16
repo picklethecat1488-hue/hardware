@@ -5,7 +5,7 @@ from functools import cached_property
 import numpy as np
 from build123d import Vector
 from pydantic import BaseModel, Field
-from model import load_measurements, DiagramOptions
+from model import load_measurements, DiagramOptions, DiagramStyle
 
 
 class ValveActuatorLimiterConfig(BaseModel):
@@ -19,7 +19,7 @@ class ValveActuatorLimiterConfig(BaseModel):
     base_thickness: float = Field(default=5.0, description="The thickness of the limiter plate base.", gt=0)
 
     diagram_options: DiagramOptions = Field(
-        default_factory=lambda: DiagramOptions(line_weight=0.5, view_from="top", show_hidden=True),
+        default_factory=lambda: DiagramOptions(line_weight=0.5, view_from="top", style=DiagramStyle.HIDDEN),
         description="Diagram export options",
     )
 

@@ -7,6 +7,7 @@ from unittest.mock import patch
 from build123d import Part, Location, Rot
 from projects_config import CatFountainConfig
 from projects.cat_fountain.provider import CatFountainProvider
+import projects.cat_fountain.layouts
 from provider import Section, Mode, Room
 
 
@@ -61,6 +62,100 @@ class TestCatFountainProvider:
         assert "bottom_cover" in room
         assert "lid" in room
         assert "drain_cover" in room
+
+    def test_build_wiring_diagram(self, provider):
+        """Verify that build_wiring_diagram populates the room with footprints and wires."""
+        room = Room()
+        provider.build_wiring_diagram(room, ["wiring"], Mode.DEFAULT)
+        assert "bowl_outline" in room
+        assert "motor_compartment" in room
+        assert "charger_footprint" in room
+        assert "pico_footprint" in room
+        assert "fuel_gauge_footprint" in room
+        assert "current_monitor_footprint" in room
+        assert "motor_driver_footprint" in room
+        assert "neodriver_footprint" in room
+        assert "motor_footprint" in room
+        assert "sensor_east_footprint" in room
+        assert "sensor_north_footprint" in room
+        assert "sensor_west_footprint" in room
+        assert "led_footprint" in room
+        assert "wire_gnd" in room
+        assert "wire_vcc_logic" in room
+        assert "wire_sda" in room
+        assert "wire_scl" in room
+
+    def test_wiring_diagram_class(self, provider):
+        """Verify that WiringDiagram populates the room with all pads and wires."""
+        from pathlib import Path
+        from provider import Wiring, WiringDiagram
+
+        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+        bowl_part = provider.build_bowl("bowl").part
+        wiring = Wiring(yaml_path, bowl_part)
+
+        room = Room()
+        diagram = WiringDiagram(wiring)
+        diagram.build(room)
+
+        # Verify footprints
+        assert "pico_footprint" in room
+        assert "charger_footprint" in room
+
+        # Verify pads
+        assert "pico_pad_GP2" in room
+        assert "pico_pad_GND_L" in room
+
+        # Verify wires
+        assert "wire_gnd" in room
+        assert "wire_sda" in room
+        assert "wire_scl" in room
+        assert "wire_led_data" in room
+
+    def test_layout_edge_pins(self):
+        """Verify edge pin layout calculations for boards and sensors."""
+        from projects.cat_fountain.layouts import layout_edge_pins
+        from model import PinModel
+
+        # Create mock pins
+        pins = [
+            PinModel(name="P1", label="P1", side="right", slot=0),
+            PinModel(name="P2", label="P2", side="right", slot=1),
+        ]
+        # Layout on a 10x20 footprint (w=10.0, l=20.0)
+        # side right -> physical left side (X = -5.0)
+        # Margin = 2.0. Limit = 10.0 - 2.0 = 8.0.
+        layout_edge_pins(pins, 10.0, 20.0, slots_per_side=2)
+        assert pins[0].position == (-5.0, 8.0, 0.0)
+        assert pins[1].position == (-5.0, -8.0, 0.0)
+
+    def test_layout_motor_pins(self):
+        """Verify motor footprint pin placements."""
+        from projects.cat_fountain.layouts import layout_motor_pins
+        from model import PinModel
+
+        pins = [
+            PinModel(name="M+", label="M+", side="top"),
+            PinModel(name="M-", label="M-", side="top"),
+        ]
+        layout_motor_pins(pins, 12.0, 10.0)
+        assert pins[0].position == (-4.0, -5.0, 0.0)
+        assert pins[1].position == (4.0, -5.0, 0.0)
+
+    def test_layout_led_pins(self):
+        """Verify LED footprint pin placements."""
+        from projects.cat_fountain.layouts import layout_led_pins
+        from model import PinModel
+
+        pins = [
+            PinModel(name="VCC", label="VCC", side="right"),
+            PinModel(name="GND", label="GND", side="right"),
+            PinModel(name="DIN", label="DIN", side="left"),
+        ]
+        layout_led_pins(pins, 10.0, 10.0)
+        assert pins[0].position == (-5.0, 3.0, 0.0)
+        assert pins[1].position == (-5.0, -3.0, 0.0)
+        assert pins[2].position == (5.0, 0.0, 0.0)
 
     def test_build_product(self, provider):
         """Verify that build_product populates the room with all fountain parts and their URDF attributes."""

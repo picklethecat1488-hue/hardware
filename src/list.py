@@ -55,8 +55,11 @@ class Lister:
         known_providers = {p.name for p in self.manager.router.providers}
         if target in known_providers:
             p_name = target
+            t_name = None
         else:
-            p_name = TargetParser.get_project_name(target)
+            p_name, t_name = TargetParser.split_target(target)
+        if t_name and t_name not in ("product", "part"):
+            return f"svg/{p_name}/{p_name}_{t_name}_diagram.svg"
         return f"svg/{p_name}/{p_name}_diagram.svg"
 
     def get_urdf_output(self, target: str) -> str:

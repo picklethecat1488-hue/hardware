@@ -10,5 +10,6 @@ limiter_plate:
   part:
     modes: [default, print]
   color: blue
+product:
   diagram:
     modes: [default]

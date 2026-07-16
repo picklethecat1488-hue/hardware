@@ -13,6 +13,7 @@ The design utilizes precise build123d joint placement to ensure alignment of the
 After running `build.py`, you should see these files in your build output organized by subdirectories under the build folder:
 
 - **build/svg/cat_fountain/cat_fountain_diagram.svg** - An exploded assembly diagram of the cat fountain.
+- **build/svg/cat_fountain/cat_fountain_wiring_diagram.svg** - A detailed 2D wiring diagram showing schematic connections and orthogonal routing.
 - **build/stl/cat_fountain/bowl.stl** / **impeller.stl** / etc. - The 3D printable STL files (in standard millimeters scale).
 - **build/obj/cat_fountain/bowl.obj** / **impeller.obj** / etc. - The 3D visual OBJ files (in standard meters scale).
 - **build/urdf/cat_fountain/product.urdf** - The URDF definition file for visualization/simulation.
@@ -72,6 +73,10 @@ graph TD
 ## Bill of Materials (BOM)
 
 To build the cat fountain with I2C communication across key monitoring subsystems (fuel gauge, current sensor, LED controller, proximity sensors), here are the recommended components to purchase. All selected parts are highly standard in the electronics maker ecosystem (Adafruit, SparkFun, TI, Raspberry Pi).
+
+![Wiring Diagram](cat_fountain_wiring_diagram.svg)
+
+*Wiring diagram showing component interconnections.*
 
 | Component | Recommended Part | Description | I2C Address (Hex) | Key Features |
 | :--- | :--- | :--- | :--- | :--- |
