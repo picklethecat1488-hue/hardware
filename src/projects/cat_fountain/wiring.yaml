@@ -1,0 +1,507 @@
+# Declarative 3D Component Layout & Netlist Configuration
+components:
+  - name: charger
+    package: board
+    position: [0.0, -79.0, 25.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [18.0, 29.0, 1.6]
+    mounting_holes: [14.0, 25.0]
+    label:
+      text: "BQ25185"
+      position: [0.0, -17.5, 0.0]
+      align: [center, max]
+    pins:
+      - name: "BAT+"
+        label: "BAT+"
+        side: right
+      - name: "BAT-"
+        label: "BAT-"
+        side: right
+      - name: "S1"
+        label: "S1"
+        side: right
+      - name: "SYS"
+        label: "SYS"
+        side: left
+      - name: "GND"
+        label: "GND"
+        side: left
+      - name: "S2"
+        label: "S2"
+        side: left
+
+  - name: pico
+    package: board
+    position: [-50.0, 0.0, 23.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [17.0, 52.0, 1.6]
+    mounting_holes: [13.0, 48.0]
+    slots_per_side: 20
+    label:
+      text: "PICO W"
+      position: [0.0, 29.0, 0.0]
+      align: [center, min]
+    pins:
+      - name: "GP2"
+        label: "4 (CTRL_XSHUT_N)"
+        side: right
+        slot: 3
+      - name: "GP3"
+        label: "5 (CTRL_XSHUT_E)"
+        side: right
+        slot: 4
+      - name: "GP4"
+        label: "6 (CTRL_XSHUT_W)"
+        side: right
+        slot: 5
+      - name: "GP5"
+        label: "7 (CTRL_INT_N)"
+        side: right
+        slot: 6
+      - name: "GP6"
+        label: "9 (CTRL_INT_E)"
+        side: right
+        slot: 8
+      - name: "GP7"
+        label: "10 (CTRL_INT_W)"
+        side: right
+        slot: 9
+      - name: "GP8"
+        label: "11 (I2C_SDA)"
+        side: right
+        slot: 10
+      - name: "GP9"
+        label: "12 (I2C_SCL)"
+        side: right
+        slot: 11
+      - name: "GP10"
+        label: "14 (CTRL_ALRT)"
+        side: right
+        slot: 13
+      - name: "GP12"
+        label: "16 (CTRL_S1)"
+        side: right
+        slot: 15
+      - name: "GP13"
+        label: "17 (CTRL_S2)"
+        side: right
+        slot: 16
+      - name: "GP14"
+        label: "19 (CTRL_IA)"
+        side: right
+        slot: 18
+      - name: "GP15"
+        label: "20 (CTRL_IB)"
+        side: right
+        slot: 19
+      - name: "GND_L"
+        label: "3 (GND)"
+        side: right
+        slot: 2
+      - name: "VSYS"
+        label: "39 (VSYS)"
+        side: left
+        slot: 18
+      - name: "GND_R"
+        label: "38 (GND)"
+        side: left
+        slot: 17
+
+  - name: fuel_gauge
+    package: board
+    position: [50.0, -45.0, 23.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [24.0, 20.0, 1.6]
+    mounting_holes: [20.0, 16.0]
+    label:
+      text: "MAX17048"
+      position: [0.0, -13.0, 0.0]
+      align: [center, max]
+    pins:
+      - name: "VCELL"
+        label: "VCELL"
+        side: right
+      - name: "GND"
+        label: "GND"
+        side: right
+      - name: "SDA"
+        label: "SDA"
+        side: right
+      - name: "SCL"
+        label: "SCL"
+        side: right
+      - name: "ALRT"
+        label: "ALRT"
+        side: left
+
+  - name: current_monitor
+    package: board
+    position: [50.0, -15.0, 23.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [25.0, 21.5, 1.6]
+    mounting_holes: [21.0, 17.5]
+    label:
+      text: "INA219"
+      position: [15.5, 0.0, 0.0]
+      align: [min, center]
+    pins:
+      - name: "VCC"
+        label: "VCC"
+        side: right
+      - name: "GND"
+        label: "GND"
+        side: right
+      - name: "SDA"
+        label: "SDA"
+        side: right
+      - name: "SCL"
+        label: "SCL"
+        side: right
+      - name: "VIN+"
+        label: "VIN+"
+        side: left
+      - name: "VIN-"
+        label: "VIN-"
+        side: left
+
+  - name: motor_driver
+    package: board
+    position: [50.0, 15.0, 23.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [24.0, 19.0, 1.6]
+    mounting_holes: [20.0, 15.0]
+    label:
+      text: "L9110S"
+      position: [15.0, 0.0, 0.0]
+      align: [min, center]
+    pins:
+      - name: "VCC"
+        label: "VCC"
+        side: right
+      - name: "GND"
+        label: "GND"
+        side: right
+      - name: "IA"
+        label: "IA"
+        side: right
+      - name: "IB"
+        label: "IB"
+        side: right
+      - name: "OA"
+        label: "OA"
+        side: left
+      - name: "OB"
+        label: "OB"
+        side: left
+
+  - name: neodriver
+    package: board
+    position: [0.0, 40.0, 23.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [25.0, 18.0, 1.6]
+    mounting_holes: [21.0, 14.0]
+    label:
+      text: "ATtiny816"
+      position: [0.0, 12.0, 0.0]
+      align: [center, min]
+    pins:
+      - name: "VCC"
+        label: "VCC"
+        side: right
+      - name: "GND"
+        label: "GND"
+        side: right
+      - name: "SDA"
+        label: "SDA"
+        side: right
+      - name: "SCL"
+        label: "SCL"
+        side: right
+      - name: "OUT"
+        label: "OUT"
+        side: left
+
+  - name: motor
+    package: motor
+    position: [0.0, 0.0, 28.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [12.0, 10.0, 24.0]
+    label:
+      text: "N20"
+      position: [0.0, -8.0, 0.0]
+      align: [center, max]
+    pins:
+      - name: "M+"
+        label: "M+"
+        side: top
+      - name: "M-"
+        label: "M-"
+        side: top
+
+  - name: sensor_east
+    package: tof_sensor
+    joint_ref:
+      joint: sensor_port_east
+      offset: [-18.3, 0.0, 0.0]
+    dimensions: [17.0, 25.0, 2.0]
+    label:
+      text: "VL53L0X (EAST)"
+      position: [10.0, 0.0, 0.0]
+      align: [min, center]
+    pins:
+      - name: "VCC"
+        label: "VCC"
+        side: right
+      - name: "GND"
+        label: "GND"
+        side: right
+      - name: "SDA"
+        label: "SDA"
+        side: right
+      - name: "SCL"
+        label: "SCL"
+        side: right
+      - name: "XSHUT"
+        label: "XSHUT"
+        side: left
+      - name: "INT"
+        label: "INT"
+        side: left
+
+  - name: sensor_north
+    package: tof_sensor
+    joint_ref:
+      joint: sensor_port_north
+      offset: [-18.3, 0.0, 0.0]
+    dimensions: [25.0, 17.0, 2.0]
+    label:
+      text: "VL53L0X (NORTH)"
+      position: [0.0, 10.0, 0.0]
+      align: [center, min]
+    pins:
+      - name: "VCC"
+        label: "VCC"
+        side: top
+      - name: "GND"
+        label: "GND"
+        side: top
+      - name: "SDA"
+        label: "SDA"
+        side: top
+      - name: "SCL"
+        label: "SCL"
+        side: top
+      - name: "XSHUT"
+        label: "XSHUT"
+        side: bottom
+      - name: "INT"
+        label: "INT"
+        side: bottom
+
+  - name: sensor_west
+    package: tof_sensor
+    joint_ref:
+      joint: sensor_port_west
+      offset: [-18.3, 0.0, 0.0]
+    dimensions: [17.0, 25.0, 2.0]
+    label:
+      text: "VL53L0X (WEST)"
+      position: [-10.0, 0.0, 0.0]
+      align: [max, center]
+    pins:
+      - name: "VCC"
+        label: "VCC"
+        side: left
+      - name: "GND"
+        label: "GND"
+        side: left
+      - name: "SDA"
+        label: "SDA"
+        side: left
+      - name: "SCL"
+        label: "SCL"
+        side: left
+      - name: "XSHUT"
+        label: "XSHUT"
+        side: right
+      - name: "INT"
+        label: "INT"
+        side: right
+
+  - name: led
+    package: led
+    joint_ref:
+      joint: led_port
+      offset: [0.0, 0.0, 0.0]
+    dimensions: [10.0, 10.0, 1.0]
+    label:
+      text: "RGB LED"
+      position: [0.0, 6.0, 0.0]
+      align: [center, min]
+    pins:
+      - name: "VCC"
+        label: "VCC"
+        side: right
+      - name: "GND"
+        label: "GND"
+        side: right
+      - name: "DIN"
+        label: "DIN"
+        side: left
+
+nets:
+  - name: gnd
+    color: black
+    pins:
+      - [charger, GND]
+      - [fuel_gauge, GND]
+      - [sensor_east, GND]
+      - [current_monitor, GND]
+      - [motor_driver, GND]
+      - [neodriver, GND]
+      - [led, GND]
+      - [sensor_north, GND]
+      - [sensor_west, GND]
+      - [pico, GND_R]
+
+  - name: vcc_logic
+    color: red
+    pins:
+      - [pico, VSYS]
+      - [sensor_west, VCC]
+      - [sensor_north, VCC]
+      - [led, VCC]
+      - [neodriver, VCC]
+      - [current_monitor, VCC]
+      - [sensor_east, VCC]
+
+  - name: vcc_bat
+    color: red
+    pins:
+      - [charger, BAT+]
+      - [fuel_gauge, VCELL]
+
+  - name: vcc_sys_pico
+    color: red
+    pins:
+      - [charger, SYS]
+      - [pico, VSYS]
+
+  - name: vcc_sys_cm
+    color: red
+    pins:
+      - [charger, SYS]
+      - [current_monitor, VIN+]
+
+  - name: vcc_sys_md
+    color: red
+    pins:
+      - [current_monitor, VIN-]
+      - [motor_driver, VCC]
+
+  - name: sda
+    color: yellow
+    pins:
+      - [pico, GP8]
+      - [sensor_west, SDA]
+      - [sensor_north, SDA]
+      - [neodriver, SDA]
+      - [current_monitor, SDA]
+      - [sensor_east, SDA]
+      - [fuel_gauge, SDA]
+
+  - name: scl
+    color: blue
+    offset: [1.5, 1.5]
+    pins:
+      - [pico, GP9]
+      - [sensor_west, SCL]
+      - [sensor_north, SCL]
+      - [neodriver, SCL]
+      - [current_monitor, SCL]
+      - [sensor_east, SCL]
+      - [fuel_gauge, SCL]
+
+  - name: motor_pos
+    color: purple
+    pins:
+      - [motor_driver, OA]
+      - [motor, M+]
+
+  - name: motor_neg
+    color: green
+    pins:
+      - [motor_driver, OB]
+      - [motor, M-]
+
+  - name: led_data
+    color: purple
+    pins:
+      - [neodriver, OUT]
+      - [led, DIN]
+
+  - name: ctrl_xshut_n
+    color: orange
+    pins:
+      - [pico, GP2]
+      - [sensor_north, XSHUT]
+
+  - name: ctrl_xshut_e
+    color: orange
+    pins:
+      - [pico, GP3]
+      - [sensor_east, XSHUT]
+
+  - name: ctrl_xshut_w
+    color: orange
+    pins:
+      - [pico, GP4]
+      - [sensor_west, XSHUT]
+
+  - name: ctrl_int_n
+    color: green
+    pins:
+      - [pico, GP5]
+      - [sensor_north, INT]
+
+  - name: ctrl_int_e
+    color: green
+    pins:
+      - [pico, GP6]
+      - [sensor_east, INT]
+
+  - name: ctrl_int_w
+    color: green
+    pins:
+      - [pico, GP7]
+      - [sensor_west, INT]
+
+  - name: ctrl_alrt
+    color: orange
+    pins:
+      - [pico, GP10]
+      - [fuel_gauge, ALRT]
+
+  - name: ctrl_s1
+    color: cyan
+    pins:
+      - [pico, GP12]
+      - [charger, S1]
+
+  - name: ctrl_s2
+    color: magenta
+    pins:
+      - [pico, GP13]
+      - [charger, S2]
+
+  - name: ctrl_ia
+    color: cyan
+    pins:
+      - [pico, GP14]
+      - [motor_driver, IA]
+
+  - name: ctrl_ib
+    color: magenta
+    pins:
+      - [pico, GP15]
+      - [motor_driver, IB]

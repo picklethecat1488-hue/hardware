@@ -2,7 +2,18 @@
 
 from build123d import *  # type: ignore
 import math
-from model import method_cache, TextArgs, ShapeType, BoundaryType
+from model import (
+    method_cache,
+    TextArgs,
+    ShapeType,
+    BoundaryType,
+    PinModel,
+    LabelModel,
+    FootprintModel,
+    NetModel,
+    Wiring,
+    DiagramStyle,
+)
 from pathlib import Path
 from provider import (
     Provider,
@@ -19,8 +30,10 @@ from provider import (
     URDFJointType,
     URDFMotorType,
     LinkType,
+    WiringDiagram,
 )
 from projects_config import CatFountainConfig
+from . import layouts
 from typing import cast, Callable, Sequence, Any, Optional
 
 
@@ -67,7 +80,10 @@ class CatFountainProvider(Provider):
     @property
     def diagram(self) -> dict[str, Callable[[Room, Sequence[str], ProviderMode], None]]:
         """Map diagram names to their build handler methods."""
-        return {name: self.build_diagram for name in self.targets.supporting(Section.DIAGRAM)}
+        return {
+            name: (self.build_wiring_diagram if "wiring" in name else self.build_diagram)
+            for name in self.targets.supporting(Section.DIAGRAM)
+        }
 
     @property
     def view(self) -> dict[str, Callable[[Room, ProviderMode], None]]:
@@ -1157,82 +1173,33 @@ class CatFountainProvider(Provider):
                     fillet(pcb.edges().filter_by(Axis.Z), radius=1.5)
                 return cast(Part, pcb.part)
 
-            floor_z = 32.0
-            t = self.settings.bowl_thickness
-
-            # Standard PCBs configuration: (name, center_x, center_y, spacing_x, spacing_y, standoff_height)
-            pcb_configs = [
-                (
-                    "fuel_gauge",
-                    50.0,
-                    -45.0,
-                    self.settings.fuel_gauge_spacing_x,
-                    self.settings.fuel_gauge_spacing_y,
-                    self.settings.fuel_gauge_standoff_height,
-                ),
-                (
-                    "pico",
-                    -50.0,
-                    0.0,
-                    self.settings.pico_spacing_x,
-                    self.settings.pico_spacing_y,
-                    self.settings.pico_standoff_height,
-                ),
-                (
-                    "charger",
-                    0.0,
-                    -79.0,
-                    self.settings.charger_spacing_x,
-                    self.settings.charger_spacing_y,
-                    self.settings.charger_standoff_height,
-                ),
-                (
-                    "neodriver",
-                    0.0,
-                    40.0,
-                    self.settings.neodriver_spacing_x,
-                    self.settings.neodriver_spacing_y,
-                    self.settings.neodriver_standoff_height,
-                ),
-                (
-                    "current_monitor",
-                    50.0,
-                    -15.0,
-                    self.settings.current_monitor_spacing_x,
-                    self.settings.current_monitor_spacing_y,
-                    self.settings.current_monitor_standoff_height,
-                ),
-                (
-                    "motor_driver",
-                    50.0,
-                    15.0,
-                    self.settings.motor_driver_spacing_x,
-                    self.settings.motor_driver_spacing_y,
-                    self.settings.motor_driver_standoff_height,
-                ),
-            ]
-
-            for name, cx, cy, sx, sy, sh in pcb_configs:
-                pcb = make_pcb(sx + 4.0, sy + 4.0)
-                pcb.location = Location((cx, cy, floor_z - t - sh - 1.0))
-                room.add(f"{name}_pcb", pcb, color="green", alpha=0.6)
-
-            # Proximity Sensor PCBs: 2.0mm thick, 25.0mm local Y, 17.0mm local Z. Centered at local X = -16.3 relative to joint
             def make_sensor_pcb() -> Part:
                 with BuildPart() as pcb:
                     Box(2.0, 25.0, 17.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
                     fillet(pcb.edges().filter_by(Axis.X), radius=1.5)
                 return cast(Part, pcb.part)
 
-            for name, joint_name in [
-                ("sensor_pcb_east", "sensor_port_east"),
-                ("sensor_pcb_north", "sensor_port_north"),
-                ("sensor_pcb_west", "sensor_port_west"),
-            ]:
-                s_pcb = make_sensor_pcb()
-                joint_loc = bowl_part.joints[joint_name].location
-                s_pcb.location = joint_loc * Location((-18.3, 0, 0))
-                room.add(name, s_pcb, color="green", alpha=0.6)
+            floor_z = 32.0
+            t = self.settings.bowl_thickness
+
+            # Load component footprints using Wiring class directly
+            yaml_path = Path(__file__).parent / "wiring.yaml"
+            wiring = Wiring(yaml_path, bowl_part)
+            pcb_footprints = wiring.footprints
+            for fp in pcb_footprints:
+                if fp.name in ("motor", "led"):
+                    continue
+                w, l, thickness = fp.dimensions
+                if fp.package == "tof_sensor":
+                    joint_name = fp.name.replace("sensor_", "sensor_port_")
+                    joint_loc = bowl_part.joints[joint_name].location
+                    s_pcb = make_sensor_pcb()
+                    s_pcb.location = joint_loc * Location((-18.3, 0, 0))
+                    room.add(f"sensor_pcb_{fp.name.split('_')[-1]}", s_pcb, color="green", alpha=0.6)
+                else:
+                    pcb = make_pcb(w, l, thickness)
+                    pcb.location = Location(fp.position, fp.rotation)
+                    room.add(f"{fp.name}_pcb", pcb, color="green", alpha=0.6)
 
         self.room = room
 
@@ -1241,3 +1208,34 @@ class CatFountainProvider(Provider):
         from .simulate_hooks import get_simulate_hooks_impl as impl
 
         return impl(self, sim_name)
+
+    def build_wiring_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
+        """Build a 2D colored wiring diagram for the cat water fountain."""
+        import math
+
+        self.settings.diagram_options.style = DiagramStyle.COLOR
+        self.settings.diagram_options.view_from = "top"
+
+        r = self.settings.bowl_radius
+        t = self.settings.bowl_thickness
+
+        # Draw the bowl outline in grey
+        with BuildSketch() as bowl_outline:
+            Circle(radius=r)
+            Circle(radius=r - t, mode=Mode.SUBTRACT)
+        room.add("bowl_outline", bowl_outline.sketch, color="grey")
+
+        # Draw the motor compartment outline in grey
+        with BuildSketch() as motor_comp:
+            Circle(radius=15.0)
+            Circle(radius=14.0, mode=Mode.SUBTRACT)
+        room.add("motor_compartment", motor_comp.sketch, color="grey")
+
+        # Get bowl part to query joints and load/resolve Wiring
+        bowl_part = self.build_bowl("bowl").part
+        yaml_path = Path(__file__).parent / "wiring.yaml"
+        wiring = Wiring(yaml_path, bowl_part)
+
+        # Build the diagram using the diagram class
+        diagram = WiringDiagram(wiring)
+        diagram.build(room)

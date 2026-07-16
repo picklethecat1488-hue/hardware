@@ -154,6 +154,8 @@ def get_rgba_color(
         ColorType.YELLOW: (1.0, 1.0, 0.0),
         ColorType.MAGENTA: (1.0, 0.0, 1.0),
         ColorType.GREY: (0.5, 0.5, 0.5),
+        ColorType.BLACK: (0.0, 0.0, 0.0),
+        ColorType.PURPLE: (0.5, 0.0, 0.5),
     }
     name = str(color)
     rgb = color_map.get(cast(ColorType, name), default_rgb)

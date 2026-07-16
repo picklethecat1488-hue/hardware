@@ -1,8 +1,9 @@
 """Models package root."""
 
 from .text_args import TextArgs
-from .diagram_options import DiagramOptions
+from .diagram_options import DiagramOptions, DiagramStyle
 from .utils import method_cache, load_measurements
 from .app_config import AppConfig
 from .boundary_config import BoundaryConfig, ShapeType, BoundaryType
 from .fluid_config import FluidConfig
+from .wiring import PinModel, LabelModel, FootprintModel, NetModel, Wiring

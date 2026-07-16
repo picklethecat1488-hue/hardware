@@ -160,3 +160,5 @@ class ColorType(StrEnum):
     YELLOW = "yellow"
     MAGENTA = "magenta"
     GREY = "grey"
+    BLACK = "black"
+    PURPLE = "purple"

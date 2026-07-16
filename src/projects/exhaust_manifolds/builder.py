@@ -417,7 +417,10 @@ class ExhaustManifoldsBuilder:
             move_dir = (center_part - center_full).normalized()
             return move_dir * dist + Vector(0, offset, 0)
 
-        names = cast(Sequence[Literal["driver", "passenger"]], targets)
+        if "product" in targets:
+            names = ["driver", "passenger"]
+        else:
+            names = cast(Sequence[Literal["driver", "passenger"]], targets)
         right_vals = (False, True)
         results = []
         for i, name in enumerate(names):
