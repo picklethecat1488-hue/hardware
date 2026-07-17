@@ -27,3 +27,5 @@ dependencies:
     - jax
     - jaxlib
     - jax-md
+    - scancode-toolkit
+    - typecode-libmagic
