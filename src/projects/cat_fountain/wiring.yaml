@@ -2,10 +2,10 @@
 components:
   - name: charger
     package: board
-    position: [0.0, -79.0, 25.0]
+    position: [0.0, -79.0, 23.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [18.0, 29.0, 1.6]
-    mounting_holes: [14.0, 25.0]
+    mounting_holes: [13.97, 25.15]
     label:
       text: "BQ25185"
       position: [0.0, -17.5, 0.0]
@@ -35,7 +35,7 @@ components:
     position: [-50.0, 0.0, 23.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [17.0, 52.0, 1.6]
-    mounting_holes: [13.0, 48.0]
+    mounting_holes: [11.4, 47.0]
     slots_per_side: 20
     label:
       text: "PICO W"
@@ -112,7 +112,7 @@ components:
     position: [50.0, -45.0, 23.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [24.0, 20.0, 1.6]
-    mounting_holes: [20.0, 16.0]
+    mounting_holes: [20.32, 12.7]
     label:
       text: "MAX17048"
       position: [0.0, -13.0, 0.0]
@@ -139,7 +139,7 @@ components:
     position: [50.0, -15.0, 23.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [25.0, 21.5, 1.6]
-    mounting_holes: [21.0, 17.5]
+    mounting_holes: [20.32, 12.7]
     label:
       text: "INA219"
       position: [15.5, 0.0, 0.0]
@@ -169,7 +169,7 @@ components:
     position: [50.0, 15.0, 23.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [24.0, 19.0, 1.6]
-    mounting_holes: [20.0, 15.0]
+    mounting_holes: [19.0, 13.0]
     label:
       text: "L9110S"
       position: [15.0, 0.0, 0.0]

@@ -254,6 +254,10 @@ class CatFountainProvider(Provider):
                 Cylinder(radius=15.0, height=20.0, align=(Align.CENTER, Align.CENTER, Align.MAX))
                 # Pocket for the motor body
                 Box(13.0, 11.0, 20.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                # Two horizontal M4 jack screw holes on either side of the motor boss (halfway down the pocket)
+                with Locations((0, 0, -10.0)):
+                    with Locations(Rot(0, 90, 0)):
+                        Cylinder(radius=1.75, height=32.0, mode=Mode.SUBTRACT)
 
             # Blind screw holes for mounting the DC motor bracket to the pocket ceiling (M2 screws, spacing 17 mm)
             for x_offset in [-self.settings.motor_spacing_x / 2.0, self.settings.motor_spacing_x / 2.0]:
@@ -294,7 +298,7 @@ class CatFountainProvider(Provider):
                 label: str,
             ):
                 dxs = [-spacing_x / 2.0, spacing_x / 2.0]
-                dys = [-spacing_y / 2.0, spacing_y / 2.0] if spacing_y is not None else [0.0]
+                dys = [-spacing_y / 2.0, spacing_y / 2.0] if spacing_y else [0.0]
 
                 locs = []
                 for dx in dxs:
@@ -377,8 +381,18 @@ class CatFountainProvider(Provider):
                 add_pcb_mount(cx, cy, sx, sy, sh, lbl)
 
             # Charging port hole in the outer wall of the dry compartment (back side, y = -r)
-            with Locations((0, -r + t / 2.0, floor_z - t - 5.0)):
-                Box(12.0, 10.0, 6.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
+            # Centered on the USB port, which is located on the underside of the PCB
+            usb_z = floor_z - t - self.settings.charger_standoff_height - 3.2
+            with Locations((0, -r + t / 2.0, usb_z)):
+                with BuildPart(mode=Mode.PRIVATE) as port_cutout:
+                    Box(
+                        self.settings.charger_port_width,
+                        10.0,
+                        self.settings.charger_port_height,
+                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                    )
+                    fillet(port_cutout.edges().filter_by(Axis.Y), radius=2.0)
+                add(port_cutout, mode=Mode.SUBTRACT)
 
             # Radial ventilation slits in the back wall around the charging port
             for angle in [252, 261, 279, 288]:
