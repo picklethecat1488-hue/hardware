@@ -899,20 +899,21 @@ class CatFountainProvider(Provider):
 
             Cylinder(radius=16.9, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.INTERSECT)
 
-            Cylinder(radius=4.0, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+            # Generate 7-hole hexagonal grid of holes
+            hex_spacing = 8.7
+            hex_width = 5.2
+            with BuildSketch() as hole_sketch:
+                hole_locations = []
+                for i in range(-2, 3):
+                    for j in range(-2, 3):
+                        x = (i + j * 0.5) * hex_spacing
+                        y = j * (math.sqrt(3) / 2) * hex_spacing
+                        if math.sqrt(x * x + y * y) <= 9.0:
+                            hole_locations.append((x, y))
+                with Locations(hole_locations):
+                    RegularPolygon(radius=hex_width / 2.0, side_count=6, major_radius=False)
 
-            Box(15.0, 2.5, cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-
-            for i in range(6):
-                angle = i * (360.0 / 6)
-                with Locations(Rot(0, 0, angle)):
-                    with Locations((10.5, 0, -1.0)):
-                        Cylinder(
-                            radius=1.2,
-                            height=cover_h + 2.0,
-                            align=(Align.CENTER, Align.CENTER, Align.MIN),
-                            mode=Mode.SUBTRACT,
-                        )
+            extrude(hole_sketch.sketch, amount=cover_h + 10.0, both=True, mode=Mode.SUBTRACT)
 
             URDFMetadata(
                 label=target,
