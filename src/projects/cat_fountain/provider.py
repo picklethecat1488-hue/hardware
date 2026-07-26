@@ -294,7 +294,7 @@ class CatFountainProvider(Provider):
                 label: str,
             ):
                 dxs = [-spacing_x / 2.0, spacing_x / 2.0]
-                dys = [-spacing_y / 2.0, spacing_y / 2.0] if spacing_y is not None else [0.0]
+                dys = [-spacing_y / 2.0, spacing_y / 2.0] if spacing_y else [0.0]
 
                 locs = []
                 for dx in dxs:
