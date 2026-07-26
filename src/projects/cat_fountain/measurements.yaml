@@ -42,8 +42,8 @@ pcb_hole_radius: 1.0
 pcb_boss_radius: 2.2
 
 # Fuel Gauge (MAX17048) footprint
-fuel_gauge_spacing_x: 20.0
-fuel_gauge_spacing_y: 16.0
+fuel_gauge_spacing_x: 20.32
+fuel_gauge_spacing_y: 12.7
 fuel_gauge_standoff_height: 4.0
 
 # Proximity Sensor (VL53L0X) footprint
@@ -52,13 +52,13 @@ proximity_sensor_spacing_y: 13.5
 proximity_sensor_standoff_height: 4.0
 
 # Pico (RP2040) footprint
-pico_spacing_x: 13.0
-pico_spacing_y: 48.0
+pico_spacing_x: 11.4
+pico_spacing_y: 47.0
 pico_standoff_height: 4.0
 
 # Charger (BQ25185) footprint
-charger_spacing_x: 14.0
-charger_spacing_y: 25.0
+charger_spacing_x: 13.97
+charger_spacing_y: 25.15
 charger_standoff_height: 2.0
 
 # NeoDriver footprint
@@ -67,13 +67,13 @@ neodriver_spacing_y: 14.0
 neodriver_standoff_height: 4.0
 
 # Current Monitor (INA219) footprint
-current_monitor_spacing_x: 21.0
-current_monitor_spacing_y: 17.5
+current_monitor_spacing_x: 20.32
+current_monitor_spacing_y: 12.7
 current_monitor_standoff_height: 4.0
 
 # Motor Driver (L9110S) footprint
-motor_driver_spacing_x: 20.0
-motor_driver_spacing_y: 15.0
+motor_driver_spacing_x: 19.0
+motor_driver_spacing_y: 13.0
 motor_driver_standoff_height: 4.0
 
 # Motor (N20) mount
