@@ -2,7 +2,7 @@
 components:
   - name: charger
     package: board
-    position: [0.0, -79.0, 25.0]
+    position: [0.0, -79.0, 23.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [18.0, 29.0, 1.6]
     mounting_holes: [13.97, 25.15]
