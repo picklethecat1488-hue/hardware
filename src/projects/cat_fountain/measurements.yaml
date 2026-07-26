@@ -59,7 +59,9 @@ pico_standoff_height: 4.0
 # Charger (BQ25185) footprint
 charger_spacing_x: 13.97
 charger_spacing_y: 25.15
-charger_standoff_height: 2.0
+charger_standoff_height: 4.0
+charger_port_width: 16.0
+charger_port_height: 9.0
 
 # NeoDriver footprint
 neodriver_spacing_x: 21.0

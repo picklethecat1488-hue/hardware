@@ -378,6 +378,16 @@ class CatFountainConfig(BaseModel):
         """Return standoff height for Charger."""
         return float(self._raw_data.get("charger_standoff_height", 2.0))
 
+    @cached_property
+    def charger_port_width(self) -> float:
+        """Return charger port cutout width."""
+        return float(self._raw_data.get("charger_port_width", 16.0))
+
+    @cached_property
+    def charger_port_height(self) -> float:
+        """Return charger port cutout height."""
+        return float(self._raw_data.get("charger_port_height", 9.0))
+
     # NeoDriver
     @cached_property
     def neodriver_spacing_x(self) -> float:
