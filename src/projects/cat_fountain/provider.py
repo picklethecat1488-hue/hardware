@@ -238,6 +238,10 @@ class CatFountainProvider(Provider):
                 Cylinder(radius=15.0, height=20.0, align=(Align.CENTER, Align.CENTER, Align.MAX))
                 # Pocket for the motor body
                 Box(13.0, 11.0, 20.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                # Two horizontal M4 jack screw holes on either side of the motor boss (halfway down the pocket)
+                with Locations((0, 0, -10.0)):
+                    with Locations(Rot(0, 90, 0)):
+                        Cylinder(radius=1.75, height=32.0, mode=Mode.SUBTRACT)
 
             # Blind screw holes for mounting the DC motor bracket to the pocket ceiling (M2 screws, spacing 17 mm)
             for x_offset in [-self.settings.motor_spacing_x / 2.0, self.settings.motor_spacing_x / 2.0]:
