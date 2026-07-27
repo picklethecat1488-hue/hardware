@@ -1,17 +1,25 @@
 """Contains Logger system unit tests."""
 
 from shell import Logger
+from unittest.mock import MagicMock
 import pytest
 
 
 class TestLogger:
     """Logger tests."""
 
+    @pytest.fixture(autouse=True)
+    def mock_isatty(self, mocker):
+        """Force stdout to behave as a TTY for logger tests."""
+        mocker.patch("sys.stdout.isatty", return_value=True)
+
     @pytest.fixture
     def mock_dependencies(self, mocker):
         """Mock external UI dependencies."""
+        mock_halo = MagicMock()
+        mocker.patch.dict(Logger.__init__.__globals__, {"Halo": mock_halo})
         return {
-            "halo": mocker.patch("shell.Halo"),
+            "halo": mock_halo,
         }
 
     def test_init_terminal_mode(self, mocker, mock_dependencies):
@@ -30,11 +38,10 @@ class TestLogger:
         captured = capsys.readouterr()
         assert captured.out == ""
 
-    def test_terminal_print_persists_message(self, mocker):
+    def test_terminal_print_persists_message(self, mock_dependencies):
         """Verify print persists messages and restarts the spinner."""
-        mock_halo_class = mocker.patch("shell.Halo")
+        mock_halo = mock_dependencies["halo"].return_value
         logger = Logger(enabled=True)
-        mock_halo = mock_halo_class.return_value
 
         logger.print("Step 1", symbol="✔")
 
@@ -42,22 +49,20 @@ class TestLogger:
         mock_halo.stop_and_persist.assert_called_with("✔ Step 1")
         assert mock_halo.start.call_count == 2  # Once in init, once in print
 
-    def test_print_without_restart(self, mocker):
+    def test_print_without_restart(self, mock_dependencies):
         """Verify print with restart=False stops the spinner."""
-        mock_halo_class = mocker.patch("shell.Halo")
+        mock_halo = mock_dependencies["halo"].return_value
         logger = Logger(enabled=True)
-        mock_halo = mock_halo_class.return_value
 
         logger.print("No restart", restart=False)
         assert logger.running is False
         assert mock_halo.stop_and_persist.called
         assert mock_halo.start.call_count == 1  # Only from init
 
-    def test_manual_start_stop(self, mocker):
+    def test_manual_start_stop(self, mock_dependencies):
         """Verify manual start and stop control."""
-        mock_halo_class = mocker.patch("shell.Halo")
+        mock_halo = mock_dependencies["halo"].return_value
         logger = Logger(enabled=True)
-        mock_halo = mock_halo_class.return_value
 
         logger.started = False
         assert logger.running is False
