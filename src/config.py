@@ -2,7 +2,9 @@
 
 import argparse
 import fnmatch
+import sys
 from typing import Optional, Sequence
+from daemon import DaemonClient
 from model import AppConfig
 from target_parser import TargetParser
 from shell import Logger
@@ -92,6 +94,4 @@ def main(logger, args):
 
 if __name__ == "__main__":
     """Program entry point."""
-    logger = Logger(text="Configuring...")
-    args = get_args()
-    main(logger, args)
+    DaemonClient().run("config", sys.argv[1:])
