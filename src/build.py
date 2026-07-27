@@ -5,8 +5,10 @@ import io
 import hashlib
 import yaml
 import os
+import sys
 from typing import cast
 from pathlib import Path
+from daemon import DaemonClient
 from model import AppConfig
 from build123d import *  # type: ignore
 from build123d import export_stl, export_brep, Shape  # type: ignore
@@ -659,6 +661,4 @@ def main(logger, args):
 
 if __name__ == "__main__":
     """Program entry point."""
-    logger = Logger()
-    args = get_args()
-    main(logger, args)
+    DaemonClient().run("build", sys.argv[1:])
