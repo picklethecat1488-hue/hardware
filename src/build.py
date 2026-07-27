@@ -102,6 +102,103 @@ class Builder:
         """Calculate the SHA1 hash of a file on disk."""
         return hashlib.sha1(path.read_bytes()).hexdigest()
 
+    def _get_project_source_hash(self, project_name: str) -> Optional[str]:
+        """Compute a combined SHA1 hash of all files in the project's source directory and its config file."""
+        project_dir = Path(__file__).parent / "projects" / project_name
+        config_path = Path(__file__).parent / "projects_config" / f"{project_name}_config.py"
+
+        if not project_dir.exists():
+            return None
+
+        sha = hashlib.sha1()
+        files = []
+        for root, _, filenames in os.walk(project_dir):
+            for filename in filenames:
+                files.append(Path(root) / filename)
+
+        if config_path.exists():
+            files.append(config_path)
+
+        # Sort files to ensure deterministic hashing
+        files.sort()
+
+        for file in files:
+            try:
+                rel_path = file.relative_to(Path(__file__).parent)
+                sha.update(str(rel_path).encode("utf-8"))
+                sha.update(file.read_bytes())
+            except Exception:
+                continue
+
+        return sha.hexdigest()
+
+    def _is_target_cached(self, target: str, sub: Optional[str], out_dir: str, force_update: bool) -> bool:
+        """Check if target's source hash matches manifest and all output files exist."""
+        if force_update:
+            return False
+
+        p_name, _ = TargetParser.split_target(target)
+        source_hash = self._get_project_source_hash(p_name)
+        if not source_hash:
+            return False
+
+        self._load_manifest(out_dir)
+        with self.lock:
+            source_manifest = self.build_manifest.setdefault("source_hash", {})
+            manifest_key = f"{target}::{sub}" if sub else target
+            if source_manifest.get(manifest_key) != source_hash:
+                return False
+
+        outputs = self.lister.get_part_outputs(target, sub)
+        for out in outputs:
+            out_path = Path(out_dir) / out
+            if not out_path.exists():
+                return False
+
+        return True
+
+    def _is_diagram_cached(self, target: str, out_dir: str, force_update: bool) -> bool:
+        """Check if diagram's source hash matches manifest and diagram file exists."""
+        if force_update:
+            return False
+
+        p_name = TargetParser.get_project_name(target)
+        source_hash = self._get_project_source_hash(p_name)
+        if not source_hash:
+            return False
+
+        self._load_manifest(out_dir)
+        with self.lock:
+            source_manifest = self.build_manifest.setdefault("source_hash", {})
+            manifest_key = f"{target}::diagram"
+            if source_manifest.get(manifest_key) != source_hash:
+                return False
+
+        diagram_file = self.lister.get_diagram_output(target)
+        path_obj = Path(out_dir) / diagram_file
+        return path_obj.exists()
+
+    def _is_urdf_cached(self, target: str, out_dir: str, force_update: bool) -> bool:
+        """Check if URDF's source hash matches manifest and URDF file exists."""
+        if force_update:
+            return False
+
+        p_name = TargetParser.get_project_name(target)
+        source_hash = self._get_project_source_hash(p_name)
+        if not source_hash:
+            return False
+
+        self._load_manifest(out_dir)
+        with self.lock:
+            source_manifest = self.build_manifest.setdefault("source_hash", {})
+            manifest_key = f"{target}::urdf"
+            if source_manifest.get(manifest_key) != source_hash:
+                return False
+
+        urdf_file = self.lister.get_urdf_output(target)
+        path_obj = Path(out_dir) / urdf_file
+        return path_obj.exists()
+
     def _export_obj(self, shape: Shape, file_path: str, tolerance: float = 0.1, scale: float = 1.0) -> bool:
         """Export build123d shape to OBJ format."""
         vertices, triangles = shape.tessellate(tolerance)
@@ -239,6 +336,15 @@ class Builder:
                                 )
                             )
 
+                    # Record source hash in manifest
+                    p_name, _ = TargetParser.split_target(name)
+                    source_hash = self._get_project_source_hash(p_name)
+                    if source_hash:
+                        with self.lock:
+                            source_manifest = self.build_manifest.setdefault("source_hash", {})
+                            manifest_key = f"{name}::{sub}" if sub else name
+                            source_manifest[manifest_key] = source_hash
+
         # Wait for all submitted exports to complete
         for fut in futures:
             fut.result()
@@ -270,14 +376,26 @@ class Builder:
             # Run targets which have subassemblies, then run any remaining base targets.
             for sub in self._resolve_subassemblies(base_targets, base_targets.subassemblies):
                 run_targets = base_targets.for_subassemblies([sub])
-                batch_results = self.manager.router.run(run_targets)
-                self._export_parts(out_dir, batch_results, sub=sub, force_update=force_update)
+                uncached_targets = [t for t in run_targets if not self._is_target_cached(t, sub, out_dir, force_update)]
+                if uncached_targets:
+                    targets_to_run = base_targets.for_targets(uncached_targets)
+                    batch_results = self.manager.router.run(targets_to_run)
+                    self._export_parts(out_dir, batch_results, sub=sub, force_update=force_update)
+                else:
+                    self.logger.print(f"Using cached parts for subassembly {sub}", symbol="✨")
                 for t in run_targets:
                     has_base_targets.discard(t)
 
             if has_base_targets:
-                batch_results = self.manager.router.run(base_targets.for_targets(has_base_targets))
-                self._export_parts(out_dir, batch_results, force_update=force_update)
+                uncached_targets = [
+                    t for t in has_base_targets if not self._is_target_cached(t, None, out_dir, force_update)
+                ]
+                if uncached_targets:
+                    targets_to_run = base_targets.for_targets(uncached_targets)
+                    batch_results = self.manager.router.run(targets_to_run)
+                    self._export_parts(out_dir, batch_results, force_update=force_update)
+                else:
+                    self.logger.print("Using cached parts for base targets", symbol="✨")
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def generate_diagram(self, out_dir, names: list[str] | None = None, force_update: Optional[bool] = None):
@@ -303,6 +421,9 @@ class Builder:
                 symbol="🛠️ ",
             )
             for target in base_targets:
+                if self._is_diagram_cached(target, out_dir, force_update):
+                    self.logger.print(f"Using cached diagram for {target}", symbol="✨")
+                    continue
                 single_target_list = base_targets.for_targets([target])
                 results = self.manager.router.run(single_target_list)
 
@@ -326,6 +447,13 @@ class Builder:
                             force_update,
                         )
                     )
+
+                    # Record source hash in manifest
+                    source_hash = self._get_project_source_hash(p_name)
+                    if source_hash:
+                        with self.lock:
+                            source_manifest = self.build_manifest.setdefault("source_hash", {})
+                            source_manifest[f"{target}::diagram"] = source_hash
 
         # Wait for all submitted diagram exports to complete
         for fut in futures:
@@ -358,7 +486,13 @@ class Builder:
             if not simulate_targets:
                 continue
 
-            results = self.manager.router.run(simulate_targets)
+            uncached_urdfs = [t for t in simulate_targets if not self._is_urdf_cached(t, out_dir, force_update)]
+            if not uncached_urdfs:
+                self.logger.print("Using cached URDFs", symbol="✨")
+                continue
+
+            targets_to_run = base_targets.for_targets(uncached_urdfs)
+            results = self.manager.router.run(targets_to_run)
             for fq_target, room in results or []:
                 proj_name = TargetParser.get_project_name(fq_target)
 
@@ -417,6 +551,13 @@ class Builder:
                         force_update,
                     )
                 )
+
+                # Record source hash in manifest
+                source_hash = self._get_project_source_hash(proj_name)
+                if source_hash:
+                    with self.lock:
+                        source_manifest = self.build_manifest.setdefault("source_hash", {})
+                        source_manifest[f"{fq_target}::urdf"] = source_hash
 
         for fut in futures:
             fut.result()
