@@ -29,3 +29,4 @@ dependencies:
     - jax-md
     - scancode-toolkit
     - typecode-libmagic
+    - cbor2
