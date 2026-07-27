@@ -31,18 +31,18 @@ class TestListMain:
         args = get_args()
         assert args.command == "outputs"
 
-    def test_main_targets(self, mock_logger, mock_lister):
+    def test_main_targets(self, mock_logger, mock_lister, mocker):
         """Verify that targets command triggers list_targets."""
-        args = argparse.Namespace(command="targets")
-        with patch("list.get_args", return_value=args):
-            main()
+        mocker.patch("sys.argv", ["list.py", "targets"])
+        mocker.patch.dict(main.__globals__, {"Lister": mock_lister})
+        main()
         mock_lister.return_value.list_targets.assert_called_once()
 
-    def test_main_outputs(self, mock_logger, mock_lister):
+    def test_main_outputs(self, mock_logger, mock_lister, mocker):
         """Verify that outputs command triggers list_outputs."""
-        args = argparse.Namespace(command="outputs")
-        with patch("list.get_args", return_value=args):
-            main()
+        mocker.patch("sys.argv", ["list.py", "outputs"])
+        mocker.patch.dict(main.__globals__, {"Lister": mock_lister})
+        main()
         mock_lister.return_value.list_outputs.assert_called_once()
 
 
