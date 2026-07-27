@@ -1,5 +1,6 @@
 """Logger and shell utilities for console output."""
 
+import sys
 import threading
 from typing import Any, cast
 from halo import Halo
@@ -16,7 +17,9 @@ class Logger:
         self.running = False
         self.lock = threading.Lock()
 
-        if self.enabled:
+        # Only run Halo spinner if stdout is a TTY (terminal)
+        self.has_tty = sys.stdout.isatty()
+        if self.enabled and self.has_tty:
             self.backend = Halo(text=self.text, spinner="dots", interval=33)
             self.backend.start()
             self.running = True
@@ -50,7 +53,7 @@ class Logger:
             if not self.running:
                 # If the spinner isn't running, just do a normal print to avoid overhead
                 print(formatted)
-                if restart:
+                if restart and self.backend:
                     cast(Any, self.backend).start()
                     self.running = True
                 return
@@ -75,3 +78,6 @@ class Logger:
                     # Stop the spinner after the operation has completed.
                     backend.stop()
                     self.running = False
+            else:
+                if self.enabled:
+                    print(f"Done {self.text}")

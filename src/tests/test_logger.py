@@ -7,6 +7,11 @@ import pytest
 class TestLogger:
     """Logger tests."""
 
+    @pytest.fixture(autouse=True)
+    def mock_isatty(self, mocker):
+        """Force stdout to behave as a TTY for logger tests."""
+        mocker.patch("sys.stdout.isatty", return_value=True)
+
     @pytest.fixture
     def mock_dependencies(self, mocker):
         """Mock external UI dependencies."""
