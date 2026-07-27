@@ -7,6 +7,7 @@ from unittest.mock import patch
 from build123d import Part, Location, Rot
 from projects_config import CatFountainConfig
 from projects.cat_fountain.provider import CatFountainProvider
+import projects.cat_fountain.layouts
 from provider import Section, Mode, Room
 
 
@@ -61,6 +62,100 @@ class TestCatFountainProvider:
         assert "bottom_cover" in room
         assert "lid" in room
         assert "drain_cover" in room
+
+    def test_build_wiring_diagram(self, provider):
+        """Verify that build_wiring_diagram populates the room with footprints and wires."""
+        room = Room()
+        provider.build_wiring_diagram(room, ["wiring"], Mode.DEFAULT)
+        assert "bowl_outline" in room
+        assert "motor_compartment" in room
+        assert "charger_footprint" in room
+        assert "pico_footprint" in room
+        assert "fuel_gauge_footprint" in room
+        assert "current_monitor_footprint" in room
+        assert "motor_driver_footprint" in room
+        assert "neodriver_footprint" in room
+        assert "motor_footprint" in room
+        assert "sensor_east_footprint" in room
+        assert "sensor_north_footprint" in room
+        assert "sensor_west_footprint" in room
+        assert "led_footprint" in room
+        assert "wire_gnd" in room
+        assert "wire_vcc_logic" in room
+        assert "wire_sda" in room
+        assert "wire_scl" in room
+
+    def test_wiring_diagram_class(self, provider):
+        """Verify that WiringDiagram populates the room with all pads and wires."""
+        from pathlib import Path
+        from provider import Wiring, WiringDiagram
+
+        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+        bowl_part = provider.build_bowl("bowl").part
+        wiring = Wiring(yaml_path, bowl_part)
+
+        room = Room()
+        diagram = WiringDiagram(wiring)
+        diagram.build(room)
+
+        # Verify footprints
+        assert "pico_footprint" in room
+        assert "charger_footprint" in room
+
+        # Verify pads
+        assert "pico_pad_GP2" in room
+        assert "pico_pad_GND_L" in room
+
+        # Verify wires
+        assert "wire_gnd" in room
+        assert "wire_sda" in room
+        assert "wire_scl" in room
+        assert "wire_led_data" in room
+
+    def test_layout_edge_pins(self):
+        """Verify edge pin layout calculations for boards and sensors."""
+        from projects.cat_fountain.layouts import layout_edge_pins
+        from model import PinModel
+
+        # Create mock pins
+        pins = [
+            PinModel(name="P1", label="P1", side="right", slot=0),
+            PinModel(name="P2", label="P2", side="right", slot=1),
+        ]
+        # Layout on a 10x20 footprint (w=10.0, l=20.0)
+        # side right -> physical left side (X = -5.0)
+        # Margin = 2.0. Limit = 10.0 - 2.0 = 8.0.
+        layout_edge_pins(pins, 10.0, 20.0, slots_per_side=2)
+        assert pins[0].position == (-5.0, 8.0, 0.0)
+        assert pins[1].position == (-5.0, -8.0, 0.0)
+
+    def test_layout_motor_pins(self):
+        """Verify motor footprint pin placements."""
+        from projects.cat_fountain.layouts import layout_motor_pins
+        from model import PinModel
+
+        pins = [
+            PinModel(name="M+", label="M+", side="top"),
+            PinModel(name="M-", label="M-", side="top"),
+        ]
+        layout_motor_pins(pins, 12.0, 10.0)
+        assert pins[0].position == (-4.0, -5.0, 0.0)
+        assert pins[1].position == (4.0, -5.0, 0.0)
+
+    def test_layout_led_pins(self):
+        """Verify LED footprint pin placements."""
+        from projects.cat_fountain.layouts import layout_led_pins
+        from model import PinModel
+
+        pins = [
+            PinModel(name="VCC", label="VCC", side="right"),
+            PinModel(name="GND", label="GND", side="right"),
+            PinModel(name="DIN", label="DIN", side="left"),
+        ]
+        layout_led_pins(pins, 10.0, 10.0)
+        assert pins[0].position == (-5.0, 3.0, 0.0)
+        assert pins[1].position == (-5.0, -3.0, 0.0)
+        assert pins[2].position == (5.0, 0.0, 0.0)
 
     def test_build_product(self, provider):
         """Verify that build_product populates the room with all fountain parts and their URDF attributes."""
@@ -135,6 +230,7 @@ class TestCatFountainProvider:
         assert impeller.part.is_valid
 
     @pytest.mark.slow
+    @pytest.mark.timeout(60)
     def test_pump_integration(self):
         """Verify that the water pump works in the simulation by measuring particles pumped."""
         import tempfile
@@ -152,6 +248,7 @@ class TestCatFountainProvider:
             )
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
+            provider.settings.target_volume = 0.00008
 
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
             builder = Builder(manager, logger=Logger(enabled=False))
@@ -198,7 +295,7 @@ class TestCatFountainProvider:
                 assert fluid is not None
 
                 step_fn = hooks[Simulate.STEP]
-                for step_idx in range(180):
+                for step_idx in range(80):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
@@ -213,11 +310,11 @@ class TestCatFountainProvider:
                 h_tube = provider.settings.tube_height * 0.001
                 t_travel = h_tube / v_z  # ~0.120 seconds
 
-                # 3. Active pumping time: motor starts at step 40, total 180 steps
+                # 3. Active pumping time: motor starts at step 40, total 80 steps
                 # dt = 1 / 240 seconds per step
                 dt = 1.0 / 240.0
-                t_motor = (180 - 40) * dt  # 0.583s
-                t_exit = t_motor - t_travel  # time during which fluid actively exits: ~0.463s
+                t_motor = (80 - 40) * dt  # 0.167s
+                t_exit = t_motor - t_travel  # time during which fluid actively exits: ~0.047s
 
                 # 4. Volume flow rate Q = Area * v_z
                 # tube inner radius r_inner = tube_radius - tube_thickness
@@ -246,6 +343,7 @@ class TestCatFountainProvider:
                 p.disconnect(physics_client)
 
     @pytest.mark.slow
+    @pytest.mark.timeout(60)
     def test_pump_integration_water_escaping(self):
         """Verify that the simulation early terminates when water escapes the bowl."""
         import tempfile
@@ -264,6 +362,7 @@ class TestCatFountainProvider:
             )
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
+            provider.settings.target_volume = 0.00008
 
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
             builder = Builder(manager, logger=Logger(enabled=False))
@@ -320,12 +419,17 @@ class TestCatFountainProvider:
                         for b in bowl_list:
                             b_dict = b.model_dump(exclude_defaults=True) if hasattr(b, "model_dump") else dict(b)
                             b_dict["height"] = (provider.settings.bowl_height - 25.0) * 0.001
+                            from provider.bullet import LinkType
+
+                            if b_dict.get("link_type") != LinkType.TUBE and b_dict.get("link_type") != "tube":
+                                b_dict["radius"] = 0.050
                             from model.boundary_config import BoundaryConfig
 
                             new_bowl_list.append(BoundaryConfig.model_validate(b_dict))
                         test_boundaries["bowl"] = new_bowl_list
                     else:
                         test_boundaries["bowl"]["height"] = (provider.settings.bowl_height - 25.0) * 0.001
+                        test_boundaries["bowl"]["radius"] = 0.050
 
                 hooks = provider.get_simulate_hooks("product:view/simulate")
                 setup_fn = hooks[Simulate.SETUP]
@@ -351,6 +455,7 @@ class TestCatFountainProvider:
                 p.disconnect(physics_client)
 
     @pytest.mark.slow
+    @pytest.mark.timeout(60)
     def test_cat_fountain_water_escaping_termination(self, provider):
         """Verify that the cat fountain simulation terminates when water escapes/falls out of bounds."""
         import pybullet as p

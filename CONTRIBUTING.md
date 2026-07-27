@@ -51,15 +51,14 @@ from functools import cached_property
 from build123d import *
 from pathlib import Path
 from provider import Provider, Action, Mode, discover_provider, Room
-from projects_config import ExhaustManifoldsConfig # Or a custom Pydantic model
+from projects_config import ExhaustManifoldsConfig  # Or a custom Pydantic model
+
 
 @discover_provider
 class BracketProvider(Provider):
     @cached_property
     def default_config(self):
-        return ExhaustManifoldsConfig(
-            measurements_path=str(Path(__file__).parent / "measurements.yaml")
-        )
+        return ExhaustManifoldsConfig(measurements_path=str(Path(__file__).parent / "measurements.yaml"))
 
     @property
     def part(self):
@@ -116,6 +115,7 @@ If your project supports physical simulation (`Mode.SIMULATE`), you should regis
 def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
     """Return simulation callbacks mapped to execution hooks."""
     from .simulate_hooks import get_simulate_hooks_impl as impl
+
     return impl(self, sim_name)
 ```
 
@@ -125,10 +125,11 @@ Create a `simulate_hooks.py` file within your project package to specify hooks f
 # src/projects/bracket/simulate_hooks.py
 from provider import Simulate, Room, Bullet, Fluid
 
+
 def get_simulate_hooks_impl(provider, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
     def on_init(bullet: Bullet, fluid: Fluid) -> None:
         bullet.set_motor_velocity("motor_joint", velocity=10.0)
-        
+
     return {
         Simulate.INIT: on_init,
     }

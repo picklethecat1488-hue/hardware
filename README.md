@@ -106,6 +106,21 @@ python src/view.py cat_fountain/product:view/simulate --no-build
 # Save the simulation recording to a (.rrd) file to upload to rerun.io:
 python src/view.py cat_fountain/product:view/simulate --save-rrd output.rrd
 ```
+
+### Wiring Diagrams
+
+This project includes a declarative wiring and footprint routing engine to generate 2D system-level wiring diagrams:
+
+*   **Declarative Configuration**: Component footprints, physical dimensions, pin configurations, and net connections are declared in a project's `wiring.yaml` file.
+*   **Automated Layouts**: Pin coordinates are computed dynamically by layout algorithms (supporting standard DIP board edges, custom motors, and LEDs) and can be namespaced to individual projects.
+*   **Orthogonal Routing**: Wire paths are routed automatically using an A* pathfinding algorithm that navigates around obstacles and draws crossover bridge bumps at wire intersections.
+*   **Layered SVG Export**: Wiring diagrams are exported as vector SVGs styled with custom stroke widths, colors, and text alignment.
+
+To generate the wiring diagram:
+```bash
+# Build the cat fountain wiring diagram
+python src/build.py cat_fountain/wiring
+```
 ---
 
 ## Running Tests

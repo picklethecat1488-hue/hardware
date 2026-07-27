@@ -55,3 +55,7 @@ product:
     modes: [default]
   view:
     modes: [default, simulate]
+
+wiring:
+  diagram:
+    modes: [default]

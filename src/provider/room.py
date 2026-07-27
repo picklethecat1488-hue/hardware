@@ -18,6 +18,7 @@ from build123d import (
     Vector,
     Plane,
     Text,
+    Rectangle,
     Align,
     Location,
     Sketch,
@@ -26,8 +27,22 @@ from build123d import (
     LinearJoint,
     BallJoint,
     LineType,
+    Shape,
 )
 from build123d.exporters import ExportSVG, Drawing
+
+
+def resolve_shape(val: Any) -> Optional[Shape]:
+    """Resolve a value to a build123d Shape if possible."""
+    if isinstance(val, Shape):
+        return val
+    if hasattr(val, "wrapped") and isinstance(val.wrapped, Shape):
+        return val
+    if hasattr(val, "part") and isinstance(val.part, Shape):
+        return val.part
+    return None
+
+
 from ezdxf.colors import RGB
 import rerun as rr
 import socket
@@ -64,6 +79,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         self.is_simulate = is_simulate
         self._labels: list[tuple[str, str, Any, TextArgs]] = []
         self.gravity: tuple[float, float, float] = (0.0, 0.0, -9.81)
+        self.line_weights: dict[str, float] = {}
 
     def add(
         self,
@@ -71,6 +87,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         geometry: Any,
         color: Optional[Union[str, ColorType, tuple[float, float, float]]] = None,
         alpha: float = 1.0,
+        line_weight: Optional[float] = None,
     ) -> None:
         """
         Add a geometry item (Part, Sketch, Wire, or Builder) to the room.
@@ -80,6 +97,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             geometry: The CAD object or build123d builder.
             color: The color name, enum member, RGB 3-tuple, or None to use default.
             alpha: Transparency value from 0.0 to 1.0.
+            line_weight: Custom thickness scaling factor (e.g. 2.0).
         """
         if name in self:
             raise ValueError(f"An item with the name '{name}' already exists in the Room.")
@@ -106,6 +124,8 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         rgba = get_rgba_color(final_color, final_alpha, default_rgb)
         self[name] = (geometry, rgba)
+        if line_weight is not None:
+            self.line_weights[name] = line_weight
 
     def add_label(self, name: str, text: str, location: Any, options: Optional[TextArgs] = None) -> None:
         """Add a camera-aligned text annotation at a 3D location."""
@@ -135,13 +155,17 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             raise ValueError(f"Unsupported diagram format for '{path}'. Only .svg is supported.")
 
         svg_opts = self._parse_options(options)
+        style = svg_opts.get("style", "outline")
+        color_mode = style in ("color", "color_hidden")
+        show_hidden = style in ("hidden", "color_hidden")
+
         look_from, look_at, up_vector = self._get_projection_vectors(svg_opts)
         drawing = Drawing(
             self.compound,
             look_from=look_from,
             look_at=look_at,
             look_up=up_vector,
-            with_hidden=svg_opts.get("show_hidden", False),
+            with_hidden=show_hidden,
         )
         visible_shapes = [drawing.visible_lines]
 
@@ -164,7 +188,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         # Include hidden lines in bounding box calculations if they are shown
         all_shapes = list(visible_shapes)
-        if svg_opts.get("show_hidden"):
+        if show_hidden:
             all_shapes.append(drawing.hidden_lines)
 
         final_drawing = Compound(children=all_shapes)
@@ -195,7 +219,69 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         exporter = ExportSVG(**filtered_opts)
 
-        if svg_opts.get("show_hidden"):
+        if color_mode:
+            shapes_by_layer = {}
+            for name, (val, rgba) in self.items():
+                geom = resolve_shape(val)
+                if geom is None:
+                    continue
+
+                color_key = tuple(round(c, 3) for c in rgba[:3])
+                line_weight = self.line_weights.get(name, 1.0)
+
+                layer_key = (color_key, line_weight)
+                if layer_key not in shapes_by_layer:
+                    shapes_by_layer[layer_key] = []
+                shapes_by_layer[layer_key].append(geom)
+
+            visible_weight_default = filtered_opts.get("line_weight", 1.0)
+
+            # Add each layer group as a separate layer
+            for (color_key, weight_mult), geoms in shapes_by_layer.items():
+                geom_comp = Compound(children=geoms)
+                drawing = Drawing(
+                    geom_comp,
+                    look_from=look_from,
+                    look_at=look_at,
+                    look_up=up_vector,
+                    with_hidden=show_hidden,
+                )
+                r_int, g_int, b_int = (int(c * 255) for c in color_key)
+                color_val = RGB(r_int, g_int, b_int)
+
+                # Format layer name to include weight to keep it unique
+                weight_str = str(weight_mult).replace(".", "_")
+                layer_name = f"Layer_{r_int}_{g_int}_{b_int}_{weight_str}"
+
+                layer_weight = visible_weight_default * weight_mult
+
+                exporter.add_layer(layer_name, line_color=color_val, line_weight=layer_weight)
+                exporter.add_shape(drawing.visible_lines, layer=layer_name)
+
+                if show_hidden:
+                    hidden_layer_name = f"Hidden_{r_int}_{g_int}_{b_int}_{weight_str}"
+                    hidden_color = RGB(
+                        int(color_val.r + (255 - color_val.r) * 0.71),
+                        int(color_val.g + (255 - color_val.g) * 0.71),
+                        int(color_val.b + (255 - color_val.b) * 0.71),
+                    )
+                    hidden_weight = layer_weight * 0.5
+                    exporter.add_layer(
+                        hidden_layer_name,
+                        line_color=hidden_color,
+                        line_weight=hidden_weight,
+                        line_type=LineType.ISO_DOT,
+                    )
+                    exporter.add_shape(drawing.hidden_lines, layer=hidden_layer_name)
+
+            # Project and add labels in a separate Labels layer
+            labels = self._project_labels(view_plane)
+            if labels:
+                label_color = RGB(0, 0, 0)
+                label_weight = filtered_opts.get("line_weight", 1.0)
+                exporter.add_layer("Labels", line_color=label_color, line_weight=label_weight)
+                exporter.add_shape(Compound(children=labels), layer="Labels")
+        elif show_hidden:
             visible_color = filtered_opts.get("line_color", (0, 0, 0))
             if isinstance(visible_color, tuple):
                 visible_color = RGB(*visible_color)
@@ -242,7 +328,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             "projection_dir",
             "projection_origin",
             "show_axes",
-            "show_hidden",
+            "style",
             "look_up",
         ]
         svg_opts = {}
