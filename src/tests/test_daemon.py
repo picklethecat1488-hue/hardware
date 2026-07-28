@@ -19,6 +19,7 @@ from daemon import (
     BUFFER_SIZE,
 )
 
+pytestmark = pytest.mark.slow
 
 def test_daemon_connection_lifecycle():
     """Verify socket connection fails cleanly when no daemon is active."""
