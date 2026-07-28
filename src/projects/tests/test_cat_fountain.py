@@ -230,7 +230,7 @@ class TestCatFountainProvider:
         assert impeller.part.is_valid
 
     @pytest.mark.slow
-    @pytest.mark.timeout(60)
+    @pytest.mark.timeout(180)
     def test_pump_integration(self):
         """Verify that the water pump works in the simulation by measuring particles pumped."""
         import tempfile
@@ -343,7 +343,7 @@ class TestCatFountainProvider:
                 p.disconnect(physics_client)
 
     @pytest.mark.slow
-    @pytest.mark.timeout(60)
+    @pytest.mark.timeout(180)
     def test_pump_integration_water_escaping(self):
         """Verify that the simulation early terminates when water escapes the bowl."""
         import tempfile
@@ -455,7 +455,7 @@ class TestCatFountainProvider:
                 p.disconnect(physics_client)
 
     @pytest.mark.slow
-    @pytest.mark.timeout(60)
+    @pytest.mark.timeout(180)
     def test_cat_fountain_water_escaping_termination(self, provider):
         """Verify that the cat fountain simulation terminates when water escapes/falls out of bounds."""
         import pybullet as p

@@ -4,6 +4,7 @@ import copy
 from functools import wraps
 import inspect
 from collections import OrderedDict
+import threading
 from pathlib import Path
 from typing import Any, Callable, TypeVar, overload, cast
 import numpy as np
@@ -88,6 +89,9 @@ def method_cache(
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]: ...
 
 
+_method_cache_lock = threading.Lock()
+
+
 def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128, deepcopy: bool = True) -> Any:
     """Create per-instance cache to avoid memory leaks and Pydantic @validate_call conflicts."""
 
@@ -95,18 +99,32 @@ def method_cache(func: Callable[..., Any] | None = None, *, maxsize: int = 128, 
         @wraps(f)
         def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
             cache_attr = f"_cache_{f.__name__}"
-            if not hasattr(self, cache_attr):
-                setattr(self, cache_attr, OrderedDict())
-            cache = getattr(self, cache_attr)
-            key = (_make_hashable(args), _make_hashable(kwargs))
-            if key in cache:
-                cache.move_to_end(key)
-                return deep_copy_shape_or_builder(cache[key]) if deepcopy else cache[key]
+            lock_attr = f"_lock_{f.__name__}"
+
+            if not hasattr(self, lock_attr):
+                with _method_cache_lock:
+                    if not hasattr(self, lock_attr):
+                        setattr(self, lock_attr, threading.Lock())
+
+            lock = getattr(self, lock_attr)
+
+            with lock:
+                if not hasattr(self, cache_attr):
+                    setattr(self, cache_attr, OrderedDict())
+                cache = getattr(self, cache_attr)
+                key = (_make_hashable(args), _make_hashable(kwargs))
+                if key in cache:
+                    cache.move_to_end(key)
+                    return deep_copy_shape_or_builder(cache[key]) if deepcopy else cache[key]
+
+            # Execute the function outside the lock to prevent deadlock if f() calls other cached methods
             result = f(self, *args, **kwargs)
-            cache[key] = result
-            if len(cache) > maxsize:
-                cache.popitem(last=False)
-            return deep_copy_shape_or_builder(result) if deepcopy else result
+
+            with lock:
+                cache[key] = result
+                if len(cache) > maxsize:
+                    cache.popitem(last=False)
+                return deep_copy_shape_or_builder(result) if deepcopy else result
 
         try:
             setattr(wrapper, "__signature__", inspect.signature(f))

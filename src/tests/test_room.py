@@ -80,7 +80,8 @@ def test_room_export_diagram():
     """Verify that export_diagram correctly maps options and calls ExportSVG for SVG paths."""
     room = Room()
 
-    with patch("provider.room.ExportSVG") as mock_exporter_cls:
+    mock_exporter_cls = MagicMock()
+    with patch.dict(Room.export_diagram.__globals__, {"ExportSVG": mock_exporter_cls}):
         mock_instance = mock_exporter_cls.return_value
 
         # Define a mock options object with snake_case attributes
