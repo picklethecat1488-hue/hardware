@@ -21,6 +21,7 @@ from daemon import (
 
 pytestmark = pytest.mark.slow
 
+
 def test_daemon_connection_lifecycle():
     """Verify socket connection fails cleanly when no daemon is active."""
     temp_sock = Path(tempfile.gettempdir()) / "test_daemon_none.sock"

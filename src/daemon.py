@@ -243,7 +243,7 @@ class DaemonServer:
             config = AppConfig()
             self.manager = ProviderManager(config, bootstrap=True)
             self.last_load_time = time.time()
-            daemon_log.info("Core modules reloaded successfully.")
+            daemon_log.info(f"Core modules reloaded successfully. Unloaded: {', '.join(modules_to_unload)}")
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def run(self):
@@ -442,7 +442,7 @@ class DaemonClient:
         daemon_script = Path(__file__).resolve()
         log_file = open(LOG_PATH, "a", encoding="utf-8")
         subprocess.Popen(
-            [sys.executable, str(daemon_script), "start"],
+            [sys.executable, str(daemon_script), "start", "--foreground"],
             stdout=log_file,
             stderr=log_file,
             close_fds=True,
@@ -460,6 +460,15 @@ class DaemonClient:
         if print_msg and logger:
             logger.done()
         return False
+
+    @property
+    def running(self) -> bool:
+        """Check if the daemon is currently running."""
+        try:
+            with daemon_connection(self.socket_path):
+                return True
+        except (ConnectionRefusedError, FileNotFoundError, OSError):
+            return False
 
     @validate_call(config={"arbitrary_types_allowed": True})
     def stop_daemon(self) -> bool:
@@ -639,7 +648,8 @@ def main():
     if len(sys.argv) > 1 and (sys.argv[1] in daemon_cmds or sys.argv[1] in ("-h", "--help")):
         parser = argparse.ArgumentParser(description="Daemon management utility.")
         subparsers = parser.add_subparsers(dest="command", required=True, help="Daemon commands")
-        subparsers.add_parser(CLICommand.START.value, help="Start the build daemon in foreground")
+        start_parser = subparsers.add_parser(CLICommand.START.value, help="Start the build daemon")
+        start_parser.add_argument("--foreground", action="store_true", help="Run daemon in the foreground")
         subparsers.add_parser(CLICommand.STOP.value, help="Stop the running build daemon")
         subparsers.add_parser(CLICommand.RESTART.value, help="Restart the running build daemon")
         subparsers.add_parser(CLICommand.STATUS.value, help="Check build daemon status")
@@ -648,8 +658,18 @@ def main():
         args = parser.parse_args()
 
         if args.command == CLICommand.START.value:
-            server = DaemonServer()
-            server.run()
+            if args.foreground:
+                server = DaemonServer()
+                server.run()
+            else:
+                client = DaemonClient()
+                if client.running:
+                    print("Daemon is already running.")
+                else:
+                    if client.start_daemon(print_msg=True):
+                        print("Daemon started successfully in background.")
+                    else:
+                        print("Failed to start daemon.")
         elif args.command == CLICommand.LOG_PATH.value:
             print(LOG_PATH)
         elif args.command == CLICommand.RESTART.value:

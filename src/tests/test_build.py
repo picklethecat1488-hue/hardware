@@ -7,7 +7,7 @@ import yaml
 from build import Builder, main, get_args
 import math
 from pathlib import Path
-from build123d import BuildPart, Box, RigidJoint, RevoluteJoint, Axis, Location
+from build123d import BuildPart, Box, RigidJoint, RevoluteJoint, Axis, Location, Vector
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 from provider import Section, Mode, TargetList, Room, SUBASSEMBLIES, URDFShape
@@ -134,13 +134,60 @@ class TestBuilderLogic:
         assert h1 == h2
 
     def test_get_diagram_hash(self, builder):
-        """Verify diagram hashing logic."""
-        room = MagicMock(spec=Room)
-        # Mock export_diagram to write something to the BytesIO stream
-        room.export_diagram.side_effect = lambda s, o: s.write(b"svg_data")
+        """Verify diagram hashing logic across different combinations."""
+        # 1. Setup standard room mock
+        room1 = MagicMock(spec=Room)
+        room1.compound = Box(1, 1, 1)
+        room1._labels = [("label1", "text1", Vector(0, 0, 0), "opts1")]
+        room1.keys.return_value = ["item1"]
 
-        h = builder._get_diagram_hash(room, None)
-        assert h == hashlib.sha1(b"svg_data").hexdigest()
+        # Mock options
+        opts1 = MagicMock()
+        opts1.model_dump.return_value = {"style": "color"}
+
+        h_base = builder._get_diagram_hash(room1, opts1)
+        assert len(h_base) == 40  # Valid SHA1 length
+
+        # 2. Verify basic hit: same room and options -> same hash
+        h_same = builder._get_diagram_hash(room1, opts1)
+        assert h_base == h_same
+
+        # 3. Verify options sensitivity: changing options -> different hash
+        opts2 = MagicMock()
+        opts2.model_dump.return_value = {"style": "outline"}
+        h_diff_opts = builder._get_diagram_hash(room1, opts2)
+        assert h_base != h_diff_opts
+
+        # 4. Verify labels sensitivity: changing labels -> different hash
+        room_diff_labels = MagicMock(spec=Room)
+        room_diff_labels.compound = Box(1, 1, 1)
+        room_diff_labels._labels = [("label1", "text2", Vector(0, 0, 0), "opts1")]
+        h_diff_labels = builder._get_diagram_hash(room_diff_labels, opts1)
+        assert h_base != h_diff_labels
+
+        # 5. Verify geometry sensitivity: changing geometry -> different hash
+        room_diff_geom = MagicMock(spec=Room)
+        room_diff_geom.compound = Box(2, 2, 2)
+        room_diff_geom._labels = [("label1", "text1", Vector(0, 0, 0), "opts1")]
+        h_diff_geom = builder._get_diagram_hash(room_diff_geom, opts1)
+        assert h_base != h_diff_geom
+
+        # 6. Verify fallback safety when export_brep fails
+        room_fail_brep = MagicMock(spec=Room)
+        type(room_fail_brep).compound = PropertyMock(side_effect=Exception("BREP export error"))
+        room_fail_brep._labels = []
+        room_fail_brep.keys.return_value = ["fallback_key1"]
+
+        h_fallback = builder._get_diagram_hash(room_fail_brep, None)
+        assert len(h_fallback) == 40
+
+        # Verify fallback is sensitive to room keys
+        room_fail_brep2 = MagicMock(spec=Room)
+        type(room_fail_brep2).compound = PropertyMock(side_effect=Exception("BREP export error"))
+        room_fail_brep2._labels = []
+        room_fail_brep2.keys.return_value = ["fallback_key2"]
+        h_fallback_diff = builder._get_diagram_hash(room_fail_brep2, None)
+        assert h_fallback != h_fallback_diff
 
     def test_load_manifest(self, builder, tmp_path):
         """Verify loading existing manifest from disk."""
