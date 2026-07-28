@@ -1270,7 +1270,8 @@ class Fluid:
                         vel_arr[idx] = [0.0, 0.0, 0.0]
                     else:
                         self.fallen_out_water_ids.add(idx)
-                        pos_arr[idx] = [0.0, 0.0, 1000.0]
+                        # Disperse inactive particles horizontally to avoid SPH neighborhood clustering hangs
+                        pos_arr[idx] = [float(idx) * 10.0, 0.0, 1000.0]
                         vel_arr[idx] = [0.0, 0.0, 0.0]
                 self.pos_jax = jnp.array(pos_arr)
                 self.vel_jax = jnp.array(vel_arr)

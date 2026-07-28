@@ -32,6 +32,8 @@ jobs:
       - name: Draft Release Notes
         id: release-drafter
         uses: release-drafter/release-drafter@v6
+        with:
+          tag: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

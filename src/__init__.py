@@ -14,6 +14,9 @@ from .model import AppConfig
 from .target_parser import TargetParser
 from .shell import Logger
 
+__version__ = "0.1.0"
+__license__ = "GPL-3.0-or-later"
+
 __all__ = [
     "Builder",
     "Viewer",

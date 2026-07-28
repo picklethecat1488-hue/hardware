@@ -2,7 +2,18 @@
 
 from build123d import *  # type: ignore
 import math
-from model import method_cache, TextArgs, ShapeType, BoundaryType
+from model import (
+    method_cache,
+    TextArgs,
+    ShapeType,
+    BoundaryType,
+    PinModel,
+    LabelModel,
+    FootprintModel,
+    NetModel,
+    Wiring,
+    DiagramStyle,
+)
 from pathlib import Path
 from provider import (
     Provider,
@@ -19,8 +30,10 @@ from provider import (
     URDFJointType,
     URDFMotorType,
     LinkType,
+    WiringDiagram,
 )
 from projects_config import CatFountainConfig
+from . import layouts
 from typing import cast, Callable, Sequence, Any, Optional
 
 
@@ -67,7 +80,10 @@ class CatFountainProvider(Provider):
     @property
     def diagram(self) -> dict[str, Callable[[Room, Sequence[str], ProviderMode], None]]:
         """Map diagram names to their build handler methods."""
-        return {name: self.build_diagram for name in self.targets.supporting(Section.DIAGRAM)}
+        return {
+            name: (self.build_wiring_diagram if "wiring" in name else self.build_diagram)
+            for name in self.targets.supporting(Section.DIAGRAM)
+        }
 
     @property
     def view(self) -> dict[str, Callable[[Room, ProviderMode], None]]:
@@ -95,6 +111,11 @@ class CatFountainProvider(Provider):
         with BuildPart() as bowl:
             # Outer bowl body
             Cylinder(radius=r, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+            # Create the global outer cylinder for trimming standoffs (recessed by 0.3mm to prevent protrusions)
+            outer_cylinder = Cylinder(
+                radius=r - 0.3, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.PRIVATE
+            )
 
             # Subtract inner water reservoir (enclosed storage tank area above floor_z)
             # Make a step at the top rim of the bowl inner wall for the lid seat
@@ -233,12 +254,16 @@ class CatFountainProvider(Provider):
                 Cylinder(radius=15.0, height=20.0, align=(Align.CENTER, Align.CENTER, Align.MAX))
                 # Pocket for the motor body
                 Box(13.0, 11.0, 20.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                # Two horizontal M4 jack screw holes on either side of the motor boss (halfway down the pocket)
+                with Locations((0, 0, -10.0)):
+                    with Locations(Rot(0, 90, 0)):
+                        Cylinder(radius=1.75, height=32.0, mode=Mode.SUBTRACT)
 
-            # Blind screw holes for mounting the DC motor bracket to the pocket ceiling (M2 screws, spacing 17 mm)
+            # Blind screw holes for mounting the DC motor bracket to the bottom face of the boss (M2 screws, spacing 17 mm)
             for x_offset in [-self.settings.motor_spacing_x / 2.0, self.settings.motor_spacing_x / 2.0]:
-                with Locations((x_offset, tube_y, floor_z - t)):
+                with Locations((x_offset, tube_y, floor_z - t - 20.0)):
                     Cylinder(
-                        radius=hole_r, height=2.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                        radius=hole_r, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                     )
 
             # Helper to create cylindrical standoff posts with blind holes
@@ -273,7 +298,7 @@ class CatFountainProvider(Provider):
                 label: str,
             ):
                 dxs = [-spacing_x / 2.0, spacing_x / 2.0]
-                dys = [-spacing_y / 2.0, spacing_y / 2.0] if spacing_y is not None else [0.0]
+                dys = [-spacing_y / 2.0, spacing_y / 2.0] if spacing_y else [0.0]
 
                 locs = []
                 for dx in dxs:
@@ -356,8 +381,18 @@ class CatFountainProvider(Provider):
                 add_pcb_mount(cx, cy, sx, sy, sh, lbl)
 
             # Charging port hole in the outer wall of the dry compartment (back side, y = -r)
-            with Locations((0, -r + t / 2.0, floor_z - t - 5.0)):
-                Box(12.0, 10.0, 6.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
+            # Centered on the USB port, which is located on the underside of the PCB
+            usb_z = floor_z - t - self.settings.charger_standoff_height - 3.2
+            with Locations((0, -r + t / 2.0, usb_z)):
+                with BuildPart(mode=Mode.PRIVATE) as port_cutout:
+                    Box(
+                        self.settings.charger_port_width,
+                        10.0,
+                        self.settings.charger_port_height,
+                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                    )
+                    fillet(port_cutout.edges().filter_by(Axis.Y), radius=2.0)
+                add(port_cutout, mode=Mode.SUBTRACT)
 
             # Radial ventilation slits in the back wall around the charging port
             for angle in [252, 261, 279, 288]:
@@ -404,21 +439,62 @@ class CatFountainProvider(Provider):
                                 mode=Mode.SUBTRACT,
                             )
 
-                        # Flat mounting standoff posts on the INSIDE (dry compartment side) of the bowl wall
-                        locs = []
-                        for dy in [-tof_spacing_x / 2.0, tof_spacing_x / 2.0]:
-                            for dz in [-tof_spacing_y / 2.0, tof_spacing_y / 2.0]:
-                                locs.append(Location((-4.0, dy, dz), (0, 90, 0)))
+                        # Flat mounting standoff posts on the INSIDE of the bowl wall
+                        # Build in a private block in local coordinates
+                        with BuildPart(mode=Mode.PRIVATE) as standoffs_part:
+                            # Bottom standoffs (dz = -tof_spacing_y / 2.0)
+                            locs_bottom = []
+                            for dy in [-tof_spacing_x / 2.0, tof_spacing_x / 2.0]:
+                                dz = -tof_spacing_y / 2.0
+                                locs_bottom.append(Location((-4.0, dy, dz), (0, 90, 0)))
 
-                        add_standoffs(
-                            locations=locs,
-                            boss_radius=boss_r,
-                            standoff_height=tof_standoff,
-                            hole_radius=hole_r,
-                            hole_depth=7.0,
-                            boss_align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                            hole_align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                        )
+                            add_standoffs(
+                                locations=locs_bottom,
+                                boss_radius=boss_r,
+                                standoff_height=tof_standoff,
+                                hole_radius=hole_r,
+                                hole_depth=7.0,
+                                boss_align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                hole_align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            )
+
+                            # Top standoffs (dz = tof_spacing_y / 2.0) extended to merge with the wall
+                            locs_top = []
+                            for dy in [-tof_spacing_x / 2.0, tof_spacing_x / 2.0]:
+                                dz = tof_spacing_y / 2.0
+                                locs_top.append(Location((-4.0, dy, dz), (0, 90, 0)) * Location((0, 0, 5.0)))
+
+                            add_standoffs(
+                                locations=locs_top,
+                                boss_radius=boss_r,
+                                standoff_height=14.0,  # 4.0 original + 10.0 extension towards wall
+                                hole_radius=hole_r,
+                                hole_depth=7.0,
+                                boss_align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                hole_align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                hole_z_offset=-5.0,  # Shift hole back to original centering
+                            )
+
+                        # Transform local standoffs to global coordinates using active locations
+                        from build123d import LocationList
+
+                        combined_loc = Location()
+                        ctx = LocationList._get_context()
+                        if ctx is not None:
+                            for loc_list in ctx.locations:
+                                combined_loc = combined_loc * loc_list
+
+                        if standoffs_part.part is not None:
+                            global_standoffs = combined_loc * standoffs_part.part
+
+                            # Trim any protrusions extending past the outer cylinder
+                            trimmed_standoffs = global_standoffs.intersect(outer_cylinder)
+
+                            # Add trimmed standoffs directly to the bowl part (bypassing locations list)
+                            if bowl.part is not None:
+                                merged_shape = bowl.part + trimmed_standoffs
+                                # Ensure final returned shape is a Part object, wrapping the internal Solid
+                                bowl.part = Part(children=merged_shape.solids(), label=target)
 
             with URDFMetadata(
                 label=target,
@@ -688,7 +764,7 @@ class CatFountainProvider(Provider):
             with Locations((0, tube_y, 0)):
                 with Locations((0, 0, 6.0)):
                     socket_r = self.settings.tube_radius + self.settings.tube_lid_clearance
-                    dome_out_r = socket_r + 1.0
+                    dome_out_r = socket_r + 1.5
                     dome_in_r = (
                         self.settings.tube_radius - self.settings.tube_thickness + self.settings.tube_lid_clearance
                     )
@@ -726,7 +802,7 @@ class CatFountainProvider(Provider):
                 with Locations((0, 0, -1.5)):
                     Cylinder(radius=17.0, height=1.3, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
                 with Locations((0, 0, -0.2)):
-                    Cylinder(radius=15.6, height=2.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                    Cylinder(radius=15.6, height=3.2, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
                     for x_offset in [-15.5, 15.5]:
                         with Locations((x_offset, 0, 0)):
                             Box(5.0, 12.0, 10.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
@@ -837,20 +913,21 @@ class CatFountainProvider(Provider):
 
             Cylinder(radius=16.9, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.INTERSECT)
 
-            Cylinder(radius=4.0, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+            # Generate 7-hole hexagonal grid of holes
+            hex_spacing = 8.7
+            hex_width = 5.2
+            with BuildSketch() as hole_sketch:
+                hole_locations = []
+                for i in range(-2, 3):
+                    for j in range(-2, 3):
+                        x = (i + j * 0.5) * hex_spacing
+                        y = j * (math.sqrt(3) / 2) * hex_spacing
+                        if math.sqrt(x * x + y * y) <= 9.0:
+                            hole_locations.append((x, y))
+                with Locations(hole_locations):
+                    RegularPolygon(radius=hex_width / 2.0, side_count=6, major_radius=False)
 
-            Box(15.0, 2.5, cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-
-            for i in range(6):
-                angle = i * (360.0 / 6)
-                with Locations(Rot(0, 0, angle)):
-                    with Locations((10.5, 0, -1.0)):
-                        Cylinder(
-                            radius=1.2,
-                            height=cover_h + 2.0,
-                            align=(Align.CENTER, Align.CENTER, Align.MIN),
-                            mode=Mode.SUBTRACT,
-                        )
+            extrude(hole_sketch.sketch, amount=cover_h + 10.0, both=True, mode=Mode.SUBTRACT)
 
             URDFMetadata(
                 label=target,
@@ -1111,82 +1188,33 @@ class CatFountainProvider(Provider):
                     fillet(pcb.edges().filter_by(Axis.Z), radius=1.5)
                 return cast(Part, pcb.part)
 
-            floor_z = 32.0
-            t = self.settings.bowl_thickness
-
-            # Standard PCBs configuration: (name, center_x, center_y, spacing_x, spacing_y, standoff_height)
-            pcb_configs = [
-                (
-                    "fuel_gauge",
-                    50.0,
-                    -45.0,
-                    self.settings.fuel_gauge_spacing_x,
-                    self.settings.fuel_gauge_spacing_y,
-                    self.settings.fuel_gauge_standoff_height,
-                ),
-                (
-                    "pico",
-                    -50.0,
-                    0.0,
-                    self.settings.pico_spacing_x,
-                    self.settings.pico_spacing_y,
-                    self.settings.pico_standoff_height,
-                ),
-                (
-                    "charger",
-                    0.0,
-                    -79.0,
-                    self.settings.charger_spacing_x,
-                    self.settings.charger_spacing_y,
-                    self.settings.charger_standoff_height,
-                ),
-                (
-                    "neodriver",
-                    0.0,
-                    40.0,
-                    self.settings.neodriver_spacing_x,
-                    self.settings.neodriver_spacing_y,
-                    self.settings.neodriver_standoff_height,
-                ),
-                (
-                    "current_monitor",
-                    50.0,
-                    -15.0,
-                    self.settings.current_monitor_spacing_x,
-                    self.settings.current_monitor_spacing_y,
-                    self.settings.current_monitor_standoff_height,
-                ),
-                (
-                    "motor_driver",
-                    50.0,
-                    15.0,
-                    self.settings.motor_driver_spacing_x,
-                    self.settings.motor_driver_spacing_y,
-                    self.settings.motor_driver_standoff_height,
-                ),
-            ]
-
-            for name, cx, cy, sx, sy, sh in pcb_configs:
-                pcb = make_pcb(sx + 4.0, sy + 4.0)
-                pcb.location = Location((cx, cy, floor_z - t - sh - 1.0))
-                room.add(f"{name}_pcb", pcb, color="green", alpha=0.6)
-
-            # Proximity Sensor PCBs: 2.0mm thick, 25.0mm local Y, 17.0mm local Z. Centered at local X = -16.3 relative to joint
             def make_sensor_pcb() -> Part:
                 with BuildPart() as pcb:
                     Box(2.0, 25.0, 17.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
                     fillet(pcb.edges().filter_by(Axis.X), radius=1.5)
                 return cast(Part, pcb.part)
 
-            for name, joint_name in [
-                ("sensor_pcb_east", "sensor_port_east"),
-                ("sensor_pcb_north", "sensor_port_north"),
-                ("sensor_pcb_west", "sensor_port_west"),
-            ]:
-                s_pcb = make_sensor_pcb()
-                joint_loc = bowl_part.joints[joint_name].location
-                s_pcb.location = joint_loc * Location((-18.3, 0, 0))
-                room.add(name, s_pcb, color="green", alpha=0.6)
+            floor_z = 32.0
+            t = self.settings.bowl_thickness
+
+            # Load component footprints using Wiring class directly
+            yaml_path = Path(__file__).parent / "wiring.yaml"
+            wiring = Wiring(yaml_path, bowl_part)
+            pcb_footprints = wiring.footprints
+            for fp in pcb_footprints:
+                if fp.name in ("motor", "led"):
+                    continue
+                w, l, thickness = fp.dimensions
+                if fp.package == "tof_sensor":
+                    joint_name = fp.name.replace("sensor_", "sensor_port_")
+                    joint_loc = bowl_part.joints[joint_name].location
+                    s_pcb = make_sensor_pcb()
+                    s_pcb.location = joint_loc * Location((-18.3, 0, 0))
+                    room.add(f"sensor_pcb_{fp.name.split('_')[-1]}", s_pcb, color="green", alpha=0.6)
+                else:
+                    pcb = make_pcb(w, l, thickness)
+                    pcb.location = Location(fp.position, fp.rotation)
+                    room.add(f"{fp.name}_pcb", pcb, color="green", alpha=0.6)
 
         self.room = room
 
@@ -1195,3 +1223,34 @@ class CatFountainProvider(Provider):
         from .simulate_hooks import get_simulate_hooks_impl as impl
 
         return impl(self, sim_name)
+
+    def build_wiring_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
+        """Build a 2D colored wiring diagram for the cat water fountain."""
+        import math
+
+        self.settings.diagram_options.style = DiagramStyle.COLOR
+        self.settings.diagram_options.view_from = "top"
+
+        r = self.settings.bowl_radius
+        t = self.settings.bowl_thickness
+
+        # Draw the bowl outline in grey
+        with BuildSketch() as bowl_outline:
+            Circle(radius=r)
+            Circle(radius=r - t, mode=Mode.SUBTRACT)
+        room.add("bowl_outline", bowl_outline.sketch, color="grey")
+
+        # Draw the motor compartment outline in grey
+        with BuildSketch() as motor_comp:
+            Circle(radius=15.0)
+            Circle(radius=14.0, mode=Mode.SUBTRACT)
+        room.add("motor_compartment", motor_comp.sketch, color="grey")
+
+        # Get bowl part to query joints and load/resolve Wiring
+        bowl_part = self.build_bowl("bowl").part
+        yaml_path = Path(__file__).parent / "wiring.yaml"
+        wiring = Wiring(yaml_path, bowl_part)
+
+        # Build the diagram using the diagram class
+        diagram = WiringDiagram(wiring)
+        diagram.build(room)

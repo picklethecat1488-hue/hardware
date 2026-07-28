@@ -4,7 +4,7 @@ from typing import Any, Optional, Union, cast
 from functools import cached_property
 from pathlib import Path
 from pydantic import BaseModel, Field
-from model import load_measurements, DiagramOptions
+from model import load_measurements, DiagramOptions, DiagramStyle
 
 
 class CatFountainConfig(BaseModel):
@@ -16,13 +16,18 @@ class CatFountainConfig(BaseModel):
     )
 
     diagram_options: DiagramOptions = Field(
-        default_factory=lambda: DiagramOptions(line_weight=1, view_from="iso", show_hidden=True),
+        default_factory=lambda: DiagramOptions(line_weight=1, view_from="iso", style=DiagramStyle.HIDDEN),
         description="Diagram export options",
     )
 
     material: str = Field(
         default="petg",
         description="The material name to use for the cat fountain parts (e.g. petg, pla, abs).",
+    )
+
+    target_volume: float = Field(
+        default=0.00020,
+        description="Target total fluid volume to spawn (m^3).",
     )
 
     # =========================================================================
@@ -372,6 +377,16 @@ class CatFountainConfig(BaseModel):
     def charger_standoff_height(self) -> float:
         """Return standoff height for Charger."""
         return float(self._raw_data.get("charger_standoff_height", 2.0))
+
+    @cached_property
+    def charger_port_width(self) -> float:
+        """Return charger port cutout width."""
+        return float(self._raw_data.get("charger_port_width", 16.0))
+
+    @cached_property
+    def charger_port_height(self) -> float:
+        """Return charger port cutout height."""
+        return float(self._raw_data.get("charger_port_height", 9.0))
 
     # NeoDriver
     @cached_property

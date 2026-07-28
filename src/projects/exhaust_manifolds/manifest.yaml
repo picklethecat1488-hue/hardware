@@ -4,8 +4,6 @@ driver:
     right: green
   config:
     modes: [mount, text]
-  diagram:
-    modes: [default]
   part:
     modes: [default, print]
     subassemblies: [left, right]
@@ -15,11 +13,12 @@ passenger:
     right: magenta
   config:
     modes: [mount, text]
-  diagram:
-    modes: [default]
   part:
     modes: [default, print]
     subassemblies: [left, right]
+product:
+  diagram:
+    modes: [default]
 part_positions:
   view:
     modes: [default]

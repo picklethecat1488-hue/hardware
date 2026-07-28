@@ -29,7 +29,6 @@ class TestExhaustManifoldsProvider:
                     "modes": [Mode.DEFAULT, Mode.PRINT],
                     "subassemblies": ["left", "right"],
                 },
-                Section.DIAGRAM: {"modes": [Mode.DEFAULT]},
             },
             "passenger": {
                 Section.CONFIG: {MODES: ["mount", "text"]},
@@ -37,6 +36,8 @@ class TestExhaustManifoldsProvider:
                     "modes": [Mode.DEFAULT, Mode.PRINT],
                     "subassemblies": ["left", "right"],
                 },
+            },
+            "product": {
                 Section.DIAGRAM: {"modes": [Mode.DEFAULT]},
             },
             "part_positions": {Section.VIEW: {"modes": [Mode.DEFAULT]}},
@@ -71,8 +72,7 @@ class TestExhaustManifoldsProvider:
         # Build registries are singular and target-aware
         assert "driver" in provider.part
         assert "passenger" in provider.part
-        assert "driver" in provider.diagram
-        assert "passenger" in provider.diagram
+        assert "product" in provider.diagram
 
         # Config modes (dynamic string keys)
         assert "mount" in provider.config
@@ -118,7 +118,7 @@ class TestExhaustManifoldsProvider:
             mock.assert_called_once()
             # Verify orchestrator passed the right arguments to the handler
             args, _ = mock.call_args
-            assert args[1] == ("driver", "passenger")
+            assert args[1] == ("product",)
 
     def test_run_config_execution(self, provider):
         """Verify executing a CONFIG action returns None."""

@@ -295,7 +295,7 @@ class TestViewer:
             mock_show.assert_called_once()
             assy = mock_show.call_args[0][0]
             names = [c.label for c in assy.children]
-            assert names == ["mock_builders_part", "mock_builders_sketch", "mock_builders_line"]
+            assert names == ["mock_builders_line", "mock_builders_part", "mock_builders_sketch"]
 
     def test_show_view_unsupported_action(self, viewer):
         """Verify error when target supports no visual actions."""
