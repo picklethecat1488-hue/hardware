@@ -177,10 +177,8 @@ class TestProviderMetadata:
 
     def test_provider_default_manifest_path(self, monkeypatch):
         """Verify that Provider.manifest defaults to loading a YAML file."""
-        import provider.provider
-
         mock_load = MagicMock(return_value={"test": "data"})
-        monkeypatch.setattr(provider.provider, "load_manifest", mock_load)
+        monkeypatch.setitem(Provider.manifest.fget.__globals__, "load_manifest", mock_load)
         # Mock os.path.exists to return True so the provider attempts to load the manifest
         monkeypatch.setattr(os.path, "exists", lambda x: True)
 

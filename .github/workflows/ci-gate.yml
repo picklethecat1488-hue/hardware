@@ -57,3 +57,11 @@ jobs:
         run: |
           set -o pipefail
           python src/smoke.py
+
+      - name: Upload Daemon Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daemon-logs-ci
+          path: build/daemon.log
+          if-no-files-found: ignore

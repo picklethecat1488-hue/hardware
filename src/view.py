@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import time
 import pybullet as p
+from daemon import DaemonClient
 from model import AppConfig
 from pathlib import Path
 from typing import Sequence, Optional, List, Any, cast, Iterable
@@ -20,6 +21,8 @@ from shell import Logger
 from ocp_vscode import set_port, Collapse, Camera, show as ocp_show  # type: ignore
 from build import Builder
 from list import Lister
+
+SPINNER_TEXT = "Visualizing..."
 
 
 def show(*args, **kwargs):
@@ -272,4 +275,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    DaemonClient().run("view", sys.argv[1:])

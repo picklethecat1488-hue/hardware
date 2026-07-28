@@ -5,8 +5,10 @@ import io
 import hashlib
 import yaml
 import os
+import sys
 from typing import cast
 from pathlib import Path
+from daemon import DaemonClient
 from model import AppConfig
 from build123d import *  # type: ignore
 from build123d import export_stl, export_brep, Shape  # type: ignore
@@ -19,6 +21,8 @@ from shell import Logger
 from concurrent.futures import ThreadPoolExecutor
 import threading
 from list import Lister
+
+SPINNER_TEXT = "Building..."
 
 
 class Builder:
@@ -87,10 +91,36 @@ class Builder:
             return hashlib.sha1(brep_stream.getvalue()).hexdigest()
 
     def _get_diagram_hash(self, room: Room, options: Any) -> str:
-        """Calculate a hash for the diagram based on its SVG output."""
-        with io.BytesIO() as svg_stream:
-            room.export_diagram(svg_stream, options)
-            return hashlib.sha1(svg_stream.getvalue()).hexdigest()
+        """Calculate a hash for the diagram based on its room contents and options."""
+        hasher = hashlib.sha1()
+
+        # 1. Hash the geometry using BREP representation
+        try:
+            with io.BytesIO() as brep_stream:
+                export_brep(room.compound, brep_stream)
+                hasher.update(brep_stream.getvalue())
+        except Exception:
+            # Fallback to key/item count representation if export_brep fails
+            hasher.update(str(sorted(room.keys())).encode("utf-8"))
+
+        # 2. Hash the labels
+        sorted_labels = sorted(getattr(room, "_labels", []), key=lambda x: x[0])
+        labels_str = str(
+            [
+                (name, text, (loc.X, loc.Y, loc.Z) if hasattr(loc, "X") else tuple(loc), repr(opts))
+                for name, text, loc, opts in sorted_labels
+            ]
+        )
+        hasher.update(labels_str.encode("utf-8"))
+
+        # 3. Hash options representation
+        if options:
+            opts_dict = (
+                options.model_dump(mode="json") if hasattr(options, "model_dump") else getattr(options, "__dict__", {})
+            )
+            hasher.update(str(sorted(opts_dict.items())).encode("utf-8"))
+
+        return hasher.hexdigest()
 
     def _get_urdf_hash(self, room: Room, p_name: str) -> str:
         """Calculate a hash for the URDF output."""
@@ -518,6 +548,4 @@ def main(logger, args):
 
 if __name__ == "__main__":
     """Program entry point."""
-    logger = Logger()
-    args = get_args()
-    main(logger, args)
+    DaemonClient().run("build", sys.argv[1:])

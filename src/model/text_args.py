@@ -24,6 +24,6 @@ class TextArgs(BaseModel):
         default=(Align.CENTER, Align.CENTER), description="Horizontal and vertical alignment"
     )
     font_style: Annotated[FontStyle, BeforeValidator(_coerce_to_int)] = Field(
-        default=FontStyle.BOLD, description="Font style (Regular, Bold, Italic)"
+        default=FontStyle.REGULAR, description="Font style (Regular, Bold, Italic)"
     )
     height: float = Field(default=3, description="Extrusion height of the text")
