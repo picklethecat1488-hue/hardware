@@ -548,7 +548,7 @@ class DaemonClient:
                 text = "Building..."
                 try:
                     module = importlib.import_module(tool_name)
-                    text = getattr(module, "SPINNER_TEXT", "Building...")
+                    text = getattr(module, "SPINNER_TEXT", text)
                 except Exception:
                     pass
                 client_logger = Logger(text=text, enabled=True)
