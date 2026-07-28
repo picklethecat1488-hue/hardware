@@ -60,6 +60,14 @@ jobs:
             pytest_report.txt
             smoke_report.txt
 
+      - name: Upload Daemon Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daemon-logs-test
+          path: build/daemon.log
+          if-no-files-found: ignore
+
   build:
     name: Build Hardware
     needs: test
@@ -93,3 +101,11 @@ jobs:
           name: nightly-build
           path: build/
           include-hidden-files: true
+
+      - name: Upload Daemon Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daemon-logs-build
+          path: build/daemon.log
+          if-no-files-found: ignore
