@@ -400,14 +400,14 @@ class WiringDiagram:
         # Get bounding box of all elements in the room to dynamically define the search limits
         bb = room.compound.bounding_box()
         # The enclosing boundary radius is the maximum extent of the bounding box
-        max_r = max(abs(bb.min.X), abs(bb.max.X), abs(bb.min.Y), abs(bb.max.Y)) + 15.0
+        max_r = round(max(abs(bb.min.X), abs(bb.max.X), abs(bb.min.Y), abs(bb.max.Y)) + 15.0, 2)
 
         # Add padding to search area bounds to allow wires to route outside components comfortably
         pad = 8.0
-        min_x = bb.min.X - pad
-        max_x = bb.max.X + pad
-        min_y = bb.min.Y - pad
-        max_y = bb.max.Y + pad
+        min_x = round(bb.min.X - pad, 2)
+        max_x = round(bb.max.X + pad, 2)
+        min_y = round(bb.min.Y - pad, 2)
+        max_y = round(bb.max.Y + pad, 2)
         grid_step = 2.0
 
         bounds = (min_x, max_x, min_y, max_y, max_r)
