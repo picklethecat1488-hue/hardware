@@ -58,6 +58,10 @@ def smart_fillet(pts: list[Vector], default_radius: float) -> Any:
                         v for v in bl.vertices() if any((v.center() - c).length < 1e-3 for c in corners)
                     ]
                     if vertices_to_fillet:
+                        # Sort vertices by coordinate values to ensure deterministic fillet order in OpenCASCADE
+                        vertices_to_fillet.sort(
+                            key=lambda v: (round(v.center().X, 6), round(v.center().Y, 6), round(v.center().Z, 6))
+                        )
                         fillet(vertices_to_fillet, radius=r)
                     return bl.line
             except Exception:
@@ -102,16 +106,13 @@ class WiringDiagram:
 
         # Helper to convert physical coordinate to grid index
         def to_grid(x: float, y: float) -> tuple[int, int]:
-            return int(round((x - min_x) / grid_step)), int(round((y - min_y) / grid_step))
+            return int(round(x / grid_step)), int(round(y / grid_step))
 
         def to_phys(gx: int, gy: int) -> tuple[float, float]:
-            return min_x + gx * grid_step, min_y + gy * grid_step
+            return gx * grid_step, gy * grid_step
 
         start_g = to_grid(start_pt.X, start_pt.Y)
         end_g = to_grid(end_pt.X, end_pt.Y)
-
-        max_gx = int((max_x - min_x) / grid_step)
-        max_gy = int((max_y - min_y) / grid_step)
 
         # Identify start/end component footprint bounding boxes (where owner is None)
         start_obs = None
@@ -149,10 +150,10 @@ class WiringDiagram:
             for dx, dy in dirs:
                 ngx, ngy = gx + dx, gy + dy
 
-                if not (0 <= ngx <= max_gx and 0 <= ngy <= max_gy):
+                px, py = to_phys(ngx, ngy)
+                if not (min_x <= px <= max_x and min_y <= py <= max_y):
                     continue
 
-                px, py = to_phys(ngx, ngy)
                 if px * px + py * py > max_r * max_r:
                     continue
 
@@ -412,7 +413,7 @@ class WiringDiagram:
         bounds = (min_x, max_x, min_y, max_y, max_r)
 
         def to_grid(x: float, y: float) -> tuple[int, int]:
-            return int(round((x - min_x) / grid_step)), int(round((y - min_y) / grid_step))
+            return int(round(x / grid_step)), int(round(y / grid_step))
 
         # Sort nets to route those with the most connections first
         sorted_nets = sorted(self.wiring.nets, key=lambda n: len(n.pins), reverse=True)
