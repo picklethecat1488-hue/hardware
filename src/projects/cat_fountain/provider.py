@@ -259,11 +259,11 @@ class CatFountainProvider(Provider):
                     with Locations(Rot(0, 90, 0)):
                         Cylinder(radius=1.75, height=32.0, mode=Mode.SUBTRACT)
 
-            # Blind screw holes for mounting the DC motor bracket to the pocket ceiling (M2 screws, spacing 17 mm)
+            # Blind screw holes for mounting the DC motor bracket to the bottom face of the boss (M2 screws, spacing 17 mm)
             for x_offset in [-self.settings.motor_spacing_x / 2.0, self.settings.motor_spacing_x / 2.0]:
-                with Locations((x_offset, tube_y, floor_z - t)):
+                with Locations((x_offset, tube_y, floor_z - t - 20.0)):
                     Cylinder(
-                        radius=hole_r, height=2.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                        radius=hole_r, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                     )
 
             # Helper to create cylindrical standoff posts with blind holes

@@ -171,6 +171,20 @@ class Builder:
 
         return True
 
+    def _export_stl_cleaned(
+        self,
+        shape: Shape,
+        file_path: str,
+        tolerance: float = 0.001,
+        angular_tolerance: float = 0.03,
+    ) -> bool:
+        """Clean cached OpenCASCADE mesh and export to STL with high resolution settings."""
+        from OCP.BRepTools import BRepTools
+
+        if shape.wrapped is not None:
+            BRepTools.Clean_s(shape.wrapped)
+        return export_stl(shape, file_path, tolerance=tolerance, angular_tolerance=angular_tolerance)
+
     def _export_if_changed(
         self,
         path: Path,
@@ -264,7 +278,7 @@ class Builder:
                                     path_obj,
                                     mesh_file_name,
                                     current_hash,
-                                    lambda g=geom.part, ps=path_str: export_stl(g, ps),
+                                    lambda g=geom.part, ps=path_str: self._export_stl_cleaned(g, ps),
                                     force_update,
                                 )
                             )
