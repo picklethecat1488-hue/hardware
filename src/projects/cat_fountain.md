@@ -36,8 +36,8 @@ python src/view.py cat_fountain/product:view/simulate -s 1000
 graph TD
     %% Power Subsystem
     USBC["USB-C Charger Port"] -->|5V Power In| BQ["BQ25185 Charger & Boost"]
-    BAT[("18650 Li-ion Battery")] <-->|Analog Cell Connection| BQ
-    BAT <-->|Analog Cell Connection| MAX["MAX17048 Fuel Gauge"]
+    BAT[("18650 Li-ion Battery")] <-->|Analog Cell Connection| MAX["MAX17048 Fuel Gauge"]
+    MAX -->|Jumpered Cell Connection| BQ
     
     %% Power Distribution
     BQ -->|5V System Power| PICO["Raspberry Pi Pico W"]
@@ -62,8 +62,6 @@ graph TD
     TOF3 -->|GP7: INT| PICO
     MAX -->|GP10: ALRT| PICO
     PICO -->|GP14, GP15: PWM| DRV
-    BQ -->|S1: GP12| PICO
-    BQ -->|S2: GP13| PICO
     
     %% Output Connections
     DRV -->|Driven Power| MOTOR["N20 Gear Motor"]
@@ -83,8 +81,8 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 | **Microcontroller Board** | **Raspberry Pi Pico W** | Main controller running MicroPython/C++. Controls the I2C bus, reads sensors, and drives motor speed. | *Host Controller* | Dual ARM Cortex-M0+, built-in Wi-Fi/Bluetooth, two hardware I2C buses (I2C0, I2C1). |
 | **IR Proximity Sensors (Qty: 3)** | **Adafruit VL53L0X Time-of-Flight (ToF)** | Long-range laser distance sensor used for cat proximity detection in North, East, and West directions. | `0x29` (default)<br>*Re-addressed to `0x30`, `0x31`, `0x32` at boot* | Measures precise distances up to 2m, unaffected by ambient light. Uses shutdown pin (XSHUT) for startup addressing. |
 | **RGB LED Indicator** | **Adafruit NeoPixel Driver (ATtiny816)** | High-brightness status LED to indicate battery capacity and device state over I2C. | `0x60` | Interfaces standard WS2812B/NeoPixels to an I2C bus via a pre-programmed ATtiny microcontroller. |
-| **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | *N/A (Standalone)* | Standalone linear charger. Uses jumpers/resistors to configure chemistry/current. S1 (FAULT) & S2 (CHG) pads provide digital status to GP12/GP13. |
-| **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Uses ModelGauge algorithm for accurate state of charge without battery calibration. Includes configurable alert interrupt (ALRT) pin connected to GP10. |
+| **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | *N/A (Standalone)* | Standalone linear charger. Uses jumpers/resistors to configure chemistry/current. S1 (FAULT) & S2 (CHG) are left disconnected. |
+| **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Primary interface to access battery and charging status. The 18650 battery connects directly to this board, which is then jumpered to the charger. Includes configurable alert interrupt (ALRT) pin connected to GP10. |
 | **Battery** | **Standard 18650 3.7V Li-ion Cell** | Main energy source (e.g. Samsung 30Q or Panasonic NCR18650B, 3000+ mAh). | *N/A (Analog)* | Rechargeable lithium-ion cell to fit the internal battery storage area. |
 | **DC Motor Driver** | **L9110S Dual-Channel H-Bridge** | Low-voltage motor driver to drive and speed-regulate the N20 gear motor. | *N/A (Driven by GPIO PWM)* | Dual H-bridge, support for 2.5V-12V motors, up to 800mA continuous. Controlled via GP14 and GP15. |
 | **DC Motor** | **N20 Micro Metal Gear Motor (3V - 6V)** | High-torque micro geared DC motor to drive the Archimedes screw shaft. | *N/A (Driven by L9110S)* | Operates at 3-6V (e.g. 50:1 or 100:1 ratio). Fits inside the dry motor compartment and mounts to the ceiling socket. |
@@ -108,14 +106,16 @@ To build the cat fountain with I2C communication across key monitoring subsystem
    * The Pico W can passively monitor the internal ambient temperature of the electronics compartment using the RP2040's built-in internal temperature sensor (on ADC channel 4). If the temperature exceeds 45°C, the Pico W should enter a low-power sleep mode and cut power to the motor driver.
 6. **Fuel Gauge Alert Interrupt**:
    * The active-low `ALRT` (Alert) pin of the MAX17048 fuel gauge is wired to Pico GPIO `GP10`. The firmware configures this pin with an internal pull-up and attaches an interrupt service routine (ISR). This enables the MAX17048 to asynchronously wake the microcontroller or trigger an interrupt on low-battery (e.g. State of Charge falls below 10%) or battery voltage alerts, rather than requiring the Pico W to constantly wake up to poll the fuel gauge, optimizing overall system power efficiency.
-7. **Charger Status Monitoring**:
-   * The status outputs S1 (FAULT/STAT1) and S2 (CHG/STAT2) are connected to Pico GPIOs GP12 and GP13 (configured as inputs with internal pull-ups).
-   * The Pico W can decode the charging state using the following logic:
-     - S1 = HIGH, S2 = LOW: Normal charging in progress.
-     - S1 = HIGH, S2 = HIGH: Charging completed, standby, or input power disconnected.
-     - S1 = LOW, S2 = HIGH: Recoverable fault (e.g. over-temperature).
-     - S1 = LOW, S2 = LOW: Non-recoverable fault (e.g. 6-hour safety timer expired).
-   * If a non-recoverable fault is detected (both S1 and S2 LOW), the user must cycle the input power (VIN) to reset the BQ25185's safety timer, as the hard-wired /CE pin cannot be toggled by the microcontroller.
+7. **Battery and Charger Status Monitoring**:
+   * S1 and S2 status connections from the BQ25185 charger to the Pico W are removed.
+   * Instead, the MAX17048 fuel gauge serves as the primary interface to access battery and charging status.
+   * The Pico W queries the MAX17048 over I2C to obtain battery state of charge (SoC) and cell voltage (VCELL). A rising voltage/SoC trend indicates charging is occurring, while a falling trend indicates discharging.
+   * The battery connects directly to the MAX17048, which is then jumpered to the BQ25185 charger to allow charging and system power pathing.
+8. **Battery-to-System Power Path (VSYS)**:
+   * **Battery Input**: The 18650 Li-ion battery connects directly to the **JST input** port on the MAX17048 Fuel Gauge.
+   * **Power Jump**: A JST-to-JST jumper cable (or equivalent wiring) connects the **JST output/parallel pads** of the MAX17048 fuel gauge to the **JST input** port on the BQ25185 charger.
+   * **System Power (VSYS)**: The BQ25185 charger boosts/routes the power to its system power rail. A wire runs from the **5V SYS output terminal block** on the BQ25185 charger to the **VSYS input pin (pin 39)** on the Raspberry Pi Pico W.
+
 
 ### 3D-Printed Parts & Materials
 
