@@ -372,7 +372,6 @@ nets:
       - [sensor_north, VCC]
       - [led, VCC]
       - [neodriver, VCC]
-      - [current_monitor, VCC]
       - [sensor_east, VCC]
 
   - name: vcc_bat
@@ -391,6 +390,12 @@ nets:
     color: red
     pins:
       - [charger, SYS]
+      - [current_monitor, VIN+]
+
+  - name: cm_jumper
+    color: red
+    pins:
+      - [current_monitor, VCC]
       - [current_monitor, VIN+]
 
   - name: vcc_sys_md
