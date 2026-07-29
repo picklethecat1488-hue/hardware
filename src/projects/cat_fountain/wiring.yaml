@@ -79,11 +79,11 @@ components:
         side: right
         slot: 13
       - name: "GP12"
-        label: "16 (CTRL_S1)"
+        label: "16"
         side: right
         slot: 15
       - name: "GP13"
-        label: "17 (CTRL_S2)"
+        label: "17"
         side: right
         slot: 16
       - name: "GP14"
@@ -486,18 +486,6 @@ nets:
     pins:
       - [pico, GP10]
       - [fuel_gauge, ALRT]
-
-  - name: ctrl_s1
-    color: cyan
-    pins:
-      - [pico, GP12]
-      - [charger, S1]
-
-  - name: ctrl_s2
-    color: magenta
-    pins:
-      - [pico, GP13]
-      - [charger, S2]
 
   - name: ctrl_ia
     color: cyan
