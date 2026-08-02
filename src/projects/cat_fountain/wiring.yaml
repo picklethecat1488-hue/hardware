@@ -1,5 +1,22 @@
 # Declarative 3D Component Layout & Netlist Configuration
 components:
+  - name: battery
+    package: board
+    position: [0.0, -110.0, 23.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [35.0, 50.0, 8.0]
+    label:
+      text: "LiPo Battery"
+      position: [0.0, -28.0, 0.0]
+      align: [center, max]
+    pins:
+      - name: "+"
+        label: "+"
+        side: right
+      - name: "-"
+        label: "-"
+        side: right
+
   - name: charger
     package: board
     position: [0.0, -79.0, 23.0]
@@ -368,6 +385,7 @@ nets:
   - name: gnd
     color: black
     pins:
+      - [battery, "-"]
       - [charger, GND]
       - [charger, BAT-]
       - [fuel_gauge, GND]
@@ -394,6 +412,7 @@ nets:
   - name: vcc_bat
     color: red
     pins:
+      - [battery, "+"]
       - [charger, BAT+]
       - [fuel_gauge, BAT]
 
