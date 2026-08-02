@@ -114,6 +114,10 @@ components:
         label: "38 (GND)"
         side: left
         slot: 17
+      - name: "3V3"
+        label: "36 (3V3)"
+        side: left
+        slot: 15
 
   - name: fuel_gauge
     package: board
@@ -126,8 +130,11 @@ components:
       position: [0.0, -13.0, 0.0]
       align: [center, max]
     pins:
-      - name: "VCELL"
-        label: "VCELL"
+      - name: "BAT"
+        label: "BAT"
+        side: right
+      - name: "VIN"
+        label: "VIN"
         side: right
       - name: "GND"
         label: "GND"
@@ -362,6 +369,7 @@ nets:
     color: black
     pins:
       - [charger, GND]
+      - [charger, BAT-]
       - [fuel_gauge, GND]
       - [sensor_east, GND]
       - [current_monitor, GND]
@@ -375,18 +383,19 @@ nets:
   - name: vcc_logic
     color: red
     pins:
-      - [pico, VSYS]
+      - [pico, 3V3]
       - [sensor_west, VCC]
       - [sensor_north, VCC]
       - [led, VCC]
       - [neodriver, VCC]
       - [sensor_east, VCC]
+      - [fuel_gauge, VIN]
 
   - name: vcc_bat
     color: red
     pins:
       - [charger, BAT+]
-      - [fuel_gauge, VCELL]
+      - [fuel_gauge, BAT]
 
   - name: vcc_sys_pico
     color: red
