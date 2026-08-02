@@ -114,6 +114,10 @@ components:
         label: "38 (GND)"
         side: left
         slot: 17
+      - name: "3V3"
+        label: "36 (3V3)"
+        side: left
+        slot: 15
 
   - name: fuel_gauge
     package: board
@@ -375,7 +379,7 @@ nets:
   - name: vcc_logic
     color: red
     pins:
-      - [pico, VSYS]
+      - [pico, 3V3]
       - [sensor_west, VCC]
       - [sensor_north, VCC]
       - [led, VCC]
