@@ -130,8 +130,11 @@ components:
       position: [0.0, -13.0, 0.0]
       align: [center, max]
     pins:
-      - name: "VCELL"
-        label: "VCELL"
+      - name: "BAT"
+        label: "BAT"
+        side: right
+      - name: "VIN"
+        label: "VIN"
         side: right
       - name: "GND"
         label: "GND"
@@ -366,6 +369,7 @@ nets:
     color: black
     pins:
       - [charger, GND]
+      - [charger, BAT-]
       - [fuel_gauge, GND]
       - [sensor_east, GND]
       - [current_monitor, GND]
@@ -385,12 +389,13 @@ nets:
       - [led, VCC]
       - [neodriver, VCC]
       - [sensor_east, VCC]
+      - [fuel_gauge, VIN]
 
   - name: vcc_bat
     color: red
     pins:
       - [charger, BAT+]
-      - [fuel_gauge, VCELL]
+      - [fuel_gauge, BAT]
 
   - name: vcc_sys_pico
     color: red
