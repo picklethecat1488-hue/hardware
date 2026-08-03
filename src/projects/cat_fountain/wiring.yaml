@@ -95,6 +95,10 @@ components:
         label: "GP10 (CTRL_INT_W)"
         side: right
         slot: 13
+      - name: "GP11"
+        label: "GP11 (LED_DATA)"
+        side: right
+        slot: 12
       - name: "GP12"
         label: "GP12 (I2C_SDA)"
         side: right
@@ -226,32 +230,6 @@ components:
         label: "OB"
         side: left
 
-  - name: neodriver
-    package: board
-    position: [0.0, 40.0, 23.0]
-    rotation: [0.0, 0.0, 0.0]
-    dimensions: [25.0, 18.0, 1.6]
-    mounting_holes: [21.0, 14.0]
-    label:
-      text: "ATtiny816"
-      position: [0.0, 12.0, 0.0]
-      align: [center, min]
-    pins:
-      - name: "VCC"
-        label: "VCC"
-        side: right
-      - name: "GND"
-        label: "GND"
-        side: right
-      - name: "SDA"
-        label: "SDA"
-        side: right
-      - name: "SCL"
-        label: "SCL"
-        side: right
-      - name: "OUT"
-        label: "OUT"
-        side: left
 
   - name: motor
     package: motor
@@ -392,7 +370,6 @@ nets:
       - [sensor_east, GND]
       - [current_monitor, GND]
       - [motor_driver, GND]
-      - [neodriver, GND]
       - [led, GND]
       - [sensor_north, GND]
       - [sensor_west, GND]
@@ -405,7 +382,6 @@ nets:
       - [sensor_west, VCC]
       - [sensor_north, VCC]
       - [led, VCC]
-      - [neodriver, VCC]
       - [sensor_east, VCC]
       - [fuel_gauge, VIN]
 
@@ -446,7 +422,6 @@ nets:
       - [pico, GP12]
       - [sensor_west, SDA]
       - [sensor_north, SDA]
-      - [neodriver, SDA]
       - [current_monitor, SDA]
       - [sensor_east, SDA]
       - [fuel_gauge, SDA]
@@ -458,7 +433,6 @@ nets:
       - [pico, GP13]
       - [sensor_west, SCL]
       - [sensor_north, SCL]
-      - [neodriver, SCL]
       - [current_monitor, SCL]
       - [sensor_east, SCL]
       - [fuel_gauge, SCL]
@@ -478,7 +452,7 @@ nets:
   - name: led_data
     color: purple
     pins:
-      - [neodriver, OUT]
+      - [pico, GP11]
       - [led, DIN]
 
   - name: ctrl_xshut_n
