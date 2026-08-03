@@ -48,7 +48,6 @@ graph TD
     PICO -->|I2C Host Bus| I2CBus{I2C Bus: SDA/SCL}
     I2CBus <--> MAX
     I2CBus <--> INA
-    I2CBus <--> LED_DRV["ATtiny816 LED Driver"]
     I2CBus <--> TOF1["VL53L0X ToF (North)"]
     I2CBus <--> TOF2["VL53L0X ToF (East)"]
     I2CBus <--> TOF3["VL53L0X ToF (West)"]
@@ -62,10 +61,10 @@ graph TD
     TOF3 -->|GP7: INT| PICO
     MAX -->|GP10: ALRT| PICO
     PICO -->|GP14, GP15: PWM| DRV
+    PICO -->|GP11: PIO/WS2812| LED["RGB NeoPixel LED"]
     
     %% Output Connections
     DRV -->|Driven Power| MOTOR["N20 Gear Motor"]
-    LED_DRV -->|WS2812 Protocol| LED["RGB NeoPixel LED"]
 ```
 
 ## Bill of Materials (BOM)
@@ -80,7 +79,7 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 | :--- | :--- | :--- | :--- | :--- |
 | **Microcontroller Board** | **Raspberry Pi Pico W** | Main controller running MicroPython/C++. Controls the I2C bus, reads sensors, and drives motor speed. | *Host Controller* | Dual ARM Cortex-M0+, built-in Wi-Fi/Bluetooth, two hardware I2C buses (I2C0, I2C1). |
 | **IR Proximity Sensors (Qty: 3)** | **Adafruit VL53L0X Time-of-Flight (ToF)** | Long-range laser distance sensor used for cat proximity detection in North, East, and West directions. | `0x29` (default)<br>*Re-addressed to `0x30`, `0x31`, `0x32` at boot* | Measures precise distances up to 2m, unaffected by ambient light. Uses shutdown pin (XSHUT) for startup addressing. |
-| **RGB LED Indicator** | **Adafruit NeoPixel Driver (ATtiny816)** | High-brightness status LED to indicate battery capacity and device state over I2C. | `0x60` | Interfaces standard WS2812B/NeoPixels to an I2C bus via a pre-programmed ATtiny microcontroller. |
+| **RGB LED Indicator** | **Standard RGB NeoPixel (WS2812B / SK6812)** | High-brightness status LED to indicate battery capacity and device state. | *N/A (Driven via PIO GP11)* | Addressable RGB LED driven directly from Raspberry Pi Pico W using a PIO state machine. |
 | **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | *N/A (Standalone)* | Standalone linear charger. Uses jumpers/resistors to configure chemistry/current. S1 (FAULT) & S2 (CHG) are left disconnected. |
 | **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Primary interface to access battery and charging status. The 18650 battery connects directly to this board, which is then jumpered to the charger. Includes configurable alert interrupt (ALRT) pin connected to GP10. |
 | **Battery** | **Standard 18650 3.7V Li-ion Cell** | Main energy source (e.g. Samsung 30Q or Panasonic NCR18650B, 3000+ mAh). | *N/A (Analog)* | Rechargeable lithium-ion cell to fit the internal battery storage area. |
@@ -152,7 +151,6 @@ These fasteners and seal components are required to assemble the 3D-printed body
 | **Pico W Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Raspberry Pi Pico W to the dry compartment ceiling. |
 | **Motor Driver Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the L9110S board to the dry compartment ceiling. |
 | **Current Sensor Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit INA219 board to the dry compartment ceiling. |
-| **LED Controller Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit NeoDriver LED board to the dry compartment ceiling. |
 | **Shaft Seal O-Ring** | 1 | 4.5 mm to 5.0 mm ID x 1.5 mm CS (Nitrile/NBR) | Fits into the sealing groove under the impeller shaft to prevent water leaking into the dry motor compartment. |
 
 ## Battery Life Estimation
