@@ -1,5 +1,22 @@
 # Declarative 3D Component Layout & Netlist Configuration
 components:
+  - name: battery
+    package: battery
+    position: [0.0, -40.0, 28.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [25.0, 35.0, 6.0]
+    label:
+      text: "LiPo Battery"
+      position: [0.0, -20.0, 0.0]
+      align: [center, max]
+    pins:
+      - name: "+"
+        label: "+"
+        side: right
+      - name: "-"
+        label: "-"
+        side: right
+
   - name: charger
     package: board
     position: [0.0, -79.0, 23.0]
@@ -43,57 +60,69 @@ components:
       align: [center, min]
     pins:
       - name: "GP2"
-        label: "4 (CTRL_XSHUT_N)"
+        label: "GP2"
         side: right
         slot: 3
       - name: "GP3"
-        label: "5 (CTRL_XSHUT_E)"
+        label: "GP3"
         side: right
         slot: 4
       - name: "GP4"
-        label: "6 (CTRL_XSHUT_W)"
+        label: "GP4 (CTRL_XSHUT_N)"
         side: right
         slot: 5
       - name: "GP5"
-        label: "7 (CTRL_INT_N)"
+        label: "GP5 (CTRL_XSHUT_E)"
         side: right
         slot: 6
       - name: "GP6"
-        label: "9 (CTRL_INT_E)"
+        label: "GP6 (CTRL_XSHUT_W)"
         side: right
         slot: 8
       - name: "GP7"
-        label: "10 (CTRL_INT_W)"
+        label: "GP7 (CTRL_INT_N)"
         side: right
         slot: 9
       - name: "GP8"
-        label: "11 (I2C_SDA)"
+        label: "GP8"
         side: right
         slot: 10
       - name: "GP9"
-        label: "12 (I2C_SCL)"
+        label: "GP9 (CTRL_INT_E)"
         side: right
         slot: 11
       - name: "GP10"
-        label: "14 (CTRL_ALRT)"
+        label: "GP10 (CTRL_INT_W)"
         side: right
         slot: 13
+      - name: "GP11"
+        label: "GP11 (LED_DATA)"
+        side: right
+        slot: 12
       - name: "GP12"
-        label: "16"
+        label: "GP12 (I2C_SDA)"
         side: right
         slot: 15
       - name: "GP13"
-        label: "17"
+        label: "GP13 (I2C_SCL)"
         side: right
         slot: 16
       - name: "GP14"
-        label: "19 (CTRL_IA)"
+        label: "GP14 (CTRL_ALRT)"
         side: right
         slot: 18
       - name: "GP15"
-        label: "20 (CTRL_IB)"
+        label: "GP15"
         side: right
         slot: 19
+      - name: "GP19"
+        label: "GP19 (CTRL_IA)"
+        side: left
+        slot: 4
+      - name: "GP20"
+        label: "GP20 (CTRL_IB)"
+        side: left
+        slot: 5
       - name: "GND_L"
         label: "3 (GND)"
         side: right
@@ -106,6 +135,10 @@ components:
         label: "38 (GND)"
         side: left
         slot: 17
+      - name: "3V3"
+        label: "36 (3V3)"
+        side: left
+        slot: 15
 
   - name: fuel_gauge
     package: board
@@ -118,8 +151,11 @@ components:
       position: [0.0, -13.0, 0.0]
       align: [center, max]
     pins:
-      - name: "VCELL"
-        label: "VCELL"
+      - name: "BAT"
+        label: "BAT"
+        side: right
+      - name: "VIN"
+        label: "VIN"
         side: right
       - name: "GND"
         label: "GND"
@@ -194,32 +230,6 @@ components:
         label: "OB"
         side: left
 
-  - name: neodriver
-    package: board
-    position: [0.0, 40.0, 23.0]
-    rotation: [0.0, 0.0, 0.0]
-    dimensions: [25.0, 18.0, 1.6]
-    mounting_holes: [21.0, 14.0]
-    label:
-      text: "ATtiny816"
-      position: [0.0, 12.0, 0.0]
-      align: [center, min]
-    pins:
-      - name: "VCC"
-        label: "VCC"
-        side: right
-      - name: "GND"
-        label: "GND"
-        side: right
-      - name: "SDA"
-        label: "SDA"
-        side: right
-      - name: "SCL"
-        label: "SCL"
-        side: right
-      - name: "OUT"
-        label: "OUT"
-        side: left
 
   - name: motor
     package: motor
@@ -353,12 +363,13 @@ nets:
   - name: gnd
     color: black
     pins:
+      - [battery, "-"]
       - [charger, GND]
+      - [charger, BAT-]
       - [fuel_gauge, GND]
       - [sensor_east, GND]
       - [current_monitor, GND]
       - [motor_driver, GND]
-      - [neodriver, GND]
       - [led, GND]
       - [sensor_north, GND]
       - [sensor_west, GND]
@@ -367,18 +378,19 @@ nets:
   - name: vcc_logic
     color: red
     pins:
-      - [pico, VSYS]
+      - [pico, 3V3]
       - [sensor_west, VCC]
       - [sensor_north, VCC]
       - [led, VCC]
-      - [neodriver, VCC]
       - [sensor_east, VCC]
+      - [fuel_gauge, VIN]
 
   - name: vcc_bat
     color: red
     pins:
+      - [battery, "+"]
       - [charger, BAT+]
-      - [fuel_gauge, VCELL]
+      - [fuel_gauge, BAT]
 
   - name: vcc_sys_pico
     color: red
@@ -407,10 +419,9 @@ nets:
   - name: sda
     color: yellow
     pins:
-      - [pico, GP8]
+      - [pico, GP12]
       - [sensor_west, SDA]
       - [sensor_north, SDA]
-      - [neodriver, SDA]
       - [current_monitor, SDA]
       - [sensor_east, SDA]
       - [fuel_gauge, SDA]
@@ -419,10 +430,9 @@ nets:
     color: blue
     offset: [1.5, 1.5]
     pins:
-      - [pico, GP9]
+      - [pico, GP13]
       - [sensor_west, SCL]
       - [sensor_north, SCL]
-      - [neodriver, SCL]
       - [current_monitor, SCL]
       - [sensor_east, SCL]
       - [fuel_gauge, SCL]
@@ -442,59 +452,59 @@ nets:
   - name: led_data
     color: purple
     pins:
-      - [neodriver, OUT]
+      - [pico, GP11]
       - [led, DIN]
 
   - name: ctrl_xshut_n
     color: orange
     pins:
-      - [pico, GP2]
+      - [pico, GP4]
       - [sensor_north, XSHUT]
 
   - name: ctrl_xshut_e
     color: orange
     pins:
-      - [pico, GP3]
+      - [pico, GP5]
       - [sensor_east, XSHUT]
 
   - name: ctrl_xshut_w
     color: orange
     pins:
-      - [pico, GP4]
+      - [pico, GP6]
       - [sensor_west, XSHUT]
 
   - name: ctrl_int_n
     color: green
     pins:
-      - [pico, GP5]
+      - [pico, GP7]
       - [sensor_north, INT]
 
   - name: ctrl_int_e
     color: green
     pins:
-      - [pico, GP6]
+      - [pico, GP9]
       - [sensor_east, INT]
 
   - name: ctrl_int_w
     color: green
     pins:
-      - [pico, GP7]
+      - [pico, GP10]
       - [sensor_west, INT]
 
   - name: ctrl_alrt
     color: orange
     pins:
-      - [pico, GP10]
+      - [pico, GP14]
       - [fuel_gauge, ALRT]
 
   - name: ctrl_ia
     color: cyan
     pins:
-      - [pico, GP14]
+      - [pico, GP19]
       - [motor_driver, IA]
 
   - name: ctrl_ib
     color: magenta
     pins:
-      - [pico, GP15]
+      - [pico, GP20]
       - [motor_driver, IB]
