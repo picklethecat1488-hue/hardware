@@ -388,22 +388,6 @@ class CatFountainConfig(BaseModel):
         """Return charger port cutout height."""
         return float(self._raw_data.get("charger_port_height", 9.0))
 
-    # NeoDriver
-    @cached_property
-    def neodriver_spacing_x(self) -> float:
-        """Return X hole spacing for NeoDriver."""
-        return float(self._raw_data.get("neodriver_spacing_x", 21.0))
-
-    @cached_property
-    def neodriver_spacing_y(self) -> float:
-        """Return Y hole spacing for NeoDriver."""
-        return float(self._raw_data.get("neodriver_spacing_y", 14.0))
-
-    @cached_property
-    def neodriver_standoff_height(self) -> float:
-        """Return standoff height for NeoDriver."""
-        return float(self._raw_data.get("neodriver_standoff_height", 4.0))
-
     # Current Monitor
     @cached_property
     def current_monitor_spacing_x(self) -> float:
@@ -441,6 +425,26 @@ class CatFountainConfig(BaseModel):
     def motor_spacing_x(self) -> float:
         """Return mounting screw spacing for N20 Motor."""
         return float(self._raw_data.get("motor_spacing_x", 17.0))
+
+    @cached_property
+    def motor_set_screw_angle(self) -> float:
+        """Return the angle of the set screw relative to the Z axis."""
+        return float(self._raw_data.get("motor_set_screw_angle", 45.0))
+
+    @cached_property
+    def motor_set_screw_x_offset(self) -> float:
+        """Return the X start position of the set screw."""
+        return float(self._raw_data.get("motor_set_screw_x_offset", 10.5))
+
+    @cached_property
+    def motor_set_screw_radius(self) -> float:
+        """Return the radius of the set screw hole."""
+        return float(self._raw_data.get("motor_set_screw_radius", 1.75))
+
+    @cached_property
+    def motor_set_screw_length(self) -> float:
+        """Return the length of the set screw hole."""
+        return float(self._raw_data.get("motor_set_screw_length", 24.0))
 
     # LED Button / hole
     @cached_property
@@ -483,3 +487,97 @@ class CatFountainConfig(BaseModel):
     def sensor_boss_z(self) -> float:
         """Return Z size of sensor outer boss."""
         return float(self._raw_data.get("sensor_boss_z", 14.0))
+
+    # Central Boss & Shaft Hole parameters
+    @cached_property
+    def boss_body_radius_offset(self) -> float:
+        """Return the radius offset for the boss body."""
+        return float(self._raw_data.get("boss_body_radius_offset", 3.5))
+
+    @cached_property
+    def boss_body_height(self) -> float:
+        """Return the height of the boss body."""
+        return float(self._raw_data.get("boss_body_height", 2.0))
+
+    @cached_property
+    def motor_collar_clearance_radius(self) -> float:
+        """Return the motor collar clearance hole radius."""
+        return float(self._raw_data.get("motor_collar_clearance_radius", 3.2))
+
+    @cached_property
+    def motor_collar_clearance_height(self) -> float:
+        """Return the motor collar clearance hole height."""
+        return float(self._raw_data.get("motor_collar_clearance_height", 2.0))
+
+    @cached_property
+    def shaft_hole_radius_offset(self) -> float:
+        """Return the shaft hole radius offset."""
+        return float(self._raw_data.get("shaft_hole_radius_offset", 0.1))
+
+    @cached_property
+    def shaft_hole_height(self) -> float:
+        """Return the shaft hole height."""
+        return float(self._raw_data.get("shaft_hole_height", 1.8))
+
+    @cached_property
+    def oring_groove_radius_offset(self) -> float:
+        """Return the O-ring groove radius offset."""
+        return float(self._raw_data.get("oring_groove_radius_offset", 1.3))
+
+    @cached_property
+    def oring_groove_height(self) -> float:
+        """Return the O-ring groove height."""
+        return float(self._raw_data.get("oring_groove_height", 2.2))
+
+    # Impeller sleeve
+    @cached_property
+    def impeller_sleeve_height(self) -> float:
+        """Return the impeller sleeve height."""
+        return float(self._raw_data.get("impeller_sleeve_height", 4.0))
+
+    # Snap-fit Lid
+    @cached_property
+    def snap_ridge_z(self) -> float:
+        """Return the Z position offset for the snap ridge."""
+        return float(self._raw_data.get("snap_ridge_z", 2.5))
+
+    @cached_property
+    def snap_ridge_major_offset(self) -> float:
+        """Return the major radius offset for the snap ridge Torus."""
+        return float(self._raw_data.get("snap_ridge_major_offset", -0.1))
+
+    @cached_property
+    def snap_ridge_minor(self) -> float:
+        """Return the minor radius for the snap ridge Torus."""
+        return float(self._raw_data.get("snap_ridge_minor", 0.5))
+
+    @cached_property
+    def snap_groove_minor(self) -> float:
+        """Return the minor radius for the snap groove Torus."""
+        return float(self._raw_data.get("snap_groove_minor", 0.6))
+
+    # Drain Shroud & Trimmer
+    @cached_property
+    def drain_shroud_radius(self) -> float:
+        """Return the radius of the drain shroud."""
+        return float(self._raw_data.get("drain_shroud_radius", 18.0))
+
+    @cached_property
+    def drain_shroud_height(self) -> float:
+        """Return the height of the drain shroud."""
+        return float(self._raw_data.get("drain_shroud_height", 15.0))
+
+    @cached_property
+    def drain_shroud_z(self) -> float:
+        """Return the Z offset position for the drain shroud."""
+        return float(self._raw_data.get("drain_shroud_z", -15.0))
+
+    @cached_property
+    def trimmer_height(self) -> float:
+        """Return the height of the trimmer cylinder."""
+        return float(self._raw_data.get("trimmer_height", 30.0))
+
+    @cached_property
+    def retention_boss_height(self) -> float:
+        """Return the height of the retention boss limiting vertical travel."""
+        return float(self._raw_data.get("retention_boss_height", 1.0))

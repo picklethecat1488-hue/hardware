@@ -47,6 +47,7 @@ python src/smoke.py
 
 ### 3. Configuration & Lazy Initialization
 * Always use `@cached_property` for `default_config` and any sub-tools (Builders, Configurators) in your provider class. This guarantees correct orchestration timing, prevents staling configs, and minimizes expensive CAD allocations.
+* **Geometry Parametrization**: Always define base geometry parameters in the project's `measurements.yaml` and read them dynamically via config settings. Compute derived geometry coordinates and dimensions dynamically relative to these settings (e.g., using clearances, wall thicknesses, and offsets) instead of hardcoding absolute values. This prevents geometry regressions (e.g. intersections, misaligned steps, or floating shells) when base dimensions are scaled or overridden.
 * Settings and configuration schemas must use Pydantic models (subclassing `BaseModel`) defined under [src/projects_config/](file:///Users/daparker/gh/hardware/src/projects_config/).
 * Config overrides can be injected dynamically via environment variables patterned as `<PROJECT>__<SETTING>` (e.g., `EXHAUST_MANIFOLDS__WALL_THICKNESS`).
 

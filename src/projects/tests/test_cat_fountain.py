@@ -74,7 +74,6 @@ class TestCatFountainProvider:
         assert "fuel_gauge_footprint" in room
         assert "current_monitor_footprint" in room
         assert "motor_driver_footprint" in room
-        assert "neodriver_footprint" in room
         assert "motor_footprint" in room
         assert "sensor_east_footprint" in room
         assert "sensor_north_footprint" in room
@@ -680,20 +679,11 @@ class TestCatFountainProvider:
                 f"Intersection detected during vertical insertion at z_offset={z_offset}: {vol:.3f} mm3"
             )
 
-        # Check Locked Position at 90 degrees rotation (and seated at z_offset = 0)
-        loc_locked = base_loc * Rot(0, 0, 90.0)
-        positioned_cover_locked = loc_locked * cover_shape
-        inter_locked = lid_shape.intersect(positioned_cover_locked)
-        vol_locked = sum(s.volume for s in inter_locked.solids()) if inter_locked else 0.0
-        assert vol_locked == pytest.approx(0.0, abs=1e-3), (
-            f"Intersection detected at locked position (90 deg): {vol_locked:.3f} mm3"
-        )
-
-        # Check Pull-out Prevention at 90 degrees (clashes when pulled upwards by 1.0mm)
-        loc_pulled = base_loc * Rot(0, 0, 90.0) * Location((0, 0, 1.0))
-        positioned_cover_pulled = loc_pulled * cover_shape
-        inter_pulled = lid_shape.intersect(positioned_cover_pulled)
-        vol_pulled = sum(s.volume for s in inter_pulled.solids()) if inter_pulled else 0.0
-        assert vol_pulled > 10.0, (
-            f"Expected collision when cover is pulled up in locked state, but got intersection volume of only {vol_pulled:.3f} mm3"
+        # Check that the cover fits at all rotations (e.g., 90 degrees) because it is circular
+        loc_rotated = base_loc * Rot(0, 0, 90.0)
+        positioned_cover_rotated = loc_rotated * cover_shape
+        inter_rotated = lid_shape.intersect(positioned_cover_rotated)
+        vol_rotated = sum(s.volume for s in inter_rotated.solids()) if inter_rotated else 0.0
+        assert vol_rotated == pytest.approx(0.0, abs=1e-3), (
+            f"Intersection detected at rotated position (90 deg): {vol_rotated:.3f} mm3"
         )
