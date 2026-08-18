@@ -346,6 +346,16 @@ class CatFountainConfig(BaseModel):
         """Return standoff height for the proximity sensor."""
         return float(self._raw_data.get("proximity_sensor_standoff_height", 4.0))
 
+    @cached_property
+    def proximity_sensor_pocket_width(self) -> float:
+        """Return pocket width for the proximity sensor."""
+        return float(self._raw_data.get("proximity_sensor_pocket_width", 12.0))
+
+    @cached_property
+    def proximity_sensor_pocket_height(self) -> float:
+        """Return pocket height for the proximity sensor."""
+        return float(self._raw_data.get("proximity_sensor_pocket_height", 14.0))
+
     # Raspberry Pi Pico
     @cached_property
     def pico_spacing_x(self) -> float:

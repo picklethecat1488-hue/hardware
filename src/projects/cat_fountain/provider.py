@@ -70,10 +70,6 @@ class CatFountainProvider(Provider):
             "bottom_cover": self.build_bottom_cover,
             "lid": self.build_lid,
             "drain_cover": self.build_drain_cover,
-            "sensor_cover": self.build_sensor_cover,
-            "sensor_cover_east": self.build_sensor_cover,
-            "sensor_cover_north": self.build_sensor_cover,
-            "sensor_cover_west": self.build_sensor_cover,
             "led_cover": self.build_led_cover,
         }
 
@@ -438,8 +434,8 @@ class CatFountainProvider(Provider):
                         with Locations(Location((11.0, 0, -2.0))):
                             Box(
                                 boss_sx + 7.0,
-                                8.0,
-                                12.0,
+                                self.settings.proximity_sensor_pocket_width,
+                                self.settings.proximity_sensor_pocket_height,
                                 align=(Align.MAX, Align.CENTER, Align.CENTER),
                                 mode=Mode.SUBTRACT,
                             )
@@ -941,33 +937,6 @@ class CatFountainProvider(Provider):
         return cover
 
     @method_cache
-    def build_sensor_cover(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
-    ) -> BuildPart:
-        """Build a push-fit flexible TPU cover for the proximity sensor port."""
-        with BuildPart() as cover:
-            with Locations((0, 0, -2.0)):
-                Box(1.5, 10.0, 14.0, align=(Align.MIN, Align.CENTER, Align.CENTER))
-            fillet(cover.edges().filter_by(Axis.X), radius=2.0)
-
-            with Locations((0, 0, -2.0)):
-                Box(6.0, 7.6, 11.6, align=(Align.MAX, Align.CENTER, Align.CENTER))
-
-            URDFMetadata(
-                label=target,
-                material="tpu",
-                density=1.20,
-                boundary_friction=0.50,
-                collision_type=URDFCollisionType.CONVEX,
-                parent="bowl",
-                joint_type=URDFJointType.FIXED,
-            )
-
-        RigidJoint("mount", cover.part, Location((0, 0, 0)))
-
-        return cover
-
-    @method_cache
     def build_led_cover(
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
@@ -1019,30 +988,14 @@ class CatFountainProvider(Provider):
         bowl_part.joints["lid_seat"].connect_to(lid_part.joints["mount"])
         lid_part.joints["drain_socket"].connect_to(drain_cover_part.joints["mount"])
 
-        # Build and connect the three sensor covers using joints
-        sensor_cover_east = self.build_sensor_cover("sensor_cover_east").part
-        sensor_cover_north = self.build_sensor_cover("sensor_cover_north").part
-        sensor_cover_west = self.build_sensor_cover("sensor_cover_west").part
-        assert sensor_cover_east is not None and sensor_cover_north is not None and sensor_cover_west is not None
-
-        bowl_part.joints["sensor_port_east"].connect_to(sensor_cover_east.joints["mount"])
-        bowl_part.joints["sensor_port_north"].connect_to(sensor_cover_north.joints["mount"])
-        bowl_part.joints["sensor_port_west"].connect_to(sensor_cover_west.joints["mount"])
-
         # Build and connect the LED cover
         led_cover = self.build_led_cover("led_cover").part
         assert led_cover is not None
         bowl_part.joints["led_port"].connect_to(led_cover.joints["mount"])
 
-        # Explode outwards by translating 30.0 mm along local X axis for sensor covers, and Z axis for LED cover
-        assert sensor_cover_east.location is not None
-        assert sensor_cover_north.location is not None
-        assert sensor_cover_west.location is not None
+        # Explode outwards by translating Z axis for LED cover
         assert led_cover.location is not None
 
-        sensor_cover_east.location = sensor_cover_east.location * Location((30.0, 0, 0))
-        sensor_cover_north.location = sensor_cover_north.location * Location((30.0, 0, 0))
-        sensor_cover_west.location = sensor_cover_west.location * Location((30.0, 0, 0))
         led_cover.location = led_cover.location * Location((0, 0, 30.0))
 
         # 3. Explode the parts by translating their .location attributes
@@ -1062,9 +1015,6 @@ class CatFountainProvider(Provider):
         room.add("bottom_cover", bottom_cover_part, color="black")
         room.add("lid", lid_part, color="green")
         room.add("drain_cover", drain_cover_part, color="light_grey")
-        room.add("sensor_cover_east", sensor_cover_east, color="grey")
-        room.add("sensor_cover_north", sensor_cover_north, color="grey")
-        room.add("sensor_cover_west", sensor_cover_west, color="grey")
         room.add("led_cover", led_cover, color="grey")
 
         # 5. Add connector lines indicating assembly paths
@@ -1088,12 +1038,7 @@ class CatFountainProvider(Provider):
             drain_cover_part.center() + Vector(40, -10, 10),
             options=TextArgs(font_size=10),
         )
-        room.add_label(
-            "sensor_cover_label",
-            "SENSOR COVER",
-            sensor_cover_east.center() + Vector(30, 0, 10),
-            options=TextArgs(font_size=10),
-        )
+
         room.add_label(
             "led_cover_label",
             "LED COVER",
@@ -1123,16 +1068,6 @@ class CatFountainProvider(Provider):
         bowl_part.joints["lid_seat"].connect_to(lid_part.joints["mount"])
         lid_part.joints["drain_socket"].connect_to(drain_cover_part.joints["mount"])
 
-        # Build and connect the three sensor covers using joints
-        sensor_cover_east = self.build_sensor_cover("sensor_cover_east", mode=mode).part
-        sensor_cover_north = self.build_sensor_cover("sensor_cover_north", mode=mode).part
-        sensor_cover_west = self.build_sensor_cover("sensor_cover_west", mode=mode).part
-        assert sensor_cover_east is not None and sensor_cover_north is not None and sensor_cover_west is not None
-
-        bowl_part.joints["sensor_port_east"].connect_to(sensor_cover_east.joints["mount"])
-        bowl_part.joints["sensor_port_north"].connect_to(sensor_cover_north.joints["mount"])
-        bowl_part.joints["sensor_port_west"].connect_to(sensor_cover_west.joints["mount"])
-
         # Build and connect the LED cover using joints
         led_cover = self.build_led_cover("led_cover", mode=mode).part
         assert led_cover is not None
@@ -1145,9 +1080,6 @@ class CatFountainProvider(Provider):
             room.add("drain_cover", drain_cover_part, color="grey")
             room.add("impeller", impeller_part, color="grey")
             room.add("bottom_cover", bottom_cover_part, color="grey", alpha=0.4)
-            room.add("sensor_cover_east", sensor_cover_east, color="grey", alpha=0.4)
-            room.add("sensor_cover_north", sensor_cover_north, color="grey", alpha=0.4)
-            room.add("sensor_cover_west", sensor_cover_west, color="grey", alpha=0.4)
             room.add("led_cover", led_cover, color="grey", alpha=0.4)
         else:
             room.add("bowl", bowl_part, color="grey")
@@ -1155,9 +1087,6 @@ class CatFountainProvider(Provider):
             room.add("drain_cover", drain_cover_part, color="light_grey")
             room.add("impeller", impeller_part, color="red")
             room.add("bottom_cover", bottom_cover_part, color="black", alpha=0.6)
-            room.add("sensor_cover_east", sensor_cover_east, color="grey", alpha=0.4)
-            room.add("sensor_cover_north", sensor_cover_north, color="grey", alpha=0.4)
-            room.add("sensor_cover_west", sensor_cover_west, color="grey", alpha=0.4)
             room.add("led_cover", led_cover, color="grey", alpha=0.4)
 
         # 4. Build and add dummy PCBs for visualization and interference checking (non-printable)
@@ -1208,6 +1137,23 @@ class CatFountainProvider(Provider):
                     s_pcb = make_sensor_pcb()
                     s_pcb.location = joint_loc * Location((-18.3, 0, 0))
                     room.add(f"sensor_pcb_{fp.name.split('_')[-1]}", s_pcb, color="green", alpha=0.6)
+
+                    # Model the emitter and receiver cones (25-degree Field of View)
+                    def make_cone() -> Part:
+                        h = 40.0
+                        r1 = 0.5
+                        r2 = r1 + h * math.tan(math.radians(12.5))
+                        with BuildPart() as cone:
+                            Cone(r1, r2, h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                        return cast(Part, cone.part)
+
+                    e_cone = make_cone()
+                    e_cone.location = joint_loc * Location((-18.3, 0, 0)) * Location((2.0, -0.8, 0)) * Rot(0, 90, 0)
+                    room.add(f"sensor_emitter_{fp.name.split('_')[-1]}", e_cone, color="red", alpha=0.3)
+
+                    r_cone = make_cone()
+                    r_cone.location = joint_loc * Location((-18.3, 0, 0)) * Location((2.0, 0.8, 0)) * Rot(0, 90, 0)
+                    room.add(f"sensor_receiver_{fp.name.split('_')[-1]}", r_cone, color="blue", alpha=0.3)
                 else:
                     pcb = make_pcb(w, l, thickness)
                     pcb.location = Location(fp.position, fp.rotation)
