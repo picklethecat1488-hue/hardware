@@ -128,12 +128,11 @@ The following parts are manufactured to form the physical structure and assembly
 | **Impeller** | 1 | PETG (Food-Safe Coating) | The spinning Archimedes screw / vortex impeller pump. |
 | **Drain Cover** | 1 | PETG (Food-Safe Coating) | Removable cover with locking tabs for the filter compartment. |
 | **Bottom Cover** | 1 | PETG or PLA | Bottom enclosure cover protecting the electronics compartment. |
-| **Sensor Cover** | 3 | UTR-8100 Translucent (SLA) | Translucent push-fit protective covers for the three proximity sensor ports. |
 | **LED Cover** | 1 | UTR-8100 Translucent (SLA) | Translucent push-fit diffuser plug for the status RGB LED. |
 
 > [!NOTE]
 > **Manufacturing & Post-Processing Details**:
-> 1. **Translucent Covers**: Since PCBWay does not offer transparent PETG, both the LED Cover and Sensor Covers should be SLA-printed using UTR-8100 translucent resin to ensure light/IR transparency.
+> 1. **Translucent Covers**: Since PCBWay does not offer transparent PETG, the LED Cover should be SLA-printed using UTR-8100 translucent resin to ensure light transparency.
 > 2. **Food Safety Post-Processing**: Standard FDM 3D printed parts have micro-grooves that can harbor bacteria. All PETG components in contact with water (Bowl, Lid, Tube, Impeller, Drain Cover) must be coated with a food-grade epoxy (e.g., Max CLR or similar FDA-compliant epoxy coating) as a post-processing step before use.
 
 ### Fasteners & O-Rings
