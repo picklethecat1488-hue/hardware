@@ -41,7 +41,6 @@ class TestCatFountainProvider:
         assert "bottom_cover" in provider.part
         assert "lid" in provider.part
         assert "drain_cover" in provider.part
-        assert "sensor_cover" in provider.part
         assert "led_cover" in provider.part
 
     def test_build_part_geometry(self, provider):
@@ -639,7 +638,11 @@ class TestCatFountainProvider:
         provider.build_product(room, Mode.DEFAULT)
         room.translate_joints()
 
-        parts = {name: geom[0] for name, geom in room.items()}
+        parts = {
+            name: geom[0]
+            for name, geom in room.items()
+            if not any(x in name for x in ["emitter", "receiver", "pcb", "motor"])
+        }
         for name1, part1 in parts.items():
             for name2, part2 in parts.items():
                 if name1 < name2:

@@ -36,13 +36,7 @@ drain_cover:
   export: [stl, obj]
   color: grey
 
-sensor_cover:
-  part:
-    modes: [default, print]
-  material: tpu
-  export: [stl, obj]
-  color: grey
-  
+
 led_cover:
   part:
     modes: [default, print]
