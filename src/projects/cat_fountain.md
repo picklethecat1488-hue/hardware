@@ -142,7 +142,6 @@ These fasteners and seal components are required to assemble the 3D-printed body
 
 | Component | Qty | Size/Spec | Use Case |
 | :--- | :--- | :--- | :--- |
-| **Lid Mounting Screws** | 4 | M3 x 10mm (Socket or Button Head) | Secures the top cover lid to the bowl tabs. Fits into the 3mm counterbores. |
 | **Bottom Cover Screws** | 4 | M3 x 10mm (Flat Head/Countersunk) | Secures the controller compartment cover. Fits flush into the bottom countersinks. |
 | **DC Motor Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the DC motor to the dry compartment ceiling mount (17mm spacing). |
 | **Proximity Sensor Screws** | 6 | M2 x 6mm (Machine Screws) | Mounts the three proximity sensors to the internal bosses. |

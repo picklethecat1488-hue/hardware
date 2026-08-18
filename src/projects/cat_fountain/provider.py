@@ -134,6 +134,10 @@ class CatFountainProvider(Provider):
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                     mode=Mode.SUBTRACT,
                 )
+            # Annular groove for lid snap fit (scaling with lid radius)
+            groove_major = r - t + self.settings.lid_step_width - self.settings.lid_clearance
+            with Locations((0, 0, h - 2.5)):
+                Torus(major_radius=groove_major, minor_radius=0.6, mode=Mode.SUBTRACT)
 
             # Subtract dry motor controller compartment under the floor
             with Locations((0, 0, 0)):
@@ -187,18 +191,6 @@ class CatFountainProvider(Provider):
                 hole_align_top=False,
             )
 
-            # Add top cover lid mounting tabs (extending from 10mm below the lid step to the bottom of the lid step)
-            add_mounting_tabs(
-                angles=[45, 135, 225, 315],
-                radial_position=r - t - 5.0,
-                z_start=h - self.settings.lid_step_depth - 10.0,
-                z_end=h - self.settings.lid_step_depth,
-                shape_fn=lambda h: Box(10.0, 10.0, h, align=(Align.CENTER, Align.CENTER, Align.MIN)),
-                hole_radius=1.2,
-                hole_depth=8.0,
-                hole_align_top=True,
-            )
-
             # --- INTEGRATED TUBE ---
             # Tube runs from floor_z = 32.0 to floor_z + tube_height = 102.0
             with Locations((0, tube_y, floor_z)):
@@ -230,20 +222,33 @@ class CatFountainProvider(Provider):
             # Raised central boss for impeller shaft (placement that won't leak water)
             with Locations((0, tube_y, floor_z)):
                 # Boss body
-                Cylinder(radius=pin_r + 3.5, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                # Subtract shaft hole going through the boss and floor (from Z=21.0 to Z=27.0, height 6.0)
+                Cylinder(
+                    radius=pin_r + self.settings.boss_body_radius_offset,
+                    height=self.settings.boss_body_height,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                )
+                # 1. Motor collar clearance counterbore at the bottom
                 with Locations((0, 0, -t)):
                     Cylinder(
-                        radius=pin_r + 0.1,
-                        height=2.0 + t,
+                        radius=self.settings.motor_collar_clearance_radius,
+                        height=self.settings.motor_collar_clearance_height,
                         align=(Align.CENTER, Align.CENTER, Align.MIN),
                         mode=Mode.SUBTRACT,
                     )
-                # Seal cavity (O-ring groove) inside the floor to prevent leakage
-                with Locations((0, 0, -2.0)):
+                # 2. Main shaft hole
+                with Locations((0, 0, -t + self.settings.motor_collar_clearance_height)):
                     Cylinder(
-                        radius=pin_r + 1.2,
-                        height=2.0,
+                        radius=pin_r + self.settings.shaft_hole_radius_offset,
+                        height=self.settings.shaft_hole_height,
+                        align=(Align.CENTER, Align.CENTER, Align.MIN),
+                        mode=Mode.SUBTRACT,
+                    )
+                # 3. O-ring groove counterbore at the top
+                oring_z = -t + self.settings.motor_collar_clearance_height + self.settings.shaft_hole_height
+                with Locations((0, 0, oring_z)):
+                    Cylinder(
+                        radius=pin_r + self.settings.oring_groove_radius_offset,
+                        height=self.settings.oring_groove_height,
                         align=(Align.CENTER, Align.CENTER, Align.MIN),
                         mode=Mode.SUBTRACT,
                     )
@@ -254,17 +259,25 @@ class CatFountainProvider(Provider):
                 Cylinder(radius=15.0, height=20.0, align=(Align.CENTER, Align.CENTER, Align.MAX))
                 # Pocket for the motor body
                 Box(13.0, 11.0, 20.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
-                # Two horizontal M4 jack screw holes on either side of the motor boss (halfway down the pocket)
-                with Locations((0, 0, -10.0)):
-                    with Locations(Rot(0, 90, 0)):
-                        Cylinder(radius=1.75, height=32.0, mode=Mode.SUBTRACT)
-
-            # Blind screw holes for mounting the DC motor bracket to the bottom face of the boss (M2 screws, spacing 17 mm)
-            for x_offset in [-self.settings.motor_spacing_x / 2.0, self.settings.motor_spacing_x / 2.0]:
-                with Locations((x_offset, tube_y, floor_z - t - 20.0)):
-                    Cylinder(
-                        radius=hole_r, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
-                    )
+                # Two angled set screw holes centered at the bottom face of the boss (Z = -20.0 relative to ceiling)
+                # left side (pointing inwards / right at angle)
+                with Locations((-self.settings.motor_set_screw_x_offset, 0, -20.0)):
+                    with Locations(Rot(0, self.settings.motor_set_screw_angle, 0)):
+                        Cylinder(
+                            radius=self.settings.motor_set_screw_radius,
+                            height=self.settings.motor_set_screw_length,
+                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            mode=Mode.SUBTRACT,
+                        )
+                # right side (pointing inwards / left at angle)
+                with Locations((self.settings.motor_set_screw_x_offset, 0, -20.0)):
+                    with Locations(Rot(0, -self.settings.motor_set_screw_angle, 0)):
+                        Cylinder(
+                            radius=self.settings.motor_set_screw_radius,
+                            height=self.settings.motor_set_screw_length,
+                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            mode=Mode.SUBTRACT,
+                        )
 
             # Helper to create cylindrical standoff posts with blind holes
             def add_standoffs(
@@ -351,14 +364,6 @@ class CatFountainProvider(Provider):
                     self.settings.charger_spacing_y,
                     self.settings.charger_standoff_height,
                     "CHARGER",
-                ),
-                (
-                    0.0,
-                    40.0,
-                    self.settings.neodriver_spacing_x,
-                    self.settings.neodriver_spacing_y,
-                    self.settings.neodriver_standoff_height,
-                    "NEODRIVE",
                 ),
                 (
                     50.0,
@@ -569,7 +574,11 @@ class CatFountainProvider(Provider):
 
         with BuildPart() as impeller:
             Cylinder(radius=hub_r, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-            Cylinder(radius=shaft_r, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MAX))
+            Cylinder(
+                radius=shaft_r,
+                height=self.settings.impeller_sleeve_height,
+                align=(Align.CENTER, Align.CENTER, Align.MAX),
+            )
 
             # D-shaped shaft hole to prevent motor shaft slippage (radius 1.55mm, flat at X = 1.05mm)
             with BuildSketch() as hole_sketch:
@@ -577,7 +586,7 @@ class CatFountainProvider(Provider):
                 with Locations((1.05 + 5.0, 0)):
                     Rectangle(10.0, 10.0, mode=Mode.SUBTRACT)
             ext_hole = extrude(hole_sketch.sketch, amount=10.5, mode=Mode.PRIVATE)
-            impeller.part -= Location((0, 0, -6.0)) * ext_hole  # type: ignore
+            impeller.part -= Location((0, 0, -self.settings.impeller_sleeve_height)) * ext_hole  # type: ignore
             blade_w = r - hub_r
             blade_t = self.settings.impeller_radius * 0.125
             total_twist = self.settings.vane_twist
@@ -716,33 +725,12 @@ class CatFountainProvider(Provider):
         with BuildPart() as lid:
             lid_disk = Cylinder(radius=lid_r, height=lid_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            with Locations((0, 0, 0)):
-                Cylinder(
-                    radius=lid_r + 2.0, height=step_d, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+            # Add the snap-fit annular Torus ridge
+            with Locations((0, 0, self.settings.snap_ridge_z)):
+                Torus(
+                    major_radius=lid_r + self.settings.snap_ridge_major_offset,
+                    minor_radius=self.settings.snap_ridge_minor,
                 )
-                Cylinder(radius=r - t - clearance, height=step_d, align=(Align.CENTER, Align.CENTER, Align.MIN))
-
-            for angle in [45, 135, 225, 315]:
-                with Locations(Rot(0, 0, angle)):
-                    with Locations((r - t - 5.0, 0, 0)):
-                        Box(10.0, 12.0, lid_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-
-            for angle in [45, 135, 225, 315]:
-                with Locations(Rot(0, 0, angle)):
-                    with Locations((r - t - 5.0, 0, -1.0)):
-                        Cylinder(
-                            radius=1.5,
-                            height=lid_h + 2.0,
-                            align=(Align.CENTER, Align.CENTER, Align.MIN),
-                            mode=Mode.SUBTRACT,
-                        )
-                        with Locations((0, 0, lid_h - 1.5)):
-                            Cylinder(
-                                radius=3.0,
-                                height=3.0,
-                                align=(Align.CENTER, Align.CENTER, Align.MIN),
-                                mode=Mode.SUBTRACT,
-                            )
 
             with BuildPart() as pocket_tool:
                 Cylinder(radius=80.0, height=6.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
@@ -781,7 +769,11 @@ class CatFountainProvider(Provider):
                             )
                     # Retention boss extending down from inner sphere ceiling to limit impeller vertical travel (added after cuts)
                     with Locations((0, 0, dome_in_r)):
-                        Cylinder(radius=3.0, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                        Cylinder(
+                            radius=3.0,
+                            height=self.settings.retention_boss_height,
+                            align=(Align.CENTER, Align.CENTER, Align.MAX),
+                        )
                 with Locations((0, 0, -10.0)):
                     Cylinder(
                         radius=socket_r,
@@ -790,9 +782,25 @@ class CatFountainProvider(Provider):
                         mode=Mode.SUBTRACT,
                     )
 
+            # Create shroud at its absolute position
+            shroud = Location((0, self.settings.drain_hole_y, self.settings.drain_shroud_z)) * Cylinder(
+                radius=self.settings.drain_shroud_radius,
+                height=self.settings.drain_shroud_height,
+                align=(Align.CENTER, Align.CENTER, Align.MIN),
+                mode=Mode.PRIVATE,
+            )
+            # Create trimmer centered at the lid origin (0, 0, 0)
+            trimmer = Cylinder(
+                radius=r - t - clearance,
+                height=self.settings.trimmer_height,
+                align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                mode=Mode.PRIVATE,
+            )
+            # Intersect them to trim the shroud to fit within the bowl's inner wall
+            trimmed_shroud = shroud.intersect(trimmer)
+            add(trimmed_shroud)
+
             with Locations((0, 65.0, 0)):
-                with Locations((0, 0, -15.0)):
-                    Cylinder(radius=18.0, height=15.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                 Cylinder(
                     radius=self.settings.drain_hole_radius,
                     height=lid_h + 2.0,
@@ -800,12 +808,7 @@ class CatFountainProvider(Provider):
                     mode=Mode.SUBTRACT,
                 )
                 with Locations((0, 0, -1.5)):
-                    Cylinder(radius=17.0, height=1.3, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-                with Locations((0, 0, -0.2)):
-                    Cylinder(radius=15.6, height=3.2, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-                    for x_offset in [-15.5, 15.5]:
-                        with Locations((x_offset, 0, 0)):
-                            Box(5.0, 12.0, 10.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                    Cylinder(radius=15.6, height=4.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
                 with Locations((0, 0, -15.0)):
                     Cylinder(
@@ -898,20 +901,14 @@ class CatFountainProvider(Provider):
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Build the removable circular drain cover with locking tabs for the filter compartment."""
-        cover_r = 15.3
         cover_h = 2.5
 
         with BuildPart() as cover:
-            Cylinder(radius=cover_r, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            # Simple circular drop-in plug
+            Cylinder(radius=15.3, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
             # Downward hollow boss to center/retain the cover (outer radius 5.5mm, inner radius 4.0mm, height 5.0mm)
             Cylinder(radius=5.5, height=5.0, align=(Align.CENTER, Align.CENTER, Align.MAX))
             Cylinder(radius=4.0, height=5.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
-
-            for x_offset in [-14.9, 14.9]:
-                with Locations((x_offset, 0, 0)):
-                    Box(3.8, 10.0, 1.2, align=(Align.CENTER, Align.CENTER, Align.MIN))
-
-            Cylinder(radius=16.9, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.INTERSECT)
 
             # Generate 7-hole hexagonal grid of holes
             hex_spacing = 8.7
