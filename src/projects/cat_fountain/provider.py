@@ -434,8 +434,8 @@ class CatFountainProvider(Provider):
                         with Locations(Location((11.0, 0, -2.0))):
                             Box(
                                 boss_sx + 7.0,
-                                8.0,
-                                12.0,
+                                self.settings.proximity_sensor_pocket_width,
+                                self.settings.proximity_sensor_pocket_height,
                                 align=(Align.MAX, Align.CENTER, Align.CENTER),
                                 mode=Mode.SUBTRACT,
                             )

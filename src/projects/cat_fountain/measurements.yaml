@@ -50,6 +50,8 @@ fuel_gauge_standoff_height: 4.0
 proximity_sensor_spacing_x: 21.0
 proximity_sensor_spacing_y: 13.5
 proximity_sensor_standoff_height: 4.0
+proximity_sensor_pocket_width: 12.0
+proximity_sensor_pocket_height: 14.0
 
 # Pico (RP2040) footprint
 pico_spacing_x: 11.4
