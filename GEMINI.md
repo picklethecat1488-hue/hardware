@@ -48,6 +48,10 @@ pytest
 * **Geometry Parametrization**: Always define base geometry parameters in the project's `measurements.yaml` and read them dynamically via config settings. Compute derived geometry coordinates and dimensions dynamically relative to these settings (e.g., using clearances, wall thicknesses, and offsets) instead of hardcoding absolute values. This prevents geometry regressions (e.g. intersections, misaligned steps, or floating shells) when base dimensions are scaled or overridden.
 * Settings and configuration schemas must use Pydantic models (subclassing `BaseModel`) defined under [src/projects_config/](file:///Users/daparker/gh/hardware/src/projects_config/).
 * Config overrides can be injected dynamically via environment variables patterned as `<PROJECT>__<SETTING>` (e.g., `EXHAUST_MANIFOLDS__WALL_THICKNESS`).
+* **Data Model Integrity**: Prefer using strongly typed data models with well-defined properties and methods over runtime dynamic attribute parsing (e.g., avoiding loose `hasattr` or `getattr` checks on untyped objects where static type annotations should instead guarantee structure).
+* **Error Handling & Exception Guardrails**: Use explicit bounds checking and validation rather than generic `try/except` blocks. Do NOT use `try/except` structures in core computation or logic paths except to guard I/O operations (such as filesystem access, networking, or database calls).
+* **Parameter Validation**: Prefer Pydantic parameter validation over manual validation checks in code. If dynamic runtime validation is necessary (e.g., in math or physics functions), raise a descriptive `ValueError` to indicate invalid parameters rather than silently failing or falling back.
+* **Method Parameterization**: Prefer passing parameters and configuration models explicitly into methods and functions rather than having them read instance attributes or parent provider properties internally. This keeps computation blocks pure, modular, and easy to unit test.
 
 ### 4. Physical Simulation & URDF Metadata
 * For components participating in physics simulations (e.g., PyBullet, JAX fluids), attach URDF and simulation attributes to shape geometries.
@@ -58,6 +62,8 @@ pytest
   - `urdf_density` (`float`): Density in $\text{kg/m}^3$.
   - `urdf_collision_type` (`URDFCollisionType`): Convex, concave, compound, analytical, or none.
   - Kinematic joint constraints (`urdf_joint_type`, `urdf_joint_axis`, limits) and motor properties (`urdf_motor_type`, target, force).
+* **Physics Parameters Definition**: All physical properties and simulation parameters—including magnetic coupling attraction forces, joint constraints, kinematics, and physical barriers—MUST be defined in the URDF metadata or settings schema rather than being hardcoded in python source code.
+* **Dynamic Physics via URDF & Joints**: The physics and simulation code (e.g., in [fluid.py](file:///Users/daparker/gh/hardware/src/provider/fluid.py) and [bullet.py](file:///Users/daparker/gh/hardware/src/provider/bullet.py)) MUST compute physics dynamically using values read from the URDF metadata and PyBullet joint information, rather than hardcoding physics constants. Extend the URDF metadata schema as needed to support new physical properties.
 
 ### 5. SPH Fluid Simulation & Numerical Stability
 * **Analytical Boundaries**: Prefer analytical boundaries (`URDFCollisionType.ANALYTICAL`) over concave meshes (`URDFCollisionType.CONCAVE`) for JAX SPH fluid simulation. This prevents boundary particle tunneling and accelerates collision resolution.
@@ -72,3 +78,4 @@ pytest
 ### 7. Documentation & Lint Style
 * Code documentation MUST be PEP-257 compliant and comprehensive. Write docstrings for all custom classes, methods, functions, and properties.
 * Docstring correctness is checked automatically by ruff linting rules (group `D` configured in [pyproject.toml](file:///Users/daparker/gh/hardware/pyproject.toml)).
+* **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum`) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes. This prevents typos and improves code readability/refactoring.

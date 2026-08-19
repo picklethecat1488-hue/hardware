@@ -45,9 +45,9 @@ impeller_radius: 12.0
 impeller_height: 77.0
 impeller_shaft_radius: 2.5
 impeller_sleeve_height: 4.0
-impeller_blades: 3
+impeller_blades: 6
 impeller_clearance: 0.4
-vane_twist: -2512.5
+vane_twist: 0.0
 motor_target: 104.72
 motor_power: 3.08
 
@@ -135,3 +135,20 @@ current_monitor_standoff_height: 4.0
 motor_driver_spacing_x: 19.0
 motor_driver_spacing_y: 13.0
 motor_driver_standoff_height: 4.0
+
+# ==========================================
+# 10. Magnetic Centrifugal Pump Redesign
+# ==========================================
+# Magnet Dimensions (6mm x 3mm N52 Disc)
+magnet_radius: 3.0
+magnet_thickness: 3.0
+magnet_clearance: 0.1
+magnet_count: 4
+magnet_ring_radius: 12.0
+
+# Volute Casing & Well Geometry
+pump_well_depth: 10.0
+pump_well_wall: 1.5
+pump_inlet_radius: 6.0
+pump_outlet_radius: 4.0      # 8mm inner diameter (10mm OD)
+pump_casing_clearance: 1.0

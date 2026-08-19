@@ -74,6 +74,15 @@ class TestBulletFluid:
             """Initialize mock provider."""
             self.spout_water_ids: set[int] = set()
             self.fallen_out_water_ids: set[int] = set()
+
+            class DummySettings:
+                magnet_radius = 3.0
+                magnet_thickness = 3.0
+                pump_well_wall = 1.2
+                magnet_count = 4
+                impeller_shaft_radius = 2.5
+
+            self.settings = DummySettings()
             if has_room:
 
                 class MockRoom(dict):

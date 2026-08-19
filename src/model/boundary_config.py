@@ -64,6 +64,11 @@ class BoundaryConfig(BaseModel):
             "vane_twist",
             "target_omega",
             "max_force",
+            "magnet_radius",
+            "magnet_thickness",
+            "pump_well_wall",
+            "magnet_count",
+            "impeller_shaft_radius",
         },
         ShapeType.BOX: {
             "height",
@@ -149,6 +154,15 @@ class BoundaryConfig(BaseModel):
     target_omega: float = Field(default=15.0, description="Target motor speed/angular velocity")
     max_force: float = Field(default=10.0, description="Maximum motor force/torque limit")
 
+    # ----------------------------------------------------
+    # Magnetic Coupling Specific Parameters
+    # ----------------------------------------------------
+    magnet_radius: Optional[float] = Field(default=None, description="Radius of coupling magnets in mm")
+    magnet_thickness: Optional[float] = Field(default=None, description="Thickness of coupling magnets in mm")
+    pump_well_wall: Optional[float] = Field(default=None, description="Pump well wall thickness in mm")
+    magnet_count: Optional[int] = Field(default=None, description="Number of coupling magnet pairs")
+    impeller_shaft_radius: Optional[float] = Field(default=None, description="Radius of the impeller shaft in mm")
+
     def __hash__(self) -> int:
         """Return a hash value calculated from model properties."""
         return hash(
@@ -174,6 +188,11 @@ class BoundaryConfig(BaseModel):
                 self.tube_radius,
                 self.target_omega,
                 self.max_force,
+                self.magnet_radius,
+                self.magnet_thickness,
+                self.pump_well_wall,
+                self.magnet_count,
+                self.impeller_shaft_radius,
             )
         )
 
@@ -203,6 +222,11 @@ class BoundaryConfig(BaseModel):
             and self.tube_radius == other.tube_radius
             and self.target_omega == other.target_omega
             and self.max_force == other.max_force
+            and self.magnet_radius == other.magnet_radius
+            and self.magnet_thickness == other.magnet_thickness
+            and self.pump_well_wall == other.pump_well_wall
+            and self.magnet_count == other.magnet_count
+            and self.impeller_shaft_radius == other.impeller_shaft_radius
         )
 
     @field_validator("xyz", "rpy", mode="before")

@@ -606,3 +606,54 @@ class CatFountainConfig(BaseModel):
     def retention_boss_height(self) -> float:
         """Return the height of the retention boss limiting vertical travel."""
         return float(self._raw_data.get("retention_boss_height", 1.0))
+
+    # Magnetic Centrifugal Pump Redesign
+    @cached_property
+    def magnet_radius(self) -> float:
+        """Return the radius of the N52 coupling magnets."""
+        return float(self._raw_data.get("magnet_radius", 3.0))
+
+    @cached_property
+    def magnet_thickness(self) -> float:
+        """Return the thickness of the N52 coupling magnets."""
+        return float(self._raw_data.get("magnet_thickness", 3.0))
+
+    @cached_property
+    def magnet_clearance(self) -> float:
+        """Return the pocket clearance for inserting the coupling magnets."""
+        return float(self._raw_data.get("magnet_clearance", 0.1))
+
+    @cached_property
+    def magnet_count(self) -> int:
+        """Return the number of coupling magnets in the drive and rotor rings."""
+        return int(self._raw_data.get("magnet_count", 4))
+
+    @cached_property
+    def magnet_ring_radius(self) -> float:
+        """Return the radial distance of the magnets from the center of rotation."""
+        return float(self._raw_data.get("magnet_ring_radius", 12.0))
+
+    @cached_property
+    def pump_well_depth(self) -> float:
+        """Return the depth of the central isolation pump well."""
+        return float(self._raw_data.get("pump_well_depth", 10.0))
+
+    @cached_property
+    def pump_well_wall(self) -> float:
+        """Return the wall thickness of the central isolation pump well."""
+        return float(self._raw_data.get("pump_well_wall", 1.5))
+
+    @cached_property
+    def pump_inlet_radius(self) -> float:
+        """Return the radius of the axial water inlet."""
+        return float(self._raw_data.get("pump_inlet_radius", 6.0))
+
+    @cached_property
+    def pump_outlet_radius(self) -> float:
+        """Return the inner radius of the tangential water outlet nozzle."""
+        return float(self._raw_data.get("pump_outlet_radius", 4.0))
+
+    @cached_property
+    def pump_casing_clearance(self) -> float:
+        """Return the tight clearance inside the scroll casing around the impeller."""
+        return float(self._raw_data.get("pump_casing_clearance", 1.0))

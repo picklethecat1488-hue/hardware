@@ -11,7 +11,7 @@ bowl:
 impeller:
   part:
     modes: [default, print]
-  material: aluminum
+  material: petg
   export: [stl, obj]
   color: red
 
@@ -31,6 +31,20 @@ lid:
 
 
 led_cover:
+  part:
+    modes: [default, print]
+  material: utr8100
+  export: [stl, obj]
+  color: grey
+
+drive_hub:
+  part:
+    modes: [default, print]
+  material: utr8100
+  export: [stl, obj]
+  color: red
+
+pump_cover:
   part:
     modes: [default, print]
   material: utr8100
