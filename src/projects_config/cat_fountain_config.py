@@ -81,6 +81,11 @@ class CatFountainConfig(BaseModel):
         """Return the bowl thickness."""
         return float(self._raw_data.get("bowl_thickness", 4.0))
 
+    @cached_property
+    def floor_z(self) -> float:
+        """Return the dry compartment floor Z coordinate in millimeters."""
+        return float(self._raw_data.get("floor_z", 36.0))
+
     # =========================================================================
     # Tube Parameters
     # =========================================================================

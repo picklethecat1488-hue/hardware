@@ -186,8 +186,8 @@ class TestCatFountainProvider:
     def test_configuration_loading(self, provider):
         """Ensure that critical measurement values are loaded correctly."""
         assert provider.settings.bowl_radius == 100.0
-        assert provider.settings.tube_radius == 10.0
-        assert provider.settings.impeller_radius == 12.0
+        assert provider.settings.tube_radius == 8.0
+        assert provider.settings.impeller_radius == 9.0
         assert provider.settings.impeller_blades == 6
         assert provider.settings.petg_boundary_friction == 0.20
         assert provider.settings.petg_contact_angle == 75.0
@@ -725,11 +725,12 @@ class TestCatFountainProvider:
                 # Verify that when all water is within boundaries, simulation does not terminate
                 assert step_fn(body_id, client, 0, "simulate") is None
 
-                # Move a sufficient volume of water particles outside the boundary to trigger escaping
-                # (threshold is 0.001L of water, with r_s=0.0015)
+                # Move a sufficient volume of water particles (at least 0.0012L) outside the boundary to trigger escaping
+                vol_s = (4.0 / 3.0) * np.pi * (provider.water_sim.r_s**3)
+                n_needed = int(np.ceil(0.0012 * 1e-3 / vol_s))
                 pos_np = np.array(provider.water_sim.pos_jax)
-                assert len(pos_np) >= 100
-                pos_np[:100, 2] = -10.0  # Put them below the floor boundary
+                assert len(pos_np) >= n_needed
+                pos_np[:n_needed, 2] = -10.0  # Put them below the floor boundary
 
                 import jax.numpy as jnp
 
