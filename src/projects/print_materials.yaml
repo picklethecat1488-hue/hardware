@@ -42,3 +42,15 @@ material:
     density: 1.20
     boundary_friction: 0.50
     contact_angle: 85.0
+
+  # Aluminum
+  aluminum:
+    density: 2.70
+    boundary_friction: 0.15
+    contact_angle: 70.0
+
+  # UTR-8100 Translucent Resin (SLA)
+  utr8100:
+    density: 1.15
+    boundary_friction: 0.22
+    contact_angle: 72.0

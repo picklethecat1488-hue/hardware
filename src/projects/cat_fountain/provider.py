@@ -604,8 +604,8 @@ class CatFountainProvider(Provider):
                 boundary_friction=self.settings.boundary_friction,
                 collision_type=URDFCollisionType.ANALYTICAL,
                 motor_type=URDFMotorType.VELOCITY,
-                motor_target=120.0,
-                motor_force=10.0,
+                motor_target=self.settings.motor_target,
+                motor_force=self.settings.motor_power / self.settings.motor_target,
             ):
                 URDFBoundary(
                     impeller,
@@ -723,10 +723,6 @@ class CatFountainProvider(Provider):
                 with Locations((0, 0, 3.0)):
                     Cylinder(radius=30.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                     Cylinder(radius=28.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-
-            with Locations((0, 65.0, 3.0)):
-                Cylinder(radius=18.0, height=1.5, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                Cylinder(radius=16.0, height=1.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
             with Locations((0, tube_y, 0)):
                 with Locations((0, 0, 6.0)):

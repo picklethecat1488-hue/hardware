@@ -4,28 +4,28 @@ imports:
 bowl:
   part:
     modes: [default, print]
-  material: petg
+  material: utr8100
   export: [stl, obj]
   color: grey
 
 impeller:
   part:
     modes: [default, print]
-  material: petg
+  material: aluminum
   export: [stl, obj]
   color: red
 
 bottom_cover:
   part:
     modes: [default, print]
-  material: petg
+  material: utr8100
   export: [stl, obj]
   color: grey
 
 lid:
   part:
     modes: [default, print]
-  material: petg
+  material: utr8100
   export: [stl, obj]
   color: green
 
@@ -33,7 +33,7 @@ lid:
 led_cover:
   part:
     modes: [default, print]
-  material: petg
+  material: utr8100
   export: [stl, obj]
   color: grey
 

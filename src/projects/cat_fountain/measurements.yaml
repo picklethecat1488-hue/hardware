@@ -48,6 +48,8 @@ impeller_sleeve_height: 4.0
 impeller_blades: 3
 impeller_clearance: 0.4
 vane_twist: -2512.5
+motor_target: 120.0
+motor_power: 1.0
 
 # ==========================================
 # 5. Motor, Central Boss & Fasteners
