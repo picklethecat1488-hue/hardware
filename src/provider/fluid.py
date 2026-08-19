@@ -1110,6 +1110,7 @@ class Fluid:
         damping: Optional[float] = None,
         target_omega: Optional[float] = None,
         max_force: Optional[float] = None,
+        motor_power: Optional[float] = None,
     ) -> None:
         """Step simulation and manage deactivation."""
         self.body_id = body_id
@@ -1117,9 +1118,40 @@ class Fluid:
         impeller_b = self.boundaries.get(LinkType.IMPELLER)
         if impeller_b is not None:
             if target_omega is not None:
-                impeller_b.target_omega = target_omega
+                # Dynamically apply torque speed limit if motor power is specified
+                if len(self.torques) > 0 and motor_power is not None:
+                    last_torque = abs(self.torques[-1])
+                    if last_torque > 1e-5:
+                        omega = min(target_omega, motor_power / last_torque)
+                    else:
+                        omega = target_omega
+                else:
+                    omega = target_omega
+                impeller_b.target_omega = omega
+            else:
+                omega = 0.0
+
             if max_force is not None:
                 impeller_b.max_force = max_force
+
+            # Automatically apply speed control to PyBullet impeller joint
+            impeller_joint_idx = self.link_indices.get(LinkType.IMPELLER, -1)
+            if impeller_joint_idx != -1 and _is_real_physics_client(physics_client):
+                p.changeDynamics(
+                    bodyUniqueId=body_id,
+                    linkIndex=impeller_joint_idx,
+                    maxJointVelocity=200.0,
+                    physicsClientId=physics_client,
+                )
+                p.setJointMotorControl2(
+                    bodyUniqueId=body_id,
+                    jointIndex=impeller_joint_idx,
+                    controlMode=p.VELOCITY_CONTROL,
+                    targetVelocity=omega,
+                    force=max_force if max_force is not None else 10.0,
+                    velocityGain=1.0,
+                    physicsClientId=physics_client,
+                )
 
         if not self.spawner:
             raise RuntimeError("Fluid spawner is not initialized.")

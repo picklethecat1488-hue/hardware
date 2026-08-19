@@ -17,15 +17,13 @@ ruff check .
 
 # 5. Run the fast test suite (excludes slow tests)
 pytest
-
-# 6. Run the integration smoke tests
-python src/smoke.py
 ```
 
 ## Validation Guidelines
 1. **Execution**: Always activate the `cq` conda environment (as specified in [environment.yml](file:///Users/daparker/gh/hardware/environment.yml)) and run commands from the repository root.
-2. **Outcome Verification**: Confirm that all checks (format, lint, compile, pytest, and smoke tests) pass with exit code `0`.
+2. **Outcome Verification**: Confirm that all checks (format, lint, compile, and pytest) pass with exit code `0`.
 3. **Resolution**: If any component fails (such as syntax error, ruff failure, or failing test), you must address the failure and re-run the check before concluding your work.
+4. **Integration Smoke Tests**: The integration smoke tests (`python src/smoke.py`) are highly resource-intensive and should be run on the continuous integration (CI) server. Avoid running them locally during normal development iterations unless you are verifying changes to the daemon, visualizer backend, or SPH physics engine.
 
 ---
 

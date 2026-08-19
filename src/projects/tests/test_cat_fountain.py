@@ -339,6 +339,112 @@ class TestCatFountainProvider:
 
     @pytest.mark.slow
     @pytest.mark.timeout(180)
+    def test_motor_torque_speed_limit_integration(self):
+        """Verify that the motor's angular velocity is dynamically torque-limited by fluid drag."""
+        import tempfile
+        import os
+        from build import Builder
+        from provider import ProviderManager, Room, Simulate
+        from model import AppConfig
+        from shell import Logger
+        import pybullet as p
+        from provider.bullet import LinkType
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = AppConfig()
+            real_measurements = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "../cat_fountain/measurements.yaml")
+            )
+            provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
+            provider.settings.measurements_path = real_measurements
+            provider.settings.target_volume = 0.0004
+
+            manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
+            builder = Builder(manager, logger=Logger(enabled=False))
+
+            builder.generate_parts(temp_dir, names=None)
+            builder.generate_urdfs(temp_dir, names=None)
+
+            # Copy compiled OBJ assets into the URDF folder so PyBullet can locate them relative to the URDF
+            obj_dir = os.path.join(temp_dir, "obj/cat_fountain")
+            urdf_proj_dir = os.path.join(temp_dir, "urdf/cat_fountain")
+            for f in os.listdir(obj_dir):
+                if f.endswith(".obj"):
+                    shutil.copy(os.path.join(obj_dir, f), os.path.join(urdf_proj_dir, f))
+
+            room = Room()
+            provider.build_product(room, mode=Mode.SIMULATE)
+            room.translate_joints()
+
+            room["impeller"][0].urdf_motor_target = 120.0
+            room["impeller"][0].urdf_motor_force = 10.0
+
+            physics_client = p.connect(p.DIRECT)
+            try:
+                p.setGravity(0, 0, -9.81, physicsClientId=physics_client)
+
+                urdf_path = os.path.join(temp_dir, "urdf/cat_fountain/product.urdf")
+                body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
+                assert body_id >= 0
+
+                boundaries = {}
+                for _, (geom, _) in room.items():
+                    u_geom = geom
+                    label = getattr(u_geom, "urdf_label", None)
+                    if label:
+                        geom_boundaries = getattr(u_geom, "urdf_boundaries", None)
+                        if geom_boundaries:
+                            boundaries[label] = geom_boundaries
+
+                hooks = provider.get_simulate_hooks("product:view/simulate")
+                setup_fn = hooks[Simulate.SETUP]
+                setup_fn(body_id, physics_client, "product:view/simulate", boundaries, None)
+
+                fluid = provider.water_sim
+                assert fluid is not None
+
+                # Find joint index for the impeller in PyBullet
+                impeller_joint_idx = -1
+                for i in range(p.getNumJoints(body_id, physicsClientId=physics_client)):
+                    info = p.getJointInfo(body_id, i, physicsClientId=physics_client)
+                    if "impeller" in info[12].decode("utf-8"):
+                        impeller_joint_idx = i
+                        break
+                assert impeller_joint_idx != -1
+
+                step_fn = hooks[Simulate.STEP]
+
+                # Run simulation and check joint velocities
+                for step_idx in range(60):
+                    step_fn(body_id, physics_client, step_idx, "product:view/simulate")
+                    p.stepSimulation(physicsClientId=physics_client)
+
+                    if step_idx >= 40:
+                        target_omega = fluid.boundaries[LinkType.IMPELLER].target_omega
+                        joint_state = p.getJointState(body_id, impeller_joint_idx, physicsClientId=physics_client)
+                        joint_vel = abs(joint_state[1])
+
+                        if step_idx >= 48:
+                            # 1. Verify that PyBullet joint velocity matches target speed at each step
+                            assert joint_vel == pytest.approx(target_omega, abs=1e-2), (
+                                f"Step {step_idx}: Joint velocity {joint_vel} did not match target omega {target_omega}"
+                            )
+
+                            # 2. Verify that target speed correctly solves the torque-limiting equation
+                            # Since the simulation updates at 1/240s steps, the speed governor is computed
+                            # using the drag torque from the previous step (which is at index -2 of fluid.torques).
+                            if len(fluid.torques) > 1:
+                                last_torque = abs(fluid.torques[-2])
+                                motor_power = provider.settings.motor_power
+                                expected_omega = min(120.0, motor_power / last_torque) if last_torque > 1e-5 else 120.0
+                                assert target_omega == pytest.approx(expected_omega, abs=1e-2), (
+                                    f"Step {step_idx}: Solver speed {target_omega} did not match expected {expected_omega} (last torque: {last_torque})"
+                                )
+            finally:
+                p.disconnect(physics_client)
+
+    @pytest.mark.slow
+    @pytest.mark.timeout(180)
     def test_pump_integration_water_escaping(self):
         """Verify that the simulation early terminates when water escapes the bowl."""
         import tempfile
@@ -358,6 +464,7 @@ class TestCatFountainProvider:
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
             provider.settings.target_volume = 0.00008
+            provider.settings.motor_power = 1000.0
 
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
             builder = Builder(manager, logger=Logger(enabled=False))
