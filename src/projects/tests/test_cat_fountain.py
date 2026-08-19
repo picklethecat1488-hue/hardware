@@ -191,7 +191,7 @@ class TestCatFountainProvider:
         assert provider.settings.bowl_radius == 100.0
         assert provider.settings.tube_radius == 10.0
         assert provider.settings.impeller_radius == 12.0
-        assert provider.settings.impeller_blades == 2
+        assert provider.settings.impeller_blades == 3
         assert provider.settings.petg_boundary_friction == 0.20
         assert provider.settings.petg_contact_angle == 75.0
 

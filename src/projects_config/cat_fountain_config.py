@@ -300,6 +300,11 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("bottom_cover_clearance", 0.2))
 
     @cached_property
+    def impeller_clearance(self) -> float:
+        """Return the radial clearance between impeller and tube."""
+        return float(self._raw_data.get("impeller_clearance", 0.1))
+
+    @cached_property
     def bottom_cover_drain_radius(self) -> float:
         """Return the bottom cover central drainage hole radius."""
         return float(self._raw_data.get("bottom_cover_drain_radius", 8.0))

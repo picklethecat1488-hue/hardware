@@ -561,8 +561,8 @@ class CatFountainProvider(Provider):
     def build_impeller(
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the vortex impeller (with helical Archimedes screw vanes)."""
-        r = self.settings.tube_radius - self.settings.tube_thickness - 0.1
+        """Build the vortex impeller (with 3-stage axial propeller blades)."""
+        r = self.settings.tube_radius - self.settings.tube_thickness - self.settings.impeller_clearance
         h = self.settings.impeller_height
         shaft_r = self.settings.impeller_shaft_radius
         num_blades = self.settings.impeller_blades
@@ -583,36 +583,20 @@ class CatFountainProvider(Provider):
                     Rectangle(10.0, 10.0, mode=Mode.SUBTRACT)
             ext_hole = extrude(hole_sketch.sketch, amount=10.5, mode=Mode.PRIVATE)
             impeller.part -= Location((0, 0, -self.settings.impeller_sleeve_height)) * ext_hole  # type: ignore
+
             blade_w = r - hub_r
-            blade_t = self.settings.impeller_radius * 0.125
-            total_twist = self.settings.vane_twist
-            num_rotations = abs(total_twist) / 360.0
-            z_start = 6.0
-            helix_height = h - z_start - 5.0
-            if num_rotations > 0:
-                pitch = helix_height / num_rotations
+            blade_t = 1.0  # Blade thickness
+
+            # Multi-stage axial propeller blades at three heights (Z = 12.0, 32.0, 52.0 mm)
+            for z_pos in [12.0, 32.0, 52.0]:
                 for i in range(num_blades):
                     angle = i * (360.0 / num_blades)
-                    path = cast(
-                        Wire,
-                        Location((0, 0, z_start))
-                        * Rot(0, 0, angle)
-                        * Helix(
-                            pitch=pitch,
-                            height=helix_height,
-                            radius=hub_r,
-                            lefthand=(total_twist < 0),
-                        ),
-                    )
-                    with BuildSketch(path ^ 0) as profile:
-                        Rectangle(blade_w, blade_t, align=(Align.MAX, Align.CENTER))
-                    sweep(profile.sketch, path=path, is_frenet=False)
-            else:
-                for i in range(num_blades):
-                    angle = i * (360.0 / num_blades)
-                    with Locations(Rot(0, 0, angle)):
-                        with Locations((hub_r + blade_w / 2.0, 0, z_start)):
-                            Box(blade_w, blade_t, helix_height, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    with Locations(Location((0, 0, z_pos)) * Rot(0, 0, angle)):
+                        with BuildPart(mode=Mode.PRIVATE) as blade:
+                            # 45-degree pitch for self-supporting printability and maximum axial lift
+                            with Locations(Location((hub_r, 0, 0)) * Rot(45.0, 0, 0)):
+                                Box(blade_w, 4.0, blade_t, align=(Align.MIN, Align.CENTER, Align.CENTER))
+                        add(blade)
 
             with URDFMetadata(
                 label=target,
@@ -631,9 +615,9 @@ class CatFountainProvider(Provider):
                     type=BoundaryType.SOLID,
                     height=cast(URDFShape, impeller.part).urdf_height,
                     thickness=shaft_r * 0.001,
-                    vane_twist=self.settings.vane_twist,
+                    vane_twist=-360.0,  # Map effective rotation direction for JAX solver
                     vane_thickness=blade_t * 0.001,
-                    num_vanes=self.settings.impeller_blades,
+                    num_vanes=num_blades,
                 )
 
         RevoluteJoint(label="motor", to_part=impeller.part, axis=Axis((0, 0, 0), (0, 0, 1)), angular_range=(0, 360))
