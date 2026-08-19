@@ -40,7 +40,6 @@ class TestCatFountainProvider:
         assert "impeller" in provider.part
         assert "bottom_cover" in provider.part
         assert "lid" in provider.part
-        assert "drain_cover" in provider.part
         assert "led_cover" in provider.part
 
     def test_build_part_geometry(self, provider):
@@ -60,7 +59,6 @@ class TestCatFountainProvider:
         assert "impeller" in room
         assert "bottom_cover" in room
         assert "lid" in room
-        assert "drain_cover" in room
 
     def test_build_wiring_diagram(self, provider):
         """Verify that build_wiring_diagram populates the room with footprints and wires."""
@@ -166,7 +164,6 @@ class TestCatFountainProvider:
         assert "impeller" in room
         assert "bottom_cover" in room
         assert "lid" in room
-        assert "drain_cover" in room
 
         # Verify attributes on bowl
         bowl_shape = room["bowl"][0]
@@ -651,42 +648,3 @@ class TestCatFountainProvider:
                     assert vol == pytest.approx(0, abs=0.2), (
                         f"Intersection detected between {name1} and {name2}: {vol:.3f} mm3"
                     )
-
-    def test_drain_cover_insertion_and_lock(self, provider):
-        """Verify that the drain cover can be inserted at 0 degrees and locked at 90 degrees."""
-        # 1. Build the lid and the drain cover
-        lid = provider.build_lid("lid")
-        cover = provider.build_drain_cover("drain_cover")
-
-        assert lid.part.is_valid
-        assert cover.part.is_valid
-
-        # 2. Get the lid and cover geometries
-        lid_shape = lid.part
-        cover_shape = cover.part
-
-        # 3. Position of the drain socket joint on the lid
-        # lid_part.joints["drain_socket"] is at Location((0, 65.0, -1.5))
-        # cover_part.joints["mount"] is at Location((0, 0, 0))
-        # Standard assembled position is: Location((0, 65.0, -1.5))
-        base_loc = Location((0, 65.0, -1.5))
-
-        # Check Insertion Path at 0 degrees (vertical translation from Z = 5.0 down to 0.0)
-        for z_offset in [5.0, 3.0, 1.0, 0.0]:
-            loc = base_loc * Location((0, 0, z_offset))
-            positioned_cover = loc * cover_shape
-
-            inter = lid_shape.intersect(positioned_cover)
-            vol = sum(s.volume for s in inter.solids()) if inter else 0.0
-            assert vol == pytest.approx(0.0, abs=1e-3), (
-                f"Intersection detected during vertical insertion at z_offset={z_offset}: {vol:.3f} mm3"
-            )
-
-        # Check that the cover fits at all rotations (e.g., 90 degrees) because it is circular
-        loc_rotated = base_loc * Rot(0, 0, 90.0)
-        positioned_cover_rotated = loc_rotated * cover_shape
-        inter_rotated = lid_shape.intersect(positioned_cover_rotated)
-        vol_rotated = sum(s.volume for s in inter_rotated.solids()) if inter_rotated else 0.0
-        assert vol_rotated == pytest.approx(0.0, abs=1e-3), (
-            f"Intersection detected at rotated position (90 deg): {vol_rotated:.3f} mm3"
-        )

@@ -29,13 +29,6 @@ lid:
   export: [stl, obj]
   color: green
 
-drain_cover:
-  part:
-    modes: [default, print]
-  material: petg
-  export: [stl, obj]
-  color: grey
-
 
 led_cover:
   part:

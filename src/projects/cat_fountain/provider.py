@@ -69,7 +69,6 @@ class CatFountainProvider(Provider):
             "impeller": self.build_impeller,
             "bottom_cover": self.build_bottom_cover,
             "lid": self.build_lid,
-            "drain_cover": self.build_drain_cover,
             "led_cover": self.build_led_cover,
         }
 
@@ -762,44 +761,17 @@ class CatFountainProvider(Provider):
                         mode=Mode.SUBTRACT,
                     )
 
-            # Create shroud at its absolute position
-            shroud = Location((0, self.settings.drain_hole_y, self.settings.drain_shroud_z)) * Cylinder(
-                radius=self.settings.drain_shroud_radius,
-                height=self.settings.drain_shroud_height,
-                align=(Align.CENTER, Align.CENTER, Align.MIN),
-                mode=Mode.PRIVATE,
-            )
-            # Create trimmer centered at the lid origin (0, 0, 0)
-            trimmer = Cylinder(
-                radius=r - t - clearance,
-                height=self.settings.trimmer_height,
-                align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                mode=Mode.PRIVATE,
-            )
-            # Intersect them to trim the shroud to fit within the bowl's inner wall
-            trimmed_shroud = shroud.intersect(trimmer)
-            add(trimmed_shroud)
-
-            with Locations((0, 65.0, 0)):
-                Cylinder(
-                    radius=self.settings.drain_hole_radius,
-                    height=lid_h + 2.0,
-                    align=(Align.CENTER, Align.CENTER, Align.MIN),
-                    mode=Mode.SUBTRACT,
-                )
-                with Locations((0, 0, -1.5)):
-                    Cylinder(radius=15.6, height=4.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-
-                with Locations((0, 0, -15.0)):
-                    Cylinder(
-                        radius=16.0, height=13.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
-                    )
-                with Locations((0, 0, -15.0)):
-                    Box(32.0, 3.0, 2.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                    Box(3.0, 32.0, 2.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                with Locations((0, 0, -12.0)):
-                    Box(4.0, 40.0, 8.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-                    Box(40.0, 4.0, 8.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+            # Create a simple integrated drainage grate (slits) at Y = 65.0
+            with Locations((0, 65.0, lid_h / 2.0)):
+                for dx in [-10.0, -5.0, 0.0, 5.0, 10.0]:
+                    with Locations((dx, 0, 0)):
+                        Box(
+                            1.5,
+                            16.0,
+                            lid_h + 10.0,
+                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                            mode=Mode.SUBTRACT,
+                        )
 
         with URDFMetadata(
             geometry=lid,
@@ -872,53 +844,8 @@ class CatFountainProvider(Provider):
             )
 
         RigidJoint("mount", lid.part, Location((0, 0, step_d)))
-        RigidJoint("drain_socket", lid.part, Location((0, 65.0, -1.5)))
 
         return lid
-
-    @method_cache
-    def build_drain_cover(
-        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
-    ) -> BuildPart:
-        """Build the removable circular drain cover with locking tabs for the filter compartment."""
-        cover_h = 2.5
-
-        with BuildPart() as cover:
-            # Simple circular drop-in plug
-            Cylinder(radius=15.3, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-            # Downward hollow boss to center/retain the cover (outer radius 5.5mm, inner radius 4.0mm, height 5.0mm)
-            Cylinder(radius=5.5, height=5.0, align=(Align.CENTER, Align.CENTER, Align.MAX))
-            Cylinder(radius=4.0, height=5.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
-
-            # Generate 7-hole hexagonal grid of holes
-            hex_spacing = 8.7
-            hex_width = 5.2
-            with BuildSketch() as hole_sketch:
-                hole_locations = []
-                for i in range(-2, 3):
-                    for j in range(-2, 3):
-                        x = (i + j * 0.5) * hex_spacing
-                        y = j * (math.sqrt(3) / 2) * hex_spacing
-                        if math.sqrt(x * x + y * y) <= 9.0:
-                            hole_locations.append((x, y))
-                with Locations(hole_locations):
-                    RegularPolygon(radius=hex_width / 2.0, side_count=6, major_radius=False)
-
-            extrude(hole_sketch.sketch, amount=cover_h + 10.0, both=True, mode=Mode.SUBTRACT)
-
-            URDFMetadata(
-                label=target,
-                material=self.settings.material,
-                density=self.settings.density,
-                boundary_friction=self.settings.boundary_friction,
-                collision_type=URDFCollisionType.CONVEX,
-                parent="bowl",
-                joint_type=URDFJointType.FIXED,
-            )
-
-        RigidJoint("mount", cover.part, Location((0, 0, 0)))
-
-        return cover
 
     @method_cache
     def build_led_cover(
@@ -956,21 +883,18 @@ class CatFountainProvider(Provider):
         impeller_part = self.build_impeller("impeller").part
         bottom_cover_part = self.build_bottom_cover("bottom_cover").part
         lid_part = self.build_lid("lid").part
-        drain_cover_part = self.build_drain_cover("drain_cover").part
 
         assert (
             bowl_part is not None
             and impeller_part is not None
             and bottom_cover_part is not None
             and lid_part is not None
-            and drain_cover_part is not None
         )
 
         # 2. Position them in their standard assembled configuration using joints
         bowl_part.joints["shaft"].connect_to(impeller_part.joints["motor"])
         bowl_part.joints["cover_seat"].connect_to(bottom_cover_part.joints["mount"])
         bowl_part.joints["lid_seat"].connect_to(lid_part.joints["mount"])
-        lid_part.joints["drain_socket"].connect_to(drain_cover_part.joints["mount"])
 
         # Build and connect the LED cover
         led_cover = self.build_led_cover("led_cover").part
@@ -986,19 +910,16 @@ class CatFountainProvider(Provider):
         assert impeller_part.location is not None
         assert bottom_cover_part.location is not None
         assert lid_part.location is not None
-        assert drain_cover_part.location is not None
 
         impeller_part.location = Location((0, 0, 50)) * impeller_part.location
         bottom_cover_part.location = Location((0, 0, -40)) * bottom_cover_part.location
         lid_part.location = Location((0, 0, 70)) * lid_part.location
-        drain_cover_part.location = Location((0, 0, 60)) * drain_cover_part.location
 
         # 4. Add the exploded parts to the room
         room.add("bowl", bowl_part, color="grey")
         room.add("impeller", impeller_part, color="red")
         room.add("bottom_cover", bottom_cover_part, color="black")
         room.add("lid", lid_part, color="green")
-        room.add("drain_cover", drain_cover_part, color="light_grey")
         room.add("led_cover", led_cover, color="grey")
 
         # 5. Add connector lines indicating assembly paths
@@ -1016,12 +937,6 @@ class CatFountainProvider(Provider):
             "cover_label", "COVER", bottom_cover_part.center() + Vector(-80, 0, -10), options=TextArgs(font_size=10)
         )
         room.add_label("lid_label", "LID", lid_part.center() + Vector(-50, -10, 20), options=TextArgs(font_size=10))
-        room.add_label(
-            "drain_cover_label",
-            "DRAIN COVER",
-            drain_cover_part.center() + Vector(40, -10, 10),
-            options=TextArgs(font_size=10),
-        )
 
         room.add_label(
             "led_cover_label",
@@ -1036,21 +951,18 @@ class CatFountainProvider(Provider):
         impeller_part = self.build_impeller("impeller", mode=mode).part
         bottom_cover_part = self.build_bottom_cover("bottom_cover", mode=mode).part
         lid_part = self.build_lid("lid", mode=mode).part
-        drain_cover_part = self.build_drain_cover("drain_cover", mode=mode).part
 
         assert (
             bowl_part is not None
             and impeller_part is not None
             and bottom_cover_part is not None
             and lid_part is not None
-            and drain_cover_part is not None
         )
 
         # 2. Position them in their standard assembled configuration using joints
         bowl_part.joints["shaft"].connect_to(impeller_part.joints["motor"])
         bowl_part.joints["cover_seat"].connect_to(bottom_cover_part.joints["mount"])
         bowl_part.joints["lid_seat"].connect_to(lid_part.joints["mount"])
-        lid_part.joints["drain_socket"].connect_to(drain_cover_part.joints["mount"])
 
         # Build and connect the LED cover using joints
         led_cover = self.build_led_cover("led_cover", mode=mode).part
@@ -1061,14 +973,12 @@ class CatFountainProvider(Provider):
         if mode == ProviderMode.SIMULATE:
             room.add("bowl", bowl_part, color="grey", alpha=0.4)
             room.add("lid", lid_part, color="grey", alpha=0.4)
-            room.add("drain_cover", drain_cover_part, color="grey")
             room.add("impeller", impeller_part, color="grey")
             room.add("bottom_cover", bottom_cover_part, color="grey", alpha=0.4)
             room.add("led_cover", led_cover, color="grey", alpha=0.4)
         else:
             room.add("bowl", bowl_part, color="grey")
             room.add("lid", lid_part, color="green", alpha=0.6)
-            room.add("drain_cover", drain_cover_part, color="light_grey")
             room.add("impeller", impeller_part, color="red")
             room.add("bottom_cover", bottom_cover_part, color="black", alpha=0.6)
             room.add("led_cover", led_cover, color="grey", alpha=0.4)
