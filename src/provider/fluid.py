@@ -84,6 +84,28 @@ def calculate_magnetic_drag_jax(
 
 
 @jax.jit
+def calculate_bearing_and_viscous_drag_jax(
+    omega: float,
+    impeller_shaft_radius: float,
+    impeller_radius: float,
+) -> float:
+    """Calculate the journal bearing and viscous disc drag torque using JAX."""
+    # Journal bearing drag (steel shaft inside PETG sleeve under water)
+    f_radial = 0.5  # Assumed radial misalignment/imbalance load of 0.5 N
+    mu_k = 0.15
+    r_shaft = impeller_shaft_radius * 0.001
+    t_bearing = jnp.where(jnp.abs(omega) > 1e-3, f_radial * mu_k * r_shaft, 0.0)
+
+    # Viscous disc shear drag (top and bottom hub faces rotating in water)
+    mu_fluid = 0.001  # Dynamic viscosity of water (Pa*s)
+    g_clearance = 0.001  # Axial clearance gap (1.0 mm)
+    r_impeller = impeller_radius * 0.001
+    t_viscous = (jnp.pi * mu_fluid * jnp.abs(omega) * (r_impeller**4)) / g_clearance
+
+    return t_bearing + t_viscous
+
+
+@jax.jit
 def q_rotate(q, v):
     """Rotate a batch of 3D vectors v by quaternion q (xyzw)."""
     q_xyz = q[:3]
@@ -1187,6 +1209,36 @@ class Fluid:
             )
         )
 
+    def calculate_bearing_and_viscous_drag(self, omega: float) -> float:
+        """Calculate additional mechanical drag torque (bearing and viscous).
+
+        Args:
+            omega: Impeller angular velocity in rad/s.
+
+        Returns:
+            float: Total bearing and viscous drag friction torque in N*m.
+        """
+        impeller_b = self.boundaries.get(LinkType.IMPELLER)
+        if impeller_b is None:
+            return 0.0
+
+        shaft_r = getattr(impeller_b, "impeller_shaft_radius", None)
+        radius = getattr(impeller_b, "radius", None)
+
+        if shaft_r is None or radius is None:
+            raise ValueError(
+                "Required URDF boundary metadata (radius or impeller_shaft_radius) is missing for the impeller."
+            )
+
+        # Delegate computation to the compiled JAX function
+        return float(
+            calculate_bearing_and_viscous_drag_jax(
+                omega,
+                shaft_r,
+                radius,
+            )
+        )
+
     def _apply_joint_velocity(
         self,
         body_id: int,
@@ -1381,7 +1433,11 @@ class Fluid:
                     raise ValueError(f"Invalid magnetic drag configuration: {e}") from e
 
             mag_friction = self.calculate_magnetic_drag(drag_config)
-        avg_step_torque = (float(torque_accum) / 5) + mag_friction
+            bearing_viscous_drag = self.calculate_bearing_and_viscous_drag(impeller_b.target_omega)
+        else:
+            bearing_viscous_drag = 0.0
+
+        avg_step_torque = (float(torque_accum) / 5) + mag_friction + bearing_viscous_drag
         self.torques.append(avg_step_torque)
 
         self.last_positions = self.pos_jax.tolist()

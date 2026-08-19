@@ -157,6 +157,7 @@ class TestBulletFluid:
                 "rpy": [0.0, 0.0, 0.0],
                 "link_type": LinkType.IMPELLER,
                 "link_idx": 1,
+                "impeller_shaft_radius": 2.5,
             },
         }
 
@@ -384,6 +385,7 @@ class TestBulletFluid:
                     "rpy": [0.0, 0.0, 0.0],
                     "link_type": LinkType.IMPELLER,
                     "link_idx": 1,
+                    "impeller_shaft_radius": 2.5,
                 },
             }
 
@@ -1105,6 +1107,51 @@ class TestBulletFluid:
             # Deactivated particles are moved to z = 1000.0
             assert updated_pos[0, 2] >= 1000.0
             assert 0 in fluid.fallen_out_water_ids
+
+        finally:
+            p.disconnect(physicsClientId=physics_client)
+
+    def test_bearing_and_viscous_drag_calculation(self):
+        """Test calculation of bearing and viscous drag (happy and sad paths)."""
+        physics_client = p.connect(p.DIRECT)
+        try:
+            body_id = self.create_test_body(physics_client, mass=0.0)
+            provider = self.DummyProvider()
+
+            # Setup valid boundaries (happy path)
+            boundaries = self.get_boundaries()
+            # Verify that get_boundaries has impeller_shaft_radius and radius
+            assert "rotary_vanes" in boundaries
+
+            fluid = self.ConservationFluid(
+                config=FluidConfig.water(
+                    viscosity=0.5,
+                    target_volume=0.00001,
+                    spawn_buffer=0.004,
+                    boundaries=boundaries,
+                    gravity=(0.0, 0.0, -9.81),
+                ),
+                provider=provider,
+                body_id=body_id,
+                physics_client=physics_client,
+            )
+
+            # 1. Happy path: valid inputs produce non-zero drag during rotation
+            drag_torque = fluid.calculate_bearing_and_viscous_drag(10.0)
+            assert drag_torque > 0.0, "Expected non-zero bearing and viscous drag torque"
+
+            # Zero speed produces only static (zero active) bearing friction, but viscous is zero
+            drag_zero = fluid.calculate_bearing_and_viscous_drag(0.0)
+            assert drag_zero == 0.0, "Expected zero drag torque when stationary"
+
+            # 2. Sad path: missing required metadata (impeller_shaft_radius is None)
+            impeller_b = fluid.boundaries.get(LinkType.IMPELLER)
+            assert impeller_b is not None
+            # Simulate missing metadata by setting to None
+            setattr(impeller_b, "impeller_shaft_radius", None)
+
+            with pytest.raises(ValueError, match="Required URDF boundary metadata"):
+                fluid.calculate_bearing_and_viscous_drag(10.0)
 
         finally:
             p.disconnect(physicsClientId=physics_client)

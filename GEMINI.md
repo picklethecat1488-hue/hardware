@@ -69,6 +69,7 @@ pytest
 * **Analytical Boundaries**: Prefer analytical boundaries (`URDFCollisionType.ANALYTICAL`) over concave meshes (`URDFCollisionType.CONCAVE`) for JAX SPH fluid simulation. This prevents boundary particle tunneling and accelerates collision resolution.
 * **Cylinder Boundaries**: For cylinder cavity boundary configurations, treat height as infinite along the local Z axis where possible to avoid particle escape at high pressures.
 * **Fluid Recycling**: Ensure `fluid.recycle_fluid = True` is used in steady-state flow loops, with boundary coordinates matching physical limits.
+* **JAX-JIT Compilation**: Prefer using `jax.jit` and pure functions during physics computations in JAX to leverage static optimization, compilation speedups, and hardware acceleration.
 * **Numeric Damping**: For long-running simulation validations, enforce stabilization velocity damping (e.g., `0.95`) to prevent numerical velocity buildup.
 
 ### 6. Declarative Wiring & Routing Engine

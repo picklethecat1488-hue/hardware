@@ -378,6 +378,7 @@ def test_fluid_simulator_dynamic_properties():
             link_type=LinkType.IMPELLER,
             radius=0.0,
             link_idx=0,
+            impeller_shaft_radius=2.5,
         ),
     }
 
