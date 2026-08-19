@@ -604,8 +604,8 @@ class CatFountainProvider(Provider):
                 boundary_friction=self.settings.boundary_friction,
                 collision_type=URDFCollisionType.ANALYTICAL,
                 motor_type=URDFMotorType.VELOCITY,
-                motor_target=120.0,
-                motor_force=10.0,
+                motor_target=self.settings.motor_target,
+                motor_force=self.settings.motor_power / self.settings.motor_target,
             ):
                 URDFBoundary(
                     impeller,

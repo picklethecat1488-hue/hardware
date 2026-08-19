@@ -134,6 +134,16 @@ class CatFountainConfig(BaseModel):
         """Return the total twist angle of the impeller blades in degrees."""
         return float(self._raw_data.get("vane_twist", -1080.0))
 
+    @cached_property
+    def motor_target(self) -> float:
+        """Return the target motor angular velocity in rad/s in the simulation."""
+        return float(self._raw_data.get("motor_target", 120.0))
+
+    @cached_property
+    def motor_power(self) -> float:
+        """Return the maximum motor output power in Watts."""
+        return float(self._raw_data.get("motor_power", 1.0))
+
     # =========================================================================
     # Spout Parameters
     # =========================================================================
