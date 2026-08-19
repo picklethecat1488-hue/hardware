@@ -59,12 +59,12 @@ motor_power: 15.0
 boss_body_height: 2.0
 boss_body_radius_offset: 3.5
 motor_collar_clearance_height: 2.0
-motor_collar_clearance_radius: 3.2
+motor_collar_clearance_radius: 2.75
 shaft_hole_height: 1.8
 shaft_hole_radius_offset: 0.1
 
 # Set screw & alignment parameters
-motor_spacing_x: 17.0
+motor_spacing_x: 6.6
 motor_set_screw_angle: 45.0
 motor_set_screw_length: 24.0
 motor_set_screw_radius: 1.75
@@ -133,8 +133,8 @@ current_monitor_spacing_y: 12.7
 current_monitor_standoff_height: 4.0
 
 # Motor Driver
-motor_driver_spacing_x: 19.0
-motor_driver_spacing_y: 13.0
+motor_driver_spacing_x: 25.4
+motor_driver_spacing_y: 20.3
 motor_driver_standoff_height: 4.0
 
 # ==========================================

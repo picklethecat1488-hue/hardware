@@ -142,51 +142,15 @@ class CatFountainProvider(Provider):
                     radius=r - t, height=floor_z - t, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                 )
 
-            # Helper to add mounting tabs that automatically extend between z_start and z_end
-            def add_mounting_tabs(
-                angles: list[float],
-                radial_position: float,
-                z_start: float,
-                z_end: float,
-                shape_fn: Callable[[float], Any],
-                hole_radius: float,
-                hole_depth: float,
-                hole_align_top: bool = True,
-            ):
-                height = abs(z_end - z_start)
-                z_min = min(z_start, z_end)
-                for angle in angles:
-                    with Locations(Rot(0, 0, angle)):
-                        with Locations((radial_position, 0, z_min)):
-                            shape_fn(height)
-                            if hole_align_top:
-                                with Locations((0, 0, height)):
-                                    Cylinder(
-                                        radius=hole_radius,
-                                        height=hole_depth,
-                                        align=(Align.CENTER, Align.CENTER, Align.MAX),
-                                        mode=Mode.SUBTRACT,
-                                    )
-                            else:
-                                Cylinder(
-                                    radius=hole_radius,
-                                    height=hole_depth,
-                                    align=(Align.CENTER, Align.CENTER, Align.MIN),
-                                    mode=Mode.SUBTRACT,
-                                )
-
-            # Add bottom controller cover mounting tabs (extending from cover thickness to dry compartment ceiling)
-            cover_thickness = 4.0
-            add_mounting_tabs(
-                angles=[45, 135, 225, 315],
-                radial_position=r - t - 5.0,
-                z_start=cover_thickness,
-                z_end=floor_z - t,
-                shape_fn=lambda h: Cylinder(radius=5.0, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN)),
-                hole_radius=1.2,
-                hole_depth=10.0,
-                hole_align_top=False,
-            )
+            # Subtract a matching snap-fit groove on the inner wall of the dry compartment
+            # Located to align with the bottom cover's snap ring (Z = 1.1 on cover of height 4.0)
+            with Locations((0, 0, 1.1)):
+                Cylinder(
+                    radius=r - t + 0.6,
+                    height=1.2,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
 
             # --- INTEGRATED TUBE & CENTRIFUGAL VOLUTE CASING ---
             tube_x = 0.0
@@ -195,24 +159,35 @@ class CatFountainProvider(Provider):
             tube_t = self.settings.tube_thickness
             tube_in_r = tube_r - tube_t
 
+            # Dynamically calculate casing dimensions based on impeller settings
+            hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.0
+            impeller_r = hub_r + 4.0
+            chamber_r = impeller_r + self.settings.pump_casing_clearance
+            casing_r = chamber_r + self.settings.pump_well_wall
+            snap_r = chamber_r + 1.0
+
             # 1. Casing & Tube outer solid geometries
             with Locations((0, 0, floor_z)):
                 # Volute casing outer cylinder
-                Cylinder(radius=26.0, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                Cylinder(radius=casing_r, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
             with Locations((tube_x, tube_y, floor_z)):
                 # Integrated vertical tube outer cylinder
                 Cylinder(radius=tube_r, height=self.settings.tube_height, align=(Align.CENTER, Align.CENTER, Align.MIN))
             # Solid connector block for the tangential flow nozzle (running along Y)
             with Locations((0, 14.0, floor_z)):
-                Box(16.0, 28.0, 10.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                Box(tube_r * 2.0, 28.0, 10.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
             # 2. Subtract inner cavities
             with Locations((0, 0, floor_z)):
                 # Volute impeller chamber
-                Cylinder(radius=24.0, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                Cylinder(
+                    radius=chamber_r, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                )
                 # Snap fit recess for pump cover at the top rim
                 with Locations((0, 0, 8.5)):
-                    Cylinder(radius=25.0, height=1.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                    Cylinder(
+                        radius=snap_r, height=1.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                    )
             with Locations((tube_x, tube_y, floor_z + 2.0)):
                 # Tube inner cavity (starting 2mm above floor to create a bottom pocket)
                 Cylinder(
@@ -234,27 +209,25 @@ class CatFountainProvider(Provider):
             # Motor mounting boss projecting down from the bowl floor (Z = floor_z)
             # This creates a solid 1.2mm barrier floor at the center of rotation
             with Locations((0, 0, floor_z)):
-                # Outer boss body (36.9mm deep to cover 2830 BLDC motor and drive hub recess)
-                Cylinder(radius=18.0, height=36.9, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                # Outer boss body (17.5mm deep to cover 9.3mm motor and drive hub recess)
+                Cylinder(radius=18.0, height=17.5, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-                # 1. Recess for the drive hub (radius 17.0mm, height 4.5mm from Z = -1.2)
+                # 1. Recess for the drive hub (radius 17.0mm, height 5.3mm from Z = -1.2)
                 with Locations((0, 0, -1.2)):
-                    Cylinder(radius=17.0, height=4.5, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                    Cylinder(radius=17.0, height=5.3, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
-                # 2. Pocket for the motor body (starting at Z = -5.7 downwards by 30.0mm)
-                with Locations((0, 0, -5.7)):
-                    # Motor body pocket (radius 14.25mm for 28.5mm diameter, height 30.0mm)
-                    Cylinder(
-                        radius=14.25, height=30.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT
-                    )
-                    # Motor front face alignment boss pocket (radius 5.0mm, height 2.0mm)
-                    Cylinder(radius=5.0, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                # 2. Pocket for the BetaFPV 1102 motor body (starting at Z = -6.5 downwards by 10.0mm)
+                with Locations((0, 0, -6.5)):
+                    # Motor body pocket (radius 7.0mm for 13.8mm diameter, height 10.0mm)
+                    Cylinder(radius=7.0, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                    # Motor front face alignment boss pocket (radius 2.75mm, height 1.6mm)
+                    Cylinder(radius=2.75, height=1.6, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
-                # 3. Face mounting screw holes (M3, spacing 19.0mm, Z = -5.7 upwards through the floor)
-                with Locations((0, -9.5, -5.7), (0, 9.5, -5.7)):
+                # 3. Face mounting screw holes for 1102 motor (M1.4 screws on 6.6mm circle, Z = -6.5 upwards)
+                with Locations((0, -3.3, -6.5), (0, 3.3, -6.5)):
                     Cylinder(
-                        radius=1.6,
-                        height=10.0,
+                        radius=0.75,
+                        height=7.0,
                         align=(Align.CENTER, Align.CENTER, Align.MIN),
                         mode=Mode.SUBTRACT,
                     )
@@ -280,6 +253,40 @@ class CatFountainProvider(Provider):
                                 align=hole_align,
                                 mode=Mode.SUBTRACT,
                             )
+
+            # Helper function to generate a 3D-printed two-sided slide-in card guide
+            def add_pcb_clip(
+                center_x: float,
+                center_y: float,
+                board_w: float,  # Width along Y (20.3)
+                board_l: float,  # Length along X (25.4)
+                standoff_h: float,
+                label: str,
+            ):
+                with Locations((center_x, center_y, floor_z - t)):
+                    # 1. Base plate connecting the two guide tracks (recessed to save material and provide airflow)
+                    Box(board_l - 4.0, board_w - 2.0, standoff_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                    
+                    # 2. Left and Right guide tracks (at X = +/- board_l/2)
+                    track_w = board_w
+                    track_l = 3.0
+                    track_h = standoff_h + 3.2
+                    
+                    with Locations((-board_l / 2.0 - 0.75, 0, 0), (board_l / 2.0 + 0.75, 0, 0)):
+                        Box(track_l, track_w, track_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                    
+                    # 3. Subtract the slot for the PCB inside the left/right tracks (1.9mm height)
+                    with Locations((0, 0, -standoff_h)):
+                        with Locations((-board_l / 2.0 - 0.15, 0, 0), (board_l / 2.0 + 0.15, 0, 0)):
+                            Box(2.0, board_w + 0.3, 1.9, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+
+                # Add engraved label
+                label_y_offset = -(board_w / 2.0 + 5.0)
+                with BuildSketch() as label_sketch:
+                    Text(label, font_size=4.5, align=(Align.CENTER, Align.CENTER))
+                mirrored_sketch = label_sketch.sketch.mirror(Plane.YZ)
+                ext_text = extrude(mirrored_sketch, amount=1.5, mode=Mode.PRIVATE)
+                bowl.part -= Location((center_x, center_y + label_y_offset, floor_z - t)) * ext_text
 
             # Helper function to generate standoff posts and blind screw holes on the ceiling
             def add_pcb_mount(
@@ -319,7 +326,7 @@ class CatFountainProvider(Provider):
                 ext_text = extrude(mirrored_sketch, amount=1.5, mode=Mode.PRIVATE)
                 bowl.part -= Location((center_x, center_y + label_y_offset, floor_z - t)) * ext_text  # type: ignore
 
-            # Mount all PCBs in the dry compartment using the helper
+            # Mount all PCBs in the dry compartment (standard boards use standoffs, TMC6300 uses slide-in guide)
             pcb_mounts = [
                 (
                     50.0,
@@ -328,6 +335,7 @@ class CatFountainProvider(Provider):
                     self.settings.fuel_gauge_spacing_y,
                     self.settings.fuel_gauge_standoff_height,
                     "FUEL",
+                    "standoff",
                 ),
                 (
                     -50.0,
@@ -336,6 +344,7 @@ class CatFountainProvider(Provider):
                     self.settings.pico_spacing_y,
                     self.settings.pico_standoff_height,
                     "PICO W",
+                    "standoff",
                 ),
                 (
                     0.0,
@@ -344,6 +353,7 @@ class CatFountainProvider(Provider):
                     self.settings.charger_spacing_y,
                     self.settings.charger_standoff_height,
                     "CHARGER",
+                    "standoff",
                 ),
                 (
                     50.0,
@@ -352,6 +362,7 @@ class CatFountainProvider(Provider):
                     self.settings.current_monitor_spacing_y,
                     self.settings.current_monitor_standoff_height,
                     "CURRENT",
+                    "standoff",
                 ),
                 (
                     50.0,
@@ -359,11 +370,16 @@ class CatFountainProvider(Provider):
                     self.settings.motor_driver_spacing_x,
                     self.settings.motor_driver_spacing_y,
                     self.settings.motor_driver_standoff_height,
-                    "MOTOR DRV",
+                    "TMC6300",
+                    "clip",
                 ),
             ]
-            for cx, cy, sx, sy, sh, lbl in pcb_mounts:
-                add_pcb_mount(cx, cy, sx, sy, sh, lbl)
+            for cx, cy, sx, sy, sh, lbl, mtype in pcb_mounts:
+                if mtype == "clip":
+                    # For the clip bracket, sx (spacing_x) is board length, sy (spacing_y) is board width
+                    add_pcb_clip(cx, cy, sy, sx, sh, lbl)
+                else:
+                    add_pcb_mount(cx, cy, sx, sy, sh, lbl)
 
             # Charging port hole in the outer wall of the dry compartment (back side, y = -r)
             # Centered on the USB port, which is located on the underside of the PCB
@@ -515,7 +531,7 @@ class CatFountainProvider(Provider):
 
         # Define joints
         RigidJoint("impeller_post", bowl.part, Location((0, 0, floor_z)))
-        RigidJoint("motor_shaft", bowl.part, Location((0, 0, floor_z - 5.2)))
+        RigidJoint("motor_shaft", bowl.part, Location((0, 0, floor_z - 6.0)))
         RigidJoint("pump_cover_seat", bowl.part, Location((0, 0, floor_z + 8.5)))
         RigidJoint("lid_seat", bowl.part, Location((0, 0, h)))
         RigidJoint("cover_seat", bowl.part, Location((0, 0, 0)))
@@ -655,25 +671,13 @@ class CatFountainProvider(Provider):
             with Locations((0, -cover_r, 0.0)):
                 Box(16.0, 10.0, 4.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
-            for angle in [45, 135, 225, 315]:
-                with Locations(Rot(0, 0, angle)):
-                    with Locations((cover_r - 10.0, 0, 0.0)):
-                        Cylinder(
-                            radius=6.0, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
-                        )
-
-            for angle in [45, 135, 225, 315]:
-                with Locations(Rot(0, 0, angle)):
-                    with Locations((r - t - 5.0, 0, 0.0)):
-                        Cylinder(
-                            radius=1.6, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
-                        )
-                        Cylinder(
-                            radius=3.2,
-                            height=2.0,
-                            align=(Align.CENTER, Align.CENTER, Align.MIN),
-                            mode=Mode.SUBTRACT,
-                        )
+            # Add a 0.5mm snap-fit ring around the perimeter
+            with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
+                Cylinder(radius=cover_r + 0.5, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.4)
+            
+            with Locations((0, 0, 1.2)):
+                add(snap_ring_part.part)
 
             URDFMetadata(
                 label=target,
@@ -883,7 +887,7 @@ class CatFountainProvider(Provider):
     ) -> BuildPart:
         """Build the dry-side magnet drive hub mounted on the motor D-shaft."""
         hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.0
-        hub_h = 4.0
+        hub_h = 4.5
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
         mt = self.settings.magnet_thickness + self.settings.magnet_clearance
         ring_r = self.settings.magnet_ring_radius
@@ -891,9 +895,9 @@ class CatFountainProvider(Provider):
         with BuildPart() as hub:
             Cylinder(radius=hub_r, height=hub_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Round shaft hole (radius 1.62mm for 3.175mm motor shaft)
+            # Round shaft hole (radius 0.78mm for 1.5mm motor shaft)
             with BuildSketch() as hole_sketch:
-                Circle(radius=1.62)
+                Circle(radius=0.78)
             ext_hole = extrude(hole_sketch.sketch, amount=hub_h + 2.0, mode=Mode.PRIVATE)
             hub.part -= Location((0, 0, -1.0)) * ext_hole
 
@@ -925,7 +929,12 @@ class CatFountainProvider(Provider):
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Build the wet-side pump cover that snaps onto the volute casing."""
-        cover_r = 24.85  # Fits into the 25.0mm recess with tight print clearance
+        # Dynamically calculate cover radius based on impeller settings
+        hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.0
+        impeller_r = hub_r + 4.0
+        chamber_r = impeller_r + self.settings.pump_casing_clearance
+        snap_r = chamber_r + 1.0
+        cover_r = snap_r - 0.15  # Fits with print clearance
         cover_h = 1.5
         inlet_r = self.settings.pump_inlet_radius
 
@@ -1069,15 +1078,15 @@ class CatFountainProvider(Provider):
 
             def make_motor() -> Part:
                 with BuildPart() as motor:
-                    # 2830 BLDC motor body (radius 14.0mm, height 30.0mm)
-                    Cylinder(radius=14.0, height=30.0, align=(Align.CENTER, Align.CENTER, Align.MAX))
-                    # 3.175mm (1/8") shaft (radius 1.5875mm, height 10.0mm)
-                    Cylinder(radius=1.5875, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    # 1102 BLDC motor body (radius 6.9mm, height 9.3mm)
+                    Cylinder(radius=6.9, height=9.3, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                    # 1.5mm shaft (radius 0.75mm, height 5.0mm)
+                    Cylinder(radius=0.75, height=5.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                 return cast(Part, motor.part)
 
             motor_part = make_motor()
             floor_z = self.settings.floor_z
-            motor_part.location = Location((0, 0, floor_z - 5.7))
+            motor_part.location = Location((0, 0, floor_z - 6.5))
             room.add("motor", motor_part, color="grey", alpha=0.8)
 
             def make_pcb(w: float, l: float, h: float = 2.0) -> Part:

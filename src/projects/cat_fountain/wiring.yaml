@@ -131,6 +131,10 @@ components:
         label: "GP21 (CTRL_IN3)"
         side: left
         slot: 6
+      - name: "GP22"
+        label: "GP22 (CTRL_DIAG)"
+        side: left
+        slot: 7
       - name: "GND_L"
         label: "3 (GND)"
         side: right
@@ -212,15 +216,18 @@ components:
     package: board
     position: [50.0, 15.0, 23.0]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [25.8, 21.0, 1.6]
-    mounting_holes: [20.0, 15.0]
+    dimensions: [25.4, 20.3, 1.6]
+    mounting_holes: [22.86, 17.78]
     label:
-      text: "DRV8313"
+      text: "TMC6300"
       position: [15.0, 0.0, 0.0]
       align: [min, center]
     pins:
-      - name: "V+"
-        label: "V+"
+      - name: "VCC"
+        label: "VCC"
+        side: right
+      - name: "VIO"
+        label: "VIO"
         side: right
       - name: "GND"
         label: "GND"
@@ -237,6 +244,9 @@ components:
       - name: "EN"
         label: "EN"
         side: right
+      - name: "DIAG"
+        label: "DIAG"
+        side: right
       - name: "OUT1"
         label: "OUT1"
         side: left
@@ -251,10 +261,10 @@ components:
     package: motor
     position: [0.0, 0.0, 28.0]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [28.0, 28.0, 30.0]
+    dimensions: [13.8, 13.8, 9.3]
     label:
-      text: "2830 BLDC"
-      position: [0.0, -15.0, 0.0]
+      text: "1102 BLDC"
+      position: [0.0, -8.0, 0.0]
       align: [center, max]
     pins:
       - name: "U"
@@ -403,6 +413,7 @@ nets:
       - [led, VCC]
       - [sensor_east, VCC]
       - [fuel_gauge, VIN]
+      - [motor_driver, VIO]
 
   - name: vcc_bat
     color: red
@@ -433,7 +444,7 @@ nets:
     color: red
     pins:
       - [current_monitor, VIN-]
-      - [motor_driver, V+]
+      - [motor_driver, VCC]
 
   - name: sda
     color: yellow
@@ -545,3 +556,9 @@ nets:
     pins:
       - [pico, GP18]
       - [motor_driver, EN]
+
+  - name: ctrl_diag
+    color: blue
+    pins:
+      - [pico, GP22]
+      - [motor_driver, DIAG]
