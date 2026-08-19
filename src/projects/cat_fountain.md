@@ -122,18 +122,16 @@ The following parts are manufactured to form the physical structure and assembly
 
 | Part Name | Qty | Recommended Material | Description / Use Case |
 | :--- | :--- | :--- | :--- |
-| **Bowl** | 1 | PETG (Food-Safe Coating) | The main water reservoir (2L capacity) and enclosure base. |
-| **Lid** | 1 | PETG (Food-Safe Coating) | Top cover acting as a drinking shelf and stabilizing the delivery tube. |
-| **Tube** | 1 | PETG (Food-Safe Coating) | Vertical water delivery tube feeding the drinking shelf. |
-| **Impeller** | 1 | PETG (Food-Safe Coating) | The spinning Archimedes screw / vortex impeller pump. |
-| **Drain Cover** | 1 | PETG (Food-Safe Coating) | Removable cover with locking tabs for the filter compartment. |
-| **Bottom Cover** | 1 | PETG or PLA | Bottom enclosure cover protecting the electronics compartment. |
+| **Bowl** | 1 | UTR-8100 Translucent (SLA) | The main water reservoir (2L capacity) and enclosure base with integrated tube. |
+| **Lid** | 1 | UTR-8100 Translucent (SLA) | Top cover acting as a drinking shelf and stabilizing the delivery tube. |
+| **Impeller** | 1 | Aluminum | The spinning multi-stage dynamic axial propeller pump. |
+| **Bottom Cover** | 1 | UTR-8100 Translucent (SLA) | Bottom enclosure cover protecting the electronics compartment. |
 | **LED Cover** | 1 | UTR-8100 Translucent (SLA) | Translucent push-fit diffuser plug for the status RGB LED. |
 
 > [!NOTE]
 > **Manufacturing & Post-Processing Details**:
-> 1. **Translucent Covers**: Since PCBWay does not offer transparent PETG, the LED Cover should be SLA-printed using UTR-8100 translucent resin to ensure light transparency.
-> 2. **Food Safety Post-Processing**: Standard FDM 3D printed parts have micro-grooves that can harbor bacteria. All PETG components in contact with water (Bowl, Lid, Tube, Impeller, Drain Cover) must be coated with a food-grade epoxy (e.g., Max CLR or similar FDA-compliant epoxy coating) as a post-processing step before use.
+> 1. **Translucent Body**: All body components (Bowl, Lid, Bottom Cover, LED Cover) are SLA-printed using UTR-8100 translucent resin to ensure light transparency and visual monitoring of water levels.
+> 2. **Food Safety Post-Processing**: SLA photopolymer resin is toxic to pets if untreated. All resin components in contact with water (Bowl, Lid) must be coated with a food-grade epoxy (e.g., Max CLR or similar FDA-compliant epoxy coating) as a post-processing step before use to completely seal the resin.
 
 ### Fasteners & O-Rings
 

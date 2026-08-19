@@ -134,6 +134,16 @@ class CatFountainConfig(BaseModel):
         """Return the total twist angle of the impeller blades in degrees."""
         return float(self._raw_data.get("vane_twist", -1080.0))
 
+    @cached_property
+    def motor_target(self) -> float:
+        """Return the target motor angular velocity in rad/s in the simulation."""
+        return float(self._raw_data.get("motor_target", 120.0))
+
+    @cached_property
+    def motor_power(self) -> float:
+        """Return the maximum motor output power in Watts."""
+        return float(self._raw_data.get("motor_power", 1.0))
+
     # =========================================================================
     # Spout Parameters
     # =========================================================================
@@ -298,6 +308,11 @@ class CatFountainConfig(BaseModel):
     def bottom_cover_clearance(self) -> float:
         """Return the bottom cover clearance."""
         return float(self._raw_data.get("bottom_cover_clearance", 0.2))
+
+    @cached_property
+    def impeller_clearance(self) -> float:
+        """Return the radial clearance between impeller and tube."""
+        return float(self._raw_data.get("impeller_clearance", 0.1))
 
     @cached_property
     def bottom_cover_drain_radius(self) -> float:

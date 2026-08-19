@@ -1,124 +1,137 @@
-# Cat Fountain Parametric Dimensions
+# ==========================================
+# 1. Main Bowl Dimensions
+# ==========================================
 bowl_radius: 100.0
 bowl_height: 107.0
 bowl_thickness: 4.0
-
-tube_radius: 10.0
-tube_thickness: 2.0
-tube_height: 75.0
+bottom_cover_clearance: 0.2
+bottom_cover_drain_radius: 8.0
+drain_hole_radius: 15.4
+drain_hole_y: 65.0
+drain_shroud_height: 15.0
+drain_shroud_radius: 18.0
+drain_shroud_z: -15.0
 slot_height: 6.0
 
-impeller_radius: 12.0
-impeller_height: 77.0
-impeller_shaft_radius: 2.5
-impeller_blades: 2
-vane_twist: -2512.5
-
-spout_length: 30.0
-spout_angle: 45.0
-
-# Lid pocket & Spout deflection boundaries
+# ==========================================
+# 2. Lid & Spout
+# ==========================================
+lid_clearance: 0.15
 lid_pocket_radius: 80.0
 lid_pocket_cavity_height: 10.0
 lid_pocket_thickness: 4.0
 lid_pocket_z_offset: 3.0
-drain_hole_y: 65.0
-drain_hole_radius: 15.4
-spout_deflection_radius: 13.0
+lid_step_depth: 5.0
+lid_step_width: 2.0
+spout_angle: 45.0
+spout_length: 30.0
 spout_deflection_height: 0.0
+spout_deflection_radius: 13.0
 spout_deflection_thickness: 40.0
 spout_deflection_z_offset: 16.0
 
-# Fit and tolerance clearances
-lid_clearance: 0.15
-lid_step_depth: 5.0
-lid_step_width: 2.0
+# ==========================================
+# 3. Tube
+# ==========================================
+tube_radius: 10.0
+tube_height: 75.0
+tube_thickness: 2.0
 tube_lid_clearance: 0.1
-bottom_cover_clearance: 0.2
-bottom_cover_drain_radius: 8.0
 
-# PCB mounting standoffs & holes
-pcb_hole_radius: 1.0
-pcb_boss_radius: 2.2
+# ==========================================
+# 4. Impeller & Shaft
+# ==========================================
+impeller_radius: 12.0
+impeller_height: 77.0
+impeller_shaft_radius: 2.5
+impeller_sleeve_height: 4.0
+impeller_blades: 3
+impeller_clearance: 0.4
+vane_twist: -2512.5
+motor_target: 120.0
+motor_power: 1.0
 
-# Fuel Gauge (MAX17048) footprint
-fuel_gauge_spacing_x: 20.32
-fuel_gauge_spacing_y: 12.7
-fuel_gauge_standoff_height: 4.0
+# ==========================================
+# 5. Motor, Central Boss & Fasteners
+# ==========================================
+# Shaft boss & collar clearance
+boss_body_height: 2.0
+boss_body_radius_offset: 3.5
+motor_collar_clearance_height: 2.0
+motor_collar_clearance_radius: 3.2
+shaft_hole_height: 1.8
+shaft_hole_radius_offset: 0.1
 
-# Proximity Sensor (VL53L0X) footprint
+# Set screw & alignment parameters
+motor_spacing_x: 17.0
+motor_set_screw_angle: 45.0
+motor_set_screw_length: 24.0
+motor_set_screw_radius: 1.75
+motor_set_screw_x_offset: 10.5
+retention_boss_height: 1.0
+trimmer_height: 30.0
+
+# ==========================================
+# 6. O-Ring & Snap Fit
+# ==========================================
+oring_groove_height: 2.2
+oring_groove_radius_offset: 1.3
+snap_groove_minor: 0.6
+snap_ridge_major_offset: -0.1
+snap_ridge_minor: 0.5
+snap_ridge_z: 2.5
+
+# ==========================================
+# 7. Proximity Sensor
+# ==========================================
+sensor_boss_x: 15.0
+sensor_boss_y: 14.0
+sensor_boss_z: 18.0
 proximity_sensor_spacing_x: 21.0
 proximity_sensor_spacing_y: 13.5
 proximity_sensor_standoff_height: 4.0
 proximity_sensor_pocket_width: 12.0
 proximity_sensor_pocket_height: 14.0
 
-# Pico (RP2040) footprint
+# ==========================================
+# 8. LED & Plug
+# ==========================================
+led_flange_thickness: 1.0
+led_flange_width: 7.0
+led_hole_width: 5.0
+led_plug_length: 3.0
+led_plug_width: 4.8
+
+# ==========================================
+# 9. PCBs & Mounting Standoffs
+# ==========================================
+# General PCB bosses
+pcb_boss_radius: 2.2
+pcb_hole_radius: 1.0
+
+# Raspberry Pi Pico
 pico_spacing_x: 11.4
 pico_spacing_y: 47.0
 pico_standoff_height: 4.0
 
-# Charger (BQ25185) footprint
+# Charger
+charger_port_height: 9.0
+charger_port_width: 16.0
 charger_spacing_x: 13.97
 charger_spacing_y: 25.15
 charger_standoff_height: 4.0
-charger_port_width: 16.0
-charger_port_height: 9.0
 
-# Current Monitor (INA219) footprint
+# Fuel Gauge
+fuel_gauge_spacing_x: 20.32
+fuel_gauge_spacing_y: 12.7
+fuel_gauge_standoff_height: 4.0
+
+# Current Monitor
 current_monitor_spacing_x: 20.32
 current_monitor_spacing_y: 12.7
 current_monitor_standoff_height: 4.0
 
-# Motor Driver (L9110S) footprint
+# Motor Driver
 motor_driver_spacing_x: 19.0
 motor_driver_spacing_y: 13.0
 motor_driver_standoff_height: 4.0
-
-# Motor (N20) mount
-motor_spacing_x: 17.0
-motor_set_screw_angle: 45.0
-motor_set_screw_x_offset: 10.5
-motor_set_screw_radius: 1.75
-motor_set_screw_length: 24.0
-
-# LED Hole and Diffuser Cover dimensions
-led_hole_width: 5.0
-led_plug_width: 4.8
-led_flange_width: 7.0
-led_flange_thickness: 1.0
-led_plug_length: 3.0
-
-# Sensor Outer Boss dimensions
-sensor_boss_x: 15.0
-sensor_boss_y: 14.0
-sensor_boss_z: 18.0
-
-# Central Boss & Shaft Hole parameters
-boss_body_radius_offset: 3.5
-boss_body_height: 2.0
-motor_collar_clearance_radius: 3.2
-motor_collar_clearance_height: 2.0
-shaft_hole_radius_offset: 0.1
-shaft_hole_height: 1.8
-oring_groove_radius_offset: 1.3
-oring_groove_height: 2.2
-
-# Impeller dimensions
-impeller_sleeve_height: 4.0
-
-# Snap-fit Lid parameters
-snap_ridge_z: 2.5
-snap_ridge_major_offset: -0.1
-snap_ridge_minor: 0.5
-snap_groove_minor: 0.6
-
-# Drain Shroud & Trimmer dimensions
-drain_shroud_radius: 18.0
-drain_shroud_height: 15.0
-drain_shroud_z: -15.0
-trimmer_height: 30.0
-
-# Retention boss height for impeller clearance
-retention_boss_height: 1.0
-
