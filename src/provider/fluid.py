@@ -1458,6 +1458,22 @@ class Fluid:
         avg_step_torque = (float(torque_accum) / 5) + mag_friction + bearing_viscous_drag
         self.torques.append(avg_step_torque)
 
+        # Check for SPH numerical instability (particle speeds exceeding physical limits)
+        if self.vel_jax is not None:
+            vel_np = np.array(self.vel_jax)
+            if len(vel_np) > 0:
+                max_speed = float(np.max(np.linalg.norm(vel_np, axis=1)))
+                if max_speed > 10.0:
+                    msg = (
+                        f"WARNING: SPH Simulation numerical instability detected! "
+                        f"Max particle speed is {max_speed:.2f} m/s (limit is 10.0 m/s). "
+                        f"Please check boundary damping and stiffness coefficients."
+                    )
+                    if self.provider and getattr(self.provider, "logger", None) is not None:
+                        self.provider.logger.print(msg, symbol="⚠️")
+                    else:
+                        print(f"⚠️ {msg}")
+
         self.last_positions = self.pos_jax.tolist()
 
         positions = self.last_positions
