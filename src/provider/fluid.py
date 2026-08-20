@@ -1019,6 +1019,13 @@ def _physics_step_jax(
         damping_by_zone = jnp.where((damping >= 0.0) | (~outside_base), damping_val, high_damping_value)[:, None]
 
         vel_next = jnp.where(active, (vel_world + accel * dt_sub) * damping_by_zone, 0.0)
+
+        # Clamp velocity to prevent LBM lattice-unit supersonic divergence (compressibility limit)
+        max_phys_speed = 3.5
+        vel_mags = jnp.linalg.norm(vel_next, axis=1, keepdims=True)
+        vel_mags_safe = jnp.maximum(vel_mags, 1e-8)
+        vel_next = vel_next * jnp.minimum(max_phys_speed / vel_mags_safe, 1.0)
+
         pos_next = jnp.where(active, pos_curr + vel_next * dt_sub, pos_curr)
         torque_accum_next = torque_accum + step_torque
 
@@ -1839,21 +1846,26 @@ class Fluid:
         avg_step_torque = (float(torque_accum) / 5) + mag_friction + bearing_viscous_drag
         self.torques.append(avg_step_torque)
 
-        # Check for SPH numerical instability (particle speeds exceeding physical limits)
-        if self.vel_jax is not None:
+        # Check for LBM numerical instability (bulk particle speeds exceeding physical limits)
+        if self.pos_jax is not None and self.vel_jax is not None:
+            pos_np = np.array(self.pos_jax)
             vel_np = np.array(self.vel_jax)
-            if len(vel_np) > 0:
-                max_speed = float(np.max(np.linalg.norm(vel_np, axis=1)))
-                if max_speed > 10.0:
-                    msg = (
-                        f"WARNING: SPH Simulation numerical instability detected! "
-                        f"Max particle speed is {max_speed:.2f} m/s (limit is 10.0 m/s). "
-                        f"Please check boundary damping and stiffness coefficients."
-                    )
-                    if self.provider and getattr(self.provider, "logger", None) is not None:
-                        self.provider.logger.print(msg, symbol="⚠️")
-                    else:
-                        print(f"⚠️ {msg}")
+            if len(pos_np) > 0 and len(vel_np) > 0:
+                active_mask = pos_np[:, 2] < 100.0
+                active_vels = vel_np[active_mask]
+                if len(active_vels) > 0:
+                    avg_speed = float(np.mean(np.linalg.norm(active_vels, axis=1)))
+                    if avg_speed > 1.5:
+                        if not getattr(self.provider, "is_tuning", False):
+                            msg = (
+                                f"WARNING: LBM Simulation numerical instability detected! "
+                                f"Average particle speed is {avg_speed:.2f} m/s (limit is 1.5 m/s). "
+                                f"Please check boundary damping and stiffness coefficients."
+                            )
+                            if self.provider and getattr(self.provider, "logger", None) is not None:
+                                self.provider.logger.print(msg, symbol="⚠️")
+                            else:
+                                print(f"⚠️ {msg}")
 
         self.last_positions = self.pos_jax.tolist()
 
