@@ -172,7 +172,7 @@ class TestCatFountainProvider:
         assert bowl_shape.urdf_parent is None
         assert bowl_shape.urdf_joint_type is None
         assert bowl_shape.urdf_boundary_friction == 0.20
-        assert len(bowl_shape.urdf_boundaries) == 2
+        assert len(bowl_shape.urdf_boundaries) == 3
         assert bowl_shape.urdf_boundaries[0].shape == "cylinder"
         assert bowl_shape.urdf_boundaries[0].type == "cavity"
 
@@ -243,7 +243,7 @@ class TestCatFountainProvider:
             )
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
-            provider.settings.target_volume = 0.00008
+            provider.settings.target_volume = 0.0002
 
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
             builder = Builder(manager, logger=Logger(enabled=False))
