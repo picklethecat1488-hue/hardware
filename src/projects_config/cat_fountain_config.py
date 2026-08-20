@@ -30,6 +30,9 @@ class CatFountainConfig(BaseModel):
         description="Target total fluid volume to spawn (m^3).",
     )
 
+    stiffness_boundary: float = Field(default=1000.0, description="SPH boundary penalty stiffness coefficient")
+    damping_boundary: Optional[float] = Field(default=None, description="SPH boundary penalty damping coefficient")
+
     # =========================================================================
     # Internal & Helper Properties
     # =========================================================================
@@ -722,3 +725,26 @@ class CatFountainConfig(BaseModel):
     def motor_clip_cutout_width(self) -> float:
         """Return the cutout width of the motor retaining clip U-fork."""
         return float(self._raw_data.get("motor_clip_cutout_width", 14.2))
+
+    def __init__(self, **data: Any):
+        """Initialize settings and load fallback values from measurements.yaml if present."""
+        super().__init__(**data)
+        if self.measurements_path:
+            try:
+                raw = self._raw_data
+                for field in ["stiffness_boundary", "damping_boundary"]:
+                    if field in raw and getattr(self, field) == self.model_fields[field].default:
+                        val = raw[field]
+                        if isinstance(val, np.ndarray):
+                            val = float(val.item()) if val.ndim == 0 else val.tolist()
+                        setattr(self, field, val)
+            except Exception:
+                pass
+
+        if self.damping_boundary is None:
+            r_s = 0.0015
+            spacing = 1.3 * r_s
+            mass = 1000.0 * (spacing**3)
+            dt_sub = 1.0 / 1200.0
+            safety_factor = 225.0
+            self.damping_boundary = float((safety_factor * mass) / dt_sub)

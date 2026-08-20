@@ -778,3 +778,55 @@ class TestCatFountainProvider:
         # This ensures the clip wraps around the collar to support the motor body.
         motor_collar_diameter = 10.0
         assert provider.settings.motor_clip_cutout_width >= motor_collar_diameter
+
+    def test_config_tune_action(self, provider):
+        """Test that config_tune executes successfully with mocked PyBullet client."""
+        from unittest.mock import MagicMock
+        from projects.cat_fountain.config import config_tune
+        from provider import Simulate
+
+        # Mock the build manager and builder
+        mock_manager = MagicMock()
+        mock_builder = MagicMock()
+
+        # Mock provider properties
+        provider.logger = MagicMock()
+
+        # Mock setup_fn to instantiate a mock water_sim on provider
+        mock_water = MagicMock()
+        mock_water.vel_jax = [[0.0, 0.0, 0.0]]
+        mock_water.pos_jax = [[0.0, 0.028, 0.05]]
+
+        def mock_setup(body_id, physics_client, view_path, boundaries, state):
+            provider.water_sim = mock_water
+
+        mock_setup_fn = MagicMock(side_effect=mock_setup)
+        mock_step_fn = MagicMock()
+
+        provider.get_simulate_hooks_impl = MagicMock(
+            return_value={
+                Simulate.SETUP: mock_setup_fn,
+                Simulate.STEP: mock_step_fn,
+            }
+        )
+
+        with (
+            patch("pybullet.connect", return_value=42),
+            patch("pybullet.disconnect") as mock_disconnect,
+            patch("pybullet.setGravity") as mock_gravity,
+            patch("pybullet.loadURDF", return_value=1),
+            patch("pybullet.stepSimulation") as mock_step_sim,
+            patch("provider.ProviderManager", return_value=mock_manager),
+            patch("build.Builder", return_value=mock_builder),
+            patch("pathlib.Path.exists", return_value=True),
+        ):
+            # Run config_tune
+            config_tune(provider, "product:view/simulate", None)
+
+            # Verify that settings were updated with some optimal boundaries
+            assert provider.settings.stiffness_boundary is not None
+            assert provider.settings.damping_boundary is not None
+
+            # Verify builder build steps were called
+            mock_builder.generate_parts.assert_called_once()
+            mock_builder.generate_urdfs.assert_called_once()

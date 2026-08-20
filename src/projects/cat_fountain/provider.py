@@ -1315,11 +1315,20 @@ class CatFountainProvider(Provider):
 
         self.room = room
 
-    def simulate(self, sim_name: str) -> Callable[[], None]:
-        """Return the simulation runner function."""
-        from .simulate_hooks import simulate as impl
+    def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+        """Return the simulation hooks for the cat fountain."""
+        from .simulate_hooks import get_simulate_hooks_impl as impl
 
         return impl(self, sim_name)
+
+    @property
+    def config(self) -> dict[str, Callable[[str, Optional[str]], Any]]:
+        """A mapping of Modes to configuration handler methods."""
+        from .config import config_tune
+
+        return {
+            "tune": lambda target, sa: config_tune(self, target, sa),
+        }
 
     def build_motor_clip(
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT

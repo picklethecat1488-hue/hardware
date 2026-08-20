@@ -53,6 +53,7 @@ pytest
 * **Error Handling & Exception Guardrails**: Use explicit bounds checking and validation rather than generic `try/except` blocks. Do NOT use `try/except` structures in core computation or logic paths except to guard I/O operations (such as filesystem access, networking, or database calls).
 * **Parameter Validation**: Prefer Pydantic parameter validation over manual validation checks in code. If dynamic runtime validation is necessary (e.g., in math or physics functions), raise a descriptive `ValueError` to indicate invalid parameters rather than silently failing or falling back.
 * **Method Parameterization**: Prefer passing parameters and configuration models explicitly into methods and functions rather than having them read instance attributes or parent provider properties internally. This keeps computation blocks pure, modular, and easy to unit test.
+* **Configuration Persistence**: For configuration actions, they should persist saved settings to the Pydantic environment file (`.env`) in addition to updating any source project data files (like `measurements.yaml`). This ensures they are immediately active in the build environment.
 
 ### 4. Physical Simulation & URDF Metadata
 * For components participating in physics simulations (e.g., PyBullet, JAX fluids), attach URDF and simulation attributes to shape geometries.

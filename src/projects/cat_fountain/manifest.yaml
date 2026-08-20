@@ -64,6 +64,10 @@ product:
   view:
     modes: [default, simulate]
 
+simulation:
+  config:
+    modes: [tune]
+
 wiring:
   diagram:
     modes: [default]
