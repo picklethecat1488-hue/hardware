@@ -751,9 +751,7 @@ class TestCatFountainProvider:
         room.translate_joints()
 
         parts = {
-            name: geom[0]
-            for name, geom in room.items()
-            if not any(x in name for x in ["emitter", "receiver", "pcb", "motor"])
+            name: geom[0] for name, geom in room.items() if not any(x in name for x in ["emitter", "receiver", "pcb"])
         }
         for name1, part1 in parts.items():
             for name2, part2 in parts.items():
@@ -763,3 +761,20 @@ class TestCatFountainProvider:
                     assert vol == pytest.approx(0, abs=0.2), (
                         f"Intersection detected between {name1} and {name2}: {vol:.3f} mm3"
                     )
+
+    def test_assembly_and_fitment_tolerances(self, provider):
+        """Verify assembly clearances: clip fits through bottom cover, and drive hub fits in recess."""
+        # 1. Verify that the bottom cover's opening width is larger than the motor clip width.
+        # This ensures the fork can actually be slid in from the side.
+        assert provider.settings.bottom_cover_opening_width > provider.settings.motor_clip_width
+
+        # 2. Verify that the drive hub outer radius is smaller than the bowl's drive hub recess radius.
+        # This ensures the drive hub can be physically inserted into the recess on the motor shaft.
+        hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
+        assert provider.settings.drive_hub_recess_radius > hub_r
+
+        # 3. Verify that the motor clip U-cutout is larger than or equal to the motor collar diameter.
+        # The BetaFPV 1102 motor collar diameter is 10.0mm.
+        # This ensures the clip wraps around the collar to support the motor body.
+        motor_collar_diameter = 10.0
+        assert provider.settings.motor_clip_cutout_width >= motor_collar_diameter

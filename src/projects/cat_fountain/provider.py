@@ -211,26 +211,42 @@ class CatFountainProvider(Provider):
             # This creates a solid 1.2mm barrier floor at the center of rotation
             with Locations((0, 0, floor_z)):
                 # Outer boss body (increased radius to 21.0mm to provide full support under the impeller casing)
-                Cylinder(radius=21.0, height=17.5, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                boss_h = self.settings.motor_boss_height
+                Cylinder(radius=21.0, height=boss_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-                # Local boss extension to house the speed sensor pocket (South side, Y = -21.0)
-                with Locations((0, -21.0, 0)):
-                    Box(8.0, 6.0, 17.5, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                # Local boss extension to house the speed sensor pocket (North side, Y = 21.0)
+                with Locations((0, 21.0, 0)):
+                    Box(8.0, 6.0, boss_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-                # 1. Recess for the drive hub (radius 17.0mm, height 5.3mm from Z = -1.2)
+                # 1. Recess for the drive hub
                 # Formed as a U-shaped slot open to the South side (Y < 0) for horizontal slide-in assembly
+                recess_r = self.settings.drive_hub_recess_radius
+                recess_d = self.settings.drive_hub_recess_depth
                 with Locations((0, 0, -1.2)):
-                    Cylinder(radius=17.0, height=5.3, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                    Cylinder(
+                        radius=recess_r,
+                        height=recess_d,
+                        align=(Align.CENTER, Align.CENTER, Align.MAX),
+                        mode=Mode.SUBTRACT,
+                    )
                     # Subtract slot extension along Y < 0
-                    with Locations((0, -17.0, 0)):
-                        Box(34.0, 34.0, 5.3, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                    with Locations((0, -recess_r, 0)):
+                        Box(
+                            recess_r * 2.0,
+                            recess_r * 2.0,
+                            recess_d,
+                            align=(Align.CENTER, Align.CENTER, Align.MAX),
+                            mode=Mode.SUBTRACT,
+                        )
                 # Restore the central column (radius 5.5mm, height 4.0mm from Z = -6.5 upwards)
                 # This fits within the drive hub bottom recess and provides solid core support
                 with Locations((0, 0, -6.5)):
                     Cylinder(radius=5.5, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.ADD)
+                    # Subtract central hole for the motor shaft to pass through (radius 0.85mm)
+                    Cylinder(radius=0.85, height=5.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
                 # Speed sensor pocket (5.0mm wide, 2.2mm thick, 14.5mm deep from Z = -17.5 upwards)
-                with Locations((0, -18.5, -17.5)):
+                with Locations((0, 18.5, -17.5)):
                     Box(5.0, 2.2, 14.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
                 # 2. Pocket for the BetaFPV 1102 motor body (starting at Z = -6.5 downwards by 12.0mm to break through bottom)
@@ -241,8 +257,11 @@ class CatFountainProvider(Provider):
                     Cylinder(radius=2.75, height=1.6, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
                 # 3. Horizontal slide-in slot for the motor retaining clip (Z = 23.5 to 25.5 mm, open to Y < 0)
-                with Locations((0, 0, -17.5)):
-                    Box(18.0, 36.0, 2.0, align=(Align.CENTER, Align.MAX, Align.MIN), mode=Mode.SUBTRACT)
+                clip_slot_w = self.settings.motor_clip_width + 0.4
+                clip_slot_h = self.settings.motor_clip_thickness + 0.2
+                # Shifted slot center to Y = 5.0 and length to 41.0 to accommodate the clip's 5.0mm front projection
+                with Locations((0, 5.0, -17.5)):
+                    Box(clip_slot_w, 41.0, clip_slot_h, align=(Align.CENTER, Align.MAX, Align.MIN), mode=Mode.SUBTRACT)
 
             # Helper to create cylindrical standoff posts with blind holes
             def add_standoffs(
@@ -708,8 +727,9 @@ class CatFountainProvider(Provider):
 
             Cylinder(radius=self.settings.bottom_cover_drain_radius, height=6.0, mode=Mode.SUBTRACT)
 
+            opening_w = self.settings.bottom_cover_opening_width
             with Locations((0, -cover_r, 0.0)):
-                Box(16.0, 10.0, 4.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                Box(opening_w, 10.0, 4.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
             # Add a 0.5mm snap-fit ring around the perimeter
             with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
@@ -769,6 +789,7 @@ class CatFountainProvider(Provider):
             # Subtract the large circular cutout, but preserve the circular platform at Y = 28.0
             cutout_r = self.settings.lid_cutout_radius
             cutout_y = self.settings.lid_cutout_y
+
             with BuildPart(mode=Mode.PRIVATE) as cutout_tool:
                 # Large cutout cylinder
                 Cylinder(radius=cutout_r, height=lid_h + 10.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
@@ -782,6 +803,30 @@ class CatFountainProvider(Provider):
                     )
             with Locations((0, cutout_y, 0)):
                 add(cutout_tool, mode=Mode.SUBTRACT)
+
+            # Create a small protective ridge around the opening (on the pocket floor, from Z = 3.0)
+            ridge_w = self.settings.lid_cutout_ridge_width
+            ridge_h = self.settings.lid_cutout_ridge_height
+            with BuildSketch() as ridge_sketch:
+                # Outer ridge: ring from cutout_r to cutout_r + ridge_w at (0, cutout_y)
+                with Locations((0, cutout_y)):
+                    Circle(radius=cutout_r + ridge_w)
+                    Circle(radius=cutout_r, mode=Mode.SUBTRACT)
+                # Subtract the platform area
+                with Locations((0, 28.0)):
+                    Circle(radius=30.0, mode=Mode.SUBTRACT)
+
+                # Inner ridge: ring from 30.0 to 30.0 + ridge_w at (0, 28.0) intersected with the cutout circle
+                with BuildSketch(mode=Mode.PRIVATE) as inner_ridge:
+                    with Locations((0, 28.0)):
+                        Circle(radius=30.0 + ridge_w)
+                        Circle(radius=30.0, mode=Mode.SUBTRACT)
+                    with Locations((0, cutout_y)):
+                        Circle(radius=cutout_r, mode=Mode.INTERSECT)
+                add(inner_ridge)
+
+            with Locations((0, 0, 3.0)):
+                extrude(ridge_sketch.sketch, amount=ridge_h)
 
             with Locations((0.0, tube_y, 3.0)):
                 terrace_shelf = Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
@@ -1280,24 +1325,32 @@ class CatFountainProvider(Provider):
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Build the slide-in motor retaining clip (fork) to secure the motor in place."""
-        clip_w = 17.6  # Fits with print clearance inside the 18.0mm slot
-        clip_l = 26.0  # Length of the slide
-        clip_h = 1.8  # Thickness (fits inside the 2.0mm slot)
-        fork_w = 10.0  # Width of the U-cutout (fits around the 10.0mm motor collar)
+        clip_w = self.settings.motor_clip_width
+        clip_l = self.settings.motor_clip_length
+        clip_h = self.settings.motor_clip_thickness
+        fork_w = self.settings.motor_clip_cutout_width
 
         with BuildPart() as clip:
-            # Main flat slide plate
-            Box(clip_w, clip_l, clip_h, align=(Align.CENTER, Align.MIN, Align.CENTER))
+            # Main flat slide plate extending South from the center (0, 0)
+            # Extends from Y = -clip_l to Y = 5.0 (so U-cutout centered at Y=0 is 5mm from front)
+            with Locations((0, -clip_l, 0)):
+                Box(clip_w, clip_l + 5.0, clip_h, align=(Align.CENTER, Align.MIN, Align.MIN))
 
-            # Subtract U-cutout at the front (Y > 0)
-            with Locations((0, clip_l - 16.0, 0)):
-                Box(fork_w, 20.0, clip_h + 1.0, align=(Align.CENTER, Align.MIN, Align.CENTER), mode=Mode.SUBTRACT)
-                # Round the bottom of the U-cutout
-                Cylinder(radius=fork_w / 2.0, height=clip_h + 1.0, mode=Mode.SUBTRACT)
+            # Subtract U-cutout centered at (0, 0) of diameter fork_w (radius fork_w / 2.0)
+            Cylinder(
+                radius=fork_w / 2.0,
+                height=clip_h + 10.0,
+                align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                mode=Mode.SUBTRACT,
+            )
 
-            # Add a pull handle at the back (Y = 0)
-            with Locations((0, -2.0, 0)):
-                Box(clip_w + 4.0, 4.0, clip_h + 3.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+            # Subtract the leading guide slot from Y = 0 to Y = 10.0 to break through the front (Y > 0)
+            with Locations((0, 0, 0)):
+                Box(fork_w, 20.0, clip_h + 10.0, align=(Align.CENTER, Align.MIN, Align.CENTER), mode=Mode.SUBTRACT)
+
+            # Add a pull handle at the back (South end, Y = -clip_l)
+            with Locations((0, -clip_l, 0)):
+                Box(clip_w + 4.0, 3.0, clip_h + 3.0, align=(Align.CENTER, Align.MAX, Align.MIN))
 
             URDFMetadata(
                 label=target,
