@@ -83,6 +83,11 @@ class URDFShape(Protocol):
     urdf_boundaries: Optional[list[dict[str, Any]]]
     urdf_boundary_friction: Optional[float]
     urdf_obj_filename: Optional[str]
+    urdf_magnet_radius: Optional[float]
+    urdf_magnet_thickness: Optional[float]
+    urdf_pump_well_wall: Optional[float]
+    urdf_magnet_count: Optional[int]
+    urdf_impeller_shaft_radius: Optional[float]
 
     @property
     def urdf_height(self) -> float:

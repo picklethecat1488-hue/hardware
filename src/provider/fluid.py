@@ -6,6 +6,7 @@ from functools import partial
 from enum import Enum, IntEnum
 import random
 from typing import Any, Optional, cast, TYPE_CHECKING
+from pydantic import BaseModel, Field
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -18,12 +19,90 @@ from provider.bullet import LinkType, _is_real_physics_client
 
 if TYPE_CHECKING:
     from model import BoundaryConfig, FluidConfig
+    from provider.provider import Provider
+
+
+class LinkKey(str, Enum):
+    """String enum for project-specific link names/keys in the simulation."""
+
+    DRIVE_HUB = "drive_hub"
+
+
+class MagneticDragConfig(BaseModel):
+    """Configuration parameters for magnetic coupling drag calculations."""
+
+    magnet_radius: float = Field(..., gt=0.0, description="Radius of the coupling magnets in mm")
+    magnet_thickness: float = Field(..., ge=0.0, description="Thickness of the coupling magnets in mm")
+    pump_well_wall: float = Field(..., ge=-0.3, description="Wall thickness of the pump well in mm")
+    magnet_count: int = Field(..., ge=0, description="Number of coupling magnet pairs")
+    impeller_shaft_radius: float = Field(..., ge=0.0, description="Radius of the impeller shaft in mm")
+
+    @classmethod
+    def is_magnetic_coupling(cls, boundary: Any) -> bool:
+        """Check if the given boundary config specifies magnetic coupling."""
+        return getattr(boundary, "magnet_count", None) is not None and getattr(boundary, "magnet_count") > 0
 
 
 @jax.jit
 def q_inv(q):
     """Calculate quaternion inverse (conjugate)."""
     return jnp.array([-q[0], -q[1], -q[2], q[3]], dtype=jnp.float32)
+
+
+@jax.jit
+def calculate_magnetic_drag_jax(
+    magnet_radius: float,
+    magnet_thickness: float,
+    pump_well_wall: float,
+    magnet_count: int,
+    impeller_shaft_radius: float,
+) -> float:
+    """Calculate the axial magnetic coupling drag torque using JAX."""
+    mu0 = 4.0 * jnp.pi * 1e-7
+    br = 1.45  # Residual flux density for N52 magnets (Tesla)
+    mu_k = 0.15  # Wet plastic-on-plastic kinetic friction coefficient
+
+    # Magnet dimensions (meters)
+    mag_r = magnet_radius * 0.001
+    mag_t = magnet_thickness * 0.001
+    mag_area = jnp.pi * (mag_r**2)
+
+    # Gap (meters): wall thickness + 0.3mm axial clearance
+    gap = (pump_well_wall + 0.3) * 0.001
+
+    # B-field at gap distance for cylindrical magnet
+    b_gap = br * ((gap + mag_t) / jnp.sqrt(mag_r**2 + (gap + mag_t) ** 2) - gap / jnp.sqrt(mag_r**2 + gap**2))
+
+    # Attractive force per pair (Newton) and total force
+    f_pair = (b_gap**2 * mag_area) / (2.0 * mu0)
+    f_total = magnet_count * f_pair
+
+    # Mean contact radius of the thrust post flange (meters)
+    r_mean = (impeller_shaft_radius + (impeller_shaft_radius + 1.5)) / 2.0 * 0.001
+
+    return f_total * mu_k * r_mean
+
+
+@jax.jit
+def calculate_bearing_and_viscous_drag_jax(
+    omega: float,
+    impeller_shaft_radius: float,
+    impeller_radius: float,
+) -> float:
+    """Calculate the journal bearing and viscous disc drag torque using JAX."""
+    # Journal bearing drag (steel shaft inside PETG sleeve under water)
+    f_radial = 0.5  # Assumed radial misalignment/imbalance load of 0.5 N
+    mu_k = 0.15
+    r_shaft = impeller_shaft_radius * 0.001
+    t_bearing = jnp.where(jnp.abs(omega) > 1e-3, f_radial * mu_k * r_shaft, 0.0)
+
+    # Viscous disc shear drag (top and bottom hub faces rotating in water)
+    mu_fluid = 0.001  # Dynamic viscosity of water (Pa*s)
+    g_clearance = 0.001  # Axial clearance gap (1.0 mm)
+    r_impeller = impeller_radius * 0.001
+    t_viscous = (jnp.pi * mu_fluid * jnp.abs(omega) * (r_impeller**4)) / g_clearance
+
+    return t_bearing + t_viscous
 
 
 @jax.jit
@@ -739,7 +818,7 @@ class Fluid:
     def __init__(
         self,
         config: Optional[FluidConfig] = None,
-        provider: Any = None,
+        provider: Optional[Provider] = None,
         body_id: Optional[int] = None,
         physics_client: Optional[int] = None,
         state_tracker: Optional[Any] = None,
@@ -751,7 +830,7 @@ class Fluid:
         if config is None:
             config = FluidConfig()
 
-        self.provider = provider
+        self.provider: Optional[Provider] = provider
 
         self.r_s = config.r_s
         self.particle_radius = config.particle_radius
@@ -877,11 +956,14 @@ class Fluid:
             spacing = 1.3 * self.r_s
 
             hc_idx = self.link_indices.get(LinkType.TUBE)
-            hc_x, hc_y = (
-                (p.getJointInfo(self.body_id, hc_idx, physicsClientId=physics_client)[14][:2])
-                if hc_idx is not None
-                else (0.0, 0.0)
-            )
+            if hc_idx is not None:
+                hc_x, hc_y = p.getJointInfo(self.body_id, hc_idx, physicsClientId=physics_client)[14][:2]
+            else:
+                tube_info = self.boundaries.get(LinkType.TUBE)
+                if tube_info is not None and tube_info.xyz is not None:
+                    hc_x, hc_y = tube_info.xyz[0], tube_info.xyz[1]
+                else:
+                    hc_x, hc_y = 0.0, 0.0
 
             cavity_info = self.boundaries.get(LinkType.BASE)
             cavity_inner_radius = cavity_info.radius if cavity_info is not None else 0.0
@@ -1103,6 +1185,87 @@ class Fluid:
             LinkType.TUBE: offset_mm,
         }
 
+    def calculate_magnetic_drag(self, drag_config: Optional[MagneticDragConfig]) -> float:
+        """Calculate the axial magnetic coupling drag torque.
+
+        Args:
+            drag_config: Explicit configuration parameters for magnetic drag.
+                         If None, returns 0.0 (direct coupling).
+
+        Returns:
+            float: The calculated magnetic drag friction torque in N*m.
+        """
+        if drag_config is None or drag_config.magnet_count <= 0:
+            return 0.0
+
+        # Delegate computation to the compiled JAX function
+        return float(
+            calculate_magnetic_drag_jax(
+                drag_config.magnet_radius,
+                drag_config.magnet_thickness,
+                drag_config.pump_well_wall,
+                drag_config.magnet_count,
+                drag_config.impeller_shaft_radius,
+            )
+        )
+
+    def calculate_bearing_and_viscous_drag(self, omega: float) -> float:
+        """Calculate additional mechanical drag torque (bearing and viscous).
+
+        Args:
+            omega: Impeller angular velocity in rad/s.
+
+        Returns:
+            float: Total bearing and viscous drag friction torque in N*m.
+        """
+        impeller_b = self.boundaries.get(LinkType.IMPELLER)
+        if impeller_b is None:
+            return 0.0
+
+        shaft_r = getattr(impeller_b, "impeller_shaft_radius", None)
+        radius = getattr(impeller_b, "radius", None)
+
+        if shaft_r is None or radius is None:
+            raise ValueError(
+                "Required URDF boundary metadata (radius or impeller_shaft_radius) is missing for the impeller."
+            )
+
+        # Delegate computation to the compiled JAX function
+        return float(
+            calculate_bearing_and_viscous_drag_jax(
+                omega,
+                shaft_r,
+                radius,
+            )
+        )
+
+    def _apply_joint_velocity(
+        self,
+        body_id: int,
+        physics_client: int,
+        link_key: LinkType | str,
+        target_velocity: float,
+        max_force: Optional[float] = None,
+    ) -> None:
+        """Apply velocity control to a specific joint in PyBullet."""
+        joint_idx = self.link_indices.get(link_key, -1)
+        if joint_idx != -1 and _is_real_physics_client(physics_client):
+            p.changeDynamics(
+                bodyUniqueId=body_id,
+                linkIndex=joint_idx,
+                maxJointVelocity=200.0,
+                physicsClientId=physics_client,
+            )
+            p.setJointMotorControl2(
+                bodyUniqueId=body_id,
+                jointIndex=joint_idx,
+                controlMode=p.VELOCITY_CONTROL,
+                targetVelocity=target_velocity,
+                force=max_force if max_force is not None else 10.0,
+                velocityGain=1.0,
+                physicsClientId=physics_client,
+            )
+
     def update(
         self,
         body_id: int,
@@ -1110,6 +1273,7 @@ class Fluid:
         damping: Optional[float] = None,
         target_omega: Optional[float] = None,
         max_force: Optional[float] = None,
+        motor_power: Optional[float] = None,
     ) -> None:
         """Step simulation and manage deactivation."""
         self.body_id = body_id
@@ -1117,9 +1281,31 @@ class Fluid:
         impeller_b = self.boundaries.get(LinkType.IMPELLER)
         if impeller_b is not None:
             if target_omega is not None:
-                impeller_b.target_omega = target_omega
+                # Dynamically apply torque speed limit if motor power is specified
+                if len(self.torques) > 0 and motor_power is not None:
+                    last_torque = abs(self.torques[-1])
+                    if last_torque > 1e-5:
+                        omega = min(target_omega, motor_power / last_torque)
+                    else:
+                        omega = target_omega
+                else:
+                    omega = target_omega
+                impeller_b.target_omega = omega
+            else:
+                omega = 0.0
+
             if max_force is not None:
                 impeller_b.max_force = max_force
+
+            is_magnetic = MagneticDragConfig.is_magnetic_coupling(impeller_b)
+
+            if is_magnetic:
+                # For magnetic coupling, drive both the dry-side drive hub and the impeller
+                self._apply_joint_velocity(body_id, physics_client, LinkKey.DRIVE_HUB, omega, max_force)
+                self._apply_joint_velocity(body_id, physics_client, LinkType.IMPELLER, omega, max_force)
+            else:
+                # For direct coupling, the motor directly drives the impeller
+                self._apply_joint_velocity(body_id, physics_client, LinkType.IMPELLER, omega, max_force)
 
         if not self.spawner:
             raise RuntimeError("Fluid spawner is not initialized.")
@@ -1228,7 +1414,30 @@ class Fluid:
             damping_val,
             self.high_damping_value,
         )
-        avg_step_torque = float(torque_accum) / 5
+        # Add magnetic coupling attractive drag friction torque dynamically.
+        # This models the axial attraction force of the neodymium disc magnet pairs
+        # acting across the thin well partition floor, generating friction torque.
+        mag_friction = 0.0
+        if impeller_b is not None and abs(impeller_b.target_omega) > 1e-3:
+            drag_config = None
+            if MagneticDragConfig.is_magnetic_coupling(impeller_b):
+                try:
+                    drag_config = MagneticDragConfig(
+                        magnet_radius=impeller_b.magnet_radius,
+                        magnet_thickness=impeller_b.magnet_thickness,
+                        pump_well_wall=impeller_b.pump_well_wall,
+                        magnet_count=impeller_b.magnet_count,
+                        impeller_shaft_radius=impeller_b.impeller_shaft_radius,
+                    )
+                except Exception as e:
+                    raise ValueError(f"Invalid magnetic drag configuration: {e}") from e
+
+            mag_friction = self.calculate_magnetic_drag(drag_config)
+            bearing_viscous_drag = self.calculate_bearing_and_viscous_drag(impeller_b.target_omega)
+        else:
+            bearing_viscous_drag = 0.0
+
+        avg_step_torque = (float(torque_accum) / 5) + mag_friction + bearing_viscous_drag
         self.torques.append(avg_step_torque)
 
         self.last_positions = self.pos_jax.tolist()

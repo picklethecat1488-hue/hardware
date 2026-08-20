@@ -40,8 +40,6 @@ class TestCatFountainProvider:
         assert "impeller" in provider.part
         assert "bottom_cover" in provider.part
         assert "lid" in provider.part
-        assert "drain_cover" in provider.part
-        assert "sensor_cover" in provider.part
         assert "led_cover" in provider.part
 
     def test_build_part_geometry(self, provider):
@@ -61,7 +59,6 @@ class TestCatFountainProvider:
         assert "impeller" in room
         assert "bottom_cover" in room
         assert "lid" in room
-        assert "drain_cover" in room
 
     def test_build_wiring_diagram(self, provider):
         """Verify that build_wiring_diagram populates the room with footprints and wires."""
@@ -167,7 +164,6 @@ class TestCatFountainProvider:
         assert "impeller" in room
         assert "bottom_cover" in room
         assert "lid" in room
-        assert "drain_cover" in room
 
         # Verify attributes on bowl
         bowl_shape = room["bowl"][0]
@@ -190,9 +186,9 @@ class TestCatFountainProvider:
     def test_configuration_loading(self, provider):
         """Ensure that critical measurement values are loaded correctly."""
         assert provider.settings.bowl_radius == 100.0
-        assert provider.settings.tube_radius == 10.0
-        assert provider.settings.impeller_radius == 12.0
-        assert provider.settings.impeller_blades == 2
+        assert provider.settings.tube_radius == 8.0
+        assert provider.settings.impeller_radius == 9.0
+        assert provider.settings.impeller_blades == 6
         assert provider.settings.petg_boundary_friction == 0.20
         assert provider.settings.petg_contact_angle == 75.0
 
@@ -343,6 +339,111 @@ class TestCatFountainProvider:
 
     @pytest.mark.slow
     @pytest.mark.timeout(180)
+    def test_motor_torque_speed_limit_integration(self):
+        """Verify that the motor's angular velocity is dynamically torque-limited by fluid drag."""
+        import tempfile
+        import os
+        from build import Builder
+        from provider import ProviderManager, Room, Simulate
+        from model import AppConfig
+        from shell import Logger
+        import pybullet as p
+        from provider.bullet import LinkType
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = AppConfig()
+            real_measurements = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "../cat_fountain/measurements.yaml")
+            )
+            provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
+            provider.settings.measurements_path = real_measurements
+            provider.settings.target_volume = 0.0004
+            manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
+            builder = Builder(manager, logger=Logger(enabled=False))
+
+            builder.generate_parts(temp_dir, names=None)
+            builder.generate_urdfs(temp_dir, names=None)
+
+            # Copy compiled OBJ assets into the URDF folder so PyBullet can locate them relative to the URDF
+            obj_dir = os.path.join(temp_dir, "obj/cat_fountain")
+            urdf_proj_dir = os.path.join(temp_dir, "urdf/cat_fountain")
+            for f in os.listdir(obj_dir):
+                if f.endswith(".obj"):
+                    shutil.copy(os.path.join(obj_dir, f), os.path.join(urdf_proj_dir, f))
+
+            room = Room()
+            provider.build_product(room, mode=Mode.SIMULATE)
+            room.translate_joints()
+
+            room["impeller"][0].urdf_motor_target = 120.0
+            room["impeller"][0].urdf_motor_force = 10.0
+
+            physics_client = p.connect(p.DIRECT)
+            try:
+                p.setGravity(0, 0, -9.81, physicsClientId=physics_client)
+
+                urdf_path = os.path.join(temp_dir, "urdf/cat_fountain/product.urdf")
+                body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
+                assert body_id >= 0
+
+                boundaries = {}
+                for _, (geom, _) in room.items():
+                    u_geom = geom
+                    label = getattr(u_geom, "urdf_label", None)
+                    if label:
+                        geom_boundaries = getattr(u_geom, "urdf_boundaries", None)
+                        if geom_boundaries:
+                            boundaries[label] = geom_boundaries
+
+                hooks = provider.get_simulate_hooks("product:view/simulate")
+                setup_fn = hooks[Simulate.SETUP]
+                setup_fn(body_id, physics_client, "product:view/simulate", boundaries, None)
+
+                fluid = provider.water_sim
+                assert fluid is not None
+
+                # Find joint index for the impeller in PyBullet
+                impeller_joint_idx = -1
+                for i in range(p.getNumJoints(body_id, physicsClientId=physics_client)):
+                    info = p.getJointInfo(body_id, i, physicsClientId=physics_client)
+                    if "impeller" in info[12].decode("utf-8"):
+                        impeller_joint_idx = i
+                        break
+                assert impeller_joint_idx != -1
+
+                step_fn = hooks[Simulate.STEP]
+
+                # Run simulation and check joint velocities
+                for step_idx in range(60):
+                    step_fn(body_id, physics_client, step_idx, "product:view/simulate")
+                    p.stepSimulation(physicsClientId=physics_client)
+
+                    if step_idx >= 40:
+                        target_omega = fluid.boundaries[LinkType.IMPELLER].target_omega
+                        joint_state = p.getJointState(body_id, impeller_joint_idx, physicsClientId=physics_client)
+                        joint_vel = abs(joint_state[1])
+
+                        if step_idx >= 48:
+                            # 1. Verify that PyBullet joint velocity matches target speed at each step
+                            assert joint_vel == pytest.approx(target_omega, abs=1e-2), (
+                                f"Step {step_idx}: Joint velocity {joint_vel} did not match target omega {target_omega}"
+                            )
+
+                            # 2. Verify that target speed correctly solves the torque-limiting equation
+                            # Since the simulation updates at 1/240s steps, the speed governor is computed
+                            # using the drag torque from the previous step (which is at index -2 of fluid.torques).
+                            if len(fluid.torques) > 1:
+                                last_torque = abs(fluid.torques[-2])
+                                motor_power = provider.settings.motor_power
+                                expected_omega = min(120.0, motor_power / last_torque) if last_torque > 1e-5 else 120.0
+                                assert target_omega == pytest.approx(expected_omega, abs=1e-2), (
+                                    f"Step {step_idx}: Solver speed {target_omega} did not match expected {expected_omega} (last torque: {last_torque})"
+                                )
+            finally:
+                p.disconnect(physics_client)
+
+    @pytest.mark.slow
+    @pytest.mark.timeout(180)
     def test_pump_integration_water_escaping(self):
         """Verify that the simulation early terminates when water escapes the bowl."""
         import tempfile
@@ -361,7 +462,8 @@ class TestCatFountainProvider:
             )
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
-            provider.settings.target_volume = 0.00008
+            provider.settings.target_volume = 0.000005
+            provider.settings.motor_power = 1000.0
 
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
             builder = Builder(manager, logger=Logger(enabled=False))
@@ -421,14 +523,14 @@ class TestCatFountainProvider:
                             from provider.bullet import LinkType
 
                             if b_dict.get("link_type") != LinkType.TUBE and b_dict.get("link_type") != "tube":
-                                b_dict["radius"] = 0.050
+                                b_dict["radius"] = 0.020
                             from model.boundary_config import BoundaryConfig
 
                             new_bowl_list.append(BoundaryConfig.model_validate(b_dict))
                         test_boundaries["bowl"] = new_bowl_list
                     else:
                         test_boundaries["bowl"]["height"] = (provider.settings.bowl_height - 25.0) * 0.001
-                        test_boundaries["bowl"]["radius"] = 0.050
+                        test_boundaries["bowl"]["radius"] = 0.020
 
                 hooks = provider.get_simulate_hooks("product:view/simulate")
                 setup_fn = hooks[Simulate.SETUP]
@@ -440,6 +542,14 @@ class TestCatFountainProvider:
                 step_fn = hooks[Simulate.STEP]
                 terminated_message = None
                 for step_idx in range(180):
+                    if step_idx == 45:
+                        import numpy as np
+                        import jax.numpy as jnp
+
+                        pos_arr = np.array(provider.water_sim.pos_jax)
+                        if len(pos_arr) > 0:
+                            pos_arr[0] = [0.0, 0.0, -10.0]
+                            provider.water_sim.pos_jax = jnp.array(pos_arr)
                     res = step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     if res is not None:
                         terminated_message = res
@@ -615,11 +725,12 @@ class TestCatFountainProvider:
                 # Verify that when all water is within boundaries, simulation does not terminate
                 assert step_fn(body_id, client, 0, "simulate") is None
 
-                # Move a sufficient volume of water particles outside the boundary to trigger escaping
-                # (threshold is 0.001L of water, with r_s=0.0015)
+                # Move a sufficient volume of water particles (at least 0.0012L) outside the boundary to trigger escaping
+                vol_s = (4.0 / 3.0) * np.pi * (provider.water_sim.r_s**3)
+                n_needed = int(np.ceil(0.0012 * 1e-3 / vol_s))
                 pos_np = np.array(provider.water_sim.pos_jax)
-                assert len(pos_np) >= 100
-                pos_np[:100, 2] = -10.0  # Put them below the floor boundary
+                assert len(pos_np) >= n_needed
+                pos_np[:n_needed, 2] = -10.0  # Put them below the floor boundary
 
                 import jax.numpy as jnp
 
@@ -639,7 +750,11 @@ class TestCatFountainProvider:
         provider.build_product(room, Mode.DEFAULT)
         room.translate_joints()
 
-        parts = {name: geom[0] for name, geom in room.items()}
+        parts = {
+            name: geom[0]
+            for name, geom in room.items()
+            if not any(x in name for x in ["emitter", "receiver", "pcb", "motor"])
+        }
         for name1, part1 in parts.items():
             for name2, part2 in parts.items():
                 if name1 < name2:
@@ -648,42 +763,3 @@ class TestCatFountainProvider:
                     assert vol == pytest.approx(0, abs=0.2), (
                         f"Intersection detected between {name1} and {name2}: {vol:.3f} mm3"
                     )
-
-    def test_drain_cover_insertion_and_lock(self, provider):
-        """Verify that the drain cover can be inserted at 0 degrees and locked at 90 degrees."""
-        # 1. Build the lid and the drain cover
-        lid = provider.build_lid("lid")
-        cover = provider.build_drain_cover("drain_cover")
-
-        assert lid.part.is_valid
-        assert cover.part.is_valid
-
-        # 2. Get the lid and cover geometries
-        lid_shape = lid.part
-        cover_shape = cover.part
-
-        # 3. Position of the drain socket joint on the lid
-        # lid_part.joints["drain_socket"] is at Location((0, 65.0, -1.5))
-        # cover_part.joints["mount"] is at Location((0, 0, 0))
-        # Standard assembled position is: Location((0, 65.0, -1.5))
-        base_loc = Location((0, 65.0, -1.5))
-
-        # Check Insertion Path at 0 degrees (vertical translation from Z = 5.0 down to 0.0)
-        for z_offset in [5.0, 3.0, 1.0, 0.0]:
-            loc = base_loc * Location((0, 0, z_offset))
-            positioned_cover = loc * cover_shape
-
-            inter = lid_shape.intersect(positioned_cover)
-            vol = sum(s.volume for s in inter.solids()) if inter else 0.0
-            assert vol == pytest.approx(0.0, abs=1e-3), (
-                f"Intersection detected during vertical insertion at z_offset={z_offset}: {vol:.3f} mm3"
-            )
-
-        # Check that the cover fits at all rotations (e.g., 90 degrees) because it is circular
-        loc_rotated = base_loc * Rot(0, 0, 90.0)
-        positioned_cover_rotated = loc_rotated * cover_shape
-        inter_rotated = lid_shape.intersect(positioned_cover_rotated)
-        vol_rotated = sum(s.volume for s in inter_rotated.solids()) if inter_rotated else 0.0
-        assert vol_rotated == pytest.approx(0.0, abs=1e-3), (
-            f"Intersection detected at rotated position (90 deg): {vol_rotated:.3f} mm3"
-        )

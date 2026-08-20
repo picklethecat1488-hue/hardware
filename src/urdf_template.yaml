@@ -40,7 +40,7 @@ joint_template: |
 
 axis_limit_template: |
   <axis xyz="{joint_axis}"/>
-    <limit effort="10.0" lower="{lower:.6f}" upper="{upper:.6f}" velocity="1.0"/>
+    <limit effort="10.0" lower="{lower:.6f}" upper="{upper:.6f}" velocity="200.0"/>
 
 primitive_collision_template: |
   <collision>

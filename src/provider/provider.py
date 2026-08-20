@@ -434,6 +434,11 @@ class URDFMetadata:
         motor_target: Optional[float] = None,
         motor_force: Optional[float] = None,
         geometry: Optional[Any] = None,
+        magnet_radius: Optional[float] = None,
+        magnet_thickness: Optional[float] = None,
+        pump_well_wall: Optional[float] = None,
+        magnet_count: Optional[int] = None,
+        impeller_shaft_radius: Optional[float] = None,
     ) -> None:
         """Initialize URDFMetadata and attach properties to geometry."""
         from build123d import Builder  # type: ignore
@@ -459,6 +464,11 @@ class URDFMetadata:
         self.motor_type = motor_type
         self.motor_target = motor_target
         self.motor_force = motor_force
+        self.magnet_radius = magnet_radius
+        self.magnet_thickness = magnet_thickness
+        self.pump_well_wall = pump_well_wall
+        self.magnet_count = magnet_count
+        self.impeller_shaft_radius = impeller_shaft_radius
 
         # Initialize boundaries list with any provided boundaries
         self.boundaries: list[Any] = list(boundaries) if boundaries is not None else []
@@ -496,6 +506,17 @@ class URDFMetadata:
             u_geom.urdf_motor_target = self.motor_target
         if self.motor_force is not None:
             u_geom.urdf_motor_force = self.motor_force
+
+        if self.magnet_radius is not None:
+            u_geom.urdf_magnet_radius = self.magnet_radius
+        if self.magnet_thickness is not None:
+            u_geom.urdf_magnet_thickness = self.magnet_thickness
+        if self.pump_well_wall is not None:
+            u_geom.urdf_pump_well_wall = self.pump_well_wall
+        if self.magnet_count is not None:
+            u_geom.urdf_magnet_count = self.magnet_count
+        if self.impeller_shaft_radius is not None:
+            u_geom.urdf_impeller_shaft_radius = self.impeller_shaft_radius
 
     def __enter__(self) -> "URDFMetadata":
         """Enter context manager."""
