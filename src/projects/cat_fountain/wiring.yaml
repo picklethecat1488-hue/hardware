@@ -151,6 +151,10 @@ components:
         label: "36 (3V3)"
         side: left
         slot: 15
+      - name: "GP26"
+        label: "GP26 (SPEED_SENSE)"
+        side: left
+        slot: 11
 
   - name: fuel_gauge
     package: board
@@ -388,6 +392,26 @@ components:
         label: "DIN"
         side: left
 
+  - name: speed_sensor
+    package: TO-92
+    position: [0.0, -17.5, 23.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [4.5, 2.2, 4.5]
+    label:
+      text: "Hall Speed Sensor"
+      position: [0.0, -10.0, 0.0]
+      align: [center, max]
+    pins:
+      - name: "VCC"
+        label: "VCC"
+        side: left
+      - name: "GND"
+        label: "GND"
+        side: left
+      - name: "OUT"
+        label: "OUT"
+        side: right
+
 nets:
   - name: gnd
     color: black
@@ -403,6 +427,7 @@ nets:
       - [sensor_north, GND]
       - [sensor_west, GND]
       - [pico, GND_R]
+      - [speed_sensor, GND]
 
   - name: vcc_logic
     color: red
@@ -414,6 +439,7 @@ nets:
       - [sensor_east, VCC]
       - [fuel_gauge, VIN]
       - [motor_driver, VIO]
+      - [speed_sensor, VCC]
 
   - name: vcc_bat
     color: red
@@ -562,3 +588,9 @@ nets:
     pins:
       - [pico, GP22]
       - [motor_driver, DIAG]
+
+  - name: speed_sense
+    color: green
+    pins:
+      - [pico, GP26]
+      - [speed_sensor, OUT]

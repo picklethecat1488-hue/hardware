@@ -212,9 +212,17 @@ class CatFountainProvider(Provider):
                 # Outer boss body (17.5mm deep to cover 9.3mm motor and drive hub recess)
                 Cylinder(radius=18.0, height=17.5, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
+                # Local boss extension to house the speed sensor pocket (South side, Y = -18.0)
+                with Locations((0, -18.0, 0)):
+                    Box(8.0, 6.0, 17.5, align=(Align.CENTER, Align.CENTER, Align.MAX))
+
                 # 1. Recess for the drive hub (radius 17.0mm, height 5.3mm from Z = -1.2)
                 with Locations((0, 0, -1.2)):
                     Cylinder(radius=17.0, height=5.3, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+
+                # Speed sensor pocket (5.0mm wide, 2.2mm thick, 14.5mm deep from Z = -17.5 upwards)
+                with Locations((0, -18.5, -17.5)):
+                    Box(5.0, 2.2, 14.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
                 # 2. Pocket for the BetaFPV 1102 motor body (starting at Z = -6.5 downwards by 10.0mm)
                 with Locations((0, 0, -6.5)):
@@ -266,19 +274,25 @@ class CatFountainProvider(Provider):
                 with Locations((center_x, center_y, floor_z - t)):
                     # 1. Base plate connecting the two guide tracks (recessed to save material and provide airflow)
                     Box(board_l - 4.0, board_w - 2.0, standoff_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
-                    
+
                     # 2. Left and Right guide tracks (at X = +/- board_l/2)
                     track_w = board_w
                     track_l = 3.0
                     track_h = standoff_h + 3.2
-                    
+
                     with Locations((-board_l / 2.0 - 0.75, 0, 0), (board_l / 2.0 + 0.75, 0, 0)):
                         Box(track_l, track_w, track_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
-                    
+
                     # 3. Subtract the slot for the PCB inside the left/right tracks (1.9mm height)
                     with Locations((0, 0, -standoff_h)):
                         with Locations((-board_l / 2.0 - 0.15, 0, 0), (board_l / 2.0 + 0.15, 0, 0)):
-                            Box(2.0, board_w + 0.3, 1.9, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                            Box(
+                                2.0,
+                                board_w + 0.3,
+                                1.9,
+                                align=(Align.CENTER, Align.CENTER, Align.MAX),
+                                mode=Mode.SUBTRACT,
+                            )
 
                 # Add engraved label
                 label_y_offset = -(board_w / 2.0 + 5.0)
@@ -675,7 +689,7 @@ class CatFountainProvider(Provider):
             with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
                 Cylinder(radius=cover_r + 0.5, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                 fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.4)
-            
+
             with Locations((0, 0, 1.2)):
                 add(snap_ring_part.part)
 
@@ -1092,7 +1106,9 @@ class CatFountainProvider(Provider):
             def make_pcb(w: float, l: float, h: float = 2.0) -> Part:
                 with BuildPart() as pcb:
                     Box(w, l, h, align=(Align.CENTER, Align.CENTER, Align.CENTER))
-                    fillet(pcb.edges().filter_by(Axis.Z), radius=1.5)
+                    fillet_r = min(1.5, min(w, l) / 2.0 - 0.1)
+                    if fillet_r > 0.1:
+                        fillet(pcb.edges().filter_by(Axis.Z), radius=fillet_r)
                 return cast(Part, pcb.part)
 
             def make_sensor_pcb() -> Part:

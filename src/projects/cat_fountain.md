@@ -87,6 +87,7 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 | **BLDC Motor (15W)** | **BetaFPV 1102 (18000KV) Brushless Motor** | Ultra-lightweight 1S-compatible brushless motor to drive the dry-side magnet hub. | *N/A (Driven by SimpleFOC Mini)* | 15W power class, 13.8mm diameter, 1.5mm shaft, lightweight 2.9g, mounts with M1.4 screws. |
 | **Coupling Magnets (Qty: 6)** | **6mm x 3mm N52 Neodymium Discs** | Rare-earth magnets to couple the dry motor shaft to the wet impeller. | *N/A (Magnetic)* | Strong N52 grade, 3 magnets on the dry hub and 3 on the wet impeller with alternating polarities. |
 | **I2C Current Sensor** | [Adafruit INA219 Current Sensor](https://www.adafruit.com/product/904) | High-side current and power monitor to measure motor current draw and calculate load torque. | `0x40` | Measures current up to 3.2A with 1% accuracy. Used for low water / refill detection. |
+| **Speed Sensor** | **Digital Latching Hall Sensor (e.g., US1881 / AH3577)** | Measures impeller rotation speed contactlessly by detecting alternating magnet poles. | *N/A (Driven by GP26)* | Latching digital output, SOT-23 or TO-92 package, fits inside custom pocket in the motor boss. |
 
 ### Technical Integration Notes
 
