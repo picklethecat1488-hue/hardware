@@ -30,6 +30,10 @@ spout_deflection_height: 0.0
 spout_deflection_radius: 13.0
 spout_deflection_thickness: 40.0
 spout_deflection_z_offset: 16.0
+lid_cutout_radius: 55.0
+lid_cutout_y: -20.0
+lid_cutout_ridge_width: 1.5
+lid_cutout_ridge_height: 2.0
 
 # ==========================================
 # 3. Tube
@@ -62,6 +66,7 @@ motor_collar_clearance_height: 2.0
 motor_collar_clearance_radius: 2.75
 shaft_hole_height: 1.8
 shaft_hole_radius_offset: 0.1
+motor_boss_height: 20.0
 
 # Set screw & alignment parameters
 motor_spacing_x: 6.6
@@ -153,3 +158,14 @@ pump_well_wall: 1.5
 pump_inlet_radius: 6.0
 pump_outlet_radius: 4.0      # 8mm inner diameter (10mm OD)
 pump_casing_clearance: 1.0
+
+# ==========================================
+# 11. Drive Hub Recess & Motor Clip Assembly
+# ==========================================
+drive_hub_recess_radius: 17.0
+drive_hub_recess_depth: 5.3
+bottom_cover_opening_width: 20.0
+motor_clip_width: 17.6
+motor_clip_thickness: 1.6
+motor_clip_length: 26.0
+motor_clip_cutout_width: 10.0
