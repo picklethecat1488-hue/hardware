@@ -1157,23 +1157,41 @@ class Fluid:
     def thresholds(self) -> dict[LinkType, float]:
         """Return dict mapping LinkType keys to their float thresholds."""
         outlet_idx = self.link_indices.get(LinkType.OUTLET)
+        has_outlet_link = outlet_idx is not None and outlet_idx != -1
+        offset_val = (5.0 / 3.0) * self.r_s
         min_h = 0.0
-        if outlet_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
-            state = p.getLinkState(self.body_id, outlet_idx, physicsClientId=self.physics_client)
-            hc_info = self.boundaries.get(LinkType.TUBE)
-            hc_height = hc_info.height if hc_info is not None else 0.0
-            min_h = float(state[4][2] + hc_height - 0.005)
+        hc_info = self.boundaries.get(LinkType.TUBE)
+        hc_height = hc_info.height if hc_info is not None else 0.0
+
+        if self.body_id is not None and _is_real_physics_client(self.physics_client):
+            if has_outlet_link:
+                state = p.getLinkState(self.body_id, outlet_idx, physicsClientId=self.physics_client)
+                min_h = float(state[4][2] + hc_height - offset_val)
+            else:
+                base_pos, _ = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.physics_client)
+                hc_z = hc_info.xyz[2] if hc_info is not None else 0.0
+                min_h = float(base_pos[2] + hc_z + hc_height - offset_val)
 
         max_y = 0.0
-        if outlet_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
-            aabb = p.getAABB(self.body_id, outlet_idx, physicsClientId=self.physics_client)
-            max_y = float(aabb[1][1] + 0.005)
+        if self.body_id is not None and _is_real_physics_client(self.physics_client):
+            if has_outlet_link:
+                aabb = p.getAABB(self.body_id, outlet_idx, physicsClientId=self.physics_client)
+                max_y = float(aabb[1][1] + offset_val)
+            else:
+                base_pos, _ = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.physics_client)
+                hc_y = hc_info.xyz[1] if hc_info is not None else 0.0
+                hc_r = hc_info.radius if hc_info is not None else 0.0
+                max_y = float(base_pos[1] + hc_y + hc_r + offset_val)
 
         offset_mm = 0.0
         hc_idx = self.link_indices.get(LinkType.TUBE)
-        if hc_idx is not None and self.body_id is not None and _is_real_physics_client(self.physics_client):
-            info = p.getJointInfo(self.body_id, hc_idx, physicsClientId=self.physics_client)
-            hc_y = info[14][1]
+        has_tube_link = hc_idx is not None and hc_idx != -1
+        if self.body_id is not None and _is_real_physics_client(self.physics_client):
+            if has_tube_link:
+                info = p.getJointInfo(self.body_id, hc_idx, physicsClientId=self.physics_client)
+                hc_y = info[14][1]
+            else:
+                hc_y = hc_info.xyz[1] if hc_info is not None else 0.0
             cavity_r_mm = self.radii[LinkType.BASE] * 1000.0
             hc_r_mm = self.radii[LinkType.TUBE] * 1000.0
             hc_y_mm = hc_y * 1000.0
@@ -1439,6 +1457,22 @@ class Fluid:
 
         avg_step_torque = (float(torque_accum) / 5) + mag_friction + bearing_viscous_drag
         self.torques.append(avg_step_torque)
+
+        # Check for SPH numerical instability (particle speeds exceeding physical limits)
+        if self.vel_jax is not None:
+            vel_np = np.array(self.vel_jax)
+            if len(vel_np) > 0:
+                max_speed = float(np.max(np.linalg.norm(vel_np, axis=1)))
+                if max_speed > 10.0:
+                    msg = (
+                        f"WARNING: SPH Simulation numerical instability detected! "
+                        f"Max particle speed is {max_speed:.2f} m/s (limit is 10.0 m/s). "
+                        f"Please check boundary damping and stiffness coefficients."
+                    )
+                    if self.provider and getattr(self.provider, "logger", None) is not None:
+                        self.provider.logger.print(msg, symbol="⚠️")
+                    else:
+                        print(f"⚠️ {msg}")
 
         self.last_positions = self.pos_jax.tolist()
 

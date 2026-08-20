@@ -30,6 +30,9 @@ class CatFountainConfig(BaseModel):
         description="Target total fluid volume to spawn (m^3).",
     )
 
+    stiffness_boundary: float = Field(default=1000.0, description="SPH boundary penalty stiffness coefficient")
+    damping_boundary: Optional[float] = Field(default=None, description="SPH boundary penalty damping coefficient")
+
     # =========================================================================
     # Internal & Helper Properties
     # =========================================================================
@@ -305,6 +308,26 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("lid_step_width", 2.0))
 
     @cached_property
+    def lid_cutout_radius(self) -> float:
+        """Return the radius of the large circular cutout in the lid in millimeters."""
+        return float(self._raw_data.get("lid_cutout_radius", 55.0))
+
+    @cached_property
+    def lid_cutout_y(self) -> float:
+        """Return the Y position of the large circular cutout in the lid in millimeters."""
+        return float(self._raw_data.get("lid_cutout_y", -20.0))
+
+    @cached_property
+    def lid_cutout_ridge_width(self) -> float:
+        """Return the width of the small ridge around the lid opening in millimeters."""
+        return float(self._raw_data.get("lid_cutout_ridge_width", 1.5))
+
+    @cached_property
+    def lid_cutout_ridge_height(self) -> float:
+        """Return the height of the small ridge around the lid opening in millimeters."""
+        return float(self._raw_data.get("lid_cutout_ridge_height", 2.0))
+
+    @cached_property
     def tube_lid_clearance(self) -> float:
         """Return the clearance between the tube and the lid socket."""
         return float(self._raw_data.get("tube_lid_clearance", 0.1))
@@ -530,6 +553,11 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("boss_body_height", 2.0))
 
     @cached_property
+    def motor_boss_height(self) -> float:
+        """Return the total height of the motor mounting boss."""
+        return float(self._raw_data.get("motor_boss_height", 20.0))
+
+    @cached_property
     def motor_collar_clearance_radius(self) -> float:
         """Return the motor collar clearance hole radius."""
         return float(self._raw_data.get("motor_collar_clearance_radius", 3.2))
@@ -662,3 +690,61 @@ class CatFountainConfig(BaseModel):
     def pump_casing_clearance(self) -> float:
         """Return the tight clearance inside the scroll casing around the impeller."""
         return float(self._raw_data.get("pump_casing_clearance", 1.0))
+
+    @cached_property
+    def drive_hub_recess_radius(self) -> float:
+        """Return the radius of the bowl's recess for the drive hub."""
+        return float(self._raw_data.get("drive_hub_recess_radius", 17.0))
+
+    @cached_property
+    def drive_hub_recess_depth(self) -> float:
+        """Return the depth of the bowl's recess for the drive hub."""
+        return float(self._raw_data.get("drive_hub_recess_depth", 5.3))
+
+    @cached_property
+    def bottom_cover_opening_width(self) -> float:
+        """Return the width of the bottom cover side opening."""
+        return float(self._raw_data.get("bottom_cover_opening_width", 20.0))
+
+    @cached_property
+    def motor_clip_width(self) -> float:
+        """Return the width of the motor retaining clip."""
+        return float(self._raw_data.get("motor_clip_width", 17.6))
+
+    @cached_property
+    def motor_clip_thickness(self) -> float:
+        """Return the thickness of the motor retaining clip."""
+        return float(self._raw_data.get("motor_clip_thickness", 1.8))
+
+    @cached_property
+    def motor_clip_length(self) -> float:
+        """Return the length of the motor retaining clip."""
+        return float(self._raw_data.get("motor_clip_length", 26.0))
+
+    @cached_property
+    def motor_clip_cutout_width(self) -> float:
+        """Return the cutout width of the motor retaining clip U-fork."""
+        return float(self._raw_data.get("motor_clip_cutout_width", 14.2))
+
+    def __init__(self, **data: Any):
+        """Initialize settings and load fallback values from measurements.yaml if present."""
+        super().__init__(**data)
+        if self.measurements_path:
+            try:
+                raw = self._raw_data
+                for field in ["stiffness_boundary", "damping_boundary"]:
+                    if field in raw and getattr(self, field) == self.model_fields[field].default:
+                        val = raw[field]
+                        if isinstance(val, np.ndarray):
+                            val = float(val.item()) if val.ndim == 0 else val.tolist()
+                        setattr(self, field, val)
+            except Exception:
+                pass
+
+        if self.damping_boundary is None:
+            r_s = 0.0015
+            spacing = 1.3 * r_s
+            mass = 1000.0 * (spacing**3)
+            dt_sub = 1.0 / 1200.0
+            safety_factor = 225.0
+            self.damping_boundary = float((safety_factor * mass) / dt_sub)
