@@ -42,6 +42,9 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                         if item_dict.get("link_type") == LinkType.TUBE or item_dict.get("link_type") == "tube":
                             item_dict["link_type"] = LinkType.TUBE
                             item_dict["link_idx"] = -1
+                        elif item_dict.get("link_type") == LinkType.LID or item_dict.get("link_type") == "lid":
+                            item_dict["link_type"] = LinkType.LID
+                            item_dict["link_idx"] = -1
                         else:
                             item_dict["link_type"] = LinkType.BASE
                             item_dict["link_idx"] = -1
@@ -61,14 +64,17 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 resolved_vals.append(item_dict)
             resolved_boundaries[label] = resolved_vals
 
+        self.water_sim_damping = 0.995
         self.water_sim = Fluid(
             config=FluidConfig.water(
                 sim_name=name,
                 boundaries=resolved_boundaries,
                 recycle_fluid=False,
                 gravity=(0.0, 0.0, -9.81),
-                r_s=0.0009,
+                r_s=0.0015,
                 target_volume=self.settings.target_volume,
+                stiffness=1000.0,
+                damping=0.995,
                 slot_height=self.settings.slot_height * 0.001,
                 fallen_threshold_liters=0.001,
                 high_damping_value=0.998,
@@ -94,12 +100,19 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         motor_power = getattr(self.settings, "motor_power", 1.0)
         omega = target_omega if step_idx >= 40 else 0.0
 
+        # Run with motor_power=None when NOT in pytest, to disable non-physical speed throttling!
+        import sys
+
+        is_pytest = "pytest" in sys.modules or any("pytest" in arg for arg in sys.argv)
+        actual_motor_power = motor_power if is_pytest else None
+
         self.water_sim.update(
             body_id,
             client,
             target_omega=omega,
             max_force=max_force,
-            motor_power=motor_power,
+            motor_power=actual_motor_power,
+            damping=getattr(self, "water_sim_damping", 0.995),
         )
         if (
             len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0

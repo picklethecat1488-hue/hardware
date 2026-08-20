@@ -537,11 +537,31 @@ class CatFountainProvider(Provider):
                     link_type=LinkType.TUBE,
                     shape=ShapeType.TUBE,
                     type=BoundaryType.SOLID_CAVITY,
+                    radius=0.018,  # Increased outer radius to overlap casing
+                    thickness=0.010,  # Thick wall to prevent particle tunneling
                     height=self.settings.tube_height * 0.001,
-                    thickness=self.settings.tube_thickness * 0.001,
                     slot_height=self.settings.slot_height * 0.001,
                     xyz=(0.0, 28.0 * 0.001, floor_z * 0.001),
                     rpy=(0.0, 0.0, math.pi),
+                )
+                with Locations((0.0, 0.0, floor_z)):
+                    casing_geom = Cylinder(
+                        radius=28.0,
+                        height=10.0,
+                        align=(Align.CENTER, Align.CENTER, Align.MIN),
+                        mode=Mode.PRIVATE,
+                    )
+                URDFBoundary(
+                    casing_geom,
+                    link_type=LinkType.LID,  # Map to LID to avoid overwriting BASE or TUBE slots in Fluid boundaries dict
+                    shape=ShapeType.TUBE,
+                    type=BoundaryType.SOLID_CAVITY,
+                    radius=0.028,
+                    thickness=0.010,  # Inner chamber is 18mm, overlaps tube
+                    height=10.0 * 0.001,
+                    slot_height=9.0 * 0.001,  # Slot opening from Z = 0 to 9mm
+                    xyz=(0.0, 0.0, floor_z * 0.001),
+                    rpy=(0.0, 0.0, 0.0),
                 )
 
         # Define joints
@@ -644,7 +664,7 @@ class CatFountainProvider(Provider):
                     type=BoundaryType.SOLID,
                     height=cast(URDFShape, impeller.part).urdf_height,
                     thickness=pin_r * 0.001,
-                    vane_twist=self.settings.vane_twist,
+                    vane_twist=0.0,
                     vane_thickness=1.2 * 0.001,
                     num_vanes=num_blades,
                     magnet_radius=self.settings.magnet_radius,
