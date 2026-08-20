@@ -27,6 +27,8 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                     link_indices[LinkKey.DRIVE_HUB] = i
                 elif "lid" in link_name:
                     link_indices["lid"] = i
+                elif "pump_cover" in link_name:
+                    link_indices["pump_cover"] = i
 
         # Resolve boundaries to include correct link_idx and link_type
         resolved_boundaries = {}
