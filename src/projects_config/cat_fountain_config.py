@@ -152,6 +152,11 @@ class CatFountainConfig(BaseModel):
         """Return the maximum motor output power in Watts."""
         return float(self._raw_data.get("motor_power", 1.0))
 
+    @cached_property
+    def motor_force_sim(self) -> float:
+        """Return the maximum joint torque limit allowed in the physics simulator (N*m)."""
+        return float(self._raw_data.get("motor_force_sim", 10.0))
+
     # =========================================================================
     # Spout Parameters
     # =========================================================================

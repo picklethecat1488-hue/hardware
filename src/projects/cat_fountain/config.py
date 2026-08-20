@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Any, Optional
-from provider import Room, Simulate, Mode
+from provider import Room, Simulate, Mode, LinkType
 
 
 def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
@@ -108,7 +108,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
 
                 max_speed_observed = 0.0
                 total_flow_accum = 0
-                num_steps = 150
+                num_steps = 500
 
                 for step_idx in range(num_steps):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
@@ -123,13 +123,15 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
                             if max_speed > 50.0:  # Prevent JAX overflow/NaN
                                 break
 
-                        # Count particles in the tube
+                        # Count particles that have reached/exited the top spout outlet
                         pos_np = np.array(provider.water_sim.pos_jax)
-                        tube_center_x = 0.0
-                        tube_center_y = 0.028
-                        dist_sq = (pos_np[:, 0] - tube_center_x) ** 2 + (pos_np[:, 1] - tube_center_y) ** 2
-                        in_tube = (dist_sq < 0.008**2) & (pos_np[:, 2] >= 0.041)
-                        total_flow_accum += int(np.sum(in_tube))
+                        if len(pos_np) > 0:
+                            ys_np = pos_np[:, 1]
+                            zs_np = pos_np[:, 2]
+                            in_spout = (zs_np >= provider.water_sim.thresholds[LinkType.OUTLET]) & (
+                                ys_np < provider.water_sim.thresholds[LinkType.OUTLET_MAX_Y]
+                            )
+                            total_flow_accum += int(np.sum(in_spout))
 
                 return max_speed_observed, total_flow_accum
 

@@ -99,7 +99,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         max_force = 10.0
         vane_obj = cast(URDFShape, self.room["impeller"][0])
         target_omega = float(getattr(vane_obj, "urdf_motor_target", 15.0))
-        max_force = float(getattr(vane_obj, "urdf_motor_force", 10.0))
+        max_force = float(getattr(self.settings, "motor_force_sim", 10.0))
         motor_power = getattr(self.settings, "motor_power", 1.0)
         omega = target_omega if step_idx >= 40 else 0.0
 

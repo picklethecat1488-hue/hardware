@@ -686,6 +686,7 @@ class CatFountainProvider(Provider):
                     link_type=LinkType.IMPELLER,
                     shape=ShapeType.IMPELLER,
                     type=BoundaryType.SOLID,
+                    radius=impeller_r * 0.001,
                     height=cast(URDFShape, impeller.part).urdf_height,
                     thickness=pin_r * 0.001,
                     vane_twist=0.0,

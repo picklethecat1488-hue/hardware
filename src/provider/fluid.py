@@ -973,16 +973,17 @@ class Fluid:
             max_r_sq = (cavity_inner_radius - self.spawn_buffer) ** 2
             min_r_sq = (hc_r + self.spawn_buffer) ** 2
 
-            # Find the casing boundary (stored with link_type == LinkType.LID)
+            # Find the casing boundary (stored with link_type == LinkType.LID and shape == ShapeType.TUBE)
             casing_x, casing_y = 0.0, 0.0
             casing_radius = 0.0
+            from model import ShapeType
+
             for b in self.boundary_list:
-                if b.link_type == LinkType.LID:
+                if b.link_type == LinkType.LID and b.shape == ShapeType.TUBE:
                     if b.xyz is not None:
                         casing_x, casing_y = b.xyz[0], b.xyz[1]
                     casing_radius = b.radius
                     break
-            casing_r_sq = (casing_radius + self.spawn_buffer) ** 2 if casing_radius > 0.0 else 0.0
 
             xy_coords = []
             lim = int(math.ceil(cavity_inner_radius / spacing))
@@ -997,9 +998,14 @@ class Fluid:
                     # Outside tube boundary
                     if (x - hc_x) ** 2 + (y - hc_y) ** 2 <= min_r_sq:
                         continue
-                    # Outside casing/motor housing boundary
-                    if casing_r_sq > 0.0 and (x - casing_x) ** 2 + (y - casing_y) ** 2 <= casing_r_sq:
-                        continue
+                    # Exclude the solid wall of the casing (between inner radius 18mm and outer radius 28mm)
+                    if casing_radius > 0.0:
+                        dist_casing_sq = (x - casing_x) ** 2 + (y - casing_y) ** 2
+                        inner_casing_r = casing_radius - 0.010
+                        inner_casing_r_sq = (inner_casing_r + self.spawn_buffer) ** 2
+                        outer_casing_r_sq = (casing_radius + self.spawn_buffer) ** 2
+                        if inner_casing_r_sq <= dist_casing_sq <= outer_casing_r_sq:
+                            continue
 
                     xy_coords.append((x, y))
 
