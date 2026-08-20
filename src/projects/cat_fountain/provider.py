@@ -539,8 +539,9 @@ class CatFountainProvider(Provider):
                     type=BoundaryType.SOLID_CAVITY,
                     height=self.settings.tube_height * 0.001,
                     thickness=self.settings.tube_thickness * 0.001,
-                    slot_height=0.0,
+                    slot_height=self.settings.slot_height * 0.001,
                     xyz=(0.0, 28.0 * 0.001, floor_z * 0.001),
+                    rpy=(0.0, 0.0, math.pi),
                 )
 
         # Define joints
@@ -960,15 +961,29 @@ class CatFountainProvider(Provider):
                 radius=inlet_r, height=cover_h + 2.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
             )
 
-            URDFMetadata(
+            with URDFMetadata(
                 label=target,
                 material="petg",
                 density=1.27,
                 boundary_friction=0.20,
-                collision_type=URDFCollisionType.CONVEX,
+                collision_type=URDFCollisionType.ANALYTICAL,
                 parent="bowl",
                 joint_type=URDFJointType.FIXED,
-            )
+            ):
+                URDFBoundary(
+                    cover,
+                    link_type=LinkType.LID,
+                    shape=ShapeType.CYLINDER,
+                    type=BoundaryType.CAVITY,
+                    radius=cover_r * 0.001,
+                    height=0.0,
+                    thickness=cover_h * 0.001,
+                    xyz=(0.0, 0.0, 0.0),
+                    rpy=(math.pi, 0.0, 0.0),
+                    has_drain=True,
+                    drain_hole_y=0.0,
+                    drain_hole_radius=inlet_r * 0.001,
+                )
 
         RigidJoint("mount", cover.part, Location((0, 0, 0)))
         return cover
@@ -1078,6 +1093,8 @@ class CatFountainProvider(Provider):
             room.add("impeller", impeller_part, color="grey")
             room.add("bottom_cover", bottom_cover_part, color="grey", alpha=0.4)
             room.add("led_cover", led_cover, color="grey", alpha=0.4)
+            room.add("drive_hub", drive_hub_part, color="grey", alpha=0.4)
+            room.add("pump_cover", pump_cover_part, color="grey", alpha=0.4)
         else:
             room.add("bowl", bowl_part, color="grey", alpha=0.4)
             room.add("lid", lid_part, color="green", alpha=0.6)
