@@ -973,14 +973,35 @@ class Fluid:
             max_r_sq = (cavity_inner_radius - self.spawn_buffer) ** 2
             min_r_sq = (hc_r + self.spawn_buffer) ** 2
 
+            # Find the casing boundary (stored with link_type == LinkType.LID)
+            casing_x, casing_y = 0.0, 0.0
+            casing_radius = 0.0
+            for b in self.boundary_list:
+                if b.link_type == LinkType.LID:
+                    if b.xyz is not None:
+                        casing_x, casing_y = b.xyz[0], b.xyz[1]
+                    casing_radius = b.radius
+                    break
+            casing_r_sq = (casing_radius + self.spawn_buffer) ** 2 if casing_radius > 0.0 else 0.0
+
             xy_coords = []
             lim = int(math.ceil(cavity_inner_radius / spacing))
             for ix in range(-lim, lim + 1):
                 for iy in range(-lim, lim + 1):
                     x = ix * spacing
                     y = iy * spacing
-                    if x**2 + y**2 < max_r_sq and (x - hc_x) ** 2 + (y - hc_y) ** 2 > min_r_sq:
-                        xy_coords.append((x, y))
+
+                    # Inside base cavity boundary
+                    if x**2 + y**2 >= max_r_sq:
+                        continue
+                    # Outside tube boundary
+                    if (x - hc_x) ** 2 + (y - hc_y) ** 2 <= min_r_sq:
+                        continue
+                    # Outside casing/motor housing boundary
+                    if casing_r_sq > 0.0 and (x - casing_x) ** 2 + (y - casing_y) ** 2 <= casing_r_sq:
+                        continue
+
+                    xy_coords.append((x, y))
 
             xy_coords.sort(key=lambda pt: pt[0] ** 2 + pt[1] ** 2)
             self.spawn_xy_coords = xy_coords
