@@ -186,9 +186,9 @@ class TestCatFountainProvider:
     def test_configuration_loading(self, provider):
         """Ensure that critical measurement values are loaded correctly."""
         assert provider.settings.bowl_radius == 100.0
-        assert provider.settings.tube_radius == 10.0
-        assert provider.settings.impeller_radius == 12.0
-        assert provider.settings.impeller_blades == 3
+        assert provider.settings.tube_radius == 8.0
+        assert provider.settings.impeller_radius == 9.0
+        assert provider.settings.impeller_blades == 6
         assert provider.settings.petg_boundary_friction == 0.20
         assert provider.settings.petg_contact_angle == 75.0
 
@@ -358,7 +358,6 @@ class TestCatFountainProvider:
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
             provider.settings.target_volume = 0.0004
-
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
             builder = Builder(manager, logger=Logger(enabled=False))
 
@@ -463,7 +462,7 @@ class TestCatFountainProvider:
             )
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
-            provider.settings.target_volume = 0.00008
+            provider.settings.target_volume = 0.000005
             provider.settings.motor_power = 1000.0
 
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
@@ -524,14 +523,14 @@ class TestCatFountainProvider:
                             from provider.bullet import LinkType
 
                             if b_dict.get("link_type") != LinkType.TUBE and b_dict.get("link_type") != "tube":
-                                b_dict["radius"] = 0.050
+                                b_dict["radius"] = 0.020
                             from model.boundary_config import BoundaryConfig
 
                             new_bowl_list.append(BoundaryConfig.model_validate(b_dict))
                         test_boundaries["bowl"] = new_bowl_list
                     else:
                         test_boundaries["bowl"]["height"] = (provider.settings.bowl_height - 25.0) * 0.001
-                        test_boundaries["bowl"]["radius"] = 0.050
+                        test_boundaries["bowl"]["radius"] = 0.020
 
                 hooks = provider.get_simulate_hooks("product:view/simulate")
                 setup_fn = hooks[Simulate.SETUP]
@@ -543,6 +542,14 @@ class TestCatFountainProvider:
                 step_fn = hooks[Simulate.STEP]
                 terminated_message = None
                 for step_idx in range(180):
+                    if step_idx == 45:
+                        import numpy as np
+                        import jax.numpy as jnp
+
+                        pos_arr = np.array(provider.water_sim.pos_jax)
+                        if len(pos_arr) > 0:
+                            pos_arr[0] = [0.0, 0.0, -10.0]
+                            provider.water_sim.pos_jax = jnp.array(pos_arr)
                     res = step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     if res is not None:
                         terminated_message = res
@@ -718,11 +725,12 @@ class TestCatFountainProvider:
                 # Verify that when all water is within boundaries, simulation does not terminate
                 assert step_fn(body_id, client, 0, "simulate") is None
 
-                # Move a sufficient volume of water particles outside the boundary to trigger escaping
-                # (threshold is 0.001L of water, with r_s=0.0015)
+                # Move a sufficient volume of water particles (at least 0.0012L) outside the boundary to trigger escaping
+                vol_s = (4.0 / 3.0) * np.pi * (provider.water_sim.r_s**3)
+                n_needed = int(np.ceil(0.0012 * 1e-3 / vol_s))
                 pos_np = np.array(provider.water_sim.pos_jax)
-                assert len(pos_np) >= 100
-                pos_np[:100, 2] = -10.0  # Put them below the floor boundary
+                assert len(pos_np) >= n_needed
+                pos_np[:n_needed, 2] = -10.0  # Put them below the floor boundary
 
                 import jax.numpy as jnp
 

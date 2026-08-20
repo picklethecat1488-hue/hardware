@@ -4,6 +4,7 @@
 bowl_radius: 100.0
 bowl_height: 107.0
 bowl_thickness: 4.0
+floor_z: 41.0
 bottom_cover_clearance: 0.2
 bottom_cover_drain_radius: 8.0
 drain_hole_radius: 15.4
@@ -33,23 +34,23 @@ spout_deflection_z_offset: 16.0
 # ==========================================
 # 3. Tube
 # ==========================================
-tube_radius: 10.0
-tube_height: 75.0
+tube_radius: 8.0
+tube_height: 66.0
 tube_thickness: 2.0
 tube_lid_clearance: 0.1
 
 # ==========================================
 # 4. Impeller & Shaft
 # ==========================================
-impeller_radius: 12.0
-impeller_height: 77.0
+impeller_radius: 9.0
+impeller_height: 68.0
 impeller_shaft_radius: 2.5
 impeller_sleeve_height: 4.0
-impeller_blades: 3
+impeller_blades: 6
 impeller_clearance: 0.4
-vane_twist: -2512.5
-motor_target: 104.72
-motor_power: 3.08
+vane_twist: -15.0
+motor_target: 125.66
+motor_power: 15.0
 
 # ==========================================
 # 5. Motor, Central Boss & Fasteners
@@ -58,12 +59,12 @@ motor_power: 3.08
 boss_body_height: 2.0
 boss_body_radius_offset: 3.5
 motor_collar_clearance_height: 2.0
-motor_collar_clearance_radius: 3.2
+motor_collar_clearance_radius: 2.75
 shaft_hole_height: 1.8
 shaft_hole_radius_offset: 0.1
 
 # Set screw & alignment parameters
-motor_spacing_x: 17.0
+motor_spacing_x: 6.6
 motor_set_screw_angle: 45.0
 motor_set_screw_length: 24.0
 motor_set_screw_radius: 1.75
@@ -132,6 +133,23 @@ current_monitor_spacing_y: 12.7
 current_monitor_standoff_height: 4.0
 
 # Motor Driver
-motor_driver_spacing_x: 19.0
-motor_driver_spacing_y: 13.0
+motor_driver_spacing_x: 25.4
+motor_driver_spacing_y: 20.3
 motor_driver_standoff_height: 4.0
+
+# ==========================================
+# 10. Magnetic Centrifugal Pump Redesign
+# ==========================================
+# Magnet Dimensions (6mm x 3mm N52 Disc)
+magnet_radius: 3.0
+magnet_thickness: 3.0
+magnet_clearance: 0.1
+magnet_count: 3
+magnet_ring_radius: 9.0
+
+# Volute Casing & Well Geometry
+pump_well_depth: 10.0
+pump_well_wall: 1.5
+pump_inlet_radius: 6.0
+pump_outlet_radius: 4.0      # 8mm inner diameter (10mm OD)
+pump_casing_clearance: 1.0

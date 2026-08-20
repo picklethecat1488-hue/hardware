@@ -115,14 +115,26 @@ components:
         label: "GP15"
         side: right
         slot: 19
+      - name: "GP18"
+        label: "GP18 (CTRL_EN)"
+        side: left
+        slot: 3
       - name: "GP19"
-        label: "GP19 (CTRL_IA)"
+        label: "GP19 (CTRL_IN1)"
         side: left
         slot: 4
       - name: "GP20"
-        label: "GP20 (CTRL_IB)"
+        label: "GP20 (CTRL_IN2)"
         side: left
         slot: 5
+      - name: "GP21"
+        label: "GP21 (CTRL_IN3)"
+        side: left
+        slot: 6
+      - name: "GP22"
+        label: "GP22 (CTRL_DIAG)"
+        side: left
+        slot: 7
       - name: "GND_L"
         label: "3 (GND)"
         side: right
@@ -139,6 +151,10 @@ components:
         label: "36 (3V3)"
         side: left
         slot: 15
+      - name: "GP26"
+        label: "GP26 (SPEED_SENSE)"
+        side: left
+        slot: 11
 
   - name: fuel_gauge
     package: board
@@ -204,47 +220,65 @@ components:
     package: board
     position: [50.0, 15.0, 23.0]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [24.0, 19.0, 1.6]
-    mounting_holes: [19.0, 13.0]
+    dimensions: [25.4, 20.3, 1.6]
+    mounting_holes: [22.86, 17.78]
     label:
-      text: "L9110S"
+      text: "TMC6300"
       position: [15.0, 0.0, 0.0]
       align: [min, center]
     pins:
       - name: "VCC"
         label: "VCC"
         side: right
+      - name: "VIO"
+        label: "VIO"
+        side: right
       - name: "GND"
         label: "GND"
         side: right
-      - name: "IA"
-        label: "IA"
+      - name: "IN1"
+        label: "IN1"
         side: right
-      - name: "IB"
-        label: "IB"
+      - name: "IN2"
+        label: "IN2"
         side: right
-      - name: "OA"
-        label: "OA"
+      - name: "IN3"
+        label: "IN3"
+        side: right
+      - name: "EN"
+        label: "EN"
+        side: right
+      - name: "DIAG"
+        label: "DIAG"
+        side: right
+      - name: "OUT1"
+        label: "OUT1"
         side: left
-      - name: "OB"
-        label: "OB"
+      - name: "OUT2"
+        label: "OUT2"
+        side: left
+      - name: "OUT3"
+        label: "OUT3"
         side: left
 
   - name: motor
     package: motor
     position: [0.0, 0.0, 28.0]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [12.0, 10.0, 24.0]
+    dimensions: [13.8, 13.8, 9.3]
     label:
-      text: "N20"
+      text: "1102 BLDC"
       position: [0.0, -8.0, 0.0]
       align: [center, max]
     pins:
-      - name: "M+"
-        label: "M+"
+      - name: "U"
+        label: "U"
         side: top
-      - name: "M-"
-        label: "M-"
+      - name: "V"
+        label: "V"
+        side: top
+      - name: "W"
+        label: "W"
         side: top
 
   - name: sensor_east
@@ -358,6 +392,26 @@ components:
         label: "DIN"
         side: left
 
+  - name: speed_sensor
+    package: TO-92
+    position: [0.0, -17.5, 23.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [4.5, 2.2, 4.5]
+    label:
+      text: "Hall Speed Sensor"
+      position: [0.0, -10.0, 0.0]
+      align: [center, max]
+    pins:
+      - name: "VCC"
+        label: "VCC"
+        side: left
+      - name: "GND"
+        label: "GND"
+        side: left
+      - name: "OUT"
+        label: "OUT"
+        side: right
+
 nets:
   - name: gnd
     color: black
@@ -373,6 +427,7 @@ nets:
       - [sensor_north, GND]
       - [sensor_west, GND]
       - [pico, GND_R]
+      - [speed_sensor, GND]
 
   - name: vcc_logic
     color: red
@@ -383,6 +438,8 @@ nets:
       - [led, VCC]
       - [sensor_east, VCC]
       - [fuel_gauge, VIN]
+      - [motor_driver, VIO]
+      - [speed_sensor, VCC]
 
   - name: vcc_bat
     color: red
@@ -436,17 +493,23 @@ nets:
       - [sensor_east, SCL]
       - [fuel_gauge, SCL]
 
-  - name: motor_pos
+  - name: motor_u
     color: purple
     pins:
-      - [motor_driver, OA]
-      - [motor, M+]
+      - [motor_driver, OUT1]
+      - [motor, U]
 
-  - name: motor_neg
+  - name: motor_v
     color: green
     pins:
-      - [motor_driver, OB]
-      - [motor, M-]
+      - [motor_driver, OUT2]
+      - [motor, V]
+
+  - name: motor_w
+    color: blue
+    pins:
+      - [motor_driver, OUT3]
+      - [motor, W]
 
   - name: led_data
     color: purple
@@ -496,14 +559,38 @@ nets:
       - [pico, GP14]
       - [fuel_gauge, ALRT]
 
-  - name: ctrl_ia
+  - name: ctrl_in1
     color: cyan
     pins:
       - [pico, GP19]
-      - [motor_driver, IA]
+      - [motor_driver, IN1]
 
-  - name: ctrl_ib
+  - name: ctrl_in2
     color: magenta
     pins:
       - [pico, GP20]
-      - [motor_driver, IB]
+      - [motor_driver, IN2]
+
+  - name: ctrl_in3
+    color: yellow
+    pins:
+      - [pico, GP21]
+      - [motor_driver, IN3]
+
+  - name: ctrl_en
+    color: orange
+    pins:
+      - [pico, GP18]
+      - [motor_driver, EN]
+
+  - name: ctrl_diag
+    color: blue
+    pins:
+      - [pico, GP22]
+      - [motor_driver, DIAG]
+
+  - name: speed_sense
+    color: green
+    pins:
+      - [pico, GP26]
+      - [speed_sensor, OUT]

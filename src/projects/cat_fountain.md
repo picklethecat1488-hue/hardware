@@ -83,18 +83,20 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 | **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | *N/A (Standalone)* | Standalone linear charger. Uses jumpers/resistors to configure chemistry/current. S1 (FAULT) & S2 (CHG) are left disconnected. |
 | **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Primary interface to access battery and charging status. The 18650 battery connects directly to this board, which is then jumpered to the charger. Includes configurable alert interrupt (ALRT) pin connected to GP10. |
 | **Battery** | **Standard 18650 3.7V Li-ion Cell** | Main energy source (e.g. Samsung 30Q or Panasonic NCR18650B, 3000+ mAh). | *N/A (Analog)* | Rechargeable lithium-ion cell to fit the internal battery storage area. |
-| **DC Motor Driver** | **L9110S Dual-Channel H-Bridge** | Low-voltage motor driver to drive and speed-regulate the N20 gear motor. | *N/A (Driven by GPIO PWM)* | Dual H-bridge, support for 2.5V-12V motors, up to 800mA continuous. Controlled via GP14 and GP15. |
-| **DC Motor** | **N20 Micro Metal Gear Motor (3V - 6V)** | High-torque micro geared DC motor to drive the Archimedes screw shaft. | *N/A (Driven by L9110S)* | Operates at 3-6V (e.g. 50:1 or 100:1 ratio). Fits inside the dry motor compartment and mounts to the ceiling socket. |
+| **BLDC Motor Driver** | **SparkFun TMC6300 Breakout** | Low-voltage three-phase brushless motor driver breakout to drive the 15W BLDC motor. | *N/A (Driven by GP18, GP19, GP20, GP21, GP22)* | Supports 2V-11V range, up to 2A continuous, breadboard-compatible 25.4mm x 20.3mm footprint. |
+| **BLDC Motor (15W)** | **BetaFPV 1102 (18000KV) Brushless Motor** | Ultra-lightweight 1S-compatible brushless motor to drive the dry-side magnet hub. | *N/A (Driven by SimpleFOC Mini)* | 15W power class, 13.8mm diameter, 1.5mm shaft, lightweight 2.9g, mounts with M1.4 screws. |
+| **Coupling Magnets (Qty: 6)** | **6mm x 3mm N52 Neodymium Discs** | Rare-earth magnets to couple the dry motor shaft to the wet impeller. | *N/A (Magnetic)* | Strong N52 grade, 3 magnets on the dry hub and 3 on the wet impeller with alternating polarities. |
 | **I2C Current Sensor** | [Adafruit INA219 Current Sensor](https://www.adafruit.com/product/904) | High-side current and power monitor to measure motor current draw and calculate load torque. | `0x40` | Measures current up to 3.2A with 1% accuracy. Used for low water / refill detection. |
+| **Speed Sensor** | **Digital Latching Hall Sensor (e.g., US1881 / AH3577)** | Measures impeller rotation speed contactlessly by detecting alternating magnet poles. | *N/A (Driven by GP26)* | Latching digital output, SOT-23 or TO-92 package, fits inside custom pocket in the motor boss. |
 
 ### Technical Integration Notes
 
 1. **Handling Multiple Proximity Sensors**:
-   Since all three `VL53L0X` sensors share the same default I2C address (`0x29`), you must connect the `XSHUT` (shutdown) pin of each sensor to a separate GPIO pin on the Pico. At boot, pull all `XSHUT` pins LOW to disable the sensors. Then, enable them one by one (pull `XSHUT` HIGH) and send an I2C command to assign a unique address (`0x30`, `0x31`, `0x32`) to the active sensor.
+   Since all three `VL53L0X` sensors share the same default I2C address (`0x29`), you must connect the `XSHUT` (shutdown) pin of each sensor to a GPIO pin on the Pico. At boot, pull all `XSHUT` pins LOW to disable the sensors. Then, enable them one by one (pull `XSHUT` HIGH) and send an I2C command to assign a unique address (`0x30`, `0x31`, `0x32`) to the active sensor.
 2. **I2C Bus Voltage & Pull-Ups**:
    The Raspberry Pi Pico operates at 3.3V logic. Ensure all boards are powered at 3.3V (or have 3.3V level-shifting built-in). Add `4.7kΩ` pull-up resistors to the `SDA` and `SCL` lines of each active I2C bus.
 3. **Motor Speed & Torque Control**:
-   * The L9110S DC motor driver allows adjusting the motor speed via PWM (Pulse Width Modulation) driven directly by Pico GPIO pins `GP14` and `GP15` (forward/backward duty cycles). This can be modulated depending on cat proximity to dynamically speed up the Archimedes screw pump when a cat approaches, and slow down or enter standby when idle.
+   * The TMC6300 brushless motor driver allows adjusting the motor speed via 3-phase PWM driven directly by Pico GPIO pins `GP19`, `GP20`, and `GP21`, with `GP18` acting as the active-high driver enable. This can be modulated depending on cat proximity to dynamically speed up the Archimedes screw pump when a cat approaches, and slow down or enter standby when idle.
    * **Water Level / Refill Detection**: The INA219 current sensor measures motor current draw over I2C. When the water level in the bowl runs low, the impeller spins in air rather than water, causing motor load torque and current draw to drop significantly. The RP2040 can monitor this current drop over I2C, trigger a "low water" alert, and pulse the RGB NeoPixel status LED to notify the user.
 4. **Debug SWD & UART Pins**:
    * **SWD Debugging**: The separate 3-pin debug header at the bottom edge of the Pico W provides **SWCLK**, **GND**, and **SWDIO** for hardware debugging (e.g., using a Raspberry Pi Debug Probe or Picoprobe). These do not occupy standard GPIO pins.
@@ -110,10 +112,10 @@ To build the cat fountain with I2C communication across key monitoring subsystem
    * Instead, the MAX17048 fuel gauge serves as the primary interface to access battery and charging status.
    * The Pico W queries the MAX17048 over I2C to obtain battery state of charge (SoC) and cell voltage (VCELL). A rising voltage/SoC trend indicates charging is occurring, while a falling trend indicates discharging.
    * The battery connects directly to the MAX17048, which is then jumpered to the BQ25185 charger to allow charging and system power pathing.
-8. **Battery-to-System Power Path (VSYS)**:
-   * **Battery Input**: The 18650 Li-ion battery connects directly to the **JST input** port on the MAX17048 Fuel Gauge.
-   * **Power Jump**: A JST-to-JST jumper cable (or equivalent wiring) connects the **JST output/parallel pads** of the MAX17048 fuel gauge to the **JST input** port on the BQ25185 charger.
    * **System Power (VSYS)**: The BQ25185 charger boosts/routes the power to its system power rail. A wire runs from the **5V SYS output terminal block** on the BQ25185 charger to the **VSYS input pin (pin 39)** on the Raspberry Pi Pico W.
+8. **Wiring Gauge Recommendations & Safety**:
+   * **Low-Power Control and Logic (Pico, VL53L0X, MAX17048, INA219, WS2812B)**: Use **30AWG wire wrap wire** since these signals carry very low current (< 50mA).
+   * **High-Power Motor Lines (TMC6300 VCC/GND and Motor Phases U/V/W)**: Use **20AWG solid core wire**. Since the 15W brushless motor can draw up to 4.0A at peak load, the 20AWG wire (rated up to 11A) is required to prevent overheating, thermal degradation, or voltage drop.
 
 
 ### 3D-Printed Parts & Materials
@@ -122,11 +124,13 @@ The following parts are manufactured to form the physical structure and assembly
 
 | Part Name | Qty | Recommended Material | Description / Use Case |
 | :--- | :--- | :--- | :--- |
-| **Bowl** | 1 | UTR-8100 Translucent (SLA) | The main water reservoir (2L capacity) and enclosure base with integrated tube. |
-| **Lid** | 1 | UTR-8100 Translucent (SLA) | Top cover acting as a drinking shelf and stabilizing the delivery tube. |
-| **Impeller** | 1 | Aluminum | The spinning multi-stage dynamic axial propeller pump. |
+| **Bowl** | 1 | UTR-8100 Translucent (SLA) | The main water reservoir (2L capacity) with integrated offset tube, static guide post, and raised volute casing. |
+| **Lid** | 1 | UTR-8100 Translucent (SLA) | Top cover acting as a drinking shelf, stabilizing the delivery tube, and containing a terrace shelf. |
+| **Impeller** | 1 | PETG / ABS | The lightweight magnetic-drive centrifugal impeller with 6 radial blades. |
 | **Bottom Cover** | 1 | UTR-8100 Translucent (SLA) | Bottom enclosure cover protecting the electronics compartment. |
 | **LED Cover** | 1 | UTR-8100 Translucent (SLA) | Translucent push-fit diffuser plug for the status RGB LED. |
+| **Drive Hub** | 1 | PETG | Dry-side hub carrying the driving coupling magnets, mounted to the motor shaft. |
+| **Pump Cover** | 1 | PETG | Wet-side snap-fit cap with an axial intake hole that seals the impeller casing. |
 
 > [!NOTE]
 > **Manufacturing & Post-Processing Details**:
@@ -140,14 +144,13 @@ These fasteners and seal components are required to assemble the 3D-printed body
 | Component | Qty | Size/Spec | Use Case |
 | :--- | :--- | :--- | :--- |
 | **Bottom Cover Screws** | 4 | M3 x 10mm (Flat Head/Countersunk) | Secures the controller compartment cover. Fits flush into the bottom countersinks. |
-| **DC Motor Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the DC motor to the dry compartment ceiling mount (17mm spacing). |
+| **Motor Set Screws** | 2 | M3 x 10mm (or M3 set screws) | Secures the N20 motor inside its pocket via the side bosses. |
 | **Proximity Sensor Screws** | 6 | M2 x 6mm (Machine Screws) | Mounts the three proximity sensors to the internal bosses. |
 | **Charger Board Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit BQ25185 board to the dry compartment ceiling. |
 | **Fuel Gauge Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit MAX17048 board to the dry compartment ceiling. |
 | **Pico W Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Raspberry Pi Pico W to the dry compartment ceiling. |
 | **Motor Driver Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the L9110S board to the dry compartment ceiling. |
 | **Current Sensor Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit INA219 board to the dry compartment ceiling. |
-| **Shaft Seal O-Ring** | 1 | 4.5 mm to 5.0 mm ID x 1.5 mm CS (Nitrile/NBR) | Fits into the sealing groove under the impeller shaft to prevent water leaking into the dry motor compartment. |
 
 ## Battery Life Estimation
 
