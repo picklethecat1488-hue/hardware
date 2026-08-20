@@ -217,6 +217,18 @@ class DaemonServer:
                     except Exception:
                         pass
 
+        # Also monitor any environment files (ending with .env) in the repository root (parent of src)
+        repo_root = src_dir.parent
+        if repo_root.exists():
+            for file in os.listdir(repo_root):
+                if file.endswith(".env") or file == ".env":
+                    try:
+                        mtime = (repo_root / file).stat().st_mtime
+                        if mtime > max_mtime:
+                            max_mtime = mtime
+                    except Exception:
+                        pass
+
         # If any files were modified since last load time, reload modules
         if max_mtime > self.last_load_time or self.manager is None:
             modules_to_unload = []
