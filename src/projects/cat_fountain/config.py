@@ -6,7 +6,7 @@ from provider import Room, Simulate, Mode, LinkType
 
 
 def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
-    """Configure and tune SPH parameters algorithmically by running simulation sweeps."""
+    """Configure and tune LBM boundary parameters algorithmically by running simulation sweeps."""
     import pybullet as p
     import numpy as np
     import tempfile
@@ -75,7 +75,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
         urdf_temp_path = Path(temp_dir) / "product.urdf"
         shutil.copy(urdf_path, urdf_temp_path)
 
-        # SPH ranges to optimize over
+        # LBM boundary parameter ranges to optimize over
         stiffness_range = (500.0, 1500.0)
         damping_range = (0.5, 3.0)
 
@@ -163,7 +163,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
         # 1. Phase 1: Seed Discovery via Monte Carlo Random Sampling
         num_seeds = 5
         provider.logger.print(
-            f"SPH Optimization Phase 1: running {num_seeds} Monte Carlo random seed trials...",
+            f"LBM Optimization Phase 1: running {num_seeds} Monte Carlo random seed trials...",
             symbol="🎲",
         )
 
@@ -206,7 +206,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
         scale_damping = 0.5
 
         provider.logger.print(
-            f"SPH Optimization Phase 2: starting localized Monte Carlo hill climbing from seed stiffness={best_stiffness:.1f}, damping={best_damping:.2f} (Flow={best_flow_score}, Max Speed={best_max_speed:.2f} m/s)...",
+            f"LBM Optimization Phase 2: starting localized Monte Carlo hill climbing from seed stiffness={best_stiffness:.1f}, damping={best_damping:.2f} (Flow={best_flow_score}, Max Speed={best_max_speed:.2f} m/s)...",
             symbol="🔍",
         )
 
@@ -244,7 +244,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
 
         if best_damping is not None and best_stiffness is not None and best_stable:
             provider.logger.print(
-                f"Optimal SPH parameters determined: stiffness_boundary = {best_stiffness:.1f}, damping_boundary = {best_damping:.2f} (Status = STABLE, Flow = {best_flow_score}, Peak Speed = {best_max_speed:.2f} m/s)",
+                f"Optimal LBM parameters determined: stiffness_boundary = {best_stiffness:.1f}, damping_boundary = {best_damping:.2f} (Status = STABLE, Flow = {best_flow_score}, Peak Speed = {best_max_speed:.2f} m/s)",
                 symbol="🏆",
             )
             # Set the optimal values back to settings for environment persistence
@@ -252,7 +252,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
             provider.settings.damping_boundary = best_damping
         else:
             raise ValueError(
-                f"SPH parameter optimization failed: no stable configuration found. "
+                f"LBM parameter optimization failed: no stable configuration found. "
                 f"Best peak speed was {best_max_speed:.2f} m/s (limit is 10.0 m/s)."
             )
 

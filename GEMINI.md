@@ -50,10 +50,11 @@ pytest
 * Settings and configuration schemas must use Pydantic models (subclassing `BaseModel`) defined under [src/projects_config/](file:///Users/daparker/gh/hardware/src/projects_config/).
 * Config overrides can be injected dynamically via environment variables patterned as `<PROJECT>__<SETTING>` (e.g., `EXHAUST_MANIFOLDS__WALL_THICKNESS`).
 * **Data Model Integrity**: Prefer using strongly typed data models with well-defined properties and methods over runtime dynamic attribute parsing (e.g., avoiding loose `hasattr` or `getattr` checks on untyped objects where static type annotations should instead guarantee structure).
-* **Error Handling & Exception Guardrails**: Use explicit bounds checking and validation rather than generic `try/except` blocks. Do NOT use `try/except` structures in core computation or logic paths except to guard I/O operations (such as filesystem access, networking, or database calls).
+* **Error Handling & Exception Guardrails**: Use explicit bounds checking and validation rather than generic `try/except` blocks. Do NOT use `try/except` structures in core computation or logic paths except to guard I/O operations (such as filesystem access, networking, or database calls). **Do NOT silently ignore errors with try/except/pass blocks; exceptions should either be logged, raised descriptively, or allowed to propagate.**
 * **Parameter Validation**: Prefer Pydantic parameter validation over manual validation checks in code. If dynamic runtime validation is necessary (e.g., in math or physics functions), raise a descriptive `ValueError` to indicate invalid parameters rather than silently failing or falling back.
 * **Method Parameterization**: Prefer passing parameters and configuration models explicitly into methods and functions rather than having them read instance attributes or parent provider properties internally. This keeps computation blocks pure, modular, and easy to unit test.
 * **Configuration Persistence**: For configuration actions, they should persist saved settings to the Pydantic environment file (`.env`) in addition to updating any source project data files (like `measurements.yaml`). This ensures they are immediately active in the build environment.
+* **No Dead Code**: Unused code (such as dangling clauses, functions, or parameters that do nothing) and settings that do not affect or update anything must be removed from the repository. Maintain a clean, minimalist codebase to prevent confusion and bugs.
 
 ### 4. Physical Simulation & URDF Metadata
 * For components participating in physics simulations (e.g., PyBullet, JAX fluids), attach URDF and simulation attributes to shape geometries.
@@ -83,3 +84,4 @@ pytest
 * Code documentation MUST be PEP-257 compliant and comprehensive. Write docstrings for all custom classes, methods, functions, and properties.
 * Docstring correctness is checked automatically by ruff linting rules (group `D` configured in [pyproject.toml](file:///Users/daparker/gh/hardware/pyproject.toml)).
 * **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum`) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes. This prevents typos and improves code readability/refactoring.
+* **Import Placement**: Imports should be done at the top of the file/listing, unless doing so would cause module load race conditions or circular dependencies (such as importing model classes inside provider packages).
