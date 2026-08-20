@@ -73,6 +73,24 @@ def layout_motor_pins(pins: List, w: float, l: float, slots_per_side: Optional[i
             p.position = (-4.0, -5.0, 0.0)
         elif p.name == "M-":
             p.position = (4.0, -5.0, 0.0)
+        elif p.name == "U":
+            p.position = (-4.0, 5.0, 0.0)
+        elif p.name == "V":
+            p.position = (0.0, 5.0, 0.0)
+        elif p.name == "W":
+            p.position = (4.0, 5.0, 0.0)
+
+
+@register_layout("TO-92")
+def layout_to92_pins(pins: List, w: float, l: float, slots_per_side: Optional[int] = None):
+    """Layout pins for TO-92 footprints (3 pins inline)."""
+    for p in pins:
+        if p.name == "VCC":
+            p.position = (-5.0, 0.0, 0.0)
+        elif p.name == "GND":
+            p.position = (0.0, 0.0, 0.0)
+        elif p.name == "OUT":
+            p.position = (5.0, 0.0, 0.0)
 
 
 @register_layout("led", surface_mount=True)
