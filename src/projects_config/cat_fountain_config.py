@@ -305,6 +305,16 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("lid_step_width", 2.0))
 
     @cached_property
+    def lid_cutout_radius(self) -> float:
+        """Return the radius of the large circular cutout in the lid in millimeters."""
+        return float(self._raw_data.get("lid_cutout_radius", 55.0))
+
+    @cached_property
+    def lid_cutout_y(self) -> float:
+        """Return the Y position of the large circular cutout in the lid in millimeters."""
+        return float(self._raw_data.get("lid_cutout_y", -20.0))
+
+    @cached_property
     def tube_lid_clearance(self) -> float:
         """Return the clearance between the tube and the lid socket."""
         return float(self._raw_data.get("tube_lid_clearance", 0.1))

@@ -30,6 +30,8 @@ spout_deflection_height: 0.0
 spout_deflection_radius: 13.0
 spout_deflection_thickness: 40.0
 spout_deflection_z_offset: 16.0
+lid_cutout_radius: 55.0
+lid_cutout_y: -20.0
 
 # ==========================================
 # 3. Tube

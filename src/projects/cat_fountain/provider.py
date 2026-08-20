@@ -766,6 +766,23 @@ class CatFountainProvider(Provider):
             with Locations((0.0, 0.0, 3.0)):
                 add(pocket_tool, mode=Mode.SUBTRACT)
 
+            # Subtract the large circular cutout, but preserve the circular platform at Y = 28.0
+            cutout_r = self.settings.lid_cutout_radius
+            cutout_y = self.settings.lid_cutout_y
+            with BuildPart(mode=Mode.PRIVATE) as cutout_tool:
+                # Large cutout cylinder
+                Cylinder(radius=cutout_r, height=lid_h + 10.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+                # Add back the platform cylinder to preserve it
+                with Locations((0, 28.0 - cutout_y, 0)):  # Relative to cutout center Y
+                    Cylinder(
+                        radius=30.0,
+                        height=lid_h + 20.0,
+                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                        mode=Mode.SUBTRACT,
+                    )
+            with Locations((0, cutout_y, 0)):
+                add(cutout_tool, mode=Mode.SUBTRACT)
+
             with Locations((0.0, tube_y, 3.0)):
                 terrace_shelf = Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                 with Locations((0, 0, 3.0)):
@@ -805,18 +822,6 @@ class CatFountainProvider(Provider):
                         mode=Mode.SUBTRACT,
                     )
 
-            # Create a simple integrated drainage grate (slits) at Y = -65.0
-            with Locations((0, -65.0, lid_h / 2.0)):
-                for dx in [-10.0, -5.0, 0.0, 5.0, 10.0]:
-                    with Locations((dx, 0, 0)):
-                        Box(
-                            1.5,
-                            16.0,
-                            lid_h + 10.0,
-                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                            mode=Mode.SUBTRACT,
-                        )
-
         with URDFMetadata(
             geometry=lid,
             label=target,
@@ -838,8 +843,8 @@ class CatFountainProvider(Provider):
                 xyz=(0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001),
                 rpy=(0.0, 0.0, 0.0),
                 has_drain=True,
-                drain_hole_y=-self.settings.drain_hole_y * 0.001,
-                drain_hole_radius=self.settings.drain_hole_radius * 0.001,
+                drain_hole_y=cutout_y * 0.001,  # Parameterized coordinate
+                drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
                 has_tube=True,
                 tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             )
@@ -868,8 +873,8 @@ class CatFountainProvider(Provider):
                 xyz=(0.0, 0.0, -2.0 * 0.001),
                 rpy=(math.pi, 0.0, 0.0),
                 has_drain=True,
-                drain_hole_y=self.settings.drain_hole_y * 0.001,
-                drain_hole_radius=self.settings.drain_hole_radius * 0.001,
+                drain_hole_y=-cutout_y * 0.001,  # Parameterized coordinate (flipped)
+                drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
                 has_tube=True,
                 tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             )
