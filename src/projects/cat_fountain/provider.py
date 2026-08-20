@@ -686,6 +686,7 @@ class CatFountainProvider(Provider):
                     link_type=LinkType.IMPELLER,
                     shape=ShapeType.IMPELLER,
                     type=BoundaryType.SOLID,
+                    radius=impeller_r * 0.001,
                     height=cast(URDFShape, impeller.part).urdf_height,
                     thickness=pin_r * 0.001,
                     vane_twist=0.0,
@@ -887,7 +888,7 @@ class CatFountainProvider(Provider):
                 thickness=3.0 * 0.001,
                 xyz=(0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001),
                 rpy=(0.0, 0.0, 0.0),
-                has_drain=True,
+                has_drain=False,
                 drain_hole_y=cutout_y * 0.001,  # Parameterized coordinate
                 drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
                 has_tube=True,
@@ -917,7 +918,7 @@ class CatFountainProvider(Provider):
                 thickness=2.0 * 0.001,
                 xyz=(0.0, 0.0, -2.0 * 0.001),
                 rpy=(math.pi, 0.0, 0.0),
-                has_drain=True,
+                has_drain=False,
                 drain_hole_y=-cutout_y * 0.001,  # Parameterized coordinate (flipped)
                 drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
                 has_tube=True,

@@ -26,7 +26,7 @@ class CatFountainConfig(BaseModel):
     )
 
     target_volume: float = Field(
-        default=0.00020,
+        default=0.00030,
         description="Target total fluid volume to spawn (m^3).",
     )
 
@@ -151,6 +151,11 @@ class CatFountainConfig(BaseModel):
     def motor_power(self) -> float:
         """Return the maximum motor output power in Watts."""
         return float(self._raw_data.get("motor_power", 1.0))
+
+    @cached_property
+    def motor_force_sim(self) -> float:
+        """Return the maximum joint torque limit allowed in the physics simulator (N*m)."""
+        return float(self._raw_data.get("motor_force_sim", 10.0))
 
     # =========================================================================
     # Spout Parameters
