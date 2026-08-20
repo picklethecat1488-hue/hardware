@@ -72,6 +72,7 @@ class CatFountainProvider(Provider):
             "led_cover": self.build_led_cover,
             "drive_hub": self.build_drive_hub,
             "pump_cover": self.build_pump_cover,
+            "motor_clip": self.build_motor_clip,
         }
 
     @property
@@ -109,9 +110,9 @@ class CatFountainProvider(Provider):
             # Outer bowl body
             Cylinder(radius=r, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Create the global outer cylinder for trimming standoffs (recessed by 0.3mm to prevent protrusions)
+            # Create the global outer cylinder for trimming standoffs (oversized to prevent coincident face mesh artifacts)
             outer_cylinder = Cylinder(
-                radius=r - 0.3, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.PRIVATE
+                radius=r + 1.0, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.PRIVATE
             )
 
             # Subtract inner water reservoir (enclosed storage tank area above floor_z)
@@ -209,36 +210,39 @@ class CatFountainProvider(Provider):
             # Motor mounting boss projecting down from the bowl floor (Z = floor_z)
             # This creates a solid 1.2mm barrier floor at the center of rotation
             with Locations((0, 0, floor_z)):
-                # Outer boss body (17.5mm deep to cover 9.3mm motor and drive hub recess)
-                Cylinder(radius=18.0, height=17.5, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                # Outer boss body (increased radius to 21.0mm to provide full support under the impeller casing)
+                Cylinder(radius=21.0, height=17.5, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-                # Local boss extension to house the speed sensor pocket (South side, Y = -18.0)
-                with Locations((0, -18.0, 0)):
+                # Local boss extension to house the speed sensor pocket (South side, Y = -21.0)
+                with Locations((0, -21.0, 0)):
                     Box(8.0, 6.0, 17.5, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
                 # 1. Recess for the drive hub (radius 17.0mm, height 5.3mm from Z = -1.2)
+                # Formed as a U-shaped slot open to the South side (Y < 0) for horizontal slide-in assembly
                 with Locations((0, 0, -1.2)):
                     Cylinder(radius=17.0, height=5.3, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                    # Subtract slot extension along Y < 0
+                    with Locations((0, -17.0, 0)):
+                        Box(34.0, 34.0, 5.3, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                # Restore the central column (radius 5.5mm, height 4.0mm from Z = -6.5 upwards)
+                # This fits within the drive hub bottom recess and provides solid core support
+                with Locations((0, 0, -6.5)):
+                    Cylinder(radius=5.5, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.ADD)
 
                 # Speed sensor pocket (5.0mm wide, 2.2mm thick, 14.5mm deep from Z = -17.5 upwards)
                 with Locations((0, -18.5, -17.5)):
                     Box(5.0, 2.2, 14.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
-                # 2. Pocket for the BetaFPV 1102 motor body (starting at Z = -6.5 downwards by 10.0mm)
+                # 2. Pocket for the BetaFPV 1102 motor body (starting at Z = -6.5 downwards by 12.0mm to break through bottom)
                 with Locations((0, 0, -6.5)):
-                    # Motor body pocket (radius 7.0mm for 13.8mm diameter, height 10.0mm)
-                    Cylinder(radius=7.0, height=10.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                    # Motor body pocket (radius 7.0mm for 13.8mm diameter, height 12.0mm)
+                    Cylinder(radius=7.0, height=12.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
                     # Motor front face alignment boss pocket (radius 2.75mm, height 1.6mm)
                     Cylinder(radius=2.75, height=1.6, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
-                # 3. Face mounting screw holes for 1102 motor (M1.4 screws on 6.6mm circle, Z = -6.5 upwards)
-                with Locations((0, -3.3, -6.5), (0, 3.3, -6.5)):
-                    Cylinder(
-                        radius=0.75,
-                        height=7.0,
-                        align=(Align.CENTER, Align.CENTER, Align.MIN),
-                        mode=Mode.SUBTRACT,
-                    )
+                # 3. Horizontal slide-in slot for the motor retaining clip (Z = 23.5 to 25.5 mm, open to Y < 0)
+                with Locations((0, 0, -17.5)):
+                    Box(18.0, 36.0, 2.0, align=(Align.CENTER, Align.MAX, Align.MIN), mode=Mode.SUBTRACT)
 
             # Helper to create cylindrical standoff posts with blind holes
             def add_standoffs(
@@ -428,7 +432,7 @@ class CatFountainProvider(Provider):
 
             # Proximity sensor mounts / cutouts at East (0), North (90), West (180)
             boss_sx = self.settings.sensor_boss_x
-            boss_sy = self.settings.sensor_boss_y
+            boss_sy = 28.0  # Increased from 14.0 to cover the 21.0mm sensor spacing and standoffs
             boss_sz = self.settings.sensor_boss_z
             tof_spacing_x = self.settings.proximity_sensor_spacing_x
             tof_spacing_y = self.settings.proximity_sensor_spacing_y
@@ -568,6 +572,7 @@ class CatFountainProvider(Provider):
         RigidJoint("impeller_post", bowl.part, Location((0, 0, floor_z)))
         RigidJoint("motor_shaft", bowl.part, Location((0, 0, floor_z - 6.0)))
         RigidJoint("pump_cover_seat", bowl.part, Location((0, 0, floor_z + 8.5)))
+        RigidJoint("motor_clip_seat", bowl.part, Location((0, 0, floor_z - 17.5)))
         RigidJoint("lid_seat", bowl.part, Location((0, 0, h)))
         RigidJoint("cover_seat", bowl.part, Location((0, 0, 0)))
         RigidJoint(
@@ -634,12 +639,12 @@ class CatFountainProvider(Provider):
 
             # Add radial blades on the top face of the hub base (Z = hub_h = 4.0)
             blade_h = 4.0
-            blade_len = hub_r - 4.5
+            blade_len = hub_r - 6.0
             num_blades = self.settings.impeller_blades
             for i in range(num_blades):
                 angle = i * (360.0 / num_blades)
                 with Locations(Location((0, 0, hub_h)) * Rot(0, 0, angle)):
-                    with Locations((4.5, 0, 0)):
+                    with Locations((6.0, 0, 0)):
                         Box(blade_len, 1.2, blade_h, align=(Align.MIN, Align.CENTER, Align.MIN))
 
             with URDFMetadata(
@@ -930,6 +935,10 @@ class CatFountainProvider(Provider):
         with BuildPart() as hub:
             Cylinder(radius=hub_r, height=hub_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
+            # Subtract central clearance recess on the bottom face to clear the bowl's mounting column/screws
+            # (radius 5.8mm, depth 3.7mm starting from Z = 0)
+            Cylinder(radius=5.8, height=3.7, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
             # Round shaft hole (radius 0.78mm for 1.5mm motor shaft)
             with BuildSketch() as hole_sketch:
                 Circle(radius=0.78)
@@ -976,10 +985,17 @@ class CatFountainProvider(Provider):
         with BuildPart() as cover:
             # Main disc body
             Cylinder(radius=cover_r, height=cover_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-            # Subtract central axial water intake hole
-            Cylinder(
-                radius=inlet_r, height=cover_h + 2.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
-            )
+            # Add downward-pointing intake snout (extends 4.0 mm downwards into the blade clearance gap)
+            with Locations((0, 0, -4.0)):
+                Cylinder(radius=inlet_r, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            # Subtract central axial water intake hole through both disc and snout
+            with Locations((0, 0, -4.0)):
+                Cylinder(
+                    radius=inlet_r - 1.5,
+                    height=cover_h + 4.0 + 2.0,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
 
             with URDFMetadata(
                 label=target,
@@ -998,11 +1014,11 @@ class CatFountainProvider(Provider):
                     radius=cover_r * 0.001,
                     height=0.0,
                     thickness=cover_h * 0.001,
-                    xyz=(0.0, 0.0, 0.0),
+                    xyz=(0.0, 0.0, -4.0 * 0.001),  # Lowered by 4.0 mm to match physical snout intake height
                     rpy=(math.pi, 0.0, 0.0),
                     has_drain=True,
                     drain_hole_y=0.0,
-                    drain_hole_radius=inlet_r * 0.001,
+                    drain_hole_radius=(inlet_r - 1.5) * 0.001,  # Matches the inner radius of the snout
                 )
 
         RigidJoint("mount", cover.part, Location((0, 0, 0)))
@@ -1014,18 +1030,27 @@ class CatFountainProvider(Provider):
         impeller_part = self.build_impeller("impeller").part
         bottom_cover_part = self.build_bottom_cover("bottom_cover").part
         lid_part = self.build_lid("lid").part
+        drive_hub_part = self.build_drive_hub("drive_hub").part
+        pump_cover_part = self.build_pump_cover("pump_cover").part
+        motor_clip_part = self.build_motor_clip("motor_clip").part
 
         assert (
             bowl_part is not None
             and impeller_part is not None
             and bottom_cover_part is not None
             and lid_part is not None
+            and drive_hub_part is not None
+            and pump_cover_part is not None
+            and motor_clip_part is not None
         )
 
         # 2. Position them in their standard assembled configuration using joints
         bowl_part.joints["impeller_post"].connect_to(impeller_part.joints["pin"])
         bowl_part.joints["cover_seat"].connect_to(bottom_cover_part.joints["mount"])
         bowl_part.joints["lid_seat"].connect_to(lid_part.joints["mount"])
+        bowl_part.joints["motor_shaft"].connect_to(drive_hub_part.joints["motor"])
+        bowl_part.joints["pump_cover_seat"].connect_to(pump_cover_part.joints["mount"])
+        bowl_part.joints["motor_clip_seat"].connect_to(motor_clip_part.joints["mount"])
 
         # Build and connect the LED cover
         led_cover = self.build_led_cover("led_cover").part
@@ -1034,17 +1059,22 @@ class CatFountainProvider(Provider):
 
         # Explode outwards by translating Z axis for LED cover
         assert led_cover.location is not None
-
         led_cover.location = led_cover.location * Location((0, 0, 30.0))
 
         # 3. Explode the parts by translating their .location attributes
         assert impeller_part.location is not None
         assert bottom_cover_part.location is not None
         assert lid_part.location is not None
+        assert drive_hub_part.location is not None
+        assert pump_cover_part.location is not None
+        assert motor_clip_part.location is not None
 
         impeller_part.location = Location((0, 0, 50)) * impeller_part.location
-        bottom_cover_part.location = Location((0, 0, -40)) * bottom_cover_part.location
-        lid_part.location = Location((0, 0, 70)) * lid_part.location
+        bottom_cover_part.location = Location((0, 0, -50)) * bottom_cover_part.location
+        lid_part.location = Location((0, 0, 80)) * lid_part.location
+        drive_hub_part.location = Location((0, 0, -25)) * drive_hub_part.location
+        pump_cover_part.location = Location((0, 0, 110)) * pump_cover_part.location
+        motor_clip_part.location = Location((0, -35, 0)) * motor_clip_part.location
 
         # 4. Add the exploded parts to the room
         room.add("bowl", bowl_part, color="grey", alpha=0.4)
@@ -1052,12 +1082,30 @@ class CatFountainProvider(Provider):
         room.add("bottom_cover", bottom_cover_part, color="black")
         room.add("lid", lid_part, color="green")
         room.add("led_cover", led_cover, color="grey")
+        room.add("drive_hub", drive_hub_part, color="red")
+        room.add("pump_cover", pump_cover_part, color="grey", alpha=0.5)
+        room.add("motor_clip", motor_clip_part, color="yellow")
 
         # 5. Add connector lines indicating assembly paths
         impeller_conn = Line(
             bowl_part.joints["impeller_post"].location.position, impeller_part.joints["pin"].location.position
         )
         room.add("impeller_connector", impeller_conn)
+
+        pump_cover_conn = Line(
+            bowl_part.joints["pump_cover_seat"].location.position, pump_cover_part.joints["mount"].location.position
+        )
+        room.add("pump_cover_connector", pump_cover_conn)
+
+        drive_hub_conn = Line(
+            bowl_part.joints["motor_shaft"].location.position, drive_hub_part.joints["motor"].location.position
+        )
+        room.add("drive_hub_connector", drive_hub_conn)
+
+        motor_clip_conn = Line(
+            bowl_part.joints["motor_clip_seat"].location.position, motor_clip_part.joints["mount"].location.position
+        )
+        room.add("motor_clip_connector", motor_clip_conn)
 
         # 6. Add labels for each part
         room.add_label("bowl_label", "BOWL", bowl_part.center() + Vector(-120, -20, 10), options=TextArgs(font_size=10))
@@ -1068,11 +1116,28 @@ class CatFountainProvider(Provider):
             "cover_label", "COVER", bottom_cover_part.center() + Vector(-80, 0, -10), options=TextArgs(font_size=10)
         )
         room.add_label("lid_label", "LID", lid_part.center() + Vector(-50, -10, 20), options=TextArgs(font_size=10))
-
         room.add_label(
             "led_cover_label",
             "LED COVER",
             led_cover.center() + Vector(30, 0, 10),
+            options=TextArgs(font_size=10),
+        )
+        room.add_label(
+            "drive_hub_label",
+            "DRIVE HUB",
+            drive_hub_part.center() + Vector(-50, 0, -10),
+            options=TextArgs(font_size=10),
+        )
+        room.add_label(
+            "pump_cover_label",
+            "PUMP COVER",
+            pump_cover_part.center() + Vector(-50, -10, 10),
+            options=TextArgs(font_size=10),
+        )
+        room.add_label(
+            "motor_clip_label",
+            "MOTOR CLIP",
+            motor_clip_part.center() + Vector(-50, -10, 0),
             options=TextArgs(font_size=10),
         )
 
@@ -1084,6 +1149,7 @@ class CatFountainProvider(Provider):
         lid_part = self.build_lid("lid", mode=mode).part
         drive_hub_part = self.build_drive_hub("drive_hub", mode=mode).part
         pump_cover_part = self.build_pump_cover("pump_cover", mode=mode).part
+        motor_clip_part = self.build_motor_clip("motor_clip", mode=mode).part
 
         assert (
             bowl_part is not None
@@ -1092,6 +1158,7 @@ class CatFountainProvider(Provider):
             and lid_part is not None
             and drive_hub_part is not None
             and pump_cover_part is not None
+            and motor_clip_part is not None
         )
 
         # 2. Position them in their standard assembled configuration using joints
@@ -1100,6 +1167,7 @@ class CatFountainProvider(Provider):
         bowl_part.joints["pump_cover_seat"].connect_to(pump_cover_part.joints["mount"])
         bowl_part.joints["cover_seat"].connect_to(bottom_cover_part.joints["mount"])
         bowl_part.joints["lid_seat"].connect_to(lid_part.joints["mount"])
+        bowl_part.joints["motor_clip_seat"].connect_to(motor_clip_part.joints["mount"])
 
         # Build and connect the LED cover using joints
         led_cover = self.build_led_cover("led_cover", mode=mode).part
@@ -1115,6 +1183,7 @@ class CatFountainProvider(Provider):
             room.add("led_cover", led_cover, color="grey", alpha=0.4)
             room.add("drive_hub", drive_hub_part, color="grey", alpha=0.4)
             room.add("pump_cover", pump_cover_part, color="grey", alpha=0.4)
+            room.add("motor_clip", motor_clip_part, color="grey", alpha=0.4)
         else:
             room.add("bowl", bowl_part, color="grey", alpha=0.4)
             room.add("lid", lid_part, color="green", alpha=0.6)
@@ -1123,6 +1192,7 @@ class CatFountainProvider(Provider):
             room.add("led_cover", led_cover, color="grey", alpha=0.4)
             room.add("drive_hub", drive_hub_part, color="red")
             room.add("pump_cover", pump_cover_part, color="grey", alpha=0.5)
+            room.add("motor_clip", motor_clip_part, color="yellow")
 
         # 4. Build and add dummy PCBs for visualization and interference checking (non-printable)
         if mode != ProviderMode.SIMULATE:
@@ -1195,11 +1265,47 @@ class CatFountainProvider(Provider):
 
         self.room = room
 
-    def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
-        """Return simulation hooks for the cat fountain."""
-        from .simulate_hooks import get_simulate_hooks_impl as impl
+    def simulate(self, sim_name: str) -> Callable[[], None]:
+        """Return the simulation runner function."""
+        from .simulate_hooks import simulate as impl
 
         return impl(self, sim_name)
+
+    def build_motor_clip(
+        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    ) -> BuildPart:
+        """Build the slide-in motor retaining clip (fork) to secure the motor in place."""
+        clip_w = 17.6  # Fits with print clearance inside the 18.0mm slot
+        clip_l = 26.0  # Length of the slide
+        clip_h = 1.8  # Thickness (fits inside the 2.0mm slot)
+        fork_w = 10.0  # Width of the U-cutout (fits around the 10.0mm motor collar)
+
+        with BuildPart() as clip:
+            # Main flat slide plate
+            Box(clip_w, clip_l, clip_h, align=(Align.CENTER, Align.MIN, Align.CENTER))
+
+            # Subtract U-cutout at the front (Y > 0)
+            with Locations((0, clip_l - 16.0, 0)):
+                Box(fork_w, 20.0, clip_h + 1.0, align=(Align.CENTER, Align.MIN, Align.CENTER), mode=Mode.SUBTRACT)
+                # Round the bottom of the U-cutout
+                Cylinder(radius=fork_w / 2.0, height=clip_h + 1.0, mode=Mode.SUBTRACT)
+
+            # Add a pull handle at the back (Y = 0)
+            with Locations((0, -2.0, 0)):
+                Box(clip_w + 4.0, 4.0, clip_h + 3.0, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+
+            URDFMetadata(
+                label=target,
+                material="petg",
+                density=1.27,
+                boundary_friction=0.20,
+                collision_type=URDFCollisionType.CONVEX,
+                parent="bowl",
+                joint_type=URDFJointType.FIXED,
+            )
+
+        RigidJoint("mount", clip.part, Location((0, 0, 0)))
+        return clip
 
     def build_wiring_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build a 2D colored wiring diagram for the cat water fountain."""

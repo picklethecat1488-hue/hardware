@@ -1158,6 +1158,7 @@ class Fluid:
         """Return dict mapping LinkType keys to their float thresholds."""
         outlet_idx = self.link_indices.get(LinkType.OUTLET)
         has_outlet_link = outlet_idx is not None and outlet_idx != -1
+        offset_val = (5.0 / 3.0) * self.r_s
         min_h = 0.0
         hc_info = self.boundaries.get(LinkType.TUBE)
         hc_height = hc_info.height if hc_info is not None else 0.0
@@ -1165,22 +1166,22 @@ class Fluid:
         if self.body_id is not None and _is_real_physics_client(self.physics_client):
             if has_outlet_link:
                 state = p.getLinkState(self.body_id, outlet_idx, physicsClientId=self.physics_client)
-                min_h = float(state[4][2] + hc_height - 0.005)
+                min_h = float(state[4][2] + hc_height - offset_val)
             else:
                 base_pos, _ = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.physics_client)
                 hc_z = hc_info.xyz[2] if hc_info is not None else 0.0
-                min_h = float(base_pos[2] + hc_z + hc_height - 0.005)
+                min_h = float(base_pos[2] + hc_z + hc_height - offset_val)
 
         max_y = 0.0
         if self.body_id is not None and _is_real_physics_client(self.physics_client):
             if has_outlet_link:
                 aabb = p.getAABB(self.body_id, outlet_idx, physicsClientId=self.physics_client)
-                max_y = float(aabb[1][1] + 0.005)
+                max_y = float(aabb[1][1] + offset_val)
             else:
                 base_pos, _ = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.physics_client)
                 hc_y = hc_info.xyz[1] if hc_info is not None else 0.0
                 hc_r = hc_info.radius if hc_info is not None else 0.0
-                max_y = float(base_pos[1] + hc_y + hc_r + 0.005)
+                max_y = float(base_pos[1] + hc_y + hc_r + offset_val)
 
         offset_mm = 0.0
         hc_idx = self.link_indices.get(LinkType.TUBE)

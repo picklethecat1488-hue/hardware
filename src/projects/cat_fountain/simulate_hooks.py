@@ -58,7 +58,8 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                         item_dict["link_type"] = LinkType.LID
                         item_dict["link_idx"] = link_indices.get("lid", -1)
                     case _:
-                        item_dict["link_idx"] = link_indices.get(label, -1)
+                        item_idx = link_indices.get(label, -1)
+                        item_dict["link_idx"] = item_idx
                         if "link_type" not in item_dict:
                             item_dict["link_type"] = LinkType.BASE
                 resolved_vals.append(item_dict)
@@ -69,7 +70,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             config=FluidConfig.water(
                 sim_name=name,
                 boundaries=resolved_boundaries,
-                recycle_fluid=False,
+                recycle_fluid=True,  # Enable fluid recycling
                 gravity=(0.0, 0.0, -9.81),
                 r_s=0.0015,
                 target_volume=self.settings.target_volume,

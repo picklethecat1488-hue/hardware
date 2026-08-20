@@ -41,6 +41,7 @@ pytest
 * Custom geometry projects must be packages nested within [src/projects/](file:///Users/daparker/gh/hardware/src/projects/).
 * The provider class must inherit from `Provider` and be decorated with `@discover_provider` (imported from [src/provider/utils.py](file:///Users/daparker/gh/hardware/src/provider/utils.py)).
 * Always export the provider at the package level (`__init__.py`) and import it in [src/projects/\_\_init\_\_.py](file:///Users/daparker/gh/hardware/src/projects/__init__.py).
+* **Project Manifest Integration**: All custom geometry parts, components, clips, or support structures that participate in assemblies or are needed for manufacturing MUST be explicitly registered in the project's `manifest.yaml` (nested under the project folder) to ensure correct build-chain discovery, STL/OBJ generation, and inclusion in final build artifacts.
 * Builder methods should return shape/build geometries (e.g., `BuildPart`), while diagram/view actions should populate a `Room` object via `room.add(...)` or `room.add_label(...)`.
 
 ### 3. Configuration & Lazy Initialization
