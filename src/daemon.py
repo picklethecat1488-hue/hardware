@@ -62,8 +62,8 @@ def is_pid_alive(pid: int) -> bool:
 
 BUFFER_SIZE = 8192
 RELOAD_PREFIXES = (
-    "projects.",
-    "projects_config.",
+    "projects",
+    "projects_config",
     "provider",
     "model",
     "shell",
