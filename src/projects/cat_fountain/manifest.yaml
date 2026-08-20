@@ -51,6 +51,13 @@ pump_cover:
   export: [stl, obj]
   color: grey
 
+motor_clip:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj]
+  color: yellow
+
 product:
   diagram:
     modes: [default]
