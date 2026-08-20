@@ -1078,6 +1078,8 @@ class CatFountainProvider(Provider):
             room.add("impeller", impeller_part, color="grey")
             room.add("bottom_cover", bottom_cover_part, color="grey", alpha=0.4)
             room.add("led_cover", led_cover, color="grey", alpha=0.4)
+            room.add("drive_hub", drive_hub_part, color="grey", alpha=0.4)
+            room.add("pump_cover", pump_cover_part, color="grey", alpha=0.4)
         else:
             room.add("bowl", bowl_part, color="grey", alpha=0.4)
             room.add("lid", lid_part, color="green", alpha=0.6)
