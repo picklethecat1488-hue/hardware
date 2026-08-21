@@ -1,5 +1,10 @@
 """Models package root."""
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, message=".*jax-mps was built for jaxlib.*")
+warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps' is experimental.*")
+
 import OCP.TopoDS  # type: ignore
 
 # Monkey-patch TopoDS_Shape to resolve Pydantic validation errors.
