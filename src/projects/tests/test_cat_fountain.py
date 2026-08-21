@@ -244,6 +244,7 @@ class TestCatFountainProvider:
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
             provider.settings.target_volume = 0.0003
+            provider.settings.motor_power = 1000.0
 
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
             builder = Builder(manager, logger=Logger(enabled=False))
@@ -299,7 +300,7 @@ class TestCatFountainProvider:
                 # lead = h_impeller * (360 / twist)
                 lead = (provider.settings.impeller_height * 0.001) / (abs(provider.settings.vane_twist) / 360.0)
                 motor_speed = float(room["impeller"][0].urdf_motor_target)
-                v_z = motor_speed * (lead / (2.0 * 3.14159))  # ~0.465 m/s
+                v_z = min(motor_speed * (lead / (2.0 * 3.14159)), 0.90)  # Capped at LBM stability limit~0.9 m/s
 
                 # 2. Time needed to travel the tube height
                 h_tube = provider.settings.tube_height * 0.001

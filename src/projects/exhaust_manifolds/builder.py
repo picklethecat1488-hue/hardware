@@ -332,10 +332,31 @@ class ExhaustManifoldsBuilder:
                 )
             )
             if not tube_only:
-                for idx in range(1, len(self.exhaust_manifolds_config.clamp_positions[name]) - 1):
-                    add(self.create_clamp_bed(name, idx, right=right))
-                label = "R" if right else ("L" if (name == "driver") else "R")
-                add(self.create_text(name, text=label, right=right))
+                # Build and clean clamp beds in a separate sub-context to avoid cutting the main tube
+                with BuildPart() as cb_part:
+                    for idx in range(1, len(self.exhaust_manifolds_config.clamp_positions[name]) - 1):
+                        add(self.create_clamp_bed(name, idx, right=right))
+                    other_manifold = self.create_manifold(
+                        name,
+                        right=not right,
+                        lap_joint=lap_joint,
+                        half_tube=True,
+                        joint_space=joint_space,
+                    )
+                    add(other_manifold, mode=Mode.SUBTRACT)
+                    for idx in range(1, len(self.exhaust_manifolds_config.clamp_positions[name]) - 1):
+                        other_cb = self.create_clamp_bed(name, idx, right=not right)
+                        add(other_cb, mode=Mode.SUBTRACT)
+                add(cb_part)
+
+                # Build and clean text in a separate sub-context to avoid cutting the main tube
+                with BuildPart() as txt_part:
+                    label = "R" if right else ("L" if (name == "driver") else "R")
+                    add(self.create_text(name, text=label, right=right))
+                    add(other_manifold, mode=Mode.SUBTRACT)
+                    other_text = self.create_text(name, text="L" if right else "R", right=not right)
+                    add(other_text, mode=Mode.SUBTRACT)
+                add(txt_part)
 
             # Clean the inner part volume and chamfer the ends
             chamfer_radius = (
