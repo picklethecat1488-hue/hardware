@@ -1,5 +1,31 @@
 """Models package root."""
 
+import warnings
+import os
+from pathlib import Path
+
+# Load .env file into os.environ before JAX or other packages are imported
+env_file = Path(__file__).resolve().parents[2] / ".env"
+if env_file.exists():
+    with open(env_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip()
+                if k not in os.environ:
+                    os.environ[k] = v
+                if k.startswith("APP_"):
+                    unprefixed = k[4:]
+                    if unprefixed not in os.environ:
+                        os.environ[unprefixed] = v
+
+warnings.filterwarnings("ignore", category=UserWarning, message=".*jax-mps was built for jaxlib.*")
+warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps' is experimental.*")
+
 import OCP.TopoDS  # type: ignore
 
 # Monkey-patch TopoDS_Shape to resolve Pydantic validation errors.
