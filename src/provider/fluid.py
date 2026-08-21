@@ -1386,6 +1386,65 @@ class FluidSpawner:
         return positions, velocities
 
 
+class ParticleSet:
+    """A high-performance set-like container for tracking particle index sets using NumPy boolean masks."""
+
+    def __init__(self, size: int):
+        """Initialize the ParticleSet with a fixed maximum size.
+
+        Args:
+            size: The maximum number of particle indices to support.
+        """
+        self._mask = np.zeros(size, dtype=bool)
+
+    def add(self, idx: int) -> None:
+        """Add a single particle index to the set.
+
+        Args:
+            idx: The particle index to add.
+        """
+        self._mask[idx] = True
+
+    def add_multiple(self, indices: np.ndarray) -> None:
+        """Add multiple particle indices to the set in a vectorized manner.
+
+        Args:
+            indices: A NumPy array of particle indices to add.
+        """
+        self._mask[indices] = True
+
+    def __contains__(self, idx: int) -> bool:
+        """Check if a particle index is in the set.
+
+        Args:
+            idx: The particle index to check.
+
+        Returns:
+            True if the index is in the set, False otherwise.
+        """
+        return bool(self._mask[idx])
+
+    def __len__(self) -> int:
+        """Return the number of unique particle indices in the set.
+
+        Returns:
+            The number of unique indices.
+        """
+        return int(np.sum(self._mask))
+
+    def __iter__(self):
+        """Iterate over the particle indices in the set.
+
+        Returns:
+            An iterator over the list of active particle indices.
+        """
+        return iter(np.where(self._mask)[0].tolist())
+
+    def clear(self) -> None:
+        """Clear all particle indices from the set."""
+        self._mask.fill(False)
+
+
 class Fluid:
     """Handles SPH fluid dynamics simulation for fluid particles in PyBullet using JAX."""
 
@@ -1467,9 +1526,9 @@ class Fluid:
         self.current_sim_time = 0.0
         self.torques: list[float] = []
         # Motor configurations are consolidated into BoundaryConfig
-        self.spout_water_ids = set()
-        self.fallen_out_water_ids = set()
-        self.total_fallen_water_ids = set()
+        self.spout_water_ids = ParticleSet(self.n_particles)
+        self.fallen_out_water_ids = ParticleSet(self.n_particles)
+        self.total_fallen_water_ids = ParticleSet(self.n_particles)
         self.state_tracker = state_tracker
 
         self._cached_active_indices = None
@@ -1556,7 +1615,7 @@ class Fluid:
             cavity_z_offset = cavity_info.xyz[2] if cavity_info is not None else 0.0
 
             hc_info = self.boundaries.get(LinkType.TUBE)
-            hc_r = (hc_info.radius - hc_info.thickness) if hc_info is not None else 0.008
+            hc_r = (hc_info.radius - hc_info.thickness) if hc_info is not None else 0.0
 
             max_r_sq = (cavity_inner_radius - self.spawn_buffer) ** 2
             min_r_sq = (hc_r + self.spawn_buffer) ** 2
@@ -2114,8 +2173,8 @@ class Fluid:
             spout_indices = np.where(
                 active_mask & (zs >= self.thresholds[LinkType.OUTLET]) & (ys < self.thresholds[LinkType.OUTLET_MAX_Y])
             )[0]
-            for idx in spout_indices:
-                self.spout_water_ids.add(idx)
+            if len(spout_indices) > 0:
+                self.spout_water_ids.add_multiple(spout_indices)
 
             # Fallen indices
             fallen_indices = np.where(
@@ -2125,8 +2184,10 @@ class Fluid:
             if len(fallen_indices) > 0:
                 pos_arr = np.array(self.pos_jax)
                 vel_arr = np.array(self.vel_jax)
+                self.total_fallen_water_ids.add_multiple(fallen_indices)
+                if not self.recycle_fluid:
+                    self.fallen_out_water_ids.add_multiple(fallen_indices)
                 for idx in fallen_indices:
-                    self.total_fallen_water_ids.add(idx)
                     if self.recycle_fluid:
                         # Select a random coordinate from pre-calculated grid
                         if self.spawn_xy_coords:
@@ -2138,7 +2199,6 @@ class Fluid:
                         pos_arr[idx] = wpt
                         vel_arr[idx] = [0.0, 0.0, 0.0]
                     else:
-                        self.fallen_out_water_ids.add(idx)
                         # Disperse inactive particles horizontally to avoid SPH neighborhood clustering hangs
                         pos_arr[idx] = [float(idx) * 10.0, 0.0, 1000.0]
                         vel_arr[idx] = [0.0, 0.0, 0.0]
