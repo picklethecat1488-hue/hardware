@@ -6,7 +6,7 @@ from provider import Room, Simulate, Mode, LinkType
 
 
 def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
-    """Configure and tune SPH parameters algorithmically by running simulation sweeps."""
+    """Configure and tune LBM boundary parameters algorithmically by running simulation sweeps."""
     import pybullet as p
     import numpy as np
     import tempfile
@@ -75,7 +75,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
         urdf_temp_path = Path(temp_dir) / "product.urdf"
         shutil.copy(urdf_path, urdf_temp_path)
 
-        # SPH ranges to optimize over
+        # LBM boundary parameter ranges to optimize over
         stiffness_range = (500.0, 1500.0)
         damping_range = (0.5, 3.0)
 
@@ -85,7 +85,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
         best_damping = None
         best_stable = False
         best_flow_score = -1
-        best_max_speed = 999.0
+        best_avg_speed = 999.0
 
         def evaluate_candidate(k_b, d_b) -> tuple[float, int]:
             # Connect to PyBullet DIRECT
@@ -99,6 +99,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
                 # Set candidate in-memory
                 provider.settings.stiffness_boundary = k_b
                 provider.settings.damping_boundary = d_b
+                provider.is_tuning = True
 
                 hooks = provider.get_simulate_hooks_impl("product:view/simulate")
                 setup_fn = hooks[Simulate.SETUP]
@@ -106,7 +107,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
 
                 setup_fn(body_id, physics_client, "product:view/simulate", boundaries, None)
 
-                max_speed_observed = 0.0
+                avg_speed_observed = 0.0
                 total_flow_accum = 0
                 num_steps = 500
 
@@ -116,12 +117,16 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
 
                     # Monitor instability and flow
                     if provider.water_sim is not None:
+                        pos_np = np.array(provider.water_sim.pos_jax)
                         vel_np = np.array(provider.water_sim.vel_jax)
-                        if len(vel_np) > 0:
-                            max_speed = float(np.max(np.linalg.norm(vel_np, axis=1)))
-                            max_speed_observed = max(max_speed_observed, max_speed)
-                            if max_speed > 50.0:  # Prevent JAX overflow/NaN
-                                break
+                        if len(pos_np) > 0 and len(vel_np) > 0:
+                            active_mask = pos_np[:, 2] < 100.0
+                            active_vels = vel_np[active_mask]
+                            if len(active_vels) > 0:
+                                avg_speed = float(np.mean(np.linalg.norm(active_vels, axis=1)))
+                                avg_speed_observed = max(avg_speed_observed, avg_speed)
+                                if avg_speed > 10.0:  # Prevent JAX overflow/NaN
+                                    break
 
                         # Count particles that have reached/exited the top spout outlet
                         pos_np = np.array(provider.water_sim.pos_jax)
@@ -133,12 +138,12 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
                             )
                             total_flow_accum += int(np.sum(in_spout))
 
-                return max_speed_observed, total_flow_accum
+                return avg_speed_observed, total_flow_accum
 
             finally:
                 p.disconnect(physics_client)
 
-        def is_better_candidate(stable: bool, max_speed: float, flow: int) -> bool:
+        def is_better_candidate(stable: bool, avg_speed: float, flow: int) -> bool:
             if best_stiffness is None:
                 return True
             # Preference 1: Stable is strictly better than unstable
@@ -153,17 +158,18 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
                 if flow_diff_ratio > 0.025:
                     return True
                 elif flow_diff_ratio >= -0.025:
-                    # Flow is within 2.5%, select the one with better stability (lower max speed)
-                    return max_speed < best_max_speed
+                    # Flow is within 2.5%, select the one with better stability (lower avg speed)
+                    return avg_speed < best_avg_speed
                 return False
             else:
-                # If both are unstable, select the one with lower max speed
-                return max_speed < best_max_speed
+                # If both are unstable, select the one with lower avg speed
+                return avg_speed < best_avg_speed
 
         # 1. Phase 1: Seed Discovery via Monte Carlo Random Sampling
         num_seeds = 5
+        speed_limit = 1.5
         provider.logger.print(
-            f"SPH Optimization Phase 1: running {num_seeds} Monte Carlo random seed trials...",
+            f"LBM Optimization Phase 1: running {num_seeds} Monte Carlo random seed trials...",
             symbol="🎲",
         )
 
@@ -172,19 +178,19 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
             k_b = float(np.random.uniform(stiffness_range[0], stiffness_range[1]))
             d_b = float(np.random.uniform(damping_range[0], damping_range[1]))
 
-            max_speed, flow = evaluate_candidate(k_b, d_b)
-            stable = max_speed <= 10.0
+            avg_speed, flow = evaluate_candidate(k_b, d_b)
+            stable = avg_speed <= speed_limit
             status_str = "STABLE" if stable else "UNSTABLE"
 
             provider.logger.print(
-                f"  Seed {seed_idx + 1} stiffness={k_b:.1f}, damping={d_b:.2f} | Status={status_str} | Max Speed={max_speed:.2f} m/s | Flow={flow}",
+                f"  Seed {seed_idx + 1} stiffness={k_b:.1f}, damping={d_b:.2f} | Status={status_str} | Avg Speed={avg_speed:.2f} m/s | Flow={flow}",
                 symbol="📊",
             )
 
-            if is_better_candidate(stable, max_speed, flow):
+            if is_better_candidate(stable, avg_speed, flow):
                 best_stable = stable
                 best_flow_score = flow
-                best_max_speed = max_speed
+                best_avg_speed = avg_speed
                 best_stiffness = k_b
                 best_damping = d_b
 
@@ -195,10 +201,10 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
             )
             best_stiffness = 1000.0
             best_damping = 1.5
-            max_speed, flow = evaluate_candidate(best_stiffness, best_damping)
-            best_stable = max_speed <= 10.0
+            avg_speed, flow = evaluate_candidate(best_stiffness, best_damping)
+            best_stable = avg_speed <= speed_limit
             best_flow_score = flow
-            best_max_speed = max_speed
+            best_avg_speed = avg_speed
 
         # 2. Phase 2: Local Search / Annealing (Gaussian random walk around the best seed)
         num_local_iters = 12
@@ -206,7 +212,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
         scale_damping = 0.5
 
         provider.logger.print(
-            f"SPH Optimization Phase 2: starting localized Monte Carlo hill climbing from seed stiffness={best_stiffness:.1f}, damping={best_damping:.2f} (Flow={best_flow_score}, Max Speed={best_max_speed:.2f} m/s)...",
+            f"LBM Optimization Phase 2: starting localized Monte Carlo hill climbing from seed stiffness={best_stiffness:.1f}, damping={best_damping:.2f} (Flow={best_flow_score}, Avg Speed={best_avg_speed:.2f} m/s)...",
             symbol="🔍",
         )
 
@@ -222,29 +228,29 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
             k_b = max(stiffness_range[0], min(stiffness_range[1], k_b))
             d_b = max(damping_range[0], min(damping_range[1], d_b))
 
-            max_speed, flow = evaluate_candidate(k_b, d_b)
-            stable = max_speed <= 10.0
+            avg_speed, flow = evaluate_candidate(k_b, d_b)
+            stable = avg_speed <= speed_limit
             status_str = "STABLE" if stable else "UNSTABLE"
 
-            if is_better_candidate(stable, max_speed, flow):
+            if is_better_candidate(stable, avg_speed, flow):
                 provider.logger.print(
-                    f"  Iter {iter_idx + 1}/{num_local_iters}: Found improved local maximum! stiffness={k_b:.1f}, damping={d_b:.2f} | Status={status_str} | Max Speed={max_speed:.2f} m/s | Flow={flow}",
+                    f"  Iter {iter_idx + 1}/{num_local_iters}: Found improved local maximum! stiffness={k_b:.1f}, damping={d_b:.2f} | Status={status_str} | Avg Speed={avg_speed:.2f} m/s | Flow={flow}",
                     symbol="🚀",
                 )
                 best_stable = stable
                 best_flow_score = flow
-                best_max_speed = max_speed
+                best_avg_speed = avg_speed
                 best_stiffness = k_b
                 best_damping = d_b
             else:
                 provider.logger.print(
-                    f"  Iter {iter_idx + 1}/{num_local_iters}: stiffness={k_b:.1f}, damping={d_b:.2f} | Status={status_str} | Max Speed={max_speed:.2f} m/s | Flow={flow}",
+                    f"  Iter {iter_idx + 1}/{num_local_iters}: stiffness={k_b:.1f}, damping={d_b:.2f} | Status={status_str} | Avg Speed={avg_speed:.2f} m/s | Flow={flow}",
                     symbol="📊",
                 )
 
         if best_damping is not None and best_stiffness is not None and best_stable:
             provider.logger.print(
-                f"Optimal SPH parameters determined: stiffness_boundary = {best_stiffness:.1f}, damping_boundary = {best_damping:.2f} (Status = STABLE, Flow = {best_flow_score}, Peak Speed = {best_max_speed:.2f} m/s)",
+                f"Optimal LBM parameters determined: stiffness_boundary = {best_stiffness:.1f}, damping_boundary = {best_damping:.2f} (Status = STABLE, Flow = {best_flow_score}, Peak Avg Speed = {best_avg_speed:.2f} m/s)",
                 symbol="🏆",
             )
             # Set the optimal values back to settings for environment persistence
@@ -252,8 +258,8 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
             provider.settings.damping_boundary = best_damping
         else:
             raise ValueError(
-                f"SPH parameter optimization failed: no stable configuration found. "
-                f"Best peak speed was {best_max_speed:.2f} m/s (limit is 10.0 m/s)."
+                f"LBM parameter optimization failed: no stable configuration found. "
+                f"Best peak average speed was {best_avg_speed:.2f} m/s (limit is {speed_limit:.1f} m/s)."
             )
 
     finally:
