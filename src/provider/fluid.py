@@ -1180,8 +1180,49 @@ def _physics_step_jax(
         b_accel_mags = jnp.linalg.norm(b_accel, axis=1, keepdims=True)
         b_accel_mags_safe = jnp.maximum(b_accel_mags, 1e-8)
         b_accel_clamped = b_accel * jnp.minimum(max_b_accel / b_accel_mags_safe, 1.0)
+        # 6. Casing suction force to pull water into the casing inlet
+        from model import ShapeType
 
-        accel = b_accel_clamped
+        has_casing = False
+        casing_height = 0.010
+        casing_idx = -1
+        for idx_cfg, cfg_check in enumerate(boundary_configs):
+            if getattr(cfg_check, "shape", None) == ShapeType.CASING:
+                has_casing = True
+                casing_height = float(cfg_check.height)
+                casing_idx = idx_cfg
+                break
+
+        if has_casing and casing_idx != -1:
+            casing_pos = b_pos_arr[casing_idx]
+            casing_orn = b_orn_arr[casing_idx]
+            casing_orn_inv = q_inv(casing_orn)
+            pos_casing = q_rotate(casing_orn_inv, pos_curr - casing_pos)
+            r_inlet_xy = jnp.sqrt(pos_casing[:, 0] ** 2 + pos_casing[:, 1] ** 2)
+
+            # Suction zone: within a cylinder slightly larger than the inlet, above the cover
+            in_suction = (
+                (r_inlet_xy < 0.016)
+                & (pos_casing[:, 2] >= casing_height - 0.002)
+                & (pos_casing[:, 2] <= casing_height + 0.020)
+            )
+
+            target_z = casing_height - 0.002
+            dx_in = 0.0 - pos_casing[:, 0]
+            dy_in = 0.0 - pos_casing[:, 1]
+            dz_in = target_z - pos_casing[:, 2]
+            dist_in = jnp.sqrt(dx_in**2 + dy_in**2 + dz_in**2 + 1e-8)
+
+            dir_casing = jnp.stack([dx_in / dist_in, dy_in / dist_in, dz_in / dist_in], axis=-1)
+            dir_world = q_rotate(casing_orn, dir_casing)
+
+            # Suction strength proportional to omega
+            suction_strength = (jnp.abs(omega) / 120.0) * 15.0
+            suction_accel = jnp.where(in_suction[:, None], dir_world * suction_strength, 0.0)
+        else:
+            suction_accel = jnp.zeros_like(pos_curr)
+
+        accel = b_accel_clamped + suction_accel
 
         # Integrate active particles
         active = (pos_curr[:, 2] < 100.0)[:, None]

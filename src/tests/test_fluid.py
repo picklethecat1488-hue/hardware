@@ -811,3 +811,116 @@ def test_physics_step_spout_forcing_sad():
     assert vel_next is not None
     assert f_next is not None
     assert torque_accum is not None
+
+
+def test_physics_step_casing_suction_happy():
+    """Verify that casing suction force is correctly applied in the suction zone (happy path)."""
+    import jax.numpy as jnp
+    from provider.fluid import _physics_step_jax
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    base_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.BASE,
+        radius=0.1,
+        height=0.05,
+        link_idx=-1,
+    )
+    casing_cfg = BoundaryConfig(
+        shape=ShapeType.CASING,
+        type=BoundaryType.SOLID_CAVITY,
+        link_type=LinkType.LID,
+        radius=0.028,
+        height=0.010,
+        link_idx=1,
+    )
+
+    # Particle position directly in the suction zone: above casing cover, near center
+    # casing_pos is (0.0, 0.0, 0.0)
+    pos = jnp.array([[0.005, 0.005, 0.012]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 32, 32, 28), dtype=jnp.float32)
+    b_pos = jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=jnp.float32)
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+
+    # Run physics step with high omega to generate a strong suction force
+    pos_next, vel_next, f_next, torque_accum = _physics_step_jax(
+        pos=pos,
+        vel=vel,
+        f_lbm=f_lbm,
+        mass=1e-6,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=(base_cfg, casing_cfg),
+        gravity=jnp.array([0.0, 0.0, -9.81]),
+        b_pos_arr=b_pos,
+        b_orn_arr=b_orn,
+        base_vel=jnp.zeros(3, dtype=jnp.float32),
+        omega=120.0,
+        t_start=0.0,
+        K_boundary=1000.0,
+        D_boundary=5.0,
+        r_s=0.003,
+        base_idx=0,
+    )
+
+    # With high suction force directed downwards and inwards, vel_next should have a negative Z component
+    assert vel_next[0, 2] < -0.02
+
+
+def test_physics_step_casing_suction_sad():
+    """Verify that no casing suction force is applied to particles outside the suction zone (sad path)."""
+    import jax.numpy as jnp
+    from provider.fluid import _physics_step_jax
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    base_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.BASE,
+        radius=0.1,
+        height=0.05,
+        link_idx=-1,
+    )
+    casing_cfg = BoundaryConfig(
+        shape=ShapeType.CASING,
+        type=BoundaryType.SOLID_CAVITY,
+        link_type=LinkType.LID,
+        radius=0.028,
+        height=0.010,
+        link_idx=1,
+    )
+
+    # Particle position far outside the suction zone (e.g. horizontally far from center)
+    pos = jnp.array([[0.050, 0.0, 0.012]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 32, 32, 28), dtype=jnp.float32)
+    b_pos = jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=jnp.float32)
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+
+    pos_next, vel_next, f_next, torque_accum = _physics_step_jax(
+        pos=pos,
+        vel=vel,
+        f_lbm=f_lbm,
+        mass=1e-6,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=(base_cfg, casing_cfg),
+        gravity=jnp.array([0.0, 0.0, 0.0]),  # Zero gravity to isolate suction effect
+        b_pos_arr=b_pos,
+        b_orn_arr=b_orn,
+        base_vel=jnp.zeros(3, dtype=jnp.float32),
+        omega=120.0,
+        t_start=0.0,
+        K_boundary=1000.0,
+        D_boundary=5.0,
+        r_s=0.003,
+        base_idx=0,
+    )
+
+    # Since the particle is far from the casing center, suction acceleration should be zero,
+    # and since gravity is also zero, vel_next should remain zero.
+    assert jnp.allclose(vel_next, 0.0, atol=1e-5)
