@@ -56,7 +56,6 @@ class BoundaryConfig(BaseModel):
             "thickness",
             "slot_height",
             "slot_width",
-            "tube_velocity",
             "spout_radius",
             "spout_height",
         },
@@ -158,7 +157,6 @@ class BoundaryConfig(BaseModel):
     # ----------------------------------------------------
     slot_height: float = Field(default=0.015, description="Height of pump slots if applicable")
     slot_width: float = Field(default=0.008, description="Width of pump slots if applicable")
-    tube_velocity: float = Field(default=0.90, description="Forced upward velocity inside the tube")
     spout_radius: float = Field(default=0.014, description="Spout deflection radius allowance at the top of the tube")
     spout_height: float = Field(default=0.049, description="Spout deflection height allowance at the top of the tube")
     tube_y: Optional[float] = Field(default=None, description="Y coordinate of the spout tube")
