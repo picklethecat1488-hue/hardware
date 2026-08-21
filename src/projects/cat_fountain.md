@@ -42,10 +42,10 @@ graph TD
     %% Power Distribution
     BQ -->|5V System Power| PICO["Raspberry Pi Pico W"]
     BQ -->|5V Motor Power| INA["INA219 Current Sensor"]
-    INA -->|Monitored Power| DRV["L9110S Motor Driver"]
+    INA -->|Monitored Power| DRV["TMC6300 Motor Driver"]
     
     %% I2C Bus Connections
-    PICO -->|I2C Host Bus| I2CBus{I2C Bus: SDA/SCL}
+    PICO -->|I2C Host Bus| I2CBus{I2C Bus: GP12/GP13}
     I2CBus <--> MAX
     I2CBus <--> INA
     I2CBus <--> TOF1["VL53L0X ToF (North)"]
@@ -53,18 +53,20 @@ graph TD
     I2CBus <--> TOF3["VL53L0X ToF (West)"]
     
     %% Control Lines
-    PICO -->|GP2: XSHUT| TOF1
-    PICO -->|GP3: XSHUT| TOF2
-    PICO -->|GP4: XSHUT| TOF3
-    TOF1 -->|GP5: INT| PICO
-    TOF2 -->|GP6: INT| PICO
-    TOF3 -->|GP7: INT| PICO
-    MAX -->|GP10: ALRT| PICO
-    PICO -->|GP14, GP15: PWM| DRV
+    PICO -->|GP4: XSHUT| TOF1
+    PICO -->|GP5: XSHUT| TOF2
+    PICO -->|GP6: XSHUT| TOF3
+    TOF1 -->|GP7: INT| PICO
+    TOF2 -->|GP9: INT| PICO
+    TOF3 -->|GP10: INT| PICO
+    MAX -->|GP14: ALRT| PICO
+    PICO -->|GP18, GP19, GP20, GP21: Control| DRV
+    PICO -->|GP22: DIAG| DRV
+    PICO -->|GP26: SPEED_SENSE| SENS["AH3577 Speed Sensor"]
     PICO -->|GP11: PIO/WS2812| LED["RGB NeoPixel LED"]
     
     %% Output Connections
-    DRV -->|Driven Power| MOTOR["N20 Gear Motor"]
+    DRV -->|Driven Power: U/V/W| MOTOR["BetaFPV 1102 BLDC Motor"]
 ```
 
 ## Bill of Materials (BOM)
@@ -81,10 +83,10 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 | **IR Proximity Sensors (Qty: 3)** | **Adafruit VL53L0X Time-of-Flight (ToF)** | Long-range laser distance sensor used for cat proximity detection in North, East, and West directions. | `0x29` (default)<br>*Re-addressed to `0x30`, `0x31`, `0x32` at boot* | Measures precise distances up to 2m, unaffected by ambient light. Uses shutdown pin (XSHUT) for startup addressing. |
 | **RGB LED Indicator** | **Standard RGB NeoPixel (WS2812B / SK6812)** | High-brightness status LED to indicate battery capacity and device state. | *N/A (Driven via PIO GP11)* | Addressable RGB LED driven directly from Raspberry Pi Pico W using a PIO state machine. |
 | **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | *N/A (Standalone)* | Standalone linear charger. Uses jumpers/resistors to configure chemistry/current. S1 (FAULT) & S2 (CHG) are left disconnected. |
-| **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Primary interface to access battery and charging status. The 18650 battery connects directly to this board, which is then jumpered to the charger. Includes configurable alert interrupt (ALRT) pin connected to GP10. |
+| **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Primary interface to access battery and charging status. The 18650 battery connects directly to this board, which is then jumpered to the charger. Includes configurable alert interrupt (ALRT) pin connected to GP14. |
 | **Battery** | **Standard 18650 3.7V Li-ion Cell** | Main energy source (e.g. Samsung 30Q or Panasonic NCR18650B, 3000+ mAh). | *N/A (Analog)* | Rechargeable lithium-ion cell to fit the internal battery storage area. |
 | **BLDC Motor Driver** | **SparkFun TMC6300 Breakout** | Low-voltage three-phase brushless motor driver breakout to drive the 15W BLDC motor. | *N/A (Driven by GP18, GP19, GP20, GP21, GP22)* | Supports 2V-11V range, up to 2A continuous, breadboard-compatible 25.4mm x 20.3mm footprint. |
-| **BLDC Motor (15W)** | **BetaFPV 1102 (18000KV) Brushless Motor** | Ultra-lightweight 1S-compatible brushless motor to drive the dry-side magnet hub. | *N/A (Driven by SimpleFOC Mini)* | 15W power class, 13.8mm diameter, 1.5mm shaft, lightweight 2.9g, mounts with M1.4 screws. |
+| **BLDC Motor (15W)** | **BetaFPV 1102 (18000KV) Brushless Motor** | Ultra-lightweight 1S-compatible brushless motor to drive the dry-side magnet hub. | *N/A (Driven by TMC6300)* | 15W power class, 13.8mm diameter, 1.5mm shaft, lightweight 2.9g, mounts with M1.4 screws. |
 | **Coupling Magnets (Qty: 6)** | **6mm x 3mm N52 Neodymium Discs** | Rare-earth magnets to couple the dry motor shaft to the wet impeller. | *N/A (Magnetic)* | Strong N52 grade, 3 magnets on the dry hub and 3 on the wet impeller with alternating polarities. |
 | **I2C Current Sensor** | [Adafruit INA219 Current Sensor](https://www.adafruit.com/product/904) | High-side current and power monitor to measure motor current draw and calculate load torque. | `0x40` | Measures current up to 3.2A with 1% accuracy. Used for low water / refill detection. |
 | **Speed Sensor** | **Digital Latching Hall Sensor (e.g., US1881 / AH3577)** | Measures impeller rotation speed contactlessly by detecting alternating magnet poles. | *N/A (Driven by GP26)* | Latching digital output, SOT-23 or TO-92 package, fits inside custom pocket in the motor boss. |
@@ -106,7 +108,7 @@ To build the cat fountain with I2C communication across key monitoring subsystem
    * To ensure battery safety inside the sealed dry electronics compartment, the BQ25185's built-in hardware temperature protection should be used: cut the TH trace jumper on the back of the board and connect a 10kΩ NTC thermistor (attached to the battery cell) between the TH pad and GND. This allows the BQ25185 to automatically suspend charging in hardware if the battery exceeds safe temperature limits.
    * The Pico W can passively monitor the internal ambient temperature of the electronics compartment using the RP2040's built-in internal temperature sensor (on ADC channel 4). If the temperature exceeds 45°C, the Pico W should enter a low-power sleep mode and cut power to the motor driver.
 6. **Fuel Gauge Alert Interrupt**:
-   * The active-low `ALRT` (Alert) pin of the MAX17048 fuel gauge is wired to Pico GPIO `GP10`. The firmware configures this pin with an internal pull-up and attaches an interrupt service routine (ISR). This enables the MAX17048 to asynchronously wake the microcontroller or trigger an interrupt on low-battery (e.g. State of Charge falls below 10%) or battery voltage alerts, rather than requiring the Pico W to constantly wake up to poll the fuel gauge, optimizing overall system power efficiency.
+   * The active-low `ALRT` (Alert) pin of the MAX17048 fuel gauge is wired to Pico GPIO `GP14`. The firmware configures this pin with an internal pull-up and attaches an interrupt service routine (ISR). This enables the MAX17048 to asynchronously wake the microcontroller or trigger an interrupt on low-battery (e.g. State of Charge falls below 10%) or battery voltage alerts, rather than requiring the Pico W to constantly wake up to poll the fuel gauge, optimizing overall system power efficiency.
 7. **Battery and Charger Status Monitoring**:
    * S1 and S2 status connections from the BQ25185 charger to the Pico W are removed.
    * Instead, the MAX17048 fuel gauge serves as the primary interface to access battery and charging status.
@@ -136,6 +138,8 @@ The following parts are manufactured to form the physical structure and assembly
 > **Manufacturing & Post-Processing Details**:
 > 1. **Translucent Body**: All body components (Bowl, Lid, Bottom Cover, LED Cover) are SLA-printed using UTR-8100 translucent resin to ensure light transparency and visual monitoring of water levels.
 > 2. **Food Safety Post-Processing**: SLA photopolymer resin is toxic to pets if untreated. All resin components in contact with water (Bowl, Lid) must be coated with a food-grade epoxy (e.g., Max CLR or similar FDA-compliant epoxy coating) as a post-processing step before use to completely seal the resin.
+> 3. **Impeller and Drive Hub Post-Processing**: The impeller and drive hub are printed using PETG. High-precision post-processing (such as removing support residue from the 6 radial blades and ensuring clean magnet pockets) is necessary to keep the impeller dynamically balanced during rotation.
+> 4. **O-Ring Groove Preparation**: The O-ring groove on the bottom cover sealing surface must be cleared of print artifacts, cleaned, and lightly lubricated with food-grade silicone grease before installing the silicone O-ring to ensure a proper water-tight seal.
 
 ### Fasteners & O-Rings
 
@@ -143,31 +147,32 @@ These fasteners and seal components are required to assemble the 3D-printed body
 
 | Component | Qty | Size/Spec | Use Case |
 | :--- | :--- | :--- | :--- |
-| **Bottom Cover Screws** | 4 | M3 x 10mm (Flat Head/Countersunk) | Secures the controller compartment cover. Fits flush into the bottom countersinks. |
-| **Motor Set Screws** | 2 | M3 x 10mm (or M3 set screws) | Secures the N20 motor inside its pocket via the side bosses. |
+| **Bottom Cover Joint** | None | Snap-fit | The bottom cover features an integrated snap-fit ring around its perimeter to secure it to the bowl. |
+| **Bottom Cover O-Ring** | 1 | Silicone O-Ring, 2mm cross-section, ~190mm ID / 194mm OD | Placed in the bottom cover groove to provide a water-tight seal for the dry compartment. |
+| **Motor Screws** | 2 | M1.4 x 4mm (Machine Screws) | Secures the BetaFPV 1102 BLDC motor to the central boss face. |
 | **Proximity Sensor Screws** | 6 | M2 x 6mm (Machine Screws) | Mounts the three proximity sensors to the internal bosses. |
 | **Charger Board Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit BQ25185 board to the dry compartment ceiling. |
 | **Fuel Gauge Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit MAX17048 board to the dry compartment ceiling. |
 | **Pico W Screws** | 4 | M2 x 4mm or 5mm (Machine Screws) | Secures the Raspberry Pi Pico W to the dry compartment ceiling. |
-| **Motor Driver Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the L9110S board to the dry compartment ceiling. |
+| **Motor Driver Mount** | None | Integrated Slide-in Guide Clip | Mounts the SparkFun TMC6300 BLDC driver board without screws. |
 | **Current Sensor Screws** | 2 | M2 x 4mm or 5mm (Machine Screws) | Secures the Adafruit INA219 board to the dry compartment ceiling. |
 
 ## Battery Life Estimation
 
-To maximize portable operation on a single **18650 3.7V Li-ion battery (3000 mAh / 11.1 Wh)**, the system implements a strict low-power duty cycle. Below is the power consumption breakdown and the firmware settings required to achieve an estimated **13.6 days of battery life**.
+To maximize portable operation on a single **18650 3.7V Li-ion battery (3000 mAh / 11.1 Wh)**, the system implements a strict low-power duty cycle. Below is the power consumption breakdown and the firmware settings required to achieve an estimated **7.0 days of battery life**.
 
 ### Power Consumption Breakdown
 
 | Subsystem State | Components Active | Current Draw (at 3.7V) | Power Draw | Daily Duty Cycle |
 | :--- | :--- | :--- | :--- | :--- |
-| **Active Mode** (Cat detected, pump running) | Pico W (active), L9110S + N20 Motor (70% speed), INA219 (measuring), 3x VL53L0X (measuring), RGB LED (pulsing status) | **~248 mA** | 918 mW | **2.08%** (15 events/day, 2 mins each) |
-| **Sleep Mode** (Idle, monitoring proximity) | Pico W (light sleep), L9110S (disabled), INA219 (power-down), 3x VL53L0X (shutdown), RGB LED (off) | **~4.1 mA** | 15 mW | **97.92%** (wakes up 50ms every 5s to poll) |
+| **Active Mode** (Cat detected, pump running) | Pico W (active), TMC6300 + BetaFPV 1102 BLDC Motor (typical load), INA219 (measuring), 3x VL53L0X (measuring), RGB LED (pulsing status) | **~670 mA** | 2480 mW | **2.08%** (15 events/day, 2 mins each) |
+| **Sleep Mode** (Idle, monitoring proximity) | Pico W (light sleep), TMC6300 (disabled), INA219 (power-down), 3x VL53L0X (shutdown), RGB LED (off) | **~4.1 mA** | 15 mW | **97.92%** (wakes up 50ms every 5s to poll) |
 
 ### Calculations
 * **Average Daily Current Draw**: 
-  $$I_{\text{avg}} = (I_{\text{active}} \times 0.0208) + (I_{\text{sleep}} \times 0.9792) = (248\text{ mA} \times 0.0208) + (4.1\text{ mA} \times 0.9792) = 5.16\text{ mA} + 4.01\text{ mA} = 9.17\text{ mA}$$
+  $$I_{\text{avg}} = (I_{\text{active}} \times 0.0208) + (I_{\text{sleep}} \times 0.9792) = (670\text{ mA} \times 0.0208) + (4.1\text{ mA} \times 0.9792) = 13.94\text{ mA} + 4.01\text{ mA} = 17.95\text{ mA}$$
 * **Estimated Runtime**:
-  $$\text{Runtime} = \frac{3000\text{ mAh}}{9.17\text{ mA}} \approx 327\text{ hours} \approx \mathbf{13.6\text{ days}}$$
+  $$\text{Runtime} = \frac{3000\text{ mAh}}{17.95\text{ mA}} \approx 167\text{ hours} \approx \mathbf{7.0\text{ days}}$$
 
 ### Required Settings for Optimal Battery Life
 
@@ -180,12 +185,12 @@ To achieve this estimate, the firmware and hardware must be configured with the 
    * Pull the `XSHUT` (shutdown) pins of all three `VL53L0X` sensors **LOW** when the Pico enters sleep. This forces the sensors into a hardware standby drawing only **$5\mu\text{A}$** each, instead of leaving them active at $20\text{ mA}$ each.
    * On wakeup, enable only one sensor at a time (pull `XSHUT` HIGH), take a single-shot measurement, and immediately disable it again.
 3. **Motor Driver & Current Sensor Standby State**:
-   * When no cat is present, pull both L9110S input control pins (`GP14` and `GP15`) **LOW** to disable the H-bridge and completely cut off motor current draw (standby current < 1µA).
+   * When no cat is present, pull the TMC6300 driver enable pin (`GP18`) and phase inputs (`GP19`, `GP20`, `GP21`) **LOW** to put it in standby and cut off motor current draw (standby current < 1µA).
    * Put the INA219 current sensor into **power-down mode** over I2C to reduce its standby current to just 15µA.
    * Wake up the INA219 only when active pumping is triggered.
 4. **Status LED Duty Cycling**:
    * The RGB NeoPixel status LED should remain **OFF** during sleep mode. For battery level indication, blink the LED briefly (e.g. 50ms pulse) once every 10 seconds rather than leaving it on continuously.
 5. **Asynchronous Battery Monitoring**:
-   * By utilizing the MAX17048 `ALRT` hardware interrupt wired to `GP10`, the Pico W avoids waking up periodically to poll the battery state of charge over I2C. The microcontroller can remain in a low-power state and receive battery alerts asynchronously.
+   * By utilizing the MAX17048 `ALRT` hardware interrupt wired to `GP14`, the Pico W avoids waking up periodically to poll the battery state of charge over I2C. The microcontroller can remain in a low-power state and receive battery alerts asynchronously.
 
 

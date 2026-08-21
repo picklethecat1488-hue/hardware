@@ -62,8 +62,8 @@ def is_pid_alive(pid: int) -> bool:
 
 BUFFER_SIZE = 8192
 RELOAD_PREFIXES = (
-    "projects.",
-    "projects_config.",
+    "projects",
+    "projects_config",
     "provider",
     "model",
     "shell",
@@ -212,6 +212,18 @@ class DaemonServer:
                 if file.endswith((".py", ".yaml", ".yml")):
                     try:
                         mtime = (Path(root) / file).stat().st_mtime
+                        if mtime > max_mtime:
+                            max_mtime = mtime
+                    except Exception:
+                        pass
+
+        # Also monitor any environment files (ending with .env) in the repository root (parent of src)
+        repo_root = src_dir.parent
+        if repo_root.exists():
+            for file in os.listdir(repo_root):
+                if file.endswith(".env") or file == ".env":
+                    try:
+                        mtime = (repo_root / file).stat().st_mtime
                         if mtime > max_mtime:
                             max_mtime = mtime
                     except Exception:
