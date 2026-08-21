@@ -1742,9 +1742,18 @@ class Fluid:
                 if key not in max_k or iz > max_k[key]:
                     max_k[key] = iz
 
+        # Only fill down to the reservoir floor level, keeping the machine room dry.
+        from provider.bullet import LinkType
+
+        base_info = self.boundaries.get(LinkType.BASE) if hasattr(self, "boundaries") else None
+        z_offset = base_info.xyz[2] if (base_info is not None and base_info.xyz is not None) else 0.0
+        iz_floor = int(math.floor((z_offset - origin[2]) / dx))
+        iz_floor = max(0, iz_floor)
+
         voxel_centers = []
         for (ix, iy), k_max in max_k.items():
-            for iz in range(k_max + 1):
+            start_iz = min(k_max, iz_floor)
+            for iz in range(start_iz, k_max + 1):
                 cx = origin[0] + (ix + 0.5) * dx
                 cy = origin[1] + (iy + 0.5) * dx
                 cz = origin[2] + (iz + 0.5) * dx

@@ -546,7 +546,7 @@ class CatFountainProvider(Provider):
                     link_type=LinkType.BASE,
                     type=BoundaryType.CAVITY,
                     height=(h - floor_z + self.settings.spout_length) * 0.001,
-                    thickness=t * 0.001,
+                    thickness=0.030,
                     has_tube=True,
                     tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
                 )
@@ -894,7 +894,7 @@ class CatFountainProvider(Provider):
                 type=BoundaryType.CAVITY,
                 radius=self.settings.lid_pocket_radius * 0.001,
                 height=self.settings.lid_pocket_cavity_height * 0.001,
-                thickness=3.0 * 0.001,
+                thickness=0.030,
                 xyz=(0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001),
                 rpy=(0.0, 0.0, 0.0),
                 has_drain=True,
