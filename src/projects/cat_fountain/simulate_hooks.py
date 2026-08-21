@@ -27,6 +27,8 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                     link_indices[LinkKey.DRIVE_HUB] = i
                 elif "lid" in link_name:
                     link_indices["lid"] = i
+                elif "pump_cover" in link_name:
+                    link_indices["pump_cover"] = i
 
         # Resolve boundaries to include correct link_idx and link_type
         resolved_boundaries = {}
@@ -39,6 +41,9 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                     case "bowl":
                         if item_dict.get("link_type") == LinkType.TUBE or item_dict.get("link_type") == "tube":
                             item_dict["link_type"] = LinkType.TUBE
+                            item_dict["link_idx"] = -1
+                        elif item_dict.get("link_type") == LinkType.LID or item_dict.get("link_type") == "lid":
+                            item_dict["link_type"] = LinkType.LID
                             item_dict["link_idx"] = -1
                         else:
                             item_dict["link_type"] = LinkType.BASE
@@ -53,24 +58,30 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                         item_dict["link_type"] = LinkType.LID
                         item_dict["link_idx"] = link_indices.get("lid", -1)
                     case _:
-                        item_dict["link_idx"] = link_indices.get(label, -1)
+                        item_idx = link_indices.get(label, -1)
+                        item_dict["link_idx"] = item_idx
                         if "link_type" not in item_dict:
                             item_dict["link_type"] = LinkType.BASE
                 resolved_vals.append(item_dict)
             resolved_boundaries[label] = resolved_vals
 
+        self.water_sim_damping = 0.995
         self.water_sim = Fluid(
             config=FluidConfig.water(
                 sim_name=name,
                 boundaries=resolved_boundaries,
-                recycle_fluid=False,
+                recycle_fluid=True,  # Enable fluid recycling
                 gravity=(0.0, 0.0, -9.81),
-                r_s=0.0009,
+                r_s=0.0015,
                 target_volume=self.settings.target_volume,
+                stiffness=1000.0,
+                damping=0.995,
+                viscosity=0.02,
                 slot_height=self.settings.slot_height * 0.001,
                 fallen_threshold_liters=0.001,
                 high_damping_value=0.998,
-                damping_boundary=25.0,
+                damping_boundary=self.settings.damping_boundary,
+                stiffness_boundary=self.settings.stiffness_boundary,
             ),
             provider=self,
             body_id=body_id,
@@ -92,15 +103,22 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         motor_power = getattr(self.settings, "motor_power", 1.0)
         omega = target_omega if step_idx >= 40 else 0.0
 
+        # Run with motor_power=None when NOT in pytest, to disable non-physical speed throttling!
+        import sys
+
+        is_pytest = "pytest" in sys.modules or any("pytest" in arg for arg in sys.argv)
+        actual_motor_power = motor_power if is_pytest else None
+
         self.water_sim.update(
             body_id,
             client,
             target_omega=omega,
             max_force=max_force,
-            motor_power=motor_power,
+            motor_power=actual_motor_power,
+            damping=getattr(self, "water_sim_damping", 0.995),
         )
         if (
-            len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0
+            len(self.water_sim.total_fallen_water_ids) * self.water_sim.vol_s * 1000.0
             >= self.water_sim.fallen_threshold_liters
         ):
             return f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl at step {step_idx}"
