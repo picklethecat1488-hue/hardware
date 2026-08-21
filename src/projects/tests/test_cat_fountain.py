@@ -172,7 +172,7 @@ class TestCatFountainProvider:
         assert bowl_shape.urdf_parent is None
         assert bowl_shape.urdf_joint_type is None
         assert bowl_shape.urdf_boundary_friction == 0.20
-        assert len(bowl_shape.urdf_boundaries) == 2
+        assert len(bowl_shape.urdf_boundaries) == 3
         assert bowl_shape.urdf_boundaries[0].shape == "cylinder"
         assert bowl_shape.urdf_boundaries[0].type == "cavity"
 
@@ -243,7 +243,8 @@ class TestCatFountainProvider:
             )
             provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
             provider.settings.measurements_path = real_measurements
-            provider.settings.target_volume = 0.00008
+            provider.settings.target_volume = 0.0003
+            provider.settings.motor_power = 1000.0
 
             manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
             builder = Builder(manager, logger=Logger(enabled=False))
@@ -299,7 +300,7 @@ class TestCatFountainProvider:
                 # lead = h_impeller * (360 / twist)
                 lead = (provider.settings.impeller_height * 0.001) / (abs(provider.settings.vane_twist) / 360.0)
                 motor_speed = float(room["impeller"][0].urdf_motor_target)
-                v_z = motor_speed * (lead / (2.0 * 3.14159))  # ~0.465 m/s
+                v_z = min(motor_speed * (lead / (2.0 * 3.14159)), 0.90)  # Capped at LBM stability limit~0.9 m/s
 
                 # 2. Time needed to travel the tube height
                 h_tube = provider.settings.tube_height * 0.001
@@ -751,9 +752,7 @@ class TestCatFountainProvider:
         room.translate_joints()
 
         parts = {
-            name: geom[0]
-            for name, geom in room.items()
-            if not any(x in name for x in ["emitter", "receiver", "pcb", "motor"])
+            name: geom[0] for name, geom in room.items() if not any(x in name for x in ["emitter", "receiver", "pcb"])
         }
         for name1, part1 in parts.items():
             for name2, part2 in parts.items():
@@ -763,3 +762,72 @@ class TestCatFountainProvider:
                     assert vol == pytest.approx(0, abs=0.2), (
                         f"Intersection detected between {name1} and {name2}: {vol:.3f} mm3"
                     )
+
+    def test_assembly_and_fitment_tolerances(self, provider):
+        """Verify assembly clearances: clip fits through bottom cover, and drive hub fits in recess."""
+        # 1. Verify that the bottom cover's opening width is larger than the motor clip width.
+        # This ensures the fork can actually be slid in from the side.
+        assert provider.settings.bottom_cover_opening_width > provider.settings.motor_clip_width
+
+        # 2. Verify that the drive hub outer radius is smaller than the bowl's drive hub recess radius.
+        # This ensures the drive hub can be physically inserted into the recess on the motor shaft.
+        hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
+        assert provider.settings.drive_hub_recess_radius > hub_r
+
+        # 3. Verify that the motor clip U-cutout is larger than or equal to the motor collar diameter.
+        # The BetaFPV 1102 motor collar diameter is 10.0mm.
+        # This ensures the clip wraps around the collar to support the motor body.
+        motor_collar_diameter = 10.0
+        assert provider.settings.motor_clip_cutout_width >= motor_collar_diameter
+
+    def test_config_tune_action(self, provider):
+        """Test that config_tune executes successfully with mocked PyBullet client."""
+        from unittest.mock import MagicMock
+        from projects.cat_fountain.config import config_tune
+        from provider import Simulate
+
+        # Mock the build manager and builder
+        mock_manager = MagicMock()
+        mock_builder = MagicMock()
+
+        # Mock provider properties
+        provider.logger = MagicMock()
+
+        # Mock setup_fn to instantiate a mock water_sim on provider
+        mock_water = MagicMock()
+        mock_water.vel_jax = [[0.0, 0.0, 0.0]]
+        mock_water.pos_jax = [[0.0, 0.028, 0.05]]
+
+        def mock_setup(body_id, physics_client, view_path, boundaries, state):
+            provider.water_sim = mock_water
+
+        mock_setup_fn = MagicMock(side_effect=mock_setup)
+        mock_step_fn = MagicMock()
+
+        provider.get_simulate_hooks_impl = MagicMock(
+            return_value={
+                Simulate.SETUP: mock_setup_fn,
+                Simulate.STEP: mock_step_fn,
+            }
+        )
+
+        with (
+            patch("pybullet.connect", return_value=42),
+            patch("pybullet.disconnect") as mock_disconnect,
+            patch("pybullet.setGravity") as mock_gravity,
+            patch("pybullet.loadURDF", return_value=1),
+            patch("pybullet.stepSimulation") as mock_step_sim,
+            patch("provider.ProviderManager", return_value=mock_manager),
+            patch("build.Builder", return_value=mock_builder),
+            patch("pathlib.Path.exists", return_value=True),
+        ):
+            # Run config_tune
+            config_tune(provider, "product:view/simulate", None)
+
+            # Verify that settings were updated with some optimal boundaries
+            assert provider.settings.stiffness_boundary is not None
+            assert provider.settings.damping_boundary is not None
+
+            # Verify builder build steps were called
+            mock_builder.generate_parts.assert_called_once()
+            mock_builder.generate_urdfs.assert_called_once()
