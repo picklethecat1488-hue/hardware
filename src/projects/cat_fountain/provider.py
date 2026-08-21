@@ -897,7 +897,7 @@ class CatFountainProvider(Provider):
                 thickness=3.0 * 0.001,
                 xyz=(0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001),
                 rpy=(0.0, 0.0, 0.0),
-                has_drain=False,
+                has_drain=True,
                 drain_hole_y=cutout_y * 0.001,  # Parameterized coordinate
                 drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
                 has_tube=True,
@@ -928,7 +928,7 @@ class CatFountainProvider(Provider):
                 thickness=2.0 * 0.001,
                 xyz=(0.0, 0.0, -2.0 * 0.001),
                 rpy=(math.pi, 0.0, 0.0),
-                has_drain=False,
+                has_drain=True,
                 drain_hole_y=-cutout_y * 0.001,  # Parameterized coordinate (flipped)
                 drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
                 has_tube=True,
