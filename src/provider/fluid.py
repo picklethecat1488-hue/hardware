@@ -970,47 +970,6 @@ def _lbm_step_3d_full_jax(
 
 
 @jax.jit
-def _p2g_jax(pos, vel, dx, origin, mass):
-    nx, ny, nz = 32, 32, 28
-    gp = (pos - origin) / dx
-    idx0 = jnp.floor(gp).astype(jnp.int32)
-    idx0 = jnp.clip(idx0, 0, jnp.array([nx - 2, ny - 2, nz - 2]))
-    t = gp - idx0
-
-    w000 = (1.0 - t[:, 0]) * (1.0 - t[:, 1]) * (1.0 - t[:, 2])
-    w100 = t[:, 0] * (1.0 - t[:, 1]) * (1.0 - t[:, 2])
-    w010 = (1.0 - t[:, 0]) * t[:, 1] * (1.0 - t[:, 2])
-    w001 = (1.0 - t[:, 0]) * (1.0 - t[:, 1]) * t[:, 2]
-    w110 = t[:, 0] * t[:, 1] * (1.0 - t[:, 2])
-    w101 = t[:, 0] * (1.0 - t[:, 1]) * t[:, 2]
-    w011 = (1.0 - t[:, 0]) * t[:, 1] * t[:, 2]
-    w111 = t[:, 0] * t[:, 1] * t[:, 2]
-
-    grid_rho = jnp.zeros((nx, ny, nz))
-    grid_mom = jnp.zeros((nx, ny, nz, 3))
-
-    offsets = [
-        (0, 0, 0, w000),
-        (1, 0, 0, w100),
-        (0, 1, 0, w010),
-        (0, 0, 1, w001),
-        (1, 1, 0, w110),
-        (1, 0, 1, w101),
-        (0, 1, 1, w011),
-        (1, 1, 1, w111),
-    ]
-
-    for di, dj, dk, w in offsets:
-        grid_rho = grid_rho.at[idx0[:, 0] + di, idx0[:, 1] + dj, idx0[:, 2] + dk].add(w * mass)
-        grid_mom = grid_mom.at[idx0[:, 0] + di, idx0[:, 1] + dj, idx0[:, 2] + dk].add((w * mass)[:, None] * vel)
-
-    grid_rho_safe = jnp.where(grid_rho > 1e-8, grid_rho, 1.0)
-    grid_u = grid_mom / grid_rho_safe[:, :, :, None]
-    grid_u = jnp.where((grid_rho > 1e-8)[:, :, :, None], grid_u, 0.0)
-    return grid_rho, grid_u
-
-
-@jax.jit
 def _g2p_jax(pos, grid_u, dx, origin):
     nx, ny, nz = 32, 32, 28
     gp = (pos - origin) / dx
@@ -1755,16 +1714,47 @@ class Fluid:
         return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)
 
     def get_particle_positions(self) -> list[list[float]]:
-        """Return particle positions for logger."""
-        return self.last_positions
+        """Return voxelized grid-based volume positions representing the water."""
+        if not self.last_positions:
+            return []
+
+        nx, ny, nz = 32, 32, 28
+        origin = [-0.075, -0.075, 0.0]
+        dx = 0.005
+
+        max_k = {}
+        for pos in self.last_positions:
+            if pos[2] >= 100.0:
+                continue
+            ix = int(math.floor((pos[0] - origin[0]) / dx))
+            iy = int(math.floor((pos[1] - origin[1]) / dx))
+            iz = int(math.floor((pos[2] - origin[2]) / dx))
+
+            if 0 <= ix < nx and 0 <= iy < ny and 0 <= iz < nz:
+                key = (ix, iy)
+                if key not in max_k or iz > max_k[key]:
+                    max_k[key] = iz
+
+        voxel_centers = []
+        for (ix, iy), k_max in max_k.items():
+            for iz in range(k_max + 1):
+                cx = origin[0] + (ix + 0.5) * dx
+                cy = origin[1] + (iy + 0.5) * dx
+                cz = origin[2] + (iz + 0.5) * dx
+                voxel_centers.append([cx, cy, cz])
+
+        self._last_voxel_count = len(voxel_centers)
+        return voxel_centers
 
     def get_particle_colors(self) -> list[list[float]]:
         """Return particle colors for logger."""
-        return [self.PARTICLE_COLOR] * self.n_particles
+        count = getattr(self, "_last_voxel_count", self.n_particles)
+        return [self.PARTICLE_COLOR] * count
 
     def get_particle_radii(self) -> list[float]:
         """Return particle radii for logger."""
-        return [self.r_s] * self.n_particles
+        count = getattr(self, "_last_voxel_count", self.n_particles)
+        return [0.0027] * count
 
     def compute_forces_jax(
         self,
