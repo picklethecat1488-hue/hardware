@@ -635,10 +635,9 @@ _weights = jnp.array(
 _opposite = jnp.array([0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13], dtype=jnp.int32)
 
 
-def _make_grid_masks(dx, origin, boundary_configs, b_pos_arr, b_orn_arr, base_idx):
+def _make_grid_masks(dx, origin, boundary_configs, b_pos_arr, b_orn_arr, base_idx, nx=32, ny=32, nz=28):
     from model import ShapeType, BoundaryType
 
-    nx, ny, nz = 32, 32, 28
     x = origin[0] + jnp.arange(nx) * dx
     y = origin[1] + jnp.arange(ny) * dx
     z = origin[2] + jnp.arange(nz) * dx
@@ -747,10 +746,11 @@ def _make_grid_masks(dx, origin, boundary_configs, b_pos_arr, b_orn_arr, base_id
     return solid_mask, tube_mask
 
 
-def _make_impeller_mask_and_vel(dx, origin, angle, omega, c_scale, boundary_configs, b_pos_arr, b_orn_arr, base_idx):
+def _make_impeller_mask_and_vel(
+    dx, origin, angle, omega, c_scale, boundary_configs, b_pos_arr, b_orn_arr, base_idx, nx=32, ny=32, nz=28
+):
     from model import ShapeType
 
-    nx, ny, nz = 32, 32, 28
     x = origin[0] + jnp.arange(nx) * dx
     y = origin[1] + jnp.arange(ny) * dx
     z = origin[2] + jnp.arange(nz) * dx
@@ -969,9 +969,8 @@ def _lbm_step_3d_full_jax(
     return f_next, u_new
 
 
-@jax.jit
-def _g2p_jax(pos, grid_u, dx, origin):
-    nx, ny, nz = 32, 32, 28
+@partial(jax.jit, static_argnums=(4, 5, 6))
+def _g2p_jax(pos, grid_u, dx, origin, nx=32, ny=32, nz=28):
     gp = (pos - origin) / dx
     idx0 = jnp.floor(gp).astype(jnp.int32)
     idx0 = jnp.clip(idx0, 0, jnp.array([nx - 2, ny - 2, nz - 2]))
@@ -1033,7 +1032,7 @@ def _lbm_step_3d_jax(grid_rho, grid_u):
     return u_new
 
 
-@partial(jax.jit, static_argnums=(6, 16))
+@partial(jax.jit, static_argnums=(6, 16, 19, 20, 21))
 def _physics_step_jax(
     pos: jnp.ndarray,
     vel: jnp.ndarray,
@@ -1054,17 +1053,17 @@ def _physics_step_jax(
     base_idx: int,
     damping: float = -1.0,
     high_damping_value: float = 0.998,
+    nx: int = 32,
+    ny: int = 32,
+    nz: int = 28,
+    dx: float = 0.005,
+    origin: jnp.ndarray = jnp.array([-0.075, -0.075, 0.0], dtype=jnp.float32),
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, float]:
     """Perform a substepped LBM-PIC simulation update integrating forces and boundary collisions."""
 
     def body_fun(i, val):
         pos_curr, vel_curr, f_curr, torque_accum = val
         t_curr = t_start + i * dt_sub
-
-        # Grid parameters for D3Q15 LBM
-        nx, ny, nz = 32, 32, 28
-        origin = jnp.array([-0.075, -0.075, 0.0], dtype=jnp.float32)
-        dx = 0.005
 
         # 1. Transform to local frame of base bowl
         base_pos = jnp.where(base_idx != -1, b_pos_arr[base_idx], jnp.zeros(3))
@@ -1077,12 +1076,14 @@ def _physics_step_jax(
         gravity_local = q_rotate(base_orn_inv, gravity)
 
         # 2. Build grid masks
-        solid_mask, tube_mask = _make_grid_masks(dx, origin, boundary_configs, b_pos_arr, b_orn_arr, base_idx)
+        solid_mask, tube_mask = _make_grid_masks(
+            dx, origin, boundary_configs, b_pos_arr, b_orn_arr, base_idx, nx, ny, nz
+        )
 
         angle = omega * t_curr
         c_scale = dt_sub / dx
         impeller_mask, imp_vx, imp_vy, imp_vz = _make_impeller_mask_and_vel(
-            dx, origin, angle, omega, c_scale, boundary_configs, b_pos_arr, b_orn_arr, base_idx
+            dx, origin, angle, omega, c_scale, boundary_configs, b_pos_arr, b_orn_arr, base_idx, nx, ny, nz
         )
 
         # 3. LBM step
@@ -1113,7 +1114,7 @@ def _physics_step_jax(
 
         # 4. G2P mapping to update particle velocities
         active_col = (pos_curr[:, 2] < 100.0)[:, None]
-        lbm_vel_local = _g2p_jax(pos_local, u_grid, dx, origin)
+        lbm_vel_local = _g2p_jax(pos_local, u_grid, dx, origin, nx, ny, nz)
         lbm_vel_local = jnp.where(active_col, lbm_vel_local / c_scale, 0.0)
 
         # Transform local particle velocity back to world frame and add base velocity
@@ -1457,6 +1458,7 @@ class Fluid:
     VISCOSITY = 0.02
     STIFFNESS = 100.0
     DEACTIVATION_BOX_FACTOR = 50.0
+    VOXEL_RADIUS_SCALE = 0.54
 
     def __init__(
         self,
@@ -1482,6 +1484,11 @@ class Fluid:
         self.spawn_buffer = config.spawn_buffer
         self.rest_density = config.rest_density
         self.viscosity = config.viscosity
+        self.nx = config.nx
+        self.ny = config.ny
+        self.nz = config.nz
+        self.dx = config.dx
+        self.origin = config.origin
 
         self.stiffness = config.stiffness
         self.k = self.stiffness
@@ -1718,9 +1725,9 @@ class Fluid:
         if not self.last_positions:
             return []
 
-        nx, ny, nz = 32, 32, 28
-        origin = [-0.075, -0.075, 0.0]
-        dx = 0.005
+        nx, ny, nz = self.nx, self.ny, self.nz
+        origin = self.origin
+        dx = self.dx
 
         max_k = {}
         for pos in self.last_positions:
@@ -1754,7 +1761,7 @@ class Fluid:
     def get_particle_radii(self) -> list[float]:
         """Return particle radii for logger."""
         count = getattr(self, "_last_voxel_count", self.n_particles)
-        return [0.0027] * count
+        return [self.dx * self.VOXEL_RADIUS_SCALE] * count
 
     def compute_forces_jax(
         self,
@@ -2110,8 +2117,7 @@ class Fluid:
         boundary_configs = tuple(b_static_list)
 
         if not hasattr(self, "f_lbm") or self.f_lbm is None:
-            nx, ny, nz = 32, 32, 28
-            self.f_lbm = jnp.zeros((15, nx, ny, nz), dtype=jnp.float32)
+            self.f_lbm = jnp.zeros((15, self.nx, self.ny, self.nz), dtype=jnp.float32)
             for i in range(15):
                 self.f_lbm = self.f_lbm.at[i].set(_weights[i] * 1.0)
 
@@ -2141,6 +2147,11 @@ class Fluid:
             self.base_idx,
             damping_val,
             self.high_damping_value,
+            self.nx,
+            self.ny,
+            self.nz,
+            self.dx,
+            jnp.array(self.origin, dtype=jnp.float32),
         )
         # Add magnetic coupling attractive drag friction torque dynamically.
         # This models the axial attraction force of the neodymium disc magnet pairs
