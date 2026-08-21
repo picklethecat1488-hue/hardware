@@ -13,6 +13,8 @@ markers = [
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
+    "ignore:.*jax-mps was built for jaxlib.*:UserWarning",
+    "ignore:.*Platform 'mps' is experimental.*:UserWarning",
 ]
 
 [tool.ruff]
