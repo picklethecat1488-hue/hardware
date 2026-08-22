@@ -3,7 +3,7 @@
 import pybullet as p
 from provider.bullet import _is_real_physics_client
 from typing import Any, Callable, cast
-from provider import Bullet, LinkType, Fluid, Simulate, URDFShape, LinkKey
+from provider import Bullet, LinkType, Fluid, Simulate, URDFShape
 from model import FluidConfig, BoundaryConfig
 
 
@@ -24,7 +24,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 elif "impeller" in link_name:
                     link_indices[LinkType.IMPELLER] = i
                 elif "drive_hub" in link_name:
-                    link_indices[LinkKey.DRIVE_HUB] = i
+                    link_indices[LinkType.DRIVE_HUB] = i
                 elif "lid" in link_name:
                     link_indices["lid"] = i
                 elif "pump_cover" in link_name:

@@ -54,7 +54,7 @@ from .types import (
 from .target_list import TargetList
 from .room import Room
 from .bullet import Bullet, LinkType
-from .fluid import Fluid, LinkKey
+from .fluid import Fluid
 from .provider_router import ProviderRouter
 from .provider_manager import ProviderManager
 from .utils import load_manifest, discover_provider
