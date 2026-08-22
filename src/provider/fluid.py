@@ -13,13 +13,6 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-# Enable JAX compilation caching globally to prevent JIT compile latency across tests, builds, and views
-_cache_dir = Path(__file__).resolve().parent.parent.parent / "build" / "jax_cache"
-jax.config.update("jax_compilation_cache_dir", str(_cache_dir))
-
-# Unset experimental and potentially unstable async dispatch on MPS backend to prevent compilation deadlocks/hangs
-if os.environ.get("JAX_MPS_ASYNC_DISPATCH") == "1":
-    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
 
 import numpy as np
 import pybullet as p
@@ -2250,6 +2243,35 @@ def build_simulation_primitives(boundaries: dict[LinkType, Any], boundary_list: 
     return primitives
 
 
+def _is_solid_vectorized(p: Any, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
+    """Vectorized check for whether coordinates lie within a solid primitive."""
+    if isinstance(p, BowlPrimitive):
+        return (x**2 + y**2 >= p.radius**2) | (z < p.z_floor)
+    elif isinstance(p, CasingWallPrimitive):
+        in_z = (p.z_min <= z) & (z <= p.z_max)
+        dist_sq = (x - p.x) ** 2 + (y - p.y) ** 2
+        in_wall = (p.r_inner**2 <= dist_sq) & (dist_sq <= p.r_outer**2)
+        in_cutout = ((z - p.z_min) < p.slot_height) & ((y - p.y) > 0.0) & (np.abs(x - p.x) < (p.slot_width / 2.0))
+        return in_z & in_wall & (~in_cutout)
+    elif isinstance(p, TubeWallPrimitive):
+        in_z = (p.z_min <= z) & (z <= p.z_max)
+        dist_sq = (x - p.x) ** 2 + (y - p.y) ** 2
+        in_wall = (p.r_inner**2 <= dist_sq) & (dist_sq <= p.r_outer**2)
+        in_cutout = ((z - p.z_min) < p.slot_height) & ((y - p.y) < 0.0) & (np.abs(x - p.x) < (p.slot_width / 2.0))
+        return in_z & in_wall & (~in_cutout)
+    elif isinstance(p, CasingLidPrimitive):
+        in_z = (p.z_min <= z) & (z <= p.z_max)
+        dist_sq = (x - p.x) ** 2 + (y - p.y) ** 2
+        in_lid = dist_sq <= p.radius**2
+        dist_snout_sq = x**2 + y**2
+        dist_tube_hole_sq = (x - p.tube_x) ** 2 + (y - p.tube_y) ** 2
+        in_cutout = (dist_snout_sq < 0.0065**2) | (dist_tube_hole_sq < p.tube_r_inner**2)
+        return in_z & in_lid & (~in_cutout)
+    else:
+        # Fallback to single element loop for custom/unknown primitives
+        return np.array([p.is_solid(xi, yi, zi) for xi, yi, zi in zip(x, y, z)])
+
+
 @dataclass(frozen=True)
 class VoxelVolumeReconstructor:
     """Reconstructs solid voxel fluid volumes from point-particle positions near boundary constraints."""
@@ -2262,18 +2284,19 @@ class VoxelVolumeReconstructor:
     iz_floor: int
     primitives: list[Any]
 
-    def reconstruct(self, positions: list[list[float]]) -> list[list[float]]:
+    def reconstruct(self, positions: Any) -> Any:
         """Map particle positions to grid and return dilated voxel centers outside solid boundaries.
 
         Args:
-            positions: List of particle coordinates.
+            positions: List or NumPy array of particle coordinates.
 
         Returns:
-            List of voxel coordinates representing the reconstructed fluid volume.
+            NumPy array of voxel coordinates representing the reconstructed fluid volume.
         """
-        if not positions:
-            return []
+        if positions is None or len(positions) == 0:
+            return np.empty((0, 3), dtype=np.float32)
 
+        pos_arr = np.asarray(positions)
         x_min = self.origin[0]
         x_max = self.origin[0] + self.nx * self.dx
         y_min = self.origin[1]
@@ -2281,40 +2304,84 @@ class VoxelVolumeReconstructor:
         z_min_bound = self.origin[2]
         z_max_bound = self.origin[2] + self.nz * self.dx
 
-        max_k = {}
-        for pos in positions:
-            if not (x_min <= pos[0] < x_max and y_min <= pos[1] < y_max and z_min_bound <= pos[2] < z_max_bound):
-                continue
-            ix = int(math.floor((pos[0] - x_min) / self.dx))
-            iy = int(math.floor((pos[1] - y_min) / self.dx))
-            iz = int(math.floor((pos[2] - z_min_bound) / self.dx))
+        # 1. Bounds check and filter valid positions
+        x = pos_arr[:, 0]
+        y = pos_arr[:, 1]
+        z = pos_arr[:, 2]
+        valid = (x >= x_min) & (x < x_max) & (y >= y_min) & (y < y_max) & (z >= z_min_bound) & (z < z_max_bound)
+        if not np.any(valid):
+            return np.empty((0, 3), dtype=np.float32)
 
-            key = (ix, iy)
-            if key not in max_k or iz > max_k[key]:
-                max_k[key] = iz
+        pos_valid = pos_arr[valid]
 
-        # Horizontally dilate occupied columns to bridge boundary gaps
-        dilated_max_k = {}
-        for (ix, iy), k_max in max_k.items():
-            for dx_i in [-1, 0, 1]:
-                for dy_i in [-1, 0, 1]:
-                    nx_i, ny_i = ix + dx_i, iy + dy_i
-                    if 0 <= nx_i < self.nx and 0 <= ny_i < self.ny:
-                        dilated_max_k[(nx_i, ny_i)] = max(dilated_max_k.get((nx_i, ny_i), 0), k_max)
+        # 2. Grid index mapping
+        ixs = np.floor((pos_valid[:, 0] - x_min) / self.dx).astype(np.int32)
+        iys = np.floor((pos_valid[:, 1] - y_min) / self.dx).astype(np.int32)
+        izs = np.floor((pos_valid[:, 2] - z_min_bound) / self.dx).astype(np.int32)
 
-        voxel_centers = []
-        for (ix, iy), k_max in dilated_max_k.items():
-            start_iz = min(k_max, self.iz_floor)
-            for iz in range(start_iz, k_max + 1):
-                cx = self.origin[0] + (ix + 0.5) * self.dx
-                cy = self.origin[1] + (iy + 0.5) * self.dx
-                cz = self.origin[2] + (iz + 0.5) * self.dx
+        # 3. Compute max z per (ix, iy) column
+        grid_max_z = np.full((self.nx, self.ny), -1, dtype=np.int32)
+        np.maximum.at(grid_max_z, (ixs, iys), izs)
 
-                # Check solid primitives
-                if not any(p.is_solid(cx, cy, cz) for p in self.primitives):
-                    voxel_centers.append([cx, cy, cz])
+        # 4. Dilate occupied columns horizontally using vectorized shifts
+        dilated = grid_max_z.copy()
+        for dx_i in [-1, 0, 1]:
+            for dy_i in [-1, 0, 1]:
+                if dx_i == 0 and dy_i == 0:
+                    continue
+                shifted = np.full_like(grid_max_z, -1)
+                src_x_start = max(0, -dx_i)
+                src_x_end = self.nx - max(0, dx_i)
+                dst_x_start = max(0, dx_i)
+                dst_x_end = self.nx - max(0, -dx_i)
 
-        return voxel_centers
+                src_y_start = max(0, -dy_i)
+                src_y_end = self.ny - max(0, dy_i)
+                dst_y_start = max(0, dy_i)
+                dst_y_end = self.ny - max(0, -dy_i)
+
+                shifted[dst_x_start:dst_x_end, dst_y_start:dst_y_end] = grid_max_z[
+                    src_x_start:src_x_end, src_y_start:src_y_end
+                ]
+                np.maximum(dilated, shifted, out=dilated)
+
+        # 5. Reconstruct candidate voxel coordinates vectorially
+        occupied_ix, occupied_iy = np.where(dilated >= 0)
+        if len(occupied_ix) == 0:
+            return np.empty((0, 3), dtype=np.float32)
+
+        k_maxs = dilated[occupied_ix, occupied_iy]
+        start_zs = np.minimum(k_maxs, self.iz_floor)
+        end_zs = k_maxs + 1
+        counts = end_zs - start_zs
+        total_voxels = np.sum(counts)
+
+        if total_voxels == 0:
+            return np.empty((0, 3), dtype=np.float32)
+
+        col_indices = np.repeat(np.arange(len(occupied_ix)), counts)
+        ixs_cand = occupied_ix[col_indices]
+        iys_cand = occupied_iy[col_indices]
+
+        # Generate run-length range array for Z grid layers
+        offsets = np.arange(total_voxels) - np.repeat(np.cumsum(counts) - counts, counts)
+        izs_cand = np.repeat(start_zs, counts) + offsets
+
+        cx = self.origin[0] + (ixs_cand + 0.5) * self.dx
+        cy = self.origin[1] + (iys_cand + 0.5) * self.dx
+        cz = self.origin[2] + (izs_cand + 0.5) * self.dx
+
+        # 6. Check solid primitives vectorially
+        is_solid = np.zeros(total_voxels, dtype=bool)
+        for p in self.primitives:
+            is_solid |= _is_solid_vectorized(p, cx, cy, cz)
+
+        # Keep voxels that are outside solid boundaries
+        non_solid = ~is_solid
+        if not np.any(non_solid):
+            return np.empty((0, 3), dtype=np.float32)
+
+        return np.column_stack((cx[non_solid], cy[non_solid], cz[non_solid]))
 
 
 @dataclass(frozen=True)
@@ -2337,14 +2404,14 @@ class FluidPostProcessor:
         z_offset = base_info.xyz[2] if (base_info is not None and base_info.xyz is not None) else 0.0
         return max(0, int(math.floor((z_offset - self.origin[2]) / self.dx)))
 
-    def process_voxels(self, positions: list[list[float]]) -> list[list[float]]:
+    def process_voxels(self, positions: Any) -> Any:
         """Run volume reconstruction to generate dense water voxels without boundary gaps.
 
         Args:
             positions: Current particle positions.
 
         Returns:
-            List of voxel coordinates representing the reconstructed fluid volume.
+            NumPy array of voxel coordinates representing the reconstructed fluid volume.
         """
         primitives = build_simulation_primitives(self.boundaries, self.boundary_list)
         reconstructor = VoxelVolumeReconstructor(
@@ -2644,14 +2711,14 @@ class Fluid:
             return p.multiplyTransforms(base_pos, base_orn, inv_inertia_pos, inv_inertia_orn)
         return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)
 
-    def get_particle_positions(self) -> list[list[float]]:
+    def get_particle_positions(self) -> Any:
         """Return voxelized grid-based volume positions representing the water.
 
         Returns:
-            List of voxel coordinates representing the reconstructed fluid volume.
+            NumPy array of voxel coordinates representing the reconstructed fluid volume.
         """
-        if not self.last_positions:
-            return []
+        if self.last_positions is None or len(self.last_positions) == 0:
+            return np.empty((0, 3), dtype=np.float32)
         voxel_centers = self.post_processor.process_voxels(self.last_positions)
         self._last_voxel_count = len(voxel_centers)
         return voxel_centers
@@ -3092,8 +3159,7 @@ class Fluid:
                             else:
                                 print(f"⚠️ {msg}")
 
-        self.last_positions = self.pos_jax.tolist()
-
+        self.last_positions = np.asarray(self.pos_jax)
         positions = self.last_positions
         pos_np = np.array(positions)
         if len(pos_np) > 0:
@@ -3161,7 +3227,7 @@ class Fluid:
                         vel_arr[idx] = [0.0, 0.0, 0.0]
                 self.pos_jax = jnp.array(pos_arr)
                 self.vel_jax = jnp.array(vel_arr)
-                self.last_positions = self.pos_jax.tolist()
+                self.last_positions = np.asarray(self.pos_jax)
 
         if self.state_tracker is not None:
             self.state_tracker.particle_positions = self.get_particle_positions()

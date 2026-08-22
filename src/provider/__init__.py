@@ -26,6 +26,21 @@ if env_file.exists():
 warnings.filterwarnings("ignore", category=UserWarning, message=".*jax-mps was built for jaxlib.*")
 warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps' is experimental.*")
 
+import jax
+import logging
+
+# Enable JAX compilation caching globally to prevent JIT compile latency across tests, builds, and views
+_cache_dir = Path(__file__).resolve().parents[2] / "build" / "jax_cache"
+jax.config.update("jax_compilation_cache_dir", str(_cache_dir))
+jax.config.update("jax_log_compiles", True)
+jax.config.update("jax_explain_cache_misses", True)
+
+logging.getLogger("jax").setLevel(logging.INFO)
+
+# Unset experimental and potentially unstable async dispatch on MPS backend to prevent compilation deadlocks/hangs
+if os.environ.get("JAX_MPS_ASYNC_DISPATCH") == "1":
+    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
+
 import OCP.TopoDS  # type: ignore
 
 # Monkey-patch TopoDS_Shape to resolve Pydantic validation errors.
