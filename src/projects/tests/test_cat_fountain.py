@@ -700,16 +700,31 @@ class TestCatFountainProvider:
             ):
                 # Define sample boundaries with new schema
                 boundaries = {
-                    "bowl": {"xyz": [0.0, 0.0, 0.003], "height": 0.010, "radius": 0.080},
+                    "bowl": {
+                        "shape": "cylinder",
+                        "type": "cavity",
+                        "xyz": [0.0, 0.0, 0.003],
+                        "height": 0.010,
+                        "radius": 0.080,
+                    },
                     "lid": [
                         {
+                            "shape": "cylinder",
+                            "type": "solid",
                             "xyz": [0.0, 0.0, 0.016],
                             "height": 0.010,
                             "radius": 0.080,
                             "has_drain": True,
                             "has_tube": True,
                         },
-                        {"xyz": [0.0, 0.0, 0.016], "height": 0.010, "radius": 0.013, "has_tube": True},
+                        {
+                            "shape": "cylinder",
+                            "type": "solid",
+                            "xyz": [0.0, 0.0, 0.016],
+                            "height": 0.010,
+                            "radius": 0.013,
+                            "has_tube": True,
+                        },
                     ],
                 }
 
