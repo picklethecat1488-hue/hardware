@@ -235,8 +235,8 @@ def get_args():
 
 def main():
     """Build and show the requested geometry in ocp_vscode."""
-    # Enable experimental async dispatch for MPS backend (can be much faster on Apple Silicon)
-    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "1"
+    # Disable experimental async dispatch for MPS backend to prevent deadlocks/hangs
+    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
     try:
         import jax
 

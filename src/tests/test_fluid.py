@@ -997,3 +997,50 @@ def test_physics_step_casing_suction_sad():
     # Since the particle is far from the casing center, suction acceleration should be zero,
     # and since gravity is also zero, vel_next should remain zero.
     assert jnp.allclose(vel_next, 0.0, atol=1e-5)
+
+
+def test_voxel_primitive_cutouts():
+    """Verify that TubeWallPrimitive and CasingWallPrimitive cutouts are computed correctly."""
+    from provider.fluid import CasingWallPrimitive, TubeWallPrimitive
+
+    # CasingWallPrimitive: centered at (0, 0), r_inner=18mm, r_outer=28mm, z_min=0, z_max=0.010
+    # Cutout should be at y > 0, |x| < slot_width/2, z < slot_height
+    casing = CasingWallPrimitive(
+        x=0.0,
+        y=0.0,
+        r_inner=0.018,
+        r_outer=0.028,
+        z_min=0.0,
+        z_max=0.010,
+        slot_height=0.009,
+        slot_width=0.008,
+    )
+
+    # A point inside the solid casing wall but not in the cutout
+    assert casing.is_solid(0.0, -0.023, 0.005) is True  # y < 0
+    assert casing.is_solid(0.023, 0.0, 0.005) is True  # x > slot_width/2
+    assert casing.is_solid(0.0, 0.023, 0.0095) is True  # z > slot_height
+
+    # A point inside the cutout connection (should NOT be solid)
+    assert casing.is_solid(0.0, 0.023, 0.005) is False
+
+    # TubeWallPrimitive: centered at (0, 0.028), r_inner=8mm, r_outer=18mm, z_min=0, z_max=0.120
+    # Cutout should be at y < self.y (facing the casing), |x - self.x| < slot_width/2, z < slot_height
+    tube = TubeWallPrimitive(
+        x=0.0,
+        y=0.028,
+        r_inner=0.008,
+        r_outer=0.018,
+        z_min=0.0,
+        z_max=0.120,
+        slot_height=0.009,
+        slot_width=0.008,
+    )
+
+    # A point inside the solid tube wall but not in the cutout
+    assert tube.is_solid(0.0, 0.028 + 0.013, 0.005) is True  # y > self.y (wrong side)
+    assert tube.is_solid(0.013, 0.028, 0.005) is True  # x > slot_width/2
+    assert tube.is_solid(0.0, 0.028 - 0.013, 0.0095) is True  # z > slot_height
+
+    # A point inside the cutout connection (should NOT be solid)
+    assert tube.is_solid(0.0, 0.028 - 0.013, 0.005) is False

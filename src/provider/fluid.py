@@ -8,8 +8,19 @@ from enum import Enum, IntEnum
 import random
 from typing import Any, Optional, cast, TYPE_CHECKING, NamedTuple
 from pydantic import BaseModel, Field
+import os
+from pathlib import Path
 import jax
 import jax.numpy as jnp
+
+# Enable JAX compilation caching globally to prevent JIT compile latency across tests, builds, and views
+_cache_dir = Path(__file__).resolve().parent.parent.parent / "build" / "jax_cache"
+jax.config.update("jax_compilation_cache_dir", str(_cache_dir))
+
+# Unset experimental and potentially unstable async dispatch on MPS backend to prevent compilation deadlocks/hangs
+if os.environ.get("JAX_MPS_ASYNC_DISPATCH") == "1":
+    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
+
 import numpy as np
 import pybullet as p
 from scipy.spatial import cKDTree  # type: ignore
@@ -333,7 +344,7 @@ def _boundary_force_cylinder_jax(
     # 2. Cavity bottom
     z_limit_c = z_offset + r_s
     pen_c_bottom = z_limit_c - pos_local[:, 2]
-    bottom_limit = z_offset - jnp.maximum(thickness, 0.002)
+    bottom_limit = z_offset - jnp.maximum(thickness, 0.020)
 
     in_tube_hole = has_tube & (pos_local[:, 0] ** 2 + (pos_local[:, 1] - local_tube_y) ** 2 < tube_radius**2)
     in_drain_hole = (
@@ -1193,8 +1204,9 @@ def _lbm_step_3d_full_jax(
         # Add virtual pump force in the tube area
         g_lat_cell = g_lat
         if tube_mask is not None:
-            # Add an upward acceleration (pressure head) of 0.05 in lattice units inside the tube
-            g_lat_cell = jnp.where(tube_mask[..., None], jnp.array([0.0, 0.0, 0.06]), g_lat)
+            # Add an upward acceleration (pressure head) inside the tube derived dynamically from the pump flow velocity
+            g_pump = jnp.where(jnp.abs(tube_uz) > 1e-6, 2.0 * jnp.abs(tube_uz), g_lat[2])
+            g_lat_cell = jnp.where(tube_mask[..., None], jnp.array([0.0, 0.0, g_pump]), g_lat)
         ei_g = ei[0] * g_lat_cell[..., 0] + ei[1] * g_lat_cell[..., 1] + ei[2] * g_lat_cell[..., 2]
         force_i = w * rho * 3.0 * ei_g
 
@@ -2028,6 +2040,8 @@ class CasingWallPrimitive:
     r_outer: float
     z_min: float
     z_max: float
+    slot_height: float
+    slot_width: float
 
     def is_solid(self, x: float, y: float, z: float) -> bool:
         """Check if a coordinate lies inside the solid pump casing wall.
@@ -2043,7 +2057,12 @@ class CasingWallPrimitive:
         if not (self.z_min <= z <= self.z_max):
             return False
         dist_sq = (x - self.x) ** 2 + (y - self.y) ** 2
-        return self.r_inner**2 <= dist_sq <= self.r_outer**2
+        if self.r_inner**2 <= dist_sq <= self.r_outer**2:
+            # Cutout for outlet connection to the tube (faces y > self.y, i.e., y > 0.0)
+            if (z - self.z_min) < self.slot_height and (y - self.y) > 0.0 and abs(x - self.x) < (self.slot_width / 2.0):
+                return False
+            return True
+        return False
 
 
 @dataclass(frozen=True)
@@ -2056,6 +2075,8 @@ class TubeWallPrimitive:
     r_outer: float
     z_min: float
     z_max: float
+    slot_height: float
+    slot_width: float
 
     def is_solid(self, x: float, y: float, z: float) -> bool:
         """Check if a coordinate lies inside the solid tube wall (excluding bottom slot connection).
@@ -2072,7 +2093,8 @@ class TubeWallPrimitive:
             return False
         dist_sq = (x - self.x) ** 2 + (y - self.y) ** 2
         if self.r_inner**2 <= dist_sq <= self.r_outer**2:
-            if (z - self.z_min) < 0.009 and y > self.y and abs(x) < 0.004:
+            # Cutout for inlet connection from the casing (faces y < self.y, i.e., y < 0.028)
+            if (z - self.z_min) < self.slot_height and (y - self.y) < 0.0 and abs(x - self.x) < (self.slot_width / 2.0):
                 return False
             return True
         return False
@@ -2137,6 +2159,7 @@ def build_simulation_primitives(boundaries: dict[LinkType, Any], boundary_list: 
 
     # 2. Casing
     casing_x, casing_y, casing_r, casing_thick, casing_h, casing_ceiling_thick = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    casing_slot_h, casing_slot_w = 0.0, 0.0
     for b in boundary_list:
         if b.shape == ShapeType.CASING:
             if b.xyz is not None:
@@ -2144,7 +2167,14 @@ def build_simulation_primitives(boundaries: dict[LinkType, Any], boundary_list: 
             casing_r = b.radius
             casing_thick = b.thickness
             casing_h = b.height
-            casing_ceiling_thick = getattr(b, "ceiling_thickness", 0.002)
+            casing_ceiling_thick = getattr(b, "ceiling_thickness", 0.0)
+            casing_slot_h = getattr(b, "slot_height", 0.0)
+            casing_slot_w = getattr(b, "slot_width", 0.0)
+            if casing_slot_h <= 0.0 or casing_slot_w <= 0.0 or casing_ceiling_thick <= 0.0:
+                raise ValueError(
+                    f"Casing slot_height ({casing_slot_h}), slot_width ({casing_slot_w}), "
+                    f"and ceiling_thickness ({casing_ceiling_thick}) must be defined and greater than zero."
+                )
             break
 
     if casing_r > 0.0:
@@ -2156,11 +2186,14 @@ def build_simulation_primitives(boundaries: dict[LinkType, Any], boundary_list: 
                 r_outer=casing_r,
                 z_min=z_floor,
                 z_max=z_floor + casing_h,
+                slot_height=casing_slot_h,
+                slot_width=casing_slot_w,
             )
         )
 
     # 3. Tube
     tube_x, tube_y, tube_r, tube_thick, tube_h = 0.0, 0.0, 0.0, 0.0, 0.0
+    tube_slot_h, tube_slot_w = 0.0, 0.0
     for b in boundary_list:
         if b.link_type == LinkType.TUBE:
             if b.xyz is not None:
@@ -2168,6 +2201,13 @@ def build_simulation_primitives(boundaries: dict[LinkType, Any], boundary_list: 
             tube_r = b.radius
             tube_thick = b.thickness
             tube_h = b.height
+            tube_slot_h = getattr(b, "slot_height", 0.0)
+            tube_slot_w = getattr(b, "slot_width", 0.0)
+            if tube_slot_h <= 0.0 or tube_slot_w <= 0.0:
+                raise ValueError(
+                    f"Tube slot_height ({tube_slot_h}) and slot_width ({tube_slot_w}) "
+                    f"must be defined and greater than zero."
+                )
             break
 
     if tube_r > 0.0:
@@ -2179,6 +2219,8 @@ def build_simulation_primitives(boundaries: dict[LinkType, Any], boundary_list: 
                 r_outer=tube_r,
                 z_min=z_floor,
                 z_max=z_floor + tube_h,
+                slot_height=tube_slot_h,
+                slot_width=tube_slot_w,
             )
         )
 
@@ -2904,6 +2946,7 @@ class Fluid:
                 impeller_b.target_omega = omega
             else:
                 omega = 0.0
+                impeller_b.target_omega = 0.0
 
             if max_force is not None:
                 impeller_b.max_force = max_force
@@ -3067,14 +3110,35 @@ class Fluid:
             if len(spout_indices) > 0:
                 self.spout_water_ids.add_multiple(spout_indices)
 
-            # Fallen indices
-            z_min = self.origin[2]
-            z_max = self.origin[2] + self.nz * self.dx + 0.020
+            # Fallen indices computed dynamically from boundary element locations in world frame
+            z_min = float("inf")
+            z_max = float("-inf")
+            for i, b in enumerate(self.boundary_list):
+                z_start = b_pos_list[i][2] + getattr(b, "z_offset", 0.0)
+                thickness = getattr(b, "thickness", 0.0)
+                bottom = z_start - thickness
+                height = getattr(b, "height", 0.0)
+                if not math.isfinite(height):
+                    height = 0.5
+                top = z_start + height
+                if bottom < z_min:
+                    z_min = bottom
+                if top > z_max:
+                    z_max = top
+
+            # Apply buffers to allow physical oscillations/boundary penetration
+            z_min -= 0.010
+            z_max += 0.020
+
             fallen_indices = np.where(
                 active_mask & ((zs < z_min) | (zs > z_max) | (xs**2 + ys**2 > (self.radii[LinkType.FALLEN]) ** 2))
             )[0]
 
             if len(fallen_indices) > 0:
+                print(f"DEBUG: z_min={z_min}, z_max={z_max}, fallen_count={len(fallen_indices)}")
+                pos_arr_tmp = np.array(self.pos_jax)
+                for idx in fallen_indices[:5]:
+                    print(f"DEBUG: fallen particle {idx} pos={pos_arr_tmp[idx]}")
                 pos_arr = np.array(self.pos_jax)
                 vel_arr = np.array(self.vel_jax)
                 self.total_fallen_water_ids.add_multiple(fallen_indices)
