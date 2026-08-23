@@ -27,7 +27,7 @@ lid_step_width: 2.0
 spout_angle: 45.0
 spout_length: 30.0
 spout_deflection_height: 0.0
-spout_deflection_radius: 13.0
+spout_deflection_radius: 30.0
 spout_deflection_thickness: 40.0
 spout_deflection_z_offset: 16.0
 lid_cutout_radius: 55.0
@@ -53,8 +53,10 @@ impeller_sleeve_height: 4.0
 impeller_blades: 6
 impeller_clearance: 0.4
 vane_twist: -15.0
-motor_target: 200.0
+motor_target: 130.0
 motor_power: 15.0
+stiffness_boundary: 5000.0
+damping_boundary: 15.0
 
 # ==========================================
 # 5. Motor, Central Boss & Fasteners

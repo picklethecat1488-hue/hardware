@@ -25,6 +25,8 @@ class LinkType(IntEnum):
     OUTLET_MAX_Y = -3
     LID = 3
     DRIVE_HUB = 4
+    PUMP_COVER = 5
+    CASING = 6
 
 
 def _is_real_physics_client(physics_client: Any) -> bool:

@@ -21,7 +21,7 @@ import numpy as np
 import pybullet as p
 from scipy.spatial import cKDTree  # type: ignore
 
-from provider.types import CollisionGroup, CollisionMask, URDFShape
+from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFBoundaryType
 from provider.room import BulletStateTracker
 from provider.bullet import LinkType, _is_real_physics_client
 
@@ -892,16 +892,15 @@ def _grid_mask_tube_jax(
     slot_width: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Compute grid solid mask and interior fluid mask for a tube boundary."""
-    r_outer = radius + thickness
-    r_inner = radius
+    r_outer = radius
+    r_inner = radius - thickness
     is_solid = (rb_sq >= r_inner**2) & (rb_sq <= r_outer**2) & (zb_loc >= 0.0) & (zb_loc <= height)
 
     half_width = slot_width / 2.0
     is_cutout = (zb_loc < slot_height) & (yb_loc > 0.0) & (jnp.abs(xb_loc) < half_width)
     is_solid = jnp.where(slot_height > 0.0, is_solid & (~is_cutout), is_solid)
 
-    r_int = radius - thickness
-    is_tube_mask = (rb_sq < r_int**2) & (zb_loc >= 0.0) & (zb_loc <= height)
+    is_tube_mask = (rb_sq < r_inner**2) & (zb_loc >= 0.0) & (zb_loc <= height)
     tube_mask = jnp.where(height > 0.05, is_tube_mask, jnp.zeros_like(rb_sq, dtype=jnp.bool_))
 
     return is_solid, tube_mask
@@ -1068,7 +1067,7 @@ def _make_grid_masks(
     # Clear solid mask inside the tube passage to prevent blockage at the casing/tube connection
     has_tube_bound, tube_xb, tube_yb, tube_rb = tube_params
 
-    in_tube_interior = ((X - tube_xb) ** 2 + (Y - tube_yb) ** 2 < (tube_rb - 0.001) ** 2) & (Z > 0.045)
+    in_tube_interior = ((X - tube_xb) ** 2 + (Y - tube_yb) ** 2 < tube_rb**2) & (Z > 0.045)
     solid_mask = jnp.where(has_tube_bound, solid_mask & (~in_tube_interior), solid_mask)
 
     return solid_mask, tube_mask
@@ -2340,7 +2339,7 @@ def build_simulation_primitives(boundaries: dict[LinkType, Any], boundary_list: 
             drain_r = getattr(b, "drain_hole_radius", 0.0)
         elif (
             b.link_type == LinkType.LID
-            and getattr(b, "type", None) == BoundaryType.CAVITY
+            and getattr(b, "type", None) == URDFBoundaryType.CAVITY
             and getattr(b, "has_tube", False)
             and getattr(b, "has_drain", False) is False
         ):
@@ -2466,42 +2465,59 @@ class VoxelVolumeReconstructor:
         iz_lid_floor = (
             int(np.floor((lid_prim.z_floor - z_min_bound) / self.dx)) if lid_prim is not None else self.nz + 1
         )
+        iz_lid_pocket_top = (
+            int(np.floor((lid_prim.z_top - z_min_bound) / self.dx)) if lid_prim is not None else self.nz + 1
+        )
 
-        cand_list_x = [ixs]
-        cand_list_y = [iys]
-        cand_list_z = [izs]
+        casing_prim = next((p for p in self.primitives if isinstance(p, CasingWallPrimitive)), None)
+        tube_prim = next((p for p in self.primitives if isinstance(p, TubeWallPrimitive)), None)
+        tube_xb = tube_prim.x if tube_prim is not None else 0.0
+        tube_yb = tube_prim.y if tube_prim is not None else 0.028
+        tube_rb = tube_prim.r_outer if tube_prim is not None else 0.008
+        casing_rb = casing_prim.r_outer if casing_prim is not None else 0.028
 
-        # Lower reservoir columns
-        res_mask = izs < iz_lid_floor
-        if np.any(res_mask):
+        # 3D neighborhood dilation around every particle (spherical 3D kernel)
+        d_offsets = np.array(
+            [
+                (d_x, d_y, d_z)
+                for d_x in [-1, 0, 1]
+                for d_y in [-1, 0, 1]
+                for d_z in [-1, 0, 1]
+                if d_x**2 + d_y**2 + d_z**2 <= 2
+            ],
+            dtype=np.int32,
+        )
+
+        dilated_3d_x = (ixs[:, None] + d_offsets[:, 0]).ravel()
+        dilated_3d_y = (iys[:, None] + d_offsets[:, 1]).ravel()
+        dilated_3d_z = (izs[:, None] + d_offsets[:, 2]).ravel()
+
+        # Clip to valid grid bounds
+        valid_3d = (
+            (dilated_3d_x >= 0)
+            & (dilated_3d_x < self.nx)
+            & (dilated_3d_y >= 0)
+            & (dilated_3d_y < self.ny)
+            & (dilated_3d_z >= 0)
+            & (dilated_3d_z < self.nz)
+        )
+        cand_list_x = [dilated_3d_x[valid_3d]]
+        cand_list_y = [dilated_3d_y[valid_3d]]
+        cand_list_z = [dilated_3d_z[valid_3d]]
+
+        # Lower reservoir pooled columns: only fill downward for particles in the quiescent pool
+        # (below casing top / reservoir surface, outside the tube passage)
+        iz_res_pool_top = self.iz_floor + max(1, int(round(0.020 / self.dx)))
+        dist_tube_sq = (pos_valid[:, 0] - tube_xb) ** 2 + (pos_valid[:, 1] - tube_yb) ** 2
+        res_pool_mask = (izs < iz_res_pool_top) & (dist_tube_sq >= (tube_rb + 0.002) ** 2)
+
+        if np.any(res_pool_mask):
             grid_max_z_res = np.full((self.nx, self.ny), -1, dtype=np.int32)
-            np.maximum.at(grid_max_z_res, (ixs[res_mask], iys[res_mask]), izs[res_mask])
+            np.maximum.at(grid_max_z_res, (ixs[res_pool_mask], iys[res_pool_mask]), izs[res_pool_mask])
 
-            # Dilate reservoir occupied columns horizontally
-            dilated_res = grid_max_z_res.copy()
-            for dx_i in [-1, 0, 1]:
-                for dy_i in [-1, 0, 1]:
-                    if dx_i == 0 and dy_i == 0:
-                        continue
-                    shifted = np.full_like(grid_max_z_res, -1)
-                    src_x_start = max(0, -dx_i)
-                    src_x_end = self.nx - max(0, dx_i)
-                    dst_x_start = max(0, dx_i)
-                    dst_x_end = self.nx - max(0, -dx_i)
-
-                    src_y_start = max(0, -dy_i)
-                    src_y_end = self.ny - max(0, dy_i)
-                    dst_y_start = max(0, dy_i)
-                    dst_y_end = self.ny - max(0, -dy_i)
-
-                    shifted[dst_x_start:dst_x_end, dst_y_start:dst_y_end] = grid_max_z_res[
-                        src_x_start:src_x_end, src_y_start:src_y_end
-                    ]
-                    np.maximum(dilated_res, shifted, out=dilated_res)
-
-            occ_res_x, occ_res_y = np.where(dilated_res >= 0)
+            occ_res_x, occ_res_y = np.where(grid_max_z_res >= 0)
             if len(occ_res_x) > 0:
-                k_maxs_res = dilated_res[occ_res_x, occ_res_y]
+                k_maxs_res = grid_max_z_res[occ_res_x, occ_res_y]
                 start_zs_res = np.minimum(k_maxs_res, self.iz_floor)
                 end_zs_res = k_maxs_res + 1
                 counts_res = end_zs_res - start_zs_res
@@ -2513,37 +2529,15 @@ class VoxelVolumeReconstructor:
                     offsets_res = np.arange(tot_res) - np.repeat(np.cumsum(counts_res) - counts_res, counts_res)
                     cand_list_z.append(np.repeat(start_zs_res, counts_res) + offsets_res)
 
-        # Lid surface columns
-        lid_mask = izs >= iz_lid_floor
-        if np.any(lid_mask):
+        # Lid surface pooled columns: only fill downward for particles shallowly pooled in the lid pocket
+        lid_pool_mask = (izs >= iz_lid_floor) & (izs <= iz_lid_pocket_top)
+        if np.any(lid_pool_mask):
             grid_max_z_lid = np.full((self.nx, self.ny), -1, dtype=np.int32)
-            np.maximum.at(grid_max_z_lid, (ixs[lid_mask], iys[lid_mask]), izs[lid_mask])
+            np.maximum.at(grid_max_z_lid, (ixs[lid_pool_mask], iys[lid_pool_mask]), izs[lid_pool_mask])
 
-            # Dilate lid occupied columns horizontally
-            dilated_lid = grid_max_z_lid.copy()
-            for dx_i in [-1, 0, 1]:
-                for dy_i in [-1, 0, 1]:
-                    if dx_i == 0 and dy_i == 0:
-                        continue
-                    shifted = np.full_like(grid_max_z_lid, -1)
-                    src_x_start = max(0, -dx_i)
-                    src_x_end = self.nx - max(0, dx_i)
-                    dst_x_start = max(0, dx_i)
-                    dst_x_end = self.nx - max(0, -dx_i)
-
-                    src_y_start = max(0, -dy_i)
-                    src_y_end = self.ny - max(0, dy_i)
-                    dst_y_start = max(0, dy_i)
-                    dst_y_end = self.ny - max(0, -dy_i)
-
-                    shifted[dst_x_start:dst_x_end, dst_y_start:dst_y_end] = grid_max_z_lid[
-                        src_x_start:src_x_end, src_y_start:src_y_end
-                    ]
-                    np.maximum(dilated_lid, shifted, out=dilated_lid)
-
-            occ_lid_x, occ_lid_y = np.where(dilated_lid >= 0)
+            occ_lid_x, occ_lid_y = np.where(grid_max_z_lid >= 0)
             if len(occ_lid_x) > 0:
-                k_maxs_lid = dilated_lid[occ_lid_x, occ_lid_y]
+                k_maxs_lid = grid_max_z_lid[occ_lid_x, occ_lid_y]
                 start_zs_lid = np.full_like(k_maxs_lid, iz_lid_floor)
                 end_zs_lid = k_maxs_lid + 1
                 counts_lid = np.maximum(0, end_zs_lid - start_zs_lid)

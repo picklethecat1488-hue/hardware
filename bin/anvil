@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Helper script for remote execution and synchronization with cloud server anvil
+# Usage:
+#   bin/anvil sync                 # Sync local workspace to anvil
+#   bin/anvil smoke                # Sync and run smoke tests on anvil
+#   bin/anvil pytest [args...]     # Sync and run pytest on anvil
+#   bin/anvil run <command...>     # Sync and run arbitrary command on anvil
+# ==============================================================================
+
+set -e
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REMOTE_HOST="anvil"
+REMOTE_DIR="/home/ubuntu/hardware"
+REMOTE_PYTHON="/home/ubuntu/miniforge3/envs/cq/bin/python"
+REMOTE_PYTEST="/home/ubuntu/miniforge3/envs/cq/bin/pytest"
+
+sync_code() {
+    echo "📦 Syncing repository to ${REMOTE_HOST}:${REMOTE_DIR}..."
+    rsync -az --delete \
+        --exclude '.git' \
+        --exclude 'build' \
+        --exclude 'build_temp' \
+        --exclude 'build_test_tmp' \
+        --exclude 'tmp' \
+        --exclude '__pycache__' \
+        --exclude '*.pyc' \
+        --exclude '.pytest_cache' \
+        --exclude '.ruff_cache' \
+        "${REPO_DIR}/" "${REMOTE_HOST}:${REMOTE_DIR}/"
+}
+
+case "$1" in
+    sync)
+        sync_code
+        echo "✅ Sync complete."
+        ;;
+    smoke)
+        sync_code
+        echo "🚀 Running smoke test suite on ${REMOTE_HOST}..."
+        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_PYTEST} src/smoke.py"
+        ;;
+    pytest)
+        shift
+        sync_code
+        echo "🧪 Running pytest on ${REMOTE_HOST}..."
+        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_PYTEST} $*"
+        ;;
+    run|exec)
+        shift
+        sync_code
+        echo "⚡ Executing command on ${REMOTE_HOST}: $*"
+        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && $*"
+        ;;
+    *)
+        if [ $# -eq 0 ]; then
+            echo "Usage: bin/anvil {sync|smoke|pytest|run} [args...]"
+            exit 1
+        fi
+        sync_code
+        echo "⚡ Executing command on ${REMOTE_HOST}: $*"
+        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && $*"
+        ;;
+esac

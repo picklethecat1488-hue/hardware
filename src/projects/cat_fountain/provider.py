@@ -581,7 +581,7 @@ class CatFountainProvider(Provider):
                     )
                 URDFBoundary(
                     casing_geom,
-                    link_type=LinkType.LID,  # Map to LID to avoid overwriting BASE or TUBE slots in Fluid boundaries dict
+                    link_type=LinkType.CASING,
                     shape=ShapeType.CASING,
                     type=BoundaryType.SOLID_CAVITY,
                     radius=0.028,
@@ -915,8 +915,6 @@ class CatFountainProvider(Provider):
                 thickness=self.settings.spout_deflection_thickness * 0.001,
                 xyz=(0.0, tube_y * 0.001, dome_top_z * 0.001),
                 rpy=(math.pi, 0.0, 0.0),
-                has_tube=True,
-                tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             )
 
             URDFBoundary(
@@ -1070,7 +1068,7 @@ class CatFountainProvider(Provider):
                 # Flat cover plate boundary (positioned at the mount joint Z_world = 49.5 mm)
                 URDFBoundary(
                     cover,
-                    link_type=LinkType.LID,
+                    link_type=LinkType.PUMP_COVER,
                     shape=ShapeType.CYLINDER,
                     type=BoundaryType.CAVITY,
                     radius=cover_r * 0.001,
