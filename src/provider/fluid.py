@@ -1510,7 +1510,7 @@ def _compute_particle_forces_subroutine(
     )
 
     b_accel = b_forces / mass
-    max_b_accel = 1000.0
+    max_b_accel = 2500.0
     b_accel_mags = jnp.linalg.norm(b_accel, axis=1, keepdims=True)
     b_accel_mags_safe = jnp.maximum(b_accel_mags, 1e-8)
     b_accel_clamped = b_accel * jnp.minimum(max_b_accel / b_accel_mags_safe, 1.0)
@@ -2460,23 +2460,7 @@ class VoxelVolumeReconstructor:
         iys = np.floor((pos_valid[:, 1] - y_min) / self.dx).astype(np.int32)
         izs = np.floor((pos_valid[:, 2] - z_min_bound) / self.dx).astype(np.int32)
 
-        # 3. Find lid primitive if present to determine multi-level separation
-        lid_prim = next((p for p in self.primitives if isinstance(p, LidPrimitive)), None)
-        iz_lid_floor = (
-            int(np.floor((lid_prim.z_floor - z_min_bound) / self.dx)) if lid_prim is not None else self.nz + 1
-        )
-        iz_lid_pocket_top = (
-            int(np.floor((lid_prim.z_top - z_min_bound) / self.dx)) if lid_prim is not None else self.nz + 1
-        )
-
-        casing_prim = next((p for p in self.primitives if isinstance(p, CasingWallPrimitive)), None)
-        tube_prim = next((p for p in self.primitives if isinstance(p, TubeWallPrimitive)), None)
-        tube_xb = tube_prim.x if tube_prim is not None else 0.0
-        tube_yb = tube_prim.y if tube_prim is not None else 0.028
-        tube_rb = tube_prim.r_outer if tube_prim is not None else 0.008
-        casing_rb = casing_prim.r_outer if casing_prim is not None else 0.028
-
-        # 3D neighborhood dilation around every particle (spherical 3D kernel)
+        # 3. 3D neighborhood dilation around every particle (spherical 3D kernel)
         d_offsets = np.array(
             [
                 (d_x, d_y, d_z)
@@ -2501,57 +2485,9 @@ class VoxelVolumeReconstructor:
             & (dilated_3d_z >= 0)
             & (dilated_3d_z < self.nz)
         )
-        cand_list_x = [dilated_3d_x[valid_3d]]
-        cand_list_y = [dilated_3d_y[valid_3d]]
-        cand_list_z = [dilated_3d_z[valid_3d]]
-
-        # Lower reservoir pooled columns: only fill downward for particles in the quiescent pool
-        # (below casing top / reservoir surface, outside the tube passage)
-        iz_res_pool_top = self.iz_floor + max(1, int(round(0.020 / self.dx)))
-        dist_tube_sq = (pos_valid[:, 0] - tube_xb) ** 2 + (pos_valid[:, 1] - tube_yb) ** 2
-        res_pool_mask = (izs < iz_res_pool_top) & (dist_tube_sq >= (tube_rb + 0.002) ** 2)
-
-        if np.any(res_pool_mask):
-            grid_max_z_res = np.full((self.nx, self.ny), -1, dtype=np.int32)
-            np.maximum.at(grid_max_z_res, (ixs[res_pool_mask], iys[res_pool_mask]), izs[res_pool_mask])
-
-            occ_res_x, occ_res_y = np.where(grid_max_z_res >= 0)
-            if len(occ_res_x) > 0:
-                k_maxs_res = grid_max_z_res[occ_res_x, occ_res_y]
-                start_zs_res = np.minimum(k_maxs_res, self.iz_floor)
-                end_zs_res = k_maxs_res + 1
-                counts_res = end_zs_res - start_zs_res
-                tot_res = np.sum(counts_res)
-                if tot_res > 0:
-                    col_idx_res = np.repeat(np.arange(len(occ_res_x)), counts_res)
-                    cand_list_x.append(occ_res_x[col_idx_res])
-                    cand_list_y.append(occ_res_y[col_idx_res])
-                    offsets_res = np.arange(tot_res) - np.repeat(np.cumsum(counts_res) - counts_res, counts_res)
-                    cand_list_z.append(np.repeat(start_zs_res, counts_res) + offsets_res)
-
-        # Lid surface pooled columns: only fill downward for particles shallowly pooled in the lid pocket
-        lid_pool_mask = (izs >= iz_lid_floor) & (izs <= iz_lid_pocket_top)
-        if np.any(lid_pool_mask):
-            grid_max_z_lid = np.full((self.nx, self.ny), -1, dtype=np.int32)
-            np.maximum.at(grid_max_z_lid, (ixs[lid_pool_mask], iys[lid_pool_mask]), izs[lid_pool_mask])
-
-            occ_lid_x, occ_lid_y = np.where(grid_max_z_lid >= 0)
-            if len(occ_lid_x) > 0:
-                k_maxs_lid = grid_max_z_lid[occ_lid_x, occ_lid_y]
-                start_zs_lid = np.full_like(k_maxs_lid, iz_lid_floor)
-                end_zs_lid = k_maxs_lid + 1
-                counts_lid = np.maximum(0, end_zs_lid - start_zs_lid)
-                tot_lid = np.sum(counts_lid)
-                if tot_lid > 0:
-                    col_idx_lid = np.repeat(np.arange(len(occ_lid_x)), counts_lid)
-                    cand_list_x.append(occ_lid_x[col_idx_lid])
-                    cand_list_y.append(occ_lid_y[col_idx_lid])
-                    offsets_lid = np.arange(tot_lid) - np.repeat(np.cumsum(counts_lid) - counts_lid, counts_lid)
-                    cand_list_z.append(np.repeat(start_zs_lid, counts_lid) + offsets_lid)
-
-        all_ixs = np.concatenate(cand_list_x)
-        all_iys = np.concatenate(cand_list_y)
-        all_izs = np.concatenate(cand_list_z)
+        all_ixs = dilated_3d_x[valid_3d]
+        all_iys = dilated_3d_y[valid_3d]
+        all_izs = dilated_3d_z[valid_3d]
 
         # Unique grid coordinates
         coords_unique = np.unique(np.column_stack((all_ixs, all_iys, all_izs)), axis=0)
@@ -3390,10 +3326,6 @@ class Fluid:
             )[0]
 
             if len(fallen_indices) > 0:
-                logger.info(f"DEBUG: z_min={z_min}, z_max={z_max}, fallen_count={len(fallen_indices)}")
-                pos_arr_tmp = np.array(self.pos_jax)
-                for idx in fallen_indices[:5]:
-                    logger.info(f"DEBUG: fallen particle {idx} pos={pos_arr_tmp[idx]}")
                 pos_arr = np.array(self.pos_jax)
                 vel_arr = np.array(self.vel_jax)
                 self.total_fallen_water_ids.add_multiple(fallen_indices)
