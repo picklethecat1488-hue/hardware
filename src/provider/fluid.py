@@ -21,7 +21,7 @@ import numpy as np
 import pybullet as p
 from scipy.spatial import cKDTree  # type: ignore
 
-from provider.types import CollisionGroup, CollisionMask, URDFShape
+from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFBoundaryType
 from provider.room import BulletStateTracker
 from provider.bullet import LinkType, _is_real_physics_client
 
@@ -862,9 +862,20 @@ def _grid_mask_cylinder_jax(
     thickness: float,
     z_offset: float,
     boundary_type: int,
+    has_tube: bool = False,
+    has_drain: bool = False,
+    tube_radius: float = 0.0,
+    drain_hole_y: float = 0.0,
+    drain_hole_radius: float = 0.0,
+    local_tube_y: float = 0.0,
 ) -> jnp.ndarray:
     """Compute grid solid mask for a cylinder boundary."""
     is_cavity = (zb_loc >= z_offset - thickness) & (zb_loc <= height) & ((rb_sq >= radius**2) | (zb_loc <= z_offset))
+    in_tube_hole = has_tube & (xb_loc**2 + (yb_loc - local_tube_y) ** 2 < tube_radius**2)
+    in_drain_hole = (
+        (has_drain & (drain_hole_radius > 0.0)) & (xb_loc**2 + (yb_loc - drain_hole_y) ** 2 < drain_hole_radius**2)
+    ) | in_tube_hole
+    is_cavity = jnp.where(has_drain | has_tube, is_cavity & (~in_drain_hole), is_cavity)
     is_solid = (rb_sq <= radius**2) & (zb_loc >= z_offset) & (zb_loc <= height)
     return jnp.where(boundary_type == 1, is_cavity, is_solid)
 
@@ -881,16 +892,15 @@ def _grid_mask_tube_jax(
     slot_width: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Compute grid solid mask and interior fluid mask for a tube boundary."""
-    r_outer = radius + thickness
-    r_inner = radius
+    r_outer = radius
+    r_inner = radius - thickness
     is_solid = (rb_sq >= r_inner**2) & (rb_sq <= r_outer**2) & (zb_loc >= 0.0) & (zb_loc <= height)
 
     half_width = slot_width / 2.0
     is_cutout = (zb_loc < slot_height) & (yb_loc > 0.0) & (jnp.abs(xb_loc) < half_width)
     is_solid = jnp.where(slot_height > 0.0, is_solid & (~is_cutout), is_solid)
 
-    r_int = radius - thickness
-    is_tube_mask = (rb_sq < r_int**2) & (zb_loc >= 0.0) & (zb_loc <= height)
+    is_tube_mask = (rb_sq < r_inner**2) & (zb_loc >= 0.0) & (zb_loc <= height)
     tube_mask = jnp.where(height > 0.05, is_tube_mask, jnp.zeros_like(rb_sq, dtype=jnp.bool_))
 
     return is_solid, tube_mask
@@ -910,27 +920,26 @@ def _grid_mask_casing_jax(
     cutoff_y: float,
 ) -> jnp.ndarray:
     """Compute grid solid mask for a pump casing boundary."""
-    r_outer = radius + thickness
-    r_inner = radius
-    is_solid = (rb_sq >= r_inner**2) & (rb_sq <= r_outer**2) & (zb_loc >= 0.0) & (zb_loc <= height)
+    r_outer = radius
+    r_inner = radius - thickness
+    is_wall = (rb_sq >= r_inner**2) & (rb_sq <= r_outer**2) & (zb_loc >= 0.0) & (zb_loc <= height)
+    is_ceiling = (rb_sq <= r_outer**2) & (zb_loc >= height - ceiling_thickness) & (zb_loc <= height)
 
     half_width = slot_width / 2.0
     is_cutout = (zb_loc < slot_height) & (yb_loc > 0.0) & (jnp.abs(xb_loc) < half_width)
-    is_solid = jnp.where(slot_height > 0.0, is_solid & (~is_cutout), is_solid)
 
-    is_ceiling = (
-        (rb_sq < r_inner**2) & (zb_loc >= height - ceiling_thickness) & (zb_loc <= height) & (yb_loc < cutoff_y)
-    )
-    return is_solid | is_ceiling
+    is_solid = (is_wall | is_ceiling) & (~is_cutout)
+    is_solid = jnp.where(cutoff_y != 0.0, is_solid & (yb_loc <= cutoff_y), is_solid)
+    return is_solid
 
 
 def _grid_mask_plane_jax(zb_loc: jnp.ndarray, thickness: float) -> jnp.ndarray:
-    """Compute grid solid mask for a plane boundary."""
-    return zb_loc <= thickness
+    """Compute grid solid mask for a planar boundary."""
+    return (zb_loc >= -thickness) & (zb_loc <= 0.0)
 
 
 def _grid_mask_sphere_jax(dist_sq: jnp.ndarray, radius: float) -> jnp.ndarray:
-    """Compute grid solid mask for a sphere boundary."""
+    """Compute grid solid mask for a spherical boundary."""
     return dist_sq <= radius**2
 
 
@@ -989,11 +998,30 @@ def _make_grid_masks(
         slot_width = b_params[idx, 5]
         ceiling_thickness = b_params[idx, 6]
         cutoff_y = b_params[idx, 10]
+        has_tube = b_params[idx, 11] > 0.5
+        has_drain = b_params[idx, 12] > 0.5
+        tube_radius = b_params[idx, 13]
+        drain_hole_y = b_params[idx, 14]
+        drain_hole_radius = b_params[idx, 15]
 
         # CYLINDER
         is_cyl = shape == SHAPE_CYLINDER
         is_solid_cyl = _grid_mask_cylinder_jax(
-            xb_loc, yb_loc, zb_loc, rb_sq, radius, height, thickness, z_offset, b_types[idx]
+            xb_loc,
+            yb_loc,
+            zb_loc,
+            rb_sq,
+            radius,
+            height,
+            thickness,
+            z_offset,
+            b_types[idx],
+            has_tube,
+            has_drain,
+            tube_radius,
+            drain_hole_y,
+            drain_hole_radius,
+            jnp.where(tube_params[0], tube_params[2], 0.0),
         )
 
         # TUBE
@@ -1039,7 +1067,7 @@ def _make_grid_masks(
     # Clear solid mask inside the tube passage to prevent blockage at the casing/tube connection
     has_tube_bound, tube_xb, tube_yb, tube_rb = tube_params
 
-    in_tube_interior = ((X - tube_xb) ** 2 + (Y - tube_yb) ** 2 < (tube_rb - 0.001) ** 2) & (Z > 0.045)
+    in_tube_interior = ((X - tube_xb) ** 2 + (Y - tube_yb) ** 2 < tube_rb**2) & (Z > 0.045)
     solid_mask = jnp.where(has_tube_bound, solid_mask & (~in_tube_interior), solid_mask)
 
     return solid_mask, tube_mask
@@ -1482,7 +1510,7 @@ def _compute_particle_forces_subroutine(
     )
 
     b_accel = b_forces / mass
-    max_b_accel = 1000.0
+    max_b_accel = 2500.0
     b_accel_mags = jnp.linalg.norm(b_accel, axis=1, keepdims=True)
     b_accel_mags_safe = jnp.maximum(b_accel_mags, 1e-8)
     b_accel_clamped = b_accel * jnp.minimum(max_b_accel / b_accel_mags_safe, 1.0)
@@ -2132,6 +2160,63 @@ class CasingLidPrimitive:
         return False
 
 
+@dataclass(frozen=True)
+class LidPrimitive:
+    """Analytical representation of the top lid with pocket, drain cutout, and tube opening."""
+
+    r_outer: float
+    r_pocket: float
+    z_base: float
+    z_floor: float
+    z_top: float
+    tube_x: float
+    tube_y: float
+    tube_r: float
+    drain_y: float
+    drain_r: float
+    terrace_r: float
+    terrace_z_max: float
+
+    def is_solid(self, x: float, y: float, z: float) -> bool:
+        """Check if a coordinate lies inside the solid portion of the lid.
+
+        Args:
+            x: X coordinate.
+            y: Y coordinate.
+            z: Z coordinate.
+
+        Returns:
+            True if the coordinate is inside the solid lid structure, False otherwise.
+        """
+        if z < self.z_base or z > max(self.z_top, self.terrace_z_max):
+            return False
+        dist_sq = x**2 + y**2
+        if dist_sq > self.r_outer**2:
+            return False
+
+        # Holes where fluid flows through
+        in_drain = (x**2 + (y - self.drain_y) ** 2) < self.drain_r**2
+        in_tube = ((x - self.tube_x) ** 2 + (y - self.tube_y) ** 2) < self.tube_r**2
+        if in_drain or in_tube:
+            return False
+
+        # Solid lid base disk
+        if self.z_base <= z <= self.z_floor:
+            return True
+
+        # Solid outer rim above the pocket floor
+        if self.z_floor <= z <= self.z_top and dist_sq >= self.r_pocket**2:
+            return True
+
+        # Solid terrace shelf above pocket floor
+        if self.z_floor <= z <= self.terrace_z_max:
+            dist_terrace_sq = (x - self.tube_x) ** 2 + (y - self.tube_y) ** 2
+            if dist_terrace_sq <= self.terrace_r**2:
+                return True
+
+        return False
+
+
 def build_simulation_primitives(boundaries: dict[LinkType, Any], boundary_list: list[Any]) -> list[Any]:
     """Parse raw boundary configurations into structured geometry primitives.
 
@@ -2220,26 +2305,64 @@ def build_simulation_primitives(boundaries: dict[LinkType, Any], boundary_list: 
             )
         )
 
-    # 4. Casing Lid
-    lid_x, lid_y, lid_r = 0.0, 0.0, 0.0
-    for b in boundary_list:
-        if b.link_type == LinkType.LID and b.shape == ShapeType.CYLINDER:
-            if b.xyz is not None:
-                lid_x, lid_y = b.xyz[0], b.xyz[1]
-            lid_r = b.radius
-            break
-
-    if lid_r > 0.0:
+    # 4. Casing Lid (pump cover)
+    if casing_r > 0.0 and casing_ceiling_thick > 0.0:
         primitives.append(
             CasingLidPrimitive(
-                x=lid_x,
-                y=lid_y,
-                radius=lid_r,
+                x=casing_x,
+                y=casing_y,
+                radius=casing_r,
                 z_min=z_floor + (casing_h - casing_ceiling_thick),
                 z_max=z_floor + casing_h,
                 tube_x=tube_x,
                 tube_y=tube_y,
                 tube_r_inner=max(0.0, tube_r - tube_thick),
+            )
+        )
+
+    # 5. Top Drinking Lid
+    lid_pocket_r = 0.0
+    drain_y, drain_r = 0.0, 0.0
+    lid_pocket_h = 0.0
+    lid_thickness = 0.0
+    terrace_r, terrace_z_max = 0.0, 0.0
+    for b in boundary_list:
+        if (
+            b.link_type == LinkType.LID
+            and getattr(b, "has_drain", False)
+            and getattr(b, "drain_hole_radius", 0.0) > 0.0
+        ):
+            lid_pocket_r = b.radius
+            lid_pocket_h = b.height
+            lid_thickness = b.thickness
+            drain_y = getattr(b, "drain_hole_y", 0.0)
+            drain_r = getattr(b, "drain_hole_radius", 0.0)
+        elif (
+            b.link_type == LinkType.LID
+            and getattr(b, "type", None) == URDFBoundaryType.CAVITY
+            and getattr(b, "has_tube", False)
+            and getattr(b, "has_drain", False) is False
+        ):
+            terrace_r = b.radius
+            if b.xyz is not None:
+                terrace_z_max = z_floor + b.xyz[2]
+
+    if lid_pocket_r > 0.0 and tube_h > 0.0:
+        lid_pocket_z = z_floor + tube_h
+        primitives.append(
+            LidPrimitive(
+                r_outer=r_bowl,
+                r_pocket=lid_pocket_r,
+                z_base=lid_pocket_z - lid_thickness,
+                z_floor=lid_pocket_z,
+                z_top=lid_pocket_z + lid_pocket_h,
+                tube_x=tube_x,
+                tube_y=tube_y,
+                tube_r=max(0.0, tube_r - tube_thick),
+                drain_y=drain_y,
+                drain_r=drain_r,
+                terrace_r=terrace_r,
+                terrace_z_max=terrace_z_max if terrace_z_max > 0.0 else lid_pocket_z,
             )
         )
 
@@ -2270,6 +2393,21 @@ def _is_solid_vectorized(p: Any, x: np.ndarray, y: np.ndarray, z: np.ndarray) ->
         dist_tube_hole_sq = (x - p.tube_x) ** 2 + (y - p.tube_y) ** 2
         in_cutout = (dist_snout_sq < 0.0065**2) | (dist_tube_hole_sq < p.tube_r_inner**2)
         return in_z & in_lid & (~in_cutout)
+    elif isinstance(p, LidPrimitive):
+        in_z = (p.z_base <= z) & (z <= max(p.z_top, p.terrace_z_max))
+        dist_sq = x**2 + y**2
+        in_outer = dist_sq <= p.r_outer**2
+
+        in_drain = (x**2 + (y - p.drain_y) ** 2) < p.drain_r**2
+        in_tube = ((x - p.tube_x) ** 2 + (y - p.tube_y) ** 2) < p.tube_r**2
+        is_hole = in_drain | in_tube
+
+        in_base = (p.z_base <= z) & (z <= p.z_floor)
+        in_rim = (p.z_floor <= z) & (z <= p.z_top) & (dist_sq >= p.r_pocket**2)
+        dist_terrace_sq = (x - p.tube_x) ** 2 + (y - p.tube_y) ** 2
+        in_terrace = (p.z_floor <= z) & (z <= p.terrace_z_max) & (dist_terrace_sq <= p.terrace_r**2)
+
+        return in_z & in_outer & (~is_hole) & (in_base | in_rim | in_terrace)
     else:
         # Fallback to single element loop for custom/unknown primitives
         return np.array([p.is_solid(xi, yi, zi) for xi, yi, zi in zip(x, y, z)])
@@ -2322,60 +2460,44 @@ class VoxelVolumeReconstructor:
         iys = np.floor((pos_valid[:, 1] - y_min) / self.dx).astype(np.int32)
         izs = np.floor((pos_valid[:, 2] - z_min_bound) / self.dx).astype(np.int32)
 
-        # 3. Compute max z per (ix, iy) column
-        grid_max_z = np.full((self.nx, self.ny), -1, dtype=np.int32)
-        np.maximum.at(grid_max_z, (ixs, iys), izs)
+        # 3. 3D neighborhood dilation around every particle (spherical 3D kernel)
+        d_offsets = np.array(
+            [
+                (d_x, d_y, d_z)
+                for d_x in [-1, 0, 1]
+                for d_y in [-1, 0, 1]
+                for d_z in [-1, 0, 1]
+                if d_x**2 + d_y**2 + d_z**2 <= 2
+            ],
+            dtype=np.int32,
+        )
 
-        # 4. Dilate occupied columns horizontally using vectorized shifts
-        dilated = grid_max_z.copy()
-        for dx_i in [-1, 0, 1]:
-            for dy_i in [-1, 0, 1]:
-                if dx_i == 0 and dy_i == 0:
-                    continue
-                shifted = np.full_like(grid_max_z, -1)
-                src_x_start = max(0, -dx_i)
-                src_x_end = self.nx - max(0, dx_i)
-                dst_x_start = max(0, dx_i)
-                dst_x_end = self.nx - max(0, -dx_i)
+        dilated_3d_x = (ixs[:, None] + d_offsets[:, 0]).ravel()
+        dilated_3d_y = (iys[:, None] + d_offsets[:, 1]).ravel()
+        dilated_3d_z = (izs[:, None] + d_offsets[:, 2]).ravel()
 
-                src_y_start = max(0, -dy_i)
-                src_y_end = self.ny - max(0, dy_i)
-                dst_y_start = max(0, dy_i)
-                dst_y_end = self.ny - max(0, -dy_i)
+        # Clip to valid grid bounds
+        valid_3d = (
+            (dilated_3d_x >= 0)
+            & (dilated_3d_x < self.nx)
+            & (dilated_3d_y >= 0)
+            & (dilated_3d_y < self.ny)
+            & (dilated_3d_z >= 0)
+            & (dilated_3d_z < self.nz)
+        )
+        all_ixs = dilated_3d_x[valid_3d]
+        all_iys = dilated_3d_y[valid_3d]
+        all_izs = dilated_3d_z[valid_3d]
 
-                shifted[dst_x_start:dst_x_end, dst_y_start:dst_y_end] = grid_max_z[
-                    src_x_start:src_x_end, src_y_start:src_y_end
-                ]
-                np.maximum(dilated, shifted, out=dilated)
+        # Unique grid coordinates
+        coords_unique = np.unique(np.column_stack((all_ixs, all_iys, all_izs)), axis=0)
 
-        # 5. Reconstruct candidate voxel coordinates vectorially
-        occupied_ix, occupied_iy = np.where(dilated >= 0)
-        if len(occupied_ix) == 0:
-            return np.empty((0, 3), dtype=np.float32)
+        cx = self.origin[0] + (coords_unique[:, 0] + 0.5) * self.dx
+        cy = self.origin[1] + (coords_unique[:, 1] + 0.5) * self.dx
+        cz = self.origin[2] + (coords_unique[:, 2] + 0.5) * self.dx
 
-        k_maxs = dilated[occupied_ix, occupied_iy]
-        start_zs = np.minimum(k_maxs, self.iz_floor)
-        end_zs = k_maxs + 1
-        counts = end_zs - start_zs
-        total_voxels = np.sum(counts)
-
-        if total_voxels == 0:
-            return np.empty((0, 3), dtype=np.float32)
-
-        col_indices = np.repeat(np.arange(len(occupied_ix)), counts)
-        ixs_cand = occupied_ix[col_indices]
-        iys_cand = occupied_iy[col_indices]
-
-        # Generate run-length range array for Z grid layers
-        offsets = np.arange(total_voxels) - np.repeat(np.cumsum(counts) - counts, counts)
-        izs_cand = np.repeat(start_zs, counts) + offsets
-
-        cx = self.origin[0] + (ixs_cand + 0.5) * self.dx
-        cy = self.origin[1] + (iys_cand + 0.5) * self.dx
-        cz = self.origin[2] + (izs_cand + 0.5) * self.dx
-
-        # 6. Check solid primitives vectorially
-        is_solid = np.zeros(total_voxels, dtype=bool)
+        # Check solid primitives vectorially
+        is_solid = np.zeros(len(coords_unique), dtype=bool)
         for p in self.primitives:
             is_solid |= _is_solid_vectorized(p, cx, cy, cz)
 
@@ -3204,10 +3326,6 @@ class Fluid:
             )[0]
 
             if len(fallen_indices) > 0:
-                logger.info(f"DEBUG: z_min={z_min}, z_max={z_max}, fallen_count={len(fallen_indices)}")
-                pos_arr_tmp = np.array(self.pos_jax)
-                for idx in fallen_indices[:5]:
-                    logger.info(f"DEBUG: fallen particle {idx} pos={pos_arr_tmp[idx]}")
                 pos_arr = np.array(self.pos_jax)
                 vel_arr = np.array(self.vel_jax)
                 self.total_fallen_water_ids.add_multiple(fallen_indices)

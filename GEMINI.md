@@ -88,3 +88,21 @@ pytest
 * Docstring correctness is checked automatically by ruff linting rules (group `D` configured in [pyproject.toml](file:///Users/daparker/gh/hardware/pyproject.toml)).
 * **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum`) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes. This prevents typos and improves code readability/refactoring.
 * **Import Placement**: Imports should be done at the top of the file/listing, unless doing so would cause module load race conditions or circular dependencies (such as importing model classes inside provider packages).
+
+---
+
+## Remote Cloud Server (`anvil`)
+
+For resource-intensive workloads, parameter sweeps, fluid dynamics simulations, integration smoke tests (`python src/smoke.py`), validation experiments, and data collection, the `anvil` cloud server is available:
+
+```ssh-config
+Host anvil
+  HostName 163.192.17.220
+  User ubuntu
+  IdentityFile "~/.ssh/FLINT'S KEY.pem"
+  IdentitiesOnly yes
+```
+
+### Usage Guidelines:
+1. **Remote Execution**: Use SSH commands targeting `ubuntu@anvil` (or `ssh anvil`) to run long-running smoke tests, large JAX SPH simulation grids, physics sweeps, and data collection benchmarks.
+2. **Environment**: Ensure the conda environment `cq` or required dependencies are activated on the remote instance before executing jobs.

@@ -3,6 +3,7 @@
 from typing import Any, Optional, Union, cast
 from functools import cached_property
 from pathlib import Path
+import numpy as np
 from pydantic import BaseModel, Field
 from model import load_measurements, DiagramOptions, DiagramStyle
 

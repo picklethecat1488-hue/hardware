@@ -42,6 +42,9 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                         if item_dict.get("link_type") == LinkType.TUBE or item_dict.get("link_type") == "tube":
                             item_dict["link_type"] = LinkType.TUBE
                             item_dict["link_idx"] = -1
+                        elif item_dict.get("link_type") == LinkType.CASING or item_dict.get("link_type") == "casing":
+                            item_dict["link_type"] = LinkType.CASING
+                            item_dict["link_idx"] = -1
                         elif item_dict.get("link_type") == LinkType.LID or item_dict.get("link_type") == "lid":
                             item_dict["link_type"] = LinkType.LID
                             item_dict["link_idx"] = -1
@@ -57,6 +60,9 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                     case "lid":
                         item_dict["link_type"] = LinkType.LID
                         item_dict["link_idx"] = link_indices.get("lid", -1)
+                    case "pump_cover":
+                        item_dict["link_type"] = LinkType.PUMP_COVER
+                        item_dict["link_idx"] = link_indices.get("pump_cover", -1)
                     case _:
                         item_idx = link_indices.get(label, -1)
                         item_dict["link_idx"] = item_idx
@@ -81,11 +87,11 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
                 fallen_threshold_liters=0.001,
                 damping_boundary=self.settings.damping_boundary,
                 stiffness_boundary=self.settings.stiffness_boundary,
-                nx=88,
-                ny=88,
-                nz=56,
-                dx=0.0025,
-                origin=(-0.110, -0.110, 0.0),
+                nx=64,
+                ny=64,
+                nz=40,
+                dx=0.0035,
+                origin=(-0.112, -0.112, 0.0),
             ),
             provider=self,
             body_id=body_id,
@@ -105,7 +111,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         target_omega = float(getattr(vane_obj, "urdf_motor_target", 15.0))
         max_force = float(getattr(vane_obj, "urdf_motor_force", 10.0))
         motor_power = getattr(self.settings, "motor_power", 1.0)
-        omega = target_omega if step_idx >= 40 else 0.0
+        omega = target_omega
 
         # Run with motor_power=None when NOT in pytest, to disable non-physical speed throttling!
         import sys
@@ -122,7 +128,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             damping=getattr(self, "water_sim_damping", 0.995),
         )
         if (
-            len(self.water_sim.total_fallen_water_ids) * self.water_sim.vol_s * 1000.0
+            len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0
             >= self.water_sim.fallen_threshold_liters
         ):
             return f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl at step {step_idx}"

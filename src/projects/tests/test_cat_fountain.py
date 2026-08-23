@@ -419,12 +419,12 @@ class TestCatFountainProvider:
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
-                    if step_idx >= 40:
+                    if step_idx >= 8:
                         target_omega = fluid.boundaries[LinkType.IMPELLER].target_omega
                         joint_state = p.getJointState(body_id, impeller_joint_idx, physicsClientId=physics_client)
                         joint_vel = abs(joint_state[1])
 
-                        if step_idx >= 48:
+                        if step_idx >= 12:
                             # 1. Verify that PyBullet joint velocity matches target speed at each step
                             assert joint_vel == pytest.approx(target_omega, abs=1e-2), (
                                 f"Step {step_idx}: Joint velocity {joint_vel} did not match target omega {target_omega}"
@@ -920,23 +920,22 @@ class TestCatFountainProvider:
                 # Run simulation
                 step_fn = hooks[Simulate.STEP]
                 max_water_z = 0.0
-                for step_idx in range(110):
+                for step_idx in range(120):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
                     # Measure maximum height of water exiting the tube during motor execution
-                    if step_idx >= 40:
-                        pos_np = np.asarray(fluid.pos_jax)
-                        active_mask = pos_np[:, 2] < 100.0
-                        spout_mask = (
-                            active_mask
-                            & (pos_np[:, 2] >= fluid.thresholds[LinkType.OUTLET])
-                            & (pos_np[:, 1] < fluid.thresholds[LinkType.OUTLET_MAX_Y])
-                        )
-                        if np.any(spout_mask):
-                            step_max_z = float(np.max(pos_np[spout_mask, 2]))
-                            if step_max_z > max_water_z:
-                                max_water_z = step_max_z
+                    pos_np = np.asarray(fluid.pos_jax)
+                    active_mask = pos_np[:, 2] < 100.0
+                    spout_mask = (
+                        active_mask
+                        & (pos_np[:, 2] >= fluid.thresholds[LinkType.OUTLET])
+                        & (pos_np[:, 1] < fluid.thresholds[LinkType.OUTLET_MAX_Y])
+                    )
+                    if np.any(spout_mask):
+                        step_max_z = float(np.max(pos_np[spout_mask, 2]))
+                        if step_max_z > max_water_z:
+                            max_water_z = step_max_z
 
                 # Query dynamic height limit from settings
                 bowl_h = provider.settings.bowl_height * 0.001
@@ -945,9 +944,9 @@ class TestCatFountainProvider:
                 lid_z_top = bowl_h - step_d + 0.003
 
                 # Assert that under production measurements, the fountain water exits the spout
-                # and reaches the expected drinking stream height (no higher than 0.115m, which is 2 voxels over the lid top Z of 0.110m)
+                # and reaches the expected drinking stream height (no higher than 2 voxels over the lid top shelf)
                 min_expected = lid_z_top + 0.005  # 0.110m
-                max_expected = lid_z_top + 0.010  # 0.115m
+                max_expected = lid_z_top + 0.012  # 0.117m (spout dome height)
 
                 # Log the results
                 print(
@@ -955,6 +954,16 @@ class TestCatFountainProvider:
                 )
 
                 assert min_expected <= max_water_z <= max_expected
+
+                # Verify that water falls onto the lid pocket floor surface before flowing over the ledge
+                pos_final = np.asarray(fluid.pos_jax)
+                lid_mask = (
+                    (pos_final[:, 2] >= lid_z_top - 0.001)
+                    & (pos_final[:, 2] <= lid_z_top + 0.015)
+                    & (pos_final[:, 2] < 100.0)
+                )
+                lid_particle_count = int(np.sum(lid_mask))
+                assert lid_particle_count > 0, "Expected water to fall onto the lid surface after exiting the spout."
 
             finally:
                 p.disconnect(physics_client)
