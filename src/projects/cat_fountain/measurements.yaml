@@ -53,7 +53,7 @@ impeller_sleeve_height: 4.0
 impeller_blades: 6
 impeller_clearance: 0.4
 vane_twist: -15.0
-motor_target: 220.0
+motor_target: 200.0
 motor_power: 15.0
 
 # ==========================================

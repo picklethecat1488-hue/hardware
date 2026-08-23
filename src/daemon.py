@@ -126,6 +126,14 @@ class StreamToLogger:
         """Flush the logger."""
         pass
 
+    def isatty(self) -> bool:
+        """Return False as logger is not a TTY."""
+        return False
+
+    def close(self):
+        """Close the stream."""
+        pass
+
 
 # Initialize structured logger
 daemon_log = logging.getLogger("daemon")
@@ -136,6 +144,11 @@ if not daemon_log.handlers:
     formatter = JSONFormatter(datefmt="%Y-%m-%dT%H:%M:%S")
     handler.setFormatter(formatter)
     daemon_log.addHandler(handler)
+
+    # Route root logger to the daemon file handler
+    root_logger = logging.getLogger()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
 
 
 @contextlib.contextmanager
@@ -267,10 +280,6 @@ class DaemonServer:
             except OSError:
                 pass
 
-        # Redirect daemon process's own stdout and stderr to structured logging
-        sys.stdout = StreamToLogger(daemon_log, logging.INFO)
-        sys.stderr = StreamToLogger(daemon_log, logging.ERROR)
-
         server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             server_socket.bind(str(self.socket_path))
@@ -285,6 +294,21 @@ class DaemonServer:
         except OSError as e:
             daemon_log.error(f"Failed to bind daemon socket: {e}")
             sys.exit(1)
+
+        # Redirect daemon process's own stdout and stderr to structured logging
+        sys.stdout = StreamToLogger(daemon_log, logging.INFO)
+        sys.stderr = StreamToLogger(daemon_log, logging.ERROR)
+
+        # Configure JAX and fluid simulation logs to go to the daemon log file
+        try:
+            from provider import DAEMON_LOGGERS
+
+            for name in DAEMON_LOGGERS:
+                l = logging.getLogger(name)
+                l.addHandler(handler)
+                l.setLevel(logging.INFO)
+        except Exception as e:
+            daemon_log.warning(f"Could not configure daemon loggers: {e}")
 
         daemon_log.info(f"Build Daemon started on UDS: {self.socket_path}")
 
@@ -453,20 +477,22 @@ class DaemonClient:
         self.socket_path.parent.mkdir(parents=True, exist_ok=True)
         daemon_script = Path(__file__).resolve()
         log_file = open(LOG_PATH, "a", encoding="utf-8")
-        subprocess.Popen(
+        proc = subprocess.Popen(
             [sys.executable, str(daemon_script), "start", "--foreground"],
             stdout=log_file,
             stderr=log_file,
             close_fds=True,
         )
 
-        for _ in range(15):
+        for _ in range(100):
             try:
                 with daemon_connection(self.socket_path):
                     if print_msg and logger:
                         logger.done()
                     return True
             except (ConnectionRefusedError, FileNotFoundError, OSError):
+                if proc.poll() is not None:
+                    break
                 time.sleep(0.1)
 
         if print_msg and logger:
