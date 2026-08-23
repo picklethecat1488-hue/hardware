@@ -35,7 +35,12 @@ jax.config.update("jax_compilation_cache_dir", str(_cache_dir))
 jax.config.update("jax_log_compiles", True)
 jax.config.update("jax_explain_cache_misses", True)
 
-logging.getLogger("jax").setLevel(logging.INFO)
+from .types import DAEMON_LOGGERS
+
+# Silence JAX and fluid simulation loggers from console output by default
+for logger_name in DAEMON_LOGGERS:
+    logging.getLogger(logger_name).setLevel(logging.INFO)
+    logging.getLogger(logger_name).propagate = False
 
 # Unset experimental and potentially unstable async dispatch on MPS backend to prevent compilation deadlocks/hangs
 if os.environ.get("JAX_MPS_ASYNC_DISPATCH") == "1":
@@ -65,6 +70,7 @@ from .types import (
     URDFJointType,
     URDFMotorType,
     COLOR,
+    DAEMON_LOGGERS,
 )
 from .target_list import TargetList
 from .room import Room

@@ -846,3 +846,115 @@ class TestCatFountainProvider:
             # Verify builder build steps were called
             mock_builder.generate_parts.assert_called_once()
             mock_builder.generate_urdfs.assert_called_once()
+
+    @pytest.mark.slow
+    @pytest.mark.timeout(300)
+    def test_impeller_velocity_tuning(self):
+        """Verify that we can tune the impeller velocity to respect the height limit."""
+        import tempfile
+        import os
+        import numpy as np
+        import pybullet as p
+        import shutil
+        from build import Builder
+        from provider import ProviderManager, Room, Simulate, LinkType
+        from model import AppConfig
+        from shell import Logger
+
+        with tempfile.TemporaryDirectory() as base_temp_dir:
+            config = AppConfig()
+            real_measurements = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "../cat_fountain/measurements.yaml")
+            )
+
+            # Re-create provider for parts building
+            provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
+            provider.settings.measurements_path = real_measurements
+
+            manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
+            builder = Builder(manager, logger=Logger(enabled=False))
+
+            # Generate parts and URDFs ONCE
+            parts_temp_dir = os.path.join(base_temp_dir, "parts")
+            builder.generate_parts(parts_temp_dir, names=None)
+            builder.generate_urdfs(parts_temp_dir, names=None)
+
+            # Copy OBJ assets
+            obj_dir = os.path.join(parts_temp_dir, "obj/cat_fountain")
+            urdf_proj_dir = os.path.join(parts_temp_dir, "urdf/cat_fountain")
+            for f in os.listdir(obj_dir):
+                if f.endswith(".obj"):
+                    shutil.copy(os.path.join(obj_dir, f), os.path.join(urdf_proj_dir, f))
+
+            # Re-create provider for a clean run using production settings
+            provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
+            provider.settings.measurements_path = real_measurements
+
+            room = Room()
+            provider.build_product(room, mode=Mode.SIMULATE)
+            room.translate_joints()
+            physics_client = p.connect(p.DIRECT)
+            try:
+                p.setGravity(0, 0, -9.81, physicsClientId=physics_client)
+
+                urdf_path = os.path.join(parts_temp_dir, "urdf/cat_fountain/product.urdf")
+                body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
+                assert body_id >= 0
+
+                boundaries = {}
+                for _, (geom, _) in room.items():
+                    u_geom = geom
+                    label = getattr(u_geom, "urdf_label", None)
+                    if label:
+                        geom_boundaries = getattr(u_geom, "urdf_boundaries", None)
+                        if geom_boundaries:
+                            boundaries[label] = geom_boundaries
+
+                hooks = provider.get_simulate_hooks("product:view/simulate")
+                setup_fn = hooks[Simulate.SETUP]
+                setup_fn(body_id, physics_client, "product:view/simulate", boundaries, None)
+
+                fluid = provider.water_sim
+                assert fluid is not None
+
+                # Run simulation
+                step_fn = hooks[Simulate.STEP]
+                max_water_z = 0.0
+                for step_idx in range(110):
+                    step_fn(body_id, physics_client, step_idx, "product:view/simulate")
+                    p.stepSimulation(physicsClientId=physics_client)
+
+                    # Measure maximum height of water exiting the tube during motor execution
+                    if step_idx >= 40:
+                        pos_np = np.asarray(fluid.pos_jax)
+                        active_mask = pos_np[:, 2] < 100.0
+                        spout_mask = (
+                            active_mask
+                            & (pos_np[:, 2] >= fluid.thresholds[LinkType.OUTLET])
+                            & (pos_np[:, 1] < fluid.thresholds[LinkType.OUTLET_MAX_Y])
+                        )
+                        if np.any(spout_mask):
+                            step_max_z = float(np.max(pos_np[spout_mask, 2]))
+                            if step_max_z > max_water_z:
+                                max_water_z = step_max_z
+
+                # Query dynamic height limit from settings
+                bowl_h = provider.settings.bowl_height * 0.001
+                step_d = provider.settings.lid_step_depth * 0.001
+                # Lid pocket floor Z (main flat top drinking shelf surface) is at bowl_height - lid_step_depth + 3.0mm
+                lid_z_top = bowl_h - step_d + 0.003
+
+                # Assert that under production measurements, the fountain water exits the spout
+                # and reaches the expected drinking stream height (no higher than 0.115m, which is 2 voxels over the lid top Z of 0.110m)
+                min_expected = lid_z_top + 0.005  # 0.110m
+                max_expected = lid_z_top + 0.010  # 0.115m
+
+                # Log the results
+                print(
+                    f"DEBUG: Production validation: max_water_z={max_water_z:.5f}, lid_z_top={lid_z_top:.5f}, expected range=[{min_expected:.5f}, {max_expected:.5f}]"
+                )
+
+                assert min_expected <= max_water_z <= max_expected
+
+            finally:
+                p.disconnect(physics_client)

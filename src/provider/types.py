@@ -167,3 +167,7 @@ class ColorType(StrEnum):
     GREY = "grey"
     BLACK = "black"
     PURPLE = "purple"
+
+
+# Whitelist of loggers configured for daemon logging redirection and console silencing.
+DAEMON_LOGGERS = ("jax", "provider.fluid")
