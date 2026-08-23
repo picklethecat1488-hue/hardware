@@ -45,6 +45,7 @@ def resolve_shape(val: Any) -> Optional[Shape]:
 
 from ezdxf.colors import RGB
 import rerun as rr
+import numpy as np
 import socket
 from model import DiagramOptions, TextArgs
 from .types import (
@@ -918,24 +919,26 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 ),
             )
 
-        # Log particles
-        if particle_positions:
-            active_indices = [idx for idx, pos in enumerate(particle_positions) if pos[2] < 100.0]
-            if active_indices:
-                filtered_positions = [particle_positions[idx] for idx in active_indices]
-                filtered_radii = (
-                    [particle_radii[idx] for idx in active_indices] if particle_radii is not None else 0.003
-                )
+        # Log particles using vectorized numpy operations for high performance
+        if particle_positions is not None and len(particle_positions) > 0:
+            pos_arr = np.asarray(particle_positions)
+            active_mask = pos_arr[:, 2] < 100.0
+            if np.any(active_mask):
+                filtered_positions = pos_arr[active_mask]
+
+                if particle_radii is not None and len(particle_radii) > 0:
+                    filtered_radii = np.asarray(particle_radii)[active_mask]
+                else:
+                    filtered_radii = None
+
                 colors_arg = [128, 204, 255, 178]
-                if particle_colors:
-                    colors_arg = []
-                    for idx in active_indices:
-                        col = particle_colors[idx]
-                        is_float = any(isinstance(c, float) for c in col) or all(c <= 1.0 for c in col)
-                        if is_float:
-                            colors_arg.append([int(round(c * 255.0)) for c in col])
+                if particle_colors is not None and len(particle_colors) > 0:
+                    colors_arr = np.asarray(particle_colors)[active_mask]
+                    if colors_arr.size > 0:
+                        if np.issubdtype(colors_arr.dtype, np.floating) or np.max(colors_arr) <= 1.0:
+                            colors_arg = (colors_arr * 255.0).round().astype(np.uint8)
                         else:
-                            colors_arg.append([int(c) for c in col])
+                            colors_arg = colors_arr.astype(np.uint8)
 
                 rr.log(
                     "world/particles",

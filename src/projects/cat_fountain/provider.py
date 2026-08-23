@@ -546,7 +546,9 @@ class CatFountainProvider(Provider):
                     link_type=LinkType.BASE,
                     type=BoundaryType.CAVITY,
                     height=(h - floor_z + self.settings.spout_length) * 0.001,
-                    thickness=t * 0.001,
+                    thickness=0.030,
+                    has_tube=True,
+                    tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
                 )
                 with Locations((0.0, 28.0, floor_z)):
                     tube_geom = Cylinder(
@@ -563,7 +565,10 @@ class CatFountainProvider(Provider):
                     radius=0.018,  # Increased outer radius to overlap casing
                     thickness=0.010,  # Thick wall to prevent particle tunneling
                     height=self.settings.tube_height * 0.001,
-                    slot_height=self.settings.slot_height * 0.001,
+                    slot_height=9.0 * 0.001,
+                    slot_width=8.0 * 0.001,
+                    spout_radius=(self.settings.spout_deflection_radius + 1.0) * 0.001,
+                    spout_height=(self.settings.spout_deflection_thickness + 9.0) * 0.001,
                     xyz=(0.0, 28.0 * 0.001, floor_z * 0.001),
                     rpy=(0.0, 0.0, math.pi),
                 )
@@ -577,12 +582,16 @@ class CatFountainProvider(Provider):
                 URDFBoundary(
                     casing_geom,
                     link_type=LinkType.LID,  # Map to LID to avoid overwriting BASE or TUBE slots in Fluid boundaries dict
-                    shape=ShapeType.TUBE,
+                    shape=ShapeType.CASING,
                     type=BoundaryType.SOLID_CAVITY,
                     radius=0.028,
                     thickness=0.010,  # Inner chamber is 18mm, overlaps tube
                     height=10.0 * 0.001,
                     slot_height=9.0 * 0.001,  # Slot opening from Z = 0 to 9mm
+                    slot_width=8.0 * 0.001,
+                    tube_y=0.028,
+                    cutoff_y=0.0,
+                    ceiling_thickness=2.0 * 0.001,
                     xyz=(0.0, 0.0, floor_z * 0.001),
                     rpy=(0.0, 0.0, 0.0),
                 )
@@ -689,7 +698,7 @@ class CatFountainProvider(Provider):
                     radius=impeller_r * 0.001,
                     height=cast(URDFShape, impeller.part).urdf_height,
                     thickness=pin_r * 0.001,
-                    vane_twist=0.0,
+                    vane_twist=self.settings.vane_twist,
                     vane_thickness=1.2 * 0.001,
                     num_vanes=num_blades,
                     magnet_radius=self.settings.magnet_radius,
@@ -885,10 +894,10 @@ class CatFountainProvider(Provider):
                 type=BoundaryType.CAVITY,
                 radius=self.settings.lid_pocket_radius * 0.001,
                 height=self.settings.lid_pocket_cavity_height * 0.001,
-                thickness=3.0 * 0.001,
+                thickness=0.030,
                 xyz=(0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001),
                 rpy=(0.0, 0.0, 0.0),
-                has_drain=False,
+                has_drain=True,
                 drain_hole_y=cutout_y * 0.001,  # Parameterized coordinate
                 drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
                 has_tube=True,
@@ -906,7 +915,8 @@ class CatFountainProvider(Provider):
                 thickness=self.settings.spout_deflection_thickness * 0.001,
                 xyz=(0.0, tube_y * 0.001, dome_top_z * 0.001),
                 rpy=(math.pi, 0.0, 0.0),
-                has_tube=False,
+                has_tube=True,
+                tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             )
 
             URDFBoundary(
@@ -918,7 +928,7 @@ class CatFountainProvider(Provider):
                 thickness=2.0 * 0.001,
                 xyz=(0.0, 0.0, -2.0 * 0.001),
                 rpy=(math.pi, 0.0, 0.0),
-                has_drain=False,
+                has_drain=True,
                 drain_hole_y=-cutout_y * 0.001,  # Parameterized coordinate (flipped)
                 drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
                 has_tube=True,
@@ -1057,6 +1067,7 @@ class CatFountainProvider(Provider):
                 parent="bowl",
                 joint_type=URDFJointType.FIXED,
             ):
+                # Flat cover plate boundary (positioned at the mount joint Z_world = 49.5 mm)
                 URDFBoundary(
                     cover,
                     link_type=LinkType.LID,
@@ -1065,11 +1076,13 @@ class CatFountainProvider(Provider):
                     radius=cover_r * 0.001,
                     height=0.0,
                     thickness=cover_h * 0.001,
-                    xyz=(0.0, 0.0, -4.0 * 0.001),  # Lowered by 4.0 mm to match physical snout intake height
+                    xyz=(0.0, 0.0, 0.0),
                     rpy=(math.pi, 0.0, 0.0),
                     has_drain=True,
                     drain_hole_y=0.0,
-                    drain_hole_radius=(inlet_r - 1.5) * 0.001,  # Matches the inner radius of the snout
+                    drain_hole_radius=inlet_r * 0.001,  # Large hole to let water enter snout
+                    has_tube=True,
+                    tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
                 )
 
         RigidJoint("mount", cover.part, Location((0, 0, 0)))

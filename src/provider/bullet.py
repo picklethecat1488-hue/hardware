@@ -24,6 +24,7 @@ class LinkType(IntEnum):
     FALLEN = -2
     OUTLET_MAX_Y = -3
     LID = 3
+    DRIVE_HUB = 4
 
 
 def _is_real_physics_client(physics_client: Any) -> bool:
@@ -52,6 +53,15 @@ class BulletStateTracker:
         self.particle_positions: list[list[float]] = []
         self._last_checked_num_bodies = 0
         self.has_fluid_simulator = False
+
+        # Cache inverse inertia transform for the base link to avoid slow dynamics IPC calls
+        try:
+            dynamics = p.getDynamicsInfo(self.body_id, -1, physicsClientId=self.physics_client)
+            local_inertia_pos = dynamics[3]
+            local_inertia_orn = dynamics[4]
+            self._inv_inertia = p.invertTransform(local_inertia_pos, local_inertia_orn)
+        except Exception:
+            self._inv_inertia = None
 
     def _discover_new_particles(self) -> None:
         """Scan for newly created bodies since the last check and add them to particles."""
@@ -92,13 +102,9 @@ class BulletStateTracker:
         for label, idx in self.label_to_link_idx.items():
             if idx == -1:
                 base_pos, base_orn = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.physics_client)
-                try:
-                    dynamics = p.getDynamicsInfo(self.body_id, -1, physicsClientId=self.physics_client)
-                    local_inertia_pos = dynamics[3]
-                    local_inertia_orn = dynamics[4]
-                    inv_inertia_pos, inv_inertia_orn = p.invertTransform(local_inertia_pos, local_inertia_orn)
-                    pos, orn = p.multiplyTransforms(base_pos, base_orn, inv_inertia_pos, inv_inertia_orn)
-                except Exception:
+                if self._inv_inertia is not None:
+                    pos, orn = p.multiplyTransforms(base_pos, base_orn, self._inv_inertia[0], self._inv_inertia[1])
+                else:
                     pos, orn = base_pos, base_orn
             else:
                 state = p.getLinkState(self.body_id, idx, physicsClientId=self.physics_client)

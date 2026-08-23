@@ -641,7 +641,33 @@ def test_compute_boundary_forces_reads_tube_y():
     vel = jnp.zeros((1, 3), dtype=jnp.float32)
     b_pos_arr = jnp.zeros((1, 3), dtype=jnp.float32)
     b_orn_arr = jnp.array([[0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
-    boundary_configs = (spout_deflection_cfg,)
+
+    # Pack parameters
+    b_shapes = jnp.array([1], dtype=jnp.int32)
+    b_types = jnp.array([1], dtype=jnp.int32)
+    b_params = jnp.array(
+        [
+            [
+                0.013,  # radius
+                0.0,  # height
+                0.040,  # thickness
+                0.0,  # z_offset
+                0.0,  # slot_height
+                0.0,  # slot_width
+                0.0,  # ceiling_thickness
+                0.0,  # vane_thickness
+                0.0,  # num_vanes
+                0.0,  # vane_twist_rad
+                0.0,  # cutoff_y
+                1.0,  # has_tube
+                0.0,  # has_drain
+                0.0,  # tube_radius
+                0.0,  # drain_hole_y
+                0.0,  # drain_hole_radius
+            ]
+        ],
+        dtype=jnp.float32,
+    )
 
     # Call the JIT function
     forces, torque = _compute_boundary_forces_jax(
@@ -652,9 +678,369 @@ def test_compute_boundary_forces_reads_tube_y():
         D=5.0,
         b_pos_arr=b_pos_arr,
         b_orn_arr=b_orn_arr,
-        boundary_configs=boundary_configs,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
         omega=0.0,
         t=0.0,
     )
     # The function compiles and executes successfully
     assert forces is not None
+
+
+def test_particleset_happy_path():
+    """Verify that ParticleSet behaves correctly for happy path operations."""
+    import numpy as np
+    from provider.fluid import ParticleSet
+
+    pset = ParticleSet(10)
+    assert len(pset) == 0
+    assert 3 not in pset
+
+    # Single add
+    pset.add(3)
+    assert len(pset) == 1
+    assert 3 in pset
+
+    # Vectorized multiple add
+    pset.add_multiple(np.array([1, 5, 7]))
+    assert len(pset) == 4
+    assert 1 in pset
+    assert 5 in pset
+    assert 7 in pset
+
+    # Iteration
+    indices = sorted(list(pset))
+    assert indices == [1, 3, 5, 7]
+
+    # Clear
+    pset.clear()
+    assert len(pset) == 0
+    assert 3 not in pset
+
+
+def test_particleset_sad_path():
+    """Verify that ParticleSet handles index bounds correctly (sad path)."""
+    import pytest
+    from provider.fluid import ParticleSet
+
+    pset = ParticleSet(5)
+    with pytest.raises(IndexError):
+        pset.add(5)
+
+    with pytest.raises(IndexError):
+        pset.add(-6)
+
+
+def test_physics_step_spout_forcing_happy():
+    """Verify that _physics_step_jax runs successfully with dynamic tube forcing (happy path)."""
+    import jax.numpy as jnp
+    from provider.fluid import _physics_step_jax, PhysicsConfig
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    # Happy path: tube configuration with non-zero tube_velocity
+    base_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.BASE,
+        radius=0.1,
+        height=0.05,
+        link_idx=-1,
+    )
+    tube_cfg = BoundaryConfig(
+        shape=ShapeType.TUBE,
+        link_type=LinkType.TUBE,
+        radius=0.010,
+        height=0.03,
+        spout_radius=0.005,
+        spout_height=0.010,
+        xyz=(0.0, 0.04, 0.0),
+        link_idx=1,
+    )
+
+    pos = jnp.array([[0.0, 0.0, 0.02]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 32, 32, 28), dtype=jnp.float32)
+    b_pos = jnp.array([[0.0, 0.0, 0.0], [0.0, 0.04, 0.0]], dtype=jnp.float32)
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+
+    config = PhysicsConfig(
+        mass=1e-6,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=(base_cfg, tube_cfg),
+        gravity=(0.0, 0.0, -9.81),
+        base_idx=0,
+        K_boundary=1000.0,
+        D_boundary=5.0,
+        r_s=0.003,
+        high_damping_value=0.998,
+        nx=32,
+        ny=32,
+        nz=28,
+        dx=0.005,
+        origin=(-0.075, -0.075, 0.0),
+    )
+
+    pos_next, vel_next, f_next, torque_accum = _physics_step_jax(
+        pos,
+        vel,
+        f_lbm,
+        b_pos,
+        b_orn,
+        jnp.zeros(3, dtype=jnp.float32),
+        120.0,
+        0.0,
+        -1.0,
+        config=config,
+    )
+
+    assert pos_next is not None
+    assert vel_next is not None
+    assert f_next is not None
+    assert torque_accum is not None
+
+
+def test_physics_step_spout_forcing_sad():
+    """Verify that _physics_step_jax falls back cleanly when no tube config is present (sad path)."""
+    import jax.numpy as jnp
+    from provider.fluid import _physics_step_jax, PhysicsConfig
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    # Sad path: no tube configuration, only base
+    base_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.BASE,
+        radius=0.1,
+        height=0.05,
+        link_idx=-1,
+    )
+
+    pos = jnp.array([[0.0, 0.0, 0.02]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 32, 32, 28), dtype=jnp.float32)
+    b_pos = jnp.array([[0.0, 0.0, 0.0]], dtype=jnp.float32)
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+
+    config = PhysicsConfig(
+        mass=1e-6,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=(base_cfg,),
+        gravity=(0.0, 0.0, -9.81),
+        base_idx=0,
+        K_boundary=1000.0,
+        D_boundary=5.0,
+        r_s=0.003,
+        high_damping_value=0.998,
+        nx=32,
+        ny=32,
+        nz=28,
+        dx=0.005,
+        origin=(-0.075, -0.075, 0.0),
+    )
+
+    pos_next, vel_next, f_next, torque_accum = _physics_step_jax(
+        pos,
+        vel,
+        f_lbm,
+        b_pos,
+        b_orn,
+        jnp.zeros(3, dtype=jnp.float32),
+        120.0,
+        0.0,
+        -1.0,
+        config=config,
+    )
+
+    assert pos_next is not None
+    assert vel_next is not None
+    assert f_next is not None
+    assert torque_accum is not None
+
+
+def test_physics_step_casing_suction_happy():
+    """Verify that casing suction force is correctly applied in the suction zone (happy path)."""
+    import jax.numpy as jnp
+    from provider.fluid import _physics_step_jax, PhysicsConfig
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    base_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.BASE,
+        radius=0.1,
+        height=0.05,
+        link_idx=-1,
+    )
+    casing_cfg = BoundaryConfig(
+        shape=ShapeType.CASING,
+        type=BoundaryType.SOLID_CAVITY,
+        link_type=LinkType.LID,
+        radius=0.028,
+        height=0.010,
+        link_idx=1,
+        cutoff_y=0.0,
+    )
+
+    # Particle position directly in the suction zone: above casing cover, near center
+    # casing_pos is (0.0, 0.0, 0.0)
+    pos = jnp.array([[0.005, 0.005, 0.012]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 32, 32, 28), dtype=jnp.float32)
+    b_pos = jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=jnp.float32)
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+
+    config = PhysicsConfig(
+        mass=1e-6,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=(base_cfg, casing_cfg),
+        gravity=(0.0, 0.0, -9.81),
+        base_idx=0,
+        K_boundary=1000.0,
+        D_boundary=5.0,
+        r_s=0.003,
+        high_damping_value=0.998,
+        nx=32,
+        ny=32,
+        nz=28,
+        dx=0.005,
+        origin=(-0.075, -0.075, 0.0),
+    )
+
+    # Run physics step with high omega to generate a strong suction force
+    pos_next, vel_next, f_next, torque_accum = _physics_step_jax(
+        pos,
+        vel,
+        f_lbm,
+        b_pos,
+        b_orn,
+        jnp.zeros(3, dtype=jnp.float32),
+        120.0,
+        0.0,
+        -1.0,
+        config=config,
+    )
+
+    # With high suction force directed downwards and inwards, vel_next should have a negative Z component
+    assert vel_next[0, 2] < -0.02
+
+
+def test_physics_step_casing_suction_sad():
+    """Verify that no casing suction force is applied to particles outside the suction zone (sad path)."""
+    import jax.numpy as jnp
+    from provider.fluid import _physics_step_jax, PhysicsConfig
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    base_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.BASE,
+        radius=0.1,
+        height=0.05,
+        link_idx=-1,
+    )
+    casing_cfg = BoundaryConfig(
+        shape=ShapeType.CASING,
+        type=BoundaryType.SOLID_CAVITY,
+        link_type=LinkType.LID,
+        radius=0.028,
+        height=0.010,
+        link_idx=1,
+        cutoff_y=0.0,
+    )
+
+    # Particle position far outside the suction zone (e.g. horizontally far from center)
+    pos = jnp.array([[0.050, 0.0, 0.012]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 32, 32, 28), dtype=jnp.float32)
+    b_pos = jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=jnp.float32)
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+
+    config = PhysicsConfig(
+        mass=1e-6,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=(base_cfg, casing_cfg),
+        gravity=(0.0, 0.0, 0.0),  # Zero gravity to isolate suction effect
+        base_idx=0,
+        K_boundary=1000.0,
+        D_boundary=5.0,
+        r_s=0.003,
+        high_damping_value=0.998,
+        nx=32,
+        ny=32,
+        nz=28,
+        dx=0.005,
+        origin=(-0.075, -0.075, 0.0),
+    )
+
+    pos_next, vel_next, f_next, torque_accum = _physics_step_jax(
+        pos,
+        vel,
+        f_lbm,
+        b_pos,
+        b_orn,
+        jnp.zeros(3, dtype=jnp.float32),
+        120.0,
+        0.0,
+        -1.0,
+        config=config,
+    )
+
+    # Since the particle is far from the casing center, suction acceleration should be zero,
+    # and since gravity is also zero, vel_next should remain zero.
+    assert jnp.allclose(vel_next, 0.0, atol=1e-5)
+
+
+def test_voxel_primitive_cutouts():
+    """Verify that TubeWallPrimitive and CasingWallPrimitive cutouts are computed correctly."""
+    from provider.fluid import CasingWallPrimitive, TubeWallPrimitive
+
+    # CasingWallPrimitive: centered at (0, 0), r_inner=18mm, r_outer=28mm, z_min=0, z_max=0.010
+    # Cutout should be at y > 0, |x| < slot_width/2, z < slot_height
+    casing = CasingWallPrimitive(
+        x=0.0,
+        y=0.0,
+        r_inner=0.018,
+        r_outer=0.028,
+        z_min=0.0,
+        z_max=0.010,
+        slot_height=0.009,
+        slot_width=0.008,
+    )
+
+    # A point inside the solid casing wall but not in the cutout
+    assert casing.is_solid(0.0, -0.023, 0.005) is True  # y < 0
+    assert casing.is_solid(0.023, 0.0, 0.005) is True  # x > slot_width/2
+    assert casing.is_solid(0.0, 0.023, 0.0095) is True  # z > slot_height
+
+    # A point inside the cutout connection (should NOT be solid)
+    assert casing.is_solid(0.0, 0.023, 0.005) is False
+
+    # TubeWallPrimitive: centered at (0, 0.028), r_inner=8mm, r_outer=18mm, z_min=0, z_max=0.120
+    # Cutout should be at y < self.y (facing the casing), |x - self.x| < slot_width/2, z < slot_height
+    tube = TubeWallPrimitive(
+        x=0.0,
+        y=0.028,
+        r_inner=0.008,
+        r_outer=0.018,
+        z_min=0.0,
+        z_max=0.120,
+        slot_height=0.009,
+        slot_width=0.008,
+    )
+
+    # A point inside the solid tube wall but not in the cutout
+    assert tube.is_solid(0.0, 0.028 + 0.013, 0.005) is True  # y > self.y (wrong side)
+    assert tube.is_solid(0.013, 0.028, 0.005) is True  # x > slot_width/2
+    assert tube.is_solid(0.0, 0.028 - 0.013, 0.0095) is True  # z > slot_height
+
+    # A point inside the cutout connection (should NOT be solid)
+    assert tube.is_solid(0.0, 0.028 - 0.013, 0.005) is False

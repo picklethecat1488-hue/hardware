@@ -17,6 +17,7 @@ class ShapeType(StrEnum):
     IMPELLER = "impeller"
     TUBE = "tube"
     SPHERE = "sphere"
+    CASING = "casing"
 
 
 class BoundaryType(StrEnum):
@@ -54,6 +55,9 @@ class BoundaryConfig(BaseModel):
             "height",
             "thickness",
             "slot_height",
+            "slot_width",
+            "spout_radius",
+            "spout_height",
         },
         ShapeType.IMPELLER: {
             "radius",
@@ -75,6 +79,16 @@ class BoundaryConfig(BaseModel):
         },
         ShapeType.PLANE: {
             "thickness",
+        },
+        ShapeType.CASING: {
+            "radius",
+            "height",
+            "thickness",
+            "slot_height",
+            "slot_width",
+            "tube_y",
+            "cutoff_y",
+            "ceiling_thickness",
         },
     }
 
@@ -139,9 +153,15 @@ class BoundaryConfig(BaseModel):
     tube_radius: float = Field(default=0.008, description="Tube hole radius")
 
     # ----------------------------------------------------
-    # Tube Specific Parameters
+    # Tube/Casing Specific Parameters
     # ----------------------------------------------------
     slot_height: float = Field(default=0.015, description="Height of pump slots if applicable")
+    slot_width: float = Field(default=0.008, description="Width of pump slots if applicable")
+    spout_radius: float = Field(default=0.014, description="Spout deflection radius allowance at the top of the tube")
+    spout_height: float = Field(default=0.049, description="Spout deflection height allowance at the top of the tube")
+    tube_y: Optional[float] = Field(default=None, description="Y coordinate of the spout tube")
+    cutoff_y: Optional[float] = Field(default=None, description="Y cutoff coordinate for casing slot connection")
+    ceiling_thickness: float = Field(default=0.002, description="Casing ceiling thickness in grid masks")
 
     # ----------------------------------------------------
     # Impeller Specific Parameters
@@ -178,6 +198,8 @@ class BoundaryConfig(BaseModel):
                 self.thickness,
                 self.z_offset,
                 self.slot_height,
+                self.tube_y,
+                self.cutoff_y,
                 self.vane_thickness,
                 self.num_vanes,
                 self.vane_twist,
@@ -212,6 +234,8 @@ class BoundaryConfig(BaseModel):
             and self.thickness == other.thickness
             and self.z_offset == other.z_offset
             and self.slot_height == other.slot_height
+            and self.tube_y == other.tube_y
+            and self.cutoff_y == other.cutoff_y
             and self.vane_thickness == other.vane_thickness
             and self.num_vanes == other.num_vanes
             and self.vane_twist == other.vane_twist

@@ -174,4 +174,3 @@ stiffness_boundary: 1000.0
 stiffness: 1000.0
 damping: 0.995
 viscosity: 0.02
-motor_force_sim: 10.0
