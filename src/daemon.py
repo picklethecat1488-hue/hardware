@@ -137,6 +137,11 @@ if not daemon_log.handlers:
     handler.setFormatter(formatter)
     daemon_log.addHandler(handler)
 
+    # Route root logger to the daemon file handler
+    root_logger = logging.getLogger()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
+
 
 @contextlib.contextmanager
 def daemon_connection(socket_path: Path):
@@ -270,6 +275,17 @@ class DaemonServer:
         # Redirect daemon process's own stdout and stderr to structured logging
         sys.stdout = StreamToLogger(daemon_log, logging.INFO)
         sys.stderr = StreamToLogger(daemon_log, logging.ERROR)
+
+        # Configure JAX and fluid simulation logs to go to the daemon log file
+        try:
+            from provider import DAEMON_LOGGERS
+
+            for name in DAEMON_LOGGERS:
+                l = logging.getLogger(name)
+                l.addHandler(handler)
+                l.setLevel(logging.INFO)
+        except Exception as e:
+            daemon_log.warning(f"Could not configure daemon loggers: {e}")
 
         server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:

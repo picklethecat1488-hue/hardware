@@ -12,6 +12,9 @@ import os
 from pathlib import Path
 import jax
 import jax.numpy as jnp
+import logging
+
+logger = logging.getLogger("provider.fluid")
 
 
 import numpy as np
@@ -3201,10 +3204,10 @@ class Fluid:
             )[0]
 
             if len(fallen_indices) > 0:
-                print(f"DEBUG: z_min={z_min}, z_max={z_max}, fallen_count={len(fallen_indices)}")
+                logger.info(f"DEBUG: z_min={z_min}, z_max={z_max}, fallen_count={len(fallen_indices)}")
                 pos_arr_tmp = np.array(self.pos_jax)
                 for idx in fallen_indices[:5]:
-                    print(f"DEBUG: fallen particle {idx} pos={pos_arr_tmp[idx]}")
+                    logger.info(f"DEBUG: fallen particle {idx} pos={pos_arr_tmp[idx]}")
                 pos_arr = np.array(self.pos_jax)
                 vel_arr = np.array(self.vel_jax)
                 self.total_fallen_water_ids.add_multiple(fallen_indices)
