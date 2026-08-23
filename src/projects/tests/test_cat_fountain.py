@@ -956,5 +956,15 @@ class TestCatFountainProvider:
 
                 assert min_expected <= max_water_z <= max_expected
 
+                # Verify that water falls onto the lid pocket floor surface before flowing over the ledge
+                pos_final = np.asarray(fluid.pos_jax)
+                lid_mask = (
+                    (pos_final[:, 2] >= lid_z_top - 0.001)
+                    & (pos_final[:, 2] <= lid_z_top + 0.015)
+                    & (pos_final[:, 2] < 100.0)
+                )
+                lid_particle_count = int(np.sum(lid_mask))
+                assert lid_particle_count > 0, "Expected water to fall onto the lid surface after exiting the spout."
+
             finally:
                 p.disconnect(physics_client)
