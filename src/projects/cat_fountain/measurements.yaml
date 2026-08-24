@@ -34,6 +34,7 @@ lid_cutout_radius: 55.0
 lid_cutout_y: -20.0
 lid_cutout_ridge_width: 1.5
 lid_cutout_ridge_height: 2.0
+lid_platform_slope_angle: 2.5
 
 # ==========================================
 # 3. Tube

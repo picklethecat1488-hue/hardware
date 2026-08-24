@@ -839,10 +839,16 @@ class CatFountainProvider(Provider):
                 extrude(ridge_sketch.sketch, amount=ridge_h)
 
             with Locations((0.0, tube_y, 3.0)):
-                terrace_shelf = Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                with Locations((0, 0, 3.0)):
-                    Cylinder(radius=30.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                    Cylinder(radius=28.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                with Locations(Rot(-self.settings.lid_platform_slope_angle, 0, 0)):
+                    terrace_shelf = Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    with Locations((0, 0, 3.0)):
+                        Cylinder(radius=30.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                        Cylinder(
+                            radius=28.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                        )
+                        # Open front spillway chute toward the front cutout
+                        with Locations((0.0, -15.0, 0.0)):
+                            Box(35.0, 30.0, 2.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
             with Locations((0.0, tube_y, 0)):
                 with Locations((0, 0, 6.0)):
@@ -852,8 +858,17 @@ class CatFountainProvider(Provider):
                         self.settings.tube_radius - self.settings.tube_thickness + self.settings.tube_lid_clearance
                     )
                     outer_dome = Sphere(radius=dome_out_r)
-                    Sphere(radius=dome_in_r, mode=Mode.SUBTRACT)
-                    for angle in [0, 45, 90, 135]:
+                    with Locations((0, 0, 0)):
+                        Sphere(radius=dome_in_r, mode=Mode.SUBTRACT)
+                    with Locations((0, 0, -dome_out_r)):
+                        Box(
+                            dome_out_r * 2,
+                            dome_out_r * 2,
+                            dome_out_r,
+                            align=(Align.CENTER, Align.CENTER, Align.MIN),
+                            mode=Mode.SUBTRACT,
+                        )
+                    for angle in [0, 90, 180, 270]:
                         with Locations(Rot(0, 0, angle)):
                             Box(
                                 self.SLOT_WIDTH,
@@ -929,19 +944,6 @@ class CatFountainProvider(Provider):
                 has_drain=True,
                 drain_hole_y=-cutout_y * 0.001,  # Parameterized coordinate (flipped)
                 drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
-                has_tube=True,
-                tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
-            )
-
-            URDFBoundary(
-                terrace_shelf,
-                link_type=LinkType.LID,
-                shape=ShapeType.CYLINDER,
-                type=BoundaryType.CAVITY,
-                radius=(terrace_shelf.bounding_box().max.X - 2.0) * 0.001,
-                height=0.0,
-                thickness=3.0 * 0.001,
-                xyz=(0.0, tube_y * 0.001, terrace_shelf.bounding_box().max.Z * 0.001),
                 has_tube=True,
                 tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             )

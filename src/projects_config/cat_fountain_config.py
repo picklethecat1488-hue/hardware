@@ -260,6 +260,11 @@ class CatFountainConfig(BaseModel):
         """Return the spout deflection cap Z offset in millimeters."""
         return float(self._raw_data.get("spout_deflection_z_offset", 16.0))
 
+    @cached_property
+    def lid_platform_slope_angle(self) -> float:
+        """Return the forward slope angle of the lid platform in degrees."""
+        return float(self._raw_data.get("lid_platform_slope_angle", 2.5))
+
     # =========================================================================
     # Simulation Parameters
     # =========================================================================
