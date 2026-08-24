@@ -1476,6 +1476,7 @@ def _lbm_step_subroutine(
 
 def _g2p_mapping_subroutine(
     pos_curr: jnp.ndarray,
+    vel_curr: jnp.ndarray,
     u_grid: jnp.ndarray,
     base_pos: jnp.ndarray,
     base_orn: jnp.ndarray,
@@ -1486,18 +1487,49 @@ def _g2p_mapping_subroutine(
     dx: float,
     origin: jnp.ndarray,
     dt_sub: float,
+    b_shapes: jnp.ndarray,
+    b_params: jnp.ndarray,
+    b_pos_arr: jnp.ndarray,
+    b_orn_arr: jnp.ndarray,
+    base_idx: int,
 ) -> jnp.ndarray:
-    """G2P subroutine: interpolates grid velocities to particle velocities in world frame."""
+    """G2P subroutine: interpolates grid velocities to particle velocities in world frame for submerged fluid."""
     c_scale = dt_sub / dx
 
     base_orn_inv = q_inv(base_orn)
     pos_local = q_rotate(base_orn_inv, pos_curr - base_pos)
+    r_local = jnp.sqrt(pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2)
 
     active_col = (pos_curr[:, 2] < 100.0)[:, None]
     lbm_vel_local = _g2p_jax(pos_local, u_grid, dx, origin, nx, ny, nz)
     lbm_vel_local = jnp.where(active_col, lbm_vel_local / c_scale, 0.0)
+    vel_grid_world = q_rotate(base_orn, lbm_vel_local) + base_vel
 
-    vel_world = q_rotate(base_orn, lbm_vel_local) + base_vel
+    # Fluid continuum mask (pool bowl and internal pump tube/casing)
+    base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.RADIUS], 0.0)
+    base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.HEIGHT], 0.0)
+    in_pool = (pos_local[:, 2] <= base_height) & (r_local <= base_radius)
+
+    in_tube_or_casing = jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_)
+    for i in range(b_shapes.shape[0]):
+        b_pos = b_pos_arr[i]
+        b_orn = b_orn_arr[i]
+        b_orn_inv = q_inv(b_orn)
+        pos_b = q_rotate(b_orn_inv, pos_curr - b_pos)
+        r_b_xy = jnp.sqrt(pos_b[:, 0] ** 2 + pos_b[:, 1] ** 2)
+        radius = b_params[i, BoundaryParam.RADIUS]
+        height = b_params[i, BoundaryParam.HEIGHT]
+
+        is_tube = (b_shapes[i] == SHAPE_TUBE) & (r_b_xy <= radius) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= height)
+        is_casing = (b_shapes[i] == SHAPE_CASING) & (r_b_xy <= radius) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= height)
+        in_tube_or_casing = in_tube_or_casing | is_tube | is_casing
+
+    in_fluid_continuum = jnp.where(
+        base_idx != -1, in_pool | in_tube_or_casing, jnp.ones(pos_curr.shape[0], dtype=jnp.bool_)
+    )
+
+    # Submerged fluid uses LBM grid velocity, airborne free-fall particles maintain Lagrangian ballistic velocity
+    vel_world = jnp.where(in_fluid_continuum[:, None], vel_grid_world, vel_curr)
     return jnp.where(active_col, vel_world, 0.0)
 
 
@@ -1792,7 +1824,23 @@ def _physics_step_jax_jit(
 
         # Step 2: G2P mapping to update particle velocities
         vel_world = _g2p_mapping_subroutine(
-            pos_curr, u_grid, base_pos, base_orn, base_vel, nx, ny, nz, dx, origin, dt_sub
+            pos_curr,
+            vel_curr,
+            u_grid,
+            base_pos,
+            base_orn,
+            base_vel,
+            nx,
+            ny,
+            nz,
+            dx,
+            origin,
+            dt_sub,
+            b_shapes,
+            b_params,
+            b_pos_arr,
+            b_orn_arr,
+            base_idx,
         )
 
         # Step 3: Compute forces acting on particles
