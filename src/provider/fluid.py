@@ -282,6 +282,27 @@ BOUNDARY_CAVITY = 1
 BOUNDARY_SOLID_CAVITY = 2
 
 
+class BoundaryParam(IntEnum):
+    """Named indices for boundary parameter columns in b_params tensor."""
+
+    RADIUS = 0
+    HEIGHT = 1
+    THICKNESS = 2
+    Z_OFFSET = 3
+    SLOT_HEIGHT = 4
+    SLOT_WIDTH = 5
+    CEILING_THICKNESS = 6
+    VANE_THICKNESS = 7
+    NUM_VANES = 8
+    VANE_TWIST_RAD = 9
+    CUTOFF_Y = 10
+    HAS_TUBE = 11
+    HAS_DRAIN = 12
+    TUBE_RADIUS = 13
+    DRAIN_HOLE_Y = 14
+    DRAIN_HOLE_RADIUS = 15
+
+
 def _boundary_force_cylinder_jax(
     pos_local: jnp.ndarray,
     vel_local: jnp.ndarray,
@@ -340,14 +361,16 @@ def _boundary_force_cylinder_jax(
     # 2. Cavity bottom
     z_limit_c = z_offset + r_s
     pen_c_bottom = z_limit_c - pos_local[:, 2]
-    bottom_limit = z_offset - jnp.maximum(thickness, 0.020)
 
     in_tube_hole = has_tube & (pos_local[:, 0] ** 2 + (pos_local[:, 1] - local_tube_y) ** 2 < tube_radius**2)
+    platform_radius = jnp.where(has_tube & has_drain, 0.030, 0.0)
+    in_platform = has_tube & (pos_local[:, 0] ** 2 + (pos_local[:, 1] - local_tube_y) ** 2 <= platform_radius**2)
     in_drain_hole = (
         (has_drain & (drain_hole_radius > 0.0))
         & (pos_local[:, 0] ** 2 + (pos_local[:, 1] - drain_hole_y) ** 2 < drain_hole_radius**2)
+        & (~in_platform)
     ) | in_tube_hole
-    bottom_mask = (pen_c_bottom > 0.0) & (r_c < radius) & (pos_local[:, 2] >= bottom_limit) & (~in_drain_hole)
+    bottom_mask = (pen_c_bottom > 0.0) & (r_c < radius) & (pos_local[:, 2] >= z_offset) & (~in_drain_hole)
     f_z_c = K * pen_c_bottom - D * vel_local[:, 2]
     force_c_bottom = jnp.stack([jnp.zeros_like(r_c), jnp.zeros_like(r_c), jnp.maximum(f_z_c, 0.0)], axis=-1)
     force_c_bottom = jnp.where(bottom_mask[:, None], force_c_bottom, 0.0)
@@ -1523,9 +1546,9 @@ def _compute_particle_forces_subroutine(
         casing_orn_inv = q_inv(casing_orn)
         pos_casing = q_rotate(casing_orn_inv, pos_curr - casing_pos)
         r_inlet_xy = jnp.sqrt(pos_casing[:, 0] ** 2 + pos_casing[:, 1] ** 2)
-        radius = b_params[i, 0]
-        casing_height = b_params[i, 1]
-        ceiling_thickness = b_params[i, 6]
+        radius = b_params[i, BoundaryParam.RADIUS]
+        casing_height = b_params[i, BoundaryParam.HEIGHT]
+        ceiling_thickness = b_params[i, BoundaryParam.CEILING_THICKNESS]
 
         in_suction = (
             (r_inlet_xy < radius)
@@ -1548,7 +1571,86 @@ def _compute_particle_forces_subroutine(
         is_casing = b_shapes[i] == SHAPE_CASING
         suction_accel += jnp.where(is_casing, suction_accel_i, jnp.zeros_like(pos_curr))
 
-    accel = b_accel_clamped + suction_accel + gravity[None, :]
+    r_impeller = 0.0
+    for j in range(b_shapes.shape[0]):
+        r_impeller = jnp.where(b_shapes[j] == SHAPE_IMPELLER, b_params[j, BoundaryParam.RADIUS], r_impeller)
+
+    g_mag = jnp.linalg.norm(gravity)
+    v_tip = jnp.abs(omega) * r_impeller
+
+    tube_pump_accel = jnp.zeros_like(pos_curr)
+    for i in range(b_shapes.shape[0]):
+        tube_pos = b_pos_arr[i]
+        tube_orn = b_orn_arr[i]
+        tube_orn_inv = q_inv(tube_orn)
+        pos_tube = q_rotate(tube_orn_inv, pos_curr - tube_pos)
+        r_tube_xy = jnp.sqrt(pos_tube[:, 0] ** 2 + pos_tube[:, 1] ** 2)
+        radius = b_params[i, BoundaryParam.RADIUS]
+        thickness = b_params[i, BoundaryParam.THICKNESS]
+        tube_h = b_params[i, BoundaryParam.HEIGHT]
+        inner_r = radius - thickness
+
+        pump_lift_scalar = jnp.where(
+            jnp.abs(omega) > 1e-3,
+            g_mag + (v_tip**2) / (2.0 * jnp.maximum(radius, 1e-6)),
+            0.0,
+        )
+        spout_tip_accel_mag = jnp.where(
+            jnp.abs(omega) > 1e-3,
+            (v_tip**2) / (2.0 * jnp.maximum(tube_h, 1e-6)),
+            0.0,
+        )
+
+        in_tube = (r_tube_xy < inner_r) & (pos_tube[:, 2] >= 0.0) & (pos_tube[:, 2] <= tube_h)
+        up_world = q_rotate(tube_orn, jnp.array([0.0, 0.0, 1.0])) * pump_lift_scalar
+
+        # Forward deflection at the tube nozzle spout exit derived from boundary metadata
+        slot_h = b_params[i, BoundaryParam.SLOT_HEIGHT]
+        nozzle_r = radius + thickness
+        nozzle_z_min = tube_h - thickness
+        nozzle_z_max = tube_h + jnp.maximum(slot_h, 2.0 * thickness)
+        in_nozzle = (r_tube_xy < nozzle_r) & (pos_tube[:, 2] >= nozzle_z_min) & (pos_tube[:, 2] <= nozzle_z_max)
+        tip_forward_world = q_rotate(tube_orn, jnp.array([0.0, -1.0, 0.0])) * spout_tip_accel_mag
+
+        tube_pump_accel_i = jnp.where(in_tube[:, None], up_world, 0.0) + jnp.where(
+            in_nozzle[:, None], tip_forward_world, 0.0
+        )
+
+        is_tube = b_shapes[i] == SHAPE_TUBE
+        tube_pump_accel += jnp.where(is_tube, tube_pump_accel_i, jnp.zeros_like(pos_curr))
+
+    lid_drain_accel = jnp.zeros_like(pos_curr)
+    for i in range(b_shapes.shape[0]):
+        lid_pos = b_pos_arr[i]
+        lid_orn = b_orn_arr[i]
+        lid_orn_inv = q_inv(lid_orn)
+        pos_lid = q_rotate(lid_orn_inv, pos_curr - lid_pos)
+
+        radius = b_params[i, BoundaryParam.RADIUS]
+        height = b_params[i, BoundaryParam.HEIGHT]
+        z_offset = b_params[i, BoundaryParam.Z_OFFSET]
+        has_drain = b_params[i, BoundaryParam.HAS_DRAIN] > 0.5
+        drain_y = b_params[i, BoundaryParam.DRAIN_HOLE_Y]
+
+        r_lid_xy = jnp.sqrt(pos_lid[:, 0] ** 2 + pos_lid[:, 1] ** 2)
+        on_lid = (r_lid_xy < radius) & (pos_lid[:, 2] >= z_offset) & (pos_lid[:, 2] <= z_offset + height + 0.005)
+
+        dx_to_drain = 0.0 - pos_lid[:, 0]
+        dy_to_drain = drain_y - pos_lid[:, 1]
+        dist_to_drain = jnp.sqrt(dx_to_drain**2 + dy_to_drain**2 + 1e-8)
+        dir_local = jnp.stack(
+            [dx_to_drain / dist_to_drain, dy_to_drain / dist_to_drain, jnp.zeros_like(dx_to_drain)],
+            axis=-1,
+        )
+        dir_world = q_rotate(lid_orn, dir_local)
+        is_lid_cavity = (b_shapes[i] == SHAPE_CYLINDER) & has_drain
+        lid_slope_factor = (height + z_offset) / jnp.maximum(radius, 1e-6)
+        lid_drain_mag = g_mag * lid_slope_factor
+        lid_drain_accel += jnp.where(
+            is_lid_cavity & on_lid[:, None], dir_world * lid_drain_mag, jnp.zeros_like(pos_curr)
+        )
+
+    accel = b_accel_clamped + suction_accel + tube_pump_accel + lid_drain_accel + gravity[None, :]
     return accel, step_torque
 
 
@@ -2197,8 +2299,10 @@ class LidPrimitive:
             return False
 
         # Holes where fluid flows through
-        in_drain = (x**2 + (y - self.drain_y) ** 2) < self.drain_r**2
-        in_tube = ((x - self.tube_x) ** 2 + (y - self.tube_y) ** 2) < self.tube_r**2
+        dist_terrace_sq = (x - self.tube_x) ** 2 + (y - self.tube_y) ** 2
+        in_platform = dist_terrace_sq <= max(self.terrace_r, 0.030) ** 2
+        in_drain = ((x**2 + (y - self.drain_y) ** 2) < self.drain_r**2) and not in_platform
+        in_tube = dist_terrace_sq < self.tube_r**2
         if in_drain or in_tube:
             return False
 
@@ -2211,10 +2315,8 @@ class LidPrimitive:
             return True
 
         # Solid terrace shelf above pocket floor
-        if self.z_floor <= z <= self.terrace_z_max:
-            dist_terrace_sq = (x - self.tube_x) ** 2 + (y - self.tube_y) ** 2
-            if dist_terrace_sq <= self.terrace_r**2:
-                return True
+        if self.z_floor <= z <= self.terrace_z_max and in_platform:
+            return True
 
         return False
 
@@ -2400,14 +2502,15 @@ def _is_solid_vectorized(p: Any, x: np.ndarray, y: np.ndarray, z: np.ndarray) ->
         dist_sq = x**2 + y**2
         in_outer = dist_sq <= p.r_outer**2
 
-        in_drain = (x**2 + (y - p.drain_y) ** 2) < p.drain_r**2
-        in_tube = ((x - p.tube_x) ** 2 + (y - p.tube_y) ** 2) < p.tube_r**2
+        dist_terrace_sq = (x - p.tube_x) ** 2 + (y - p.tube_y) ** 2
+        in_platform = dist_terrace_sq <= max(p.terrace_r, 0.030) ** 2
+        in_drain = ((x**2 + (y - p.drain_y) ** 2) < p.drain_r**2) & (~in_platform)
+        in_tube = dist_terrace_sq < p.tube_r**2
         is_hole = in_drain | in_tube
 
         in_base = (p.z_base <= z) & (z <= p.z_floor)
         in_rim = (p.z_floor <= z) & (z <= p.z_top) & (dist_sq >= p.r_pocket**2)
-        dist_terrace_sq = (x - p.tube_x) ** 2 + (y - p.tube_y) ** 2
-        in_terrace = (p.z_floor <= z) & (z <= p.terrace_z_max) & (dist_terrace_sq <= p.terrace_r**2)
+        in_terrace = (p.z_floor <= z) & (z <= p.terrace_z_max) & in_platform
 
         return in_z & in_outer & (~is_hole) & (in_base | in_rim | in_terrace)
     else:

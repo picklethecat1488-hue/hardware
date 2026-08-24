@@ -839,10 +839,13 @@ class CatFountainProvider(Provider):
                 extrude(ridge_sketch.sketch, amount=ridge_h)
 
             with Locations((0.0, tube_y, 3.0)):
-                terrace_shelf = Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                with Locations((0, 0, 3.0)):
-                    Cylinder(radius=30.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                    Cylinder(radius=28.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                with Locations(Rot(-self.settings.lid_platform_slope_angle, 0, 0)):
+                    terrace_shelf = Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    with Locations((0, 0, 3.0)):
+                        Cylinder(radius=30.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                        Cylinder(
+                            radius=28.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                        )
 
             with Locations((0.0, tube_y, 0)):
                 with Locations((0, 0, 6.0)):

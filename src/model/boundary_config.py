@@ -3,7 +3,7 @@
 from typing import Any, Literal, Optional, Tuple, Union
 from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 
-from enum import StrEnum
+from enum import StrEnum, IntEnum
 import math
 from provider.bullet import LinkType
 
@@ -26,6 +26,27 @@ class BoundaryType(StrEnum):
     CAVITY = "cavity"
     SOLID = "solid"
     SOLID_CAVITY = "solid_cavity"
+
+
+class BoundaryParam(IntEnum):
+    """Named indices for boundary parameter columns in b_params tensor."""
+
+    RADIUS = 0
+    HEIGHT = 1
+    THICKNESS = 2
+    Z_OFFSET = 3
+    SLOT_HEIGHT = 4
+    SLOT_WIDTH = 5
+    CEILING_THICKNESS = 6
+    VANE_THICKNESS = 7
+    NUM_VANES = 8
+    VANE_TWIST_RAD = 9
+    CUTOFF_Y = 10
+    HAS_TUBE = 11
+    HAS_DRAIN = 12
+    TUBE_RADIUS = 13
+    DRAIN_HOLE_Y = 14
+    DRAIN_HOLE_RADIUS = 15
 
 
 class BoundaryConfig(BaseModel):
