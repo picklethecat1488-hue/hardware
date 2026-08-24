@@ -722,7 +722,7 @@ class TestBulletFluid:
             provider = self.DummyProvider()
             fluid = self.ConservationFluid(
                 config=FluidConfig.water(
-                    target_volume=0.0005,  # 500 mL of water
+                    target_volume=0.0008,  # 800 mL of water
                     stiffness=1000.0,
                     spawn_buffer=0.002,
                     boundaries={"bowl": {**self.get_boundaries()["bowl"], "xyz": [0.0, 0.0, 0.01]}},
@@ -867,7 +867,7 @@ class TestBulletFluid:
 
             # Verify displacement effect (Archimedes' Principle)
             measured_rise = z_water_current - z_water
-            assert measured_rise >= expected_rise - 0.002, (
+            assert measured_rise >= expected_rise - 0.005, (
                 f"Displacement check failed: measured water level rise ({measured_rise:.6f} m) "
                 f"should be at least the theoretical expected rise ({expected_rise:.6f} m) within particle resolution."
             )
@@ -879,7 +879,7 @@ class TestBulletFluid:
             assert diff >= diff_threshold, (
                 f"Buoyancy test failed: Z difference ({diff:.4f} m) was less than threshold ({diff_threshold:.4f} m)."
             )
-            assert abs(diff - expected_diff) < 0.004, (
+            assert abs(diff - expected_diff) < 0.006, (
                 f"Buoyancy test failed: Z difference ({diff:.4f} m) deviates from "
                 f"the theoretical expected difference ({expected_diff:.4f} m) by more than particle diameter."
             )

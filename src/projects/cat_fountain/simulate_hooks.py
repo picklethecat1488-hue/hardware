@@ -128,7 +128,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             damping=getattr(self, "water_sim_damping", 0.995),
         )
         if (
-            len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0
+            len(self.water_sim.total_fallen_water_ids) * self.water_sim.vol_s * 1000.0
             >= self.water_sim.fallen_threshold_liters
         ):
             return f"{self.water_sim.fallen_threshold_liters}L of water fell out of bowl at step {step_idx}"
