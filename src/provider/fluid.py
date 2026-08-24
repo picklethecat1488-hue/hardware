@@ -1492,8 +1492,9 @@ def _compute_particle_forces_subroutine(
     D_boundary: float,
     r_s: float,
     mass: float,
+    gravity: jnp.ndarray,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Force subroutine: computes containment boundary penalty forces and casing suction forces."""
+    """Force subroutine: computes containment boundary penalty forces, casing suction forces, and gravity."""
     b_forces, step_torque = _compute_boundary_forces_jax(
         pos_curr,
         vel_world,
@@ -1547,7 +1548,7 @@ def _compute_particle_forces_subroutine(
         is_casing = b_shapes[i] == SHAPE_CASING
         suction_accel += jnp.where(is_casing, suction_accel_i, jnp.zeros_like(pos_curr))
 
-    accel = b_accel_clamped + suction_accel
+    accel = b_accel_clamped + suction_accel + gravity[None, :]
     return accel, step_torque
 
 
@@ -1663,7 +1664,7 @@ def _physics_step_jax_jit(
         base_pos = jnp.where(base_idx != -1, b_pos_arr[base_idx], jnp.zeros(3))
         base_orn = jnp.where(base_idx != -1, b_orn_arr[base_idx], jnp.array([0.0, 0.0, 0.0, 1.0]))
 
-        # Step 1: LBM solver
+        # Step 1: LBM solver (incompressible Navier-Stokes flow driven by moving boundaries)
         f_next, u_grid = _lbm_step_subroutine(
             pos_curr,
             f_curr,
@@ -1683,7 +1684,7 @@ def _physics_step_jax_jit(
             dx,
             origin,
             dt_sub,
-            gravity,
+            jnp.zeros(3),
             tube_params,
         )
 
@@ -1707,6 +1708,7 @@ def _physics_step_jax_jit(
             D_boundary,
             r_s,
             mass,
+            gravity,
         )
 
         # Step 4: Integrate active particles

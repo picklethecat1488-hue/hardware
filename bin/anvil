@@ -3,6 +3,9 @@
 # Helper script for remote execution and synchronization with cloud server anvil
 # Usage:
 #   bin/anvil sync                 # Sync local workspace to anvil
+#   bin/anvil pull <file...>       # Download generated files/directories from anvil to local
+#   bin/anvil fetch <file...>      # Alias for pull
+#   bin/anvil simulate [args...]   # Run simulation on anvil and auto-download resulting .rrd
 #   bin/anvil smoke                # Sync and run smoke tests on anvil
 #   bin/anvil pytest [args...]     # Sync and run pytest on anvil
 #   bin/anvil run <command...>     # Sync and run arbitrary command on anvil
@@ -31,10 +34,39 @@ sync_code() {
         "${REPO_DIR}/" "${REMOTE_HOST}:${REMOTE_DIR}/"
 }
 
+pull_file() {
+    local remote_path="$1"
+    local local_dest="${2:-$1}"
+    echo "📥 Downloading ${REMOTE_HOST}:${REMOTE_DIR}/${remote_path} -> ${REPO_DIR}/${local_dest}..."
+    rsync -avz "${REMOTE_HOST}:${REMOTE_DIR}/${remote_path}" "${REPO_DIR}/${local_dest}"
+    echo "✅ Download complete."
+}
+
 case "$1" in
-    sync)
+    sync|push)
         sync_code
         echo "✅ Sync complete."
+        ;;
+    pull|fetch|get|download)
+        shift
+        if [ $# -eq 0 ]; then
+            echo "Usage: bin/anvil pull <remote_path> [local_dest]"
+            exit 1
+        fi
+        pull_file "$1" "$2"
+        ;;
+    simulate)
+        shift
+        sync_code
+        echo "🌊 Running simulation on ${REMOTE_HOST}..."
+        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_PYTHON} src/view.py $*"
+        # Auto-download any .rrd file specified in arguments
+        for arg in "$@"; do
+            if [[ "$arg" == *.rrd ]]; then
+                echo "📥 Auto-downloading generated recording ${arg}..."
+                pull_file "$arg" "$arg"
+            fi
+        done
         ;;
     smoke)
         sync_code
@@ -55,7 +87,7 @@ case "$1" in
         ;;
     *)
         if [ $# -eq 0 ]; then
-            echo "Usage: bin/anvil {sync|smoke|pytest|run} [args...]"
+            echo "Usage: bin/anvil {sync|pull|simulate|smoke|pytest|run} [args...]"
             exit 1
         fi
         sync_code
