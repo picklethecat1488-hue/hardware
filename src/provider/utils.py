@@ -176,6 +176,10 @@ def initialize_jax_environment(cache_dir: Optional[Union[str, os.PathLike]] = No
     warnings.filterwarnings("ignore", category=UserWarning, message=".*jax-mps was built for jaxlib.*")
     warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps' is experimental.*")
 
+    # Disable aggressive CUDA device memory preallocation in JAX
+    os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+    os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.75")
+
     # Unset experimental async dispatch on MPS backend to prevent deadlocks
     if os.environ.get("JAX_MPS_ASYNC_DISPATCH") == "1":
         os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
