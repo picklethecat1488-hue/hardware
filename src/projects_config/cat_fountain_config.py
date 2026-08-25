@@ -27,7 +27,7 @@ class CatFountainConfig(BaseModel):
     )
 
     target_volume: float = Field(
-        default=0.00030,
+        default=0.0010,
         description="Target total fluid volume to spawn (m^3).",
     )
 

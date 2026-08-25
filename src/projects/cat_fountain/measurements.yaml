@@ -5,6 +5,7 @@ bowl_radius: 100.0
 bowl_height: 107.0
 bowl_thickness: 4.0
 floor_z: 41.0
+target_volume: 0.0010
 bottom_cover_clearance: 0.2
 bottom_cover_drain_radius: 8.0
 drain_hole_radius: 15.4
