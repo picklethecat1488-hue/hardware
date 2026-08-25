@@ -29,19 +29,24 @@ warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps
 import sys
 
 # Silence C-level MPS startup banners on stderr during initial JAX device probe
-_stderr_fd = sys.stderr.fileno()
-_saved_stderr = os.dup(_stderr_fd)
-_devnull = os.open(os.devnull, os.O_WRONLY)
-os.dup2(_devnull, _stderr_fd)
-os.close(_devnull)
+_stderr_fd = getattr(sys.stderr, "fileno", lambda: 2)()
+try:
+    _saved_stderr = os.dup(_stderr_fd)
+    _devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(_devnull, _stderr_fd)
+    os.close(_devnull)
+    _redirected = True
+except (OSError, ValueError):
+    _redirected = False
 
 try:
     import jax
 
     _ = jax.devices()
 finally:
-    os.dup2(_saved_stderr, _stderr_fd)
-    os.close(_saved_stderr)
+    if _redirected:
+        os.dup2(_saved_stderr, _stderr_fd)
+        os.close(_saved_stderr)
 
 import logging
 
