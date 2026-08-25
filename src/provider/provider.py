@@ -628,6 +628,7 @@ class URDFBoundary:
         thickness = kwargs.pop("thickness", default_thickness)
         xyz = kwargs.pop("xyz", default_xyz)
         rpy = kwargs.pop("rpy", default_rpy)
+        boundary_friction = kwargs.pop("boundary_friction", getattr(metadata, "boundary_friction", 0.20))
 
         config_dict = {
             "link_type": link_type,
@@ -639,6 +640,7 @@ class URDFBoundary:
             "thickness": thickness,
             "xyz": xyz,
             "rpy": rpy,
+            "boundary_friction": boundary_friction,
             **kwargs,
         }
         boundary = BoundaryConfig.model_validate(config_dict)

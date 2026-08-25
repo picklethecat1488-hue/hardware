@@ -1044,3 +1044,111 @@ def test_voxel_primitive_cutouts():
 
     # A point inside the cutout connection (should NOT be solid)
     assert tube.is_solid(0.0, 0.028 - 0.013, 0.005) is False
+
+
+def test_airborne_freefall_particles_maintain_ballistic_velocity():
+    """Verify that airborne particles falling in mid-air outside the tube maintain ballistic velocity without spurious rotation."""
+    import jax.numpy as jnp
+    from model.boundary_config import BoundaryConfig, BoundaryType, ShapeType
+    from provider.bullet import LinkType
+    from provider.fluid import PhysicsConfig, _physics_step_jax
+
+    # Particle in mid-air outside the tube, falling down
+    pos = jnp.array([[0.0, -0.020, 0.060]], dtype=jnp.float32)
+    vel = jnp.array([[0.0, 0.0, -0.5]], dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 16, 16, 16), dtype=jnp.float32)
+
+    # Base bowl, casing, tube, and spinning impeller
+    b_bowl = BoundaryConfig(
+        link_type=LinkType.BASE,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.100,
+        height=0.107,
+        link_idx=-1,
+    )
+    b_casing = BoundaryConfig(
+        link_type=LinkType.CASING,
+        shape=ShapeType.CASING,
+        type=BoundaryType.SOLID_CAVITY,
+        radius=0.028,
+        height=0.010,
+        thickness=0.010,
+        ceiling_thickness=0.002,
+        slot_height=0.009,
+        slot_width=0.008,
+        link_idx=-1,
+    )
+    b_tube = BoundaryConfig(
+        link_type=LinkType.TUBE,
+        shape=ShapeType.TUBE,
+        type=BoundaryType.SOLID_CAVITY,
+        radius=0.018,
+        height=0.066,
+        thickness=0.010,
+        slot_height=0.009,
+        slot_width=0.008,
+        xyz=(0.0, 0.028, 0.0),
+        link_idx=-1,
+    )
+    b_impeller = BoundaryConfig(
+        link_type=LinkType.IMPELLER,
+        shape=ShapeType.IMPELLER,
+        type=BoundaryType.SOLID,
+        radius=0.009,
+        height=0.015,
+        thickness=0.003,
+        vane_thickness=0.001,
+        num_vanes=6,
+        vane_twist=-15.0,
+        link_idx=-1,
+    )
+
+    b_pos = jnp.array(
+        [
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.028, 0.0],
+            [0.0, 0.0, 0.0],
+        ],
+        dtype=jnp.float32,
+    )
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0]] * 4, dtype=jnp.float32)
+
+    config = PhysicsConfig(
+        mass=1.4e-5,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=[b_bowl, b_casing, b_tube, b_impeller],
+        gravity=jnp.array([0.0, 0.0, -9.81], dtype=jnp.float32),
+        base_idx=0,
+        K_boundary=5000.0,
+        D_boundary=15.0,
+        r_s=0.0015,
+        high_damping_value=0.995,
+        nx=16,
+        ny=16,
+        nz=16,
+        dx=0.010,
+        origin=(-0.08, -0.08, 0.0),
+    )
+
+    # Step simulation with spinning impeller
+    pos_next, vel_next, f_next, _ = _physics_step_jax(
+        pos,
+        vel,
+        f_lbm,
+        b_pos,
+        b_orn,
+        jnp.zeros(3, dtype=jnp.float32),
+        120.0,
+        0.0,
+        0.995,
+        config=config,
+    )
+
+    # Airborne particle should not receive horizontal rotation/swirl from the spinning impeller LBM grid
+    assert jnp.isclose(vel_next[0, 0], 0.0, atol=1e-4)
+    assert jnp.isclose(vel_next[0, 1], 0.0, atol=1e-4)
+    # Particle should continue accelerating downward under gravity
+    assert vel_next[0, 2] < -0.50

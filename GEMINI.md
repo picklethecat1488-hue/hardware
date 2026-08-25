@@ -20,10 +20,10 @@ pytest
 ```
 
 ## Validation Guidelines
-1. **Execution**: Always activate the `cq` conda environment (as specified in [environment.yml](file:///Users/daparker/gh/hardware/environment.yml)) and run commands from the repository root.
+1. **Execution**: Prefer offloading test suites (`pytest`, `pytest -m "slow"`, `python src/smoke.py`) and pre-commit validation to the `anvil` cloud server (e.g., via `bin/anvil run "PYTHONPATH=src /home/ubuntu/miniforge3/envs/cq/bin/pytest"` or `ssh anvil`) to free up local CPU/GPU compute for rapid iteration, CAD generation, and interactive experiments. When running locally, activate the `cq` conda environment.
 2. **Outcome Verification**: Confirm that all checks (format, lint, compile, and pytest) pass with exit code `0`.
 3. **Resolution**: If any component fails (such as syntax error, ruff failure, or failing test), you must address the failure and re-run the check before concluding your work.
-4. **Integration Smoke Tests**: The integration smoke tests (`python src/smoke.py`) are highly resource-intensive and should be run on the continuous integration (CI) server. Avoid running them locally during normal development iterations unless you are verifying changes to the daemon, visualizer backend, or SPH physics engine.
+4. **Integration Smoke Tests**: The integration smoke tests (`python src/smoke.py`) are highly resource-intensive and should always be run on `anvil`.
 
 ---
 
@@ -87,6 +87,7 @@ pytest
 * Code documentation MUST be PEP-257 compliant and comprehensive. Write docstrings for all custom classes, methods, functions, and properties.
 * Docstring correctness is checked automatically by ruff linting rules (group `D` configured in [pyproject.toml](file:///Users/daparker/gh/hardware/pyproject.toml)).
 * **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum`) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes. This prevents typos and improves code readability/refactoring.
+* **Named Constant Formatting**: Constant values in production code must be assigned to module-level or class-level `ALL_CAPS` named constant variables rather than being embedded as inline magic literals.
 * **Import Placement**: Imports should be done at the top of the file/listing, unless doing so would cause module load race conditions or circular dependencies (such as importing model classes inside provider packages).
 
 ---
@@ -104,5 +105,5 @@ Host anvil
 ```
 
 ### Usage Guidelines:
-1. **Remote Execution**: Use SSH commands targeting `ubuntu@anvil` (or `ssh anvil`) to run long-running smoke tests, large JAX SPH simulation grids, physics sweeps, and data collection benchmarks.
-2. **Environment**: Ensure the conda environment `cq` or required dependencies are activated on the remote instance before executing jobs.
+1. **Remote Execution**: Use `bin/anvil run "<command>"` or SSH targeting `ubuntu@anvil` (or `ssh anvil`) to run full test suites (`pytest`), slow physics benchmarks (`pytest -m "slow"`), large JAX SPH simulation grids, parameter sweeps, and integration smoke tests (`python src/smoke.py`).
+2. **Environment & Binaries**: On `anvil`, execute commands using the `cq` environment at `/home/ubuntu/miniforge3/envs/cq/bin/` (e.g. `PYTHONPATH=src /home/ubuntu/miniforge3/envs/cq/bin/pytest`).

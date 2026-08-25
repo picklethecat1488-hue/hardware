@@ -23,28 +23,15 @@ if env_file.exists():
                     if unprefixed not in os.environ:
                         os.environ[unprefixed] = v
 
-warnings.filterwarnings("ignore", category=UserWarning, message=".*jax-mps was built for jaxlib.*")
-warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps' is experimental.*")
+from .utils import (
+    discover_provider,
+    load_manifest,
+    get_rgba_color,
+    initialize_jax_environment,
+)
 
-import jax
-import logging
-
-# Enable JAX compilation caching globally to prevent JIT compile latency across tests, builds, and views
-_cache_dir = Path(__file__).resolve().parents[2] / "build" / "jax_cache"
-jax.config.update("jax_compilation_cache_dir", str(_cache_dir))
-jax.config.update("jax_log_compiles", True)
-jax.config.update("jax_explain_cache_misses", True)
-
-from .types import DAEMON_LOGGERS
-
-# Silence JAX and fluid simulation loggers from console output by default
-for logger_name in DAEMON_LOGGERS:
-    logging.getLogger(logger_name).setLevel(logging.INFO)
-    logging.getLogger(logger_name).propagate = False
-
-# Unset experimental and potentially unstable async dispatch on MPS backend to prevent compilation deadlocks/hangs
-if os.environ.get("JAX_MPS_ASYNC_DISPATCH") == "1":
-    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
+# Initialize JAX environment configuration deterministically
+initialize_jax_environment()
 
 import OCP.TopoDS  # type: ignore
 

@@ -47,6 +47,7 @@ class BoundaryParam(IntEnum):
     TUBE_RADIUS = 13
     DRAIN_HOLE_Y = 14
     DRAIN_HOLE_RADIUS = 15
+    BOUNDARY_FRICTION = 16
 
 
 class BoundaryConfig(BaseModel):
@@ -120,7 +121,7 @@ class BoundaryConfig(BaseModel):
             return self
 
         supported = self.SHAPE_SUPPORTED_FIELDS.get(self.shape, set())
-        common = {"shape", "type", "link_type", "link_idx", "xyz", "rpy"}
+        common = {"shape", "type", "link_type", "link_idx", "xyz", "rpy", "boundary_friction"}
 
         for field_name in self.model_fields_set:
             if field_name not in common and field_name not in supported:
@@ -147,6 +148,7 @@ class BoundaryConfig(BaseModel):
     type: Optional[BoundaryType] = Field(
         default=None, description="Collision type (cavity container, solid obstacle, or solid cavity)"
     )
+    boundary_friction: Optional[float] = Field(default=0.0, ge=0.0, description="Boundary friction coefficient")
 
     # ----------------------------------------------------
     # Spatial Transform Fields

@@ -725,6 +725,17 @@ class CatFountainProvider(Provider):
         with BuildPart() as cover:
             Cylinder(radius=cover_r, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
+            # Add a 0.5mm snap-fit annular ring around the perimeter
+            with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
+                Cylinder(radius=cover_r + 0.5, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                Cylinder(
+                    radius=cover_r - 2.0, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                )
+                fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.4)
+
+            with Locations((0, 0, 1.2)):
+                add(snap_ring_part.part)
+
             # Funnel-shaped top surface to drain water towards the central drain hole
             with Locations((0, 0, 1.5)):
                 Cone(
@@ -735,19 +746,18 @@ class CatFountainProvider(Provider):
                     mode=Mode.SUBTRACT,
                 )
 
-            Cylinder(radius=self.settings.bottom_cover_drain_radius, height=6.0, mode=Mode.SUBTRACT)
+            # Central drain hole drilled through the entire cover
+            Cylinder(
+                radius=self.settings.bottom_cover_drain_radius,
+                height=10.0,
+                align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                mode=Mode.SUBTRACT,
+            )
 
+            # Peripheral wire/access opening notch on the edge
             opening_w = self.settings.bottom_cover_opening_width
             with Locations((0, -cover_r, 0.0)):
-                Box(opening_w, 10.0, 4.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-
-            # Add a 0.5mm snap-fit ring around the perimeter
-            with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
-                Cylinder(radius=cover_r + 0.5, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.4)
-
-            with Locations((0, 0, 1.2)):
-                add(snap_ring_part.part)
+                Box(opening_w, 20.0, 10.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
 
             URDFMetadata(
                 label=target,
@@ -971,8 +981,8 @@ class CatFountainProvider(Provider):
             URDFMetadata(
                 label=target,
                 material="petg",
-                density=1.27,
-                boundary_friction=0.20,
+                density=self.settings.petg_density,
+                boundary_friction=self.settings.petg_boundary_friction,
                 collision_type=URDFCollisionType.CONVEX,
                 parent="bowl",
                 joint_type=URDFJointType.FIXED,
@@ -1061,8 +1071,8 @@ class CatFountainProvider(Provider):
             with URDFMetadata(
                 label=target,
                 material="petg",
-                density=1.27,
-                boundary_friction=0.20,
+                density=self.settings.petg_density,
+                boundary_friction=self.settings.petg_boundary_friction,
                 collision_type=URDFCollisionType.ANALYTICAL,
                 parent="bowl",
                 joint_type=URDFJointType.FIXED,
@@ -1378,8 +1388,8 @@ class CatFountainProvider(Provider):
             URDFMetadata(
                 label=target,
                 material="petg",
-                density=1.27,
-                boundary_friction=0.20,
+                density=self.settings.petg_density,
+                boundary_friction=self.settings.petg_boundary_friction,
                 collision_type=URDFCollisionType.CONVEX,
                 parent="bowl",
                 joint_type=URDFJointType.FIXED,

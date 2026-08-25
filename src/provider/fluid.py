@@ -301,265 +301,7 @@ class BoundaryParam(IntEnum):
     TUBE_RADIUS = 13
     DRAIN_HOLE_Y = 14
     DRAIN_HOLE_RADIUS = 15
-
-
-def _boundary_force_cylinder_jax(
-    pos_local: jnp.ndarray,
-    vel_local: jnp.ndarray,
-    radius: float,
-    height: float,
-    thickness: float,
-    z_offset: float,
-    r_s: float,
-    K: float,
-    D: float,
-    boundary_type: int,
-    has_tube: bool,
-    has_drain: bool,
-    tube_radius: float,
-    drain_hole_y: float,
-    drain_hole_radius: float,
-    local_tube_y: float,
-) -> jnp.ndarray:
-    """Compute boundary force for a cylinder cavity or solid boundary.
-
-    Args:
-        pos_local: Particle positions in boundary local frame.
-        vel_local: Particle velocities in boundary local frame.
-        radius: Cylinder radius.
-        height: Cylinder height.
-        thickness: Wall/floor thickness.
-        z_offset: Z coordinate offset.
-        r_s: Particle radius/rejection distance.
-        K: Collision penalty stiffness.
-        D: Collision penalty damping.
-        boundary_type: Cavity or Solid.
-        has_tube: True if the bottom has a tube connection hole.
-        has_drain: True if the bottom has a drain hole.
-        tube_radius: Inner tube radius.
-        drain_hole_y: Y location of the drain hole.
-        drain_hole_radius: Radius of the drain hole.
-        local_tube_y: Local Y coordinate of the tube axis.
-
-    Returns:
-        jnp.ndarray: Force vectors in boundary local frame.
-    """
-    r_c = jnp.sqrt(pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2)
-    r_c = jnp.maximum(r_c, 1e-8)
-
-    # 1. Cavity side wall
-    r_limit_c = radius - r_s
-    pen_c_side = r_c - r_limit_c
-    side_mask = (pen_c_side > 0.0) & (pos_local[:, 2] >= z_offset) & (pos_local[:, 2] <= height)
-    nx_c = -pos_local[:, 0] / r_c
-    ny_c = -pos_local[:, 1] / r_c
-    v_n_c = vel_local[:, 0] * (-nx_c) + vel_local[:, 1] * (-ny_c)
-    f_mag_c_side = K * pen_c_side + D * jnp.maximum(v_n_c, 0.0)
-    force_c_side = jnp.stack([f_mag_c_side * nx_c, f_mag_c_side * ny_c, jnp.zeros_like(r_c)], axis=-1)
-    force_c_side = jnp.where(side_mask[:, None], force_c_side, 0.0)
-
-    # 2. Cavity bottom
-    z_limit_c = z_offset + r_s
-    pen_c_bottom = z_limit_c - pos_local[:, 2]
-
-    in_tube_hole = has_tube & (pos_local[:, 0] ** 2 + (pos_local[:, 1] - local_tube_y) ** 2 < tube_radius**2)
-    platform_radius = jnp.where(has_tube & has_drain, 0.030, 0.0)
-    in_platform = has_tube & (pos_local[:, 0] ** 2 + (pos_local[:, 1] - local_tube_y) ** 2 <= platform_radius**2)
-    in_drain_hole = (
-        (has_drain & (drain_hole_radius > 0.0))
-        & (pos_local[:, 0] ** 2 + (pos_local[:, 1] - drain_hole_y) ** 2 < drain_hole_radius**2)
-        & (~in_platform)
-    ) | in_tube_hole
-    bottom_mask = (pen_c_bottom > 0.0) & (r_c < radius) & (pos_local[:, 2] >= z_offset) & (~in_drain_hole)
-    f_z_c = K * pen_c_bottom - D * vel_local[:, 2]
-    force_c_bottom = jnp.stack([jnp.zeros_like(r_c), jnp.zeros_like(r_c), jnp.maximum(f_z_c, 0.0)], axis=-1)
-    force_c_bottom = jnp.where(bottom_mask[:, None], force_c_bottom, 0.0)
-
-    force_cavity = force_c_side + force_c_bottom
-
-    # 3. Solid cylinder collision
-    pen_solid = (radius + r_s) - r_c
-    solid_mask = (pen_solid > 0.0) & (pos_local[:, 2] >= z_offset) & (pos_local[:, 2] <= height)
-    nx_solid = pos_local[:, 0] / r_c
-    ny_solid = pos_local[:, 1] / r_c
-    v_n_solid = vel_local[:, 0] * nx_solid + vel_local[:, 1] * ny_solid
-    f_mag_solid = K * pen_solid - D * v_n_solid
-    force_solid = jnp.stack([f_mag_solid * nx_solid, f_mag_solid * ny_solid, jnp.zeros_like(r_c)], axis=-1)
-    force_solid = jnp.where((solid_mask[:, None]) & (f_mag_solid[:, None] > 0.0), force_solid, 0.0)
-
-    return jnp.where(boundary_type == 1, force_cavity, force_solid)
-
-
-def _boundary_force_sphere_jax(
-    pos_local: jnp.ndarray,
-    vel_local: jnp.ndarray,
-    radius: float,
-    r_s: float,
-    K: float,
-    D: float,
-) -> jnp.ndarray:
-    """Compute boundary force for a solid sphere boundary.
-
-    Args:
-        pos_local: Particle positions in boundary local frame.
-        vel_local: Particle velocities in boundary local frame.
-        radius: Sphere radius.
-        r_s: Particle radius.
-        K: Collision penalty stiffness.
-        D: Collision penalty damping.
-
-    Returns:
-        jnp.ndarray: Force vectors in boundary local frame.
-    """
-    dist = jnp.sqrt(pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2 + pos_local[:, 2] ** 2)
-    dist = jnp.maximum(dist, 1e-8)
-    pen = (radius + r_s) - dist
-    mask = pen > 0.0
-    nx = pos_local[:, 0] / dist
-    ny = pos_local[:, 1] / dist
-    nz = pos_local[:, 2] / dist
-    v_n = vel_local[:, 0] * nx + vel_local[:, 1] * ny + vel_local[:, 2] * nz
-    f_mag = K * pen - D * v_n
-    force = jnp.stack([f_mag * nx, f_mag * ny, f_mag * nz], axis=-1)
-    return jnp.where((mask & (f_mag > 0.0))[:, None], force, 0.0)
-
-
-def _boundary_force_tube_jax(
-    pos_local: jnp.ndarray,
-    vel_local: jnp.ndarray,
-    radius: float,
-    height: float,
-    thickness: float,
-    r_s: float,
-    K: float,
-    D: float,
-    slot_height: float,
-    slot_width: float,
-) -> jnp.ndarray:
-    """Compute boundary force for a vertical tube wall boundary.
-
-    Args:
-        pos_local: Particle positions in boundary local frame.
-        vel_local: Particle velocities in boundary local frame.
-        radius: Tube inner radius.
-        height: Tube height.
-        thickness: Tube wall thickness.
-        r_s: Particle radius.
-        K: Collision penalty stiffness.
-        D: Collision penalty damping.
-        slot_height: Height of flow slots at the tube base.
-        slot_width: Width of flow slots.
-
-    Returns:
-        jnp.ndarray: Force vectors in boundary local frame.
-    """
-    height_mask = (pos_local[:, 2] >= 0.0) & (pos_local[:, 2] <= height)
-    half_width = slot_width / 2.0
-    cutout_mask = (pos_local[:, 2] < slot_height) & (pos_local[:, 1] > 0.0) & (jnp.abs(pos_local[:, 0]) < half_width)
-    active_mask = height_mask & (~cutout_mask)
-
-    r_hc = jnp.sqrt(pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2)
-    r_hc = jnp.maximum(r_hc, 1e-8)
-
-    inner_r = radius - thickness
-    r_hc_mid = (inner_r + radius) / 2.0
-
-    # 1. Inner cavity collision
-    pen_hc_in = r_hc - (inner_r - r_s)
-    in_mask = active_mask & (inner_r > 0.0) & (r_hc < r_hc_mid) & (pen_hc_in > 0.0)
-    nx_hc_in = -pos_local[:, 0] / r_hc
-    ny_hc_in = -pos_local[:, 1] / r_hc
-    v_n_hc_in = vel_local[:, 0] * (-nx_hc_in) + vel_local[:, 1] * (-ny_hc_in)
-    f_mag_hc_in = K * pen_hc_in + D * jnp.maximum(v_n_hc_in, 0.0)
-    force_hc_in = jnp.stack([f_mag_hc_in * nx_hc_in, f_mag_hc_in * ny_hc_in, jnp.zeros_like(r_hc)], axis=-1)
-    force_hc_in = jnp.where(in_mask[:, None], force_hc_in, 0.0)
-
-    # 2. Outer solid cylinder collision
-    pen_hc_out = (radius + r_s) - r_hc
-    out_mask = active_mask & (radius > 0.0) & (r_hc >= r_hc_mid) & (pen_hc_out > 0.0)
-    nx_hc_out = pos_local[:, 0] / r_hc
-    ny_hc_out = pos_local[:, 1] / r_hc
-    v_n_hc_out = vel_local[:, 0] * nx_hc_out + vel_local[:, 1] * ny_hc_out
-    f_mag_hc_out = K * pen_hc_out - D * v_n_hc_out
-    force_hc_out = jnp.stack([f_mag_hc_out * nx_hc_out, f_mag_hc_out * ny_hc_out, jnp.zeros_like(r_hc)], axis=-1)
-    force_hc_out = jnp.where((out_mask[:, None]) & (f_mag_hc_out[:, None] > 0.0), force_hc_out, 0.0)
-
-    return force_hc_in + force_hc_out
-
-
-def _boundary_force_casing_jax(
-    pos_local: jnp.ndarray,
-    vel_local: jnp.ndarray,
-    radius: float,
-    height: float,
-    thickness: float,
-    r_s: float,
-    K: float,
-    D: float,
-    slot_height: float,
-    slot_width: float,
-    cutoff_y: float,
-) -> jnp.ndarray:
-    """Compute boundary force for a pump casing boundary.
-
-    Args:
-        pos_local: Particle positions in boundary local frame.
-        vel_local: Particle velocities in boundary local frame.
-        radius: Casing inner radius.
-        height: Casing height.
-        thickness: Casing wall thickness.
-        r_s: Particle radius.
-        K: Collision penalty stiffness.
-        D: Collision penalty damping.
-        slot_height: Height of flow inlet slots.
-        slot_width: Width of flow inlet slots.
-        cutoff_y: Y limit cutoff for closed ceiling.
-
-    Returns:
-        jnp.ndarray: Force vectors in boundary local frame.
-    """
-    height_mask = (pos_local[:, 2] >= 0.0) & (pos_local[:, 2] <= height)
-    half_width = slot_width / 2.0
-    cutout_mask = (pos_local[:, 2] < slot_height) & (pos_local[:, 1] > 0.0) & (jnp.abs(pos_local[:, 0]) < half_width)
-    active_mask = height_mask & (~cutout_mask)
-
-    r_hc = jnp.sqrt(pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2)
-    r_hc = jnp.maximum(r_hc, 1e-8)
-
-    inner_r = radius - thickness
-    r_hc_mid = (inner_r + radius) / 2.0
-
-    # 1. Inner cavity collision
-    pen_hc_in = r_hc - (inner_r - r_s)
-    in_mask = active_mask & (inner_r > 0.0) & (r_hc < r_hc_mid) & (pen_hc_in > 0.0)
-    nx_hc_in = -pos_local[:, 0] / r_hc
-    ny_hc_in = -pos_local[:, 1] / r_hc
-    v_n_hc_in = vel_local[:, 0] * (-nx_hc_in) + vel_local[:, 1] * (-ny_hc_in)
-    f_mag_hc_in = K * pen_hc_in + D * jnp.maximum(v_n_hc_in, 0.0)
-    force_hc_in = jnp.stack([f_mag_hc_in * nx_hc_in, f_mag_hc_in * ny_hc_in, jnp.zeros_like(r_hc)], axis=-1)
-    force_hc_in = jnp.where(in_mask[:, None], force_hc_in, 0.0)
-
-    # 2. Outer solid cylinder collision
-    pen_hc_out = (radius + r_s) - r_hc
-    out_mask = active_mask & (radius > 0.0) & (r_hc >= r_hc_mid) & (pen_hc_out > 0.0)
-    nx_hc_out = pos_local[:, 0] / r_hc
-    ny_hc_out = pos_local[:, 1] / r_hc
-    v_n_hc_out = vel_local[:, 0] * nx_hc_out + vel_local[:, 1] * ny_hc_out
-    f_mag_hc_out = K * pen_hc_out - D * v_n_hc_out
-    force_hc_out = jnp.stack([f_mag_hc_out * nx_hc_out, f_mag_hc_out * ny_hc_out, jnp.zeros_like(r_hc)], axis=-1)
-    force_hc_out = jnp.where((out_mask[:, None]) & (f_mag_hc_out[:, None] > 0.0), force_hc_out, 0.0)
-
-    force_hc_total = force_hc_in + force_hc_out
-
-    # 3. Solid ceiling collision
-    pen_ceiling = pos_local[:, 2] - (height - r_s)
-    ceiling_mask = (pos_local[:, 2] >= 0.0) & (pen_ceiling > 0.0) & (r_hc <= inner_r) & (pos_local[:, 1] < cutoff_y)
-    f_mag_ceiling = K * pen_ceiling + D * jnp.maximum(vel_local[:, 2], 0.0)
-    force_ceiling = jnp.stack([jnp.zeros_like(r_hc), jnp.zeros_like(r_hc), -f_mag_ceiling], axis=-1)
-    force_ceiling = jnp.where(ceiling_mask[:, None], force_ceiling, 0.0)
-    force_hc_total += force_ceiling
-
-    return force_hc_total
+    BOUNDARY_FRICTION = 16
 
 
 def _boundary_force_impeller_jax(
@@ -660,35 +402,6 @@ def _boundary_force_impeller_jax(
     return total_force, step_torque
 
 
-def _boundary_force_plane_jax(
-    pos_local: jnp.ndarray,
-    vel_local: jnp.ndarray,
-    thickness: float,
-    r_s: float,
-    K: float,
-    D: float,
-) -> jnp.ndarray:
-    """Compute boundary force for a plane boundary.
-
-    Args:
-        pos_local: Particle positions in boundary local frame.
-        vel_local: Particle velocities in boundary local frame.
-        thickness: Plane boundary thickness.
-        r_s: Particle radius.
-        K: Collision penalty stiffness.
-        D: Collision penalty damping.
-
-    Returns:
-        jnp.ndarray: Force vectors in boundary local frame.
-    """
-    pen = (thickness + r_s) - pos_local[:, 2]
-    mask = pen > 0.0
-    f_z = K * pen - D * vel_local[:, 2]
-    force = jnp.stack([jnp.zeros_like(pen), jnp.zeros_like(pen), jnp.maximum(f_z, 0.0)], axis=-1)
-    return jnp.where((mask & (f_z > 0.0))[:, None], force, 0.0)
-
-
-@jax.jit
 def _compute_boundary_forces_jax(
     pos: jnp.ndarray,
     vel: jnp.ndarray,
@@ -702,8 +415,18 @@ def _compute_boundary_forces_jax(
     b_params: jnp.ndarray,
     omega: float,
     t: float,
+    solid_mask: jnp.ndarray | None = None,
+    solid_friction: jnp.ndarray | None = None,
+    normal_grid: jnp.ndarray | None = None,
+    smooth_occ: jnp.ndarray | None = None,
+    dx: float = 0.0035,
+    origin: jnp.ndarray | None = None,
+    base_idx: int = -1,
+    nx: int = 32,
+    ny: int = 32,
+    nz: int = 28,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Compute boundary collision and friction forces using penalty-based methods.
+    """Compute unified voxel-based boundary collision and surface friction forces with dynamic impeller physics.
 
     Args:
         pos: (N, 3) array of SPH particle positions in world coordinates (meters).
@@ -718,89 +441,84 @@ def _compute_boundary_forces_jax(
         b_params: (B, 16) array of boundary parameters.
         omega: Target impeller angular speed (rad/s).
         t: Current simulation time (seconds).
+        solid_mask: Optional solid mask array.
+        solid_friction: Optional solid friction array.
+        normal_grid: Optional normal grid array.
+        smooth_occ: Optional smooth occupancy array.
+        dx: Voxel grid cell pitch (meters).
+        origin: Voxel grid origin coordinates.
+        base_idx: Index of base link in boundary arrays.
+        nx: Number of voxel cells in X.
+        ny: Number of voxel cells in Y.
+        nz: Number of voxel cells in Z.
 
     Returns:
         A tuple containing:
             - forces: (N, 3) array of boundary forces acting on each particle in world coordinates.
             - vanes_torque: Reaction torque acting on the rotary vanes (impeller).
     """
-    forces = jnp.zeros_like(pos)
+    origin_arr = jnp.array([-0.112, -0.112, 0.0]) if origin is None else origin
+    base_pos = jnp.where(base_idx != -1, b_pos_arr[base_idx], jnp.zeros(3))
+    base_orn = jnp.where(base_idx != -1, b_orn_arr[base_idx], jnp.array([0.0, 0.0, 0.0, 1.0]))
+    base_orn_inv = q_inv(base_orn)
+
+    if solid_mask is None or solid_friction is None or normal_grid is None or smooth_occ is None:
+        solid_mask, _, solid_friction, normal_grid, smooth_occ = _make_grid_masks(
+            dx,
+            origin_arr,
+            b_shapes,
+            b_types,
+            b_params,
+            b_pos_arr,
+            b_orn_arr,
+            base_idx,
+            nx,
+            ny,
+            nz,
+            (False, 0.0, 0.0, 0.0),
+        )
+
+    pos_local = q_rotate(base_orn_inv, pos - base_pos)
+    vel_local = q_rotate(base_orn_inv, vel)
+
+    occ_p = _g2p_scalar_jax(pos_local, smooth_occ, dx, origin_arr, nx, ny, nz)
+    norm_p = _g2p_jax(pos_local, normal_grid, dx, origin_arr, nx, ny, nz)
+    norm_p_mag = jnp.sqrt(jnp.sum(norm_p**2, axis=-1, keepdims=True) + 1e-8)
+    norm_unit = norm_p / norm_p_mag
+    fric_p = _g2p_scalar_jax(pos_local, solid_friction, dx, origin_arr, nx, ny, nz)
+
+    pen = jnp.maximum(occ_p - 0.40, 0.0) * r_s
+    v_n = -jnp.sum(vel_local * norm_unit, axis=-1)
+    f_n_mag = jnp.maximum(K * pen + D * jnp.maximum(v_n, 0.0), 0.0)
+
+    v_tan = vel_local - jnp.sum(vel_local * norm_unit, axis=-1, keepdims=True) * norm_unit
+    v_tan_mag = jnp.sqrt(jnp.sum(v_tan**2, axis=-1, keepdims=True) + 1e-8)
+    f_fric_tan = -fric_p[:, None] * f_n_mag[:, None] * (v_tan / v_tan_mag)
+
+    force_local = f_n_mag[:, None] * norm_unit + f_fric_tan
+    force_voxel = jnp.where((occ_p > 0.40)[:, None], force_local, 0.0)
+    forces = q_rotate(base_orn, force_voxel)
     vanes_torque = jnp.array(0.0)
 
+    # Dynamic rotating impeller forces and reaction torque
     for i in range(b_shapes.shape[0]):
+        is_imp = b_shapes[i] == SHAPE_IMPELLER
         b_pos = b_pos_arr[i]
         b_orn = b_orn_arr[i]
         b_orn_inv = q_inv(b_orn)
-        pos_local = q_rotate(b_orn_inv, pos - b_pos)
-        vel_local = q_rotate(b_orn_inv, vel)
+        pos_imp = q_rotate(b_orn_inv, pos - b_pos)
+        vel_imp = q_rotate(b_orn_inv, vel)
 
-        shape = b_shapes[i]
-        b_type = b_types[i]
-        radius = b_params[i, 0]
-        height = b_params[i, 1]
-        thickness = b_params[i, 2]
-        z_offset = b_params[i, 3]
-        slot_height = b_params[i, 4]
-        slot_width = b_params[i, 5]
-        ceiling_thickness = b_params[i, 6]
-        vane_thickness = b_params[i, 7]
-        num_vanes = b_params[i, 8]
-        vane_twist_rad = b_params[i, 9]
-        cutoff_y = b_params[i, 10]
-        has_tube = b_params[i, 11] > 0.5
-        has_drain = b_params[i, 12] > 0.5
-        tube_radius = b_params[i, 13]
-        drain_hole_y = b_params[i, 14]
-        drain_hole_radius = b_params[i, 15]
+        radius = b_params[i, BoundaryParam.RADIUS]
+        height = b_params[i, BoundaryParam.HEIGHT]
+        thickness = b_params[i, BoundaryParam.THICKNESS]
+        vane_thickness = b_params[i, BoundaryParam.VANE_THICKNESS]
+        num_vanes = b_params[i, BoundaryParam.NUM_VANES]
+        vane_twist_rad = b_params[i, BoundaryParam.VANE_TWIST_RAD]
 
-        # CYLINDER
-        is_cyl = shape == SHAPE_CYLINDER
-        local_tube_y = 0.0
-        for j in range(b_shapes.shape[0]):
-            tube_pos_world = b_pos_arr[j]
-            local_tube_pos = q_rotate(b_orn_inv, tube_pos_world - b_pos)
-            local_tube_y = jnp.where(b_shapes[j] == SHAPE_TUBE, local_tube_pos[1], local_tube_y)
-
-        force_cyl = _boundary_force_cylinder_jax(
-            pos_local,
-            vel_local,
-            radius,
-            height,
-            thickness,
-            z_offset,
-            r_s,
-            K,
-            D,
-            b_type,
-            has_tube,
-            has_drain,
-            tube_radius,
-            drain_hole_y,
-            drain_hole_radius,
-            local_tube_y,
-        )
-
-        # SPHERE
-        is_sph = shape == SHAPE_SPHERE
-        force_sph = _boundary_force_sphere_jax(pos_local, vel_local, radius, r_s, K, D)
-
-        # TUBE
-        is_tube = shape == SHAPE_TUBE
-        force_tube = _boundary_force_tube_jax(
-            pos_local, vel_local, radius, height, thickness, r_s, K, D, slot_height, slot_width
-        )
-
-        # CASING
-        is_casing = shape == SHAPE_CASING
-        force_casing = _boundary_force_casing_jax(
-            pos_local, vel_local, radius, height, thickness, r_s, K, D, slot_height, slot_width, cutoff_y
-        )
-
-        # IMPELLER
-        is_imp = shape == SHAPE_IMPELLER
         force_imp, torque_imp = _boundary_force_impeller_jax(
-            pos_local,
-            vel_local,
+            pos_imp,
+            vel_imp,
             radius,
             height,
             thickness,
@@ -813,21 +531,9 @@ def _compute_boundary_forces_jax(
             omega,
             t,
         )
-
-        # PLANE
-        is_plane = shape == SHAPE_PLANE
-        force_plane = _boundary_force_plane_jax(pos_local, vel_local, thickness, r_s, K, D)
-
-        # Accumulate forces using jnp.where
-        f_curr = jnp.where(is_cyl, force_cyl, jnp.zeros_like(pos))
-        f_curr = jnp.where(is_sph, force_sph, f_curr)
-        f_curr = jnp.where(is_tube, force_tube, f_curr)
-        f_curr = jnp.where(is_casing, force_casing, f_curr)
-        f_curr = jnp.where(is_imp, force_imp, f_curr)
-        f_curr = jnp.where(is_plane, force_plane, f_curr)
-
-        forces += q_rotate(b_orn, f_curr)
-        vanes_torque = jnp.where(is_imp, vanes_torque + torque_imp, vanes_torque)
+        force_imp_world = q_rotate(b_orn, force_imp)
+        forces += jnp.where(is_imp, force_imp_world, 0.0)
+        vanes_torque = jnp.where(is_imp, torque_imp, vanes_torque)
 
     return forces, vanes_torque
 
@@ -945,8 +651,11 @@ def _grid_mask_casing_jax(
     """Compute grid solid mask for a pump casing boundary."""
     r_outer = radius
     r_inner = radius - thickness
+    r_inlet = radius * 0.35
     is_wall = (rb_sq >= r_inner**2) & (rb_sq <= r_outer**2) & (zb_loc >= 0.0) & (zb_loc <= height)
-    is_ceiling = (rb_sq <= r_outer**2) & (zb_loc >= height - ceiling_thickness) & (zb_loc <= height)
+    is_ceiling = (
+        (rb_sq >= r_inlet**2) & (rb_sq <= r_outer**2) & (zb_loc >= height - ceiling_thickness) & (zb_loc <= height)
+    )
 
     half_width = slot_width / 2.0
     is_cutout = (zb_loc < slot_height) & (yb_loc > 0.0) & (jnp.abs(xb_loc) < half_width)
@@ -987,6 +696,7 @@ def _make_grid_masks(
 
     solid_mask = jnp.zeros(X.shape, dtype=jnp.bool_)
     tube_mask = jnp.zeros(X.shape, dtype=jnp.bool_)
+    solid_friction = jnp.zeros(X.shape, dtype=jnp.float32)
 
     base_pos = jnp.where(base_idx != -1, b_pos_arr[base_idx], jnp.zeros(3))
     base_orn = jnp.where(base_idx != -1, b_orn_arr[base_idx], jnp.array([0.0, 0.0, 0.0, 1.0]))
@@ -1026,6 +736,7 @@ def _make_grid_masks(
         tube_radius = b_params[idx, 13]
         drain_hole_y = b_params[idx, 14]
         drain_hole_radius = b_params[idx, 15]
+        b_fric = b_params[idx, BoundaryParam.BOUNDARY_FRICTION]
 
         # CYLINDER
         is_cyl = shape == SHAPE_CYLINDER
@@ -1085,15 +796,40 @@ def _make_grid_masks(
 
         # Ignore impeller nodes in solid_mask
         solid_mask = jnp.where(is_imp, solid_mask, solid_mask | is_solid)
+        solid_friction = jnp.where(is_solid & (~is_imp), b_fric, solid_friction)
         tube_mask = jnp.where(is_tube, tube_mask | is_tube_mask, tube_mask)
 
-    # Clear solid mask inside the tube passage to prevent blockage at the casing/tube connection
+    # Clear solid mask inside the tube passage at the casing junction to prevent blockage
     has_tube_bound, tube_xb, tube_yb, tube_rb = tube_params
 
-    in_tube_interior = ((X - tube_xb) ** 2 + (Y - tube_yb) ** 2 < tube_rb**2) & (Z > 0.045)
-    solid_mask = jnp.where(has_tube_bound, solid_mask & (~in_tube_interior), solid_mask)
+    casing_z_min = 0.0
+    casing_z_max = 0.0
+    for idx in range(b_shapes.shape[0]):
+        is_cas = b_shapes[idx] == SHAPE_CASING
+        c_z = b_pos_arr[idx, 2]
+        c_h = b_params[idx, BoundaryParam.HEIGHT]
+        c_ceil = b_params[idx, BoundaryParam.CEILING_THICKNESS]
+        casing_z_min = jnp.where(is_cas, c_z + c_h - c_ceil, casing_z_min)
+        casing_z_max = jnp.where(is_cas, c_z + c_h + 2.0 * c_ceil, casing_z_max)
 
-    return solid_mask, tube_mask
+    in_tube_interior = (
+        ((X - tube_xb) ** 2 + (Y - tube_yb) ** 2 < tube_rb**2) & (Z >= casing_z_min) & (Z <= casing_z_max)
+    )
+    solid_mask = jnp.where(has_tube_bound, solid_mask & (~in_tube_interior), solid_mask)
+    solid_friction = jnp.where(has_tube_bound & in_tube_interior, 0.0, solid_friction)
+
+    solid_occ = solid_mask.astype(jnp.float32)
+    kernel = jnp.ones((3, 3, 3), dtype=jnp.float32) / 27.0
+    smooth_occ = jax.scipy.signal.convolve(solid_occ, kernel, mode="same")
+
+    pad_s = jnp.pad(smooth_occ, ((1, 1), (1, 1), (1, 1)), mode="edge")
+    d_dx = (pad_s[2:, 1:-1, 1:-1] - pad_s[:-2, 1:-1, 1:-1]) / (2.0 * dx)
+    d_dy = (pad_s[1:-1, 2:, 1:-1] - pad_s[1:-1, :-2, 1:-1]) / (2.0 * dx)
+    d_dz = (pad_s[1:-1, 1:-1, 2:] - pad_s[1:-1, 1:-1, :-2]) / (2.0 * dx)
+    grad_mag = jnp.sqrt(d_dx**2 + d_dy**2 + d_dz**2 + 1e-8)
+    normal_grid = jnp.stack([-d_dx / grad_mag, -d_dy / grad_mag, -d_dz / grad_mag], axis=-1)
+
+    return solid_mask, tube_mask, solid_friction, normal_grid, smooth_occ
 
 
 def _make_impeller_mask_and_vel(
@@ -1353,6 +1089,35 @@ def _g2p_jax(pos, grid_u, dx, origin, nx=32, ny=32, nz=28):
     return u_p
 
 
+@partial(jax.jit, static_argnums=(4, 5, 6))
+def _g2p_scalar_jax(pos, grid_val, dx, origin, nx=32, ny=32, nz=28):
+    gp = (pos - origin) / dx
+    idx0 = jnp.floor(gp).astype(jnp.int32)
+    idx0 = jnp.clip(idx0, 0, jnp.array([nx - 2, ny - 2, nz - 2]))
+    t = gp - idx0
+
+    w000 = (1.0 - t[:, 0]) * (1.0 - t[:, 1]) * (1.0 - t[:, 2])
+    w100 = t[:, 0] * (1.0 - t[:, 1]) * (1.0 - t[:, 2])
+    w010 = (1.0 - t[:, 0]) * t[:, 1] * (1.0 - t[:, 2])
+    w001 = (1.0 - t[:, 0]) * (1.0 - t[:, 1]) * t[:, 2]
+    w110 = t[:, 0] * t[:, 1] * (1.0 - t[:, 2])
+    w101 = t[:, 0] * (1.0 - t[:, 1]) * t[:, 2]
+    w011 = (1.0 - t[:, 0]) * t[:, 1] * t[:, 2]
+    w111 = t[:, 0] * t[:, 1] * t[:, 2]
+
+    val_p = (
+        w000 * grid_val[idx0[:, 0], idx0[:, 1], idx0[:, 2]]
+        + w100 * grid_val[idx0[:, 0] + 1, idx0[:, 1], idx0[:, 2]]
+        + w010 * grid_val[idx0[:, 0], idx0[:, 1] + 1, idx0[:, 2]]
+        + w001 * grid_val[idx0[:, 0], idx0[:, 1], idx0[:, 2] + 1]
+        + w110 * grid_val[idx0[:, 0] + 1, idx0[:, 1] + 1, idx0[:, 2]]
+        + w101 * grid_val[idx0[:, 0] + 1, idx0[:, 1], idx0[:, 2] + 1]
+        + w011 * grid_val[idx0[:, 0], idx0[:, 1] + 1, idx0[:, 2] + 1]
+        + w111 * grid_val[idx0[:, 0] + 1, idx0[:, 1] + 1, idx0[:, 2] + 1]
+    )
+    return val_p
+
+
 @jax.jit
 def _lbm_step_3d_jax(grid_rho, grid_u):
     feq_list = []
@@ -1427,7 +1192,7 @@ def _lbm_step_subroutine(
     tube_params: tuple[bool, float, float, float],
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     """LBM solver subroutine: builds masks, solves lattice dynamics, and returns grid states."""
-    solid_mask, tube_mask = _make_grid_masks(
+    solid_mask, tube_mask, solid_friction, normal_grid, smooth_occ = _make_grid_masks(
         dx, origin, b_shapes, b_types, b_params, b_pos_arr, b_orn_arr, base_idx, nx, ny, nz, tube_params
     )
 
@@ -1471,7 +1236,7 @@ def _lbm_step_subroutine(
         tube_mask,
         tube_uz_lat,
     )
-    return f_next, u_grid
+    return f_next, u_grid, solid_mask, solid_friction, normal_grid, smooth_occ
 
 
 def _g2p_mapping_subroutine(
@@ -1508,7 +1273,17 @@ def _g2p_mapping_subroutine(
     # Fluid continuum mask (pool bowl and internal pump tube/casing)
     base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.RADIUS], 0.0)
     base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.HEIGHT], 0.0)
-    in_pool = (pos_local[:, 2] <= base_height) & (r_local <= base_radius)
+
+    # Dynamic pool level: if a casing is present, the reservoir pool top is at the casing height (plus ceiling).
+    # If no casing is present (e.g. pure open cylindrical container tests), pool height is base_height.
+    casing_top = 0.0
+    for i in range(b_shapes.shape[0]):
+        is_c = b_shapes[i] == SHAPE_CASING
+        c_h = b_params[i, BoundaryParam.HEIGHT] + b_params[i, BoundaryParam.CEILING_THICKNESS]
+        casing_top = jnp.where(is_c, c_h, casing_top)
+
+    pool_height = jnp.where(casing_top > 0.0, casing_top, base_height)
+    in_pool = (pos_local[:, 2] <= pool_height) & (r_local <= base_radius)
 
     in_tube_or_casing = jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_)
     for i in range(b_shapes.shape[0]):
@@ -1519,8 +1294,10 @@ def _g2p_mapping_subroutine(
         r_b_xy = jnp.sqrt(pos_b[:, 0] ** 2 + pos_b[:, 1] ** 2)
         radius = b_params[i, BoundaryParam.RADIUS]
         height = b_params[i, BoundaryParam.HEIGHT]
+        thickness = b_params[i, BoundaryParam.THICKNESS]
+        inner_r = radius - thickness
 
-        is_tube = (b_shapes[i] == SHAPE_TUBE) & (r_b_xy <= radius) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= height)
+        is_tube = (b_shapes[i] == SHAPE_TUBE) & (r_b_xy <= inner_r) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= height)
         is_casing = (b_shapes[i] == SHAPE_CASING) & (r_b_xy <= radius) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= height)
         in_tube_or_casing = in_tube_or_casing | is_tube | is_casing
 
@@ -1548,6 +1325,16 @@ def _compute_particle_forces_subroutine(
     r_s: float,
     mass: float,
     gravity: jnp.ndarray,
+    solid_mask: jnp.ndarray,
+    solid_friction: jnp.ndarray,
+    normal_grid: jnp.ndarray,
+    smooth_occ: jnp.ndarray,
+    dx: float,
+    origin: jnp.ndarray,
+    base_idx: int,
+    nx: int,
+    ny: int,
+    nz: int,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Force subroutine: computes containment boundary penalty forces, casing suction forces, and gravity."""
     b_forces, step_torque = _compute_boundary_forces_jax(
@@ -1563,6 +1350,16 @@ def _compute_particle_forces_subroutine(
         b_params,
         omega,
         t_curr,
+        solid_mask,
+        solid_friction,
+        normal_grid,
+        smooth_occ,
+        dx,
+        origin,
+        base_idx,
+        nx,
+        ny,
+        nz,
     )
 
     b_accel = b_forces / mass
@@ -1622,31 +1419,41 @@ def _compute_particle_forces_subroutine(
         tube_h = b_params[i, BoundaryParam.HEIGHT]
         inner_r = radius - thickness
 
+        # Query lid deflection / socket height offset dynamically from URDF boundary metadata
+        lid_height_offset = 0.0
+        for j in range(b_shapes.shape[0]):
+            is_dome = (
+                (b_shapes[j] == SHAPE_CYLINDER)
+                & (b_types[j] == 1)
+                & (b_params[j, BoundaryParam.HEIGHT] < 0.02)
+                & (b_params[j, BoundaryParam.HEIGHT] > 0.0)
+            )
+            lid_height_offset = jnp.where(
+                is_dome,
+                b_params[j, BoundaryParam.HEIGHT] + b_params[j, BoundaryParam.THICKNESS],
+                lid_height_offset,
+            )
+
+        tube_effective_h = tube_h - lid_height_offset
+
+        v_tube = q_rotate(tube_orn_inv, vel_world)
+        v_z_tube = v_tube[:, 2]
+        # Velocity tapering toward the tube outlet accelerates convergence to steady-state
+        # laminar flow, speeding up simulation data collection and avoiding initial splash transients.
+        height_frac = jnp.clip(1.0 - pos_tube[:, 2] / (tube_effective_h + 1e-6), 0.0, 1.0)
+        v_target_rise = 0.05 + 0.10 * height_frac
+
         pump_lift_scalar = jnp.where(
             jnp.abs(omega) > 1e-3,
-            g_mag + (v_tip**2) / (2.0 * jnp.maximum(radius, 1e-6)),
-            0.0,
-        )
-        spout_tip_accel_mag = jnp.where(
-            jnp.abs(omega) > 1e-3,
-            (v_tip**2) / (2.0 * jnp.maximum(tube_h, 1e-6)),
+            g_mag + jnp.maximum(0.0, v_target_rise - v_z_tube) * 15.0,
             0.0,
         )
 
-        in_tube = (r_tube_xy < inner_r) & (pos_tube[:, 2] >= 0.0) & (pos_tube[:, 2] <= tube_h)
-        up_world = q_rotate(tube_orn, jnp.array([0.0, 0.0, 1.0])) * pump_lift_scalar
+        in_tube = (r_tube_xy < inner_r) & (pos_tube[:, 2] >= 0.0) & (pos_tube[:, 2] <= tube_effective_h)
+        up_vector = q_rotate(tube_orn, jnp.array([0.0, 0.0, 1.0]))
+        up_world = up_vector[None, :] * pump_lift_scalar[:, None]
 
-        # Forward deflection at the tube nozzle spout exit derived from boundary metadata
-        slot_h = b_params[i, BoundaryParam.SLOT_HEIGHT]
-        nozzle_r = radius + thickness
-        nozzle_z_min = tube_h - thickness
-        nozzle_z_max = tube_h + jnp.maximum(slot_h, 2.0 * thickness)
-        in_nozzle = (r_tube_xy < nozzle_r) & (pos_tube[:, 2] >= nozzle_z_min) & (pos_tube[:, 2] <= nozzle_z_max)
-        tip_forward_world = q_rotate(tube_orn, jnp.array([0.0, -1.0, 0.0])) * spout_tip_accel_mag
-
-        tube_pump_accel_i = jnp.where(in_tube[:, None], up_world, 0.0) + jnp.where(
-            in_nozzle[:, None], tip_forward_world, 0.0
-        )
+        tube_pump_accel_i = jnp.where(in_tube[:, None], up_world, 0.0)
 
         is_tube = b_shapes[i] == SHAPE_TUBE
         tube_pump_accel += jnp.where(is_tube, tube_pump_accel_i, jnp.zeros_like(pos_curr))
@@ -1799,7 +1606,7 @@ def _physics_step_jax_jit(
         base_orn = jnp.where(base_idx != -1, b_orn_arr[base_idx], jnp.array([0.0, 0.0, 0.0, 1.0]))
 
         # Step 1: LBM solver (incompressible Navier-Stokes flow driven by moving boundaries)
-        f_next, u_grid = _lbm_step_subroutine(
+        f_next, u_grid, solid_mask, solid_friction, normal_grid, smooth_occ = _lbm_step_subroutine(
             pos_curr,
             f_curr,
             base_pos,
@@ -1859,6 +1666,16 @@ def _physics_step_jax_jit(
             r_s,
             mass,
             gravity,
+            solid_mask,
+            solid_friction,
+            normal_grid,
+            smooth_occ,
+            dx,
+            origin,
+            base_idx,
+            nx,
+            ny,
+            nz,
         )
 
         # Step 4: Integrate active particles
@@ -1965,6 +1782,9 @@ def _physics_step_jax(
             float(getattr(cfg, "tube_radius", 0.0)),
             float(getattr(cfg, "drain_hole_y", 0.0)),
             float(getattr(cfg, "drain_hole_radius", 0.0)),
+            float(
+                getattr(cfg, "boundary_friction", 0.20) if getattr(cfg, "boundary_friction", None) is not None else 0.20
+            ),
         ]
         b_params_list.append(params)
 
@@ -1986,7 +1806,7 @@ def _physics_step_jax(
             has_tube_bound = True
             if cfg.xyz is not None:
                 tube_xb, tube_yb = float(cfg.xyz[0]), float(cfg.xyz[1])
-            tube_rb = float(cfg.radius)
+            tube_rb = float(cfg.radius) - float(getattr(cfg, "thickness", 0.0))
             break
     tube_params = (has_tube_bound, tube_xb, tube_yb, tube_rb)
 
@@ -2009,7 +1829,7 @@ def _physics_step_jax(
         if getattr(cfg_check, "link_type", None) == LinkType.TUBE:
             has_tube_damping = True
             tube_y_check = float(cfg_check.xyz[1]) if cfg_check.xyz is not None else 0.0
-            tube_r_check = float(cfg_check.radius)
+            tube_r_check = float(cfg_check.radius) - float(getattr(cfg_check, "thickness", 0.0))
             tube_h_check = float(cfg_check.height)
             influence_r = tube_r_check + float(getattr(cfg_check, "spout_radius", 0.0))
             influence_h = tube_h_check + float(getattr(cfg_check, "spout_height", 0.0))

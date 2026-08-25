@@ -795,6 +795,23 @@ class TestCatFountainProvider:
         motor_collar_diameter = 10.0
         assert provider.settings.motor_clip_cutout_width >= motor_collar_diameter
 
+    def test_bottom_cover_drain_and_notch_unobstructed(self, provider):
+        """Verify that the bottom cover's central drain hole and edge notch are not filled by the snap ring."""
+        cover = provider.build_bottom_cover("bottom_cover")
+        solid = cover.part
+
+        # Check central drain hole: point (0, 0, 2.0) must not be inside solid
+        drain_pt = (0.0, 0.0, 2.0)
+        assert not solid.is_inside(drain_pt), "Central drain hole is obstructed!"
+
+        # Check notch opening on the rim: point (0, -cover_r, 2.0) must not be inside solid
+        r = provider.settings.bowl_radius
+        t = provider.settings.bowl_thickness
+        clearance = provider.settings.bottom_cover_clearance
+        cover_r = r - t - clearance
+        notch_pt = (0.0, -cover_r, 2.0)
+        assert not solid.is_inside(notch_pt), "Bottom cover opening notch is obstructed!"
+
     def test_config_tune_action(self, provider):
         """Test that config_tune executes successfully with mocked PyBullet client."""
         from unittest.mock import MagicMock
@@ -940,13 +957,19 @@ class TestCatFountainProvider:
                 # Query dynamic height limit from settings
                 bowl_h = provider.settings.bowl_height * 0.001
                 step_d = provider.settings.lid_step_depth * 0.001
-                # Lid pocket floor Z (main flat top drinking shelf surface) is at bowl_height - lid_step_depth + 3.0mm
-                lid_z_top = bowl_h - step_d + 0.003
+                lid_mount_z = bowl_h - step_d
+                # Lid pocket floor Z (main flat top drinking shelf surface) is at lid_mount_z + 3.0mm
+                lid_z_top = lid_mount_z + 0.003
+
+                # Dome top is at lid_mount_z + 6.0mm center + dome_outer_radius
+                socket_r = (provider.settings.tube_radius + provider.settings.tube_lid_clearance) * 0.001
+                dome_out_r = socket_r + 0.0015
+                dome_top_z = lid_mount_z + 0.006 + dome_out_r
 
                 # Assert that under production measurements, the fountain water exits the spout
-                # and reaches the expected drinking stream height (no higher than 2 voxels over the lid top shelf)
-                min_expected = lid_z_top + 0.005  # 0.110m
-                max_expected = lid_z_top + 0.012  # 0.117m (spout dome height)
+                # and reaches the expected drinking stream height (contained by the spout dome ceiling)
+                min_expected = lid_z_top + 0.005
+                max_expected = dome_top_z + fluid.r_s + 0.001
 
                 # Log the results
                 print(
