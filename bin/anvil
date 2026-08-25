@@ -16,8 +16,7 @@ set -e
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REMOTE_HOST="anvil"
 REMOTE_DIR="/home/ubuntu/hardware"
-REMOTE_PYTHON="/home/ubuntu/miniforge3/envs/cq/bin/python"
-REMOTE_PYTEST="/home/ubuntu/miniforge3/envs/cq/bin/pytest"
+REMOTE_CONDA="source /home/ubuntu/miniforge3/etc/profile.d/conda.sh && conda run -n cq --no-capture-output"
 
 sync_code() {
     echo "📦 Syncing repository to ${REMOTE_HOST}:${REMOTE_DIR}..."
@@ -59,7 +58,7 @@ case "$1" in
         shift
         sync_code
         echo "🌊 Running simulation on ${REMOTE_HOST}..."
-        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_PYTHON} src/view.py $*"
+        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} python src/view.py $*"
         # Auto-download any .rrd file specified in arguments
         for arg in "$@"; do
             if [[ "$arg" == *.rrd ]]; then
@@ -71,19 +70,19 @@ case "$1" in
     smoke)
         sync_code
         echo "🚀 Running smoke test suite on ${REMOTE_HOST}..."
-        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_PYTEST} src/smoke.py"
+        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} pytest src/smoke.py"
         ;;
     pytest)
         shift
         sync_code
         echo "🧪 Running pytest on ${REMOTE_HOST}..."
-        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_PYTEST} $*"
+        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} pytest $*"
         ;;
     run|exec)
         shift
         sync_code
         echo "⚡ Executing command on ${REMOTE_HOST}: $*"
-        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && $*"
+        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} $*"
         ;;
     *)
         if [ $# -eq 0 ]; then
@@ -92,6 +91,6 @@ case "$1" in
         fi
         sync_code
         echo "⚡ Executing command on ${REMOTE_HOST}: $*"
-        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && $*"
+        ssh "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} $*"
         ;;
 esac

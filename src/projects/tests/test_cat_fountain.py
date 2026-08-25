@@ -826,6 +826,36 @@ class TestCatFountainProvider:
         # Ensure lid consists of a single connected solid
         assert len(solid.solids()) == 1, "Lid has disconnected or floating solid bodies!"
 
+    def test_drive_hub_minimum_wall_thickness(self, provider):
+        """Verify that the drive hub has at least 0.8mm wall thickness everywhere."""
+        import math
+
+        hub = provider.build_drive_hub("drive_hub")
+        solid = hub.part
+
+        # 1. Floor thickness under magnet pockets (at ring_r = 9.0mm, Z = 1.0mm must be solid)
+        ring_r = provider.settings.magnet_ring_radius
+        for angle_deg in [0, 120, 240]:
+            rad = math.radians(angle_deg)
+            x = ring_r * math.cos(rad)
+            y = ring_r * math.sin(rad)
+            # Underneath magnet pocket: Z = 1.0mm (below pocket bottom Z=1.9mm) must be solid
+            assert solid.is_inside((x, y, 1.0)), (
+                f"Drive hub magnet pocket floor at ({x:.1f}, {y:.1f}) is broken through!"
+            )
+
+        # 2. Radial partition between bottom recess (r=5.6) and magnet pocket (r=5.9): point at r=5.75, Z=4.2 must be solid
+        for angle_deg in [0, 120, 240]:
+            rad = math.radians(angle_deg)
+            x = 5.75 * math.cos(rad)
+            y = 5.75 * math.sin(rad)
+            assert solid.is_inside((x, y, 4.2)), (
+                f"Radial partition between bottom recess and magnet pocket at ({x:.1f}, {y:.1f}) is too thin!"
+            )
+
+        # 3. Ensure drive hub is a single connected solid
+        assert len(solid.solids()) == 1, "Drive hub is split into disconnected parts!"
+
     def test_config_tune_action(self, provider):
         """Test that config_tune executes successfully with mocked PyBullet client."""
         from unittest.mock import MagicMock

@@ -599,12 +599,18 @@ def _grid_mask_cylinder_jax(
     local_tube_y: float = 0.0,
 ) -> jnp.ndarray:
     """Compute grid solid mask for a cylinder boundary."""
-    is_cavity = (zb_loc >= z_offset - thickness) & (zb_loc <= height) & ((rb_sq >= radius**2) | (zb_loc <= z_offset))
-    in_tube_hole = has_tube & (xb_loc**2 + (yb_loc - local_tube_y) ** 2 < tube_radius**2)
-    in_drain_hole = (
-        (has_drain & (drain_hole_radius > 0.0)) & (xb_loc**2 + (yb_loc - drain_hole_y) ** 2 < drain_hole_radius**2)
-    ) | in_tube_hole
-    is_cavity = jnp.where(has_drain | has_tube, is_cavity & (~in_drain_hole), is_cavity)
+    # Cavity: cylinder side wall (rb_sq >= radius**2) and solid floor (zb_loc <= z_offset)
+    is_wall = (zb_loc <= height) & (rb_sq >= radius**2)
+    is_floor = zb_loc <= z_offset
+
+    # Only lid drainage openings (at z_offset > 0.01 where fluid drains back to reservoir) cut through the cylinder
+    in_drain = (
+        (has_drain & (drain_hole_radius > 0.0))
+        & (xb_loc**2 + (yb_loc - drain_hole_y) ** 2 < drain_hole_radius**2)
+        & (zb_loc >= z_offset - thickness)
+    )
+
+    is_cavity = (is_wall | is_floor) & (~in_drain)
     is_solid = (rb_sq <= radius**2) & (zb_loc >= z_offset) & (zb_loc <= height)
     return jnp.where(boundary_type == 1, is_cavity, is_solid)
 
@@ -1562,6 +1568,39 @@ def _integrate_particles_subroutine(
     vel_next = vel_next * jnp.minimum(max_phys_speed / vel_mags_safe, 1.0)
 
     pos_next = jnp.where(active, pos_curr + vel_next * dt_sub, pos_curr)
+
+    # Enforce analytical non-penetration boundary conditions on base container
+    pos_local_next = q_rotate(base_orn_inv, pos_next - base_pos)
+    vel_local_next = q_rotate(base_orn_inv, vel_next)
+
+    # 1. Floor non-penetration: local Z >= base_z_offset for near-surface particles
+    below_floor = (
+        (pos_local_next[:, 2] >= base_z_offset - 0.010) & (pos_local_next[:, 2] < base_z_offset) & (base_idx != -1)
+    )
+    pos_z_clamped = jnp.where(below_floor, base_z_offset + 1e-4, pos_local_next[:, 2])
+    vel_z_clamped = jnp.where(below_floor, jnp.maximum(vel_local_next[:, 2], 0.0), vel_local_next[:, 2])
+
+    # 2. Side wall non-penetration: local r <= base_radius when below base_height
+    r_loc_next = jnp.sqrt(pos_local_next[:, 0] ** 2 + pos_local_next[:, 1] ** 2)
+    outside_wall = (
+        (r_loc_next > base_radius)
+        & (r_loc_next <= base_radius + 0.015)
+        & (pos_local_next[:, 2] >= base_z_offset)
+        & (pos_local_next[:, 2] <= base_height)
+        & (base_idx != -1)
+    )
+    scale_r = jnp.where(outside_wall & (r_loc_next > 1e-6), (base_radius - 1e-4) / r_loc_next, 1.0)
+    pos_x_clamped = pos_local_next[:, 0] * scale_r
+    pos_y_clamped = pos_local_next[:, 1] * scale_r
+
+    # Recompose local clamped coordinates
+    pos_local_safe = jnp.stack([pos_x_clamped, pos_y_clamped, pos_z_clamped], axis=-1)
+    vel_local_safe = jnp.stack([vel_local_next[:, 0], vel_local_next[:, 1], vel_z_clamped], axis=-1)
+
+    # Rotate back to world frame
+    pos_next = jnp.where(active, q_rotate(base_orn, pos_local_safe) + base_pos, pos_curr)
+    vel_next = jnp.where(active, q_rotate(base_orn, vel_local_safe), 0.0)
+
     return pos_next, vel_next
 
 

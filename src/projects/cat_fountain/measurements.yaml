@@ -5,6 +5,7 @@ bowl_radius: 100.0
 bowl_height: 107.0
 bowl_thickness: 4.0
 floor_z: 41.0
+target_volume: 0.0010
 bottom_cover_clearance: 0.2
 bottom_cover_drain_radius: 8.0
 drain_hole_radius: 15.4
@@ -55,7 +56,7 @@ impeller_blades: 6
 impeller_clearance: 0.4
 vane_twist: -15.0
 motor_target: 130.0
-motor_power: 15.0
+motor_power: 30.0
 stiffness_boundary: 5000.0
 damping_boundary: 15.0
 
