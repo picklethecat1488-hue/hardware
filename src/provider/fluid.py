@@ -799,10 +799,22 @@ def _make_grid_masks(
         solid_friction = jnp.where(is_solid & (~is_imp), b_fric, solid_friction)
         tube_mask = jnp.where(is_tube, tube_mask | is_tube_mask, tube_mask)
 
-    # Clear solid mask inside the tube passage to prevent blockage at the casing/tube connection
+    # Clear solid mask inside the tube passage at the casing junction to prevent blockage
     has_tube_bound, tube_xb, tube_yb, tube_rb = tube_params
 
-    in_tube_interior = ((X - tube_xb) ** 2 + (Y - tube_yb) ** 2 < tube_rb**2) & (Z > 0.045)
+    casing_z_min = 0.0
+    casing_z_max = 0.0
+    for idx in range(b_shapes.shape[0]):
+        is_cas = b_shapes[idx] == SHAPE_CASING
+        c_z = b_pos_arr[idx, 2]
+        c_h = b_params[idx, BoundaryParam.HEIGHT]
+        c_ceil = b_params[idx, BoundaryParam.CEILING_THICKNESS]
+        casing_z_min = jnp.where(is_cas, c_z + c_h - c_ceil, casing_z_min)
+        casing_z_max = jnp.where(is_cas, c_z + c_h + 2.0 * c_ceil, casing_z_max)
+
+    in_tube_interior = (
+        ((X - tube_xb) ** 2 + (Y - tube_yb) ** 2 < tube_rb**2) & (Z >= casing_z_min) & (Z <= casing_z_max)
+    )
     solid_mask = jnp.where(has_tube_bound, solid_mask & (~in_tube_interior), solid_mask)
     solid_friction = jnp.where(has_tube_bound & in_tube_interior, 0.0, solid_friction)
 
@@ -1407,9 +1419,29 @@ def _compute_particle_forces_subroutine(
         tube_h = b_params[i, BoundaryParam.HEIGHT]
         inner_r = radius - thickness
 
+        # Query lid deflection / socket height offset dynamically from URDF boundary metadata
+        lid_height_offset = 0.0
+        for j in range(b_shapes.shape[0]):
+            is_dome = (
+                (b_shapes[j] == SHAPE_CYLINDER)
+                & (b_types[j] == 1)
+                & (b_params[j, BoundaryParam.HEIGHT] < 0.02)
+                & (b_params[j, BoundaryParam.HEIGHT] > 0.0)
+            )
+            lid_height_offset = jnp.where(
+                is_dome,
+                b_params[j, BoundaryParam.HEIGHT] + b_params[j, BoundaryParam.THICKNESS],
+                lid_height_offset,
+            )
+
+        tube_effective_h = tube_h - lid_height_offset
+
         v_tube = q_rotate(tube_orn_inv, vel_world)
         v_z_tube = v_tube[:, 2]
-        v_target_rise = 0.25
+        # Velocity tapering toward the tube outlet accelerates convergence to steady-state
+        # laminar flow, speeding up simulation data collection and avoiding initial splash transients.
+        height_frac = jnp.clip(1.0 - pos_tube[:, 2] / (tube_effective_h + 1e-6), 0.0, 1.0)
+        v_target_rise = 0.05 + 0.10 * height_frac
 
         pump_lift_scalar = jnp.where(
             jnp.abs(omega) > 1e-3,
@@ -1417,7 +1449,7 @@ def _compute_particle_forces_subroutine(
             0.0,
         )
 
-        in_tube = (r_tube_xy < inner_r) & (pos_tube[:, 2] >= 0.0) & (pos_tube[:, 2] <= tube_h)
+        in_tube = (r_tube_xy < inner_r) & (pos_tube[:, 2] >= 0.0) & (pos_tube[:, 2] <= tube_effective_h)
         up_vector = q_rotate(tube_orn, jnp.array([0.0, 0.0, 1.0]))
         up_world = up_vector[None, :] * pump_lift_scalar[:, None]
 
