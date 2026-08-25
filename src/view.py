@@ -18,6 +18,11 @@ from target_parser import TargetParser
 from provider import ProviderManager, Section, TargetList, Room, Simulate, Mode, Provider, URDFShape
 from pydantic import validate_call
 from shell import Logger
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="ocp_vscode.*")
+warnings.filterwarnings("ignore", message=".*collapse value from viewer.*")
+
 from ocp_vscode import set_port, Collapse, Camera, show as ocp_show  # type: ignore
 from build import Builder
 from list import Lister
@@ -188,7 +193,7 @@ class Viewer:
         else:
             summary = self.get_summary(list(room.keys()))
             self.logger.print(f"Showing {summary}", symbol="👁️ ")
-            show(room.compound, names=["View"], collapse=Collapse.ALL, reset_camera=Camera.RESET)
+            show(room.compound, names=["View"], collapse=Collapse.LEAVES, reset_camera=Camera.RESET)
 
 
 def get_args():

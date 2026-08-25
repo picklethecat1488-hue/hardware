@@ -208,7 +208,7 @@ class CatFountainProvider(Provider):
                 Cylinder(radius=pin_r, height=12.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
             # Motor mounting boss projecting down from the bowl floor (Z = floor_z)
-            # This creates a solid 1.2mm barrier floor at the center of rotation
+            # This creates a solid 1.5mm barrier floor at the center of rotation
             with Locations((0, 0, floor_z)):
                 # Outer boss body (increased radius to 21.0mm to provide full support under the impeller casing)
                 boss_h = self.settings.motor_boss_height
@@ -222,7 +222,7 @@ class CatFountainProvider(Provider):
                 # Formed as a U-shaped slot open to the South side (Y < 0) for horizontal slide-in assembly
                 recess_r = self.settings.drive_hub_recess_radius
                 recess_d = self.settings.drive_hub_recess_depth
-                with Locations((0, 0, -1.2)):
+                with Locations((0, 0, -self.settings.pump_well_wall)):
                     Cylinder(
                         radius=recess_r,
                         height=recess_d,
@@ -238,21 +238,22 @@ class CatFountainProvider(Provider):
                             align=(Align.CENTER, Align.CENTER, Align.MAX),
                             mode=Mode.SUBTRACT,
                         )
-                # Restore the central column (radius 5.5mm, height 4.0mm from Z = -6.5 upwards)
-                # This fits within the drive hub bottom recess and provides solid core support
-                with Locations((0, 0, -6.5)):
-                    Cylinder(radius=5.5, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.ADD)
-                    # Subtract central hole for the motor shaft to pass through (radius 0.85mm)
-                    Cylinder(radius=0.85, height=5.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
-                # Speed sensor pocket (5.0mm wide, 2.2mm thick, 14.5mm deep from Z = -17.5 upwards)
-                with Locations((0, 18.5, -17.5)):
-                    Box(5.0, 2.2, 14.5, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+                # Speed sensor pocket (5.0mm wide, 2.2mm thick, open from Z = -3.0 down through bottom)
+                with Locations((0, 18.5, -3.0)):
+                    Box(5.0, 2.2, 20.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
-                # 2. Pocket for the BetaFPV 1102 motor body (starting at Z = -6.5 downwards by 12.0mm to break through bottom)
-                with Locations((0, 0, -6.5)):
-                    # Motor body pocket (radius 7.0mm for 13.8mm diameter, height 12.0mm)
-                    Cylinder(radius=7.0, height=12.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                # 2. Pocket for the BetaFPV 1102 motor body (open from motor_pocket_z down through bottom)
+                motor_pocket_z = -(self.settings.pump_well_wall + recess_d)
+                motor_pocket_h = boss_h - (self.settings.pump_well_wall + recess_d) + 5.0
+                with Locations((0, 0, motor_pocket_z)):
+                    # Motor body pocket (radius 7.0mm for 13.8mm diameter, breaking through bottom)
+                    Cylinder(
+                        radius=7.0,
+                        height=motor_pocket_h,
+                        align=(Align.CENTER, Align.CENTER, Align.MAX),
+                        mode=Mode.SUBTRACT,
+                    )
                     # Motor front face alignment boss pocket (radius 2.75mm, height 1.6mm)
                     Cylinder(radius=2.75, height=1.6, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
@@ -597,8 +598,10 @@ class CatFountainProvider(Provider):
                 )
 
         # Define joints
+        hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 1.5
+        motor_shaft_z = floor_z - (self.settings.pump_well_wall + hub_h + 0.35)
         RigidJoint("impeller_post", bowl.part, Location((0, 0, floor_z)))
-        RigidJoint("motor_shaft", bowl.part, Location((0, 0, floor_z - 6.0)))
+        RigidJoint("motor_shaft", bowl.part, Location((0, 0, motor_shaft_z)))
         RigidJoint("pump_cover_seat", bowl.part, Location((0, 0, floor_z + 8.5)))
         RigidJoint("motor_clip_seat", bowl.part, Location((0, 0, floor_z - 17.5)))
         RigidJoint("lid_seat", bowl.part, Location((0, 0, h)))
@@ -1002,18 +1005,14 @@ class CatFountainProvider(Provider):
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Build the dry-side magnet drive hub mounted on the motor D-shaft."""
-        hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.5
-        hub_h = 4.5
+        hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.6
+        hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 1.5
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
         mt = self.settings.magnet_thickness + self.settings.magnet_clearance
         ring_r = self.settings.magnet_ring_radius
 
         with BuildPart() as hub:
             Cylinder(radius=hub_r, height=hub_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-
-            # Subtract central clearance recess on the bottom face to clear the bowl's 5.5mm mounting column
-            # (radius 5.8mm, depth 3.6mm starting from Z = 0, leaving 0.9mm ceiling and 2.4mm floor under magnets)
-            Cylinder(radius=5.8, height=3.6, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
             # Round shaft hole (radius 0.78mm for 1.5mm motor shaft)
             with BuildSketch() as hole_sketch:
