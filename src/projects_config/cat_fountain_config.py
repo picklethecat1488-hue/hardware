@@ -151,7 +151,7 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def motor_power(self) -> float:
         """Return the maximum motor output power in Watts."""
-        return float(self._raw_data.get("motor_power", 1.0))
+        return float(self._raw_data.get("motor_power", 30.0))
 
     @cached_property
     def motor_force_sim(self) -> float:

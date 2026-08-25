@@ -1033,10 +1033,13 @@ class CatFountainProvider(Provider):
 
             URDFMetadata(
                 label=target,
-                material="petg",
-                density=1.27,
-                boundary_friction=0.35,
+                material=self.settings.material,
+                density=self.settings.density,
+                boundary_friction=self.settings.boundary_friction,
                 collision_type=URDFCollisionType.CONVEX,
+                motor_type=URDFMotorType.VELOCITY,
+                motor_target=self.settings.motor_target,
+                motor_force=self.settings.motor_power / self.settings.motor_target,
                 parent="bowl",
                 joint_type=URDFJointType.CONTINUOUS,
             )
