@@ -1,7 +1,7 @@
 """Utility functions for build providers."""
 
 import os
-from typing import Any, TypeVar, Callable, overload, Union, cast
+from typing import Any, TypeVar, Callable, overload, Union, Optional, cast
 import yaml
 from .types import Mode, Section, ColorType, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT
 
@@ -160,3 +160,61 @@ def get_rgba_color(
     name = str(color)
     rgb = color_map.get(cast(ColorType, name), default_rgb)
     return (*rgb, alpha)
+
+
+def initialize_jax_environment(cache_dir: Optional[Union[str, os.PathLike]] = None) -> None:
+    """Initialize and configure the JAX environment deterministically.
+
+    Suppresses noisy C-level MPS startup banners, silences JAX logger propagation to stdout,
+    configures persistent compilation caching, and disables verbose compile logs unless requested.
+    """
+    import sys
+    import warnings
+    import logging
+    from pathlib import Path
+
+    warnings.filterwarnings("ignore", category=UserWarning, message=".*jax-mps was built for jaxlib.*")
+    warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps' is experimental.*")
+
+    # Unset experimental async dispatch on MPS backend to prevent deadlocks
+    if os.environ.get("JAX_MPS_ASYNC_DISPATCH") == "1":
+        os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
+
+    # Silence C-level MPS startup banners on stderr during initial JAX device probe
+    _stderr_fd = getattr(sys.stderr, "fileno", lambda: 2)()
+    try:
+        _saved_stderr = os.dup(_stderr_fd)
+        _devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(_devnull, _stderr_fd)
+        os.close(_devnull)
+        _redirected = True
+    except (OSError, ValueError):
+        _redirected = False
+
+    try:
+        import jax
+
+        _ = jax.devices()
+    finally:
+        if _redirected:
+            os.dup2(_saved_stderr, _stderr_fd)
+            os.close(_saved_stderr)
+
+    # Enable JAX compilation caching globally to prevent JIT compile latency
+    if cache_dir is None:
+        cache_dir = Path(__file__).resolve().parents[2] / "build" / "jax_cache"
+    jax.config.update("jax_compilation_cache_dir", str(cache_dir))
+
+    if os.environ.get("JAX_LOG_COMPILES") == "1":
+        jax.config.update("jax_log_compiles", True)
+        jax.config.update("jax_explain_cache_misses", True)
+    else:
+        jax.config.update("jax_log_compiles", False)
+        jax.config.update("jax_explain_cache_misses", False)
+
+    # Silence JAX and fluid simulation loggers from console output by default
+    from .types import DAEMON_LOGGERS
+
+    for logger_name in DAEMON_LOGGERS:
+        logging.getLogger(logger_name).setLevel(logging.INFO)
+        logging.getLogger(logger_name).propagate = False

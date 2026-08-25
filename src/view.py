@@ -235,15 +235,9 @@ def get_args():
 
 def main():
     """Build and show the requested geometry in ocp_vscode."""
-    # Disable experimental async dispatch for MPS backend to prevent deadlocks/hangs
-    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
-    try:
-        import jax
+    from provider.utils import initialize_jax_environment
 
-        # Enable compilation caching to avoid JIT compile latency on subsequent runs
-        jax.config.update("jax_compilation_cache_dir", "build/jax_cache")
-    except ImportError:
-        pass
+    initialize_jax_environment()
 
     args = get_args()
 

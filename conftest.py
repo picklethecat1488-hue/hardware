@@ -7,6 +7,10 @@ import os
 os.environ["JAX_PLATFORMS"] = "cpu"
 os.environ["JAX_PLATFORM_NAME"] = "cpu"
 
+from provider.utils import initialize_jax_environment
+
+initialize_jax_environment()
+
 
 def pytest_cmdline_main(config):
     """Check options before test session runs."""
