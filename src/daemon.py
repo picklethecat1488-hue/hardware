@@ -301,8 +301,10 @@ class DaemonServer:
 
         # Configure JAX and fluid simulation logs to go to the daemon log file
         try:
+            from provider.utils import initialize_jax_environment
             from provider import DAEMON_LOGGERS
 
+            initialize_jax_environment()
             for name in DAEMON_LOGGERS:
                 l = logging.getLogger(name)
                 l.addHandler(handler)
