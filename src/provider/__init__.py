@@ -26,14 +26,31 @@ if env_file.exists():
 warnings.filterwarnings("ignore", category=UserWarning, message=".*jax-mps was built for jaxlib.*")
 warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps' is experimental.*")
 
-import jax
+import sys
+
+# Silence C-level MPS startup banners on stderr during initial JAX device probe
+_stderr_fd = sys.stderr.fileno()
+_saved_stderr = os.dup(_stderr_fd)
+_devnull = os.open(os.devnull, os.O_WRONLY)
+os.dup2(_devnull, _stderr_fd)
+os.close(_devnull)
+
+try:
+    import jax
+
+    _ = jax.devices()
+finally:
+    os.dup2(_saved_stderr, _stderr_fd)
+    os.close(_saved_stderr)
+
 import logging
 
 # Enable JAX compilation caching globally to prevent JIT compile latency across tests, builds, and views
 _cache_dir = Path(__file__).resolve().parents[2] / "build" / "jax_cache"
 jax.config.update("jax_compilation_cache_dir", str(_cache_dir))
-jax.config.update("jax_log_compiles", True)
-jax.config.update("jax_explain_cache_misses", True)
+if os.environ.get("JAX_LOG_COMPILES") == "1":
+    jax.config.update("jax_log_compiles", True)
+    jax.config.update("jax_explain_cache_misses", True)
 
 from .types import DAEMON_LOGGERS
 
