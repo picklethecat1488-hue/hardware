@@ -1002,7 +1002,7 @@ class CatFountainProvider(Provider):
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
         """Build the dry-side magnet drive hub mounted on the motor D-shaft."""
-        hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.0
+        hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.5
         hub_h = 4.5
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
         mt = self.settings.magnet_thickness + self.settings.magnet_clearance
@@ -1011,9 +1011,9 @@ class CatFountainProvider(Provider):
         with BuildPart() as hub:
             Cylinder(radius=hub_r, height=hub_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Subtract central clearance recess on the bottom face to clear the bowl's mounting column/screws
-            # (radius 5.8mm, depth 3.7mm starting from Z = 0)
-            Cylinder(radius=5.8, height=3.7, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+            # Subtract central clearance recess on the bottom face to clear the bowl's 5.5mm mounting column
+            # (radius 5.8mm, depth 3.6mm starting from Z = 0, leaving 0.9mm ceiling and 2.4mm floor under magnets)
+            Cylinder(radius=5.8, height=3.6, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
 
             # Round shaft hole (radius 0.78mm for 1.5mm motor shaft)
             with BuildSketch() as hole_sketch:
@@ -1021,7 +1021,7 @@ class CatFountainProvider(Provider):
             ext_hole = extrude(hole_sketch.sketch, amount=hub_h + 2.0, mode=Mode.PRIVATE)
             hub.part -= Location((0, 0, -1.0)) * ext_hole
 
-            # 4 magnet pockets on the top face (Z = hub_h)
+            # Magnet pockets on the top face (Z = hub_h)
             for i in range(self.settings.magnet_count):
                 angle = i * (360.0 / self.settings.magnet_count)
                 with Locations(Location((0, 0, hub_h)) * Rot(0, 0, angle)):
