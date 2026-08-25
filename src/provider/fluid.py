@@ -347,10 +347,12 @@ def _boundary_force_cylinder_jax(
     r_c = jnp.sqrt(pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2)
     r_c = jnp.maximum(r_c, 1e-8)
 
+    bottom_limit = z_offset - jnp.maximum(thickness, 0.0)
+
     # 1. Cavity side wall
     r_limit_c = radius - r_s
     pen_c_side = r_c - r_limit_c
-    side_mask = (pen_c_side > 0.0) & (pos_local[:, 2] >= z_offset) & (pos_local[:, 2] <= height)
+    side_mask = (pen_c_side > 0.0) & (pos_local[:, 2] >= bottom_limit) & (pos_local[:, 2] <= height)
     nx_c = -pos_local[:, 0] / r_c
     ny_c = -pos_local[:, 1] / r_c
     v_n_c = vel_local[:, 0] * (-nx_c) + vel_local[:, 1] * (-ny_c)
@@ -370,7 +372,7 @@ def _boundary_force_cylinder_jax(
         & (pos_local[:, 0] ** 2 + (pos_local[:, 1] - drain_hole_y) ** 2 < drain_hole_radius**2)
         & (~in_platform)
     ) | in_tube_hole
-    bottom_mask = (pen_c_bottom > 0.0) & (r_c < radius) & (pos_local[:, 2] >= z_offset) & (~in_drain_hole)
+    bottom_mask = (pen_c_bottom > 0.0) & (r_c < radius) & (pos_local[:, 2] >= bottom_limit) & (~in_drain_hole)
     f_z_c = K * pen_c_bottom - D * vel_local[:, 2]
     force_c_bottom = jnp.stack([jnp.zeros_like(r_c), jnp.zeros_like(r_c), jnp.maximum(f_z_c, 0.0)], axis=-1)
     force_c_bottom = jnp.where(bottom_mask[:, None], force_c_bottom, 0.0)
@@ -1508,7 +1510,17 @@ def _g2p_mapping_subroutine(
     # Fluid continuum mask (pool bowl and internal pump tube/casing)
     base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.RADIUS], 0.0)
     base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.HEIGHT], 0.0)
-    in_pool = (pos_local[:, 2] <= base_height) & (r_local <= base_radius)
+
+    # Dynamic pool level: if a casing is present, the reservoir pool top is at the casing height (plus ceiling).
+    # If no casing is present (e.g. pure open cylindrical container tests), pool height is base_height.
+    casing_top = 0.0
+    for i in range(b_shapes.shape[0]):
+        is_c = b_shapes[i] == SHAPE_CASING
+        c_h = b_params[i, BoundaryParam.HEIGHT] + b_params[i, BoundaryParam.CEILING_THICKNESS]
+        casing_top = jnp.where(is_c, c_h, casing_top)
+
+    pool_height = jnp.where(casing_top > 0.0, casing_top, base_height)
+    in_pool = (pos_local[:, 2] <= pool_height) & (r_local <= base_radius)
 
     in_tube_or_casing = jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_)
     for i in range(b_shapes.shape[0]):
@@ -1519,8 +1531,10 @@ def _g2p_mapping_subroutine(
         r_b_xy = jnp.sqrt(pos_b[:, 0] ** 2 + pos_b[:, 1] ** 2)
         radius = b_params[i, BoundaryParam.RADIUS]
         height = b_params[i, BoundaryParam.HEIGHT]
+        thickness = b_params[i, BoundaryParam.THICKNESS]
+        inner_r = radius - thickness
 
-        is_tube = (b_shapes[i] == SHAPE_TUBE) & (r_b_xy <= radius) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= height)
+        is_tube = (b_shapes[i] == SHAPE_TUBE) & (r_b_xy <= inner_r) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= height)
         is_casing = (b_shapes[i] == SHAPE_CASING) & (r_b_xy <= radius) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= height)
         in_tube_or_casing = in_tube_or_casing | is_tube | is_casing
 
@@ -1610,47 +1624,6 @@ def _compute_particle_forces_subroutine(
     g_mag = jnp.linalg.norm(gravity)
     v_tip = jnp.abs(omega) * r_impeller
 
-    tube_pump_accel = jnp.zeros_like(pos_curr)
-    for i in range(b_shapes.shape[0]):
-        tube_pos = b_pos_arr[i]
-        tube_orn = b_orn_arr[i]
-        tube_orn_inv = q_inv(tube_orn)
-        pos_tube = q_rotate(tube_orn_inv, pos_curr - tube_pos)
-        r_tube_xy = jnp.sqrt(pos_tube[:, 0] ** 2 + pos_tube[:, 1] ** 2)
-        radius = b_params[i, BoundaryParam.RADIUS]
-        thickness = b_params[i, BoundaryParam.THICKNESS]
-        tube_h = b_params[i, BoundaryParam.HEIGHT]
-        inner_r = radius - thickness
-
-        pump_lift_scalar = jnp.where(
-            jnp.abs(omega) > 1e-3,
-            g_mag + (v_tip**2) / (2.0 * jnp.maximum(radius, 1e-6)),
-            0.0,
-        )
-        spout_tip_accel_mag = jnp.where(
-            jnp.abs(omega) > 1e-3,
-            (v_tip**2) / (2.0 * jnp.maximum(tube_h, 1e-6)),
-            0.0,
-        )
-
-        in_tube = (r_tube_xy < inner_r) & (pos_tube[:, 2] >= 0.0) & (pos_tube[:, 2] <= tube_h)
-        up_world = q_rotate(tube_orn, jnp.array([0.0, 0.0, 1.0])) * pump_lift_scalar
-
-        # Forward deflection at the tube nozzle spout exit derived from boundary metadata
-        slot_h = b_params[i, BoundaryParam.SLOT_HEIGHT]
-        nozzle_r = radius + thickness
-        nozzle_z_min = tube_h - thickness
-        nozzle_z_max = tube_h + jnp.maximum(slot_h, 2.0 * thickness)
-        in_nozzle = (r_tube_xy < nozzle_r) & (pos_tube[:, 2] >= nozzle_z_min) & (pos_tube[:, 2] <= nozzle_z_max)
-        tip_forward_world = q_rotate(tube_orn, jnp.array([0.0, -1.0, 0.0])) * spout_tip_accel_mag
-
-        tube_pump_accel_i = jnp.where(in_tube[:, None], up_world, 0.0) + jnp.where(
-            in_nozzle[:, None], tip_forward_world, 0.0
-        )
-
-        is_tube = b_shapes[i] == SHAPE_TUBE
-        tube_pump_accel += jnp.where(is_tube, tube_pump_accel_i, jnp.zeros_like(pos_curr))
-
     lid_drain_accel = jnp.zeros_like(pos_curr)
     for i in range(b_shapes.shape[0]):
         lid_pos = b_pos_arr[i]
@@ -1682,7 +1655,7 @@ def _compute_particle_forces_subroutine(
             is_lid_cavity & on_lid[:, None], dir_world * lid_drain_mag, jnp.zeros_like(pos_curr)
         )
 
-    accel = b_accel_clamped + suction_accel + tube_pump_accel + lid_drain_accel + gravity[None, :]
+    accel = b_accel_clamped + suction_accel + lid_drain_accel + gravity[None, :]
     return accel, step_torque
 
 
@@ -1986,7 +1959,7 @@ def _physics_step_jax(
             has_tube_bound = True
             if cfg.xyz is not None:
                 tube_xb, tube_yb = float(cfg.xyz[0]), float(cfg.xyz[1])
-            tube_rb = float(cfg.radius)
+            tube_rb = float(cfg.radius) - float(getattr(cfg, "thickness", 0.0))
             break
     tube_params = (has_tube_bound, tube_xb, tube_yb, tube_rb)
 
@@ -2009,7 +1982,7 @@ def _physics_step_jax(
         if getattr(cfg_check, "link_type", None) == LinkType.TUBE:
             has_tube_damping = True
             tube_y_check = float(cfg_check.xyz[1]) if cfg_check.xyz is not None else 0.0
-            tube_r_check = float(cfg_check.radius)
+            tube_r_check = float(cfg_check.radius) - float(getattr(cfg_check, "thickness", 0.0))
             tube_h_check = float(cfg_check.height)
             influence_r = tube_r_check + float(getattr(cfg_check, "spout_radius", 0.0))
             influence_h = tube_h_check + float(getattr(cfg_check, "spout_height", 0.0))
