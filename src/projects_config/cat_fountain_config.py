@@ -184,22 +184,22 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def petg_boundary_friction(self) -> float:
         """Return the boundary friction of PETG material dynamically from manifest configuration."""
-        return float(self._material_data.get("petg", {}).get("boundary_friction", 0.20))
+        return float(self._material_data.get("petg", {}).get("boundary_friction", 0.0))
 
     @cached_property
     def petg_contact_angle(self) -> float:
         """Return the contact angle of PETG material dynamically from manifest configuration."""
-        return float(self._material_data.get("petg", {}).get("contact_angle", 75.0))
+        return float(self._material_data.get("petg", {}).get("contact_angle", 0.0))
 
     @property
     def density(self) -> float:
         """Return the density of the configured material dynamically from manifest configuration."""
-        return float(self._material_data.get(self.material, {}).get("density", 1.27))
+        return float(self._material_data.get(self.material, {}).get("density", 0.0))
 
     @property
     def boundary_friction(self) -> float:
         """Return the boundary friction of the configured material dynamically from manifest configuration."""
-        return float(self._material_data.get(self.material, {}).get("boundary_friction", 0.20))
+        return float(self._material_data.get(self.material, {}).get("boundary_friction", 0.0))
 
     @property
     def contact_angle(self) -> float:

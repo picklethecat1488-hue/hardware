@@ -972,8 +972,8 @@ class CatFountainProvider(Provider):
             URDFMetadata(
                 label=target,
                 material="petg",
-                density=1.27,
-                boundary_friction=0.20,
+                density=self.settings.petg_density,
+                boundary_friction=self.settings.petg_boundary_friction,
                 collision_type=URDFCollisionType.CONVEX,
                 parent="bowl",
                 joint_type=URDFJointType.FIXED,
@@ -1062,8 +1062,8 @@ class CatFountainProvider(Provider):
             with URDFMetadata(
                 label=target,
                 material="petg",
-                density=1.27,
-                boundary_friction=0.20,
+                density=self.settings.petg_density,
+                boundary_friction=self.settings.petg_boundary_friction,
                 collision_type=URDFCollisionType.ANALYTICAL,
                 parent="bowl",
                 joint_type=URDFJointType.FIXED,
@@ -1379,8 +1379,8 @@ class CatFountainProvider(Provider):
             URDFMetadata(
                 label=target,
                 material="petg",
-                density=1.27,
-                boundary_friction=0.20,
+                density=self.settings.petg_density,
+                boundary_friction=self.settings.petg_boundary_friction,
                 collision_type=URDFCollisionType.CONVEX,
                 parent="bowl",
                 joint_type=URDFJointType.FIXED,
