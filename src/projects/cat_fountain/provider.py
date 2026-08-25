@@ -725,6 +725,17 @@ class CatFountainProvider(Provider):
         with BuildPart() as cover:
             Cylinder(radius=cover_r, height=4.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
+            # Add a 0.5mm snap-fit annular ring around the perimeter
+            with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
+                Cylinder(radius=cover_r + 0.5, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                Cylinder(
+                    radius=cover_r - 2.0, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                )
+                fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.4)
+
+            with Locations((0, 0, 1.2)):
+                add(snap_ring_part.part)
+
             # Funnel-shaped top surface to drain water towards the central drain hole
             with Locations((0, 0, 1.5)):
                 Cone(
@@ -735,19 +746,18 @@ class CatFountainProvider(Provider):
                     mode=Mode.SUBTRACT,
                 )
 
-            Cylinder(radius=self.settings.bottom_cover_drain_radius, height=6.0, mode=Mode.SUBTRACT)
+            # Central drain hole drilled through the entire cover
+            Cylinder(
+                radius=self.settings.bottom_cover_drain_radius,
+                height=10.0,
+                align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                mode=Mode.SUBTRACT,
+            )
 
+            # Peripheral wire/access opening notch on the edge
             opening_w = self.settings.bottom_cover_opening_width
             with Locations((0, -cover_r, 0.0)):
-                Box(opening_w, 10.0, 4.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-
-            # Add a 0.5mm snap-fit ring around the perimeter
-            with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
-                Cylinder(radius=cover_r + 0.5, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.4)
-
-            with Locations((0, 0, 1.2)):
-                add(snap_ring_part.part)
+                Box(opening_w, 20.0, 10.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
 
             URDFMetadata(
                 label=target,
@@ -848,30 +858,34 @@ class CatFountainProvider(Provider):
                         )
 
             with Locations((0.0, tube_y, 0)):
-                with Locations((0, 0, 6.0)):
-                    socket_r = self.settings.tube_radius + self.settings.tube_lid_clearance
-                    dome_out_r = socket_r + 1.5
-                    dome_in_r = (
-                        self.settings.tube_radius - self.settings.tube_thickness + self.settings.tube_lid_clearance
-                    )
-                    outer_dome = Sphere(radius=dome_out_r)
-                    Sphere(radius=dome_in_r, mode=Mode.SUBTRACT)
-                    for angle in [0, 45, 90, 135]:
-                        with Locations(Rot(0, 0, angle)):
-                            Box(
-                                self.SLOT_WIDTH,
-                                self.SLOT_LENGTH,
-                                dome_in_r,
-                                align=(Align.CENTER, Align.CENTER, Align.MIN),
-                                mode=Mode.SUBTRACT,
+                socket_r = self.settings.tube_radius + self.settings.tube_lid_clearance
+                dome_out_r = socket_r + 1.5
+                dome_in_r = self.settings.tube_radius - self.settings.tube_thickness + self.settings.tube_lid_clearance
+                dome_slot_len = (dome_out_r + 1.0) * 2.0
+
+                with BuildPart(mode=Mode.PRIVATE) as dome_tool:
+                    with Locations((0, 0, 6.0)):
+                        outer_dome = Sphere(radius=dome_out_r)
+                        Sphere(radius=dome_in_r, mode=Mode.SUBTRACT)
+                        for angle in [0, 45, 90, 135]:
+                            with Locations(Rot(0, 0, angle)):
+                                Box(
+                                    self.SLOT_WIDTH,
+                                    dome_slot_len,
+                                    dome_in_r,
+                                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                                    mode=Mode.SUBTRACT,
+                                )
+                        # Retention boss extending down from inner sphere ceiling to limit impeller vertical travel (added after cuts)
+                        with Locations((0, 0, dome_in_r)):
+                            Cylinder(
+                                radius=3.0,
+                                height=self.settings.retention_boss_height,
+                                align=(Align.CENTER, Align.CENTER, Align.MAX),
                             )
-                    # Retention boss extending down from inner sphere ceiling to limit impeller vertical travel (added after cuts)
-                    with Locations((0, 0, dome_in_r)):
-                        Cylinder(
-                            radius=3.0,
-                            height=self.settings.retention_boss_height,
-                            align=(Align.CENTER, Align.CENTER, Align.MAX),
-                        )
+
+                add(dome_tool.part)
+
                 with Locations((0, 0, -10.0)):
                     Cylinder(
                         radius=socket_r,

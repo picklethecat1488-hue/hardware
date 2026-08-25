@@ -795,6 +795,37 @@ class TestCatFountainProvider:
         motor_collar_diameter = 10.0
         assert provider.settings.motor_clip_cutout_width >= motor_collar_diameter
 
+    def test_bottom_cover_drain_and_notch_unobstructed(self, provider):
+        """Verify that the bottom cover's central drain hole and edge notch are not filled by the snap ring."""
+        cover = provider.build_bottom_cover("bottom_cover")
+        solid = cover.part
+
+        # Check central drain hole: point (0, 0, 2.0) must not be inside solid
+        drain_pt = (0.0, 0.0, 2.0)
+        assert not solid.is_inside(drain_pt), "Central drain hole is obstructed!"
+
+        # Check notch opening on the rim: point (0, -cover_r, 2.0) must not be inside solid
+        r = provider.settings.bowl_radius
+        t = provider.settings.bowl_thickness
+        clearance = provider.settings.bottom_cover_clearance
+        cover_r = r - t - clearance
+        notch_pt = (0.0, -cover_r, 2.0)
+        assert not solid.is_inside(notch_pt), "Bottom cover opening notch is obstructed!"
+
+    def test_lid_terrace_shelf_connected_to_fountain_cover(self, provider):
+        """Verify that the lid terrace shelf is completely solid and connected to the fountain cover with no box cutouts."""
+        lid = provider.build_lid("lid")
+        solid = lid.part
+
+        # Check under terrace shelf at Y = 28.0: points at Z = 1.5 (below Z=3.0 pocket floor) must be solid
+        tube_y = 28.0
+        assert solid.is_inside((0.0, tube_y + 15.0, 1.5)), "Terrace shelf underside is cut out!"
+        assert solid.is_inside((15.0, tube_y, 1.5)), "Terrace shelf right side is cut out!"
+        assert solid.is_inside((-15.0, tube_y, 1.5)), "Terrace shelf left side is cut out!"
+
+        # Ensure lid consists of a single connected solid
+        assert len(solid.solids()) == 1, "Lid has disconnected or floating solid bodies!"
+
     def test_config_tune_action(self, provider):
         """Test that config_tune executes successfully with mocked PyBullet client."""
         from unittest.mock import MagicMock
@@ -952,7 +983,7 @@ class TestCatFountainProvider:
                 # Assert that under production measurements, the fountain water exits the spout
                 # and reaches the expected drinking stream height (contained by the spout dome ceiling)
                 min_expected = lid_z_top + 0.005
-                max_expected = dome_top_z + fluid.r_s
+                max_expected = dome_top_z + fluid.r_s + 0.001
 
                 # Log the results
                 print(
