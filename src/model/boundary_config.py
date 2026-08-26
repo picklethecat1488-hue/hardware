@@ -5,7 +5,21 @@ from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_valid
 
 from enum import StrEnum, IntEnum
 import math
-from provider.bullet import LinkType
+
+
+class LinkType(IntEnum):
+    """Bullet link types."""
+
+    BASE = -1
+    OUTLET = 0
+    TUBE = 1
+    IMPELLER = 2
+    FALLEN = -2
+    OUTLET_MAX_Y = -3
+    LID = 3
+    DRIVE_HUB = 4
+    PUMP_COVER = 5
+    CASING = 6
 
 
 class ShapeType(StrEnum):

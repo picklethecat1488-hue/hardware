@@ -914,7 +914,7 @@ class CatFountainProvider(Provider):
                 type=BoundaryType.CAVITY,
                 radius=self.settings.lid_pocket_radius * 0.001,
                 height=self.settings.lid_pocket_cavity_height * 0.001,
-                thickness=0.030,
+                thickness=self.settings.lid_pocket_thickness * 0.001,
                 xyz=(0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001),
                 rpy=(0.0, 0.0, 0.0),
                 has_drain=True,
@@ -935,6 +935,8 @@ class CatFountainProvider(Provider):
                 thickness=self.settings.spout_deflection_thickness * 0.001,
                 xyz=(0.0, tube_y * 0.001, dome_top_z * 0.001),
                 rpy=(math.pi, 0.0, 0.0),
+                has_tube=True,
+                tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             )
 
             URDFBoundary(

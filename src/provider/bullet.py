@@ -11,22 +11,7 @@ from typing import Any, Optional, Callable, cast
 import rerun as rr
 import queue
 import threading
-from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFCollisionType, Simulate
-
-
-class LinkType(IntEnum):
-    """Bullet link types."""
-
-    BASE = -1
-    OUTLET = 0
-    TUBE = 1
-    IMPELLER = 2
-    FALLEN = -2
-    OUTLET_MAX_Y = -3
-    LID = 3
-    DRIVE_HUB = 4
-    PUMP_COVER = 5
-    CASING = 6
+from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFCollisionType, Simulate, LinkType
 
 
 def _is_real_physics_client(physics_client: Any) -> bool:
@@ -53,6 +38,7 @@ class BulletStateTracker:
         self.particle_radii: list[float] = []
         self.transforms: dict[str, tuple[list[float], list[float]]] = {}
         self.particle_positions: list[list[float]] = []
+        self.boundary_voxels: Optional[dict[str, Any]] = None
         self._last_checked_num_bodies = 0
         self.has_fluid_simulator = False
 
@@ -549,12 +535,20 @@ class Bullet:
                             item = q.get()
                             if item is None:
                                 break
-                            transforms, particle_positions, particle_colors, particle_radii, step_idx = item
+                            (
+                                transforms,
+                                particle_positions,
+                                particle_colors,
+                                particle_radii,
+                                boundary_voxels,
+                                step_idx,
+                            ) = item
                             self.room._log_rerun(
                                 transforms,
                                 particle_positions,
                                 particle_colors,
                                 particle_radii=particle_radii,
+                                boundary_voxels=boundary_voxels,
                                 step_idx=step_idx,
                             )
 
@@ -585,6 +579,7 @@ class Bullet:
                                     state_tracker.particle_positions,
                                     state_tracker.particle_colors,
                                     state_tracker.particle_radii,
+                                    state_tracker.boundary_voxels,
                                     step_idx,
                                 )
                             )

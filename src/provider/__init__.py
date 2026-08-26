@@ -62,6 +62,18 @@ from .types import (
 from .target_list import TargetList
 from .room import Room
 from .bullet import Bullet, LinkType
+from .boundary import (
+    BowlBoundary,
+    CasingWallBoundary,
+    TubeWallBoundary,
+    CasingLidBoundary,
+    LidBoundary,
+    ImpellerBoundary,
+    SphereBoundary,
+    PlaneBoundary,
+    ProcessedBoundaries,
+    BoundaryProcessor,
+)
 from .fluid import Fluid
 from .provider_router import ProviderRouter
 from .provider_manager import ProviderManager

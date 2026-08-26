@@ -90,6 +90,9 @@ pytest
 * **Named Constant Formatting**: Constant values in production code must be assigned to module-level or class-level `ALL_CAPS` named constant variables rather than being embedded as inline magic literals.
 * **Import Placement**: Imports should be done at the top of the file/listing, unless doing so would cause module load race conditions or circular dependencies (such as importing model classes inside provider packages).
 
+### 8. Work Tracking & Task Management
+* **Task List (`TODO.md`)**: Maintain and track planned tasks, active implementation steps, outstanding engineering checklist items, and completed work in a `TODO.md` file in the workspace root. Keep the checklist updated (`[ ]` -> `[x]`) as subtasks progress to provide clear visibility and alignment.
+
 ---
 
 ## Remote Cloud Server (`anvil`)

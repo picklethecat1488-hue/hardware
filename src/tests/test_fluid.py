@@ -456,10 +456,10 @@ def test_fluid_simulator_dynamic_properties():
             return ((-0.008, 0.049, 0.0), (0.008, 0.065, 0.100))
         return ((0, 0, 0), (0, 0, 0))
 
-    def mock_get_link_state(body_id, link_idx, physicsClientId):
+    def mock_get_link_state(body_id, link_idx, computeLinkVelocity=0, physicsClientId=None):
         if link_idx == 2:
-            return (None, None, None, None, (0.0, 0.0, 0.025), (0.0, 0.0, 0.0, 1.0))
-        return (None, None, None, None, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
+            return (None, None, None, None, (0.0, 0.0, 0.025), (0.0, 0.0, 0.0, 1.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
+        return (None, None, None, None, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
 
     def mock_get_base_position_and_orientation(body_id, physicsClientId):
         return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)
@@ -476,6 +476,7 @@ def test_fluid_simulator_dynamic_properties():
         patch("pybullet.createCollisionShape", return_value=0),
         patch("pybullet.createVisualShape", return_value=0),
         patch("pybullet.getBasePositionAndOrientation", side_effect=mock_get_base_position_and_orientation),
+        patch("pybullet.getBaseVelocity", return_value=((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))),
         patch("pybullet.getDynamicsInfo", side_effect=mock_get_dynamics_info),
     ):
         sim = Fluid(
@@ -664,6 +665,7 @@ def test_compute_boundary_forces_reads_tube_y():
                 0.0,  # tube_radius
                 0.0,  # drain_hole_y
                 0.0,  # drain_hole_radius
+                0.20,  # boundary_friction
             ]
         ],
         dtype=jnp.float32,
@@ -783,7 +785,7 @@ def test_physics_step_spout_forcing_happy():
         origin=(-0.075, -0.075, 0.0),
     )
 
-    pos_next, vel_next, f_next, torque_accum = _physics_step_jax(
+    pos_next, vel_next, f_next, torque_accum, b_forces = _physics_step_jax(
         pos,
         vel,
         f_lbm,
@@ -800,6 +802,7 @@ def test_physics_step_spout_forcing_happy():
     assert vel_next is not None
     assert f_next is not None
     assert torque_accum is not None
+    assert b_forces is not None
 
 
 def test_physics_step_spout_forcing_sad():
@@ -843,7 +846,7 @@ def test_physics_step_spout_forcing_sad():
         origin=(-0.075, -0.075, 0.0),
     )
 
-    pos_next, vel_next, f_next, torque_accum = _physics_step_jax(
+    pos_next, vel_next, f_next, torque_accum, b_forces = _physics_step_jax(
         pos,
         vel,
         f_lbm,
@@ -860,6 +863,7 @@ def test_physics_step_spout_forcing_sad():
     assert vel_next is not None
     assert f_next is not None
     assert torque_accum is not None
+    assert b_forces is not None
 
 
 def test_physics_step_casing_suction_happy():
@@ -914,7 +918,7 @@ def test_physics_step_casing_suction_happy():
     )
 
     # Run physics step with high omega to generate a strong suction force
-    pos_next, vel_next, f_next, torque_accum = _physics_step_jax(
+    pos_next, vel_next, f_next, torque_accum, b_forces = _physics_step_jax(
         pos,
         vel,
         f_lbm,
@@ -981,7 +985,7 @@ def test_physics_step_casing_suction_sad():
         origin=(-0.075, -0.075, 0.0),
     )
 
-    pos_next, vel_next, f_next, torque_accum = _physics_step_jax(
+    pos_next, vel_next, f_next, torque_accum, b_forces = _physics_step_jax(
         pos,
         vel,
         f_lbm,
@@ -1134,7 +1138,7 @@ def test_airborne_freefall_particles_maintain_ballistic_velocity():
     )
 
     # Step simulation with spinning impeller
-    pos_next, vel_next, f_next, _ = _physics_step_jax(
+    pos_next, vel_next, f_next, _, b_forces = _physics_step_jax(
         pos,
         vel,
         f_lbm,
@@ -1152,3 +1156,141 @@ def test_airborne_freefall_particles_maintain_ballistic_velocity():
     assert jnp.isclose(vel_next[0, 1], 0.0, atol=1e-4)
     # Particle should continue accelerating downward under gravity
     assert vel_next[0, 2] < -0.50
+    assert b_forces.shape == (1, 3)
+
+
+def test_moving_boundary_force_client_api():
+    """Verify that Fluid exposes moving boundary interaction forces and voxel-mapped forces to clients."""
+    import jax.numpy as jnp
+    import numpy as np
+    from model.boundary_config import BoundaryConfig, BoundaryType, ShapeType
+    from provider.bullet import LinkType
+    from provider.fluid import Fluid, FluidConfig
+
+    b_bowl = BoundaryConfig(
+        link_type=LinkType.BASE,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.096,
+        height=0.096,
+        link_idx=-1,
+    )
+
+    boundaries = {"bowl": b_bowl}
+    config = FluidConfig.water(
+        target_volume=0.00001,
+        boundaries=boundaries,
+    )
+
+    fluid = Fluid(config=config)
+    fluid.n_particles = 10
+    fluid.pos_jax = jnp.zeros((10, 3), dtype=jnp.float32)
+    fluid.vel_jax = jnp.zeros((10, 3), dtype=jnp.float32)
+    fluid.last_positions = [(0.0, 0.0, 0.01) for _ in range(10)]
+    fluid.last_boundary_forces = np.ones((10, 3), dtype=np.float32) * 0.05
+
+    # 1. Boundary forces on particles
+    b_forces = fluid.get_boundary_forces()
+    assert b_forces.shape == (10, 3)
+    assert np.allclose(b_forces, 0.05)
+
+    # 2. Voxel mapped forces
+    fluid.last_voxel_positions = np.array([[0.0, 0.0, 0.01], [0.01, 0.0, 0.01]], dtype=np.float32)
+    voxel_forces = fluid.get_voxel_forces()
+    assert voxel_forces.shape == (2, 3)
+    assert np.allclose(voxel_forces, 0.05)
+
+    # 3. Net reaction force on moving boundary body
+    reaction_force = fluid.get_boundary_reaction_force()
+    assert reaction_force.shape == (3,)
+    assert np.allclose(reaction_force, -0.50)
+
+    # 4. Reaction torque
+    fluid.torques = [0.012]
+    reaction_torque = fluid.get_boundary_reaction_torque()
+    assert abs(reaction_torque - 0.012) < 1e-5
+
+
+def test_boundary_voxels_labeled_by_type():
+    """Verify that Fluid and FluidPostProcessor extract 3D voxels labeled for each boundary type."""
+    import pybullet as p
+    from unittest.mock import MagicMock
+    from model.boundary_config import BoundaryConfig, BoundaryType, ShapeType
+    from provider.bullet import LinkType
+    from provider.fluid import Fluid, FluidConfig
+
+    b_bowl = BoundaryConfig(
+        link_type=LinkType.BASE,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.096,
+        height=0.096,
+        link_idx=-1,
+    )
+    b_casing = BoundaryConfig(
+        link_type=LinkType.CASING,
+        shape=ShapeType.CASING,
+        type=BoundaryType.SOLID_CAVITY,
+        radius=0.028,
+        height=0.010,
+        thickness=0.004,
+        link_idx=-1,
+    )
+    b_tube = BoundaryConfig(
+        link_type=LinkType.TUBE,
+        shape=ShapeType.TUBE,
+        type=BoundaryType.SOLID_CAVITY,
+        radius=0.018,
+        height=0.066,
+        thickness=0.004,
+        xyz=(0.0, 0.028, 0.0),
+        link_idx=-1,
+    )
+    b_impeller = BoundaryConfig(
+        link_type=LinkType.IMPELLER,
+        shape=ShapeType.IMPELLER,
+        type=BoundaryType.SOLID,
+        radius=0.009,
+        height=0.015,
+        thickness=0.003,
+        vane_thickness=0.001,
+        num_vanes=4,
+        vane_twist=-15.0,
+        link_idx=-1,
+    )
+
+    boundaries = {
+        "bowl": b_bowl,
+        "casing": b_casing,
+        "tube": b_tube,
+        "impeller": b_impeller,
+    }
+
+    mock_state_tracker = MagicMock()
+    config = FluidConfig.water(
+        target_volume=0.00001,
+        boundaries=boundaries,
+    )
+
+    fluid = Fluid(
+        config=config,
+        state_tracker=mock_state_tracker,
+    )
+
+    voxels = fluid.get_boundary_voxels()
+    assert isinstance(voxels, dict)
+    # Check that each configured boundary type has voxel entries
+    assert "bowl" in voxels
+    assert "casingwall" in voxels
+    assert "tubewall" in voxels
+    assert "impeller" in voxels
+
+    assert len(voxels["bowl"]) > 0
+    assert len(voxels["casingwall"]) > 0
+    assert len(voxels["tubewall"]) > 0
+    assert len(voxels["impeller"]) > 0
+
+    # Ensure state tracker receives the boundary voxels on explicit update
+    fluid.state_tracker.boundary_voxels = fluid.get_boundary_voxels()
+    assert mock_state_tracker.boundary_voxels is not None
+    assert "bowl" in mock_state_tracker.boundary_voxels
