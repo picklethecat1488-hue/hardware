@@ -1,6 +1,6 @@
 """Boundary configuration data models."""
 
-from typing import Any, Literal, Optional, Tuple, Union
+from typing import Any, ClassVar, Literal, Optional, Tuple, Union
 from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 
 from enum import StrEnum, IntEnum
@@ -71,7 +71,7 @@ class BoundaryConfig(BaseModel):
     """
 
     # Dictionary mapping each ShapeType to the fields it supports/uses
-    SHAPE_SUPPORTED_FIELDS: dict[ShapeType, set[str]] = {
+    SHAPE_SUPPORTED_FIELDS: ClassVar[dict[ShapeType, set[str]]] = {
         ShapeType.CYLINDER: {
             "radius",
             "height",

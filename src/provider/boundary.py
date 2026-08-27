@@ -292,7 +292,8 @@ class PlaneBoundary:
 
     def is_solid_vectorized(self, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
         """Evaluate points within planar slab boundary."""
-        return (z >= -self.thickness) & (z <= 0.0)
+        dz = z - self.pos[2]
+        return (dz >= -self.thickness) & (dz <= 0.0)
 
 
 @dataclass

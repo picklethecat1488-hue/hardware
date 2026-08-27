@@ -1024,10 +1024,42 @@ class TestCatFountainProvider:
                 min_expected = lid_z_top - 0.015
                 max_expected = dome_top_z + fluid.r_s + 0.005
 
-                assert min_expected <= max_water_z <= max_expected
+                assert min_expected <= max_water_z <= max_expected, (
+                    f"max_water_z={max_water_z:.5f}, min={min_expected:.5f}, max={max_expected:.5f}"
+                )
 
                 # Verify that water reached the drinking surface
                 assert max_water_z >= min_expected, "Expected water to reach the lid surface after exiting the spout."
 
+                # Verify that reservoir pool water touches the bowl floor and outer wall
+                floor_z_m = provider.settings.floor_z * 0.001
+                reservoir_mask = active_mask & (pos_np[:, 2] < lid_mount_z)
+                assert np.any(reservoir_mask), "Expected active reservoir fluid in the bowl."
+                reservoir_pts = pos_np[reservoir_mask]
+                min_reservoir_z = float(np.min(reservoir_pts[:, 2]))
+                assert min_reservoir_z <= floor_z_m + fluid.r_s + 0.004, (
+                    f"Reservoir fluid is hovering above floor: min Z is {min_reservoir_z:.5f}, expected <= {floor_z_m + fluid.r_s + 0.004:.5f}"
+                )
+
+                # Verify reservoir fluid spreads to outer bowl boundary
+                r_reservoir = np.sqrt(reservoir_pts[:, 0] ** 2 + reservoir_pts[:, 1] ** 2)
+                max_r = float(np.max(r_reservoir))
+                bowl_inner_r = (provider.settings.bowl_radius - provider.settings.bowl_thickness) * 0.001
+                assert max_r >= bowl_inner_r - 2.0 * fluid.r_s - 0.010, (
+                    f"Reservoir fluid did not spread to bowl wall: max R is {max_r:.5f}, expected >= {bowl_inner_r - 2.0 * fluid.r_s - 0.010:.5f}"
+                )
+
+                # Verify that water in the mid-air column is not trapped in an artificial static hover blob
+                mid_air_column_mask = (
+                    active_mask
+                    & (pos_np[:, 2] >= 0.060)
+                    & (pos_np[:, 2] <= 0.095)
+                )
+                if np.any(mid_air_column_mask):
+                    speeds_mid_air = np.linalg.norm(vel_np[mid_air_column_mask], axis=-1)
+                    static_particles = int(np.sum(speeds_mid_air < 0.05))
+                    assert static_particles == 0, (
+                        f"Unnatural static hovering fluid blob: {static_particles} stationary particles in mid-air Z in [0.060, 0.095]m"
+                    )
             finally:
                 p.disconnect(physics_client)

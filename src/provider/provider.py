@@ -630,7 +630,10 @@ class URDFBoundary:
         rpy = kwargs.pop("rpy", default_rpy)
         boundary_friction = kwargs.pop("boundary_friction", getattr(metadata, "boundary_friction", 0.20))
 
-        config_dict = {
+        supported_fields = BoundaryConfig.SHAPE_SUPPORTED_FIELDS.get(shape, set())
+        common_fields = {"link_type", "link_idx", "shape", "type", "xyz", "rpy", "boundary_friction"}
+
+        candidates = {
             "link_type": link_type,
             "link_idx": link_idx,
             "shape": shape,
@@ -643,6 +646,7 @@ class URDFBoundary:
             "boundary_friction": boundary_friction,
             **kwargs,
         }
+        config_dict = {k: v for k, v in candidates.items() if k in supported_fields or k in common_fields}
         boundary = BoundaryConfig.model_validate(config_dict)
         # Append to active metadata's boundaries list
         metadata.boundaries.append(boundary)

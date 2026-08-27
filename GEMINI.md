@@ -78,6 +78,8 @@ pytest
 * **Fluid Recycling**: Ensure `fluid.recycle_fluid = True` is used in steady-state flow loops, with boundary coordinates matching physical limits.
 * **JAX-JIT Compilation**: Prefer using `jax.jit` and pure functions during physics computations in JAX to leverage static optimization, compilation speedups, and hardware acceleration.
 * **Numeric Damping**: For long-running simulation validations, enforce stabilization velocity damping (e.g., `0.95`) to prevent numerical velocity buildup.
+* **Physical Contact & Non-Floating Invariants**: Fluid particles residing in containers under gravity must make direct physical contact with the bottom floor ($\min(Z) \le Z_{\text{floor}} + 2 \cdot r_s + \text{margin}$) and spread to outer containment boundaries ($r \to R_{\text{wall}}$), forming a continuous fluid mass. Fluid tests must explicitly assert these contact invariants to prevent artificial mid-air hovering, floating shells, or disconnected particle clusters.
+* **Test Failure Replication**: When unphysical behaviors (such as mid-air hovering, suction traps, or hollow shells) are observed during visual simulation inspection, test cases must be updated with assertions that actively reproduce the failure under flawed dynamics and only pass when the physical dynamics are verified.
 
 ### 6. Declarative Wiring & Routing Engine
 * Declare footprint, physical dimensions, pinouts, and net connections in the project's `wiring.yaml` file.
@@ -88,6 +90,7 @@ pytest
 * Docstring correctness is checked automatically by ruff linting rules (group `D` configured in [pyproject.toml](file:///Users/daparker/gh/hardware/pyproject.toml)).
 * **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum`) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes. This prevents typos and improves code readability/refactoring.
 * **Named Constant Formatting**: Constant values in production code must be assigned to module-level or class-level `ALL_CAPS` named constant variables rather than being embedded as inline magic literals.
+* **Idiomatic Iteration & Enumeration**: Prefer looping over sequences and arrays directly or using `enumerate(...)` (e.g., `for idx, shape in enumerate(b_shapes):` or `for shape in b_shapes:`) rather than indexing by integer range bounds (such as `for k in range(b_shapes.shape[0]):` or `for i in range(len(items)):`).
 * **Import Placement**: Imports should be done at the top of the file/listing, unless doing so would cause module load race conditions or circular dependencies (such as importing model classes inside provider packages).
 
 ### 8. Work Tracking & Task Management

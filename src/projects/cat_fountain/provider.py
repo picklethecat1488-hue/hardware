@@ -924,18 +924,15 @@ class CatFountainProvider(Provider):
                 tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             )
 
-            dome_h = (outer_dome.bounding_box().max.Z - outer_dome.bounding_box().min.Z) * 0.001
-            dome_top_z = outer_dome.bounding_box().max.Z
             URDFBoundary(
                 outer_dome,
                 link_type=LinkType.LID,
-                shape=ShapeType.CYLINDER,
-                type=BoundaryType.CAVITY,
+                shape=ShapeType.SPHERE,
+                type=BoundaryType.SOLID,
                 radius=dome_out_r * 0.001,
-                height=dome_h,
                 thickness=0.0035,
-                xyz=(0.0, tube_y * 0.001, dome_top_z * 0.001),
-                rpy=(math.pi, 0.0, 0.0),
+                xyz=(0.0, tube_y * 0.001, 0.009),
+                rpy=(0.0, 0.0, 0.0),
             )
 
         RigidJoint("mount", lid.part, Location((0, 0, step_d)))
