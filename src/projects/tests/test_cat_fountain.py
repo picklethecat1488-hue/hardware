@@ -1002,12 +1002,13 @@ class TestCatFountainProvider:
                 # Run simulation
                 step_fn = hooks[Simulate.STEP]
                 max_water_z = 0.0
-                for step_idx in range(120):
+                for step_idx in range(240):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
                     # Measure maximum height of water exiting the tube during motor execution
                     pos_np = np.asarray(fluid.pos_jax)
+                    vel_np = np.asarray(fluid.vel_jax)
                     active_mask = pos_np[:, 2] < 100.0
                     if np.any(active_mask):
                         step_max_z = float(np.max(pos_np[active_mask, 2]))
@@ -1022,11 +1023,6 @@ class TestCatFountainProvider:
                 # Assert that under production measurements, the fountain water is contained by the spout dome ceiling
                 min_expected = lid_z_top - 0.015
                 max_expected = dome_top_z + fluid.r_s + 0.005
-
-                # Log the results
-                print(
-                    f"DEBUG: Production validation: max_water_z={max_water_z:.5f}, lid_z_top={lid_z_top:.5f}, expected range=[{min_expected:.5f}, {max_expected:.5f}]"
-                )
 
                 assert min_expected <= max_water_z <= max_expected
 

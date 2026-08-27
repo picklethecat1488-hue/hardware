@@ -547,7 +547,7 @@ class CatFountainProvider(Provider):
                     link_type=LinkType.BASE,
                     type=BoundaryType.CAVITY,
                     height=(h - floor_z + self.settings.spout_length) * 0.001,
-                    thickness=0.030,
+                    thickness=0.0035,
                     has_tube=True,
                     tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
                 )
@@ -563,8 +563,8 @@ class CatFountainProvider(Provider):
                     link_type=LinkType.TUBE,
                     shape=ShapeType.TUBE,
                     type=BoundaryType.SOLID_CAVITY,
-                    radius=0.018,  # Increased outer radius to overlap casing
-                    thickness=0.010,  # Thick wall to prevent particle tunneling
+                    radius=(self.settings.tube_radius + 3.5) * 0.001,
+                    thickness=0.0035,
                     height=self.settings.tube_height * 0.001,
                     slot_height=9.0 * 0.001,
                     slot_width=8.0 * 0.001,
@@ -586,13 +586,13 @@ class CatFountainProvider(Provider):
                     shape=ShapeType.CASING,
                     type=BoundaryType.SOLID_CAVITY,
                     radius=0.028,
-                    thickness=0.010,  # Inner chamber is 18mm, overlaps tube
+                    thickness=0.0035,
                     height=10.0 * 0.001,
                     slot_height=9.0 * 0.001,  # Slot opening from Z = 0 to 9mm
                     slot_width=8.0 * 0.001,
                     tube_y=0.028,
                     cutoff_y=0.0,
-                    ceiling_thickness=2.0 * 0.001,
+                    ceiling_thickness=0.0035,
                     xyz=(0.0, 0.0, floor_z * 0.001),
                     rpy=(0.0, 0.0, 0.0),
                 )
@@ -913,9 +913,9 @@ class CatFountainProvider(Provider):
                 shape=ShapeType.CYLINDER,
                 type=BoundaryType.CAVITY,
                 radius=self.settings.lid_pocket_radius * 0.001,
-                height=self.settings.lid_pocket_cavity_height * 0.001,
-                thickness=self.settings.lid_pocket_thickness * 0.001,
-                xyz=(0.0, 0.0, self.settings.lid_pocket_z_offset * 0.001),
+                height=0.0035,
+                thickness=0.0035,
+                xyz=(0.0, 0.0, 0.0),
                 rpy=(0.0, 0.0, 0.0),
                 has_drain=True,
                 drain_hole_y=cutout_y * 0.001,  # Parameterized coordinate
@@ -924,48 +924,18 @@ class CatFountainProvider(Provider):
                 tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             )
 
+            dome_h = (outer_dome.bounding_box().max.Z - outer_dome.bounding_box().min.Z) * 0.001
             dome_top_z = outer_dome.bounding_box().max.Z
             URDFBoundary(
                 outer_dome,
                 link_type=LinkType.LID,
                 shape=ShapeType.CYLINDER,
                 type=BoundaryType.CAVITY,
-                radius=self.settings.spout_deflection_radius * 0.001,
-                height=self.settings.spout_deflection_height * 0.001,
-                thickness=self.settings.spout_deflection_thickness * 0.001,
+                radius=dome_out_r * 0.001,
+                height=dome_h,
+                thickness=0.0035,
                 xyz=(0.0, tube_y * 0.001, dome_top_z * 0.001),
                 rpy=(math.pi, 0.0, 0.0),
-                has_tube=True,
-                tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
-            )
-
-            URDFBoundary(
-                lid_disk,
-                link_type=LinkType.LID,
-                shape=ShapeType.CYLINDER,
-                type=BoundaryType.CAVITY,
-                height=0.0,
-                thickness=2.0 * 0.001,
-                xyz=(0.0, 0.0, -2.0 * 0.001),
-                rpy=(math.pi, 0.0, 0.0),
-                has_drain=True,
-                drain_hole_y=-cutout_y * 0.001,  # Parameterized coordinate (flipped)
-                drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
-                has_tube=True,
-                tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
-            )
-
-            URDFBoundary(
-                terrace_shelf,
-                link_type=LinkType.LID,
-                shape=ShapeType.CYLINDER,
-                type=BoundaryType.CAVITY,
-                radius=(terrace_shelf.bounding_box().max.X - 2.0) * 0.001,
-                height=0.0,
-                thickness=3.0 * 0.001,
-                xyz=(0.0, tube_y * 0.001, terrace_shelf.bounding_box().max.Z * 0.001),
-                has_tube=True,
-                tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
             )
 
         RigidJoint("mount", lid.part, Location((0, 0, step_d)))

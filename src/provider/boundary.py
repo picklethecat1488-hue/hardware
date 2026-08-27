@@ -45,14 +45,23 @@ class BowlBoundary:
     radius: float
     z_floor: float
     height: float = 0.096
-    thickness: float = 0.004
+    thickness: float = 0.0035
     friction: float = 0.20
     pos: tuple[float, float, float] = (0.0, 0.0, 0.0)
     orn: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
 
     def is_solid_vectorized(self, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
         """Evaluate whether points lie inside the solid structure of the bowl container."""
-        return (x**2 + y**2 >= self.radius**2) | (z < self.z_floor)
+        thick = self.thickness if self.thickness > 0.0 else 0.0035
+        dist_sq = (x - self.pos[0]) ** 2 + (y - self.pos[1]) ** 2
+        is_wall = (
+            (z >= self.z_floor)
+            & (z <= self.z_floor + self.height)
+            & (dist_sq >= self.radius**2)
+            & (dist_sq <= (self.radius + thick) ** 2)
+        )
+        is_floor = (z >= self.z_floor - thick) & (z <= self.z_floor) & (dist_sq <= (self.radius + thick) ** 2)
+        return is_wall | is_floor
 
     def is_solid(self, x: float, y: float, z: float) -> bool:
         """Evaluate scalar point inside solid structure."""
@@ -71,7 +80,7 @@ class CasingWallBoundary:
     z_max: float
     slot_height: float
     slot_width: float
-    ceiling_thickness: float = 0.002
+    ceiling_thickness: float = 0.0035
     friction: float = 0.20
     pos: tuple[float, float, float] = (0.0, 0.0, 0.0)
     orn: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
@@ -182,7 +191,7 @@ class LidBoundary:
     def is_solid_vectorized(self, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
         """Evaluate whether points lie inside the solid structure of the lid."""
         in_z = (self.z_base <= z) & (z <= max(self.z_top, self.terrace_z_max))
-        dist_sq = x**2 + y**2
+        dist_sq = (x - self.pos[0]) ** 2 + (y - self.pos[1]) ** 2
         in_outer = dist_sq <= self.r_outer**2
 
         dist_terrace_sq = (x - self.tube_x) ** 2 + (y - self.tube_y) ** 2
@@ -191,9 +200,9 @@ class LidBoundary:
         in_tube = dist_terrace_sq < self.tube_r**2
         is_hole = in_drain | in_tube
 
-        in_base = (self.z_base <= z) & (z <= self.z_floor) & (dist_sq >= self.r_pocket**2)
-        in_rim = (self.z_floor <= z) & (z <= self.z_top) & (dist_sq >= self.r_pocket**2)
-        in_terrace = (self.z_floor <= z) & (z <= self.terrace_z_max) & in_platform
+        in_base = (self.z_base <= z) & (z <= self.z_floor)
+        in_rim = (self.z_floor < z) & (z <= self.z_top) & (dist_sq >= self.r_pocket**2)
+        in_terrace = (self.z_floor < z) & (z <= self.terrace_z_max) & in_platform
 
         return in_z & in_outer & (~is_hole) & (in_base | in_rim | in_terrace)
 
@@ -651,13 +660,13 @@ class BoundaryProcessor:
         casing_pos_t = (0.0, 0.0, 0.0)
         casing_orn_t = (0.0, 0.0, 0.0, 1.0)
         for i, b in enumerate(boundary_list):
-            if b.shape == ShapeType.CASING:
+            if b.shape == ShapeType.CASING or b.link_type == LinkType.CASING:
                 if b.xyz is not None:
                     casing_x, casing_y = b.xyz[0], b.xyz[1]
                 casing_r = b.radius
-                casing_thick = b.thickness
+                casing_thick = b.thickness if b.thickness > 0.0 else 0.0035
                 casing_h = b.height
-                casing_ceiling_thick = getattr(b, "ceiling_thickness", 0.002)
+                casing_ceiling_thick = getattr(b, "ceiling_thickness", 0.0035) or 0.0035
                 casing_slot_h = getattr(b, "slot_height", 0.006)
                 casing_slot_w = getattr(b, "slot_width", 0.008)
                 casing_fric = float(b.boundary_friction or 0.20)
@@ -695,7 +704,7 @@ class BoundaryProcessor:
                 if b.xyz is not None:
                     tube_x, tube_y = b.xyz[0], b.xyz[1]
                 tube_r = b.radius
-                tube_thick = b.thickness
+                tube_thick = b.thickness if b.thickness > 0.0 else 0.0035
                 tube_h = b.height
                 tube_slot_h = getattr(b, "slot_height", 0.006)
                 tube_slot_w = getattr(b, "slot_width", 0.008)
@@ -744,33 +753,36 @@ class BoundaryProcessor:
             )
 
         # Top Drinking Lid
-        lid_pocket_r = 0.0
-        drain_y, drain_r = 0.0, 0.0
-        lid_pocket_h, lid_thickness = 0.0, 0.0
-        terrace_r, terrace_z_max = 0.0, 0.0
+        lid_pocket_r = 0.080
+        drain_y, drain_r = -0.020, 0.055
+        lid_pocket_h, lid_thickness = 0.0035, 0.0035
+        terrace_r = 0.030
         lid_fric = 0.20
         lid_pos_t = (0.0, 0.0, 0.0)
         lid_orn_t = (0.0, 0.0, 0.0, 1.0)
+        has_lid = False
         for i, b in enumerate(boundary_list):
-            if (
-                b.link_type == LinkType.LID
-                and getattr(b, "has_drain", False)
-                and getattr(b, "drain_hole_radius", 0.0) > 0.0
-            ):
-                lid_pocket_r = b.radius
-                lid_pocket_h = b.height
-                lid_thickness = b.thickness
-                drain_y = getattr(b, "drain_hole_y", 0.0)
-                drain_r = getattr(b, "drain_hole_radius", 0.0)
-                lid_fric = float(b.boundary_friction or 0.20)
-                lid_pos_t = b_pos_list[i]
-                lid_orn_t = b_orn_list[i]
-            elif b.link_type == LinkType.LID and getattr(b, "has_tube", False) and not getattr(b, "has_drain", False):
-                terrace_r = b.radius
-                if b.xyz is not None:
-                    terrace_z_max = z_floor + b.xyz[2]
+            if b.link_type == LinkType.LID:
+                has_lid = True
+                if (
+                    getattr(b, "has_drain", False)
+                    and getattr(b, "drain_hole_radius", 0.0) > 0.0
+                    and b.radius < r_bowl
+                    and b.radius > 0.0
+                ):
+                    lid_pocket_r = b.radius
+                    lid_pocket_h = b.height if b.height > 0.0 else 0.0035
+                    lid_thickness = b.thickness if b.thickness > 0.0 else 0.0035
+                    drain_y = getattr(b, "drain_hole_y", -0.020)
+                    drain_r = getattr(b, "drain_hole_radius", 0.055)
+                    lid_fric = float(b.boundary_friction or 0.20)
+                    lid_pos_t = b_pos_list[i]
+                    lid_orn_t = b_orn_list[i]
+                elif getattr(b, "has_tube", False) and not getattr(b, "has_drain", False):
+                    if b.radius > 0.0:
+                        terrace_r = b.radius
 
-        if lid_pocket_r > 0.0 and tube_h > 0.0:
+        if has_lid or (lid_pocket_r > 0.0 and tube_h > 0.0):
             lid_pocket_z = z_floor + tube_h
             intermediate_boundaries.append(
                 LidBoundary(
@@ -785,7 +797,7 @@ class BoundaryProcessor:
                     drain_y=drain_y,
                     drain_r=drain_r,
                     terrace_r=terrace_r,
-                    terrace_z_max=terrace_z_max if terrace_z_max > 0.0 else lid_pocket_z,
+                    terrace_z_max=lid_pocket_z + lid_pocket_h,
                     friction=lid_fric,
                     pos=lid_pos_t,
                     orn=lid_orn_t,

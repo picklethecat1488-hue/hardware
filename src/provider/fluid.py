@@ -508,7 +508,7 @@ def _compute_boundary_forces_jax(
     norm_unit = norm_p_clean / norm_p_mag
     fric_p = _g2p_scalar_jax(pos_local, solid_friction, dx, origin_arr, nx, ny, nz)
 
-    pen = jnp.maximum(occ_p - 0.50, 0.0) * r_s
+    pen = occ_p * dx
     v_n = -jnp.sum(vel_local * norm_unit, axis=-1)
     f_n_mag = jnp.maximum(K * pen + D * jnp.maximum(v_n, 0.0), 0.0)
 
@@ -517,7 +517,7 @@ def _compute_boundary_forces_jax(
     f_fric_tan = -fric_p[:, None] * f_n_mag[:, None] * (v_tan / v_tan_mag)
 
     force_local = f_n_mag[:, None] * norm_unit + f_fric_tan
-    force_voxel = jnp.where((occ_p >= 0.50)[:, None], force_local, 0.0)
+    force_voxel = jnp.where((occ_p > 0.01)[:, None], force_local, 0.0)
     forces = q_rotate(base_orn, force_voxel)
     vanes_torque = jnp.array(0.0)
 
@@ -612,6 +612,7 @@ def _grid_mask_cylinder_jax(
     thickness: float,
     z_offset: float,
     boundary_type: int,
+    dx: float = 0.0035,
     has_tube: bool = False,
     has_drain: bool = False,
     tube_radius: float = 0.0,
@@ -620,20 +621,24 @@ def _grid_mask_cylinder_jax(
     local_tube_x: float = 0.0,
     local_tube_y: float = 0.0,
 ) -> jnp.ndarray:
+    thick = jnp.maximum(thickness, dx)
     # Cavity: cylinder side wall (rb_sq >= radius**2) and solid floor (zb_loc <= z_offset)
-    is_wall = (zb_loc <= height) & (rb_sq >= radius**2)
-    is_floor = (zb_loc >= z_offset - thickness) & (zb_loc <= z_offset)
+    is_wall = (zb_loc >= z_offset) & (zb_loc <= height) & (rb_sq >= radius**2)
+    is_wall = jnp.where(thick > 0.0, is_wall & (rb_sq <= (radius + thick) ** 2), is_wall)
+    is_floor = (zb_loc >= z_offset - thick) & (zb_loc <= z_offset) & (rb_sq <= (radius + thick) ** 2)
 
     # Drainage hole and tube pass-through openings cut through the cylinder floor/solid
     in_drain = (
         (has_drain & (drain_hole_radius > 0.0))
         & (xb_loc**2 + (yb_loc - drain_hole_y) ** 2 < drain_hole_radius**2)
-        & (zb_loc >= z_offset - thickness)
+        & (zb_loc >= z_offset - thick)
+        & (zb_loc <= z_offset + thick)
     )
     in_tube_hole = (
         (has_tube & (tube_radius > 0.0))
         & ((xb_loc - local_tube_x) ** 2 + (yb_loc - local_tube_y) ** 2 < tube_radius**2)
-        & (zb_loc >= z_offset - thickness)
+        & (zb_loc >= z_offset - thick)
+        & (zb_loc <= z_offset + thick)
     )
 
     is_cavity = (is_wall | is_floor) & (~in_drain) & (~in_tube_hole)
@@ -736,6 +741,7 @@ def _make_grid_masks(
     solid_mask = jnp.zeros(flat_shape, dtype=jnp.bool_)
     tube_mask = jnp.zeros(flat_shape, dtype=jnp.bool_)
     solid_friction = jnp.zeros(flat_shape, dtype=jnp.float32)
+    normal_grid_flat = jnp.zeros((n_pts, 3), dtype=jnp.float32)
 
     has_tube_bound = jnp.any(b_shapes == SHAPE_TUBE)
     tube_idx = jnp.argmax(b_shapes == SHAPE_TUBE)
@@ -795,6 +801,7 @@ def _make_grid_masks(
             thickness,
             z_offset,
             b_types[idx],
+            dx,
             has_tube,
             has_drain,
             tube_radius,
@@ -840,38 +847,76 @@ def _make_grid_masks(
         is_solid = jnp.where(is_plane, is_solid_plane, is_solid)
         is_solid = jnp.where(is_sphere, is_solid_sphere, is_solid)
 
+        # Analytical normal vectors for each shape type
+        thick = jnp.maximum(thickness, dx)
+        r_safe = jnp.maximum(jnp.sqrt(rb_sq), 1e-6)
+        cyl_wall_norm_loc = jnp.stack([-xb_loc / r_safe, -yb_loc / r_safe, jnp.zeros_like(xb_loc)], axis=-1)
+        cyl_floor_norm_loc = jnp.stack([jnp.zeros_like(xb_loc), jnp.zeros_like(yb_loc), jnp.ones_like(zb_loc)], axis=-1)
+        is_cyl_floor = (zb_loc >= z_offset - thick) & (zb_loc <= z_offset)
+        cyl_norm_loc = jnp.where(is_cyl_floor[:, None], cyl_floor_norm_loc, cyl_wall_norm_loc)
+        cyl_norm_base = q_rotate(b_orn, cyl_norm_loc)
+
+        tube_norm_loc = jnp.stack([-xb_loc / r_safe, -yb_loc / r_safe, jnp.zeros_like(xb_loc)], axis=-1)
+        tube_norm_base = q_rotate(b_orn, tube_norm_loc)
+
+        casing_floor_norm_loc = jnp.stack(
+            [jnp.zeros_like(xb_loc), jnp.zeros_like(yb_loc), jnp.ones_like(zb_loc)], axis=-1
+        )
+        casing_ceil_norm_loc = jnp.stack(
+            [jnp.zeros_like(xb_loc), jnp.zeros_like(yb_loc), -jnp.ones_like(zb_loc)], axis=-1
+        )
+        casing_wall_norm_loc = jnp.stack([-xb_loc / r_safe, -yb_loc / r_safe, jnp.zeros_like(xb_loc)], axis=-1)
+        is_casing_floor = zb_loc <= 0.0
+        is_casing_ceil = zb_loc >= height
+        casing_norm_loc = jnp.where(
+            is_casing_floor[:, None],
+            casing_floor_norm_loc,
+            jnp.where(is_casing_ceil[:, None], casing_ceil_norm_loc, casing_wall_norm_loc),
+        )
+        casing_norm_base = q_rotate(b_orn, casing_norm_loc)
+
+        plane_norm_base = q_rotate(
+            b_orn, jnp.stack([jnp.zeros_like(xb_loc), jnp.zeros_like(yb_loc), jnp.ones_like(zb_loc)], axis=-1)
+        )
+
+        r_3d_safe = jnp.maximum(jnp.sqrt(xb_loc**2 + yb_loc**2 + zb_loc**2), 1e-6)
+        sphere_norm_loc = jnp.stack([-xb_loc / r_3d_safe, -yb_loc / r_3d_safe, -zb_loc / r_3d_safe], axis=-1)
+        sphere_norm_base = q_rotate(b_orn, sphere_norm_loc)
+
+        norm_base_i = jnp.where(is_cyl, cyl_norm_base, jnp.zeros((n_pts, 3), dtype=jnp.float32))
+        norm_base_i = jnp.where(is_tube, tube_norm_base, norm_base_i)
+        norm_base_i = jnp.where(is_casing, casing_norm_base, norm_base_i)
+        norm_base_i = jnp.where(is_plane, plane_norm_base, norm_base_i)
+        norm_base_i = jnp.where(is_sphere, sphere_norm_base, norm_base_i)
+
+        normal_grid_flat = jnp.where(is_solid[:, None] & (~is_imp), norm_base_i, normal_grid_flat)
+
         # Ignore impeller nodes in solid_mask
         solid_mask = jnp.where(is_imp, solid_mask, solid_mask | is_solid)
         solid_friction = jnp.where(is_solid & (~is_imp), b_fric, solid_friction)
         tube_mask = jnp.where(is_tube, tube_mask | is_tube_mask, tube_mask)
 
     # Clear solid mask inside the tube passage along the entire tube column to prevent internal blockage
-    base_pos_z = jnp.where(base_idx != -1, b_pos_arr[base_idx, 2], 0.0)
-    tube_top_z = 0.0
+    tube_top_world_z = 0.0
+    tube_bot_world_z = 0.0
     for idx in range(b_shapes.shape[0]):
         is_tb = b_shapes[idx] == SHAPE_TUBE
-        tb_z = b_pos_arr[idx, 2] - base_pos_z
+        tb_wz = b_pos_arr[idx, 2]
         tb_h = b_params[idx, BoundaryParam.HEIGHT]
-        tube_top_z = jnp.where(is_tb, tb_z + tb_h, tube_top_z)
+        tube_bot_world_z = jnp.where(is_tb, tb_wz, tube_bot_world_z)
+        tube_top_world_z = jnp.where(is_tb, tb_wz + tb_h, tube_top_world_z)
 
     in_tube_interior = (
-        ((coords[:, 0] - tube_xb) ** 2 + (coords[:, 1] - tube_yb) ** 2 < tube_rb**2)
-        & (coords[:, 2] >= 0.0)
-        & (coords[:, 2] <= tube_top_z)
+        ((coords[:, 0] - tube_world_pos[0]) ** 2 + (coords[:, 1] - tube_world_pos[1]) ** 2 < tube_rb**2)
+        & (coords[:, 2] >= tube_bot_world_z)
+        & (coords[:, 2] <= tube_top_world_z)
     )
     solid_mask = jnp.where(has_tube_bound, solid_mask & (~in_tube_interior), solid_mask)
     solid_friction = jnp.where(has_tube_bound & in_tube_interior, 0.0, solid_friction)
 
     solid_occ = solid_mask.reshape((nx, ny, nz)).astype(jnp.float32)
-    kernel = jnp.ones((3, 3, 3), dtype=jnp.float32) / 27.0
-    smooth_occ = jax.scipy.signal.convolve(solid_occ, kernel, mode="same")
-
-    pad_s = jnp.pad(smooth_occ, ((1, 1), (1, 1), (1, 1)), mode="edge")
-    d_dx = (pad_s[2:, 1:-1, 1:-1] - pad_s[:-2, 1:-1, 1:-1]) / (2.0 * dx)
-    d_dy = (pad_s[1:-1, 2:, 1:-1] - pad_s[1:-1, :-2, 1:-1]) / (2.0 * dx)
-    d_dz = (pad_s[1:-1, 1:-1, 2:] - pad_s[1:-1, 1:-1, :-2]) / (2.0 * dx)
-    grad_mag = jnp.sqrt(d_dx**2 + d_dy**2 + d_dz**2 + 1e-8)
-    normal_grid = jnp.stack([-d_dx / grad_mag, -d_dy / grad_mag, -d_dz / grad_mag], axis=-1)
+    smooth_occ = solid_occ
+    normal_grid = normal_grid_flat.reshape((nx, ny, nz, 3))
     return (
         solid_mask.reshape((nx, ny, nz)),
         tube_mask.reshape((nx, ny, nz)),
@@ -1281,14 +1326,32 @@ def _lbm_step_subroutine(
     for j in range(b_shapes.shape[0]):
         r_impeller = jnp.where(b_shapes[j] == SHAPE_IMPELLER, b_params[j, 0], r_impeller)
 
-    # Find tube radius dynamically
+    # Find tube inner radius dynamically
     r_tube = 0.0
     for j in range(b_shapes.shape[0]):
-        r_tube = jnp.where(b_shapes[j] == SHAPE_TUBE, b_params[j, 0], r_tube)
+        is_tb = b_shapes[j] == SHAPE_TUBE
+        r_inner_tb = b_params[j, 0] - b_params[j, 2]
+        r_tube = jnp.where(is_tb, r_inner_tb, r_tube)
 
     # Default to 0.015 if no impeller is present to support tests that don't model the impeller
     r_impeller_eff = jnp.where(r_impeller > 0.0, r_impeller, 0.015)
-    tube_uz_phys = jnp.where(r_tube > 0.0, 0.2222 * (r_impeller_eff**3 / r_tube**2) * jnp.abs(omega), 0.0)
+
+    slot_w = 0.0
+    slot_h = 0.0
+    for j in range(b_shapes.shape[0]):
+        is_cas = b_shapes[j] == SHAPE_CASING
+        slot_w = jnp.where(is_cas, b_params[j, BoundaryParam.SLOT_WIDTH], slot_w)
+        slot_h = jnp.where(is_cas, b_params[j, BoundaryParam.SLOT_HEIGHT], slot_h)
+
+    a_slot = slot_w * slot_h
+    a_tube = math.pi * (r_tube**2) + 1e-6
+    constriction_ratio = jnp.where(a_tube > 0.0, a_slot / a_tube, 1.0)
+    v_tip = r_impeller_eff * jnp.abs(omega)
+    tube_uz_phys = jnp.where(
+        (r_tube > 0.0) & (r_impeller_eff > 0.0),
+        jnp.minimum(constriction_ratio, 1.5) * v_tip,
+        0.0,
+    )
     tube_uz_lat = tube_uz_phys * dt_sub / dx
 
     base_orn_inv = q_inv(base_orn)
@@ -1537,21 +1600,21 @@ def _compute_particle_forces_subroutine(
         r_tube_eff = inner_r
         slot_w = jnp.where(casing_idx != -1, b_params[casing_idx, BoundaryParam.SLOT_WIDTH], 0.0)
         slot_h = jnp.where(casing_idx != -1, b_params[casing_idx, BoundaryParam.SLOT_HEIGHT], 0.0)
-        r_casing = jnp.where(casing_idx != -1, b_params[casing_idx, BoundaryParam.RADIUS], 1.0)
-        constriction_ratio = (slot_w * slot_h) / (math.pi * (r_casing**2) + 1e-6)
+        a_slot = slot_w * slot_h
+        a_tube = math.pi * (r_tube_eff**2) + 1e-6
+        constriction_ratio = a_slot / a_tube
 
         v_flow_est = jnp.where(
             (r_tube_eff > 0.0) & (r_impeller_eff > 0.0),
-            constriction_ratio * (r_impeller_eff**3 / r_tube_eff**2) * jnp.abs(omega),
+            jnp.minimum(constriction_ratio, 1.0) * (r_impeller_eff * jnp.abs(omega)),
             0.0,
         )
         height_frac = jnp.clip(1.0 - pos_tube[:, 2] / (tube_h + 1e-6), 0.0, 1.0)
-        v_target_rise = v_flow_est * (0.3 + 0.2 * height_frac)
+        v_target_rise = jnp.maximum(v_flow_est * 1.5, 0.35) * (0.8 + 0.2 * height_frac)
 
         pump_lift_scalar = jnp.where(
             jnp.abs(omega) > 1e-3,
-            g_mag * (1.0 + (v_flow_est / (tube_h + 1e-6)) * 1.5)
-            + jnp.maximum(0.0, v_target_rise - v_z_tube) * (g_mag / (r_s + 1e-6)) * 0.02,
+            g_mag + jnp.maximum(0.0, v_target_rise - v_z_tube) * 25.0,
             0.0,
         )
 
@@ -1703,7 +1766,7 @@ def _integrate_particles_subroutine(
 
     vel_next = jnp.where(active, (vel_world + accel * dt_sub) * damping_by_zone, 0.0)
 
-    max_phys_speed = 3.5
+    max_phys_speed = 1.5
     vel_mags = jnp.linalg.norm(vel_next, axis=1, keepdims=True)
     vel_mags_safe = jnp.maximum(vel_mags, 1e-8)
     vel_next = vel_next * jnp.minimum(max_phys_speed / vel_mags_safe, 1.0)

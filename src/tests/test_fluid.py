@@ -1223,8 +1223,9 @@ def test_boundary_voxels_labeled_by_type():
         link_type=LinkType.BASE,
         shape=ShapeType.CYLINDER,
         type=BoundaryType.CAVITY,
-        radius=0.096,
+        radius=0.060,
         height=0.096,
+        thickness=0.005,
         link_idx=-1,
     )
     b_casing = BoundaryConfig(
@@ -1246,6 +1247,20 @@ def test_boundary_voxels_labeled_by_type():
         xyz=(0.0, 0.028, 0.0),
         link_idx=-1,
     )
+    b_lid = BoundaryConfig(
+        link_type=LinkType.LID,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.050,
+        height=0.0035,
+        thickness=0.0035,
+        has_drain=True,
+        drain_hole_y=-0.010,
+        drain_hole_radius=0.020,
+        has_tube=True,
+        tube_radius=0.008,
+        link_idx=-1,
+    )
     b_impeller = BoundaryConfig(
         link_type=LinkType.IMPELLER,
         shape=ShapeType.IMPELLER,
@@ -1263,6 +1278,7 @@ def test_boundary_voxels_labeled_by_type():
         "bowl": b_bowl,
         "casing": b_casing,
         "tube": b_tube,
+        "lid": b_lid,
         "impeller": b_impeller,
     }
 
@@ -1283,14 +1299,17 @@ def test_boundary_voxels_labeled_by_type():
     assert "bowl" in voxels
     assert "casingwall" in voxels
     assert "tubewall" in voxels
+    assert "lid" in voxels
     assert "impeller" in voxels
 
     assert len(voxels["bowl"]) > 0
     assert len(voxels["casingwall"]) > 0
     assert len(voxels["tubewall"]) > 0
+    assert len(voxels["lid"]) > 0
     assert len(voxels["impeller"]) > 0
 
     # Ensure state tracker receives the boundary voxels on explicit update
     fluid.state_tracker.boundary_voxels = fluid.get_boundary_voxels()
     assert mock_state_tracker.boundary_voxels is not None
     assert "bowl" in mock_state_tracker.boundary_voxels
+    assert "lid" in mock_state_tracker.boundary_voxels
