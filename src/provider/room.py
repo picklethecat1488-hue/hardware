@@ -902,6 +902,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         particle_positions: list[list[float]],
         particle_colors: Optional[list[list[float]]] = None,
         particle_radii: Optional[list[float]] = None,
+        boundary_voxels: Optional[dict[str, Any]] = None,
         step_idx: Optional[int] = None,
     ) -> None:
         """Log the given state data to Rerun."""
@@ -948,6 +949,38 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                         colors=colors_arg,
                     ),
                 )
+
+        # Log boundary voxels labeled for each boundary type
+        if boundary_voxels is not None and len(boundary_voxels) > 0:
+            boundary_color_map = {
+                "bowl": [180, 180, 190, 80],
+                "casingwall": [255, 160, 50, 100],
+                "casing_wall": [255, 160, 50, 100],
+                "casing": [255, 160, 50, 100],
+                "tubewall": [50, 200, 100, 100],
+                "tube_wall": [50, 200, 100, 100],
+                "tube": [50, 200, 100, 100],
+                "casinglid": [160, 100, 220, 100],
+                "casing_lid": [160, 100, 220, 100],
+                "lid": [140, 90, 200, 100],
+                "impeller": [220, 50, 50, 140],
+                "sphere": [100, 180, 220, 100],
+                "plane": [150, 150, 150, 80],
+            }
+            default_color = [160, 160, 160, 90]
+
+            for label, vox_positions in boundary_voxels.items():
+                if vox_positions is not None and len(vox_positions) > 0:
+                    pos_arr = np.asarray(vox_positions, dtype=np.float32)
+                    color = boundary_color_map.get(label.lower(), default_color)
+                    rr.log(
+                        f"world/boundaries/{label}",
+                        rr.Points3D(
+                            positions=pos_arr,
+                            radii=0.0018,
+                            colors=color,
+                        ),
+                    )
 
     def simulate(
         self,

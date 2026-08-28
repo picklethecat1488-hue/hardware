@@ -29,7 +29,7 @@ spout_angle: 45.0
 spout_length: 30.0
 spout_deflection_height: 0.0
 spout_deflection_radius: 30.0
-spout_deflection_thickness: 40.0
+spout_deflection_thickness: 2.0
 spout_deflection_z_offset: 16.0
 lid_cutout_radius: 55.0
 lid_cutout_y: -20.0

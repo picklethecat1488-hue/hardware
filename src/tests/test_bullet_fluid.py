@@ -628,6 +628,34 @@ class TestBulletFluid:
                         weighted_om = np.sum(x_t * vy_t - y_t * vx_t) / np.sum(x_t**2 + y_t**2)
                         omega_history.append(weighted_om)
 
+            # Verify fluid particles remain contained inside the bowl
+            pos_final = np.array(fluid.pos_jax)
+            bowl_r = boundaries["bowl"]["radius"]
+            r_final_sq = pos_final[:, 0] ** 2 + pos_final[:, 1] ** 2
+            r_final = np.sqrt(r_final_sq)
+            inside_bowl = (
+                (pos_final[:, 2] < 100.0)
+                & (r_final_sq <= (bowl_r + fluid.r_s + 0.002) ** 2)
+                & (pos_final[:, 2] >= -0.002)
+            )
+            contained_count = int(np.sum(inside_bowl))
+            assert contained_count == fluid.n_particles, (
+                f"Fluid escaped container during rotation: {contained_count} / {fluid.n_particles} remained inside"
+            )
+
+            # Verify fluid makes physical contact with the container floor (non-floating)
+            min_z = float(np.min(pos_final[:, 2]))
+            assert min_z <= 2.0 * fluid.r_s + 0.004, (
+                f"Fluid is hovering above floor: min Z is {min_z:.5f}, expected <= {2.0 * fluid.r_s + 0.004:.5f}"
+            )
+
+            # In steady-state slow mode, verify fluid spreads outward toward container wall under rotation
+            if mode == "slow":
+                max_r = float(np.max(r_final))
+                assert max_r >= bowl_r - 2.0 * fluid.r_s - 0.015, (
+                    f"Fluid did not spread to bowl wall: max radius is {max_r:.5f}, expected >= {bowl_r - 2.0 * fluid.r_s - 0.015:.5f}"
+                )
+
             # Verify fluid particles are rotating in the positive Z direction as forced by impeller
             assert len(omega_history) > 0, "No active particles in the bowl during window."
             avg_omega = np.mean(omega_history)

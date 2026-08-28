@@ -20,6 +20,21 @@ class CollisionMask(IntEnum):
     ALL = 3
 
 
+class LinkType(IntEnum):
+    """Bullet link types."""
+
+    BASE = -1
+    OUTLET = 0
+    TUBE = 1
+    IMPELLER = 2
+    FALLEN = -2
+    OUTLET_MAX_Y = -3
+    LID = 3
+    DRIVE_HUB = 4
+    PUMP_COVER = 5
+    CASING = 6
+
+
 class URDFCollisionType(StrEnum):
     """URDF collision representation types."""
 
