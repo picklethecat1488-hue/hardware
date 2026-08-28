@@ -24,7 +24,7 @@ from scipy.spatial import cKDTree  # type: ignore
 from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFBoundaryType
 from provider.room import BulletStateTracker
 from provider.bullet import LinkType, _is_real_physics_client
-from model import BoundaryConfig, FluidConfig, CoordinateSpace, CoordinateSystem, SpatialPose
+from model import BoundaryConfig, FluidConfig, CoordinateSpace, CoordinateSystem, SpatialPose, BoundaryParam
 from provider.transforms import (
     invert_orientation,
     world_to_base_orientation,
@@ -301,28 +301,6 @@ BOUNDARY_CAVITY = 1
 BOUNDARY_SOLID_CAVITY = 2
 
 
-class BoundaryParam(IntEnum):
-    """Named indices for boundary parameter columns in b_params tensor."""
-
-    RADIUS = 0
-    HEIGHT = 1
-    THICKNESS = 2
-    Z_OFFSET = 3
-    SLOT_HEIGHT = 4
-    SLOT_WIDTH = 5
-    CEILING_THICKNESS = 6
-    VANE_THICKNESS = 7
-    NUM_VANES = 8
-    VANE_TWIST_RAD = 9
-    CUTOFF_Y = 10
-    HAS_TUBE = 11
-    HAS_DRAIN = 12
-    TUBE_RADIUS = 13
-    DRAIN_HOLE_Y = 14
-    DRAIN_HOLE_RADIUS = 15
-    BOUNDARY_FRICTION = 16
-
-
 def _boundary_force_impeller_jax(
     pos_local: jnp.ndarray,
     vel_local: jnp.ndarray,
@@ -504,8 +482,8 @@ def _compute_boundary_forces_jax(
     occ_p = _g2p_scalar_jax(pos_local, smooth_occ, dx, origin_arr, nx, ny, nz)
     norm_p = _g2p_jax(pos_local, normal_grid, dx, origin_arr, nx, ny, nz)
     # Prevent spurious upward ejection forces from outer vertical side walls
-    base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.RADIUS], 0.0)
-    base_floor_z = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.Z_OFFSET] + dx, dx)
+    base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
+    base_floor_z = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.Z_BOTTOM] + dx, dx)
     is_outer_wall = (pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2) >= (base_radius - 2.0 * dx) ** 2
     norm_pz = jnp.where(
         (pos_local[:, 2] > base_floor_z) & is_outer_wall,
@@ -762,11 +740,9 @@ def _make_grid_masks(
     tube_pos_local = world_to_base_frame(tube_world_pos, base_pos, base_orn_inv)
     tube_xb = jnp.where(has_tube_bound, tube_pos_local[0], 0.0)
     tube_yb = jnp.where(has_tube_bound, tube_pos_local[1], 0.0)
-    tube_rb = jnp.where(
-        has_tube_bound,
-        b_params[tube_idx, BoundaryParam.RADIUS] - b_params[tube_idx, BoundaryParam.THICKNESS],
-        0.0,
-    )
+    tube_rb = jnp.where(has_tube_bound, b_params[tube_idx, BoundaryParam.R_INNER], 0.0)
+    tube_bot_local_z = jnp.where(has_tube_bound, tube_pos_local[2] + b_params[tube_idx, BoundaryParam.Z_BOTTOM], 0.0)
+    tube_top_local_z = jnp.where(has_tube_bound, tube_pos_local[2] + b_params[tube_idx, BoundaryParam.Z_TOP], 0.0)
 
     for idx, shape in enumerate(b_shapes):
         is_imp = shape == SHAPE_IMPELLER
@@ -870,16 +846,18 @@ def _make_grid_masks(
         cyl_norm_loc = jnp.where(is_cyl_floor[:, None], cyl_floor_norm_loc, cyl_wall_norm_loc)
         cyl_norm_base = local_to_base_vector(cyl_norm_loc, b_orn_loc)
 
-        r_inner_tube = radius - thickness
-        r_mid_tube = (radius + r_inner_tube) / 2.0
+        r_inner_tube = b_params[idx, BoundaryParam.R_INNER]
+        r_outer_tube = b_params[idx, BoundaryParam.R_OUTER]
+        r_mid_tube = (r_outer_tube + r_inner_tube) * 0.5
         tube_sign = jnp.where(r_safe < r_mid_tube, -1.0, 1.0)
         tube_norm_loc = tube_sign[:, None] * jnp.stack(
             [xb_loc / r_safe, yb_loc / r_safe, jnp.zeros_like(xb_loc)], axis=-1
         )
         tube_norm_base = local_to_base_vector(tube_norm_loc, b_orn_loc)
 
-        r_inner_casing = radius - thickness
-        r_mid_casing = (radius + r_inner_casing) / 2.0
+        r_inner_casing = b_params[idx, BoundaryParam.R_INNER]
+        r_outer_casing = b_params[idx, BoundaryParam.R_OUTER]
+        r_mid_casing = (r_outer_casing + r_inner_casing) * 0.5
         casing_sign = jnp.where(r_safe < r_mid_casing, -1.0, 1.0)
         casing_floor_norm_loc = jnp.stack(
             [jnp.zeros_like(xb_loc), jnp.zeros_like(yb_loc), jnp.ones_like(zb_loc)], axis=-1
@@ -890,8 +868,8 @@ def _make_grid_masks(
         casing_wall_norm_loc = casing_sign[:, None] * jnp.stack(
             [xb_loc / r_safe, yb_loc / r_safe, jnp.zeros_like(xb_loc)], axis=-1
         )
-        is_casing_floor = zb_loc <= 0.0
-        is_casing_ceil = zb_loc >= height
+        is_casing_floor = zb_loc <= b_params[idx, BoundaryParam.Z_BOTTOM]
+        is_casing_ceil = zb_loc >= b_params[idx, BoundaryParam.Z_TOP]
         casing_norm_loc = jnp.where(
             is_casing_floor[:, None],
             casing_floor_norm_loc,
@@ -923,16 +901,6 @@ def _make_grid_masks(
         tube_mask = jnp.where(is_tube, tube_mask | is_tube_mask, tube_mask)
 
     # Clear solid mask inside the tube passage along the entire tube column to prevent internal blockage
-    tube_top_local_z = 0.0
-    tube_bot_local_z = 0.0
-    for idx, shape in enumerate(b_shapes):
-        is_tb = shape == SHAPE_TUBE
-        tb_pos_loc = world_to_base_frame(b_pos_arr[idx], base_pos, base_orn_inv)
-        tb_lz = tb_pos_loc[2]
-        tb_h = b_params[idx, BoundaryParam.HEIGHT]
-        tube_bot_local_z = jnp.where(is_tb, tb_lz, tube_bot_local_z)
-        tube_top_local_z = jnp.where(is_tb, tb_lz + tb_h, tube_top_local_z)
-
     in_tube_interior = (
         ((coords[:, 0] - tube_xb) ** 2 + (coords[:, 1] - tube_yb) ** 2 < tube_rb**2)
         & (coords[:, 2] >= tube_bot_local_z)
@@ -1355,22 +1323,13 @@ def _lbm_step_subroutine(
     r_tube = 0.0
     for j, shape_j in enumerate(b_shapes):
         is_tb = shape_j == SHAPE_TUBE
-        r_inner_tb = b_params[j, BoundaryParam.RADIUS] - b_params[j, BoundaryParam.THICKNESS]
+        r_inner_tb = b_params[j, BoundaryParam.R_INNER]
         r_tube = jnp.where(is_tb, r_inner_tb, r_tube)
 
     # Default to 0.015 if no impeller is present to support tests that don't model the impeller
     r_impeller_eff = jnp.where(r_impeller > 0.0, r_impeller, 0.015)
 
-    slot_w = 0.0
-    slot_h = 0.0
-    for j, shape_j in enumerate(b_shapes):
-        is_cas = shape_j == SHAPE_CASING
-        slot_w = jnp.where(is_cas, b_params[j, BoundaryParam.SLOT_WIDTH], slot_w)
-        slot_h = jnp.where(is_cas, b_params[j, BoundaryParam.SLOT_HEIGHT], slot_h)
-
-    a_slot = slot_w * slot_h
-    a_tube = math.pi * (r_tube**2) + 1e-6
-    constriction_ratio = jnp.where(a_tube > 0.0, a_slot / a_tube, 1.0)
+    constriction_ratio = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.SLOT_CONSTRICTION_RATIO], 1.0)
     v_tip = r_impeller_eff * jnp.abs(omega)
     tube_uz_phys = jnp.where(
         (r_tube > 0.0) & (r_impeller_eff > 0.0),
@@ -1431,16 +1390,12 @@ def _g2p_mapping_subroutine(
     vel_grid_world = base_to_world_vector(lbm_vel_local, base_orn) + base_vel
 
     # Submerged reservoir pool: derive liquid depth from fluid volume and base container area
-    base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.RADIUS], 0.0)
-    base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.HEIGHT], 0.0)
+    base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
+    base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.Z_TOP], 0.0)
     vol_total = pos_curr.shape[0] * ((4.0 / 3.0) * math.pi * (r_s**3))
     pool_depth = vol_total / (math.pi * (base_radius**2) + 1e-6)
 
-    casing_top = 0.0
-    for i, shape in enumerate(b_shapes):
-        is_c = shape == SHAPE_CASING
-        c_h = b_params[i, BoundaryParam.HEIGHT] + b_params[i, BoundaryParam.CEILING_THICKNESS]
-        casing_top = jnp.where(is_c, c_h, casing_top)
+    casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
 
     pool_height = jnp.where(
         base_idx != -1,
@@ -1456,14 +1411,11 @@ def _g2p_mapping_subroutine(
         b_orn_inv = invert_orientation(b_orn)
         pos_b = world_to_local_frame(pos_curr, b_pos, b_orn_inv)
         r_b_xy, _, _ = cartesian_to_cylindrical(pos_b)
-        radius = b_params[i, BoundaryParam.RADIUS]
-        height = b_params[i, BoundaryParam.HEIGHT]
-        thickness = b_params[i, BoundaryParam.THICKNESS]
-        inner_r = radius - thickness
-        is_tube = (
-            (shape == SHAPE_TUBE) & (r_b_xy <= inner_r) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] < height - 2.0 * r_s)
-        )
-        is_casing = (shape == SHAPE_CASING) & (r_b_xy <= radius) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= height)
+        inner_r = b_params[i, BoundaryParam.R_INNER]
+        r_outer = b_params[i, BoundaryParam.R_OUTER]
+        z_top = b_params[i, BoundaryParam.Z_TOP]
+        is_tube = (shape == SHAPE_TUBE) & (r_b_xy <= inner_r) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] < z_top - 2.0 * r_s)
+        is_casing = (shape == SHAPE_CASING) & (r_b_xy <= r_outer) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= z_top)
         in_tube_or_casing = in_tube_or_casing | is_tube | is_casing
     in_fluid_continuum = jnp.where(
         base_idx != -1, in_pool & (~in_tube_or_casing), jnp.ones(pos_curr.shape[0], dtype=jnp.bool_)
@@ -1535,7 +1487,12 @@ def _compute_particle_forces_subroutine(
     b_accel_mags = jnp.linalg.norm(b_accel, axis=1, keepdims=True)
     b_accel_mags_safe = jnp.maximum(b_accel_mags, 1e-8)
     b_accel_clamped = b_accel * jnp.minimum(max_b_accel / b_accel_mags_safe, 1.0)
+    r_impeller = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.IMPELLER_RADIUS], 0.0)
+    r_impeller_eff = jnp.where(r_impeller > 0.0, r_impeller, 0.015)
+    g_mag = jnp.linalg.norm(gravity)
+    v_tip = jnp.abs(omega) * r_impeller_eff
 
+    # Impeller suction intake force directed toward casing center
     suction_accel = jnp.zeros_like(pos_curr)
     for i, shape in enumerate(b_shapes):
         casing_pos = b_pos_arr[i]
@@ -1544,17 +1501,17 @@ def _compute_particle_forces_subroutine(
         pos_casing = world_to_local_frame(pos_curr, casing_pos, casing_orn_inv)
         r_inlet_xy, _, _ = cartesian_to_cylindrical(pos_casing)
         radius = b_params[i, BoundaryParam.RADIUS]
-        casing_height = b_params[i, BoundaryParam.HEIGHT]
-        ceiling_thickness = b_params[i, BoundaryParam.CEILING_THICKNESS]
         inlet_radius = radius * 0.35
+        suction_z_min = b_params[i, BoundaryParam.SUCTION_Z_MIN]
+        suction_z_max = b_params[i, BoundaryParam.SUCTION_Z_MAX]
 
         in_suction = (
             (r_inlet_xy < inlet_radius + r_s)
-            & (pos_casing[:, 2] >= casing_height - ceiling_thickness - 0.002)
-            & (pos_casing[:, 2] <= casing_height + 2.0 * ceiling_thickness)
+            & (pos_casing[:, 2] >= suction_z_min)
+            & (pos_casing[:, 2] <= suction_z_max)
         )
 
-        target_z = casing_height - ceiling_thickness
+        target_z = b_params[i, BoundaryParam.HEIGHT] - b_params[i, BoundaryParam.CEILING_THICKNESS]
         dx_in = 0.0 - pos_casing[:, 0]
         dy_in = 0.0 - pos_casing[:, 1]
         dz_in = target_z - pos_casing[:, 2]
@@ -1563,18 +1520,11 @@ def _compute_particle_forces_subroutine(
         dir_casing = jnp.stack([dx_in / dist_in, dy_in / dist_in, dz_in / dist_in], axis=-1)
         dir_world = local_to_world_vector(dir_casing, casing_orn)
 
-        suction_strength = (jnp.abs(omega) / 120.0) * 15.0
+        suction_strength = v_tip * (g_mag * 1.25)
         suction_accel_i = jnp.where(in_suction[:, None], dir_world * suction_strength, 0.0)
 
         is_casing = shape == SHAPE_CASING
         suction_accel += jnp.where(is_casing, suction_accel_i, jnp.zeros_like(pos_curr))
-
-    r_impeller = 0.0
-    for j, shape_j in enumerate(b_shapes):
-        r_impeller = jnp.where(shape_j == SHAPE_IMPELLER, b_params[j, BoundaryParam.RADIUS], r_impeller)
-
-    g_mag = jnp.linalg.norm(gravity)
-    v_tip = jnp.abs(omega) * r_impeller
 
     tube_pump_accel = jnp.zeros_like(pos_curr)
     for i, shape in enumerate(b_shapes):
@@ -1583,10 +1533,9 @@ def _compute_particle_forces_subroutine(
         tube_orn_inv = invert_orientation(tube_orn)
         pos_tube = world_to_local_frame(pos_curr, tube_pos, tube_orn_inv)
         r_tube_xy, _, _ = cartesian_to_cylindrical(pos_tube)
-        radius = b_params[i, BoundaryParam.RADIUS]
-        thickness = b_params[i, BoundaryParam.THICKNESS]
+        inner_r = b_params[i, BoundaryParam.R_INNER]
         tube_h = b_params[i, BoundaryParam.HEIGHT]
-        inner_r = radius - thickness
+        spout_z_min = b_params[i, BoundaryParam.SPOUT_Z_MIN]
 
         # Query lid deflection / socket height offset dynamically from URDF boundary metadata
         lid_height_offset = 0.0
@@ -1609,23 +1558,8 @@ def _compute_particle_forces_subroutine(
         v_z_tube = v_tube[:, 2]
 
         # Derive flow velocity from impeller geometry, slot constriction ratio, and motor speed
-        impeller_idx = -1
-        casing_idx = -1
-        for k, shape_k in enumerate(b_shapes):
-            impeller_idx = jnp.where(shape_k == SHAPE_IMPELLER, k, impeller_idx)
-            casing_idx = jnp.where(shape_k == SHAPE_CASING, k, casing_idx)
-
-        r_impeller_eff = jnp.where(
-            impeller_idx != -1,
-            b_params[impeller_idx, BoundaryParam.RADIUS],
-            0.0,
-        )
         r_tube_eff = inner_r
-        slot_w = jnp.where(casing_idx != -1, b_params[casing_idx, BoundaryParam.SLOT_WIDTH], 0.0)
-        slot_h = jnp.where(casing_idx != -1, b_params[casing_idx, BoundaryParam.SLOT_HEIGHT], 0.0)
-        a_slot = slot_w * slot_h
-        a_tube = math.pi * (r_tube_eff**2) + 1e-6
-        constriction_ratio = a_slot / a_tube
+        constriction_ratio = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.SLOT_CONSTRICTION_RATIO], 1.0)
 
         v_flow_est = jnp.where(
             (r_tube_eff > 0.0) & (r_impeller_eff > 0.0),
@@ -1646,18 +1580,15 @@ def _compute_particle_forces_subroutine(
         up_world = up_vector[None, :] * pump_lift_scalar[:, None]
 
         # Radial spreading and outward deflection at the fountain spout opening
-        at_spout = (pos_tube[:, 2] >= tube_h - 1.0 * r_s) & (r_tube_xy < inner_r + 3.0 * r_s)
+        at_spout = (pos_tube[:, 2] >= spout_z_min) & (r_tube_xy < inner_r + 3.0 * r_s)
 
         # Derive spout deflection direction: 360-degree radial expansion with forward slope bias
         drain_hole_y = 0.0
-        lid_slope_ratio = 0.5
         for j, shape_j in enumerate(b_shapes):
             has_dr = b_params[j, BoundaryParam.HAS_DRAIN] > 0.5
             dr_y = b_params[j, BoundaryParam.DRAIN_HOLE_Y]
-            lid_r = b_params[j, BoundaryParam.RADIUS]
-            lid_h = b_params[j, BoundaryParam.HEIGHT]
             drain_hole_y = jnp.where(has_dr, dr_y, drain_hole_y)
-            lid_slope_ratio = jnp.where(has_dr & (lid_r > 0.0), lid_h / lid_r, lid_slope_ratio)
+        lid_slope_ratio = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.LID_SLOPE_RATIO], 0.0)
 
         r_xy_safe = jnp.maximum(r_tube_xy, 1e-5)
         radial_unit_local = jnp.stack(
@@ -1685,55 +1616,6 @@ def _compute_particle_forces_subroutine(
         is_tube = shape == SHAPE_TUBE
         tube_pump_accel += jnp.where(is_tube, tube_pump_accel_i, jnp.zeros_like(pos_curr))
 
-    lid_drain_accel = jnp.zeros_like(pos_curr)
-    for i, shape in enumerate(b_shapes):
-        lid_pos = b_pos_arr[i]
-        lid_orn = b_orn_arr[i]
-        lid_orn_inv = invert_orientation(lid_orn)
-        pos_lid = world_to_local_frame(pos_curr, lid_pos, lid_orn_inv)
-        r_lid_xy, _, _ = cartesian_to_cylindrical(pos_lid)
-        has_drain = b_params[i, BoundaryParam.HAS_DRAIN] > 0.5
-        drain_hole_y = b_params[i, BoundaryParam.DRAIN_HOLE_Y]
-        radius = b_params[i, BoundaryParam.RADIUS]
-        height = b_params[i, BoundaryParam.HEIGHT]
-        thickness = b_params[i, BoundaryParam.THICKNESS]
-
-        # Fluid on top lid tray
-        on_lid = (
-            has_drain
-            & (b_types[i] == 1)
-            & (pos_lid[:, 2] >= -thickness - 0.005)
-            & (pos_lid[:, 2] <= height + 0.060)
-            & (r_lid_xy <= radius)
-        )
-
-        # 1. Down-slope flow across the whole lid platform (along -Y)
-        dy_to_drain = drain_hole_y - pos_lid[:, 1]
-        slope_accel_local = jnp.stack(
-            [
-                jnp.zeros_like(pos_lid[:, 0]),
-                jnp.where(dy_to_drain < 0.0, -1.0, 1.0) * (g_mag * 0.8),
-                jnp.zeros_like(pos_lid[:, 0]),
-            ],
-            axis=-1,
-        )
-
-        # 2. Funneling convergence specifically near the drain hole
-        dist_to_drain = jnp.sqrt(pos_lid[:, 0] ** 2 + (pos_lid[:, 1] - drain_hole_y) ** 2)
-        near_drain = dist_to_drain < 0.030
-        target_drain_local = jnp.array([0.0, drain_hole_y, -thickness - 0.005])
-        d_drain = target_drain_local - pos_lid
-        dist_d = jnp.sqrt(jnp.sum(d_drain**2, axis=-1, keepdims=True) + 1e-8)
-        dir_drain_local = d_drain / dist_d
-
-        drain_funnel_accel_local = dir_drain_local * (g_mag * 1.5)
-        total_lid_accel_local = jnp.where(near_drain[:, None], drain_funnel_accel_local, slope_accel_local)
-        total_lid_accel_world = local_to_world_vector(total_lid_accel_local, lid_orn)
-
-        lid_drain_accel_i = jnp.where(on_lid[:, None], total_lid_accel_world, 0.0)
-        is_lid_cavity = (b_shapes[i] == SHAPE_CYLINDER) & has_drain
-        lid_drain_accel += jnp.where(is_lid_cavity, lid_drain_accel_i, jnp.zeros_like(pos_curr))
-
     hydrostatic_support = (
         jnp.where(in_fluid_continuum[:, None], -gravity[None, :], 0.0)
         if in_fluid_continuum is not None
@@ -1741,7 +1623,7 @@ def _compute_particle_forces_subroutine(
     )
     effective_gravity = gravity[None, :] + hydrostatic_support
 
-    accel = b_accel_clamped + suction_accel + tube_pump_accel + lid_drain_accel + effective_gravity
+    accel = b_accel_clamped + suction_accel + tube_pump_accel + effective_gravity
     return accel, step_torque, b_forces
 
 
@@ -1764,18 +1646,18 @@ def _integrate_particles_subroutine(
     base_vel: jnp.ndarray,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Integration subroutine: applies accelerations, zone-based damping, and clamps speed limits."""
-    base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.RADIUS], 0.096)
-    base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.HEIGHT], 0.096)
+    base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
+    base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.Z_TOP], 0.0)
 
     has_tube = jnp.any(b_shapes == SHAPE_TUBE)
     tube_idx = jnp.argmax(b_shapes == SHAPE_TUBE)
     tube_y_check = jnp.where(has_tube, b_pos_arr[tube_idx, 1] - base_pos[1], 0.0)
     tube_r_check = jnp.where(
         has_tube,
-        b_params[tube_idx, BoundaryParam.RADIUS] - b_params[tube_idx, BoundaryParam.THICKNESS],
+        b_params[tube_idx, BoundaryParam.R_INNER],
         0.0,
     )
-    spout_r = jnp.where(has_tube, b_params[tube_idx, BoundaryParam.RADIUS], 0.014)
+    spout_r = jnp.where(has_tube, b_params[tube_idx, BoundaryParam.R_OUTER], 0.014)
     tube_h = jnp.where(has_tube, b_params[tube_idx, BoundaryParam.HEIGHT], 0.0)
     influence_r = spout_r
     influence_h = tube_h + 0.049
@@ -1802,23 +1684,7 @@ def _integrate_particles_subroutine(
     in_tube = (dist_tube_sq < influence_r**2) & (pos_local_check[:, 2] >= 0.0) & (pos_local_check[:, 2] <= influence_h)
     in_tube = jnp.where(has_tube, in_tube, jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_))
 
-    fountain_top_z = base_height
-    for k, shape_k in enumerate(b_shapes):
-        b_z = (
-            b_pos_arr[k, 2]
-            - base_pos[2]
-            + jnp.maximum(b_params[k, BoundaryParam.HEIGHT], b_params[k, BoundaryParam.RADIUS])
-        )
-        fountain_top_z = jnp.maximum(fountain_top_z, b_z)
-
-    has_sph = jnp.any(b_shapes == SHAPE_SPHERE)
-    sph_idx = jnp.argmax(b_shapes == SHAPE_SPHERE)
-    sph_top_z = jnp.where(
-        has_sph,
-        b_pos_arr[sph_idx, 2] - base_pos[2] + b_params[sph_idx, BoundaryParam.RADIUS] + 0.002,
-        fountain_top_z,
-    )
-    max_ceiling_z = jnp.where(has_sph, sph_top_z, fountain_top_z)
+    max_ceiling_z = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.MAX_CEILING_Z], base_height)
     influence_h = jnp.minimum(tube_h + 0.049, max_ceiling_z)
 
     outside_base_raw = (
@@ -1838,22 +1704,34 @@ def _integrate_particles_subroutine(
 
     pos_next = jnp.where(active, pos_curr + vel_next * dt_sub, pos_curr)
 
-    # Enforce analytical non-penetration boundary conditions on base container
+    # Enforce analytical non-penetration boundary conditions on base container in Base Link Frame
     pos_local_next = world_to_base_frame(pos_next, base_pos, base_orn_inv)
     v_rel_local = world_to_base_vector(vel_next - base_vel, base_orn_inv)
 
-    # 1. Floor non-penetration: local Z >= 0.0 for near-surface particles
+    # 1. Unified Floor and Ceiling Containment
+    has_sph = jnp.any(b_shapes == SHAPE_SPHERE)
     below_floor = (pos_local_next[:, 2] >= -0.010) & (pos_local_next[:, 2] < 0.0) & (base_idx != -1)
-    pos_z_clamped = jnp.where(below_floor, 1e-4, pos_local_next[:, 2])
-    vel_z_clamped = jnp.where(below_floor, jnp.maximum(v_rel_local[:, 2], 0.0), v_rel_local[:, 2])
+    above_ceiling = (pos_local_next[:, 2] > max_ceiling_z) & (base_idx != -1) & has_sph
 
-    # 2. Side wall non-penetration: local r <= base_radius when below base_height
+    pos_z_clamped = jnp.where(
+        below_floor,
+        1e-4,
+        jnp.where(above_ceiling, max_ceiling_z - 1e-4, pos_local_next[:, 2]),
+    )
+    vel_z_clamped = jnp.where(
+        below_floor,
+        jnp.maximum(v_rel_local[:, 2], 0.0),
+        jnp.where(above_ceiling, jnp.minimum(v_rel_local[:, 2], 0.0), v_rel_local[:, 2]),
+    )
+
+    # 2. Side Wall Non-Penetration
     r_loc_next, _, _ = cartesian_to_cylindrical(pos_local_next)
+    wall_band_r_max = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.WALL_BAND_R_MAX], base_radius + 0.015)
     outside_wall = (
         (r_loc_next > base_radius)
-        & (r_loc_next <= base_radius + 0.015)
+        & (r_loc_next <= wall_band_r_max)
         & (pos_local_next[:, 2] >= 0.0)
-        & (pos_local_next[:, 2] <= base_height)
+        & (pos_local_next[:, 2] <= max_ceiling_z)
         & (base_idx != -1)
     )
     scale_r = jnp.where(outside_wall & (r_loc_next > 1e-6), (base_radius - 1e-4) / r_loc_next, 1.0)
@@ -1887,11 +1765,11 @@ def _integrate_particles_subroutine(
         axis=-1,
     )
 
-    # Rotate back to world frame
+    # Transform back to World Frame
     pos_next = jnp.where(active, base_to_world_frame(pos_local_safe, base_pos, base_orn), pos_curr)
     vel_next = jnp.where(active, base_to_world_vector(vel_local_safe, base_orn), 0.0)
 
-    # 3. Analytical non-penetration for planar and spherical boundaries (such as spout dome)
+    # 3. Analytical Non-Penetration for Planar and Spherical Obstacles
     for k, shape_k in enumerate(b_shapes):
         is_pl = shape_k == SHAPE_PLANE
         pl_pos = b_pos_arr[k]
@@ -1900,7 +1778,8 @@ def _integrate_particles_subroutine(
         pos_pl = world_to_local_frame(pos_next, pl_pos, pl_orn_inv)
         v_pl = world_to_local_vector(vel_next, pl_orn_inv)
 
-        penetrating_plane = is_pl & (pos_pl[:, 2] < 0.0) & (pos_pl[:, 2] >= -0.050)
+        thick_pl = b_params[k, BoundaryParam.THICKNESS]
+        penetrating_plane = is_pl & (pos_pl[:, 2] < 0.0) & (pos_pl[:, 2] >= -jnp.maximum(thick_pl, 0.010))
         pos_pl_z = jnp.where(penetrating_plane, 1e-4, pos_pl[:, 2])
         v_pl_z = jnp.where(penetrating_plane, jnp.maximum(v_pl[:, 2], 0.0), v_pl[:, 2])
 
@@ -1913,24 +1792,12 @@ def _integrate_particles_subroutine(
         # Solid spherical boundaries (such as the spout dome ceiling)
         is_sph = (shape_k == SHAPE_SPHERE) & (b_types[k] == 0)
         sph_pos = b_pos_arr[k]
-        sph_radius = b_params[k, BoundaryParam.RADIUS]
+        sph_radius = b_params[k, BoundaryParam.R_OUTER]
         pos_rel = pos_next - sph_pos
         dist_sph = jnp.sqrt(jnp.sum(pos_rel**2, axis=-1, keepdims=True) + 1e-8)
         penetrating_sph = is_sph & (dist_sph < sph_radius)[:, 0]
         scale_sph = (sph_radius + 1e-4) / dist_sph
         pos_next = jnp.where(penetrating_sph[:, None], sph_pos + pos_rel * scale_sph, pos_next)
-        norm_sph = pos_rel / dist_sph
-        v_dot_n = jnp.sum(vel_next * norm_sph, axis=-1, keepdims=True)
-    # 4. Containment ceiling clamp at max_ceiling_z (active when an analytical dome ceiling boundary is present)
-    pos_local_final = world_to_base_frame(pos_next, base_pos, base_orn_inv)
-    v_local_final = world_to_base_vector(vel_next - base_vel, base_orn_inv)
-    above_top = (pos_local_final[:, 2] > max_ceiling_z) & (base_idx != -1) & has_sph
-    pos_z_final = jnp.where(above_top, max_ceiling_z - 1e-4, pos_local_final[:, 2])
-    vel_z_final = jnp.where(above_top, jnp.minimum(v_local_final[:, 2], 0.0), v_local_final[:, 2])
-    pos_local_final = jnp.stack([pos_local_final[:, 0], pos_local_final[:, 1], pos_z_final], axis=-1)
-    v_local_final = jnp.stack([v_local_final[:, 0], v_local_final[:, 1], vel_z_final], axis=-1)
-    pos_next = jnp.where(active, base_to_world_frame(pos_local_final, base_pos, base_orn), pos_curr)
-    vel_next = jnp.where(active, base_to_world_vector(v_local_final, base_orn) + base_vel, 0.0)
 
     return pos_next, vel_next
 
@@ -3229,13 +3096,10 @@ class Fluid:
             z_min = float("inf")
             z_max = float("-inf")
             for i, b in enumerate(self.boundary_list):
-                z_start = self.processed_boundaries.b_pos_list[i][2] + getattr(b, "z_offset", 0.0)
-                thickness = getattr(b, "thickness", 0.0)
-                bottom = z_start - thickness
-                height = getattr(b, "height", 0.0)
-                if not math.isfinite(height):
-                    height = 0.5
-                top = z_start + height
+                surf = b.compute_surface_bounds()
+                z_start = float(self.processed_boundaries.b_pos_arr[i, 2])
+                bottom = z_start + surf.z_bottom - float(b.thickness)
+                top = z_start + surf.z_top
                 if bottom < z_min:
                     z_min = bottom
                 if top > z_max:

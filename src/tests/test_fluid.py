@@ -1313,3 +1313,113 @@ def test_boundary_voxels_labeled_by_type():
     assert mock_state_tracker.boundary_voxels is not None
     assert "bowl" in mock_state_tracker.boundary_voxels
     assert "lid" in mock_state_tracker.boundary_voxels
+
+
+def test_voxel_masks_consistent_with_surface_bounds():
+    """Verify consistency between voxel masks, surface normals, and precomputed CAD surface bounds."""
+    import jax.numpy as jnp
+    import numpy as np
+    from model.boundary_config import BoundaryConfig, BoundaryParam, BoundaryType, ShapeType
+    from provider.boundary import BoundaryProcessor
+    from provider.bullet import LinkType
+    from provider.fluid import _make_grid_masks
+
+    b_bowl = BoundaryConfig(
+        link_type=LinkType.BASE,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.060,
+        height=0.080,
+        thickness=0.005,
+        link_idx=-1,
+    )
+    b_tube = BoundaryConfig(
+        link_type=LinkType.TUBE,
+        shape=ShapeType.TUBE,
+        type=BoundaryType.SOLID_CAVITY,
+        radius=0.015,
+        height=0.060,
+        thickness=0.003,
+        xyz=(0.0, 0.020, 0.0),
+        link_idx=-1,
+    )
+    b_lid = BoundaryConfig(
+        link_type=LinkType.LID,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.058,
+        height=0.005,
+        thickness=0.003,
+        has_drain=True,
+        drain_hole_y=-0.015,
+        drain_hole_radius=0.012,
+        has_tube=True,
+        tube_radius=0.015,
+        link_idx=-1,
+    )
+
+    boundary_list = [b_bowl, b_tube, b_lid]
+    base_pos = (0.0, 0.0, 0.0)
+    base_orn = (0.0, 0.0, 0.0, 1.0)
+    processed = BoundaryProcessor.process(boundary_list, base_link_origin=(base_pos, base_orn))
+
+    dx = 0.003
+    nx, ny, nz = 48, 48, 36
+    origin = jnp.array([-0.072, -0.072, -0.010], dtype=jnp.float32)
+
+    solid_mask, tube_mask, solid_friction, normal_grid, smooth_occ = _make_grid_masks(
+        dx=dx,
+        origin=origin,
+        b_shapes=processed.b_shapes,
+        b_types=processed.b_types,
+        b_params=processed.b_params,
+        b_pos_arr=processed.b_pos_arr,
+        b_orn_arr=processed.b_orn_arr,
+        base_idx=0,
+        nx=nx,
+        ny=ny,
+        nz=nz,
+    )
+
+    solid_np = np.asarray(solid_mask)
+    tube_np = np.asarray(tube_mask)
+    normals_np = np.asarray(normal_grid)
+
+    # 1. Base bowl surface bounds check
+    bowl_surf = b_bowl.compute_surface_bounds()
+    assert processed.b_params[0, BoundaryParam.Z_BOTTOM] == bowl_surf.z_bottom
+    assert processed.b_params[0, BoundaryParam.Z_TOP] == bowl_surf.z_top
+    assert processed.b_params[0, BoundaryParam.R_INNER] == bowl_surf.r_inner
+    assert processed.b_params[0, BoundaryParam.R_OUTER] == bowl_surf.r_outer
+
+    # 2. Tube column interior clearing check: voxels inside tube bore must not be blocked
+    ix = np.arange(nx)
+    iy = np.arange(ny)
+    iz = np.arange(nz)
+    gx, gy, gz = np.meshgrid(ix, iy, iz, indexing="ij")
+    cx = float(origin[0]) + (gx + 0.5) * dx
+    cy = float(origin[1]) + (gy + 0.5) * dx
+    cz = float(origin[2]) + (gz + 0.5) * dx
+    coords_np = np.stack([cx, cy, cz], axis=-1)
+
+    tube_x, tube_y = 0.0, 0.020
+    tube_r_inner = b_tube.radius - b_tube.thickness
+    tube_r_sq = (coords_np[:, :, :, 0] - tube_x) ** 2 + (coords_np[:, :, :, 1] - tube_y) ** 2
+    in_bore = (tube_r_sq < (tube_r_inner - dx) ** 2) & (coords_np[:, :, :, 2] >= 0.0) & (coords_np[:, :, :, 2] <= 0.055)
+    # Bore interior must be active in tube_mask and cleared from solid_mask
+    assert np.any(tube_np[in_bore])
+    assert not np.any(solid_np[in_bore])
+
+    # 3. Normals on outer wall must point outward from solid cavity
+    outer_wall_nodes = (coords_np[:, :, :, 0] ** 2 + coords_np[:, :, :, 1] ** 2 >= (b_bowl.radius - dx) ** 2) & solid_np
+    if np.any(outer_wall_nodes):
+        node_normals = normals_np[outer_wall_nodes]
+        node_coords = coords_np[outer_wall_nodes]
+        radial_dots = node_normals[:, 0] * node_coords[:, 0] + node_normals[:, 1] * node_coords[:, 1]
+        # Inward-pointing cavity normals for container walls
+        assert np.all(radial_dots <= 1e-4)
+
+    # 4. Drain hole target centroid consistency
+    lid_surf = b_lid.compute_surface_bounds()
+    assert processed.b_params[2, BoundaryParam.DRAIN_TARGET_Z] == lid_surf.drain_target_z
+    assert processed.b_params[2, BoundaryParam.DRAIN_INFLUENCE_RADIUS] == lid_surf.drain_influence_radius
