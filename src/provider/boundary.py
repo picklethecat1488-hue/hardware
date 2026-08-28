@@ -374,9 +374,12 @@ class ProcessedBoundaries:
 
     @property
     def cavity_z_offset(self) -> float:
-        """Get base container bottom floor Z offset."""
-        if self.base_idx >= 0 and self.base_idx < len(self.b_params):
-            return float(self.b_params[self.base_idx, BoundaryParam.Z_OFFSET])
+        """Get base container bottom floor Z offset in world coordinates."""
+        if self.base_idx >= 0 and self.base_idx < len(self.b_pos_arr):
+            return float(
+                self.b_pos_arr[self.base_idx, BoundaryParam.THICKNESS]
+                + self.b_params[self.base_idx, BoundaryParam.Z_OFFSET]
+            )
         return 0.0
 
     @property

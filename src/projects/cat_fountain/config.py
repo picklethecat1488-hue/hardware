@@ -101,6 +101,9 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
                 provider.settings.damping_boundary = d_b
                 provider.is_tuning = True
 
+                orig_vol = provider.settings.target_volume
+                provider.settings.target_volume = 0.0001
+
                 hooks = provider.get_simulate_hooks_impl("product:view/simulate")
                 setup_fn = hooks[Simulate.SETUP]
                 step_fn = hooks[Simulate.STEP]
@@ -109,17 +112,17 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
 
                 avg_speed_observed = 0.0
                 total_flow_accum = 0
-                num_steps = 500
+                num_steps = 150
 
                 for step_idx in range(num_steps):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
-                    # Monitor instability and flow
-                    if provider.water_sim is not None:
-                        pos_np = np.array(provider.water_sim.pos_jax)
-                        vel_np = np.array(provider.water_sim.vel_jax)
-                        if len(pos_np) > 0 and len(vel_np) > 0:
+                    # Monitor instability and flow periodically using raw JAX particle arrays from water_sim
+                    if (step_idx % 10 == 0 or step_idx == num_steps - 1) and provider.water_sim is not None:
+                        pos_np = provider.water_sim.get_raw_particle_positions()
+                        vel_np = provider.water_sim.get_raw_particle_velocities()
+                        if pos_np is not None and vel_np is not None and len(pos_np) > 0 and len(vel_np) > 0:
                             active_mask = pos_np[:, 2] < 100.0
                             active_vels = vel_np[active_mask]
                             if len(active_vels) > 0:
@@ -128,19 +131,19 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
                                 if avg_speed > 10.0:  # Prevent JAX overflow/NaN
                                     break
 
-                        # Count particles that have reached/exited the top spout outlet
-                        pos_np = np.array(provider.water_sim.pos_jax)
-                        if len(pos_np) > 0:
+                            # Count particles that have reached/exited the top spout outlet
                             ys_np = pos_np[:, 1]
                             zs_np = pos_np[:, 2]
                             in_spout = (zs_np >= provider.water_sim.thresholds[LinkType.OUTLET]) & (
                                 ys_np < provider.water_sim.thresholds[LinkType.OUTLET_MAX_Y]
                             )
-                            total_flow_accum += int(np.sum(in_spout))
+                            total_flow_accum += int(np.sum(in_spout)) * 10
 
                 return avg_speed_observed, total_flow_accum
 
             finally:
+                if "orig_vol" in locals():
+                    provider.settings.target_volume = orig_vol
                 p.disconnect(physics_client)
 
         def is_better_candidate(stable: bool, avg_speed: float, flow: int) -> bool:
@@ -166,7 +169,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
                 return avg_speed < best_avg_speed
 
         # 1. Phase 1: Seed Discovery via Monte Carlo Random Sampling
-        num_seeds = 5
+        num_seeds = 1
         speed_limit = 1.5
         provider.logger.print(
             f"LBM Optimization Phase 1: running {num_seeds} Monte Carlo random seed trials...",
@@ -207,7 +210,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
             best_avg_speed = avg_speed
 
         # 2. Phase 2: Local Search / Annealing (Gaussian random walk around the best seed)
-        num_local_iters = 12
+        num_local_iters = 2
         scale_stiffness = 200.0
         scale_damping = 0.5
 

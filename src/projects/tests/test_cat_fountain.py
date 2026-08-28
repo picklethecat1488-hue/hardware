@@ -1049,6 +1049,13 @@ class TestCatFountainProvider:
                     f"Reservoir fluid did not spread to bowl wall: max R is {max_r:.5f}, expected >= {bowl_inner_r - 2.0 * fluid.r_s - 0.010:.5f}"
                 )
 
+                # Verify that water particles do not flood the dry compartment / machine room below floor_z
+                machine_room_mask = active_mask & (pos_np[:, 2] < floor_z_m - 0.005)
+                flooded_particles = int(np.sum(machine_room_mask))
+                assert flooded_particles == 0, (
+                    f"Water is flooding the machine room under the bowl floor: {flooded_particles} particles below {floor_z_m - 0.005:.4f}m"
+                )
+
                 # Verify that water falling through mid-air between pool surface and lid is not hovering statically
                 pool_top_z = floor_z_m + (provider.settings.target_volume / (math.pi * bowl_inner_r**2))
                 tube_pos_xy = (0.0, 0.028)

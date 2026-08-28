@@ -1278,6 +1278,12 @@ class PhysicsConfig:
         self.boundary_configs = (
             boundary_configs if boundary_configs is not None else tuple(self.processed_boundaries.boundaries)
         )
+        pb = self.processed_boundaries
+        self.b_shapes_jax = jnp.array(pb.b_shapes, dtype=jnp.int32)
+        self.b_types_jax = jnp.array(pb.b_types, dtype=jnp.int32)
+        self.b_params_jax = jnp.array(pb.b_params, dtype=jnp.float32)
+        self.gravity_arr = jnp.array(self.gravity, dtype=jnp.float32)
+        self.origin_arr = jnp.array(self.origin, dtype=jnp.float32)
 
 
 def _lbm_step_subroutine(
@@ -1396,13 +1402,22 @@ def _g2p_mapping_subroutine(
     pool_depth = vol_total / (math.pi * (base_radius**2) + 1e-6)
 
     casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
+    cavity_floor_z = jnp.where(
+        base_idx != -1,
+        b_pos_arr[base_idx, 2] - base_pos[2] + b_params[base_idx, BoundaryParam.Z_OFFSET],
+        0.0,
+    )
 
     pool_height = jnp.where(
         base_idx != -1,
         jnp.where(casing_top > 0.0, jnp.maximum(pool_depth + 4.0 * dx, casing_top), pool_depth),
         base_height,
     )
-    in_pool = (pos_local[:, 2] <= pool_height) & (r_local <= base_radius)
+    in_pool = (
+        (pos_local[:, 2] >= cavity_floor_z)
+        & (pos_local[:, 2] <= cavity_floor_z + pool_height)
+        & (r_local <= base_radius)
+    )
 
     in_tube_or_casing = jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_)
     for i, shape in enumerate(b_shapes):
@@ -1680,15 +1695,27 @@ def _integrate_particles_subroutine(
     pos_local_check = world_to_base_frame(pos_curr, base_pos, base_orn_inv)
     r_local, _, _ = cartesian_to_cylindrical(pos_local_check)
 
+    cavity_floor_z = jnp.where(
+        base_idx != -1,
+        b_pos_arr[base_idx, 2] - base_pos[2] + b_params[base_idx, BoundaryParam.Z_OFFSET],
+        0.0,
+    )
+
     dist_tube_sq = pos_local_check[:, 0] ** 2 + (pos_local_check[:, 1] - tube_y_check) ** 2
-    in_tube = (dist_tube_sq < influence_r**2) & (pos_local_check[:, 2] >= 0.0) & (pos_local_check[:, 2] <= influence_h)
+    in_tube = (
+        (dist_tube_sq < influence_r**2)
+        & (pos_local_check[:, 2] >= cavity_floor_z)
+        & (pos_local_check[:, 2] <= influence_h)
+    )
     in_tube = jnp.where(has_tube, in_tube, jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_))
 
     max_ceiling_z = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.MAX_CEILING_Z], base_height)
     influence_h = jnp.minimum(tube_h + 0.049, max_ceiling_z)
 
     outside_base_raw = (
-        (r_local > base_radius) | (pos_local_check[:, 2] < 0.0) | (pos_local_check[:, 2] > max_ceiling_z + 0.005)
+        (r_local > base_radius)
+        | (pos_local_check[:, 2] < cavity_floor_z)
+        | (pos_local_check[:, 2] > max_ceiling_z + 0.005)
     ) & (~in_tube)
     outside_base = jnp.where(base_idx != -1, outside_base_raw, jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_))
 
@@ -1709,12 +1736,14 @@ def _integrate_particles_subroutine(
     v_rel_local = world_to_base_vector(vel_next - base_vel, base_orn_inv)
 
     # 1. Unified Floor and Ceiling Containment
-    below_floor = (pos_local_next[:, 2] >= -0.010) & (pos_local_next[:, 2] < 0.0) & (base_idx != -1)
+    below_floor = (
+        (pos_local_next[:, 2] >= cavity_floor_z - 0.010) & (pos_local_next[:, 2] < cavity_floor_z) & (base_idx != -1)
+    )
     above_ceiling = (pos_local_next[:, 2] > max_ceiling_z) & (base_idx != -1)
 
     pos_z_clamped = jnp.where(
         below_floor,
-        1e-4,
+        cavity_floor_z + 1e-4,
         jnp.where(above_ceiling, max_ceiling_z - 1e-4, pos_local_next[:, 2]),
     )
     vel_z_clamped = jnp.where(
@@ -1729,7 +1758,7 @@ def _integrate_particles_subroutine(
     outside_wall = (
         (r_loc_next > base_radius)
         & (r_loc_next <= wall_band_r_max)
-        & (pos_local_next[:, 2] >= 0.0)
+        & (pos_local_next[:, 2] >= cavity_floor_z)
         & (pos_local_next[:, 2] <= max_ceiling_z)
         & (base_idx != -1)
     )
@@ -1963,28 +1992,6 @@ def _physics_step_jax(
     config: PhysicsConfig,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, float, jnp.ndarray]:
     """Perform a substepped LBM-PIC simulation update integrating forces and boundary collisions."""
-    mass = config.mass
-    dt_sub = config.dt_sub
-    n_substeps = config.n_substeps
-    gravity = config.gravity
-    base_idx = config.base_idx
-    K_boundary = config.K_boundary
-    D_boundary = config.D_boundary
-    r_s = config.r_s
-    high_damping_value = config.high_damping_value
-    nx = config.nx
-    ny = config.ny
-    nz = config.nz
-    dx = config.dx
-    origin = config.origin
-    pb = config.processed_boundaries
-
-    b_shapes = jnp.array(pb.b_shapes, dtype=jnp.int32)
-    b_types = jnp.array(pb.b_types, dtype=jnp.int32)
-    b_params = jnp.array(pb.b_params, dtype=jnp.float32)
-    gravity_arr = jnp.array(gravity, dtype=jnp.float32)
-    origin_arr = jnp.array(origin, dtype=jnp.float32)
-
     return _physics_step_jax_jit(
         pos,
         vel,
@@ -1995,23 +2002,23 @@ def _physics_step_jax(
         omega,
         t_start,
         damping,
-        b_shapes,
-        b_types,
-        b_params,
-        mass,
-        dt_sub,
-        gravity_arr,
-        base_idx,
-        K_boundary,
-        D_boundary,
-        r_s,
-        high_damping_value,
-        nx,
-        ny,
-        nz,
-        dx,
-        origin_arr,
-        n_substeps,
+        config.b_shapes_jax,
+        config.b_types_jax,
+        config.b_params_jax,
+        config.mass,
+        config.dt_sub,
+        config.gravity_arr,
+        config.base_idx,
+        config.K_boundary,
+        config.D_boundary,
+        config.r_s,
+        config.high_damping_value,
+        config.nx,
+        config.ny,
+        config.nz,
+        config.dx,
+        config.origin_arr,
+        config.n_substeps,
     )
 
 
@@ -2409,6 +2416,7 @@ class Fluid:
         vol_s = (4.0 / 3.0) * math.pi * (self.r_s**3)
         self.n_particles = int(round(self.target_volume / vol_s))
         self.last_positions: list[list[float]] = []
+        self.last_velocities: list[list[float]] = []
         self.current_sim_time = 0.0
         self.torques: list[float] = []
         # Motor configurations are consolidated into BoundaryConfig
@@ -2588,6 +2596,20 @@ class Fluid:
             inv_inertia_pos, inv_inertia_orn = p.invertTransform(local_inertia_pos, local_inertia_orn)
             return p.multiplyTransforms(base_pos, base_orn, inv_inertia_pos, inv_inertia_orn)
         return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)
+
+    def get_raw_particle_positions(self) -> np.ndarray:
+        """Return the raw particle positions array."""
+        if self.pos_jax is not None:
+            self.pos_jax.block_until_ready()
+            return np.asarray(self.pos_jax)
+        return np.empty((0, 3), dtype=np.float32)
+
+    def get_raw_particle_velocities(self) -> np.ndarray:
+        """Return the raw particle velocities array."""
+        if self.vel_jax is not None:
+            self.vel_jax.block_until_ready()
+            return np.asarray(self.vel_jax)
+        return np.empty((0, 3), dtype=np.float32)
 
     def get_particle_positions(self) -> Any:
         """Return voxelized grid-based volume positions representing the water.
@@ -3002,23 +3024,29 @@ class Fluid:
             bowl_vel = [0.0, 0.0, 0.0]
         base_vel_arr = jnp.array(bowl_vel, dtype=jnp.float32)
 
-        config = PhysicsConfig(
-            mass=self.particle_mass,
-            dt_sub=1.0 / (240.0 * 5),
-            n_substeps=5,
-            processed_boundaries=self.processed_boundaries,
-            gravity=tuple(map(float, self.gravity)),
-            base_idx=self.base_idx,
-            K_boundary=self.stiffness_boundary,
-            D_boundary=self.damping_boundary,
-            r_s=self.r_s,
-            high_damping_value=self.high_damping_value,
-            nx=self.nx,
-            ny=self.ny,
-            nz=self.nz,
-            dx=self.dx,
-            origin=tuple(map(float, self.origin)),
-        )
+        if not hasattr(self, "physics_config") or self.physics_config is None:
+            self.physics_config = PhysicsConfig(
+                mass=self.particle_mass,
+                dt_sub=1.0 / (240.0 * 5),
+                n_substeps=5,
+                processed_boundaries=self.processed_boundaries,
+                gravity=tuple(map(float, self.gravity)),
+                base_idx=self.base_idx,
+                K_boundary=self.stiffness_boundary,
+                D_boundary=self.damping_boundary,
+                r_s=self.r_s,
+                high_damping_value=self.high_damping_value,
+                nx=self.nx,
+                ny=self.ny,
+                nz=self.nz,
+                dx=self.dx,
+                origin=tuple(map(float, self.origin)),
+            )
+        else:
+            self.physics_config.K_boundary = self.stiffness_boundary
+            self.physics_config.D_boundary = self.damping_boundary
+
+        config = self.physics_config
 
         self.pos_jax, self.vel_jax, self.f_lbm, torque_accum, b_forces_accum = _physics_step_jax(
             self.pos_jax,
@@ -3032,119 +3060,137 @@ class Fluid:
             damping_val,
             config,
         )
-        self.last_boundary_forces = np.asarray(b_forces_accum)
+        self.last_boundary_forces = b_forces_accum
         # Add magnetic coupling attractive drag friction torque dynamically.
         # This models the axial attraction force of the neodymium disc magnet pairs
         # acting across the thin well partition floor, generating friction torque.
         mag_friction = 0.0
+        bearing_viscous_drag = 0.0
         if impeller_b is not None and abs(impeller_b.target_omega) > 1e-3:
-            drag_config = None
-            if MagneticDragConfig.is_magnetic_coupling(impeller_b):
-                try:
-                    drag_config = MagneticDragConfig(
-                        magnet_radius=impeller_b.magnet_radius,
-                        magnet_thickness=impeller_b.magnet_thickness,
-                        pump_well_wall=impeller_b.pump_well_wall,
-                        magnet_count=impeller_b.magnet_count,
-                        impeller_shaft_radius=impeller_b.impeller_shaft_radius,
-                    )
-                except Exception as e:
-                    raise ValueError(f"Invalid magnetic drag configuration: {e}") from e
+            if not hasattr(self, "_cached_mag_friction"):
+                drag_config = None
+                if MagneticDragConfig.is_magnetic_coupling(impeller_b):
+                    try:
+                        drag_config = MagneticDragConfig(
+                            magnet_radius=impeller_b.magnet_radius,
+                            magnet_thickness=impeller_b.magnet_thickness,
+                            pump_well_wall=impeller_b.pump_well_wall,
+                            magnet_count=impeller_b.magnet_count,
+                            impeller_shaft_radius=impeller_b.impeller_shaft_radius,
+                        )
+                    except Exception as e:
+                        raise ValueError(f"Invalid magnetic drag configuration: {e}") from e
 
-            mag_friction = self.calculate_magnetic_drag(drag_config)
-            bearing_viscous_drag = self.calculate_bearing_and_viscous_drag(impeller_b.target_omega)
+                self._cached_mag_friction = self.calculate_magnetic_drag(drag_config)
+                self._cached_bearing_drag = self.calculate_bearing_and_viscous_drag(impeller_b.target_omega)
+            mag_friction = self._cached_mag_friction
+            bearing_viscous_drag = self._cached_bearing_drag
+
+        is_tuning = getattr(self.provider, "is_tuning", False)
+        if not is_tuning:
+            avg_step_torque = (float(torque_accum) / 5) + mag_friction + bearing_viscous_drag
+            self.torques.append(avg_step_torque)
         else:
-            bearing_viscous_drag = 0.0
+            self.torques.append(0.0)
 
-        avg_step_torque = (float(torque_accum) / 5) + mag_friction + bearing_viscous_drag
-        self.torques.append(avg_step_torque)
+        # Ensure JAX device computations are resolved before converting to NumPy views when needed
+        if not is_tuning:
+            if self.pos_jax is not None:
+                self.pos_jax.block_until_ready()
+                pos_np = np.asarray(self.pos_jax)
+                self.last_positions = pos_np
+            else:
+                pos_np = np.empty((0, 3), dtype=np.float32)
 
-        # Check for LBM numerical instability (bulk particle speeds exceeding physical limits)
-        if self.pos_jax is not None and self.vel_jax is not None:
-            pos_np = np.array(self.pos_jax)
-            vel_np = np.array(self.vel_jax)
+            if self.vel_jax is not None:
+                self.vel_jax.block_until_ready()
+                vel_np = np.asarray(self.vel_jax)
+                self.last_velocities = vel_np
+            else:
+                vel_np = np.empty((0, 3), dtype=np.float32)
+
+            # Check for LBM numerical instability (bulk particle speeds exceeding physical limits)
             if len(pos_np) > 0 and len(vel_np) > 0:
                 active_mask = pos_np[:, 2] < 100.0
                 active_vels = vel_np[active_mask]
                 if len(active_vels) > 0:
                     avg_speed = float(np.mean(np.linalg.norm(active_vels, axis=1)))
                     if avg_speed > 1.5:
-                        if not getattr(self.provider, "is_tuning", False):
-                            msg = (
-                                f"WARNING: LBM Simulation numerical instability detected! "
-                                f"Average particle speed is {avg_speed:.2f} m/s (limit is 1.5 m/s). "
-                                f"Please check boundary damping and stiffness coefficients."
-                            )
-                            if self.provider and getattr(self.provider, "logger", None) is not None:
-                                self.provider.logger.print(msg, symbol="⚠️")
-                            else:
-                                print(f"⚠️ {msg}")
-
-        self.last_positions = np.asarray(self.pos_jax)
-        positions = self.last_positions
-        pos_np = np.array(positions)
-        if len(pos_np) > 0:
-            xs = pos_np[:, 0]
-            ys = pos_np[:, 1]
-            zs = pos_np[:, 2]
-
-            active_mask = zs < 100.0
-
-            # Spout/outlet indices
-            spout_indices = np.where(
-                active_mask & (zs >= self.thresholds[LinkType.OUTLET]) & (ys < self.thresholds[LinkType.OUTLET_MAX_Y])
-            )[0]
-            if len(spout_indices) > 0:
-                self.spout_water_ids.add_multiple(spout_indices)
-
-            # Fallen indices computed dynamically from boundary element locations in world frame
-            z_min = float("inf")
-            z_max = float("-inf")
-            for i, b in enumerate(self.boundary_list):
-                surf = b.compute_surface_bounds()
-                z_start = float(self.processed_boundaries.b_pos_arr[i, 2])
-                bottom = z_start + surf.z_bottom - float(b.thickness)
-                top = z_start + surf.z_top
-                if bottom < z_min:
-                    z_min = bottom
-                if top > z_max:
-                    z_max = top
-
-            # Apply buffers to allow physical oscillations/boundary penetration
-            z_min -= 0.010
-            z_max += 0.020
-
-            fallen_indices = np.where(
-                active_mask & ((zs < z_min) | (zs > z_max) | (xs**2 + ys**2 > (self.radii[LinkType.FALLEN]) ** 2))
-            )[0]
-
-            if len(fallen_indices) > 0:
-                pos_arr = np.array(self.pos_jax)
-                vel_arr = np.array(self.vel_jax)
-                self.total_fallen_water_ids.add_multiple(fallen_indices)
-                if not self.recycle_fluid:
-                    self.fallen_out_water_ids.add_multiple(fallen_indices)
-                cavity_pos = self.processed_boundaries.cavity_pos
-                cavity_orn = self.processed_boundaries.cavity_orn
-                cavity_z_offset = self.processed_boundaries.cavity_z_offset
-                for idx in fallen_indices:
-                    if self.recycle_fluid:
-                        # Select a random coordinate from pre-calculated grid
-                        if self.spawn_xy_coords:
-                            x, y = random.choice(self.spawn_xy_coords)
+                        msg = (
+                            f"WARNING: LBM Simulation numerical instability detected! "
+                            f"Average particle speed is {avg_speed:.2f} m/s (limit is 1.5 m/s). "
+                            f"Please check boundary damping and stiffness coefficients."
+                        )
+                        if self.provider and getattr(self.provider, "logger", None) is not None:
+                            self.provider.logger.print(msg, symbol="⚠️")
                         else:
-                            x, y = 0.0, 0.0
-                        z_local = cavity_z_offset + self.r_s + self.spawn_buffer + random.uniform(0.0, 0.010)
-                        wpt, _ = p.multiplyTransforms(cavity_pos, cavity_orn, [x, y, z_local], [0.0, 0.0, 0.0, 1.0])
-                        pos_arr[idx] = wpt
-                        vel_arr[idx] = [0.0, 0.0, 0.0]
+                            print(f"⚠️ {msg}")
+
+            if len(pos_np) > 0:
+                xs = pos_np[:, 0]
+                ys = pos_np[:, 1]
+                zs = pos_np[:, 2]
+
+                active_mask = zs < 100.0
+
+                # Spout/outlet indices
+                spout_indices = np.where(
+                    active_mask
+                    & (zs >= self.thresholds[LinkType.OUTLET])
+                    & (ys < self.thresholds[LinkType.OUTLET_MAX_Y])
+                )[0]
+                if len(spout_indices) > 0:
+                    self.spout_water_ids.add_multiple(spout_indices)
+
+                # Fallen indices computed dynamically from base cavity floor and boundaries in world frame
+                base_thick = (
+                    float(self.processed_boundaries.boundaries[0].thickness)
+                    if self.processed_boundaries.boundaries
+                    else 0.0035
+                )
+                z_min = self.processed_boundaries.cavity_z_offset - base_thick - 0.010
+                z_max = float("-inf")
+                for i, b in enumerate(self.boundary_list):
+                    surf = b.compute_surface_bounds()
+                    z_start = float(self.processed_boundaries.b_pos_arr[i, 2])
+                    top = z_start + surf.z_top
+                    if top > z_max:
+                        z_max = top
+
+                # Apply buffers to allow physical oscillations/boundary penetration
+                z_max += 0.020
+
+                fallen_indices = np.where(
+                    active_mask & ((zs < z_min) | (zs > z_max) | (xs**2 + ys**2 > (self.radii[LinkType.FALLEN]) ** 2))
+                )[0]
+
+                if len(fallen_indices) > 0:
+                    self.total_fallen_water_ids.add_multiple(fallen_indices)
+                    pos_arr = np.array(self.pos_jax)
+                    vel_arr = np.array(self.vel_jax)
+                    if not self.recycle_fluid:
+                        self.fallen_out_water_ids.add_multiple(fallen_indices)
+                        for idx in fallen_indices:
+                            pos_arr[idx] = [float(idx) * 10.0, 0.0, 1000.0]
+                            vel_arr[idx] = [0.0, 0.0, 0.0]
                     else:
-                        # Disperse inactive particles horizontally to avoid SPH neighborhood clustering hangs
-                        pos_arr[idx] = [float(idx) * 10.0, 0.0, 1000.0]
-                        vel_arr[idx] = [0.0, 0.0, 0.0]
-                self.pos_jax = jnp.array(pos_arr)
-                self.vel_jax = jnp.array(vel_arr)
-                self.last_positions = np.asarray(self.pos_jax)
+                        bowl_pos, bowl_orn = self._get_base_link_origin(self.body_id, physics_client)
+                        for idx in fallen_indices:
+                            if self.spawn_xy_coords:
+                                x, y = random.choice(self.spawn_xy_coords)
+                            else:
+                                x, y = 0.0, 0.0
+                            z_local = (
+                                self.processed_boundaries.cavity_z_offset
+                                + self.r_s
+                                + self.spawn_buffer
+                                + random.uniform(0.0, 0.010)
+                            )
+                            wpt, _ = p.multiplyTransforms(bowl_pos, bowl_orn, [x, y, z_local], [0.0, 0.0, 0.0, 1.0])
+                            pos_arr[idx] = wpt
+                            vel_arr[idx] = [0.0, 0.0, 0.0]
+                    self.pos_jax = jnp.array(pos_arr)
+                    self.vel_jax = jnp.array(vel_arr)
 
         if self.state_tracker is not None:
             self.state_tracker.particle_positions = self.get_particle_positions()

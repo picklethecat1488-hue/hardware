@@ -111,7 +111,8 @@ class ProviderOrchestrator(Orchestrator):
                 target, sa, m = item
                 self.provider.config[m](target, sa)
 
-            list(self.executor.map(config_task, work))
+            for item in work:
+                config_task(item)
             self.post_handler(targets, None, action)
             return None
         elif action == Section.PART:
