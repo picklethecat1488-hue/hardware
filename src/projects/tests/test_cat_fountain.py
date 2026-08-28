@@ -1050,11 +1050,7 @@ class TestCatFountainProvider:
                 )
 
                 # Verify that water in the mid-air column is not trapped in an artificial static hover blob
-                mid_air_column_mask = (
-                    active_mask
-                    & (pos_np[:, 2] >= 0.060)
-                    & (pos_np[:, 2] <= 0.095)
-                )
+                mid_air_column_mask = active_mask & (pos_np[:, 2] >= 0.060) & (pos_np[:, 2] <= 0.095)
                 if np.any(mid_air_column_mask):
                     speeds_mid_air = np.linalg.norm(vel_np[mid_air_column_mask], axis=-1)
                     static_particles = int(np.sum(speeds_mid_air < 0.05))

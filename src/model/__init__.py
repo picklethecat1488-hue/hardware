@@ -6,4 +6,5 @@ from .utils import method_cache, load_measurements
 from .app_config import AppConfig
 from .boundary_config import BoundaryConfig, ShapeType, BoundaryType, BoundaryParam, LinkType
 from .fluid_config import FluidConfig
+from .coordinates import CoordinateSpace, CoordinateSystem, SpatialPose
 from .wiring import PinModel, LabelModel, FootprintModel, NetModel, Wiring

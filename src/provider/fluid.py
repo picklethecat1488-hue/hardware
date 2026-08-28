@@ -24,7 +24,31 @@ from scipy.spatial import cKDTree  # type: ignore
 from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFBoundaryType
 from provider.room import BulletStateTracker
 from provider.bullet import LinkType, _is_real_physics_client
-from model import BoundaryConfig, FluidConfig
+from model import BoundaryConfig, FluidConfig, CoordinateSpace, CoordinateSystem, SpatialPose
+from provider.transforms import (
+    invert_orientation,
+    world_to_base_orientation,
+    world_to_base_frame,
+    base_to_world_frame,
+    base_to_local_frame,
+    local_to_base_frame,
+    world_to_local_frame,
+    local_to_world_frame,
+    world_to_base_vector,
+    base_to_world_vector,
+    world_to_local_vector,
+    local_to_world_vector,
+    local_to_base_vector,
+    base_to_local_vector,
+    base_to_voxel_coord,
+    voxel_to_base_coord,
+    cartesian_to_cylindrical,
+    cylindrical_to_cartesian,
+    cartesian_to_polar_2d,
+    polar_to_cartesian_2d,
+    cartesian_to_spherical,
+    spherical_to_cartesian,
+)
 from provider.boundary import (
     ImpellerBoundary,
     BowlBoundary as BowlPrimitive,
@@ -115,28 +139,6 @@ class MagneticDragConfig(BaseModel):
 
 
 @jax.jit
-def q_inv(q):
-    """Calculate quaternion inverse (conjugate)."""
-    return jnp.array([-q[0], -q[1], -q[2], q[3]], dtype=jnp.float32)
-
-
-@jax.jit
-def q_mult(q1, q2):
-    """Multiply two quaternions q1 and q2 (xyzw order)."""
-    x1, y1, z1, w1 = q1[0], q1[1], q1[2], q1[3]
-    x2, y2, z2, w2 = q2[0], q2[1], q2[2], q2[3]
-    return jnp.array(
-        [
-            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
-            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-        ],
-        dtype=jnp.float32,
-    )
-
-
-@jax.jit
 def calculate_magnetic_drag_jax(
     magnet_radius: float,
     magnet_thickness: float,
@@ -190,15 +192,6 @@ def calculate_bearing_and_viscous_drag_jax(
     t_viscous = (jnp.pi * mu_fluid * jnp.abs(omega) * (r_impeller**4)) / g_clearance
 
     return t_bearing + t_viscous
-
-
-@jax.jit
-def q_rotate(q, v):
-    """Rotate a batch of 3D vectors v by quaternion q (xyzw)."""
-    q_xyz = q[:3]
-    w = q[3]
-    cross1 = jnp.cross(q_xyz, v) + w * v
-    return v + 2.0 * jnp.cross(q_xyz, cross1)
 
 
 # JIT compiled SPH force computation
@@ -487,7 +480,7 @@ def _compute_boundary_forces_jax(
     origin_arr = jnp.array([-0.112, -0.112, 0.0]) if origin is None else origin
     base_pos = jnp.where(base_idx != -1, b_pos_arr[base_idx], jnp.zeros(3))
     base_orn = jnp.where(base_idx != -1, b_orn_arr[base_idx], jnp.array([0.0, 0.0, 0.0, 1.0]))
-    base_orn_inv = q_inv(base_orn)
+    base_orn_inv = jnp.array([-base_orn[0], -base_orn[1], -base_orn[2], base_orn[3]], dtype=jnp.float32)
 
     if solid_mask is None or solid_friction is None or normal_grid is None or smooth_occ is None:
         solid_mask, _, solid_friction, normal_grid, smooth_occ = _make_grid_masks(
@@ -505,8 +498,8 @@ def _compute_boundary_forces_jax(
         )
 
     base_vel_arr = jnp.zeros(3) if base_vel is None else base_vel
-    pos_local = q_rotate(base_orn_inv, pos - base_pos)
-    vel_local = q_rotate(base_orn_inv, vel - base_vel_arr)
+    pos_local = world_to_base_frame(pos, base_pos, base_orn_inv)
+    vel_local = world_to_base_vector(vel - base_vel_arr, base_orn_inv)
 
     occ_p = _g2p_scalar_jax(pos_local, smooth_occ, dx, origin_arr, nx, ny, nz)
     norm_p = _g2p_jax(pos_local, normal_grid, dx, origin_arr, nx, ny, nz)
@@ -534,7 +527,7 @@ def _compute_boundary_forces_jax(
 
     force_local = f_n_mag[:, None] * norm_unit + f_fric_tan
     force_voxel = jnp.where((occ_p > 0.01)[:, None], force_local, 0.0)
-    forces = q_rotate(base_orn, force_voxel)
+    forces = base_to_world_vector(force_voxel, base_orn)
     vanes_torque = jnp.array(0.0)
 
     # Dynamic rotating impeller forces and reaction torque
@@ -542,9 +535,9 @@ def _compute_boundary_forces_jax(
         is_imp = shape == SHAPE_IMPELLER
         b_pos = b_pos_arr[i]
         b_orn = b_orn_arr[i]
-        b_orn_inv = q_inv(b_orn)
-        pos_imp = q_rotate(b_orn_inv, pos - b_pos)
-        vel_imp = q_rotate(b_orn_inv, vel - base_vel_arr)
+        b_orn_inv = jnp.array([-b_orn[0], -b_orn[1], -b_orn[2], b_orn[3]], dtype=jnp.float32)
+        pos_imp = world_to_local_frame(pos, b_pos, b_orn_inv)
+        vel_imp = world_to_local_vector(vel - base_vel_arr, b_orn_inv)
 
         radius = b_params[i, BoundaryParam.RADIUS]
         height = b_params[i, BoundaryParam.HEIGHT]
@@ -568,7 +561,7 @@ def _compute_boundary_forces_jax(
             omega,
             t,
         )
-        force_imp_world = q_rotate(b_orn, force_imp)
+        force_imp_world = local_to_world_vector(force_imp, b_orn)
         forces += jnp.where(is_imp, force_imp_world, 0.0)
         vanes_torque = jnp.where(is_imp, torque_imp, vanes_torque)
 
@@ -764,9 +757,9 @@ def _make_grid_masks(
     tube_world_pos = jnp.where(has_tube_bound, b_pos_arr[tube_idx], jnp.zeros(3))
     base_pos = jnp.where(base_idx != -1, b_pos_arr[base_idx], jnp.zeros(3))
     base_orn = jnp.where(base_idx != -1, b_orn_arr[base_idx], jnp.array([0.0, 0.0, 0.0, 1.0]))
-    base_orn_inv = q_inv(base_orn)
+    base_orn_inv = invert_orientation(base_orn)
 
-    tube_pos_local = q_rotate(base_orn_inv, tube_world_pos - base_pos)
+    tube_pos_local = world_to_base_frame(tube_world_pos, base_pos, base_orn_inv)
     tube_xb = jnp.where(has_tube_bound, tube_pos_local[0], 0.0)
     tube_yb = jnp.where(has_tube_bound, tube_pos_local[1], 0.0)
     tube_rb = jnp.where(
@@ -780,10 +773,10 @@ def _make_grid_masks(
         b_pos = b_pos_arr[idx]
         b_orn = b_orn_arr[idx]
 
-        b_pos_loc = q_rotate(base_orn_inv, b_pos - base_pos)
-        b_orn_loc = q_mult(base_orn_inv, b_orn)
-        b_orn_loc_inv = q_inv(b_orn_loc)
-        pos_b = q_rotate(b_orn_loc_inv, coords - b_pos_loc)
+        b_pos_loc = world_to_base_frame(b_pos, base_pos, base_orn_inv)
+        b_orn_loc = world_to_base_orientation(b_orn, base_orn)
+        b_orn_loc_inv = invert_orientation(b_orn_loc)
+        pos_b = base_to_local_frame(coords, b_pos_loc, b_orn_loc_inv)
 
         xb_loc = pos_b[:, 0]
         yb_loc = pos_b[:, 1]
@@ -806,7 +799,7 @@ def _make_grid_masks(
         b_fric = b_params[idx, BoundaryParam.BOUNDARY_FRICTION]
 
         # Calculate exact local tube coordinates for boundary idx
-        tube_pos_in_b = q_rotate(b_orn_loc_inv, tube_pos_local - b_pos_loc)
+        tube_pos_in_b = base_to_local_frame(tube_pos_local, b_pos_loc, b_orn_loc_inv)
         local_tube_x = jnp.where(has_tube_bound, tube_pos_in_b[0], 0.0)
         local_tube_y = jnp.where(has_tube_bound, tube_pos_in_b[1], 0.0)
 
@@ -875,7 +868,7 @@ def _make_grid_masks(
         cyl_floor_norm_loc = jnp.stack([jnp.zeros_like(xb_loc), jnp.zeros_like(yb_loc), jnp.ones_like(zb_loc)], axis=-1)
         is_cyl_floor = (zb_loc >= z_offset - thick) & (zb_loc <= z_offset)
         cyl_norm_loc = jnp.where(is_cyl_floor[:, None], cyl_floor_norm_loc, cyl_wall_norm_loc)
-        cyl_norm_base = q_rotate(b_orn_loc, cyl_norm_loc)
+        cyl_norm_base = local_to_base_vector(cyl_norm_loc, b_orn_loc)
 
         r_inner_tube = radius - thickness
         r_mid_tube = (radius + r_inner_tube) / 2.0
@@ -883,7 +876,7 @@ def _make_grid_masks(
         tube_norm_loc = tube_sign[:, None] * jnp.stack(
             [xb_loc / r_safe, yb_loc / r_safe, jnp.zeros_like(xb_loc)], axis=-1
         )
-        tube_norm_base = q_rotate(b_orn_loc, tube_norm_loc)
+        tube_norm_base = local_to_base_vector(tube_norm_loc, b_orn_loc)
 
         r_inner_casing = radius - thickness
         r_mid_casing = (radius + r_inner_casing) / 2.0
@@ -904,16 +897,17 @@ def _make_grid_masks(
             casing_floor_norm_loc,
             jnp.where(is_casing_ceil[:, None], casing_ceil_norm_loc, casing_wall_norm_loc),
         )
-        casing_norm_base = q_rotate(b_orn_loc, casing_norm_loc)
+        casing_norm_base = local_to_base_vector(casing_norm_loc, b_orn_loc)
 
-        plane_norm_base = q_rotate(
-            b_orn_loc, jnp.stack([jnp.zeros_like(xb_loc), jnp.zeros_like(yb_loc), jnp.ones_like(zb_loc)], axis=-1)
+        plane_norm_base = local_to_base_vector(
+            jnp.stack([jnp.zeros_like(xb_loc), jnp.zeros_like(yb_loc), jnp.ones_like(zb_loc)], axis=-1),
+            b_orn_loc,
         )
 
         r_3d_safe = jnp.maximum(jnp.sqrt(xb_loc**2 + yb_loc**2 + zb_loc**2), 1e-6)
         sphere_sign = jnp.where(b_types[idx] == 1, -1.0, 1.0)
         sphere_norm_loc = sphere_sign * jnp.stack([xb_loc / r_3d_safe, yb_loc / r_3d_safe, zb_loc / r_3d_safe], axis=-1)
-        sphere_norm_base = q_rotate(b_orn_loc, sphere_norm_loc)
+        sphere_norm_base = local_to_base_vector(sphere_norm_loc, b_orn_loc)
 
         norm_base_i = jnp.where(is_cyl, cyl_norm_base, jnp.zeros((n_pts, 3), dtype=jnp.float32))
         norm_base_i = jnp.where(is_tube, tube_norm_base, norm_base_i)
@@ -933,7 +927,7 @@ def _make_grid_masks(
     tube_bot_local_z = 0.0
     for idx, shape in enumerate(b_shapes):
         is_tb = shape == SHAPE_TUBE
-        tb_pos_loc = q_rotate(base_orn_inv, b_pos_arr[idx] - base_pos)
+        tb_pos_loc = world_to_base_frame(b_pos_arr[idx], base_pos, base_orn_inv)
         tb_lz = tb_pos_loc[2]
         tb_h = b_params[idx, BoundaryParam.HEIGHT]
         tube_bot_local_z = jnp.where(is_tb, tb_lz, tube_bot_local_z)
@@ -993,14 +987,13 @@ def _make_impeller_mask_and_vel(
         pos_b = b_pos_arr[idx]
         orn_b = b_orn_arr[idx]
 
+        pos_base = jnp.stack([X.ravel(), Y.ravel(), Z.ravel()], axis=-1)
+        pos_world = base_to_world_frame(pos_base, base_pos, base_orn)
+
+        orn_b_inv = invert_orientation(orn_b)
+        pos_b_local = world_to_local_frame(pos_world, pos_b, orn_b_inv)
+
         flat_shape = X.shape
-        pos_world = q_rotate(base_orn, jnp.stack([X.ravel(), Y.ravel(), Z.ravel()], axis=-1)) + base_pos
-
-        orn_b_inv = q_inv(orn_b)
-        pos_b_local = q_rotate(orn_b_inv, pos_world - pos_b)
-
-        # Coordinate center is already aligned via b_pos
-
         xb_loc = pos_b_local[:, 0].reshape(flat_shape)
         yb_loc = pos_b_local[:, 1].reshape(flat_shape)
         zb_loc = pos_b_local[:, 2].reshape(flat_shape)
@@ -1049,7 +1042,7 @@ def _make_impeller_mask_and_vel(
         vz_local = jnp.zeros_like(xb_loc)
 
         v_rot_local = jnp.stack([vx_local, vy_local, vz_local], axis=-1)
-        v_rot_world = q_rotate(orn_b, v_rot_local.reshape((-1, 3))).reshape(flat_shape + (3,))
+        v_rot_world = local_to_world_vector(v_rot_local.reshape((-1, 3)), orn_b).reshape(flat_shape + (3,))
 
         # Lattice units
         vx_lat = v_rot_world[..., 0] * c_scale
@@ -1386,8 +1379,8 @@ def _lbm_step_subroutine(
     )
     tube_uz_lat = tube_uz_phys * dt_sub / dx
 
-    base_orn_inv = q_inv(base_orn)
-    gravity_local = q_rotate(base_orn_inv, gravity)
+    base_orn_inv = invert_orientation(base_orn)
+    gravity_local = world_to_base_vector(gravity, base_orn_inv)
 
     f_next, u_grid = _lbm_step_3d_full_jax(
         f_curr,
@@ -1428,14 +1421,14 @@ def _g2p_mapping_subroutine(
     """G2P subroutine: interpolates grid velocities to particle velocities in world frame for submerged fluid."""
     c_scale = dt_sub / dx
 
-    base_orn_inv = q_inv(base_orn)
-    pos_local = q_rotate(base_orn_inv, pos_curr - base_pos)
-    r_local = jnp.sqrt(pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2)
+    base_orn_inv = invert_orientation(base_orn)
+    pos_local = world_to_base_frame(pos_curr, base_pos, base_orn_inv)
+    r_local, _, _ = cartesian_to_cylindrical(pos_local)
 
     active_col = (pos_curr[:, 2] < 100.0)[:, None]
     lbm_vel_local = _g2p_jax(pos_local, u_grid, dx, origin, nx, ny, nz)
     lbm_vel_local = jnp.where(active_col, lbm_vel_local / c_scale, 0.0)
-    vel_grid_world = q_rotate(base_orn, lbm_vel_local) + base_vel
+    vel_grid_world = base_to_world_vector(lbm_vel_local, base_orn) + base_vel
 
     # Submerged reservoir pool: derive liquid depth from fluid volume and base container area
     base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.RADIUS], 0.0)
@@ -1460,9 +1453,9 @@ def _g2p_mapping_subroutine(
     for i, shape in enumerate(b_shapes):
         b_pos = b_pos_arr[i]
         b_orn = b_orn_arr[i]
-        b_orn_inv = q_inv(b_orn)
-        pos_b = q_rotate(b_orn_inv, pos_curr - b_pos)
-        r_b_xy = jnp.sqrt(pos_b[:, 0] ** 2 + pos_b[:, 1] ** 2)
+        b_orn_inv = invert_orientation(b_orn)
+        pos_b = world_to_local_frame(pos_curr, b_pos, b_orn_inv)
+        r_b_xy, _, _ = cartesian_to_cylindrical(pos_b)
         radius = b_params[i, BoundaryParam.RADIUS]
         height = b_params[i, BoundaryParam.HEIGHT]
         thickness = b_params[i, BoundaryParam.THICKNESS]
@@ -1547,9 +1540,9 @@ def _compute_particle_forces_subroutine(
     for i, shape in enumerate(b_shapes):
         casing_pos = b_pos_arr[i]
         casing_orn = b_orn_arr[i]
-        casing_orn_inv = q_inv(casing_orn)
-        pos_casing = q_rotate(casing_orn_inv, pos_curr - casing_pos)
-        r_inlet_xy = jnp.sqrt(pos_casing[:, 0] ** 2 + pos_casing[:, 1] ** 2)
+        casing_orn_inv = invert_orientation(casing_orn)
+        pos_casing = world_to_local_frame(pos_curr, casing_pos, casing_orn_inv)
+        r_inlet_xy, _, _ = cartesian_to_cylindrical(pos_casing)
         radius = b_params[i, BoundaryParam.RADIUS]
         casing_height = b_params[i, BoundaryParam.HEIGHT]
         ceiling_thickness = b_params[i, BoundaryParam.CEILING_THICKNESS]
@@ -1568,7 +1561,7 @@ def _compute_particle_forces_subroutine(
         dist_in = jnp.sqrt(dx_in**2 + dy_in**2 + dz_in**2 + 1e-8)
 
         dir_casing = jnp.stack([dx_in / dist_in, dy_in / dist_in, dz_in / dist_in], axis=-1)
-        dir_world = q_rotate(casing_orn, dir_casing)
+        dir_world = local_to_world_vector(dir_casing, casing_orn)
 
         suction_strength = (jnp.abs(omega) / 120.0) * 15.0
         suction_accel_i = jnp.where(in_suction[:, None], dir_world * suction_strength, 0.0)
@@ -1587,9 +1580,9 @@ def _compute_particle_forces_subroutine(
     for i, shape in enumerate(b_shapes):
         tube_pos = b_pos_arr[i]
         tube_orn = b_orn_arr[i]
-        tube_orn_inv = q_inv(tube_orn)
-        pos_tube = q_rotate(tube_orn_inv, pos_curr - tube_pos)
-        r_tube_xy = jnp.sqrt(pos_tube[:, 0] ** 2 + pos_tube[:, 1] ** 2)
+        tube_orn_inv = invert_orientation(tube_orn)
+        pos_tube = world_to_local_frame(pos_curr, tube_pos, tube_orn_inv)
+        r_tube_xy, _, _ = cartesian_to_cylindrical(pos_tube)
         radius = b_params[i, BoundaryParam.RADIUS]
         thickness = b_params[i, BoundaryParam.THICKNESS]
         tube_h = b_params[i, BoundaryParam.HEIGHT]
@@ -1612,7 +1605,7 @@ def _compute_particle_forces_subroutine(
 
         tube_effective_h = tube_h - lid_height_offset
 
-        v_tube = q_rotate(tube_orn_inv, vel_world)
+        v_tube = world_to_local_vector(vel_world, tube_orn_inv)
         v_z_tube = v_tube[:, 2]
 
         # Derive flow velocity from impeller geometry, slot constriction ratio, and motor speed
@@ -1649,7 +1642,7 @@ def _compute_particle_forces_subroutine(
         )
 
         in_tube = (r_tube_xy < inner_r + r_s) & (pos_tube[:, 2] >= -2.0 * r_s) & (pos_tube[:, 2] <= tube_h)
-        up_vector = q_rotate(tube_orn, jnp.array([0.0, 0.0, 1.0]))
+        up_vector = local_to_world_vector(jnp.array([0.0, 0.0, 1.0]), tube_orn)
         up_world = up_vector[None, :] * pump_lift_scalar[:, None]
 
         # Radial spreading and outward deflection at the fountain spout opening
@@ -1671,7 +1664,7 @@ def _compute_particle_forces_subroutine(
             [pos_tube[:, 0] / r_xy_safe, pos_tube[:, 1] / r_xy_safe, jnp.zeros_like(pos_tube[:, 0])],
             axis=-1,
         )
-        radial_unit_world = q_rotate(tube_orn, radial_unit_local)
+        radial_unit_world = local_to_world_vector(radial_unit_local, tube_orn)
 
         dy_spout = drain_hole_y - tube_pos[1]
         dist_spout_y = jnp.abs(dy_spout) + 1e-6
@@ -1696,9 +1689,9 @@ def _compute_particle_forces_subroutine(
     for i, shape in enumerate(b_shapes):
         lid_pos = b_pos_arr[i]
         lid_orn = b_orn_arr[i]
-        lid_orn_inv = q_inv(lid_orn)
-        pos_lid = q_rotate(lid_orn_inv, pos_curr - lid_pos)
-        r_lid_xy = jnp.sqrt(pos_lid[:, 0] ** 2 + pos_lid[:, 1] ** 2)
+        lid_orn_inv = invert_orientation(lid_orn)
+        pos_lid = world_to_local_frame(pos_curr, lid_pos, lid_orn_inv)
+        r_lid_xy, _, _ = cartesian_to_cylindrical(pos_lid)
         has_drain = b_params[i, BoundaryParam.HAS_DRAIN] > 0.5
         drain_hole_y = b_params[i, BoundaryParam.DRAIN_HOLE_Y]
         radius = b_params[i, BoundaryParam.RADIUS]
@@ -1735,7 +1728,7 @@ def _compute_particle_forces_subroutine(
 
         drain_funnel_accel_local = dir_drain_local * (g_mag * 1.5)
         total_lid_accel_local = jnp.where(near_drain[:, None], drain_funnel_accel_local, slope_accel_local)
-        total_lid_accel_world = q_rotate(lid_orn, total_lid_accel_local)
+        total_lid_accel_world = local_to_world_vector(total_lid_accel_local, lid_orn)
 
         lid_drain_accel_i = jnp.where(on_lid[:, None], total_lid_accel_world, 0.0)
         is_lid_cavity = (b_shapes[i] == SHAPE_CYLINDER) & has_drain
@@ -1801,9 +1794,9 @@ def _integrate_particles_subroutine(
     dynamic_damping = gamma_base - 0.16 * v_excess
     dynamic_damping = jnp.maximum(0.90, jnp.minimum(gamma_base, dynamic_damping))
 
-    base_orn_inv = q_inv(base_orn)
-    pos_local_check = q_rotate(base_orn_inv, pos_curr - base_pos)
-    r_local = jnp.sqrt(pos_local_check[:, 0] ** 2 + pos_local_check[:, 1] ** 2)
+    base_orn_inv = invert_orientation(base_orn)
+    pos_local_check = world_to_base_frame(pos_curr, base_pos, base_orn_inv)
+    r_local, _, _ = cartesian_to_cylindrical(pos_local_check)
 
     dist_tube_sq = pos_local_check[:, 0] ** 2 + (pos_local_check[:, 1] - tube_y_check) ** 2
     in_tube = (dist_tube_sq < influence_r**2) & (pos_local_check[:, 2] >= 0.0) & (pos_local_check[:, 2] <= influence_h)
@@ -1846,8 +1839,8 @@ def _integrate_particles_subroutine(
     pos_next = jnp.where(active, pos_curr + vel_next * dt_sub, pos_curr)
 
     # Enforce analytical non-penetration boundary conditions on base container
-    pos_local_next = q_rotate(base_orn_inv, pos_next - base_pos)
-    v_rel_local = q_rotate(base_orn_inv, vel_next - base_vel)
+    pos_local_next = world_to_base_frame(pos_next, base_pos, base_orn_inv)
+    v_rel_local = world_to_base_vector(vel_next - base_vel, base_orn_inv)
 
     # 1. Floor non-penetration: local Z >= 0.0 for near-surface particles
     below_floor = (pos_local_next[:, 2] >= -0.010) & (pos_local_next[:, 2] < 0.0) & (base_idx != -1)
@@ -1855,7 +1848,7 @@ def _integrate_particles_subroutine(
     vel_z_clamped = jnp.where(below_floor, jnp.maximum(v_rel_local[:, 2], 0.0), v_rel_local[:, 2])
 
     # 2. Side wall non-penetration: local r <= base_radius when below base_height
-    r_loc_next = jnp.sqrt(pos_local_next[:, 0] ** 2 + pos_local_next[:, 1] ** 2)
+    r_loc_next, _, _ = cartesian_to_cylindrical(pos_local_next)
     outside_wall = (
         (r_loc_next > base_radius)
         & (r_loc_next <= base_radius + 0.015)
@@ -1881,7 +1874,7 @@ def _integrate_particles_subroutine(
         v_rel_local[:, 1] - v_outward_pos * (pos_local_next[:, 1] / r_safe),
         v_rel_local[:, 1],
     )
-    base_vel_local = q_rotate(base_orn_inv, base_vel)
+    base_vel_local = world_to_base_vector(base_vel, base_orn_inv)
 
     # Recompose local clamped coordinates
     pos_local_safe = jnp.stack([pos_x_clamped, pos_y_clamped, pos_z_clamped], axis=-1)
@@ -1895,17 +1888,17 @@ def _integrate_particles_subroutine(
     )
 
     # Rotate back to world frame
-    pos_next = jnp.where(active, q_rotate(base_orn, pos_local_safe) + base_pos, pos_curr)
-    vel_next = jnp.where(active, q_rotate(base_orn, vel_local_safe), 0.0)
+    pos_next = jnp.where(active, base_to_world_frame(pos_local_safe, base_pos, base_orn), pos_curr)
+    vel_next = jnp.where(active, base_to_world_vector(vel_local_safe, base_orn), 0.0)
 
     # 3. Analytical non-penetration for planar and spherical boundaries (such as spout dome)
     for k, shape_k in enumerate(b_shapes):
         is_pl = shape_k == SHAPE_PLANE
         pl_pos = b_pos_arr[k]
         pl_orn = b_orn_arr[k]
-        pl_orn_inv = q_inv(pl_orn)
-        pos_pl = q_rotate(pl_orn_inv, pos_next - pl_pos)
-        v_pl = q_rotate(pl_orn_inv, vel_next)
+        pl_orn_inv = invert_orientation(pl_orn)
+        pos_pl = world_to_local_frame(pos_next, pl_pos, pl_orn_inv)
+        v_pl = world_to_local_vector(vel_next, pl_orn_inv)
 
         penetrating_plane = is_pl & (pos_pl[:, 2] < 0.0) & (pos_pl[:, 2] >= -0.050)
         pos_pl_z = jnp.where(penetrating_plane, 1e-4, pos_pl[:, 2])
@@ -1914,8 +1907,8 @@ def _integrate_particles_subroutine(
         pos_pl_safe = jnp.stack([pos_pl[:, 0], pos_pl[:, 1], pos_pl_z], axis=-1)
         v_pl_safe = jnp.stack([v_pl[:, 0], v_pl[:, 1], v_pl_z], axis=-1)
 
-        pos_next = jnp.where(penetrating_plane[:, None], q_rotate(pl_orn, pos_pl_safe) + pl_pos, pos_next)
-        vel_next = jnp.where(penetrating_plane[:, None], q_rotate(pl_orn, v_pl_safe), vel_next)
+        pos_next = jnp.where(penetrating_plane[:, None], local_to_world_frame(pos_pl_safe, pl_pos, pl_orn), pos_next)
+        vel_next = jnp.where(penetrating_plane[:, None], local_to_world_vector(v_pl_safe, pl_orn), vel_next)
 
         # Solid spherical boundaries (such as the spout dome ceiling)
         is_sph = (shape_k == SHAPE_SPHERE) & (b_types[k] == 0)
@@ -1929,15 +1922,15 @@ def _integrate_particles_subroutine(
         norm_sph = pos_rel / dist_sph
         v_dot_n = jnp.sum(vel_next * norm_sph, axis=-1, keepdims=True)
     # 4. Containment ceiling clamp at max_ceiling_z (active when an analytical dome ceiling boundary is present)
-    pos_local_final = q_rotate(base_orn_inv, pos_next - base_pos)
-    v_local_final = q_rotate(base_orn_inv, vel_next - base_vel)
+    pos_local_final = world_to_base_frame(pos_next, base_pos, base_orn_inv)
+    v_local_final = world_to_base_vector(vel_next - base_vel, base_orn_inv)
     above_top = (pos_local_final[:, 2] > max_ceiling_z) & (base_idx != -1) & has_sph
     pos_z_final = jnp.where(above_top, max_ceiling_z - 1e-4, pos_local_final[:, 2])
     vel_z_final = jnp.where(above_top, jnp.minimum(v_local_final[:, 2], 0.0), v_local_final[:, 2])
     pos_local_final = jnp.stack([pos_local_final[:, 0], pos_local_final[:, 1], pos_z_final], axis=-1)
     v_local_final = jnp.stack([v_local_final[:, 0], v_local_final[:, 1], vel_z_final], axis=-1)
-    pos_next = jnp.where(active, q_rotate(base_orn, pos_local_final) + base_pos, pos_curr)
-    vel_next = jnp.where(active, q_rotate(base_orn, v_local_final) + base_vel, 0.0)
+    pos_next = jnp.where(active, base_to_world_frame(pos_local_final, base_pos, base_orn), pos_curr)
+    vel_next = jnp.where(active, base_to_world_vector(v_local_final, base_orn) + base_vel, 0.0)
 
     return pos_next, vel_next
 
