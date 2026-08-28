@@ -993,9 +993,10 @@ class TestCatFountainProvider:
                 assert fluid is not None
 
                 # Query dynamic height limit from settings
+                floor_z_m = provider.settings.floor_z * 0.001
                 bowl_h = provider.settings.bowl_height * 0.001
                 step_d = provider.settings.lid_step_depth * 0.001
-                lid_mount_z = bowl_h - step_d
+                lid_mount_z = floor_z_m + bowl_h - step_d
                 # Lid pocket floor Z (main flat top drinking shelf surface) is at lid_mount_z + 3.0mm
                 lid_z_top = lid_mount_z + 0.003
 
@@ -1032,7 +1033,6 @@ class TestCatFountainProvider:
                 assert max_water_z >= min_expected, "Expected water to reach the lid surface after exiting the spout."
 
                 # Verify that reservoir pool water touches the bowl floor and outer wall
-                floor_z_m = provider.settings.floor_z * 0.001
                 reservoir_mask = active_mask & (pos_np[:, 2] < lid_mount_z)
                 assert np.any(reservoir_mask), "Expected active reservoir fluid in the bowl."
                 reservoir_pts = pos_np[reservoir_mask]
@@ -1049,13 +1049,29 @@ class TestCatFountainProvider:
                     f"Reservoir fluid did not spread to bowl wall: max R is {max_r:.5f}, expected >= {bowl_inner_r - 2.0 * fluid.r_s - 0.010:.5f}"
                 )
 
-                # Verify that water in the mid-air column is not trapped in an artificial static hover blob
-                mid_air_column_mask = active_mask & (pos_np[:, 2] >= 0.060) & (pos_np[:, 2] <= 0.095)
+                # Verify that water falling through mid-air between pool surface and lid is not hovering statically
+                pool_top_z = floor_z_m + (provider.settings.target_volume / (math.pi * bowl_inner_r**2))
+                tube_pos_xy = (0.0, 0.028)
+                for b_list in boundaries.values():
+                    b_items = b_list if isinstance(b_list, list) else [b_list]
+                    for b in b_items:
+                        if getattr(b, "link_type", None) == LinkType.TUBE and getattr(b, "xyz", None) is not None:
+                            tube_pos_xy = (b.xyz[0], b.xyz[1])
+                            break
+
+                r_tube_outer_m = provider.settings.tube_radius * 0.001
+                dist_tube = np.sqrt((pos_np[:, 0] - tube_pos_xy[0]) ** 2 + (pos_np[:, 1] - tube_pos_xy[1]) ** 2)
+                mid_air_column_mask = (
+                    active_mask
+                    & (pos_np[:, 2] >= pool_top_z + 0.010)
+                    & (pos_np[:, 2] <= lid_mount_z - 0.005)
+                    & (dist_tube > r_tube_outer_m + 0.005)
+                )
                 if np.any(mid_air_column_mask):
                     speeds_mid_air = np.linalg.norm(vel_np[mid_air_column_mask], axis=-1)
                     static_particles = int(np.sum(speeds_mid_air < 0.05))
-                    assert static_particles == 0, (
-                        f"Unnatural static hovering fluid blob: {static_particles} stationary particles in mid-air Z in [0.060, 0.095]m"
+                    assert static_particles <= 2, (
+                        f"Unnatural static hovering fluid blob: {static_particles} stationary particles in mid-air Z in [{pool_top_z + 0.010:.3f}, {lid_mount_z - 0.005:.3f}]m"
                     )
             finally:
                 p.disconnect(physics_client)

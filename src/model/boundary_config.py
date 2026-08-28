@@ -62,6 +62,47 @@ class BoundaryParam(IntEnum):
     DRAIN_HOLE_Y = 14
     DRAIN_HOLE_RADIUS = 15
     BOUNDARY_FRICTION = 16
+    Z_BOTTOM = 17
+    Z_TOP = 18
+    R_INNER = 19
+    R_OUTER = 20
+    TRAY_Z_MIN = 21
+    TRAY_Z_MAX = 22
+    SUCTION_Z_MIN = 23
+    SUCTION_Z_MAX = 24
+    SPOUT_Z_MIN = 25
+    DRAIN_TARGET_Z = 26
+    DRAIN_INFLUENCE_RADIUS = 27
+    MAX_CEILING_Z = 28
+    WALL_BAND_R_MAX = 29
+    CASING_TOP_Z = 30
+    IMPELLER_RADIUS = 31
+    SLOT_CONSTRICTION_RATIO = 32
+    LID_SLOPE_RATIO = 33
+
+
+class SurfaceBounds(BaseModel):
+    """Precomputed geometric surface boundaries and interaction extents for a physical boundary."""
+
+    z_bottom: float = Field(description="Bottom surface / floor height in local Z (meters)")
+    z_top: float = Field(description="Top surface / ceiling height in local Z (meters)")
+    r_inner: float = Field(description="Inside wall radius in meters")
+    r_outer: float = Field(description="Outside wall radius in meters")
+    tray_z_min: float = Field(default=0.0, description="Active tray interaction lower Z bound (meters)")
+    tray_z_max: float = Field(default=0.0, description="Active tray interaction upper Z bound (meters)")
+    suction_z_min: float = Field(default=0.0, description="Active suction intake lower Z bound (meters)")
+    suction_z_max: float = Field(default=0.0, description="Active suction intake upper Z bound (meters)")
+    spout_z_min: float = Field(default=0.0, description="Active spout deflection lower Z bound (meters)")
+    drain_target_z: float = Field(default=0.0, description="Target centroid Z for drain funneling (meters)")
+    drain_influence_radius: float = Field(
+        default=0.030, description="Radial influence threshold for drain funneling (meters)"
+    )
+    max_ceiling_z: float = Field(default=0.0, description="Maximum fountain containment ceiling Z (meters)")
+    wall_band_r_max: float = Field(default=0.0, description="Outer wall containment buffer radius (meters)")
+    casing_top_z: float = Field(default=0.0, description="Casing top ceiling height in local Z (meters)")
+    impeller_radius: float = Field(default=0.0, description="Impeller outer radius (meters)")
+    slot_constriction_ratio: float = Field(default=1.0, description="Impeller slot to tube area ratio")
+    lid_slope_ratio: float = Field(default=0.0, description="Ratio of lid height to radius (slope gradient)")
 
 
 class BoundaryConfig(BaseModel):
@@ -311,3 +352,52 @@ class BoundaryConfig(BaseModel):
     def vane_twist_rad(self) -> float:
         """Calculate and return vane_twist in radians."""
         return float(math.radians(self.vane_twist))
+
+    def compute_surface_bounds(
+        self,
+        max_ceiling_z: float = 0.0,
+        casing_top_z: float = 0.0,
+        impeller_radius: float = 0.0,
+        slot_constriction_ratio: float = 1.0,
+        lid_slope_ratio: float = 0.0,
+    ) -> SurfaceBounds:
+        """Precompute topological surfaces (tops, bottoms, inner and outer walls) and interaction bounds."""
+        z_off = float(self.z_offset or 0.0)
+        h = float(self.height)
+        r = float(self.radius)
+        thick = float(self.thickness)
+        ceil_thick = float(self.ceiling_thickness)
+        dr_r = float(self.drain_hole_radius or 0.0)
+
+        z_bottom = z_off
+        z_top = z_off + h
+        r_inner = max(0.0, r - thick)
+        r_outer = r
+        tray_z_min = -thick
+        tray_z_max = h
+        suction_z_min = h - ceil_thick
+        suction_z_max = h + ceil_thick
+        spout_z_min = h - thick
+        drain_target_z = -thick
+        drain_influence_radius = dr_r
+        wall_band_r_max = r + thick
+
+        return SurfaceBounds(
+            z_bottom=z_bottom,
+            z_top=z_top,
+            r_inner=r_inner,
+            r_outer=r_outer,
+            tray_z_min=tray_z_min,
+            tray_z_max=tray_z_max,
+            suction_z_min=suction_z_min,
+            suction_z_max=suction_z_max,
+            spout_z_min=spout_z_min,
+            drain_target_z=drain_target_z,
+            drain_influence_radius=drain_influence_radius,
+            max_ceiling_z=max_ceiling_z,
+            wall_band_r_max=wall_band_r_max,
+            casing_top_z=casing_top_z,
+            impeller_radius=impeller_radius,
+            slot_constriction_ratio=slot_constriction_ratio,
+            lid_slope_ratio=lid_slope_ratio,
+        )

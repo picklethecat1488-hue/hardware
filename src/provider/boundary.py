@@ -1,5 +1,6 @@
 """Intermediate boundary domain models and boundary processing stage."""
 
+import math
 from dataclasses import dataclass
 from typing import Any, Optional, Sequence
 import numpy as np
@@ -44,7 +45,7 @@ class BowlBoundary:
 
     radius: float
     z_floor: float
-    height: float = 0.096
+    height: float = 0.0
     thickness: float = 0.0035
     friction: float = 0.20
     pos: tuple[float, float, float] = (0.0, 0.0, 0.0)
@@ -600,13 +601,65 @@ class BoundaryProcessor:
             b_orn_list.append(b_world_orn)
             b_vel_list.append(tuple(parent_vel))
 
+        # Precompute maximum fountain top / ceiling Z relative to base link origin
+        base_h = 0.0
+        for b in boundary_list:
+            if b.link_type == LinkType.BASE:
+                base_h = float(b.height)
+                break
+
+        fountain_top_z = base_h
+        for idx, b in enumerate(boundary_list):
+            b_z = b_pos_list[idx][2] - base_pos[2] + max(float(b.height), float(b.radius))
+            fountain_top_z = max(fountain_top_z, b_z)
+
+        has_sph = any(b.shape == ShapeType.SPHERE for b in boundary_list)
+        if has_sph:
+            sph_idx = [idx for idx, b in enumerate(boundary_list) if b.shape == ShapeType.SPHERE][0]
+            sph_top_z = b_pos_list[sph_idx][2] - base_pos[2] + float(boundary_list[sph_idx].radius) + 0.002
+            max_ceiling_z = sph_top_z
+        else:
+            max_ceiling_z = fountain_top_z
+
+        # Precompute casing, impeller, and lid geometry
+        casing_top_z = 0.0
+        impeller_radius = 0.0
+        slot_w = 0.0
+        slot_h = 0.0
+        tube_r_eff = 0.0
+        lid_slope_ratio = 0.0
+        for b in boundary_list:
+            if b.shape == ShapeType.CASING or b.link_type == LinkType.CASING:
+                casing_top_z = float(b.height) + float(b.ceiling_thickness)
+                slot_w = float(b.slot_width)
+                slot_h = float(b.slot_height)
+            elif b.shape == ShapeType.IMPELLER or b.link_type == LinkType.IMPELLER:
+                impeller_radius = float(b.radius)
+            elif b.shape == ShapeType.TUBE or b.link_type == LinkType.TUBE:
+                tube_r_eff = max(0.0, float(b.radius) - float(b.thickness))
+            elif (b.shape == ShapeType.CYLINDER or b.link_type == LinkType.LID) and b.has_drain:
+                if float(b.radius) > 0.0:
+                    lid_slope_ratio = float(b.height) / float(b.radius)
+
+        a_slot = slot_w * slot_h
+        a_tube = math.pi * (tube_r_eff**2) + 1e-6
+        slot_constriction_ratio = min(a_slot / a_tube, 1.0) if tube_r_eff > 0.0 else 1.0
+
+        for idx, b in enumerate(boundary_list):
             shape_int = SHAPE_NAME_TO_INT.get(b.shape, SHAPE_NONE) if b.shape is not None else SHAPE_NONE
             b_shapes_list.append(shape_int)
 
             type_int = 1 if (b.type == BoundaryType.CAVITY or b.type == BoundaryType.SOLID_CAVITY) else 0
             b_types_list.append(type_int)
 
-            friction_val = float(b.boundary_friction) if b.boundary_friction is not None else 0.20
+            friction_val = float(b.boundary_friction) if b.boundary_friction is not None else 0.0
+            surf = b.compute_surface_bounds(
+                max_ceiling_z=max_ceiling_z,
+                casing_top_z=casing_top_z,
+                impeller_radius=impeller_radius,
+                slot_constriction_ratio=slot_constriction_ratio,
+                lid_slope_ratio=lid_slope_ratio,
+            )
             params = [
                 float(b.radius),
                 float(b.height),
@@ -615,8 +668,8 @@ class BoundaryProcessor:
                 float(b.slot_height),
                 float(b.slot_width),
                 float(b.ceiling_thickness),
-                float(b.vane_thickness) if b.vane_thickness is not None else 0.0015,
-                float(b.num_vanes) if b.num_vanes is not None else 4.0,
+                float(b.vane_thickness) if b.vane_thickness is not None else 0.0,
+                float(b.num_vanes) if b.num_vanes is not None else 0.0,
                 float(b.vane_twist_rad),
                 float(b.cutoff_y) if b.cutoff_y is not None else 0.0,
                 1.0 if b.has_tube else 0.0,
@@ -625,6 +678,23 @@ class BoundaryProcessor:
                 float(b.drain_hole_y) if b.drain_hole_y is not None else 0.0,
                 float(b.drain_hole_radius) if b.drain_hole_radius is not None else 0.0,
                 friction_val,
+                surf.z_bottom,
+                surf.z_top,
+                surf.r_inner,
+                surf.r_outer,
+                surf.tray_z_min,
+                surf.tray_z_max,
+                surf.suction_z_min,
+                surf.suction_z_max,
+                surf.spout_z_min,
+                surf.drain_target_z,
+                surf.drain_influence_radius,
+                surf.max_ceiling_z,
+                surf.wall_band_r_max,
+                surf.casing_top_z,
+                surf.impeller_radius,
+                surf.slot_constriction_ratio,
+                surf.lid_slope_ratio,
             ]
             b_params_list.append(params)
 
@@ -637,9 +707,9 @@ class BoundaryProcessor:
         # 2. Build intermediate structured domain models
         intermediate_boundaries: list[Any] = []
         z_floor = base_info.xyz[2] if (base_info is not None and base_info.xyz is not None) else 0.0
-        r_bowl = base_info.radius if base_info is not None else 0.096
-        base_h = base_info.height if base_info is not None else 0.096
-        base_thick = base_info.thickness if base_info is not None else 0.004
+        r_bowl = base_info.radius if base_info is not None else 0.0
+        base_h = base_info.height if base_info is not None else 0.0
+        base_thick = base_info.thickness if base_info is not None else 0.0
 
         if base_info is not None:
             intermediate_boundaries.append(
@@ -648,7 +718,7 @@ class BoundaryProcessor:
                     z_floor=z_floor,
                     height=base_h,
                     thickness=base_thick,
-                    friction=float(base_info.boundary_friction or 0.20),
+                    friction=float(base_info.boundary_friction or 0.0),
                     pos=b_pos_list[base_boundary_idx] if base_boundary_idx != -1 else base_pos,
                     orn=b_orn_list[base_boundary_idx] if base_boundary_idx != -1 else base_orn,
                 )
@@ -657,7 +727,7 @@ class BoundaryProcessor:
         # Casing
         casing_x, casing_y, casing_r, casing_thick, casing_h = 0.0, 0.0, 0.0, 0.0, 0.0
         casing_ceiling_thick, casing_slot_h, casing_slot_w = 0.0, 0.0, 0.0
-        casing_fric = 0.20
+        casing_fric = 0.0
         casing_pos_t = (0.0, 0.0, 0.0)
         casing_orn_t = (0.0, 0.0, 0.0, 1.0)
         for i, b in enumerate(boundary_list):
@@ -665,12 +735,12 @@ class BoundaryProcessor:
                 if b.xyz is not None:
                     casing_x, casing_y = b.xyz[0], b.xyz[1]
                 casing_r = b.radius
-                casing_thick = b.thickness if b.thickness > 0.0 else 0.0035
+                casing_thick = b.thickness if b.thickness is not None else 0.0
                 casing_h = b.height
-                casing_ceiling_thick = getattr(b, "ceiling_thickness", 0.0035) or 0.0035
-                casing_slot_h = getattr(b, "slot_height", 0.006)
-                casing_slot_w = getattr(b, "slot_width", 0.008)
-                casing_fric = float(b.boundary_friction or 0.20)
+                casing_ceiling_thick = getattr(b, "ceiling_thickness", 0.0) or 0.0
+                casing_slot_h = getattr(b, "slot_height", 0.0) or 0.0
+                casing_slot_w = getattr(b, "slot_width", 0.0) or 0.0
+                casing_fric = float(b.boundary_friction or 0.0)
                 casing_pos_t = b_pos_list[i]
                 casing_orn_t = b_orn_list[i]
                 break
@@ -697,7 +767,7 @@ class BoundaryProcessor:
         tube_x, tube_y, tube_r, tube_thick, tube_h = 0.0, 0.0, 0.0, 0.0, 0.0
         tube_slot_h, tube_slot_w = 0.0, 0.0
         tube_spout_r, tube_spout_h = 0.0, 0.0
-        tube_fric = 0.20
+        tube_fric = 0.0
         tube_pos_t = (0.0, 0.0, 0.0)
         tube_orn_t = (0.0, 0.0, 0.0, 1.0)
         for i, b in enumerate(boundary_list):
@@ -705,13 +775,13 @@ class BoundaryProcessor:
                 if b.xyz is not None:
                     tube_x, tube_y = b.xyz[0], b.xyz[1]
                 tube_r = b.radius
-                tube_thick = b.thickness if b.thickness > 0.0 else 0.0035
+                tube_thick = b.thickness if b.thickness is not None else 0.0
                 tube_h = b.height
-                tube_slot_h = getattr(b, "slot_height", 0.006)
-                tube_slot_w = getattr(b, "slot_width", 0.008)
-                tube_spout_r = getattr(b, "spout_radius", 0.014)
-                tube_spout_h = getattr(b, "spout_height", 0.049)
-                tube_fric = float(b.boundary_friction or 0.20)
+                tube_slot_h = getattr(b, "slot_height", 0.0) or 0.0
+                tube_slot_w = getattr(b, "slot_width", 0.0) or 0.0
+                tube_spout_r = getattr(b, "spout_radius", 0.0) or 0.0
+                tube_spout_h = getattr(b, "spout_height", 0.0) or 0.0
+                tube_fric = float(b.boundary_friction or 0.0)
                 tube_pos_t = b_pos_list[i]
                 tube_orn_t = b_orn_list[i]
                 break
@@ -754,11 +824,11 @@ class BoundaryProcessor:
             )
 
         # Top Drinking Lid
-        lid_pocket_r = 0.080
-        drain_y, drain_r = -0.020, 0.055
-        lid_pocket_h, lid_thickness = 0.0035, 0.0035
-        terrace_r = 0.030
-        lid_fric = 0.20
+        lid_pocket_r = 0.0
+        drain_y, drain_r = 0.0, 0.0
+        lid_pocket_h, lid_thickness = 0.0, 0.0
+        terrace_r = 0.0
+        lid_fric = 0.0
         lid_pos_t = (0.0, 0.0, 0.0)
         lid_orn_t = (0.0, 0.0, 0.0, 1.0)
         has_lid = False
@@ -772,11 +842,11 @@ class BoundaryProcessor:
                     and b.radius > 0.0
                 ):
                     lid_pocket_r = b.radius
-                    lid_pocket_h = b.height if b.height > 0.0 else 0.0035
-                    lid_thickness = b.thickness if b.thickness > 0.0 else 0.0035
-                    drain_y = getattr(b, "drain_hole_y", -0.020)
-                    drain_r = getattr(b, "drain_hole_radius", 0.055)
-                    lid_fric = float(b.boundary_friction or 0.20)
+                    lid_pocket_h = b.height if b.height is not None else 0.0
+                    lid_thickness = b.thickness if b.thickness is not None else 0.0
+                    drain_y = getattr(b, "drain_hole_y", 0.0) or 0.0
+                    drain_r = getattr(b, "drain_hole_radius", 0.0) or 0.0
+                    lid_fric = float(b.boundary_friction or 0.0)
                     lid_pos_t = b_pos_list[i]
                     lid_orn_t = b_orn_list[i]
                 elif getattr(b, "has_tube", False) and not getattr(b, "has_drain", False):
@@ -813,12 +883,12 @@ class BoundaryProcessor:
                     radius=impeller_info.radius,
                     height=impeller_info.height,
                     thickness=impeller_info.thickness,
-                    vane_thickness=getattr(impeller_info, "vane_thickness", 0.0015) or 0.0015,
-                    num_vanes=getattr(impeller_info, "num_vanes", 4.0) or 4.0,
+                    vane_thickness=getattr(impeller_info, "vane_thickness", 0.0) or 0.0,
+                    num_vanes=getattr(impeller_info, "num_vanes", 0.0) or 0.0,
                     vane_twist_rad=impeller_info.vane_twist_rad,
                     target_omega=impeller_info.target_omega,
                     max_force=impeller_info.max_force,
-                    friction=float(impeller_info.boundary_friction or 0.20),
+                    friction=float(impeller_info.boundary_friction or 0.0),
                     pos=b_pos_list[imp_idx],
                     orn=b_orn_list[imp_idx],
                 )
