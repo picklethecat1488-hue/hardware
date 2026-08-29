@@ -118,6 +118,7 @@ class Viewer:
         save_rrd: Optional[str] = None,
         rerun_port: Optional[int] = None,
         no_gui: bool = False,
+        stage_window_size: Optional[int] = None,
     ):
         """Build and show the requested geometry in ocp_vscode."""
         display_items = []
@@ -189,6 +190,7 @@ class Viewer:
                 save_rrd=save_rrd,
                 rerun_port=rerun_port,
                 spawn_viewer=not no_gui,
+                stage_window_size=stage_window_size,
             )
         else:
             summary = self.get_summary(list(room.keys()))
@@ -218,6 +220,15 @@ def get_args():
     parser.add_argument(
         "--save-rrd",
         help="Path to save the rerun (.rrd) recording file.",
+    )
+    parser.add_argument(
+        "--stage-window",
+        "--stage-window-size",
+        "--staging-frame-window-size",
+        type=int,
+        default=None,
+        dest="stage_window_size",
+        help="Number of simulation frames per staging checkpoint window (e.g. 1000).",
     )
     parser.add_argument(
         "-p",
@@ -268,6 +279,7 @@ def main():
                 save_rrd=args.save_rrd,
                 rerun_port=args.port,
                 no_gui=args.no_gui,
+                stage_window_size=args.stage_window_size,
             )
     finally:
         logger.done()

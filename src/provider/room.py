@@ -1015,6 +1015,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         save_rrd: Optional[str] = None,
         rerun_port: Optional[int] = None,
         spawn_viewer: bool = True,
+        stage_window_size: Optional[int] = None,
     ) -> None:
         """
         Run a PyBullet physics simulation for the room geometries.
@@ -1041,5 +1042,6 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             save_rrd,
             rerun_port,
             spawn_viewer,
+            stage_window_size=stage_window_size,
         )
         bullet_sim.run()
