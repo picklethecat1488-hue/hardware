@@ -955,14 +955,32 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     pos_pts = np.asarray(filtered_positions)
                     xs, ys, zs = pos_pts[:, 0], pos_pts[:, 1], pos_pts[:, 2]
                     dist_tube = np.sqrt(xs**2 + (ys - 0.028) ** 2)
-                    in_tube_cnt = int(np.sum((dist_tube < 0.012) & (zs >= 0.041) & (zs < 0.095)))
-                    at_spout_cnt = int(np.sum((dist_tube < 0.020) & (zs >= 0.095)))
+                    dist_cutout = np.sqrt(xs**2 + (ys - (-0.020)) ** 2)
                     r_xy = np.sqrt(xs**2 + ys**2)
-                    on_lid = zs >= 0.075
-                    waterfall_cnt = int(np.sum(r_xy[on_lid] >= 0.080))
-                    drain_cnt = int(np.sum((ys[on_lid] < -0.010) & (np.abs(xs[on_lid]) < 0.040)))
-                    lid_sheet_cnt = int(np.sum(on_lid) - waterfall_cnt - drain_cnt)
-                    pool_cnt = int(np.sum((r_xy >= 0.028) & (zs < 0.055)))
+
+                    # 1. Flow in vertical delivery tube (strictly inside 6mm bore from floor to top)
+                    in_tube_mask = (dist_tube <= 0.007) & (zs >= 0.041) & (zs <= 0.107)
+                    in_tube_cnt = int(np.sum(in_tube_mask))
+
+                    # 2. Flow emerging at spout
+                    at_spout_mask = (dist_tube <= 0.030) & (zs > 0.106)
+                    at_spout_cnt = int(np.sum(at_spout_mask))
+
+                    # 3. Flow on lid drinking shelf / tray (outside spout dome, inside lid rim)
+                    lid_sheet_mask = (zs >= 0.100) & (zs <= 0.115) & (dist_tube > 0.025) & (r_xy <= 0.082)
+                    lid_sheet_cnt = int(np.sum(lid_sheet_mask))
+
+                    # 4. Drainage: Perimeter waterfall cascading into bowl (R >= 78mm, falling below lid)
+                    waterfall_mask = (r_xy >= 0.078) & (zs >= 0.041) & (zs < 0.102)
+                    waterfall_cnt = int(np.sum(waterfall_mask))
+
+                    # 5. Drainage: Front cutout drain returning to bowl (inside cutout hole, falling below lid)
+                    drain_mask = (dist_cutout <= 0.055) & (ys < 0.0) & (zs >= 0.041) & (zs < 0.102) & (r_xy < 0.078)
+                    drain_cnt = int(np.sum(drain_mask))
+
+                    # 6. Reservoir pool volume (entire base container fluid layer)
+                    pool_mask = (zs >= 0.038) & (zs < 0.070) & (r_xy <= 0.096)
+                    pool_cnt = int(np.sum(pool_mask))
 
                     rr.log("metrics/flow_spout", rr.Scalars(float(at_spout_cnt)))
                     rr.log("metrics/flow_tube", rr.Scalars(float(in_tube_cnt)))
