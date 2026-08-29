@@ -8,7 +8,6 @@ from enum import Enum, IntEnum
 import random
 from typing import Any, Optional, cast, TYPE_CHECKING, NamedTuple
 from pydantic import BaseModel, Field
-import os
 from pathlib import Path
 import jax
 import jax.numpy as jnp

@@ -180,6 +180,9 @@ def initialize_jax_environment(cache_dir: Optional[Union[str, os.PathLike]] = No
     os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
     os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.75")
 
+    # Configure deterministic single-threaded XLA CPU execution to prevent native Eigen threadpool futex deadlocks
+    os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1")
+
     # Unset experimental async dispatch on MPS backend to prevent deadlocks
     if os.environ.get("JAX_MPS_ASYNC_DISPATCH") == "1":
         os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
