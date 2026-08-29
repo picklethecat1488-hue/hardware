@@ -1763,12 +1763,7 @@ def _compute_particle_forces_subroutine(
         0.0,
     )
 
-    hydrostatic_support = (
-        jnp.where(in_fluid_continuum[:, None], -gravity[None, :], 0.0)
-        if in_fluid_continuum is not None
-        else jnp.zeros_like(gravity[None, :])
-    )
-    effective_gravity = gravity[None, :] + hydrostatic_support
+    effective_gravity = gravity[None, :]
 
     accel = b_accel_clamped + suction_accel + tube_pump_accel + lid_drain_accel + pool_inward_accel + effective_gravity
     return accel, step_torque, b_forces
@@ -1868,9 +1863,7 @@ def _integrate_particles_subroutine(
     v_rel_local = world_to_base_vector(vel_next - base_vel, base_orn_inv)
 
     # 1. Unified Floor and Ceiling Containment
-    below_floor = (
-        (pos_local_next[:, 2] >= cavity_floor_z - 0.010) & (pos_local_next[:, 2] < cavity_floor_z) & (base_idx != -1)
-    )
+    below_floor = (pos_local_next[:, 2] < cavity_floor_z) & (base_idx != -1)
     above_ceiling = (pos_local_next[:, 2] > max_ceiling_z) & (base_idx != -1)
 
     pos_z_clamped = jnp.where(
@@ -1886,10 +1879,8 @@ def _integrate_particles_subroutine(
 
     # 2. Side Wall Non-Penetration
     r_loc_next, _, _ = cartesian_to_cylindrical(pos_local_next)
-    wall_band_r_max = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.WALL_BAND_R_MAX], base_radius + 0.015)
     outside_wall = (
         (r_loc_next > base_radius)
-        & (r_loc_next <= wall_band_r_max)
         & (pos_local_next[:, 2] >= cavity_floor_z)
         & (pos_local_next[:, 2] <= max_ceiling_z)
         & (base_idx != -1)
