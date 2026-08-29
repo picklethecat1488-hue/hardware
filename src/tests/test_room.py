@@ -787,3 +787,43 @@ def test_merge_rrd_recordings(tmp_path):
     assert result == out_file
     assert out_file.exists()
     assert out_file.stat().st_size > 0
+
+
+def test_room_simulate_combines_staged_recordings(tmp_path):
+    """Verify that Room.simulate triggers merge_rrd_recordings for staged checkpoints."""
+    from unittest.mock import MagicMock, patch
+    from provider.room import Room
+
+    room = Room(is_simulate=True)
+    room.add("test_box", Box(10, 10, 10))
+
+    mock_logger = MagicMock()
+    mock_manager = MagicMock()
+
+    staged_file1 = tmp_path / "sim_1000.rrd"
+    staged_file2 = tmp_path / "sim_2000.rrd"
+    staged_file1.write_text("dummy1")
+    staged_file2.write_text("dummy2")
+
+    save_rrd_path = tmp_path / "sim_7200.rrd"
+
+    with (
+        patch("provider.bullet.Bullet.run") as mock_bullet_run,
+        patch("provider.utils.merge_rrd_recordings") as mock_merge,
+    ):
+        room.simulate(
+            provider_hooks={},
+            proj_name="test_proj",
+            sim_target="test_target",
+            steps=7200,
+            manager=mock_manager,
+            logger=mock_logger,
+            save_rrd=str(save_rrd_path),
+            stage_window_size=1000,
+        )
+
+        mock_bullet_run.assert_called_once()
+        mock_merge.assert_called_once()
+        args, _ = mock_merge.call_args
+        assert sorted(args[0]) == [str(staged_file1), str(staged_file2)]
+        assert args[1] == str(save_rrd_path)
