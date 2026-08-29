@@ -767,9 +767,9 @@ class TestBulletFluid:
             self.disable_pybullet_particle_collisions(physics_client, body_id, fluid)
 
             # Settle parameters based on mode
-            settle_steps = 100 if mode == "fast" else 150
+            settle_steps = 150
             run_steps = 50 if mode == "fast" else 100
-            diff_threshold = 0.001 if mode == "fast" else 0.002
+            diff_threshold = 0.0005 if mode == "fast" else 0.0005
 
             # 1. Let the fluid settle to form a pool
             for step in range(settle_steps):
@@ -783,8 +783,8 @@ class TestBulletFluid:
             z_water = np.percentile(active_zs, 90)
             initial_active_count = len(active_zs)
 
-            # 2. Spawn HDPE and Nylon spheres (Radius = 6 mm)
-            r_sphere = 0.006
+            # 2. Spawn HDPE and Nylon spheres (Radius = 1.2 mm)
+            r_sphere = 0.0012
             v_sphere = (4.0 / 3.0) * math.pi * (r_sphere**3)
 
             # Density values: HDPE (950 kg/m^3), Nylon 6-6 (1140 kg/m^3)

@@ -1,17 +1,113 @@
-"""Simulation hooks for the cat fountain project."""
+"""Simulation hooks and flow metrics for the cat fountain project."""
 
+import numpy as np
 import pybullet as p
 from provider.bullet import _is_real_physics_client
-from typing import Any, Callable, cast
-from provider import Bullet, LinkType, Fluid, Simulate, URDFShape
+from typing import Any, Callable, cast, Optional
+from provider import Bullet, LinkType, Fluid, Simulate, URDFShape, rerun_is_enabled
 from model import FluidConfig, BoundaryConfig
+
+
+def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[str, int]:
+    """Compute flow, sheet, drainage, and reservoir volume metrics from current fluid state."""
+    metrics = {
+        "flow_spout": 0,
+        "flow_tube": 0,
+        "flow_lid_sheet": 0,
+        "drainage_waterfall": 0,
+        "drainage_cutout": 0,
+        "pool_volume": 0,
+    }
+    if getattr(provider, "water_sim", None) is None:
+        return metrics
+
+    positions = getattr(provider.water_sim, "last_positions", None)
+    if positions is None or len(positions) == 0:
+        return metrics
+
+    pos_pts = np.asarray(positions)
+    active_mask = pos_pts[:, 2] < 100.0
+    if not np.any(active_mask):
+        return metrics
+
+    pos_active = pos_pts[active_mask]
+    xs, ys, zs = pos_active[:, 0], pos_active[:, 1], pos_active[:, 2]
+
+    tube_x = 0.0
+    tube_y = 0.028
+    tube_r_inner = (provider.settings.tube_radius - provider.settings.tube_thickness) * 0.001
+    floor_z = provider.settings.floor_z * 0.001
+    tube_top_z = (provider.settings.floor_z + provider.settings.tube_height) * 0.001
+    cutout_y = provider.settings.lid_cutout_y * 0.001
+    cutout_r = provider.settings.lid_cutout_radius * 0.001
+    bowl_r = (provider.settings.bowl_radius - provider.settings.bowl_thickness) * 0.001
+    lid_z_min = (provider.settings.bowl_height - provider.settings.lid_step_depth) * 0.001
+
+    dist_tube = np.sqrt((xs - tube_x) ** 2 + (ys - tube_y) ** 2)
+    dist_cutout = np.sqrt(xs**2 + (ys - cutout_y) ** 2)
+    r_xy = np.sqrt(xs**2 + ys**2)
+
+    # 1. Flow in vertical delivery tube (strictly inside 6mm bore from floor to top)
+    in_tube_mask = (dist_tube <= tube_r_inner + 0.001) & (zs >= floor_z) & (zs <= tube_top_z)
+    in_tube_cnt = int(np.sum(in_tube_mask))
+
+    # 2. Flow emerging at spout
+    at_spout_mask = (dist_tube <= 0.030) & (zs > tube_top_z - 0.001)
+    at_spout_cnt = int(np.sum(at_spout_mask))
+
+    # 3. Flow on lid drinking shelf / tray (outside spout dome, inside lid rim)
+    lid_sheet_mask = (zs >= lid_z_min) & (zs <= lid_z_min + 0.015) & (dist_tube > 0.025) & (r_xy <= 0.082)
+    lid_sheet_cnt = int(np.sum(lid_sheet_mask))
+
+    # 4. Drainage: Perimeter waterfall cascading into bowl (R >= 78mm, falling below lid)
+    waterfall_mask = (r_xy >= 0.078) & (zs >= floor_z) & (zs < lid_z_min)
+    waterfall_cnt = int(np.sum(waterfall_mask))
+
+    # 5. Drainage: Front cutout drain returning to bowl (inside cutout hole, falling below lid)
+    drain_mask = (dist_cutout <= cutout_r) & (ys < 0.0) & (zs >= floor_z) & (zs < lid_z_min) & (r_xy < 0.078)
+    drain_cnt = int(np.sum(drain_mask))
+
+    # 6. Reservoir pool volume (entire base container fluid layer)
+    pool_mask = (zs >= floor_z - 0.003) & (zs < floor_z + 0.030) & (r_xy <= bowl_r)
+    pool_cnt = int(np.sum(pool_mask))
+
+    metrics = {
+        "flow_spout": at_spout_cnt,
+        "flow_tube": in_tube_cnt,
+        "flow_lid_sheet": lid_sheet_cnt,
+        "drainage_waterfall": waterfall_cnt,
+        "drainage_cutout": drain_cnt,
+        "pool_volume": pool_cnt,
+    }
+    provider.last_metrics = metrics
+    if not hasattr(provider, "metrics_history") or provider.metrics_history is None:
+        provider.metrics_history = []
+    provider.metrics_history.append(metrics)
+
+    if step_idx is not None and rerun_is_enabled():
+        import rerun as rr
+
+        rr.set_time("step", sequence=step_idx)
+        rr.log("metrics/flow_spout", rr.Scalars(float(at_spout_cnt)))
+        rr.log("metrics/flow_tube", rr.Scalars(float(in_tube_cnt)))
+        rr.log("metrics/flow_lid_sheet", rr.Scalars(float(lid_sheet_cnt)))
+        rr.log("metrics/drainage_waterfall", rr.Scalars(float(waterfall_cnt)))
+        rr.log("metrics/drainage_cutout", rr.Scalars(float(drain_cnt)))
+        rr.log("metrics/pool_volume", rr.Scalars(float(pool_cnt)))
+
+    return metrics
 
 
 def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
     """Return simulation hooks for the cat fountain."""
     self.water_sim = None
+    self.last_metrics = {}
+    self.metrics_history = []
+    self.compute_flow_metrics = lambda step_idx=None: compute_flow_metrics(self, step_idx)
 
     def setup_simulation(body_id, client, name, boundaries, state_tracker=None):
+        self.last_metrics = {}
+        self.metrics_history = []
         link_indices = {}
         if _is_real_physics_client(client):
             p.setGravity(0.0, 0.0, -9.81, physicsClientId=client)
@@ -127,6 +223,9 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             motor_power=actual_motor_power,
             damping=getattr(self, "water_sim_damping", 0.995),
         )
+
+        compute_flow_metrics(self, step_idx=step_idx)
+
         if (
             not self.water_sim.recycle_fluid
             and len(self.water_sim.fallen_out_water_ids) * self.water_sim.vol_s * 1000.0

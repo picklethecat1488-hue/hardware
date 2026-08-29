@@ -1082,3 +1082,153 @@ class TestCatFountainProvider:
                     )
             finally:
                 p.disconnect(physics_client)
+
+    @pytest.mark.slow
+    @pytest.mark.timeout(300)
+    def test_flow_and_drainage_metrics_stability_integration(self):
+        """Verify continuous stability of flow, spout discharge, waterfall, drainage, and pool metrics."""
+        import tempfile
+        import os
+        import shutil
+        import numpy as np
+        import pybullet as p
+        from build import Builder
+        from provider import ProviderManager, Room, Simulate
+        from model import AppConfig
+        from shell import Logger
+
+        with tempfile.TemporaryDirectory() as base_temp_dir:
+            config = AppConfig()
+            real_measurements = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "../cat_fountain/measurements.yaml")
+            )
+            provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
+            provider.settings.measurements_path = real_measurements
+
+            manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
+            builder = Builder(manager, logger=Logger(enabled=False))
+
+            parts_temp_dir = os.path.join(base_temp_dir, "parts")
+            builder.generate_parts(parts_temp_dir, names=None)
+            builder.generate_urdfs(parts_temp_dir, names=None)
+
+            obj_dir = os.path.join(parts_temp_dir, "obj/cat_fountain")
+            urdf_proj_dir = os.path.join(parts_temp_dir, "urdf/cat_fountain")
+            for f in os.listdir(obj_dir):
+                if f.endswith(".obj"):
+                    shutil.copy(os.path.join(obj_dir, f), os.path.join(urdf_proj_dir, f))
+
+            provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
+            provider.settings.measurements_path = real_measurements
+            provider.settings.motor_power = 1000.0
+
+            room = Room()
+            provider.build_product(room, mode=Mode.SIMULATE)
+            room.translate_joints()
+            room["impeller"][0].urdf_motor_target = provider.settings.motor_target
+            room["impeller"][0].urdf_motor_force = 10.0
+            provider.room = room
+
+            physics_client = p.connect(p.DIRECT)
+            try:
+                p.setGravity(0, 0, -9.81, physicsClientId=physics_client)
+
+                urdf_path = os.path.join(parts_temp_dir, "urdf/cat_fountain/product.urdf")
+                body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
+                assert body_id >= 0
+
+                boundaries = {}
+                for _, (geom, _) in room.items():
+                    label = getattr(geom, "urdf_label", None)
+                    if label:
+                        geom_boundaries = getattr(geom, "urdf_boundaries", None)
+                        if geom_boundaries:
+                            boundaries[label] = geom_boundaries
+
+                hooks = provider.get_simulate_hooks("product:view/simulate")
+                setup_fn = hooks[Simulate.SETUP]
+                setup_fn(body_id, physics_client, "product:view/simulate", boundaries, None)
+                step_fn = hooks[Simulate.STEP]
+
+                fluid = provider.water_sim
+                assert fluid is not None
+
+                # Execute simulation steps through production hooks
+                for step_idx in range(120):
+                    step_fn(body_id, physics_client, step_idx, "product:view/simulate")
+                    p.stepSimulation(physicsClientId=physics_client)
+
+                assert hasattr(provider, "metrics_history") and len(provider.metrics_history) == 120
+
+                # Derive physical expectations from first principles:
+                # 1. Total active fluid particles and single particle volume
+                total_particles = len(fluid.pos_jax)
+                assert total_particles > 0
+                v_particle = (4.0 / 3.0) * math.pi * (fluid.r_s**3)
+
+                # 2. Geometric delivery tube capacity: V_tube = pi * r_inner^2 * h_tube
+                r_inner = (provider.settings.tube_radius - provider.settings.tube_thickness) * 0.001
+                h_tube = provider.settings.tube_height * 0.001
+                v_tube = math.pi * (r_inner**2) * h_tube
+                n_tube_capacity = max(1, int(v_tube / v_particle))
+
+                # 3. Geometric spout dome chamber capacity
+                r_spout_dome = (provider.settings.tube_radius + 0.006) * 0.001
+                v_spout_dome = (2.0 / 3.0) * math.pi * (r_spout_dome**3)
+                n_spout_capacity = max(1, int(v_spout_dome / v_particle))
+
+                # 4. Continuous Delivery Tube Flow & Spout Discharge with naturalistic lower and upper bounds:
+                # - Lower bounds ensure pump delivery column does not collapse to zero
+                # - Upper bounds ensure fluid packing remains physically bounded by geometric volume
+                steady_tube = np.array([m["flow_tube"] for m in provider.metrics_history[40:]])
+                steady_spout = np.array([m["flow_spout"] for m in provider.metrics_history[40:]])
+
+                min_tube_particles = max(1, int(0.01 * n_tube_capacity))
+                max_tube_particles = int(1.20 * n_tube_capacity)
+                assert np.all(steady_tube >= min_tube_particles), (
+                    f"Delivery tube flow fell below minimum physical threshold ({min_tube_particles} particles)"
+                )
+                assert np.all(steady_tube <= max_tube_particles), (
+                    f"Delivery tube flow exceeded maximum geometric packing capacity ({max_tube_particles} particles)"
+                )
+
+                min_spout_particles = max(1, int(0.005 * n_spout_capacity))
+                max_spout_particles = int(2.00 * n_spout_capacity)
+                assert np.all(steady_spout >= min_spout_particles), (
+                    f"Spout discharge stream fell below minimum continuous flow ({min_spout_particles} particles)"
+                )
+                assert np.all(steady_spout <= max_spout_particles), (
+                    f"Spout discharge stream exceeded dome exit volume capacity ({max_spout_particles} particles)"
+                )
+
+                # 5. Drainage Continuity: Fluid mass returning across the perimeter waterfall and front drain
+                steady_waterfall = np.array([m["drainage_waterfall"] for m in provider.metrics_history[40:]])
+                steady_drain = np.array([m["drainage_cutout"] for m in provider.metrics_history[40:]])
+                total_steady_drainage = steady_waterfall + steady_drain
+
+                assert np.all(total_steady_drainage > 0), (
+                    "Total drainage returning to reservoir collapsed to zero in steady state"
+                )
+                assert np.all(steady_waterfall > 0), "Perimeter waterfall drainage dried up in steady state"
+                assert np.all(steady_drain > 0), "Front cutout drainage dried up in steady state"
+                assert np.all(total_steady_drainage <= int(0.80 * total_particles)), (
+                    "Falling drainage exceeded physical system mass allocation"
+                )
+
+                # 6. Reservoir Pool Mass Conservation: In steady state, reservoir pool retains majority fluid mass
+                min_expected_pool_particles = int(0.50 * total_particles)
+                max_expected_pool_particles = total_particles
+                steady_pool = np.array([m["pool_volume"] for m in provider.metrics_history[40:]])
+                assert np.all(steady_pool >= min_expected_pool_particles), (
+                    f"Pool volume collapsed below physical mass conservation threshold ({min_expected_pool_particles} particles)"
+                )
+                assert np.all(steady_pool <= max_expected_pool_particles), (
+                    f"Pool volume exceeded total active fluid mass ({max_expected_pool_particles} particles)"
+                )
+
+                # Verify standalone compute_flow_metrics hook method
+                current_metrics = provider.compute_flow_metrics()
+                assert min_expected_pool_particles <= current_metrics["pool_volume"] <= max_expected_pool_particles
+
+            finally:
+                p.disconnect(physics_client)

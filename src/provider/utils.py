@@ -260,6 +260,15 @@ def merge_rrd_recordings(
         chunks = list(reader.stream())
         if chunks:
             rr.bindings.send_chunks(chunks, recording=rec.to_native())
-
     rec.flush()
     return out_p
+
+
+def rerun_is_enabled() -> bool:
+    """Return True if rerun logging is enabled and active."""
+    try:
+        import rerun as rr
+
+        return bool(hasattr(rr, "is_enabled") and rr.is_enabled())
+    except ImportError:
+        return False

@@ -1407,7 +1407,7 @@ def _g2p_mapping_subroutine(
     # Submerged reservoir pool: derive liquid depth from fluid volume and base container area
     base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
     base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.Z_TOP], 0.0)
-    vol_total = pos_curr.shape[0] * ((4.0 / 3.0) * math.pi * (r_s**3))
+    vol_total = pos_curr.shape[0] * (dx**3)
     pool_depth = vol_total / (math.pi * (base_radius**2) + 1e-6)
 
     casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
@@ -1519,7 +1519,7 @@ def _compute_particle_forces_subroutine(
     base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
     base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.Z_TOP], 0.0)
     casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
-    vol_total = pos_curr.shape[0] * ((4.0 / 3.0) * math.pi * (r_s**3))
+    vol_total = pos_curr.shape[0] * (dx**3)
     pool_depth = vol_total / (math.pi * (base_radius**2) + 1e-6)
     pool_height = jnp.where(
         base_idx != -1,
@@ -1687,7 +1687,7 @@ def _compute_particle_forces_subroutine(
             [dx_to_drain / dist_to_drain_xy, dy_to_drain / dist_to_drain_xy, jnp.zeros_like(dx_to_drain)],
             axis=-1,
         )
-        sheet_flow_dir = radial_lid_dir * 0.40 + dir_slope_local * 0.60
+        sheet_flow_dir = radial_lid_dir * 0.70 + dir_slope_local * 0.30
         sheet_flow_mag = jnp.sqrt(jnp.sum(sheet_flow_dir**2, axis=-1, keepdims=True) + 1e-8)
         sheet_flow_unit = sheet_flow_dir / sheet_flow_mag
         slope_factor = jnp.maximum(lid_slope_ratio, 0.25)
@@ -1765,7 +1765,37 @@ def _compute_particle_forces_subroutine(
 
     effective_gravity = gravity[None, :]
 
-    accel = b_accel_clamped + suction_accel + tube_pump_accel + lid_drain_accel + pool_inward_accel + effective_gravity
+    # Reservoir pool hydrostatic support gradient:
+    # Within the settled fluid layer (cavity_floor_z <= z <= cavity_floor_z + pool_height),
+    # upward hydrostatic pressure gradient balances gravity at the floor, transitioning linearly
+    # to 0 at the free surface (s = (z - z_floor) / pool_height).
+    in_hydrostatic_pool = (
+        (pos_b[:, 2] >= cavity_floor_z)
+        & (pos_b[:, 2] <= cavity_floor_z + pool_height)
+        & (r_b <= base_radius)
+        & (base_idx != -1)
+        & (pool_height > 1e-4)
+    )
+    s_pool = jnp.clip((pos_b[:, 2] - cavity_floor_z) / jnp.maximum(pool_height, 1e-4), 0.0, 1.0)
+    hydrostatic_support_world = local_to_world_vector(
+        jnp.stack([jnp.zeros_like(s_pool), jnp.zeros_like(s_pool), g_mag * (1.0 - s_pool)], axis=-1),
+        base_orn_b,
+    )
+    hydrostatic_accel = jnp.where(
+        in_hydrostatic_pool[:, None],
+        hydrostatic_support_world,
+        0.0,
+    )
+
+    accel = (
+        b_accel_clamped
+        + suction_accel
+        + tube_pump_accel
+        + lid_drain_accel
+        + pool_inward_accel
+        + effective_gravity
+        + hydrostatic_accel
+    )
     return accel, step_torque, b_forces
 
 
@@ -1863,8 +1893,12 @@ def _integrate_particles_subroutine(
     v_rel_local = world_to_base_vector(vel_next - base_vel, base_orn_inv)
 
     # 1. Unified Floor and Ceiling Containment
-    below_floor = (pos_local_next[:, 2] < cavity_floor_z) & (base_idx != -1)
-    above_ceiling = (pos_local_next[:, 2] > max_ceiling_z) & (base_idx != -1)
+    below_floor = (
+        (pos_local_next[:, 2] < cavity_floor_z) & (pos_local_next[:, 2] >= cavity_floor_z - 0.020) & (base_idx != -1)
+    )
+    above_ceiling = (
+        (pos_local_next[:, 2] > max_ceiling_z) & (pos_local_next[:, 2] <= max_ceiling_z + 0.020) & (base_idx != -1)
+    )
 
     pos_z_clamped = jnp.where(
         below_floor,
@@ -1881,8 +1915,9 @@ def _integrate_particles_subroutine(
     r_loc_next, _, _ = cartesian_to_cylindrical(pos_local_next)
     outside_wall = (
         (r_loc_next > base_radius)
-        & (pos_local_next[:, 2] >= cavity_floor_z)
-        & (pos_local_next[:, 2] <= max_ceiling_z)
+        & (r_loc_next <= base_radius + 0.020)
+        & (pos_local_next[:, 2] >= cavity_floor_z - 0.020)
+        & (pos_local_next[:, 2] <= max_ceiling_z + 0.020)
         & (base_idx != -1)
     )
     scale_r = jnp.where(outside_wall & (r_loc_next > 1e-6), (base_radius - 1e-4) / r_loc_next, 1.0)

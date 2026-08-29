@@ -950,27 +950,6 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     ),
                 )
 
-                # Log continuous flow and drainage metrics for simulation audits
-                if len(filtered_positions) > 0:
-                    pos_pts = np.asarray(filtered_positions)
-                    xs, ys, zs = pos_pts[:, 0], pos_pts[:, 1], pos_pts[:, 2]
-                    dist_tube = np.sqrt(xs**2 + (ys - 0.028) ** 2)
-                    in_tube_cnt = int(np.sum((dist_tube < 0.012) & (zs >= 0.041) & (zs < 0.095)))
-                    at_spout_cnt = int(np.sum((dist_tube < 0.020) & (zs >= 0.095)))
-                    r_xy = np.sqrt(xs**2 + ys**2)
-                    on_lid = zs >= 0.075
-                    waterfall_cnt = int(np.sum(r_xy[on_lid] >= 0.080))
-                    drain_cnt = int(np.sum((ys[on_lid] < -0.010) & (np.abs(xs[on_lid]) < 0.040)))
-                    lid_sheet_cnt = int(np.sum(on_lid) - waterfall_cnt - drain_cnt)
-                    pool_cnt = int(np.sum((r_xy >= 0.028) & (zs < 0.055)))
-
-                    rr.log("metrics/flow_spout", rr.Scalars(at_spout_cnt))
-                    rr.log("metrics/flow_tube", rr.Scalars(in_tube_cnt))
-                    rr.log("metrics/flow_lid_sheet", rr.Scalars(lid_sheet_cnt))
-                    rr.log("metrics/drainage_waterfall", rr.Scalars(waterfall_cnt))
-                    rr.log("metrics/drainage_cutout", rr.Scalars(drain_cnt))
-                    rr.log("metrics/pool_volume", rr.Scalars(pool_cnt))
-
         # Log boundary voxels labeled for each boundary type
         if boundary_voxels is not None and len(boundary_voxels) > 0:
             boundary_color_map = {
