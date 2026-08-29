@@ -1516,7 +1516,23 @@ def _compute_particle_forces_subroutine(
     g_mag = jnp.linalg.norm(gravity)
     v_tip = jnp.abs(omega) * r_impeller_eff
 
-    # Impeller suction intake force directed toward casing center
+    base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
+    base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.Z_TOP], 0.0)
+    casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
+    vol_total = pos_curr.shape[0] * ((4.0 / 3.0) * math.pi * (r_s**3))
+    pool_depth = vol_total / (math.pi * (base_radius**2) + 1e-6)
+    pool_height = jnp.where(
+        base_idx != -1,
+        jnp.where(casing_top > 0.0, jnp.maximum(pool_depth + 4.0 * dx, casing_top), pool_depth),
+        base_height,
+    )
+    cavity_floor_z = jnp.where(
+        base_idx != -1,
+        b_params[base_idx, BoundaryParam.Z_OFFSET],
+        0.0,
+    )
+
+    # Impeller suction intake force directed toward casing center and tangential injection into tube
     suction_accel = jnp.zeros_like(pos_curr)
     for i, shape in enumerate(b_shapes):
         casing_pos = b_pos_arr[i]
@@ -1525,30 +1541,37 @@ def _compute_particle_forces_subroutine(
         pos_casing = world_to_local_frame(pos_curr, casing_pos, casing_orn_inv)
         r_inlet_xy, _, _ = cartesian_to_cylindrical(pos_casing)
         radius = b_params[i, BoundaryParam.RADIUS]
-        inlet_radius = radius * 0.35
-        suction_z_min = b_params[i, BoundaryParam.SUCTION_Z_MIN]
-        suction_z_max = b_params[i, BoundaryParam.SUCTION_Z_MAX]
+        casing_h = b_params[i, BoundaryParam.HEIGHT]
+        ceil_thick = b_params[i, BoundaryParam.CEILING_THICKNESS]
 
-        in_suction = (
-            (r_inlet_xy < inlet_radius + r_s)
-            & (pos_casing[:, 2] >= suction_z_min)
-            & (pos_casing[:, 2] <= suction_z_max)
-        )
+        # 1. Inward suction draw across the lower reservoir pool near the casing intake
+        in_suction = (r_inlet_xy < radius * 1.6) & (pos_casing[:, 2] >= -0.005) & (pos_casing[:, 2] <= casing_h + 0.025)
 
-        target_z = b_params[i, BoundaryParam.HEIGHT] - b_params[i, BoundaryParam.CEILING_THICKNESS]
         dx_in = 0.0 - pos_casing[:, 0]
         dy_in = 0.0 - pos_casing[:, 1]
-        dz_in = target_z - pos_casing[:, 2]
+        dz_in = jnp.clip(casing_h - ceil_thick - pos_casing[:, 2], -0.01, 0.01)
         dist_in = jnp.sqrt(dx_in**2 + dy_in**2 + dz_in**2 + 1e-8)
 
         dir_casing = jnp.stack([dx_in / dist_in, dy_in / dist_in, dz_in / dist_in], axis=-1)
         dir_world = local_to_world_vector(dir_casing, casing_orn)
 
-        suction_strength = v_tip * (g_mag * 1.25)
+        suction_strength = v_tip * (g_mag * 1.5)
         suction_accel_i = jnp.where(in_suction[:, None], dir_world * suction_strength, 0.0)
 
+        # 2. Inside the volute chamber (r <= radius), push tangentially and along +Y into the tube entrance
+        in_volute = (r_inlet_xy <= radius + r_s) & (pos_casing[:, 2] >= 0.0) & (pos_casing[:, 2] <= casing_h)
+        tangent_x = -pos_casing[:, 1] / (r_inlet_xy + 1e-5)
+        tangent_y = pos_casing[:, 0] / (r_inlet_xy + 1e-5)
+        nozzle_dir_local = jnp.stack(
+            [tangent_x * 0.4, tangent_y * 0.4 + 0.8, jnp.zeros_like(pos_casing[:, 0])], axis=-1
+        )
+        nozzle_dir_mag = jnp.sqrt(jnp.sum(nozzle_dir_local**2, axis=-1, keepdims=True) + 1e-8)
+        nozzle_dir_world = local_to_world_vector(nozzle_dir_local / nozzle_dir_mag, casing_orn)
+        volute_accel_i = nozzle_dir_world * (v_tip * 15.0 + g_mag * 1.5)
+
         is_casing = shape == SHAPE_CASING
-        suction_accel += jnp.where(is_casing, suction_accel_i, jnp.zeros_like(pos_curr))
+        casing_total_accel = jnp.where(in_volute[:, None], volute_accel_i, suction_accel_i)
+        suction_accel += jnp.where(is_casing, casing_total_accel, jnp.zeros_like(pos_curr))
 
     tube_pump_accel = jnp.zeros_like(pos_curr)
     for i, shape in enumerate(b_shapes):
@@ -1607,14 +1630,6 @@ def _compute_particle_forces_subroutine(
         r_outer = b_params[i, BoundaryParam.R_OUTER]
         at_spout = (pos_tube[:, 2] >= spout_z_min) & (r_tube_xy < r_outer + r_s)
 
-        # Derive spout deflection direction: 360-degree radial expansion with forward slope bias
-        drain_hole_y = 0.0
-        for j, shape_j in enumerate(b_shapes):
-            has_dr = b_params[j, BoundaryParam.HAS_DRAIN] > 0.5
-            dr_y = b_params[j, BoundaryParam.DRAIN_HOLE_Y]
-            drain_hole_y = jnp.where(has_dr, dr_y, drain_hole_y)
-        lid_slope_ratio = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.LID_SLOPE_RATIO], 0.0)
-
         r_xy_safe = jnp.maximum(r_tube_xy, 1e-5)
         radial_unit_local = jnp.stack(
             [pos_tube[:, 0] / r_xy_safe, pos_tube[:, 1] / r_xy_safe, jnp.zeros_like(pos_tube[:, 0])],
@@ -1622,13 +1637,9 @@ def _compute_particle_forces_subroutine(
         )
         radial_unit_world = local_to_world_vector(radial_unit_local, tube_orn)
 
-        dy_spout = drain_hole_y - tube_pos[1]
-        dist_spout_y = jnp.abs(dy_spout) + 1e-6
-        forward_dir_world = jnp.stack([0.0, dy_spout / dist_spout_y, 0.0], axis=-1)
-
-        # Blend 360-degree radial expansion (0.60) with forward slope bias (0.40) and downward dome deflection
+        # Purely radial 360-degree expansion over dome with downward deflection (centered on spout)
         down_dir_world = local_to_world_vector(jnp.array([0.0, 0.0, -1.0]), tube_orn)
-        dome_disp = radial_unit_world * 0.60 + forward_dir_world[None, :] * 0.40 + down_dir_world[None, :] * 0.25
+        dome_disp = radial_unit_world * 0.85 + down_dir_world[None, :] * 0.35
         disp_mag = jnp.sqrt(jnp.sum(dome_disp**2, axis=-1, keepdims=True) + 1e-8)
         spout_out_dir = dome_disp / disp_mag
         spout_accel = spout_out_dir * (g_mag * 1.5 + v_flow_est * 1.5)
@@ -1643,6 +1654,7 @@ def _compute_particle_forces_subroutine(
         tube_pump_accel += jnp.where(is_tube, tube_pump_accel_i, jnp.zeros_like(pos_curr))
 
     lid_drain_accel = jnp.zeros_like(pos_curr)
+    lid_slope_ratio = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.LID_SLOPE_RATIO], 0.0)
     for i, shape in enumerate(b_shapes):
         lid_pos = b_pos_arr[i]
         lid_orn = b_orn_arr[i]
@@ -1721,6 +1733,36 @@ def _compute_particle_forces_subroutine(
         active_lid_mask = on_lid | edge_zone
         lid_drain_accel += jnp.where(is_lid & active_lid_mask[:, None], total_lid_accel_world, jnp.zeros_like(pos_curr))
 
+    # Reservoir pool inward return drift to feed pump volute intake
+    base_pos_b = b_pos_arr[base_idx]
+    base_orn_b = b_orn_arr[base_idx]
+    base_orn_b_inv = invert_orientation(base_orn_b)
+    pos_b = world_to_local_frame(pos_curr, base_pos_b, base_orn_b_inv)
+    r_b, _, _ = cartesian_to_cylindrical(pos_b)
+    r_b_safe = jnp.maximum(r_b, 1e-5)
+    in_outer_pool = (
+        (pos_b[:, 2] >= cavity_floor_z)
+        & (pos_b[:, 2] <= cavity_floor_z + pool_height)
+        & (r_b <= base_radius)
+        & (r_b >= 0.018)
+        & (base_idx != -1)
+    )
+    inward_dir_local = jnp.stack(
+        [-pos_b[:, 0] / r_b_safe, -pos_b[:, 1] / r_b_safe, jnp.zeros_like(pos_b[:, 0])],
+        axis=-1,
+    )
+    inward_dir_world = local_to_world_vector(inward_dir_local, base_orn_b)
+    inward_strength = jnp.where(
+        jnp.abs(omega) > 0.0,
+        (g_mag * 0.45) * (r_b / (base_radius + 1e-5)),
+        0.0,
+    )
+    pool_inward_accel = jnp.where(
+        in_outer_pool[:, None],
+        inward_dir_world * inward_strength[:, None],
+        0.0,
+    )
+
     hydrostatic_support = (
         jnp.where(in_fluid_continuum[:, None], -gravity[None, :], 0.0)
         if in_fluid_continuum is not None
@@ -1728,7 +1770,7 @@ def _compute_particle_forces_subroutine(
     )
     effective_gravity = gravity[None, :] + hydrostatic_support
 
-    accel = b_accel_clamped + suction_accel + tube_pump_accel + lid_drain_accel + effective_gravity
+    accel = b_accel_clamped + suction_accel + tube_pump_accel + lid_drain_accel + pool_inward_accel + effective_gravity
     return accel, step_torque, b_forces
 
 
