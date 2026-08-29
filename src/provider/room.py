@@ -964,12 +964,12 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     lid_sheet_cnt = int(np.sum(on_lid) - waterfall_cnt - drain_cnt)
                     pool_cnt = int(np.sum((r_xy >= 0.028) & (zs < 0.055)))
 
-                    rr.log("metrics/flow_spout", rr.Scalars(at_spout_cnt))
-                    rr.log("metrics/flow_tube", rr.Scalars(in_tube_cnt))
-                    rr.log("metrics/flow_lid_sheet", rr.Scalars(lid_sheet_cnt))
-                    rr.log("metrics/drainage_waterfall", rr.Scalars(waterfall_cnt))
-                    rr.log("metrics/drainage_cutout", rr.Scalars(drain_cnt))
-                    rr.log("metrics/pool_volume", rr.Scalars(pool_cnt))
+                    rr.log("metrics/flow_spout", rr.Scalars(float(at_spout_cnt)))
+                    rr.log("metrics/flow_tube", rr.Scalars(float(in_tube_cnt)))
+                    rr.log("metrics/flow_lid_sheet", rr.Scalars(float(lid_sheet_cnt)))
+                    rr.log("metrics/drainage_waterfall", rr.Scalars(float(waterfall_cnt)))
+                    rr.log("metrics/drainage_cutout", rr.Scalars(float(drain_cnt)))
+                    rr.log("metrics/pool_volume", rr.Scalars(float(pool_cnt)))
 
         # Log boundary voxels labeled for each boundary type
         if boundary_voxels is not None and len(boundary_voxels) > 0:
