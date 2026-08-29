@@ -72,6 +72,36 @@ case "$1" in
         shift
         pull_stages "$1"
         ;;
+    combine|merge)
+        shift
+        echo "✨ Combining staged RRD recordings..."
+        python -c "
+import sys, os, glob
+sys.path.insert(0, os.path.abspath('src'))
+from provider.utils import merge_rrd_recordings
+
+args = sys.argv[1:]
+out = 'recordings/sim_combined.rrd'
+inputs = []
+if '-o' in args:
+    idx = args.index('-o')
+    out = args[idx + 1]
+    inputs = args[:idx] + args[idx + 2:]
+else:
+    inputs = args
+
+if not inputs:
+    inputs = sorted(glob.glob('recordings/sim_*.rrd'))
+
+inputs = [f for f in inputs if os.path.abspath(f) != os.path.abspath(out)]
+if not inputs:
+    print('No input RRD files found to combine.')
+    sys.exit(1)
+
+merge_rrd_recordings(inputs, out)
+print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
+" "$@"
+        ;;
     simulate)
         shift
         sync_code

@@ -758,3 +758,32 @@ def test_urdf_shape_derived_properties():
 
     # thickness should be minimum dimension (10.0) in meters -> 0.01
     assert math.isclose(u_box.urdf_thickness, 0.01, abs_tol=1e-6)
+
+
+def test_merge_rrd_recordings(tmp_path):
+    """Verify that merge_rrd_recordings combines multiple RRD files cleanly."""
+    import rerun as rr
+    from provider.utils import merge_rrd_recordings
+
+    # Create two dummy RRD recordings
+    file1 = tmp_path / "part1.rrd"
+    file2 = tmp_path / "part2.rrd"
+    out_file = tmp_path / "combined.rrd"
+
+    rec1 = rr.RecordingStream(application_id="test1")
+    rec1.save(str(file1))
+    rec1.log("test/point1", rr.Points3D([[0.0, 0.0, 0.0]]))
+    rec1.flush()
+
+    rec2 = rr.RecordingStream(application_id="test2")
+    rec2.save(str(file2))
+    rec2.log("test/point2", rr.Points3D([[1.0, 1.0, 1.0]]))
+    rec2.flush()
+
+    assert file1.exists()
+    assert file2.exists()
+
+    result = merge_rrd_recordings([file1, file2], out_file)
+    assert result == out_file
+    assert out_file.exists()
+    assert out_file.stat().st_size > 0
