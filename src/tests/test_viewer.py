@@ -789,3 +789,24 @@ class TestViewer:
         with patch.object(sys, "argv", test_args_removed):
             with pytest.raises(SystemExit):
                 get_args()
+
+    def test_view_cli_stage_window(self):
+        """Verify view.py CLI parses --stage-window and --stage-window-size correctly."""
+        import sys
+        from unittest.mock import patch
+        from view import get_args
+
+        test_args = ["view.py", "cat_fountain/product:view/simulate", "--stage-window", "1000"]
+        with patch.object(sys, "argv", test_args):
+            args = get_args()
+            assert args.stage_window_size == 1000
+
+        test_args_alias = ["view.py", "cat_fountain/product:view/simulate", "--stage-window-size", "2500"]
+        with patch.object(sys, "argv", test_args_alias):
+            args = get_args()
+            assert args.stage_window_size == 2500
+
+        test_args_alias2 = ["view.py", "cat_fountain/product:view/simulate", "--staging-frame-window-size", "500"]
+        with patch.object(sys, "argv", test_args_alias2):
+            args = get_args()
+            assert args.stage_window_size == 500

@@ -758,3 +758,72 @@ def test_urdf_shape_derived_properties():
 
     # thickness should be minimum dimension (10.0) in meters -> 0.01
     assert math.isclose(u_box.urdf_thickness, 0.01, abs_tol=1e-6)
+
+
+def test_merge_rrd_recordings(tmp_path):
+    """Verify that merge_rrd_recordings combines multiple RRD files cleanly."""
+    import rerun as rr
+    from provider.utils import merge_rrd_recordings
+
+    # Create two dummy RRD recordings
+    file1 = tmp_path / "part1.rrd"
+    file2 = tmp_path / "part2.rrd"
+    out_file = tmp_path / "combined.rrd"
+
+    rec1 = rr.RecordingStream(application_id="test1")
+    rec1.save(str(file1))
+    rec1.log("test/point1", rr.Points3D([[0.0, 0.0, 0.0]]))
+    rec1.flush()
+
+    rec2 = rr.RecordingStream(application_id="test2")
+    rec2.save(str(file2))
+    rec2.log("test/point2", rr.Points3D([[1.0, 1.0, 1.0]]))
+    rec2.flush()
+
+    assert file1.exists()
+    assert file2.exists()
+
+    result = merge_rrd_recordings([file1, file2], out_file)
+    assert result == out_file
+    assert out_file.exists()
+    assert out_file.stat().st_size > 0
+
+
+def test_room_simulate_combines_staged_recordings(tmp_path):
+    """Verify that Room.simulate triggers merge_rrd_recordings for staged checkpoints."""
+    from unittest.mock import MagicMock, patch
+    from provider.room import Room
+
+    room = Room(is_simulate=True)
+    room.add("test_box", Box(10, 10, 10))
+
+    mock_logger = MagicMock()
+    mock_manager = MagicMock()
+
+    staged_file1 = tmp_path / "sim_1000.rrd"
+    staged_file2 = tmp_path / "sim_2000.rrd"
+    staged_file1.write_text("dummy1")
+    staged_file2.write_text("dummy2")
+
+    save_rrd_path = tmp_path / "sim_7200.rrd"
+
+    with (
+        patch("provider.bullet.Bullet.run") as mock_bullet_run,
+        patch("provider.utils.merge_rrd_recordings") as mock_merge,
+    ):
+        room.simulate(
+            provider_hooks={},
+            proj_name="test_proj",
+            sim_target="test_target",
+            steps=7200,
+            manager=mock_manager,
+            logger=mock_logger,
+            save_rrd=str(save_rrd_path),
+            stage_window_size=1000,
+        )
+
+        mock_bullet_run.assert_called_once()
+        mock_merge.assert_called_once()
+        args, _ = mock_merge.call_args
+        assert sorted(args[0]) == [str(staged_file1), str(staged_file2)]
+        assert args[1] == str(save_rrd_path)

@@ -2,13 +2,14 @@
 # ==============================================================================
 # Helper script for remote execution and synchronization with cloud server anvil
 # Usage:
-#   bin/anvil sync                 # Sync local workspace to anvil
-#   bin/anvil pull <file...>       # Download generated files/directories from anvil to local
-#   bin/anvil fetch <file...>      # Alias for pull
-#   bin/anvil simulate [args...]   # Run simulation on anvil and auto-download resulting .rrd
-#   bin/anvil smoke                # Sync and run smoke tests on anvil
-#   bin/anvil pytest [args...]     # Sync and run pytest on anvil
-#   bin/anvil run <command...>     # Sync and run arbitrary command on anvil
+#   bin/anvil sync                     # Sync local workspace to anvil
+#   bin/anvil pull <file...>           # Download generated files/directories from anvil to local
+#   bin/anvil fetch <file...>          # Alias for pull
+#   bin/anvil stages [dir]             # Download all staged .rrd checkpoints from anvil
+#   bin/anvil simulate [args...]       # Run simulation on anvil and auto-download resulting .rrd and staged checkpoints
+#   bin/anvil smoke                    # Sync and run smoke tests on anvil
+#   bin/anvil pytest [args...]         # Sync and run pytest on anvil
+#   bin/anvil run <command...>         # Sync and run arbitrary command on anvil
 # ==============================================================================
 
 set -e
@@ -38,9 +39,20 @@ sync_code() {
 pull_file() {
     local remote_path="$1"
     local local_dest="${2:-$1}"
+    local local_dir
+    local_dir="$(dirname "${REPO_DIR}/${local_dest}")"
+    mkdir -p "${local_dir}"
     echo "📥 Downloading ${REMOTE_HOST}:${REMOTE_DIR}/${remote_path} -> ${REPO_DIR}/${local_dest}..."
     rsync -avz "${REMOTE_HOST}:${REMOTE_DIR}/${remote_path}" "${REPO_DIR}/${local_dest}"
     echo "✅ Download complete."
+}
+
+pull_stages() {
+    local target_dir="${1:-recordings}"
+    mkdir -p "${REPO_DIR}/${target_dir}"
+    echo "📥 Syncing all staged .rrd recordings from ${REMOTE_HOST}:${REMOTE_DIR}/${target_dir}/..."
+    rsync -avz --include='*.rrd' --include='*/' --exclude='*' "${REMOTE_HOST}:${REMOTE_DIR}/${target_dir}/" "${REPO_DIR}/${target_dir}/"
+    echo "✅ Staged recordings synced."
 }
 
 case "$1" in
@@ -56,16 +68,57 @@ case "$1" in
         fi
         pull_file "$1" "$2"
         ;;
+    stages|checkpoints)
+        shift
+        pull_stages "$1"
+        ;;
+    combine|merge)
+        shift
+        echo "✨ Combining staged RRD recordings..."
+        python -c "
+import sys, os, glob
+sys.path.insert(0, os.path.abspath('src'))
+from provider.utils import merge_rrd_recordings
+
+args = sys.argv[1:]
+out = 'recordings/sim_combined.rrd'
+inputs = []
+if '-o' in args:
+    idx = args.index('-o')
+    out = args[idx + 1]
+    inputs = args[:idx] + args[idx + 2:]
+else:
+    inputs = args
+
+if not inputs:
+    inputs = sorted(glob.glob('recordings/sim_*.rrd'))
+
+inputs = [f for f in inputs if os.path.abspath(f) != os.path.abspath(out)]
+if not inputs:
+    print('No input RRD files found to combine.')
+    sys.exit(1)
+
+merge_rrd_recordings(inputs, out)
+print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
+" "$@"
+        ;;
     simulate)
         shift
         sync_code
         echo "🌊 Running simulation on ${REMOTE_HOST}..."
         ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} python src/view.py $*"
-        # Auto-download any .rrd file specified in arguments
+        # Auto-download any .rrd file and all staged checkpoint recordings
         for arg in "$@"; do
             if [[ "$arg" == *.rrd ]]; then
-                echo "📥 Auto-downloading generated recording ${arg}..."
-                pull_file "$arg" "$arg"
+                local rrd_dir
+                rrd_dir="$(dirname "$arg")"
+                local rrd_base
+                rrd_base="$(basename "$arg" .rrd)"
+                local prefix
+                prefix="${rrd_base%_*}"
+                
+                echo "📥 Auto-downloading generated recording and staging checkpoints for ${arg}..."
+                pull_stages "${rrd_dir}"
             fi
         done
         ;;
@@ -88,7 +141,7 @@ case "$1" in
         ;;
     *)
         if [ $# -eq 0 ]; then
-            echo "Usage: bin/anvil {sync|pull|simulate|smoke|pytest|run} [args...]"
+            echo "Usage: bin/anvil {sync|pull|stages|simulate|smoke|pytest|run} [args...]"
             exit 1
         fi
         sync_code

@@ -122,6 +122,7 @@ class Bullet:
         save_rrd: Optional[str] = None,
         rerun_port: Optional[int] = None,
         spawn_viewer: bool = True,
+        stage_window_size: Optional[int] = None,
     ):
         """Initialize the simulator."""
         self.room = room
@@ -135,6 +136,7 @@ class Bullet:
         self.save_rrd = save_rrd
         self.rerun_port = rerun_port
         self.spawn_viewer = spawn_viewer
+        self.stage_window_size = stage_window_size
 
     def _parse_urdf_meshes(self, build_proj_dir: str) -> dict[str, str]:
         """Parse URDF files to map link names to their OBJ filenames."""
@@ -534,6 +536,7 @@ class Bullet:
                         while True:
                             item = q.get()
                             if item is None:
+                                q.task_done()
                                 break
                             (
                                 transforms,
@@ -551,6 +554,7 @@ class Bullet:
                                 boundary_voxels=boundary_voxels,
                                 step_idx=step_idx,
                             )
+                            q.task_done()
 
                     t = threading.Thread(target=logging_worker, daemon=True)
                     log_thread = t
@@ -585,6 +589,23 @@ class Bullet:
                             )
                         except queue.Full:
                             pass
+
+                    # Check for staging frame window checkpoint
+                    if self.stage_window_size and self.save_rrd and ((step_idx + 1) % self.stage_window_size == 0):
+                        if log_queue is not None:
+                            log_queue.join()
+                        base_dir = os.path.dirname(self.save_rrd) or "."
+                        base_name = os.path.splitext(os.path.basename(self.save_rrd))[0]
+                        import re
+
+                        prefix = re.sub(r"_\d+$", "", base_name)
+                        staged_name = f"{prefix}_{step_idx + 1}.rrd"
+                        staged_path = os.path.join(base_dir, staged_name)
+                        if os.path.exists(self.save_rrd):
+                            shutil.copyfile(self.save_rrd, staged_path)
+                            self.logger.print(
+                                f"Staged checkpoint saved: {staged_path} ({step_idx + 1} frames)", symbol="💾"
+                            )
 
                     if terminated:
                         break

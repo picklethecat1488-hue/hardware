@@ -1,6 +1,8 @@
 """Utility functions for build providers."""
 
 import os
+from collections.abc import Sequence
+from pathlib import Path
 from typing import Any, TypeVar, Callable, overload, Union, Optional, cast
 import yaml
 from .types import Mode, Section, ColorType, MODES, SUBASSEMBLIES, COLOR, MATERIAL, EXPORT
@@ -225,3 +227,39 @@ def initialize_jax_environment(cache_dir: Optional[Union[str, os.PathLike]] = No
     for logger_name in DAEMON_LOGGERS:
         logging.getLogger(logger_name).setLevel(logging.INFO)
         logging.getLogger(logger_name).propagate = False
+
+
+def merge_rrd_recordings(
+    input_paths: Sequence[str | Path],
+    output_path: str | Path,
+    application_id: str = "simulation",
+) -> Path:
+    """Merge and concatenate multiple RRD recording files into a single unified recording.
+
+    Args:
+        input_paths: List or sequence of input .rrd file paths to combine.
+        output_path: Destination path for the unified combined .rrd recording.
+        application_id: Application ID string for the Rerun recording stream.
+
+    Returns:
+        Path to the generated combined .rrd file.
+    """
+    import rerun as rr
+
+    out_p = Path(output_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+
+    rec = rr.RecordingStream(application_id=application_id)
+    rec.save(str(out_p))
+
+    for in_path in input_paths:
+        p_in = Path(in_path)
+        if not p_in.exists():
+            continue
+        reader = rr.bindings.RrdReaderInternal(str(p_in))
+        chunks = list(reader.stream())
+        if chunks:
+            rr.bindings.send_chunks(chunks, recording=rec.to_native())
+
+    rec.flush()
+    return out_p
