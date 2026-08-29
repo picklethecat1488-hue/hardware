@@ -908,13 +908,13 @@ class CatFountainProvider(Provider):
             joint_type=URDFJointType.FIXED,
         ):
             URDFBoundary(
-                pocket_tool.part,
+                lid.part,
                 link_type=LinkType.LID,
                 shape=ShapeType.CYLINDER,
                 type=BoundaryType.CAVITY,
                 radius=self.settings.lid_pocket_radius * 0.001,
-                height=0.0035,
-                thickness=0.0035,
+                height=self.settings.lid_pocket_cavity_height * 0.001,
+                thickness=self.settings.lid_pocket_thickness * 0.001,
                 xyz=(0.0, 0.0, 0.0),
                 rpy=(0.0, 0.0, 0.0),
                 has_drain=True,
@@ -925,7 +925,7 @@ class CatFountainProvider(Provider):
             )
 
             URDFBoundary(
-                outer_dome,
+                lid.part,
                 link_type=LinkType.LID,
                 shape=ShapeType.SPHERE,
                 type=BoundaryType.SOLID,
@@ -1404,3 +1404,9 @@ class CatFountainProvider(Provider):
         # Build the diagram using the diagram class
         diagram = WiringDiagram(wiring)
         diagram.build(room)
+
+    def compute_flow_metrics(self) -> dict[str, int]:
+        """Compute continuous flow and drainage metrics delegating to simulation hooks."""
+        from .simulate_hooks import compute_flow_metrics
+
+        return compute_flow_metrics(self)

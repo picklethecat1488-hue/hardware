@@ -25,6 +25,24 @@ def _is_real_physics_client(physics_client: Any) -> bool:
         return False
 
 
+def get_bullet_link_names(body_id: Optional[int], physics_client: Optional[int]) -> list[str]:
+    """Extract joint/link names from a PyBullet body ID.
+
+    Args:
+        body_id: PyBullet multi-body ID.
+        physics_client: PyBullet physics client ID.
+
+    Returns:
+        List of link name strings indexed by joint index.
+    """
+    if body_id is None or physics_client is None or not _is_real_physics_client(physics_client):
+        return []
+    return [
+        p.getJointInfo(body_id, i, physicsClientId=physics_client)[12].decode("utf-8")
+        for i in range(p.getNumJoints(body_id, physicsClientId=physics_client))
+    ]
+
+
 class BulletStateTracker:
     """Helper class to track and query PyBullet body and particle states efficiently."""
 

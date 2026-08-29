@@ -1,6 +1,6 @@
 """Boundary configuration data models."""
 
-from typing import Any, ClassVar, Literal, Optional, Tuple, Union
+from typing import Any, ClassVar, Literal, Optional, Tuple, Union, Sequence
 from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 
 from enum import StrEnum, IntEnum
@@ -81,6 +81,7 @@ class BoundaryParam(IntEnum):
     LID_SLOPE_RATIO = 33
     DRAIN_EDGE_R_MIN = 34
     DRAIN_EDGE_R_MAX = 35
+    SHELF_DEPTH = 36
 
 
 class SurfaceBounds(BaseModel):
@@ -111,6 +112,9 @@ class SurfaceBounds(BaseModel):
     drain_edge_r_max: float = Field(
         default=0.0, description="Maximum radius for perimeter edge drainage cascade (meters)"
     )
+    shelf_depth: float = Field(
+        default=0.0, description="Downward solid shelf barrier depth to prevent tunneling (meters)"
+    )
 
 
 class BoundaryConfig(BaseModel):
@@ -131,6 +135,7 @@ class BoundaryConfig(BaseModel):
             "has_drain",
             "drain_hole_y",
             "drain_hole_radius",
+            "shelf_depth",
         },
         ShapeType.SPHERE: {
             "radius",
@@ -228,6 +233,9 @@ class BoundaryConfig(BaseModel):
     radius: float = Field(default=0.0, ge=0.0, description="Radius parameter (applicable for cylinders)")
     height: float = Field(default=0.0, ge=0.0, description="Height parameter (applicable for cylinders or boxes)")
     thickness: float = Field(default=0.0, description="Wall/plate thickness parameter if applicable")
+    shelf_depth: Optional[float] = Field(
+        default=None, description="Downward solid shelf barrier depth to prevent tunneling (meters)"
+    )
 
     # ----------------------------------------------------
     # Cylinder / Cavity Specific Parameters
@@ -368,6 +376,7 @@ class BoundaryConfig(BaseModel):
         impeller_radius: float = 0.0,
         slot_constriction_ratio: float = 1.0,
         lid_slope_ratio: float = 0.0,
+        lid_cavity_depth: float = 0.0,
     ) -> SurfaceBounds:
         """Precompute topological surfaces (tops, bottoms, inner and outer walls) and interaction bounds."""
         z_off = float(self.z_offset or 0.0)
@@ -393,6 +402,13 @@ class BoundaryConfig(BaseModel):
         drain_edge_r_min = max(0.0, r - 0.008) if self.has_drain else 0.0
         drain_edge_r_max = (r + 0.015) if self.has_drain else 0.0
 
+        if self.shelf_depth is not None:
+            shelf_depth = float(self.shelf_depth)
+        elif lid_cavity_depth > 0.0:
+            shelf_depth = max(thick, lid_cavity_depth * 0.55)
+        else:
+            shelf_depth = thick * 4.0 if thick > 0.0 else 0.0
+
         return SurfaceBounds(
             z_bottom=z_bottom,
             z_top=z_top,
@@ -413,4 +429,103 @@ class BoundaryConfig(BaseModel):
             lid_slope_ratio=lid_slope_ratio,
             drain_edge_r_min=drain_edge_r_min,
             drain_edge_r_max=drain_edge_r_max,
+            shelf_depth=shelf_depth,
         )
+
+
+class ResolvedBoundaries(BaseModel):
+    """Container for resolved link indices and boundaries linked to physical URDF joints."""
+
+    link_indices: dict[LinkType, int] = Field(default_factory=dict)
+    boundaries: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+
+    @classmethod
+    def from_link_names(
+        cls,
+        boundaries: dict[str, Any],
+        link_names: Sequence[str] = (),
+    ) -> "ResolvedBoundaries":
+        """Resolve boundaries given a sequence of link/joint names indexed by link ID.
+
+        Args:
+            boundaries: Dictionary mapping component labels to URDF boundary metadata.
+            link_names: Sequence of joint/link name strings.
+
+        Returns:
+            ResolvedBoundaries containing structured link_indices and resolved boundaries.
+        """
+        link_indices: dict[LinkType, int] = {}
+        for i, link_name in enumerate(link_names):
+            match link_name:
+                case name if "tube" in name:
+                    link_indices[LinkType.TUBE] = i
+                    link_indices[LinkType.OUTLET] = i
+                case name if "impeller" in name:
+                    link_indices[LinkType.IMPELLER] = i
+                case name if "drive_hub" in name:
+                    link_indices[LinkType.DRIVE_HUB] = i
+                case name if "lid" in name:
+                    link_indices[LinkType.LID] = i
+                case name if "pump_cover" in name:
+                    link_indices[LinkType.PUMP_COVER] = i
+        return cls.resolve(boundaries=boundaries, link_indices=link_indices)
+
+    @classmethod
+    def resolve(
+        cls,
+        boundaries: dict[str, Any],
+        link_indices: Optional[dict[LinkType, int]] = None,
+    ) -> "ResolvedBoundaries":
+        """Resolve raw provider boundary geometries using provided link indices.
+
+        Args:
+            boundaries: Dictionary mapping component labels to URDF boundary metadata.
+            link_indices: Optional dictionary mapping LinkType enums to joint link IDs.
+
+        Returns:
+            ResolvedBoundaries containing structured link_indices and resolved boundaries.
+        """
+        if link_indices is None:
+            link_indices = {}
+
+        resolved_boundaries: dict[str, list[dict[str, Any]]] = {}
+        for label, val in boundaries.items():
+            vals = val if isinstance(val, list) else [val]
+            resolved_vals = []
+            for item in vals:
+                item_dict = item.model_dump(exclude_defaults=True) if hasattr(item, "model_dump") else dict(item)
+                base_label = label.split("/")[-1]
+                match base_label:
+                    case "bowl":
+                        match item_dict.get("link_type"):
+                            case LinkType.TUBE | "tube":
+                                item_dict["link_type"] = LinkType.TUBE
+                                item_dict["link_idx"] = -1
+                            case LinkType.CASING | "casing":
+                                item_dict["link_type"] = LinkType.CASING
+                                item_dict["link_idx"] = -1
+                            case LinkType.LID | "lid":
+                                item_dict["link_type"] = LinkType.LID
+                                item_dict["link_idx"] = -1
+                            case _:
+                                item_dict["link_type"] = LinkType.BASE
+                                item_dict["link_idx"] = -1
+                    case "tube":
+                        item_dict["link_type"] = LinkType.TUBE
+                        item_dict["link_idx"] = link_indices.get(LinkType.TUBE, -1)
+                    case "impeller":
+                        item_dict["link_type"] = LinkType.IMPELLER
+                        item_dict["link_idx"] = link_indices.get(LinkType.IMPELLER, -1)
+                    case "lid":
+                        item_dict["link_type"] = LinkType.LID
+                        item_dict["link_idx"] = link_indices.get(LinkType.LID, -1)
+                    case "pump_cover":
+                        item_dict["link_type"] = LinkType.PUMP_COVER
+                        item_dict["link_idx"] = link_indices.get(LinkType.PUMP_COVER, -1)
+                    case _:
+                        item_dict["link_type"] = item_dict.get("link_type", LinkType.BASE)
+                        item_dict["link_idx"] = link_indices.get(item_dict["link_type"], -1)
+                resolved_vals.append(item_dict)
+            resolved_boundaries[label] = resolved_vals
+
+        return cls(link_indices=link_indices, boundaries=resolved_boundaries)

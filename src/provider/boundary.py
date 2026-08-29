@@ -586,8 +586,12 @@ class BoundaryProcessor:
                 and _is_real_physics_client(physics_client)
             ):
                 state = p.getLinkState(body_id, link_idx, computeLinkVelocity=1, physicsClientId=physics_client)
-                parent_pos, parent_orn = state[4], state[5]
-                parent_vel = state[6]
+                if state is not None:
+                    parent_pos, parent_orn = state[4], state[5]
+                    parent_vel = state[6]
+                else:
+                    parent_pos, parent_orn = base_pos, base_orn
+                    parent_vel, _ = p.getBaseVelocity(body_id, physicsClientId=physics_client)
             elif body_id is not None and physics_client is not None and _is_real_physics_client(physics_client):
                 parent_pos, parent_orn = base_pos, base_orn
                 parent_vel, _ = p.getBaseVelocity(body_id, physicsClientId=physics_client)
@@ -656,12 +660,16 @@ class BoundaryProcessor:
             b_types_list.append(type_int)
 
             friction_val = float(b.boundary_friction) if b.boundary_friction is not None else 0.0
+            lid_cavity_depth = (
+                max(0.0, b_pos_list[idx][2] - base_pos[2]) if (b.link_type == LinkType.LID or b.has_drain) else 0.0
+            )
             surf = b.compute_surface_bounds(
                 max_ceiling_z=max_ceiling_z,
                 casing_top_z=casing_top_z,
                 impeller_radius=impeller_radius,
                 slot_constriction_ratio=slot_constriction_ratio,
                 lid_slope_ratio=lid_slope_ratio,
+                lid_cavity_depth=lid_cavity_depth,
             )
             params = [
                 float(b.radius),
@@ -700,6 +708,7 @@ class BoundaryProcessor:
                 surf.lid_slope_ratio,
                 surf.drain_edge_r_min,
                 surf.drain_edge_r_max,
+                surf.shelf_depth,
             ]
             b_params_list.append(params)
 
