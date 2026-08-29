@@ -1082,3 +1082,98 @@ class TestCatFountainProvider:
                     )
             finally:
                 p.disconnect(physics_client)
+
+    @pytest.mark.slow
+    @pytest.mark.timeout(300)
+    def test_flow_and_drainage_metrics_stability_integration(self):
+        """Verify continuous stability of flow, spout discharge, waterfall, drainage, and pool metrics."""
+        import tempfile
+        import os
+        import shutil
+        import numpy as np
+        import pybullet as p
+        from build import Builder
+        from provider import ProviderManager, Room, Simulate
+        from model import AppConfig
+        from shell import Logger
+
+        with tempfile.TemporaryDirectory() as base_temp_dir:
+            config = AppConfig()
+            real_measurements = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "../cat_fountain/measurements.yaml")
+            )
+            provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
+            provider.settings.measurements_path = real_measurements
+
+            manager = ProviderManager(config, providers=[provider], logger=Logger(enabled=False))
+            builder = Builder(manager, logger=Logger(enabled=False))
+
+            parts_temp_dir = os.path.join(base_temp_dir, "parts")
+            builder.generate_parts(parts_temp_dir, names=None)
+            builder.generate_urdfs(parts_temp_dir, names=None)
+
+            obj_dir = os.path.join(parts_temp_dir, "obj/cat_fountain")
+            urdf_proj_dir = os.path.join(parts_temp_dir, "urdf/cat_fountain")
+            for f in os.listdir(obj_dir):
+                if f.endswith(".obj"):
+                    shutil.copy(os.path.join(obj_dir, f), os.path.join(urdf_proj_dir, f))
+
+            provider = CatFountainProvider(config=config, logger=Logger(enabled=False))
+            provider.settings.measurements_path = real_measurements
+            provider.settings.motor_power = 1000.0
+
+            room = Room()
+            provider.build_product(room, mode=Mode.SIMULATE)
+            room.translate_joints()
+            room["impeller"][0].urdf_motor_target = provider.settings.motor_target
+            room["impeller"][0].urdf_motor_force = 10.0
+            provider.room = room
+
+            physics_client = p.connect(p.DIRECT)
+            try:
+                p.setGravity(0, 0, -9.81, physicsClientId=physics_client)
+
+                urdf_path = os.path.join(parts_temp_dir, "urdf/cat_fountain/product.urdf")
+                body_id = p.loadURDF(urdf_path, useFixedBase=True, physicsClientId=physics_client)
+                assert body_id >= 0
+
+                boundaries = {}
+                for _, (geom, _) in room.items():
+                    label = getattr(geom, "urdf_label", None)
+                    if label:
+                        geom_boundaries = getattr(geom, "urdf_boundaries", None)
+                        if geom_boundaries:
+                            boundaries[label] = geom_boundaries
+
+                hooks = provider.get_simulate_hooks("product:view/simulate")
+                setup_fn = hooks[Simulate.SETUP]
+                setup_fn(body_id, physics_client, "product:view/simulate", boundaries, None)
+                step_fn = hooks[Simulate.STEP]
+
+                fluid = provider.water_sim
+                assert fluid is not None
+
+                for step_idx in range(120):
+                    step_fn(body_id, physics_client, step_idx, "product:view/simulate")
+                    p.stepSimulation(physicsClientId=physics_client)
+
+                assert hasattr(provider, "metrics_history") and len(provider.metrics_history) == 120
+
+                # 1. Emerging Spout Flow: once pumped stream arrives, spout discharge remains continuous
+                steady_spout = [m["flow_spout"] for m in provider.metrics_history[40:]]
+                assert np.all(np.array(steady_spout) > 0), "Spout discharge stream collapsed to zero in steady state"
+
+                # 2. Continuous Waterfall & Cutout Drainage: water continuously returns to the bowl
+                steady_waterfall = [m["drainage_waterfall"] for m in provider.metrics_history[40:]]
+                steady_drain = [m["drainage_cutout"] for m in provider.metrics_history[40:]]
+                assert np.all(np.array(steady_waterfall) > 100), (
+                    "Perimeter waterfall collapsed to near-zero in steady state"
+                )
+                assert np.all(np.array(steady_drain) > 100), "Cutout drainage collapsed to near-zero in steady state"
+
+                # 3. Reservoir Pool Stability: volume maintains depth and does not collapse
+                steady_pool = [m["pool_volume"] for m in provider.metrics_history[40:]]
+                assert np.all(np.array(steady_pool) > 10000), "Pool volume collapsed during steady-state operation"
+
+            finally:
+                p.disconnect(physics_client)
