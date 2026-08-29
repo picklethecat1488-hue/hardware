@@ -2,8 +2,6 @@
 
 from build123d import *  # type: ignore
 import math
-from functools import cached_property
-import numpy as np
 from model import (
     method_cache,
     TextArgs,
@@ -48,103 +46,6 @@ class CatFountainProvider(Provider):
     SLOT_LENGTH = 100.0
 
     water_sim: Optional[Any] = None
-    last_metrics: Optional[dict[str, int]] = None
-    metrics_history: Optional[list[dict[str, int]]] = None
-
-    @cached_property
-    def rr(self) -> Any:
-        """Cached rerun module for fluid telemetry logging."""
-        import rerun as rr_mod
-
-        return rr_mod
-
-    def compute_flow_metrics(self, step_idx: Optional[int] = None) -> dict[str, int]:
-        """Compute flow, sheet, drainage, and reservoir volume metrics from the current fluid state."""
-        metrics = {
-            "flow_spout": 0,
-            "flow_tube": 0,
-            "flow_lid_sheet": 0,
-            "drainage_waterfall": 0,
-            "drainage_cutout": 0,
-            "pool_volume": 0,
-        }
-        if self.water_sim is None:
-            return metrics
-
-        positions = getattr(self.water_sim, "last_positions", None)
-        if positions is None or len(positions) == 0:
-            return metrics
-
-        pos_pts = np.asarray(positions)
-        active_mask = pos_pts[:, 2] < 100.0
-        if not np.any(active_mask):
-            return metrics
-
-        pos_active = pos_pts[active_mask]
-        xs, ys, zs = pos_active[:, 0], pos_active[:, 1], pos_active[:, 2]
-
-        tube_x = 0.0
-        tube_y = 0.028
-        tube_r_inner = (self.settings.tube_radius - self.settings.tube_thickness) * 0.001
-        floor_z = self.settings.floor_z * 0.001
-        tube_top_z = (self.settings.floor_z + self.settings.tube_height) * 0.001
-        cutout_y = self.settings.lid_cutout_y * 0.001
-        cutout_r = self.settings.lid_cutout_radius * 0.001
-        bowl_r = (self.settings.bowl_radius - self.settings.bowl_thickness) * 0.001
-        lid_z_min = (self.settings.bowl_height - self.settings.lid_step_depth) * 0.001
-
-        dist_tube = np.sqrt((xs - tube_x) ** 2 + (ys - tube_y) ** 2)
-        dist_cutout = np.sqrt(xs**2 + (ys - cutout_y) ** 2)
-        r_xy = np.sqrt(xs**2 + ys**2)
-
-        # 1. Flow in vertical delivery tube (strictly inside 6mm bore from floor to top)
-        in_tube_mask = (dist_tube <= tube_r_inner + 0.001) & (zs >= floor_z) & (zs <= tube_top_z)
-        in_tube_cnt = int(np.sum(in_tube_mask))
-
-        # 2. Flow emerging at spout
-        at_spout_mask = (dist_tube <= 0.030) & (zs > tube_top_z - 0.001)
-        at_spout_cnt = int(np.sum(at_spout_mask))
-
-        # 3. Flow on lid drinking shelf / tray (outside spout dome, inside lid rim)
-        lid_sheet_mask = (zs >= lid_z_min) & (zs <= lid_z_min + 0.015) & (dist_tube > 0.025) & (r_xy <= 0.082)
-        lid_sheet_cnt = int(np.sum(lid_sheet_mask))
-
-        # 4. Drainage: Perimeter waterfall cascading into bowl (R >= 78mm, falling below lid)
-        waterfall_mask = (r_xy >= 0.078) & (zs >= floor_z) & (zs < lid_z_min)
-        waterfall_cnt = int(np.sum(waterfall_mask))
-
-        # 5. Drainage: Front cutout drain returning to bowl (inside cutout hole, falling below lid)
-        drain_mask = (dist_cutout <= cutout_r) & (ys < 0.0) & (zs >= floor_z) & (zs < lid_z_min) & (r_xy < 0.078)
-        drain_cnt = int(np.sum(drain_mask))
-
-        # 6. Reservoir pool volume (entire base container fluid layer)
-        pool_mask = (zs >= floor_z - 0.003) & (zs < floor_z + 0.030) & (r_xy <= bowl_r)
-        pool_cnt = int(np.sum(pool_mask))
-
-        metrics = {
-            "flow_spout": at_spout_cnt,
-            "flow_tube": in_tube_cnt,
-            "flow_lid_sheet": lid_sheet_cnt,
-            "drainage_waterfall": waterfall_cnt,
-            "drainage_cutout": drain_cnt,
-            "pool_volume": pool_cnt,
-        }
-        self.last_metrics = metrics
-        if not hasattr(self, "metrics_history") or self.metrics_history is None:
-            self.metrics_history = []
-        self.metrics_history.append(metrics)
-
-        rr = self.rr
-        if step_idx is not None and hasattr(rr, "is_enabled") and rr.is_enabled():
-            rr.set_time("step", sequence=step_idx)
-            rr.log("metrics/flow_spout", rr.Scalars(float(at_spout_cnt)))
-            rr.log("metrics/flow_tube", rr.Scalars(float(in_tube_cnt)))
-            rr.log("metrics/flow_lid_sheet", rr.Scalars(float(lid_sheet_cnt)))
-            rr.log("metrics/drainage_waterfall", rr.Scalars(float(waterfall_cnt)))
-            rr.log("metrics/drainage_cutout", rr.Scalars(float(drain_cnt)))
-            rr.log("metrics/pool_volume", rr.Scalars(float(pool_cnt)))
-
-        return metrics
 
     @property
     def default_config(self) -> CatFountainConfig:

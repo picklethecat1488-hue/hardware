@@ -28,6 +28,7 @@ from .utils import (
     load_manifest,
     get_rgba_color,
     initialize_jax_environment,
+    rerun_is_enabled,
 )
 
 # Initialize JAX environment configuration deterministically
