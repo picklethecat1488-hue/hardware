@@ -611,6 +611,7 @@ def _grid_mask_cylinder_jax(
     # Cavity: cylinder side wall (rb_sq >= radius**2) and solid floor (zb_loc <= z_offset)
     is_wall = (zb_loc >= z_offset) & (zb_loc <= height) & (rb_sq >= radius**2)
     is_wall = jnp.where(thick > 0.0, is_wall & (rb_sq <= (radius + thick) ** 2), is_wall)
+    is_wall = jnp.where(has_drain, False, is_wall)
     is_floor = (zb_loc >= z_offset - thick) & (zb_loc <= z_offset) & (rb_sq <= (radius + thick) ** 2)
 
     # Drainage hole and tube pass-through openings cut through the cylinder floor/solid
@@ -1594,7 +1595,8 @@ def _compute_particle_forces_subroutine(
         up_world = up_vector[None, :] * pump_lift_scalar[:, None]
 
         # Radial spreading and outward deflection at the fountain spout opening
-        at_spout = (pos_tube[:, 2] >= spout_z_min) & (r_tube_xy < inner_r + 3.0 * r_s)
+        r_outer = b_params[i, BoundaryParam.R_OUTER]
+        at_spout = (pos_tube[:, 2] >= spout_z_min) & (r_tube_xy < r_outer + r_s)
 
         # Derive spout deflection direction: 360-degree radial expansion with forward slope bias
         drain_hole_y = 0.0
@@ -1615,10 +1617,11 @@ def _compute_particle_forces_subroutine(
         dist_spout_y = jnp.abs(dy_spout) + 1e-6
         forward_dir_world = jnp.stack([0.0, dy_spout / dist_spout_y, 0.0], axis=-1)
 
-        # Blend 360-degree radial expansion (0.60) with forward slope bias (0.40) and smooth outward momentum
-        horiz_disp = radial_unit_world * 0.60 + forward_dir_world[None, :] * 0.40
-        disp_mag = jnp.sqrt(jnp.sum(horiz_disp**2, axis=-1, keepdims=True) + 1e-8)
-        spout_out_dir = horiz_disp / disp_mag
+        # Blend 360-degree radial expansion (0.60) with forward slope bias (0.40) and downward dome deflection
+        down_dir_world = local_to_world_vector(jnp.array([0.0, 0.0, -1.0]), tube_orn)
+        dome_disp = radial_unit_world * 0.60 + forward_dir_world[None, :] * 0.40 + down_dir_world[None, :] * 0.25
+        disp_mag = jnp.sqrt(jnp.sum(dome_disp**2, axis=-1, keepdims=True) + 1e-8)
+        spout_out_dir = dome_disp / disp_mag
         spout_accel = spout_out_dir * (g_mag * 1.5 + v_flow_est * 1.5)
 
         tube_pump_accel_i = jnp.where(
@@ -1630,6 +1633,85 @@ def _compute_particle_forces_subroutine(
         is_tube = shape == SHAPE_TUBE
         tube_pump_accel += jnp.where(is_tube, tube_pump_accel_i, jnp.zeros_like(pos_curr))
 
+    lid_drain_accel = jnp.zeros_like(pos_curr)
+    for i, shape in enumerate(b_shapes):
+        lid_pos = b_pos_arr[i]
+        lid_orn = b_orn_arr[i]
+        lid_orn_inv = invert_orientation(lid_orn)
+        pos_lid = world_to_local_frame(pos_curr, lid_pos, lid_orn_inv)
+
+        radius = b_params[i, BoundaryParam.RADIUS]
+        has_drain = b_params[i, BoundaryParam.HAS_DRAIN] > 0.5
+        drain_hole_y = b_params[i, BoundaryParam.DRAIN_HOLE_Y]
+        drain_target_z = b_params[i, BoundaryParam.DRAIN_TARGET_Z]
+        drain_influence_r = b_params[i, BoundaryParam.DRAIN_INFLUENCE_RADIUS]
+
+        r_lid_xy, _, _ = cartesian_to_cylindrical(pos_lid)
+        r_lid_xy_safe = jnp.maximum(r_lid_xy, 1e-5)
+        tray_z_min = b_params[i, BoundaryParam.TRAY_Z_MIN]
+        tray_z_max = b_params[i, BoundaryParam.TRAY_Z_MAX]
+
+        # 1. Particles on the main lid surface
+        on_lid = (r_lid_xy < radius) & (pos_lid[:, 2] >= tray_z_min) & (pos_lid[:, 2] <= tray_z_max + 0.015)
+
+        # 2. Surface sheet flow: blend radial expansion from center with forward gravity slope towards drain
+        radial_lid_dir = jnp.stack(
+            [pos_lid[:, 0] / r_lid_xy_safe, pos_lid[:, 1] / r_lid_xy_safe, jnp.zeros_like(pos_lid[:, 0])],
+            axis=-1,
+        )
+        dx_to_drain = 0.0 - pos_lid[:, 0]
+        dy_to_drain = drain_hole_y - pos_lid[:, 1]
+        dist_to_drain_xy = jnp.sqrt(dx_to_drain**2 + dy_to_drain**2 + 1e-8)
+        dir_slope_local = jnp.stack(
+            [dx_to_drain / dist_to_drain_xy, dy_to_drain / dist_to_drain_xy, jnp.zeros_like(dx_to_drain)],
+            axis=-1,
+        )
+        sheet_flow_dir = radial_lid_dir * 0.40 + dir_slope_local * 0.60
+        sheet_flow_mag = jnp.sqrt(jnp.sum(sheet_flow_dir**2, axis=-1, keepdims=True) + 1e-8)
+        sheet_flow_unit = sheet_flow_dir / sheet_flow_mag
+        slope_factor = jnp.maximum(lid_slope_ratio, 0.25)
+        sheet_accel_local = sheet_flow_unit * (g_mag * slope_factor)
+
+        # 3. Funneling convergence specifically near the drain hole
+        near_drain = dist_to_drain_xy < drain_influence_r
+        target_drain_local = jnp.array([0.0, drain_hole_y, drain_target_z])
+        d_drain = target_drain_local - pos_lid
+        dist_d = jnp.sqrt(jnp.sum(d_drain**2, axis=-1, keepdims=True) + 1e-8)
+        dir_drain_local = d_drain / dist_d
+        drain_funnel_accel_local = dir_drain_local * (g_mag * 1.5)
+
+        # 4. Naturalistic edge rollover & waterfall cascade off the lid perimeter
+        drain_edge_r_min = b_params[i, BoundaryParam.DRAIN_EDGE_R_MIN]
+        drain_edge_r_max = b_params[i, BoundaryParam.DRAIN_EDGE_R_MAX]
+        edge_zone = (
+            (r_lid_xy >= drain_edge_r_min)
+            & (r_lid_xy <= drain_edge_r_max)
+            & (pos_lid[:, 2] >= tray_z_min)
+            & (drain_edge_r_max > 0.0)
+        )
+        edge_rollover_local = jnp.stack(
+            [
+                pos_lid[:, 0] / r_lid_xy_safe * 0.35,
+                pos_lid[:, 1] / r_lid_xy_safe * 0.35,
+                -0.85 * jnp.ones_like(pos_lid[:, 0]),
+            ],
+            axis=-1,
+        )
+        edge_rollover_mag = jnp.sqrt(jnp.sum(edge_rollover_local**2, axis=-1, keepdims=True) + 1e-8)
+        edge_rollover_unit = edge_rollover_local / edge_rollover_mag
+        edge_accel_local = edge_rollover_unit * (g_mag * 1.25)
+
+        lid_accel_local = jnp.where(
+            near_drain[:, None],
+            drain_funnel_accel_local,
+            jnp.where(edge_zone[:, None], edge_accel_local, sheet_accel_local),
+        )
+        total_lid_accel_world = local_to_world_vector(lid_accel_local, lid_orn)
+
+        is_lid = (shape == SHAPE_CYLINDER) & has_drain
+        active_lid_mask = on_lid | edge_zone
+        lid_drain_accel += jnp.where(is_lid & active_lid_mask[:, None], total_lid_accel_world, jnp.zeros_like(pos_curr))
+
     hydrostatic_support = (
         jnp.where(in_fluid_continuum[:, None], -gravity[None, :], 0.0)
         if in_fluid_continuum is not None
@@ -1637,7 +1719,7 @@ def _compute_particle_forces_subroutine(
     )
     effective_gravity = gravity[None, :] + hydrostatic_support
 
-    accel = b_accel_clamped + suction_accel + tube_pump_accel + effective_gravity
+    accel = b_accel_clamped + suction_accel + tube_pump_accel + lid_drain_accel + effective_gravity
     return accel, step_torque, b_forces
 
 

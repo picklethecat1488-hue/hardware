@@ -79,6 +79,8 @@ class BoundaryParam(IntEnum):
     IMPELLER_RADIUS = 31
     SLOT_CONSTRICTION_RATIO = 32
     LID_SLOPE_RATIO = 33
+    DRAIN_EDGE_R_MIN = 34
+    DRAIN_EDGE_R_MAX = 35
 
 
 class SurfaceBounds(BaseModel):
@@ -103,6 +105,12 @@ class SurfaceBounds(BaseModel):
     impeller_radius: float = Field(default=0.0, description="Impeller outer radius (meters)")
     slot_constriction_ratio: float = Field(default=1.0, description="Impeller slot to tube area ratio")
     lid_slope_ratio: float = Field(default=0.0, description="Ratio of lid height to radius (slope gradient)")
+    drain_edge_r_min: float = Field(
+        default=0.0, description="Minimum radius for perimeter edge drainage cascade (meters)"
+    )
+    drain_edge_r_max: float = Field(
+        default=0.0, description="Maximum radius for perimeter edge drainage cascade (meters)"
+    )
 
 
 class BoundaryConfig(BaseModel):
@@ -382,6 +390,9 @@ class BoundaryConfig(BaseModel):
         drain_influence_radius = dr_r
         wall_band_r_max = r + thick
 
+        drain_edge_r_min = max(0.0, r - 0.008) if self.has_drain else 0.0
+        drain_edge_r_max = (r + 0.015) if self.has_drain else 0.0
+
         return SurfaceBounds(
             z_bottom=z_bottom,
             z_top=z_top,
@@ -400,4 +411,6 @@ class BoundaryConfig(BaseModel):
             impeller_radius=impeller_radius,
             slot_constriction_ratio=slot_constriction_ratio,
             lid_slope_ratio=lid_slope_ratio,
+            drain_edge_r_min=drain_edge_r_min,
+            drain_edge_r_max=drain_edge_r_max,
         )

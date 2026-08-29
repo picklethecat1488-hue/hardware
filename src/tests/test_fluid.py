@@ -1419,7 +1419,9 @@ def test_voxel_masks_consistent_with_surface_bounds():
         # Inward-pointing cavity normals for container walls
         assert np.all(radial_dots <= 1e-4)
 
-    # 4. Drain hole target centroid consistency
+    # 4. Drain hole target centroid and edge drainage bounds consistency
     lid_surf = b_lid.compute_surface_bounds()
     assert processed.b_params[2, BoundaryParam.DRAIN_TARGET_Z] == lid_surf.drain_target_z
     assert processed.b_params[2, BoundaryParam.DRAIN_INFLUENCE_RADIUS] == lid_surf.drain_influence_radius
+    assert processed.b_params[2, BoundaryParam.DRAIN_EDGE_R_MIN] == lid_surf.drain_edge_r_min
+    assert processed.b_params[2, BoundaryParam.DRAIN_EDGE_R_MAX] == lid_surf.drain_edge_r_max

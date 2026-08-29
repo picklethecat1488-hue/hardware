@@ -698,6 +698,8 @@ class BoundaryProcessor:
                 surf.impeller_radius,
                 surf.slot_constriction_ratio,
                 surf.lid_slope_ratio,
+                surf.drain_edge_r_min,
+                surf.drain_edge_r_max,
             ]
             b_params_list.append(params)
 
