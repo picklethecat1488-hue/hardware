@@ -102,7 +102,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
                 provider.is_tuning = True
 
                 orig_vol = provider.settings.target_volume
-                provider.settings.target_volume = 0.0001
+                provider.settings.target_volume = 0.0003
 
                 hooks = provider.get_simulate_hooks_impl("product:view/simulate")
                 setup_fn = hooks[Simulate.SETUP]
