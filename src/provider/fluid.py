@@ -1052,7 +1052,13 @@ def _lbm_step_3d_full_jax(
     uy = uy / rho_safe
     uz = uz / rho_safe
 
-    # 2. Collision (BGK)
+    # 2. Collision (BGK) with Mach limiting to prevent lattice compressibility blowup
+    u_lat_mag = jnp.sqrt(ux**2 + uy**2 + uz**2 + 1e-8)
+    u_scale = jnp.minimum(0.40 / u_lat_mag, 1.0)
+    ux = ux * u_scale
+    uy = uy * u_scale
+    uz = uz * u_scale
+
     feq_list = []
     for i, (ei, w) in enumerate(zip(_e_dir, _weights)):
         ei_u = ei[0] * ux + ei[1] * uy + ei[2] * uz
@@ -1066,6 +1072,9 @@ def _lbm_step_3d_full_jax(
     for i, (ei, w) in enumerate(zip(_e_dir, _weights)):
         e_dot_g = ei[0] * gravity[0] + ei[1] * gravity[1] + ei[2] * gravity[2]
         f_post = f_post.at[i].add(3.0 * w * rho * e_dot_g * dt_sub)
+
+    # Ensure non-negative population distributions for unconditional numerical stability
+    f_post = jnp.maximum(f_post, 0.0)
 
     # 4. Streaming
     f_coll = f_post
