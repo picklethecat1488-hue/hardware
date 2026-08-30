@@ -504,7 +504,7 @@ def _compute_boundary_forces_jax(
     f_fric_tan = -fric_p[:, None] * f_n_mag[:, None] * (v_tan / v_tan_mag)
 
     force_local = f_n_mag[:, None] * norm_unit + f_fric_tan
-    force_voxel = jnp.where((occ_p > 0.01)[:, None], force_local, 0.0)
+    force_voxel = jnp.where((occ_p > 0.50)[:, None], force_local, 0.0)
     forces = base_to_world_vector(force_voxel, base_orn)
     vanes_torque = jnp.array(0.0)
 
@@ -1509,7 +1509,7 @@ def _compute_particle_forces_subroutine(
     )
 
     b_accel = b_forces / mass
-    max_b_accel = 500.0
+    max_b_accel = 35.0
     b_accel_mags = jnp.linalg.norm(b_accel, axis=1, keepdims=True)
     b_accel_mags_safe = jnp.maximum(b_accel_mags, 1e-8)
     b_accel_clamped = b_accel * jnp.minimum(max_b_accel / b_accel_mags_safe, 1.0)

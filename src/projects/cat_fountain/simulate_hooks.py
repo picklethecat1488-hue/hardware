@@ -82,6 +82,22 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     drain_mask = (dist_cutout <= cutout_r + 0.005) & (ys < 0.0) & (zs >= pool_surface_z + 0.003) & (zs < lid_mount_z)
     drain_cnt = int(np.sum(drain_mask))
 
+    # 8. Ejected / airborne explosion particles breaching the top spout dome or outer perimeter
+    dome_top_z = lid_mount_z + 0.015
+    ejected_mask = (zs > dome_top_z + 0.005) | ((r_xy > bowl_r + 0.005) & (zs > lid_mount_z))
+    ejected_cnt = int(np.sum(ejected_mask))
+
+    velocities = getattr(provider.water_sim, "last_velocities", None)
+    if velocities is not None:
+        vel_pts = np.asarray(velocities)
+        if vel_pts.ndim == 2 and len(vel_pts) == len(active_mask):
+            vz = vel_pts[active_mask, 2]
+            max_vz = float(np.max(vz)) if len(vz) > 0 else 0.0
+        else:
+            max_vz = 0.0
+    else:
+        max_vz = 0.0
+
     metrics = {
         "flow_spout": at_spout_cnt,
         "flow_tube": in_tube_cnt,
@@ -90,6 +106,8 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         "drainage_cutout": drain_cnt,
         "pool_volume": pool_cnt,
         "water_depth": round(water_depth, 5),
+        "ejected_particles": ejected_cnt,
+        "max_vertical_vel": round(max_vz, 4),
     }
     provider.last_metrics = metrics
     if not hasattr(provider, "metrics_history") or provider.metrics_history is None:
@@ -107,6 +125,8 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         rr.log("metrics/drainage_cutout", rr.Scalars(float(drain_cnt)))
         rr.log("metrics/pool_volume", rr.Scalars(float(pool_cnt)))
         rr.log("metrics/water_depth", rr.Scalars(float(water_depth)))
+        rr.log("metrics/ejected_particles", rr.Scalars(float(ejected_cnt)))
+        rr.log("metrics/max_vertical_vel", rr.Scalars(float(max_vz)))
 
     return metrics
 
@@ -167,12 +187,13 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         vane_obj = cast(URDFShape, self.room["impeller"][0])
         target_omega = float(getattr(vane_obj, "urdf_motor_target", 15.0))
         max_force = float(getattr(vane_obj, "urdf_motor_force", 10.0))
+        motor_power = getattr(self.settings, "motor_power", None)
         self.water_sim.update(
             body_id,
             client,
             target_omega=target_omega,
             max_force=max_force,
-            motor_power=None,
+            motor_power=motor_power,
             damping=getattr(self, "water_sim_damping", 0.995),
         )
 
