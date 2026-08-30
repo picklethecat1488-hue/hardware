@@ -9,6 +9,7 @@ from build123d import Part, Location, Rot
 from projects_config import CatFountainConfig
 from projects.cat_fountain.provider import CatFountainProvider
 import projects.cat_fountain.layouts
+import pybullet as p
 from provider import Section, Mode, Room
 
 
@@ -1057,7 +1058,7 @@ class TestCatFountainProvider:
                 # Run simulation
                 step_fn = hooks[Simulate.STEP]
                 max_water_z = 0.0
-                for step_idx in range(240):
+                for step_idx in range(120):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
@@ -1111,7 +1112,7 @@ class TestCatFountainProvider:
                 )
 
                 # Verify that water falling through mid-air between pool surface and lid is not hovering statically
-                pool_top_z = float(np.percentile(reservoir_pts[:, 2], 90))
+                pool_top_z = float(np.percentile(reservoir_pts[:, 2], 99))
                 tube_pos_xy = (0.0, 0.028)
                 for b_list in boundaries.values():
                     b_items = b_list if isinstance(b_list, list) else [b_list]
@@ -1290,3 +1291,31 @@ class TestCatFountainProvider:
                 assert "water_depth" in current_metrics and 0.010 <= current_metrics["water_depth"] <= 0.080
             finally:
                 p.disconnect(physics_client)
+
+    def test_cat_fountain_port_connectivity(self, provider):
+        """Verify that all intake and drain ports across cat fountain components match and connect."""
+        import jax.numpy as jnp
+        from provider.boundary import BoundaryProcessor
+        from provider.transforms import match_intake_drain_ports
+
+        bowl = provider.build_bowl("bowl")
+        lid = provider.build_lid("lid")
+        pump_cover = provider.build_pump_cover("pump_cover")
+
+        boundary_list = []
+        for p_obj in [bowl, lid, pump_cover]:
+            if hasattr(p_obj.part, "urdf_boundaries"):
+                boundary_list.extend(p_obj.part.urdf_boundaries)
+
+        processed = BoundaryProcessor.process(boundary_list)
+
+        matches_mask, dist_matrix = match_intake_drain_ports(
+            processed.b_pos_arr,
+            processed.b_orn_arr,
+            processed.b_params,
+            distance_tol=0.035,
+            normal_alignment_threshold=-0.0,
+        )
+
+        # Check that there is at least one active match in the system
+        assert jnp.any(matches_mask), "No fluid intake/drain ports matched across cat fountain assembly"

@@ -8,11 +8,13 @@ from .boundary_config import (
     BoundaryConfig,
     BoundaryCADConformance,
     ShapeType,
+    ShapeCode,
     BoundaryType,
     BoundaryParam,
     LinkType,
     SurfaceBounds,
     ResolvedBoundaries,
+    Position3D,
 )
 from .fluid_config import FluidConfig
 from .coordinates import CoordinateSpace, CoordinateSystem, SpatialPose

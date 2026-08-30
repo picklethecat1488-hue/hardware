@@ -167,21 +167,12 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
         vane_obj = cast(URDFShape, self.room["impeller"][0])
         target_omega = float(getattr(vane_obj, "urdf_motor_target", 15.0))
         max_force = float(getattr(vane_obj, "urdf_motor_force", 10.0))
-        motor_power = getattr(self.settings, "motor_power", 1.0)
-        omega = target_omega
-
-        # Run with motor_power=None when NOT in pytest, to disable non-physical speed throttling!
-        import sys
-
-        is_pytest = "pytest" in sys.modules or any("pytest" in arg for arg in sys.argv)
-        actual_motor_power = motor_power if is_pytest else None
-
         self.water_sim.update(
             body_id,
             client,
-            target_omega=omega,
+            target_omega=target_omega,
             max_force=max_force,
-            motor_power=actual_motor_power,
+            motor_power=None,
             damping=getattr(self, "water_sim_damping", 0.995),
         )
 

@@ -889,6 +889,9 @@ def test_physics_step_casing_suction_happy():
         height=0.010,
         link_idx=1,
         cutoff_y=0.0,
+        has_intake=True,
+        intake_hole_radius=0.010,
+        intake_hole_z=0.010,
     )
 
     # Particle position directly in the suction zone: above casing cover, near center
@@ -958,6 +961,9 @@ def test_physics_step_casing_suction_sad():
         height=0.010,
         link_idx=1,
         cutoff_y=0.0,
+        has_intake=True,
+        intake_hole_radius=0.010,
+        intake_hole_z=0.010,
     )
 
     # Particle position far outside the suction zone (e.g. horizontally far from center)

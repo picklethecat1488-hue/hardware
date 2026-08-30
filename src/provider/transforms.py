@@ -23,8 +23,8 @@ def _q_mult(q1: jnp.ndarray, q2: jnp.ndarray) -> jnp.ndarray:
 @jax.jit
 def _q_rotate(q: jnp.ndarray, v: jnp.ndarray) -> jnp.ndarray:
     """Rotate 3D vector v by quaternion q in (x, y, z, w) format."""
-    q_xyz = q[:3]
-    w = q[3]
+    q_xyz = q[..., :3]
+    w = q[..., 3:4]
     cross1 = jnp.cross(q_xyz, v) + w * v
     return v + 2.0 * jnp.cross(q_xyz, cross1)
 
@@ -32,7 +32,7 @@ def _q_rotate(q: jnp.ndarray, v: jnp.ndarray) -> jnp.ndarray:
 @jax.jit
 def invert_orientation(orn: jnp.ndarray) -> jnp.ndarray:
     """Calculate the inverse (conjugate) of an orientation quaternion in (x, y, z, w) format."""
-    return jnp.array([-orn[0], -orn[1], -orn[2], orn[3]], dtype=jnp.float32)
+    return jnp.concatenate([-orn[..., :3], orn[..., 3:4]], axis=-1)
 
 
 @jax.jit
@@ -273,3 +273,156 @@ def spherical_to_cartesian(
     y = r * jnp.sin(phi) * jnp.sin(theta)
     z = r * jnp.cos(phi)
     return jnp.stack([x, y, z], axis=-1)
+
+
+# ==============================================================================
+# Surface Geometry & Hole Cutout Projection (Analytical Normals)
+# ==============================================================================
+
+
+@jax.jit
+def point_in_surface_hole(
+    pos_local: jnp.ndarray,
+    hole_pos: jnp.ndarray,
+    hole_normal: jnp.ndarray,
+    hole_radius: float,
+    normal_tol: float = 0.010,
+) -> jnp.ndarray:
+    """Determine whether 3D local points project within a circular hole cutout defined by center position and surface normal.
+
+    Args:
+        pos_local: 3D point coordinates in boundary local frame, shape (..., 3).
+        hole_pos: 3D center position of the hole cutout in boundary local frame, shape (3,).
+        hole_normal: 3D surface normal vector pointing out from the cut surface, shape (3,).
+        hole_radius: Radius of the circular hole cutout in meters.
+        normal_tol: Longitudinal tolerance along the surface normal axis in meters.
+
+    Returns:
+        Boolean array indicating whether each point falls within the hole cutout cylinder.
+    """
+    rel = pos_local - hole_pos
+    norm_sq = jnp.sum(hole_normal**2)
+    unit_norm = jnp.where(norm_sq > 1e-6, hole_normal / jnp.sqrt(norm_sq), jnp.array([0.0, 0.0, 1.0]))
+
+    d_parallel = jnp.sum(rel * unit_norm, axis=-1)
+    v_perp = rel - d_parallel[..., None] * unit_norm
+    d_perp = jnp.sqrt(jnp.sum(v_perp**2, axis=-1) + 1e-12)
+
+    return (d_perp < hole_radius) & (jnp.abs(d_parallel) <= normal_tol) & (hole_radius > 0.0)
+
+
+@jax.jit
+def compute_surface_normal(
+    shape_type: int,
+    pos_local: jnp.ndarray,
+    radius: float,
+    height: float,
+) -> jnp.ndarray:
+    """Compute outward-pointing unit surface normal vector for canonical shapes at local coordinates.
+
+    Args:
+        shape_type: ShapeType integer code (e.g. CYLINDER, TUBE, SPHERE, CASING, BOX, PLANE).
+        pos_local: 3D coordinates in local boundary frame, shape (..., 3).
+        radius: Radius parameter of the geometric shape in meters.
+        height: Height parameter of the geometric shape in meters.
+
+    Returns:
+        Unit normal vector array, shape (..., 3).
+    """
+    x = pos_local[..., 0]
+    y = pos_local[..., 1]
+    z = pos_local[..., 2]
+    r_xy = jnp.sqrt(x**2 + y**2 + 1e-12)
+
+    # Cylinder / Tube normals: caps vs sidewall
+    top_cap_norm = jnp.array([0.0, 0.0, 1.0])
+    bot_cap_norm = jnp.array([0.0, 0.0, -1.0])
+    radial_norm = jnp.stack([x / r_xy, y / r_xy, jnp.zeros_like(z)], axis=-1)
+
+    dist_top = jnp.abs(z - height)
+    dist_bot = jnp.abs(z)
+    dist_side = jnp.abs(r_xy - radius)
+
+    is_top = (dist_top <= dist_bot) & (dist_top <= dist_side)
+    is_bot = (dist_bot < dist_top) & (dist_bot <= dist_side)
+    cylinder_norm = jnp.where(
+        is_top[..., None],
+        top_cap_norm,
+        jnp.where(is_bot[..., None], bot_cap_norm, radial_norm),
+    )
+
+    # Sphere normal: radial from origin
+    r_3d = jnp.sqrt(x**2 + y**2 + z**2 + 1e-12)
+    sphere_norm = jnp.stack([x / r_3d, y / r_3d, z / r_3d], axis=-1)
+
+    # Default / Plane / Box (normal along Z)
+    default_norm = jnp.array([0.0, 0.0, 1.0])
+
+    return jnp.where(
+        shape_type == 1,  # SPHERE
+        sphere_norm,
+        jnp.where(
+            (shape_type == 0) | (shape_type == 2) | (shape_type == 6),  # CYLINDER, TUBE, CASING
+            cylinder_norm,
+            default_norm,
+        ),
+    )
+
+
+@jax.jit
+def match_intake_drain_ports(
+    b_pos_arr: jnp.ndarray,
+    b_orn_arr: jnp.ndarray,
+    b_params: jnp.ndarray,
+    distance_tol: float = 0.020,
+    normal_alignment_threshold: float = -0.3,
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Find matching fluid intake and drain port pairs across all boundaries in world space.
+
+    A drain port on boundary J connects to an intake port on boundary I when:
+    1. Both ports are active (has_drain[j] and has_intake[i]).
+    2. Their world-space centroids are within distance_tol (||p_intake_world - p_drain_world|| < distance_tol).
+    3. Their surface normals oppose each other (n_intake_world · n_drain_world < normal_alignment_threshold).
+
+    Args:
+        b_pos_arr: Boundary world position origins, shape (N, 3).
+        b_orn_arr: Boundary world quaternions, shape (N, 4).
+        b_params: Boundary parameters tensor, shape (N, P).
+        distance_tol: Maximum allowable distance between mating port centroids in meters.
+        normal_alignment_threshold: Cosine similarity threshold for opposing port normals.
+
+    Returns:
+        matches_mask: Boolean adjacency matrix (N, N) where matches_mask[i, j] is True if
+                      intake on boundary I mates with drain on boundary J.
+        match_distances: Float matrix (N, N) with world distances between port pairs.
+    """
+    has_intake = b_params[:, 37] > 0.5  # HAS_INTAKE
+    intake_pos_local = b_params[:, 38:41]  # INTAKE_POS (x, y, z)
+    intake_norm_local = b_params[:, 41:44]  # INTAKE_NORMAL (nx, ny, nz)
+
+    has_drain = b_params[:, 12] > 0.5  # HAS_DRAIN
+    drain_pos_local = b_params[:, 45:48]  # DRAIN_POS (x, y, z)
+    drain_norm_local = b_params[:, 48:51]  # DRAIN_NORMAL (nx, ny, nz)
+
+    # Transform intake ports to world space
+    intake_pos_world = local_to_world_frame(intake_pos_local, b_pos_arr, b_orn_arr)
+    intake_norm_world = local_to_world_vector(intake_norm_local, b_orn_arr)
+
+    # Transform drain ports to world space
+    drain_pos_world = local_to_world_frame(drain_pos_local, b_pos_arr, b_orn_arr)
+    drain_norm_world = local_to_world_vector(drain_norm_local, b_orn_arr)
+
+    # Pairwise distance matrix between intake i and drain j: shape (N, N)
+    diff = intake_pos_world[:, None, :] - drain_pos_world[None, :, :]
+    dist_matrix = jnp.sqrt(jnp.sum(diff**2, axis=-1) + 1e-12)
+
+    # Pairwise normal dot product: shape (N, N)
+    normal_dots = jnp.sum(intake_norm_world[:, None, :] * drain_norm_world[None, :, :], axis=-1)
+
+    # Matched condition: active intake, active drain, close distance, opposing normals
+    active_pair = has_intake[:, None] & has_drain[None, :]
+    close_dist = dist_matrix < distance_tol
+    opposing_norm = normal_dots < normal_alignment_threshold
+
+    matches_mask = active_pair & close_dist & opposing_norm
+    return matches_mask, dist_matrix
