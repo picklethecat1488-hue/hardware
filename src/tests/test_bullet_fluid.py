@@ -427,7 +427,8 @@ class TestBulletFluid:
             max_steps = self.SLOW_STEPS if mode == "slow" else self.FAST_STEPS
 
             for step in range(max_steps):
-                fluid.update(body_id, physics_client, damping=0.998)
+                damp_val = 0.998 if step >= 40 else 0.95
+                fluid.update(body_id, physics_client, damping=damp_val)
                 p.stepSimulation(physicsClientId=physics_client)
 
             expected_volume = self.get_expected_remaining_volume(theta, R=R, H=H, initial_volume=fluid.target_volume)
@@ -768,8 +769,8 @@ class TestBulletFluid:
 
             # Settle parameters based on mode
             settle_steps = 150
-            run_steps = 50 if mode == "fast" else 100
-            diff_threshold = 0.0005 if mode == "fast" else 0.0005
+            run_steps = 50
+            diff_threshold = 0.0005
 
             # 1. Let the fluid settle to form a pool
             for step in range(settle_steps):

@@ -563,19 +563,20 @@ class CatFountainProvider(Provider):
                     link_type=LinkType.TUBE,
                     shape=ShapeType.TUBE,
                     type=BoundaryType.SOLID_CAVITY,
-                    radius=(self.settings.tube_radius + 3.5) * 0.001,
-                    thickness=0.0035,
+                    radius=self.settings.tube_radius * 0.001,
+                    thickness=self.settings.tube_thickness * 0.001,
                     height=self.settings.tube_height * 0.001,
                     slot_height=9.0 * 0.001,
                     slot_width=8.0 * 0.001,
                     spout_radius=(self.settings.spout_deflection_radius + 1.0) * 0.001,
                     spout_height=(self.settings.spout_deflection_thickness + 9.0) * 0.001,
                     xyz=(0.0, 28.0 * 0.001, floor_z * 0.001),
-                    rpy=(0.0, 0.0, math.pi),
+                    rpy=(0.0, 0.0, 0.0),
                 )
+                casing_thick = (casing_r - chamber_r) * 0.001
                 with Locations((0.0, 0.0, floor_z)):
                     casing_geom = Cylinder(
-                        radius=28.0,
+                        radius=casing_r,
                         height=10.0,
                         align=(Align.CENTER, Align.CENTER, Align.MIN),
                         mode=Mode.PRIVATE,
@@ -585,14 +586,14 @@ class CatFountainProvider(Provider):
                     link_type=LinkType.CASING,
                     shape=ShapeType.CASING,
                     type=BoundaryType.SOLID_CAVITY,
-                    radius=0.028,
-                    thickness=0.0035,
+                    radius=casing_r * 0.001,
+                    thickness=casing_thick,
                     height=10.0 * 0.001,
                     slot_height=9.0 * 0.001,  # Slot opening from Z = 0 to 9mm
                     slot_width=8.0 * 0.001,
-                    tube_y=0.028,
+                    tube_y=28.0 * 0.001,
                     cutoff_y=0.0,
-                    ceiling_thickness=0.0035,
+                    ceiling_thickness=0.0,
                     xyz=(0.0, 0.0, floor_z * 0.001),
                     rpy=(0.0, 0.0, 0.0),
                 )
@@ -908,13 +909,13 @@ class CatFountainProvider(Provider):
             joint_type=URDFJointType.FIXED,
         ):
             URDFBoundary(
-                pocket_tool.part,
+                lid.part,
                 link_type=LinkType.LID,
                 shape=ShapeType.CYLINDER,
                 type=BoundaryType.CAVITY,
                 radius=self.settings.lid_pocket_radius * 0.001,
-                height=0.0035,
-                thickness=0.0035,
+                height=self.settings.lid_pocket_cavity_height * 0.001,
+                thickness=self.settings.lid_pocket_thickness * 0.001,
                 xyz=(0.0, 0.0, 0.0),
                 rpy=(0.0, 0.0, 0.0),
                 has_drain=True,
@@ -925,13 +926,13 @@ class CatFountainProvider(Provider):
             )
 
             URDFBoundary(
-                outer_dome,
+                lid.part,
                 link_type=LinkType.LID,
                 shape=ShapeType.SPHERE,
                 type=BoundaryType.SOLID,
                 radius=dome_out_r * 0.001,
                 thickness=0.0035,
-                xyz=(0.0, tube_y * 0.001, 0.009),
+                xyz=(0.0, tube_y * 0.001, 6.0 * 0.001),
                 rpy=(0.0, 0.0, 0.0),
             )
 
@@ -1404,3 +1405,9 @@ class CatFountainProvider(Provider):
         # Build the diagram using the diagram class
         diagram = WiringDiagram(wiring)
         diagram.build(room)
+
+    def compute_flow_metrics(self) -> dict[str, Any]:
+        """Compute continuous flow and drainage metrics delegating to simulation hooks."""
+        from .simulate_hooks import compute_flow_metrics
+
+        return compute_flow_metrics(self)

@@ -190,14 +190,18 @@ def initialize_jax_environment(cache_dir: Optional[Union[str, os.PathLike]] = No
         os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
 
     # Silence C-level MPS startup banners on stderr during initial JAX device probe
-    _stderr_fd = getattr(sys.stderr, "fileno", lambda: 2)()
+    _redirected = False
+    _saved_stderr = None
+    _stderr_fd = None
     try:
-        _saved_stderr = os.dup(_stderr_fd)
-        _devnull = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(_devnull, _stderr_fd)
-        os.close(_devnull)
-        _redirected = True
-    except (OSError, ValueError):
+        if hasattr(sys.stderr, "fileno"):
+            _stderr_fd = sys.stderr.fileno()
+            _saved_stderr = os.dup(_stderr_fd)
+            _devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(_devnull, _stderr_fd)
+            os.close(_devnull)
+            _redirected = True
+    except (OSError, ValueError, AttributeError):
         _redirected = False
 
     try:
@@ -205,7 +209,7 @@ def initialize_jax_environment(cache_dir: Optional[Union[str, os.PathLike]] = No
 
         _ = jax.devices()
     finally:
-        if _redirected:
+        if _redirected and _saved_stderr is not None and _stderr_fd is not None:
             os.dup2(_saved_stderr, _stderr_fd)
             os.close(_saved_stderr)
 

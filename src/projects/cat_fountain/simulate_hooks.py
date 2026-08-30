@@ -2,10 +2,10 @@
 
 import numpy as np
 import pybullet as p
-from provider.bullet import _is_real_physics_client
+from provider.bullet import _is_real_physics_client, get_bullet_link_names
 from typing import Any, Callable, cast, Optional
 from provider import Bullet, LinkType, Fluid, Simulate, URDFShape, rerun_is_enabled
-from model import FluidConfig, BoundaryConfig
+from model import FluidConfig, BoundaryConfig, ResolvedBoundaries
 
 
 def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[str, int]:
@@ -41,35 +41,46 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     cutout_y = provider.settings.lid_cutout_y * 0.001
     cutout_r = provider.settings.lid_cutout_radius * 0.001
     bowl_r = (provider.settings.bowl_radius - provider.settings.bowl_thickness) * 0.001
-    lid_z_min = (provider.settings.bowl_height - provider.settings.lid_step_depth) * 0.001
+    bowl_h = provider.settings.bowl_height * 0.001
+    step_d = provider.settings.lid_step_depth * 0.001
+    lid_mount_z = floor_z + bowl_h - step_d
 
     dist_tube = np.sqrt((xs - tube_x) ** 2 + (ys - tube_y) ** 2)
     dist_cutout = np.sqrt(xs**2 + (ys - cutout_y) ** 2)
     r_xy = np.sqrt(xs**2 + ys**2)
 
-    # 1. Flow in vertical delivery tube (strictly inside 6mm bore from floor to top)
-    in_tube_mask = (dist_tube <= tube_r_inner + 0.001) & (zs >= floor_z) & (zs <= tube_top_z)
+    # 1. Flow in vertical delivery tube (strictly inside bore from floor to spout exit)
+    in_tube_mask = (dist_tube <= tube_r_inner) & (zs >= floor_z) & (zs <= tube_top_z)
     in_tube_cnt = int(np.sum(in_tube_mask))
 
     # 2. Flow emerging at spout
-    at_spout_mask = (dist_tube <= 0.030) & (zs > tube_top_z - 0.001)
+    at_spout_mask = (dist_tube <= tube_r_inner + 0.008) & (zs > tube_top_z) & (zs <= tube_top_z + 0.015)
     at_spout_cnt = int(np.sum(at_spout_mask))
 
-    # 3. Flow on lid drinking shelf / tray (outside spout dome, inside lid rim)
-    lid_sheet_mask = (zs >= lid_z_min) & (zs <= lid_z_min + 0.015) & (dist_tube > 0.025) & (r_xy <= 0.082)
+    # 3. Flow on lid drinking shelf / tray (outside tube, inside lid rim)
+    lid_sheet_mask = (zs >= lid_mount_z - 0.005) & (zs <= lid_mount_z + 0.025) & (dist_tube > 0.010) & (r_xy <= 0.082)
     lid_sheet_cnt = int(np.sum(lid_sheet_mask))
 
-    # 4. Drainage: Perimeter waterfall cascading into bowl (R >= 78mm, falling below lid)
-    waterfall_mask = (r_xy >= 0.078) & (zs >= floor_z) & (zs < lid_z_min)
+    # 4. Drainage: Perimeter waterfall cascading into bowl (R >= 75mm, falling or rolling off lid rim)
+    waterfall_mask = (r_xy >= 0.075) & (zs >= lid_mount_z - 0.015) & (zs <= lid_mount_z + 0.015)
     waterfall_cnt = int(np.sum(waterfall_mask))
 
-    # 5. Drainage: Front cutout drain returning to bowl (inside cutout hole, falling below lid)
-    drain_mask = (dist_cutout <= cutout_r) & (ys < 0.0) & (zs >= floor_z) & (zs < lid_z_min) & (r_xy < 0.078)
-    drain_cnt = int(np.sum(drain_mask))
-
-    # 6. Reservoir pool volume (entire base container fluid layer)
-    pool_mask = (zs >= floor_z - 0.003) & (zs < floor_z + 0.030) & (r_xy <= bowl_r)
+    # 6. Reservoir pool volume (entire base container fluid layer below falling air gap)
+    pool_mask = (zs >= floor_z - 0.003) & (zs < lid_mount_z - 0.015) & (r_xy <= bowl_r)
     pool_cnt = int(np.sum(pool_mask))
+
+    # 7. Reservoir water depth (height of fluid surface above bowl floor in meters)
+    if pool_cnt > 0:
+        pool_zs = zs[pool_mask]
+        pool_surface_z = float(np.percentile(pool_zs, 95))
+        water_depth = max(0.0, pool_surface_z - floor_z)
+    else:
+        pool_surface_z = floor_z
+        water_depth = 0.0
+
+    # 5. Drainage: Front cutout drain returning to bowl (inside cutout hole, falling through air gap above pool)
+    drain_mask = (dist_cutout <= cutout_r + 0.005) & (ys < 0.0) & (zs >= pool_surface_z + 0.003) & (zs < lid_mount_z)
+    drain_cnt = int(np.sum(drain_mask))
 
     metrics = {
         "flow_spout": at_spout_cnt,
@@ -78,6 +89,7 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         "drainage_waterfall": waterfall_cnt,
         "drainage_cutout": drain_cnt,
         "pool_volume": pool_cnt,
+        "water_depth": round(water_depth, 5),
     }
     provider.last_metrics = metrics
     if not hasattr(provider, "metrics_history") or provider.metrics_history is None:
@@ -94,6 +106,7 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         rr.log("metrics/drainage_waterfall", rr.Scalars(float(waterfall_cnt)))
         rr.log("metrics/drainage_cutout", rr.Scalars(float(drain_cnt)))
         rr.log("metrics/pool_volume", rr.Scalars(float(pool_cnt)))
+        rr.log("metrics/water_depth", rr.Scalars(float(water_depth)))
 
     return metrics
 
@@ -107,65 +120,13 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
 
     def setup_simulation(body_id, client, name, boundaries, state_tracker=None):
         self.last_metrics = {}
-        self.metrics_history = []
-        link_indices = {}
         if _is_real_physics_client(client):
             p.setGravity(0.0, 0.0, -9.81, physicsClientId=client)
-            for i in range(p.getNumJoints(body_id, physicsClientId=client)):
-                info = p.getJointInfo(body_id, i, physicsClientId=client)
-                link_name = info[12].decode("utf-8")
-                if "tube" in link_name:
-                    link_indices[LinkType.TUBE] = i
-                    link_indices[LinkType.OUTLET] = i
-                elif "impeller" in link_name:
-                    link_indices[LinkType.IMPELLER] = i
-                elif "drive_hub" in link_name:
-                    link_indices[LinkType.DRIVE_HUB] = i
-                elif "lid" in link_name:
-                    link_indices["lid"] = i
-                elif "pump_cover" in link_name:
-                    link_indices["pump_cover"] = i
 
-        # Resolve boundaries to include correct link_idx and link_type
-        resolved_boundaries = {}
-        for label, val in boundaries.items():
-            vals = val if isinstance(val, list) else [val]
-            resolved_vals = []
-            for item in vals:
-                item_dict = item.model_dump(exclude_defaults=True) if hasattr(item, "model_dump") else dict(item)
-                match label:
-                    case "bowl":
-                        if item_dict.get("link_type") == LinkType.TUBE or item_dict.get("link_type") == "tube":
-                            item_dict["link_type"] = LinkType.TUBE
-                            item_dict["link_idx"] = -1
-                        elif item_dict.get("link_type") == LinkType.CASING or item_dict.get("link_type") == "casing":
-                            item_dict["link_type"] = LinkType.CASING
-                            item_dict["link_idx"] = -1
-                        elif item_dict.get("link_type") == LinkType.LID or item_dict.get("link_type") == "lid":
-                            item_dict["link_type"] = LinkType.LID
-                            item_dict["link_idx"] = -1
-                        else:
-                            item_dict["link_type"] = LinkType.BASE
-                            item_dict["link_idx"] = -1
-                    case "tube":
-                        item_dict["link_type"] = LinkType.TUBE
-                        item_dict["link_idx"] = link_indices.get(LinkType.TUBE, -1)
-                    case "impeller":
-                        item_dict["link_type"] = LinkType.IMPELLER
-                        item_dict["link_idx"] = link_indices.get(LinkType.IMPELLER, -1)
-                    case "lid":
-                        item_dict["link_type"] = LinkType.LID
-                        item_dict["link_idx"] = link_indices.get("lid", -1)
-                    case "pump_cover":
-                        item_dict["link_type"] = LinkType.PUMP_COVER
-                        item_dict["link_idx"] = link_indices.get("pump_cover", -1)
-                    case _:
-                        item_idx = link_indices.get(label, -1)
-                        item_dict["link_idx"] = item_idx
-                        if "link_type" not in item_dict:
-                            item_dict["link_type"] = LinkType.BASE
-                resolved_vals.append(item_dict)
-            resolved_boundaries[label] = resolved_vals
+        link_names = get_bullet_link_names(body_id, client)
+        resolved = ResolvedBoundaries.from_link_names(boundaries=boundaries, link_names=link_names)
+        link_indices = resolved.link_indices
+        resolved_boundaries = resolved.boundaries
 
         self.water_sim_damping = 0.995
         self.water_sim = Fluid(
