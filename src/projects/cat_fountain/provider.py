@@ -1405,7 +1405,7 @@ class CatFountainProvider(Provider):
         diagram = WiringDiagram(wiring)
         diagram.build(room)
 
-    def compute_flow_metrics(self) -> dict[str, int]:
+    def compute_flow_metrics(self) -> dict[str, Any]:
         """Compute continuous flow and drainage metrics delegating to simulation hooks."""
         from .simulate_hooks import compute_flow_metrics
 

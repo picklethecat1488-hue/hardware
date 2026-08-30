@@ -1406,9 +1406,10 @@ def _g2p_mapping_subroutine(
 
     # Submerged reservoir pool: derive liquid depth from fluid volume and base container area
     base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
-    base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.Z_TOP], 0.0)
-    vol_total = pos_curr.shape[0] * (dx**3)
-    pool_depth = vol_total / (math.pi * (base_radius**2) + 1e-6)
+    vol_particle = (4.0 / 3.0) * math.pi * (r_s**3)
+    vol_total = pos_curr.shape[0] * vol_particle
+    pool_area = math.pi * (base_radius**2) + 1e-6
+    pool_depth = (vol_total / 0.70) / pool_area
 
     casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
     cavity_floor_z = jnp.where(
@@ -1419,8 +1420,8 @@ def _g2p_mapping_subroutine(
 
     pool_height = jnp.where(
         base_idx != -1,
-        jnp.where(casing_top > 0.0, jnp.maximum(pool_depth + 4.0 * dx, casing_top), pool_depth),
-        base_height,
+        jnp.where(casing_top > 0.0, jnp.maximum(pool_depth, casing_top), pool_depth),
+        pool_depth,
     )
     in_pool = (
         (pos_local[:, 2] >= cavity_floor_z)
@@ -1518,14 +1519,15 @@ def _compute_particle_forces_subroutine(
 
     base_pos = jnp.where(base_idx != -1, b_pos_arr[base_idx], jnp.zeros(3))
     base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
-    base_height = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.Z_TOP], 0.0)
     casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
-    vol_total = pos_curr.shape[0] * (dx**3)
-    pool_depth = vol_total / (math.pi * (base_radius**2) + 1e-6)
+    vol_particle = (4.0 / 3.0) * math.pi * (r_s**3)
+    vol_total = pos_curr.shape[0] * vol_particle
+    pool_area = math.pi * (base_radius**2) + 1e-6
+    pool_depth = (vol_total / 0.70) / pool_area
     pool_height = jnp.where(
         base_idx != -1,
-        jnp.where(casing_top > 0.0, jnp.maximum(pool_depth + 4.0 * dx, casing_top), pool_depth),
-        base_height,
+        jnp.where(casing_top > 0.0, jnp.maximum(pool_depth, casing_top), pool_depth),
+        pool_depth,
     )
     cavity_floor_z = jnp.where(
         base_idx != -1,

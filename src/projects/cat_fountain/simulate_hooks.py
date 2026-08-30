@@ -41,7 +41,9 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     cutout_y = provider.settings.lid_cutout_y * 0.001
     cutout_r = provider.settings.lid_cutout_radius * 0.001
     bowl_r = (provider.settings.bowl_radius - provider.settings.bowl_thickness) * 0.001
-    lid_z_min = (provider.settings.bowl_height - provider.settings.lid_step_depth) * 0.001
+    bowl_h = provider.settings.bowl_height * 0.001
+    step_d = provider.settings.lid_step_depth * 0.001
+    lid_mount_z = floor_z + bowl_h - step_d
 
     dist_tube = np.sqrt((xs - tube_x) ** 2 + (ys - tube_y) ** 2)
     dist_cutout = np.sqrt(xs**2 + (ys - cutout_y) ** 2)
@@ -56,20 +58,29 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     at_spout_cnt = int(np.sum(at_spout_mask))
 
     # 3. Flow on lid drinking shelf / tray (outside tube, inside lid rim)
-    lid_sheet_mask = (zs >= lid_z_min) & (zs <= lid_z_min + 0.025) & (dist_tube > 0.010) & (r_xy <= 0.082)
+    lid_sheet_mask = (zs >= lid_mount_z - 0.005) & (zs <= lid_mount_z + 0.025) & (dist_tube > 0.010) & (r_xy <= 0.082)
     lid_sheet_cnt = int(np.sum(lid_sheet_mask))
 
     # 4. Drainage: Perimeter waterfall cascading into bowl (R >= 75mm, falling or rolling off lid rim)
-    waterfall_mask = (r_xy >= 0.075) & (zs >= lid_z_min - 0.010) & (zs <= lid_z_min + 0.010)
+    waterfall_mask = (r_xy >= 0.075) & (zs >= lid_mount_z - 0.015) & (zs <= lid_mount_z + 0.015)
     waterfall_cnt = int(np.sum(waterfall_mask))
 
-    # 5. Drainage: Front cutout drain returning to bowl (inside cutout hole, falling between lid and pool)
-    drain_mask = (dist_cutout <= cutout_r + 0.005) & (ys < 0.0) & (zs >= floor_z + 0.015) & (zs < lid_z_min)
-    drain_cnt = int(np.sum(drain_mask))
-
     # 6. Reservoir pool volume (entire base container fluid layer below falling air gap)
-    pool_mask = (zs >= floor_z - 0.003) & (zs < lid_z_min - 0.015) & (r_xy <= bowl_r)
+    pool_mask = (zs >= floor_z - 0.003) & (zs < lid_mount_z - 0.015) & (r_xy <= bowl_r)
     pool_cnt = int(np.sum(pool_mask))
+
+    # 7. Reservoir water depth (height of fluid surface above bowl floor in meters)
+    if pool_cnt > 0:
+        pool_zs = zs[pool_mask]
+        pool_surface_z = float(np.percentile(pool_zs, 95))
+        water_depth = max(0.0, pool_surface_z - floor_z)
+    else:
+        pool_surface_z = floor_z
+        water_depth = 0.0
+
+    # 5. Drainage: Front cutout drain returning to bowl (inside cutout hole, falling through air gap above pool)
+    drain_mask = (dist_cutout <= cutout_r + 0.005) & (ys < 0.0) & (zs >= pool_surface_z + 0.003) & (zs < lid_mount_z)
+    drain_cnt = int(np.sum(drain_mask))
 
     metrics = {
         "flow_spout": at_spout_cnt,
@@ -78,6 +89,7 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         "drainage_waterfall": waterfall_cnt,
         "drainage_cutout": drain_cnt,
         "pool_volume": pool_cnt,
+        "water_depth": round(water_depth, 5),
     }
     provider.last_metrics = metrics
     if not hasattr(provider, "metrics_history") or provider.metrics_history is None:
@@ -94,6 +106,7 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         rr.log("metrics/drainage_waterfall", rr.Scalars(float(waterfall_cnt)))
         rr.log("metrics/drainage_cutout", rr.Scalars(float(drain_cnt)))
         rr.log("metrics/pool_volume", rr.Scalars(float(pool_cnt)))
+        rr.log("metrics/water_depth", rr.Scalars(float(water_depth)))
 
     return metrics
 
