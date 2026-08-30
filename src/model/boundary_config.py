@@ -42,6 +42,28 @@ class BoundaryType(StrEnum):
     SOLID_CAVITY = "solid_cavity"
 
 
+class BoundaryCADConformance(BaseModel):
+    """Struct representing 3D CAD boolean intersection and geometric conformance for a URDF boundary."""
+
+    shape: Optional[ShapeType] = Field(default=None, description="Analytical shape type of the evaluated boundary")
+    type: Optional[BoundaryType] = Field(default=None, description="Barrier type (solid, cavity, or solid_cavity)")
+    solid_volume: float = Field(
+        default=0.0, description="Total 3D volume of the reconstructed solid barrier geometry in mm³"
+    )
+    solid_intersection_volume: float = Field(
+        default=0.0, description="Volume of overlap between the solid CAD model and the reconstructed barrier in mm³"
+    )
+    solid_conformance_ratio: float = Field(
+        default=0.0, description="Ratio of CAD solid intersection volume to reconstructed solid barrier volume"
+    )
+    cavity_volume: float = Field(
+        default=0.0, description="Total 3D volume of the reconstructed fluid flow cavity in mm³"
+    )
+    cavity_intersection_volume: float = Field(
+        default=0.0, description="Volume of overlap between the solid CAD model and the open cavity volume in mm³"
+    )
+
+
 class BoundaryParam(IntEnum):
     """Named indices for boundary parameter columns in b_params tensor."""
 
@@ -139,6 +161,7 @@ class BoundaryConfig(BaseModel):
         },
         ShapeType.SPHERE: {
             "radius",
+            "thickness",
         },
         ShapeType.TUBE: {
             "radius",

@@ -1591,6 +1591,7 @@ def _compute_particle_forces_subroutine(
         inner_r = b_params[i, BoundaryParam.R_INNER]
         tube_h = b_params[i, BoundaryParam.HEIGHT]
         spout_z_min = b_params[i, BoundaryParam.SPOUT_Z_MIN]
+        spout_head_room = tube_h - spout_z_min
 
         # Query lid deflection / socket height offset dynamically from URDF boundary metadata
         lid_height_offset = 0.0
@@ -1630,13 +1631,17 @@ def _compute_particle_forces_subroutine(
             0.0,
         )
 
-        in_tube = (r_tube_xy < inner_r + r_s) & (pos_tube[:, 2] >= -2.0 * r_s) & (pos_tube[:, 2] <= tube_h)
+        in_tube = (r_tube_xy <= inner_r - 0.0005) & (pos_tube[:, 2] >= -2.0 * r_s) & (pos_tube[:, 2] < spout_z_min)
         up_vector = local_to_world_vector(jnp.array([0.0, 0.0, 1.0]), tube_orn)
         up_world = up_vector[None, :] * pump_lift_scalar[:, None]
 
         # Radial spreading and outward deflection at the fountain spout opening
         r_outer = b_params[i, BoundaryParam.R_OUTER]
-        at_spout = (pos_tube[:, 2] >= spout_z_min) & (r_tube_xy < r_outer + r_s)
+        at_spout = (
+            (pos_tube[:, 2] >= spout_z_min)
+            & (pos_tube[:, 2] <= tube_h + spout_head_room)
+            & (r_tube_xy <= r_outer + r_s)
+        )
 
         r_xy_safe = jnp.maximum(r_tube_xy, 1e-5)
         radial_unit_local = jnp.stack(
@@ -1964,6 +1969,56 @@ def _ccd_sphere_obstacle_boundary(
     return pos_out, vel_out
 
 
+def _ccd_tube_cylinder_boundary(
+    pos_curr_loc: jnp.ndarray,
+    pos_next_loc: jnp.ndarray,
+    v_rel_local: jnp.ndarray,
+    r_inner: float,
+    r_outer: float,
+    tube_h: float,
+    slot_h: float,
+    active_boundary: jnp.ndarray,
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Continuous collision detection for a vertical delivery tube (bore containment and solid outer wall)."""
+    r_curr, _, _ = cartesian_to_cylindrical(pos_curr_loc)
+    r_next, _, _ = cartesian_to_cylindrical(pos_next_loc)
+    z_next = pos_next_loc[:, 2]
+
+    # The bottom of the tube (z <= slot_h) has an inlet slot from the impeller casing
+    in_solid_wall_height = (z_next > slot_h) & (z_next <= tube_h) & active_boundary
+    in_bore_height = (z_next >= 0.0) & (z_next <= tube_h) & active_boundary
+    r_safe = jnp.maximum(r_next, 1e-6)
+
+    # 1. External collision above slot: particle outside tube (r_curr >= r_outer) trying to penetrate outer wall
+    penetrating_outer = (r_curr >= r_outer) & (r_next < r_outer) & in_solid_wall_height
+    scale_outer = jnp.where(penetrating_outer, (r_outer + 1e-4) / r_safe, 1.0)
+
+    # 2. Internal collision: particle inside bore (r_curr <= r_inner) trying to penetrate inner bore wall
+    penetrating_inner = (r_curr <= r_inner) & (r_next > r_inner) & in_bore_height
+    scale_inner = jnp.where(penetrating_inner, (r_inner - 1e-4) / r_safe, 1.0)
+
+    scale_r = jnp.where(penetrating_outer, scale_outer, scale_inner)
+    pos_x_clamped = pos_next_loc[:, 0] * scale_r
+    pos_y_clamped = pos_next_loc[:, 1] * scale_r
+
+    v_rad = (v_rel_local[:, 0] * pos_next_loc[:, 0] + v_rel_local[:, 1] * pos_next_loc[:, 1]) / r_safe
+    v_rad_inward = jnp.minimum(v_rad, 0.0)
+    v_rad_outward = jnp.maximum(v_rad, 0.0)
+
+    v_x_outer = v_rel_local[:, 0] - v_rad_inward * (pos_next_loc[:, 0] / r_safe)
+    v_y_outer = v_rel_local[:, 1] - v_rad_inward * (pos_next_loc[:, 1] / r_safe)
+
+    v_x_inner = v_rel_local[:, 0] - v_rad_outward * (pos_next_loc[:, 0] / r_safe)
+    v_y_inner = v_rel_local[:, 1] - v_rad_outward * (pos_next_loc[:, 1] / r_safe)
+
+    v_x = jnp.where(penetrating_outer, v_x_outer, jnp.where(penetrating_inner, v_x_inner, v_rel_local[:, 0]))
+    v_y = jnp.where(penetrating_outer, v_y_outer, jnp.where(penetrating_inner, v_y_inner, v_rel_local[:, 1]))
+
+    pos_out = jnp.stack([pos_x_clamped, pos_y_clamped, z_next], axis=-1)
+    vel_out = jnp.stack([v_x, v_y, v_rel_local[:, 2]], axis=-1)
+    return pos_out, vel_out
+
+
 def _apply_boundary_ccd_subroutine(
     pos_curr: jnp.ndarray,
     pos_next: jnp.ndarray,
@@ -2024,6 +2079,28 @@ def _apply_boundary_ccd_subroutine(
         pos_next = jnp.where(is_lid_k, pos_out, pos_next)
         vel_next = jnp.where(is_lid_k, vel_out, vel_next)
 
+        # 4. Vertical delivery tube (solid outer wall + internal bore containment)
+        is_tube_k = shape_k == SHAPE_TUBE
+        tube_k_pos = b_pos_arr[k]
+        tube_k_orn = b_orn_arr[k]
+        tube_k_orn_inv = invert_orientation(tube_k_orn)
+        pos_tb_curr = world_to_local_frame(pos_curr, tube_k_pos, tube_k_orn_inv)
+        pos_tb_next = world_to_local_frame(pos_next, tube_k_pos, tube_k_orn_inv)
+        v_tb_k = world_to_local_vector(vel_next, tube_k_orn_inv)
+
+        r_in_k = b_params[k, BoundaryParam.R_INNER]
+        r_out_k = b_params[k, BoundaryParam.R_OUTER]
+        tube_h_k = b_params[k, BoundaryParam.HEIGHT]
+        slot_h_k = b_params[k, BoundaryParam.SLOT_HEIGHT]
+
+        pos_tb_safe, v_tb_safe = _ccd_tube_cylinder_boundary(
+            pos_tb_curr, pos_tb_next, v_tb_k, r_in_k, r_out_k, tube_h_k, slot_h_k, is_tube_k
+        )
+        pos_tb_world = local_to_world_frame(pos_tb_safe, tube_k_pos, tube_k_orn)
+        vel_tb_world = local_to_world_vector(v_tb_safe, tube_k_orn)
+        pos_next = jnp.where(is_tube_k, pos_tb_world, pos_next)
+        vel_next = jnp.where(is_tube_k, vel_tb_world, vel_next)
+
     return pos_next, vel_next
 
 
@@ -2059,7 +2136,7 @@ def _integrate_particles_subroutine(
     )
     spout_r = jnp.where(has_tube, b_params[tube_idx, BoundaryParam.R_OUTER], 0.014)
     tube_h = jnp.where(has_tube, b_params[tube_idx, BoundaryParam.HEIGHT], 0.0)
-    influence_r = spout_r
+    influence_r = tube_r_check
     influence_h = tube_h + 0.049
 
     gamma_base = jnp.where(jnp.abs(omega) > 0.0, 0.95, 0.998)

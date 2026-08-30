@@ -6,6 +6,7 @@ from .utils import method_cache, load_measurements
 from .app_config import AppConfig
 from .boundary_config import (
     BoundaryConfig,
+    BoundaryCADConformance,
     ShapeType,
     BoundaryType,
     BoundaryParam,

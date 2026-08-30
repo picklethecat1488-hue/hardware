@@ -99,6 +99,12 @@ from .transforms import (
     cartesian_to_spherical,
     spherical_to_cartesian,
 )
+from .cad_boundary import (
+    reconstruct_boundary_cad_solid,
+    reconstruct_boundary_cad_cavity,
+    evaluate_boundary_cad_conformance,
+    validate_room_urdf_boundaries,
+)
 from .fluid import Fluid
 from .provider_router import ProviderRouter
 from .provider_manager import ProviderManager
