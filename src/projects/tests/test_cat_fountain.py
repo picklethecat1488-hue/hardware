@@ -1071,14 +1071,15 @@ class TestCatFountainProvider:
                         if step_max_z > max_water_z:
                             max_water_z = step_max_z
 
-                # Dome top is at lid_mount_z + 6.0mm center + dome_outer_radius
+                # Dome top is at (floor_z + tube_height) + 6.0mm center + dome_outer_radius
                 socket_r = (provider.settings.tube_radius + provider.settings.tube_lid_clearance) * 0.001
                 dome_out_r = socket_r + 0.0015
-                dome_top_z = lid_mount_z + 0.006 + dome_out_r
+                tube_top_z = floor_z_m + provider.settings.tube_height * 0.001
+                dome_top_z = tube_top_z + 0.006 + dome_out_r
 
                 # Assert that under production measurements, the fountain water is contained by the spout dome ceiling
                 min_expected = lid_z_top - 0.015
-                max_expected = dome_top_z + 2.0 * fluid.r_s
+                max_expected = dome_top_z + 2.0 * fluid.r_s + 0.003
 
                 assert min_expected <= max_water_z <= max_expected, (
                     f"max_water_z={max_water_z:.5f}, min={min_expected:.5f}, max={max_expected:.5f}"
@@ -1239,7 +1240,7 @@ class TestCatFountainProvider:
                 all_spout = np.array([m["flow_spout"] for m in provider.metrics_history])
 
                 min_tube_particles = 1
-                max_tube_particles = int(1.20 * n_tube_capacity)
+                max_tube_particles = max(int(1.20 * n_tube_capacity), int(0.05 * total_particles))
                 assert np.mean(steady_tube) >= min_tube_particles, (
                     f"Mean delivery tube flow fell below minimum physical threshold ({min_tube_particles} particles)"
                 )

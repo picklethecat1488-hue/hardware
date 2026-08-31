@@ -705,10 +705,8 @@ class BoundaryConfig(BaseModel):
 
         if self.shelf_depth is not None:
             shelf_depth = float(self.shelf_depth)
-        elif lid_cavity_depth > 0.0:
-            shelf_depth = max(thick, lid_cavity_depth * 0.55)
         else:
-            shelf_depth = thick * 4.0 if thick > 0.0 else 0.0
+            shelf_depth = thick
 
         return SurfaceBounds(
             z_bottom=z_bottom,

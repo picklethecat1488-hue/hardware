@@ -954,6 +954,7 @@ class CatFountainProvider(Provider):
                 tube_pos=(0.0, tube_y * 0.001, 0.0),
                 tube_normal=(0.0, 0.0, 1.0),
                 tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
+                shelf_depth=self.settings.lid_pocket_thickness * 0.001,
             )
 
             URDFBoundary(
