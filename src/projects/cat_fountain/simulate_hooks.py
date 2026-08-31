@@ -43,18 +43,18 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     bowl_r = (provider.settings.bowl_radius - provider.settings.bowl_thickness) * 0.001
     bowl_h = provider.settings.bowl_height * 0.001
     step_d = provider.settings.lid_step_depth * 0.001
-    lid_mount_z = floor_z + bowl_h - step_d
+    lid_mount_z = bowl_h - step_d
 
     dist_tube = np.sqrt((xs - tube_x) ** 2 + (ys - tube_y) ** 2)
     dist_cutout = np.sqrt(xs**2 + (ys - cutout_y) ** 2)
     r_xy = np.sqrt(xs**2 + ys**2)
 
     # 1. Flow in vertical delivery tube (strictly inside bore from floor to spout exit)
-    in_tube_mask = (dist_tube <= tube_r_inner) & (zs >= floor_z) & (zs <= tube_top_z)
+    in_tube_mask = (dist_tube <= tube_r_inner) & (zs >= floor_z) & (zs < tube_top_z - 0.005)
     in_tube_cnt = int(np.sum(in_tube_mask))
 
-    # 2. Flow emerging at spout
-    at_spout_mask = (dist_tube <= tube_r_inner + 0.008) & (zs > tube_top_z) & (zs <= tube_top_z + 0.015)
+    # 2. Flow emerging at spout dome
+    at_spout_mask = (dist_tube <= tube_r_inner + 0.008) & (zs >= tube_top_z - 0.005) & (zs <= tube_top_z + 0.015)
     at_spout_cnt = int(np.sum(at_spout_mask))
 
     # 3. Flow on lid drinking shelf / tray (outside tube, inside lid rim)

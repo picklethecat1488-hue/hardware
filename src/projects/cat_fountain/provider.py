@@ -809,6 +809,7 @@ class CatFountainProvider(Provider):
         step_d = self.settings.lid_step_depth
         step_w = self.settings.lid_step_width
         clearance = self.settings.lid_clearance
+        socket_r = self.settings.tube_radius + self.settings.tube_lid_clearance
 
         with BuildPart() as lid:
             lid_disk = Cylinder(radius=lid_r, height=lid_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
@@ -871,12 +872,18 @@ class CatFountainProvider(Provider):
 
             with Locations((0.0, tube_y, 3.0)):
                 with Locations(Rot(-self.settings.lid_platform_slope_angle, 0, 0)):
-                    terrace_shelf = Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                     with Locations((0, 0, 3.0)):
                         Cylinder(radius=30.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                         Cylinder(
                             radius=28.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                         )
+                    Cylinder(
+                        radius=socket_r,
+                        height=10.0,
+                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                        mode=Mode.SUBTRACT,
+                    )
 
             with Locations((0.0, tube_y, 0)):
                 socket_r = self.settings.tube_radius + self.settings.tube_lid_clearance

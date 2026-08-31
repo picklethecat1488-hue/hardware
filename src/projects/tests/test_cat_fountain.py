@@ -1051,7 +1051,7 @@ class TestCatFountainProvider:
                 floor_z_m = provider.settings.floor_z * 0.001
                 bowl_h = provider.settings.bowl_height * 0.001
                 step_d = provider.settings.lid_step_depth * 0.001
-                lid_mount_z = floor_z_m + bowl_h - step_d
+                lid_mount_z = bowl_h - step_d
                 # Lid pocket floor Z (main flat top drinking shelf surface) is at lid_mount_z + 3.0mm
                 lid_z_top = lid_mount_z + 0.003
 
@@ -1280,10 +1280,34 @@ class TestCatFountainProvider:
                     f"Pool volume exceeded total active fluid mass ({max_expected_pool_particles} particles)"
                 )
 
-                # 7. Reservoir Water Depth: Steady state water depth matches geometric liquid column height
+                # 7. Reservoir Water Depth & Casing Contact Continuity
                 steady_depth = np.array([m["water_depth"] for m in provider.metrics_history[40:]])
                 assert np.all(steady_depth >= 0.010), "Reservoir water depth drained below minimum threshold"
                 assert np.all(steady_depth <= 0.080), "Reservoir water depth exceeded maximum bowl capacity"
+
+                # Verify continuous physical fluid contact with motor casing and non-piled reservoir distribution
+                pos_np = np.asarray(fluid.pos_jax)
+                active = pos_np[:, 2] < 100.0
+                pos_act = pos_np[active]
+                bowl_floor_z = provider.settings.floor_z * 0.001
+                lid_z = (provider.settings.bowl_height - provider.settings.lid_step_depth) * 0.001
+                in_bowl = (pos_act[:, 2] >= bowl_floor_z - 0.005) & (pos_act[:, 2] <= lid_z)
+                pos_bowl = pos_act[in_bowl]
+
+                casing_x, casing_y = 0.0, -0.028
+                casing_r = 0.025
+                d_casing = np.sqrt((pos_bowl[:, 0] - casing_x) ** 2 + (pos_bowl[:, 1] - casing_y) ** 2)
+                r_bowl = np.sqrt(pos_bowl[:, 0] ** 2 + pos_bowl[:, 1] ** 2)
+
+                assert np.min(d_casing) <= casing_r + 0.003, (
+                    f"Water detached from motor casing: min_d_casing={np.min(d_casing):.4f} m"
+                )
+                assert np.sum(d_casing <= casing_r + 0.005) >= 1000, (
+                    "Insufficient fluid volume in contact with motor casing"
+                )
+                assert np.sum(r_bowl >= 0.080) <= int(0.60 * len(pos_bowl)), (
+                    "Excessive fluid mass piled up at outer bowl wall"
+                )
 
                 # Verify standalone compute_flow_metrics hook method
                 current_metrics = provider.compute_flow_metrics()
