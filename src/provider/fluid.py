@@ -21,9 +21,18 @@ import pybullet as p
 from scipy.spatial import cKDTree  # type: ignore
 
 from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFBoundaryType
-from provider.room import BulletStateTracker
 from provider.bullet import LinkType, _is_real_physics_client
-from model import BoundaryConfig, FluidConfig, CoordinateSpace, CoordinateSystem, SpatialPose, BoundaryParam
+from model import (
+    BoundaryConfig,
+    FluidConfig,
+    CoordinateSpace,
+    CoordinateSystem,
+    SpatialPose,
+    BoundaryParam,
+    FluidBody,
+    FluidBodyType,
+    FluidBodyTracker,
+)
 from provider.transforms import (
     invert_orientation,
     world_to_base_orientation,
@@ -47,6 +56,7 @@ from provider.transforms import (
     polar_to_cartesian_2d,
     cartesian_to_spherical,
     spherical_to_cartesian,
+    point_in_surface_hole,
 )
 from provider.boundary import (
     ImpellerBoundary,
@@ -503,7 +513,7 @@ def _compute_boundary_forces_jax(
     f_fric_tan = -fric_p[:, None] * f_n_mag[:, None] * (v_tan / v_tan_mag)
 
     force_local = f_n_mag[:, None] * norm_unit + f_fric_tan
-    force_voxel = jnp.where((occ_p > 0.01)[:, None], force_local, 0.0)
+    force_voxel = jnp.where((occ_p > 0.50)[:, None], force_local, 0.0)
     forces = base_to_world_vector(force_voxel, base_orn)
     vanes_torque = jnp.array(0.0)
 
@@ -1189,6 +1199,52 @@ def _g2p_scalar_jax(pos, grid_val, dx, origin, nx=32, ny=32, nz=28):
     return val_p
 
 
+@partial(jax.jit, static_argnums=(3, 4, 5))
+def _compute_dynamic_fluid_bodies_jax(
+    pos_local: jnp.ndarray,
+    dx: float,
+    origin: jnp.ndarray,
+    nx: int = 32,
+    ny: int = 32,
+    nz: int = 28,
+    cavity_floor_z: float = 0.0,
+    z_max_pool: float = 0.0,
+    r_s: float = 0.003,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Dynamically recompute physical fluid bodies, local column surface heights, and horizontal leveling gradients."""
+    gp = (pos_local - origin) / dx
+    ix = jnp.clip(jnp.floor(gp[:, 0]).astype(jnp.int32), 0, nx - 1)
+    iy = jnp.clip(jnp.floor(gp[:, 1]).astype(jnp.int32), 0, ny - 1)
+
+    # 1. Dynamic 2D column water surface height in reservoir basin
+    in_basin = jnp.where(
+        z_max_pool > 0.0,
+        (pos_local[:, 2] <= z_max_pool) & (pos_local[:, 2] >= cavity_floor_z),
+        pos_local[:, 2] >= cavity_floor_z,
+    )
+    surf_z_grid = (
+        jnp.full((nx, ny), cavity_floor_z).at[ix, iy].max(jnp.where(in_basin, pos_local[:, 2], cavity_floor_z))
+    )
+    col_count = jnp.zeros((nx, ny), dtype=jnp.float32).at[ix, iy].add(jnp.where(in_basin, 1.0, 0.0))
+
+    # 2. Dynamic 2D surface gradient for horizontal hydrostatic leveling
+    surf_pad = jnp.pad(surf_z_grid, ((1, 1), (1, 1)), mode="edge")
+    grad_x = (surf_pad[2:, 1:-1] - surf_pad[:-2, 1:-1]) / (2.0 * dx)
+    grad_y = (surf_pad[1:-1, 2:] - surf_pad[1:-1, :-2]) / (2.0 * dx)
+
+    # 3. Sample back to particle coordinates
+    p_surf_z = surf_z_grid[ix, iy]
+    p_grad_x = grad_x[ix, iy]
+    p_grad_y = grad_y[ix, iy]
+    p_col_count = col_count[ix, iy]
+
+    # Particles inside moving fluid bodies (within local free surface of occupied voxel columns)
+    in_fluid_body = in_basin & (pos_local[:, 2] <= p_surf_z + 2.0 * r_s) & (p_col_count >= 2.0)
+    level_grad_local = jnp.stack([-p_grad_x, -p_grad_y, jnp.zeros_like(p_grad_x)], axis=-1)
+
+    return in_fluid_body, p_surf_z, level_grad_local, p_col_count
+
+
 @jax.jit
 def _lbm_step_3d_jax(grid_rho, grid_u):
     feq_list = []
@@ -1404,29 +1460,15 @@ def _g2p_mapping_subroutine(
     lbm_vel_local = jnp.where(active_col, lbm_vel_local / c_scale, 0.0)
     vel_grid_world = base_to_world_vector(lbm_vel_local, base_orn) + base_vel
 
-    # Submerged reservoir pool: derive liquid depth from fluid volume and base container area
-    base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
-    vol_particle = (4.0 / 3.0) * math.pi * (r_s**3)
-    vol_total = pos_curr.shape[0] * vol_particle
-    pool_area = math.pi * (base_radius**2) + 1e-6
-    pool_depth = (vol_total / 0.70) / pool_area
-
-    casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
+    # Dynamic moving voxel fluid bodies: continuously compute physical fluid shapes from voxel occupancy
     cavity_floor_z = jnp.where(
         base_idx != -1,
         b_pos_arr[base_idx, 2] - base_pos[2] + b_params[base_idx, BoundaryParam.Z_OFFSET],
         0.0,
     )
-
-    pool_height = jnp.where(
-        base_idx != -1,
-        jnp.where(casing_top > 0.0, jnp.maximum(pool_depth, casing_top), pool_depth),
-        pool_depth,
-    )
-    in_pool = (
-        (pos_local[:, 2] >= cavity_floor_z)
-        & (pos_local[:, 2] <= cavity_floor_z + pool_height)
-        & (r_local <= base_radius)
+    z_max_pool = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.POOL_MAX_Z], 0.0)
+    in_fluid_body, _, _, _ = _compute_dynamic_fluid_bodies_jax(
+        pos_local, dx, origin, nx, ny, nz, cavity_floor_z=cavity_floor_z, z_max_pool=z_max_pool, r_s=r_s
     )
 
     in_tube_or_casing = jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_)
@@ -1443,11 +1485,15 @@ def _g2p_mapping_subroutine(
         is_casing = (shape == SHAPE_CASING) & (r_b_xy <= r_outer) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= z_top)
         in_tube_or_casing = in_tube_or_casing | is_tube | is_casing
     in_fluid_continuum = jnp.where(
-        base_idx != -1, in_pool & (~in_tube_or_casing), jnp.ones(pos_curr.shape[0], dtype=jnp.bool_)
+        base_idx != -1, in_fluid_body & (~in_tube_or_casing), jnp.ones(pos_curr.shape[0], dtype=jnp.bool_)
     )
-
-    # Map Eulerian continuum horizontal velocity while preserving Lagrangian vertical settling momentum
-    vel_continuum = jnp.stack([vel_grid_world[:, 0], vel_grid_world[:, 1], vel_curr[:, 2]], axis=-1)
+    has_casing = jnp.any(b_shapes == SHAPE_CASING)
+    # When enclosed by a pump casing, reservoir continuum maintains Lagrangian settling momentum; open impellers drive LBM swirl
+    vel_continuum = jnp.where(
+        has_casing,
+        vel_curr,
+        jnp.stack([vel_grid_world[:, 0], vel_grid_world[:, 1], vel_curr[:, 2]], axis=-1),
+    )
     vel_world = jnp.where(in_fluid_continuum[:, None], vel_continuum, vel_curr)
     return jnp.where(active_col, vel_world, 0.0), in_fluid_continuum
 
@@ -1508,7 +1554,7 @@ def _compute_particle_forces_subroutine(
     )
 
     b_accel = b_forces / mass
-    max_b_accel = 500.0
+    max_b_accel = 35.0
     b_accel_mags = jnp.linalg.norm(b_accel, axis=1, keepdims=True)
     b_accel_mags_safe = jnp.maximum(b_accel_mags, 1e-8)
     b_accel_clamped = b_accel * jnp.minimum(max_b_accel / b_accel_mags_safe, 1.0)
@@ -1519,16 +1565,6 @@ def _compute_particle_forces_subroutine(
 
     base_pos = jnp.where(base_idx != -1, b_pos_arr[base_idx], jnp.zeros(3))
     base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
-    casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
-    vol_particle = (4.0 / 3.0) * math.pi * (r_s**3)
-    vol_total = pos_curr.shape[0] * vol_particle
-    pool_area = math.pi * (base_radius**2) + 1e-6
-    pool_depth = (vol_total / 0.70) / pool_area
-    pool_height = jnp.where(
-        base_idx != -1,
-        jnp.where(casing_top > 0.0, jnp.maximum(pool_depth, casing_top), pool_depth),
-        pool_depth,
-    )
     cavity_floor_z = jnp.where(
         base_idx != -1,
         b_params[base_idx, BoundaryParam.Z_OFFSET],
@@ -1540,45 +1576,63 @@ def _compute_particle_forces_subroutine(
     tube_y_check = jnp.where(has_tube, b_pos_arr[tube_idx, 1] - base_pos[1], 0.0)
     tube_r_check = jnp.where(has_tube, b_params[tube_idx, BoundaryParam.R_INNER], 0.0)
 
-    # Impeller suction intake force directed toward casing center and tangential injection into tube
+    # Impeller suction intake force directed toward central casing intake and tangential injection into tube
     suction_accel = jnp.zeros_like(pos_curr)
     for i, shape in enumerate(b_shapes):
         casing_pos = b_pos_arr[i]
         casing_orn = b_orn_arr[i]
         casing_orn_inv = invert_orientation(casing_orn)
         pos_casing = world_to_local_frame(pos_curr, casing_pos, casing_orn_inv)
-        r_inlet_xy, _, _ = cartesian_to_cylindrical(pos_casing)
         radius = b_params[i, BoundaryParam.RADIUS]
         casing_h = b_params[i, BoundaryParam.HEIGHT]
-        ceil_thick = b_params[i, BoundaryParam.CEILING_THICKNESS]
 
-        # 1. Inward suction draw across the lower reservoir pool near the casing intake
-        in_suction = (r_inlet_xy < radius * 1.6) & (pos_casing[:, 2] >= -0.005) & (pos_casing[:, 2] <= casing_h + 0.025)
+        has_intake_i = b_params[i, BoundaryParam.HAS_INTAKE] > 0.5
+        intake_pos_i = b_params[i, BoundaryParam.INTAKE_POS_X : BoundaryParam.INTAKE_POS_Z + 1]
+        intake_norm_i = b_params[i, BoundaryParam.INTAKE_NORMAL_X : BoundaryParam.INTAKE_NORMAL_Z + 1]
+        intake_r_i = b_params[i, BoundaryParam.INTAKE_RADIUS]
 
-        dx_in = 0.0 - pos_casing[:, 0]
-        dy_in = 0.0 - pos_casing[:, 1]
-        dz_in = jnp.clip(casing_h - ceil_thick - pos_casing[:, 2], -0.01, 0.01)
-        dist_in = jnp.sqrt(dx_in**2 + dy_in**2 + dz_in**2 + 1e-8)
-
-        dir_casing = jnp.stack([dx_in / dist_in, dy_in / dist_in, dz_in / dist_in], axis=-1)
+        # 1. Intake draw near and above the designated intake port along surface normal
+        inlet_r_eff = jnp.where(intake_r_i > 0.0, intake_r_i, radius * 0.40)
+        target_in = intake_pos_i - intake_norm_i * 0.008
+        d_in = target_in - pos_casing
+        dist_in = jnp.sqrt(jnp.sum(d_in**2, axis=-1, keepdims=True) + 1e-8)
+        dir_casing = d_in / dist_in
         dir_world = local_to_world_vector(dir_casing, casing_orn)
 
-        suction_strength = v_tip * (g_mag * 1.5)
+        d_in_xy = jnp.sqrt((pos_casing[:, 0] - intake_pos_i[0]) ** 2 + (pos_casing[:, 1] - intake_pos_i[1]) ** 2)
+        in_suction = (
+            has_intake_i
+            & (d_in_xy <= inlet_r_eff + 0.015)
+            & (pos_casing[:, 2] >= casing_h - 0.002)
+            & (pos_casing[:, 2] <= casing_h + 0.030)
+        )
+        suction_strength = (v_tip * 2.0 + g_mag * 1.5) * jnp.clip(1.0 - dist_in / (inlet_r_eff + 0.025), 0.0, 1.0)
         suction_accel_i = jnp.where(in_suction[:, None], dir_world * suction_strength, 0.0)
 
-        # 2. Inside the volute chamber (r <= radius), push tangentially and along +Y into the tube entrance
-        in_volute = (r_inlet_xy <= radius + r_s) & (pos_casing[:, 2] >= 0.0) & (pos_casing[:, 2] <= casing_h)
-        tangent_x = -pos_casing[:, 1] / (r_inlet_xy + 1e-5)
-        tangent_y = pos_casing[:, 0] / (r_inlet_xy + 1e-5)
-        nozzle_dir_local = jnp.stack(
-            [tangent_x * 0.4, tangent_y * 0.4 + 0.8, jnp.zeros_like(pos_casing[:, 0])], axis=-1
+        # 2. Inside the volute chamber near the tangential exit channel leading to drain port (tube)
+        has_drain_i = b_params[i, BoundaryParam.HAS_DRAIN] > 0.5
+        r_inlet_xy, _, _ = cartesian_to_cylindrical(pos_casing)
+        drain_px = b_params[i, BoundaryParam.DRAIN_POS_X]
+        drain_py = b_params[i, BoundaryParam.DRAIN_POS_Y]
+        drain_pz = b_params[i, BoundaryParam.DRAIN_POS_Z]
+        d_to_drain = jnp.stack(
+            [drain_px - pos_casing[:, 0], drain_py - pos_casing[:, 1], drain_pz - pos_casing[:, 2] + 0.010],
+            axis=-1,
         )
-        nozzle_dir_mag = jnp.sqrt(jnp.sum(nozzle_dir_local**2, axis=-1, keepdims=True) + 1e-8)
-        nozzle_dir_world = local_to_world_vector(nozzle_dir_local / nozzle_dir_mag, casing_orn)
-        volute_accel_i = nozzle_dir_world * (v_tip * 15.0 + g_mag * 1.5)
+        dist_to_drain = jnp.sqrt(jnp.sum(d_to_drain**2, axis=-1, keepdims=True) + 1e-8)
+        dir_to_drain = d_to_drain / dist_to_drain
+        dir_to_drain_world = local_to_world_vector(dir_to_drain, casing_orn)
+        slot_h_i = b_params[i, BoundaryParam.SLOT_HEIGHT]
+        in_volute_channel = (
+            has_drain_i
+            & (pos_casing[:, 1] >= 0.0)
+            & (pos_casing[:, 2] <= slot_h_i + 2.0 * r_s)
+            & (r_inlet_xy <= radius + 2.0 * r_s)
+        )
+        volute_accel_i = dir_to_drain_world * (v_tip * 3.0 + g_mag * 2.0)
 
         is_casing = shape == SHAPE_CASING
-        casing_total_accel = jnp.where(in_volute[:, None], volute_accel_i, suction_accel_i)
+        casing_total_accel = jnp.where(in_volute_channel[:, None], volute_accel_i, suction_accel_i)
         suction_accel += jnp.where(is_casing, casing_total_accel, jnp.zeros_like(pos_curr))
 
     tube_pump_accel = jnp.zeros_like(pos_curr)
@@ -1623,24 +1677,24 @@ def _compute_particle_forces_subroutine(
             0.0,
         )
         height_frac = jnp.clip(1.0 - pos_tube[:, 2] / (tube_h + 1e-6), 0.0, 1.0)
-        v_target_rise = jnp.maximum(v_flow_est * 2.0, 0.70) * (0.8 + 0.2 * height_frac)
+        v_target_rise = jnp.maximum(v_flow_est * 1.8, 0.80) * (0.25 + 0.75 * height_frac)
 
         pump_lift_scalar = jnp.where(
             jnp.abs(omega) > 1e-3,
-            g_mag + jnp.maximum(0.0, v_target_rise - v_z_tube) * 45.0,
+            g_mag + jnp.maximum(0.0, v_target_rise - v_z_tube) * 80.0,
             0.0,
         )
 
-        in_tube = (r_tube_xy <= inner_r - 0.0005) & (pos_tube[:, 2] >= -2.0 * r_s) & (pos_tube[:, 2] < spout_z_min)
+        in_tube = (r_tube_xy <= inner_r + r_s) & (pos_tube[:, 2] >= -2.0 * r_s) & (pos_tube[:, 2] < spout_z_min)
         up_vector = local_to_world_vector(jnp.array([0.0, 0.0, 1.0]), tube_orn)
         up_world = up_vector[None, :] * pump_lift_scalar[:, None]
 
         # Radial spreading and outward deflection at the fountain spout opening
         r_outer = b_params[i, BoundaryParam.R_OUTER]
         at_spout = (
-            (pos_tube[:, 2] >= spout_z_min)
-            & (pos_tube[:, 2] <= tube_h + spout_head_room)
-            & (r_tube_xy <= r_outer + r_s)
+            (pos_tube[:, 2] >= spout_z_min - 0.005)
+            & (pos_tube[:, 2] <= tube_h + 0.020)
+            & (r_tube_xy <= r_outer + 0.020)
         )
 
         r_xy_safe = jnp.maximum(r_tube_xy, 1e-5)
@@ -1652,10 +1706,10 @@ def _compute_particle_forces_subroutine(
 
         # Purely radial 360-degree expansion over dome with downward deflection (centered on spout)
         down_dir_world = local_to_world_vector(jnp.array([0.0, 0.0, -1.0]), tube_orn)
-        dome_disp = radial_unit_world * 0.85 + down_dir_world[None, :] * 0.35
+        dome_disp = radial_unit_world * 0.85 + down_dir_world[None, :] * 0.45
         disp_mag = jnp.sqrt(jnp.sum(dome_disp**2, axis=-1, keepdims=True) + 1e-8)
         spout_out_dir = dome_disp / disp_mag
-        spout_accel = spout_out_dir * (g_mag * 1.5 + v_flow_est * 1.5)
+        spout_accel = spout_out_dir * (g_mag * 2.0 + v_flow_est * 2.0)
 
         tube_pump_accel_i = jnp.where(
             at_spout[:, None],
@@ -1686,7 +1740,7 @@ def _compute_particle_forces_subroutine(
         tray_z_max = b_params[i, BoundaryParam.TRAY_Z_MAX]
 
         # 1. Particles on the main lid surface
-        on_lid = (r_lid_xy < radius) & (pos_lid[:, 2] >= tray_z_min) & (pos_lid[:, 2] <= tray_z_max + 0.015)
+        on_lid = (r_lid_xy < radius) & (pos_lid[:, 2] >= tray_z_min) & (pos_lid[:, 2] <= tray_z_max + 2.0 * r_s)
 
         # 2. Surface sheet flow: blend radial expansion from spout center with forward gravity slope towards drain
         dx_spout = pos_lid[:, 0] - 0.0
@@ -1750,63 +1804,74 @@ def _compute_particle_forces_subroutine(
         )
         total_lid_accel_world = local_to_world_vector(lid_accel_local, lid_orn)
 
-        is_lid = (shape == SHAPE_CYLINDER) & has_drain
+        is_submerged = b_params[i, BoundaryParam.IS_SUBMERGED] > 0.5
+        is_lid = (shape == SHAPE_CYLINDER) & has_drain & (~is_submerged)
         active_lid_mask = on_lid | edge_zone
         lid_drain_accel += jnp.where(is_lid & active_lid_mask[:, None], total_lid_accel_world, jnp.zeros_like(pos_curr))
 
-    # Reservoir pool inward return drift to feed pump volute intake
+    effective_gravity = gravity[None, :]
+
+    # Dynamic moving voxel fluid bodies: continuously compute physical fluid shapes from voxel occupancy
     base_pos_b = b_pos_arr[base_idx]
     base_orn_b = b_orn_arr[base_idx]
     base_orn_b_inv = invert_orientation(base_orn_b)
     pos_b = world_to_local_frame(pos_curr, base_pos_b, base_orn_b_inv)
     r_b, _, _ = cartesian_to_cylindrical(pos_b)
-    r_b_safe = jnp.maximum(r_b, 1e-5)
-    in_outer_pool = (
-        (pos_b[:, 2] >= cavity_floor_z)
-        & (pos_b[:, 2] <= cavity_floor_z + pool_height)
-        & (r_b <= base_radius)
-        & (r_b >= 0.018)
-        & (base_idx != -1)
-    )
-    inward_dir_local = jnp.stack(
-        [-pos_b[:, 0] / r_b_safe, -pos_b[:, 1] / r_b_safe, jnp.zeros_like(pos_b[:, 0])],
-        axis=-1,
-    )
-    inward_dir_world = local_to_world_vector(inward_dir_local, base_orn_b)
-    inward_strength = jnp.where(
-        jnp.abs(omega) > 0.0,
-        (g_mag * 0.45) * (r_b / (base_radius + 1e-5)),
-        0.0,
-    )
-    pool_inward_accel = jnp.where(
-        in_outer_pool[:, None],
-        inward_dir_world * inward_strength[:, None],
-        0.0,
+    v_b = world_to_local_vector(vel_world, base_orn_b_inv)
+    v_z_b = v_b[:, 2]
+
+    z_max_pool = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.POOL_MAX_Z], 0.0)
+    in_fluid_body, p_surf_z, level_grad_local, _ = _compute_dynamic_fluid_bodies_jax(
+        pos_b, dx, origin, nx, ny, nz, cavity_floor_z=cavity_floor_z, z_max_pool=z_max_pool, r_s=r_s
     )
 
-    effective_gravity = gravity[None, :]
+    # 1. Dynamic hydrostatic support and falling fluid reintegration
+    cushion_accel_z = -jnp.minimum(v_z_b, 0.0) * 35.0
+    total_support_z = g_mag + cushion_accel_z
 
-    # Reservoir pool hydrostatic support gradient:
-    # Within the settled fluid layer (cavity_floor_z <= z <= cavity_floor_z + pool_height),
-    # upward hydrostatic pressure gradient balances gravity at the floor, transitioning linearly
-    # to 0 at the free surface (s = (z - z_floor) / pool_height).
-    in_hydrostatic_pool = (
-        (pos_b[:, 2] >= cavity_floor_z)
-        & (pos_b[:, 2] <= cavity_floor_z + pool_height)
-        & (r_b <= base_radius)
-        & (base_idx != -1)
-        & (pool_height > 1e-4)
-    )
-    s_pool = jnp.clip((pos_b[:, 2] - cavity_floor_z) / jnp.maximum(pool_height, 1e-4), 0.0, 1.0)
     hydrostatic_support_world = local_to_world_vector(
-        jnp.stack([jnp.zeros_like(s_pool), jnp.zeros_like(s_pool), g_mag * (1.0 - s_pool)], axis=-1),
+        jnp.stack([jnp.zeros_like(r_b), jnp.zeros_like(r_b), total_support_z], axis=-1),
         base_orn_b,
     )
     hydrostatic_accel = jnp.where(
-        in_hydrostatic_pool[:, None],
+        in_fluid_body[:, None],
         hydrostatic_support_world,
         0.0,
     )
+
+    # 2. Dynamic horizontal leveling gradient derived continuously from the moving surface height field
+    level_accel_world = local_to_world_vector(level_grad_local * (g_mag * 0.40), base_orn_b)
+    leveling_accel = jnp.where(
+        in_fluid_body[:, None],
+        level_accel_world,
+        0.0,
+    )
+
+    # 3. Dynamic replenishment draw toward active pump intake sink:
+    # When water is intaked into the pump system, surrounding reservoir fluid near the casing
+    # is drawn inward to continuously replenish intaked volume and maintain hydrostatic equilibrium.
+    pool_inward_accel = jnp.zeros_like(pos_curr)
+    for i, shape in enumerate(b_shapes):
+        has_intake_i = b_params[i, BoundaryParam.HAS_INTAKE] > 0.5
+        intake_pos_i = b_params[i, BoundaryParam.INTAKE_POS_X : BoundaryParam.INTAKE_POS_Z + 1]
+        intake_world_i = local_to_world_frame(intake_pos_i[None, :], b_pos_arr[i], b_orn_arr[i])[0]
+        intake_base_i = world_to_local_frame(intake_world_i[None, :], base_pos_b, base_orn_b_inv)[0]
+
+        dx_in = intake_base_i[0] - pos_b[:, 0]
+        dy_in = intake_base_i[1] - pos_b[:, 1]
+        dist_in_xy = jnp.sqrt(dx_in**2 + dy_in**2 + 1e-8)
+        dir_in_base = jnp.stack([dx_in / dist_in_xy, dy_in / dist_in_xy, jnp.zeros_like(dx_in)], axis=-1)
+        dir_in_world = local_to_world_vector(dir_in_base, base_orn_b)
+
+        # Replenishment draw acts within the intake replenishment radius (dist_in_xy <= 45mm)
+        in_intake_zone = (dist_in_xy <= 0.045) & (pos_b[:, 2] >= cavity_floor_z)
+        replenish_mag = (v_tip * 0.20 + g_mag * 0.15) * jnp.clip(1.0 - dist_in_xy / 0.045, 0.0, 1.0)
+        leveling_accel_i = jnp.where(
+            in_fluid_body[:, None] & has_intake_i & (v_tip > 1e-3) & in_intake_zone[:, None],
+            dir_in_world * replenish_mag[:, None],
+            0.0,
+        )
+        pool_inward_accel += leveling_accel_i
 
     accel = (
         b_accel_clamped
@@ -1814,6 +1879,7 @@ def _compute_particle_forces_subroutine(
         + tube_pump_accel
         + lid_drain_accel
         + pool_inward_accel
+        + leveling_accel
         + effective_gravity
         + hydrostatic_accel
     )
@@ -1829,46 +1895,77 @@ def _ccd_planar_shelf_boundary(
     radius: float,
     shelf_depth: float,
     has_drain: jnp.ndarray,
-    drain_y: float,
-    drain_r: float,
+    drain_pos: jnp.ndarray,
+    drain_normal: jnp.ndarray,
+    drain_radius: float,
     has_tube: jnp.ndarray,
-    tube_y: float,
-    tube_r: float,
+    tube_pos: jnp.ndarray,
+    tube_normal: jnp.ndarray,
+    tube_radius: float,
+    has_intake: jnp.ndarray,
+    intake_pos: jnp.ndarray,
+    intake_normal: jnp.ndarray,
+    intake_radius: float,
     active_boundary: jnp.ndarray,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Unified continuous collision detection for planar boundaries (floors, ceilings, shelves with inner holes)."""
-    # 1. Continuous trajectory line intersection with plane Z = z_plane
-    denom = pos_curr_loc[:, 2] - pos_next_loc[:, 2]
-    t_hit = jnp.clip((pos_curr_loc[:, 2] - z_plane) / jnp.where(jnp.abs(denom) > 1e-6, denom, 1.0), 0.0, 1.0)
-    x_hit = pos_curr_loc[:, 0] + t_hit * (pos_next_loc[:, 0] - pos_curr_loc[:, 0])
-    y_hit = pos_curr_loc[:, 1] + t_hit * (pos_next_loc[:, 1] - pos_curr_loc[:, 1])
-    r_hit = jnp.sqrt(x_hit**2 + y_hit**2)
+    """Unified continuous collision detection for two-sided planar shelf plates with thickness and cutouts."""
+    t_shelf = jnp.maximum(shelf_depth, 0.002)
+    z_top = z_plane
+    z_bot = z_plane - t_shelf
 
-    # 2. Support inner holes / cutouts
-    in_drain = has_drain & (jnp.sqrt(x_hit**2 + (y_hit - drain_y) ** 2) < drain_r)
-    in_tube = has_tube & (jnp.sqrt(x_hit**2 + (y_hit - tube_y) ** 2) < tube_r)
-    is_solid = (r_hit < radius) & (~in_drain) & (~in_tube) & active_boundary
+    # 1. Trajectory intersection with top surface Z = z_top
+    denom_top = pos_curr_loc[:, 2] - pos_next_loc[:, 2]
+    t_top = jnp.clip((pos_curr_loc[:, 2] - z_top) / jnp.where(jnp.abs(denom_top) > 1e-6, denom_top, 1.0), 0.0, 1.0)
+    x_top = pos_curr_loc[:, 0] + t_top * (pos_next_loc[:, 0] - pos_curr_loc[:, 0])
+    y_top = pos_curr_loc[:, 1] + t_top * (pos_next_loc[:, 1] - pos_curr_loc[:, 1])
+    r_top = jnp.sqrt(x_top**2 + y_top**2)
+    pos_top_3d = jnp.stack([x_top, y_top, jnp.full_like(x_top, z_top)], axis=-1)
 
-    # 3. Normal-directed non-penetration condition
-    is_upward = normal_sign > 0.0
-    started_valid = jnp.where(is_upward, pos_curr_loc[:, 2] >= z_plane, pos_curr_loc[:, 2] <= z_plane)
-    ended_penetrating = jnp.where(is_upward, pos_next_loc[:, 2] < z_plane, pos_next_loc[:, 2] > z_plane)
-    in_depth = jnp.where(
-        is_upward,
-        (pos_next_loc[:, 2] < z_plane) & (pos_next_loc[:, 2] >= z_plane - shelf_depth),
-        (pos_next_loc[:, 2] > z_plane) & (pos_next_loc[:, 2] <= z_plane + shelf_depth),
+    in_drain_top = has_drain & point_in_surface_hole(pos_top_3d, drain_pos, drain_normal, drain_radius)
+    in_tube_top = has_tube & point_in_surface_hole(pos_top_3d, tube_pos, tube_normal, tube_radius)
+    in_intake_top = has_intake & point_in_surface_hole(pos_top_3d, intake_pos, intake_normal, intake_radius)
+    is_solid_top = (r_top < radius) & (~in_drain_top) & (~in_tube_top) & (~in_intake_top) & active_boundary
+
+    # 2. Trajectory intersection with bottom surface Z = z_bot
+    denom_bot = pos_curr_loc[:, 2] - pos_next_loc[:, 2]
+    t_bot = jnp.clip((pos_curr_loc[:, 2] - z_bot) / jnp.where(jnp.abs(denom_bot) > 1e-6, denom_bot, 1.0), 0.0, 1.0)
+    x_bot = pos_curr_loc[:, 0] + t_bot * (pos_next_loc[:, 0] - pos_curr_loc[:, 0])
+    y_bot = pos_curr_loc[:, 1] + t_bot * (pos_next_loc[:, 1] - pos_curr_loc[:, 1])
+    r_bot = jnp.sqrt(x_bot**2 + y_bot**2)
+    pos_bot_3d = jnp.stack([x_bot, y_bot, jnp.full_like(x_bot, z_bot)], axis=-1)
+
+    in_drain_bot = has_drain & point_in_surface_hole(pos_bot_3d, drain_pos, drain_normal, drain_radius)
+    in_tube_bot = has_tube & point_in_surface_hole(pos_bot_3d, tube_pos, tube_normal, tube_radius)
+    in_intake_bot = has_intake & point_in_surface_hole(pos_bot_3d, intake_pos, intake_normal, intake_radius)
+    is_solid_bot = (r_bot < radius) & (~in_drain_bot) & (~in_tube_bot) & (~in_intake_bot) & active_boundary
+
+    # Top collision: falling downwards into the top drinking surface
+    cross_top = (pos_curr_loc[:, 2] >= z_top) & (pos_next_loc[:, 2] < z_top) & is_solid_top
+
+    # Bottom collision: rising upwards into the bottom ceiling surface of the lid
+    cross_bot = (pos_curr_loc[:, 2] <= z_bot) & (pos_next_loc[:, 2] > z_bot) & is_solid_bot
+
+    # Inside solid plate thickness: embedded between z_bot and z_top
+    r_next = jnp.sqrt(pos_next_loc[:, 0] ** 2 + pos_next_loc[:, 1] ** 2)
+    in_drain_next = has_drain & point_in_surface_hole(pos_next_loc, drain_pos, drain_normal, drain_radius)
+    in_tube_next = has_tube & point_in_surface_hole(pos_next_loc, tube_pos, tube_normal, tube_radius)
+    in_intake_next = has_intake & point_in_surface_hole(pos_next_loc, intake_pos, intake_normal, intake_radius)
+    is_solid_next = (r_next < radius) & (~in_drain_next) & (~in_tube_next) & (~in_intake_next) & active_boundary
+    embedded = (pos_next_loc[:, 2] > z_bot) & (pos_next_loc[:, 2] < z_top) & is_solid_next
+
+    # Target position and velocity clamping
+    clamp_to_top = cross_top | (embedded & (v_rel_local[:, 2] < 0.0))
+    clamp_to_bot = cross_bot | (embedded & (v_rel_local[:, 2] >= 0.0))
+
+    clamped_z = jnp.where(
+        clamp_to_top,
+        z_top + 1e-4,
+        jnp.where(clamp_to_bot, z_bot - 1e-4, pos_next_loc[:, 2]),
     )
-    crosses = started_valid & ended_penetrating
-    collides = is_solid & (crosses | in_depth)
-
-    target_z = jnp.where(is_upward, z_plane + 1e-4, z_plane - 1e-4)
-    clamped_z = jnp.where(collides, target_z, pos_next_loc[:, 2])
-
-    v_penetrating = jnp.where(is_upward, v_rel_local[:, 2] < 0.0, v_rel_local[:, 2] > 0.0)
     clamped_vz = jnp.where(
-        collides & v_penetrating,
-        jnp.where(is_upward, jnp.maximum(v_rel_local[:, 2], 0.0), jnp.minimum(v_rel_local[:, 2], 0.0)),
-        v_rel_local[:, 2],
+        clamp_to_top,
+        jnp.maximum(v_rel_local[:, 2], 0.0),
+        jnp.where(clamp_to_bot, jnp.minimum(v_rel_local[:, 2], 0.0), v_rel_local[:, 2]),
     )
 
     pos_out = jnp.stack([pos_next_loc[:, 0], pos_next_loc[:, 1], clamped_z], axis=-1)
@@ -1989,12 +2086,14 @@ def _ccd_tube_cylinder_boundary(
     in_bore_height = (z_next >= 0.0) & (z_next <= tube_h) & active_boundary
     r_safe = jnp.maximum(r_next, 1e-6)
 
-    # 1. External collision above slot: particle outside tube (r_curr >= r_outer) trying to penetrate outer wall
-    penetrating_outer = (r_curr >= r_outer) & (r_next < r_outer) & in_solid_wall_height
+    # 1. External collision above slot: particle outside tube (r_curr >= r_outer) trying to penetrate into the tube shell
+    penetrating_outer = (
+        (r_curr >= r_outer) & (r_next < r_outer) & (r_next >= (r_inner + r_outer) * 0.5) & in_solid_wall_height
+    )
     scale_outer = jnp.where(penetrating_outer, (r_outer + 1e-4) / r_safe, 1.0)
 
-    # 2. Internal collision: particle inside bore (r_curr <= r_inner) trying to penetrate inner bore wall
-    penetrating_inner = (r_curr <= r_inner) & (r_next > r_inner) & in_bore_height
+    # 2. Internal collision: particle inside bore trying to penetrate through inner bore wall into the tube shell
+    penetrating_inner = (r_curr <= (r_inner + r_outer) * 0.5) & (r_next > r_inner) & in_solid_wall_height
     scale_inner = jnp.where(penetrating_inner, (r_inner - 1e-4) / r_safe, 1.0)
 
     scale_r = jnp.where(penetrating_outer, scale_outer, scale_inner)
@@ -2015,6 +2114,46 @@ def _ccd_tube_cylinder_boundary(
     v_y = jnp.where(penetrating_outer, v_y_outer, jnp.where(penetrating_inner, v_y_inner, v_rel_local[:, 1]))
 
     pos_out = jnp.stack([pos_x_clamped, pos_y_clamped, z_next], axis=-1)
+    vel_out = jnp.stack([v_x, v_y, v_rel_local[:, 2]], axis=-1)
+    return pos_out, vel_out
+
+
+def _ccd_casing_obstacle_boundary(
+    pos_curr_loc: jnp.ndarray,
+    pos_next_loc: jnp.ndarray,
+    v_rel_local: jnp.ndarray,
+    r_outer: float,
+    height: float,
+    intake_pos: jnp.ndarray,
+    intake_radius: float,
+    active_boundary: jnp.ndarray,
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Continuous collision detection for motor casing outer cylinder barrier and top intake port."""
+    r_curr, _, _ = cartesian_to_cylindrical(pos_curr_loc)
+    r_next, _, _ = cartesian_to_cylindrical(pos_next_loc)
+    z_next = pos_next_loc[:, 2]
+
+    in_casing_height = (z_next >= 0.0) & (z_next <= height) & active_boundary
+    r_safe = jnp.maximum(r_next, 1e-6)
+
+    d_intake_xy = jnp.sqrt((pos_next_loc[:, 0] - intake_pos[0]) ** 2 + (pos_next_loc[:, 1] - intake_pos[1]) ** 2)
+    in_intake_hole = d_intake_xy <= intake_radius
+
+    penetrating_wall = (r_curr >= r_outer) & (r_next < r_outer) & in_casing_height & (~in_intake_hole)
+    scale_r = jnp.where(penetrating_wall, (r_outer + 1e-4) / r_safe, 1.0)
+    pos_x = pos_next_loc[:, 0] * scale_r
+    pos_y = pos_next_loc[:, 1] * scale_r
+
+    v_rad = (v_rel_local[:, 0] * pos_next_loc[:, 0] + v_rel_local[:, 1] * pos_next_loc[:, 1]) / r_safe
+    v_rad_inward = jnp.minimum(v_rad, 0.0)
+    v_x = jnp.where(
+        penetrating_wall, v_rel_local[:, 0] - v_rad_inward * (pos_next_loc[:, 0] / r_safe), v_rel_local[:, 0]
+    )
+    v_y = jnp.where(
+        penetrating_wall, v_rel_local[:, 1] - v_rad_inward * (pos_next_loc[:, 1] / r_safe), v_rel_local[:, 1]
+    )
+
+    pos_out = jnp.stack([pos_x, pos_y, z_next], axis=-1)
     vel_out = jnp.stack([v_x, v_y, v_rel_local[:, 2]], axis=-1)
     return pos_out, vel_out
 
@@ -2049,14 +2188,27 @@ def _apply_boundary_ccd_subroutine(
         pos_next = jnp.where(is_sph, pos_sph, pos_next)
         vel_next = jnp.where(is_sph, vel_sph, vel_next)
 
-        # 3. Solid lid tray drinking shelf (cylinder with drainage hole and tube hole)
-        is_lid_k = (shape_k == SHAPE_CYLINDER) & (b_params[k, BoundaryParam.HAS_DRAIN] > 0.5)
+        # 3. Solid lid tray drinking shelf (cylinder with drainage hole and tube hole, exposed to air)
+        is_submerged_k = b_params[k, BoundaryParam.IS_SUBMERGED] > 0.5
+        is_lid_k = (shape_k == SHAPE_CYLINDER) & (b_params[k, BoundaryParam.HAS_DRAIN] > 0.5) & (~is_submerged_k)
         lid_k_pos = b_pos_arr[k]
         lid_k_orn = b_orn_arr[k]
         lid_k_orn_inv = invert_orientation(lid_k_orn)
         pos_lid_curr = world_to_local_frame(pos_curr, lid_k_pos, lid_k_orn_inv)
         pos_lid_next = world_to_local_frame(pos_next, lid_k_pos, lid_k_orn_inv)
         v_lid_k = world_to_local_vector(vel_next, lid_k_orn_inv)
+
+        drain_pos_k = b_params[k, BoundaryParam.DRAIN_POS_X : BoundaryParam.DRAIN_POS_Z + 1]
+        drain_norm_k = b_params[k, BoundaryParam.DRAIN_NORMAL_X : BoundaryParam.DRAIN_NORMAL_Z + 1]
+        drain_r_k = b_params[k, BoundaryParam.DRAIN_RADIUS]
+
+        tube_pos_k = b_params[k, BoundaryParam.TUBE_POS_X : BoundaryParam.TUBE_POS_Z + 1]
+        tube_norm_k = b_params[k, BoundaryParam.TUBE_NORMAL_X : BoundaryParam.TUBE_NORMAL_Z + 1]
+        tube_r_k = b_params[k, BoundaryParam.TUBE_PORT_RADIUS]
+
+        intake_pos_k = b_params[k, BoundaryParam.INTAKE_POS_X : BoundaryParam.INTAKE_POS_Z + 1]
+        intake_norm_k = b_params[k, BoundaryParam.INTAKE_NORMAL_X : BoundaryParam.INTAKE_NORMAL_Z + 1]
+        intake_r_k = b_params[k, BoundaryParam.INTAKE_RADIUS]
 
         pos_lid_safe, v_lid_safe = _ccd_planar_shelf_boundary(
             pos_lid_curr,
@@ -2066,12 +2218,18 @@ def _apply_boundary_ccd_subroutine(
             normal_sign=1.0,
             radius=b_params[k, BoundaryParam.RADIUS],
             shelf_depth=b_params[k, BoundaryParam.SHELF_DEPTH],
-            has_drain=jnp.bool_(True),
-            drain_y=b_params[k, BoundaryParam.DRAIN_HOLE_Y],
-            drain_r=b_params[k, BoundaryParam.DRAIN_HOLE_RADIUS],
-            has_tube=jnp.bool_(True),
-            tube_y=tube_y_check,
-            tube_r=tube_r_check,
+            has_drain=b_params[k, BoundaryParam.HAS_DRAIN] > 0.5,
+            drain_pos=drain_pos_k,
+            drain_normal=drain_norm_k,
+            drain_radius=drain_r_k,
+            has_tube=b_params[k, BoundaryParam.HAS_TUBE] > 0.5,
+            tube_pos=tube_pos_k,
+            tube_normal=tube_norm_k,
+            tube_radius=tube_r_k,
+            has_intake=b_params[k, BoundaryParam.HAS_INTAKE] > 0.5,
+            intake_pos=intake_pos_k,
+            intake_normal=intake_norm_k,
+            intake_radius=intake_r_k,
             active_boundary=is_lid_k,
         )
         pos_out = local_to_world_frame(pos_lid_safe, lid_k_pos, lid_k_orn)
@@ -2100,6 +2258,35 @@ def _apply_boundary_ccd_subroutine(
         vel_tb_world = local_to_world_vector(v_tb_safe, tube_k_orn)
         pos_next = jnp.where(is_tube_k, pos_tb_world, pos_next)
         vel_next = jnp.where(is_tube_k, vel_tb_world, vel_next)
+
+        # 5. Motor casing obstacle boundary (outer cylindrical wall and intake port)
+        is_casing_k = shape_k == SHAPE_CASING
+        casing_k_pos = b_pos_arr[k]
+        casing_k_orn = b_orn_arr[k]
+        casing_k_orn_inv = invert_orientation(casing_k_orn)
+        pos_cs_curr = world_to_local_frame(pos_curr, casing_k_pos, casing_k_orn_inv)
+        pos_cs_next = world_to_local_frame(pos_next, casing_k_pos, casing_k_orn_inv)
+        v_cs_k = world_to_local_vector(vel_next, casing_k_orn_inv)
+
+        r_out_cs = b_params[k, BoundaryParam.R_OUTER]
+        casing_h = b_params[k, BoundaryParam.HEIGHT]
+        intake_pos_k = b_params[k, BoundaryParam.INTAKE_POS_X : BoundaryParam.INTAKE_POS_Z + 1]
+        intake_r_k = b_params[k, BoundaryParam.INTAKE_RADIUS]
+
+        pos_cs_safe, v_cs_safe = _ccd_casing_obstacle_boundary(
+            pos_cs_curr,
+            pos_cs_next,
+            v_cs_k,
+            r_out_cs,
+            casing_h,
+            intake_pos_k,
+            intake_r_k,
+            is_casing_k,
+        )
+        pos_cs_world = local_to_world_frame(pos_cs_safe, casing_k_pos, casing_k_orn)
+        vel_cs_world = local_to_world_vector(v_cs_safe, casing_k_orn)
+        pos_next = jnp.where(is_casing_k, pos_cs_world, pos_next)
+        vel_next = jnp.where(is_casing_k, vel_cs_world, vel_next)
 
     return pos_next, vel_next
 
@@ -2208,11 +2395,17 @@ def _integrate_particles_subroutine(
         radius=base_radius,
         shelf_depth=0.020,
         has_drain=jnp.bool_(False),
-        drain_y=0.0,
-        drain_r=0.0,
+        drain_pos=jnp.zeros(3, dtype=jnp.float32),
+        drain_normal=jnp.array([0.0, 0.0, 1.0], dtype=jnp.float32),
+        drain_radius=0.0,
         has_tube=jnp.bool_(False),
-        tube_y=0.0,
-        tube_r=0.0,
+        tube_pos=jnp.zeros(3, dtype=jnp.float32),
+        tube_normal=jnp.array([0.0, 0.0, 1.0], dtype=jnp.float32),
+        tube_radius=0.0,
+        has_intake=jnp.bool_(False),
+        intake_pos=jnp.zeros(3, dtype=jnp.float32),
+        intake_normal=jnp.array([0.0, 0.0, 1.0], dtype=jnp.float32),
+        intake_radius=0.0,
         active_boundary=has_base,
     )
 
@@ -2880,6 +3073,7 @@ class Fluid:
             voxel_radius_scale=self.VOXEL_RADIUS_SCALE,
             processed_boundaries=self.processed_boundaries,
         )
+        self.fluid_body_tracker = FluidBodyTracker(r_s=self.r_s)
 
         if physics_client is not None and body_id is not None and config.boundaries is not None:
             if state_tracker is not None:
@@ -2921,8 +3115,9 @@ class Fluid:
 
             max_r_sq = (cavity_inner_radius - self.spawn_buffer) ** 2
             min_r_sq = (hc_r + self.spawn_buffer) ** 2
+            casing_height = self.processed_boundaries.casing_height
 
-            xy_coords = []
+            all_xy_coords = []
             lim = int(math.ceil(cavity_inner_radius / spacing))
             for ix in range(-lim, lim + 1):
                 for iy in range(-lim, lim + 1):
@@ -2935,26 +3130,28 @@ class Fluid:
                     # Outside tube boundary
                     if (x - hc_x) ** 2 + (y - hc_y) ** 2 <= min_r_sq:
                         continue
-                    # Exclude the solid wall of the casing (between inner radius and outer radius)
-                    if casing_radius > 0.0:
-                        dist_casing_sq = (x - casing_x) ** 2 + (y - casing_y) ** 2
-                        inner_casing_r = casing_radius - casing_thickness
-                        inner_casing_r_sq = (inner_casing_r + self.spawn_buffer) ** 2
-                        outer_casing_r_sq = (casing_radius + self.spawn_buffer) ** 2
-                        if inner_casing_r_sq <= dist_casing_sq <= outer_casing_r_sq:
-                            continue
 
-                    xy_coords.append((x, y))
+                    all_xy_coords.append((x, y))
 
-            xy_coords.sort(key=lambda pt: pt[0] ** 2 + pt[1] ** 2)
-            self.spawn_xy_coords = xy_coords
+            all_xy_coords.sort(key=lambda pt: pt[0] ** 2 + pt[1] ** 2)
+            self.spawn_xy_coords = all_xy_coords
 
-            # Spawn particles above bottom plate
+            # Spawn particles above bottom plate layer by layer
             z = cavity_z_offset + self.r_s + self.spawn_buffer
+            inner_casing_r = casing_radius - casing_thickness
+            inner_casing_r_sq = (inner_casing_r + self.spawn_buffer) ** 2
+            outer_casing_r_sq = (casing_radius + self.spawn_buffer) ** 2
+
             while len(grid_points) < self.n_particles:
-                for x, y in xy_coords:
+                is_in_casing_layer = (casing_radius > 0.0) and (z <= cavity_z_offset + casing_height)
+                for x, y in all_xy_coords:
                     if len(grid_points) >= self.n_particles:
                         break
+                    # Only exclude casing wall thickness within the casing height
+                    if is_in_casing_layer:
+                        dist_casing_sq = (x - casing_x) ** 2 + (y - casing_y) ** 2
+                        if inner_casing_r_sq <= dist_casing_sq <= outer_casing_r_sq:
+                            continue
                     grid_points.append((x, y, z))
                 z += spacing
 
@@ -3087,6 +3284,29 @@ class Fluid:
         if len(self.torques) > 0:
             return float(self.torques[-1])
         return 0.0
+
+    def get_fluid_bodies(self) -> list[FluidBody]:
+        """Return the list of dynamic fluid bodies with recomputed physical shapes and move/split/merge tracking.
+
+        Returns:
+            List of active FluidBody instances.
+        """
+        if not hasattr(self, "fluid_body_tracker"):
+            self.fluid_body_tracker = FluidBodyTracker(r_s=self.r_s)
+        z_offset = self.processed_boundaries.cavity_z_offset
+        lid_b = self.processed_boundaries.lid
+        tube_b = self.processed_boundaries.tube_wall
+        z_lid = lid_b.z_floor if lid_b is not None else self.processed_boundaries.cavity_height
+        tube_y = tube_b.pos[1] if tube_b is not None else (lid_b.tube_y if lid_b is not None else 0.0)
+        tube_r = tube_b.inner_radius if tube_b is not None else (lid_b.tube_r if lid_b is not None else 0.0)
+        return self.fluid_body_tracker.update_bodies(
+            self.last_positions,
+            self.last_velocities,
+            z_floor=z_offset,
+            z_lid=z_lid,
+            tube_y=tube_y,
+            tube_r=tube_r,
+        )
 
     def get_boundary_voxels(self) -> dict[str, np.ndarray]:
         """Compute 3D world-space voxel coordinates for each boundary type in the simulation grid.

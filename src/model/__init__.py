@@ -8,12 +8,15 @@ from .boundary_config import (
     BoundaryConfig,
     BoundaryCADConformance,
     ShapeType,
+    ShapeCode,
     BoundaryType,
     BoundaryParam,
     LinkType,
     SurfaceBounds,
     ResolvedBoundaries,
+    Position3D,
 )
 from .fluid_config import FluidConfig
+from .fluid_body import FluidBody, FluidBodyType, FluidBodyTracker
 from .coordinates import CoordinateSpace, CoordinateSystem, SpatialPose
 from .wiring import PinModel, LabelModel, FootprintModel, NetModel, Wiring

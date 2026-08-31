@@ -459,6 +459,12 @@ class ProcessedBoundaries:
         return float(self.b_params[c_idx, BoundaryParam.THICKNESS]) if c_idx >= 0 else 0.0
 
     @property
+    def casing_height(self) -> float:
+        """Get casing height."""
+        c_idx = self.casing_idx
+        return float(self.b_params[c_idx, BoundaryParam.HEIGHT]) if c_idx >= 0 else 0.0
+
+    @property
     def b_pos_list(self) -> list[tuple[float, float, float]]:
         """Get list of 3D positions for all boundaries."""
         return [tuple(float(v) for v in p) for p in self.b_pos_arr]  # type: ignore[misc]
@@ -709,6 +715,30 @@ class BoundaryProcessor:
                 surf.drain_edge_r_min,
                 surf.drain_edge_r_max,
                 surf.shelf_depth,
+                surf.has_intake,
+                surf.intake_pos_x,
+                surf.intake_pos_y,
+                surf.intake_pos_z,
+                surf.intake_normal_x,
+                surf.intake_normal_y,
+                surf.intake_normal_z,
+                surf.intake_radius,
+                surf.drain_pos_x,
+                surf.drain_pos_y,
+                surf.drain_pos_z,
+                surf.drain_normal_x,
+                surf.drain_normal_y,
+                surf.drain_normal_z,
+                surf.drain_radius,
+                surf.tube_pos_x,
+                surf.tube_pos_y,
+                surf.tube_pos_z,
+                surf.tube_normal_x,
+                surf.tube_normal_y,
+                surf.tube_normal_z,
+                surf.tube_port_radius,
+                surf.is_submerged,
+                surf.pool_max_z,
             ]
             b_params_list.append(params)
 

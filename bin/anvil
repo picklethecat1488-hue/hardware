@@ -55,6 +55,17 @@ pull_stages() {
     echo "✅ Staged recordings synced."
 }
 
+auto_download_simulate() {
+    for arg in "$@"; do
+        if [[ "$arg" == *.rrd ]]; then
+            local rrd_dir
+            rrd_dir="$(dirname "$arg")"
+            echo "📥 Auto-downloading generated recording and staging checkpoints for ${arg}..."
+            pull_stages "${rrd_dir}"
+        fi
+    done
+}
+
 case "$1" in
     sync|push)
         sync_code
@@ -107,20 +118,7 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
         sync_code
         echo "🌊 Running simulation on ${REMOTE_HOST}..."
         ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} python src/view.py $*"
-        # Auto-download any .rrd file and all staged checkpoint recordings
-        for arg in "$@"; do
-            if [[ "$arg" == *.rrd ]]; then
-                local rrd_dir
-                rrd_dir="$(dirname "$arg")"
-                local rrd_base
-                rrd_base="$(basename "$arg" .rrd)"
-                local prefix
-                prefix="${rrd_base%_*}"
-                
-                echo "📥 Auto-downloading generated recording and staging checkpoints for ${arg}..."
-                pull_stages "${rrd_dir}"
-            fi
-        done
+        auto_download_simulate "$@"
         ;;
     smoke)
         sync_code

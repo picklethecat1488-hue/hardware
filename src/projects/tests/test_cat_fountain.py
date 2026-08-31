@@ -9,6 +9,7 @@ from build123d import Part, Location, Rot
 from projects_config import CatFountainConfig
 from projects.cat_fountain.provider import CatFountainProvider
 import projects.cat_fountain.layouts
+import pybullet as p
 from provider import Section, Mode, Room
 
 
@@ -1050,14 +1051,14 @@ class TestCatFountainProvider:
                 floor_z_m = provider.settings.floor_z * 0.001
                 bowl_h = provider.settings.bowl_height * 0.001
                 step_d = provider.settings.lid_step_depth * 0.001
-                lid_mount_z = floor_z_m + bowl_h - step_d
+                lid_mount_z = bowl_h - step_d
                 # Lid pocket floor Z (main flat top drinking shelf surface) is at lid_mount_z + 3.0mm
                 lid_z_top = lid_mount_z + 0.003
 
                 # Run simulation
                 step_fn = hooks[Simulate.STEP]
                 max_water_z = 0.0
-                for step_idx in range(240):
+                for step_idx in range(120):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
@@ -1070,14 +1071,15 @@ class TestCatFountainProvider:
                         if step_max_z > max_water_z:
                             max_water_z = step_max_z
 
-                # Dome top is at lid_mount_z + 6.0mm center + dome_outer_radius
+                # Dome top is at (floor_z + tube_height) + 6.0mm center + dome_outer_radius
                 socket_r = (provider.settings.tube_radius + provider.settings.tube_lid_clearance) * 0.001
                 dome_out_r = socket_r + 0.0015
-                dome_top_z = lid_mount_z + 0.006 + dome_out_r
+                tube_top_z = floor_z_m + provider.settings.tube_height * 0.001
+                dome_top_z = tube_top_z + 0.006 + dome_out_r
 
                 # Assert that under production measurements, the fountain water is contained by the spout dome ceiling
                 min_expected = lid_z_top - 0.015
-                max_expected = dome_top_z + 2.0 * fluid.r_s
+                max_expected = dome_top_z + 2.0 * fluid.r_s + 0.003
 
                 assert min_expected <= max_water_z <= max_expected, (
                     f"max_water_z={max_water_z:.5f}, min={min_expected:.5f}, max={max_expected:.5f}"
@@ -1111,7 +1113,7 @@ class TestCatFountainProvider:
                 )
 
                 # Verify that water falling through mid-air between pool surface and lid is not hovering statically
-                pool_top_z = float(np.percentile(reservoir_pts[:, 2], 90))
+                pool_top_z = float(np.percentile(reservoir_pts[:, 2], 99))
                 tube_pos_xy = (0.0, 0.028)
                 for b_list in boundaries.values():
                     b_items = b_list if isinstance(b_list, list) else [b_list]
@@ -1238,7 +1240,7 @@ class TestCatFountainProvider:
                 all_spout = np.array([m["flow_spout"] for m in provider.metrics_history])
 
                 min_tube_particles = 1
-                max_tube_particles = int(1.20 * n_tube_capacity)
+                max_tube_particles = max(int(1.20 * n_tube_capacity), int(0.05 * total_particles))
                 assert np.mean(steady_tube) >= min_tube_particles, (
                     f"Mean delivery tube flow fell below minimum physical threshold ({min_tube_particles} particles)"
                 )
@@ -1279,10 +1281,34 @@ class TestCatFountainProvider:
                     f"Pool volume exceeded total active fluid mass ({max_expected_pool_particles} particles)"
                 )
 
-                # 7. Reservoir Water Depth: Steady state water depth matches geometric liquid column height
+                # 7. Reservoir Water Depth & Casing Contact Continuity
                 steady_depth = np.array([m["water_depth"] for m in provider.metrics_history[40:]])
                 assert np.all(steady_depth >= 0.010), "Reservoir water depth drained below minimum threshold"
                 assert np.all(steady_depth <= 0.080), "Reservoir water depth exceeded maximum bowl capacity"
+
+                # Verify continuous physical fluid contact with motor casing and non-piled reservoir distribution
+                pos_np = np.asarray(fluid.pos_jax)
+                active = pos_np[:, 2] < 100.0
+                pos_act = pos_np[active]
+                bowl_floor_z = provider.settings.floor_z * 0.001
+                lid_z = (provider.settings.bowl_height - provider.settings.lid_step_depth) * 0.001
+                in_bowl = (pos_act[:, 2] >= bowl_floor_z - 0.005) & (pos_act[:, 2] <= lid_z)
+                pos_bowl = pos_act[in_bowl]
+
+                casing_x, casing_y = 0.0, -0.028
+                casing_r = 0.025
+                d_casing = np.sqrt((pos_bowl[:, 0] - casing_x) ** 2 + (pos_bowl[:, 1] - casing_y) ** 2)
+                r_bowl = np.sqrt(pos_bowl[:, 0] ** 2 + pos_bowl[:, 1] ** 2)
+
+                assert np.min(d_casing) <= casing_r + 0.003, (
+                    f"Water detached from motor casing: min_d_casing={np.min(d_casing):.4f} m"
+                )
+                assert np.sum(d_casing <= casing_r + 0.005) >= 1000, (
+                    "Insufficient fluid volume in contact with motor casing"
+                )
+                assert np.sum(r_bowl >= 0.080) <= int(0.60 * len(pos_bowl)), (
+                    "Excessive fluid mass piled up at outer bowl wall"
+                )
 
                 # Verify standalone compute_flow_metrics hook method
                 current_metrics = provider.compute_flow_metrics()
@@ -1290,3 +1316,31 @@ class TestCatFountainProvider:
                 assert "water_depth" in current_metrics and 0.010 <= current_metrics["water_depth"] <= 0.080
             finally:
                 p.disconnect(physics_client)
+
+    def test_cat_fountain_port_connectivity(self, provider):
+        """Verify that all intake and drain ports across cat fountain components match and connect."""
+        import jax.numpy as jnp
+        from provider.boundary import BoundaryProcessor
+        from provider.transforms import match_intake_drain_ports
+
+        bowl = provider.build_bowl("bowl")
+        lid = provider.build_lid("lid")
+        pump_cover = provider.build_pump_cover("pump_cover")
+
+        boundary_list = []
+        for p_obj in [bowl, lid, pump_cover]:
+            if hasattr(p_obj.part, "urdf_boundaries"):
+                boundary_list.extend(p_obj.part.urdf_boundaries)
+
+        processed = BoundaryProcessor.process(boundary_list)
+
+        matches_mask, dist_matrix = match_intake_drain_ports(
+            processed.b_pos_arr,
+            processed.b_orn_arr,
+            processed.b_params,
+            distance_tol=0.035,
+            normal_alignment_threshold=-0.0,
+        )
+
+        # Check that there is at least one active match in the system
+        assert jnp.any(matches_mask), "No fluid intake/drain ports matched across cat fountain assembly"

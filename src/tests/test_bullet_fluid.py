@@ -769,7 +769,7 @@ class TestBulletFluid:
 
             # Settle parameters based on mode
             settle_steps = 150
-            run_steps = 50
+            run_steps = 100
             diff_threshold = 0.0005
 
             # 1. Let the fluid settle to form a pool

@@ -570,6 +570,14 @@ class CatFountainProvider(Provider):
                     slot_width=8.0 * 0.001,
                     spout_radius=(self.settings.spout_deflection_radius + 1.0) * 0.001,
                     spout_height=(self.settings.spout_deflection_thickness + 9.0) * 0.001,
+                    has_intake=True,
+                    intake_pos=(0.0, 0.0, 0.0),
+                    intake_normal=(0.0, 0.0, -1.0),
+                    intake_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
+                    has_drain=True,
+                    drain_pos=(0.0, 0.0, self.settings.tube_height * 0.001),
+                    drain_normal=(0.0, 0.0, 1.0),
+                    drain_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
                     xyz=(0.0, 28.0 * 0.001, floor_z * 0.001),
                     rpy=(0.0, 0.0, 0.0),
                 )
@@ -591,9 +599,18 @@ class CatFountainProvider(Provider):
                     height=10.0 * 0.001,
                     slot_height=9.0 * 0.001,  # Slot opening from Z = 0 to 9mm
                     slot_width=8.0 * 0.001,
-                    tube_y=28.0 * 0.001,
+                    tube_pos=(0.0, 28.0 * 0.001, 0.0),
                     cutoff_y=0.0,
                     ceiling_thickness=0.0,
+                    has_intake=True,
+                    intake_pos=(0.0, 0.0, 10.0 * 0.001),
+                    intake_normal=(0.0, 0.0, 1.0),
+                    intake_radius=self.settings.pump_inlet_radius * 0.001,
+                    has_drain=True,
+                    drain_pos=(0.0, 28.0 * 0.001, 0.0),
+                    drain_normal=(0.0, 1.0, 0.0),
+                    drain_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
+                    is_submerged=True,
                     xyz=(0.0, 0.0, floor_z * 0.001),
                     rpy=(0.0, 0.0, 0.0),
                 )
@@ -792,6 +809,7 @@ class CatFountainProvider(Provider):
         step_d = self.settings.lid_step_depth
         step_w = self.settings.lid_step_width
         clearance = self.settings.lid_clearance
+        socket_r = self.settings.tube_radius + self.settings.tube_lid_clearance
 
         with BuildPart() as lid:
             lid_disk = Cylinder(radius=lid_r, height=lid_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
@@ -854,12 +872,18 @@ class CatFountainProvider(Provider):
 
             with Locations((0.0, tube_y, 3.0)):
                 with Locations(Rot(-self.settings.lid_platform_slope_angle, 0, 0)):
-                    terrace_shelf = Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                     with Locations((0, 0, 3.0)):
                         Cylinder(radius=30.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                         Cylinder(
                             radius=28.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
                         )
+                    Cylinder(
+                        radius=socket_r,
+                        height=10.0,
+                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                        mode=Mode.SUBTRACT,
+                    )
 
             with Locations((0.0, tube_y, 0)):
                 socket_r = self.settings.tube_radius + self.settings.tube_lid_clearance
@@ -918,11 +942,19 @@ class CatFountainProvider(Provider):
                 thickness=self.settings.lid_pocket_thickness * 0.001,
                 xyz=(0.0, 0.0, 0.0),
                 rpy=(0.0, 0.0, 0.0),
+                has_intake=True,
+                intake_pos=(0.0, tube_y * 0.001, 0.0),
+                intake_normal=(0.0, 0.0, 1.0),
+                intake_radius=(self.settings.tube_radius + self.settings.tube_lid_clearance) * 0.001,
                 has_drain=True,
-                drain_hole_y=cutout_y * 0.001,  # Parameterized coordinate
-                drain_hole_radius=cutout_r * 0.001,  # Parameterized radius
+                drain_pos=(0.0, cutout_y * 0.001, 0.0),
+                drain_normal=(0.0, 0.0, 1.0),
+                drain_radius=cutout_r * 0.001,
                 has_tube=True,
+                tube_pos=(0.0, tube_y * 0.001, 0.0),
+                tube_normal=(0.0, 0.0, 1.0),
                 tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
+                shelf_depth=self.settings.lid_pocket_thickness * 0.001,
             )
 
             URDFBoundary(
@@ -1065,11 +1097,16 @@ class CatFountainProvider(Provider):
                     thickness=cover_h * 0.001,
                     xyz=(0.0, 0.0, 0.0),
                     rpy=(math.pi, 0.0, 0.0),
-                    has_drain=True,
-                    drain_hole_y=0.0,
-                    drain_hole_radius=inlet_r * 0.001,  # Large hole to let water enter snout
-                    has_tube=True,
-                    tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
+                    has_intake=True,
+                    intake_pos=(0.0, 0.0, 0.0),
+                    intake_normal=(0.0, 0.0, 1.0),
+                    intake_radius=inlet_r * 0.001,
+                    has_drain=False,
+                    has_tube=False,
+                    tube_pos=(0.0, 0.0, 0.0),
+                    tube_normal=(0.0, 0.0, 1.0),
+                    tube_radius=0.0,
+                    is_submerged=True,
                 )
 
         RigidJoint("mount", cover.part, Location((0, 0, 0)))
