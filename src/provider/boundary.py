@@ -738,6 +738,7 @@ class BoundaryProcessor:
                 surf.tube_normal_z,
                 surf.tube_port_radius,
                 surf.is_submerged,
+                surf.pool_max_z,
             ]
             b_params_list.append(params)
 

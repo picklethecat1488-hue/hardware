@@ -193,6 +193,7 @@ class BoundaryParam(IntEnum):
     TUBE_NORMAL_Z = 57
     TUBE_PORT_RADIUS = 58
     IS_SUBMERGED = 59
+    POOL_MAX_Z = 60
 
     # Vec3 Block Base Indices
     INTAKE_POS = 38
@@ -263,6 +264,9 @@ class SurfaceBounds(BaseModel):
 
     is_submerged: float = Field(
         default=0.0, description="Flag indicating if boundary is submerged in liquid (1.0) or exposed to air (0.0)"
+    )
+    pool_max_z: float = Field(
+        default=0.0, description="Maximum Z elevation of the reservoir pool cavity under the lid (meters)"
     )
 
 
@@ -708,6 +712,12 @@ class BoundaryConfig(BaseModel):
         else:
             shelf_depth = thick
 
+        pool_max_z = (
+            max(0.0, (z_off + h) - shelf_depth)
+            if (self.type == BoundaryType.CAVITY or self.link_type == LinkType.BASE)
+            else 0.0
+        )
+
         return SurfaceBounds(
             z_bottom=z_bottom,
             z_top=z_top,
@@ -754,6 +764,7 @@ class BoundaryConfig(BaseModel):
             tube_normal_z=float(self.tube_normal[2]),
             tube_port_radius=float(self.tube_radius or 0.0),
             is_submerged=1.0 if self.is_submerged else 0.0,
+            pool_max_z=pool_max_z,
         )
 
 

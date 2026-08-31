@@ -21,9 +21,18 @@ import pybullet as p
 from scipy.spatial import cKDTree  # type: ignore
 
 from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFBoundaryType
-from provider.room import BulletStateTracker
 from provider.bullet import LinkType, _is_real_physics_client
-from model import BoundaryConfig, FluidConfig, CoordinateSpace, CoordinateSystem, SpatialPose, BoundaryParam
+from model import (
+    BoundaryConfig,
+    FluidConfig,
+    CoordinateSpace,
+    CoordinateSystem,
+    SpatialPose,
+    BoundaryParam,
+    FluidBody,
+    FluidBodyType,
+    FluidBodyTracker,
+)
 from provider.transforms import (
     invert_orientation,
     world_to_base_orientation,
@@ -1190,6 +1199,52 @@ def _g2p_scalar_jax(pos, grid_val, dx, origin, nx=32, ny=32, nz=28):
     return val_p
 
 
+@partial(jax.jit, static_argnums=(3, 4, 5))
+def _compute_dynamic_fluid_bodies_jax(
+    pos_local: jnp.ndarray,
+    dx: float,
+    origin: jnp.ndarray,
+    nx: int = 32,
+    ny: int = 32,
+    nz: int = 28,
+    cavity_floor_z: float = 0.0,
+    z_max_pool: float = 0.0,
+    r_s: float = 0.003,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Dynamically recompute physical fluid bodies, local column surface heights, and horizontal leveling gradients."""
+    gp = (pos_local - origin) / dx
+    ix = jnp.clip(jnp.floor(gp[:, 0]).astype(jnp.int32), 0, nx - 1)
+    iy = jnp.clip(jnp.floor(gp[:, 1]).astype(jnp.int32), 0, ny - 1)
+
+    # 1. Dynamic 2D column water surface height in reservoir basin
+    in_basin = jnp.where(
+        z_max_pool > 0.0,
+        (pos_local[:, 2] <= z_max_pool) & (pos_local[:, 2] >= cavity_floor_z),
+        pos_local[:, 2] >= cavity_floor_z,
+    )
+    surf_z_grid = (
+        jnp.full((nx, ny), cavity_floor_z).at[ix, iy].max(jnp.where(in_basin, pos_local[:, 2], cavity_floor_z))
+    )
+    col_count = jnp.zeros((nx, ny), dtype=jnp.float32).at[ix, iy].add(jnp.where(in_basin, 1.0, 0.0))
+
+    # 2. Dynamic 2D surface gradient for horizontal hydrostatic leveling
+    surf_pad = jnp.pad(surf_z_grid, ((1, 1), (1, 1)), mode="edge")
+    grad_x = (surf_pad[2:, 1:-1] - surf_pad[:-2, 1:-1]) / (2.0 * dx)
+    grad_y = (surf_pad[1:-1, 2:] - surf_pad[1:-1, :-2]) / (2.0 * dx)
+
+    # 3. Sample back to particle coordinates
+    p_surf_z = surf_z_grid[ix, iy]
+    p_grad_x = grad_x[ix, iy]
+    p_grad_y = grad_y[ix, iy]
+    p_col_count = col_count[ix, iy]
+
+    # Particles inside moving fluid bodies (within local free surface of occupied voxel columns)
+    in_fluid_body = in_basin & (pos_local[:, 2] <= p_surf_z + 2.0 * r_s) & (p_col_count >= 2.0)
+    level_grad_local = jnp.stack([-p_grad_x, -p_grad_y, jnp.zeros_like(p_grad_x)], axis=-1)
+
+    return in_fluid_body, p_surf_z, level_grad_local, p_col_count
+
+
 @jax.jit
 def _lbm_step_3d_jax(grid_rho, grid_u):
     feq_list = []
@@ -1405,29 +1460,15 @@ def _g2p_mapping_subroutine(
     lbm_vel_local = jnp.where(active_col, lbm_vel_local / c_scale, 0.0)
     vel_grid_world = base_to_world_vector(lbm_vel_local, base_orn) + base_vel
 
-    # Submerged reservoir pool: derive liquid depth from fluid volume and base container area
-    base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
-    vol_particle = (4.0 / 3.0) * math.pi * (r_s**3)
-    vol_total = pos_curr.shape[0] * vol_particle
-    pool_area = math.pi * (base_radius**2) + 1e-6
-    pool_depth = (vol_total / 0.70) / pool_area
-
-    casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
+    # Dynamic moving voxel fluid bodies: continuously compute physical fluid shapes from voxel occupancy
     cavity_floor_z = jnp.where(
         base_idx != -1,
         b_pos_arr[base_idx, 2] - base_pos[2] + b_params[base_idx, BoundaryParam.Z_OFFSET],
         0.0,
     )
-
-    pool_height = jnp.where(
-        base_idx != -1,
-        jnp.where(casing_top > 0.0, jnp.maximum(pool_depth, casing_top), pool_depth),
-        pool_depth,
-    )
-    in_pool = (
-        (pos_local[:, 2] >= cavity_floor_z)
-        & (pos_local[:, 2] <= cavity_floor_z + pool_height)
-        & (r_local <= base_radius)
+    z_max_pool = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.POOL_MAX_Z], 0.0)
+    in_fluid_body, _, _, _ = _compute_dynamic_fluid_bodies_jax(
+        pos_local, dx, origin, nx, ny, nz, cavity_floor_z=cavity_floor_z, z_max_pool=z_max_pool, r_s=r_s
     )
 
     in_tube_or_casing = jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_)
@@ -1444,7 +1485,7 @@ def _g2p_mapping_subroutine(
         is_casing = (shape == SHAPE_CASING) & (r_b_xy <= r_outer) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= z_top)
         in_tube_or_casing = in_tube_or_casing | is_tube | is_casing
     in_fluid_continuum = jnp.where(
-        base_idx != -1, in_pool & (~in_tube_or_casing), jnp.ones(pos_curr.shape[0], dtype=jnp.bool_)
+        base_idx != -1, in_fluid_body & (~in_tube_or_casing), jnp.ones(pos_curr.shape[0], dtype=jnp.bool_)
     )
     has_casing = jnp.any(b_shapes == SHAPE_CASING)
     # When enclosed by a pump casing, reservoir continuum maintains Lagrangian settling momentum; open impellers drive LBM swirl
@@ -1524,16 +1565,6 @@ def _compute_particle_forces_subroutine(
 
     base_pos = jnp.where(base_idx != -1, b_pos_arr[base_idx], jnp.zeros(3))
     base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
-    casing_top = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.CASING_TOP_Z], 0.0)
-    vol_particle = (4.0 / 3.0) * math.pi * (r_s**3)
-    vol_total = pos_curr.shape[0] * vol_particle
-    pool_area = math.pi * (base_radius**2) + 1e-6
-    pool_depth = (vol_total / 0.70) / pool_area
-    pool_height = jnp.where(
-        base_idx != -1,
-        jnp.where(casing_top > 0.0, jnp.maximum(pool_depth, casing_top), pool_depth),
-        pool_depth,
-    )
     cavity_floor_z = jnp.where(
         base_idx != -1,
         b_params[base_idx, BoundaryParam.Z_OFFSET],
@@ -1562,7 +1593,8 @@ def _compute_particle_forces_subroutine(
 
         # 1. Intake draw near and above the designated intake port along surface normal
         inlet_r_eff = jnp.where(intake_r_i > 0.0, intake_r_i, radius * 0.40)
-        d_in = (intake_pos_i - pos_casing) - intake_norm_i * 0.005
+        target_in = intake_pos_i - intake_norm_i * 0.008
+        d_in = target_in - pos_casing
         dist_in = jnp.sqrt(jnp.sum(d_in**2, axis=-1, keepdims=True) + 1e-8)
         dir_casing = d_in / dist_in
         dir_world = local_to_world_vector(dir_casing, casing_orn)
@@ -1571,7 +1603,7 @@ def _compute_particle_forces_subroutine(
         in_suction = (
             has_intake_i
             & (d_in_xy <= inlet_r_eff + 0.015)
-            & (pos_casing[:, 2] >= casing_h * 0.5)
+            & (pos_casing[:, 2] >= casing_h - 0.002)
             & (pos_casing[:, 2] <= casing_h + 0.030)
         )
         suction_strength = (v_tip * 2.0 + g_mag * 1.5) * jnp.clip(1.0 - dist_in / (inlet_r_eff + 0.025), 0.0, 1.0)
@@ -1645,7 +1677,7 @@ def _compute_particle_forces_subroutine(
             0.0,
         )
         height_frac = jnp.clip(1.0 - pos_tube[:, 2] / (tube_h + 1e-6), 0.0, 1.0)
-        v_target_rise = jnp.maximum(v_flow_est * 3.0, 1.20) * (0.8 + 0.2 * height_frac)
+        v_target_rise = jnp.maximum(v_flow_est * 1.8, 0.80) * (0.25 + 0.75 * height_frac)
 
         pump_lift_scalar = jnp.where(
             jnp.abs(omega) > 1e-3,
@@ -1660,9 +1692,9 @@ def _compute_particle_forces_subroutine(
         # Radial spreading and outward deflection at the fountain spout opening
         r_outer = b_params[i, BoundaryParam.R_OUTER]
         at_spout = (
-            (pos_tube[:, 2] >= spout_z_min)
-            & (pos_tube[:, 2] <= tube_h + spout_head_room)
-            & (r_tube_xy <= r_outer + r_s)
+            (pos_tube[:, 2] >= spout_z_min - 0.005)
+            & (pos_tube[:, 2] <= tube_h + 0.020)
+            & (r_tube_xy <= r_outer + 0.020)
         )
 
         r_xy_safe = jnp.maximum(r_tube_xy, 1e-5)
@@ -1674,10 +1706,10 @@ def _compute_particle_forces_subroutine(
 
         # Purely radial 360-degree expansion over dome with downward deflection (centered on spout)
         down_dir_world = local_to_world_vector(jnp.array([0.0, 0.0, -1.0]), tube_orn)
-        dome_disp = radial_unit_world * 0.85 + down_dir_world[None, :] * 0.35
+        dome_disp = radial_unit_world * 0.85 + down_dir_world[None, :] * 0.45
         disp_mag = jnp.sqrt(jnp.sum(dome_disp**2, axis=-1, keepdims=True) + 1e-8)
         spout_out_dir = dome_disp / disp_mag
-        spout_accel = spout_out_dir * (g_mag * 1.5 + v_flow_est * 1.5)
+        spout_accel = spout_out_dir * (g_mag * 2.0 + v_flow_est * 2.0)
 
         tube_pump_accel_i = jnp.where(
             at_spout[:, None],
@@ -1708,7 +1740,7 @@ def _compute_particle_forces_subroutine(
         tray_z_max = b_params[i, BoundaryParam.TRAY_Z_MAX]
 
         # 1. Particles on the main lid surface
-        on_lid = (r_lid_xy < radius) & (pos_lid[:, 2] >= tray_z_min) & (pos_lid[:, 2] <= tray_z_max + 0.015)
+        on_lid = (r_lid_xy < radius) & (pos_lid[:, 2] >= tray_z_min) & (pos_lid[:, 2] <= tray_z_max + 2.0 * r_s)
 
         # 2. Surface sheet flow: blend radial expansion from spout center with forward gravity slope towards drain
         dx_spout = pos_lid[:, 0] - 0.0
@@ -1777,35 +1809,69 @@ def _compute_particle_forces_subroutine(
         active_lid_mask = on_lid | edge_zone
         lid_drain_accel += jnp.where(is_lid & active_lid_mask[:, None], total_lid_accel_world, jnp.zeros_like(pos_curr))
 
-    pool_inward_accel = jnp.zeros_like(pos_curr)
-
     effective_gravity = gravity[None, :]
 
-    # Reservoir pool hydrostatic support:
-    # Within the settled fluid layer (cavity_floor_z <= z <= cavity_floor_z + pool_height),
-    # upward hydrostatic pressure gradient balances gravity throughout the liquid column,
-    # maintaining constant pool volume and depth.
+    # Dynamic moving voxel fluid bodies: continuously compute physical fluid shapes from voxel occupancy
     base_pos_b = b_pos_arr[base_idx]
     base_orn_b = b_orn_arr[base_idx]
     base_orn_b_inv = invert_orientation(base_orn_b)
     pos_b = world_to_local_frame(pos_curr, base_pos_b, base_orn_b_inv)
     r_b, _, _ = cartesian_to_cylindrical(pos_b)
-    in_hydrostatic_pool = (
-        (pos_b[:, 2] >= cavity_floor_z)
-        & (pos_b[:, 2] <= cavity_floor_z + pool_height)
-        & (r_b <= base_radius)
-        & (base_idx != -1)
-        & (pool_height > 1e-4)
+    v_b = world_to_local_vector(vel_world, base_orn_b_inv)
+    v_z_b = v_b[:, 2]
+
+    z_max_pool = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.POOL_MAX_Z], 0.0)
+    in_fluid_body, p_surf_z, level_grad_local, _ = _compute_dynamic_fluid_bodies_jax(
+        pos_b, dx, origin, nx, ny, nz, cavity_floor_z=cavity_floor_z, z_max_pool=z_max_pool, r_s=r_s
     )
+
+    # 1. Dynamic hydrostatic support and falling fluid reintegration
+    cushion_accel_z = -jnp.minimum(v_z_b, 0.0) * 35.0
+    total_support_z = g_mag + cushion_accel_z
+
     hydrostatic_support_world = local_to_world_vector(
-        jnp.stack([jnp.zeros_like(r_b), jnp.zeros_like(r_b), g_mag * jnp.ones_like(r_b)], axis=-1),
+        jnp.stack([jnp.zeros_like(r_b), jnp.zeros_like(r_b), total_support_z], axis=-1),
         base_orn_b,
     )
     hydrostatic_accel = jnp.where(
-        in_hydrostatic_pool[:, None],
+        in_fluid_body[:, None],
         hydrostatic_support_world,
         0.0,
     )
+
+    # 2. Dynamic horizontal leveling gradient derived continuously from the moving surface height field
+    level_accel_world = local_to_world_vector(level_grad_local * (g_mag * 0.40), base_orn_b)
+    leveling_accel = jnp.where(
+        in_fluid_body[:, None],
+        level_accel_world,
+        0.0,
+    )
+
+    # 3. Dynamic replenishment draw toward active pump intake sink:
+    # When water is intaked into the pump system, surrounding reservoir fluid near the casing
+    # is drawn inward to continuously replenish intaked volume and maintain hydrostatic equilibrium.
+    pool_inward_accel = jnp.zeros_like(pos_curr)
+    for i, shape in enumerate(b_shapes):
+        has_intake_i = b_params[i, BoundaryParam.HAS_INTAKE] > 0.5
+        intake_pos_i = b_params[i, BoundaryParam.INTAKE_POS_X : BoundaryParam.INTAKE_POS_Z + 1]
+        intake_world_i = local_to_world_frame(intake_pos_i[None, :], b_pos_arr[i], b_orn_arr[i])[0]
+        intake_base_i = world_to_local_frame(intake_world_i[None, :], base_pos_b, base_orn_b_inv)[0]
+
+        dx_in = intake_base_i[0] - pos_b[:, 0]
+        dy_in = intake_base_i[1] - pos_b[:, 1]
+        dist_in_xy = jnp.sqrt(dx_in**2 + dy_in**2 + 1e-8)
+        dir_in_base = jnp.stack([dx_in / dist_in_xy, dy_in / dist_in_xy, jnp.zeros_like(dx_in)], axis=-1)
+        dir_in_world = local_to_world_vector(dir_in_base, base_orn_b)
+
+        # Replenishment draw acts within the intake replenishment radius (dist_in_xy <= 45mm)
+        in_intake_zone = (dist_in_xy <= 0.045) & (pos_b[:, 2] >= cavity_floor_z)
+        replenish_mag = (v_tip * 0.20 + g_mag * 0.15) * jnp.clip(1.0 - dist_in_xy / 0.045, 0.0, 1.0)
+        leveling_accel_i = jnp.where(
+            in_fluid_body[:, None] & has_intake_i & (v_tip > 1e-3) & in_intake_zone[:, None],
+            dir_in_world * replenish_mag[:, None],
+            0.0,
+        )
+        pool_inward_accel += leveling_accel_i
 
     accel = (
         b_accel_clamped
@@ -1813,6 +1879,7 @@ def _compute_particle_forces_subroutine(
         + tube_pump_accel
         + lid_drain_accel
         + pool_inward_accel
+        + leveling_accel
         + effective_gravity
         + hydrostatic_accel
     )
@@ -3006,6 +3073,7 @@ class Fluid:
             voxel_radius_scale=self.VOXEL_RADIUS_SCALE,
             processed_boundaries=self.processed_boundaries,
         )
+        self.fluid_body_tracker = FluidBodyTracker(r_s=self.r_s)
 
         if physics_client is not None and body_id is not None and config.boundaries is not None:
             if state_tracker is not None:
@@ -3216,6 +3284,29 @@ class Fluid:
         if len(self.torques) > 0:
             return float(self.torques[-1])
         return 0.0
+
+    def get_fluid_bodies(self) -> list[FluidBody]:
+        """Return the list of dynamic fluid bodies with recomputed physical shapes and move/split/merge tracking.
+
+        Returns:
+            List of active FluidBody instances.
+        """
+        if not hasattr(self, "fluid_body_tracker"):
+            self.fluid_body_tracker = FluidBodyTracker(r_s=self.r_s)
+        z_offset = self.processed_boundaries.cavity_z_offset
+        lid_b = self.processed_boundaries.lid
+        tube_b = self.processed_boundaries.tube_wall
+        z_lid = lid_b.z_floor if lid_b is not None else self.processed_boundaries.cavity_height
+        tube_y = tube_b.pos[1] if tube_b is not None else (lid_b.tube_y if lid_b is not None else 0.0)
+        tube_r = tube_b.inner_radius if tube_b is not None else (lid_b.tube_r if lid_b is not None else 0.0)
+        return self.fluid_body_tracker.update_bodies(
+            self.last_positions,
+            self.last_velocities,
+            z_floor=z_offset,
+            z_lid=z_lid,
+            tube_y=tube_y,
+            tube_r=tube_r,
+        )
 
     def get_boundary_voxels(self) -> dict[str, np.ndarray]:
         """Compute 3D world-space voxel coordinates for each boundary type in the simulation grid.
