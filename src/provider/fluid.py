@@ -1685,17 +1685,13 @@ def _compute_particle_forces_subroutine(
             0.0,
         )
 
-        in_tube = (r_tube_xy <= inner_r + r_s) & (pos_tube[:, 2] >= -2.0 * r_s) & (pos_tube[:, 2] < spout_z_min)
+        in_tube = (r_tube_xy <= inner_r + r_s) & (pos_tube[:, 2] >= -2.0 * r_s) & (pos_tube[:, 2] <= tube_h)
         up_vector = local_to_world_vector(jnp.array([0.0, 0.0, 1.0]), tube_orn)
         up_world = up_vector[None, :] * pump_lift_scalar[:, None]
 
-        # Radial spreading and outward deflection at the fountain spout opening
+        # Radial spreading and outward deflection at the fountain spout opening (above tube exit)
         r_outer = b_params[i, BoundaryParam.R_OUTER]
-        at_spout = (
-            (pos_tube[:, 2] >= spout_z_min - 0.005)
-            & (pos_tube[:, 2] <= tube_h + 0.020)
-            & (r_tube_xy <= r_outer + 0.020)
-        )
+        at_spout = (pos_tube[:, 2] > tube_h) & (pos_tube[:, 2] <= tube_h + 0.020) & (r_tube_xy <= r_outer + 0.020)
 
         r_xy_safe = jnp.maximum(r_tube_xy, 1e-5)
         radial_unit_local = jnp.stack(
@@ -2046,7 +2042,7 @@ def _ccd_sphere_obstacle_boundary(
     sph_radius: float,
     sph_pos: jnp.ndarray,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Continuous collision detection against solid sphere obstacles (e.g. spout deflection dome)."""
+    """Continuous collision detection against spherical dome canopy and obstacle boundaries."""
     pos_rel_curr = pos_curr - sph_pos
     dist_curr = jnp.sqrt(jnp.sum(pos_rel_curr**2, axis=-1, keepdims=True) + 1e-8)
     n_curr = pos_rel_curr / dist_curr
@@ -2055,14 +2051,34 @@ def _ccd_sphere_obstacle_boundary(
     dist_next = jnp.sqrt(jnp.sum(pos_rel_next**2, axis=-1, keepdims=True) + 1e-8)
     n_next = pos_rel_next / dist_next
 
-    penetrating_sph = (dist_next < sph_radius)[:, 0]
-    n_sph = jnp.where(dist_curr >= sph_radius, n_curr, n_next)
-    pos_out = jnp.where(penetrating_sph[:, None], sph_pos + n_sph * (sph_radius + 1e-4), pos_next)
+    # 1. Internal canopy ceiling collision: particle rising from below/inside attempting to burst through top ceiling
+    is_upper_dome = pos_rel_next[:, 2] > 0.0
+    hitting_canopy_ceiling = (
+        is_upper_dome & (dist_next[:, 0] >= sph_radius - 1e-4) & (pos_rel_curr[:, 2] <= sph_radius + 0.005)
+    )
+    pos_canopy = sph_pos + n_next * (sph_radius - 2e-4)
+    v_canopy_dot = jnp.sum(vel_next * n_next, axis=-1, keepdims=True)
+    v_canopy_normal = jnp.maximum(v_canopy_dot, 0.0) * n_next
+    v_canopy_deflected = vel_next - 1.5 * v_canopy_normal
 
+    # 2. External obstacle collision: particle outside upper dome attempting to penetrate inward
+    penetrating_external = (~hitting_canopy_ceiling) & (dist_next[:, 0] < sph_radius) & is_upper_dome
+    n_sph = jnp.where(dist_curr >= sph_radius, n_curr, n_next)
+    pos_external = sph_pos + n_sph * (sph_radius + 1e-4)
     v_sph_dot = jnp.sum(vel_next * n_sph, axis=-1, keepdims=True)
     v_sph_normal = jnp.minimum(v_sph_dot, 0.0) * n_sph
     v_sph_deflected = vel_next - 1.2 * v_sph_normal
-    vel_out = jnp.where(penetrating_sph[:, None], v_sph_deflected, vel_next)
+
+    pos_out = jnp.where(
+        hitting_canopy_ceiling[:, None],
+        pos_canopy,
+        jnp.where(penetrating_external[:, None], pos_external, pos_next),
+    )
+    vel_out = jnp.where(
+        hitting_canopy_ceiling[:, None],
+        v_canopy_deflected,
+        jnp.where(penetrating_external[:, None], v_sph_deflected, vel_next),
+    )
     return pos_out, vel_out
 
 
@@ -2083,17 +2099,15 @@ def _ccd_tube_cylinder_boundary(
 
     # The bottom of the tube (z <= slot_h) has an inlet slot from the impeller casing
     in_solid_wall_height = (z_next > slot_h) & (z_next <= tube_h) & active_boundary
-    in_bore_height = (z_next >= 0.0) & (z_next <= tube_h) & active_boundary
+    r_mid = (r_inner + r_outer) * 0.5
     r_safe = jnp.maximum(r_next, 1e-6)
 
-    # 1. External collision above slot: particle outside tube (r_curr >= r_outer) trying to penetrate into the tube shell
-    penetrating_outer = (
-        (r_curr >= r_outer) & (r_next < r_outer) & (r_next >= (r_inner + r_outer) * 0.5) & in_solid_wall_height
-    )
+    # 1. External collision above slot: particle outside tube trying to penetrate into the tube shell
+    penetrating_outer = (r_curr >= r_mid) & (r_next < r_outer) & in_solid_wall_height
     scale_outer = jnp.where(penetrating_outer, (r_outer + 1e-4) / r_safe, 1.0)
 
     # 2. Internal collision: particle inside bore trying to penetrate through inner bore wall into the tube shell
-    penetrating_inner = (r_curr <= (r_inner + r_outer) * 0.5) & (r_next > r_inner) & in_solid_wall_height
+    penetrating_inner = (r_curr < r_mid) & (r_next > r_inner) & in_solid_wall_height
     scale_inner = jnp.where(penetrating_inner, (r_inner - 1e-4) / r_safe, 1.0)
 
     scale_r = jnp.where(penetrating_outer, scale_outer, scale_inner)

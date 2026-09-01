@@ -51,11 +51,11 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     tube_r_outer = provider.settings.tube_radius * 0.001
 
     # 1. Flow in vertical delivery tube (strictly inside bore from floor to spout exit)
-    in_tube_mask = (dist_tube <= tube_r_outer) & (zs >= floor_z) & (zs < tube_top_z - 0.005)
+    in_tube_mask = (dist_tube <= tube_r_inner) & (zs >= floor_z) & (zs < tube_top_z - 0.005)
     in_tube_cnt = int(np.sum(in_tube_mask))
 
     # 2. Flow emerging at spout dome
-    at_spout_mask = (dist_tube <= tube_r_outer + 0.008) & (zs >= tube_top_z - 0.005) & (zs <= tube_top_z + 0.015)
+    at_spout_mask = (dist_tube <= tube_r_outer + 0.010) & (zs >= tube_top_z - 0.005) & (zs <= tube_top_z + 0.012)
     at_spout_cnt = int(np.sum(at_spout_mask))
 
     # 3. Flow on lid drinking shelf / tray (outside tube, inside lid rim)
@@ -66,8 +66,8 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     waterfall_mask = (r_xy >= 0.075) & (zs >= lid_mount_z - 0.015) & (zs <= lid_mount_z + 0.015)
     waterfall_cnt = int(np.sum(waterfall_mask))
 
-    # 6. Reservoir pool volume (entire base container fluid layer below falling air gap)
-    pool_mask = (zs >= floor_z - 0.003) & (zs < lid_mount_z - 0.015) & (r_xy <= bowl_r)
+    # 6. Reservoir pool volume (entire base container fluid layer below falling air gap, excluding tube bore)
+    pool_mask = (zs >= floor_z - 0.003) & (zs < lid_mount_z - 0.015) & (r_xy <= bowl_r) & (~in_tube_mask)
     pool_cnt = int(np.sum(pool_mask))
 
     # 7. Reservoir water depth (height of fluid surface above bowl floor in meters)
