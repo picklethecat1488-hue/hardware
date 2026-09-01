@@ -619,7 +619,9 @@ class Bullet:
                         prefix = re.sub(r"_\d+$", "", base_name)
                         staged_name = f"{prefix}_{step_idx + 1}.rrd"
                         staged_path = os.path.join(base_dir, staged_name)
-                        if os.path.exists(self.save_rrd):
+                        if os.path.exists(self.save_rrd) and os.path.abspath(self.save_rrd) != os.path.abspath(
+                            staged_path
+                        ):
                             shutil.copyfile(self.save_rrd, staged_path)
                             self.logger.print(
                                 f"Staged checkpoint saved: {staged_path} ({step_idx + 1} frames)", symbol="💾"

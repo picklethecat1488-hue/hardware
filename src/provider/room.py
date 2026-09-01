@@ -1025,19 +1025,32 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         )
         bullet_sim.run()
 
-        # Combine all staged recordings if any were created
+        # Combine all staged recordings if any were created and save_rrd was not already written directly
         if stage_window_size and save_rrd:
             import glob
             import os
             import re
             from .utils import merge_rrd_recordings
 
-            base_dir = os.path.dirname(save_rrd) or "."
-            base_name = os.path.splitext(os.path.basename(save_rrd))[0]
-            prefix = re.sub(r"_\d+$", "", base_name)
-            stage_pattern = os.path.join(base_dir, f"{prefix}_*.rrd")
-            staged_files = sorted(glob.glob(stage_pattern))
-            staged_files = [f for f in staged_files if os.path.abspath(f) != os.path.abspath(save_rrd)]
-            if staged_files:
-                merge_rrd_recordings(staged_files, save_rrd)
-                logger.print(f"Combined {len(staged_files)} staged recording(s) into {save_rrd}", symbol="✨")
+            if not os.path.exists(save_rrd):
+                base_dir = os.path.dirname(save_rrd) or "."
+                base_name = os.path.splitext(os.path.basename(save_rrd))[0]
+                prefix = re.sub(r"_\d+$", "", base_name)
+                stage_pattern = os.path.join(base_dir, f"{prefix}_*.rrd")
+                staged_files = sorted(glob.glob(stage_pattern))
+                staged_files = [
+                    f
+                    for f in staged_files
+                    if os.path.abspath(f) != os.path.abspath(save_rrd)
+                    and re.match(rf"^{re.escape(prefix)}_\d+\.rrd$", os.path.basename(f))
+                ]
+                if staged_files:
+                    staged_files.sort(
+                        key=lambda x: (
+                            int(re.search(r"_(\d+)\.rrd$", os.path.basename(x)).group(1))
+                            if re.search(r"_(\d+)\.rrd$", os.path.basename(x))
+                            else 0
+                        )
+                    )
+                    merge_rrd_recordings(staged_files, save_rrd)
+                    logger.print(f"Combined {len(staged_files)} staged recording(s) into {save_rrd}", symbol="✨")

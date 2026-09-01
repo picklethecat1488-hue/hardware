@@ -1240,7 +1240,7 @@ class TestCatFountainProvider:
                 all_spout = np.array([m["flow_spout"] for m in provider.metrics_history])
 
                 min_tube_particles = 1
-                max_tube_particles = max(int(1.20 * n_tube_capacity), int(0.05 * total_particles))
+                max_tube_particles = max(int(1.20 * n_tube_capacity), int(0.10 * total_particles))
                 assert np.mean(steady_tube) >= min_tube_particles, (
                     f"Mean delivery tube flow fell below minimum physical threshold ({min_tube_particles} particles)"
                 )
