@@ -107,11 +107,19 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         vel_pts = np.asarray(velocities)
         if vel_pts.ndim == 2 and len(vel_pts) == len(active_mask):
             vz = vel_pts[active_mask, 2]
+            v_all = vel_pts[active_mask]
+            v_mags = np.linalg.norm(v_all, axis=-1)
+            max_speed = float(np.max(v_mags)) if len(v_mags) > 0 else 0.0
             max_vz = float(np.max(vz)) if len(vz) > 0 else 0.0
+            sheet_speed = float(np.mean(v_mags[lid_sheet_mask])) if lid_sheet_cnt > 0 else 0.0
         else:
+            max_speed = 0.0
             max_vz = 0.0
+            sheet_speed = 0.0
     else:
+        max_speed = 0.0
         max_vz = 0.0
+        sheet_speed = 0.0
 
     metrics = {
         "flow_spout": at_spout_cnt,
@@ -123,6 +131,8 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         "water_depth": round(water_depth, 5),
         "ejected_particles": ejected_cnt,
         "max_vertical_vel": round(max_vz, 4),
+        "max_particle_speed": round(max_speed, 4),
+        "mean_sheet_speed": round(sheet_speed, 4),
     }
     provider.last_metrics = metrics
     if not hasattr(provider, "metrics_history") or provider.metrics_history is None:
@@ -142,6 +152,8 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         rr.log("metrics/water_depth", rr.Scalars(float(water_depth)))
         rr.log("metrics/ejected_particles", rr.Scalars(float(ejected_cnt)))
         rr.log("metrics/max_vertical_vel", rr.Scalars(float(max_vz)))
+        rr.log("metrics/max_particle_speed", rr.Scalars(float(max_speed)))
+        rr.log("metrics/mean_sheet_speed", rr.Scalars(float(sheet_speed)))
 
     return metrics
 
