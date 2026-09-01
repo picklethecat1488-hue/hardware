@@ -1321,6 +1321,76 @@ def test_boundary_voxels_labeled_by_type():
     assert "lid" in mock_state_tracker.boundary_voxels
 
 
+def test_show_boundary_voxels_env_gating(monkeypatch):
+    """Verify that boundary voxels logging is disabled by default and enabled via SHOW_BOUNDARY_VOXELS env var."""
+    from unittest.mock import MagicMock
+    from model.boundary_config import BoundaryConfig, BoundaryType, ShapeType
+    from provider.bullet import LinkType
+    from provider.utils import str_to_bool, get_env_bool
+
+    # 1. Test str_to_bool utility
+    assert str_to_bool("1") is True
+    assert str_to_bool("true") is True
+    assert str_to_bool("TRUE") is True
+    assert str_to_bool("yes") is True
+    assert str_to_bool("on") is True
+    assert str_to_bool("enable") is True
+    assert str_to_bool("0") is False
+    assert str_to_bool("false") is False
+    assert str_to_bool("no") is False
+    assert str_to_bool("off") is False
+    assert str_to_bool(None, default=False) is False
+    assert str_to_bool("unknown", default=True) is True
+
+    # 2. Test get_env_bool utility
+    monkeypatch.delenv("SHOW_BOUNDARY_VOXELS", raising=False)
+    assert get_env_bool("SHOW_BOUNDARY_VOXELS", False) is False
+
+    monkeypatch.setenv("SHOW_BOUNDARY_VOXELS", "1")
+    assert get_env_bool("SHOW_BOUNDARY_VOXELS", False) is True
+
+    # 3. Test Fluid state_tracker gating
+    b_bowl = BoundaryConfig(
+        link_type=LinkType.BASE,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.SOLID,
+        radius=0.08,
+        height=0.05,
+        thickness=0.002,
+        link_idx=-1,
+    )
+    boundaries = {"bowl": b_bowl}
+    config = FluidConfig.water(
+        target_volume=0.00001,
+        boundaries=boundaries,
+    )
+
+    # When SHOW_BOUNDARY_VOXELS is unset (default: False)
+    monkeypatch.delenv("SHOW_BOUNDARY_VOXELS", raising=False)
+    mock_tracker_disabled = MagicMock()
+    mock_tracker_disabled.boundary_voxels = None
+
+    fluid_disabled = Fluid(
+        config=config,
+        state_tracker=mock_tracker_disabled,
+    )
+    fluid_disabled._update_state_tracker()
+    assert mock_tracker_disabled.boundary_voxels is None
+
+    # When SHOW_BOUNDARY_VOXELS is set to '1' (enabled: True)
+    monkeypatch.setenv("SHOW_BOUNDARY_VOXELS", "1")
+    mock_tracker_enabled = MagicMock()
+    mock_tracker_enabled.boundary_voxels = None
+
+    fluid_enabled = Fluid(
+        config=config,
+        state_tracker=mock_tracker_enabled,
+    )
+    fluid_enabled._update_state_tracker()
+    assert mock_tracker_enabled.boundary_voxels is not None
+    assert "bowl" in mock_tracker_enabled.boundary_voxels
+
+
 def test_voxel_masks_consistent_with_surface_bounds():
     """Verify consistency between voxel masks, surface normals, and precomputed CAD surface bounds."""
     import jax.numpy as jnp

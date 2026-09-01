@@ -30,6 +30,7 @@ from build123d import (
     Shape,
 )
 from build123d.exporters import ExportSVG, Drawing
+from .utils import get_env_bool
 
 
 def resolve_shape(val: Any) -> Optional[Shape]:
@@ -950,8 +951,9 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     ),
                 )
 
-        # Log boundary voxels labeled for each boundary type
-        if boundary_voxels is not None and len(boundary_voxels) > 0:
+        # Log boundary voxels labeled for each boundary type (gated on environment variable)
+        enable_boundary_voxels = get_env_bool("SHOW_BOUNDARY_VOXELS", False)
+        if enable_boundary_voxels and boundary_voxels is not None and len(boundary_voxels) > 0:
             boundary_color_map = {
                 "bowl": [180, 180, 190, 80],
                 "casingwall": [255, 160, 50, 100],
