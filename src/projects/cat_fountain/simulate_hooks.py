@@ -44,6 +44,8 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     bowl_h = provider.settings.bowl_height * 0.001
     step_d = provider.settings.lid_step_depth * 0.001
     lid_mount_z = bowl_h - step_d
+    lid_pocket_floor_z = lid_mount_z + provider.settings.lid_pocket_z_offset * 0.001
+    lid_platform_z = lid_pocket_floor_z + 0.00175
 
     dist_tube = np.sqrt((xs - tube_x) ** 2 + (ys - tube_y) ** 2)
     dist_cutout = np.sqrt(xs**2 + (ys - cutout_y) ** 2)
@@ -51,20 +53,23 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     tube_r_outer = provider.settings.tube_radius * 0.001
 
     # 1. Flow in vertical delivery tube (strictly inside bore from floor to spout exit)
-    in_tube_mask = (dist_tube <= tube_r_inner) & (zs >= floor_z) & (zs < tube_top_z - 0.005)
+    in_tube_mask = (dist_tube <= tube_r_inner) & (zs >= floor_z) & (zs < tube_top_z - 0.002)
     in_tube_cnt = int(np.sum(in_tube_mask))
 
     # 2. Flow emerging at spout dome
-    at_spout_mask = (dist_tube <= tube_r_outer + 0.010) & (zs >= tube_top_z - 0.005) & (zs <= tube_top_z + 0.012)
+    at_spout_mask = (dist_tube <= tube_r_outer + 0.010) & (zs >= tube_top_z - 0.002) & (zs <= tube_top_z + 0.012)
     at_spout_cnt = int(np.sum(at_spout_mask))
 
-    # 3. Flow on lid drinking shelf / tray (outside tube, inside lid rim)
-    lid_sheet_mask = (zs >= lid_mount_z - 0.005) & (zs <= lid_mount_z + 0.025) & (dist_tube > 0.010) & (r_xy <= 0.082)
+    # 3. Flow on lid drinking shelf / tray (outside tube bore, inside lid rim, on top surface)
+    on_cutout_hole = (dist_cutout <= cutout_r) & (dist_tube > 0.030)
+    lid_sheet_mask = (
+        (zs >= lid_pocket_floor_z - 0.002)
+        & (zs <= lid_platform_z + 0.006)
+        & (dist_tube > tube_r_inner)
+        & (r_xy <= 0.082)
+        & (~on_cutout_hole)
+    )
     lid_sheet_cnt = int(np.sum(lid_sheet_mask))
-
-    # 4. Drainage: Perimeter waterfall cascading into bowl (R >= 75mm, falling or rolling off lid rim)
-    waterfall_mask = (r_xy >= 0.075) & (zs >= lid_mount_z - 0.015) & (zs <= lid_mount_z + 0.015)
-    waterfall_cnt = int(np.sum(waterfall_mask))
 
     # 6. Reservoir pool volume (entire base container fluid layer below falling air gap, excluding tube bore)
     pool_mask = (zs >= floor_z - 0.003) & (zs < lid_mount_z - 0.015) & (r_xy <= bowl_r) & (~in_tube_mask)
@@ -79,12 +84,21 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         pool_surface_z = floor_z
         water_depth = 0.0
 
+    # 4. Drainage: Perimeter waterfall cascading into bowl (R >= 75mm, falling or rolling off lid rim)
+    waterfall_mask = (r_xy >= 0.075) & (zs >= pool_surface_z + 0.005) & (zs <= lid_platform_z + 0.004)
+    waterfall_cnt = int(np.sum(waterfall_mask))
+
     # 5. Drainage: Front cutout drain returning to bowl (inside cutout hole, falling through air gap above pool)
-    drain_mask = (dist_cutout <= cutout_r + 0.005) & (ys < 0.0) & (zs >= pool_surface_z + 0.003) & (zs < lid_mount_z)
+    drain_mask = (
+        (dist_cutout <= cutout_r + 0.005)
+        & (dist_tube > 0.030)
+        & (zs >= pool_surface_z + 0.003)
+        & (zs < lid_pocket_floor_z)
+    )
     drain_cnt = int(np.sum(drain_mask))
 
     # 8. Ejected / airborne explosion particles breaching the top spout dome or outer perimeter
-    dome_top_z = lid_mount_z + 0.015
+    dome_top_z = lid_mount_z + 0.0156
     ejected_mask = (zs > dome_top_z + 0.005) | ((r_xy > bowl_r + 0.005) & (zs > lid_mount_z))
     ejected_cnt = int(np.sum(ejected_mask))
 
