@@ -3,6 +3,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import math
+import os
 from functools import partial, cached_property
 from enum import Enum, IntEnum
 import random
@@ -68,6 +69,7 @@ from provider.boundary import (
     ProcessedBoundaries,
     BoundaryProcessor,
 )
+from provider.utils import get_env_bool
 
 if TYPE_CHECKING:
     from provider.provider import Provider
@@ -3111,10 +3113,7 @@ class Fluid:
         if physics_client is not None and body_id is not None and config.boundaries is not None:
             if state_tracker is not None:
                 state_tracker.has_fluid_simulator = True
-                state_tracker.particle_positions = self.get_particle_positions()
-                state_tracker.particle_colors = self.get_particle_colors()
-                state_tracker.particle_radii = self.get_particle_radii()
-                state_tracker.boundary_voxels = self.get_boundary_voxels()
+                self._update_state_tracker()
 
             self.spawner = FluidSpawner(
                 physics_client=physics_client,
@@ -3861,10 +3860,16 @@ class Fluid:
                     self.pos_jax = jnp.array(pos_arr)
                     self.vel_jax = jnp.array(vel_arr)
 
+        self._update_state_tracker()
+        self.current_sim_time += 1.0 / 240.0
+
+    def _update_state_tracker(self) -> None:
+        """Synchronize particle positions, colors, radii, and boundary voxels to state tracker."""
         if self.state_tracker is not None:
             self.state_tracker.particle_positions = self.get_particle_positions()
             self.state_tracker.particle_colors = self.get_particle_colors()
             self.state_tracker.particle_radii = self.get_particle_radii()
-            self.state_tracker.boundary_voxels = self.get_boundary_voxels()
-
-        self.current_sim_time += 1.0 / 240.0
+            if get_env_bool("SHOW_BOUNDARY_VOXELS", False):
+                self.state_tracker.boundary_voxels = self.get_boundary_voxels()
+            else:
+                self.state_tracker.boundary_voxels = None

@@ -827,3 +827,37 @@ def test_room_simulate_combines_staged_recordings(tmp_path):
         args, _ = mock_merge.call_args
         assert sorted(args[0]) == [str(staged_file1), str(staged_file2)]
         assert args[1] == str(save_rrd_path)
+
+
+def test_room_log_rerun_show_boundary_voxels(monkeypatch):
+    """Verify that Room._log_rerun logs boundary voxels only when SHOW_BOUNDARY_VOXELS is enabled."""
+    room = Room(is_simulate=True)
+    boundary_voxels = {"lid": [[0.0, 0.0, 0.105], [0.01, 0.01, 0.105]]}
+
+    with patch("rerun.log") as mock_rr_log:
+        # Default: disabled
+        monkeypatch.delenv("SHOW_BOUNDARY_VOXELS", raising=False)
+        room._log_rerun(
+            transforms={},
+            particle_positions=None,
+            particle_colors=None,
+            particle_radii=None,
+            boundary_voxels=boundary_voxels,
+            step_idx=0,
+        )
+        logged_paths = [call[0][0] for call in mock_rr_log.call_args_list]
+        assert not any("world/boundaries" in p for p in logged_paths)
+
+    with patch("rerun.log") as mock_rr_log:
+        # Enabled: True
+        monkeypatch.setenv("SHOW_BOUNDARY_VOXELS", "1")
+        room._log_rerun(
+            transforms={},
+            particle_positions=None,
+            particle_colors=None,
+            particle_radii=None,
+            boundary_voxels=boundary_voxels,
+            step_idx=0,
+        )
+        logged_paths = [call[0][0] for call in mock_rr_log.call_args_list]
+        assert any("world/boundaries/lid" in p for p in logged_paths)

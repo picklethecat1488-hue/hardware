@@ -276,3 +276,46 @@ def rerun_is_enabled() -> bool:
         return bool(hasattr(rr, "is_enabled") and rr.is_enabled())
     except ImportError:
         return False
+
+
+def str_to_bool(val: Any, default: bool = False) -> bool:
+    """Convert a string or arbitrary value to a boolean.
+
+    Recognizes '1', 'true', 'yes', 'on', 'enable', 'enabled' (case-insensitive) as True,
+    and '0', 'false', 'no', 'off', 'disable', 'disabled' as False.
+
+    Args:
+        val: Input value or string representation.
+        default: Fallback boolean value if val is None or unrecognized.
+
+    Returns:
+        Boolean evaluation.
+    """
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return bool(val)
+    s = str(val).strip().lower()
+    if s in ("1", "true", "yes", "on", "enable", "enabled", "t", "y"):
+        return True
+    if s in ("0", "false", "no", "off", "disable", "disabled", "f", "n"):
+        return False
+    return default
+
+
+def get_env_bool(name: str, default: bool = False) -> bool:
+    """Read an environment variable and convert it to a boolean.
+
+    Args:
+        name: Name of the environment variable.
+        default: Default boolean value if the environment variable is unset.
+
+    Returns:
+        Boolean representation of the environment variable.
+    """
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return str_to_bool(val, default=default)
