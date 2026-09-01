@@ -872,6 +872,7 @@ class BoundaryProcessor:
         drain_y, drain_r = 0.0, 0.0
         lid_pocket_h, lid_thickness = 0.0, 0.0
         terrace_r = 0.0
+        terrace_h = 0.0
         lid_fric = 0.0
         lid_pos_t = (0.0, 0.0, 0.0)
         lid_orn_t = (0.0, 0.0, 0.0, 1.0)
@@ -893,6 +894,12 @@ class BoundaryProcessor:
                     lid_fric = float(b.boundary_friction or 0.0)
                     lid_pos_t = b_pos_list[i]
                     lid_orn_t = b_orn_list[i]
+                    if getattr(b, "has_intake", False) and getattr(b, "intake_pos", None) is not None:
+                        terrace_h = b.intake_pos[2]
+                    elif getattr(b, "shelf_depth", None) is not None:
+                        terrace_h = b.shelf_depth
+                    if getattr(b, "intake_radius", 0.0) > 0.0:
+                        terrace_r = b.intake_radius
                 elif getattr(b, "has_tube", False) and not getattr(b, "has_drain", False):
                     if b.radius > 0.0:
                         terrace_r = b.radius
@@ -912,7 +919,7 @@ class BoundaryProcessor:
                     drain_y=drain_y,
                     drain_r=drain_r,
                     terrace_r=terrace_r,
-                    terrace_z_max=lid_pocket_z + lid_pocket_h,
+                    terrace_z_max=lid_pocket_z + terrace_h,
                     friction=lid_fric,
                     pos=lid_pos_t,
                     orn=lid_orn_t,

@@ -1760,21 +1760,28 @@ def _compute_particle_forces_subroutine(
             [dx_to_drain / dist_to_drain_xy, dy_to_drain / dist_to_drain_xy, jnp.zeros_like(dx_to_drain)],
             axis=-1,
         )
-        sheet_flow_dir = radial_spout_dir * 0.60 + dir_slope_local * 0.40
+        platform_radius = b_params[i, BoundaryParam.INTAKE_RADIUS]
+        in_platform_zone = has_tube & (platform_radius > 0.0) & (dist_spout_xy <= platform_radius)
+        radial_weight = jnp.where(in_platform_zone, 1.0, 0.40)
+        sheet_flow_dir = radial_spout_dir * radial_weight[:, None] + dir_slope_local * (1.0 - radial_weight[:, None])
         sheet_flow_mag = jnp.sqrt(jnp.sum(sheet_flow_dir**2, axis=-1, keepdims=True) + 1e-8)
         sheet_flow_unit = sheet_flow_dir / sheet_flow_mag
-        slope_factor = jnp.maximum(lid_slope_ratio, 0.35)
+        slope_factor = jnp.where(in_platform_zone, 0.45, jnp.maximum(lid_slope_ratio, 0.35))
         # Normal upward floor support balancing gravity and arresting plunging impact velocity on solid drinking shelf
         v_lid = world_to_local_vector(vel_world, lid_orn_inv)
         cushion_lid_z = -jnp.minimum(v_lid[:, 2], 0.0) * 45.0
+        v_lid_xy = jnp.stack([v_lid[:, 0], v_lid[:, 1], jnp.zeros_like(v_lid[:, 2])], axis=-1)
+        surface_friction_local = -v_lid_xy * 12.0
         support_normal_local = jnp.stack(
             [jnp.zeros_like(dx_to_drain), jnp.zeros_like(dx_to_drain), (g_mag + cushion_lid_z)],
             axis=-1,
         )
-        sheet_accel_local = sheet_flow_unit * (g_mag * slope_factor) + support_normal_local
+        sheet_accel_local = (
+            sheet_flow_unit * (g_mag * slope_factor[:, None]) + support_normal_local + surface_friction_local
+        )
 
         # 3. Funneling convergence specifically near the front drain cutout hole
-        in_platform_force = has_tube & (dist_spout_xy <= 0.030)
+        in_platform_force = has_tube & (platform_radius > 0.0) & (dist_spout_xy <= platform_radius)
         near_drain = (dist_to_drain_xy < drain_influence_r) & (~in_platform_force) & (pos_lid[:, 1] < -0.005)
         target_drain_local = jnp.array([0.0, drain_hole_y, drain_target_z])
         d_drain = target_drain_local - pos_lid
@@ -2062,6 +2069,7 @@ def _ccd_sphere_obstacle_boundary(
     vel_next: jnp.ndarray,
     sph_radius: float,
     sph_pos: jnp.ndarray,
+    sph_thickness: float = 0.003,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Continuous collision detection against spherical dome canopy and obstacle boundaries."""
     pos_rel_curr = pos_curr - sph_pos
@@ -2072,19 +2080,30 @@ def _ccd_sphere_obstacle_boundary(
     dist_next = jnp.sqrt(jnp.sum(pos_rel_next**2, axis=-1, keepdims=True) + 1e-8)
     n_next = pos_rel_next / dist_next
 
-    # 1. Internal canopy ceiling collision: particle rising from below/inside attempting to burst through top ceiling
-    is_upper_dome = pos_rel_next[:, 2] > 0.0
-    hitting_canopy_ceiling = (
-        is_upper_dome & (dist_next[:, 0] >= sph_radius - 1e-4) & (pos_rel_curr[:, 2] <= sph_radius + 0.005)
-    )
-    pos_canopy = sph_pos + n_next * (sph_radius - 2e-4)
-    v_canopy_dot = jnp.sum(vel_next * n_next, axis=-1, keepdims=True)
-    v_canopy_normal = jnp.maximum(v_canopy_dot, 0.0) * n_next
-    v_canopy_deflected = vel_next - 1.5 * v_canopy_normal
+    r_inner = jnp.maximum(sph_radius - sph_thickness, 0.001)
 
-    # 2. External obstacle collision: particle outside upper dome attempting to penetrate inward
-    penetrating_external = (~hitting_canopy_ceiling) & (dist_next[:, 0] < sph_radius) & is_upper_dome
-    n_sph = jnp.where(dist_curr >= sph_radius, n_curr, n_next)
+    # 1. Internal canopy ceiling collision: particle rising from below/inside attempting to burst through inner ceiling
+    is_upper_dome = pos_rel_next[:, 2] > 0.0
+    is_rising_in_dome = is_upper_dome & ((pos_rel_curr[:, 2] <= r_inner + 0.002) | (vel_next[:, 2] > 0.0))
+    hitting_canopy_ceiling = is_rising_in_dome & (dist_next[:, 0] >= r_inner - 1e-4)
+
+    # Deflect into 360-degree radial outward flow along canopy curve through side grating slots
+    r_xy_next = jnp.sqrt(pos_rel_next[:, 0] ** 2 + pos_rel_next[:, 1] ** 2 + 1e-8)
+    n_xy = pos_rel_next[:, :2] / r_xy_next[:, None]
+    r_eff = r_inner - 2e-4
+    r_clamped = jnp.minimum(r_xy_next, r_eff)
+    z_canopy = jnp.sqrt(jnp.maximum(r_eff**2 - r_clamped**2, 0.0))
+    pos_canopy = sph_pos + jnp.concatenate([n_xy * r_clamped[:, None], z_canopy[:, None]], axis=-1)
+
+    v_speed = jnp.sqrt(jnp.sum(vel_next**2, axis=-1, keepdims=True) + 1e-8)
+    v_radial_xy = n_xy * jnp.maximum(v_speed * 0.95, 1.10)
+    v_canopy_deflected = jnp.concatenate([v_radial_xy, -0.10 * jnp.ones_like(z_canopy[:, None])], axis=-1)
+
+    # 2. External obstacle collision: particle outside upper dome attempting to penetrate inward from outside
+    penetrating_external = (
+        (dist_curr[:, 0] >= sph_radius) & (dist_next[:, 0] < sph_radius) & is_upper_dome & (~hitting_canopy_ceiling)
+    )
+    n_sph = n_curr
     pos_external = sph_pos + n_sph * (sph_radius + 1e-4)
     v_sph_dot = jnp.sum(vel_next * n_sph, axis=-1, keepdims=True)
     v_sph_normal = jnp.minimum(v_sph_dot, 0.0) * n_sph
@@ -2217,8 +2236,9 @@ def _apply_boundary_ccd_subroutine(
 
         # 2. Spherical obstacles (such as the spout deflection dome)
         is_sph = (shape_k == SHAPE_SPHERE) & (b_types[k] == 0)
+        sph_t = b_params[k, BoundaryParam.THICKNESS]
         pos_sph, vel_sph = _ccd_sphere_obstacle_boundary(
-            pos_curr, pos_next, vel_next, b_params[k, BoundaryParam.R_OUTER], b_pos_arr[k]
+            pos_curr, pos_next, vel_next, b_params[k, BoundaryParam.R_OUTER], b_pos_arr[k], sph_t
         )
         pos_next = jnp.where(is_sph, pos_sph, pos_next)
         vel_next = jnp.where(is_sph, vel_sph, vel_next)

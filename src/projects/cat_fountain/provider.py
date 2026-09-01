@@ -810,6 +810,7 @@ class CatFountainProvider(Provider):
         step_w = self.settings.lid_step_width
         clearance = self.settings.lid_clearance
         socket_r = self.settings.tube_radius + self.settings.tube_lid_clearance
+        platform_r = self.settings.spout_deflection_radius
 
         with BuildPart() as lid:
             lid_disk = Cylinder(radius=lid_r, height=lid_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
@@ -838,7 +839,7 @@ class CatFountainProvider(Provider):
                 # Add back the platform cylinder to preserve it
                 with Locations((0, 28.0 - cutout_y, 0)):  # Relative to cutout center Y
                     Cylinder(
-                        radius=30.0,
+                        radius=platform_r,
                         height=lid_h + 20.0,
                         align=(Align.CENTER, Align.CENTER, Align.CENTER),
                         mode=Mode.SUBTRACT,
@@ -856,13 +857,13 @@ class CatFountainProvider(Provider):
                     Circle(radius=cutout_r, mode=Mode.SUBTRACT)
                 # Subtract the platform area
                 with Locations((0, 28.0)):
-                    Circle(radius=30.0, mode=Mode.SUBTRACT)
+                    Circle(radius=platform_r, mode=Mode.SUBTRACT)
 
-                # Inner ridge: ring from 30.0 to 30.0 + ridge_w at (0, 28.0) intersected with the cutout circle
+                # Inner ridge: ring from platform_r to platform_r + ridge_w at (0, 28.0) intersected with the cutout circle
                 with BuildSketch(mode=Mode.PRIVATE) as inner_ridge:
                     with Locations((0, 28.0)):
-                        Circle(radius=30.0 + ridge_w)
-                        Circle(radius=30.0, mode=Mode.SUBTRACT)
+                        Circle(radius=platform_r + ridge_w)
+                        Circle(radius=platform_r, mode=Mode.SUBTRACT)
                     with Locations((0, cutout_y)):
                         Circle(radius=cutout_r, mode=Mode.INTERSECT)
                 add(inner_ridge)
@@ -872,11 +873,14 @@ class CatFountainProvider(Provider):
 
             with Locations((0.0, tube_y, 3.0)):
                 with Locations(Rot(-self.settings.lid_platform_slope_angle, 0, 0)):
-                    Cylinder(radius=30.0, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    Cylinder(radius=platform_r, height=3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                     with Locations((0, 0, 3.0)):
-                        Cylinder(radius=30.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                        Cylinder(radius=platform_r, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                         Cylinder(
-                            radius=28.0, height=1.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT
+                            radius=platform_r - 2.0,
+                            height=1.0,
+                            align=(Align.CENTER, Align.CENTER, Align.MIN),
+                            mode=Mode.SUBTRACT,
                         )
                     Cylinder(
                         radius=socket_r,
@@ -945,7 +949,7 @@ class CatFountainProvider(Provider):
                 has_intake=True,
                 intake_pos=(0.0, tube_y * 0.001, 0.00175),
                 intake_normal=(0.0, 0.0, 1.0),
-                intake_radius=30.0 * 0.001,
+                intake_radius=platform_r * 0.001,
                 has_drain=True,
                 drain_pos=(0.0, cutout_y * 0.001, 0.0),
                 drain_normal=(0.0, 0.0, 1.0),
@@ -963,7 +967,7 @@ class CatFountainProvider(Provider):
                 shape=ShapeType.SPHERE,
                 type=BoundaryType.SOLID,
                 radius=dome_out_r * 0.001,
-                thickness=0.0035,
+                thickness=(dome_out_r - dome_in_r) * 0.001,
                 xyz=(0.0, tube_y * 0.001, 6.0 * 0.001),
                 rpy=(0.0, 0.0, 0.0),
             )
