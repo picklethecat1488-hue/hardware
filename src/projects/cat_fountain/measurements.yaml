@@ -57,8 +57,6 @@ impeller_clearance: 0.4
 vane_twist: -15.0
 motor_target: 130.0
 motor_power: 30.0
-stiffness_boundary: 5000.0
-damping_boundary: 15.0
 
 # ==========================================
 # 5. Motor, Central Boss & Fasteners
@@ -173,8 +171,3 @@ motor_clip_width: 17.6
 motor_clip_thickness: 1.6
 motor_clip_length: 26.0
 motor_clip_cutout_width: 10.0
-damping_boundary: 2.0020162500000005
-stiffness_boundary: 1000.0
-stiffness: 1000.0
-damping: 0.995
-viscosity: 0.02

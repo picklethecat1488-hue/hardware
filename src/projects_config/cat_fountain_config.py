@@ -738,20 +738,8 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("motor_clip_cutout_width", 14.2))
 
     def __init__(self, **data: Any):
-        """Initialize settings and load fallback values from measurements.yaml if present."""
+        """Initialize settings and calculate physical defaults."""
         super().__init__(**data)
-        if self.measurements_path:
-            try:
-                raw = self._raw_data
-                for field in ["stiffness_boundary", "damping_boundary"]:
-                    if field in raw and getattr(self, field) == self.model_fields[field].default:
-                        val = raw[field]
-                        if isinstance(val, np.ndarray):
-                            val = float(val.item()) if val.ndim == 0 else val.tolist()
-                        setattr(self, field, val)
-            except Exception:
-                pass
-
         if self.damping_boundary is None:
             r_s = 0.0015
             spacing = 1.3 * r_s

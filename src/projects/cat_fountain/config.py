@@ -256,7 +256,7 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
                 f"Optimal LBM parameters determined: stiffness_boundary = {best_stiffness:.1f}, damping_boundary = {best_damping:.2f} (Status = STABLE, Flow = {best_flow_score}, Peak Avg Speed = {best_avg_speed:.2f} m/s)",
                 symbol="🏆",
             )
-            # Set the optimal values back to settings for environment persistence
+            # Set the optimal values back to settings for environment persistence (.env)
             provider.settings.stiffness_boundary = best_stiffness
             provider.settings.damping_boundary = best_damping
         else:
