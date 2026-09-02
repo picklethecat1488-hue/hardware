@@ -48,10 +48,11 @@ class ShapeCode(IntEnum):
 
 
 class BoundaryType(StrEnum):
-    """Supported boundary collision types."""
+    """Boundary collision classification types."""
 
     CAVITY = "cavity"
     SOLID = "solid"
+    OBSTACLE = "obstacle"
     SOLID_CAVITY = "solid_cavity"
 
 
@@ -302,6 +303,7 @@ class BoundaryConfig(BaseModel):
             "intake_hole_y",
             "intake_hole_radius",
             "intake_hole_z",
+            "pool_max_z",
         },
         ShapeType.SPHERE: {
             "radius",
@@ -440,6 +442,9 @@ class BoundaryConfig(BaseModel):
     thickness: float = Field(default=0.0, description="Wall/plate thickness parameter if applicable")
     shelf_depth: Optional[float] = Field(
         default=None, description="Downward solid shelf barrier depth to prevent tunneling (meters)"
+    )
+    pool_max_z: Optional[float] = Field(
+        default=None, description="Maximum reservoir pool depth / liquid fill height in local Z (meters)"
     )
 
     # ----------------------------------------------------
@@ -695,7 +700,16 @@ class BoundaryConfig(BaseModel):
         z_top = z_off + h
         r_inner = max(0.0, r - thick)
         r_outer = r
-        tray_z_min = -thick
+        if self.shelf_depth is not None:
+            shelf_depth = float(self.shelf_depth)
+        else:
+            shelf_depth = thick
+
+        tray_z_min = (
+            -max(lid_cavity_depth - shelf_depth, thick)
+            if (self.has_drain or self.link_type == LinkType.LID) and lid_cavity_depth > 0.0
+            else -thick
+        )
         tray_z_max = h
         suction_z_min = h - ceil_thick
         suction_z_max = h + ceil_thick
@@ -704,16 +718,13 @@ class BoundaryConfig(BaseModel):
         drain_influence_radius = dr_r
         wall_band_r_max = r + thick
 
-        drain_edge_r_min = max(0.0, r - 0.008) if self.has_drain else 0.0
-        drain_edge_r_max = (r + 0.015) if self.has_drain else 0.0
+        drain_edge_r_min = max(0.0, r - thick * 2.0) if self.has_drain else 0.0
+        drain_edge_r_max = (r + thick) if self.has_drain else 0.0
 
-        if self.shelf_depth is not None:
-            shelf_depth = float(self.shelf_depth)
-        else:
-            shelf_depth = thick
-
+        cad_derived_max_z = max(0.0, (z_off + h) - shelf_depth)
+        pool_cap_z = float(self.pool_max_z) if self.pool_max_z is not None else cad_derived_max_z
         pool_max_z = (
-            max(0.0, (z_off + h) - shelf_depth)
+            min(cad_derived_max_z, pool_cap_z)
             if (self.type == BoundaryType.CAVITY or self.link_type == LinkType.BASE)
             else 0.0
         )

@@ -1224,14 +1224,11 @@ def _compute_dynamic_fluid_bodies_jax(
     iy = jnp.clip(jnp.floor(gp[:, 1]).astype(jnp.int32), 0, ny - 1)
 
     # 1. Dynamic 2D column water surface height in reservoir basin
-    in_basin = jnp.where(
-        z_max_pool > 0.0,
-        (pos_local[:, 2] <= z_max_pool) & (pos_local[:, 2] >= cavity_floor_z),
-        pos_local[:, 2] >= cavity_floor_z,
-    )
+    in_basin = (pos_local[:, 2] <= z_max_pool) & (pos_local[:, 2] >= cavity_floor_z)
     surf_z_grid = (
         jnp.full((nx, ny), cavity_floor_z).at[ix, iy].max(jnp.where(in_basin, pos_local[:, 2], cavity_floor_z))
     )
+    min_z_grid = jnp.full((nx, ny), 10.0).at[ix, iy].min(jnp.where(in_basin, pos_local[:, 2], 10.0))
     col_count = jnp.zeros((nx, ny), dtype=jnp.float32).at[ix, iy].add(jnp.where(in_basin, 1.0, 0.0))
 
     # 2. Dynamic 2D surface gradient for horizontal hydrostatic leveling
@@ -1241,12 +1238,14 @@ def _compute_dynamic_fluid_bodies_jax(
 
     # 3. Sample back to particle coordinates
     p_surf_z = surf_z_grid[ix, iy]
+    p_min_z = min_z_grid[ix, iy]
     p_grad_x = grad_x[ix, iy]
     p_grad_y = grad_y[ix, iy]
     p_col_count = col_count[ix, iy]
 
-    # Particles inside moving fluid bodies (within local free surface of occupied voxel columns)
-    in_fluid_body = in_basin & (pos_local[:, 2] <= p_surf_z + 2.0 * r_s) & (p_col_count >= 2.0)
+    # Particles inside resting/moving continuous fluid bodies (grounded on cavity floor within column free surface)
+    is_grounded = p_min_z <= cavity_floor_z + 4.0 * r_s
+    in_fluid_body = in_basin & is_grounded & (pos_local[:, 2] <= p_surf_z + 2.0 * r_s) & (p_col_count >= 2.0)
     level_grad_local = jnp.stack([-p_grad_x, -p_grad_y, jnp.zeros_like(p_grad_x)], axis=-1)
 
     return in_fluid_body, p_surf_z, level_grad_local, p_col_count
@@ -1742,13 +1741,26 @@ def _compute_particle_forces_subroutine(
         tray_z_min = b_params[i, BoundaryParam.TRAY_Z_MIN]
         tray_z_max = b_params[i, BoundaryParam.TRAY_Z_MAX]
 
-        # 1. Particles on the main lid surface
-        on_lid = (r_lid_xy < radius) & (pos_lid[:, 2] >= tray_z_min) & (pos_lid[:, 2] <= tray_z_max + 2.0 * r_s)
-
-        # 2. Surface sheet flow: blend radial expansion from spout center with forward gravity slope towards drain
         dx_spout = pos_lid[:, 0] - 0.0
         dy_spout = pos_lid[:, 1] - tube_y_check
         dist_spout_xy = jnp.sqrt(dx_spout**2 + dy_spout**2 + 1e-8)
+        platform_radius = b_params[i, BoundaryParam.INTAKE_RADIUS]
+        in_platform_zone = has_tube & (platform_radius > 0.0) & (dist_spout_xy <= platform_radius)
+
+        drain_pos_i = b_params[i, BoundaryParam.DRAIN_POS_X : BoundaryParam.DRAIN_POS_Z + 1]
+        drain_norm_i = b_params[i, BoundaryParam.DRAIN_NORMAL_X : BoundaryParam.DRAIN_NORMAL_Z + 1]
+        drain_r_i = b_params[i, BoundaryParam.DRAIN_RADIUS]
+        in_drain_hole = (
+            has_drain
+            & (drain_r_i > 0.0)
+            & point_in_surface_hole(pos_lid, drain_pos_i, drain_norm_i, drain_r_i, normal_tol=0.080)
+            & (~in_platform_zone)
+        )
+
+        # 1. Particles on the solid raised drinking platform
+        on_drinking_platform = in_platform_zone & (pos_lid[:, 2] >= 0.0) & (pos_lid[:, 2] <= tray_z_max + 2.0 * r_s)
+
+        # 2. Surface sheet flow across the raised drinking platform: radial expansion with slope towards drain
         radial_spout_dir = jnp.stack(
             [dx_spout / dist_spout_xy, dy_spout / dist_spout_xy, jnp.zeros_like(dx_spout)],
             axis=-1,
@@ -1760,14 +1772,12 @@ def _compute_particle_forces_subroutine(
             [dx_to_drain / dist_to_drain_xy, dy_to_drain / dist_to_drain_xy, jnp.zeros_like(dx_to_drain)],
             axis=-1,
         )
-        platform_radius = b_params[i, BoundaryParam.INTAKE_RADIUS]
-        in_platform_zone = has_tube & (platform_radius > 0.0) & (dist_spout_xy <= platform_radius)
-        radial_weight = jnp.where(in_platform_zone, 1.0, 0.40)
-        sheet_flow_dir = radial_spout_dir * radial_weight[:, None] + dir_slope_local * (1.0 - radial_weight[:, None])
+        sheet_flow_dir = radial_spout_dir * 0.70 + dir_slope_local * 0.30
         sheet_flow_mag = jnp.sqrt(jnp.sum(sheet_flow_dir**2, axis=-1, keepdims=True) + 1e-8)
         sheet_flow_unit = sheet_flow_dir / sheet_flow_mag
-        slope_factor = jnp.where(in_platform_zone, 0.45, jnp.maximum(lid_slope_ratio, 0.35))
-        # Normal upward floor support balancing gravity and arresting plunging impact velocity on solid drinking shelf
+        slope_factor = 0.45
+
+        # Upward floor support on the solid drinking platform
         v_lid = world_to_local_vector(vel_world, lid_orn_inv)
         cushion_lid_z = -jnp.minimum(v_lid[:, 2], 0.0) * 45.0
         v_lid_xy = jnp.stack([v_lid[:, 0], v_lid[:, 1], jnp.zeros_like(v_lid[:, 2])], axis=-1)
@@ -1776,50 +1786,39 @@ def _compute_particle_forces_subroutine(
             [jnp.zeros_like(dx_to_drain), jnp.zeros_like(dx_to_drain), (g_mag + cushion_lid_z)],
             axis=-1,
         )
-        sheet_accel_local = (
-            sheet_flow_unit * (g_mag * slope_factor[:, None]) + support_normal_local + surface_friction_local
-        )
+        platform_accel_local = sheet_flow_unit * (g_mag * slope_factor) + support_normal_local + surface_friction_local
 
-        # 3. Funneling convergence specifically near the front drain cutout hole
-        in_platform_force = has_tube & (platform_radius > 0.0) & (dist_spout_xy <= platform_radius)
-        near_drain = (dist_to_drain_xy < drain_influence_r) & (~in_platform_force) & (pos_lid[:, 1] < -0.005)
-        target_drain_local = jnp.array([0.0, drain_hole_y, drain_target_z])
-        d_drain = target_drain_local - pos_lid
-        dist_d = jnp.sqrt(jnp.sum(d_drain**2, axis=-1, keepdims=True) + 1e-8)
-        dir_drain_local = d_drain / dist_d
-        drain_funnel_accel_local = dir_drain_local * (g_mag * 1.5)
-
-        # 4. Naturalistic edge rollover & waterfall cascade off the lid perimeter
-        drain_edge_r_min = b_params[i, BoundaryParam.DRAIN_EDGE_R_MIN]
-        drain_edge_r_max = b_params[i, BoundaryParam.DRAIN_EDGE_R_MAX]
-        edge_zone = (
-            (r_lid_xy >= drain_edge_r_min)
-            & (r_lid_xy <= drain_edge_r_max)
+        # 3. Waterfall cascade as soon as water meets the edge of the platform or drain cutout
+        # Active strictly in the free-fall region above the reservoir pool surface
+        wall_band_r_max = b_params[i, BoundaryParam.WALL_BAND_R_MAX]
+        in_waterfall = (
+            (~in_platform_zone)
+            & (r_lid_xy < wall_band_r_max)
             & (pos_lid[:, 2] >= tray_z_min)
-            & (drain_edge_r_max > 0.0)
+            & (pos_lid[:, 2] <= tray_z_max + 2.0 * r_s)
         )
-        edge_rollover_local = jnp.stack(
+        waterfall_plunge_local = jnp.stack(
             [
-                pos_lid[:, 0] / r_lid_xy_safe * 0.35,
-                pos_lid[:, 1] / r_lid_xy_safe * 0.35,
-                -0.85 * jnp.ones_like(pos_lid[:, 0]),
+                jnp.zeros_like(dx_spout),
+                (dy_to_drain / dist_to_drain_xy) * 0.15,
+                -0.95 * jnp.ones_like(dx_spout),
             ],
             axis=-1,
         )
-        edge_rollover_mag = jnp.sqrt(jnp.sum(edge_rollover_local**2, axis=-1, keepdims=True) + 1e-8)
-        edge_rollover_unit = edge_rollover_local / edge_rollover_mag
-        edge_accel_local = edge_rollover_unit * (g_mag * 1.25)
+        waterfall_plunge_mag = jnp.sqrt(jnp.sum(waterfall_plunge_local**2, axis=-1, keepdims=True) + 1e-8)
+        waterfall_plunge_unit = waterfall_plunge_local / waterfall_plunge_mag
+        waterfall_accel_local = waterfall_plunge_unit * g_mag - v_lid_xy * 12.0
 
         lid_accel_local = jnp.where(
-            near_drain[:, None],
-            drain_funnel_accel_local,
-            jnp.where(edge_zone[:, None], edge_accel_local, sheet_accel_local),
+            on_drinking_platform[:, None],
+            platform_accel_local,
+            waterfall_accel_local,
         )
         total_lid_accel_world = local_to_world_vector(lid_accel_local, lid_orn)
 
         is_submerged = b_params[i, BoundaryParam.IS_SUBMERGED] > 0.5
         is_lid = (shape == SHAPE_CYLINDER) & has_drain & (~is_submerged)
-        active_lid_mask = on_lid | edge_zone
+        active_lid_mask = on_drinking_platform | in_waterfall
         lid_drain_accel += jnp.where(is_lid & active_lid_mask[:, None], total_lid_accel_world, jnp.zeros_like(pos_curr))
 
     effective_gravity = gravity[None, :]
@@ -1838,9 +1837,10 @@ def _compute_particle_forces_subroutine(
         pos_b, dx, origin, nx, ny, nz, cavity_floor_z=cavity_floor_z, z_max_pool=z_max_pool, r_s=r_s
     )
 
-    # 1. Dynamic hydrostatic support and falling fluid reintegration
+    # 1. Dynamic hydrostatic support and vertical column pressure
+    depth_pressure = jnp.clip((p_surf_z - pos_b[:, 2]) / (4.0 * r_s), 0.0, 4.0)
     cushion_accel_z = -jnp.minimum(v_z_b, 0.0) * 35.0
-    total_support_z = g_mag + cushion_accel_z
+    total_support_z = g_mag * (1.0 + depth_pressure * 0.35) + cushion_accel_z
 
     hydrostatic_support_world = local_to_world_vector(
         jnp.stack([jnp.zeros_like(r_b), jnp.zeros_like(r_b), total_support_z], axis=-1),
@@ -1928,16 +1928,22 @@ def _ccd_planar_shelf_boundary(
 
     # Target surface evaluation at pos_next_loc
     r_next = jnp.sqrt(pos_next_loc[:, 0] ** 2 + pos_next_loc[:, 1] ** 2)
-    in_platform_next = has_intake & point_in_surface_hole(pos_next_loc, intake_pos, intake_normal, intake_radius)
-    in_drain_next = (
-        has_drain & point_in_surface_hole(pos_next_loc, drain_pos, drain_normal, drain_radius) & (~in_platform_next)
+    in_platform_next = has_intake & point_in_surface_hole(
+        pos_next_loc, intake_pos, intake_normal, intake_radius, normal_tol=0.100
     )
-    in_tube_next = has_tube & point_in_surface_hole(pos_next_loc, tube_pos, tube_normal, tube_radius)
+    in_drain_next = (
+        has_drain
+        & point_in_surface_hole(pos_next_loc, drain_pos, drain_normal, drain_radius, normal_tol=0.100)
+        & (~in_platform_next)
+    )
+    in_tube_next = has_tube & point_in_surface_hole(pos_next_loc, tube_pos, tube_normal, tube_radius, normal_tol=0.100)
     is_solid_next = (r_next < radius) & (~in_drain_next) & (~in_tube_next) & active_boundary
     z_top_next = z_top + jnp.where(in_platform_next, intake_pos[2], 0.0)
 
     # 1. Trajectory intersection with top surface Z = z_top_curr
-    in_platform_curr = has_intake & point_in_surface_hole(pos_curr_loc, intake_pos, intake_normal, intake_radius)
+    in_platform_curr = has_intake & point_in_surface_hole(
+        pos_curr_loc, intake_pos, intake_normal, intake_radius, normal_tol=0.100
+    )
     z_top_curr = z_top + jnp.where(in_platform_curr, intake_pos[2], 0.0)
     denom_top = pos_curr_loc[:, 2] - pos_next_loc[:, 2]
     t_top = jnp.clip((pos_curr_loc[:, 2] - z_top_curr) / jnp.where(jnp.abs(denom_top) > 1e-6, denom_top, 1.0), 0.0, 1.0)
@@ -1946,11 +1952,15 @@ def _ccd_planar_shelf_boundary(
     r_top = jnp.sqrt(x_top**2 + y_top**2)
     pos_top_3d = jnp.stack([x_top, y_top, jnp.full_like(x_top, z_top_curr)], axis=-1)
 
-    in_platform_top = has_intake & point_in_surface_hole(pos_top_3d, intake_pos, intake_normal, intake_radius)
-    in_drain_top = (
-        has_drain & point_in_surface_hole(pos_top_3d, drain_pos, drain_normal, drain_radius) & (~in_platform_top)
+    in_platform_top = has_intake & point_in_surface_hole(
+        pos_top_3d, intake_pos, intake_normal, intake_radius, normal_tol=0.100
     )
-    in_tube_top = has_tube & point_in_surface_hole(pos_top_3d, tube_pos, tube_normal, tube_radius)
+    in_drain_top = (
+        has_drain
+        & point_in_surface_hole(pos_top_3d, drain_pos, drain_normal, drain_radius, normal_tol=0.100)
+        & (~in_platform_top)
+    )
+    in_tube_top = has_tube & point_in_surface_hole(pos_top_3d, tube_pos, tube_normal, tube_radius, normal_tol=0.100)
     is_solid_top = (r_top < radius) & (~in_drain_top) & (~in_tube_top) & active_boundary
 
     # 2. Trajectory intersection with bottom surface Z = z_bot
@@ -1961,11 +1971,15 @@ def _ccd_planar_shelf_boundary(
     r_bot = jnp.sqrt(x_bot**2 + y_bot**2)
     pos_bot_3d = jnp.stack([x_bot, y_bot, jnp.full_like(x_bot, z_bot)], axis=-1)
 
-    in_platform_bot = has_intake & point_in_surface_hole(pos_bot_3d, intake_pos, intake_normal, intake_radius)
-    in_drain_bot = (
-        has_drain & point_in_surface_hole(pos_bot_3d, drain_pos, drain_normal, drain_radius) & (~in_platform_bot)
+    in_platform_bot = has_intake & point_in_surface_hole(
+        pos_bot_3d, intake_pos, intake_normal, intake_radius, normal_tol=0.100
     )
-    in_tube_bot = has_tube & point_in_surface_hole(pos_bot_3d, tube_pos, tube_normal, tube_radius)
+    in_drain_bot = (
+        has_drain
+        & point_in_surface_hole(pos_bot_3d, drain_pos, drain_normal, drain_radius, normal_tol=0.100)
+        & (~in_platform_bot)
+    )
+    in_tube_bot = has_tube & point_in_surface_hole(pos_bot_3d, tube_pos, tube_normal, tube_radius, normal_tol=0.100)
     is_solid_bot = (r_bot < radius) & (~in_drain_bot) & (~in_tube_bot) & active_boundary
 
     # Top collision: falling downwards onto the top drinking surface

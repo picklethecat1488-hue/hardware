@@ -112,14 +112,20 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
             max_speed = float(np.max(v_mags)) if len(v_mags) > 0 else 0.0
             max_vz = float(np.max(vz)) if len(vz) > 0 else 0.0
             sheet_speed = float(np.mean(v_mags[lid_sheet_mask])) if lid_sheet_cnt > 0 else 0.0
+            drain_down_vz = float(np.mean(-vz[drain_mask])) if drain_cnt > 0 else 0.0
+            drain_stagnant_cnt = int(np.sum(drain_mask & (np.abs(vz) < 0.05)))
         else:
             max_speed = 0.0
             max_vz = 0.0
             sheet_speed = 0.0
+            drain_down_vz = 0.0
+            drain_stagnant_cnt = 0
     else:
         max_speed = 0.0
         max_vz = 0.0
         sheet_speed = 0.0
+        drain_down_vz = 0.0
+        drain_stagnant_cnt = 0
 
     metrics = {
         "flow_spout": at_spout_cnt,
@@ -133,6 +139,8 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         "max_vertical_vel": round(max_vz, 4),
         "max_particle_speed": round(max_speed, 4),
         "mean_sheet_speed": round(sheet_speed, 4),
+        "drain_downward_vel": round(drain_down_vz, 4),
+        "drain_stagnant_particles": drain_stagnant_cnt,
     }
     provider.last_metrics = metrics
     if not hasattr(provider, "metrics_history") or provider.metrics_history is None:
@@ -154,6 +162,8 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         rr.log("metrics/max_vertical_vel", rr.Scalars(float(max_vz)))
         rr.log("metrics/max_particle_speed", rr.Scalars(float(max_speed)))
         rr.log("metrics/mean_sheet_speed", rr.Scalars(float(sheet_speed)))
+        rr.log("metrics/drain_downward_vel", rr.Scalars(float(drain_down_vz)))
+        rr.log("metrics/drain_stagnant_particles", rr.Scalars(float(drain_stagnant_cnt)))
 
     return metrics
 

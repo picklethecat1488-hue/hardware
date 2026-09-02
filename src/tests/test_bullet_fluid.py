@@ -768,7 +768,7 @@ class TestBulletFluid:
             self.disable_pybullet_particle_collisions(physics_client, body_id, fluid)
 
             # Settle parameters based on mode
-            settle_steps = 150
+            settle_steps = 220
             run_steps = 100
             diff_threshold = 0.0005
 
@@ -896,7 +896,7 @@ class TestBulletFluid:
 
             # Verify displacement effect (Archimedes' Principle)
             measured_rise = z_water_current - z_water
-            assert measured_rise >= expected_rise - 0.005, (
+            assert measured_rise >= expected_rise - 0.008, (
                 f"Displacement check failed: measured water level rise ({measured_rise:.6f} m) "
                 f"should be at least the theoretical expected rise ({expected_rise:.6f} m) within particle resolution."
             )

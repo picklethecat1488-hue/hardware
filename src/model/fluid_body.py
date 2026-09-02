@@ -13,6 +13,7 @@ class FluidBodyType(str, Enum):
     POOL = "pool"
     STREAM = "stream"
     SHEET = "sheet"
+    WATERFALL = "waterfall"
     CLUSTER = "cluster"
 
 

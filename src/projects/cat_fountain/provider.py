@@ -550,6 +550,7 @@ class CatFountainProvider(Provider):
                     thickness=0.0035,
                     has_tube=True,
                     tube_radius=(self.settings.tube_radius - self.settings.tube_thickness) * 0.001,
+                    shelf_depth=self.settings.lid_pocket_cavity_height * 0.001,
                 )
                 with Locations((0.0, 28.0, floor_z)):
                     tube_geom = Cylinder(
