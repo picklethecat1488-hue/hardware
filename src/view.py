@@ -18,6 +18,11 @@ from target_parser import TargetParser
 from provider import ProviderManager, Section, TargetList, Room, Simulate, Mode, Provider, URDFShape
 from pydantic import validate_call
 from shell import Logger
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="ocp_vscode.*")
+warnings.filterwarnings("ignore", message=".*collapse value from viewer.*")
+
 from ocp_vscode import set_port, Collapse, Camera, show as ocp_show  # type: ignore
 from build import Builder
 from list import Lister
@@ -113,6 +118,7 @@ class Viewer:
         save_rrd: Optional[str] = None,
         rerun_port: Optional[int] = None,
         no_gui: bool = False,
+        stage_window_size: Optional[int] = None,
     ):
         """Build and show the requested geometry in ocp_vscode."""
         display_items = []
@@ -184,11 +190,12 @@ class Viewer:
                 save_rrd=save_rrd,
                 rerun_port=rerun_port,
                 spawn_viewer=not no_gui,
+                stage_window_size=stage_window_size,
             )
         else:
             summary = self.get_summary(list(room.keys()))
             self.logger.print(f"Showing {summary}", symbol="👁️ ")
-            show(room.compound, names=["View"], collapse=Collapse.ALL, reset_camera=Camera.RESET)
+            show(room.compound, names=["View"], collapse=Collapse.LEAVES, reset_camera=Camera.RESET)
 
 
 def get_args():
@@ -215,6 +222,15 @@ def get_args():
         help="Path to save the rerun (.rrd) recording file.",
     )
     parser.add_argument(
+        "--stage-window",
+        "--stage-window-size",
+        "--staging-frame-window-size",
+        type=int,
+        default=None,
+        dest="stage_window_size",
+        help="Number of simulation frames per staging checkpoint window (e.g. 1000).",
+    )
+    parser.add_argument(
         "-p",
         "--port",
         type=int,
@@ -235,15 +251,9 @@ def get_args():
 
 def main():
     """Build and show the requested geometry in ocp_vscode."""
-    # Disable experimental async dispatch for MPS backend to prevent deadlocks/hangs
-    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
-    try:
-        import jax
+    from provider.utils import initialize_jax_environment
 
-        # Enable compilation caching to avoid JIT compile latency on subsequent runs
-        jax.config.update("jax_compilation_cache_dir", "build/jax_cache")
-    except ImportError:
-        pass
+    initialize_jax_environment()
 
     args = get_args()
 
@@ -269,6 +279,7 @@ def main():
                 save_rrd=args.save_rrd,
                 rerun_port=args.port,
                 no_gui=args.no_gui,
+                stage_window_size=args.stage_window_size,
             )
     finally:
         logger.done()

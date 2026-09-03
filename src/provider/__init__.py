@@ -23,23 +23,18 @@ if env_file.exists():
                     if unprefixed not in os.environ:
                         os.environ[unprefixed] = v
 
-warnings.filterwarnings("ignore", category=UserWarning, message=".*jax-mps was built for jaxlib.*")
-warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps' is experimental.*")
+from .utils import (
+    discover_provider,
+    load_manifest,
+    get_rgba_color,
+    initialize_jax_environment,
+    rerun_is_enabled,
+    str_to_bool,
+    get_env_bool,
+)
 
-import jax
-import logging
-
-# Enable JAX compilation caching globally to prevent JIT compile latency across tests, builds, and views
-_cache_dir = Path(__file__).resolve().parents[2] / "build" / "jax_cache"
-jax.config.update("jax_compilation_cache_dir", str(_cache_dir))
-jax.config.update("jax_log_compiles", True)
-jax.config.update("jax_explain_cache_misses", True)
-
-logging.getLogger("jax").setLevel(logging.INFO)
-
-# Unset experimental and potentially unstable async dispatch on MPS backend to prevent compilation deadlocks/hangs
-if os.environ.get("JAX_MPS_ASYNC_DISPATCH") == "1":
-    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "0"
+# Initialize JAX environment configuration deterministically
+initialize_jax_environment()
 
 import OCP.TopoDS  # type: ignore
 
@@ -65,10 +60,53 @@ from .types import (
     URDFJointType,
     URDFMotorType,
     COLOR,
+    DAEMON_LOGGERS,
 )
 from .target_list import TargetList
 from .room import Room
 from .bullet import Bullet, LinkType
+from .boundary import (
+    BowlBoundary,
+    CasingWallBoundary,
+    TubeWallBoundary,
+    CasingLidBoundary,
+    LidBoundary,
+    ImpellerBoundary,
+    SphereBoundary,
+    PlaneBoundary,
+    ProcessedBoundaries,
+    BoundaryProcessor,
+)
+from .transforms import (
+    invert_orientation,
+    world_to_base_orientation,
+    world_to_base_frame,
+    base_to_world_frame,
+    base_to_local_frame,
+    local_to_base_frame,
+    world_to_local_frame,
+    local_to_world_frame,
+    world_to_base_vector,
+    base_to_world_vector,
+    world_to_local_vector,
+    local_to_world_vector,
+    local_to_base_vector,
+    base_to_local_vector,
+    base_to_voxel_coord,
+    voxel_to_base_coord,
+    cartesian_to_cylindrical,
+    cylindrical_to_cartesian,
+    cartesian_to_polar_2d,
+    polar_to_cartesian_2d,
+    cartesian_to_spherical,
+    spherical_to_cartesian,
+)
+from .cad_boundary import (
+    reconstruct_boundary_cad_solid,
+    reconstruct_boundary_cad_cavity,
+    evaluate_boundary_cad_conformance,
+    validate_room_urdf_boundaries,
+)
 from .fluid import Fluid
 from .provider_router import ProviderRouter
 from .provider_manager import ProviderManager

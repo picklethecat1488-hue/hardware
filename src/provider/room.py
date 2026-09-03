@@ -30,6 +30,7 @@ from build123d import (
     Shape,
 )
 from build123d.exporters import ExportSVG, Drawing
+from .utils import get_env_bool
 
 
 def resolve_shape(val: Any) -> Optional[Shape]:
@@ -902,6 +903,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         particle_positions: list[list[float]],
         particle_colors: Optional[list[list[float]]] = None,
         particle_radii: Optional[list[float]] = None,
+        boundary_voxels: Optional[dict[str, Any]] = None,
         step_idx: Optional[int] = None,
     ) -> None:
         """Log the given state data to Rerun."""
@@ -949,6 +951,39 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                     ),
                 )
 
+        # Log boundary voxels labeled for each boundary type (gated on environment variable)
+        enable_boundary_voxels = get_env_bool("SHOW_BOUNDARY_VOXELS", False)
+        if enable_boundary_voxels and boundary_voxels is not None and len(boundary_voxels) > 0:
+            boundary_color_map = {
+                "bowl": [180, 180, 190, 80],
+                "casingwall": [255, 160, 50, 100],
+                "casing_wall": [255, 160, 50, 100],
+                "casing": [255, 160, 50, 100],
+                "tubewall": [50, 200, 100, 100],
+                "tube_wall": [50, 200, 100, 100],
+                "tube": [50, 200, 100, 100],
+                "casinglid": [160, 100, 220, 100],
+                "casing_lid": [160, 100, 220, 100],
+                "lid": [140, 90, 200, 100],
+                "impeller": [220, 50, 50, 140],
+                "sphere": [100, 180, 220, 100],
+                "plane": [150, 150, 150, 80],
+            }
+            default_color = [160, 160, 160, 90]
+
+            for label, vox_positions in boundary_voxels.items():
+                if vox_positions is not None and len(vox_positions) > 0:
+                    pos_arr = np.asarray(vox_positions, dtype=np.float32)
+                    color = boundary_color_map.get(label.lower(), default_color)
+                    rr.log(
+                        f"world/boundaries/{label}",
+                        rr.Points3D(
+                            positions=pos_arr,
+                            radii=0.0018,
+                            colors=color,
+                        ),
+                    )
+
     def simulate(
         self,
         provider_hooks: dict[Simulate, Callable[..., Any]],
@@ -961,6 +996,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         save_rrd: Optional[str] = None,
         rerun_port: Optional[int] = None,
         spawn_viewer: bool = True,
+        stage_window_size: Optional[int] = None,
     ) -> None:
         """
         Run a PyBullet physics simulation for the room geometries.
@@ -987,5 +1023,36 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             save_rrd,
             rerun_port,
             spawn_viewer,
+            stage_window_size=stage_window_size,
         )
         bullet_sim.run()
+
+        # Combine all staged recordings if any were created and save_rrd was not already written directly
+        if stage_window_size and save_rrd:
+            import glob
+            import os
+            import re
+            from .utils import merge_rrd_recordings
+
+            if not os.path.exists(save_rrd):
+                base_dir = os.path.dirname(save_rrd) or "."
+                base_name = os.path.splitext(os.path.basename(save_rrd))[0]
+                prefix = re.sub(r"_\d+$", "", base_name)
+                stage_pattern = os.path.join(base_dir, f"{prefix}_*.rrd")
+                staged_files = sorted(glob.glob(stage_pattern))
+                staged_files = [
+                    f
+                    for f in staged_files
+                    if os.path.abspath(f) != os.path.abspath(save_rrd)
+                    and re.match(rf"^{re.escape(prefix)}_\d+\.rrd$", os.path.basename(f))
+                ]
+                if staged_files:
+                    staged_files.sort(
+                        key=lambda x: (
+                            int(re.search(r"_(\d+)\.rrd$", os.path.basename(x)).group(1))
+                            if re.search(r"_(\d+)\.rrd$", os.path.basename(x))
+                            else 0
+                        )
+                    )
+                    merge_rrd_recordings(staged_files, save_rrd)
+                    logger.print(f"Combined {len(staged_files)} staged recording(s) into {save_rrd}", symbol="✨")

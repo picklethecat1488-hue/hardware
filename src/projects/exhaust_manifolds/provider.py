@@ -27,9 +27,7 @@ class ExhaustManifoldsProvider(Provider):
     @cached_property
     def builder(self) -> ExhaustManifoldsBuilder:
         """Return the exhaust manifolds builder."""
-        return ExhaustManifoldsBuilder(
-            config=self.app_config, exhaust_manifolds_config=self.settings, executor=self.orchestrator.executor
-        )
+        return ExhaustManifoldsBuilder(config=self.app_config, exhaust_manifolds_config=self.settings)
 
     @cached_property
     def configurator(self) -> ExhaustManifoldsConfigurator:
@@ -38,7 +36,6 @@ class ExhaustManifoldsProvider(Provider):
             builder=self.builder,
             config=self.app_config,
             exhaust_manifolds_config=self.settings,
-            executor=self.orchestrator.executor,
             logger=self.logger,
         )
 
@@ -50,7 +47,6 @@ class ExhaustManifoldsProvider(Provider):
             configurator=self.configurator,
             config=self.app_config,
             exhaust_manifolds_config=self.settings,
-            executor=self.orchestrator.executor,
         )
 
     @property

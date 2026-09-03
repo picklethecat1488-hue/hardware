@@ -28,6 +28,7 @@ class TestSmoke:
         env = os.environ.copy()
         # Force CPU execution for JAX in smoke tests to bypass MPS compilation/deadlock lag
         env["JAX_PLATFORMS"] = "cpu"
+        env["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1"
         if extra_env:
             env.update(extra_env)
 

@@ -111,7 +111,8 @@ class ProviderOrchestrator(Orchestrator):
                 target, sa, m = item
                 self.provider.config[m](target, sa)
 
-            list(self.executor.map(config_task, work))
+            for item in work:
+                config_task(item)
             self.post_handler(targets, None, action)
             return None
         elif action == Section.PART:
@@ -628,8 +629,12 @@ class URDFBoundary:
         thickness = kwargs.pop("thickness", default_thickness)
         xyz = kwargs.pop("xyz", default_xyz)
         rpy = kwargs.pop("rpy", default_rpy)
+        boundary_friction = kwargs.pop("boundary_friction", getattr(metadata, "boundary_friction", 0.20))
 
-        config_dict = {
+        supported_fields = BoundaryConfig.SHAPE_SUPPORTED_FIELDS.get(shape, set())
+        common_fields = {"link_type", "link_idx", "shape", "type", "xyz", "rpy", "boundary_friction"}
+
+        candidates = {
             "link_type": link_type,
             "link_idx": link_idx,
             "shape": shape,
@@ -639,8 +644,10 @@ class URDFBoundary:
             "thickness": thickness,
             "xyz": xyz,
             "rpy": rpy,
+            "boundary_friction": boundary_friction,
             **kwargs,
         }
+        config_dict = {k: v for k, v in candidates.items() if k in supported_fields or k in common_fields}
         boundary = BoundaryConfig.model_validate(config_dict)
         # Append to active metadata's boundaries list
         metadata.boundaries.append(boundary)

@@ -3,6 +3,7 @@
 from typing import Any, Optional, Union, cast
 from functools import cached_property
 from pathlib import Path
+import numpy as np
 from pydantic import BaseModel, Field
 from model import load_measurements, DiagramOptions, DiagramStyle
 
@@ -26,7 +27,7 @@ class CatFountainConfig(BaseModel):
     )
 
     target_volume: float = Field(
-        default=0.00030,
+        default=0.0010,
         description="Target total fluid volume to spawn (m^3).",
     )
 
@@ -150,7 +151,7 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def motor_power(self) -> float:
         """Return the maximum motor output power in Watts."""
-        return float(self._raw_data.get("motor_power", 1.0))
+        return float(self._raw_data.get("motor_power", 30.0))
 
     @cached_property
     def motor_force_sim(self) -> float:
@@ -183,22 +184,22 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def petg_boundary_friction(self) -> float:
         """Return the boundary friction of PETG material dynamically from manifest configuration."""
-        return float(self._material_data.get("petg", {}).get("boundary_friction", 0.20))
+        return float(self._material_data.get("petg", {}).get("boundary_friction", 0.0))
 
     @cached_property
     def petg_contact_angle(self) -> float:
         """Return the contact angle of PETG material dynamically from manifest configuration."""
-        return float(self._material_data.get("petg", {}).get("contact_angle", 75.0))
+        return float(self._material_data.get("petg", {}).get("contact_angle", 0.0))
 
     @property
     def density(self) -> float:
         """Return the density of the configured material dynamically from manifest configuration."""
-        return float(self._material_data.get(self.material, {}).get("density", 1.27))
+        return float(self._material_data.get(self.material, {}).get("density", 0.0))
 
     @property
     def boundary_friction(self) -> float:
         """Return the boundary friction of the configured material dynamically from manifest configuration."""
-        return float(self._material_data.get(self.material, {}).get("boundary_friction", 0.20))
+        return float(self._material_data.get(self.material, {}).get("boundary_friction", 0.0))
 
     @property
     def contact_angle(self) -> float:
@@ -258,6 +259,11 @@ class CatFountainConfig(BaseModel):
     def spout_deflection_z_offset(self) -> float:
         """Return the spout deflection cap Z offset in millimeters."""
         return float(self._raw_data.get("spout_deflection_z_offset", 16.0))
+
+    @cached_property
+    def lid_platform_slope_angle(self) -> float:
+        """Return the forward slope angle of the lid platform in degrees."""
+        return float(self._raw_data.get("lid_platform_slope_angle", 2.5))
 
     # =========================================================================
     # Simulation Parameters
@@ -732,20 +738,8 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("motor_clip_cutout_width", 14.2))
 
     def __init__(self, **data: Any):
-        """Initialize settings and load fallback values from measurements.yaml if present."""
+        """Initialize settings and calculate physical defaults."""
         super().__init__(**data)
-        if self.measurements_path:
-            try:
-                raw = self._raw_data
-                for field in ["stiffness_boundary", "damping_boundary"]:
-                    if field in raw and getattr(self, field) == self.model_fields[field].default:
-                        val = raw[field]
-                        if isinstance(val, np.ndarray):
-                            val = float(val.item()) if val.ndim == 0 else val.tolist()
-                        setattr(self, field, val)
-            except Exception:
-                pass
-
         if self.damping_boundary is None:
             r_s = 0.0015
             spacing = 1.3 * r_s

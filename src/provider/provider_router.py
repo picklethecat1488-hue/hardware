@@ -90,8 +90,12 @@ class ProviderRouterOrchestrator(Orchestrator):
             sub_list = TargetList(p, p_targets, subassemblies=p_subs, modes=list(modes), action=action)
             return p, indices, p.run(sub_list)
 
-        # Execute all provider runs in parallel across the thread pool
-        results = list(self.executor.map(provider_task, groups.items()))
+        # Execute config runs sequentially to avoid concurrent OpenCASCADE deadlocks
+        if action == Section.CONFIG:
+            results = [provider_task(item) for item in groups.items()]
+        else:
+            # Execute provider runs in parallel across the thread pool
+            results = list(self.executor.map(provider_task, groups.items()))
         return self.merge(action, targets, results)
 
 

@@ -11,20 +11,7 @@ from typing import Any, Optional, Callable, cast
 import rerun as rr
 import queue
 import threading
-from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFCollisionType, Simulate
-
-
-class LinkType(IntEnum):
-    """Bullet link types."""
-
-    BASE = -1
-    OUTLET = 0
-    TUBE = 1
-    IMPELLER = 2
-    FALLEN = -2
-    OUTLET_MAX_Y = -3
-    LID = 3
-    DRIVE_HUB = 4
+from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFCollisionType, Simulate, LinkType
 
 
 def _is_real_physics_client(physics_client: Any) -> bool:
@@ -36,6 +23,24 @@ def _is_real_physics_client(physics_client: Any) -> bool:
         return bool(info.get("isConnected", False))
     except Exception:
         return False
+
+
+def get_bullet_link_names(body_id: Optional[int], physics_client: Optional[int]) -> list[str]:
+    """Extract joint/link names from a PyBullet body ID.
+
+    Args:
+        body_id: PyBullet multi-body ID.
+        physics_client: PyBullet physics client ID.
+
+    Returns:
+        List of link name strings indexed by joint index.
+    """
+    if body_id is None or physics_client is None or not _is_real_physics_client(physics_client):
+        return []
+    return [
+        p.getJointInfo(body_id, i, physicsClientId=physics_client)[12].decode("utf-8")
+        for i in range(p.getNumJoints(body_id, physicsClientId=physics_client))
+    ]
 
 
 class BulletStateTracker:
@@ -51,6 +56,7 @@ class BulletStateTracker:
         self.particle_radii: list[float] = []
         self.transforms: dict[str, tuple[list[float], list[float]]] = {}
         self.particle_positions: list[list[float]] = []
+        self.boundary_voxels: Optional[dict[str, Any]] = None
         self._last_checked_num_bodies = 0
         self.has_fluid_simulator = False
 
@@ -134,6 +140,7 @@ class Bullet:
         save_rrd: Optional[str] = None,
         rerun_port: Optional[int] = None,
         spawn_viewer: bool = True,
+        stage_window_size: Optional[int] = None,
     ):
         """Initialize the simulator."""
         self.room = room
@@ -147,6 +154,7 @@ class Bullet:
         self.save_rrd = save_rrd
         self.rerun_port = rerun_port
         self.spawn_viewer = spawn_viewer
+        self.stage_window_size = stage_window_size
 
     def _parse_urdf_meshes(self, build_proj_dir: str) -> dict[str, str]:
         """Parse URDF files to map link names to their OBJ filenames."""
@@ -546,15 +554,25 @@ class Bullet:
                         while True:
                             item = q.get()
                             if item is None:
+                                q.task_done()
                                 break
-                            transforms, particle_positions, particle_colors, particle_radii, step_idx = item
+                            (
+                                transforms,
+                                particle_positions,
+                                particle_colors,
+                                particle_radii,
+                                boundary_voxels,
+                                step_idx,
+                            ) = item
                             self.room._log_rerun(
                                 transforms,
                                 particle_positions,
                                 particle_colors,
                                 particle_radii=particle_radii,
+                                boundary_voxels=boundary_voxels,
                                 step_idx=step_idx,
                             )
+                            q.task_done()
 
                     t = threading.Thread(target=logging_worker, daemon=True)
                     log_thread = t
@@ -583,11 +601,31 @@ class Bullet:
                                     state_tracker.particle_positions,
                                     state_tracker.particle_colors,
                                     state_tracker.particle_radii,
+                                    state_tracker.boundary_voxels,
                                     step_idx,
                                 )
                             )
                         except queue.Full:
                             pass
+
+                    # Check for staging frame window checkpoint
+                    if self.stage_window_size and self.save_rrd and ((step_idx + 1) % self.stage_window_size == 0):
+                        if log_queue is not None:
+                            log_queue.join()
+                        base_dir = os.path.dirname(self.save_rrd) or "."
+                        base_name = os.path.splitext(os.path.basename(self.save_rrd))[0]
+                        import re
+
+                        prefix = re.sub(r"_\d+$", "", base_name)
+                        staged_name = f"{prefix}_{step_idx + 1}.rrd"
+                        staged_path = os.path.join(base_dir, staged_name)
+                        if os.path.exists(self.save_rrd) and os.path.abspath(self.save_rrd) != os.path.abspath(
+                            staged_path
+                        ):
+                            shutil.copyfile(self.save_rrd, staged_path)
+                            self.logger.print(
+                                f"Staged checkpoint saved: {staged_path} ({step_idx + 1} frames)", symbol="💾"
+                            )
 
                     if terminated:
                         break

@@ -20,10 +20,10 @@ pytest
 ```
 
 ## Validation Guidelines
-1. **Execution**: Always activate the `cq` conda environment (as specified in [environment.yml](file:///Users/daparker/gh/hardware/environment.yml)) and run commands from the repository root.
+1. **Execution**: Prefer offloading test suites (`pytest`, `pytest -m "slow"`, `python src/smoke.py`) and pre-commit validation to the `anvil` cloud server (e.g., via `bin/anvil run "PYTHONPATH=src /home/ubuntu/miniforge3/envs/cq/bin/pytest"` or `ssh anvil`) to free up local CPU/GPU compute for rapid iteration, CAD generation, and interactive experiments. When running locally, activate the `cq` conda environment.
 2. **Outcome Verification**: Confirm that all checks (format, lint, compile, and pytest) pass with exit code `0`.
 3. **Resolution**: If any component fails (such as syntax error, ruff failure, or failing test), you must address the failure and re-run the check before concluding your work.
-4. **Integration Smoke Tests**: The integration smoke tests (`python src/smoke.py`) are highly resource-intensive and should be run on the continuous integration (CI) server. Avoid running them locally during normal development iterations unless you are verifying changes to the daemon, visualizer backend, or SPH physics engine.
+4. **Integration Smoke Tests**: The integration smoke tests (`python src/smoke.py`) are highly resource-intensive and should always be run on `anvil`.
 
 ---
 
@@ -77,7 +77,10 @@ pytest
 * **Cylinder Boundaries**: For cylinder cavity boundary configurations, treat height as infinite along the local Z axis where possible to avoid particle escape at high pressures.
 * **Fluid Recycling**: Ensure `fluid.recycle_fluid = True` is used in steady-state flow loops, with boundary coordinates matching physical limits.
 * **JAX-JIT Compilation**: Prefer using `jax.jit` and pure functions during physics computations in JAX to leverage static optimization, compilation speedups, and hardware acceleration.
+* **Semantic Coordinate Transforms**: Direct matrix and raw quaternion operations (`q_inv`, `q_mult`, `q_rotate`) are strictly BANNED in JAX simulation and provider production code. All spatial transitions and frame changes MUST use semantic coordinate transformations (`world_to_base_frame`, `base_to_world_frame`, `base_to_local_frame`, `local_to_base_frame`, `base_to_voxel_coord`) and coordinate system conversions (`cartesian_to_cylindrical`, `cylindrical_to_cartesian`, `cartesian_to_spherical`) from `provider.transforms`. This guarantees mathematical consistency across coordinate frames (World, Base Link, Local Link, Voxel Grid) and prevents phantom collision boundaries or force misprojections.
 * **Numeric Damping**: For long-running simulation validations, enforce stabilization velocity damping (e.g., `0.95`) to prevent numerical velocity buildup.
+* **Physical Contact & Non-Floating Invariants**: Fluid particles residing in containers under gravity must make direct physical contact with the bottom floor ($\min(Z) \le Z_{\text{floor}} + 2 \cdot r_s + \text{margin}$) and spread to outer containment boundaries ($r \to R_{\text{wall}}$), forming a continuous fluid mass. Fluid tests must explicitly assert these contact invariants to prevent artificial mid-air hovering, floating shells, or disconnected particle clusters.
+* **Test Failure Replication**: When unphysical behaviors (such as mid-air hovering, suction traps, or hollow shells) are observed during visual simulation inspection, test cases must be updated with assertions that actively reproduce the failure under flawed dynamics and only pass when the physical dynamics are verified.
 
 ### 6. Declarative Wiring & Routing Engine
 * Declare footprint, physical dimensions, pinouts, and net connections in the project's `wiring.yaml` file.
@@ -87,4 +90,27 @@ pytest
 * Code documentation MUST be PEP-257 compliant and comprehensive. Write docstrings for all custom classes, methods, functions, and properties.
 * Docstring correctness is checked automatically by ruff linting rules (group `D` configured in [pyproject.toml](file:///Users/daparker/gh/hardware/pyproject.toml)).
 * **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum`) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes. This prevents typos and improves code readability/refactoring.
+* **Named Constant Formatting**: Constant values in production code must be assigned to module-level or class-level `ALL_CAPS` named constant variables rather than being embedded as inline magic literals.
+* **Idiomatic Iteration & Enumeration**: Prefer looping over sequences and arrays directly or using `enumerate(...)` (e.g., `for idx, shape in enumerate(b_shapes):` or `for shape in b_shapes:`) rather than indexing by integer range bounds (such as `for k in range(b_shapes.shape[0]):` or `for i in range(len(items)):`).
 * **Import Placement**: Imports should be done at the top of the file/listing, unless doing so would cause module load race conditions or circular dependencies (such as importing model classes inside provider packages).
+
+### 8. Work Tracking & Task Management
+* **Task List (`TODO.md`)**: Maintain and track planned tasks, active implementation steps, outstanding engineering checklist items, and completed work in a `TODO.md` file in the workspace root. Keep the checklist updated (`[ ]` -> `[x]`) as subtasks progress to provide clear visibility and alignment.
+
+---
+
+## Remote Cloud Server (`anvil`)
+
+For resource-intensive workloads, parameter sweeps, fluid dynamics simulations, integration smoke tests (`python src/smoke.py`), validation experiments, and data collection, the `anvil` cloud server is available:
+
+```ssh-config
+Host anvil
+  HostName 163.192.17.220
+  User ubuntu
+  IdentityFile "~/.ssh/FLINT'S KEY.pem"
+  IdentitiesOnly yes
+```
+
+### Usage Guidelines:
+1. **Remote Execution**: Use `bin/anvil run "<command>"` or SSH targeting `ubuntu@anvil` (or `ssh anvil`) to run full test suites (`pytest`), slow physics benchmarks (`pytest -m "slow"`), large JAX SPH simulation grids, parameter sweeps, and integration smoke tests (`python src/smoke.py`).
+2. **Conda Environment & Binaries**: On `anvil`, execute commands within the `cq` conda environment using `conda run -n cq --no-capture-output <command>` (prefer relative executable names like `python`, `pytest`, `ruff` over absolute paths).

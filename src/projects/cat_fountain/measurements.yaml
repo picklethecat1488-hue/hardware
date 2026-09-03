@@ -5,6 +5,7 @@ bowl_radius: 100.0
 bowl_height: 107.0
 bowl_thickness: 4.0
 floor_z: 41.0
+target_volume: 0.0010
 bottom_cover_clearance: 0.2
 bottom_cover_drain_radius: 8.0
 drain_hole_radius: 15.4
@@ -27,13 +28,14 @@ lid_step_width: 2.0
 spout_angle: 45.0
 spout_length: 30.0
 spout_deflection_height: 0.0
-spout_deflection_radius: 13.0
-spout_deflection_thickness: 40.0
+spout_deflection_radius: 30.0
+spout_deflection_thickness: 2.0
 spout_deflection_z_offset: 16.0
 lid_cutout_radius: 55.0
 lid_cutout_y: -20.0
 lid_cutout_ridge_width: 1.5
 lid_cutout_ridge_height: 2.0
+lid_platform_slope_angle: 2.5
 
 # ==========================================
 # 3. Tube
@@ -53,8 +55,8 @@ impeller_sleeve_height: 4.0
 impeller_blades: 6
 impeller_clearance: 0.4
 vane_twist: -15.0
-motor_target: 220.0
-motor_power: 15.0
+motor_target: 130.0
+motor_power: 30.0
 
 # ==========================================
 # 5. Motor, Central Boss & Fasteners
@@ -169,8 +171,3 @@ motor_clip_width: 17.6
 motor_clip_thickness: 1.6
 motor_clip_length: 26.0
 motor_clip_cutout_width: 10.0
-damping_boundary: 2.0020162500000005
-stiffness_boundary: 1000.0
-stiffness: 1000.0
-damping: 0.995
-viscosity: 0.02

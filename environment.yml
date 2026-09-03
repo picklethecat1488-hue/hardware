@@ -22,7 +22,7 @@ dependencies:
     - pytest-timeout
     - numpy
     - scipy
-    - rerun-sdk
+    - rerun-sdk==0.36.2
     - trimesh
     - jax
     - jaxlib
