@@ -261,25 +261,34 @@ def generate_manifold_mesh_around_particles(
     if positions is None or len(positions) == 0:
         return np.empty((0, 3), dtype=np.float32), np.empty((0, 3), dtype=np.uint32)
 
+    vol = len(positions) * (4.0 / 3.0) * math.pi * (r_s**3)
+    equiv_radius = max(r_s, (3.0 * vol / (4.0 * math.pi)) ** (1.0 / 3.0))
+
     if len(positions) < 4:
         centroid = tuple(float(x) for x in np.mean(positions, axis=0))
-        vol = len(positions) * (4.0 / 3.0) * math.pi * (r_s**3)
-        radius = max(r_s, (3.0 * vol / (4.0 * math.pi)) ** (1.0 / 3.0))
-        return generate_sphere_mesh(center=centroid, radius=radius)
+        return generate_sphere_mesh(center=centroid, radius=equiv_radius)
 
     try:
         from scipy.spatial import ConvexHull
 
-        hull = ConvexHull(positions)
+        # Expand points with thickness (+/- r_s * 0.5) to guarantee 3D volume for coplanar sets
+        pts_expanded = np.vstack(
+            [
+                positions + np.array([0.0, 0.0, r_s * 0.5]),
+                positions - np.array([0.0, 0.0, r_s * 0.5]),
+            ]
+        )
+        hull = ConvexHull(pts_expanded)
         unique_indices = np.unique(hull.simplices)
         index_map = {orig: new for new, orig in enumerate(unique_indices)}
-        vertices = positions[unique_indices].astype(np.float32)
+        vertices = pts_expanded[unique_indices].astype(np.float32)
         faces = np.vectorize(index_map.get)(hull.simplices).astype(np.uint32)
         return vertices, faces
     except Exception:
         centroid = tuple(float(x) for x in np.mean(positions, axis=0))
-        radius = float(np.max(np.linalg.norm(positions - centroid, axis=1))) + r_s
-        return generate_sphere_mesh(center=centroid, radius=radius)
+        max_extent = min(float(np.max(np.linalg.norm(positions - centroid, axis=1))) + r_s, equiv_radius * 1.5)
+        safe_radius = max(equiv_radius, max_extent)
+        return generate_sphere_mesh(center=centroid, radius=safe_radius)
 
 
 class FluidBodyType(str, Enum):
@@ -511,6 +520,45 @@ class FluidBody(BaseModel):
         return self
 
 
+def cluster_particles(positions: np.ndarray, max_dist: float = 0.020) -> list[np.ndarray]:
+    """Group 3D particles into spatially connected clusters within max_dist threshold."""
+    if positions is None or len(positions) == 0:
+        return []
+    if len(positions) == 1:
+        return [np.array([0])]
+
+    from scipy.spatial import KDTree
+
+    tree = KDTree(positions)
+    pairs = tree.query_pairs(max_dist)
+
+    parent = list(range(len(positions)))
+
+    def find(i: int) -> int:
+        path = []
+        while parent[i] != i:
+            path.append(i)
+            i = parent[i]
+        for node in path:
+            parent[node] = i
+        return i
+
+    def union(i: int, j: int) -> None:
+        root_i, root_j = find(i), find(j)
+        if root_i != root_j:
+            parent[root_i] = root_j
+
+    for i, j in pairs:
+        union(i, j)
+
+    groups: dict[int, list[int]] = {}
+    for idx in range(len(positions)):
+        root = find(idx)
+        groups.setdefault(root, []).append(idx)
+
+    return [np.array(indices) for indices in groups.values()]
+
+
 class FluidBodyTracker:
     """Manages the dynamic lifecycle of fluid bodies, performing move, split, and merge transitions."""
 
@@ -613,26 +661,38 @@ class FluidBodyTracker:
             if len(indices) == 0:
                 continue
 
-            # Find matching existing body or create new one
-            matched = False
-            for body in self.bodies.values():
-                if body.body_type == b_type:
-                    # Move & update body with current indices
-                    body.particle_indices = indices
-                    body.recompute_shape(positions, velocities, self.r_s)
-                    active_bodies.append(body)
-                    matched = True
-                    break
+            # For cluster and waterfall bodies with multiple disconnected droplets, decompose into local clusters
+            if b_type in (FluidBodyType.CLUSTER, FluidBodyType.WATERFALL) and len(indices) > 1:
+                cluster_subsets = cluster_particles(positions[indices], max_dist=0.020)
+                for c_subset in cluster_subsets:
+                    c_indices = indices[c_subset]
+                    child = FluidBody(
+                        body_id=self._get_next_id(),
+                        body_type=b_type,
+                        particle_indices=c_indices,
+                    )
+                    child.recompute_shape(positions, velocities, self.r_s)
+                    self.bodies[child.body_id] = child
+                    active_bodies.append(child)
+            else:
+                matched = False
+                for body in self.bodies.values():
+                    if body.body_type == b_type:
+                        body.particle_indices = indices
+                        body.recompute_shape(positions, velocities, self.r_s)
+                        active_bodies.append(body)
+                        matched = True
+                        break
 
-            if not matched:
-                new_body = FluidBody(
-                    body_id=self._get_next_id(),
-                    body_type=b_type,
-                    particle_indices=indices,
-                )
-                new_body.recompute_shape(positions, velocities, self.r_s)
-                self.bodies[new_body.body_id] = new_body
-                active_bodies.append(new_body)
+                if not matched:
+                    new_body = FluidBody(
+                        body_id=self._get_next_id(),
+                        body_type=b_type,
+                        particle_indices=indices,
+                    )
+                    new_body.recompute_shape(positions, velocities, self.r_s)
+                    self.bodies[new_body.body_id] = new_body
+                    active_bodies.append(new_body)
 
         # Prune dead bodies
         active_ids = {b.body_id for b in active_bodies}
