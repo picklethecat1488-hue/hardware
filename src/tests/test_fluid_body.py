@@ -177,3 +177,54 @@ def test_fluid_body_tracker():
     assert FluidBodyType.SHEET in types
     assert FluidBodyType.CLUSTER in types
     assert len(bodies) == 4
+
+
+def test_fluid_body_to_mesh_and_cad_solid():
+    """Verify watertight mesh and CAD solid generation for various fluid body types."""
+    from model.fluid_body import generate_cylinder_mesh, generate_box_mesh
+
+    # 1. Cylinder mesh generator
+    verts, faces = generate_cylinder_mesh(radius=0.050, z_min=0.040, z_max=0.080, center=(0.0, 0.0), n_segments=16)
+    assert len(verts) == 16 * 2 + 2
+    assert len(faces) == 16 * 4  # 16 quad sides (32 tris) + 16 bottom tris + 16 top tris = 64 tris
+    assert np.all(verts[:, 2] >= 0.040)
+    assert np.all(verts[:, 2] <= 0.080)
+
+    # 2. Box mesh generator
+    b_verts, b_faces = generate_box_mesh(bounds_min=(-0.01, -0.01, 0.0), bounds_max=(0.01, 0.01, 0.05))
+    assert len(b_verts) == 8
+    assert len(b_faces) == 12  # 6 faces * 2 tris = 12
+
+    # 3. Pool FluidBody to_mesh and to_cad_solid
+    pool = FluidBody(
+        body_id=1,
+        body_type=FluidBodyType.POOL,
+        particle_indices=np.array([0, 1]),
+        centroid=(0.0, 0.0, 0.060),
+        bounds_min=(-0.080, -0.080, 0.041),
+        bounds_max=(0.080, 0.080, 0.078),
+    )
+    p_verts, p_faces = pool.to_mesh()
+    assert len(p_verts) > 0
+    assert len(p_faces) > 0
+
+    p_solid = pool.to_cad_solid()
+    assert p_solid is not None
+    assert hasattr(p_solid, "volume")
+    assert p_solid.volume > 0.0
+
+    # 4. Stream FluidBody to_mesh and to_cad_solid
+    stream = FluidBody(
+        body_id=2,
+        body_type=FluidBodyType.STREAM,
+        particle_indices=np.array([0]),
+        centroid=(0.0, 0.028, 0.070),
+        bounds_min=(-0.006, 0.022, 0.041),
+        bounds_max=(0.006, 0.034, 0.107),
+    )
+    s_verts, s_faces = stream.to_mesh()
+    assert len(s_verts) > 0
+    assert len(s_faces) > 0
+    s_solid = stream.to_cad_solid()
+    assert s_solid is not None
+    assert s_solid.volume > 0.0
