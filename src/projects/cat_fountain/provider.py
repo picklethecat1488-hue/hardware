@@ -617,8 +617,7 @@ class CatFountainProvider(Provider):
                 )
 
         # Define joints
-        hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 1.5
-        motor_shaft_z = floor_z - (self.settings.pump_well_wall + hub_h + 0.35)
+        motor_shaft_z = floor_z - 17.5 + self.settings.motor_clip_thickness + 9.3
         RigidJoint("impeller_post", bowl.part, Location((0, 0, floor_z)))
         RigidJoint("motor_shaft", bowl.part, Location((0, 0, motor_shaft_z)))
         RigidJoint("pump_cover_seat", bowl.part, Location((0, 0, floor_z + 8.5)))
@@ -780,6 +779,25 @@ class CatFountainProvider(Provider):
             opening_w = self.settings.bottom_cover_opening_width
             with Locations((0, -cover_r, 0.0)):
                 Box(opening_w, 20.0, 10.0, align=(Align.CENTER, Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT)
+
+            # Symmetrically spaced depressions for adhesive rubber feet on the bottom face (Z = 0)
+            feet_r = self.settings.rubber_feet_radius
+            feet_d = self.settings.rubber_feet_depth
+            pitch_r = self.settings.rubber_feet_pitch_radius
+            feet_count = self.settings.rubber_feet_count
+            if feet_count > 0 and feet_r > 0.0 and feet_d > 0.0:
+                for i in range(feet_count):
+                    angle_deg = (i * 360.0 / feet_count) + 45.0
+                    rad = math.radians(angle_deg)
+                    fx = pitch_r * math.cos(rad)
+                    fy = pitch_r * math.sin(rad)
+                    with Locations((fx, fy, 0.0)):
+                        Cylinder(
+                            radius=feet_r,
+                            height=feet_d,
+                            align=(Align.CENTER, Align.CENTER, Align.MIN),
+                            mode=Mode.SUBTRACT,
+                        )
 
             URDFMetadata(
                 label=target,
@@ -1014,6 +1032,8 @@ class CatFountainProvider(Provider):
         """Build the dry-side magnet drive hub mounted on the motor D-shaft."""
         hub_r = self.settings.impeller_radius + self.settings.magnet_radius + 1.6
         hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 1.5
+        standoff_r = self.settings.drive_hub_standoff_radius
+        standoff_h = self.settings.drive_hub_standoff_height
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
         mt = self.settings.magnet_thickness + self.settings.magnet_clearance
         ring_r = self.settings.magnet_ring_radius
@@ -1021,10 +1041,16 @@ class CatFountainProvider(Provider):
         with BuildPart() as hub:
             Cylinder(radius=hub_r, height=hub_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
+            # Add integral standoff thrust ring on top face (Z = hub_h) facing the impeller / well ceiling
+            if standoff_h > 0.0 and standoff_r > 0.0:
+                with Locations((0, 0, hub_h)):
+                    Cylinder(radius=standoff_r, height=standoff_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
             # Round shaft hole (radius 0.78mm for 1.5mm motor shaft)
+            total_h = hub_h + standoff_h
             with BuildSketch() as hole_sketch:
                 Circle(radius=0.78)
-            ext_hole = extrude(hole_sketch.sketch, amount=hub_h + 2.0, mode=Mode.PRIVATE)
+            ext_hole = extrude(hole_sketch.sketch, amount=total_h + 2.0, mode=Mode.PRIVATE)
             hub.part -= Location((0, 0, -1.0)) * ext_hole
 
             # Magnet pockets on the top face (Z = hub_h)
@@ -1300,7 +1326,8 @@ class CatFountainProvider(Provider):
 
             motor_part = make_motor()
             floor_z = self.settings.floor_z
-            motor_part.location = Location((0, 0, floor_z - 6.5))
+            motor_top_z = floor_z - 17.5 + self.settings.motor_clip_thickness + 9.3
+            motor_part.location = Location((0, 0, motor_top_z))
             room.add("motor", motor_part, color="grey", alpha=0.8)
 
             def make_pcb(w: float, l: float, h: float = 2.0) -> Part:
