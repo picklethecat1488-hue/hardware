@@ -7,6 +7,92 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 
+def generate_cylinder_mesh(
+    radius: float,
+    z_min: float,
+    z_max: float,
+    center: tuple[float, float] = (0.0, 0.0),
+    n_segments: int = 32,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Generate a watertight 3D cylinder triangle mesh with outward normals."""
+    cx, cy = center
+    theta = np.linspace(0.0, 2.0 * np.pi, n_segments, endpoint=False)
+    cos_t = np.cos(theta)
+    sin_t = np.sin(theta)
+
+    # Bottom ring vertices (0 .. n_segments - 1)
+    v_bottom = np.column_stack([cx + radius * cos_t, cy + radius * sin_t, np.full(n_segments, z_min)])
+    # Top ring vertices (n_segments .. 2*n_segments - 1)
+    v_top = np.column_stack([cx + radius * cos_t, cy + radius * sin_t, np.full(n_segments, z_max)])
+    # Bottom center (2*n_segments)
+    v_bottom_center = np.array([[cx, cy, z_min]])
+    # Top center (2*n_segments + 1)
+    v_top_center = np.array([[cx, cy, z_max]])
+
+    vertices = np.vstack([v_bottom, v_top, v_bottom_center, v_top_center]).astype(np.float32)
+
+    idx_bot_c = 2 * n_segments
+    idx_top_c = 2 * n_segments + 1
+
+    faces = []
+    for i in range(n_segments):
+        next_i = (i + 1) % n_segments
+        # Side quad (2 triangles)
+        faces.append([i, n_segments + i, n_segments + next_i])
+        faces.append([i, n_segments + next_i, next_i])
+        # Bottom cap (viewed from bottom)
+        faces.append([idx_bot_c, next_i, i])
+        # Top cap (viewed from top)
+        faces.append([idx_top_c, n_segments + i, n_segments + next_i])
+
+    return vertices, np.array(faces, dtype=np.uint32)
+
+
+def generate_box_mesh(
+    bounds_min: tuple[float, float, float],
+    bounds_max: tuple[float, float, float],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Generate a watertight 3D axis-aligned box triangle mesh."""
+    x0, y0, z0 = bounds_min
+    x1, y1, z1 = bounds_max
+    x1 = max(x1, x0 + 1e-4)
+    y1 = max(y1, y0 + 1e-4)
+    z1 = max(z1, z0 + 1e-4)
+
+    vertices = np.array(
+        [
+            [x0, y0, z0],
+            [x1, y0, z0],
+            [x1, y1, z0],
+            [x0, y1, z0],
+            [x0, y0, z1],
+            [x1, y0, z1],
+            [x1, y1, z1],
+            [x0, y1, z1],
+        ],
+        dtype=np.float32,
+    )
+
+    faces = np.array(
+        [
+            [0, 2, 1],
+            [0, 3, 2],
+            [4, 5, 6],
+            [4, 6, 7],
+            [0, 1, 5],
+            [0, 5, 4],
+            [2, 3, 7],
+            [2, 7, 6],
+            [0, 4, 7],
+            [0, 7, 3],
+            [1, 2, 6],
+            [1, 6, 5],
+        ],
+        dtype=np.uint32,
+    )
+    return vertices, faces
+
+
 class FluidBodyType(str, Enum):
     """Semantic classification of dynamic fluid bodies."""
 
@@ -39,6 +125,52 @@ class FluidBody(BaseModel):
     velocity: tuple[float, float, float] = Field(default=(0.0, 0.0, 0.0), description="Mean 3D velocity vector (m/s).")
     volume: float = Field(default=0.0, description="Physical fluid volume of the body in cubic meters.")
     particle_count: int = Field(default=0, description="Total number of particles in this fluid body.")
+
+    def to_mesh(self, n_segments: int = 32) -> tuple[np.ndarray, np.ndarray]:
+        """Generate watertight 3D triangle mesh vertices and face indices for this fluid body."""
+        cx, cy, _ = self.centroid
+        z_min = self.bounds_min[2]
+        z_max = self.bounds_max[2]
+
+        if self.body_type == FluidBodyType.POOL:
+            rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+            ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+            radius = max(0.010, (rx + ry) / 2.0)
+            return generate_cylinder_mesh(radius, z_min, z_max, center=(0.0, 0.0), n_segments=n_segments)
+        elif self.body_type == FluidBodyType.STREAM:
+            rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+            ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+            radius = max(0.003, (rx + ry) / 2.0)
+            return generate_cylinder_mesh(radius, z_min, z_max, center=(cx, cy), n_segments=n_segments)
+        elif self.body_type == FluidBodyType.SHEET:
+            rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+            ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+            radius = max(0.010, (rx + ry) / 2.0)
+            return generate_cylinder_mesh(radius, z_min, z_max, center=(cx, cy), n_segments=n_segments)
+        else:
+            return generate_box_mesh(self.bounds_min, self.bounds_max)
+
+    def to_cad_solid(self) -> Any:
+        """Build and return a watertight build123d Solid representation conforming to CAD design principles."""
+        from build123d import Cylinder, Box, Align, Location
+
+        cx, cy, _ = self.centroid
+        z_min = self.bounds_min[2]
+        z_max = self.bounds_max[2]
+        h = max(0.001, z_max - z_min)
+
+        if self.body_type in (FluidBodyType.POOL, FluidBodyType.STREAM, FluidBodyType.SHEET):
+            rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+            ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+            radius = max(0.002, (rx + ry) / 2.0)
+            c = Cylinder(radius=radius, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            pos = (0.0, 0.0, z_min) if self.body_type == FluidBodyType.POOL else (cx, cy, z_min)
+            return c.locate(Location(pos))
+        else:
+            dx = max(0.002, self.bounds_max[0] - self.bounds_min[0])
+            dy = max(0.002, self.bounds_max[1] - self.bounds_min[1])
+            b = Box(dx, dy, h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            return b.locate(Location((cx, cy, z_min)))
 
     def move(self, displacement: tuple[float, float, float] | np.ndarray) -> None:
         """Translate the fluid body bounding geometry and centroid by a 3D displacement vector.
