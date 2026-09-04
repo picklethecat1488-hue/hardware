@@ -32,6 +32,7 @@ from model import (
     BoundaryParam,
     FluidBody,
     FluidBodyType,
+    FluidStage,
     FluidBodyTracker,
 )
 from provider.transforms import (
@@ -3375,19 +3376,11 @@ class Fluid:
         """
         if not hasattr(self, "fluid_body_tracker"):
             self.fluid_body_tracker = FluidBodyTracker(r_s=self.r_s)
-        z_offset = self.processed_boundaries.cavity_z_offset
-        lid_b = self.processed_boundaries.lid
-        tube_b = self.processed_boundaries.tube_wall
-        z_lid = lid_b.z_floor if lid_b is not None else (z_offset + self.processed_boundaries.base_height)
-        tube_y = tube_b.pos[1] if tube_b is not None else (lid_b.tube_y if lid_b is not None else 0.0)
-        tube_r = tube_b.r_inner if tube_b is not None else (lid_b.tube_r if lid_b is not None else 0.0)
+
         return self.fluid_body_tracker.update_bodies(
             self.last_positions,
             self.last_velocities,
-            z_floor=z_offset,
-            z_lid=z_lid,
-            tube_y=tube_y,
-            tube_r=tube_r,
+            cad_context=self.processed_boundaries.fluid_context,
         )
 
     def get_boundary_voxels(self) -> dict[str, np.ndarray]:
@@ -3923,7 +3916,7 @@ class Fluid:
         bodies = self.get_fluid_bodies()
         meshes = {}
         for body in bodies:
-            name = f"{body.body_type.value}_{body.body_id}"
+            name = body.display_name
             verts, faces = body.to_mesh()
             if len(verts) > 0 and len(faces) > 0:
                 meshes[name] = (verts, faces)

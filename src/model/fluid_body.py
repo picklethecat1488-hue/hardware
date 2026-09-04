@@ -2,7 +2,7 @@
 
 from enum import Enum
 import math
-from typing import Any, Optional
+from typing import Any, NamedTuple, Optional, Sequence, Union
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -120,7 +120,7 @@ def generate_heightfield_cylinder_mesh(
     cos_s = np.cos(spoke_angles)
     sin_s = np.sin(spoke_angles)
 
-    # 1. Build 2D surface height grid from surface particles if provided
+    # 1. Build 2D surface height grid from surface particles strictly within containing radius
     nx, ny = 32, 32
     x_min, x_max = cx - radius, cx + radius
     y_min, y_max = cy - radius, cy + radius
@@ -129,9 +129,17 @@ def generate_heightfield_cylinder_mesh(
     grid_z = np.full((nx, ny), default_z_top, dtype=np.float32)
 
     if surface_positions is not None and len(surface_positions) > 0:
-        ix = np.clip(np.floor((surface_positions[:, 0] - x_min) / dx).astype(int), 0, nx - 1)
-        iy = np.clip(np.floor((surface_positions[:, 1] - y_min) / dy).astype(int), 0, ny - 1)
-        np.maximum.at(grid_z, (ix, iy), surface_positions[:, 2])
+        d_center_sq = (surface_positions[:, 0] - cx) ** 2 + (surface_positions[:, 1] - cy) ** 2
+        in_bounds = (
+            (d_center_sq <= (radius + 1e-4) ** 2)
+            & (surface_positions[:, 2] >= z_floor)
+            & (surface_positions[:, 2] <= default_z_top + 0.010)
+        )
+        valid_pos = surface_positions[in_bounds]
+        if len(valid_pos) > 0:
+            ix = np.clip(np.floor((valid_pos[:, 0] - x_min) / dx).astype(int), 0, nx - 1)
+            iy = np.clip(np.floor((valid_pos[:, 1] - y_min) / dy).astype(int), 0, ny - 1)
+            np.maximum.at(grid_z, (ix, iy), valid_pos[:, 2])
 
     def sample_z(x_arr: np.ndarray, y_arr: np.ndarray) -> np.ndarray:
         gx = np.clip(np.floor((x_arr - x_min) / dx).astype(int), 0, nx - 1)
@@ -291,6 +299,149 @@ def generate_manifold_mesh_around_particles(
         return generate_sphere_mesh(center=centroid, radius=safe_radius)
 
 
+def generate_lip_waterfall_mesh(
+    positions: Optional[np.ndarray],
+    center_xy: tuple[float, float] = (0.0, 0.0),
+    lip_radius: float = 0.030,
+    z_top: float = 0.113,
+    z_bot: float = 0.106,
+    thickness: float = 0.003,
+    n_segments: int = 32,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Generate a watertight annular curtain waterfall mesh cascading off an elevated platform lip."""
+    cx, cy = center_xy
+    theta = np.linspace(0.0, 2.0 * np.pi, n_segments, endpoint=False)
+    cos_t = np.cos(theta)
+    sin_t = np.sin(theta)
+
+    r_out_top = lip_radius
+    r_in_top = max(0.005, lip_radius - thickness)
+    r_out_bot = lip_radius + 0.002
+    r_in_bot = max(0.005, lip_radius - thickness + 0.002)
+
+    vertices = []
+    for seg in range(n_segments):
+        vertices.append([cx + r_out_top * cos_t[seg], cy + r_out_top * sin_t[seg], z_top])
+    for seg in range(n_segments):
+        vertices.append([cx + r_in_top * cos_t[seg], cy + r_in_top * sin_t[seg], z_top])
+    for seg in range(n_segments):
+        vertices.append([cx + r_out_bot * cos_t[seg], cy + r_out_bot * sin_t[seg], z_bot])
+    for seg in range(n_segments):
+        vertices.append([cx + r_in_bot * cos_t[seg], cy + r_in_bot * sin_t[seg], z_bot])
+
+    vertices_arr = np.array(vertices, dtype=np.float32)
+    faces = []
+
+    # Top annular cap
+    for seg in range(n_segments):
+        next_seg = (seg + 1) % n_segments
+        faces.append([seg, next_seg, n_segments + next_seg])
+        faces.append([seg, n_segments + next_seg, n_segments + seg])
+
+    # Outer cylindrical curtain
+    r2_offset = 2 * n_segments
+    for seg in range(n_segments):
+        next_seg = (seg + 1) % n_segments
+        faces.append([seg, r2_offset + seg, r2_offset + next_seg])
+        faces.append([seg, r2_offset + next_seg, next_seg])
+
+    # Inner cylindrical curtain
+    r3_offset = 3 * n_segments
+    for seg in range(n_segments):
+        next_seg = (seg + 1) % n_segments
+        faces.append([n_segments + seg, n_segments + next_seg, r3_offset + next_seg])
+        faces.append([n_segments + seg, r3_offset + next_seg, r3_offset + seg])
+
+    # Bottom annular cap
+    for seg in range(n_segments):
+        next_seg = (seg + 1) % n_segments
+        faces.append([r2_offset + seg, r3_offset + seg, r3_offset + next_seg])
+        faces.append([r2_offset + seg, r3_offset + next_seg, r2_offset + next_seg])
+
+    faces_arr = np.array(faces, dtype=np.uint32)
+    return vertices_arr, faces_arr
+
+
+def generate_waterfall_mesh(
+    positions: Optional[np.ndarray],
+    z_top: float = 0.105,
+    z_bot: float = 0.048,
+    cutout_xy: tuple[float, float] = (0.0, 0.0),
+    nominal_radius: float = 0.012,
+    n_slices: int = 16,
+    n_segments: int = 24,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Generate a watertight, smooth curved waterfall column mesh along the true flow spine from lip to pool."""
+    cx, cy = cutout_xy
+    z_slices = np.linspace(z_bot, z_top, n_slices)
+
+    spine_x = []
+    spine_y = []
+    radii = []
+    safe_nominal_r = min(0.012, max(0.006, nominal_radius))
+    dz = (z_top - z_bot) / max(1, n_slices)
+    for z in z_slices:
+        if positions is not None and len(positions) > 0:
+            mask = np.abs(positions[:, 2] - z) <= dz
+            if np.any(mask):
+                pts_slice = positions[mask]
+                mean_xy = np.mean(pts_slice[:, :2], axis=0)
+                sx = float(0.2 * cx + 0.8 * mean_xy[0])
+                sy = float(0.2 * cy + 0.8 * mean_xy[1])
+                spread = np.percentile(np.linalg.norm(pts_slice[:, :2] - [sx, sy], axis=1), 90)
+                rad = max(0.005, min(0.016, float(spread) + 0.002))
+            else:
+                sx, sy = cx, cy
+                rad = safe_nominal_r
+        else:
+            sx, sy = cx, cy
+            rad = safe_nominal_r
+        spine_x.append(sx)
+        spine_y.append(sy)
+        radii.append(rad)
+
+    theta = np.linspace(0.0, 2.0 * np.pi, n_segments, endpoint=False)
+    cos_t = np.cos(theta)
+    sin_t = np.sin(theta)
+
+    vertices = []
+    for i in range(n_slices):
+        z = z_slices[i]
+        sx = spine_x[i]
+        sy = spine_y[i]
+        r = radii[i]
+        for seg in range(n_segments):
+            vertices.append([sx + r * cos_t[seg], sy + r * sin_t[seg], z])
+
+    bot_center_idx = len(vertices)
+    vertices.append([spine_x[0], spine_y[0], z_bot])
+    top_center_idx = len(vertices)
+    vertices.append([spine_x[-1], spine_y[-1], z_top])
+
+    vertices_arr = np.array(vertices, dtype=np.float32)
+
+    faces = []
+    for i in range(n_slices - 1):
+        r1 = i * n_segments
+        r2 = (i + 1) * n_segments
+        for seg in range(n_segments):
+            next_seg = (seg + 1) % n_segments
+            faces.append([r1 + seg, r2 + seg, r2 + next_seg])
+            faces.append([r1 + seg, r2 + next_seg, r1 + next_seg])
+
+    for seg in range(n_segments):
+        next_seg = (seg + 1) % n_segments
+        faces.append([bot_center_idx, next_seg, seg])
+
+    top_ring_start = (n_slices - 1) * n_segments
+    for seg in range(n_segments):
+        next_seg = (seg + 1) % n_segments
+        faces.append([top_center_idx, top_ring_start + seg, top_ring_start + next_seg])
+
+    faces_arr = np.array(faces, dtype=np.uint32)
+    return vertices_arr, faces_arr
+
+
 class FluidBodyType(str, Enum):
     """Semantic classification of dynamic fluid bodies."""
 
@@ -301,14 +452,147 @@ class FluidBodyType(str, Enum):
     CLUSTER = "cluster"
 
 
+class FluidStage(str, Enum):
+    """Semantic cascade stage identifying the physical role and location of a fluid body."""
+
+    DELIVERY_STREAM = "delivery_stream"
+    TOP_SHEET = "top_sheet"
+    LIP_WATERFALL = "lip_waterfall"
+    LID_POOL = "lid_pool"
+    DRAIN_WATERFALL = "drain_waterfall"
+    BOWL_POOL = "bowl_pool"
+    SPLASH_CLUSTER = "splash_cluster"
+
+
+class CADFeatureType(str, Enum):
+    """Semantic classification of CAD geometry features."""
+
+    TUBE = "Tube"
+    TERRACE = "Terrace"
+    DRAIN = "Drain"
+    POCKET = "Pocket"
+    BOWL = "Bowl"
+
+
+class CADFeature(NamedTuple):
+    """Spatial 4D coordinate tuple (X, Y, Z, R) with semantic CADFeatureType and optional label."""
+
+    feature_type: CADFeatureType = CADFeatureType.TUBE
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+    r: float = 0.0
+    label: Optional[str] = None
+
+    @property
+    def name(self) -> str:
+        """Return string name/label of the CAD feature."""
+        if self.label:
+            return self.label
+        return self.feature_type.value if isinstance(self.feature_type, CADFeatureType) else str(self.feature_type)
+
+    @property
+    def coords(self) -> tuple[float, float, float, float]:
+        """Return 4D geometric coordinates (X, Y, Z, R)."""
+        return (self.x, self.y, self.z, self.r)
+
+
+class FluidCADContext(NamedTuple):
+    """Encapsulates CAD geometry as an ordered sequence of CADFeature instances."""
+
+    features: Sequence[CADFeature] = ()
+
+    def get(self, feature_type: Union[CADFeatureType, str]) -> Optional[CADFeature]:
+        """Find a CADFeature by CADFeatureType or string name/label."""
+        target = feature_type.value.lower() if isinstance(feature_type, CADFeatureType) else str(feature_type).lower()
+        for feat in self.features:
+            feat_name = (
+                feat.feature_type.value.lower()
+                if isinstance(feat.feature_type, CADFeatureType)
+                else str(feat.feature_type).lower()
+            )
+            feat_label = feat.label.lower() if feat.label is not None else ""
+            if target in (feat_name, feat_label):
+                return feat
+        return None
+
+    def get_all(self, feature_type: Union[CADFeatureType, str]) -> list[CADFeature]:
+        """Find all CADFeatures matching the given CADFeatureType or string name/label."""
+        target = feature_type.value.lower() if isinstance(feature_type, CADFeatureType) else str(feature_type).lower()
+        matches = []
+        for feat in self.features:
+            feat_name = (
+                feat.feature_type.value.lower()
+                if isinstance(feat.feature_type, CADFeatureType)
+                else str(feat.feature_type).lower()
+            )
+            feat_label = feat.label.lower() if feat.label is not None else ""
+            if target in (feat_name, feat_label):
+                matches.append(feat)
+        return matches
+
+    @property
+    def terraces(self) -> list[CADFeature]:
+        """Get all terrace platform features."""
+        return self.get_all(CADFeatureType.TERRACE)
+
+    @property
+    def drains(self) -> list[CADFeature]:
+        """Get all drain cutout features."""
+        return self.get_all(CADFeatureType.DRAIN)
+
+    @property
+    def pockets(self) -> list[CADFeature]:
+        """Get all pocket/shelf features."""
+        return self.get_all(CADFeatureType.POCKET)
+
+    @property
+    def tubes(self) -> list[CADFeature]:
+        """Get all delivery tube features."""
+        return self.get_all(CADFeatureType.TUBE)
+
+    @property
+    def bowls(self) -> list[CADFeature]:
+        """Get all reservoir bowl features."""
+        return self.get_all(CADFeatureType.BOWL)
+
+    @property
+    def z_floor(self) -> float:
+        """Get floor elevation from bowl or tube."""
+        bowl = self.get(CADFeatureType.BOWL)
+        if bowl is not None and bowl.z != 0.0:
+            return bowl.z
+        tube = self.get(CADFeatureType.TUBE)
+        return tube.z if tube is not None else 0.0
+
+    @property
+    def z_lid(self) -> float:
+        """Get drinking lid shelf elevation."""
+        pocket = self.get(CADFeatureType.POCKET)
+        return pocket.z if pocket is not None else 0.0
+
+
 class FluidBody(BaseModel):
     """Represents a dynamic, contiguous 3D fluid body undergoing motion, deformation, splitting, or merging."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    body_id: int = Field(description="Unique identifier for the dynamic fluid body.")
+    body_id: int = Field(default=0, description="Unique tracking identifier for the dynamic fluid body.")
     body_type: FluidBodyType = Field(
         default=FluidBodyType.POOL, description="Semantic classification of the fluid body."
+    )
+    stage: FluidStage = Field(default=FluidStage.BOWL_POOL, description="Semantic cascade stage classification.")
+    feature_type: Optional[CADFeatureType] = Field(
+        default=None, description="Associated CAD feature type providing geometric origin/bounds."
+    )
+    cad_feature: Optional[CADFeature] = Field(
+        default=None, description="Associated CAD feature primitive providing dynamic origin/bounds."
+    )
+    tier: int = Field(
+        default=0, description="Cascade tier index (0 = top terrace, 1 = mid terrace/lid, 2 = reservoir bowl)."
+    )
+    cad_context: Optional[FluidCADContext] = Field(
+        default=None, description="CAD geometry boundaries context for dynamic physical alignment."
     )
     particle_indices: np.ndarray = Field(description="Array of global particle indices belonging to this fluid body.")
     centroid: tuple[float, float, float] = Field(
@@ -327,48 +611,139 @@ class FluidBody(BaseModel):
         default=None, description="Local or surface particle positions (M, 3) for dynamic surface heightfield sampling."
     )
 
+    @property
+    def display_name(self) -> str:
+        """Return a unique, semantic identifier for this fluid body."""
+        if self.cad_feature is not None and self.cad_feature.label:
+            return f"{self.stage.value}_{self.cad_feature.label.lower()}"
+        return f"{self.stage.value}_{self.body_id}"
+
     def to_mesh(self, n_segments: int = 32) -> tuple[np.ndarray, np.ndarray]:
         """Generate watertight 3D triangle mesh vertices and face indices for this fluid body."""
         cx, cy, _ = self.centroid
         z_min = self.bounds_min[2]
         z_max = self.bounds_max[2]
+        ctx = self.cad_context
 
-        if self.body_type == FluidBodyType.POOL:
-            rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
-            ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
-            radius = max(0.010, (rx + ry) / 2.0)
-            return generate_heightfield_cylinder_mesh(
-                radius=radius,
-                z_floor=z_min,
-                surface_positions=self.surface_positions,
-                default_z_top=z_max,
-                center=(0.0, 0.0),
-                n_rings=6,
-                n_spokes=n_segments,
-            )
-        elif self.body_type == FluidBodyType.STREAM:
-            rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
-            ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
-            radius = max(0.003, (rx + ry) / 2.0)
-            return generate_cylinder_mesh(radius, z_min, z_max, center=(cx, cy), n_segments=n_segments)
-        elif self.body_type == FluidBodyType.WATERFALL:
-            if self.surface_positions is not None and len(self.surface_positions) >= 4:
-                return generate_manifold_mesh_around_particles(self.surface_positions)
-            rx = max(0.003, (self.bounds_max[0] - self.bounds_min[0]) / 2.0)
-            ry = max(0.003, (self.bounds_max[1] - self.bounds_min[1]) / 2.0)
-            radius = max(0.003, min(0.015, (rx + ry) / 2.0))
-            return generate_cylinder_mesh(radius, z_min, z_max, center=(cx, cy), n_segments=n_segments)
-        elif self.body_type == FluidBodyType.SHEET:
-            rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
-            ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
-            radius = max(0.010, (rx + ry) / 2.0)
-            return generate_cylinder_mesh(radius, z_min, z_max, center=(cx, cy), n_segments=n_segments)
-        else:
-            if self.surface_positions is not None and len(self.surface_positions) >= 4:
-                return generate_manifold_mesh_around_particles(self.surface_positions)
-            equiv_radius = max(0.002, (3.0 * max(1e-9, self.volume) / (4.0 * math.pi)) ** (1.0 / 3.0))
-            equiv_radius = min(equiv_radius, max(0.004, (self.bounds_max[2] - self.bounds_min[2]) / 2.0))
-            return generate_sphere_mesh(center=self.centroid, radius=equiv_radius, n_lat=10, n_lon=20)
+        feat = self.cad_feature
+        if feat is None and ctx is not None and self.feature_type is not None:
+            feat = ctx.get(self.feature_type)
+
+        match self.body_type:
+            case FluidBodyType.POOL:
+                rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+                ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+                radius = max(0.010, (rx + ry) / 2.0)
+                if self.feature_type == CADFeatureType.POCKET or self.tier == 1 or self.stage == FluidStage.LID_POOL:
+                    center = (feat.x, feat.y) if feat is not None else (0.0, 0.0)
+                    z_floor_val = ctx.z_lid if ctx is not None and ctx.z_lid > 0.0 else z_min
+                    z_top_val = min(
+                        feat.z if feat is not None and feat.z > 0.0 else (z_floor_val + 0.010),
+                        max(z_max, z_floor_val + 0.003),
+                    )
+                    radius = feat.r if feat is not None and feat.r > 0.0 else radius
+                else:
+                    center = (feat.x, feat.y) if feat is not None else (0.0, 0.0)
+                    z_floor_val = ctx.z_floor if ctx is not None and ctx.z_floor > 0.0 else z_min
+                    z_top_val = min(
+                        ctx.z_lid - 0.005 if ctx is not None and ctx.z_lid > 0.0 else z_max,
+                        max(z_max, z_floor_val + 0.015),
+                    )
+                    radius = feat.r if feat is not None and feat.r > 0.0 else radius
+
+                return generate_heightfield_cylinder_mesh(
+                    radius=radius,
+                    z_floor=z_floor_val,
+                    surface_positions=self.surface_positions,
+                    default_z_top=z_top_val,
+                    center=center,
+                    n_rings=6,
+                    n_spokes=n_segments,
+                )
+
+            case FluidBodyType.STREAM:
+                rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+                ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+                radius = feat.r if feat is not None and feat.r > 0.0 else max(0.003, (rx + ry) / 2.0)
+                center = (feat.x, feat.y) if feat is not None else (0.0, 0.0)
+                z_bot_val = ctx.z_floor if ctx is not None and ctx.z_floor > 0.0 else z_min
+                terrace = ctx.get(CADFeatureType.TERRACE) if ctx is not None else None
+                z_top_val = terrace.z if terrace is not None and terrace.z > 0.0 else z_max
+                return generate_cylinder_mesh(radius, z_bot_val, z_top_val, center=center, n_segments=n_segments)
+
+            case FluidBodyType.WATERFALL:
+                if (
+                    self.feature_type == CADFeatureType.TERRACE
+                    or self.tier == 0
+                    or self.stage == FluidStage.LIP_WATERFALL
+                ):
+                    rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+                    ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+                    lip_radius = feat.r if feat is not None and feat.r > 0.0 else max(0.015, (rx + ry) / 2.0)
+                    center_xy = (feat.x, feat.y) if feat is not None else (0.0, 0.0)
+                    z_top_val = feat.z if feat is not None and feat.z > 0.0 else z_max
+                    z_bot_val = ctx.z_lid if ctx is not None and ctx.z_lid > 0.0 else z_min
+                    return generate_lip_waterfall_mesh(
+                        self.surface_positions,
+                        center_xy=center_xy,
+                        lip_radius=lip_radius,
+                        z_top=z_top_val,
+                        z_bot=z_bot_val,
+                        n_segments=n_segments,
+                    )
+
+                # Lower Drain Waterfall: Plunges from lid pool cutout down into reservoir bowl pool
+                if self.surface_positions is not None and len(self.surface_positions) > 0:
+                    mean_stream_xy = (
+                        float(np.mean(self.surface_positions[:, 0])),
+                        float(np.mean(self.surface_positions[:, 1])),
+                    )
+                else:
+                    mean_stream_xy = (feat.x, feat.y) if feat is not None else (0.0, 0.0)
+
+                stream_r = min(0.012, max(0.006, feat.r if feat else 0.010))
+                z_top_val = (ctx.z_lid + 0.003) if ctx is not None and ctx.z_lid > 0.0 else z_max
+                if self.surface_positions is not None and len(self.surface_positions) > 0:
+                    max_stream_z = float(np.max(self.surface_positions[:, 2]))
+                    z_top_val = max(z_top_val, min(max_stream_z + 0.002, z_max))
+
+                z_bot_val = (ctx.z_floor + 0.015) if ctx is not None and ctx.z_floor > 0.0 else z_min
+                if self.surface_positions is not None and len(self.surface_positions) > 0:
+                    z_bot_val = max(z_bot_val, float(np.min(self.surface_positions[:, 2])) - 0.003)
+                return generate_waterfall_mesh(
+                    self.surface_positions,
+                    z_top=z_top_val,
+                    z_bot=z_bot_val,
+                    cutout_xy=mean_stream_xy,
+                    nominal_radius=stream_r,
+                    n_segments=n_segments,
+                )
+
+            case FluidBodyType.SHEET:
+                rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+                ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+                radius = feat.r if feat is not None and feat.r > 0.0 else max(0.010, (rx + ry) / 2.0)
+                center = (feat.x, feat.y) if feat is not None else (0.0, 0.0)
+                z_floor_val = (
+                    (ctx.z_lid + feat.z) / 2.0 if ctx is not None and feat is not None and feat.z > 0.0 else z_min
+                )
+                z_top_val = min(feat.z + 0.003, max(z_max, feat.z)) if feat is not None and feat.z > 0.0 else z_max
+                return generate_heightfield_cylinder_mesh(
+                    radius=radius,
+                    z_floor=z_floor_val,
+                    surface_positions=self.surface_positions,
+                    default_z_top=z_top_val,
+                    center=center,
+                    n_rings=6,
+                    n_spokes=n_segments,
+                )
+
+            case _:
+                if self.surface_positions is not None and len(self.surface_positions) >= 4:
+                    return generate_manifold_mesh_around_particles(self.surface_positions)
+                equiv_radius = max(0.002, (3.0 * max(1e-9, self.volume) / (4.0 * math.pi)) ** (1.0 / 3.0))
+                equiv_radius = min(equiv_radius, max(0.004, (self.bounds_max[2] - self.bounds_min[2]) / 2.0))
+                return generate_sphere_mesh(center=self.centroid, radius=equiv_radius, n_lat=10, n_lon=20)
 
     def to_cad_solid(self) -> Any:
         """Build and return a watertight build123d Solid representation conforming to CAD design principles."""
@@ -377,19 +752,121 @@ class FluidBody(BaseModel):
         cx, cy, _ = self.centroid
         z_min = self.bounds_min[2]
         z_max = self.bounds_max[2]
-        h = max(0.001, z_max - z_min)
+        ctx = self.cad_context
 
-        if self.body_type in (FluidBodyType.POOL, FluidBodyType.STREAM, FluidBodyType.SHEET, FluidBodyType.WATERFALL):
-            rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
-            ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
-            radius = max(0.002, (rx + ry) / 2.0)
-            c = Cylinder(radius=radius, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-            pos = (0.0, 0.0, z_min) if self.body_type == FluidBodyType.POOL else (cx, cy, z_min)
-            return c.locate(Location(pos))
-        else:
-            equiv_radius = max(0.002, (3.0 * max(1e-9, self.volume) / (4.0 * math.pi)) ** (1.0 / 3.0))
-            s = Sphere(radius=equiv_radius)
-            return s.locate(Location(self.centroid))
+        feat = self.cad_feature
+        if feat is None and ctx is not None and self.feature_type is not None:
+            feat = ctx.get(self.feature_type)
+
+        match self.body_type:
+            case FluidBodyType.POOL:
+                rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+                ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+                radius = max(0.010, (rx + ry) / 2.0)
+                if self.feature_type == CADFeatureType.POCKET or self.tier == 1 or self.stage == FluidStage.LID_POOL:
+                    pos = (
+                        feat.x if feat is not None else 0.0,
+                        feat.y if feat is not None else 0.0,
+                        ctx.z_lid if ctx is not None and ctx.z_lid > 0.0 else z_min,
+                    )
+                    radius = feat.r if feat is not None and feat.r > 0.0 else radius
+                    h = max(0.002, min(0.008, z_max - pos[2]))
+                else:
+                    pos = (
+                        feat.x if feat is not None else 0.0,
+                        feat.y if feat is not None else 0.0,
+                        ctx.z_floor if ctx is not None and ctx.z_floor > 0.0 else z_min,
+                    )
+                    radius = feat.r if feat is not None and feat.r > 0.0 else radius
+                    h = max(0.015, min((ctx.z_lid if ctx and ctx.z_lid > 0.0 else z_max) - pos[2], z_max - pos[2]))
+                c = Cylinder(radius=radius, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                return c.locate(Location(pos))
+
+            case FluidBodyType.STREAM:
+                rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+                ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+                radius = feat.r if feat is not None and feat.r > 0.0 else max(0.003, (rx + ry) / 2.0)
+                pos = (
+                    feat.x if feat is not None else 0.0,
+                    feat.y if feat is not None else 0.0,
+                    ctx.z_floor if ctx is not None and ctx.z_floor > 0.0 else z_min,
+                )
+                terrace = ctx.get(CADFeatureType.TERRACE) if ctx is not None else None
+                z_top = terrace.z if terrace is not None and terrace.z > 0.0 else z_max
+                h = max(
+                    0.010,
+                    z_top - pos[2],
+                )
+                c = Cylinder(radius=radius, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                return c.locate(Location(pos))
+
+            case FluidBodyType.WATERFALL:
+                rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+                ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+                if (
+                    self.feature_type == CADFeatureType.TERRACE
+                    or self.tier == 0
+                    or self.stage == FluidStage.LIP_WATERFALL
+                ):
+                    pos = (
+                        feat.x if feat is not None else 0.0,
+                        feat.y if feat is not None else 0.0,
+                        ctx.z_lid if ctx is not None and ctx.z_lid > 0.0 else z_min,
+                    )
+                    radius = feat.r if feat is not None and feat.r > 0.0 else max(0.008, (rx + ry) / 2.0)
+                    h = max(
+                        0.005,
+                        (feat.z if feat is not None and feat.z > 0.0 else z_max) - pos[2],
+                    )
+                    c = Cylinder(radius=radius, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    return c.locate(Location(pos))
+                else:
+                    if self.surface_positions is not None and len(self.surface_positions) > 0:
+                        stream_xy = (
+                            float(np.mean(self.surface_positions[:, 0])),
+                            float(np.mean(self.surface_positions[:, 1])),
+                        )
+                    else:
+                        stream_xy = (feat.x, feat.y) if feat is not None else (0.0, 0.0)
+
+                    pos = (
+                        stream_xy[0],
+                        stream_xy[1],
+                        ctx.z_floor if ctx is not None and ctx.z_floor > 0.0 else z_min,
+                    )
+                    stream_r = min(0.012, max(0.006, feat.r if feat else 0.010))
+                    z_top_val = (ctx.z_lid + 0.003) if ctx is not None and ctx.z_lid > 0.0 else z_max
+                    if self.surface_positions is not None and len(self.surface_positions) > 0:
+                        max_stream_z = float(np.max(self.surface_positions[:, 2]))
+                        z_top_val = max(z_top_val, min(max_stream_z + 0.002, z_max))
+
+                    h = max(
+                        0.010,
+                        z_top_val - pos[2],
+                    )
+                    c = Cylinder(radius=stream_r, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    return c.locate(Location(pos))
+
+            case FluidBodyType.SHEET:
+                rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
+                ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
+                radius = feat.r if feat is not None and feat.r > 0.0 else max(0.010, (rx + ry) / 2.0)
+                pos = (
+                    feat.x if feat is not None else 0.0,
+                    feat.y if feat is not None else 0.0,
+                    (ctx.z_lid + feat.z) / 2.0 if ctx is not None and feat is not None and feat.z > 0.0 else z_min,
+                )
+                h = max(
+                    0.002,
+                    ((feat.z + 0.003) if feat is not None and feat.z > 0.0 else z_max) - pos[2],
+                )
+                c = Cylinder(radius=radius, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                return c.locate(Location(pos))
+
+            case _:
+                equiv_radius = max(0.002, (3.0 * max(1e-9, self.volume) / (4.0 * math.pi)) ** (1.0 / 3.0))
+                s = Sphere(radius=equiv_radius)
+                return s.locate(Location(self.centroid))
 
     def move(self, displacement: tuple[float, float, float] | np.ndarray) -> None:
         """Translate the fluid body bounding geometry and centroid by a 3D displacement vector.
@@ -441,16 +918,108 @@ class FluidBody(BaseModel):
         self.volume = self.particle_count * vol_particle
 
         mean_c = np.mean(body_pos, axis=0)
-        self.centroid = (float(mean_c[0]), float(mean_c[1]), float(mean_c[2]))
-
         min_b = np.min(body_pos, axis=0) - r_s
-        self.bounds_min = (float(min_b[0]), float(min_b[1]), float(min_b[2]))
-
         max_b = np.max(body_pos, axis=0) + r_s
-        self.bounds_max = (float(max_b[0]), float(max_b[1]), float(max_b[2]))
-
         mean_v = np.mean(body_vel, axis=0)
         self.velocity = (float(mean_v[0]), float(mean_v[1]), float(mean_v[2]))
+
+        ctx = self.cad_context
+        feat = self.cad_feature
+        if feat is None and ctx is not None and self.feature_type is not None:
+            feat = ctx.get(self.feature_type)
+
+        if feat is not None:
+            match self.stage:
+                case FluidStage.LID_POOL:
+                    self.centroid = (feat.x, feat.y, float(mean_c[2]))
+                    self.bounds_min = (
+                        feat.x - feat.r,
+                        feat.y - feat.r,
+                        max(float(min_b[2]), ctx.z_lid if ctx is not None else float(min_b[2])),
+                    )
+                    terrace = ctx.get(CADFeatureType.TERRACE) if ctx is not None else None
+                    z_t_max = terrace.z if terrace is not None and terrace.z > 0.0 else float(max_b[2])
+                    self.bounds_max = (
+                        feat.x + feat.r,
+                        feat.y + feat.r,
+                        min(float(max_b[2]), z_t_max),
+                    )
+                case FluidStage.BOWL_POOL:
+                    self.centroid = (feat.x, feat.y, float(mean_c[2]))
+                    self.bounds_min = (
+                        feat.x - feat.r,
+                        feat.y - feat.r,
+                        max(float(min_b[2]), ctx.z_floor if ctx is not None else float(min_b[2])),
+                    )
+                    self.bounds_max = (
+                        feat.x + feat.r,
+                        feat.y + feat.r,
+                        min(float(max_b[2]), ctx.z_lid if ctx is not None and ctx.z_lid > 0.0 else float(max_b[2])),
+                    )
+                case FluidStage.TOP_SHEET:
+                    self.centroid = (feat.x, feat.y, float(mean_c[2]))
+                    self.bounds_min = (
+                        feat.x - feat.r,
+                        feat.y - feat.r,
+                        float(min_b[2]),
+                    )
+                    self.bounds_max = (
+                        feat.x + feat.r,
+                        feat.y + feat.r,
+                        float(max_b[2]),
+                    )
+                case FluidStage.DELIVERY_STREAM:
+                    self.centroid = (feat.x, feat.y, float(mean_c[2]))
+                    self.bounds_min = (
+                        feat.x - feat.r,
+                        feat.y - feat.r,
+                        max(float(min_b[2]), ctx.z_floor if ctx is not None else float(min_b[2])),
+                    )
+                    terrace = ctx.get(CADFeatureType.TERRACE) if ctx is not None else None
+                    z_t_max = terrace.z if terrace is not None and terrace.z > 0.0 else float(max_b[2])
+                    self.bounds_max = (
+                        feat.x + feat.r,
+                        feat.y + feat.r,
+                        min(float(max_b[2]), z_t_max),
+                    )
+                case FluidStage.LIP_WATERFALL:
+                    self.centroid = (feat.x, feat.y, float(mean_c[2]))
+                    self.bounds_min = (
+                        feat.x - feat.r - 0.003,
+                        feat.y - feat.r - 0.003,
+                        max(float(min_b[2]), ctx.z_lid if ctx is not None else float(min_b[2])),
+                    )
+                    self.bounds_max = (
+                        feat.x + feat.r + 0.003,
+                        feat.y + feat.r + 0.003,
+                        min(float(max_b[2]), feat.z if feat.z > 0.0 else float(max_b[2])),
+                    )
+                case FluidStage.DRAIN_WATERFALL:
+                    self.centroid = (feat.x, feat.y, float(mean_c[2]))
+                    self.bounds_min = (
+                        feat.x - feat.r,
+                        feat.y - feat.r,
+                        max(float(min_b[2]), ctx.z_floor if ctx is not None else float(min_b[2])),
+                    )
+                    terrace = ctx.get(CADFeatureType.TERRACE) if ctx is not None else None
+                    z_t_max = (
+                        terrace.z
+                        if terrace is not None and terrace.z > 0.0
+                        else ((ctx.z_lid + 0.003) if ctx is not None and ctx.z_lid > 0.0 else float(max_b[2]))
+                    )
+                    self.bounds_max = (
+                        feat.x + feat.r,
+                        feat.y + feat.r,
+                        min(float(max_b[2]), z_t_max),
+                    )
+                case _:
+                    self.centroid = (float(mean_c[0]), float(mean_c[1]), float(mean_c[2]))
+                    self.bounds_min = (float(min_b[0]), float(min_b[1]), float(min_b[2]))
+                    self.bounds_max = (float(max_b[0]), float(max_b[1]), float(max_b[2]))
+        else:
+            self.centroid = (float(mean_c[0]), float(mean_c[1]), float(mean_c[2]))
+            self.bounds_min = (float(min_b[0]), float(min_b[1]), float(min_b[2]))
+            self.bounds_max = (float(max_b[0]), float(max_b[1]), float(max_b[2]))
 
         if self.body_type == FluidBodyType.POOL and len(body_pos) > 0:
             z_thresh = np.percentile(body_pos[:, 2], 75.0)
@@ -582,20 +1151,14 @@ class FluidBodyTracker:
         self,
         positions: np.ndarray,
         velocities: np.ndarray,
-        z_floor: float,
-        z_lid: float,
-        tube_y: float = 0.028,
-        tube_r: float = 0.010,
+        cad_context: Optional[FluidCADContext] = None,
     ) -> list[FluidBody]:
-        """Classify and recompute dynamic fluid bodies using move, split, and merge primitives.
+        """Classify and recompute dynamic fluid bodies across the 5-stage multi-tier architecture.
 
         Args:
             positions: Global particle positions array of shape (N, 3).
             velocities: Global particle velocities array of shape (N, 3).
-            z_floor: Cavity floor elevation in meters.
-            z_lid: Lid terrace elevation in meters.
-            tube_y: Center Y offset of the delivery tube.
-            tube_r: Delivery tube inner radius.
+            cad_context: Dynamic CAD geometry boundaries context model.
 
         Returns:
             List of active FluidBody instances with recomputed physical shapes.
@@ -611,91 +1174,204 @@ class FluidBodyTracker:
             self.bodies.clear()
             return []
 
+        ctx = cad_context if cad_context is not None else FluidCADContext()
+        z_floor = ctx.z_floor
+        z_lid = ctx.z_lid
+
+        tube = ctx.get(CADFeatureType.TUBE)
+        tube_y = tube.y if tube is not None else 0.0
+        tube_r = tube.r if tube is not None else 0.0
+
+        bowl = ctx.get(CADFeatureType.BOWL)
+
         pos_act = positions[active_indices]
         d_tube_xy = np.sqrt(pos_act[:, 0] ** 2 + (pos_act[:, 1] - tube_y) ** 2)
 
-        # Dynamic particle classification across moving fluid bodies
-        is_stream = (
-            (d_tube_xy <= tube_r + self.r_s) & (pos_act[:, 2] >= z_floor) & (pos_act[:, 2] <= z_lid + self.r_s * 4.0)
-        )
-        is_sheet = (pos_act[:, 2] >= z_lid - self.r_s) & (~is_stream)
-        in_basin = (~is_sheet) & (~is_stream)
+        # 1. Delivery Stream rising inside the delivery tube
+        is_stream = (d_tube_xy <= tube_r + self.r_s * 0.5) & (pos_act[:, 2] >= z_floor) & (pos_act[:, 2] <= z_lid)
 
-        # Dynamically determine continuous reservoir pool free-surface elevation via spatial contiguity
-        basin_indices = np.flatnonzero(in_basin)
-        if len(basin_indices) > 0:
-            basin_z = pos_act[basin_indices, 2]
-            sorted_order = np.argsort(basin_z)
-            sorted_z = basin_z[sorted_order]
-            z_diffs = np.diff(sorted_z)
-            gap_threshold = 4.0 * self.r_s
-            gap_idx = np.where(z_diffs > gap_threshold)[0]
-            if len(gap_idx) > 0:
-                first_gap = gap_idx[0]
-                z_pool_surf = float(sorted_z[first_gap] + self.r_s)
-            else:
-                z_pool_surf = float(np.max(basin_z))
+        # 2. Basin particles below lid
+        in_basin = (pos_act[:, 2] < z_lid - self.r_s) & (~is_stream)
+
+        # 3. Robust bowl reservoir free-surface elevation computed from undisturbed bed
+        bed_mask = in_basin & (d_tube_xy > tube_r + self.r_s * 2.0)
+        for drain in ctx.drains:
+            d_d_xy = np.sqrt((pos_act[:, 0] - drain.x) ** 2 + (pos_act[:, 1] - drain.y) ** 2)
+            bed_mask = bed_mask & (d_d_xy > max(0.020, drain.r + self.r_s * 2.0))
+
+        bed_indices = np.flatnonzero(bed_mask)
+        z_pool_max_allowed = z_lid - 0.015
+
+        if len(bed_indices) > 0:
+            bed_z = pos_act[bed_indices, 2]
+            z_pool_surf = min(float(np.percentile(bed_z, 75.0) + self.r_s), z_pool_max_allowed)
+            z_pool_surf = max(z_pool_surf, z_floor + self.r_s)
         else:
-            z_pool_surf = float(z_floor)
+            basin_indices = np.flatnonzero(in_basin)
+            if len(basin_indices) > 0:
+                basin_z = pos_act[basin_indices, 2]
+                z_pool_surf = min(float(np.percentile(basin_z, 75.0) + self.r_s), z_pool_max_allowed)
+                z_pool_surf = max(z_pool_surf, z_floor + self.r_s)
+            else:
+                z_pool_surf = float(z_floor)
 
-        is_pool = in_basin & (pos_act[:, 2] <= z_pool_surf)
-        is_falling = in_basin & (pos_act[:, 2] > z_pool_surf)
+        body_specs: list[
+            tuple[FluidBodyType, FluidStage, CADFeatureType, int, int, np.ndarray, Optional[CADFeature]]
+        ] = []
 
-        # Distinguish drain waterfall streams from isolated droplet clusters
-        d_drain_xy = np.sqrt(pos_act[:, 0] ** 2 + (pos_act[:, 1] + 0.020) ** 2)
-        r_basin_xy = np.sqrt(pos_act[:, 0] ** 2 + pos_act[:, 1] ** 2)
-        is_waterfall = is_falling & ((d_drain_xy < 0.040) | (r_basin_xy > 0.070))
-        is_cluster = is_falling & (~is_waterfall)
+        # 1. Delivery Stream bodies (per tube)
+        for tb_idx, tube_feat in enumerate(ctx.tubes):
+            b_id = tb_idx + 1
+            body_specs.append(
+                (FluidBodyType.STREAM, FluidStage.DELIVERY_STREAM, CADFeatureType.TUBE, 0, b_id, is_stream, tube_feat)
+            )
 
-        body_types = [
-            (FluidBodyType.STREAM, is_stream),
-            (FluidBodyType.SHEET, is_sheet),
-            (FluidBodyType.WATERFALL, is_waterfall),
-            (FluidBodyType.CLUSTER, is_cluster),
-            (FluidBodyType.POOL, is_pool),
-        ]
+        # 4. Terraces: Top Sheet and Lip Waterfall per terrace
+        all_platform_mask = np.zeros(len(pos_act), dtype=bool)
+        for t_idx, terrace in enumerate(ctx.terraces):
+            d_t_xy = np.sqrt((pos_act[:, 0] - terrace.x) ** 2 + (pos_act[:, 1] - terrace.y) ** 2)
+            is_terrace_zone = d_t_xy <= terrace.r + self.r_s
+            is_lip_zone = d_t_xy <= terrace.r + max(0.006, self.r_s * 2.0)
+            all_platform_mask |= is_lip_zone
+
+            z_t_max = terrace.z if terrace.z > 0.0 else z_lid
+            z_plat_mid = (z_lid + z_t_max) / 2.0
+
+            is_top_sheet = is_terrace_zone & (pos_act[:, 2] >= z_plat_mid) & (~is_stream)
+            has_top_sheet = np.count_nonzero(is_top_sheet) >= 2
+
+            # Lip waterfall: active only when top sheet is active and spilling over lip / ridge
+            is_lip_wf = (
+                has_top_sheet
+                & is_lip_zone
+                & (pos_act[:, 2] < z_plat_mid)
+                & (pos_act[:, 2] >= z_lid - self.r_s)
+                & (~is_stream)
+            )
+
+            b_id = t_idx + 1
+            body_specs.append(
+                (
+                    FluidBodyType.SHEET,
+                    FluidStage.TOP_SHEET,
+                    CADFeatureType.TERRACE,
+                    0,
+                    b_id,
+                    is_top_sheet,
+                    terrace,
+                )
+            )
+            body_specs.append(
+                (
+                    FluidBodyType.WATERFALL,
+                    FluidStage.LIP_WATERFALL,
+                    CADFeatureType.TERRACE,
+                    0,
+                    b_id,
+                    is_lip_wf,
+                    terrace,
+                )
+            )
+
+        # 5. Lid Pockets / Shelf Pools per pocket
+        all_drain_column_mask = np.zeros(len(pos_act), dtype=bool)
+        for p_idx, pocket in enumerate(ctx.pockets):
+            d_p_xy = np.sqrt((pos_act[:, 0] - pocket.x) ** 2 + (pos_act[:, 1] - pocket.y) ** 2)
+            is_lid_pool = (~all_platform_mask) & (pos_act[:, 2] >= z_lid - self.r_s) & (d_p_xy <= pocket.r + self.r_s)
+            b_id = p_idx + 1
+            body_specs.append(
+                (FluidBodyType.POOL, FluidStage.LID_POOL, CADFeatureType.POCKET, 1, b_id, is_lid_pool, pocket)
+            )
+
+        # 6. Drains: Waterfall per drain with upstream adjacent inflow activation check
+        z_terrace_max = max([t.z for t in ctx.terraces], default=z_lid)
+        for d_idx, drain in enumerate(ctx.drains):
+            d_d_xy = np.sqrt((pos_act[:, 0] - drain.x) ** 2 + (pos_act[:, 1] - drain.y) ** 2)
+            drain_rad = max(0.015, drain.r + self.r_s * 2.0)
+            in_drain_zone = d_d_xy <= drain_rad
+            all_drain_column_mask |= in_drain_zone
+
+            # Check upstream inflow from both routes:
+            # Route A: Fluid at lid shelf reaching drain aperture
+            lid_inflow_fluid = (pos_act[:, 2] >= z_lid - self.r_s) & (d_d_xy <= drain.r + self.r_s * 2.0)
+            # Route B: Fluid plunging directly from top terrace sheet into drain aperture
+            top_sheet_inflow_fluid = (pos_act[:, 2] >= z_plat_mid) & (d_d_xy <= drain_rad + max(0.010, self.r_s * 3.0))
+
+            has_drain_inflow = (np.count_nonzero(lid_inflow_fluid) >= 2) or (
+                np.count_nonzero(top_sheet_inflow_fluid) >= 2
+            )
+
+            # Falling particles in the air column between top sheet / lid and pool surface
+            falling_in_col = (
+                (pos_act[:, 2] > z_pool_surf)
+                & (pos_act[:, 2] <= z_terrace_max + self.r_s)
+                & in_drain_zone
+                & (~is_stream)
+            )
+            has_falling_col = np.count_nonzero(falling_in_col) >= 2
+
+            # Activate drain waterfall when upstream lid pool / top sheet is feeding the drain or particles are actively falling
+            is_drain_wf = (has_drain_inflow or has_falling_col) & falling_in_col
+
+            b_id = d_idx + 1
+            body_specs.append(
+                (
+                    FluidBodyType.WATERFALL,
+                    FluidStage.DRAIN_WATERFALL,
+                    CADFeatureType.DRAIN,
+                    1,
+                    b_id,
+                    is_drain_wf,
+                    drain,
+                )
+            )
+
+        # 7. Reservoir Bowl Pools (per bowl)
+        for b_idx, bowl_feat in enumerate(ctx.bowls):
+            is_bowl_pool = in_basin & (pos_act[:, 2] <= z_pool_surf)
+            b_id = b_idx + 1
+            body_specs.append(
+                (FluidBodyType.POOL, FluidStage.BOWL_POOL, CADFeatureType.BOWL, 2, b_id, is_bowl_pool, bowl_feat)
+            )
+
+        # 8. Splash Clusters (airborne droplets not part of any active waterfall)
+        is_cluster = in_basin & (pos_act[:, 2] > z_pool_surf) & (~all_drain_column_mask)
 
         active_bodies: list[FluidBody] = []
-        for b_type, mask in body_types:
+        for b_type, stage, feat_type, tier, b_id, mask, feat_inst in body_specs:
             indices = active_indices[mask]
             if len(indices) == 0:
                 continue
 
-            # For cluster and waterfall bodies with multiple disconnected droplets, decompose into local clusters
-            if b_type in (FluidBodyType.CLUSTER, FluidBodyType.WATERFALL) and len(indices) > 1:
-                cluster_subsets = cluster_particles(positions[indices], max_dist=0.020)
-                for c_subset in cluster_subsets:
-                    c_indices = indices[c_subset]
-                    child = FluidBody(
-                        body_id=self._get_next_id(),
-                        body_type=b_type,
-                        particle_indices=c_indices,
-                    )
-                    child.recompute_shape(positions, velocities, self.r_s)
-                    self.bodies[child.body_id] = child
-                    active_bodies.append(child)
-            else:
-                matched = False
-                for body in self.bodies.values():
-                    if body.body_type == b_type:
-                        body.particle_indices = indices
-                        body.recompute_shape(positions, velocities, self.r_s)
-                        active_bodies.append(body)
-                        matched = True
-                        break
+            body = FluidBody(
+                body_id=b_id,
+                body_type=b_type,
+                stage=stage,
+                feature_type=feat_type,
+                cad_feature=feat_inst,
+                tier=tier,
+                particle_indices=indices,
+                cad_context=ctx,
+            )
+            body.recompute_shape(positions, velocities, self.r_s)
+            self.bodies[b_id if b_type != FluidBodyType.POOL else (b_id + 100)] = body
+            active_bodies.append(body)
 
-                if not matched:
-                    new_body = FluidBody(
-                        body_id=self._get_next_id(),
-                        body_type=b_type,
-                        particle_indices=indices,
-                    )
-                    new_body.recompute_shape(positions, velocities, self.r_s)
-                    self.bodies[new_body.body_id] = new_body
-                    active_bodies.append(new_body)
-
-        # Prune dead bodies
-        active_ids = {b.body_id for b in active_bodies}
-        self.bodies = {k: v for k, v in self.bodies.items() if k in active_ids}
+        # Clusters for free splash droplets
+        cluster_indices = active_indices[is_cluster]
+        if len(cluster_indices) > 0:
+            cluster_subsets = cluster_particles(positions[cluster_indices], max_dist=0.020)
+            if len(cluster_subsets) > 10:
+                cluster_subsets = sorted(cluster_subsets, key=len, reverse=True)[:10]
+            for idx, c_subset in enumerate(cluster_subsets):
+                c_indices = cluster_indices[c_subset]
+                child = FluidBody(
+                    body_id=idx + 1,
+                    body_type=FluidBodyType.CLUSTER,
+                    stage=FluidStage.SPLASH_CLUSTER,
+                    particle_indices=c_indices,
+                )
+                child.recompute_shape(positions, velocities, self.r_s)
+                active_bodies.append(child)
 
         return active_bodies
