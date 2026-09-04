@@ -359,6 +359,26 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("bottom_cover_drain_radius", 8.0))
 
     @cached_property
+    def rubber_feet_count(self) -> int:
+        """Return the number of rubber feet depressions on the bottom cover."""
+        return int(self._raw_data.get("rubber_feet_count", 4))
+
+    @cached_property
+    def rubber_feet_radius(self) -> float:
+        """Return the radius of the rubber feet depressions in millimeters."""
+        return float(self._raw_data.get("rubber_feet_radius", 5.5))
+
+    @cached_property
+    def rubber_feet_depth(self) -> float:
+        """Return the depth of the rubber feet depressions in millimeters."""
+        return float(self._raw_data.get("rubber_feet_depth", 1.0))
+
+    @cached_property
+    def rubber_feet_pitch_radius(self) -> float:
+        """Return the radial pitch distance from center for rubber feet depressions."""
+        return float(self._raw_data.get("rubber_feet_pitch_radius", 78.0))
+
+    @cached_property
     def pcb_hole_radius(self) -> float:
         """Return the mounting hole radius for PCBs."""
         return float(self._raw_data.get("pcb_hole_radius", 1.0))
@@ -711,6 +731,16 @@ class CatFountainConfig(BaseModel):
     def drive_hub_recess_depth(self) -> float:
         """Return the depth of the bowl's recess for the drive hub."""
         return float(self._raw_data.get("drive_hub_recess_depth", 5.3))
+
+    @cached_property
+    def drive_hub_standoff_radius(self) -> float:
+        """Return the outer radius of the drive hub standoff thrust ring."""
+        return float(self._raw_data.get("drive_hub_standoff_radius", 2.5))
+
+    @cached_property
+    def drive_hub_standoff_height(self) -> float:
+        """Return the height of the drive hub standoff thrust ring."""
+        return float(self._raw_data.get("drive_hub_standoff_height", 0.5))
 
     @cached_property
     def bottom_cover_opening_width(self) -> float:
