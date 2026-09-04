@@ -542,33 +542,39 @@ def test_lid_pool_cad_primitive_bounding_and_stability():
     pocket_r = 0.080
     z_lid = 0.098
     terrace_z = 0.108
+    drain_y = -0.020
+    drain_r = 0.055
+    terrace_y = 0.028
+    terrace_r = 0.030
+
     ctx = FluidCADContext(
         features=(
-            CADFeature(CADFeatureType.TUBE, x=0.0, y=0.028, z=0.041, r=0.010),
-            CADFeature(CADFeatureType.TERRACE, x=0.0, y=0.028, z=terrace_z, r=0.030),
-            CADFeature(CADFeatureType.DRAIN, x=0.0, y=-0.020, z=z_lid, r=0.055),
+            CADFeature(CADFeatureType.TUBE, x=0.0, y=terrace_y, z=0.041, r=0.010),
+            CADFeature(CADFeatureType.TERRACE, x=0.0, y=terrace_y, z=terrace_z, r=terrace_r),
+            CADFeature(CADFeatureType.DRAIN, x=0.0, y=drain_y, z=z_lid, r=0.015),
+            CADFeature(CADFeatureType.CUTOUT, x=0.0, y=drain_y, z=z_lid, r=drain_r),
             CADFeature(CADFeatureType.POCKET, x=0.0, y=0.0, z=z_lid, r=pocket_r),
             CADFeature(CADFeatureType.BOWL, x=0.0, y=0.0, z=0.041, r=0.090),
         )
     )
 
-    # Frame 1: particles clustered near front-right (Y = -0.010, X = 0.040)
+    # Frame 1: particles clustered on right lid shelf (X = 0.060, Y = 0.010, outside cutout and terrace)
     pos_f1 = np.array(
         [
-            [0.040, -0.010, 0.100],
-            [0.045, -0.015, 0.101],
-            [0.035, -0.005, 0.099],
+            [0.060, 0.010, 0.100],
+            [0.065, 0.015, 0.101],
+            [0.055, 0.005, 0.099],
         ],
         dtype=np.float32,
     )
     vel_f1 = np.zeros((3, 3), dtype=np.float32)
 
-    # Frame 2: particles shifted to back-left (Y = 0.050, X = -0.040)
+    # Frame 2: particles shifted to left lid shelf (X = -0.060, Y = 0.010, outside cutout and terrace)
     pos_f2 = np.array(
         [
-            [-0.040, 0.050, 0.100],
-            [-0.045, 0.055, 0.101],
-            [-0.035, 0.045, 0.099],
+            [-0.060, 0.010, 0.100],
+            [-0.065, 0.015, 0.101],
+            [-0.055, 0.005, 0.099],
         ],
         dtype=np.float32,
     )
@@ -606,8 +612,16 @@ def test_lid_pool_cad_primitive_bounding_and_stability():
     d_xy_f2 = np.sqrt(verts_f2[:, 0] ** 2 + verts_f2[:, 1] ** 2)
     assert np.all(d_xy_f2 <= pocket_r + 1e-4)
 
-    # 4. CAD solid volume is strictly contained within CAD boundaries
+    # 4. Mesh vertices must NOT cover the drain cutout hole or terrace platform
+    d_drain_f1 = np.sqrt(verts_f1[:, 0] ** 2 + (verts_f1[:, 1] - drain_y) ** 2)
+    assert not np.any(d_drain_f1 < drain_r - 0.001)
+
+    d_terrace_f1 = np.sqrt(verts_f1[:, 0] ** 2 + (verts_f1[:, 1] - terrace_y) ** 2)
+    assert not np.any(d_terrace_f1 < terrace_r - 0.001)
+
+    # 5. CAD solid volume is strictly contained within CAD boundaries and has positive volume
     solid_f1 = pool_f1.to_cad_solid()
+    assert solid_f1.volume > 0.0
     bbox_f1 = solid_f1.bounding_box()
     assert bbox_f1.min.X >= -pocket_r - 1e-4
     assert bbox_f1.max.X <= pocket_r + 1e-4
@@ -704,3 +718,73 @@ def test_direct_top_sheet_to_drain_cascade():
     verts, faces = drain_wf.to_mesh()
     assert np.max(verts[:, 2]) >= 0.105
     assert np.min(verts[:, 2]) <= 0.065
+
+
+def test_fluid_cad_context_from_boundaries_and_urdf_metadata():
+    """Verify that FluidCADContext is dynamically constructed from URDF boundary metadata."""
+    from model.boundary_config import BoundaryConfig, ShapeType, BoundaryType, LinkType
+
+    boundaries = [
+        BoundaryConfig(
+            link_idx=0,
+            link_type=LinkType.BASE,
+            shape=ShapeType.CYLINDER,
+            type=BoundaryType.CAVITY,
+            xyz=(0.0, 0.0, 0.041),
+            radius=0.090,
+            height=0.060,
+        ),
+        BoundaryConfig(
+            link_idx=1,
+            link_type=LinkType.TUBE,
+            shape=ShapeType.TUBE,
+            type=BoundaryType.SOLID,
+            xyz=(0.0, 0.028, 0.041),
+            radius=0.010,
+            has_tube=True,
+            tube_pos=(0.0, 0.028, 0.041),
+            tube_radius=0.008,
+        ),
+        BoundaryConfig(
+            link_idx=2,
+            link_type=LinkType.LID,
+            shape=ShapeType.CYLINDER,
+            type=BoundaryType.CAVITY,
+            xyz=(0.0, 0.0, 0.098),
+            radius=0.080,
+            height=0.015,
+            has_intake=True,
+            intake_pos=(0.0, 0.028, 0.010),
+            intake_radius=0.030,
+            has_drain=True,
+            drain_pos=(0.0, -0.020, 0.0),
+            drain_radius=0.055,
+        ),
+    ]
+
+    ctx = FluidCADContext.from_boundaries(boundaries)
+
+    assert len(ctx.bowls) == 1
+    assert ctx.bowls[0].z == 0.041
+    assert ctx.bowls[0].r == 0.090
+
+    assert len(ctx.tubes) == 1
+    assert ctx.tubes[0].y == 0.028
+    assert ctx.tubes[0].r == 0.008
+
+    assert len(ctx.terraces) == 1
+    assert ctx.terraces[0].y == 0.028
+    assert ctx.terraces[0].z == 0.108
+    assert ctx.terraces[0].r == 0.030
+
+    assert len(ctx.pockets) == 1
+    assert ctx.pockets[0].z == 0.098
+    assert ctx.pockets[0].r == 0.080
+
+    assert len(ctx.cutouts) == 1
+    assert ctx.cutouts[0].y == -0.020
+    assert ctx.cutouts[0].r == 0.055
+
+    assert len(ctx.drains) == 3
+    drain_labels = {d.label for d in ctx.drains}
+    assert drain_labels == {"Drain_Center", "Drain_Left", "Drain_Right"}

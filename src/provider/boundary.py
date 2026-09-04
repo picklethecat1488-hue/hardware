@@ -400,45 +400,7 @@ class ProcessedBoundaries:
     @property
     def fluid_context(self) -> FluidCADContext:
         """Construct dynamic CAD geometry boundaries context for multi-tier fluid simulation tracking."""
-        lid_b = self.lid
-        tube_b = self.tube_wall
-        base_b = self.base
-        z_offset = self.cavity_z_offset
-        base_h = self.base_height
-        z_lid = lid_b.z_floor if lid_b is not None else (z_offset + base_h)
-        tube_y = tube_b.pos[1] if tube_b is not None else (lid_b.tube_y if lid_b is not None else 0.0)
-        tube_r = tube_b.r_inner if tube_b is not None else (lid_b.tube_r if lid_b is not None else 0.0)
-        terrace_r = lid_b.terrace_r if lid_b is not None else 0.0
-        terrace_z = lid_b.terrace_z_max if lid_b is not None else 0.0
-        drain_y = lid_b.drain_y if lid_b is not None else 0.0
-        drain_r = lid_b.drain_r if lid_b is not None else 0.0
-        pocket_r = lid_b.r_pocket if lid_b is not None else 0.0
-        bowl_r = base_b.radius if base_b is not None else 0.0
-
-        drain_features: list[CADFeature] = []
-        if drain_r > 0.0:
-            stream_r = min(0.015, max(0.010, drain_r * 0.25))
-            drain_features.append(
-                CADFeature(CADFeatureType.DRAIN, label="Drain_Center", x=0.0, y=drain_y, z=z_lid, r=stream_r)
-            )
-            drain_features.append(
-                CADFeature(CADFeatureType.DRAIN, label="Drain_Left", x=-0.025, y=drain_y + 0.005, z=z_lid, r=stream_r)
-            )
-            drain_features.append(
-                CADFeature(CADFeatureType.DRAIN, label="Drain_Right", x=0.025, y=drain_y + 0.005, z=z_lid, r=stream_r)
-            )
-        else:
-            drain_features.append(CADFeature(CADFeatureType.DRAIN, label="Drain", x=0.0, y=drain_y, z=z_lid, r=drain_r))
-
-        return FluidCADContext(
-            features=(
-                CADFeature(CADFeatureType.TUBE, x=0.0, y=tube_y, z=z_offset, r=tube_r),
-                CADFeature(CADFeatureType.TERRACE, x=0.0, y=tube_y, z=terrace_z, r=terrace_r),
-                *drain_features,
-                CADFeature(CADFeatureType.POCKET, x=0.0, y=0.0, z=z_lid, r=pocket_r),
-                CADFeature(CADFeatureType.BOWL, x=0.0, y=0.0, z=z_offset, r=bowl_r),
-            )
-        )
+        return FluidCADContext.from_processed_boundaries(self)
 
     @property
     def tube_idx(self) -> int:

@@ -470,6 +470,7 @@ class CADFeatureType(str, Enum):
     TUBE = "Tube"
     TERRACE = "Terrace"
     DRAIN = "Drain"
+    CUTOUT = "Cutout"
     POCKET = "Pocket"
     BOWL = "Bowl"
 
@@ -542,6 +543,11 @@ class FluidCADContext(NamedTuple):
         return self.get_all(CADFeatureType.DRAIN)
 
     @property
+    def cutouts(self) -> list[CADFeature]:
+        """Get all cutout aperture features."""
+        return self.get_all(CADFeatureType.CUTOUT)
+
+    @property
     def pockets(self) -> list[CADFeature]:
         """Get all pocket/shelf features."""
         return self.get_all(CADFeatureType.POCKET)
@@ -570,6 +576,190 @@ class FluidCADContext(NamedTuple):
         """Get drinking lid shelf elevation."""
         pocket = self.get(CADFeatureType.POCKET)
         return pocket.z if pocket is not None else 0.0
+
+    @staticmethod
+    def _create_drain_features(
+        drain_x: float,
+        drain_y: float,
+        z_lid: float,
+        drain_r: float,
+        tube_r: float = 0.0,
+    ) -> tuple[list[CADFeature], list[CADFeature]]:
+        """Construct dynamic drain spillway stream features and cutout aperture features from geometric parameters."""
+        drain_features: list[CADFeature] = []
+        cutout_features: list[CADFeature] = []
+
+        if drain_r <= 0.0:
+            drain_features.append(
+                CADFeature(CADFeatureType.DRAIN, label="Drain", x=drain_x, y=drain_y, z=z_lid, r=drain_r)
+            )
+            return drain_features, cutout_features
+
+        cutout_features.append(
+            CADFeature(CADFeatureType.CUTOUT, label="Lid_Cutout", x=drain_x, y=drain_y, z=z_lid, r=drain_r)
+        )
+
+        # Stream radius dynamically bounded by tube flow channel or cutout aperture
+        stream_r = min(drain_r, tube_r) if tube_r > 0.0 else drain_r
+        stream_r = max(1e-4, stream_r)
+        aperture_ratio = drain_r / stream_r
+
+        if aperture_ratio > 1.5:
+            # Wide aperture: generate multi-stream spillways spaced dynamically along the cutout arc
+            n_streams = min(3, max(3, round(aperture_ratio)))
+            max_angle = math.pi / 4.0
+            for i in range(n_streams):
+                norm = (i / (n_streams - 1) - 0.5) * 2.0
+                angle = norm * max_angle
+                x = drain_x + drain_r * math.sin(angle) * 0.707
+                y = drain_y + drain_r * (1.0 - math.cos(angle)) * 0.50
+                if math.isclose(norm, 0.0, abs_tol=1e-4):
+                    label = "Drain_Center"
+                elif norm < 0.0:
+                    label = "Drain_Left" if n_streams == 3 else f"Drain_Left_{abs(i - n_streams // 2)}"
+                else:
+                    label = "Drain_Right" if n_streams == 3 else f"Drain_Right_{i - n_streams // 2}"
+                drain_features.append(CADFeature(CADFeatureType.DRAIN, label=label, x=x, y=y, z=z_lid, r=stream_r))
+        else:
+            drain_features.append(
+                CADFeature(CADFeatureType.DRAIN, label="Drain_Center", x=drain_x, y=drain_y, z=z_lid, r=drain_r)
+            )
+
+        return drain_features, cutout_features
+
+    @classmethod
+    def from_processed_boundaries(cls, pb: Any) -> "FluidCADContext":
+        """Construct FluidCADContext dynamically from URDF boundary metadata and processed boundaries."""
+        lid_b = getattr(pb, "lid", None)
+        tube_b = getattr(pb, "tube_wall", None)
+        base_b = getattr(pb, "base", None)
+        z_offset = getattr(pb, "cavity_z_offset", 0.0)
+        base_h = getattr(pb, "base_height", 0.0)
+        z_lid = lid_b.z_floor if lid_b is not None else (z_offset + base_h)
+        tube_y = tube_b.pos[1] if tube_b is not None else (lid_b.tube_y if lid_b is not None else 0.0)
+        tube_r = tube_b.r_inner if tube_b is not None else (lid_b.tube_r if lid_b is not None else 0.0)
+        terrace_r = lid_b.terrace_r if lid_b is not None else 0.0
+        terrace_z = lid_b.terrace_z_max if lid_b is not None else 0.0
+        drain_x = lid_b.pos[0] if lid_b is not None else 0.0
+        drain_y = lid_b.drain_y if lid_b is not None else 0.0
+        drain_r = lid_b.drain_r if lid_b is not None else 0.0
+        pocket_r = lid_b.r_pocket if lid_b is not None else 0.0
+        bowl_r = base_b.radius if base_b is not None else 0.0
+
+        drain_features, cutout_features = cls._create_drain_features(
+            drain_x=drain_x,
+            drain_y=drain_y,
+            z_lid=z_lid,
+            drain_r=drain_r,
+            tube_r=tube_r,
+        )
+
+        return cls(
+            features=(
+                CADFeature(CADFeatureType.TUBE, x=0.0, y=tube_y, z=z_offset, r=tube_r),
+                CADFeature(CADFeatureType.TERRACE, x=0.0, y=tube_y, z=terrace_z, r=terrace_r),
+                *drain_features,
+                *cutout_features,
+                CADFeature(CADFeatureType.POCKET, x=0.0, y=0.0, z=z_lid, r=pocket_r),
+                CADFeature(CADFeatureType.BOWL, x=0.0, y=0.0, z=z_offset, r=bowl_r),
+            )
+        )
+
+    @classmethod
+    def from_boundaries(cls, boundaries: Sequence[Any]) -> "FluidCADContext":
+        """Construct FluidCADContext directly from a sequence of URDFBoundary or BoundaryConfig models."""
+        from model.boundary_config import BoundaryType, LinkType, ShapeType
+
+        features: list[CADFeature] = []
+        z_floor = 0.0
+        tube_r = 0.0
+
+        for b in boundaries:
+            link_type = getattr(b, "link_type", None)
+            shape = getattr(b, "shape", None)
+            b_type = getattr(b, "type", None)
+            xyz = getattr(b, "xyz", (0.0, 0.0, 0.0))
+            radius = getattr(b, "radius", 0.0) or 0.0
+
+            # Base container
+            is_base = link_type in (LinkType.BASE, "base", "bowl") or (
+                shape in (ShapeType.CYLINDER, "cylinder")
+                and b_type in (BoundaryType.CAVITY, "cavity")
+                and link_type not in (LinkType.LID, "lid")
+            )
+            if is_base:
+                z_floor = float(xyz[2])
+                features.append(
+                    CADFeature(
+                        CADFeatureType.BOWL, label="Bowl", x=float(xyz[0]), y=float(xyz[1]), z=z_floor, r=float(radius)
+                    )
+                )
+
+            # Delivery tube
+            is_tube = (
+                getattr(b, "has_tube", False)
+                or link_type in (LinkType.TUBE, "tube")
+                or shape in (ShapeType.TUBE, "tube")
+            )
+            if is_tube:
+                t_pos = getattr(b, "tube_pos", xyz)
+                tube_r = float(getattr(b, "tube_radius", radius))
+                features.append(
+                    CADFeature(
+                        CADFeatureType.TUBE,
+                        label="Tube",
+                        x=float(t_pos[0]),
+                        y=float(t_pos[1]),
+                        z=z_floor,
+                        r=tube_r,
+                    )
+                )
+
+            # Terrace platform
+            is_terrace = getattr(b, "has_intake", False) or link_type in (LinkType.OUTLET, "terrace")
+            if is_terrace:
+                intake_pos = getattr(b, "intake_pos", xyz)
+                intake_r = getattr(b, "intake_radius", radius)
+                features.append(
+                    CADFeature(
+                        CADFeatureType.TERRACE,
+                        label="Terrace",
+                        x=float(intake_pos[0]),
+                        y=float(intake_pos[1]),
+                        z=float(xyz[2] + intake_pos[2]),
+                        r=float(intake_r),
+                    )
+                )
+
+            # Lid shelf and drain
+            is_lid = link_type in (LinkType.LID, "lid")
+            if is_lid:
+                z_lid = float(xyz[2])
+                features.append(
+                    CADFeature(
+                        CADFeatureType.POCKET,
+                        label="Pocket",
+                        x=float(xyz[0]),
+                        y=float(xyz[1]),
+                        z=z_lid,
+                        r=float(radius),
+                    )
+                )
+
+                if getattr(b, "has_drain", False) and getattr(b, "drain_radius", 0.0) > 0.0:
+                    d_pos = getattr(b, "drain_pos", (0.0, 0.0, 0.0))
+                    d_rad = float(getattr(b, "drain_radius", 0.0))
+                    d_feats, c_feats = cls._create_drain_features(
+                        drain_x=float(d_pos[0]),
+                        drain_y=float(d_pos[1]),
+                        z_lid=z_lid,
+                        drain_r=d_rad,
+                        tube_r=tube_r,
+                    )
+                    features.extend(c_feats)
+                    features.extend(d_feats)
+
+        return cls(features=tuple(features))
 
 
 class FluidBody(BaseModel):
@@ -635,6 +825,14 @@ class FluidBody(BaseModel):
                 ry = (self.bounds_max[1] - self.bounds_min[1]) / 2.0
                 radius = max(0.010, (rx + ry) / 2.0)
                 if self.feature_type == CADFeatureType.POCKET or self.tier == 1 or self.stage == FluidStage.LID_POOL:
+                    solid = self.to_cad_solid()
+                    if hasattr(solid, "tessellate"):
+                        verts, triangles = solid.tessellate(0.0005)
+                        if len(verts) > 0 and len(triangles) > 0:
+                            verts_arr = np.array([[v.X, v.Y, v.Z] for v in verts], dtype=np.float32)
+                            faces_arr = np.array(triangles, dtype=np.uint32)
+                            return verts_arr, faces_arr
+
                     center = (feat.x, feat.y) if feat is not None else (0.0, 0.0)
                     z_floor_val = ctx.z_lid if ctx is not None and ctx.z_lid > 0.0 else z_min
                     z_top_val = min(
@@ -642,6 +840,15 @@ class FluidBody(BaseModel):
                         max(z_max, z_floor_val + 0.003),
                     )
                     radius = feat.r if feat is not None and feat.r > 0.0 else radius
+                    return generate_heightfield_cylinder_mesh(
+                        radius=radius,
+                        z_floor=z_floor_val,
+                        surface_positions=self.surface_positions,
+                        default_z_top=z_top_val,
+                        center=center,
+                        n_rings=6,
+                        n_spokes=n_segments,
+                    )
                 else:
                     center = (feat.x, feat.y) if feat is not None else (0.0, 0.0)
                     z_floor_val = ctx.z_floor if ctx is not None and ctx.z_floor > 0.0 else z_min
@@ -651,15 +858,15 @@ class FluidBody(BaseModel):
                     )
                     radius = feat.r if feat is not None and feat.r > 0.0 else radius
 
-                return generate_heightfield_cylinder_mesh(
-                    radius=radius,
-                    z_floor=z_floor_val,
-                    surface_positions=self.surface_positions,
-                    default_z_top=z_top_val,
-                    center=center,
-                    n_rings=6,
-                    n_spokes=n_segments,
-                )
+                    return generate_heightfield_cylinder_mesh(
+                        radius=radius,
+                        z_floor=z_floor_val,
+                        surface_positions=self.surface_positions,
+                        default_z_top=z_top_val,
+                        center=center,
+                        n_rings=6,
+                        n_spokes=n_segments,
+                    )
 
             case FluidBodyType.STREAM:
                 rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
@@ -747,7 +954,7 @@ class FluidBody(BaseModel):
 
     def to_cad_solid(self) -> Any:
         """Build and return a watertight build123d Solid representation conforming to CAD design principles."""
-        from build123d import Cylinder, Sphere, Align, Location
+        from build123d import Align, BuildPart, Cylinder, Location, Locations, Mode, Sphere
 
         cx, cy, _ = self.centroid
         z_min = self.bounds_min[2]
@@ -771,6 +978,40 @@ class FluidBody(BaseModel):
                     )
                     radius = feat.r if feat is not None and feat.r > 0.0 else radius
                     h = max(0.002, min(0.008, z_max - pos[2]))
+
+                    with BuildPart() as bp:
+                        Cylinder(radius=radius, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.ADD)
+                        if ctx is not None:
+                            for terrace in ctx.terraces:
+                                if terrace.r > 0.0:
+                                    with Locations((terrace.x - pos[0], terrace.y - pos[1], 0.0)):
+                                        Cylinder(
+                                            radius=terrace.r,
+                                            height=h * 3.0,
+                                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                            mode=Mode.SUBTRACT,
+                                        )
+                            for cutout in ctx.cutouts:
+                                if cutout.r > 0.0:
+                                    with Locations((cutout.x - pos[0], cutout.y - pos[1], 0.0)):
+                                        Cylinder(
+                                            radius=cutout.r,
+                                            height=h * 3.0,
+                                            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                            mode=Mode.SUBTRACT,
+                                        )
+                            if len(ctx.cutouts) == 0:
+                                for drain in ctx.drains:
+                                    if drain.r > 0.020:
+                                        with Locations((drain.x - pos[0], drain.y - pos[1], 0.0)):
+                                            Cylinder(
+                                                radius=drain.r,
+                                                height=h * 3.0,
+                                                align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                                mode=Mode.SUBTRACT,
+                                            )
+                    solid = bp.part
+                    return solid.locate(Location(pos))
                 else:
                     pos = (
                         feat.x if feat is not None else 0.0,
@@ -779,8 +1020,8 @@ class FluidBody(BaseModel):
                     )
                     radius = feat.r if feat is not None and feat.r > 0.0 else radius
                     h = max(0.015, min((ctx.z_lid if ctx and ctx.z_lid > 0.0 else z_max) - pos[2], z_max - pos[2]))
-                c = Cylinder(radius=radius, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                return c.locate(Location(pos))
+                    c = Cylinder(radius=radius, height=h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    return c.locate(Location(pos))
 
             case FluidBodyType.STREAM:
                 rx = (self.bounds_max[0] - self.bounds_min[0]) / 2.0
@@ -1274,10 +1515,26 @@ class FluidBodyTracker:
             )
 
         # 5. Lid Pockets / Shelf Pools per pocket
+        all_cutout_mask = np.zeros(len(pos_act), dtype=bool)
+        for cutout in ctx.cutouts:
+            d_c_xy = np.sqrt((pos_act[:, 0] - cutout.x) ** 2 + (pos_act[:, 1] - cutout.y) ** 2)
+            all_cutout_mask |= d_c_xy <= cutout.r
+
         all_drain_column_mask = np.zeros(len(pos_act), dtype=bool)
+        for drain in ctx.drains:
+            d_d_xy = np.sqrt((pos_act[:, 0] - drain.x) ** 2 + (pos_act[:, 1] - drain.y) ** 2)
+            drain_rad = max(0.015, drain.r + self.r_s * 2.0)
+            all_drain_column_mask |= d_d_xy <= drain_rad
+
         for p_idx, pocket in enumerate(ctx.pockets):
             d_p_xy = np.sqrt((pos_act[:, 0] - pocket.x) ** 2 + (pos_act[:, 1] - pocket.y) ** 2)
-            is_lid_pool = (~all_platform_mask) & (pos_act[:, 2] >= z_lid - self.r_s) & (d_p_xy <= pocket.r + self.r_s)
+            is_lid_pool = (
+                (~all_platform_mask)
+                & (~all_cutout_mask)
+                & (~all_drain_column_mask)
+                & (pos_act[:, 2] >= z_lid - self.r_s)
+                & (d_p_xy <= pocket.r + self.r_s)
+            )
             b_id = p_idx + 1
             body_specs.append(
                 (FluidBodyType.POOL, FluidStage.LID_POOL, CADFeatureType.POCKET, 1, b_id, is_lid_pool, pocket)
@@ -1289,7 +1546,6 @@ class FluidBodyTracker:
             d_d_xy = np.sqrt((pos_act[:, 0] - drain.x) ** 2 + (pos_act[:, 1] - drain.y) ** 2)
             drain_rad = max(0.015, drain.r + self.r_s * 2.0)
             in_drain_zone = d_d_xy <= drain_rad
-            all_drain_column_mask |= in_drain_zone
 
             # Check upstream inflow from both routes:
             # Route A: Fluid at lid shelf reaching drain aperture
