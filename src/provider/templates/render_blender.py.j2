@@ -40,6 +40,60 @@ try:
             scene.eevee.use_fast_gi = True
     if hasattr(scene, "cycles"):
         scene.cycles.samples = {{ samples }}
+        cycles_addon = bpy.context.preferences.addons.get("cycles")
+        if cycles_addon:
+            cprefs = cycles_addon.preferences
+            device_types = [item[0] for item in cprefs.get_device_types(bpy.context)]
+            for dev_type in ("OPTIX", "CUDA", "METAL"):
+                if dev_type in device_types:
+                    cprefs.compute_device_type = dev_type
+                    cprefs.get_devices()
+                    gpu_devices = [d for d in cprefs.devices if d.type == dev_type]
+                    if gpu_devices:
+                        for d in cprefs.devices:
+                            d.use = (d.type == dev_type)
+                        scene.cycles.device = "GPU"
+                        break
+
+        # Configure OptiX / OpenImageDenoise AI Denoising
+        if hasattr(scene.cycles, "use_denoising"):
+            scene.cycles.use_denoising = True
+            if hasattr(scene.cycles, "denoising_use_gpu"):
+                scene.cycles.denoising_use_gpu = True
+            if hasattr(scene.cycles, "denoiser") and "denoiser" in scene.cycles.bl_rna.properties:
+                denoiser_props = [item.identifier for item in scene.cycles.bl_rna.properties["denoiser"].enum_items]
+                if "OPTIX" in denoiser_props and cycles_addon and cycles_addon.preferences.compute_device_type == "OPTIX":
+                    scene.cycles.denoiser = "OPTIX"
+                elif "OPENIMAGEDENOISE" in denoiser_props:
+                    scene.cycles.denoiser = "OPENIMAGEDENOISE"
+            if hasattr(scene.cycles, "denoising_input_passes") and "denoising_input_passes" in scene.cycles.bl_rna.properties:
+                pass_props = [item.identifier for item in scene.cycles.bl_rna.properties["denoising_input_passes"].enum_items]
+                if "RGB_ALBEDO_NORMAL" in pass_props:
+                    scene.cycles.denoising_input_passes = "RGB_ALBEDO_NORMAL"
+            if hasattr(scene.cycles, "denoising_prefilter") and "denoising_prefilter" in scene.cycles.bl_rna.properties:
+                scene.cycles.denoising_prefilter = "FAST"
+
+        # Optimize Ray Tree Depth & Light Clamping for High-Throughput Raytracing
+        if hasattr(scene.cycles, "max_bounces"):
+            scene.cycles.max_bounces = 8
+        if hasattr(scene.cycles, "diffuse_bounces"):
+            scene.cycles.diffuse_bounces = 2
+        if hasattr(scene.cycles, "glossy_bounces"):
+            scene.cycles.glossy_bounces = 4
+        if hasattr(scene.cycles, "transmission_bounces"):
+            scene.cycles.transmission_bounces = 6
+        if hasattr(scene.cycles, "transparent_max_bounces"):
+            scene.cycles.transparent_max_bounces = 6
+        if hasattr(scene.cycles, "volume_bounces"):
+            scene.cycles.volume_bounces = 0
+        if hasattr(scene.cycles, "sample_clamp_indirect"):
+            scene.cycles.sample_clamp_indirect = 10.0
+        if hasattr(scene.cycles, "use_adaptive_sampling"):
+            scene.cycles.use_adaptive_sampling = True
+            if hasattr(scene.cycles, "adaptive_threshold"):
+                scene.cycles.adaptive_threshold = 0.015
+            if hasattr(scene.cycles, "adaptive_min_samples"):
+                scene.cycles.adaptive_min_samples = 4
 
     # World & Background Lighting
     world = bpy.data.worlds.new("StudioWorld")
