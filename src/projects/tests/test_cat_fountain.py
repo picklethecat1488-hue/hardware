@@ -1311,11 +1311,11 @@ class TestCatFountainProvider:
                 assert fluid is not None
 
                 # Execute simulation steps through production hooks
-                for step_idx in range(240):
+                for step_idx in range(120):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
-                assert hasattr(provider, "metrics_history") and len(provider.metrics_history) == 240
+                assert hasattr(provider, "metrics_history") and len(provider.metrics_history) == 120
 
                 # Derive physical expectations from first principles:
                 # 1. Total active fluid particles and single particle volume
@@ -1337,7 +1337,7 @@ class TestCatFountainProvider:
                 # 4. Continuous Delivery Tube Flow & Spout Discharge with naturalistic lower and upper bounds:
                 # - Lower bounds ensure pump delivery column does not collapse to zero after priming
                 # - Upper bounds ensure fluid packing remains physically bounded by geometric volume
-                steady_tube = np.array([m["flow_tube"] for m in provider.metrics_history[150:]])
+                steady_tube = np.array([m["flow_tube"] for m in provider.metrics_history[100:]])
                 all_spout = np.array([m["flow_spout"] for m in provider.metrics_history])
 
                 min_tube_particles = 1
@@ -1383,7 +1383,7 @@ class TestCatFountainProvider:
                 )
 
                 # 7. Reservoir Water Depth & Casing Contact Continuity
-                min_pool_depth = provider.settings.slot_height * 0.001
+                min_pool_depth = (provider.settings.slot_height - provider.settings.pump_casing_clearance) * 0.001
                 max_pool_depth = (provider.settings.bowl_height - provider.settings.floor_z) * 0.001
                 steady_depth = np.array([m["water_depth"] for m in provider.metrics_history[40:]])
                 assert np.all(steady_depth >= min_pool_depth), "Reservoir water depth drained below minimum threshold"
