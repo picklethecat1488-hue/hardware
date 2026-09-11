@@ -397,6 +397,11 @@ class ProcessedBoundaries:
         return 0.0
 
     @property
+    def cavity_height(self) -> float:
+        """Get base container cavity height."""
+        return self.base_height
+
+    @property
     def tube_idx(self) -> int:
         """Find the index of the tube boundary element."""
         indices = np.where(self.b_shapes == SHAPE_TUBE)[0]

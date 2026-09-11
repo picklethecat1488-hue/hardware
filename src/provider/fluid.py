@@ -3364,7 +3364,7 @@ class Fluid:
         z_offset = self.processed_boundaries.cavity_z_offset
         lid_b = self.processed_boundaries.lid
         tube_b = self.processed_boundaries.tube_wall
-        z_lid = lid_b.z_floor if lid_b is not None else self.processed_boundaries.cavity_height
+        z_lid = lid_b.z_floor if lid_b is not None else (z_offset + self.processed_boundaries.cavity_height)
         tube_y = tube_b.pos[1] if tube_b is not None else (lid_b.tube_y if lid_b is not None else 0.0)
         tube_r = tube_b.inner_radius if tube_b is not None else (lid_b.tube_r if lid_b is not None else 0.0)
         return self.fluid_body_tracker.update_bodies(
