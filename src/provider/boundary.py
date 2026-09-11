@@ -121,6 +121,16 @@ class TubeWallBoundary:
     pos: tuple[float, float, float] = (0.0, 0.0, 0.0)
     orn: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
 
+    @property
+    def inner_radius(self) -> float:
+        """Alias for r_inner."""
+        return self.r_inner
+
+    @property
+    def outer_radius(self) -> float:
+        """Alias for r_outer."""
+        return self.r_outer
+
     def is_solid_vectorized(self, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
         """Evaluate whether points lie inside the solid vertical tube wall."""
         in_z = (self.z_min <= z) & (z <= self.z_max)
