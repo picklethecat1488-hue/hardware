@@ -71,9 +71,9 @@ try:
                 if "RGB_ALBEDO_NORMAL" in pass_props:
                     scene.cycles.denoising_input_passes = "RGB_ALBEDO_NORMAL"
             if hasattr(scene.cycles, "denoising_prefilter") and "denoising_prefilter" in scene.cycles.bl_rna.properties:
-                scene.cycles.denoising_prefilter = "FAST"
+                scene.cycles.denoising_prefilter = "ACCURATE"
 
-        # Optimize Ray Tree Depth & Light Clamping for High-Throughput Raytracing
+        # Optimize Ray Tree Depth, Light Clamping, and Caustics for High-Quality Anti-Flicker Raytracing
         if hasattr(scene.cycles, "max_bounces"):
             scene.cycles.max_bounces = 8
         if hasattr(scene.cycles, "diffuse_bounces"):
@@ -87,63 +87,75 @@ try:
         if hasattr(scene.cycles, "volume_bounces"):
             scene.cycles.volume_bounces = 0
         if hasattr(scene.cycles, "sample_clamp_indirect"):
-            scene.cycles.sample_clamp_indirect = 10.0
+            scene.cycles.sample_clamp_indirect = 3.0
+        if hasattr(scene.cycles, "blur_glossy"):
+            scene.cycles.blur_glossy = 1.0
+        if hasattr(scene.cycles, "caustics_reflective"):
+            scene.cycles.caustics_reflective = False
+        if hasattr(scene.cycles, "caustics_refractive"):
+            scene.cycles.caustics_refractive = False
         if hasattr(scene.cycles, "use_adaptive_sampling"):
             scene.cycles.use_adaptive_sampling = True
             if hasattr(scene.cycles, "adaptive_threshold"):
-                scene.cycles.adaptive_threshold = 0.015
+                scene.cycles.adaptive_threshold = 0.010
             if hasattr(scene.cycles, "adaptive_min_samples"):
-                scene.cycles.adaptive_min_samples = 4
+                scene.cycles.adaptive_min_samples = 8
 
-    # World & Background Lighting
+    # World & Background Lighting (Neutral daylight studio dome)
     world = bpy.data.worlds.new("StudioWorld")
     scene.world = world
     world.use_nodes = True
     bg_node = world.node_tree.nodes.get("Background")
     if bg_node:
         bg_node.inputs["Color"].default_value = ({{ background_color[0] }}, {{ background_color[1] }}, {{ background_color[2] }}, 1.0)
-        bg_node.inputs["Strength"].default_value = 1.0
+        bg_node.inputs["Strength"].default_value = 0.80
+
+    # Color Management (Use Standard sRGB transform for accurate CAD colors matching viewer)
+    if hasattr(scene, "view_settings"):
+        scene.view_settings.view_transform = "Standard"
+        if hasattr(scene.view_settings, "look"):
+            scene.view_settings.look = "None"
 
     # 1. 3-Point Studio Lighting Setup (6500K Daylight, Soft Diffused Studio Lights)
     c_target = mathutils.Vector(manifest.get("center", [0.0, 0.0, 0.06]))
 
-    # Key Light (Soft Daylight Area Light)
+    # Key Light (Warm daylight studio softbox)
     key_light_data = bpy.data.lights.new("KeyLight", type="AREA")
     key_light_data.energy = 120.0
-    key_light_data.size = 0.8
-    key_light_data.color = (1.0, 1.0, 1.0)
+    key_light_data.size = 0.5
+    key_light_data.color = (1.0, 0.98, 0.95)
     key_light_obj = bpy.data.objects.new("KeyLight", key_light_data)
     scene.collection.objects.link(key_light_obj)
-    key_light_obj.location = (c_target.x + 0.40, c_target.y - 0.45, c_target.z + 0.55)
+    key_light_obj.location = (c_target.x + 0.35, c_target.y - 0.40, c_target.z + 0.45)
     dir_key = c_target - key_light_obj.location
     key_light_obj.rotation_euler = dir_key.to_track_quat("-Z", "Y").to_euler()
 
-    # Fill Light (Soft Daylight Area Light)
+    # Fill Light (Cool daylight softbox)
     fill_light_data = bpy.data.lights.new("FillLight", type="AREA")
     fill_light_data.energy = 60.0
-    fill_light_data.size = 0.8
-    fill_light_data.color = (1.0, 1.0, 1.0)
+    fill_light_data.size = 0.5
+    fill_light_data.color = (0.95, 0.98, 1.0)
     fill_light_obj = bpy.data.objects.new("FillLight", fill_light_data)
     scene.collection.objects.link(fill_light_obj)
-    fill_light_obj.location = (c_target.x - 0.45, c_target.y - 0.30, c_target.z + 0.40)
+    fill_light_obj.location = (c_target.x - 0.40, c_target.y - 0.30, c_target.z + 0.35)
     dir_fill = c_target - fill_light_obj.location
     fill_light_obj.rotation_euler = dir_fill.to_track_quat("-Z", "Y").to_euler()
 
     # Rim Light (Top-Back Daylight Accent for edge refraction and fluid highlights)
     rim_light_data = bpy.data.lights.new("RimLight", type="AREA")
-    rim_light_data.energy = 80.0
-    rim_light_data.size = 0.6
+    rim_light_data.energy = 90.0
+    rim_light_data.size = 0.4
     rim_light_data.color = (1.0, 1.0, 1.0)
     rim_light_obj = bpy.data.objects.new("RimLight", rim_light_data)
     scene.collection.objects.link(rim_light_obj)
-    rim_light_obj.location = (c_target.x, c_target.y + 0.45, c_target.z + 0.50)
+    rim_light_obj.location = (c_target.x, c_target.y + 0.40, c_target.z + 0.45)
     dir_rim = c_target - rim_light_obj.location
     rim_light_obj.rotation_euler = dir_rim.to_track_quat("-Z", "Y").to_euler()
 
     # Studio Floor Pedestal
     c_center = manifest.get("center", [0.0, 0.0, 0.06])
     bpy.ops.mesh.primitive_cylinder_add(
-        radius=0.25,
+        radius=0.30,
         depth=0.004,
         location=(c_center[0], c_center[1], -0.002),
     )
@@ -153,7 +165,7 @@ try:
     floor_mat.use_nodes = True
     floor_bsdf = floor_mat.node_tree.nodes.get("Principled BSDF")
     if floor_bsdf:
-        floor_bsdf.inputs["Base Color"].default_value = (0.12, 0.14, 0.18, 1.0)
+        floor_bsdf.inputs["Base Color"].default_value = (0.75, 0.78, 0.82, 1.0)
         floor_bsdf.inputs["Roughness"].default_value = 0.35
         if "Specular IOR Level" in floor_bsdf.inputs:
             floor_bsdf.inputs["Specular IOR Level"].default_value = 0.20
@@ -218,7 +230,7 @@ try:
             bsdf.inputs["Specular"].default_value = specular
 
         if "Alpha" in bsdf.inputs:
-            bsdf.inputs["Alpha"].default_value = alpha_val
+            bsdf.inputs["Alpha"].default_value = 1.0 if transmission > 0.5 else alpha_val
 
         # Enable EEVEE and raytraced refraction settings for translucent materials
         if transmission > 0.0 or alpha_val < 1.0:

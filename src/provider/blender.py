@@ -105,10 +105,10 @@ class RenderConfig:
     resolution: tuple[int, int] = (2560, 1440)
     fps: int = 60
     samples: int = 32
-    engine: str = "BLENDER_EEVEE"
+    engine: str = "CYCLES"
     view_from: str = "iso"
     shadow_catcher: bool = True
-    background_color: tuple[float, float, float, float] = (0.06, 0.07, 0.09, 1.0)
+    background_color: tuple[float, float, float, float] = (0.85, 0.88, 0.92, 1.0)
     output_mp4: Optional[str] = None
     turntable: bool = True
     crf: int = 18
@@ -624,42 +624,57 @@ class BlenderRenderer:
             # Export fluid bodies if present
             if fluid_bodies_per_frame and step_idx < len(fluid_bodies_per_frame):
                 bodies = fluid_bodies_per_frame[step_idx]
-                for b_idx, body in enumerate(bodies):
-                    verts, faces = body.to_mesh()
-                    if len(verts) > 0 and len(faces) > 0:
-                        b_name = f"water_{body.display_name}_{step_idx:05d}_{b_idx}.obj"
-                        b_path = os.path.join(target_dir, b_name)
-                        tm = trimesh.Trimesh(vertices=verts, faces=faces)
-                        tm.export(b_path)
-                        water_mat = cls.resolve_item_material(
-                            body.display_name, body, [0.2, 0.65, 0.95, 0.40], materials=mats
-                        )
-                        frame_items.append(
-                            {
-                                "name": body.display_name,
-                                "file": b_path,
-                                "scale": 1.0,
-                                **water_mat,
-                            }
-                        )
+                mesh_verts_list = []
+                mesh_faces_list = []
+                vert_offset = 0
+                for body in bodies:
+                    if hasattr(body, "to_mesh"):
+                        verts, faces = body.to_mesh()
+                        if len(verts) > 0 and len(faces) > 0:
+                            mesh_verts_list.append(verts)
+                            mesh_faces_list.append(faces + vert_offset)
+                            vert_offset += len(verts)
+                if mesh_verts_list:
+                    comb_verts = np.vstack(mesh_verts_list).astype(np.float32)
+                    comb_faces = np.vstack(mesh_faces_list).astype(np.uint32)
+                    b_name = f"water_frame_{step_idx:05d}.npz"
+                    b_path = os.path.join(target_dir, b_name)
+                    np.savez(b_path, verts=comb_verts, faces=comb_faces)
+                    water_mat = cls.resolve_item_material("water", None, [0.05, 0.65, 0.95, 0.35], materials=mats)
+                    frame_items.append(
+                        {
+                            "name": "water",
+                            "file": b_path,
+                            "scale": 1.0,
+                            **water_mat,
+                        }
+                    )
             # Export water meshes if present
             elif water_meshes_per_frame and step_idx < len(water_meshes_per_frame):
                 meshes_dict = water_meshes_per_frame[step_idx]
-                for m_idx, (m_name, (verts, faces)) in enumerate(meshes_dict.items()):
+                mesh_verts_list = []
+                mesh_faces_list = []
+                vert_offset = 0
+                for m_name, (verts, faces) in meshes_dict.items():
                     if len(verts) > 0 and len(faces) > 0:
-                        b_name = f"water_{m_name}_{step_idx:05d}_{m_idx}.obj"
-                        b_path = os.path.join(target_dir, b_name)
-                        tm = trimesh.Trimesh(vertices=verts, faces=faces)
-                        tm.export(b_path)
-                        water_mat = cls.resolve_item_material(m_name, None, [0.2, 0.65, 0.95, 0.40], materials=mats)
-                        frame_items.append(
-                            {
-                                "name": m_name,
-                                "file": b_path,
-                                "scale": 1.0,
-                                **water_mat,
-                            }
-                        )
+                        mesh_verts_list.append(verts)
+                        mesh_faces_list.append(faces + vert_offset)
+                        vert_offset += len(verts)
+                if mesh_verts_list:
+                    comb_verts = np.vstack(mesh_verts_list).astype(np.float32)
+                    comb_faces = np.vstack(mesh_faces_list).astype(np.uint32)
+                    b_name = f"water_frame_{step_idx:05d}.npz"
+                    b_path = os.path.join(target_dir, b_name)
+                    np.savez(b_path, verts=comb_verts, faces=comb_faces)
+                    water_mat = cls.resolve_item_material("water", None, [0.05, 0.65, 0.95, 0.35], materials=mats)
+                    frame_items.append(
+                        {
+                            "name": "water",
+                            "file": b_path,
+                            "scale": 1.0,
+                            **water_mat,
+                        }
+                    )
 
             rigid_transforms = (
                 rigid_transforms_per_frame[step_idx]

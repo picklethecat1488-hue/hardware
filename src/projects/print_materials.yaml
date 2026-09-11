@@ -79,22 +79,23 @@ material:
     density: 1.15
     boundary_friction: 0.22
     contact_angle: 72.0
-    roughness: 0.35
+    roughness: 0.20
     ior: 1.51
-    transmission: 0.88
+    transmission: 0.85
     metallic: 0.0
-    specular: 0.20
+    specular: 0.50
+
 
   # Water (Liquid)
   water:
     density: 1.00
     boundary_friction: 0.0
     contact_angle: 0.0
-    roughness: 0.08
+    roughness: 0.04
     ior: 1.333
-    transmission: 0.98
+    transmission: 0.95
     metallic: 0.0
-    specular: 0.25
+    specular: 0.30
 
   # Generic Metal
   metal:

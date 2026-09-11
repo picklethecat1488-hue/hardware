@@ -219,5 +219,5 @@ class TestBlenderRenderer:
 
         utr = mats.get("utr8100")
         assert utr is not None
-        assert utr.transmission == 0.88
+        assert utr.transmission == 0.85
         assert utr.ior == 1.51
