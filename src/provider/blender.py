@@ -141,7 +141,20 @@ class BlenderRenderer:
                 if which_cand:
                     return which_cand
 
-        # 2. Standard PATH lookup
+        # 2. High-performance & custom standalone installations (Blender 4.x LTS with CUDA/OptiX)
+        opt_paths = [
+            "/home/ubuntu/blender-4.2/blender",
+            os.path.expanduser("~/blender-4.2/blender"),
+            "/home/ubuntu/opt/blender/blender",
+            os.path.expanduser("~/opt/blender/blender"),
+            "/opt/blender/blender",
+            "/usr/local/blender/blender",
+        ]
+        for p in opt_paths:
+            if os.path.exists(p) and os.path.isfile(p):
+                return p
+
+        # 3. Standard PATH lookup
         for name in ("blender", "blender.exe", "blender-launcher", "blender-launcher.exe"):
             which_blender = shutil.which(name)
             if which_blender:

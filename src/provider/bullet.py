@@ -46,11 +46,18 @@ def get_bullet_link_names(body_id: Optional[int], physics_client: Optional[int])
 class BulletStateTracker:
     """Helper class to track and query PyBullet body and particle states efficiently."""
 
-    def __init__(self, body_id: int, physics_client: int, label_to_link_idx: dict[str, int]):
+    def __init__(
+        self,
+        body_id: int,
+        physics_client: int,
+        label_to_link_idx: dict[str, int],
+        step_stride: int = 4,
+    ):
         """Initialize the Tracker."""
         self.body_id = body_id
         self.physics_client = physics_client
         self.label_to_link_idx = label_to_link_idx
+        self.step_stride = step_stride
         self.particle_body_ids: list[int] = []
         self.particle_colors: list[list[float]] = []
         self.particle_radii: list[float] = []
@@ -160,6 +167,7 @@ class Bullet:
         self.save_mp4 = save_mp4
         self.view_from = view_from
         self.fps = fps
+        self.step_stride = max(1, 240 // self.fps) if self.fps > 0 else 1
         self.resolution = resolution
         self.samples = samples
         self.rerun_port = rerun_port
@@ -524,7 +532,9 @@ class Bullet:
                     raise RuntimeError("PyBullet failed to load the URDF.")
 
                 label_to_link_idx = self._init_simulation_objects(physics_client, body_id, proj_dir, urdf_path)
-                state_tracker = BulletStateTracker(body_id, physics_client, label_to_link_idx)
+                state_tracker = BulletStateTracker(
+                    body_id, physics_client, label_to_link_idx, step_stride=self.step_stride
+                )
 
                 # Parse boundaries metadata
                 boundaries_metadata = {}
@@ -600,7 +610,9 @@ class Bullet:
                             self.logger.print(f"Simulation terminated: {res}", symbol="🛑")
                             terminated = True
 
-                    if is_logging_enabled:
+                    is_frame_step = step_idx % self.step_stride == 0
+
+                    if is_logging_enabled and is_frame_step:
                         state_tracker.update_state()
                         if self.save_mp4:
                             if state_tracker.fluid_bodies is not None:
@@ -612,7 +624,7 @@ class Bullet:
                     if not terminated:
                         p.stepSimulation(physicsClientId=physics_client)
 
-                    if log_queue is not None:
+                    if log_queue is not None and is_frame_step:
                         try:
                             log_queue.put_nowait(
                                 (
@@ -647,6 +659,29 @@ class Bullet:
                             )
 
                     if terminated:
+                        if is_logging_enabled and not is_frame_step:
+                            state_tracker.update_state()
+                            if self.save_mp4:
+                                if state_tracker.fluid_bodies is not None:
+                                    frame_fluid_bodies.append(list(state_tracker.fluid_bodies))
+                                elif state_tracker.water_meshes is not None:
+                                    frame_water_meshes.append(dict(state_tracker.water_meshes))
+                                frame_transforms.append(dict(state_tracker.transforms))
+                            if log_queue is not None:
+                                try:
+                                    log_queue.put_nowait(
+                                        (
+                                            state_tracker.transforms,
+                                            state_tracker.particle_positions,
+                                            state_tracker.particle_colors,
+                                            state_tracker.particle_radii,
+                                            state_tracker.boundary_voxels,
+                                            state_tracker.water_meshes,
+                                            step_idx,
+                                        )
+                                    )
+                                except queue.Full:
+                                    pass
                         break
 
                 if log_queue is not None and log_thread is not None:
