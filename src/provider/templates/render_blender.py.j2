@@ -1,0 +1,559 @@
+import bpy
+import json
+import math
+import os
+import sys
+import traceback
+import mathutils
+import numpy as np
+
+try:
+    with open(r"{{ scene_data_path }}", "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    # Clear default scene
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    scene = bpy.context.scene
+
+    # Configure Render Engine & Resolution
+    engine_name = "{{ engine }}".upper()
+    if "EEVEE" in engine_name:
+        scene.render.engine = "BLENDER_EEVEE"
+    elif "CYCLES" in engine_name:
+        scene.render.engine = "CYCLES"
+    elif "WORKBENCH" in engine_name:
+        scene.render.engine = "BLENDER_WORKBENCH"
+    else:
+        scene.render.engine = "BLENDER_EEVEE"
+
+    scene.render.resolution_x = {{ resolution_x }}
+    scene.render.resolution_y = {{ resolution_y }}
+    scene.render.resolution_percentage = 100
+    scene.render.fps = {{ fps }}
+
+    # Configure Cycles / EEVEE Quality & Raytracing
+    if hasattr(scene, "eevee"):
+        if hasattr(scene.eevee, "taa_render_samples"):
+            scene.eevee.taa_render_samples = {{ samples }}
+        if hasattr(scene.eevee, "use_raytracing"):
+            scene.eevee.use_raytracing = True
+        if hasattr(scene.eevee, "use_fast_gi"):
+            scene.eevee.use_fast_gi = True
+    if hasattr(scene, "cycles"):
+        scene.cycles.samples = {{ samples }}
+        cycles_addon = bpy.context.preferences.addons.get("cycles")
+        if cycles_addon:
+            cprefs = cycles_addon.preferences
+            device_types = [item[0] for item in cprefs.get_device_types(bpy.context)]
+            for dev_type in ("OPTIX", "CUDA", "METAL"):
+                if dev_type in device_types:
+                    cprefs.compute_device_type = dev_type
+                    cprefs.get_devices()
+                    gpu_devices = [d for d in cprefs.devices if d.type == dev_type]
+                    if gpu_devices:
+                        for d in cprefs.devices:
+                            d.use = (d.type == dev_type)
+                        scene.cycles.device = "GPU"
+                        break
+
+        # Configure OptiX / OpenImageDenoise AI Denoising
+        if hasattr(scene.cycles, "use_denoising"):
+            scene.cycles.use_denoising = True
+            if hasattr(scene.cycles, "denoising_use_gpu"):
+                scene.cycles.denoising_use_gpu = True
+            if hasattr(scene.cycles, "denoiser") and "denoiser" in scene.cycles.bl_rna.properties:
+                denoiser_props = [item.identifier for item in scene.cycles.bl_rna.properties["denoiser"].enum_items]
+                if "OPTIX" in denoiser_props and cycles_addon and cycles_addon.preferences.compute_device_type == "OPTIX":
+                    scene.cycles.denoiser = "OPTIX"
+                elif "OPENIMAGEDENOISE" in denoiser_props:
+                    scene.cycles.denoiser = "OPENIMAGEDENOISE"
+            if hasattr(scene.cycles, "denoising_input_passes") and "denoising_input_passes" in scene.cycles.bl_rna.properties:
+                pass_props = [item.identifier for item in scene.cycles.bl_rna.properties["denoising_input_passes"].enum_items]
+                if "RGB_ALBEDO_NORMAL" in pass_props:
+                    scene.cycles.denoising_input_passes = "RGB_ALBEDO_NORMAL"
+            if hasattr(scene.cycles, "denoising_prefilter") and "denoising_prefilter" in scene.cycles.bl_rna.properties:
+                scene.cycles.denoising_prefilter = "ACCURATE"
+
+        # Optimize Ray Tree Depth, Light Clamping, and Caustics for High-Quality Anti-Flicker Raytracing
+        if hasattr(scene.cycles, "max_bounces"):
+            scene.cycles.max_bounces = 8
+        if hasattr(scene.cycles, "diffuse_bounces"):
+            scene.cycles.diffuse_bounces = 2
+        if hasattr(scene.cycles, "glossy_bounces"):
+            scene.cycles.glossy_bounces = 4
+        if hasattr(scene.cycles, "transmission_bounces"):
+            scene.cycles.transmission_bounces = 6
+        if hasattr(scene.cycles, "transparent_max_bounces"):
+            scene.cycles.transparent_max_bounces = 6
+        if hasattr(scene.cycles, "volume_bounces"):
+            scene.cycles.volume_bounces = 0
+        if hasattr(scene.cycles, "sample_clamp_indirect"):
+            scene.cycles.sample_clamp_indirect = 3.0
+        if hasattr(scene.cycles, "blur_glossy"):
+            scene.cycles.blur_glossy = 1.0
+        if hasattr(scene.cycles, "caustics_reflective"):
+            scene.cycles.caustics_reflective = False
+        if hasattr(scene.cycles, "caustics_refractive"):
+            scene.cycles.caustics_refractive = False
+        if hasattr(scene.cycles, "use_adaptive_sampling"):
+            scene.cycles.use_adaptive_sampling = True
+            if hasattr(scene.cycles, "adaptive_threshold"):
+                scene.cycles.adaptive_threshold = 0.010
+            if hasattr(scene.cycles, "adaptive_min_samples"):
+                scene.cycles.adaptive_min_samples = 8
+
+        # Configure Micro-Polygon Dicing (Cycles Adaptive Subdivision)
+{% if use_micro_polygon_dicing %}
+        scene.cycles.feature_set = "EXPERIMENTAL"
+        if hasattr(scene.cycles, "dicing_rate"):
+            scene.cycles.dicing_rate = {{ dicing_rate }}
+        if hasattr(scene.cycles, "max_subdivisions"):
+            scene.cycles.max_subdivisions = 16
+{% endif %}
+
+    # World & Background Lighting (Neutral daylight studio dome)
+    world = bpy.data.worlds.new("StudioWorld")
+    scene.world = world
+    world.use_nodes = True
+    bg_node = world.node_tree.nodes.get("Background")
+    if bg_node:
+        bg_node.inputs["Color"].default_value = ({{ background_color[0] }}, {{ background_color[1] }}, {{ background_color[2] }}, 1.0)
+        bg_node.inputs["Strength"].default_value = 0.30
+
+    # Color Management (Use AgX or Filmic transform to prevent blown-out highlights)
+    if hasattr(scene, "view_settings"):
+        view_transforms = [item.identifier for item in scene.view_settings.bl_rna.properties["view_transform"].enum_items]
+        if "AgX" in view_transforms:
+            scene.view_settings.view_transform = "AgX"
+        elif "Filmic" in view_transforms:
+            scene.view_settings.view_transform = "Filmic"
+        else:
+            scene.view_settings.view_transform = "Standard"
+        if hasattr(scene.view_settings, "look"):
+            scene.view_settings.look = "None"
+
+    # Screen-Space Fluid Rendering (SSFR) Compositor Pipeline
+{% if use_ssfr %}
+    if hasattr(scene, "view_layers"):
+        for vl in scene.view_layers:
+            vl.use_pass_z = True
+            vl.use_pass_normal = True
+
+    comp_tree = None
+    comp_out = None
+    if hasattr(scene, "compositing_node_group"):
+        comp_tree = bpy.data.node_groups.new("SSFR_Compositor", "CompositorNodeTree")
+        scene.compositing_node_group = comp_tree
+        comp_tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+        comp_out = comp_tree.nodes.new("NodeGroupOutput")
+    elif hasattr(scene, "node_tree"):
+        scene.use_nodes = True
+        comp_tree = scene.node_tree
+        comp_out = comp_tree.nodes.get("Composite") or comp_tree.nodes.new("CompositorNodeComposite")
+
+    if comp_tree and comp_out:
+        rl_node = comp_tree.nodes.get("Render Layers") or comp_tree.nodes.new("CompositorNodeRLayers")
+        if hasattr(bpy.types, "CompositorNodeBilateralblur"):
+            b_blur = comp_tree.nodes.new("CompositorNodeBilateralblur")
+            if hasattr(b_blur, "iterations"):
+                b_blur.iterations = 1
+            elif "Iterations" in b_blur.inputs:
+                b_blur.inputs["Iterations"].default_value = 1
+            if hasattr(b_blur, "sigma_color"):
+                b_blur.sigma_color = 0.05
+            elif "Color Sigma" in b_blur.inputs:
+                b_blur.inputs["Color Sigma"].default_value = 0.05
+            if hasattr(b_blur, "sigma_space"):
+                b_blur.sigma_space = 1.0
+            elif "Space Sigma" in b_blur.inputs:
+                b_blur.inputs["Space Sigma"].default_value = 1.0
+
+            img_out = rl_node.outputs.get("Image")
+            det_out = rl_node.outputs.get("Depth") or rl_node.outputs.get("Z")
+            img_in = b_blur.inputs.get("Image")
+            det_in = b_blur.inputs.get("Determinator")
+            if img_out and img_in:
+                comp_tree.links.new(img_out, img_in)
+            if det_out and det_in:
+                comp_tree.links.new(det_out, det_in)
+
+            b_blur_out = b_blur.outputs.get("Image")
+            comp_in = comp_out.inputs.get("Image")
+            if b_blur_out and comp_in:
+                comp_tree.links.new(b_blur_out, comp_in)
+        elif hasattr(bpy.types, "CompositorNodeBlur"):
+            blur_node = comp_tree.nodes.new("CompositorNodeBlur")
+            blur_node.size_x = 2
+            blur_node.size_y = 2
+            img_out = rl_node.outputs.get("Image")
+            blur_in = blur_node.inputs.get("Image")
+            blur_out = blur_node.outputs.get("Image")
+            comp_in = comp_out.inputs.get("Image")
+            if img_out and blur_in:
+                comp_tree.links.new(img_out, blur_in)
+            if blur_out and comp_in:
+                comp_tree.links.new(blur_out, comp_in)
+        else:
+            img_out = rl_node.outputs.get("Image")
+            comp_in = comp_out.inputs.get("Image")
+            if img_out and comp_in:
+                comp_tree.links.new(img_out, comp_in)
+{% endif %}
+
+    # 1. 3-Point Studio Lighting Setup (6500K Daylight, Soft Diffused Studio Lights)
+    c_target = mathutils.Vector(manifest.get("center", [0.0, 0.0, 0.06]))
+
+    # Key Light (Warm daylight studio softbox)
+    key_light_data = bpy.data.lights.new("KeyLight", type="AREA")
+    key_light_data.energy = 28.0
+    key_light_data.size = 0.8
+    key_light_data.color = (1.0, 0.98, 0.95)
+    key_light_obj = bpy.data.objects.new("KeyLight", key_light_data)
+    scene.collection.objects.link(key_light_obj)
+    key_light_obj.location = (c_target.x + 0.45, c_target.y - 0.50, c_target.z + 0.55)
+    dir_key = c_target - key_light_obj.location
+    key_light_obj.rotation_euler = dir_key.to_track_quat("-Z", "Y").to_euler()
+
+    # Fill Light (Cool daylight softbox)
+    fill_light_data = bpy.data.lights.new("FillLight", type="AREA")
+    fill_light_data.energy = 12.0
+    fill_light_data.size = 0.8
+    fill_light_data.color = (0.95, 0.98, 1.0)
+    fill_light_obj = bpy.data.objects.new("FillLight", fill_light_data)
+    scene.collection.objects.link(fill_light_obj)
+    fill_light_obj.location = (c_target.x - 0.50, c_target.y - 0.40, c_target.z + 0.45)
+    dir_fill = c_target - fill_light_obj.location
+    fill_light_obj.rotation_euler = dir_fill.to_track_quat("-Z", "Y").to_euler()
+
+    # Rim Light (Top-Back Daylight Accent for edge refraction and fluid highlights)
+    rim_light_data = bpy.data.lights.new("RimLight", type="AREA")
+    rim_light_data.energy = 18.0
+    rim_light_data.size = 0.6
+    rim_light_data.color = (1.0, 1.0, 1.0)
+    rim_light_obj = bpy.data.objects.new("RimLight", rim_light_data)
+    scene.collection.objects.link(rim_light_obj)
+    rim_light_obj.location = (c_target.x, c_target.y + 0.50, c_target.z + 0.55)
+    dir_rim = c_target - rim_light_obj.location
+    rim_light_obj.rotation_euler = dir_rim.to_track_quat("-Z", "Y").to_euler()
+
+    # Studio Floor Pedestal (Dark slate for contrast with translucent water & resin)
+    c_center = manifest.get("center", [0.0, 0.0, 0.06])
+    bpy.ops.mesh.primitive_cylinder_add(
+        radius=2.5,
+        depth=0.004,
+        location=(c_center[0], c_center[1], -0.002),
+    )
+    floor_obj = bpy.context.active_object
+    floor_obj.name = "StudioPedestal"
+    floor_mat = bpy.data.materials.new(name="Mat_Pedestal")
+    floor_mat.use_nodes = True
+    floor_bsdf = floor_mat.node_tree.nodes.get("Principled BSDF")
+    if floor_bsdf:
+        floor_bsdf.inputs["Base Color"].default_value = (0.18, 0.20, 0.24, 1.0)
+        floor_bsdf.inputs["Roughness"].default_value = 0.40
+        if "Specular IOR Level" in floor_bsdf.inputs:
+            floor_bsdf.inputs["Specular IOR Level"].default_value = 0.20
+    floor_obj.data.materials.append(floor_mat)
+
+    # 2. Camera Setup
+    cam_meta = manifest["camera"]
+    cam_data = bpy.data.cameras.new("Camera")
+    cam_data.lens = cam_meta.get("focal_length", 50.0)
+    cam_obj = bpy.data.objects.new("Camera", cam_data)
+    scene.collection.objects.link(cam_obj)
+    scene.camera = cam_obj
+
+    cam_loc = mathutils.Vector(cam_meta["location"])
+    target_loc = mathutils.Vector(cam_meta["target"])
+    cam_obj.location = cam_loc
+    dir_cam = target_loc - cam_loc
+    cam_obj.rotation_euler = dir_cam.to_track_quat("-Z", "Y").to_euler()
+
+    # Helper for importing OBJ with upright +Z axis
+    def import_obj_file(filepath):
+        if hasattr(bpy.ops.wm, "obj_import"):
+            bpy.ops.wm.obj_import(filepath=filepath, forward_axis="Y", up_axis="Z")
+        else:
+            bpy.ops.import_scene.obj(filepath=filepath, axis_forward="Y", axis_up="Z")
+
+    def find_socket(collection, name):
+        for s in collection:
+            if s.name == name or getattr(s, "identifier", None) == name:
+                return s
+        return None
+
+    # Helper for loading dynamic water objects (Geometry Nodes Points-to-Volume, NPZ Meshes, or OBJ)
+    def load_water_objects(filepath, mat):
+        if filepath.endswith(".npz"):
+            npz_data = np.load(filepath)
+            if "points" in npz_data:
+                pts = npz_data["points"].tolist()
+                w_mesh = bpy.data.meshes.new("water_points_mesh")
+                w_mesh.from_pydata(pts, [], [])
+                w_mesh.update()
+                w_obj = bpy.data.objects.new("water", w_mesh)
+                scene.collection.objects.link(w_obj)
+
+                # Reconstruct smooth liquid surface via Blender Geometry Nodes (Points -> Volume -> Mesh)
+                mod = w_obj.modifiers.new(name="FluidGeometryNodes", type="NODES")
+                gn_tree = bpy.data.node_groups.new(name="FluidReconstructTree", type="GeometryNodeTree")
+                mod.node_group = gn_tree
+                if hasattr(gn_tree, "interface"):
+                    gn_tree.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+                    gn_tree.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+
+                in_node = gn_tree.nodes.new("NodeGroupInput")
+                out_node = gn_tree.nodes.new("NodeGroupOutput")
+                p2v = gn_tree.nodes.new("GeometryNodePointsToVolume")
+                v2m = gn_tree.nodes.new("GeometryNodeVolumeToMesh")
+                smooth = gn_tree.nodes.new("GeometryNodeSetShadeSmooth")
+                set_mat = gn_tree.nodes.new("GeometryNodeSetMaterial")
+
+                p2v_voxel = find_socket(p2v.inputs, "Voxel Size")
+                if p2v_voxel:
+                    p2v_voxel.default_value = {{ fluid_voxel_size }}
+                p2v_radius = find_socket(p2v.inputs, "Radius")
+                if p2v_radius:
+                    p2v_radius.default_value = {{ fluid_point_radius }}
+                v2m_thresh = find_socket(v2m.inputs, "Threshold")
+                if v2m_thresh:
+                    v2m_thresh.default_value = 0.08
+                v2m_adapt = find_socket(v2m.inputs, "Adaptivity")
+                if v2m_adapt:
+                    v2m_adapt.default_value = 0.05
+                set_mat_slot = find_socket(set_mat.inputs, "Material")
+                if set_mat_slot:
+                    set_mat_slot.default_value = mat
+
+                in_geom = find_socket(in_node.outputs, "Geometry")
+                p2v_pts = find_socket(p2v.inputs, "Points")
+                p2v_vol = find_socket(p2v.outputs, "Volume")
+                v2m_vol = find_socket(v2m.inputs, "Volume")
+                v2m_mesh = find_socket(v2m.outputs, "Mesh")
+                smooth_in = find_socket(smooth.inputs, "Geometry")
+                smooth_out = find_socket(smooth.outputs, "Geometry")
+                set_mat_in = find_socket(set_mat.inputs, "Geometry")
+                set_mat_out = find_socket(set_mat.outputs, "Geometry")
+                out_geom = find_socket(out_node.inputs, "Geometry")
+
+                if in_geom and p2v_pts:
+                    gn_tree.links.new(in_geom, p2v_pts)
+                if p2v_vol and v2m_vol:
+                    gn_tree.links.new(p2v_vol, v2m_vol)
+                if v2m_mesh and smooth_in:
+                    gn_tree.links.new(v2m_mesh, smooth_in)
+                if smooth_out and set_mat_in:
+                    gn_tree.links.new(smooth_out, set_mat_in)
+                if set_mat_out and out_geom:
+                    gn_tree.links.new(set_mat_out, out_geom)
+
+{% if use_micro_polygon_dicing %}
+                sub = w_obj.modifiers.new("Subsurf", "SUBSURF")
+                if hasattr(w_obj, "cycles") and hasattr(w_obj.cycles, "use_adaptive_subdivision"):
+                    w_obj.cycles.use_adaptive_subdivision = True
+                if hasattr(sub, "use_adaptive_subdivision"):
+                    sub.use_adaptive_subdivision = True
+                    sub.adaptive_pixel_size = {{ dicing_rate }}
+{% endif %}
+                return [w_obj]
+            elif "verts" in npz_data and "faces" in npz_data:
+                verts = npz_data["verts"].tolist()
+                faces = npz_data["faces"].tolist()
+                w_mesh = bpy.data.meshes.new("water_mesh")
+                w_mesh.from_pydata(verts, [], faces)
+                w_mesh.update()
+                for poly in w_mesh.polygons:
+                    poly.use_smooth = True
+                w_mesh.materials.append(mat)
+                w_obj = bpy.data.objects.new("water", w_mesh)
+                scene.collection.objects.link(w_obj)
+{% if use_micro_polygon_dicing %}
+                sub = w_obj.modifiers.new("Subsurf", "SUBSURF")
+                if hasattr(w_obj, "cycles") and hasattr(w_obj.cycles, "use_adaptive_subdivision"):
+                    w_obj.cycles.use_adaptive_subdivision = True
+                if hasattr(sub, "use_adaptive_subdivision"):
+                    sub.use_adaptive_subdivision = True
+                    sub.adaptive_pixel_size = {{ dicing_rate }}
+{% endif %}
+                return [w_obj]
+        else:
+            bpy.ops.object.select_all(action="DESELECT")
+            import_obj_file(filepath)
+            objs = []
+            for w_obj in bpy.context.selected_objects:
+                if hasattr(w_obj.data, "polygons"):
+                    for poly in w_obj.data.polygons:
+                        poly.use_smooth = True
+                w_obj.data.materials.clear()
+                w_obj.data.materials.append(mat)
+{% if use_micro_polygon_dicing %}
+                sub = w_obj.modifiers.new("Subsurf", "SUBSURF")
+                if hasattr(w_obj, "cycles") and hasattr(w_obj.cycles, "use_adaptive_subdivision"):
+                    w_obj.cycles.use_adaptive_subdivision = True
+                if hasattr(sub, "use_adaptive_subdivision"):
+                    sub.use_adaptive_subdivision = True
+                    sub.adaptive_pixel_size = {{ dicing_rate }}
+{% endif %}
+                objs.append(w_obj)
+            return objs
+
+    # 3. Material Generators
+    def get_or_create_material(item):
+        name = item["name"]
+        mat_name = f"Mat_{name}"
+        if mat_name in bpy.data.materials:
+            return bpy.data.materials[mat_name]
+
+        mat = bpy.data.materials.new(name=mat_name)
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        bsdf = nodes.get("Principled BSDF")
+        if not bsdf:
+            return mat
+
+        rgba = item.get("rgba", [0.8, 0.8, 0.8, 1.0])
+        roughness = item.get("roughness", 0.30)
+        ior = item.get("ior", 1.49)
+        transmission = item.get("transmission", 0.0)
+        metallic = item.get("metallic", 0.0)
+        specular = item.get("specular", 0.50)
+        alpha_val = rgba[3] if len(rgba) > 3 else 1.0
+
+        bsdf.inputs["Base Color"].default_value = (rgba[0], rgba[1], rgba[2], 1.0)
+        bsdf.inputs["Roughness"].default_value = roughness
+        bsdf.inputs["IOR"].default_value = ior
+        bsdf.inputs["Metallic"].default_value = metallic
+
+        if "Transmission Weight" in bsdf.inputs:
+            bsdf.inputs["Transmission Weight"].default_value = transmission
+        elif "Transmission" in bsdf.inputs:
+            bsdf.inputs["Transmission"].default_value = transmission
+
+        if "Specular IOR Level" in bsdf.inputs:
+            bsdf.inputs["Specular IOR Level"].default_value = specular
+        elif "Specular" in bsdf.inputs:
+            bsdf.inputs["Specular"].default_value = specular
+
+        if "Alpha" in bsdf.inputs:
+            bsdf.inputs["Alpha"].default_value = 1.0 if transmission > 0.5 else alpha_val
+
+        # Enable EEVEE and raytraced refraction settings for translucent materials
+        if transmission > 0.0 or alpha_val < 1.0:
+            if hasattr(mat, "use_screen_refraction"):
+                mat.use_screen_refraction = True
+            if hasattr(mat, "use_raytrace_refraction"):
+                mat.use_raytrace_refraction = True
+            if hasattr(mat, "use_transparent_shadow"):
+                mat.use_transparent_shadow = True
+            if hasattr(mat, "surface_render_method"):
+                mat.surface_render_method = "BLENDED"
+            if hasattr(mat, "blend_method"):
+                mat.blend_method = "BLEND" if alpha_val < 1.0 else "OPAQUE"
+            if hasattr(mat, "shadow_method"):
+                mat.shadow_method = "HASHED"
+
+        return mat
+
+    # 4. Import Base CAD Objects
+    imported_objects = {}
+    for item in manifest["items"]:
+        f_path = item["file"]
+        if not os.path.exists(f_path):
+            continue
+        # Deselect prior objects
+        bpy.ops.object.select_all(action="DESELECT")
+        import_obj_file(f_path)
+
+        mat = get_or_create_material(item)
+
+        for obj in bpy.context.selected_objects:
+            obj.name = item["name"]
+            obj.rotation_mode = "QUATERNION"
+            scale_factor = item.get("scale", 1.0)
+            if abs(scale_factor - 1.0) > 1e-6:
+                obj.scale = (scale_factor, scale_factor, scale_factor)
+                bpy.context.view_layer.objects.active = obj
+                bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+            if hasattr(obj.data, "polygons"):
+                for poly in obj.data.polygons:
+                    poly.use_smooth = True
+
+            obj.data.materials.clear()
+            obj.data.materials.append(mat)
+            imported_objects[item["name"]] = obj
+
+    # 5. Render execution
+    output_target = r"{{ output_path }}"
+    scene.render.filepath = output_target
+
+{% if is_animation %}
+    tot_f = {{ total_frames }}
+    scene.frame_start = 0
+    scene.frame_end = tot_f - 1
+
+    is_turntable = manifest.get("turntable", True)
+    t_center = mathutils.Vector(manifest["center"])
+    orig_cam_loc = mathutils.Vector(manifest["camera"]["location"])
+    delta = orig_cam_loc - t_center
+    r_xy = math.sqrt(delta.x**2 + delta.y**2)
+    elev_z = delta.z
+    start_angle = math.atan2(delta.x, -delta.y)
+
+    frames_data = manifest.get("frames", [])
+
+    for f_idx in range(tot_f):
+        scene.frame_set(f_idx)
+
+        # Update camera position if turntable is active
+        if is_turntable:
+            turntable_period_frames = max({{ fps }} * 20.0, 1.0)
+            theta = start_angle + (2.0 * math.pi * f_idx) / turntable_period_frames
+            cam_obj.location = (
+                t_center.x + r_xy * math.sin(theta),
+                t_center.y - r_xy * math.cos(theta),
+                t_center.z + elev_z,
+            )
+            dir_c = t_center - cam_obj.location
+            cam_obj.rotation_euler = dir_c.to_track_quat("-Z", "Y").to_euler()
+
+        current_water_objs = []
+        if f_idx < len(frames_data):
+            frame_info = frames_data[f_idx]
+
+            # Add dynamic water objects for this frame
+            for w_item in frame_info.get("water_items", []):
+                w_path = w_item["file"]
+                if os.path.exists(w_path):
+                    w_mat = get_or_create_material(w_item)
+                    w_objs = load_water_objects(w_path, w_mat)
+                    current_water_objs.extend(w_objs)
+
+            # Apply rigid transforms if present
+            for link_name, (pos, orn) in frame_info.get("transforms", {}).items():
+                if link_name in imported_objects:
+                    obj = imported_objects[link_name]
+                    obj.rotation_mode = "QUATERNION"
+                    obj.location = mathutils.Vector(pos)
+                    obj.rotation_quaternion = mathutils.Quaternion((orn[3], orn[0], orn[1], orn[2]))
+
+        scene.render.filepath = output_target.replace("####", f"{f_idx:05d}")
+        bpy.ops.render.render(write_still=True)
+
+        # Clean up transient water objects, underlying mesh data, and transient node groups
+        for w_obj in current_water_objs:
+            w_mesh = w_obj.data
+            bpy.data.objects.remove(w_obj, do_unlink=True)
+            if w_mesh:
+                bpy.data.meshes.remove(w_mesh, do_unlink=True)
+        for ng in list(bpy.data.node_groups):
+            if ng.name.startswith("FluidReconstructTree"):
+                bpy.data.node_groups.remove(ng, do_unlink=True)
+{% else %}
+    bpy.ops.render.render(write_still=True)
+{% endif %}
+
+    print("✅ Blender render execution completed successfully.")
+except Exception:
+    traceback.print_exc()
+    sys.exit(1)

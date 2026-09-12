@@ -1501,3 +1501,48 @@ def test_voxel_masks_consistent_with_surface_bounds():
     assert processed.b_params[2, BoundaryParam.DRAIN_INFLUENCE_RADIUS] == lid_surf.drain_influence_radius
     assert processed.b_params[2, BoundaryParam.DRAIN_EDGE_R_MIN] == lid_surf.drain_edge_r_min
     assert processed.b_params[2, BoundaryParam.DRAIN_EDGE_R_MAX] == lid_surf.drain_edge_r_max
+
+
+def test_canopy_ceiling_ccd_containment():
+    """Verify that particles rising inside a canopy boundary do not breach the inner ceiling.
+
+    Regression test for mid-air hovering fluid particles escaping through canopy ceiling.
+    """
+    import jax.numpy as jnp
+    from provider.fluid import _ccd_sphere_obstacle_boundary
+
+    sph_pos = jnp.array([0.0, 0.0, 0.100])
+    sph_radius = 0.015
+    sph_thickness = 0.003
+    r_inner = sph_radius - sph_thickness  # 0.012 m
+
+    # Test particles rising across 360-degree radial angles and multiple elevations:
+    angles = jnp.linspace(0.0, 2.0 * jnp.pi, 8, endpoint=False)
+    r_vals = jnp.linspace(0.001, r_inner + 0.002, 12)
+    pos_curr_list = []
+    pos_next_list = []
+    vel_next_list = []
+    for theta in angles:
+        cos_t, sin_t = float(jnp.cos(theta)), float(jnp.sin(theta))
+        for r in r_vals:
+            # Rising upward toward and past inner ceiling
+            pos_curr_list.append([r * cos_t, r * sin_t, 0.100 + 0.5 * float(r_inner)])
+            pos_next_list.append([r * cos_t, r * sin_t, 0.100 + float(r_inner) + 0.003])
+            vel_next_list.append([0.0, 0.0, 1.2])
+
+    pos_curr = jnp.array(pos_curr_list, dtype=jnp.float32)
+    pos_next = jnp.array(pos_next_list, dtype=jnp.float32)
+    vel_next = jnp.array(vel_next_list, dtype=jnp.float32)
+
+    pos_out, vel_out = _ccd_sphere_obstacle_boundary(pos_curr, pos_next, vel_next, sph_radius, sph_pos, sph_thickness)
+
+    # Invariant 1: No particle rising inside the dome may breach the inner ceiling into mid-air
+    dist_out = jnp.linalg.norm(pos_out - sph_pos, axis=-1)
+    assert jnp.all(dist_out <= r_inner + 1e-4), f"Canopy ceiling breached: max dist {jnp.max(dist_out)} > {r_inner}"
+
+    # Invariant 2: Particles hitting the ceiling must be deflected downward along the canopy curve
+    assert jnp.all(vel_out[:, 2] <= 0.0), f"Canopy deflection vertical velocity must be downward: {vel_out[:, 2]}"
+    # Invariant 3: Deflected particles must maintain outward radial momentum to emerge through side slots
+    r_xy_out = jnp.sqrt(pos_out[:, 0] ** 2 + pos_out[:, 1] ** 2)
+    v_radial = (pos_out[:, 0] * vel_out[:, 0] + pos_out[:, 1] * vel_out[:, 1]) / jnp.maximum(r_xy_out, 1e-6)
+    assert jnp.all(v_radial >= 0.0), f"Canopy deflection must direct particles radially outward: {v_radial}"

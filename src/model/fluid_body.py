@@ -39,6 +39,7 @@ class FluidBody(BaseModel):
     velocity: tuple[float, float, float] = Field(default=(0.0, 0.0, 0.0), description="Mean 3D velocity vector (m/s).")
     volume: float = Field(default=0.0, description="Physical fluid volume of the body in cubic meters.")
     particle_count: int = Field(default=0, description="Total number of particles in this fluid body.")
+    urdf_material: str = Field(default="water", description="URDF material name for physics and rendering.")
 
     def move(self, displacement: tuple[float, float, float] | np.ndarray) -> None:
         """Translate the fluid body bounding geometry and centroid by a 3D displacement vector.
