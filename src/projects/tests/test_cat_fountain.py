@@ -914,6 +914,66 @@ class TestCatFountainProvider:
         # 4. Ensure drive hub is a single connected solid
         assert len(solid.solids()) == 1, "Drive hub is split into disconnected parts!"
 
+    def test_drive_hub_standoff_thrust_ring(self, provider):
+        """Verify that the drive hub has an integral standoff thrust ring on the top face facing the impeller."""
+        hub = provider.build_drive_hub("drive_hub")
+        solid = hub.part
+
+        hub_h = provider.settings.magnet_thickness + provider.settings.magnet_clearance + 1.5
+        standoff_r = provider.settings.drive_hub_standoff_radius
+        standoff_h = provider.settings.drive_hub_standoff_height
+        assert standoff_h > 0.0, "Expected positive standoff height"
+        assert standoff_r > 0.0, "Expected positive standoff radius"
+
+        # Point inside the standoff annular ring at Z = hub_h + standoff_h / 2.0 must be solid
+        test_r = (standoff_r + 0.78) / 2.0
+        z_mid = hub_h + standoff_h / 2.0
+        assert solid.is_inside((test_r, 0.0, z_mid)), "Standoff annular ring is missing or hollow!"
+
+        # Point outside standoff radius at Z = hub_h + standoff_h / 2.0 must be empty space
+        assert not solid.is_inside((standoff_r + 2.0, 0.0, z_mid)), "Standoff ring is unexpectedly wide!"
+
+        # Central shaft hole at Z = hub_h + standoff_h / 2.0 must be open
+        assert not solid.is_inside((0.0, 0.0, z_mid)), "Shaft hole does not extend through standoff ring!"
+
+        # Ensure single contiguous solid
+        assert len(solid.solids()) == 1, "Drive hub is split into disconnected parts!"
+
+    def test_bottom_cover_rubber_feet_depressions(self, provider):
+        """Verify that the bottom cover has recessed depressions for adhesive rubber feet."""
+        import math
+
+        cover = provider.build_bottom_cover("bottom_cover")
+        solid = cover.part
+
+        feet_count = provider.settings.rubber_feet_count
+        feet_r = provider.settings.rubber_feet_radius
+        feet_d = provider.settings.rubber_feet_depth
+        pitch_r = provider.settings.rubber_feet_pitch_radius
+
+        assert feet_count == 4, f"Expected 4 rubber feet depressions, got {feet_count}"
+        assert feet_r > 0.0, "Expected positive rubber feet radius"
+        assert feet_d > 0.0, "Expected positive rubber feet depth"
+
+        for i in range(feet_count):
+            angle_deg = (i * 360.0 / feet_count) + 45.0
+            rad = math.radians(angle_deg)
+            fx = pitch_r * math.cos(rad)
+            fy = pitch_r * math.sin(rad)
+
+            # Center of depression at Z = feet_d / 2.0 must be hollow (subtracted)
+            assert not solid.is_inside((fx, fy, feet_d / 2.0)), (
+                f"Rubber foot depression {i} at ({fx:.1f}, {fy:.1f}) is obstructed!"
+            )
+
+            # Solid material above the depression at Z = feet_d + 1.0 must be solid
+            assert solid.is_inside((fx, fy, feet_d + 1.0)), (
+                f"Material above rubber foot depression {i} at ({fx:.1f}, {fy:.1f}) is broken through!"
+            )
+
+        # Ensure single contiguous solid
+        assert len(solid.solids()) == 1, "Bottom cover is split into disconnected solids!"
+
     def test_bowl_no_floating_solids(self, provider):
         """Verify that the main bowl is a single contiguous solid without internal floating shells."""
         bowl = provider.build_bowl("bowl")
