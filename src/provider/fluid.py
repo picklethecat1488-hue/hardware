@@ -303,7 +303,7 @@ SHAPE_BOX = 2
 SHAPE_PLANE = 3
 SHAPE_IMPELLER = 4
 SHAPE_TUBE = 5
-SHAPE_SPHERE = 6
+SHAPE_CANOPY = 6
 SHAPE_CASING = 7
 
 # Integer identifiers for BoundaryType
@@ -844,15 +844,15 @@ def _make_grid_masks(
         is_plane = shape == SHAPE_PLANE
         is_solid_plane = _grid_mask_plane_jax(zb_loc, thickness)
 
-        # SPHERE
-        is_sphere = shape == SHAPE_SPHERE
-        is_solid_sphere = _grid_mask_sphere_jax(xb_loc**2 + yb_loc**2 + zb_loc**2, radius)
+        # CANOPY
+        is_canopy = shape == SHAPE_CANOPY
+        is_solid_canopy = _grid_mask_sphere_jax(xb_loc**2 + yb_loc**2 + zb_loc**2, radius)
 
         is_solid = jnp.where(is_cyl, is_solid_cyl, jnp.zeros(flat_shape, dtype=jnp.bool_))
         is_solid = jnp.where(is_tube, is_solid_tube, is_solid)
         is_solid = jnp.where(is_casing, is_solid_casing, is_solid)
         is_solid = jnp.where(is_plane, is_solid_plane, is_solid)
-        is_solid = jnp.where(is_sphere, is_solid_sphere, is_solid)
+        is_solid = jnp.where(is_canopy, is_solid_canopy, is_solid)
 
         # Analytical normal vectors for each shape type
         thick = jnp.maximum(thickness, dx)
@@ -908,7 +908,7 @@ def _make_grid_masks(
         norm_base_i = jnp.where(is_tube, tube_norm_base, norm_base_i)
         norm_base_i = jnp.where(is_casing, casing_norm_base, norm_base_i)
         norm_base_i = jnp.where(is_plane, plane_norm_base, norm_base_i)
-        norm_base_i = jnp.where(is_sphere, sphere_norm_base, norm_base_i)
+        norm_base_i = jnp.where(is_canopy, sphere_norm_base, norm_base_i)
 
         normal_grid_flat = jnp.where(is_solid[:, None] & (~is_imp), norm_base_i, normal_grid_flat)
 
@@ -2095,19 +2095,18 @@ def _ccd_sphere_obstacle_boundary(
     n_next = pos_rel_next / dist_next
 
     r_inner = jnp.maximum(sph_radius - sph_thickness, 0.001)
+    r_eff = r_inner - 2e-4
+    r_xy_next = jnp.sqrt(pos_rel_next[:, 0] ** 2 + pos_rel_next[:, 1] ** 2 + 1e-8)
+    n_xy = pos_rel_next[:, :2] / r_xy_next[:, None]
 
     # 1. Internal canopy ceiling collision: particle rising from below/inside attempting to burst through inner ceiling
     is_upper_dome = pos_rel_next[:, 2] > 0.0
     is_rising_in_dome = is_upper_dome & ((pos_rel_curr[:, 2] <= r_inner + 0.002) | (vel_next[:, 2] > 0.0))
-    hitting_canopy_ceiling = is_rising_in_dome & (dist_next[:, 0] >= r_inner - 1e-4)
+    hitting_canopy_ceiling = is_rising_in_dome & (dist_next[:, 0] >= r_inner - 1e-4) & (r_xy_next < r_eff)
 
     # Deflect into 360-degree radial outward flow along canopy curve through side grating slots
-    r_xy_next = jnp.sqrt(pos_rel_next[:, 0] ** 2 + pos_rel_next[:, 1] ** 2 + 1e-8)
-    n_xy = pos_rel_next[:, :2] / r_xy_next[:, None]
-    r_eff = r_inner - 2e-4
-    r_clamped = jnp.minimum(r_xy_next, r_eff)
-    z_canopy = jnp.sqrt(jnp.maximum(r_eff**2 - r_clamped**2, 0.0))
-    pos_canopy = sph_pos + jnp.concatenate([n_xy * r_clamped[:, None], z_canopy[:, None]], axis=-1)
+    z_canopy = jnp.sqrt(jnp.maximum(r_eff**2 - r_xy_next**2, 0.0))
+    pos_canopy = sph_pos + jnp.concatenate([pos_rel_next[:, :2], z_canopy[:, None]], axis=-1)
 
     v_speed = jnp.sqrt(jnp.sum(vel_next**2, axis=-1, keepdims=True) + 1e-8)
     v_radial_xy = n_xy * jnp.maximum(v_speed * 0.95, 1.10)
@@ -2248,14 +2247,14 @@ def _apply_boundary_ccd_subroutine(
         pos_next = jnp.where(is_pl, pos_pl, pos_next)
         vel_next = jnp.where(is_pl, vel_pl, vel_next)
 
-        # 2. Spherical obstacles (such as the spout deflection dome)
-        is_sph = (shape_k == SHAPE_SPHERE) & (b_types[k] == 0)
-        sph_t = b_params[k, BoundaryParam.THICKNESS]
-        pos_sph, vel_sph = _ccd_sphere_obstacle_boundary(
-            pos_curr, pos_next, vel_next, b_params[k, BoundaryParam.R_OUTER], b_pos_arr[k], sph_t
+        # 2. Spherical obstacles / canopy (such as the spout deflection dome)
+        is_canopy = (shape_k == SHAPE_CANOPY) & (b_types[k] == 0)
+        canopy_t = b_params[k, BoundaryParam.THICKNESS]
+        pos_canopy, vel_canopy = _ccd_sphere_obstacle_boundary(
+            pos_curr, pos_next, vel_next, b_params[k, BoundaryParam.R_OUTER], b_pos_arr[k], canopy_t
         )
-        pos_next = jnp.where(is_sph, pos_sph, pos_next)
-        vel_next = jnp.where(is_sph, vel_sph, vel_next)
+        pos_next = jnp.where(is_canopy, pos_canopy, pos_next)
+        vel_next = jnp.where(is_canopy, vel_canopy, vel_next)
 
         # 3. Solid lid tray drinking shelf (cylinder with drainage hole and tube hole, exposed to air)
         is_submerged_k = b_params[k, BoundaryParam.IS_SUBMERGED] > 0.5
@@ -2428,12 +2427,11 @@ def _integrate_particles_subroutine(
     in_tube = jnp.where(has_tube, in_tube, jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_))
 
     max_ceiling_z = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.MAX_CEILING_Z], base_height)
-    influence_h = jnp.minimum(tube_h + 0.049, max_ceiling_z)
 
     outside_base_raw = (
         (r_local > base_radius)
         | (pos_local_check[:, 2] < cavity_floor_z)
-        | (pos_local_check[:, 2] > max_ceiling_z + 0.005)
+        | (pos_local_check[:, 2] > max_ceiling_z + 0.015)
     ) & (~in_tube)
     outside_base = jnp.where(base_idx != -1, outside_base_raw, jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_))
 
@@ -3092,6 +3090,9 @@ class Fluid:
         self.fallen_out_water_ids = ParticleSet(self.n_particles)
         self.total_fallen_water_ids = ParticleSet(self.n_particles)
         self.state_tracker = state_tracker
+        self.step_idx = 0
+        raw_stride = getattr(state_tracker, "step_stride", None) if state_tracker is not None else None
+        self.step_stride = raw_stride if isinstance(raw_stride, int) else 4
 
         self._cached_active_indices = None
         self._cached_mapper = None
@@ -3147,7 +3148,7 @@ class Fluid:
         if physics_client is not None and body_id is not None and config.boundaries is not None:
             if state_tracker is not None:
                 state_tracker.has_fluid_simulator = True
-                self._update_state_tracker()
+                self._update_state_tracker(force_mesh=True)
 
             self.spawner = FluidSpawner(
                 physics_client=physics_client,
@@ -3362,9 +3363,9 @@ class Fluid:
         z_offset = self.processed_boundaries.cavity_z_offset
         lid_b = self.processed_boundaries.lid
         tube_b = self.processed_boundaries.tube_wall
-        z_lid = lid_b.z_floor if lid_b is not None else self.processed_boundaries.cavity_height
+        z_lid = lid_b.z_floor if lid_b is not None else (z_offset + self.processed_boundaries.cavity_height)
         tube_y = tube_b.pos[1] if tube_b is not None else (lid_b.tube_y if lid_b is not None else 0.0)
-        tube_r = tube_b.inner_radius if tube_b is not None else (lid_b.tube_r if lid_b is not None else 0.0)
+        tube_r = tube_b.r_inner if tube_b is not None else (lid_b.tube_r if lid_b is not None else 0.0)
         return self.fluid_body_tracker.update_bodies(
             self.last_positions,
             self.last_velocities,
@@ -3636,7 +3637,7 @@ class Fluid:
 
             if shape_type == p.GEOM_SPHERE:
                 b_cfg = BoundaryConfig(
-                    shape=ShapeType.SPHERE,
+                    shape=ShapeType.CANOPY,
                     type=BoundaryType.SOLID,
                     radius=radius,
                     xyz=b_pos,
@@ -3657,8 +3658,13 @@ class Fluid:
         max_force: Optional[float] = None,
         motor_power: Optional[float] = None,
         velocity_gain: Optional[float] = None,
+        step_idx: Optional[int] = None,
     ) -> None:
         """Step simulation and manage deactivation."""
+        if step_idx is not None:
+            self.step_idx = step_idx
+        else:
+            self.step_idx += 1
         self.body_id = body_id
         self.physics_client = physics_client
         impeller_b = self.boundaries.get(LinkType.IMPELLER)
@@ -3897,12 +3903,47 @@ class Fluid:
         self._update_state_tracker()
         self.current_sim_time += 1.0 / 240.0
 
-    def _update_state_tracker(self) -> None:
-        """Synchronize particle positions, colors, radii, and boundary voxels to state tracker."""
+    def get_water_meshes(self, bodies: Optional[list[Any]] = None) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+        """Compute watertight 3D triangle meshes for all active dynamic fluid bodies.
+
+        Args:
+            bodies: Optional list of pre-computed FluidBody instances. If None, computes bodies.
+
+        Returns:
+            Dictionary mapping fluid body identifier (e.g. 'pool_1', 'stream_2', 'sheet_3')
+            to a tuple of (vertices_array, faces_array).
+        """
+        if bodies is None:
+            bodies = self.get_fluid_bodies()
+        meshes = {}
+        for body in bodies:
+            if hasattr(body, "to_mesh"):
+                name = getattr(body, "display_name", f"fluid_body_{getattr(body, 'body_id', 0)}")
+                verts, faces = body.to_mesh()
+                if len(verts) > 0 and len(faces) > 0:
+                    meshes[name] = (verts, faces)
+        return meshes
+
+    def _update_state_tracker(self, force_mesh: bool = False) -> None:
+        """Synchronize particle positions, colors, radii, water meshes, and boundary voxels to state tracker."""
         if self.state_tracker is not None:
-            self.state_tracker.particle_positions = self.get_particle_positions()
-            self.state_tracker.particle_colors = self.get_particle_colors()
-            self.state_tracker.particle_radii = self.get_particle_radii()
+            raw_stride = getattr(self.state_tracker, "step_stride", None)
+            step_stride = raw_stride if isinstance(raw_stride, int) else self.step_stride
+            is_frame_step = force_mesh or (step_stride <= 1) or (self.step_idx % step_stride == 0)
+
+            if is_frame_step and get_env_bool("SHOW_WATER_VOXELS", True):
+                self.state_tracker.particle_positions = self.get_particle_positions()
+                self.state_tracker.particle_colors = self.get_particle_colors()
+                self.state_tracker.particle_radii = self.get_particle_radii()
+            else:
+                self.state_tracker.particle_positions = []
+                self.state_tracker.particle_colors = []
+                self.state_tracker.particle_radii = []
+
+            if is_frame_step:
+                bodies = self.get_fluid_bodies()
+                self.state_tracker.fluid_bodies = bodies
+                self.state_tracker.water_meshes = self.get_water_meshes(bodies=bodies)
             if get_env_bool("SHOW_BOUNDARY_VOXELS", False):
                 self.state_tracker.boundary_voxels = self.get_boundary_voxels()
             else:
