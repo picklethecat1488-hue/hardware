@@ -275,6 +275,11 @@ class CatFountainConfig(BaseModel):
         """Return the forward slope angle of the lid platform in degrees."""
         return float(self._raw_data.get("lid_platform_slope_angle", 2.5))
 
+    @cached_property
+    def lid_intake_z(self) -> float:
+        """Return the vertical elevation of the lid fluid intake port in millimeters."""
+        return float(self._raw_data.get("lid_intake_z", 1.75))
+
     # =========================================================================
     # Simulation Parameters
     # =========================================================================

@@ -1358,17 +1358,26 @@ class TestCatFountainProvider:
                     f"Spout discharge stream exceeded dome exit volume capacity ({max_spout_particles} particles)"
                 )
 
-                # 5. Drainage Continuity: Fluid mass returning across the perimeter waterfall and front drain
+                # 5. Continuous Lid Sheet Flow and Perimeter Waterfall Continuity
+                steady_sheet = np.array([m["flow_lid_sheet"] for m in provider.metrics_history[40:]])
+                assert np.mean(steady_sheet) > 0.0, "Drinking sheet flow across lid tray collapsed to zero"
+                assert np.count_nonzero(steady_sheet) > 0, "No fluid particles established flow across lid tray"
+
                 steady_waterfall = np.array([m["drainage_waterfall"] for m in provider.metrics_history[40:]])
                 steady_drain = np.array([m["drainage_cutout"] for m in provider.metrics_history[40:]])
                 total_steady_drainage = steady_waterfall + steady_drain
 
+                assert np.mean(steady_waterfall) > 0.0, "Perimeter waterfall drainage collapsed to zero"
+                assert np.count_nonzero(steady_waterfall) > 0, "Perimeter waterfall dried up during simulation"
                 assert np.mean(total_steady_drainage) > 0.0, (
                     "Total drainage returning to reservoir collapsed to zero in steady state"
                 )
                 assert np.count_nonzero(total_steady_drainage) > 0, "Total drainage dried up in steady state"
                 assert np.all(total_steady_drainage <= int(0.80 * total_particles)), (
                     "Falling drainage exceeded physical system mass allocation"
+                )
+                assert len(fluid.total_fallen_water_ids) == 0, (
+                    f"Fluid particles unexpectedly deactivated or collapsed: {len(fluid.total_fallen_water_ids)}"
                 )
 
                 # 6. Reservoir Pool Mass Conservation: In steady state, reservoir pool retains majority fluid mass

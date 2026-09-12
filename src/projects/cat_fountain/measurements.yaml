@@ -29,6 +29,7 @@ lid_pocket_thickness: 4.0
 lid_pocket_z_offset: 3.0
 lid_step_depth: 5.0
 lid_step_width: 2.0
+lid_intake_z: 1.75
 spout_angle: 45.0
 spout_length: 30.0
 spout_deflection_height: 0.0

@@ -2095,19 +2095,18 @@ def _ccd_sphere_obstacle_boundary(
     n_next = pos_rel_next / dist_next
 
     r_inner = jnp.maximum(sph_radius - sph_thickness, 0.001)
+    r_eff = r_inner - 2e-4
+    r_xy_next = jnp.sqrt(pos_rel_next[:, 0] ** 2 + pos_rel_next[:, 1] ** 2 + 1e-8)
+    n_xy = pos_rel_next[:, :2] / r_xy_next[:, None]
 
     # 1. Internal canopy ceiling collision: particle rising from below/inside attempting to burst through inner ceiling
     is_upper_dome = pos_rel_next[:, 2] > 0.0
     is_rising_in_dome = is_upper_dome & ((pos_rel_curr[:, 2] <= r_inner + 0.002) | (vel_next[:, 2] > 0.0))
-    hitting_canopy_ceiling = is_rising_in_dome & (dist_next[:, 0] >= r_inner - 1e-4)
+    hitting_canopy_ceiling = is_rising_in_dome & (dist_next[:, 0] >= r_inner - 1e-4) & (r_xy_next < r_eff)
 
     # Deflect into 360-degree radial outward flow along canopy curve through side grating slots
-    r_xy_next = jnp.sqrt(pos_rel_next[:, 0] ** 2 + pos_rel_next[:, 1] ** 2 + 1e-8)
-    n_xy = pos_rel_next[:, :2] / r_xy_next[:, None]
-    r_eff = r_inner - 2e-4
-    r_clamped = jnp.minimum(r_xy_next, r_eff)
-    z_canopy = jnp.sqrt(jnp.maximum(r_eff**2 - r_clamped**2, 0.0))
-    pos_canopy = sph_pos + jnp.concatenate([n_xy * r_clamped[:, None], z_canopy[:, None]], axis=-1)
+    z_canopy = jnp.sqrt(jnp.maximum(r_eff**2 - r_xy_next**2, 0.0))
+    pos_canopy = sph_pos + jnp.concatenate([pos_rel_next[:, :2], z_canopy[:, None]], axis=-1)
 
     v_speed = jnp.sqrt(jnp.sum(vel_next**2, axis=-1, keepdims=True) + 1e-8)
     v_radial_xy = n_xy * jnp.maximum(v_speed * 0.95, 1.10)
