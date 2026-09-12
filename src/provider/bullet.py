@@ -691,6 +691,7 @@ class Bullet:
                         samples=self.samples,
                         view_from=self.view_from,
                         output_mp4=self.save_mp4,
+                        turntable=False,
                     )
                     BlenderRenderer.render_simulation_to_mp4(
                         room=self.room,

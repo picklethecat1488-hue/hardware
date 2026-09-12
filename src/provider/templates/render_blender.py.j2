@@ -118,11 +118,17 @@ try:
     bg_node = world.node_tree.nodes.get("Background")
     if bg_node:
         bg_node.inputs["Color"].default_value = ({{ background_color[0] }}, {{ background_color[1] }}, {{ background_color[2] }}, 1.0)
-        bg_node.inputs["Strength"].default_value = 0.80
+        bg_node.inputs["Strength"].default_value = 0.30
 
-    # Color Management (Use Standard sRGB transform for accurate CAD colors matching viewer)
+    # Color Management (Use AgX or Filmic transform to prevent blown-out highlights)
     if hasattr(scene, "view_settings"):
-        scene.view_settings.view_transform = "Standard"
+        view_transforms = [item.identifier for item in scene.view_settings.bl_rna.properties["view_transform"].enum_items]
+        if "AgX" in view_transforms:
+            scene.view_settings.view_transform = "AgX"
+        elif "Filmic" in view_transforms:
+            scene.view_settings.view_transform = "Filmic"
+        else:
+            scene.view_settings.view_transform = "Standard"
         if hasattr(scene.view_settings, "look"):
             scene.view_settings.look = "None"
 
@@ -150,17 +156,17 @@ try:
         if hasattr(bpy.types, "CompositorNodeBilateralblur"):
             b_blur = comp_tree.nodes.new("CompositorNodeBilateralblur")
             if hasattr(b_blur, "iterations"):
-                b_blur.iterations = 2
+                b_blur.iterations = 1
             elif "Iterations" in b_blur.inputs:
-                b_blur.inputs["Iterations"].default_value = 2
+                b_blur.inputs["Iterations"].default_value = 1
             if hasattr(b_blur, "sigma_color"):
-                b_blur.sigma_color = 0.5
+                b_blur.sigma_color = 0.05
             elif "Color Sigma" in b_blur.inputs:
-                b_blur.inputs["Color Sigma"].default_value = 0.5
+                b_blur.inputs["Color Sigma"].default_value = 0.05
             if hasattr(b_blur, "sigma_space"):
-                b_blur.sigma_space = 3.0
+                b_blur.sigma_space = 1.0
             elif "Space Sigma" in b_blur.inputs:
-                b_blur.inputs["Space Sigma"].default_value = 3.0
+                b_blur.inputs["Space Sigma"].default_value = 1.0
 
             img_out = rl_node.outputs.get("Image")
             det_out = rl_node.outputs.get("Depth") or rl_node.outputs.get("Z")
@@ -199,41 +205,41 @@ try:
 
     # Key Light (Warm daylight studio softbox)
     key_light_data = bpy.data.lights.new("KeyLight", type="AREA")
-    key_light_data.energy = 120.0
-    key_light_data.size = 0.5
+    key_light_data.energy = 28.0
+    key_light_data.size = 0.8
     key_light_data.color = (1.0, 0.98, 0.95)
     key_light_obj = bpy.data.objects.new("KeyLight", key_light_data)
     scene.collection.objects.link(key_light_obj)
-    key_light_obj.location = (c_target.x + 0.35, c_target.y - 0.40, c_target.z + 0.45)
+    key_light_obj.location = (c_target.x + 0.45, c_target.y - 0.50, c_target.z + 0.55)
     dir_key = c_target - key_light_obj.location
     key_light_obj.rotation_euler = dir_key.to_track_quat("-Z", "Y").to_euler()
 
     # Fill Light (Cool daylight softbox)
     fill_light_data = bpy.data.lights.new("FillLight", type="AREA")
-    fill_light_data.energy = 60.0
-    fill_light_data.size = 0.5
+    fill_light_data.energy = 12.0
+    fill_light_data.size = 0.8
     fill_light_data.color = (0.95, 0.98, 1.0)
     fill_light_obj = bpy.data.objects.new("FillLight", fill_light_data)
     scene.collection.objects.link(fill_light_obj)
-    fill_light_obj.location = (c_target.x - 0.40, c_target.y - 0.30, c_target.z + 0.35)
+    fill_light_obj.location = (c_target.x - 0.50, c_target.y - 0.40, c_target.z + 0.45)
     dir_fill = c_target - fill_light_obj.location
     fill_light_obj.rotation_euler = dir_fill.to_track_quat("-Z", "Y").to_euler()
 
     # Rim Light (Top-Back Daylight Accent for edge refraction and fluid highlights)
     rim_light_data = bpy.data.lights.new("RimLight", type="AREA")
-    rim_light_data.energy = 90.0
-    rim_light_data.size = 0.4
+    rim_light_data.energy = 18.0
+    rim_light_data.size = 0.6
     rim_light_data.color = (1.0, 1.0, 1.0)
     rim_light_obj = bpy.data.objects.new("RimLight", rim_light_data)
     scene.collection.objects.link(rim_light_obj)
-    rim_light_obj.location = (c_target.x, c_target.y + 0.40, c_target.z + 0.45)
+    rim_light_obj.location = (c_target.x, c_target.y + 0.50, c_target.z + 0.55)
     dir_rim = c_target - rim_light_obj.location
     rim_light_obj.rotation_euler = dir_rim.to_track_quat("-Z", "Y").to_euler()
 
-    # Studio Floor Pedestal
+    # Studio Floor Pedestal (Dark slate for contrast with translucent water & resin)
     c_center = manifest.get("center", [0.0, 0.0, 0.06])
     bpy.ops.mesh.primitive_cylinder_add(
-        radius=0.30,
+        radius=2.5,
         depth=0.004,
         location=(c_center[0], c_center[1], -0.002),
     )
@@ -243,8 +249,8 @@ try:
     floor_mat.use_nodes = True
     floor_bsdf = floor_mat.node_tree.nodes.get("Principled BSDF")
     if floor_bsdf:
-        floor_bsdf.inputs["Base Color"].default_value = (0.75, 0.78, 0.82, 1.0)
-        floor_bsdf.inputs["Roughness"].default_value = 0.35
+        floor_bsdf.inputs["Base Color"].default_value = (0.18, 0.20, 0.24, 1.0)
+        floor_bsdf.inputs["Roughness"].default_value = 0.40
         if "Specular IOR Level" in floor_bsdf.inputs:
             floor_bsdf.inputs["Specular IOR Level"].default_value = 0.20
     floor_obj.data.materials.append(floor_mat)
@@ -311,7 +317,7 @@ try:
                     p2v_radius.default_value = {{ fluid_point_radius }}
                 v2m_thresh = find_socket(v2m.inputs, "Threshold")
                 if v2m_thresh:
-                    v2m_thresh.default_value = 0.10
+                    v2m_thresh.default_value = 0.08
                 v2m_adapt = find_socket(v2m.inputs, "Adaptivity")
                 if v2m_adapt:
                     v2m_adapt.default_value = 0.05
@@ -501,7 +507,8 @@ try:
 
         # Update camera position if turntable is active
         if is_turntable:
-            theta = start_angle + (2.0 * math.pi * f_idx) / tot_f
+            turntable_period_frames = max({{ fps }} * 20.0, 1.0)
+            theta = start_angle + (2.0 * math.pi * f_idx) / turntable_period_frames
             cam_obj.location = (
                 t_center.x + r_xy * math.sin(theta),
                 t_center.y - r_xy * math.cos(theta),

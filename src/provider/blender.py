@@ -108,9 +108,9 @@ class RenderConfig:
     engine: str = "CYCLES"
     view_from: str = "iso"
     shadow_catcher: bool = True
-    background_color: tuple[float, float, float, float] = (0.85, 0.88, 0.92, 1.0)
+    background_color: tuple[float, float, float, float] = (0.65, 0.68, 0.72, 1.0)
     output_mp4: Optional[str] = None
-    turntable: bool = True
+    turntable: bool = False
     crf: int = 18
     materials: Optional[Any] = None
     blender_executable: str = field(default_factory=lambda: BlenderRenderer.find_blender_binary())
@@ -119,7 +119,7 @@ class RenderConfig:
     dicing_rate: float = 1.0
     use_ssfr: bool = True
     fluid_voxel_size: float = 0.0010
-    fluid_point_radius: float = 0.0020
+    fluid_point_radius: float = 0.0028
 
 
 class BlenderRenderer:
@@ -525,6 +525,7 @@ class BlenderRenderer:
         target_dir: str,
         scene_data_path: str,
         config: RenderConfig,
+        initial_transforms: Optional[dict[str, tuple[list[float], list[float]]]] = None,
     ) -> None:
         """Export room geometry items into OBJ files and create the scene metadata manifest."""
         import trimesh
@@ -546,9 +547,26 @@ class BlenderRenderer:
                 export_stl(shape, stl_path)
                 tm = trimesh.load(stl_path)
                 tm.apply_scale(0.001)  # Convert mm to meters
-                tm.export(obj_path)
                 if hasattr(tm, "vertices") and len(tm.vertices) > 0:
                     all_verts.append(np.asarray(tm.vertices))
+
+                # In room, parts are assembled in world coordinates.
+                # If this part has a kinematic transform in initial_transforms,
+                # convert mesh vertices from world coordinates into link-local coordinates
+                # so that Blender's per-frame obj.location and obj.rotation_quaternion
+                # place the object at its exact world pose rather than double-transforming it.
+                if initial_transforms and name in initial_transforms:
+                    t0_pos, t0_orn = initial_transforms[name]
+                    import pybullet as p
+
+                    inv_pos, inv_orn = p.invertTransform(t0_pos, t0_orn)
+                    rot_matrix = np.array(p.getMatrixFromQuaternion(inv_orn)).reshape((3, 3))
+                    inv_mat = np.eye(4)
+                    inv_mat[:3, :3] = rot_matrix
+                    inv_mat[:3, 3] = inv_pos
+                    tm.apply_transform(inv_mat)
+
+                tm.export(obj_path)
 
                 mat_params = cls.resolve_item_material(name, geom, rgba, materials=mats)
                 items_meta.append(
@@ -562,9 +580,23 @@ class BlenderRenderer:
             elif hasattr(geom, "vertices") and hasattr(geom, "faces"):
                 obj_name = f"{name}.obj"
                 obj_path = os.path.join(target_dir, obj_name)
-                geom.export(obj_path)
                 if len(geom.vertices) > 0:
                     all_verts.append(np.asarray(geom.vertices))
+
+                export_geom = geom
+                if initial_transforms and name in initial_transforms:
+                    t0_pos, t0_orn = initial_transforms[name]
+                    import pybullet as p
+
+                    inv_pos, inv_orn = p.invertTransform(t0_pos, t0_orn)
+                    rot_matrix = np.array(p.getMatrixFromQuaternion(inv_orn)).reshape((3, 3))
+                    inv_mat = np.eye(4)
+                    inv_mat[:3, :3] = rot_matrix
+                    inv_mat[:3, 3] = inv_pos
+                    export_geom = geom.copy()
+                    export_geom.apply_transform(inv_mat)
+
+                export_geom.export(obj_path)
                 mat_params = cls.resolve_item_material(name, geom, rgba, materials=mats)
                 items_meta.append(
                     {
@@ -622,7 +654,8 @@ class BlenderRenderer:
         """Export full simulation frame meshes and joint transforms to directory."""
         import trimesh
 
-        cls._export_room_to_dir(room, target_dir, scene_data_path, config)
+        initial_transforms = rigid_transforms_per_frame[0] if rigid_transforms_per_frame else None
+        cls._export_room_to_dir(room, target_dir, scene_data_path, config, initial_transforms=initial_transforms)
         with open(scene_data_path, "r", encoding="utf-8") as f:
             manifest = json.load(f)
 

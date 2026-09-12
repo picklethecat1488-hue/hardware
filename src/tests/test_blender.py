@@ -204,8 +204,51 @@ class TestBlenderRenderer:
         assert "FluidGeometryNodes" in code
         assert "GeometryNodePointsToVolume" in code
         assert "GeometryNodeVolumeToMesh" in code
+        assert "turntable_period_frames" in code
+        assert "b_blur.sigma_color = 0.05" in code
+        assert "key_light_data.energy = 28.0" in code
+        assert 'scene.view_settings.view_transform = "AgX"' in code
         # Check Python compilation of generated script
         compile(code, str(script_file), "exec")
+
+    def test_export_room_inverts_initial_transforms_for_links(self, tmp_path):
+        """Verify that link meshes are exported in link-local coordinates using inverse initial transform.
+
+        Regression test: Prevents double-transformation where assembled parts were levitated in Blender.
+        """
+        import trimesh
+        from build123d import Box, Location
+
+        room = Room()
+        # Box centered at (0, 0, 100) mm -> 0.100 m
+        box = Box(20, 20, 20).locate(Location((0, 0, 100)))
+        room.add("lid", box, color=(0.1, 0.5, 0.9, 0.7))
+
+        initial_transforms = {
+            "lid": ([0.0, 0.0, 0.100], [0.0, 0.0, 0.0, 1.0]),
+        }
+        cfg = RenderConfig()
+        scene_file = tmp_path / "scene.json"
+        BlenderRenderer._export_room_to_dir(
+            room=room,
+            target_dir=str(tmp_path),
+            scene_data_path=str(scene_file),
+            config=cfg,
+            initial_transforms=initial_transforms,
+        )
+
+        lid_obj_path = tmp_path / "lid.obj"
+        assert lid_obj_path.exists()
+        tm = trimesh.load(str(lid_obj_path))
+        # With inverse transform applied, vertices should be centered at Z=0 (local frame), not Z=0.100
+        z_mean = float(tm.vertices[:, 2].mean())
+        assert abs(z_mean) < 1e-4, f"Link vertices not in local coordinates: z_mean={z_mean}"
+
+    def test_turntable_default_is_false_for_simulations(self):
+        """Verify that RenderConfig defaults turntable to False to prevent centrifuge spinning."""
+        cfg = RenderConfig()
+        assert cfg.turntable is False
+        assert cfg.fluid_point_radius == 0.0028
 
     @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")
     @patch("subprocess.run")
