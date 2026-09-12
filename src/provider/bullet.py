@@ -151,6 +151,7 @@ class Bullet:
         save_mp4: Optional[str] = None,
         view_from: str = "iso",
         fps: int = 60,
+        step_stride: Optional[int] = None,
         resolution: tuple[int, int] = (2560, 1440),
         samples: int = 32,
         rerun_port: Optional[int] = None,
@@ -170,7 +171,7 @@ class Bullet:
         self.save_mp4 = save_mp4
         self.view_from = view_from
         self.fps = fps
-        self.step_stride = max(1, 240 // self.fps) if self.fps > 0 else 1
+        self.step_stride = step_stride if step_stride is not None else 1
         self.resolution = resolution
         self.samples = samples
         self.rerun_port = rerun_port

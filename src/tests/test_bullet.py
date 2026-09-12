@@ -293,3 +293,51 @@ def test_bullet_rerun_logging_step_continuity(tmp_path):
             assert all(d == 1 for d in step_diffs), f"Non-consecutive step diffs: {step_diffs}"
     finally:
         p.disconnect(physicsClientId=real_client)
+
+
+def test_bullet_step_stride_timescale_parity(tmp_path):
+    """Verify that Bullet step_stride defaults to 1 for timescale parity with Rerun, and forwards correctly."""
+    from provider.room import Room
+
+    room = Room()
+    bullet_default = Bullet(
+        room=room,
+        provider_hooks={},
+        proj_name="test_proj",
+        sim_target="default",
+        steps=5,
+        manager=MagicMock(),
+        logger=MagicMock(),
+        fps=30,
+    )
+    # Default must be 1 to guarantee 1:1 timescale parity with Rerun playback
+    assert bullet_default.step_stride == 1
+
+    # Explicit override must be respected
+    bullet_stride_4 = Bullet(
+        room=room,
+        provider_hooks={},
+        proj_name="test_proj",
+        sim_target="default",
+        steps=5,
+        manager=MagicMock(),
+        logger=MagicMock(),
+        fps=30,
+        step_stride=4,
+    )
+    assert bullet_stride_4.step_stride == 4
+
+    # Verify Room.simulate forwards step_stride
+    with patch("provider.bullet.Bullet") as mock_bullet_cls:
+        room["dummy"] = (MagicMock(), None)
+        room.simulate(
+            provider_hooks={},
+            proj_name="test_proj",
+            sim_target="default",
+            steps=5,
+            manager=MagicMock(),
+            logger=MagicMock(),
+            step_stride=2,
+        )
+        mock_bullet_cls.assert_called_once()
+        assert mock_bullet_cls.call_args.kwargs["step_stride"] == 2

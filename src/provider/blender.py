@@ -117,9 +117,29 @@ class RenderConfig:
     use_geometry_nodes_fluid: bool = True
     use_micro_polygon_dicing: bool = True
     dicing_rate: float = 1.0
-    use_ssfr: bool = True
-    fluid_voxel_size: float = 0.0003
-    fluid_point_radius: float = 0.0022
+    use_ssfr: Optional[bool] = None
+    fluid_voxel_size: Optional[float] = None
+    fluid_point_radius: Optional[float] = None
+    fluid_surface_threshold: Optional[float] = None
+    fluid_adaptivity: Optional[float] = None
+
+    def __post_init__(self) -> None:
+        """Resolve fluid meshing parameters dynamically from MaterialsModel if not explicitly overridden."""
+        from model import MaterialsModel
+
+        mats = self.materials if self.materials is not None else MaterialsModel.default()
+        water_mat = mats.get("water") if mats else None
+        if water_mat is not None:
+            if self.use_ssfr is None and water_mat.use_ssfr is not None:
+                self.use_ssfr = water_mat.use_ssfr
+            if self.fluid_voxel_size is None and water_mat.fluid_voxel_size is not None:
+                self.fluid_voxel_size = water_mat.fluid_voxel_size
+            if self.fluid_point_radius is None and water_mat.fluid_point_radius is not None:
+                self.fluid_point_radius = water_mat.fluid_point_radius
+            if self.fluid_surface_threshold is None and water_mat.fluid_surface_threshold is not None:
+                self.fluid_surface_threshold = water_mat.fluid_surface_threshold
+            if self.fluid_adaptivity is None and water_mat.fluid_adaptivity is not None:
+                self.fluid_adaptivity = water_mat.fluid_adaptivity
 
 
 class BlenderRenderer:
@@ -516,7 +536,7 @@ class BlenderRenderer:
         metallic = mat_model.metallic if mat_model else 0.0
         specular = mat_model.specular if mat_model else 0.50
 
-        return {
+        mat_dict: dict[str, Any] = {
             "material_type": urdf_mat or mat_key,
             "rgba": list(rgba),
             "roughness": roughness,
@@ -525,6 +545,19 @@ class BlenderRenderer:
             "metallic": metallic,
             "specular": specular,
         }
+        if mat_model is not None:
+            if mat_model.fluid_voxel_size is not None:
+                mat_dict["fluid_voxel_size"] = mat_model.fluid_voxel_size
+            if mat_model.fluid_point_radius is not None:
+                mat_dict["fluid_point_radius"] = mat_model.fluid_point_radius
+            if mat_model.fluid_surface_threshold is not None:
+                mat_dict["fluid_surface_threshold"] = mat_model.fluid_surface_threshold
+            if mat_model.fluid_adaptivity is not None:
+                mat_dict["fluid_adaptivity"] = mat_model.fluid_adaptivity
+            if mat_model.use_ssfr is not None:
+                mat_dict["use_ssfr"] = mat_model.use_ssfr
+
+        return mat_dict
 
     @classmethod
     def _export_room_to_dir(
@@ -801,6 +834,8 @@ class BlenderRenderer:
             use_ssfr=config.use_ssfr,
             fluid_voxel_size=config.fluid_voxel_size,
             fluid_point_radius=config.fluid_point_radius,
+            fluid_surface_threshold=config.fluid_surface_threshold,
+            fluid_adaptivity=config.fluid_adaptivity,
         )
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(rendered_script.strip())

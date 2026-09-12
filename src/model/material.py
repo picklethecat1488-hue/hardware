@@ -16,6 +16,19 @@ class MaterialModel(BaseModel):
     transmission: float = Field(default=0.0, description="Optical transmission weight (0.0 to 1.0).")
     metallic: float = Field(default=0.0, description="Metallic reflection weight (0.0 to 1.0).")
     specular: float = Field(default=0.50, description="Specular reflection factor (0.0 to 1.0).")
+    fluid_voxel_size: Optional[float] = Field(
+        default=None, description="Voxel size in meters for fluid volume reconstruction."
+    )
+    fluid_point_radius: Optional[float] = Field(
+        default=None, description="Point splat radius in meters for fluid volume reconstruction."
+    )
+    fluid_surface_threshold: Optional[float] = Field(
+        default=None, description="Isosurface density threshold for volume-to-mesh."
+    )
+    fluid_adaptivity: Optional[float] = Field(default=None, description="Mesh adaptivity factor for volume-to-mesh.")
+    use_ssfr: Optional[bool] = Field(
+        default=None, description="Whether to enable screen-space fluid rendering bilateral blur."
+    )
 
 
 class MaterialsModel(BaseModel):

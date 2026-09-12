@@ -283,7 +283,13 @@ try:
         return None
 
     # Helper for loading dynamic water objects (Geometry Nodes Points-to-Volume, NPZ Meshes, or OBJ)
-    def load_water_objects(filepath, mat):
+    def load_water_objects(filepath, mat, item_meta=None):
+        meta = item_meta or {}
+        v_size = meta.get("fluid_voxel_size", {{ fluid_voxel_size }})
+        p_rad = meta.get("fluid_point_radius", {{ fluid_point_radius }})
+        v_thresh = meta.get("fluid_surface_threshold", {{ fluid_surface_threshold }})
+        v_adapt = meta.get("fluid_adaptivity", {{ fluid_adaptivity }})
+
         if filepath.endswith(".npz"):
             npz_data = np.load(filepath)
             if "points" in npz_data:
@@ -311,16 +317,16 @@ try:
 
                 p2v_voxel = find_socket(p2v.inputs, "Voxel Size")
                 if p2v_voxel:
-                    p2v_voxel.default_value = {{ fluid_voxel_size }}
+                    p2v_voxel.default_value = v_size
                 p2v_radius = find_socket(p2v.inputs, "Radius")
                 if p2v_radius:
-                    p2v_radius.default_value = {{ fluid_point_radius }}
+                    p2v_radius.default_value = p_rad
                 v2m_thresh = find_socket(v2m.inputs, "Threshold")
                 if v2m_thresh:
-                    v2m_thresh.default_value = 0.08
+                    v2m_thresh.default_value = v_thresh
                 v2m_adapt = find_socket(v2m.inputs, "Adaptivity")
                 if v2m_adapt:
-                    v2m_adapt.default_value = 0.05
+                    v2m_adapt.default_value = v_adapt
                 set_mat_slot = find_socket(set_mat.inputs, "Material")
                 if set_mat_slot:
                     set_mat_slot.default_value = mat
@@ -526,7 +532,7 @@ try:
                 w_path = w_item["file"]
                 if os.path.exists(w_path):
                     w_mat = get_or_create_material(w_item)
-                    w_objs = load_water_objects(w_path, w_mat)
+                    w_objs = load_water_objects(w_path, w_mat, item_meta=w_item)
                     current_water_objs.extend(w_objs)
 
             # Apply rigid transforms if present

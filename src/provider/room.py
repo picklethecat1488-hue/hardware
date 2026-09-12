@@ -1004,15 +1004,14 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         save_mp4: Optional[str] = None,
         view_from: str = "iso",
         fps: int = 60,
+        step_stride: Optional[int] = None,
         resolution: tuple[int, int] = (2560, 1440),
         samples: int = 32,
         rerun_port: Optional[int] = None,
         spawn_viewer: bool = True,
         stage_window_size: Optional[int] = None,
     ) -> None:
-        """
-        Run a PyBullet physics simulation for the room geometries.
-        """
+        """Run a PyBullet physics simulation for the room geometries."""
         from .provider import Provider
         from .bullet import Bullet
 
@@ -1036,6 +1035,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             save_mp4=save_mp4,
             view_from=view_from,
             fps=fps,
+            step_stride=step_stride,
             resolution=resolution,
             samples=samples,
             rerun_port=rerun_port,

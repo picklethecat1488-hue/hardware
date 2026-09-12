@@ -185,7 +185,9 @@ class TestBlenderRenderer:
             dicing_rate=0.5,
             use_ssfr=True,
             fluid_voxel_size=0.0003,
-            fluid_point_radius=0.0020,
+            fluid_point_radius=0.0011,
+            fluid_surface_threshold=0.40,
+            fluid_adaptivity=0.05,
         )
         BlenderRenderer._write_blender_script(
             script_path=str(script_file),
@@ -204,13 +206,28 @@ class TestBlenderRenderer:
         assert "FluidGeometryNodes" in code
         assert "GeometryNodePointsToVolume" in code
         assert "GeometryNodeVolumeToMesh" in code
-        assert "turntable_period_frames = max(60 * 10.0, 1.0)" in code
-        assert "p2v_voxel.default_value = 0.0003" in code
+        assert "p2v_voxel.default_value = v_size" in code
+        assert "p2v_radius.default_value = p_rad" in code
+        assert "v2m_thresh.default_value = v_thresh" in code
+        assert "v2m_adapt.default_value = v_adapt" in code
+        assert 'meta.get("fluid_voxel_size", 0.0003)' in code
+        assert 'meta.get("fluid_point_radius", 0.0011)' in code
+        assert 'meta.get("fluid_surface_threshold", 0.4)' in code
+        assert 'meta.get("fluid_adaptivity", 0.05)' in code
         assert "b_blur.sigma_color = 0.05" in code
         assert "key_light_data.energy = 28.0" in code
         assert 'scene.view_settings.view_transform = "AgX"' in code
         # Check Python compilation of generated script
         compile(code, str(script_file), "exec")
+
+    def test_render_config_fluid_defaults(self):
+        """Verify RenderConfig default parameters for crisp liquid fluid meshing."""
+        cfg = RenderConfig()
+        assert cfg.fluid_point_radius == 0.0020
+        assert cfg.fluid_surface_threshold == 0.18
+        assert cfg.fluid_voxel_size == 0.0003
+        assert cfg.fluid_adaptivity == 0.05
+        assert cfg.use_ssfr is False
 
     def test_export_room_inverts_initial_transforms_for_links(self, tmp_path):
         """Verify that link meshes are exported in link-local coordinates using inverse initial transform.
@@ -250,7 +267,7 @@ class TestBlenderRenderer:
         cfg = RenderConfig()
         assert cfg.turntable is True
         assert cfg.fluid_voxel_size == 0.0003
-        assert cfg.fluid_point_radius == 0.0022
+        assert cfg.fluid_point_radius == 0.0020
 
     @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")
     @patch("subprocess.run")
@@ -312,6 +329,27 @@ class TestBlenderRenderer:
         assert mat_params["metallic"] == 0.1
         assert mat_params["specular"] == 0.70
 
+    def test_resolve_water_material_from_yaml_schema(self):
+        """Verify resolve_item_material resolves fluid meshing parameters from print_materials.yaml."""
+        water_geom = MagicMock()
+        water_geom.urdf_material = "water"
+
+        mat_params = BlenderRenderer.resolve_item_material(
+            name="water",
+            geom=water_geom,
+            rgba=(0.05, 0.65, 0.95, 0.35),
+        )
+
+        assert mat_params["material_type"] == "water"
+        assert mat_params["roughness"] == 0.04
+        assert mat_params["ior"] == 1.333
+        assert mat_params["transmission"] == 0.95
+        assert mat_params["fluid_voxel_size"] == 0.0003
+        assert mat_params["fluid_point_radius"] == 0.0020
+        assert mat_params["fluid_surface_threshold"] == 0.18
+        assert mat_params["fluid_adaptivity"] == 0.05
+        assert mat_params["use_ssfr"] is False
+
     def test_materials_model_from_yaml(self):
         """Verify MaterialsModel loads correctly from print_materials.yaml."""
         from model import MaterialsModel
@@ -330,3 +368,14 @@ class TestBlenderRenderer:
         assert utr is not None
         assert utr.transmission == 0.85
         assert utr.ior == 1.51
+
+        water = mats.get("water")
+        assert water is not None
+        assert water.roughness == 0.04
+        assert water.ior == 1.333
+        assert water.transmission == 0.95
+        assert water.fluid_voxel_size == 0.0003
+        assert water.fluid_point_radius == 0.0020
+        assert water.fluid_surface_threshold == 0.18
+        assert water.fluid_adaptivity == 0.05
+        assert water.use_ssfr is False

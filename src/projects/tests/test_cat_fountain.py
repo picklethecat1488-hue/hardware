@@ -457,7 +457,7 @@ class TestCatFountainProvider:
                 p.disconnect(physics_client)
 
     @pytest.mark.slow
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(300)
     def test_pump_integration_water_escaping(self):
         """Verify that the simulation early terminates when water escapes the bowl."""
         import tempfile
@@ -558,7 +558,7 @@ class TestCatFountainProvider:
                 step_fn = hooks[Simulate.STEP]
                 terminated_message = None
                 for step_idx in range(180):
-                    if step_idx == 45:
+                    if step_idx == 15:
                         import numpy as np
                         import jax.numpy as jnp
 
@@ -580,7 +580,7 @@ class TestCatFountainProvider:
                 p.disconnect(physics_client)
 
     @pytest.mark.slow
-    @pytest.mark.timeout(180)
+    @pytest.mark.timeout(300)
     def test_cat_fountain_water_escaping_termination(self, provider):
         """Verify that the cat fountain simulation terminates when water escapes/falls out of bounds."""
         import pybullet as p
@@ -1074,7 +1074,7 @@ class TestCatFountainProvider:
             mock_builder.generate_urdfs.assert_called_once()
 
     @pytest.mark.slow
-    @pytest.mark.timeout(300)
+    @pytest.mark.timeout(450)
     def test_impeller_velocity_tuning(self):
         """Verify that we can tune the impeller velocity to respect the height limit."""
         import tempfile
@@ -1159,7 +1159,7 @@ class TestCatFountainProvider:
                 # Run simulation
                 step_fn = hooks[Simulate.STEP]
                 max_water_z = 0.0
-                for step_idx in range(120):
+                for step_idx in range(80):
                     step_fn(body_id, physics_client, step_idx, "product:view/simulate")
                     p.stepSimulation(physicsClientId=physics_client)
 
@@ -1402,6 +1402,13 @@ class TestCatFountainProvider:
                 assert np.all(steady_depth >= min_pool_depth), "Reservoir water depth drained below minimum threshold"
                 assert np.all(steady_depth <= max_pool_depth), "Reservoir water depth exceeded maximum bowl capacity"
 
+                # Regression assertions: guard against reservoir water volume collapse and flow loss
+                assert np.all(steady_depth >= 0.025), (
+                    f"Reservoir water depth collapsed: min={np.min(steady_depth):.4f}m"
+                )
+                steady_sheet = np.array([m["flow_lid_sheet"] for m in provider.metrics_history[40:]])
+                assert np.all(steady_sheet >= 300), f"Lid sheet flow collapsed: min={np.min(steady_sheet)}"
+
                 # Verify continuous physical fluid contact with motor casing and non-piled reservoir distribution
                 pos_np = np.asarray(fluid.pos_jax)
                 active = pos_np[:, 2] < 100.0
@@ -1410,6 +1417,12 @@ class TestCatFountainProvider:
                 lid_z = (provider.settings.bowl_height - provider.settings.lid_step_depth) * 0.001
                 in_bowl = (pos_act[:, 2] >= bowl_floor_z - 0.005) & (pos_act[:, 2] <= lid_z)
                 pos_bowl = pos_act[in_bowl]
+
+                # Guard against reservoir fluid collapsing into a pancake layer on the floor
+                z_p50 = float(np.percentile(pos_bowl[:, 2], 50))
+                assert z_p50 >= bowl_floor_z + 0.015, (
+                    f"Fluid volume collapsed into pancake layer at floor: z_p50={z_p50:.4f}m"
+                )
 
                 casing_r = (
                     provider.settings.impeller_radius

@@ -235,7 +235,15 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             step_idx=step_idx,
         )
 
-        compute_flow_metrics(self, step_idx=step_idx)
+        metrics = compute_flow_metrics(self, step_idx=step_idx)
+        if step_idx is not None and step_idx % 100 == 0:
+            logger = getattr(self, "logger", None)
+            if logger is not None:
+                logger.print(
+                    f"Step {step_idx:05d}: depth={metrics['water_depth'] * 1000.0:.1f}mm, "
+                    f"sheet={metrics['flow_lid_sheet']}, pool={metrics['pool_volume']}",
+                    symbol="🌊",
+                )
 
         if (
             not self.water_sim.recycle_fluid
