@@ -242,3 +242,54 @@ def test_bullet_init_simulation_objects():
 
     finally:
         p.disconnect(physicsClientId=client_id)
+
+
+def test_bullet_rerun_logging_step_continuity(tmp_path):
+    """Verify that Rerun logging queue records every simulation step sequentially (stride=1).
+
+    Regression test for laggy Rerun playback due to step stride gaps.
+    """
+    from provider.room import Room
+
+    room = Room()
+    dummy_urdf = tmp_path / "test.urdf"
+    dummy_urdf.write_text('<robot name="test"></robot>')
+
+    bullet = Bullet(
+        room=room,
+        provider_hooks={},
+        proj_name="test_proj",
+        sim_target="default",
+        steps=10,
+        manager=MagicMock(),
+        logger=MagicMock(),
+        build_dir=str(tmp_path),
+        save_rrd=str(tmp_path / "test.rrd"),
+        spawn_viewer=False,
+    )
+
+    real_client = p.connect(p.DIRECT)
+    try:
+        col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.1, 0.1, 0.01], physicsClientId=real_client)
+        real_body_id = p.createMultiBody(baseCollisionShapeIndex=col, physicsClientId=real_client)
+        with (
+            patch("list.Lister.get_urdf_output", return_value="test.urdf"),
+            patch.object(Bullet, "_copy_project_assets"),
+            patch("pybullet.connect", return_value=real_client),
+            patch("pybullet.disconnect"),
+            patch("pybullet.loadURDF", return_value=real_body_id),
+            patch("pybullet.stepSimulation"),
+            patch.object(Bullet, "_init_simulation_objects", return_value={"base": -1}),
+            patch.object(Bullet, "_init_rerun"),
+            patch("rerun.save"),
+            patch.object(Room, "_log_rerun") as mock_log_rerun,
+        ):
+            bullet.run()
+
+            assert mock_log_rerun.call_count == 10
+            logged_steps = [call.kwargs.get("step_idx") for call in mock_log_rerun.call_args_list]
+            assert logged_steps == list(range(10)), f"Steps not consecutive: {logged_steps}"
+            step_diffs = [b - a for a, b in zip(logged_steps, logged_steps[1:])]
+            assert all(d == 1 for d in step_diffs), f"Non-consecutive step diffs: {step_diffs}"
+    finally:
+        p.disconnect(physicsClientId=real_client)
