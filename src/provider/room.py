@@ -1011,9 +1011,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         spawn_viewer: bool = True,
         stage_window_size: Optional[int] = None,
     ) -> None:
-        """
-        Run a PyBullet physics simulation for the room geometries.
-        """
+        """Run a PyBullet physics simulation for the room geometries."""
         from .provider import Provider
         from .bullet import Bullet
 
