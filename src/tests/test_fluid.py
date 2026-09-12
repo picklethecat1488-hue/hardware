@@ -1722,3 +1722,63 @@ def test_integrate_particles_floor_non_penetration():
     assert float(pos_next[0, 2]) >= cavity_floor_z, f"Particle penetrated below floor: {pos_next[0, 2]}"
     # Invariant: particle vertical velocity must be non-negative after floor impact
     assert float(vel_next[0, 2]) >= 0.0, f"Particle vertical velocity must be non-negative: {vel_next[0, 2]}"
+
+
+def test_dynamic_fluid_bodies_column_volume_restoration():
+    """Verify that _compute_dynamic_fluid_bodies_jax maintains physical column height based on particle volume.
+
+    When particles in a column compress toward the cavity floor, surf_z_eff must reflect the
+    physical fluid volume (cavity_floor_z + col_count * vol_s / dx^2) rather than collapsing to the
+    compressed particle height, ensuring continuous upward hydrostatic restoring pressure.
+    """
+    import jax.numpy as jnp
+    from provider.fluid import _compute_dynamic_fluid_bodies_jax
+
+    dx = 0.0035
+    r_s = 0.0015
+    cavity_floor_z = 0.0410
+    z_max_pool = 0.1045
+    origin = jnp.array([-0.112, -0.112, 0.0], dtype=jnp.float32)
+
+    # 32 particles placed in a single cell (0, 0), all compressed near the floor (Z in [0.0411, 0.0430])
+    num_particles = 32
+    z_compressed = jnp.linspace(cavity_floor_z + 0.0001, cavity_floor_z + 0.0020, num_particles)
+    pos_local = jnp.stack(
+        [
+            jnp.zeros(num_particles, dtype=jnp.float32),
+            jnp.zeros(num_particles, dtype=jnp.float32),
+            z_compressed,
+        ],
+        axis=-1,
+    )
+
+    in_fluid_body, p_surf_z, _, col_count = _compute_dynamic_fluid_bodies_jax(
+        pos_local=pos_local,
+        dx=dx,
+        origin=origin,
+        nx=64,
+        ny=64,
+        nz=40,
+        cavity_floor_z=cavity_floor_z,
+        z_max_pool=z_max_pool,
+        r_s=r_s,
+    )
+
+    vol_s = (4.0 / 3.0) * math.pi * (r_s**3)
+    expected_col_depth = (num_particles * vol_s) / (dx * dx)
+    expected_surf_z = cavity_floor_z + expected_col_depth
+
+    # Assert that column count is accurately aggregated
+    assert float(col_count[0]) == num_particles
+
+    # Invariant: p_surf_z must reflect physical column volume (~0.078m), NOT compressed particle max (~0.043m)
+    assert float(p_surf_z[0]) >= expected_surf_z - 1e-4, (
+        f"Surface height collapsed to compressed particle level: got {p_surf_z[0]}, expected >= {expected_surf_z}"
+    )
+
+    # Invariant: all compressed particles in the column remain inside the active fluid body
+    assert bool(jnp.all(in_fluid_body))
+
+    # Invariant: depth pressure gradient is strictly positive to restore 3D column height
+    depth_pressure = (p_surf_z[0] - pos_local[0, 2]) / (4.0 * r_s)
+    assert float(depth_pressure) >= 4.0, f"Insufficient restoring depth pressure: {depth_pressure}"

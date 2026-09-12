@@ -1224,20 +1224,26 @@ def _compute_dynamic_fluid_bodies_jax(
     iy = jnp.clip(jnp.floor(gp[:, 1]).astype(jnp.int32), 0, ny - 1)
 
     # 1. Dynamic 2D column water surface height in reservoir basin
-    in_basin = (pos_local[:, 2] <= z_max_pool) & (pos_local[:, 2] >= cavity_floor_z)
+    in_basin = (pos_local[:, 2] <= z_max_pool) & (pos_local[:, 2] >= cavity_floor_z - 0.001)
     surf_z_grid = (
         jnp.full((nx, ny), cavity_floor_z).at[ix, iy].max(jnp.where(in_basin, pos_local[:, 2], cavity_floor_z))
     )
     min_z_grid = jnp.full((nx, ny), 10.0).at[ix, iy].min(jnp.where(in_basin, pos_local[:, 2], 10.0))
     col_count = jnp.zeros((nx, ny), dtype=jnp.float32).at[ix, iy].add(jnp.where(in_basin, 1.0, 0.0))
 
+    # Conservation of column volume: derive physical liquid column height from particle count
+    vol_s = (4.0 / 3.0) * jnp.pi * (r_s**3)
+    col_depth_vol = (col_count * vol_s) / (dx * dx)
+    z_surf_vol = cavity_floor_z + col_depth_vol
+    surf_z_eff = jnp.minimum(z_max_pool, jnp.maximum(surf_z_grid, z_surf_vol))
+
     # 2. Dynamic 2D surface gradient for horizontal hydrostatic leveling
-    surf_pad = jnp.pad(surf_z_grid, ((1, 1), (1, 1)), mode="edge")
+    surf_pad = jnp.pad(surf_z_eff, ((1, 1), (1, 1)), mode="edge")
     grad_x = (surf_pad[2:, 1:-1] - surf_pad[:-2, 1:-1]) / (2.0 * dx)
     grad_y = (surf_pad[1:-1, 2:] - surf_pad[1:-1, :-2]) / (2.0 * dx)
 
     # 3. Sample back to particle coordinates
-    p_surf_z = surf_z_grid[ix, iy]
+    p_surf_z = surf_z_eff[ix, iy]
     p_min_z = min_z_grid[ix, iy]
     p_grad_x = grad_x[ix, iy]
     p_grad_y = grad_y[ix, iy]
@@ -1838,7 +1844,7 @@ def _compute_particle_forces_subroutine(
     )
 
     # 1. Dynamic hydrostatic support and vertical column pressure
-    depth_pressure = jnp.clip((p_surf_z - pos_b[:, 2]) / (4.0 * r_s), 0.0, 4.0)
+    depth_pressure = jnp.clip((p_surf_z - pos_b[:, 2]) / (4.0 * r_s), 0.0, 6.0)
     cushion_accel_z = -jnp.minimum(v_z_b, 0.0) * 35.0
     total_support_z = g_mag * (1.0 + depth_pressure * 0.35) + cushion_accel_z
 

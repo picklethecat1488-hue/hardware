@@ -99,6 +99,8 @@ pytest
 * **Idiomatic Iteration & Enumeration**: Prefer looping over sequences and arrays directly or using `enumerate(...)` (e.g., `for idx, shape in enumerate(b_shapes):` or `for shape in b_shapes:`) rather than indexing by integer range bounds (such as `for k in range(b_shapes.shape[0]):` or `for i in range(len(items)):`).
 * **Pattern Matching (`match` / `case`)**: Prefer Python `match / case` pattern matching syntax when comparing the same subject field or expression against multiple comparands, enum variants, or constant branches rather than chained `if / elif / elif / else` ladders.
 * **Import Placement**: Imports should be done at the top of the file/listing, unless doing so would cause module load race conditions or circular dependencies (such as importing model classes inside provider packages).
+* **Markdown Preview Asset Location**: All markdown preview galleries, rendered frame previews, inspection figures, and simulation snapshots intended for visual evaluation MUST be placed inside the workspace under `recordings/previews/` (e.g., `recordings/previews/README.md` and `recordings/previews/preview_frame_*.png`) using relative image paths. Never place visual markdown preview assets exclusively in external application data or scratch directories outside the workspace, as VSCode's Markdown Preview security sandbox blocks loading external image resources.
+
 
 ### 8. Work Tracking & Task Management
 * **Task List (`TODO.md`)**: Maintain and track planned tasks, active implementation steps, outstanding engineering checklist items, and completed work in a `TODO.md` file in the workspace root. Keep the checklist updated (`[ ]` -> `[x]`) as subtasks progress to provide clear visibility and alignment.

@@ -119,6 +119,7 @@ class Viewer:
         save_mp4: Optional[str] = None,
         view_from: str = "iso",
         fps: int = 60,
+        step_stride: int = 1,
         resolution: Union[str, tuple[int, int]] = (2560, 1440),
         samples: int = 32,
         rerun_port: Optional[int] = None,
@@ -208,6 +209,7 @@ class Viewer:
                 save_mp4=save_mp4,
                 view_from=view_from,
                 fps=fps,
+                step_stride=step_stride,
                 resolution=res_tuple,
                 samples=samples,
                 rerun_port=rerun_port,
@@ -280,6 +282,12 @@ def get_args():
         help="Frames per second for MP4 video export (default: 60).",
     )
     parser.add_argument(
+        "--step-stride",
+        type=int,
+        default=1,
+        help="Simulation step stride per exported animation frame (default: 1 for 1:1 timescale parity with Rerun).",
+    )
+    parser.add_argument(
         "--resolution",
         default="2560x1440",
         help="Render resolution formatted as WxH (default: '2560x1440').",
@@ -349,6 +357,7 @@ def main():
                 save_mp4=args.save_mp4,
                 view_from=args.view_from,
                 fps=args.fps,
+                step_stride=args.step_stride,
                 resolution=args.resolution,
                 samples=args.samples,
                 rerun_port=args.port,
