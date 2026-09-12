@@ -1546,3 +1546,179 @@ def test_canopy_ceiling_ccd_containment():
     r_xy_out = jnp.sqrt(pos_out[:, 0] ** 2 + pos_out[:, 1] ** 2)
     v_radial = (pos_out[:, 0] * vel_out[:, 0] + pos_out[:, 1] * vel_out[:, 1]) / jnp.maximum(r_xy_out, 1e-6)
     assert jnp.all(v_radial >= 0.0), f"Canopy deflection must direct particles radially outward: {v_radial}"
+
+
+def test_bowl_boundary_subfloor_solid():
+    """Verify that BowlBoundary marks all space below the floor as solid.
+
+    Regression test for fluid seeping or clipping through the bowl floor into the bottom dry compartment.
+    """
+    import numpy as np
+    from provider.boundary import BowlBoundary
+
+    radius = 0.095
+    z_floor = 0.041
+    height = 0.060
+    thick = 0.004
+
+    bowl = BowlBoundary(radius=radius, z_floor=z_floor, height=height, thickness=thick)
+
+    # Subfloor points under the reservoir
+    subfloor_z = np.array([0.035, 0.020, 0.000, -0.010], dtype=np.float32)
+    subfloor_r = np.array([0.0, 0.030, 0.080, 0.095], dtype=np.float32)
+    xs = subfloor_r
+    ys = np.zeros_like(xs)
+
+    is_sol = bowl.is_solid_vectorized(xs, ys, subfloor_z)
+    assert np.all(is_sol), f"Subfloor coordinates must be classified as solid: {is_sol}"
+
+    # Also test scalar is_solid
+    for x, y, z in zip(xs, ys, subfloor_z, strict=True):
+        assert bowl.is_solid(float(x), float(y), float(z)), f"Subfloor point ({x}, {y}, {z}) must be solid"
+
+
+def test_voxel_reconstructor_containment_bounds():
+    """Verify VoxelVolumeReconstructor discards any dilated voxels outside physical container containment.
+
+    Regression test for water voxels clipping through the outer bowl wall or floor.
+    """
+    import numpy as np
+    from model.boundary_config import BoundaryParam
+    from provider.boundary import BowlBoundary, ProcessedBoundaries, SHAPE_CYLINDER
+    from provider.fluid import VoxelVolumeReconstructor
+
+    dx = 0.0035
+    nx, ny, nz = 64, 64, 40
+    # Center = (0, 0, 0), bounds: x,y in [-0.112, 0.112], z in [0, 0.140]
+    z_floor = 0.041
+    r_inner = 0.095
+    thick = 0.004
+    r_outer = r_inner + thick
+
+    # Build mock ProcessedBoundaries
+    bowl = BowlBoundary(radius=r_inner, z_floor=z_floor, height=0.060, thickness=thick)
+    b_shapes = np.array([SHAPE_CYLINDER], dtype=np.int32)
+    b_types = np.array([1], dtype=np.int32)
+    b_params = np.zeros((1, 64), dtype=np.float32)
+    b_params[0, BoundaryParam.RADIUS] = r_inner
+    b_params[0, BoundaryParam.HEIGHT] = 0.060
+    b_params[0, BoundaryParam.THICKNESS] = thick
+    b_params[0, BoundaryParam.Z_OFFSET] = z_floor
+
+    b_pos = np.zeros((1, 3), dtype=np.float32)
+    b_orn = np.zeros((1, 4), dtype=np.float32)
+    b_orn[0, 3] = 1.0  # Identity quaternion [x, y, z, w]
+    b_vel = np.zeros((1, 3), dtype=np.float32)
+
+    pb = ProcessedBoundaries(
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos,
+        b_orn_arr=b_orn,
+        b_vel_arr=b_vel,
+        base_idx=0,
+        boundaries=[bowl],
+    )
+
+    origin = (-0.112, -0.112, 0.0)
+    iz_floor = int(np.floor((z_floor - origin[2]) / dx))
+
+    reconstructor = VoxelVolumeReconstructor(
+        nx=nx,
+        ny=ny,
+        nz=nz,
+        origin=origin,
+        dx=dx,
+        iz_floor=iz_floor,
+        processed_boundaries=pb,
+    )
+
+    # Place a fluid particle right at the inner wall edge (r = 0.0945, z = 0.050)
+    # Dilation by +/- 1 cell (3.5 mm) will generate voxels past the 4mm wall (r > 0.099)
+    positions = np.array(
+        [
+            [0.0945, 0.0, 0.050],
+            [0.0, 0.0, z_floor + 0.001],
+        ],
+        dtype=np.float32,
+    )
+
+    voxels = reconstructor.reconstruct(positions)
+    assert len(voxels) > 0, "Reconstructed voxels should not be empty"
+
+    # Verify containment invariants across all reconstructed voxels:
+    # 1. No voxel below container floor
+    assert np.all(voxels[:, 2] >= z_floor - 1e-4), f"Voxel found below floor: min z = {voxels[:, 2].min()}"
+
+    # 2. No voxel outside outer bowl radius
+    r_voxels = np.sqrt(voxels[:, 0] ** 2 + voxels[:, 1] ** 2)
+    assert np.all(r_voxels <= r_outer + 1e-4), f"Voxel found outside outer bowl radius: max r = {r_voxels.max()}"
+
+    # 3. Below top rim (z < z_top), no voxel outside inner radius
+    z_top = z_floor + 0.060
+    sub_rim_mask = voxels[:, 2] < z_top
+    assert np.all(r_voxels[sub_rim_mask] <= r_inner + 1e-4), (
+        f"Voxel found clipping through bowl wall: max r = {r_voxels[sub_rim_mask].max()} > {r_inner}"
+    )
+
+
+def test_integrate_particles_floor_non_penetration():
+    """Verify that particle integration strictly enforces floor non-penetration.
+
+    Regression test for particles sinking below the container floor.
+    """
+    import jax.numpy as jnp
+    from provider.fluid import _integrate_particles_subroutine
+
+    dt = 0.001
+    cavity_floor_z = 0.041
+    base_radius = 0.095
+
+    # Particles attempting to drop below floor
+    pos_curr = jnp.array([[0.0, 0.0, cavity_floor_z + 0.0005]], dtype=jnp.float32)
+    vel_world = jnp.array([[0.0, 0.0, -1.5]], dtype=jnp.float32)
+    accel = jnp.array([[0.0, 0.0, -9.81]], dtype=jnp.float32)
+
+    base_pos = jnp.zeros(3, dtype=jnp.float32)
+    base_orn = jnp.array([0.0, 0.0, 0.0, 1.0], dtype=jnp.float32)
+    base_vel = jnp.zeros(3, dtype=jnp.float32)
+
+    from model.boundary_config import BoundaryParam
+    from provider.boundary import SHAPE_CYLINDER
+
+    b_shapes = jnp.array([SHAPE_CYLINDER], dtype=jnp.int32)
+    b_types = jnp.array([1], dtype=jnp.int32)
+    b_params = jnp.zeros((1, 64), dtype=jnp.float32)
+    b_params = b_params.at[0, BoundaryParam.R_OUTER].set(base_radius)
+    b_params = b_params.at[0, BoundaryParam.Z_TOP].set(0.100)
+    b_params = b_params.at[0, BoundaryParam.Z_OFFSET].set(cavity_floor_z)
+    b_params = b_params.at[0, BoundaryParam.MAX_CEILING_Z].set(0.100)
+
+    b_pos_arr = jnp.zeros((1, 3), dtype=jnp.float32)
+    b_orn_arr = jnp.zeros((1, 4), dtype=jnp.float32)
+    b_orn_arr = b_orn_arr.at[0, 3].set(1.0)
+
+    pos_next, vel_next = _integrate_particles_subroutine(
+        pos_curr=pos_curr,
+        vel_world=vel_world,
+        accel=accel,
+        base_pos=base_pos,
+        base_orn=base_orn,
+        dt_sub=dt,
+        damping=0.998,
+        high_damping_value=0.50,
+        base_idx=0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        omega=0.0,
+        base_vel=base_vel,
+    )
+
+    # Invariant: particle must not penetrate below cavity_floor_z
+    assert float(pos_next[0, 2]) >= cavity_floor_z, f"Particle penetrated below floor: {pos_next[0, 2]}"
+    # Invariant: particle vertical velocity must be non-negative after floor impact
+    assert float(vel_next[0, 2]) >= 0.0, f"Particle vertical velocity must be non-negative: {vel_next[0, 2]}"

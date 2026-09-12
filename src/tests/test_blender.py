@@ -184,7 +184,7 @@ class TestBlenderRenderer:
             use_micro_polygon_dicing=True,
             dicing_rate=0.5,
             use_ssfr=True,
-            fluid_voxel_size=0.0010,
+            fluid_voxel_size=0.0003,
             fluid_point_radius=0.0020,
         )
         BlenderRenderer._write_blender_script(
@@ -204,7 +204,8 @@ class TestBlenderRenderer:
         assert "FluidGeometryNodes" in code
         assert "GeometryNodePointsToVolume" in code
         assert "GeometryNodeVolumeToMesh" in code
-        assert "turntable_period_frames" in code
+        assert "turntable_period_frames = max(60 * 10.0, 1.0)" in code
+        assert "p2v_voxel.default_value = 0.0003" in code
         assert "b_blur.sigma_color = 0.05" in code
         assert "key_light_data.energy = 28.0" in code
         assert 'scene.view_settings.view_transform = "AgX"' in code
@@ -244,11 +245,12 @@ class TestBlenderRenderer:
         z_mean = float(tm.vertices[:, 2].mean())
         assert abs(z_mean) < 1e-4, f"Link vertices not in local coordinates: z_mean={z_mean}"
 
-    def test_turntable_default_is_false_for_simulations(self):
-        """Verify that RenderConfig defaults turntable to False to prevent centrifuge spinning."""
+    def test_turntable_and_voxel_pitch_defaults(self):
+        """Verify RenderConfig defaults for 10s turntable rotation and 0.3mm voxel pitch."""
         cfg = RenderConfig()
-        assert cfg.turntable is False
-        assert cfg.fluid_point_radius == 0.0028
+        assert cfg.turntable is True
+        assert cfg.fluid_voxel_size == 0.0003
+        assert cfg.fluid_point_radius == 0.0022
 
     @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")
     @patch("subprocess.run")

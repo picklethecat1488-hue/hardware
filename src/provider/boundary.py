@@ -61,7 +61,7 @@ class BowlBoundary:
             & (dist_sq >= self.radius**2)
             & (dist_sq <= (self.radius + thick) ** 2)
         )
-        is_floor = (z >= self.z_floor - thick) & (z <= self.z_floor) & (dist_sq <= (self.radius + thick) ** 2)
+        is_floor = (z <= self.z_floor) & (dist_sq <= (self.radius + thick) ** 2)
         return is_wall | is_floor
 
     def is_solid(self, x: float, y: float, z: float) -> bool:

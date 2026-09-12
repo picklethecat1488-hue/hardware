@@ -507,7 +507,7 @@ try:
 
         # Update camera position if turntable is active
         if is_turntable:
-            turntable_period_frames = max({{ fps }} * 20.0, 1.0)
+            turntable_period_frames = max({{ fps }} * 10.0, 1.0)
             theta = start_angle + (2.0 * math.pi * f_idx) / turntable_period_frames
             cam_obj.location = (
                 t_center.x + r_xy * math.sin(theta),

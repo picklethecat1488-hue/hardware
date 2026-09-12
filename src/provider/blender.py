@@ -110,7 +110,7 @@ class RenderConfig:
     shadow_catcher: bool = True
     background_color: tuple[float, float, float, float] = (0.65, 0.68, 0.72, 1.0)
     output_mp4: Optional[str] = None
-    turntable: bool = False
+    turntable: bool = True
     crf: int = 18
     materials: Optional[Any] = None
     blender_executable: str = field(default_factory=lambda: BlenderRenderer.find_blender_binary())
@@ -118,8 +118,8 @@ class RenderConfig:
     use_micro_polygon_dicing: bool = True
     dicing_rate: float = 1.0
     use_ssfr: bool = True
-    fluid_voxel_size: float = 0.0010
-    fluid_point_radius: float = 0.0028
+    fluid_voxel_size: float = 0.0003
+    fluid_point_radius: float = 0.0022
 
 
 class BlenderRenderer:
@@ -309,6 +309,14 @@ class BlenderRenderer:
         return "ffmpeg"
 
     @classmethod
+    def _build_blender_command(cls, blender_exec: str, script_path: str) -> list[str]:
+        """Construct the CLI command for running headless Blender, wrapping with xvfb-run on Linux if headless."""
+        cmd = [blender_exec, "-b", "-P", script_path]
+        if sys.platform.startswith("linux") and "DISPLAY" not in os.environ and shutil.which("xvfb-run"):
+            return ["xvfb-run", "-a"] + cmd
+        return cmd
+
+    @classmethod
     def is_available(cls) -> bool:
         """Check if Blender is installed and runnable on this system."""
         try:
@@ -353,7 +361,7 @@ class BlenderRenderer:
             )
 
             # 3. Run Blender headless
-            cmd = [config.blender_executable, "-b", "-P", script_path]
+            cmd = cls._build_blender_command(config.blender_executable, script_path)
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if res.returncode != 0:
                 raise RuntimeError(f"Blender render failed (exit code {res.returncode}):\n{res.stderr}\n{res.stdout}")
@@ -399,7 +407,7 @@ class BlenderRenderer:
             )
 
             # 3. Run Blender headless
-            cmd = [config.blender_executable, "-b", "-P", script_path]
+            cmd = cls._build_blender_command(config.blender_executable, script_path)
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if res.returncode != 0:
                 raise RuntimeError(f"Blender render failed (exit code {res.returncode}):\n{res.stderr}\n{res.stdout}")
@@ -461,7 +469,7 @@ class BlenderRenderer:
             )
 
             # 3. Run Blender headless to render frame sequence
-            cmd = [config.blender_executable, "-b", "-P", script_path]
+            cmd = cls._build_blender_command(config.blender_executable, script_path)
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if res.returncode != 0:
                 raise RuntimeError(f"Blender render failed (exit code {res.returncode}):\n{res.stderr}\n{res.stdout}")
