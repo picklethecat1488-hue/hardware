@@ -57,7 +57,7 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     in_tube_cnt = int(np.sum(in_tube_mask))
 
     # 2. Flow emerging at spout dome
-    at_spout_mask = (dist_tube <= tube_r_outer + 0.010) & (zs >= tube_top_z - 0.002) & (zs <= tube_top_z + 0.012)
+    at_spout_mask = (dist_tube <= tube_r_outer + 0.015) & (zs >= tube_top_z - 0.005) & (zs <= tube_top_z + 0.015)
     at_spout_cnt = int(np.sum(at_spout_mask))
 
     # 3. Flow on lid drinking shelf / tray (outside tube bore, inside lid rim, on top surface)
@@ -147,7 +147,8 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         provider.metrics_history = []
     provider.metrics_history.append(metrics)
 
-    if step_idx is not None and rerun_is_enabled():
+    step_stride = getattr(getattr(provider, "water_sim", None), "step_stride", 4)
+    if step_idx is not None and rerun_is_enabled() and (step_idx % step_stride == 0):
         import rerun as rr
 
         rr.set_time("step", sequence=step_idx)
@@ -232,6 +233,7 @@ def get_simulate_hooks_impl(self: Any, sim_name: str) -> dict[Simulate, Callable
             max_force=max_force,
             motor_power=motor_power,
             damping=getattr(self, "water_sim_damping", 0.995),
+            step_idx=step_idx,
         )
 
         compute_flow_metrics(self, step_idx=step_idx)
