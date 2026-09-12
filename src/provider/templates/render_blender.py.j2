@@ -5,6 +5,7 @@ import os
 import sys
 import traceback
 import mathutils
+import numpy as np
 
 try:
     with open(r"{{ scene_data_path }}", "r", encoding="utf-8") as f:
@@ -101,6 +102,15 @@ try:
             if hasattr(scene.cycles, "adaptive_min_samples"):
                 scene.cycles.adaptive_min_samples = 8
 
+        # Configure Micro-Polygon Dicing (Cycles Adaptive Subdivision)
+{% if use_micro_polygon_dicing %}
+        scene.cycles.feature_set = "EXPERIMENTAL"
+        if hasattr(scene.cycles, "dicing_rate"):
+            scene.cycles.dicing_rate = {{ dicing_rate }}
+        if hasattr(scene.cycles, "max_subdivisions"):
+            scene.cycles.max_subdivisions = 16
+{% endif %}
+
     # World & Background Lighting (Neutral daylight studio dome)
     world = bpy.data.worlds.new("StudioWorld")
     scene.world = world
@@ -108,54 +118,128 @@ try:
     bg_node = world.node_tree.nodes.get("Background")
     if bg_node:
         bg_node.inputs["Color"].default_value = ({{ background_color[0] }}, {{ background_color[1] }}, {{ background_color[2] }}, 1.0)
-        bg_node.inputs["Strength"].default_value = 0.80
+        bg_node.inputs["Strength"].default_value = 0.30
 
-    # Color Management (Use Standard sRGB transform for accurate CAD colors matching viewer)
+    # Color Management (Use AgX or Filmic transform to prevent blown-out highlights)
     if hasattr(scene, "view_settings"):
-        scene.view_settings.view_transform = "Standard"
+        view_transforms = [item.identifier for item in scene.view_settings.bl_rna.properties["view_transform"].enum_items]
+        if "AgX" in view_transforms:
+            scene.view_settings.view_transform = "AgX"
+        elif "Filmic" in view_transforms:
+            scene.view_settings.view_transform = "Filmic"
+        else:
+            scene.view_settings.view_transform = "Standard"
         if hasattr(scene.view_settings, "look"):
             scene.view_settings.look = "None"
+
+    # Screen-Space Fluid Rendering (SSFR) Compositor Pipeline
+{% if use_ssfr %}
+    if hasattr(scene, "view_layers"):
+        for vl in scene.view_layers:
+            vl.use_pass_z = True
+            vl.use_pass_normal = True
+
+    comp_tree = None
+    comp_out = None
+    if hasattr(scene, "compositing_node_group"):
+        comp_tree = bpy.data.node_groups.new("SSFR_Compositor", "CompositorNodeTree")
+        scene.compositing_node_group = comp_tree
+        comp_tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+        comp_out = comp_tree.nodes.new("NodeGroupOutput")
+    elif hasattr(scene, "node_tree"):
+        scene.use_nodes = True
+        comp_tree = scene.node_tree
+        comp_out = comp_tree.nodes.get("Composite") or comp_tree.nodes.new("CompositorNodeComposite")
+
+    if comp_tree and comp_out:
+        rl_node = comp_tree.nodes.get("Render Layers") or comp_tree.nodes.new("CompositorNodeRLayers")
+        if hasattr(bpy.types, "CompositorNodeBilateralblur"):
+            b_blur = comp_tree.nodes.new("CompositorNodeBilateralblur")
+            if hasattr(b_blur, "iterations"):
+                b_blur.iterations = 1
+            elif "Iterations" in b_blur.inputs:
+                b_blur.inputs["Iterations"].default_value = 1
+            if hasattr(b_blur, "sigma_color"):
+                b_blur.sigma_color = 0.05
+            elif "Color Sigma" in b_blur.inputs:
+                b_blur.inputs["Color Sigma"].default_value = 0.05
+            if hasattr(b_blur, "sigma_space"):
+                b_blur.sigma_space = 1.0
+            elif "Space Sigma" in b_blur.inputs:
+                b_blur.inputs["Space Sigma"].default_value = 1.0
+
+            img_out = rl_node.outputs.get("Image")
+            det_out = rl_node.outputs.get("Depth") or rl_node.outputs.get("Z")
+            img_in = b_blur.inputs.get("Image")
+            det_in = b_blur.inputs.get("Determinator")
+            if img_out and img_in:
+                comp_tree.links.new(img_out, img_in)
+            if det_out and det_in:
+                comp_tree.links.new(det_out, det_in)
+
+            b_blur_out = b_blur.outputs.get("Image")
+            comp_in = comp_out.inputs.get("Image")
+            if b_blur_out and comp_in:
+                comp_tree.links.new(b_blur_out, comp_in)
+        elif hasattr(bpy.types, "CompositorNodeBlur"):
+            blur_node = comp_tree.nodes.new("CompositorNodeBlur")
+            blur_node.size_x = 2
+            blur_node.size_y = 2
+            img_out = rl_node.outputs.get("Image")
+            blur_in = blur_node.inputs.get("Image")
+            blur_out = blur_node.outputs.get("Image")
+            comp_in = comp_out.inputs.get("Image")
+            if img_out and blur_in:
+                comp_tree.links.new(img_out, blur_in)
+            if blur_out and comp_in:
+                comp_tree.links.new(blur_out, comp_in)
+        else:
+            img_out = rl_node.outputs.get("Image")
+            comp_in = comp_out.inputs.get("Image")
+            if img_out and comp_in:
+                comp_tree.links.new(img_out, comp_in)
+{% endif %}
 
     # 1. 3-Point Studio Lighting Setup (6500K Daylight, Soft Diffused Studio Lights)
     c_target = mathutils.Vector(manifest.get("center", [0.0, 0.0, 0.06]))
 
     # Key Light (Warm daylight studio softbox)
     key_light_data = bpy.data.lights.new("KeyLight", type="AREA")
-    key_light_data.energy = 120.0
-    key_light_data.size = 0.5
+    key_light_data.energy = 28.0
+    key_light_data.size = 0.8
     key_light_data.color = (1.0, 0.98, 0.95)
     key_light_obj = bpy.data.objects.new("KeyLight", key_light_data)
     scene.collection.objects.link(key_light_obj)
-    key_light_obj.location = (c_target.x + 0.35, c_target.y - 0.40, c_target.z + 0.45)
+    key_light_obj.location = (c_target.x + 0.45, c_target.y - 0.50, c_target.z + 0.55)
     dir_key = c_target - key_light_obj.location
     key_light_obj.rotation_euler = dir_key.to_track_quat("-Z", "Y").to_euler()
 
     # Fill Light (Cool daylight softbox)
     fill_light_data = bpy.data.lights.new("FillLight", type="AREA")
-    fill_light_data.energy = 60.0
-    fill_light_data.size = 0.5
+    fill_light_data.energy = 12.0
+    fill_light_data.size = 0.8
     fill_light_data.color = (0.95, 0.98, 1.0)
     fill_light_obj = bpy.data.objects.new("FillLight", fill_light_data)
     scene.collection.objects.link(fill_light_obj)
-    fill_light_obj.location = (c_target.x - 0.40, c_target.y - 0.30, c_target.z + 0.35)
+    fill_light_obj.location = (c_target.x - 0.50, c_target.y - 0.40, c_target.z + 0.45)
     dir_fill = c_target - fill_light_obj.location
     fill_light_obj.rotation_euler = dir_fill.to_track_quat("-Z", "Y").to_euler()
 
     # Rim Light (Top-Back Daylight Accent for edge refraction and fluid highlights)
     rim_light_data = bpy.data.lights.new("RimLight", type="AREA")
-    rim_light_data.energy = 90.0
-    rim_light_data.size = 0.4
+    rim_light_data.energy = 18.0
+    rim_light_data.size = 0.6
     rim_light_data.color = (1.0, 1.0, 1.0)
     rim_light_obj = bpy.data.objects.new("RimLight", rim_light_data)
     scene.collection.objects.link(rim_light_obj)
-    rim_light_obj.location = (c_target.x, c_target.y + 0.40, c_target.z + 0.45)
+    rim_light_obj.location = (c_target.x, c_target.y + 0.50, c_target.z + 0.55)
     dir_rim = c_target - rim_light_obj.location
     rim_light_obj.rotation_euler = dir_rim.to_track_quat("-Z", "Y").to_euler()
 
-    # Studio Floor Pedestal
+    # Studio Floor Pedestal (Dark slate for contrast with translucent water & resin)
     c_center = manifest.get("center", [0.0, 0.0, 0.06])
     bpy.ops.mesh.primitive_cylinder_add(
-        radius=0.30,
+        radius=2.5,
         depth=0.004,
         location=(c_center[0], c_center[1], -0.002),
     )
@@ -165,8 +249,8 @@ try:
     floor_mat.use_nodes = True
     floor_bsdf = floor_mat.node_tree.nodes.get("Principled BSDF")
     if floor_bsdf:
-        floor_bsdf.inputs["Base Color"].default_value = (0.75, 0.78, 0.82, 1.0)
-        floor_bsdf.inputs["Roughness"].default_value = 0.35
+        floor_bsdf.inputs["Base Color"].default_value = (0.18, 0.20, 0.24, 1.0)
+        floor_bsdf.inputs["Roughness"].default_value = 0.40
         if "Specular IOR Level" in floor_bsdf.inputs:
             floor_bsdf.inputs["Specular IOR Level"].default_value = 0.20
     floor_obj.data.materials.append(floor_mat)
@@ -191,6 +275,127 @@ try:
             bpy.ops.wm.obj_import(filepath=filepath, forward_axis="Y", up_axis="Z")
         else:
             bpy.ops.import_scene.obj(filepath=filepath, axis_forward="Y", axis_up="Z")
+
+    def find_socket(collection, name):
+        for s in collection:
+            if s.name == name or getattr(s, "identifier", None) == name:
+                return s
+        return None
+
+    # Helper for loading dynamic water objects (Geometry Nodes Points-to-Volume, NPZ Meshes, or OBJ)
+    def load_water_objects(filepath, mat):
+        if filepath.endswith(".npz"):
+            npz_data = np.load(filepath)
+            if "points" in npz_data:
+                pts = npz_data["points"].tolist()
+                w_mesh = bpy.data.meshes.new("water_points_mesh")
+                w_mesh.from_pydata(pts, [], [])
+                w_mesh.update()
+                w_obj = bpy.data.objects.new("water", w_mesh)
+                scene.collection.objects.link(w_obj)
+
+                # Reconstruct smooth liquid surface via Blender Geometry Nodes (Points -> Volume -> Mesh)
+                mod = w_obj.modifiers.new(name="FluidGeometryNodes", type="NODES")
+                gn_tree = bpy.data.node_groups.new(name="FluidReconstructTree", type="GeometryNodeTree")
+                mod.node_group = gn_tree
+                if hasattr(gn_tree, "interface"):
+                    gn_tree.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+                    gn_tree.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+
+                in_node = gn_tree.nodes.new("NodeGroupInput")
+                out_node = gn_tree.nodes.new("NodeGroupOutput")
+                p2v = gn_tree.nodes.new("GeometryNodePointsToVolume")
+                v2m = gn_tree.nodes.new("GeometryNodeVolumeToMesh")
+                smooth = gn_tree.nodes.new("GeometryNodeSetShadeSmooth")
+                set_mat = gn_tree.nodes.new("GeometryNodeSetMaterial")
+
+                p2v_voxel = find_socket(p2v.inputs, "Voxel Size")
+                if p2v_voxel:
+                    p2v_voxel.default_value = {{ fluid_voxel_size }}
+                p2v_radius = find_socket(p2v.inputs, "Radius")
+                if p2v_radius:
+                    p2v_radius.default_value = {{ fluid_point_radius }}
+                v2m_thresh = find_socket(v2m.inputs, "Threshold")
+                if v2m_thresh:
+                    v2m_thresh.default_value = 0.08
+                v2m_adapt = find_socket(v2m.inputs, "Adaptivity")
+                if v2m_adapt:
+                    v2m_adapt.default_value = 0.05
+                set_mat_slot = find_socket(set_mat.inputs, "Material")
+                if set_mat_slot:
+                    set_mat_slot.default_value = mat
+
+                in_geom = find_socket(in_node.outputs, "Geometry")
+                p2v_pts = find_socket(p2v.inputs, "Points")
+                p2v_vol = find_socket(p2v.outputs, "Volume")
+                v2m_vol = find_socket(v2m.inputs, "Volume")
+                v2m_mesh = find_socket(v2m.outputs, "Mesh")
+                smooth_in = find_socket(smooth.inputs, "Geometry")
+                smooth_out = find_socket(smooth.outputs, "Geometry")
+                set_mat_in = find_socket(set_mat.inputs, "Geometry")
+                set_mat_out = find_socket(set_mat.outputs, "Geometry")
+                out_geom = find_socket(out_node.inputs, "Geometry")
+
+                if in_geom and p2v_pts:
+                    gn_tree.links.new(in_geom, p2v_pts)
+                if p2v_vol and v2m_vol:
+                    gn_tree.links.new(p2v_vol, v2m_vol)
+                if v2m_mesh and smooth_in:
+                    gn_tree.links.new(v2m_mesh, smooth_in)
+                if smooth_out and set_mat_in:
+                    gn_tree.links.new(smooth_out, set_mat_in)
+                if set_mat_out and out_geom:
+                    gn_tree.links.new(set_mat_out, out_geom)
+
+{% if use_micro_polygon_dicing %}
+                sub = w_obj.modifiers.new("Subsurf", "SUBSURF")
+                if hasattr(w_obj, "cycles") and hasattr(w_obj.cycles, "use_adaptive_subdivision"):
+                    w_obj.cycles.use_adaptive_subdivision = True
+                if hasattr(sub, "use_adaptive_subdivision"):
+                    sub.use_adaptive_subdivision = True
+                    sub.adaptive_pixel_size = {{ dicing_rate }}
+{% endif %}
+                return [w_obj]
+            elif "verts" in npz_data and "faces" in npz_data:
+                verts = npz_data["verts"].tolist()
+                faces = npz_data["faces"].tolist()
+                w_mesh = bpy.data.meshes.new("water_mesh")
+                w_mesh.from_pydata(verts, [], faces)
+                w_mesh.update()
+                for poly in w_mesh.polygons:
+                    poly.use_smooth = True
+                w_mesh.materials.append(mat)
+                w_obj = bpy.data.objects.new("water", w_mesh)
+                scene.collection.objects.link(w_obj)
+{% if use_micro_polygon_dicing %}
+                sub = w_obj.modifiers.new("Subsurf", "SUBSURF")
+                if hasattr(w_obj, "cycles") and hasattr(w_obj.cycles, "use_adaptive_subdivision"):
+                    w_obj.cycles.use_adaptive_subdivision = True
+                if hasattr(sub, "use_adaptive_subdivision"):
+                    sub.use_adaptive_subdivision = True
+                    sub.adaptive_pixel_size = {{ dicing_rate }}
+{% endif %}
+                return [w_obj]
+        else:
+            bpy.ops.object.select_all(action="DESELECT")
+            import_obj_file(filepath)
+            objs = []
+            for w_obj in bpy.context.selected_objects:
+                if hasattr(w_obj.data, "polygons"):
+                    for poly in w_obj.data.polygons:
+                        poly.use_smooth = True
+                w_obj.data.materials.clear()
+                w_obj.data.materials.append(mat)
+{% if use_micro_polygon_dicing %}
+                sub = w_obj.modifiers.new("Subsurf", "SUBSURF")
+                if hasattr(w_obj, "cycles") and hasattr(w_obj.cycles, "use_adaptive_subdivision"):
+                    w_obj.cycles.use_adaptive_subdivision = True
+                if hasattr(sub, "use_adaptive_subdivision"):
+                    sub.use_adaptive_subdivision = True
+                    sub.adaptive_pixel_size = {{ dicing_rate }}
+{% endif %}
+                objs.append(w_obj)
+            return objs
 
     # 3. Material Generators
     def get_or_create_material(item):
@@ -302,7 +507,8 @@ try:
 
         # Update camera position if turntable is active
         if is_turntable:
-            theta = start_angle + (2.0 * math.pi * f_idx) / tot_f
+            turntable_period_frames = max({{ fps }} * 10.0, 1.0)
+            theta = start_angle + (2.0 * math.pi * f_idx) / turntable_period_frames
             cam_obj.location = (
                 t_center.x + r_xy * math.sin(theta),
                 t_center.y - r_xy * math.cos(theta),
@@ -315,20 +521,13 @@ try:
         if f_idx < len(frames_data):
             frame_info = frames_data[f_idx]
 
-            # Add dynamic water meshes for this frame
+            # Add dynamic water objects for this frame
             for w_item in frame_info.get("water_items", []):
                 w_path = w_item["file"]
                 if os.path.exists(w_path):
-                    bpy.ops.object.select_all(action="DESELECT")
-                    import_obj_file(w_path)
                     w_mat = get_or_create_material(w_item)
-                    for w_obj in bpy.context.selected_objects:
-                        if hasattr(w_obj.data, "polygons"):
-                            for poly in w_obj.data.polygons:
-                                poly.use_smooth = True
-                        w_obj.data.materials.clear()
-                        w_obj.data.materials.append(w_mat)
-                        current_water_objs.append(w_obj)
+                    w_objs = load_water_objects(w_path, w_mat)
+                    current_water_objs.extend(w_objs)
 
             # Apply rigid transforms if present
             for link_name, (pos, orn) in frame_info.get("transforms", {}).items():
@@ -341,12 +540,15 @@ try:
         scene.render.filepath = output_target.replace("####", f"{f_idx:05d}")
         bpy.ops.render.render(write_still=True)
 
-        # Clean up transient water objects and their underlying mesh data
+        # Clean up transient water objects, underlying mesh data, and transient node groups
         for w_obj in current_water_objs:
             w_mesh = w_obj.data
             bpy.data.objects.remove(w_obj, do_unlink=True)
             if w_mesh:
                 bpy.data.meshes.remove(w_mesh, do_unlink=True)
+        for ng in list(bpy.data.node_groups):
+            if ng.name.startswith("FluidReconstructTree"):
+                bpy.data.node_groups.remove(ng, do_unlink=True)
 {% else %}
     bpy.ops.render.render(write_still=True)
 {% endif %}

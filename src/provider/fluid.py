@@ -2024,7 +2024,6 @@ def _ccd_cylinder_wall_boundary(
     r_loc_next, _, _ = cartesian_to_cylindrical(pos_next_loc)
     outside_wall = (
         (r_loc_next > base_radius)
-        & (r_loc_next <= base_radius + 0.020)
         & (pos_next_loc[:, 2] >= cavity_floor_z - 0.020)
         & (pos_next_loc[:, 2] <= max_ceiling_z + 0.020)
         & has_base
@@ -2482,6 +2481,13 @@ def _integrate_particles_subroutine(
         pos_local_check, pos_local_next, v_rel_local, base_radius, cavity_floor_z, max_ceiling_z, has_base
     )
 
+    # 3. Base container floor non-penetration constraint: particles cannot sink below the container floor
+    below_floor = has_base & (pos_local_check[:, 2] >= cavity_floor_z - 0.005) & (pos_local_next[:, 2] < cavity_floor_z)
+    pos_local_next = pos_local_next.at[:, 2].set(jnp.where(below_floor, cavity_floor_z + 1e-4, pos_local_next[:, 2]))
+    v_rel_local = v_rel_local.at[:, 2].set(
+        jnp.where(below_floor, jnp.maximum(v_rel_local[:, 2], 0.0), v_rel_local[:, 2])
+    )
+
     base_vel_local = world_to_base_vector(base_vel, base_orn_inv)
     vel_local_safe = v_rel_local + base_vel_local
 
@@ -2875,7 +2881,7 @@ class VoxelVolumeReconstructor:
             & (dilated_3d_x < self.nx)
             & (dilated_3d_y >= 0)
             & (dilated_3d_y < self.ny)
-            & (dilated_3d_z >= 0)
+            & (dilated_3d_z >= self.iz_floor)
             & (dilated_3d_z < self.nz)
         )
         all_ixs = dilated_3d_x[valid_3d]
@@ -2898,12 +2904,30 @@ class VoxelVolumeReconstructor:
         # Check solid boundaries vectorially via ProcessedBoundaries
         is_solid = self.processed_boundaries.is_solid(cx, cy, cz)
 
-        # Keep voxels that are outside solid boundaries
-        non_solid = ~is_solid
-        if not np.any(non_solid):
+        # Enforce physical container containment: water cannot exist below the floor, outside the outer bowl radius,
+        # or outside the inner reservoir cavity below the top rim.
+        b_idx = self.processed_boundaries.base_idx
+        if b_idx >= 0 and b_idx < len(self.processed_boundaries.b_params):
+            base_x = float(self.processed_boundaries.b_pos_arr[b_idx, 0])
+            base_y = float(self.processed_boundaries.b_pos_arr[b_idx, 1])
+            z_floor = self.processed_boundaries.cavity_z_offset
+            r_inner = float(self.processed_boundaries.b_params[b_idx, BoundaryParam.RADIUS])
+            thick = float(self.processed_boundaries.b_params[b_idx, BoundaryParam.THICKNESS])
+            r_outer = r_inner + thick
+            z_top = z_floor + float(self.processed_boundaries.b_params[b_idx, BoundaryParam.HEIGHT])
+
+            r_sq = (cx - base_x) ** 2 + (cy - base_y) ** 2
+            outside_containment = (
+                (cz < z_floor) | (r_sq > (r_outer - 1e-4) ** 2) | ((cz < z_top) & (r_sq > (r_inner - 1e-4) ** 2))
+            )
+            valid_water = (~is_solid) & (~outside_containment)
+        else:
+            valid_water = ~is_solid
+
+        if not np.any(valid_water):
             return np.empty((0, 3), dtype=np.float32)
 
-        return np.column_stack((cx[non_solid], cy[non_solid], cz[non_solid]))
+        return np.column_stack((cx[valid_water], cy[valid_water], cz[valid_water]))
 
 
 @dataclass(frozen=True)

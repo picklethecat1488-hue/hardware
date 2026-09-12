@@ -34,6 +34,7 @@ sync_code() {
         --exclude '.pytest_cache' \
         --exclude '.ruff_cache' \
         --exclude '*.rrd' \
+        --exclude '*.mp4' \
         "${REPO_DIR}/" "${REMOTE_HOST}:${REMOTE_DIR}/"
 }
 
