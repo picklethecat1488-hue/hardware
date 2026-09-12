@@ -24,6 +24,7 @@ pytest
 2. **Outcome Verification**: Confirm that all checks (format, lint, compile, and pytest) pass with exit code `0`.
 3. **Resolution**: If any component fails (such as syntax error, ruff failure, or failing test), you must address the failure and re-run the check before concluding your work.
 4. **Integration Smoke Tests**: The integration smoke tests (`python src/smoke.py`) are highly resource-intensive and should always be run on `anvil`.
+5. **Process Management & Rerun Hygiene**: When restarting or re-running test suites (`pytest`, `pytest -m "slow"`, `bin/anvil pytest`, `python src/smoke.py`, etc.), you MUST explicitly terminate/kill any preceding running instances of that test or task before launching a new execution. Never allow multiple overlapping runs of the same test command.
 
 ---
 
@@ -67,6 +68,7 @@ pytest
   - `urdf_density` (`float`): Density in $\text{kg/m}^3$.
   - `urdf_collision_type` (`URDFCollisionType`): Convex, concave, compound, analytical, or none.
   - Kinematic joint constraints (`urdf_joint_type`, `urdf_joint_axis`, limits) and motor properties (`urdf_motor_type`, target, force).
+* **Mandated `URDFBoundary.from_shape` & Direct CAD Boundary Derivation**: ALL simulation boundaries (`URDFBoundary`)—across all collision types (`ANALYTICAL`, `CONVEX`, `CONCAVE`, `COMPOUND`, etc.) and physical bodies—MUST be derived directly from build123d shapes, solids, compounds, or attached joint ports using `URDFBoundary.from_shape(shape_geom, ...)` or `URDFBoundary.from_part(part, ...)`. Do NOT manually type duplicate numeric literals or re-compute geometric scalars (`radius`, `height`, `thickness`, `xyz`, `intake_pos`, `drain_pos`, etc.) in python source code. B-Rep face dimensions, bounding envelopes, and fluid port coordinates must be extracted automatically from CAD geometry and `RigidJoint` markers. This eliminates the dual single-source-of-truth problem and guarantees that all physics boundaries remain 100% synchronized with CAD specifications.
 * **Physics Parameters Definition**: All physical properties and simulation parameters—including magnetic coupling attraction forces, joint constraints, kinematics, and physical barriers—MUST be defined in the URDF metadata or settings schema rather than being hardcoded in python source code.
 * **Temporary Debugging Constants**: Adding constant values in physics code is acceptable during active local debugging/iteration. However, before concluding a task, proposing changes, or running pre-commit checks, all such temporary constants MUST be replaced with dynamic queries referencing the boundary configuration model or URDF metadata.
 * **Dynamic Physics via URDF & Joints**: The physics and simulation code (e.g., in [fluid.py](file:///Users/daparker/gh/hardware/src/provider/fluid.py) and [bullet.py](file:///Users/daparker/gh/hardware/src/provider/bullet.py)) MUST compute physics dynamically using values read from the URDF metadata and PyBullet joint information, rather than hardcoding physics constants. Extend the URDF metadata schema as needed to support new physical properties.
@@ -97,6 +99,11 @@ pytest
 ### 8. Work Tracking & Task Management
 * **Task List (`TODO.md`)**: Maintain and track planned tasks, active implementation steps, outstanding engineering checklist items, and completed work in a `TODO.md` file in the workspace root. Keep the checklist updated (`[ ]` -> `[x]`) as subtasks progress to provide clear visibility and alignment.
 
+### 9. Code Generation & Jinja2 Templates
+* **Jinja2 Templating Engine**: Always use Jinja2 (`jinja2`) to generate templated Python scripts, Blender headless scripts, URDF models, or simulation configurations rather than embedding large multi-line f-strings directly inside Python source files.
+* **Dedicated Templates Directory**: All templated script files (`.py.j2`, `.yaml.j2`, `.urdf.j2`, `.sh.j2`) MUST be stored in a dedicated `templates/` folder nested within the respective package or module (e.g., `src/provider/templates/`).
+* **Clean Rendering & Context Separation**: Render external Jinja2 templates via `jinja2.Environment(loader=jinja2.FileSystemLoader(...), trim_blocks=True, lstrip_blocks=True)` or package loaders, passing configuration parameters as explicit dictionaries or strongly typed models.
+
 ---
 
 ## Remote Cloud Server (`anvil`)
@@ -114,3 +121,4 @@ Host anvil
 ### Usage Guidelines:
 1. **Remote Execution**: Use `bin/anvil run "<command>"` or SSH targeting `ubuntu@anvil` (or `ssh anvil`) to run full test suites (`pytest`), slow physics benchmarks (`pytest -m "slow"`), large JAX SPH simulation grids, parameter sweeps, and integration smoke tests (`python src/smoke.py`).
 2. **Conda Environment & Binaries**: On `anvil`, execute commands within the `cq` conda environment using `conda run -n cq --no-capture-output <command>` (prefer relative executable names like `python`, `pytest`, `ruff` over absolute paths).
+3. **Preceding Run Cancellation**: Before initiating a new remote execution or benchmark on `anvil`, ensure any active or stale background runs of the same command are cancelled or terminated to avoid cloud resource contention and duplicate processing.
