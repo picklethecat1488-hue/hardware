@@ -11,6 +11,7 @@ from typing import Any, Optional, Callable, cast
 import rerun as rr
 import queue
 import threading
+import numpy as np
 from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFCollisionType, Simulate, LinkType
 
 
@@ -569,6 +570,7 @@ class Bullet:
                 is_logging_enabled = self.spawn_viewer or (self.save_rrd is not None) or (self.save_mp4 is not None)
                 frame_fluid_bodies: list[list[Any]] = []
                 frame_water_meshes: list[dict[str, tuple[np.ndarray, np.ndarray]]] = []
+                frame_particle_positions: list[np.ndarray] = []
                 frame_transforms: list[dict[str, tuple[list[float], list[float]]]] = []
 
                 if self.spawn_viewer or self.save_rrd is not None:
@@ -599,14 +601,13 @@ class Bullet:
                             )
                             q.task_done()
 
-                    t = threading.Thread(target=logging_worker, daemon=True)
-                    log_thread = t
-                    t.start()
+                    log_thread = threading.Thread(target=logging_worker, daemon=True)
+                    log_thread.start()
 
+                step_hook = self.provider_hooks.get(Simulate.STEP, None)
                 for step_idx in range(self.steps):
-                    step_hook = self.provider_hooks.get(Simulate.STEP, None)
                     terminated = False
-                    if step_hook:
+                    if step_hook is not None:
                         res = step_hook(body_id, physics_client, step_idx, self.sim_target)
                         if isinstance(res, str):
                             self.logger.print(f"Simulation terminated: {res}", symbol="🛑")
@@ -617,6 +618,11 @@ class Bullet:
                     if is_logging_enabled:
                         state_tracker.update_state()
                         if self.save_mp4 and is_frame_step:
+                            if (
+                                state_tracker.particle_positions is not None
+                                and len(state_tracker.particle_positions) > 0
+                            ):
+                                frame_particle_positions.append(np.asarray(state_tracker.particle_positions))
                             if state_tracker.fluid_bodies is not None:
                                 frame_fluid_bodies.append(list(state_tracker.fluid_bodies))
                             elif state_tracker.water_meshes is not None:
@@ -693,6 +699,7 @@ class Bullet:
                         config=render_cfg,
                         fluid_bodies_per_frame=frame_fluid_bodies if frame_fluid_bodies else None,
                         water_meshes_per_frame=frame_water_meshes if frame_water_meshes else None,
+                        particle_positions_per_frame=frame_particle_positions if frame_particle_positions else None,
                         rigid_transforms_per_frame=frame_transforms,
                     )
                     self.logger.print(f"Exported H.264 MP4 video to {self.save_mp4}", symbol="✨")

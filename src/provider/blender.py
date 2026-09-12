@@ -114,6 +114,12 @@ class RenderConfig:
     crf: int = 18
     materials: Optional[Any] = None
     blender_executable: str = field(default_factory=lambda: BlenderRenderer.find_blender_binary())
+    use_geometry_nodes_fluid: bool = True
+    use_micro_polygon_dicing: bool = True
+    dicing_rate: float = 1.0
+    use_ssfr: bool = True
+    fluid_voxel_size: float = 0.0010
+    fluid_point_radius: float = 0.0020
 
 
 class BlenderRenderer:
@@ -417,6 +423,7 @@ class BlenderRenderer:
         config: Optional[RenderConfig] = None,
         fluid_bodies_per_frame: Optional[list[list[Any]]] = None,
         water_meshes_per_frame: Optional[list[dict[str, tuple[np.ndarray, np.ndarray]]]] = None,
+        particle_positions_per_frame: Optional[list[np.ndarray]] = None,
         rigid_transforms_per_frame: Optional[list[dict[str, tuple[list[float], list[float]]]]] = None,
     ) -> str:
         """Render a full simulation animation sequence to an H.264 MP4 video."""
@@ -439,6 +446,7 @@ class BlenderRenderer:
                 sim_steps=sim_steps,
                 fluid_bodies_per_frame=fluid_bodies_per_frame,
                 water_meshes_per_frame=water_meshes_per_frame,
+                particle_positions_per_frame=particle_positions_per_frame,
                 rigid_transforms_per_frame=rigid_transforms_per_frame,
             )
 
@@ -608,6 +616,7 @@ class BlenderRenderer:
         sim_steps: int = 1000,
         fluid_bodies_per_frame: Optional[list[list[Any]]] = None,
         water_meshes_per_frame: Optional[list[dict[str, tuple[np.ndarray, np.ndarray]]]] = None,
+        particle_positions_per_frame: Optional[list[np.ndarray]] = None,
         rigid_transforms_per_frame: Optional[list[dict[str, tuple[list[float], list[float]]]]] = None,
     ) -> None:
         """Export full simulation frame meshes and joint transforms to directory."""
@@ -621,8 +630,30 @@ class BlenderRenderer:
         frames_meta = []
         for step_idx in range(sim_steps):
             frame_items = []
-            # Export fluid bodies if present
-            if fluid_bodies_per_frame and step_idx < len(fluid_bodies_per_frame):
+            # 1. Export fluid points for Geometry Nodes if requested and present
+            if (
+                config.use_geometry_nodes_fluid
+                and particle_positions_per_frame
+                and step_idx < len(particle_positions_per_frame)
+            ):
+                pts = particle_positions_per_frame[step_idx]
+                if pts is not None and len(pts) > 0:
+                    pts_arr = np.asarray(pts, dtype=np.float32)
+                    b_name = f"water_frame_{step_idx:05d}.npz"
+                    b_path = os.path.join(target_dir, b_name)
+                    np.savez(b_path, points=pts_arr)
+                    water_mat = cls.resolve_item_material("water", None, [0.05, 0.65, 0.95, 0.35], materials=mats)
+                    frame_items.append(
+                        {
+                            "name": "water",
+                            "file": b_path,
+                            "scale": 1.0,
+                            "type": "points",
+                            **water_mat,
+                        }
+                    )
+            # 2. Export fluid bodies if present
+            elif fluid_bodies_per_frame and step_idx < len(fluid_bodies_per_frame):
                 bodies = fluid_bodies_per_frame[step_idx]
                 mesh_verts_list = []
                 mesh_faces_list = []
@@ -724,6 +755,11 @@ class BlenderRenderer:
             fps=config.fps,
             samples=config.samples,
             background_color=config.background_color,
+            use_micro_polygon_dicing=config.use_micro_polygon_dicing,
+            dicing_rate=config.dicing_rate,
+            use_ssfr=config.use_ssfr,
+            fluid_voxel_size=config.fluid_voxel_size,
+            fluid_point_radius=config.fluid_point_radius,
         )
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(rendered_script.strip())

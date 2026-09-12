@@ -169,6 +169,70 @@ class TestBlenderRenderer:
         # Check Python compilation of generated script
         compile(code, str(script_file), "exec")
 
+    def test_write_blender_script_micro_polygon_dicing_and_ssfr(self, tmp_path):
+        """Verify _write_blender_script generates micro-polygon dicing, SSFR, and Geometry Nodes fluid code."""
+        script_file = tmp_path / "test_advanced_script.py"
+        scene_file = tmp_path / "scene_data.json"
+        output_image = tmp_path / "frame_####.png"
+
+        cfg = RenderConfig(
+            resolution=(2560, 1440),
+            fps=60,
+            samples=32,
+            engine="CYCLES",
+            use_geometry_nodes_fluid=True,
+            use_micro_polygon_dicing=True,
+            dicing_rate=0.5,
+            use_ssfr=True,
+            fluid_voxel_size=0.0010,
+            fluid_point_radius=0.0020,
+        )
+        BlenderRenderer._write_blender_script(
+            script_path=str(script_file),
+            scene_data_path=str(scene_file),
+            output_path=str(output_image),
+            is_animation=True,
+            config=cfg,
+            total_frames=5,
+        )
+
+        assert script_file.exists()
+        code = script_file.read_text(encoding="utf-8")
+        assert "scene.cycles.dicing_rate = 0.5" in code
+        assert "use_adaptive_subdivision = True" in code
+        assert "SSFR_Compositor" in code
+        assert "FluidGeometryNodes" in code
+        assert "GeometryNodePointsToVolume" in code
+        assert "GeometryNodeVolumeToMesh" in code
+        # Check Python compilation of generated script
+        compile(code, str(script_file), "exec")
+
+    @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")
+    @patch("subprocess.run")
+    def test_render_simulation_with_particle_positions(self, mock_run, mock_encode):
+        """Verify render_simulation_to_mp4 exports particle points for Geometry Nodes when provided."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="Sim render success", stderr="")
+        room = Room()
+        from build123d import Box
+
+        room.add("casing", Box(20, 20, 20), color=(0.8, 0.8, 0.8, 1.0))
+
+        particle_positions = [np.array([[0.0, 0.0, 0.05], [0.01, 0.0, 0.05], [0.0, 0.01, 0.05]], dtype=np.float32)]
+        transforms = [{"casing": ([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0])}]
+
+        cfg = RenderConfig(fps=30, samples=16, use_geometry_nodes_fluid=True)
+        out_path = BlenderRenderer.render_simulation_to_mp4(
+            room=room,
+            output_mp4="build/test_sim_points.mp4",
+            sim_steps=1,
+            config=cfg,
+            particle_positions_per_frame=particle_positions,
+            rigid_transforms_per_frame=transforms,
+        )
+        assert os.path.basename(out_path) == "test_sim_points.mp4"
+        assert mock_run.called
+        assert mock_encode.called
+
     def test_resolve_item_material_with_materials_model(self):
         """Verify resolve_item_material resolves PBR properties directly from MaterialsModel."""
         from model import MaterialModel, MaterialsModel
