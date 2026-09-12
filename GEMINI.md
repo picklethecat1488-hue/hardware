@@ -37,6 +37,7 @@ pytest
   ```bash
   pytest -m "slow"
   ```
+* **Regression Unit Testing Mandate**: Whenever a regression is identified, investigated, or bisected to a prior change, you MUST introduce dedicated regression unit tests (or add active regression assertions to existing test suites) that explicitly guard against the identified regression before concluding the task. The test case must assert the expected invariant (such as non-zero sheet flow, steady-state waterfall volume, boundary coordinate alignment, or valid frame intervals) to prevent future regressions.
 
 ### 2. Geometry Providers & Discoverability
 * Custom geometry projects must be packages nested within [src/projects/](file:///Users/daparker/gh/hardware/src/projects/).

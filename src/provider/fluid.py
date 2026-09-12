@@ -2102,11 +2102,12 @@ def _ccd_sphere_obstacle_boundary(
     # 1. Internal canopy ceiling collision: particle rising from below/inside attempting to burst through inner ceiling
     is_upper_dome = pos_rel_next[:, 2] > 0.0
     is_rising_in_dome = is_upper_dome & ((pos_rel_curr[:, 2] <= r_inner + 0.002) | (vel_next[:, 2] > 0.0))
-    hitting_canopy_ceiling = is_rising_in_dome & (dist_next[:, 0] >= r_inner - 1e-4) & (r_xy_next < r_eff)
+    hitting_canopy_ceiling = is_rising_in_dome & (dist_next[:, 0] >= r_inner - 1e-4)
 
     # Deflect into 360-degree radial outward flow along canopy curve through side grating slots
-    z_canopy = jnp.sqrt(jnp.maximum(r_eff**2 - r_xy_next**2, 0.0))
-    pos_canopy = sph_pos + jnp.concatenate([pos_rel_next[:, :2], z_canopy[:, None]], axis=-1)
+    r_clamped = jnp.minimum(r_xy_next, r_eff)
+    z_canopy = jnp.sqrt(jnp.maximum(r_eff**2 - r_clamped**2, 0.0))
+    pos_canopy = sph_pos + jnp.concatenate([n_xy * r_clamped[:, None], z_canopy[:, None]], axis=-1)
 
     v_speed = jnp.sqrt(jnp.sum(vel_next**2, axis=-1, keepdims=True) + 1e-8)
     v_radial_xy = n_xy * jnp.maximum(v_speed * 0.95, 1.10)
@@ -3927,11 +3928,7 @@ class Fluid:
     def _update_state_tracker(self, force_mesh: bool = False) -> None:
         """Synchronize particle positions, colors, radii, water meshes, and boundary voxels to state tracker."""
         if self.state_tracker is not None:
-            raw_stride = getattr(self.state_tracker, "step_stride", None)
-            step_stride = raw_stride if isinstance(raw_stride, int) else self.step_stride
-            is_frame_step = force_mesh or (step_stride <= 1) or (self.step_idx % step_stride == 0)
-
-            if is_frame_step and get_env_bool("SHOW_WATER_VOXELS", True):
+            if get_env_bool("SHOW_WATER_VOXELS", True):
                 self.state_tracker.particle_positions = self.get_particle_positions()
                 self.state_tracker.particle_colors = self.get_particle_colors()
                 self.state_tracker.particle_radii = self.get_particle_radii()
@@ -3939,6 +3936,10 @@ class Fluid:
                 self.state_tracker.particle_positions = []
                 self.state_tracker.particle_colors = []
                 self.state_tracker.particle_radii = []
+
+            raw_stride = getattr(self.state_tracker, "step_stride", None)
+            step_stride = raw_stride if isinstance(raw_stride, int) else self.step_stride
+            is_frame_step = force_mesh or (step_stride <= 1) or (self.step_idx % step_stride == 0)
 
             if is_frame_step:
                 bodies = self.get_fluid_bodies()

@@ -1379,6 +1379,10 @@ class TestCatFountainProvider:
                 assert len(fluid.total_fallen_water_ids) == 0, (
                     f"Fluid particles unexpectedly deactivated or collapsed: {len(fluid.total_fallen_water_ids)}"
                 )
+                steady_ejected = np.array([m["ejected_particles"] for m in provider.metrics_history[40:]])
+                assert np.all(steady_ejected == 0), (
+                    f"Fluid particles unexpectedly breached canopy or hovered in mid-air: {np.max(steady_ejected)} particles"
+                )
 
                 # 6. Reservoir Pool Mass Conservation: In steady state, reservoir pool retains majority fluid mass
                 min_expected_pool_particles = int(0.40 * total_particles)

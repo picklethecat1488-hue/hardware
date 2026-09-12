@@ -147,8 +147,7 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
         provider.metrics_history = []
     provider.metrics_history.append(metrics)
 
-    step_stride = getattr(getattr(provider, "water_sim", None), "step_stride", 4)
-    if step_idx is not None and rerun_is_enabled() and (step_idx % step_stride == 0):
+    if step_idx is not None and rerun_is_enabled():
         import rerun as rr
 
         rr.set_time("step", sequence=step_idx)

@@ -614,9 +614,9 @@ class Bullet:
 
                     is_frame_step = step_idx % self.step_stride == 0
 
-                    if is_logging_enabled and is_frame_step:
+                    if is_logging_enabled:
                         state_tracker.update_state()
-                        if self.save_mp4:
+                        if self.save_mp4 and is_frame_step:
                             if state_tracker.fluid_bodies is not None:
                                 frame_fluid_bodies.append(list(state_tracker.fluid_bodies))
                             elif state_tracker.water_meshes is not None:
@@ -626,7 +626,7 @@ class Bullet:
                     if not terminated:
                         p.stepSimulation(physicsClientId=physics_client)
 
-                    if log_queue is not None and is_frame_step:
+                    if log_queue is not None:
                         try:
                             log_queue.put_nowait(
                                 (
@@ -661,28 +661,12 @@ class Bullet:
                             )
 
                     if terminated:
-                        if is_logging_enabled and not is_frame_step:
-                            state_tracker.update_state()
-                            if self.save_mp4:
-                                if state_tracker.fluid_bodies is not None:
-                                    frame_fluid_bodies.append(list(state_tracker.fluid_bodies))
-                                elif state_tracker.water_meshes is not None:
-                                    frame_water_meshes.append(dict(state_tracker.water_meshes))
-                                frame_transforms.append(dict(state_tracker.transforms))
-                            if log_queue is not None:
-                                try:
-                                    log_queue.put_nowait(
-                                        (
-                                            state_tracker.transforms,
-                                            state_tracker.particle_positions,
-                                            state_tracker.particle_colors,
-                                            state_tracker.particle_radii,
-                                            state_tracker.boundary_voxels,
-                                            step_idx,
-                                        )
-                                    )
-                                except queue.Full:
-                                    pass
+                        if self.save_mp4 and not is_frame_step:
+                            if state_tracker.fluid_bodies is not None:
+                                frame_fluid_bodies.append(list(state_tracker.fluid_bodies))
+                            elif state_tracker.water_meshes is not None:
+                                frame_water_meshes.append(dict(state_tracker.water_meshes))
+                            frame_transforms.append(dict(state_tracker.transforms))
                         break
 
                 if log_queue is not None and log_thread is not None:

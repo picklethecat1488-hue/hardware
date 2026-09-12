@@ -643,9 +643,9 @@ def test_room_simulate_loop_optimization():
             save_rrd=None,
         )
 
-        # BulletStateTracker.update_state and room._log_rerun should be called on frame steps (steps 0 and 4 with stride 4)
-        assert mock_tracker.update_state.call_count == 2
-        assert mock_log_rerun.call_count == 2
+        # BulletStateTracker.update_state and room._log_rerun should be called continuously on every step
+        assert mock_tracker.update_state.call_count == 5
+        assert mock_log_rerun.call_count == 5
         assert mock_step_sim.call_count == 5
 
 
