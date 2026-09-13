@@ -64,6 +64,7 @@ class BulletStateTracker:
         self.particle_radii: list[float] = []
         self.transforms: dict[str, tuple[list[float], list[float]]] = {}
         self.particle_positions: list[list[float]] = []
+        self.raw_particle_positions: Optional[np.ndarray] = None
         self.boundary_voxels: Optional[dict[str, Any]] = None
         self.fluid_bodies: Optional[list[Any]] = None
         self.water_meshes: Optional[dict[str, tuple[np.ndarray, np.ndarray]]] = None
@@ -620,6 +621,11 @@ class Bullet:
                         state_tracker.update_state()
                         if self.save_mp4 and is_frame_step:
                             if (
+                                getattr(state_tracker, "raw_particle_positions", None) is not None
+                                and len(state_tracker.raw_particle_positions) > 0
+                            ):
+                                frame_particle_positions.append(np.asarray(state_tracker.raw_particle_positions))
+                            elif (
                                 state_tracker.particle_positions is not None
                                 and len(state_tracker.particle_positions) > 0
                             ):

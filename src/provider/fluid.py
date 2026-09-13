@@ -3958,6 +3958,13 @@ class Fluid:
     def _update_state_tracker(self, force_mesh: bool = False) -> None:
         """Synchronize particle positions, colors, radii, water meshes, and boundary voxels to state tracker."""
         if self.state_tracker is not None:
+            raw_pos = self.get_raw_particle_positions()
+            if len(raw_pos) > 0:
+                active_mask = raw_pos[:, 2] < 100.0
+                self.state_tracker.raw_particle_positions = raw_pos[active_mask]
+            else:
+                self.state_tracker.raw_particle_positions = np.empty((0, 3), dtype=np.float32)
+
             if get_env_bool("SHOW_WATER_VOXELS", True):
                 self.state_tracker.particle_positions = self.get_particle_positions()
                 self.state_tracker.particle_colors = self.get_particle_colors()
