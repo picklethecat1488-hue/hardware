@@ -264,8 +264,9 @@ class WiringDiagram:
             # Build footprint sketch
             with BuildSketch() as f_sketch:
                 Rectangle(w, l)
-                if not self.wiring.is_surface_mount(fp.name):
-                    fillet(f_sketch.vertices(), radius=1.5)
+                fillet_r = min(1.5, min(w, l) / 2.0 - 0.1)
+                if fillet_r > 0.1:
+                    fillet(f_sketch.vertices(), radius=fillet_r)
 
             room.add(f"{fp.name}_footprint", f_sketch.sketch.moved(Location((cx, cy))), color="grey", line_weight=2.0)
 

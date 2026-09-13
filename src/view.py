@@ -12,12 +12,17 @@ import pybullet as p
 from daemon import DaemonClient
 from model import AppConfig
 from pathlib import Path
-from typing import Sequence, Optional, List, Any, cast, Iterable
+from typing import Sequence, Optional, List, Any, cast, Iterable, Union
 from build123d import *  # type: ignore
 from target_parser import TargetParser
 from provider import ProviderManager, Section, TargetList, Room, Simulate, Mode, Provider, URDFShape
 from pydantic import validate_call
 from shell import Logger
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="ocp_vscode.*")
+warnings.filterwarnings("ignore", message=".*collapse value from viewer.*")
+
 from ocp_vscode import set_port, Collapse, Camera, show as ocp_show  # type: ignore
 from build import Builder
 from list import Lister
@@ -111,14 +116,33 @@ class Viewer:
         no_build: bool = False,
         sim_steps: int = 2000,
         save_rrd: Optional[str] = None,
+        save_mp4: Optional[str] = None,
+        view_from: str = "iso",
+        fps: int = 60,
+        step_stride: int = 1,
+        resolution: Union[str, tuple[int, int]] = (2560, 1440),
+        samples: int = 32,
         rerun_port: Optional[int] = None,
         no_gui: bool = False,
+        stage_window_size: Optional[int] = None,
     ):
         """Build and show the requested geometry in ocp_vscode."""
         display_items = []
         is_simulate = False
         provider: Optional[Provider] = None
         sim_target = None
+
+        if isinstance(resolution, str):
+            res_parts = resolution.lower().split("x")
+            if len(res_parts) == 2:
+                try:
+                    res_tuple = (int(res_parts[0]), int(res_parts[1]))
+                except ValueError:
+                    res_tuple = (2560, 1440)
+            else:
+                res_tuple = (2560, 1440)
+        else:
+            res_tuple = tuple(resolution)
 
         for target in input_targets:
             for action in self.VISUAL_ACTIONS:
@@ -182,13 +206,38 @@ class Viewer:
                 logger=self.logger,
                 build_dir=build_dir,
                 save_rrd=save_rrd,
+                save_mp4=save_mp4,
+                view_from=view_from,
+                fps=fps,
+                step_stride=step_stride,
+                resolution=res_tuple,
+                samples=samples,
                 rerun_port=rerun_port,
                 spawn_viewer=not no_gui,
+                stage_window_size=stage_window_size,
             )
         else:
             summary = self.get_summary(list(room.keys()))
             self.logger.print(f"Showing {summary}", symbol="👁️ ")
-            show(room.compound, names=["View"], collapse=Collapse.ALL, reset_camera=Camera.RESET)
+            if save_mp4:
+                self.logger.print(f"Rendering turntable MP4 via Blender: {save_mp4}", symbol="🎬")
+                from provider.blender import BlenderRenderer, RenderConfig
+
+                render_cfg = RenderConfig(
+                    resolution=res_tuple,
+                    fps=fps,
+                    samples=samples,
+                    view_from=view_from,
+                    output_mp4=save_mp4,
+                )
+                BlenderRenderer.render_turntable_to_mp4(
+                    room=room,
+                    output_mp4=save_mp4,
+                    config=render_cfg,
+                )
+                self.logger.print(f"Exported H.264 MP4 video to {save_mp4}", symbol="✨")
+            if not no_gui:
+                show(room.compound, names=["View"], collapse=Collapse.LEAVES, reset_camera=Camera.RESET)
 
 
 def get_args():
@@ -215,6 +264,50 @@ def get_args():
         help="Path to save the rerun (.rrd) recording file.",
     )
     parser.add_argument(
+        "--save-mp4",
+        "--export-mp4",
+        dest="save_mp4",
+        default=None,
+        help="Path to export H.264 MP4 video using Blender (e.g. 'recordings/video.mp4').",
+    )
+    parser.add_argument(
+        "--view-from",
+        default="iso",
+        help="Camera viewpoint for visualization or rendering (e.g. 'iso', 'front', 'rear', 'left', 'right', 'top', 'bottom', or '(x,y,z)').",
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=60,
+        help="Frames per second for MP4 video export (default: 60).",
+    )
+    parser.add_argument(
+        "--step-stride",
+        type=int,
+        default=1,
+        help="Simulation step stride per exported animation frame (default: 1 for 1:1 timescale parity with Rerun).",
+    )
+    parser.add_argument(
+        "--resolution",
+        default="2560x1440",
+        help="Render resolution formatted as WxH (default: '2560x1440').",
+    )
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=32,
+        help="Blender Cycles/EEVEE render samples per frame (default: 32).",
+    )
+    parser.add_argument(
+        "--stage-window",
+        "--stage-window-size",
+        "--staging-frame-window-size",
+        type=int,
+        default=None,
+        dest="stage_window_size",
+        help="Number of simulation frames per staging checkpoint window (e.g. 1000).",
+    )
+    parser.add_argument(
         "-p",
         "--port",
         type=int,
@@ -235,15 +328,9 @@ def get_args():
 
 def main():
     """Build and show the requested geometry in ocp_vscode."""
-    # Enable experimental async dispatch for MPS backend (can be much faster on Apple Silicon)
-    os.environ["JAX_MPS_ASYNC_DISPATCH"] = "1"
-    try:
-        import jax
+    from provider.utils import initialize_jax_environment
 
-        # Enable compilation caching to avoid JIT compile latency on subsequent runs
-        jax.config.update("jax_compilation_cache_dir", "build/jax_cache")
-    except ImportError:
-        pass
+    initialize_jax_environment()
 
     args = get_args()
 
@@ -267,8 +354,15 @@ def main():
                 no_build=args.no_build,
                 sim_steps=args.sim_steps,
                 save_rrd=args.save_rrd,
+                save_mp4=args.save_mp4,
+                view_from=args.view_from,
+                fps=args.fps,
+                step_stride=args.step_stride,
+                resolution=args.resolution,
+                samples=args.samples,
                 rerun_port=args.port,
                 no_gui=args.no_gui,
+                stage_window_size=args.stage_window_size,
             )
     finally:
         logger.done()

@@ -56,6 +56,13 @@ class FluidConfig(BaseModel):
     damping_boundary: float = Field(default=5.0, description="Boundary collision penalty damping coefficient.")
 
     # --- Simulation Domain & Volumes ---
+    nx: int = Field(default=32, description="Number of grid cells along X axis.")
+    ny: int = Field(default=32, description="Number of grid cells along Y axis.")
+    nz: int = Field(default=28, description="Number of grid cells along Z axis.")
+    dx: float = Field(default=0.005, description="Grid cell width (meters).")
+    origin: tuple[float, float, float] = Field(
+        default=(-0.075, -0.075, 0.0), description="Grid origin position (meters)."
+    )
     target_volume: float = Field(default=0.0005, description="Target total fluid volume to spawn (m^3).")
     spawn_buffer: float = Field(
         default=0.002, description="Spawning buffer distance offset from container side walls (meters)."

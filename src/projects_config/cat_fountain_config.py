@@ -3,6 +3,7 @@
 from typing import Any, Optional, Union, cast
 from functools import cached_property
 from pathlib import Path
+import numpy as np
 from pydantic import BaseModel, Field
 from model import load_measurements, DiagramOptions, DiagramStyle
 
@@ -26,9 +27,12 @@ class CatFountainConfig(BaseModel):
     )
 
     target_volume: float = Field(
-        default=0.00020,
+        default=0.0010,
         description="Target total fluid volume to spawn (m^3).",
     )
+
+    stiffness_boundary: float = Field(default=1000.0, description="SPH boundary penalty stiffness coefficient")
+    damping_boundary: Optional[float] = Field(default=None, description="SPH boundary penalty damping coefficient")
 
     # =========================================================================
     # Internal & Helper Properties
@@ -81,6 +85,11 @@ class CatFountainConfig(BaseModel):
         """Return the bowl thickness."""
         return float(self._raw_data.get("bowl_thickness", 4.0))
 
+    @cached_property
+    def floor_z(self) -> float:
+        """Return the dry compartment floor Z coordinate in millimeters."""
+        return float(self._raw_data.get("floor_z", 36.0))
+
     # =========================================================================
     # Tube Parameters
     # =========================================================================
@@ -125,6 +134,16 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("impeller_shaft_radius", 2.5))
 
     @cached_property
+    def impeller_shaft_clearance(self) -> float:
+        """Return the radial clearance between the guide post and impeller sleeve bore."""
+        return float(self._raw_data.get("impeller_shaft_clearance", 0.30))
+
+    @cached_property
+    def impeller_base_height(self) -> float:
+        """Return the height of the impeller base disk."""
+        return float(self._raw_data.get("impeller_base_height", 6.0))
+
+    @cached_property
     def impeller_blades(self) -> int:
         """Return the number of impeller blades."""
         return int(self._raw_data.get("impeller_blades", 6))
@@ -133,6 +152,21 @@ class CatFountainConfig(BaseModel):
     def vane_twist(self) -> float:
         """Return the total twist angle of the impeller blades in degrees."""
         return float(self._raw_data.get("vane_twist", -1080.0))
+
+    @cached_property
+    def motor_target(self) -> float:
+        """Return the target motor angular velocity in rad/s in the simulation."""
+        return float(self._raw_data.get("motor_target", 120.0))
+
+    @cached_property
+    def motor_power(self) -> float:
+        """Return the maximum motor output power in Watts."""
+        return float(self._raw_data.get("motor_power", 30.0))
+
+    @cached_property
+    def motor_force_sim(self) -> float:
+        """Return the maximum joint torque limit allowed in the physics simulator (N*m)."""
+        return float(self._raw_data.get("motor_force_sim", 10.0))
 
     # =========================================================================
     # Spout Parameters
@@ -160,22 +194,22 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def petg_boundary_friction(self) -> float:
         """Return the boundary friction of PETG material dynamically from manifest configuration."""
-        return float(self._material_data.get("petg", {}).get("boundary_friction", 0.20))
+        return float(self._material_data.get("petg", {}).get("boundary_friction", 0.0))
 
     @cached_property
     def petg_contact_angle(self) -> float:
         """Return the contact angle of PETG material dynamically from manifest configuration."""
-        return float(self._material_data.get("petg", {}).get("contact_angle", 75.0))
+        return float(self._material_data.get("petg", {}).get("contact_angle", 0.0))
 
     @property
     def density(self) -> float:
         """Return the density of the configured material dynamically from manifest configuration."""
-        return float(self._material_data.get(self.material, {}).get("density", 1.27))
+        return float(self._material_data.get(self.material, {}).get("density", 0.0))
 
     @property
     def boundary_friction(self) -> float:
         """Return the boundary friction of the configured material dynamically from manifest configuration."""
-        return float(self._material_data.get(self.material, {}).get("boundary_friction", 0.20))
+        return float(self._material_data.get(self.material, {}).get("boundary_friction", 0.0))
 
     @property
     def contact_angle(self) -> float:
@@ -236,6 +270,16 @@ class CatFountainConfig(BaseModel):
         """Return the spout deflection cap Z offset in millimeters."""
         return float(self._raw_data.get("spout_deflection_z_offset", 16.0))
 
+    @cached_property
+    def lid_platform_slope_angle(self) -> float:
+        """Return the forward slope angle of the lid platform in degrees."""
+        return float(self._raw_data.get("lid_platform_slope_angle", 2.5))
+
+    @cached_property
+    def lid_intake_z(self) -> float:
+        """Return the vertical elevation of the lid fluid intake port in millimeters."""
+        return float(self._raw_data.get("lid_intake_z", 1.75))
+
     # =========================================================================
     # Simulation Parameters
     # =========================================================================
@@ -290,6 +334,26 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("lid_step_width", 2.0))
 
     @cached_property
+    def lid_cutout_radius(self) -> float:
+        """Return the radius of the large circular cutout in the lid in millimeters."""
+        return float(self._raw_data.get("lid_cutout_radius", 55.0))
+
+    @cached_property
+    def lid_cutout_y(self) -> float:
+        """Return the Y position of the large circular cutout in the lid in millimeters."""
+        return float(self._raw_data.get("lid_cutout_y", -20.0))
+
+    @cached_property
+    def lid_cutout_ridge_width(self) -> float:
+        """Return the width of the small ridge around the lid opening in millimeters."""
+        return float(self._raw_data.get("lid_cutout_ridge_width", 1.5))
+
+    @cached_property
+    def lid_cutout_ridge_height(self) -> float:
+        """Return the height of the small ridge around the lid opening in millimeters."""
+        return float(self._raw_data.get("lid_cutout_ridge_height", 2.0))
+
+    @cached_property
     def tube_lid_clearance(self) -> float:
         """Return the clearance between the tube and the lid socket."""
         return float(self._raw_data.get("tube_lid_clearance", 0.1))
@@ -300,9 +364,34 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("bottom_cover_clearance", 0.2))
 
     @cached_property
+    def impeller_clearance(self) -> float:
+        """Return the radial clearance between impeller and tube."""
+        return float(self._raw_data.get("impeller_clearance", 0.1))
+
+    @cached_property
     def bottom_cover_drain_radius(self) -> float:
         """Return the bottom cover central drainage hole radius."""
         return float(self._raw_data.get("bottom_cover_drain_radius", 8.0))
+
+    @cached_property
+    def rubber_feet_count(self) -> int:
+        """Return the number of rubber feet depressions on the bottom cover."""
+        return int(self._raw_data.get("rubber_feet_count", 4))
+
+    @cached_property
+    def rubber_feet_radius(self) -> float:
+        """Return the radius of the rubber feet depressions in millimeters."""
+        return float(self._raw_data.get("rubber_feet_radius", 5.5))
+
+    @cached_property
+    def rubber_feet_depth(self) -> float:
+        """Return the depth of the rubber feet depressions in millimeters."""
+        return float(self._raw_data.get("rubber_feet_depth", 1.0))
+
+    @cached_property
+    def rubber_feet_pitch_radius(self) -> float:
+        """Return the radial pitch distance from center for rubber feet depressions."""
+        return float(self._raw_data.get("rubber_feet_pitch_radius", 78.0))
 
     @cached_property
     def pcb_hole_radius(self) -> float:
@@ -345,6 +434,16 @@ class CatFountainConfig(BaseModel):
     def proximity_sensor_standoff_height(self) -> float:
         """Return standoff height for the proximity sensor."""
         return float(self._raw_data.get("proximity_sensor_standoff_height", 4.0))
+
+    @cached_property
+    def proximity_sensor_pocket_width(self) -> float:
+        """Return pocket width for the proximity sensor."""
+        return float(self._raw_data.get("proximity_sensor_pocket_width", 12.0))
+
+    @cached_property
+    def proximity_sensor_pocket_height(self) -> float:
+        """Return pocket height for the proximity sensor."""
+        return float(self._raw_data.get("proximity_sensor_pocket_height", 14.0))
 
     # Raspberry Pi Pico
     @cached_property
@@ -500,6 +599,11 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("boss_body_height", 2.0))
 
     @cached_property
+    def motor_boss_height(self) -> float:
+        """Return the total height of the motor mounting boss."""
+        return float(self._raw_data.get("motor_boss_height", 20.0))
+
+    @cached_property
     def motor_collar_clearance_radius(self) -> float:
         """Return the motor collar clearance hole radius."""
         return float(self._raw_data.get("motor_collar_clearance_radius", 3.2))
@@ -581,3 +685,160 @@ class CatFountainConfig(BaseModel):
     def retention_boss_height(self) -> float:
         """Return the height of the retention boss limiting vertical travel."""
         return float(self._raw_data.get("retention_boss_height", 1.0))
+
+    # Magnetic Centrifugal Pump Redesign
+    @cached_property
+    def magnet_radius(self) -> float:
+        """Return the radius of the N52 coupling magnets."""
+        return float(self._raw_data.get("magnet_radius", 3.0))
+
+    @cached_property
+    def magnet_thickness(self) -> float:
+        """Return the thickness of the N52 coupling magnets."""
+        return float(self._raw_data.get("magnet_thickness", 3.0))
+
+    @cached_property
+    def magnet_clearance(self) -> float:
+        """Return the pocket clearance for inserting the coupling magnets."""
+        return float(self._raw_data.get("magnet_clearance", 0.1))
+
+    @cached_property
+    def magnet_count(self) -> int:
+        """Return the number of coupling magnets in the drive and rotor rings."""
+        return int(self._raw_data.get("magnet_count", 4))
+
+    @cached_property
+    def magnet_ring_radius(self) -> float:
+        """Return the radial distance of the magnets from the center of rotation."""
+        return float(self._raw_data.get("magnet_ring_radius", 12.0))
+
+    @cached_property
+    def pump_well_depth(self) -> float:
+        """Return the depth of the central isolation pump well."""
+        return float(self._raw_data.get("pump_well_depth", 10.0))
+
+    @cached_property
+    def pump_well_wall(self) -> float:
+        """Return the wall thickness of the central isolation pump well."""
+        return float(self._raw_data.get("pump_well_wall", 1.5))
+
+    @cached_property
+    def pump_inlet_radius(self) -> float:
+        """Return the radius of the axial water inlet."""
+        return float(self._raw_data.get("pump_inlet_radius", 6.0))
+
+    @cached_property
+    def pump_inlet_width(self) -> float:
+        """Return the width of the pump cover side water intake slot."""
+        return float(self._raw_data.get("pump_inlet_width", 12.0))
+
+    @cached_property
+    def pump_inlet_height(self) -> float:
+        """Return the height of the pump cover side water intake slot."""
+        return float(self._raw_data.get("pump_inlet_height", 4.0))
+
+    @cached_property
+    def pump_cover_height(self) -> float:
+        """Return the height of the pump cover cap over the casing."""
+        return float(self._raw_data.get("pump_cover_height", 4.0))
+
+    @cached_property
+    def pump_cover_sleeve_height(self) -> float:
+        """Return the height of the pump cover tube sleeve."""
+        return float(self._raw_data.get("pump_cover_sleeve_height", 8.0))
+
+    @cached_property
+    def pump_cover_tube_clearance(self) -> float:
+        """Return the clearance for the pump cover sleeve sliding over the tube."""
+        return float(self._raw_data.get("pump_cover_tube_clearance", 0.35))
+
+    @cached_property
+    def pump_cover_snap_clearance(self) -> float:
+        """Return the radial clearance for the pump cover downward lip entering the casing recess."""
+        return float(self._raw_data.get("pump_cover_snap_clearance", 0.45))
+
+    @cached_property
+    def pump_cover_lip_thickness(self) -> float:
+        """Return the thickness of the pump cover downward lip."""
+        return float(self._raw_data.get("pump_cover_lip_thickness", 1.5))
+
+    @cached_property
+    def pump_cover_internal_clearance(self) -> float:
+        """Return the extra radial clearance inside the pump cover over the volute chamber."""
+        return float(self._raw_data.get("pump_cover_internal_clearance", 0.40))
+
+    @cached_property
+    def pump_cover_clip_opening_width(self) -> float:
+        """Return the width of the North-facing snap opening in the pump cover tube sleeve."""
+        return float(self._raw_data.get("pump_cover_clip_opening_width", 14.8))
+
+    @cached_property
+    def pump_outlet_radius(self) -> float:
+        """Return the inner radius of the tangential water outlet nozzle."""
+        return float(self._raw_data.get("pump_outlet_radius", 4.0))
+
+    @cached_property
+    def pump_casing_clearance(self) -> float:
+        """Return the tight clearance inside the scroll casing around the impeller."""
+        return float(self._raw_data.get("pump_casing_clearance", 1.0))
+
+    @cached_property
+    def drive_hub_shaft_radius(self) -> float:
+        """Return the motor shaft hole radius on the drive hub."""
+        return float(self._raw_data.get("drive_hub_shaft_radius", 0.85))
+
+    @cached_property
+    def drive_hub_recess_radius(self) -> float:
+        """Return the radius of the bowl's recess for the drive hub."""
+        return float(self._raw_data.get("drive_hub_recess_radius", 17.0))
+
+    @cached_property
+    def drive_hub_recess_depth(self) -> float:
+        """Return the depth of the bowl's recess for the drive hub."""
+        return float(self._raw_data.get("drive_hub_recess_depth", 5.3))
+
+    @cached_property
+    def drive_hub_standoff_radius(self) -> float:
+        """Return the outer radius of the drive hub standoff thrust ring."""
+        return float(self._raw_data.get("drive_hub_standoff_radius", 2.5))
+
+    @cached_property
+    def drive_hub_standoff_height(self) -> float:
+        """Return the height of the drive hub standoff thrust ring."""
+        return float(self._raw_data.get("drive_hub_standoff_height", 0.8))
+
+    @cached_property
+    def bottom_cover_opening_width(self) -> float:
+        """Return the width of the bottom cover side opening."""
+        return float(self._raw_data.get("bottom_cover_opening_width", 20.0))
+
+    @cached_property
+    def motor_clip_width(self) -> float:
+        """Return the width of the motor retaining clip."""
+        return float(self._raw_data.get("motor_clip_width", 17.6))
+
+    @cached_property
+    def motor_clip_thickness(self) -> float:
+        """Return the thickness of the motor retaining clip."""
+        return float(self._raw_data.get("motor_clip_thickness", 1.8))
+
+    @cached_property
+    def motor_clip_length(self) -> float:
+        """Return the length of the motor retaining clip."""
+        return float(self._raw_data.get("motor_clip_length", 26.0))
+
+    @cached_property
+    def motor_clip_cutout_width(self) -> float:
+        """Return the cutout width of the motor retaining clip U-fork."""
+        return float(self._raw_data.get("motor_clip_cutout_width", 14.2))
+
+    def __init__(self, **data: Any):
+        """Initialize settings and calculate physical defaults."""
+        super().__init__(**data)
+        if self.damping_boundary is None:
+            r_s = 0.0015
+            spacing = 1.3 * r_s
+            mass = 1000.0 * (spacing**3)
+            dt_sub = 1.0 / 1200.0
+            safety_factor = 225.0
+            self.damping_boundary = float((safety_factor * mass) / dt_sub)

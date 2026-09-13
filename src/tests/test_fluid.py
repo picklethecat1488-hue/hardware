@@ -378,6 +378,7 @@ def test_fluid_simulator_dynamic_properties():
             link_type=LinkType.IMPELLER,
             radius=0.0,
             link_idx=0,
+            impeller_shaft_radius=2.5,
         ),
     }
 
@@ -455,10 +456,10 @@ def test_fluid_simulator_dynamic_properties():
             return ((-0.008, 0.049, 0.0), (0.008, 0.065, 0.100))
         return ((0, 0, 0), (0, 0, 0))
 
-    def mock_get_link_state(body_id, link_idx, physicsClientId):
+    def mock_get_link_state(body_id, link_idx, computeLinkVelocity=0, physicsClientId=None):
         if link_idx == 2:
-            return (None, None, None, None, (0.0, 0.0, 0.025), (0.0, 0.0, 0.0, 1.0))
-        return (None, None, None, None, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
+            return (None, None, None, None, (0.0, 0.0, 0.025), (0.0, 0.0, 0.0, 1.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
+        return (None, None, None, None, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
 
     def mock_get_base_position_and_orientation(body_id, physicsClientId):
         return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)
@@ -475,6 +476,7 @@ def test_fluid_simulator_dynamic_properties():
         patch("pybullet.createCollisionShape", return_value=0),
         patch("pybullet.createVisualShape", return_value=0),
         patch("pybullet.getBasePositionAndOrientation", side_effect=mock_get_base_position_and_orientation),
+        patch("pybullet.getBaseVelocity", return_value=((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))),
         patch("pybullet.getDynamicsInfo", side_effect=mock_get_dynamics_info),
     ):
         sim = Fluid(
@@ -640,7 +642,34 @@ def test_compute_boundary_forces_reads_tube_y():
     vel = jnp.zeros((1, 3), dtype=jnp.float32)
     b_pos_arr = jnp.zeros((1, 3), dtype=jnp.float32)
     b_orn_arr = jnp.array([[0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
-    boundary_configs = (spout_deflection_cfg,)
+
+    # Pack parameters
+    b_shapes = jnp.array([1], dtype=jnp.int32)
+    b_types = jnp.array([1], dtype=jnp.int32)
+    b_params = jnp.array(
+        [
+            [
+                0.013,  # radius
+                0.0,  # height
+                0.040,  # thickness
+                0.0,  # z_offset
+                0.0,  # slot_height
+                0.0,  # slot_width
+                0.0,  # ceiling_thickness
+                0.0,  # vane_thickness
+                0.0,  # num_vanes
+                0.0,  # vane_twist_rad
+                0.0,  # cutoff_y
+                1.0,  # has_tube
+                0.0,  # has_drain
+                0.0,  # tube_radius
+                0.0,  # drain_hole_y
+                0.0,  # drain_hole_radius
+                0.20,  # boundary_friction
+            ]
+        ],
+        dtype=jnp.float32,
+    )
 
     # Call the JIT function
     forces, torque = _compute_boundary_forces_jax(
@@ -651,9 +680,1105 @@ def test_compute_boundary_forces_reads_tube_y():
         D=5.0,
         b_pos_arr=b_pos_arr,
         b_orn_arr=b_orn_arr,
-        boundary_configs=boundary_configs,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
         omega=0.0,
         t=0.0,
     )
     # The function compiles and executes successfully
     assert forces is not None
+
+
+def test_particleset_happy_path():
+    """Verify that ParticleSet behaves correctly for happy path operations."""
+    import numpy as np
+    from provider.fluid import ParticleSet
+
+    pset = ParticleSet(10)
+    assert len(pset) == 0
+    assert 3 not in pset
+
+    # Single add
+    pset.add(3)
+    assert len(pset) == 1
+    assert 3 in pset
+
+    # Vectorized multiple add
+    pset.add_multiple(np.array([1, 5, 7]))
+    assert len(pset) == 4
+    assert 1 in pset
+    assert 5 in pset
+    assert 7 in pset
+
+    # Iteration
+    indices = sorted(list(pset))
+    assert indices == [1, 3, 5, 7]
+
+    # Clear
+    pset.clear()
+    assert len(pset) == 0
+    assert 3 not in pset
+
+
+def test_particleset_sad_path():
+    """Verify that ParticleSet handles index bounds correctly (sad path)."""
+    import pytest
+    from provider.fluid import ParticleSet
+
+    pset = ParticleSet(5)
+    with pytest.raises(IndexError):
+        pset.add(5)
+
+    with pytest.raises(IndexError):
+        pset.add(-6)
+
+
+def test_physics_step_spout_forcing_happy():
+    """Verify that _physics_step_jax runs successfully with dynamic tube forcing (happy path)."""
+    import jax.numpy as jnp
+    from provider.fluid import _physics_step_jax, PhysicsConfig
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    # Happy path: tube configuration with non-zero tube_velocity
+    base_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.BASE,
+        radius=0.1,
+        height=0.05,
+        link_idx=-1,
+    )
+    tube_cfg = BoundaryConfig(
+        shape=ShapeType.TUBE,
+        link_type=LinkType.TUBE,
+        radius=0.010,
+        height=0.03,
+        spout_radius=0.005,
+        spout_height=0.010,
+        xyz=(0.0, 0.04, 0.0),
+        link_idx=1,
+    )
+
+    pos = jnp.array([[0.0, 0.0, 0.02]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 32, 32, 28), dtype=jnp.float32)
+    b_pos = jnp.array([[0.0, 0.0, 0.0], [0.0, 0.04, 0.0]], dtype=jnp.float32)
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+
+    config = PhysicsConfig(
+        mass=1e-6,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=(base_cfg, tube_cfg),
+        gravity=(0.0, 0.0, -9.81),
+        base_idx=0,
+        K_boundary=1000.0,
+        D_boundary=5.0,
+        r_s=0.003,
+        high_damping_value=0.998,
+        nx=32,
+        ny=32,
+        nz=28,
+        dx=0.005,
+        origin=(-0.075, -0.075, 0.0),
+    )
+
+    pos_next, vel_next, f_next, torque_accum, b_forces = _physics_step_jax(
+        pos,
+        vel,
+        f_lbm,
+        b_pos,
+        b_orn,
+        jnp.zeros(3, dtype=jnp.float32),
+        120.0,
+        0.0,
+        -1.0,
+        config=config,
+    )
+
+    assert pos_next is not None
+    assert vel_next is not None
+    assert f_next is not None
+    assert torque_accum is not None
+    assert b_forces is not None
+
+
+def test_physics_step_spout_forcing_sad():
+    """Verify that _physics_step_jax falls back cleanly when no tube config is present (sad path)."""
+    import jax.numpy as jnp
+    from provider.fluid import _physics_step_jax, PhysicsConfig
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    # Sad path: no tube configuration, only base
+    base_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.BASE,
+        radius=0.1,
+        height=0.05,
+        link_idx=-1,
+    )
+
+    pos = jnp.array([[0.0, 0.0, 0.02]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 32, 32, 28), dtype=jnp.float32)
+    b_pos = jnp.array([[0.0, 0.0, 0.0]], dtype=jnp.float32)
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+
+    config = PhysicsConfig(
+        mass=1e-6,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=(base_cfg,),
+        gravity=(0.0, 0.0, -9.81),
+        base_idx=0,
+        K_boundary=1000.0,
+        D_boundary=5.0,
+        r_s=0.003,
+        high_damping_value=0.998,
+        nx=32,
+        ny=32,
+        nz=28,
+        dx=0.005,
+        origin=(-0.075, -0.075, 0.0),
+    )
+
+    pos_next, vel_next, f_next, torque_accum, b_forces = _physics_step_jax(
+        pos,
+        vel,
+        f_lbm,
+        b_pos,
+        b_orn,
+        jnp.zeros(3, dtype=jnp.float32),
+        120.0,
+        0.0,
+        -1.0,
+        config=config,
+    )
+
+    assert pos_next is not None
+    assert vel_next is not None
+    assert f_next is not None
+    assert torque_accum is not None
+    assert b_forces is not None
+
+
+def test_physics_step_casing_suction_happy():
+    """Verify that casing suction force is correctly applied in the suction zone (happy path)."""
+    import jax.numpy as jnp
+    from provider.fluid import _physics_step_jax, PhysicsConfig
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    base_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.BASE,
+        radius=0.1,
+        height=0.05,
+        link_idx=-1,
+    )
+    casing_cfg = BoundaryConfig(
+        shape=ShapeType.CASING,
+        type=BoundaryType.SOLID_CAVITY,
+        link_type=LinkType.LID,
+        radius=0.028,
+        height=0.010,
+        link_idx=1,
+        cutoff_y=0.0,
+        has_intake=True,
+        intake_hole_radius=0.010,
+        intake_hole_z=0.010,
+    )
+
+    # Particle position directly in the suction zone: above casing cover, near center
+    # casing_pos is (0.0, 0.0, 0.0)
+    pos = jnp.array([[0.005, 0.005, 0.012]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 32, 32, 28), dtype=jnp.float32)
+    b_pos = jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=jnp.float32)
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+
+    config = PhysicsConfig(
+        mass=1e-6,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=(base_cfg, casing_cfg),
+        gravity=(0.0, 0.0, -9.81),
+        base_idx=0,
+        K_boundary=1000.0,
+        D_boundary=5.0,
+        r_s=0.003,
+        high_damping_value=0.998,
+        nx=32,
+        ny=32,
+        nz=28,
+        dx=0.005,
+        origin=(-0.075, -0.075, 0.0),
+    )
+
+    # Run physics step with high omega to generate a strong suction force
+    pos_next, vel_next, f_next, torque_accum, b_forces = _physics_step_jax(
+        pos,
+        vel,
+        f_lbm,
+        b_pos,
+        b_orn,
+        jnp.zeros(3, dtype=jnp.float32),
+        120.0,
+        0.0,
+        -1.0,
+        config=config,
+    )
+
+    # With high suction force directed downwards and inwards, vel_next should have a negative Z component
+    assert vel_next[0, 2] < -0.02
+
+
+def test_physics_step_casing_suction_sad():
+    """Verify that no casing suction force is applied to particles outside the suction zone (sad path)."""
+    import jax.numpy as jnp
+    from provider.fluid import _physics_step_jax, PhysicsConfig
+    from model import BoundaryConfig, ShapeType, BoundaryType
+    from provider.bullet import LinkType
+
+    base_cfg = BoundaryConfig(
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        link_type=LinkType.BASE,
+        radius=0.1,
+        height=0.05,
+        link_idx=-1,
+    )
+    casing_cfg = BoundaryConfig(
+        shape=ShapeType.CASING,
+        type=BoundaryType.SOLID_CAVITY,
+        link_type=LinkType.LID,
+        radius=0.028,
+        height=0.010,
+        link_idx=1,
+        cutoff_y=0.0,
+        has_intake=True,
+        intake_hole_radius=0.010,
+        intake_hole_z=0.010,
+    )
+
+    # Particle position far outside the suction zone (e.g. horizontally far from center)
+    pos = jnp.array([[0.050, 0.0, 0.012]], dtype=jnp.float32)
+    vel = jnp.zeros((1, 3), dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 32, 32, 28), dtype=jnp.float32)
+    b_pos = jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=jnp.float32)
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+
+    config = PhysicsConfig(
+        mass=1e-6,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=(base_cfg, casing_cfg),
+        gravity=(0.0, 0.0, 0.0),  # Zero gravity to isolate suction effect
+        base_idx=0,
+        K_boundary=1000.0,
+        D_boundary=5.0,
+        r_s=0.003,
+        high_damping_value=0.998,
+        nx=32,
+        ny=32,
+        nz=28,
+        dx=0.005,
+        origin=(-0.075, -0.075, 0.0),
+    )
+
+    pos_next, vel_next, f_next, torque_accum, b_forces = _physics_step_jax(
+        pos,
+        vel,
+        f_lbm,
+        b_pos,
+        b_orn,
+        jnp.zeros(3, dtype=jnp.float32),
+        120.0,
+        0.0,
+        -1.0,
+        config=config,
+    )
+
+    # Since the particle is far from the casing center, suction acceleration should be zero,
+    # and since gravity is also zero, vel_next should remain zero.
+    assert jnp.allclose(vel_next, 0.0, atol=1e-5)
+
+
+def test_voxel_primitive_cutouts():
+    """Verify that TubeWallPrimitive and CasingWallPrimitive cutouts are computed correctly."""
+    from provider.fluid import CasingWallPrimitive, TubeWallPrimitive
+
+    # CasingWallPrimitive: centered at (0, 0), r_inner=18mm, r_outer=28mm, z_min=0, z_max=0.010
+    # Cutout should be at y > 0, |x| < slot_width/2, z < slot_height
+    casing = CasingWallPrimitive(
+        x=0.0,
+        y=0.0,
+        r_inner=0.018,
+        r_outer=0.028,
+        z_min=0.0,
+        z_max=0.010,
+        slot_height=0.009,
+        slot_width=0.008,
+    )
+
+    # A point inside the solid casing wall but not in the cutout
+    assert casing.is_solid(0.0, -0.023, 0.005) is True  # y < 0
+    assert casing.is_solid(0.023, 0.0, 0.005) is True  # x > slot_width/2
+    assert casing.is_solid(0.0, 0.023, 0.0095) is True  # z > slot_height
+
+    # A point inside the cutout connection (should NOT be solid)
+    assert casing.is_solid(0.0, 0.023, 0.005) is False
+
+    # TubeWallPrimitive: centered at (0, 0.028), r_inner=8mm, r_outer=18mm, z_min=0, z_max=0.120
+    # Cutout should be at y < self.y (facing the casing), |x - self.x| < slot_width/2, z < slot_height
+    tube = TubeWallPrimitive(
+        x=0.0,
+        y=0.028,
+        r_inner=0.008,
+        r_outer=0.018,
+        z_min=0.0,
+        z_max=0.120,
+        slot_height=0.009,
+        slot_width=0.008,
+    )
+
+    # A point inside the solid tube wall but not in the cutout
+    assert tube.is_solid(0.0, 0.028 + 0.013, 0.005) is True  # y > self.y (wrong side)
+    assert tube.is_solid(0.013, 0.028, 0.005) is True  # x > slot_width/2
+    assert tube.is_solid(0.0, 0.028 - 0.013, 0.0095) is True  # z > slot_height
+
+    # A point inside the cutout connection (should NOT be solid)
+    assert tube.is_solid(0.0, 0.028 - 0.013, 0.005) is False
+
+
+def test_airborne_freefall_particles_maintain_ballistic_velocity():
+    """Verify that airborne particles falling in mid-air outside the tube maintain ballistic velocity without spurious rotation."""
+    import jax.numpy as jnp
+    from model.boundary_config import BoundaryConfig, BoundaryType, ShapeType
+    from provider.bullet import LinkType
+    from provider.fluid import PhysicsConfig, _physics_step_jax
+
+    # Particle in mid-air outside the tube, falling down
+    pos = jnp.array([[0.0, -0.020, 0.060]], dtype=jnp.float32)
+    vel = jnp.array([[0.0, 0.0, -0.5]], dtype=jnp.float32)
+    f_lbm = jnp.zeros((15, 16, 16, 16), dtype=jnp.float32)
+
+    # Base bowl, casing, tube, and spinning impeller
+    b_bowl = BoundaryConfig(
+        link_type=LinkType.BASE,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.100,
+        height=0.107,
+        link_idx=-1,
+    )
+    b_casing = BoundaryConfig(
+        link_type=LinkType.CASING,
+        shape=ShapeType.CASING,
+        type=BoundaryType.SOLID_CAVITY,
+        radius=0.028,
+        height=0.010,
+        thickness=0.010,
+        ceiling_thickness=0.002,
+        slot_height=0.009,
+        slot_width=0.008,
+        link_idx=-1,
+    )
+    b_tube = BoundaryConfig(
+        link_type=LinkType.TUBE,
+        shape=ShapeType.TUBE,
+        type=BoundaryType.SOLID_CAVITY,
+        radius=0.018,
+        height=0.066,
+        thickness=0.010,
+        slot_height=0.009,
+        slot_width=0.008,
+        xyz=(0.0, 0.028, 0.0),
+        link_idx=-1,
+    )
+    b_impeller = BoundaryConfig(
+        link_type=LinkType.IMPELLER,
+        shape=ShapeType.IMPELLER,
+        type=BoundaryType.SOLID,
+        radius=0.009,
+        height=0.015,
+        thickness=0.003,
+        vane_thickness=0.001,
+        num_vanes=6,
+        vane_twist=-15.0,
+        link_idx=-1,
+    )
+
+    b_pos = jnp.array(
+        [
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.028, 0.0],
+            [0.0, 0.0, 0.0],
+        ],
+        dtype=jnp.float32,
+    )
+    b_orn = jnp.array([[0.0, 0.0, 0.0, 1.0]] * 4, dtype=jnp.float32)
+
+    config = PhysicsConfig(
+        mass=1.4e-5,
+        dt_sub=1.0 / 240.0,
+        n_substeps=1,
+        boundary_configs=[b_bowl, b_casing, b_tube, b_impeller],
+        gravity=jnp.array([0.0, 0.0, -9.81], dtype=jnp.float32),
+        base_idx=0,
+        K_boundary=5000.0,
+        D_boundary=15.0,
+        r_s=0.0015,
+        high_damping_value=0.995,
+        nx=16,
+        ny=16,
+        nz=16,
+        dx=0.010,
+        origin=(-0.08, -0.08, 0.0),
+    )
+
+    # Step simulation with spinning impeller
+    pos_next, vel_next, f_next, _, b_forces = _physics_step_jax(
+        pos,
+        vel,
+        f_lbm,
+        b_pos,
+        b_orn,
+        jnp.zeros(3, dtype=jnp.float32),
+        120.0,
+        0.0,
+        0.995,
+        config=config,
+    )
+
+    # Airborne particle should not receive horizontal rotation/swirl from the spinning impeller LBM grid
+    assert jnp.isclose(vel_next[0, 0], 0.0, atol=1e-4)
+    assert jnp.isclose(vel_next[0, 1], 0.0, atol=1e-4)
+    # Particle should continue accelerating downward under gravity
+    assert vel_next[0, 2] < -0.50
+    assert b_forces.shape == (1, 3)
+
+
+def test_moving_boundary_force_client_api():
+    """Verify that Fluid exposes moving boundary interaction forces and voxel-mapped forces to clients."""
+    import jax.numpy as jnp
+    import numpy as np
+    from model.boundary_config import BoundaryConfig, BoundaryType, ShapeType
+    from provider.bullet import LinkType
+    from provider.fluid import Fluid, FluidConfig
+
+    b_bowl = BoundaryConfig(
+        link_type=LinkType.BASE,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.096,
+        height=0.096,
+        link_idx=-1,
+    )
+
+    boundaries = {"bowl": b_bowl}
+    config = FluidConfig.water(
+        target_volume=0.00001,
+        boundaries=boundaries,
+    )
+
+    fluid = Fluid(config=config)
+    fluid.n_particles = 10
+    fluid.pos_jax = jnp.zeros((10, 3), dtype=jnp.float32)
+    fluid.vel_jax = jnp.zeros((10, 3), dtype=jnp.float32)
+    fluid.last_positions = [(0.0, 0.0, 0.01) for _ in range(10)]
+    fluid.last_boundary_forces = np.ones((10, 3), dtype=np.float32) * 0.05
+
+    # 1. Boundary forces on particles
+    b_forces = fluid.get_boundary_forces()
+    assert b_forces.shape == (10, 3)
+    assert np.allclose(b_forces, 0.05)
+
+    # 2. Voxel mapped forces
+    fluid.last_voxel_positions = np.array([[0.0, 0.0, 0.01], [0.01, 0.0, 0.01]], dtype=np.float32)
+    voxel_forces = fluid.get_voxel_forces()
+    assert voxel_forces.shape == (2, 3)
+    assert np.allclose(voxel_forces, 0.05)
+
+    # 3. Net reaction force on moving boundary body
+    reaction_force = fluid.get_boundary_reaction_force()
+    assert reaction_force.shape == (3,)
+    assert np.allclose(reaction_force, -0.50)
+
+    # 4. Reaction torque
+    fluid.torques = [0.012]
+    reaction_torque = fluid.get_boundary_reaction_torque()
+    assert abs(reaction_torque - 0.012) < 1e-5
+
+
+def test_boundary_voxels_labeled_by_type():
+    """Verify that Fluid and FluidPostProcessor extract 3D voxels labeled for each boundary type."""
+    import pybullet as p
+    from unittest.mock import MagicMock
+    from model.boundary_config import BoundaryConfig, BoundaryType, ShapeType
+    from provider.bullet import LinkType
+    from provider.fluid import Fluid, FluidConfig
+
+    b_bowl = BoundaryConfig(
+        link_type=LinkType.BASE,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.060,
+        height=0.096,
+        thickness=0.005,
+        link_idx=-1,
+    )
+    b_casing = BoundaryConfig(
+        link_type=LinkType.CASING,
+        shape=ShapeType.CASING,
+        type=BoundaryType.SOLID_CAVITY,
+        radius=0.028,
+        height=0.010,
+        thickness=0.004,
+        link_idx=-1,
+    )
+    b_tube = BoundaryConfig(
+        link_type=LinkType.TUBE,
+        shape=ShapeType.TUBE,
+        type=BoundaryType.SOLID_CAVITY,
+        radius=0.018,
+        height=0.066,
+        thickness=0.004,
+        xyz=(0.0, 0.028, 0.0),
+        link_idx=-1,
+    )
+    b_lid = BoundaryConfig(
+        link_type=LinkType.LID,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.050,
+        height=0.0035,
+        thickness=0.0035,
+        has_drain=True,
+        drain_hole_y=-0.010,
+        drain_hole_radius=0.020,
+        has_tube=True,
+        tube_radius=0.008,
+        link_idx=-1,
+    )
+    b_impeller = BoundaryConfig(
+        link_type=LinkType.IMPELLER,
+        shape=ShapeType.IMPELLER,
+        type=BoundaryType.SOLID,
+        radius=0.009,
+        height=0.015,
+        thickness=0.003,
+        vane_thickness=0.001,
+        num_vanes=4,
+        vane_twist=-15.0,
+        link_idx=-1,
+    )
+
+    boundaries = {
+        "bowl": b_bowl,
+        "casing": b_casing,
+        "tube": b_tube,
+        "lid": b_lid,
+        "impeller": b_impeller,
+    }
+
+    mock_state_tracker = MagicMock()
+    config = FluidConfig.water(
+        target_volume=0.00001,
+        boundaries=boundaries,
+    )
+
+    fluid = Fluid(
+        config=config,
+        state_tracker=mock_state_tracker,
+    )
+
+    voxels = fluid.get_boundary_voxels()
+    assert isinstance(voxels, dict)
+    # Check that each configured boundary type has voxel entries
+    assert "bowl" in voxels
+    assert "casingwall" in voxels
+    assert "tubewall" in voxels
+    assert "lid" in voxels
+    assert "impeller" in voxels
+
+    assert len(voxels["bowl"]) > 0
+    assert len(voxels["casingwall"]) > 0
+    assert len(voxels["tubewall"]) > 0
+    assert len(voxels["lid"]) > 0
+    assert len(voxels["impeller"]) > 0
+
+    # Ensure state tracker receives the boundary voxels on explicit update
+    fluid.state_tracker.boundary_voxels = fluid.get_boundary_voxels()
+    assert mock_state_tracker.boundary_voxels is not None
+    assert "bowl" in mock_state_tracker.boundary_voxels
+    assert "lid" in mock_state_tracker.boundary_voxels
+
+
+def test_show_boundary_voxels_env_gating(monkeypatch):
+    """Verify that boundary voxels logging is disabled by default and enabled via SHOW_BOUNDARY_VOXELS env var."""
+    from unittest.mock import MagicMock
+    from model.boundary_config import BoundaryConfig, BoundaryType, ShapeType
+    from provider.bullet import LinkType
+    from provider.utils import str_to_bool, get_env_bool
+
+    # 1. Test str_to_bool utility
+    assert str_to_bool("1") is True
+    assert str_to_bool("true") is True
+    assert str_to_bool("TRUE") is True
+    assert str_to_bool("yes") is True
+    assert str_to_bool("on") is True
+    assert str_to_bool("enable") is True
+    assert str_to_bool("0") is False
+    assert str_to_bool("false") is False
+    assert str_to_bool("no") is False
+    assert str_to_bool("off") is False
+    assert str_to_bool(None, default=False) is False
+    assert str_to_bool("unknown", default=True) is True
+
+    # 2. Test get_env_bool utility
+    monkeypatch.delenv("SHOW_BOUNDARY_VOXELS", raising=False)
+    assert get_env_bool("SHOW_BOUNDARY_VOXELS", False) is False
+
+    monkeypatch.setenv("SHOW_BOUNDARY_VOXELS", "1")
+    assert get_env_bool("SHOW_BOUNDARY_VOXELS", False) is True
+
+    # 3. Test Fluid state_tracker gating
+    b_bowl = BoundaryConfig(
+        link_type=LinkType.BASE,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.SOLID,
+        radius=0.08,
+        height=0.05,
+        thickness=0.002,
+        link_idx=-1,
+    )
+    boundaries = {"bowl": b_bowl}
+    config = FluidConfig.water(
+        target_volume=0.00001,
+        boundaries=boundaries,
+    )
+
+    # When SHOW_BOUNDARY_VOXELS is unset (default: False)
+    monkeypatch.delenv("SHOW_BOUNDARY_VOXELS", raising=False)
+    mock_tracker_disabled = MagicMock()
+    mock_tracker_disabled.boundary_voxels = None
+
+    fluid_disabled = Fluid(
+        config=config,
+        state_tracker=mock_tracker_disabled,
+    )
+    fluid_disabled._update_state_tracker()
+    assert mock_tracker_disabled.boundary_voxels is None
+
+    # When SHOW_BOUNDARY_VOXELS is set to '1' (enabled: True)
+    monkeypatch.setenv("SHOW_BOUNDARY_VOXELS", "1")
+    mock_tracker_enabled = MagicMock()
+    mock_tracker_enabled.boundary_voxels = None
+
+    fluid_enabled = Fluid(
+        config=config,
+        state_tracker=mock_tracker_enabled,
+    )
+    fluid_enabled._update_state_tracker()
+    assert mock_tracker_enabled.boundary_voxels is not None
+    assert "bowl" in mock_tracker_enabled.boundary_voxels
+
+
+def test_voxel_masks_consistent_with_surface_bounds():
+    """Verify consistency between voxel masks, surface normals, and precomputed CAD surface bounds."""
+    import jax.numpy as jnp
+    import numpy as np
+    from model.boundary_config import BoundaryConfig, BoundaryParam, BoundaryType, ShapeType
+    from provider.boundary import BoundaryProcessor
+    from provider.bullet import LinkType
+    from provider.fluid import _make_grid_masks
+
+    b_bowl = BoundaryConfig(
+        link_type=LinkType.BASE,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.060,
+        height=0.080,
+        thickness=0.005,
+        link_idx=-1,
+    )
+    b_tube = BoundaryConfig(
+        link_type=LinkType.TUBE,
+        shape=ShapeType.TUBE,
+        type=BoundaryType.SOLID_CAVITY,
+        radius=0.015,
+        height=0.060,
+        thickness=0.003,
+        xyz=(0.0, 0.020, 0.0),
+        link_idx=-1,
+    )
+    b_lid = BoundaryConfig(
+        link_type=LinkType.LID,
+        shape=ShapeType.CYLINDER,
+        type=BoundaryType.CAVITY,
+        radius=0.058,
+        height=0.005,
+        thickness=0.003,
+        has_drain=True,
+        drain_hole_y=-0.015,
+        drain_hole_radius=0.012,
+        has_tube=True,
+        tube_radius=0.015,
+        link_idx=-1,
+    )
+
+    boundary_list = [b_bowl, b_tube, b_lid]
+    base_pos = (0.0, 0.0, 0.0)
+    base_orn = (0.0, 0.0, 0.0, 1.0)
+    processed = BoundaryProcessor.process(boundary_list, base_link_origin=(base_pos, base_orn))
+
+    dx = 0.003
+    nx, ny, nz = 48, 48, 36
+    origin = jnp.array([-0.072, -0.072, -0.010], dtype=jnp.float32)
+
+    solid_mask, tube_mask, solid_friction, normal_grid, smooth_occ = _make_grid_masks(
+        dx=dx,
+        origin=origin,
+        b_shapes=processed.b_shapes,
+        b_types=processed.b_types,
+        b_params=processed.b_params,
+        b_pos_arr=processed.b_pos_arr,
+        b_orn_arr=processed.b_orn_arr,
+        base_idx=0,
+        nx=nx,
+        ny=ny,
+        nz=nz,
+    )
+
+    solid_np = np.asarray(solid_mask)
+    tube_np = np.asarray(tube_mask)
+    normals_np = np.asarray(normal_grid)
+
+    # 1. Base bowl surface bounds check
+    bowl_surf = b_bowl.compute_surface_bounds()
+    assert processed.b_params[0, BoundaryParam.Z_BOTTOM] == bowl_surf.z_bottom
+    assert processed.b_params[0, BoundaryParam.Z_TOP] == bowl_surf.z_top
+    assert processed.b_params[0, BoundaryParam.R_INNER] == bowl_surf.r_inner
+    assert processed.b_params[0, BoundaryParam.R_OUTER] == bowl_surf.r_outer
+
+    # 2. Tube column interior clearing check: voxels inside tube bore must not be blocked
+    ix = np.arange(nx)
+    iy = np.arange(ny)
+    iz = np.arange(nz)
+    gx, gy, gz = np.meshgrid(ix, iy, iz, indexing="ij")
+    cx = float(origin[0]) + (gx + 0.5) * dx
+    cy = float(origin[1]) + (gy + 0.5) * dx
+    cz = float(origin[2]) + (gz + 0.5) * dx
+    coords_np = np.stack([cx, cy, cz], axis=-1)
+
+    tube_x, tube_y = 0.0, 0.020
+    tube_r_inner = b_tube.radius - b_tube.thickness
+    tube_r_sq = (coords_np[:, :, :, 0] - tube_x) ** 2 + (coords_np[:, :, :, 1] - tube_y) ** 2
+    in_bore = (tube_r_sq < (tube_r_inner - dx) ** 2) & (coords_np[:, :, :, 2] >= 0.0) & (coords_np[:, :, :, 2] <= 0.055)
+    # Bore interior must be active in tube_mask and cleared from solid_mask
+    assert np.any(tube_np[in_bore])
+    assert not np.any(solid_np[in_bore])
+
+    # 3. Normals on outer wall must point outward from solid cavity
+    outer_wall_nodes = (coords_np[:, :, :, 0] ** 2 + coords_np[:, :, :, 1] ** 2 >= (b_bowl.radius - dx) ** 2) & solid_np
+    if np.any(outer_wall_nodes):
+        node_normals = normals_np[outer_wall_nodes]
+        node_coords = coords_np[outer_wall_nodes]
+        radial_dots = node_normals[:, 0] * node_coords[:, 0] + node_normals[:, 1] * node_coords[:, 1]
+        # Inward-pointing cavity normals for container walls
+        assert np.all(radial_dots <= 1e-4)
+
+    # 4. Drain hole target centroid and edge drainage bounds consistency
+    lid_surf = b_lid.compute_surface_bounds()
+    assert processed.b_params[2, BoundaryParam.DRAIN_TARGET_Z] == lid_surf.drain_target_z
+    assert processed.b_params[2, BoundaryParam.DRAIN_INFLUENCE_RADIUS] == lid_surf.drain_influence_radius
+    assert processed.b_params[2, BoundaryParam.DRAIN_EDGE_R_MIN] == lid_surf.drain_edge_r_min
+    assert processed.b_params[2, BoundaryParam.DRAIN_EDGE_R_MAX] == lid_surf.drain_edge_r_max
+
+
+def test_canopy_ceiling_ccd_containment():
+    """Verify that particles rising inside a canopy boundary do not breach the inner ceiling.
+
+    Regression test for mid-air hovering fluid particles escaping through canopy ceiling.
+    """
+    import jax.numpy as jnp
+    from provider.fluid import _ccd_sphere_obstacle_boundary
+
+    sph_pos = jnp.array([0.0, 0.0, 0.100])
+    sph_radius = 0.015
+    sph_thickness = 0.003
+    r_inner = sph_radius - sph_thickness  # 0.012 m
+
+    # Test particles rising across 360-degree radial angles and multiple elevations:
+    angles = jnp.linspace(0.0, 2.0 * jnp.pi, 8, endpoint=False)
+    r_vals = jnp.linspace(0.001, r_inner + 0.002, 12)
+    pos_curr_list = []
+    pos_next_list = []
+    vel_next_list = []
+    for theta in angles:
+        cos_t, sin_t = float(jnp.cos(theta)), float(jnp.sin(theta))
+        for r in r_vals:
+            # Rising upward toward and past inner ceiling
+            pos_curr_list.append([r * cos_t, r * sin_t, 0.100 + 0.5 * float(r_inner)])
+            pos_next_list.append([r * cos_t, r * sin_t, 0.100 + float(r_inner) + 0.003])
+            vel_next_list.append([0.0, 0.0, 1.2])
+
+    pos_curr = jnp.array(pos_curr_list, dtype=jnp.float32)
+    pos_next = jnp.array(pos_next_list, dtype=jnp.float32)
+    vel_next = jnp.array(vel_next_list, dtype=jnp.float32)
+
+    pos_out, vel_out = _ccd_sphere_obstacle_boundary(pos_curr, pos_next, vel_next, sph_radius, sph_pos, sph_thickness)
+
+    # Invariant 1: No particle rising inside the dome may breach the inner ceiling into mid-air
+    dist_out = jnp.linalg.norm(pos_out - sph_pos, axis=-1)
+    assert jnp.all(dist_out <= r_inner + 1e-4), f"Canopy ceiling breached: max dist {jnp.max(dist_out)} > {r_inner}"
+
+    # Invariant 2: Particles hitting the ceiling must be deflected downward along the canopy curve
+    assert jnp.all(vel_out[:, 2] <= 0.0), f"Canopy deflection vertical velocity must be downward: {vel_out[:, 2]}"
+    # Invariant 3: Deflected particles must maintain outward radial momentum to emerge through side slots
+    r_xy_out = jnp.sqrt(pos_out[:, 0] ** 2 + pos_out[:, 1] ** 2)
+    v_radial = (pos_out[:, 0] * vel_out[:, 0] + pos_out[:, 1] * vel_out[:, 1]) / jnp.maximum(r_xy_out, 1e-6)
+    assert jnp.all(v_radial >= 0.0), f"Canopy deflection must direct particles radially outward: {v_radial}"
+
+
+def test_bowl_boundary_subfloor_solid():
+    """Verify that BowlBoundary marks all space below the floor as solid.
+
+    Regression test for fluid seeping or clipping through the bowl floor into the bottom dry compartment.
+    """
+    import numpy as np
+    from provider.boundary import BowlBoundary
+
+    radius = 0.095
+    z_floor = 0.041
+    height = 0.060
+    thick = 0.004
+
+    bowl = BowlBoundary(radius=radius, z_floor=z_floor, height=height, thickness=thick)
+
+    # Subfloor points under the reservoir
+    subfloor_z = np.array([0.035, 0.020, 0.000, -0.010], dtype=np.float32)
+    subfloor_r = np.array([0.0, 0.030, 0.080, 0.095], dtype=np.float32)
+    xs = subfloor_r
+    ys = np.zeros_like(xs)
+
+    is_sol = bowl.is_solid_vectorized(xs, ys, subfloor_z)
+    assert np.all(is_sol), f"Subfloor coordinates must be classified as solid: {is_sol}"
+
+    # Also test scalar is_solid
+    for x, y, z in zip(xs, ys, subfloor_z, strict=True):
+        assert bowl.is_solid(float(x), float(y), float(z)), f"Subfloor point ({x}, {y}, {z}) must be solid"
+
+
+def test_voxel_reconstructor_containment_bounds():
+    """Verify VoxelVolumeReconstructor discards any dilated voxels outside physical container containment.
+
+    Regression test for water voxels clipping through the outer bowl wall or floor.
+    """
+    import numpy as np
+    from model.boundary_config import BoundaryParam
+    from provider.boundary import BowlBoundary, ProcessedBoundaries, SHAPE_CYLINDER
+    from provider.fluid import VoxelVolumeReconstructor
+
+    dx = 0.0035
+    nx, ny, nz = 64, 64, 40
+    # Center = (0, 0, 0), bounds: x,y in [-0.112, 0.112], z in [0, 0.140]
+    z_floor = 0.041
+    r_inner = 0.095
+    thick = 0.004
+    r_outer = r_inner + thick
+
+    # Build mock ProcessedBoundaries
+    bowl = BowlBoundary(radius=r_inner, z_floor=z_floor, height=0.060, thickness=thick)
+    b_shapes = np.array([SHAPE_CYLINDER], dtype=np.int32)
+    b_types = np.array([1], dtype=np.int32)
+    b_params = np.zeros((1, 64), dtype=np.float32)
+    b_params[0, BoundaryParam.RADIUS] = r_inner
+    b_params[0, BoundaryParam.HEIGHT] = 0.060
+    b_params[0, BoundaryParam.THICKNESS] = thick
+    b_params[0, BoundaryParam.Z_OFFSET] = z_floor
+
+    b_pos = np.zeros((1, 3), dtype=np.float32)
+    b_orn = np.zeros((1, 4), dtype=np.float32)
+    b_orn[0, 3] = 1.0  # Identity quaternion [x, y, z, w]
+    b_vel = np.zeros((1, 3), dtype=np.float32)
+
+    pb = ProcessedBoundaries(
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos,
+        b_orn_arr=b_orn,
+        b_vel_arr=b_vel,
+        base_idx=0,
+        boundaries=[bowl],
+    )
+
+    origin = (-0.112, -0.112, 0.0)
+    iz_floor = int(np.floor((z_floor - origin[2]) / dx))
+
+    reconstructor = VoxelVolumeReconstructor(
+        nx=nx,
+        ny=ny,
+        nz=nz,
+        origin=origin,
+        dx=dx,
+        iz_floor=iz_floor,
+        processed_boundaries=pb,
+    )
+
+    # Place a fluid particle right at the inner wall edge (r = 0.0945, z = 0.050)
+    # Dilation by +/- 1 cell (3.5 mm) will generate voxels past the 4mm wall (r > 0.099)
+    positions = np.array(
+        [
+            [0.0945, 0.0, 0.050],
+            [0.0, 0.0, z_floor + 0.001],
+        ],
+        dtype=np.float32,
+    )
+
+    voxels = reconstructor.reconstruct(positions)
+    assert len(voxels) > 0, "Reconstructed voxels should not be empty"
+
+    # Verify containment invariants across all reconstructed voxels:
+    # 1. No voxel below container floor
+    assert np.all(voxels[:, 2] >= z_floor - 1e-4), f"Voxel found below floor: min z = {voxels[:, 2].min()}"
+
+    # 2. No voxel outside outer bowl radius
+    r_voxels = np.sqrt(voxels[:, 0] ** 2 + voxels[:, 1] ** 2)
+    assert np.all(r_voxels <= r_outer + 1e-4), f"Voxel found outside outer bowl radius: max r = {r_voxels.max()}"
+
+    # 3. Below top rim (z < z_top), no voxel outside inner radius
+    z_top = z_floor + 0.060
+    sub_rim_mask = voxels[:, 2] < z_top
+    assert np.all(r_voxels[sub_rim_mask] <= r_inner + 1e-4), (
+        f"Voxel found clipping through bowl wall: max r = {r_voxels[sub_rim_mask].max()} > {r_inner}"
+    )
+
+
+def test_integrate_particles_floor_non_penetration():
+    """Verify that particle integration strictly enforces floor non-penetration.
+
+    Regression test for particles sinking below the container floor.
+    """
+    import jax.numpy as jnp
+    from provider.fluid import _integrate_particles_subroutine
+
+    dt = 0.001
+    cavity_floor_z = 0.041
+    base_radius = 0.095
+
+    # Particles attempting to drop below floor
+    pos_curr = jnp.array([[0.0, 0.0, cavity_floor_z + 0.0005]], dtype=jnp.float32)
+    vel_world = jnp.array([[0.0, 0.0, -1.5]], dtype=jnp.float32)
+    accel = jnp.array([[0.0, 0.0, -9.81]], dtype=jnp.float32)
+
+    base_pos = jnp.zeros(3, dtype=jnp.float32)
+    base_orn = jnp.array([0.0, 0.0, 0.0, 1.0], dtype=jnp.float32)
+    base_vel = jnp.zeros(3, dtype=jnp.float32)
+
+    from model.boundary_config import BoundaryParam
+    from provider.boundary import SHAPE_CYLINDER
+
+    b_shapes = jnp.array([SHAPE_CYLINDER], dtype=jnp.int32)
+    b_types = jnp.array([1], dtype=jnp.int32)
+    b_params = jnp.zeros((1, 64), dtype=jnp.float32)
+    b_params = b_params.at[0, BoundaryParam.R_OUTER].set(base_radius)
+    b_params = b_params.at[0, BoundaryParam.Z_TOP].set(0.100)
+    b_params = b_params.at[0, BoundaryParam.Z_OFFSET].set(cavity_floor_z)
+    b_params = b_params.at[0, BoundaryParam.MAX_CEILING_Z].set(0.100)
+
+    b_pos_arr = jnp.zeros((1, 3), dtype=jnp.float32)
+    b_orn_arr = jnp.zeros((1, 4), dtype=jnp.float32)
+    b_orn_arr = b_orn_arr.at[0, 3].set(1.0)
+
+    pos_next, vel_next = _integrate_particles_subroutine(
+        pos_curr=pos_curr,
+        vel_world=vel_world,
+        accel=accel,
+        base_pos=base_pos,
+        base_orn=base_orn,
+        dt_sub=dt,
+        damping=0.998,
+        high_damping_value=0.50,
+        base_idx=0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        omega=0.0,
+        base_vel=base_vel,
+    )
+
+    # Invariant: particle must not penetrate below cavity_floor_z
+    assert float(pos_next[0, 2]) >= cavity_floor_z, f"Particle penetrated below floor: {pos_next[0, 2]}"
+    # Invariant: particle vertical velocity must be non-negative after floor impact
+    assert float(vel_next[0, 2]) >= 0.0, f"Particle vertical velocity must be non-negative: {vel_next[0, 2]}"
+
+
+def test_dynamic_fluid_bodies_column_volume_restoration():
+    """Verify that _compute_dynamic_fluid_bodies_jax maintains physical column height based on particle volume.
+
+    When particles in a column compress toward the cavity floor, surf_z_eff must reflect the
+    physical fluid volume (cavity_floor_z + col_count * vol_s / dx^2) rather than collapsing to the
+    compressed particle height, ensuring continuous upward hydrostatic restoring pressure.
+    """
+    import jax.numpy as jnp
+    from provider.fluid import _compute_dynamic_fluid_bodies_jax
+
+    dx = 0.0035
+    r_s = 0.0015
+    cavity_floor_z = 0.0410
+    z_max_pool = 0.1045
+    origin = jnp.array([-0.112, -0.112, 0.0], dtype=jnp.float32)
+
+    # 32 particles placed in a single cell (0, 0), all compressed near the floor (Z in [0.0411, 0.0430])
+    num_particles = 32
+    z_compressed = jnp.linspace(cavity_floor_z + 0.0001, cavity_floor_z + 0.0020, num_particles)
+    pos_local = jnp.stack(
+        [
+            jnp.zeros(num_particles, dtype=jnp.float32),
+            jnp.zeros(num_particles, dtype=jnp.float32),
+            z_compressed,
+        ],
+        axis=-1,
+    )
+
+    in_fluid_body, p_surf_z, _, col_count = _compute_dynamic_fluid_bodies_jax(
+        pos_local=pos_local,
+        dx=dx,
+        origin=origin,
+        nx=64,
+        ny=64,
+        nz=40,
+        cavity_floor_z=cavity_floor_z,
+        z_max_pool=z_max_pool,
+        r_s=r_s,
+    )
+
+    vol_s = (4.0 / 3.0) * math.pi * (r_s**3)
+    expected_col_depth = (num_particles * vol_s) / (dx * dx)
+    expected_surf_z = cavity_floor_z + expected_col_depth
+
+    # Assert that column count is accurately aggregated
+    assert float(col_count[0]) == num_particles
+
+    # Invariant: p_surf_z must reflect physical column volume (~0.078m), NOT compressed particle max (~0.043m)
+    assert float(p_surf_z[0]) >= expected_surf_z - 1e-4, (
+        f"Surface height collapsed to compressed particle level: got {p_surf_z[0]}, expected >= {expected_surf_z}"
+    )
+
+    # Invariant: all compressed particles in the column remain inside the active fluid body
+    assert bool(jnp.all(in_fluid_body))
+
+    # Invariant: depth pressure gradient is strictly positive to restore 3D column height
+    depth_pressure = (p_surf_z[0] - pos_local[0, 2]) / (4.0 * r_s)
+    assert float(depth_pressure) >= 4.0, f"Insufficient restoring depth pressure: {depth_pressure}"
