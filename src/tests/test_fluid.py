@@ -1782,3 +1782,52 @@ def test_dynamic_fluid_bodies_column_volume_restoration():
     # Invariant: depth pressure gradient is strictly positive to restore 3D column height
     depth_pressure = (p_surf_z[0] - pos_local[0, 2]) / (4.0 * r_s)
     assert float(depth_pressure) >= 4.0, f"Insufficient restoring depth pressure: {depth_pressure}"
+
+
+def test_fluid_state_tracker_raw_particles_not_grid_quantized():
+    """Verify Fluid._update_state_tracker populates raw_particle_positions with continuous SPH coordinates."""
+    from unittest.mock import MagicMock
+    from provider.fluid import Fluid
+    from model import FluidConfig
+
+    config = FluidConfig(
+        target_volume=0.0001,
+        nx=16,
+        ny=16,
+        nz=16,
+        dx=0.005,
+        r_s=0.002,
+        origin=(-0.04, -0.04, 0.0),
+    )
+    import numpy as np
+    import jax.numpy as jnp
+
+    mock_tracker = MagicMock()
+    mock_tracker.step_stride = 1
+    fluid = Fluid(config, state_tracker=mock_tracker)
+
+    # Set continuous particle coordinates (not snapped to grid)
+    positions = [
+        (0.0012, 0.0034, 0.0125),
+        (-0.0023, 0.0045, 0.0135),
+        (0.0056, -0.0018, 0.0142),
+    ]
+    fluid.pos_jax = jnp.array(positions, dtype=jnp.float32)
+    fluid.vel_jax = jnp.zeros((3, 3), dtype=jnp.float32)
+
+    # Force state tracker update
+    fluid._update_state_tracker()
+
+    assert mock_tracker.raw_particle_positions is not None
+    assert len(mock_tracker.raw_particle_positions) == 3
+
+    # Assert that raw particle coordinates are continuous, not snapped to dx/2 grid centers
+    dx = config.dx
+    origin = np.array(config.origin)
+    grid_offsets = (mock_tracker.raw_particle_positions - origin) / dx
+    fractional_parts = np.abs((grid_offsets - 0.5) - np.round(grid_offsets - 0.5))
+
+    # A quantized grid would have fractional_parts identically 0.0 everywhere.
+    # Continuous SPH particles must have non-zero fractional deviation.
+    mean_deviation = float(np.mean(fractional_parts))
+    assert mean_deviation > 0.05, f"Particles appear snapped to voxel grid: mean deviation {mean_deviation}"
