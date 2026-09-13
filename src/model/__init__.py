@@ -20,3 +20,4 @@ from .fluid_config import FluidConfig
 from .fluid_body import FluidBody, FluidBodyType, FluidBodyTracker
 from .coordinates import CoordinateSpace, CoordinateSystem, SpatialPose
 from .wiring import PinModel, LabelModel, FootprintModel, NetModel, Wiring
+from .material import MaterialModel, MaterialsModel

@@ -148,7 +148,7 @@ if not daemon_log.handlers:
     # Route root logger to the daemon file handler
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(logging.WARNING)
 
 
 @contextlib.contextmanager

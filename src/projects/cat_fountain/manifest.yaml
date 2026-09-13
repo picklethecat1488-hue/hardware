@@ -6,57 +6,58 @@ bowl:
     modes: [default, print]
   material: utr8100
   export: [stl, obj]
-  color: grey
+  color: [0.08, 0.45, 0.88, 0.65]
 
 impeller:
   part:
     modes: [default, print]
   material: petg
   export: [stl, obj]
-  color: red
+  color: [0.03, 0.03, 0.04, 1.0]
 
 bottom_cover:
   part:
     modes: [default, print]
   material: utr8100
   export: [stl, obj]
-  color: grey
+  color: [0.15, 0.16, 0.20, 0.95]
 
 lid:
   part:
     modes: [default, print]
   material: utr8100
   export: [stl, obj]
-  color: green
-
+  color: [0.08, 0.45, 0.88, 0.65]
 
 led_cover:
   part:
     modes: [default, print]
   material: utr8100
   export: [stl, obj]
-  color: grey
+  color: [0.20, 0.90, 0.45, 0.90]
 
 drive_hub:
   part:
     modes: [default, print]
-  material: utr8100
+  material: petg
   export: [stl, obj]
-  color: red
+  color: [0.08, 0.08, 0.10, 1.0]
 
 pump_cover:
   part:
     modes: [default, print]
   material: utr8100
   export: [stl, obj]
-  color: grey
+  color: [0.08, 0.45, 0.88, 0.65]
+
 
 motor_clip:
   part:
     modes: [default, print]
   material: petg
   export: [stl, obj]
-  color: yellow
+  color: [0.18, 0.18, 0.22, 1.0]
+
 
 product:
   diagram:
