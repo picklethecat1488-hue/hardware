@@ -11,19 +11,8 @@ from typing import Any, Optional, Callable, cast
 import rerun as rr
 import queue
 import threading
-from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFCollisionType, Simulate
-
-
-class LinkType(IntEnum):
-    """Bullet link types."""
-
-    BASE = -1
-    OUTLET = 0
-    TUBE = 1
-    IMPELLER = 2
-    FALLEN = -2
-    OUTLET_MAX_Y = -3
-    LID = 3
+import numpy as np
+from provider.types import CollisionGroup, CollisionMask, URDFShape, URDFCollisionType, Simulate, LinkType
 
 
 def _is_real_physics_client(physics_client: Any) -> bool:
@@ -37,21 +26,58 @@ def _is_real_physics_client(physics_client: Any) -> bool:
         return False
 
 
+def get_bullet_link_names(body_id: Optional[int], physics_client: Optional[int]) -> list[str]:
+    """Extract joint/link names from a PyBullet body ID.
+
+    Args:
+        body_id: PyBullet multi-body ID.
+        physics_client: PyBullet physics client ID.
+
+    Returns:
+        List of link name strings indexed by joint index.
+    """
+    if body_id is None or physics_client is None or not _is_real_physics_client(physics_client):
+        return []
+    return [
+        p.getJointInfo(body_id, i, physicsClientId=physics_client)[12].decode("utf-8")
+        for i in range(p.getNumJoints(body_id, physicsClientId=physics_client))
+    ]
+
+
 class BulletStateTracker:
     """Helper class to track and query PyBullet body and particle states efficiently."""
 
-    def __init__(self, body_id: int, physics_client: int, label_to_link_idx: dict[str, int]):
+    def __init__(
+        self,
+        body_id: int,
+        physics_client: int,
+        label_to_link_idx: dict[str, int],
+        step_stride: int = 4,
+    ):
         """Initialize the Tracker."""
         self.body_id = body_id
         self.physics_client = physics_client
         self.label_to_link_idx = label_to_link_idx
+        self.step_stride = step_stride
         self.particle_body_ids: list[int] = []
         self.particle_colors: list[list[float]] = []
         self.particle_radii: list[float] = []
         self.transforms: dict[str, tuple[list[float], list[float]]] = {}
         self.particle_positions: list[list[float]] = []
+        self.boundary_voxels: Optional[dict[str, Any]] = None
+        self.fluid_bodies: Optional[list[Any]] = None
+        self.water_meshes: Optional[dict[str, tuple[np.ndarray, np.ndarray]]] = None
         self._last_checked_num_bodies = 0
         self.has_fluid_simulator = False
+
+        # Cache inverse inertia transform for the base link to avoid slow dynamics IPC calls
+        try:
+            dynamics = p.getDynamicsInfo(self.body_id, -1, physicsClientId=self.physics_client)
+            local_inertia_pos = dynamics[3]
+            local_inertia_orn = dynamics[4]
+            self._inv_inertia = p.invertTransform(local_inertia_pos, local_inertia_orn)
+        except Exception:
+            self._inv_inertia = None
 
     def _discover_new_particles(self) -> None:
         """Scan for newly created bodies since the last check and add them to particles."""
@@ -92,13 +118,9 @@ class BulletStateTracker:
         for label, idx in self.label_to_link_idx.items():
             if idx == -1:
                 base_pos, base_orn = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.physics_client)
-                try:
-                    dynamics = p.getDynamicsInfo(self.body_id, -1, physicsClientId=self.physics_client)
-                    local_inertia_pos = dynamics[3]
-                    local_inertia_orn = dynamics[4]
-                    inv_inertia_pos, inv_inertia_orn = p.invertTransform(local_inertia_pos, local_inertia_orn)
-                    pos, orn = p.multiplyTransforms(base_pos, base_orn, inv_inertia_pos, inv_inertia_orn)
-                except Exception:
+                if self._inv_inertia is not None:
+                    pos, orn = p.multiplyTransforms(base_pos, base_orn, self._inv_inertia[0], self._inv_inertia[1])
+                else:
                     pos, orn = base_pos, base_orn
             else:
                 state = p.getLinkState(self.body_id, idx, physicsClientId=self.physics_client)
@@ -126,8 +148,15 @@ class Bullet:
         logger: Any,
         build_dir: str = "build",
         save_rrd: Optional[str] = None,
+        save_mp4: Optional[str] = None,
+        view_from: str = "iso",
+        fps: int = 60,
+        step_stride: Optional[int] = None,
+        resolution: tuple[int, int] = (2560, 1440),
+        samples: int = 32,
         rerun_port: Optional[int] = None,
         spawn_viewer: bool = True,
+        stage_window_size: Optional[int] = None,
     ):
         """Initialize the simulator."""
         self.room = room
@@ -139,8 +168,15 @@ class Bullet:
         self.logger = logger
         self.build_dir = build_dir
         self.save_rrd = save_rrd
+        self.save_mp4 = save_mp4
+        self.view_from = view_from
+        self.fps = fps
+        self.step_stride = step_stride if step_stride is not None else 1
+        self.resolution = resolution
+        self.samples = samples
         self.rerun_port = rerun_port
         self.spawn_viewer = spawn_viewer
+        self.stage_window_size = stage_window_size
 
     def _parse_urdf_meshes(self, build_proj_dir: str) -> dict[str, str]:
         """Parse URDF files to map link names to their OBJ filenames."""
@@ -500,7 +536,9 @@ class Bullet:
                     raise RuntimeError("PyBullet failed to load the URDF.")
 
                 label_to_link_idx = self._init_simulation_objects(physics_client, body_id, proj_dir, urdf_path)
-                state_tracker = BulletStateTracker(body_id, physics_client, label_to_link_idx)
+                state_tracker = BulletStateTracker(
+                    body_id, physics_client, label_to_link_idx, step_stride=self.step_stride
+                )
 
                 # Parse boundaries metadata
                 boundaries_metadata = {}
@@ -530,9 +568,13 @@ class Bullet:
 
                 log_queue = None
                 log_thread = None
-                is_logging_enabled = self.spawn_viewer or (self.save_rrd is not None)
+                is_logging_enabled = self.spawn_viewer or (self.save_rrd is not None) or (self.save_mp4 is not None)
+                frame_fluid_bodies: list[list[Any]] = []
+                frame_water_meshes: list[dict[str, tuple[np.ndarray, np.ndarray]]] = []
+                frame_particle_positions: list[np.ndarray] = []
+                frame_transforms: list[dict[str, tuple[list[float], list[float]]]] = []
 
-                if is_logging_enabled:
+                if self.spawn_viewer or self.save_rrd is not None:
                     q = queue.Queue(maxsize=128)
                     log_queue = q
 
@@ -540,36 +582,58 @@ class Bullet:
                         while True:
                             item = q.get()
                             if item is None:
+                                q.task_done()
                                 break
-                            transforms, particle_positions, particle_colors, particle_radii, step_idx = item
+                            (
+                                transforms,
+                                particle_positions,
+                                particle_colors,
+                                particle_radii,
+                                boundary_voxels,
+                                step_idx,
+                            ) = item
                             self.room._log_rerun(
                                 transforms,
                                 particle_positions,
                                 particle_colors,
                                 particle_radii=particle_radii,
+                                boundary_voxels=boundary_voxels,
                                 step_idx=step_idx,
                             )
+                            q.task_done()
 
-                    t = threading.Thread(target=logging_worker, daemon=True)
-                    log_thread = t
-                    t.start()
+                    log_thread = threading.Thread(target=logging_worker, daemon=True)
+                    log_thread.start()
 
+                step_hook = self.provider_hooks.get(Simulate.STEP, None)
                 for step_idx in range(self.steps):
-                    step_hook = self.provider_hooks.get(Simulate.STEP, None)
                     terminated = False
-                    if step_hook:
+                    if step_hook is not None:
                         res = step_hook(body_id, physics_client, step_idx, self.sim_target)
                         if isinstance(res, str):
                             self.logger.print(f"Simulation terminated: {res}", symbol="🛑")
                             terminated = True
 
+                    is_frame_step = step_idx % self.step_stride == 0
+
                     if is_logging_enabled:
                         state_tracker.update_state()
+                        if self.save_mp4 and is_frame_step:
+                            if (
+                                state_tracker.particle_positions is not None
+                                and len(state_tracker.particle_positions) > 0
+                            ):
+                                frame_particle_positions.append(np.asarray(state_tracker.particle_positions))
+                            if state_tracker.fluid_bodies is not None:
+                                frame_fluid_bodies.append(list(state_tracker.fluid_bodies))
+                            elif state_tracker.water_meshes is not None:
+                                frame_water_meshes.append(dict(state_tracker.water_meshes))
+                            frame_transforms.append(dict(state_tracker.transforms))
 
                     if not terminated:
                         p.stepSimulation(physicsClientId=physics_client)
 
-                    if is_logging_enabled and log_queue is not None:
+                    if log_queue is not None:
                         try:
                             log_queue.put_nowait(
                                 (
@@ -577,18 +641,70 @@ class Bullet:
                                     state_tracker.particle_positions,
                                     state_tracker.particle_colors,
                                     state_tracker.particle_radii,
+                                    state_tracker.boundary_voxels,
                                     step_idx,
                                 )
                             )
                         except queue.Full:
                             pass
 
+                    # Check for staging frame window checkpoint
+                    if self.stage_window_size and self.save_rrd and ((step_idx + 1) % self.stage_window_size == 0):
+                        if log_queue is not None:
+                            log_queue.join()
+                        base_dir = os.path.dirname(self.save_rrd) or "."
+                        base_name = os.path.splitext(os.path.basename(self.save_rrd))[0]
+                        import re
+
+                        prefix = re.sub(r"_\d+$", "", base_name)
+                        staged_name = f"{prefix}_{step_idx + 1}.rrd"
+                        staged_path = os.path.join(base_dir, staged_name)
+                        if os.path.exists(self.save_rrd) and os.path.abspath(self.save_rrd) != os.path.abspath(
+                            staged_path
+                        ):
+                            shutil.copyfile(self.save_rrd, staged_path)
+                            self.logger.print(
+                                f"Staged checkpoint saved: {staged_path} ({step_idx + 1} frames)", symbol="💾"
+                            )
+
                     if terminated:
+                        if self.save_mp4 and not is_frame_step:
+                            if state_tracker.fluid_bodies is not None:
+                                frame_fluid_bodies.append(list(state_tracker.fluid_bodies))
+                            elif state_tracker.water_meshes is not None:
+                                frame_water_meshes.append(dict(state_tracker.water_meshes))
+                            frame_transforms.append(dict(state_tracker.transforms))
                         break
 
-                if is_logging_enabled and log_queue is not None and log_thread is not None:
+                if log_queue is not None and log_thread is not None:
                     log_queue.put(None)
                     log_thread.join()
+
+                if self.save_mp4 and frame_transforms:
+                    self.logger.print(
+                        f"Rendering {len(frame_transforms)} frames to MP4 via Blender: {self.save_mp4}", symbol="🎬"
+                    )
+                    from .blender import BlenderRenderer, RenderConfig
+
+                    render_cfg = RenderConfig(
+                        resolution=self.resolution,
+                        fps=self.fps,
+                        samples=self.samples,
+                        view_from=self.view_from,
+                        output_mp4=self.save_mp4,
+                        turntable=True,
+                    )
+                    BlenderRenderer.render_simulation_to_mp4(
+                        room=self.room,
+                        output_mp4=self.save_mp4,
+                        sim_steps=len(frame_transforms),
+                        config=render_cfg,
+                        fluid_bodies_per_frame=frame_fluid_bodies if frame_fluid_bodies else None,
+                        water_meshes_per_frame=frame_water_meshes if frame_water_meshes else None,
+                        particle_positions_per_frame=frame_particle_positions if frame_particle_positions else None,
+                        rigid_transforms_per_frame=frame_transforms,
+                    )
+                    self.logger.print(f"Exported H.264 MP4 video to {self.save_mp4}", symbol="✨")
 
             except KeyboardInterrupt:
                 self.logger.print("Simulation stopped.", symbol="💥")

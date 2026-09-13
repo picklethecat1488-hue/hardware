@@ -29,6 +29,27 @@ class AppConfig(ChangeDetectionMixin, BaseSettings):
         extra="allow",
     )
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the application configuration and load environment variables from the .env file."""
+        env_file = self.model_config.get("env_file", ".env")
+        if isinstance(env_file, str) and os.path.exists(env_file):
+            with open(env_file, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip()
+                        if k not in os.environ:
+                            os.environ[k] = v
+                        if k.startswith("APP_"):
+                            unprefixed = k[4:]
+                            if unprefixed not in os.environ:
+                                os.environ[unprefixed] = v
+        super().__init__(*args, **kwargs)
+
     def dump_env(self, path: str | Path):
         """Dump the configuration to a .env file with flattened nested keys."""
         env_prefix = cast(str, self.model_config.get("env_prefix", ""))

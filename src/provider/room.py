@@ -30,6 +30,7 @@ from build123d import (
     Shape,
 )
 from build123d.exporters import ExportSVG, Drawing
+from .utils import get_env_bool
 
 
 def resolve_shape(val: Any) -> Optional[Shape]:
@@ -45,6 +46,7 @@ def resolve_shape(val: Any) -> Optional[Shape]:
 
 from ezdxf.colors import RGB
 import rerun as rr
+import numpy as np
 import socket
 from model import DiagramOptions, TextArgs
 from .types import (
@@ -60,6 +62,7 @@ from .utils import get_rgba_color
 
 if TYPE_CHECKING:
     from model.app_config import AppConfig
+    from model.material import MaterialsModel
 
 
 from .bullet import BulletStateTracker, _is_real_physics_client
@@ -72,11 +75,17 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
     Keys are unique names for the items, and values are tuples of (geometry, rgba_tuple).
     """
 
-    def __init__(self, config: Optional["AppConfig"] = None, is_simulate: bool = False):
-        """Initialize the room with an optional application configuration."""
+    def __init__(
+        self,
+        config: Optional["AppConfig"] = None,
+        is_simulate: bool = False,
+        materials: Optional["MaterialsModel"] = None,
+    ):
+        """Initialize the room with optional application configuration and materials model."""
         super().__init__()
         self.config = config
         self.is_simulate = is_simulate
+        self.materials = materials
         self._labels: list[tuple[str, str, Any, TextArgs]] = []
         self.gravity: tuple[float, float, float] = (0.0, 0.0, -9.81)
         self.line_weights: dict[str, float] = {}
@@ -901,6 +910,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         particle_positions: list[list[float]],
         particle_colors: Optional[list[list[float]]] = None,
         particle_radii: Optional[list[float]] = None,
+        boundary_voxels: Optional[dict[str, Any]] = None,
         step_idx: Optional[int] = None,
     ) -> None:
         """Log the given state data to Rerun."""
@@ -918,24 +928,26 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                 ),
             )
 
-        # Log particles
-        if particle_positions:
-            active_indices = [idx for idx, pos in enumerate(particle_positions) if pos[2] < 100.0]
-            if active_indices:
-                filtered_positions = [particle_positions[idx] for idx in active_indices]
-                filtered_radii = (
-                    [particle_radii[idx] for idx in active_indices] if particle_radii is not None else 0.003
-                )
+        # Log particles using vectorized numpy operations for high performance
+        if particle_positions is not None and len(particle_positions) > 0:
+            pos_arr = np.asarray(particle_positions)
+            active_mask = pos_arr[:, 2] < 100.0
+            if np.any(active_mask):
+                filtered_positions = pos_arr[active_mask]
+
+                if particle_radii is not None and len(particle_radii) > 0:
+                    filtered_radii = np.asarray(particle_radii)[active_mask]
+                else:
+                    filtered_radii = None
+
                 colors_arg = [128, 204, 255, 178]
-                if particle_colors:
-                    colors_arg = []
-                    for idx in active_indices:
-                        col = particle_colors[idx]
-                        is_float = any(isinstance(c, float) for c in col) or all(c <= 1.0 for c in col)
-                        if is_float:
-                            colors_arg.append([int(round(c * 255.0)) for c in col])
+                if particle_colors is not None and len(particle_colors) > 0:
+                    colors_arr = np.asarray(particle_colors)[active_mask]
+                    if colors_arr.size > 0:
+                        if np.issubdtype(colors_arr.dtype, np.floating) or np.max(colors_arr) <= 1.0:
+                            colors_arg = (colors_arr * 255.0).round().astype(np.uint8)
                         else:
-                            colors_arg.append([int(c) for c in col])
+                            colors_arg = colors_arr.astype(np.uint8)
 
                 rr.log(
                     "world/particles",
@@ -945,6 +957,39 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
                         colors=colors_arg,
                     ),
                 )
+
+        # Log boundary voxels labeled for each boundary type (gated on environment variable)
+        enable_boundary_voxels = get_env_bool("SHOW_BOUNDARY_VOXELS", False)
+        if enable_boundary_voxels and boundary_voxels is not None and len(boundary_voxels) > 0:
+            boundary_color_map = {
+                "bowl": [180, 180, 190, 80],
+                "casingwall": [255, 160, 50, 100],
+                "casing_wall": [255, 160, 50, 100],
+                "casing": [255, 160, 50, 100],
+                "tubewall": [50, 200, 100, 100],
+                "tube_wall": [50, 200, 100, 100],
+                "tube": [50, 200, 100, 100],
+                "casinglid": [160, 100, 220, 100],
+                "casing_lid": [160, 100, 220, 100],
+                "lid": [140, 90, 200, 100],
+                "impeller": [220, 50, 50, 140],
+                "sphere": [100, 180, 220, 100],
+                "plane": [150, 150, 150, 80],
+            }
+            default_color = [160, 160, 160, 90]
+
+            for label, vox_positions in boundary_voxels.items():
+                if vox_positions is not None and len(vox_positions) > 0:
+                    pos_arr = np.asarray(vox_positions, dtype=np.float32)
+                    color = boundary_color_map.get(label.lower(), default_color)
+                    rr.log(
+                        f"world/boundaries/{label}",
+                        rr.Points3D(
+                            positions=pos_arr,
+                            radii=0.0018,
+                            colors=color,
+                        ),
+                    )
 
     def simulate(
         self,
@@ -956,12 +1001,17 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         logger: Any,
         build_dir: str = "build",
         save_rrd: Optional[str] = None,
+        save_mp4: Optional[str] = None,
+        view_from: str = "iso",
+        fps: int = 60,
+        step_stride: Optional[int] = None,
+        resolution: tuple[int, int] = (2560, 1440),
+        samples: int = 32,
         rerun_port: Optional[int] = None,
         spawn_viewer: bool = True,
+        stage_window_size: Optional[int] = None,
     ) -> None:
-        """
-        Run a PyBullet physics simulation for the room geometries.
-        """
+        """Run a PyBullet physics simulation for the room geometries."""
         from .provider import Provider
         from .bullet import Bullet
 
@@ -973,16 +1023,53 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         Provider.validate_simulate_hooks(provider_hooks)
 
         bullet_sim = Bullet(
-            self,
-            provider_hooks,
-            proj_name,
-            sim_target,
-            steps,
-            manager,
-            logger,
-            build_dir,
-            save_rrd,
-            rerun_port,
-            spawn_viewer,
+            room=self,
+            provider_hooks=provider_hooks,
+            proj_name=proj_name,
+            sim_target=sim_target,
+            steps=steps,
+            manager=manager,
+            logger=logger,
+            build_dir=build_dir,
+            save_rrd=save_rrd,
+            save_mp4=save_mp4,
+            view_from=view_from,
+            fps=fps,
+            step_stride=step_stride,
+            resolution=resolution,
+            samples=samples,
+            rerun_port=rerun_port,
+            spawn_viewer=spawn_viewer,
+            stage_window_size=stage_window_size,
         )
         bullet_sim.run()
+
+        # Combine all staged recordings if any were created and save_rrd was not already written directly
+        if stage_window_size and save_rrd:
+            import glob
+            import os
+            import re
+            from .utils import merge_rrd_recordings
+
+            if not os.path.exists(save_rrd):
+                base_dir = os.path.dirname(save_rrd) or "."
+                base_name = os.path.splitext(os.path.basename(save_rrd))[0]
+                prefix = re.sub(r"_\d+$", "", base_name)
+                stage_pattern = os.path.join(base_dir, f"{prefix}_*.rrd")
+                staged_files = sorted(glob.glob(stage_pattern))
+                staged_files = [
+                    f
+                    for f in staged_files
+                    if os.path.abspath(f) != os.path.abspath(save_rrd)
+                    and re.match(rf"^{re.escape(prefix)}_\d+\.rrd$", os.path.basename(f))
+                ]
+                if staged_files:
+                    staged_files.sort(
+                        key=lambda x: (
+                            int(re.search(r"_(\d+)\.rrd$", os.path.basename(x)).group(1))
+                            if re.search(r"_(\d+)\.rrd$", os.path.basename(x))
+                            else 0
+                        )
+                    )
+                    merge_rrd_recordings(staged_files, save_rrd)
+                    logger.print(f"Combined {len(staged_files)} staged recording(s) into {save_rrd}", symbol="✨")

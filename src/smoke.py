@@ -26,6 +26,10 @@ class TestSmoke:
     def run_command(self, args: list[str], extra_env: Optional[dict[str, str]] = None):
         """Run a command using the current python interpreter."""
         env = os.environ.copy()
+        # Force CPU execution for JAX in smoke tests to bypass MPS compilation/deadlock lag on macOS
+        if sys.platform == "darwin":
+            env["JAX_PLATFORMS"] = "cpu"
+            env["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1"
         if extra_env:
             env.update(extra_env)
 
@@ -110,4 +114,4 @@ class TestSmoke:
 
 
 if __name__ == "__main__":
-    sys.exit(pytest.main([__file__, "-s", "-v"]))
+    sys.exit(pytest.main([__file__, "-s", "-v", "-n", "0"]))

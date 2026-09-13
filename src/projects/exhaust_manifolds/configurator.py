@@ -107,8 +107,8 @@ class ExhaustManifoldsConfigurator:
                 return angle, distance
             return None, None
 
-        # Parallelize the angle scanning to utilize multiple CPU cores for CAD calculations.
-        results = self.executor.map(check_angle, angles)
+        # Scan angle candidates sequentially to avoid OpenCASCADE multi-threading deadlocks
+        results = [check_angle(angle) for angle in angles]
         for angle, distance in results:
             if angle is not None and distance is not None:
                 if distance < best_distance:
