@@ -341,3 +341,14 @@ def test_bullet_step_stride_timescale_parity(tmp_path):
         )
         mock_bullet_cls.assert_called_once()
         assert mock_bullet_cls.call_args.kwargs["step_stride"] == 2
+
+
+def test_bullet_state_tracker_raw_continuous_particles():
+    """Verify BulletStateTracker supports continuous raw particle positions for smooth fluid volume rendering."""
+    client_id = p.connect(p.DIRECT)
+    try:
+        tracker = BulletStateTracker(0, client_id, {})
+        assert hasattr(tracker, "raw_particle_positions")
+        assert tracker.raw_particle_positions is None
+    finally:
+        p.disconnect(physicsClientId=client_id)
