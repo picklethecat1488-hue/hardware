@@ -53,6 +53,8 @@ try:
                     if gpu_devices:
                         for d in cprefs.devices:
                             d.use = (d.type == dev_type)
+                        if hasattr(cprefs, "peer_memory"):
+                            cprefs.peer_memory = True
                         scene.cycles.device = "GPU"
                         break
 
