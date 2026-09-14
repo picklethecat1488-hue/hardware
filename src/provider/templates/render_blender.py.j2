@@ -510,12 +510,17 @@ try:
 
     frames_data = manifest.get("frames", [])
 
-    for f_idx in range(tot_f):
+    f_start = int(os.environ.get("RENDER_FRAME_START", 0))
+    f_end = int(os.environ.get("RENDER_FRAME_END", tot_f))
+    f_start = max(0, min(f_start, tot_f))
+    f_end = max(f_start, min(f_end, tot_f))
+
+    for f_idx in range(f_start, f_end):
         scene.frame_set(f_idx)
 
         # Update camera position if turntable is active
         if is_turntable:
-            turntable_period_frames = max({{ fps }} * 10.0, 1.0)
+            turntable_period_frames = tot_f if tot_f > 1 else max({{ fps }} * 60.0, 1.0)
             theta = start_angle + (2.0 * math.pi * f_idx) / turntable_period_frames
             cam_obj.location = (
                 t_center.x + r_xy * math.sin(theta),

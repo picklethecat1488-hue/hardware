@@ -74,6 +74,8 @@ from provider.utils import get_env_bool
 if TYPE_CHECKING:
     from provider.provider import Provider
 
+MAX_PHYSICAL_FLUID_SPEED: float = 0.85
+
 
 class ParticleSet:
     """A high-performance set-like container for tracking particle index sets using NumPy boolean masks."""
@@ -1235,7 +1237,28 @@ def _compute_dynamic_fluid_bodies_jax(
     vol_s = (4.0 / 3.0) * jnp.pi * (r_s**3)
     col_depth_vol = (col_count * vol_s) / (dx * dx)
     z_surf_vol = cavity_floor_z + col_depth_vol
-    surf_z_eff = jnp.minimum(z_max_pool, jnp.maximum(surf_z_grid, z_surf_vol))
+    # Bounded surface height: tracks column volume while preventing stray airborne droplets from pulling up surface
+    surf_z_eff = jnp.minimum(z_max_pool, jnp.maximum(z_surf_vol, jnp.minimum(surf_z_grid, z_surf_vol + 3.0 * r_s)))
+
+    # 2D spatial smoothing of surface height field across occupied wet cells to eliminate grid-frequency stalagmites/spikes
+    has_fluid = col_count >= 1.0
+    has_pad = jnp.pad(has_fluid.astype(jnp.float32), ((1, 1), (1, 1)), mode="constant", constant_values=0.0)
+    w_c, w_n, w_d = 0.50, 0.10, 0.025
+    weight_sum = (
+        w_c * has_pad[1:-1, 1:-1]
+        + w_n * (has_pad[:-2, 1:-1] + has_pad[2:, 1:-1] + has_pad[1:-1, :-2] + has_pad[1:-1, 2:])
+        + w_d * (has_pad[:-2, :-2] + has_pad[:-2, 2:] + has_pad[2:, :-2] + has_pad[2:, 2:])
+    )
+    weight_safe = jnp.maximum(weight_sum, 1e-5)
+    surf_val_pad = jnp.pad(
+        jnp.where(has_fluid, surf_z_eff, 0.0), ((1, 1), (1, 1)), mode="constant", constant_values=0.0
+    )
+    surf_smooth = (
+        w_c * surf_val_pad[1:-1, 1:-1]
+        + w_n * (surf_val_pad[:-2, 1:-1] + surf_val_pad[2:, 1:-1] + surf_val_pad[1:-1, :-2] + surf_val_pad[1:-1, 2:])
+        + w_d * (surf_val_pad[:-2, :-2] + surf_val_pad[:-2, 2:] + surf_val_pad[2:, :-2] + surf_val_pad[2:, 2:])
+    ) / weight_safe
+    surf_z_eff = jnp.where(has_fluid, surf_smooth, cavity_floor_z)
 
     # 2. Dynamic 2D surface gradient for horizontal hydrostatic leveling
     surf_pad = jnp.pad(surf_z_eff, ((1, 1), (1, 1)), mode="edge")
@@ -1689,11 +1712,11 @@ def _compute_particle_forces_subroutine(
             0.0,
         )
         height_frac = jnp.clip(1.0 - pos_tube[:, 2] / (tube_h + 1e-6), 0.0, 1.0)
-        v_target_rise = jnp.maximum(v_flow_est * 1.8, 0.80) * (0.25 + 0.75 * height_frac)
+        v_target_rise = jnp.clip(v_flow_est * 0.6, 0.25, 0.45) * (0.35 + 0.65 * height_frac)
 
         pump_lift_scalar = jnp.where(
             jnp.abs(omega) > 1e-3,
-            g_mag + jnp.maximum(0.0, v_target_rise - v_z_tube) * 80.0,
+            g_mag + jnp.maximum(0.0, v_target_rise - v_z_tube) * 35.0,
             0.0,
         )
 
@@ -1717,7 +1740,7 @@ def _compute_particle_forces_subroutine(
         dome_disp = radial_unit_world * 0.85 + down_dir_world[None, :] * 0.45
         disp_mag = jnp.sqrt(jnp.sum(dome_disp**2, axis=-1, keepdims=True) + 1e-8)
         spout_out_dir = dome_disp / disp_mag
-        spout_accel = spout_out_dir * (g_mag * 2.0 + v_flow_est * 2.0)
+        spout_accel = spout_out_dir * (g_mag * 0.30 + v_target_rise[:, None] * 0.4)
 
         tube_pump_accel_i = jnp.where(
             at_spout[:, None],
@@ -1781,13 +1804,13 @@ def _compute_particle_forces_subroutine(
         sheet_flow_dir = radial_spout_dir * 0.70 + dir_slope_local * 0.30
         sheet_flow_mag = jnp.sqrt(jnp.sum(sheet_flow_dir**2, axis=-1, keepdims=True) + 1e-8)
         sheet_flow_unit = sheet_flow_dir / sheet_flow_mag
-        slope_factor = 0.45
+        slope_factor = jnp.where(lid_slope_ratio > 0.0, jnp.minimum(lid_slope_ratio, 0.10), 0.06)
 
         # Upward floor support on the solid drinking platform
         v_lid = world_to_local_vector(vel_world, lid_orn_inv)
         cushion_lid_z = -jnp.minimum(v_lid[:, 2], 0.0) * 45.0
         v_lid_xy = jnp.stack([v_lid[:, 0], v_lid[:, 1], jnp.zeros_like(v_lid[:, 2])], axis=-1)
-        surface_friction_local = -v_lid_xy * 12.0
+        surface_friction_local = -v_lid_xy * 18.0
         support_normal_local = jnp.stack(
             [jnp.zeros_like(dx_to_drain), jnp.zeros_like(dx_to_drain), (g_mag + cushion_lid_z)],
             axis=-1,
@@ -1846,7 +1869,8 @@ def _compute_particle_forces_subroutine(
     # 1. Dynamic hydrostatic support and vertical column pressure
     depth_pressure = jnp.clip((p_surf_z - pos_b[:, 2]) / (4.0 * r_s), 0.0, 6.0)
     cushion_accel_z = -jnp.minimum(v_z_b, 0.0) * 35.0
-    total_support_z = g_mag * (1.0 + depth_pressure * 0.35) + cushion_accel_z
+    surface_damping = jnp.where(pos_b[:, 2] >= p_surf_z - 2.0 * r_s, -jnp.maximum(v_z_b, 0.0) * 15.0, 0.0)
+    total_support_z = g_mag * (1.0 + depth_pressure * 0.35) + cushion_accel_z + surface_damping
 
     hydrostatic_support_world = local_to_world_vector(
         jnp.stack([jnp.zeros_like(r_b), jnp.zeros_like(r_b), total_support_z], axis=-1),
@@ -1859,7 +1883,7 @@ def _compute_particle_forces_subroutine(
     )
 
     # 2. Dynamic horizontal leveling gradient derived continuously from the moving surface height field
-    level_accel_world = local_to_world_vector(level_grad_local * (g_mag * 0.40), base_orn_b)
+    level_accel_world = local_to_world_vector(level_grad_local * (g_mag * 0.60), base_orn_b)
     leveling_accel = jnp.where(
         in_fluid_body[:, None],
         level_accel_world,
@@ -2446,10 +2470,9 @@ def _integrate_particles_subroutine(
 
     vel_next = jnp.where(active, (vel_world + accel * dt_sub) * damping_by_zone, 0.0)
 
-    max_phys_speed = 1.5
     vel_mags = jnp.linalg.norm(vel_next, axis=1, keepdims=True)
     vel_mags_safe = jnp.maximum(vel_mags, 1e-8)
-    vel_next = vel_next * jnp.minimum(max_phys_speed / vel_mags_safe, 1.0)
+    vel_next = vel_next * jnp.minimum(MAX_PHYSICAL_FLUID_SPEED / vel_mags_safe, 1.0)
 
     pos_next = jnp.where(active, pos_curr + vel_next * dt_sub, pos_curr)
 

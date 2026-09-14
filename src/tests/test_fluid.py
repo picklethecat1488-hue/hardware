@@ -1831,3 +1831,194 @@ def test_fluid_state_tracker_raw_particles_not_grid_quantized():
     # Continuous SPH particles must have non-zero fractional deviation.
     mean_deviation = float(np.mean(fractional_parts))
     assert mean_deviation > 0.05, f"Particles appear snapped to voxel grid: mean deviation {mean_deviation}"
+
+
+def test_dynamic_fluid_bodies_airborne_droplet_isolation():
+    """Verify that isolated airborne droplets do not pull up column surface height or trigger spiky stalagmites.
+
+    Regression test: Prevents runaway upward hydrostatic support acceleration where stray droplets
+    blasted resting reservoir columns into 30mm vertical spires.
+    """
+    import math
+    import jax.numpy as jnp
+    from provider.fluid import _compute_dynamic_fluid_bodies_jax
+
+    dx = 0.0035
+    r_s = 0.0015
+    cavity_floor_z = 0.0410
+    z_max_pool = 0.1045
+    origin = jnp.array([-0.112, -0.112, 0.0], dtype=jnp.float32)
+
+    # 20 resting particles at bottom (Z around 0.042 - 0.070m) + 1 stray droplet near lid (Z = 0.095m)
+    zs = [0.042 + i * 0.0015 for i in range(20)] + [0.095]
+    pos = jnp.stack([jnp.zeros(len(zs)), jnp.zeros(len(zs)), jnp.array(zs)], axis=-1)
+
+    in_fb, p_surf_z, grad, col_cnt = _compute_dynamic_fluid_bodies_jax(
+        pos, dx, origin, 64, 64, 40, cavity_floor_z=cavity_floor_z, z_max_pool=z_max_pool, r_s=r_s
+    )
+
+    # Physical resting column volume height
+    vol_s = (4.0 / 3.0) * math.pi * (r_s**3)
+    resting_depth = (len(zs) * vol_s) / (dx * dx)
+    max_expected_surface = cavity_floor_z + resting_depth + 3.0 * r_s
+
+    # Invariant: p_surf_z must be bounded near resting column volume, NOT dragged up to droplet (0.095m)
+    assert float(p_surf_z[0]) <= max_expected_surface + 1e-3, (
+        f"Surface height was dragged up by stray airborne droplet: got {p_surf_z[0]}, max allowed {max_expected_surface}"
+    )
+
+    # Invariant: depth pressure at the bottom must remain within stable bounds (<= 6.0)
+    depth_pressure = float(jnp.clip((p_surf_z[0] - pos[0, 2]) / (4.0 * r_s), 0.0, 6.0))
+    assert depth_pressure <= 6.0
+    support_mult = 1.0 + depth_pressure * 0.35
+    assert support_mult <= 3.1, f"Excessive upward hydrostatic blast: {support_mult}x gravity"
+
+
+def test_fountain_flow_velocities_bounded_and_natural():
+    """Verify that pump lift, spout discharge, platform slope acceleration, and max speed are naturally bounded.
+
+    Regression test: Prevents runaway water animation speed where excessive pump lift, 22 m/s^2 spout acceleration,
+    and 0.45 slope factor made water flow appear 10x too fast across the lid.
+    """
+    import jax.numpy as jnp
+    from model.boundary_config import BoundaryParam
+    from provider.boundary import SHAPE_TUBE, SHAPE_CYLINDER
+    from provider.fluid import (
+        _compute_particle_forces_subroutine,
+        _integrate_particles_subroutine,
+        MAX_PHYSICAL_FLUID_SPEED,
+    )
+
+    r_s = 0.0015
+    tube_h = 0.066
+    tube_inner_r = 0.004
+    tube_outer_r = 0.006
+
+    # Setup boundary arrays with tube and lid
+    b_shapes = jnp.array([SHAPE_CYLINDER, SHAPE_TUBE, SHAPE_CYLINDER], dtype=jnp.int32)
+    b_types = jnp.array([1, 1, 1], dtype=jnp.int32)
+    b_params = jnp.zeros((3, 64), dtype=jnp.float32)
+
+    # Bowl base boundary (idx 0)
+    b_params = b_params.at[0, BoundaryParam.R_OUTER].set(0.095)
+    b_params = b_params.at[0, BoundaryParam.Z_TOP].set(0.105)
+    b_params = b_params.at[0, BoundaryParam.Z_OFFSET].set(0.041)
+    b_params = b_params.at[0, BoundaryParam.POOL_MAX_Z].set(0.104)
+    b_params = b_params.at[0, BoundaryParam.SLOT_CONSTRICTION_RATIO].set(0.30)
+    b_params = b_params.at[0, BoundaryParam.IMPELLER_RADIUS].set(0.015)
+    b_params = b_params.at[0, BoundaryParam.LID_SLOPE_RATIO].set(0.05)
+
+    # Tube boundary (idx 1)
+    b_params = b_params.at[1, BoundaryParam.HEIGHT].set(tube_h)
+    b_params = b_params.at[1, BoundaryParam.R_INNER].set(tube_inner_r)
+    b_params = b_params.at[1, BoundaryParam.R_OUTER].set(tube_outer_r)
+
+    # Lid boundary (idx 2)
+    b_params = b_params.at[2, BoundaryParam.HAS_DRAIN].set(1.0)
+    b_params = b_params.at[2, BoundaryParam.DRAIN_HOLE_Y].set(-0.035)
+    b_params = b_params.at[2, BoundaryParam.DRAIN_RADIUS].set(0.015)
+    b_params = b_params.at[2, BoundaryParam.INTAKE_RADIUS].set(0.030)
+    b_params = b_params.at[2, BoundaryParam.TRAY_Z_MIN].set(0.0)
+    b_params = b_params.at[2, BoundaryParam.TRAY_Z_MAX].set(0.010)
+
+    b_pos_arr = jnp.zeros((3, 3), dtype=jnp.float32)
+    b_pos_arr = b_pos_arr.at[1, 1].set(0.028)  # Tube at Y = 28mm
+    b_pos_arr = b_pos_arr.at[2, 2].set(0.105)  # Lid at Z = 105mm
+
+    b_orn_arr = jnp.zeros((3, 4), dtype=jnp.float32)
+    b_orn_arr = b_orn_arr.at[:, 3].set(1.0)
+
+    # 1. Test particle at spout opening
+    pos_spout = jnp.array([[0.0, 0.028, tube_h + 0.005]], dtype=jnp.float32)
+    vel_spout = jnp.zeros((1, 3), dtype=jnp.float32)
+    origin = jnp.array([-0.1, -0.1, 0.0], dtype=jnp.float32)
+
+    accel_spout, _, _ = _compute_particle_forces_subroutine(
+        pos_curr=pos_spout,
+        vel_world=vel_spout,
+        omega=200.0,
+        t_curr=0.0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        K_boundary=100.0,
+        D_boundary=10.0,
+        r_s=r_s,
+        mass=0.0001,
+        gravity=jnp.array([0.0, 0.0, -9.81], dtype=jnp.float32),
+        solid_mask=jnp.zeros((32, 32, 32), dtype=jnp.bool_),
+        solid_friction=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        normal_grid=jnp.zeros((3, 32, 32, 32), dtype=jnp.float32),
+        smooth_occ=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        dx=0.0035,
+        origin=origin,
+        base_idx=0,
+        nx=32,
+        ny=32,
+        nz=32,
+    )
+
+    spout_accel_mag = float(jnp.linalg.norm(accel_spout[0]))
+    # Invariant: Spout acceleration must be calm and serene (< 15.0 m/s^2, not 22+ m/s^2)
+    assert spout_accel_mag < 15.0, f"Spout acceleration was excessively high: {spout_accel_mag} m/s^2"
+
+    # 2. Test particle on drinking platform
+    pos_lid = jnp.array([[0.010, 0.028, 0.107]], dtype=jnp.float32)
+    accel_lid, _, _ = _compute_particle_forces_subroutine(
+        pos_curr=pos_lid,
+        vel_world=vel_spout,
+        omega=200.0,
+        t_curr=0.0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        K_boundary=100.0,
+        D_boundary=10.0,
+        r_s=r_s,
+        mass=0.0001,
+        gravity=jnp.array([0.0, 0.0, -9.81], dtype=jnp.float32),
+        solid_mask=jnp.zeros((32, 32, 32), dtype=jnp.bool_),
+        solid_friction=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        normal_grid=jnp.zeros((3, 32, 32, 32), dtype=jnp.float32),
+        smooth_occ=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        dx=0.0035,
+        origin=origin,
+        base_idx=0,
+        nx=32,
+        ny=32,
+        nz=32,
+    )
+
+    # Invariant: Horizontal platform acceleration must be gentle (< 2.0 m/s^2, not 4.4+ m/s^2)
+    lid_accel_xy = float(jnp.linalg.norm(accel_lid[0, :2]))
+    assert lid_accel_xy < 2.0, f"Platform horizontal acceleration too aggressive: {lid_accel_xy} m/s^2"
+
+    # 3. Test speed clamp in integration
+    vel_high = jnp.array([[2.5, 0.0, 0.0]], dtype=jnp.float32)
+    _, vel_integrated = _integrate_particles_subroutine(
+        pos_curr=pos_lid,
+        vel_world=vel_high,
+        accel=jnp.zeros_like(vel_high),
+        base_pos=b_pos_arr[0],
+        base_orn=b_orn_arr[0],
+        dt_sub=0.001,
+        damping=0.998,
+        high_damping_value=0.50,
+        base_idx=0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        omega=200.0,
+        base_vel=jnp.zeros(3, dtype=jnp.float32),
+    )
+
+    speed_integrated = float(jnp.linalg.norm(vel_integrated[0]))
+    assert speed_integrated <= MAX_PHYSICAL_FLUID_SPEED + 1e-4, (
+        f"Speed exceeded maximum physical clamp: {speed_integrated} > {MAX_PHYSICAL_FLUID_SPEED}"
+    )

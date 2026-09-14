@@ -380,3 +380,57 @@ class TestBlenderRenderer:
         assert water.fluid_surface_threshold == 0.18
         assert water.fluid_adaptivity == 0.05
         assert water.use_ssfr is False
+
+    @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")
+    @patch("subprocess.run")
+    def test_parallel_multi_gpu_workers(self, mock_run, mock_encode):
+        """Verify BlenderRenderer parallelizes frame rendering across multiple workers with chunked frame ranges."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="Frame rendered", stderr="")
+        room = Room()
+        from build123d import Box
+
+        room.add("casing", Box(10, 10, 10), color=(0.8, 0.8, 0.8, 1.0))
+        transforms = [{"casing": ([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0])} for _ in range(8)]
+
+        # 4 workers configured for 8 simulation steps
+        cfg = RenderConfig(fps=30, samples=16, workers=4)
+        with patch.object(BlenderRenderer, "get_available_gpu_devices", return_value=[0, 1, 2, 3]):
+            out_path = BlenderRenderer.render_simulation_to_mp4(
+                room=room,
+                output_mp4="build/test_parallel.mp4",
+                sim_steps=8,
+                config=cfg,
+                rigid_transforms_per_frame=transforms,
+            )
+
+        assert os.path.basename(out_path) == "test_parallel.mp4"
+        # 4 subprocess workers should have been invoked
+        assert mock_run.call_count == 4
+        # Verify frame ranges and GPU device assignments across worker calls
+        called_envs = [call.kwargs.get("env") for call in mock_run.call_args_list if "env" in call.kwargs]
+        assert len(called_envs) == 4
+        assert [env["RENDER_FRAME_START"] for env in called_envs] == ["0", "2", "4", "6"]
+        assert [env["RENDER_FRAME_END"] for env in called_envs] == ["2", "4", "6", "8"]
+        assert [env["CUDA_VISIBLE_DEVICES"] for env in called_envs] == ["0", "1", "2", "3"]
+
+    def test_turntable_rotation_spans_full_animation(self, tmp_path):
+        """Verify render_blender.py.j2 script scales turntable period to the full animation frame count."""
+        script_file = tmp_path / "test_turntable_script.py"
+        scene_file = tmp_path / "scene_data.json"
+        output_image = tmp_path / "frame_####.png"
+
+        cfg = RenderConfig(fps=30, turntable=True)
+        BlenderRenderer._write_blender_script(
+            script_path=str(script_file),
+            scene_data_path=str(scene_file),
+            output_path=str(output_image),
+            is_animation=True,
+            config=cfg,
+            total_frames=1800,
+        )
+
+        assert script_file.exists()
+        code = script_file.read_text(encoding="utf-8")
+        assert "turntable_period_frames = tot_f if tot_f > 1 else max(30 * 60.0, 1.0)" in code
+        assert 'f_start = int(os.environ.get("RENDER_FRAME_START", 0))' in code
+        assert 'f_end = int(os.environ.get("RENDER_FRAME_END", tot_f))' in code
