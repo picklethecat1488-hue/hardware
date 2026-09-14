@@ -121,10 +121,14 @@ For resource-intensive workloads, parameter sweeps, fluid dynamics simulations, 
 
 ```ssh-config
 Host anvil
-  HostName 163.192.17.220
+  HostName <anvil-ip>
   User ubuntu
   IdentityFile "~/.ssh/FLINT'S KEY.pem"
   IdentitiesOnly yes
+  ServerAliveInterval 30
+  ServerAliveCountMax 10
+  TCPKeepAlive yes
+  StrictHostKeyChecking accept-new
 ```
 
 ### Usage Guidelines:

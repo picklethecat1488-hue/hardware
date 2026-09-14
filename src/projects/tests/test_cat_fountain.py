@@ -1061,6 +1061,7 @@ class TestCatFountainProvider:
             patch("provider.ProviderManager", return_value=mock_manager),
             patch("build.Builder", return_value=mock_builder),
             patch("pathlib.Path.exists", return_value=True),
+            patch("shutil.copy"),
         ):
             # Run config_tune
             config_tune(provider, "product:view/simulate", None)
