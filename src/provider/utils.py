@@ -169,11 +169,18 @@ def get_rgba_color(
     return (*rgb, alpha)
 
 
-def initialize_jax_environment(cache_dir: Optional[Union[str, os.PathLike]] = None) -> None:
+def initialize_jax_environment(
+    cache_dir: Optional[Union[str, os.PathLike]] = None,
+    device_id: Optional[Union[int, str]] = None,
+) -> None:
     """Initialize and configure the JAX environment deterministically.
 
     Suppresses noisy C-level MPS startup banners, silences JAX logger propagation to stdout,
     configures persistent compilation caching, and disables verbose compile logs unless requested.
+
+    Args:
+        cache_dir: Optional custom directory to store JAX compilation cache.
+        device_id: Optional GPU device index to set for CUDA_VISIBLE_DEVICES dynamically if not already set.
     """
     import sys
     import warnings
@@ -183,9 +190,13 @@ def initialize_jax_environment(cache_dir: Optional[Union[str, os.PathLike]] = No
     warnings.filterwarnings("ignore", category=UserWarning, message=".*jax-mps was built for jaxlib.*")
     warnings.filterwarnings("ignore", category=UserWarning, message=".*Platform 'mps' is experimental.*")
 
-    # Disable aggressive CUDA device memory preallocation in JAX
+    # Allow dynamic CUDA device selection if device_id is provided and CUDA_VISIBLE_DEVICES is not set
+    if device_id is not None and "CUDA_VISIBLE_DEVICES" not in os.environ:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(device_id)
+
+    # Disable aggressive CUDA device memory preallocation in JAX to allow multi-process concurrency
     os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
-    os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.75")
+    os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.20")
 
     # Configure deterministic single-threaded XLA CPU execution to prevent native Eigen threadpool futex deadlocks
     os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1")

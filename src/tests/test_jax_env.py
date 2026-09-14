@@ -31,3 +31,32 @@ def test_jax_jit_compilation():
     val_b = jnp.array(4.0, dtype=jnp.float32)
     res = simple_func(val_a, val_b)
     assert math.isclose(float(res), 14.5, rel_tol=1e-5)
+
+
+def test_initialize_jax_environment_memory_and_preallocation(monkeypatch):
+    """Verify initialize_jax_environment sets non-greedy memory fraction and disables preallocation."""
+    import os
+    from provider.utils import initialize_jax_environment
+
+    monkeypatch.delenv("XLA_PYTHON_CLIENT_PREALLOCATE", raising=False)
+    monkeypatch.delenv("XLA_PYTHON_CLIENT_MEM_FRACTION", raising=False)
+
+    initialize_jax_environment()
+
+    assert os.environ.get("XLA_PYTHON_CLIENT_PREALLOCATE") == "false"
+    assert os.environ.get("XLA_PYTHON_CLIENT_MEM_FRACTION") == "0.20"
+
+
+def test_initialize_jax_environment_dynamic_device_id(monkeypatch):
+    """Verify initialize_jax_environment dynamically configures CUDA_VISIBLE_DEVICES when specified."""
+    import os
+    from provider.utils import initialize_jax_environment
+
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+
+    initialize_jax_environment(device_id=2)
+    assert os.environ.get("CUDA_VISIBLE_DEVICES") == "2"
+
+    # Verify that existing CUDA_VISIBLE_DEVICES is preserved dynamically and not clobbered
+    initialize_jax_environment(device_id=3)
+    assert os.environ.get("CUDA_VISIBLE_DEVICES") == "2"
