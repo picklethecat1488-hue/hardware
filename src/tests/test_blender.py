@@ -407,7 +407,10 @@ class TestBlenderRenderer:
         # 4 subprocess workers should have been invoked
         assert mock_run.call_count == 4
         # Verify frame ranges and GPU device assignments across worker calls
-        called_envs = [call.kwargs.get("env") for call in mock_run.call_args_list if "env" in call.kwargs]
+        called_envs = sorted(
+            [call.kwargs.get("env") for call in mock_run.call_args_list if "env" in call.kwargs],
+            key=lambda env: int(env["RENDER_FRAME_START"]),
+        )
         assert len(called_envs) == 4
         assert [env["RENDER_FRAME_START"] for env in called_envs] == ["0", "2", "4", "6"]
         assert [env["RENDER_FRAME_END"] for env in called_envs] == ["2", "4", "6", "8"]
