@@ -225,9 +225,9 @@ class TestBlenderRenderer:
         """Verify RenderConfig default parameters for crisp liquid fluid meshing."""
         cfg = RenderConfig()
         assert cfg.fluid_point_radius == 0.0020
-        assert cfg.fluid_surface_threshold == 0.18
+        assert cfg.fluid_surface_threshold == 0.20
         assert cfg.fluid_voxel_size == 0.0003
-        assert cfg.fluid_adaptivity == 0.05
+        assert cfg.fluid_adaptivity == 0.0
         assert cfg.use_ssfr is False
 
     def test_export_room_inverts_initial_transforms_for_links(self, tmp_path):
@@ -342,13 +342,13 @@ class TestBlenderRenderer:
         )
 
         assert mat_params["material_type"] == "water"
-        assert mat_params["roughness"] == 0.04
+        assert mat_params["roughness"] == 0.08
         assert mat_params["ior"] == 1.333
         assert mat_params["transmission"] == 0.95
         assert mat_params["fluid_voxel_size"] == 0.0003
         assert mat_params["fluid_point_radius"] == 0.0020
-        assert mat_params["fluid_surface_threshold"] == 0.18
-        assert mat_params["fluid_adaptivity"] == 0.05
+        assert mat_params["fluid_surface_threshold"] == 0.20
+        assert mat_params["fluid_adaptivity"] == 0.0
         assert mat_params["use_ssfr"] is False
 
     def test_materials_model_from_yaml(self):
@@ -372,13 +372,13 @@ class TestBlenderRenderer:
 
         water = mats.get("water")
         assert water is not None
-        assert water.roughness == 0.04
+        assert water.roughness == 0.08
         assert water.ior == 1.333
         assert water.transmission == 0.95
         assert water.fluid_voxel_size == 0.0003
         assert water.fluid_point_radius == 0.0020
-        assert water.fluid_surface_threshold == 0.18
-        assert water.fluid_adaptivity == 0.05
+        assert water.fluid_surface_threshold == 0.20
+        assert water.fluid_adaptivity == 0.0
         assert water.use_ssfr is False
 
     @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")
@@ -437,3 +437,34 @@ class TestBlenderRenderer:
         assert "turntable_period_frames = tot_f if tot_f > 1 else max(30 * 60.0, 1.0)" in code
         assert 'f_start = int(os.environ.get("RENDER_FRAME_START", 0))' in code
         assert 'f_end = int(os.environ.get("RENDER_FRAME_END", tot_f))' in code
+
+    def test_anti_flicker_render_settings_and_material_invariants(self, tmp_path):
+        """Verify BlenderRenderer generates anti-flicker raytracing and fluid settings.
+
+        Regression test: Guards against fluid mesh adaptivity popping, screen-space
+        adaptive subdivision jitter, OptiX animation flickering, and low-sample noise.
+        """
+        script_file = tmp_path / "test_anti_flicker_script.py"
+        scene_file = tmp_path / "scene_data.json"
+        output_image = tmp_path / "frame_####.png"
+
+        cfg = RenderConfig()
+        assert cfg.fluid_adaptivity == 0.0
+        assert cfg.use_micro_polygon_dicing is False
+        assert cfg.samples >= 64
+
+        BlenderRenderer._write_blender_script(
+            script_path=str(script_file),
+            scene_data_path=str(scene_file),
+            output_path=str(output_image),
+            is_animation=True,
+            config=cfg,
+            total_frames=10,
+        )
+
+        code = script_file.read_text(encoding="utf-8")
+        assert 'scene.cycles.denoiser = "OPENIMAGEDENOISE"' in code
+        assert "scene.cycles.sample_clamp_indirect = 2.0" in code
+        assert "scene.cycles.adaptive_threshold = 0.005" in code
+        assert "scene.cycles.adaptive_min_samples = 32" in code
+        assert "use_adaptive_subdivision" not in code

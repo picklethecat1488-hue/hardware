@@ -65,10 +65,10 @@ try:
                 scene.cycles.denoising_use_gpu = True
             if hasattr(scene.cycles, "denoiser") and "denoiser" in scene.cycles.bl_rna.properties:
                 denoiser_props = [item.identifier for item in scene.cycles.bl_rna.properties["denoiser"].enum_items]
-                if "OPTIX" in denoiser_props and cycles_addon and cycles_addon.preferences.compute_device_type == "OPTIX":
-                    scene.cycles.denoiser = "OPTIX"
-                elif "OPENIMAGEDENOISE" in denoiser_props:
+                if "OPENIMAGEDENOISE" in denoiser_props:
                     scene.cycles.denoiser = "OPENIMAGEDENOISE"
+                elif "OPTIX" in denoiser_props and cycles_addon and cycles_addon.preferences.compute_device_type == "OPTIX":
+                    scene.cycles.denoiser = "OPTIX"
             if hasattr(scene.cycles, "denoising_input_passes") and "denoising_input_passes" in scene.cycles.bl_rna.properties:
                 pass_props = [item.identifier for item in scene.cycles.bl_rna.properties["denoising_input_passes"].enum_items]
                 if "RGB_ALBEDO_NORMAL" in pass_props:
@@ -90,7 +90,7 @@ try:
         if hasattr(scene.cycles, "volume_bounces"):
             scene.cycles.volume_bounces = 0
         if hasattr(scene.cycles, "sample_clamp_indirect"):
-            scene.cycles.sample_clamp_indirect = 3.0
+            scene.cycles.sample_clamp_indirect = 2.0
         if hasattr(scene.cycles, "blur_glossy"):
             scene.cycles.blur_glossy = 1.0
         if hasattr(scene.cycles, "caustics_reflective"):
@@ -100,13 +100,14 @@ try:
         if hasattr(scene.cycles, "use_adaptive_sampling"):
             scene.cycles.use_adaptive_sampling = True
             if hasattr(scene.cycles, "adaptive_threshold"):
-                scene.cycles.adaptive_threshold = 0.010
+                scene.cycles.adaptive_threshold = 0.005
             if hasattr(scene.cycles, "adaptive_min_samples"):
-                scene.cycles.adaptive_min_samples = 8
+                scene.cycles.adaptive_min_samples = 32
 
         # Configure Micro-Polygon Dicing (Cycles Adaptive Subdivision)
 {% if use_micro_polygon_dicing %}
-        scene.cycles.feature_set = "EXPERIMENTAL"
+        if hasattr(scene.cycles, "feature_set"):
+            scene.cycles.feature_set = "EXPERIMENTAL"
         if hasattr(scene.cycles, "dicing_rate"):
             scene.cycles.dicing_rate = {{ dicing_rate }}
         if hasattr(scene.cycles, "max_subdivisions"):

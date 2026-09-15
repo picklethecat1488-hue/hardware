@@ -104,7 +104,7 @@ class RenderConfig:
 
     resolution: tuple[int, int] = (2560, 1440)
     fps: int = 60
-    samples: int = 32
+    samples: int = 64
     engine: str = "CYCLES"
     view_from: str = "iso"
     shadow_catcher: bool = True
@@ -115,7 +115,7 @@ class RenderConfig:
     materials: Optional[Any] = None
     blender_executable: str = field(default_factory=lambda: BlenderRenderer.find_blender_binary())
     use_geometry_nodes_fluid: bool = True
-    use_micro_polygon_dicing: bool = True
+    use_micro_polygon_dicing: bool = False
     dicing_rate: float = 1.0
     use_ssfr: Optional[bool] = None
     fluid_voxel_size: Optional[float] = None
