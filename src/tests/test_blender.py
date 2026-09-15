@@ -224,8 +224,8 @@ class TestBlenderRenderer:
     def test_render_config_fluid_defaults(self):
         """Verify RenderConfig default parameters for crisp liquid fluid meshing."""
         cfg = RenderConfig()
-        assert cfg.fluid_point_radius == 0.0020
-        assert cfg.fluid_surface_threshold == 0.20
+        assert cfg.fluid_point_radius == 0.0030
+        assert cfg.fluid_surface_threshold == 0.14
         assert cfg.fluid_voxel_size == 0.0003
         assert cfg.fluid_adaptivity == 0.0
         assert cfg.use_ssfr is False
@@ -268,7 +268,7 @@ class TestBlenderRenderer:
         cfg = RenderConfig()
         assert cfg.turntable is True
         assert cfg.fluid_voxel_size == 0.0003
-        assert cfg.fluid_point_radius == 0.0020
+        assert cfg.fluid_point_radius == 0.0030
 
     @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")
     @patch("subprocess.run")
@@ -346,8 +346,8 @@ class TestBlenderRenderer:
         assert mat_params["ior"] == 1.333
         assert mat_params["transmission"] == 0.95
         assert mat_params["fluid_voxel_size"] == 0.0003
-        assert mat_params["fluid_point_radius"] == 0.0020
-        assert mat_params["fluid_surface_threshold"] == 0.20
+        assert mat_params["fluid_point_radius"] == 0.0030
+        assert mat_params["fluid_surface_threshold"] == 0.14
         assert mat_params["fluid_adaptivity"] == 0.0
         assert mat_params["use_ssfr"] is False
 
@@ -376,8 +376,8 @@ class TestBlenderRenderer:
         assert water.ior == 1.333
         assert water.transmission == 0.95
         assert water.fluid_voxel_size == 0.0003
-        assert water.fluid_point_radius == 0.0020
-        assert water.fluid_surface_threshold == 0.20
+        assert water.fluid_point_radius == 0.0030
+        assert water.fluid_surface_threshold == 0.14
         assert water.fluid_adaptivity == 0.0
         assert water.use_ssfr is False
 
@@ -468,3 +468,35 @@ class TestBlenderRenderer:
         assert "scene.cycles.adaptive_threshold = 0.005" in code
         assert "scene.cycles.adaptive_min_samples = 32" in code
         assert "use_adaptive_subdivision" not in code
+
+    def test_fluid_geometry_nodes_sheet_bridging_invariant(self):
+        """Verify OpenVDB particle bridging distance prevents thin film popping and fracturing.
+
+        Regression test: In SPH fluid dynamics, particles on the lid spread horizontally
+        with inter-particle spacing d ~ 3.5 - 4.5 mm. In Blender Geometry Nodes Points to Volume,
+        particles use quadratic falloff w(r) = (1 - (r/R)^2)^2. For adjacent particles separated
+        by d, the midpoint density is D_mid = 2 * (1 - (d / 2R)^2)^2. For an isosurface to bridge
+        at threshold T, d <= 2 * R * sqrt(1 - sqrt(T / 2)).
+        If d_max < 4.5 mm, slight lateral particle drift causes continuous liquid sheets to
+        repeatedly shatter into disconnected droplets and reform frame-to-frame, appearing
+        as violent size fluctuations and flickering.
+        """
+        import math
+        from model import MaterialsModel
+
+        water = MaterialsModel.default().get("water")
+        assert water is not None
+        r_splat = water.fluid_point_radius
+        thresh = water.fluid_surface_threshold
+
+        assert r_splat is not None and thresh is not None
+        # Maximum bridging distance between two particles before isosurface breaks
+        d_bridge_max = 2.0 * r_splat * math.sqrt(1.0 - math.sqrt(thresh / 2.0))
+
+        # Must bridge spreading monolayer particles with spacing up to 4.5mm
+        assert d_bridge_max >= 0.0045, (
+            f"Bridging distance {d_bridge_max * 1e3:.2f} mm < 4.5 mm allows thin film shattering"
+        )
+        # Surface threshold must be bounded to prevent excessive metaball bloating while maintaining cohesion
+        assert 0.10 <= thresh <= 0.16, f"Surface threshold {thresh} outside optimal cohesion range [0.10, 0.16]"
+        assert 0.0028 <= r_splat <= 0.0035, f"Point radius {r_splat} outside optimal splat range [0.0028, 0.0035]"
