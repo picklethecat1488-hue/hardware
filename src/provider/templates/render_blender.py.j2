@@ -339,10 +339,10 @@ try:
                 p2v_vol = find_socket(p2v.outputs, "Volume")
                 v2m_vol = find_socket(v2m.inputs, "Volume")
                 v2m_mesh = find_socket(v2m.outputs, "Mesh")
-                smooth_in = find_socket(smooth.inputs, "Geometry")
-                smooth_out = find_socket(smooth.outputs, "Geometry")
-                set_mat_in = find_socket(set_mat.inputs, "Geometry")
-                set_mat_out = find_socket(set_mat.outputs, "Geometry")
+                smooth_in = find_socket(smooth.inputs, "Geometry") or find_socket(smooth.inputs, "Mesh")
+                smooth_out = find_socket(smooth.outputs, "Geometry") or find_socket(smooth.outputs, "Mesh")
+                set_mat_in = find_socket(set_mat.inputs, "Geometry") or find_socket(set_mat.inputs, "Mesh")
+                set_mat_out = find_socket(set_mat.outputs, "Geometry") or find_socket(set_mat.outputs, "Mesh")
                 out_geom = find_socket(out_node.inputs, "Geometry")
 
                 if in_geom and p2v_pts:
