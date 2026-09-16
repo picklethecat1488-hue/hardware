@@ -1,4 +1,4 @@
-"""Unit tests for advanced PCB features: CPWG impedance, RF/Display DRC, CAD boundary containment, Eye diagram, and SensorHub."""
+"""Unit tests for advanced PCB features: CPWG impedance, RF/Display DRC, CAD boundary containment, Eye diagram, and TestBoard."""
 
 import json
 from pathlib import Path
@@ -18,7 +18,7 @@ from provider.pcb.exporter import PCBExporter
 from provider.pcb.eye_diagram import EyeDiagramSimulator, EyeDiagramConfig, generate_prbs9
 from provider.pcb.rerun_logger import log_drc_report, log_eye_diagram
 from provider import Room, Mode
-from projects.test_board.provider import TestBoardProvider, SensorHubProvider
+from projects.test_board.provider import TestBoardProvider
 
 
 @pytest.fixture
@@ -298,7 +298,7 @@ def test_rerun_logger_drc_and_eye(advanced_pcb_stackup: StackupModel):
     log_eye_diagram(eye_res)
 
 
-def test_sensor_hub_provider_cad_and_assembly():
+def test_test_board_provider_cad_and_assembly():
     """Verify TestBoardProvider builds valid 3D shapes, loads measurements, and populates Room."""
     provider = TestBoardProvider()
     assert provider.settings.board_width == 60.0
@@ -391,9 +391,9 @@ def test_schematic_diagram_dynamic_scaling(tmp_path: Path):
     assert svg_height >= 700
 
 
-def test_sensor_hub_wiring_and_diagram_generation(tmp_path: Path):
-    """Verify that SensorHub wiring YAML parses footprints and nets, generates diagrams, and exports BOM/CPL."""
-    provider = SensorHubProvider()
+def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
+    """Verify that TestBoard wiring YAML parses footprints and nets, generates diagrams, and exports BOM/CPL."""
+    provider = TestBoardProvider()
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)

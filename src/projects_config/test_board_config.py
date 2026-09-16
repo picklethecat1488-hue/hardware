@@ -117,7 +117,3 @@ class TestBoardConfig(BaseModel):
     def test_pcie_diff_target_ohm(self) -> float:
         """Target differential impedance in ohms for PCIe lines."""
         return float(self._raw_data.get("test_pcie_diff_target_ohm", 85.0))
-
-
-# Alias for backward compatibility
-SensorHubConfig = TestBoardConfig

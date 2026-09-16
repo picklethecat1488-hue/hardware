@@ -186,7 +186,3 @@ class TestBoardProvider(Provider):
             "product": self.diagram_product,
             "wiring": self.diagram_wiring,
         }
-
-
-# Alias for backward compatibility
-SensorHubProvider = TestBoardProvider
