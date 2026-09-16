@@ -65,10 +65,10 @@ try:
                 scene.cycles.denoising_use_gpu = True
             if hasattr(scene.cycles, "denoiser") and "denoiser" in scene.cycles.bl_rna.properties:
                 denoiser_props = [item.identifier for item in scene.cycles.bl_rna.properties["denoiser"].enum_items]
-                if "OPTIX" in denoiser_props and cycles_addon and cycles_addon.preferences.compute_device_type == "OPTIX":
-                    scene.cycles.denoiser = "OPTIX"
-                elif "OPENIMAGEDENOISE" in denoiser_props:
+                if "OPENIMAGEDENOISE" in denoiser_props:
                     scene.cycles.denoiser = "OPENIMAGEDENOISE"
+                elif "OPTIX" in denoiser_props and cycles_addon and cycles_addon.preferences.compute_device_type == "OPTIX":
+                    scene.cycles.denoiser = "OPTIX"
             if hasattr(scene.cycles, "denoising_input_passes") and "denoising_input_passes" in scene.cycles.bl_rna.properties:
                 pass_props = [item.identifier for item in scene.cycles.bl_rna.properties["denoising_input_passes"].enum_items]
                 if "RGB_ALBEDO_NORMAL" in pass_props:
@@ -90,7 +90,7 @@ try:
         if hasattr(scene.cycles, "volume_bounces"):
             scene.cycles.volume_bounces = 0
         if hasattr(scene.cycles, "sample_clamp_indirect"):
-            scene.cycles.sample_clamp_indirect = 3.0
+            scene.cycles.sample_clamp_indirect = 2.0
         if hasattr(scene.cycles, "blur_glossy"):
             scene.cycles.blur_glossy = 1.0
         if hasattr(scene.cycles, "caustics_reflective"):
@@ -100,13 +100,14 @@ try:
         if hasattr(scene.cycles, "use_adaptive_sampling"):
             scene.cycles.use_adaptive_sampling = True
             if hasattr(scene.cycles, "adaptive_threshold"):
-                scene.cycles.adaptive_threshold = 0.010
+                scene.cycles.adaptive_threshold = 0.005
             if hasattr(scene.cycles, "adaptive_min_samples"):
-                scene.cycles.adaptive_min_samples = 8
+                scene.cycles.adaptive_min_samples = 32
 
         # Configure Micro-Polygon Dicing (Cycles Adaptive Subdivision)
 {% if use_micro_polygon_dicing %}
-        scene.cycles.feature_set = "EXPERIMENTAL"
+        if hasattr(scene.cycles, "feature_set"):
+            scene.cycles.feature_set = "EXPERIMENTAL"
         if hasattr(scene.cycles, "dicing_rate"):
             scene.cycles.dicing_rate = {{ dicing_rate }}
         if hasattr(scene.cycles, "max_subdivisions"):
@@ -338,10 +339,10 @@ try:
                 p2v_vol = find_socket(p2v.outputs, "Volume")
                 v2m_vol = find_socket(v2m.inputs, "Volume")
                 v2m_mesh = find_socket(v2m.outputs, "Mesh")
-                smooth_in = find_socket(smooth.inputs, "Geometry")
-                smooth_out = find_socket(smooth.outputs, "Geometry")
-                set_mat_in = find_socket(set_mat.inputs, "Geometry")
-                set_mat_out = find_socket(set_mat.outputs, "Geometry")
+                smooth_in = find_socket(smooth.inputs, "Geometry") or find_socket(smooth.inputs, "Mesh")
+                smooth_out = find_socket(smooth.outputs, "Geometry") or find_socket(smooth.outputs, "Mesh")
+                set_mat_in = find_socket(set_mat.inputs, "Geometry") or find_socket(set_mat.inputs, "Mesh")
+                set_mat_out = find_socket(set_mat.outputs, "Geometry") or find_socket(set_mat.outputs, "Mesh")
                 out_geom = find_socket(out_node.inputs, "Geometry")
 
                 if in_geom and p2v_pts:
@@ -354,6 +355,14 @@ try:
                     gn_tree.links.new(smooth_out, set_mat_in)
                 if set_mat_out and out_geom:
                     gn_tree.links.new(set_mat_out, out_geom)
+
+                smooth_iter = meta.get("fluid_smooth_iterations", {{ fluid_smooth_iterations if fluid_smooth_iterations is not none else 'None' }})
+                smooth_fac = meta.get("fluid_smooth_factor", {{ fluid_smooth_factor if fluid_smooth_factor is not none else 'None' }})
+                if smooth_iter is not None and int(smooth_iter) > 0:
+                    smooth_mod = w_obj.modifiers.new(name="FluidMeshSmooth", type="SMOOTH")
+                    smooth_mod.iterations = int(smooth_iter)
+                    if smooth_fac is not None:
+                        smooth_mod.factor = float(smooth_fac)
 
 {% if use_micro_polygon_dicing %}
                 sub = w_obj.modifiers.new("Subsurf", "SUBSURF")
@@ -375,6 +384,15 @@ try:
                 w_mesh.materials.append(mat)
                 w_obj = bpy.data.objects.new("water", w_mesh)
                 scene.collection.objects.link(w_obj)
+
+                smooth_iter = meta.get("fluid_smooth_iterations", {{ fluid_smooth_iterations if fluid_smooth_iterations is not none else 'None' }})
+                smooth_fac = meta.get("fluid_smooth_factor", {{ fluid_smooth_factor if fluid_smooth_factor is not none else 'None' }})
+                if smooth_iter is not None and int(smooth_iter) > 0:
+                    smooth_mod = w_obj.modifiers.new(name="FluidMeshSmooth", type="SMOOTH")
+                    smooth_mod.iterations = int(smooth_iter)
+                    if smooth_fac is not None:
+                        smooth_mod.factor = float(smooth_fac)
+
 {% if use_micro_polygon_dicing %}
                 sub = w_obj.modifiers.new("Subsurf", "SUBSURF")
                 if hasattr(w_obj, "cycles") and hasattr(w_obj.cycles, "use_adaptive_subdivision"):
@@ -510,12 +528,17 @@ try:
 
     frames_data = manifest.get("frames", [])
 
-    for f_idx in range(tot_f):
+    f_start = int(os.environ.get("RENDER_FRAME_START", 0))
+    f_end = int(os.environ.get("RENDER_FRAME_END", tot_f))
+    f_start = max(0, min(f_start, tot_f))
+    f_end = max(f_start, min(f_end, tot_f))
+
+    for f_idx in range(f_start, f_end):
         scene.frame_set(f_idx)
 
         # Update camera position if turntable is active
         if is_turntable:
-            turntable_period_frames = max({{ fps }} * 10.0, 1.0)
+            turntable_period_frames = tot_f if tot_f > 1 else max({{ fps }} * 60.0, 1.0)
             theta = start_angle + (2.0 * math.pi * f_idx) / turntable_period_frames
             cam_obj.location = (
                 t_center.x + r_xy * math.sin(theta),
