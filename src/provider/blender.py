@@ -122,6 +122,8 @@ class RenderConfig:
     fluid_point_radius: Optional[float] = None
     fluid_surface_threshold: Optional[float] = None
     fluid_adaptivity: Optional[float] = None
+    fluid_smooth_iterations: Optional[int] = None
+    fluid_smooth_factor: Optional[float] = None
     workers: Optional[int] = None
 
     def __post_init__(self) -> None:
@@ -141,6 +143,10 @@ class RenderConfig:
                 self.fluid_surface_threshold = water_mat.fluid_surface_threshold
             if self.fluid_adaptivity is None and water_mat.fluid_adaptivity is not None:
                 self.fluid_adaptivity = water_mat.fluid_adaptivity
+            if self.fluid_smooth_iterations is None and getattr(water_mat, "fluid_smooth_iterations", None) is not None:
+                self.fluid_smooth_iterations = water_mat.fluid_smooth_iterations
+            if self.fluid_smooth_factor is None and getattr(water_mat, "fluid_smooth_factor", None) is not None:
+                self.fluid_smooth_factor = water_mat.fluid_smooth_factor
 
 
 class BlenderRenderer:
@@ -619,6 +625,10 @@ class BlenderRenderer:
                 mat_dict["fluid_surface_threshold"] = mat_model.fluid_surface_threshold
             if mat_model.fluid_adaptivity is not None:
                 mat_dict["fluid_adaptivity"] = mat_model.fluid_adaptivity
+            if mat_model.fluid_smooth_iterations is not None:
+                mat_dict["fluid_smooth_iterations"] = mat_model.fluid_smooth_iterations
+            if mat_model.fluid_smooth_factor is not None:
+                mat_dict["fluid_smooth_factor"] = mat_model.fluid_smooth_factor
             if mat_model.use_ssfr is not None:
                 mat_dict["use_ssfr"] = mat_model.use_ssfr
 
@@ -901,6 +911,8 @@ class BlenderRenderer:
             fluid_point_radius=config.fluid_point_radius,
             fluid_surface_threshold=config.fluid_surface_threshold,
             fluid_adaptivity=config.fluid_adaptivity,
+            fluid_smooth_iterations=config.fluid_smooth_iterations,
+            fluid_smooth_factor=config.fluid_smooth_factor,
         )
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(rendered_script.strip())

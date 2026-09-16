@@ -356,6 +356,14 @@ try:
                 if set_mat_out and out_geom:
                     gn_tree.links.new(set_mat_out, out_geom)
 
+                smooth_iter = meta.get("fluid_smooth_iterations", {{ fluid_smooth_iterations if fluid_smooth_iterations is not none else 'None' }})
+                smooth_fac = meta.get("fluid_smooth_factor", {{ fluid_smooth_factor if fluid_smooth_factor is not none else 'None' }})
+                if smooth_iter is not None and int(smooth_iter) > 0:
+                    smooth_mod = w_obj.modifiers.new(name="FluidMeshSmooth", type="SMOOTH")
+                    smooth_mod.iterations = int(smooth_iter)
+                    if smooth_fac is not None:
+                        smooth_mod.factor = float(smooth_fac)
+
 {% if use_micro_polygon_dicing %}
                 sub = w_obj.modifiers.new("Subsurf", "SUBSURF")
                 if hasattr(w_obj, "cycles") and hasattr(w_obj.cycles, "use_adaptive_subdivision"):
@@ -376,6 +384,15 @@ try:
                 w_mesh.materials.append(mat)
                 w_obj = bpy.data.objects.new("water", w_mesh)
                 scene.collection.objects.link(w_obj)
+
+                smooth_iter = meta.get("fluid_smooth_iterations", {{ fluid_smooth_iterations if fluid_smooth_iterations is not none else 'None' }})
+                smooth_fac = meta.get("fluid_smooth_factor", {{ fluid_smooth_factor if fluid_smooth_factor is not none else 'None' }})
+                if smooth_iter is not None and int(smooth_iter) > 0:
+                    smooth_mod = w_obj.modifiers.new(name="FluidMeshSmooth", type="SMOOTH")
+                    smooth_mod.iterations = int(smooth_iter)
+                    if smooth_fac is not None:
+                        smooth_mod.factor = float(smooth_fac)
+
 {% if use_micro_polygon_dicing %}
                 sub = w_obj.modifiers.new("Subsurf", "SUBSURF")
                 if hasattr(w_obj, "cycles") and hasattr(w_obj.cycles, "use_adaptive_subdivision"):

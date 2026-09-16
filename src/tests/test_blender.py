@@ -224,10 +224,12 @@ class TestBlenderRenderer:
     def test_render_config_fluid_defaults(self):
         """Verify RenderConfig default parameters for crisp liquid fluid meshing."""
         cfg = RenderConfig()
-        assert cfg.fluid_point_radius == 0.0030
-        assert cfg.fluid_surface_threshold == 0.14
+        assert cfg.fluid_point_radius == 0.0034
+        assert cfg.fluid_surface_threshold == 0.12
         assert cfg.fluid_voxel_size == 0.0003
         assert cfg.fluid_adaptivity == 0.0
+        assert cfg.fluid_smooth_iterations == 4
+        assert cfg.fluid_smooth_factor == 0.60
         assert cfg.use_ssfr is False
 
     def test_export_room_inverts_initial_transforms_for_links(self, tmp_path):
@@ -268,7 +270,7 @@ class TestBlenderRenderer:
         cfg = RenderConfig()
         assert cfg.turntable is True
         assert cfg.fluid_voxel_size == 0.0003
-        assert cfg.fluid_point_radius == 0.0030
+        assert cfg.fluid_point_radius == 0.0034
 
     @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")
     @patch("subprocess.run")
@@ -346,9 +348,11 @@ class TestBlenderRenderer:
         assert mat_params["ior"] == 1.333
         assert mat_params["transmission"] == 0.95
         assert mat_params["fluid_voxel_size"] == 0.0003
-        assert mat_params["fluid_point_radius"] == 0.0030
-        assert mat_params["fluid_surface_threshold"] == 0.14
+        assert mat_params["fluid_point_radius"] == 0.0034
+        assert mat_params["fluid_surface_threshold"] == 0.12
         assert mat_params["fluid_adaptivity"] == 0.0
+        assert mat_params["fluid_smooth_iterations"] == 4
+        assert mat_params["fluid_smooth_factor"] == 0.60
         assert mat_params["use_ssfr"] is False
 
     def test_materials_model_from_yaml(self):
@@ -376,9 +380,11 @@ class TestBlenderRenderer:
         assert water.ior == 1.333
         assert water.transmission == 0.95
         assert water.fluid_voxel_size == 0.0003
-        assert water.fluid_point_radius == 0.0030
-        assert water.fluid_surface_threshold == 0.14
+        assert water.fluid_point_radius == 0.0034
+        assert water.fluid_surface_threshold == 0.12
         assert water.fluid_adaptivity == 0.0
+        assert water.fluid_smooth_iterations == 4
+        assert water.fluid_smooth_factor == 0.60
         assert water.use_ssfr is False
 
     @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")

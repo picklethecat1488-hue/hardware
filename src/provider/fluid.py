@@ -495,9 +495,29 @@ def _compute_boundary_forces_jax(
     occ_p = _g2p_scalar_jax(pos_local, smooth_occ, dx, origin_arr, nx, ny, nz)
     norm_p = _g2p_jax(pos_local, normal_grid, dx, origin_arr, nx, ny, nz)
     # Prevent spurious upward ejection forces from outer vertical side walls
+    # Prevent spurious upward ejection forces and staircase artifacts from outer vertical side walls
     base_radius = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.R_OUTER], 0.0)
     base_floor_z = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.Z_BOTTOM] + dx, dx)
     is_outer_wall = (pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2) >= (base_radius - 2.0 * dx) ** 2
+
+    # 1. Exact analytical cylindrical outer wall boundary force:
+    # Eliminates discrete Cartesian grid voxel steps, polygonal faceting, and columnar stalagmites
+    r_safe = jnp.maximum(jnp.sqrt(pos_local[:, 0] ** 2 + pos_local[:, 1] ** 2), 1e-6)
+    cyl_wall_norm = jnp.stack([-pos_local[:, 0] / r_safe, -pos_local[:, 1] / r_safe, jnp.zeros_like(r_safe)], axis=-1)
+    cyl_wall_pen = jnp.maximum(r_safe - (base_radius - r_s), 0.0)
+    v_n_cyl = (vel_local[:, 0] * pos_local[:, 0] + vel_local[:, 1] * pos_local[:, 1]) / r_safe
+    f_n_cyl = jnp.maximum(K * cyl_wall_pen + D * jnp.maximum(v_n_cyl, 0.0), 0.0)
+    v_tan_cyl = vel_local - jnp.stack(
+        [v_n_cyl * pos_local[:, 0] / r_safe, v_n_cyl * pos_local[:, 1] / r_safe, jnp.zeros_like(r_safe)], axis=-1
+    )
+    v_tan_cyl_mag = jnp.sqrt(jnp.sum(v_tan_cyl**2, axis=-1, keepdims=True) + 1e-8)
+    fric_base = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.BOUNDARY_FRICTION], 0.20)
+    f_fric_cyl = -fric_base * f_n_cyl[:, None] * (v_tan_cyl / v_tan_cyl_mag)
+    force_cyl_wall = f_n_cyl[:, None] * cyl_wall_norm + f_fric_cyl
+    force_cyl_wall = jnp.where((cyl_wall_pen > 0.0)[:, None], force_cyl_wall, 0.0)
+
+    # 2. Voxel-based boundary collision force for internal obstacles (impeller casing, tube, floor)
+    # Continuous penetration (pen = (occ_p - 0.50) * dx) eliminates discontinuous step impulses
     norm_pz = jnp.where(
         (pos_local[:, 2] > base_floor_z) & is_outer_wall,
         jnp.minimum(0.0, norm_p[:, 2]),
@@ -508,17 +528,19 @@ def _compute_boundary_forces_jax(
     norm_unit = norm_p_clean / norm_p_mag
     fric_p = _g2p_scalar_jax(pos_local, solid_friction, dx, origin_arr, nx, ny, nz)
 
-    pen = occ_p * dx
-    v_n = -jnp.sum(vel_local * norm_unit, axis=-1)
-    f_n_mag = jnp.maximum(K * pen + D * jnp.maximum(v_n, 0.0), 0.0)
+    pen_vox = jnp.maximum(occ_p - 0.50, 0.0) * dx
+    v_n_vox = -jnp.sum(vel_local * norm_unit, axis=-1)
+    f_n_vox = jnp.maximum(K * pen_vox + D * jnp.maximum(v_n_vox, 0.0), 0.0)
 
-    v_tan = vel_local - jnp.sum(vel_local * norm_unit, axis=-1, keepdims=True) * norm_unit
-    v_tan_mag = jnp.sqrt(jnp.sum(v_tan**2, axis=-1, keepdims=True) + 1e-8)
-    f_fric_tan = -fric_p[:, None] * f_n_mag[:, None] * (v_tan / v_tan_mag)
+    v_tan_vox = vel_local - jnp.sum(vel_local * norm_unit, axis=-1, keepdims=True) * norm_unit
+    v_tan_vox_mag = jnp.sqrt(jnp.sum(v_tan_vox**2, axis=-1, keepdims=True) + 1e-8)
+    f_fric_vox = -fric_p[:, None] * f_n_vox[:, None] * (v_tan_vox / v_tan_vox_mag)
 
-    force_local = f_n_mag[:, None] * norm_unit + f_fric_tan
-    force_voxel = jnp.where((occ_p > 0.50)[:, None], force_local, 0.0)
-    forces = base_to_world_vector(force_voxel, base_orn)
+    force_vox = f_n_vox[:, None] * norm_unit + f_fric_vox
+    force_vox = jnp.where((occ_p > 0.50)[:, None], force_vox, 0.0)
+
+    force_local = jnp.where(is_outer_wall[:, None], force_cyl_wall, force_vox)
+    forces = base_to_world_vector(force_local, base_orn)
     vanes_torque = jnp.array(0.0)
 
     # Dynamic rotating impeller forces and reaction torque
@@ -1219,7 +1241,7 @@ def _compute_dynamic_fluid_bodies_jax(
     cavity_floor_z: float = 0.0,
     z_max_pool: float = 0.0,
     r_s: float = 0.003,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Dynamically recompute physical fluid bodies, local column surface heights, and horizontal leveling gradients."""
     gp = (pos_local - origin) / dx
     ix = jnp.clip(jnp.floor(gp[:, 0]).astype(jnp.int32), 0, nx - 1)
@@ -1277,7 +1299,10 @@ def _compute_dynamic_fluid_bodies_jax(
     in_fluid_body = in_basin & is_grounded & (pos_local[:, 2] <= p_surf_z + 2.0 * r_s) & (p_col_count >= 2.0)
     level_grad_local = jnp.stack([-p_grad_x, -p_grad_y, jnp.zeros_like(p_grad_x)], axis=-1)
 
-    return in_fluid_body, p_surf_z, level_grad_local, p_col_count
+    deficit_grid = jnp.clip((z_surf_vol - surf_z_grid) / (4.0 * r_s), 0.0, 3.0)
+    p_deficit_ratio = deficit_grid[ix, iy]
+
+    return in_fluid_body, p_surf_z, level_grad_local, p_col_count, p_deficit_ratio
 
 
 @jax.jit
@@ -1502,7 +1527,7 @@ def _g2p_mapping_subroutine(
         0.0,
     )
     z_max_pool = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.POOL_MAX_Z], 0.0)
-    in_fluid_body, _, _, _ = _compute_dynamic_fluid_bodies_jax(
+    in_fluid_body, _, _, _, _ = _compute_dynamic_fluid_bodies_jax(
         pos_local, dx, origin, nx, ny, nz, cavity_floor_z=cavity_floor_z, z_max_pool=z_max_pool, r_s=r_s
     )
 
@@ -1515,9 +1540,16 @@ def _g2p_mapping_subroutine(
         r_b_xy, _, _ = cartesian_to_cylindrical(pos_b)
         inner_r = b_params[i, BoundaryParam.R_INNER]
         r_outer = b_params[i, BoundaryParam.R_OUTER]
-        z_top = b_params[i, BoundaryParam.Z_TOP]
-        is_tube = (shape == SHAPE_TUBE) & (r_b_xy <= inner_r) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] < z_top - 2.0 * r_s)
-        is_casing = (shape == SHAPE_CASING) & (r_b_xy <= r_outer) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= z_top)
+        height = b_params[i, BoundaryParam.HEIGHT]
+        is_tube = (
+            (shape == SHAPE_TUBE)
+            & (r_b_xy <= inner_r + r_s)
+            & (pos_b[:, 2] >= -2.0 * r_s)
+            & (pos_b[:, 2] <= height + 0.020)
+        )
+        is_casing = (
+            (shape == SHAPE_CASING) & (r_b_xy <= r_outer + r_s) & (pos_b[:, 2] >= 0.0) & (pos_b[:, 2] <= height + 0.020)
+        )
         in_tube_or_casing = in_tube_or_casing | is_tube | is_casing
     in_fluid_continuum = jnp.where(
         base_idx != -1, in_fluid_body & (~in_tube_or_casing), jnp.ones(pos_curr.shape[0], dtype=jnp.bool_)
@@ -1711,8 +1743,7 @@ def _compute_particle_forces_subroutine(
             jnp.minimum(constriction_ratio, 1.0) * (r_impeller_eff * jnp.abs(omega)),
             0.0,
         )
-        height_frac = jnp.clip(1.0 - pos_tube[:, 2] / (tube_h + 1e-6), 0.0, 1.0)
-        v_target_rise = jnp.clip(v_flow_est * 0.6, 0.25, 0.45) * (0.35 + 0.65 * height_frac)
+        v_target_rise = jnp.clip(v_flow_est * 0.6, 0.25, 0.45)
 
         pump_lift_scalar = jnp.where(
             jnp.abs(omega) > 1e-3,
@@ -1740,7 +1771,7 @@ def _compute_particle_forces_subroutine(
         dome_disp = radial_unit_world * 0.85 + down_dir_world[None, :] * 0.45
         disp_mag = jnp.sqrt(jnp.sum(dome_disp**2, axis=-1, keepdims=True) + 1e-8)
         spout_out_dir = dome_disp / disp_mag
-        spout_accel = spout_out_dir * (g_mag * 0.30 + v_target_rise[:, None] * 0.4)
+        spout_accel = spout_out_dir * (g_mag * 0.30 + v_target_rise * 0.4)
 
         tube_pump_accel_i = jnp.where(
             at_spout[:, None],
@@ -1750,6 +1781,47 @@ def _compute_particle_forces_subroutine(
 
         is_tube = shape == SHAPE_TUBE
         tube_pump_accel += jnp.where(is_tube, tube_pump_accel_i, jnp.zeros_like(pos_curr))
+
+    effective_gravity = gravity[None, :]
+
+    # Dynamic moving voxel fluid bodies: continuously compute physical fluid shapes from voxel occupancy
+    base_pos_b = b_pos_arr[base_idx]
+    base_orn_b = b_orn_arr[base_idx]
+    base_orn_b_inv = invert_orientation(base_orn_b)
+    pos_b = world_to_base_frame(pos_curr, base_pos_b, base_orn_b_inv)
+    r_b, _, _ = cartesian_to_cylindrical(pos_b)
+    v_b = world_to_local_vector(vel_world, base_orn_b_inv)
+    v_z_b = v_b[:, 2]
+
+    in_tube_or_casing = jnp.zeros(pos_curr.shape[0], dtype=jnp.bool_)
+    for i, shape in enumerate(b_shapes):
+        b_pos = b_pos_arr[i]
+        b_orn = b_orn_arr[i]
+        b_orn_inv = invert_orientation(b_orn)
+        pos_link = world_to_local_frame(pos_curr, b_pos, b_orn_inv)
+        r_link_xy, _, _ = cartesian_to_cylindrical(pos_link)
+        inner_r = b_params[i, BoundaryParam.R_INNER]
+        r_outer = b_params[i, BoundaryParam.R_OUTER]
+        height = b_params[i, BoundaryParam.HEIGHT]
+        is_tube = (
+            (shape == SHAPE_TUBE)
+            & (r_link_xy <= inner_r + r_s)
+            & (pos_link[:, 2] >= -2.0 * r_s)
+            & (pos_link[:, 2] <= height + 0.020)
+        )
+        is_casing = (
+            (shape == SHAPE_CASING)
+            & (r_link_xy <= r_outer + r_s)
+            & (pos_link[:, 2] >= 0.0)
+            & (pos_link[:, 2] <= height + 0.020)
+        )
+        in_tube_or_casing = in_tube_or_casing | is_tube | is_casing
+
+    z_max_pool = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.POOL_MAX_Z], 0.0)
+    in_fluid_body, p_surf_z, level_grad_local, _, p_deficit_ratio = _compute_dynamic_fluid_bodies_jax(
+        pos_b, dx, origin, nx, ny, nz, cavity_floor_z=cavity_floor_z, z_max_pool=z_max_pool, r_s=r_s
+    )
+    in_pool = in_fluid_body & (~in_tube_or_casing)
 
     lid_drain_accel = jnp.zeros_like(pos_curr)
     lid_slope_ratio = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.LID_SLOPE_RATIO], 0.0)
@@ -1808,20 +1880,27 @@ def _compute_particle_forces_subroutine(
 
         # Upward floor support on the solid drinking platform
         v_lid = world_to_local_vector(vel_world, lid_orn_inv)
-        cushion_lid_z = -jnp.minimum(v_lid[:, 2], 0.0) * 45.0
+        cushion_lid_z = -jnp.minimum(v_lid[:, 2], 0.0) * 25.0
+        lid_damping_z = -v_lid[:, 2] * 20.0
         v_lid_xy = jnp.stack([v_lid[:, 0], v_lid[:, 1], jnp.zeros_like(v_lid[:, 2])], axis=-1)
         surface_friction_local = -v_lid_xy * 18.0
         support_normal_local = jnp.stack(
-            [jnp.zeros_like(dx_to_drain), jnp.zeros_like(dx_to_drain), (g_mag + cushion_lid_z)],
+            [jnp.zeros_like(dx_to_drain), jnp.zeros_like(dx_to_drain), (g_mag + cushion_lid_z + lid_damping_z)],
             axis=-1,
         )
         platform_accel_local = sheet_flow_unit * (g_mag * slope_factor) + support_normal_local + surface_friction_local
 
         # 3. Waterfall cascade as soon as water meets the edge of the platform or drain cutout
-        # Active strictly in the free-fall region above the reservoir pool surface
+        # Active strictly in the free-fall air gap region above the reservoir pool surface
         wall_band_r_max = b_params[i, BoundaryParam.WALL_BAND_R_MAX]
+        platform_blend = jnp.clip((platform_radius - dist_spout_xy) / (2.0 * r_s), 0.0, 1.0)
+        on_drinking_platform = (
+            (platform_blend > 0.0) & (pos_lid[:, 2] >= 0.0) & (pos_lid[:, 2] <= tray_z_max + 2.0 * r_s)
+        )
         in_waterfall = (
-            (~in_platform_zone)
+            (~in_fluid_body)
+            & (pos_b[:, 2] > p_surf_z)
+            & (platform_blend < 1.0)
             & (r_lid_xy < wall_band_r_max)
             & (pos_lid[:, 2] >= tray_z_min)
             & (pos_lid[:, 2] <= tray_z_max + 2.0 * r_s)
@@ -1838,9 +1917,12 @@ def _compute_particle_forces_subroutine(
         waterfall_plunge_unit = waterfall_plunge_local / waterfall_plunge_mag
         waterfall_accel_local = waterfall_plunge_unit * g_mag - v_lid_xy * 12.0
 
+        blended_lid_accel = platform_accel_local * platform_blend[:, None] + waterfall_accel_local * (
+            1.0 - platform_blend[:, None]
+        )
         lid_accel_local = jnp.where(
             on_drinking_platform[:, None],
-            platform_accel_local,
+            blended_lid_accel,
             waterfall_accel_local,
         )
         total_lid_accel_world = local_to_world_vector(lid_accel_local, lid_orn)
@@ -1850,42 +1932,31 @@ def _compute_particle_forces_subroutine(
         active_lid_mask = on_drinking_platform | in_waterfall
         lid_drain_accel += jnp.where(is_lid & active_lid_mask[:, None], total_lid_accel_world, jnp.zeros_like(pos_curr))
 
-    effective_gravity = gravity[None, :]
-
-    # Dynamic moving voxel fluid bodies: continuously compute physical fluid shapes from voxel occupancy
-    base_pos_b = b_pos_arr[base_idx]
-    base_orn_b = b_orn_arr[base_idx]
-    base_orn_b_inv = invert_orientation(base_orn_b)
-    pos_b = world_to_local_frame(pos_curr, base_pos_b, base_orn_b_inv)
-    r_b, _, _ = cartesian_to_cylindrical(pos_b)
-    v_b = world_to_local_vector(vel_world, base_orn_b_inv)
-    v_z_b = v_b[:, 2]
-
-    z_max_pool = jnp.where(base_idx != -1, b_params[base_idx, BoundaryParam.POOL_MAX_Z], 0.0)
-    in_fluid_body, p_surf_z, level_grad_local, _ = _compute_dynamic_fluid_bodies_jax(
-        pos_b, dx, origin, nx, ny, nz, cavity_floor_z=cavity_floor_z, z_max_pool=z_max_pool, r_s=r_s
-    )
-
-    # 1. Dynamic hydrostatic support and vertical column pressure
-    depth_pressure = jnp.clip((p_surf_z - pos_b[:, 2]) / (4.0 * r_s), 0.0, 6.0)
-    cushion_accel_z = -jnp.minimum(v_z_b, 0.0) * 35.0
-    surface_damping = jnp.where(pos_b[:, 2] >= p_surf_z - 2.0 * r_s, -jnp.maximum(v_z_b, 0.0) * 15.0, 0.0)
-    total_support_z = g_mag * (1.0 + depth_pressure * 0.35) + cushion_accel_z + surface_damping
+    # 1. Dynamic hydrostatic support and tranquil pool stabilization
+    # In equilibrium, hydrostatic support balances gravity (1.0 * g_mag).
+    # Critical viscous damping on vertical and horizontal velocity absorbs sloshing, turbulence,
+    # and convective boiling currents, producing a tranquil, placid, glassy mirror water surface in the reservoir pool.
+    near_floor = pos_b[:, 2] <= cavity_floor_z + 4.0 * r_s
+    cushion_accel_z = jnp.where(near_floor, -jnp.minimum(v_z_b, 0.0) * 25.0, 0.0)
+    pool_viscous_damping_z = -v_z_b * 16.0
+    total_support_z = g_mag + cushion_accel_z + pool_viscous_damping_z
+    v_b_xy = jnp.stack([v_b[:, 0], v_b[:, 1], jnp.zeros_like(v_z_b)], axis=-1)
+    pool_viscous_damping_xy = -v_b_xy * 12.0
 
     hydrostatic_support_world = local_to_world_vector(
-        jnp.stack([jnp.zeros_like(r_b), jnp.zeros_like(r_b), total_support_z], axis=-1),
+        jnp.stack([pool_viscous_damping_xy[:, 0], pool_viscous_damping_xy[:, 1], total_support_z], axis=-1),
         base_orn_b,
     )
     hydrostatic_accel = jnp.where(
-        in_fluid_body[:, None],
+        in_pool[:, None],
         hydrostatic_support_world,
         0.0,
     )
 
     # 2. Dynamic horizontal leveling gradient derived continuously from the moving surface height field
-    level_accel_world = local_to_world_vector(level_grad_local * (g_mag * 0.60), base_orn_b)
+    level_accel_world = local_to_world_vector(level_grad_local * (g_mag * 0.15), base_orn_b)
     leveling_accel = jnp.where(
-        in_fluid_body[:, None],
+        in_pool[:, None],
         level_accel_world,
         0.0,
     )
@@ -2076,8 +2147,13 @@ def _ccd_cylinder_wall_boundary(
         v_rel_local[:, 1] - v_outward_pos * (pos_next_loc[:, 1] / r_safe),
         v_rel_local[:, 1],
     )
+    v_rel_z_clamped = jnp.where(
+        outside_wall,
+        v_rel_local[:, 2] * 0.85,
+        v_rel_local[:, 2],
+    )
     pos_out = jnp.stack([pos_x_clamped, pos_y_clamped, pos_next_loc[:, 2]], axis=-1)
-    vel_out = jnp.stack([v_rel_x_clamped, v_rel_y_clamped, v_rel_local[:, 2]], axis=-1)
+    vel_out = jnp.stack([v_rel_x_clamped, v_rel_y_clamped, v_rel_z_clamped], axis=-1)
     return pos_out, vel_out
 
 
@@ -3265,15 +3341,22 @@ class Fluid:
 
             while len(grid_points) < self.n_particles:
                 is_in_casing_layer = (casing_radius > 0.0) and (z <= cavity_z_offset + casing_height)
+                valid_layer_points = []
                 for x, y in all_xy_coords:
-                    if len(grid_points) >= self.n_particles:
-                        break
                     # Only exclude casing wall thickness within the casing height
                     if is_in_casing_layer:
                         dist_casing_sq = (x - casing_x) ** 2 + (y - casing_y) ** 2
                         if inner_casing_r_sq <= dist_casing_sq <= outer_casing_r_sq:
                             continue
-                    grid_points.append((x, y, z))
+                    valid_layer_points.append((x, y, z))
+
+                needed = self.n_particles - len(grid_points)
+                if len(valid_layer_points) <= needed:
+                    grid_points.extend(valid_layer_points)
+                else:
+                    # Distribute remainder particles evenly across the cross section to maintain a flat surface
+                    sub_indices = np.round(np.linspace(0, len(valid_layer_points) - 1, needed)).astype(int)
+                    grid_points.extend([valid_layer_points[idx] for idx in sub_indices])
                 z += spacing
 
             # Transform spawned points from local coordinates to world coordinates
