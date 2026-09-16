@@ -17,6 +17,7 @@ from provider.pcb.drc import PCBDesignRulesChecker, DRCSeverity
 from provider.pcb.exporter import PCBExporter
 from provider.pcb.eye_diagram import EyeDiagramSimulator, EyeDiagramConfig, generate_prbs9
 from provider.pcb.rerun_logger import log_drc_report, log_eye_diagram
+from provider import Room, Mode
 from projects.sensor_hub.provider import SensorHubProvider
 
 
@@ -299,8 +300,6 @@ def test_rerun_logger_drc_and_eye(advanced_pcb_stackup: StackupModel):
 
 def test_sensor_hub_provider_cad_and_assembly():
     """Verify SensorHubProvider builds valid 3D shapes, loads measurements, and populates Room."""
-    from provider import Room, Mode
-
     provider = SensorHubProvider()
     assert provider.settings.board_width == 60.0
     assert provider.settings.board_length == 90.0
@@ -381,3 +380,39 @@ def test_schematic_diagram_dynamic_scaling(tmp_path: Path):
     assert match is not None
     svg_height = int(match.group(1))
     assert svg_height >= 700
+
+
+def test_sensor_hub_wiring_and_diagram_generation(tmp_path: Path):
+    """Verify that SensorHub wiring YAML parses footprints and nets, generates diagrams, and exports BOM/CPL."""
+    provider = SensorHubProvider()
+    assert provider.wiring_path.exists()
+
+    wiring = Wiring(provider.wiring_path)
+    assert len(wiring.footprints) == 4
+    footprint_names = [fp.name for fp in wiring.footprints]
+    assert "U1" in footprint_names
+    assert "U2" in footprint_names
+    assert "J1" in footprint_names
+    assert "J2" in footprint_names
+
+    # Verify diagram population
+    room = Room(config=provider.app_config, materials=provider.materials)
+    provider.diagram_wiring(room, ["wiring"], Mode.DEFAULT)
+    assert len(room.keys()) > 0
+
+    # Verify BOM and CPL export
+    pcb_config = provider.pcb_config
+    assert pcb_config is not None
+    exporter = PCBExporter(pcb_config, wiring)
+
+    bom_csv = tmp_path / "bom.csv"
+    pos_csv = tmp_path / "pos.csv"
+    exporter.export_bom_csv(bom_csv)
+    exporter.export_pick_and_place_csv(pos_csv)
+
+    bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
+    assert len(bom_lines) == 5  # header + 4 components
+    assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
+
+    pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
+    assert len(pos_lines) == 5  # header + 4 components

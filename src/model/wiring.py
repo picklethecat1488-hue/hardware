@@ -120,7 +120,8 @@ class Wiring:
     def footprints(self) -> List[FootprintModel]:
         """Load and compute all component footprints with resolved positions and pin layouts."""
         components = []
-        for c in self.config.get("components", []):
+        raw_items = self.config.get("components") or self.config.get("footprints") or []
+        for c in raw_items:
             position = c.get("position", [0.0, 0.0, 0.0])
             rotation = c.get("rotation", [0.0, 0.0, 0.0])
 
@@ -132,7 +133,15 @@ class Wiring:
                 loc = joint_loc * Location(tuple(offset))
                 position = [loc.position.X, loc.position.Y, loc.position.Z]
 
-            pins = [PinModel(**p) for p in c.get("pins", [])]
+            pins = []
+            for p in c.get("pins", []):
+                p_dict = dict(p)
+                if "label" not in p_dict:
+                    p_dict["label"] = p_dict["name"]
+                if "position" in p_dict and len(p_dict["position"]) == 2:
+                    p_dict["position"] = (p_dict["position"][0], p_dict["position"][1], 0.0)
+                pins.append(PinModel(**p_dict))
+
             w, l, thickness = c["dimensions"]
 
             # Parse package and namespace from the YAML value
@@ -154,7 +163,12 @@ class Wiring:
             if layout_func is not None:
                 layout_func(pins, w, l, c.get("slots_per_side"))
 
-            label = LabelModel(**c["label"])
+            label_data = c.get("label")
+            label = (
+                LabelModel(**label_data)
+                if label_data
+                else LabelModel(text=c["name"], position=(0.0, 0.0, 0.0), align=("center", "center"))
+            )
 
             components.append(
                 FootprintModel(

@@ -156,12 +156,9 @@ class SensorHubProvider(Provider):
     def diagram_wiring(self, room: Room, targets: Sequence[str], mode: Mode) -> None:
         """Render electrical netlist and component layout in vector diagram."""
         if self.wiring_path.exists():
-            import yaml
-
-            with open(self.wiring_path, "r", encoding="utf-8") as f:
-                wiring_data = yaml.safe_load(f)
-            wiring_model = Wiring.model_validate(wiring_data)
-            WiringDiagram(wiring_model, self.settings.diagram_options).render(room)
+            wiring = Wiring(self.wiring_path)
+            diagram = WiringDiagram(wiring)
+            diagram.build(room)
 
     @property
     def part(self) -> dict[str, Callable[..., Any]]:
