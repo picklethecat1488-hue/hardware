@@ -124,6 +124,49 @@ class ProviderOrchestrator(Orchestrator):
                 return handler(target, sa, m)
 
             raw_results = list(self.executor.map(build_task, work))
+        elif action == Section.PCB:
+
+            def pcb_task(item: tuple[str, Optional[str], Mode]) -> Any:
+                target, sa, m = item
+                handler = self.provider.pcb.get(target)
+                if handler is None:
+                    from provider.pcb.exporter import PCBExporter
+                    from model.wiring import Wiring
+                    import yaml
+
+                    pcb_cfg = self.provider.pcb_config
+                    if not pcb_cfg:
+                        raise ValueError(
+                            f"No pcb.yaml found for project '{self.provider.name}' to build PCB target '{target}'"
+                        )
+
+                    import types
+
+                    wiring = None
+                    if os.path.exists(self.provider.wiring_path):
+                        wiring = Wiring(self.provider.wiring_path)
+                    else:
+                        wiring = types.SimpleNamespace(footprints=[], nets=[])
+
+                    exporter = PCBExporter(pcb_cfg, wiring)
+                    out_dir = Path("build") / self.provider.name / "pcb"
+                    out_dir.mkdir(parents=True, exist_ok=True)
+
+                    gerber_zip = exporter.export_gerber_archive(out_dir / f"{target}_gerber.zip")
+                    bom_csv = exporter.export_bom_csv(out_dir / f"{target}_bom.csv")
+                    cpl_csv = exporter.export_pick_and_place_csv(out_dir / f"{target}_cpl.csv")
+                    sch_svg = exporter.export_schematic_svg(out_dir / f"{target}_schematic.svg")
+                    cap_json = exporter.export_capacitive_config_json(out_dir / f"{target}_capacitive_config.json")
+                    return {
+                        "gerber": gerber_zip,
+                        "bom": bom_csv,
+                        "cpl": cpl_csv,
+                        "schematic": sch_svg,
+                        "capacitive_config": cap_json,
+                    }
+                return handler(target, sa, m)
+
+            raw_results = list(self.executor.map(pcb_task, work))
         else:
             raise ValueError(f"Unsupported action: {action}")
 
@@ -249,13 +292,50 @@ class Provider:
         return getattr(self.app_config, self.name.lower(), self.default_config)
 
     @property
+    def project_dir(self) -> Path:
+        """Return the directory containing the provider's definition."""
+        from pathlib import Path
+
+        return Path(inspect.getfile(self.__class__)).resolve().parent
+
+    @property
+    def wiring_path(self) -> Path:
+        """Return the path to the provider's wiring specification file."""
+        return self.project_dir / "wiring.yaml"
+
+    @property
+    def pcb_manifest_path(self) -> Path:
+        """Return the path to the provider's PCB configuration file (pcb.yaml)."""
+        return self.project_dir / "pcb.yaml"
+
+    @property
+    def pcb_manifest(self) -> Optional[dict[str, Any]]:
+        """Return raw YAML data from pcb.yaml if it exists."""
+        p = self.pcb_manifest_path
+        if os.path.exists(p):
+            import yaml
+
+            with open(p, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f)
+        return None
+
+    @property
+    def pcb_config(self) -> Optional[Any]:
+        """Return parsed PCBConfig Pydantic model from pcb.yaml if available."""
+        data = self.pcb_manifest
+        if data:
+            from model.pcb import PCBConfig
+
+            return PCBConfig.model_validate(data)
+        return None
+
+    @property
     def manifest(self) -> dict[str, dict[str, Any]]:
         """Map part names to their supported capabilities and colors.
 
         By default, attempts to load "manifest.yaml" relative to the provider module.
         """
-        base_dir = os.path.dirname(os.path.abspath(inspect.getfile(self.__class__)))
-        manifest_path = os.path.join(base_dir, "manifest.yaml")
+        manifest_path = os.path.join(str(self.project_dir), "manifest.yaml")
         if os.path.exists(manifest_path):
             return load_manifest(manifest_path)
         return {}
@@ -263,6 +343,11 @@ class Provider:
     @property
     def part(self) -> dict[str, Callable[..., Any]]:
         """Map part names to their build handler methods."""
+        return {}
+
+    @property
+    def pcb(self) -> dict[str, Callable[..., Any]]:
+        """Map PCB target names to their build handler methods."""
         return {}
 
     @property
