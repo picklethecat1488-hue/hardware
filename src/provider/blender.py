@@ -104,7 +104,7 @@ class RenderConfig:
 
     resolution: tuple[int, int] = (2560, 1440)
     fps: int = 60
-    samples: int = 32
+    samples: int = 64
     engine: str = "CYCLES"
     view_from: str = "iso"
     shadow_catcher: bool = True
@@ -115,13 +115,16 @@ class RenderConfig:
     materials: Optional[Any] = None
     blender_executable: str = field(default_factory=lambda: BlenderRenderer.find_blender_binary())
     use_geometry_nodes_fluid: bool = True
-    use_micro_polygon_dicing: bool = True
+    use_micro_polygon_dicing: bool = False
     dicing_rate: float = 1.0
     use_ssfr: Optional[bool] = None
     fluid_voxel_size: Optional[float] = None
     fluid_point_radius: Optional[float] = None
     fluid_surface_threshold: Optional[float] = None
     fluid_adaptivity: Optional[float] = None
+    fluid_smooth_iterations: Optional[int] = None
+    fluid_smooth_factor: Optional[float] = None
+    workers: Optional[int] = None
 
     def __post_init__(self) -> None:
         """Resolve fluid meshing parameters dynamically from MaterialsModel if not explicitly overridden."""
@@ -140,6 +143,10 @@ class RenderConfig:
                 self.fluid_surface_threshold = water_mat.fluid_surface_threshold
             if self.fluid_adaptivity is None and water_mat.fluid_adaptivity is not None:
                 self.fluid_adaptivity = water_mat.fluid_adaptivity
+            if self.fluid_smooth_iterations is None and getattr(water_mat, "fluid_smooth_iterations", None) is not None:
+                self.fluid_smooth_iterations = water_mat.fluid_smooth_iterations
+            if self.fluid_smooth_factor is None and getattr(water_mat, "fluid_smooth_factor", None) is not None:
+                self.fluid_smooth_factor = water_mat.fluid_smooth_factor
 
 
 class BlenderRenderer:
@@ -328,6 +335,34 @@ class BlenderRenderer:
 
         return "ffmpeg"
 
+    @staticmethod
+    def get_available_gpu_devices() -> list[int]:
+        """Detect available CUDA GPU device indices for multi-GPU parallel rendering."""
+        cuda_vis = os.environ.get("CUDA_VISIBLE_DEVICES")
+        if cuda_vis:
+            devs = []
+            for d in cuda_vis.split(","):
+                d_str = d.strip()
+                if d_str.isdigit():
+                    devs.append(int(d_str))
+            if devs:
+                return devs
+        try:
+            res = subprocess.run(
+                ["nvidia-smi", "-L"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+            if res.returncode == 0:
+                lines = [line for line in res.stdout.strip().splitlines() if line.startswith("GPU ")]
+                if lines:
+                    return list(range(len(lines)))
+        except Exception:
+            pass
+        return []
+
     @classmethod
     def _build_blender_command(cls, blender_exec: str, script_path: str) -> list[str]:
         """Construct the CLI command for running headless Blender, wrapping with xvfb-run on Linux if headless."""
@@ -488,11 +523,47 @@ class BlenderRenderer:
                 total_frames=sim_steps,
             )
 
-            # 3. Run Blender headless to render frame sequence
+            # 3. Run Blender headless to render frame sequence (parallelized across GPUs/workers if available)
             cmd = cls._build_blender_command(config.blender_executable, script_path)
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if res.returncode != 0:
-                raise RuntimeError(f"Blender render failed (exit code {res.returncode}):\n{res.stderr}\n{res.stdout}")
+            available_gpus = cls.get_available_gpu_devices()
+            env_workers_str = os.environ.get("BLENDER_WORKERS", os.environ.get("RENDER_WORKERS", ""))
+            env_workers = int(env_workers_str) if env_workers_str.isdigit() else 0
+            num_workers = config.workers or env_workers or len(available_gpus) or 1
+            num_workers = max(1, min(num_workers, sim_steps))
+
+            if num_workers > 1:
+                import concurrent.futures
+
+                def run_worker(w_idx: int) -> None:
+                    w_start = (w_idx * sim_steps) // num_workers
+                    w_end = ((w_idx + 1) * sim_steps) // num_workers
+                    w_env = os.environ.copy()
+                    w_env["RENDER_FRAME_START"] = str(w_start)
+                    w_env["RENDER_FRAME_END"] = str(w_end)
+                    if available_gpus:
+                        gpu_id = available_gpus[w_idx % len(available_gpus)]
+                        w_env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
+                    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=w_env)
+                    if res.returncode != 0:
+                        raise RuntimeError(
+                            f"Blender worker {w_idx} (frames {w_start}..{w_end}) failed (exit code {res.returncode}):\n"
+                            f"{res.stderr}\n{res.stdout}"
+                        )
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    futures = [executor.submit(run_worker, w) for w in range(num_workers)]
+                    for future in concurrent.futures.as_completed(futures):
+                        future.result()
+            else:
+                w_env = os.environ.copy()
+                w_env["RENDER_FRAME_START"] = "0"
+                w_env["RENDER_FRAME_END"] = str(sim_steps)
+                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=w_env)
+                if res.returncode != 0:
+                    raise RuntimeError(
+                        f"Blender render failed (exit code {res.returncode}):\n{res.stderr}\n{res.stdout}"
+                    )
 
             # 4. Compile frame sequence into H.264 MP4 via ffmpeg
             cls._encode_frames_to_mp4(
@@ -554,6 +625,10 @@ class BlenderRenderer:
                 mat_dict["fluid_surface_threshold"] = mat_model.fluid_surface_threshold
             if mat_model.fluid_adaptivity is not None:
                 mat_dict["fluid_adaptivity"] = mat_model.fluid_adaptivity
+            if mat_model.fluid_smooth_iterations is not None:
+                mat_dict["fluid_smooth_iterations"] = mat_model.fluid_smooth_iterations
+            if mat_model.fluid_smooth_factor is not None:
+                mat_dict["fluid_smooth_factor"] = mat_model.fluid_smooth_factor
             if mat_model.use_ssfr is not None:
                 mat_dict["use_ssfr"] = mat_model.use_ssfr
 
@@ -836,6 +911,8 @@ class BlenderRenderer:
             fluid_point_radius=config.fluid_point_radius,
             fluid_surface_threshold=config.fluid_surface_threshold,
             fluid_adaptivity=config.fluid_adaptivity,
+            fluid_smooth_iterations=config.fluid_smooth_iterations,
+            fluid_smooth_factor=config.fluid_smooth_factor,
         )
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(rendered_script.strip())

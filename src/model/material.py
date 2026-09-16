@@ -26,6 +26,12 @@ class MaterialModel(BaseModel):
         default=None, description="Isosurface density threshold for volume-to-mesh."
     )
     fluid_adaptivity: Optional[float] = Field(default=None, description="Mesh adaptivity factor for volume-to-mesh.")
+    fluid_smooth_iterations: Optional[int] = Field(
+        default=None, description="Number of Laplacian smoothing iterations for reconstructed fluid surface."
+    )
+    fluid_smooth_factor: Optional[float] = Field(
+        default=None, description="Smoothing factor (0.0 to 1.0) for reconstructed fluid surface."
+    )
     use_ssfr: Optional[bool] = Field(
         default=None, description="Whether to enable screen-space fluid rendering bilateral blur."
     )

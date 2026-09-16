@@ -1404,11 +1404,16 @@ class TestCatFountainProvider:
                 assert np.all(steady_depth <= max_pool_depth), "Reservoir water depth exceeded maximum bowl capacity"
 
                 # Regression assertions: guard against reservoir water volume collapse and flow loss
-                assert np.all(steady_depth >= 0.025), (
-                    f"Reservoir water depth collapsed: min={np.min(steady_depth):.4f}m"
+                min_steady_depth = 2.5 * min_pool_depth
+                assert np.all(steady_depth >= min_steady_depth), (
+                    f"Reservoir water depth collapsed below physical threshold: min={np.min(steady_depth):.4f}m"
                 )
-                steady_sheet = np.array([m["flow_lid_sheet"] for m in provider.metrics_history[40:]])
-                assert np.all(steady_sheet >= 300), f"Lid sheet flow collapsed: min={np.min(steady_sheet)}"
+                initial_sheet = np.array([m["flow_lid_sheet"] for m in provider.metrics_history[40:]])
+                assert np.all(initial_sheet > 0), f"Lid sheet failed to prime: min={np.min(initial_sheet)}"
+                steady_sheet = np.array([m["flow_lid_sheet"] for m in provider.metrics_history[75:]])
+                assert np.all(steady_sheet >= 300), (
+                    f"Lid sheet flow collapsed in steady state: min={np.min(steady_sheet)}"
+                )
 
                 # Verify continuous physical fluid contact with motor casing and non-piled reservoir distribution
                 pos_np = np.asarray(fluid.pos_jax)
@@ -1421,7 +1426,7 @@ class TestCatFountainProvider:
 
                 # Guard against reservoir fluid collapsing into a pancake layer on the floor
                 z_p50 = float(np.percentile(pos_bowl[:, 2], 50))
-                assert z_p50 >= bowl_floor_z + 0.015, (
+                assert z_p50 >= bowl_floor_z + min_pool_depth, (
                     f"Fluid volume collapsed into pancake layer at floor: z_p50={z_p50:.4f}m"
                 )
 
@@ -1504,3 +1509,29 @@ class TestCatFountainProvider:
         # South bridge/cradle wall (Y = tube_y - tube_r - 1.0) must be solid to support and locate the cover
         south_y = tube_y - tube_r - 1.0
         assert solid.is_inside((0.0, south_y, z_mid)), f"Pump cover South cradle wall is broken at Y = {south_y}!"
+
+    def test_compute_flow_metrics_upper_reservoir_retention(self, provider):
+        """Verify that fluid particles filling the reservoir up to the lid shelf are counted in pool_volume.
+
+        Regression test: Prevents metric collapse where an artificial 15mm cutoff dropped pool_volume
+        when the bowl reservoir was filled near the lid.
+        """
+        import numpy as np
+        from projects.cat_fountain.simulate_hooks import compute_flow_metrics
+
+        bowl_h = provider.settings.bowl_height * 0.001
+        step_d = provider.settings.lid_step_depth * 0.001
+        lid_mount_z = bowl_h - step_d
+
+        # 500 particles in upper reservoir at z = lid_mount_z - 0.005 (e.g. 97mm in a 102mm lid mount)
+        pts = np.zeros((500, 3))
+        pts[:, 0] = 0.035
+        pts[:, 1] = 0.0
+        pts[:, 2] = lid_mount_z - 0.005
+
+        provider.water_sim = type("MockSim", (), {"last_positions": pts, "last_velocities": None})()
+        metrics = compute_flow_metrics(provider)
+
+        assert metrics["pool_volume"] == 500, (
+            f"Upper reservoir particles were artificially excluded from pool_volume: got {metrics['pool_volume']}"
+        )

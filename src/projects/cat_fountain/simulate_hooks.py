@@ -72,7 +72,7 @@ def compute_flow_metrics(provider: Any, step_idx: Optional[int] = None) -> dict[
     lid_sheet_cnt = int(np.sum(lid_sheet_mask))
 
     # 6. Reservoir pool volume (entire base container fluid layer below falling air gap, excluding tube bore)
-    pool_mask = (zs >= floor_z - 0.003) & (zs < lid_mount_z - 0.015) & (r_xy <= bowl_r) & (~in_tube_mask)
+    pool_mask = (zs >= floor_z - 0.003) & (zs < lid_mount_z) & (r_xy <= bowl_r) & (~in_tube_mask)
     pool_cnt = int(np.sum(pool_mask))
 
     # 7. Reservoir water depth (height of fluid surface above bowl floor in meters)

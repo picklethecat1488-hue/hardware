@@ -224,10 +224,12 @@ class TestBlenderRenderer:
     def test_render_config_fluid_defaults(self):
         """Verify RenderConfig default parameters for crisp liquid fluid meshing."""
         cfg = RenderConfig()
-        assert cfg.fluid_point_radius == 0.0020
-        assert cfg.fluid_surface_threshold == 0.18
+        assert cfg.fluid_point_radius == 0.0034
+        assert cfg.fluid_surface_threshold == 0.12
         assert cfg.fluid_voxel_size == 0.0003
-        assert cfg.fluid_adaptivity == 0.05
+        assert cfg.fluid_adaptivity == 0.0
+        assert cfg.fluid_smooth_iterations == 4
+        assert cfg.fluid_smooth_factor == 0.60
         assert cfg.use_ssfr is False
 
     def test_export_room_inverts_initial_transforms_for_links(self, tmp_path):
@@ -268,7 +270,7 @@ class TestBlenderRenderer:
         cfg = RenderConfig()
         assert cfg.turntable is True
         assert cfg.fluid_voxel_size == 0.0003
-        assert cfg.fluid_point_radius == 0.0020
+        assert cfg.fluid_point_radius == 0.0034
 
     @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")
     @patch("subprocess.run")
@@ -342,13 +344,15 @@ class TestBlenderRenderer:
         )
 
         assert mat_params["material_type"] == "water"
-        assert mat_params["roughness"] == 0.04
+        assert mat_params["roughness"] == 0.08
         assert mat_params["ior"] == 1.333
         assert mat_params["transmission"] == 0.95
         assert mat_params["fluid_voxel_size"] == 0.0003
-        assert mat_params["fluid_point_radius"] == 0.0020
-        assert mat_params["fluid_surface_threshold"] == 0.18
-        assert mat_params["fluid_adaptivity"] == 0.05
+        assert mat_params["fluid_point_radius"] == 0.0034
+        assert mat_params["fluid_surface_threshold"] == 0.12
+        assert mat_params["fluid_adaptivity"] == 0.0
+        assert mat_params["fluid_smooth_iterations"] == 4
+        assert mat_params["fluid_smooth_factor"] == 0.60
         assert mat_params["use_ssfr"] is False
 
     def test_materials_model_from_yaml(self):
@@ -372,11 +376,133 @@ class TestBlenderRenderer:
 
         water = mats.get("water")
         assert water is not None
-        assert water.roughness == 0.04
+        assert water.roughness == 0.08
         assert water.ior == 1.333
         assert water.transmission == 0.95
         assert water.fluid_voxel_size == 0.0003
-        assert water.fluid_point_radius == 0.0020
-        assert water.fluid_surface_threshold == 0.18
-        assert water.fluid_adaptivity == 0.05
+        assert water.fluid_point_radius == 0.0034
+        assert water.fluid_surface_threshold == 0.12
+        assert water.fluid_adaptivity == 0.0
+        assert water.fluid_smooth_iterations == 4
+        assert water.fluid_smooth_factor == 0.60
         assert water.use_ssfr is False
+
+    @patch("provider.blender.BlenderRenderer._encode_frames_to_mp4")
+    @patch("subprocess.run")
+    def test_parallel_multi_gpu_workers(self, mock_run, mock_encode):
+        """Verify BlenderRenderer parallelizes frame rendering across multiple workers with chunked frame ranges."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="Frame rendered", stderr="")
+        room = Room()
+        from build123d import Box
+
+        room.add("casing", Box(10, 10, 10), color=(0.8, 0.8, 0.8, 1.0))
+        transforms = [{"casing": ([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0])} for _ in range(8)]
+
+        # 4 workers configured for 8 simulation steps
+        cfg = RenderConfig(fps=30, samples=16, workers=4)
+        with patch.object(BlenderRenderer, "get_available_gpu_devices", return_value=[0, 1, 2, 3]):
+            out_path = BlenderRenderer.render_simulation_to_mp4(
+                room=room,
+                output_mp4="build/test_parallel.mp4",
+                sim_steps=8,
+                config=cfg,
+                rigid_transforms_per_frame=transforms,
+            )
+
+        assert os.path.basename(out_path) == "test_parallel.mp4"
+        # 4 subprocess workers should have been invoked
+        assert mock_run.call_count == 4
+        # Verify frame ranges and GPU device assignments across worker calls
+        called_envs = sorted(
+            [call.kwargs.get("env") for call in mock_run.call_args_list if "env" in call.kwargs],
+            key=lambda env: int(env["RENDER_FRAME_START"]),
+        )
+        assert len(called_envs) == 4
+        assert [env["RENDER_FRAME_START"] for env in called_envs] == ["0", "2", "4", "6"]
+        assert [env["RENDER_FRAME_END"] for env in called_envs] == ["2", "4", "6", "8"]
+        assert [env["CUDA_VISIBLE_DEVICES"] for env in called_envs] == ["0", "1", "2", "3"]
+
+    def test_turntable_rotation_spans_full_animation(self, tmp_path):
+        """Verify render_blender.py.j2 script scales turntable period to the full animation frame count."""
+        script_file = tmp_path / "test_turntable_script.py"
+        scene_file = tmp_path / "scene_data.json"
+        output_image = tmp_path / "frame_####.png"
+
+        cfg = RenderConfig(fps=30, turntable=True)
+        BlenderRenderer._write_blender_script(
+            script_path=str(script_file),
+            scene_data_path=str(scene_file),
+            output_path=str(output_image),
+            is_animation=True,
+            config=cfg,
+            total_frames=1800,
+        )
+
+        assert script_file.exists()
+        code = script_file.read_text(encoding="utf-8")
+        assert "turntable_period_frames = tot_f if tot_f > 1 else max(30 * 60.0, 1.0)" in code
+        assert 'f_start = int(os.environ.get("RENDER_FRAME_START", 0))' in code
+        assert 'f_end = int(os.environ.get("RENDER_FRAME_END", tot_f))' in code
+
+    def test_anti_flicker_render_settings_and_material_invariants(self, tmp_path):
+        """Verify BlenderRenderer generates anti-flicker raytracing and fluid settings.
+
+        Regression test: Guards against fluid mesh adaptivity popping, screen-space
+        adaptive subdivision jitter, OptiX animation flickering, and low-sample noise.
+        """
+        script_file = tmp_path / "test_anti_flicker_script.py"
+        scene_file = tmp_path / "scene_data.json"
+        output_image = tmp_path / "frame_####.png"
+
+        cfg = RenderConfig()
+        assert cfg.fluid_adaptivity == 0.0
+        assert cfg.use_micro_polygon_dicing is False
+        assert cfg.samples >= 64
+
+        BlenderRenderer._write_blender_script(
+            script_path=str(script_file),
+            scene_data_path=str(scene_file),
+            output_path=str(output_image),
+            is_animation=True,
+            config=cfg,
+            total_frames=10,
+        )
+
+        code = script_file.read_text(encoding="utf-8")
+        assert 'scene.cycles.denoiser = "OPENIMAGEDENOISE"' in code
+        assert "scene.cycles.sample_clamp_indirect = 2.0" in code
+        assert "scene.cycles.adaptive_threshold = 0.005" in code
+        assert "scene.cycles.adaptive_min_samples = 32" in code
+        assert "use_adaptive_subdivision" not in code
+
+    def test_fluid_geometry_nodes_sheet_bridging_invariant(self):
+        """Verify OpenVDB particle bridging distance prevents thin film popping and fracturing.
+
+        Regression test: In SPH fluid dynamics, particles on the lid spread horizontally
+        with inter-particle spacing d ~ 3.5 - 4.5 mm. In Blender Geometry Nodes Points to Volume,
+        particles use quadratic falloff w(r) = (1 - (r/R)^2)^2. For adjacent particles separated
+        by d, the midpoint density is D_mid = 2 * (1 - (d / 2R)^2)^2. For an isosurface to bridge
+        at threshold T, d <= 2 * R * sqrt(1 - sqrt(T / 2)).
+        If d_max < 4.5 mm, slight lateral particle drift causes continuous liquid sheets to
+        repeatedly shatter into disconnected droplets and reform frame-to-frame, appearing
+        as violent size fluctuations and flickering.
+        """
+        import math
+        from model import MaterialsModel
+
+        water = MaterialsModel.default().get("water")
+        assert water is not None
+        r_splat = water.fluid_point_radius
+        thresh = water.fluid_surface_threshold
+
+        assert r_splat is not None and thresh is not None
+        # Maximum bridging distance between two particles before isosurface breaks
+        d_bridge_max = 2.0 * r_splat * math.sqrt(1.0 - math.sqrt(thresh / 2.0))
+
+        # Must bridge spreading monolayer particles with spacing up to 4.5mm
+        assert d_bridge_max >= 0.0045, (
+            f"Bridging distance {d_bridge_max * 1e3:.2f} mm < 4.5 mm allows thin film shattering"
+        )
+        # Surface threshold must be bounded to prevent excessive metaball bloating while maintaining cohesion
+        assert 0.10 <= thresh <= 0.16, f"Surface threshold {thresh} outside optimal cohesion range [0.10, 0.16]"
+        assert 0.0028 <= r_splat <= 0.0035, f"Point radius {r_splat} outside optimal splat range [0.0028, 0.0035]"

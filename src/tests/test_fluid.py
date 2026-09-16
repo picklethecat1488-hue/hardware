@@ -1752,7 +1752,7 @@ def test_dynamic_fluid_bodies_column_volume_restoration():
         axis=-1,
     )
 
-    in_fluid_body, p_surf_z, _, col_count = _compute_dynamic_fluid_bodies_jax(
+    in_fluid_body, p_surf_z, _, col_count, depth_restore = _compute_dynamic_fluid_bodies_jax(
         pos_local=pos_local,
         dx=dx,
         origin=origin,
@@ -1831,3 +1831,583 @@ def test_fluid_state_tracker_raw_particles_not_grid_quantized():
     # Continuous SPH particles must have non-zero fractional deviation.
     mean_deviation = float(np.mean(fractional_parts))
     assert mean_deviation > 0.05, f"Particles appear snapped to voxel grid: mean deviation {mean_deviation}"
+
+
+def test_dynamic_fluid_bodies_airborne_droplet_isolation():
+    """Verify that isolated airborne droplets do not pull up column surface height or trigger spiky stalagmites.
+
+    Regression test: Prevents runaway upward hydrostatic support acceleration where stray droplets
+    blasted resting reservoir columns into 30mm vertical spires.
+    """
+    import math
+    import jax.numpy as jnp
+    from provider.fluid import _compute_dynamic_fluid_bodies_jax
+
+    dx = 0.0035
+    r_s = 0.0015
+    cavity_floor_z = 0.0410
+    z_max_pool = 0.1045
+    origin = jnp.array([-0.112, -0.112, 0.0], dtype=jnp.float32)
+
+    # 20 resting particles at bottom (Z around 0.042 - 0.070m) + 1 stray droplet near lid (Z = 0.095m)
+    zs = [0.042 + i * 0.0015 for i in range(20)] + [0.095]
+    pos = jnp.stack([jnp.zeros(len(zs)), jnp.zeros(len(zs)), jnp.array(zs)], axis=-1)
+
+    in_fb, p_surf_z, grad, col_cnt, _ = _compute_dynamic_fluid_bodies_jax(
+        pos, dx, origin, 64, 64, 40, cavity_floor_z=cavity_floor_z, z_max_pool=z_max_pool, r_s=r_s
+    )
+
+    # Physical resting column volume height
+    vol_s = (4.0 / 3.0) * math.pi * (r_s**3)
+    resting_depth = (len(zs) * vol_s) / (dx * dx)
+    max_expected_surface = cavity_floor_z + resting_depth + 3.0 * r_s
+
+    # Invariant: p_surf_z must be bounded near resting column volume, NOT dragged up to droplet (0.095m)
+    assert float(p_surf_z[0]) <= max_expected_surface + 1e-3, (
+        f"Surface height was dragged up by stray airborne droplet: got {p_surf_z[0]}, max allowed {max_expected_surface}"
+    )
+
+    # Invariant: depth pressure at the bottom must remain within stable bounds (<= 6.0)
+    depth_pressure = float(jnp.clip((p_surf_z[0] - pos[0, 2]) / (4.0 * r_s), 0.0, 6.0))
+    assert depth_pressure <= 6.0
+    support_mult = 1.0 + depth_pressure * 0.35
+    assert support_mult <= 3.1, f"Excessive upward hydrostatic blast: {support_mult}x gravity"
+
+
+def test_fountain_flow_velocities_bounded_and_natural():
+    """Verify that pump lift, spout discharge, platform slope acceleration, and max speed are naturally bounded.
+
+    Regression test: Prevents runaway water animation speed where excessive pump lift, 22 m/s^2 spout acceleration,
+    and 0.45 slope factor made water flow appear 10x too fast across the lid.
+    """
+    import jax.numpy as jnp
+    from model.boundary_config import BoundaryParam
+    from provider.boundary import SHAPE_TUBE, SHAPE_CYLINDER
+    from provider.fluid import (
+        _compute_particle_forces_subroutine,
+        _integrate_particles_subroutine,
+        MAX_PHYSICAL_FLUID_SPEED,
+    )
+
+    r_s = 0.0015
+    tube_h = 0.066
+    tube_inner_r = 0.004
+    tube_outer_r = 0.006
+
+    # Setup boundary arrays with tube and lid
+    b_shapes = jnp.array([SHAPE_CYLINDER, SHAPE_TUBE, SHAPE_CYLINDER], dtype=jnp.int32)
+    b_types = jnp.array([1, 1, 1], dtype=jnp.int32)
+    b_params = jnp.zeros((3, 64), dtype=jnp.float32)
+
+    # Bowl base boundary (idx 0)
+    b_params = b_params.at[0, BoundaryParam.R_OUTER].set(0.095)
+    b_params = b_params.at[0, BoundaryParam.Z_TOP].set(0.105)
+    b_params = b_params.at[0, BoundaryParam.Z_OFFSET].set(0.041)
+    b_params = b_params.at[0, BoundaryParam.POOL_MAX_Z].set(0.104)
+    b_params = b_params.at[0, BoundaryParam.SLOT_CONSTRICTION_RATIO].set(0.30)
+    b_params = b_params.at[0, BoundaryParam.IMPELLER_RADIUS].set(0.015)
+    b_params = b_params.at[0, BoundaryParam.LID_SLOPE_RATIO].set(0.05)
+
+    # Tube boundary (idx 1)
+    b_params = b_params.at[1, BoundaryParam.HEIGHT].set(tube_h)
+    b_params = b_params.at[1, BoundaryParam.R_INNER].set(tube_inner_r)
+    b_params = b_params.at[1, BoundaryParam.R_OUTER].set(tube_outer_r)
+
+    # Lid boundary (idx 2)
+    b_params = b_params.at[2, BoundaryParam.HAS_DRAIN].set(1.0)
+    b_params = b_params.at[2, BoundaryParam.DRAIN_HOLE_Y].set(-0.035)
+    b_params = b_params.at[2, BoundaryParam.DRAIN_RADIUS].set(0.015)
+    b_params = b_params.at[2, BoundaryParam.INTAKE_RADIUS].set(0.030)
+    b_params = b_params.at[2, BoundaryParam.TRAY_Z_MIN].set(0.0)
+    b_params = b_params.at[2, BoundaryParam.TRAY_Z_MAX].set(0.010)
+
+    b_pos_arr = jnp.zeros((3, 3), dtype=jnp.float32)
+    b_pos_arr = b_pos_arr.at[1, 1].set(0.028)  # Tube at Y = 28mm
+    b_pos_arr = b_pos_arr.at[2, 2].set(0.105)  # Lid at Z = 105mm
+
+    b_orn_arr = jnp.zeros((3, 4), dtype=jnp.float32)
+    b_orn_arr = b_orn_arr.at[:, 3].set(1.0)
+
+    # 1. Test particle at spout opening
+    pos_spout = jnp.array([[0.0, 0.028, tube_h + 0.005]], dtype=jnp.float32)
+    vel_spout = jnp.zeros((1, 3), dtype=jnp.float32)
+    origin = jnp.array([-0.1, -0.1, 0.0], dtype=jnp.float32)
+
+    accel_spout, _, _ = _compute_particle_forces_subroutine(
+        pos_curr=pos_spout,
+        vel_world=vel_spout,
+        omega=200.0,
+        t_curr=0.0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        K_boundary=100.0,
+        D_boundary=10.0,
+        r_s=r_s,
+        mass=0.0001,
+        gravity=jnp.array([0.0, 0.0, -9.81], dtype=jnp.float32),
+        solid_mask=jnp.zeros((32, 32, 32), dtype=jnp.bool_),
+        solid_friction=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        normal_grid=jnp.zeros((3, 32, 32, 32), dtype=jnp.float32),
+        smooth_occ=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        dx=0.0035,
+        origin=origin,
+        base_idx=0,
+        nx=32,
+        ny=32,
+        nz=32,
+    )
+
+    spout_accel_mag = float(jnp.linalg.norm(accel_spout[0]))
+    # Invariant: Spout acceleration must be calm and serene (< 15.0 m/s^2, not 22+ m/s^2)
+    assert spout_accel_mag < 15.0, f"Spout acceleration was excessively high: {spout_accel_mag} m/s^2"
+
+    # 2. Test particle on drinking platform
+    pos_lid = jnp.array([[0.010, 0.028, 0.107]], dtype=jnp.float32)
+    accel_lid, _, _ = _compute_particle_forces_subroutine(
+        pos_curr=pos_lid,
+        vel_world=vel_spout,
+        omega=200.0,
+        t_curr=0.0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        K_boundary=100.0,
+        D_boundary=10.0,
+        r_s=r_s,
+        mass=0.0001,
+        gravity=jnp.array([0.0, 0.0, -9.81], dtype=jnp.float32),
+        solid_mask=jnp.zeros((32, 32, 32), dtype=jnp.bool_),
+        solid_friction=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        normal_grid=jnp.zeros((3, 32, 32, 32), dtype=jnp.float32),
+        smooth_occ=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        dx=0.0035,
+        origin=origin,
+        base_idx=0,
+        nx=32,
+        ny=32,
+        nz=32,
+    )
+
+    # Invariant: Horizontal platform acceleration must be gentle (< 2.0 m/s^2, not 4.4+ m/s^2)
+    lid_accel_xy = float(jnp.linalg.norm(accel_lid[0, :2]))
+    assert lid_accel_xy < 2.0, f"Platform horizontal acceleration too aggressive: {lid_accel_xy} m/s^2"
+
+    # 3. Test speed clamp in integration
+    vel_high = jnp.array([[2.5, 0.0, 0.0]], dtype=jnp.float32)
+    _, vel_integrated = _integrate_particles_subroutine(
+        pos_curr=pos_lid,
+        vel_world=vel_high,
+        accel=jnp.zeros_like(vel_high),
+        base_pos=b_pos_arr[0],
+        base_orn=b_orn_arr[0],
+        dt_sub=0.001,
+        damping=0.998,
+        high_damping_value=0.50,
+        base_idx=0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        omega=200.0,
+        base_vel=jnp.zeros(3, dtype=jnp.float32),
+    )
+
+    speed_integrated = float(jnp.linalg.norm(vel_integrated[0]))
+    assert speed_integrated <= MAX_PHYSICAL_FLUID_SPEED + 1e-4, (
+        f"Speed exceeded maximum physical clamp: {speed_integrated} > {MAX_PHYSICAL_FLUID_SPEED}"
+    )
+
+
+def test_tranquil_pool_stabilization_and_lid_damping():
+    """Verify that pool viscous damping and lid critical damping prevent rolling boil and jiggling regressions.
+
+    Invariants:
+    1. Submerged pool fluid particles experience critical viscous damping on vertical velocity:
+       Upward churning velocity (+vz) is strongly opposed, eliminating convective boiling eruptions.
+    2. Hydrostatic restoring acceleration remains bounded (<= 2.5 * g_mag) rather than launching particles
+       explosively toward the surface (+20.6 m/s^2).
+    3. Lid drinking shelf particles undergo vertical damping on +vz, eliminating high-frequency contour jiggling.
+    4. Transition at drinking shelf perimeter blends continuously from platform support into waterfall plunge.
+    """
+    import jax.numpy as jnp
+    from model.boundary_config import BoundaryParam
+    from provider.fluid import (
+        SHAPE_CYLINDER,
+        SHAPE_TUBE,
+        _compute_particle_forces_subroutine,
+    )
+
+    r_s = 0.0015
+    mass = 0.0001
+    gravity = jnp.array([0.0, 0.0, -9.81], dtype=jnp.float32)
+    g_mag = 9.81
+
+    b_shapes = jnp.array([SHAPE_CYLINDER, SHAPE_TUBE, SHAPE_CYLINDER], dtype=jnp.int32)
+    b_types = jnp.array([0, 0, 1], dtype=jnp.int32)
+    b_params = jnp.zeros((3, 64), dtype=jnp.float32)
+
+    # Bowl base boundary (idx 0)
+    b_params = b_params.at[0, BoundaryParam.R_OUTER].set(0.096)
+    b_params = b_params.at[0, BoundaryParam.HEIGHT].set(0.060)
+    b_params = b_params.at[0, BoundaryParam.Z_TOP].set(0.105)
+    b_params = b_params.at[0, BoundaryParam.Z_OFFSET].set(0.041)
+    b_params = b_params.at[0, BoundaryParam.POOL_MAX_Z].set(0.104)
+    b_params = b_params.at[0, BoundaryParam.SLOT_CONSTRICTION_RATIO].set(0.30)
+    b_params = b_params.at[0, BoundaryParam.IMPELLER_RADIUS].set(0.015)
+    b_params = b_params.at[0, BoundaryParam.LID_SLOPE_RATIO].set(0.05)
+
+    # Tube boundary (idx 1)
+    b_params = b_params.at[1, BoundaryParam.HEIGHT].set(0.066)
+    b_params = b_params.at[1, BoundaryParam.R_INNER].set(0.006)
+    b_params = b_params.at[1, BoundaryParam.R_OUTER].set(0.008)
+
+    # Lid boundary (idx 2)
+    b_params = b_params.at[2, BoundaryParam.HAS_DRAIN].set(1.0)
+    b_params = b_params.at[2, BoundaryParam.DRAIN_HOLE_Y].set(-0.035)
+    b_params = b_params.at[2, BoundaryParam.DRAIN_RADIUS].set(0.015)
+    b_params = b_params.at[2, BoundaryParam.INTAKE_RADIUS].set(0.030)
+    b_params = b_params.at[2, BoundaryParam.TRAY_Z_MIN].set(0.0)
+    b_params = b_params.at[2, BoundaryParam.TRAY_Z_MAX].set(0.010)
+    b_params = b_params.at[2, BoundaryParam.WALL_BAND_R_MAX].set(0.080)
+
+    b_pos_arr = jnp.zeros((3, 3), dtype=jnp.float32)
+    b_pos_arr = b_pos_arr.at[1, 1].set(0.028)
+    b_pos_arr = b_pos_arr.at[2, 2].set(0.105)
+
+    b_orn_arr = jnp.zeros((3, 4), dtype=jnp.float32)
+    b_orn_arr = b_orn_arr.at[:, 3].set(1.0)
+    origin = jnp.array([-0.112, -0.112, 0.0], dtype=jnp.float32)
+
+    # 1. Test pool particles in fluid body column: net upward acceleration must be gentle (<= 2.5 * g_mag)
+    cavity_floor_z = 0.0410
+    num_particles = 16
+    z_col = jnp.linspace(cavity_floor_z + 0.0005, cavity_floor_z + 0.0200, num_particles)
+    pos_pool = jnp.stack(
+        [
+            jnp.full(num_particles, 0.040, dtype=jnp.float32),
+            jnp.zeros(num_particles, dtype=jnp.float32),
+            z_col,
+        ],
+        axis=-1,
+    )
+    vel_rest = jnp.zeros((num_particles, 3), dtype=jnp.float32)
+
+    accel_rest, _, _ = _compute_particle_forces_subroutine(
+        pos_curr=pos_pool,
+        vel_world=vel_rest,
+        omega=130.0,
+        t_curr=0.0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        K_boundary=100.0,
+        D_boundary=10.0,
+        r_s=r_s,
+        mass=mass,
+        gravity=gravity,
+        solid_mask=jnp.zeros((32, 32, 32), dtype=jnp.bool_),
+        solid_friction=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        normal_grid=jnp.zeros((3, 32, 32, 32), dtype=jnp.float32),
+        smooth_occ=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        dx=0.0035,
+        origin=origin,
+        base_idx=0,
+        nx=32,
+        ny=32,
+        nz=32,
+    )
+
+    rest_az = float(jnp.mean(accel_rest[:, 2]))
+    # Invariant: Net upward acceleration must be bounded to prevent explosive rolling boil (was > +20 m/s^2)
+    assert rest_az <= 2.5 * g_mag, f"Resting pool particle upward acceleration too high: {rest_az} m/s^2"
+
+    # 2. Test pool particle with upward velocity: vertical damping must oppose upward velocity
+    vel_up = jnp.stack(
+        [
+            jnp.zeros(num_particles, dtype=jnp.float32),
+            jnp.zeros(num_particles, dtype=jnp.float32),
+            jnp.full(num_particles, 0.50, dtype=jnp.float32),
+        ],
+        axis=-1,
+    )
+    accel_up, _, _ = _compute_particle_forces_subroutine(
+        pos_curr=pos_pool,
+        vel_world=vel_up,
+        omega=130.0,
+        t_curr=0.0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        K_boundary=100.0,
+        D_boundary=10.0,
+        r_s=r_s,
+        mass=mass,
+        gravity=gravity,
+        solid_mask=jnp.zeros((32, 32, 32), dtype=jnp.bool_),
+        solid_friction=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        normal_grid=jnp.zeros((3, 32, 32, 32), dtype=jnp.float32),
+        smooth_occ=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        dx=0.0035,
+        origin=origin,
+        base_idx=0,
+        nx=32,
+        ny=32,
+        nz=32,
+    )
+
+    up_az = float(jnp.mean(accel_up[:, 2]))
+    damping_delta_az = rest_az - up_az
+    # Invariant: Upward motion must be strongly dampened (delta_az >= 5.0 m/s^2)
+    assert damping_delta_az >= 5.0, (
+        f"Vertical damping insufficient: rest_az={rest_az}, up_az={up_az}, delta={damping_delta_az}"
+    )
+
+    # 3. Test lid particle upward velocity damping to prevent shape jiggling
+    pos_lid = jnp.array([[0.010, 0.028, 0.107]], dtype=jnp.float32)
+    vel_lid_up = jnp.array([[0.0, 0.0, 0.50]], dtype=jnp.float32)
+    accel_lid_up, _, _ = _compute_particle_forces_subroutine(
+        pos_curr=pos_lid,
+        vel_world=vel_lid_up,
+        omega=130.0,
+        t_curr=0.0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        K_boundary=100.0,
+        D_boundary=10.0,
+        r_s=r_s,
+        mass=mass,
+        gravity=gravity,
+        solid_mask=jnp.zeros((32, 32, 32), dtype=jnp.bool_),
+        solid_friction=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        normal_grid=jnp.zeros((3, 32, 32, 32), dtype=jnp.float32),
+        smooth_occ=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        dx=0.0035,
+        origin=origin,
+        base_idx=0,
+        nx=32,
+        ny=32,
+        nz=32,
+    )
+
+    lid_up_az = float(accel_lid_up[0, 2])
+    # Invariant: Upward velocity on lid platform must be damped downward (net az < 0)
+    assert lid_up_az < 0.0, f"Lid particle upward motion was not damped: {lid_up_az} m/s^2"
+
+
+def test_outer_cylinder_boundary_axisymmetric_and_zero_upward_force():
+    """Verify that outer cylinder wall boundary force is exact, axisymmetric, and has zero upward force.
+
+    Guards against:
+    1. Upward ejection / spiky stalagmites along the reservoir wall (asserts Fz == 0.0).
+    2. Discrete Cartesian grid staircase bumps / faceting (asserts force magnitude is identical across all theta).
+    """
+    import math
+    import jax.numpy as jnp
+    from model.boundary_config import BoundaryParam
+    from provider.fluid import (
+        SHAPE_CYLINDER,
+        _compute_boundary_forces_jax,
+    )
+
+    r_s = 0.0015
+    base_radius = 0.096
+    K = 1000.0
+    D = 5.0
+    pen_depth = 0.0010  # 1mm penetration into wall
+
+    b_shapes = jnp.array([SHAPE_CYLINDER], dtype=jnp.int32)
+    b_types = jnp.array([1], dtype=jnp.int32)
+    b_params = jnp.zeros((1, 64), dtype=jnp.float32)
+    b_params = b_params.at[0, BoundaryParam.R_OUTER].set(base_radius)
+    b_params = b_params.at[0, BoundaryParam.HEIGHT].set(0.060)
+    b_params = b_params.at[0, BoundaryParam.Z_BOTTOM].set(0.041)
+    b_params = b_params.at[0, BoundaryParam.BOUNDARY_FRICTION].set(0.20)
+
+    b_pos_arr = jnp.zeros((1, 3), dtype=jnp.float32)
+    b_orn_arr = jnp.array([[0.0, 0.0, 0.0, 1.0]], dtype=jnp.float32)
+    origin = jnp.array([-0.112, -0.112, 0.0], dtype=jnp.float32)
+
+    # Place particles at 8 distinct angles around the perimeter with identical penetration
+    angles = [0.0, math.pi / 4, math.pi / 2, 3 * math.pi / 4, math.pi, -3 * math.pi / 4, -math.pi / 2, -math.pi / 4]
+    test_r = (base_radius - r_s) + pen_depth
+    pts = [[test_r * math.cos(a), test_r * math.sin(a), 0.055] for a in angles]
+    pos = jnp.array(pts, dtype=jnp.float32)
+    vel = jnp.zeros_like(pos)
+
+    forces, _ = _compute_boundary_forces_jax(
+        pos=pos,
+        vel=vel,
+        r_s=r_s,
+        K=K,
+        D=D,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        omega=0.0,
+        t=0.0,
+        origin=origin,
+        base_idx=0,
+    )
+
+    forces_np = [forces[i] for i in range(len(angles))]
+    f_mags = [float(jnp.linalg.norm(f[:2])) for f in forces_np]
+
+    # Invariant 1: Vertical force on vertical wall must be strictly zero (no upward stalagmites)
+    for i, f in enumerate(forces_np):
+        assert abs(float(f[2])) < 1e-5, f"Spurious upward force detected at angle {angles[i]}: f_z={float(f[2])}"
+
+    # Invariant 2: Force must be purely radial inward
+    expected_f_mag = K * pen_depth
+    for i, f in enumerate(forces_np):
+        a = angles[i]
+        inward_unit = jnp.array([-math.cos(a), -math.sin(a), 0.0], dtype=jnp.float32)
+        dot_inward = float(jnp.sum(f * inward_unit))
+        assert dot_inward > 0.99 * expected_f_mag, f"Force not inward at angle {angles[i]}: {f}"
+
+    # Invariant 3: Force magnitude must be axisymmetric across all angles (zero Cartesian grid faceting)
+    for mag in f_mags:
+        assert abs(mag - expected_f_mag) < 1e-4, f"Non-axisymmetric force magnitude: {mag} != {expected_f_mag}"
+
+
+def test_pool_particles_exempt_from_waterfall_plunge_and_hydrostatic_equilibrium():
+    """Verify that submerged reservoir pool particles do NOT receive waterfall plunge acceleration.
+
+    Regression test:
+    Previously, lid_drain_accel had in_waterfall condition checking pos_lid[:, 2] >= tray_z_min (-0.101m),
+    which encompassed the entire reservoir pool down to the floor, applying -0.95*g downward hammer blow
+    (-9.3 m/s^2) to resting pool fluid. This caused the reservoir water to collapse into free-fall onto the floor
+    and splash violently into a rolling boil within 1s.
+
+    Invariants:
+    1. Resting pool particles in fluid body experience net az ~ 0 (hydrostatic support balances gravity).
+    2. Horizontal velocity in pool experiences viscous damping (-v_xy * 12.0) to maintain a tranquil, placid mirror surface.
+    3. Waterfall plunge is strictly gated to (~in_fluid_body) & (pos_b[:, 2] > p_surf_z).
+    """
+    import jax.numpy as jnp
+    from model.boundary_config import BoundaryParam
+    from provider.fluid import (
+        SHAPE_CYLINDER,
+        SHAPE_TUBE,
+        _compute_particle_forces_subroutine,
+    )
+
+    r_s = 0.0015
+    mass = 0.0001
+    gravity = jnp.array([0.0, 0.0, -9.81], dtype=jnp.float32)
+
+    b_shapes = jnp.array([SHAPE_CYLINDER, SHAPE_TUBE, SHAPE_CYLINDER], dtype=jnp.int32)
+    b_types = jnp.array([0, 0, 1], dtype=jnp.int32)
+    b_params = jnp.zeros((3, 64), dtype=jnp.float32)
+
+    # Base cavity
+    b_params = b_params.at[0, BoundaryParam.R_OUTER].set(0.096)
+    b_params = b_params.at[0, BoundaryParam.HEIGHT].set(0.060)
+    b_params = b_params.at[0, BoundaryParam.Z_TOP].set(0.105)
+    b_params = b_params.at[0, BoundaryParam.Z_OFFSET].set(0.041)
+    b_params = b_params.at[0, BoundaryParam.POOL_MAX_Z].set(0.104)
+
+    # Tube
+    b_params = b_params.at[1, BoundaryParam.HEIGHT].set(0.066)
+    b_params = b_params.at[1, BoundaryParam.R_INNER].set(0.006)
+    b_params = b_params.at[1, BoundaryParam.R_OUTER].set(0.008)
+
+    # Lid with deep tray_z_min extending to floor
+    b_params = b_params.at[2, BoundaryParam.HAS_DRAIN].set(1.0)
+    b_params = b_params.at[2, BoundaryParam.DRAIN_HOLE_Y].set(-0.035)
+    b_params = b_params.at[2, BoundaryParam.DRAIN_RADIUS].set(0.015)
+    b_params = b_params.at[2, BoundaryParam.INTAKE_RADIUS].set(0.030)
+    b_params = b_params.at[2, BoundaryParam.TRAY_Z_MIN].set(-0.101)  # Extends all the way down into reservoir pool!
+    b_params = b_params.at[2, BoundaryParam.TRAY_Z_MAX].set(0.010)
+    b_params = b_params.at[2, BoundaryParam.WALL_BAND_R_MAX].set(0.080)
+
+    b_pos_arr = jnp.zeros((3, 3), dtype=jnp.float32)
+    b_pos_arr = b_pos_arr.at[1, 1].set(0.028)
+    b_pos_arr = b_pos_arr.at[2, 2].set(0.105)  # lid at 0.105
+
+    b_orn_arr = jnp.zeros((3, 4), dtype=jnp.float32)
+    b_orn_arr = b_orn_arr.at[:, 3].set(1.0)
+    origin = jnp.array([-0.112, -0.112, 0.0], dtype=jnp.float32)
+
+    # Column of pool particles in resting fluid body (Z in [0.045, 0.065] in world, so pos_lid_z in [-0.060, -0.040])
+    num_pts = 16
+    z_col = jnp.linspace(0.045, 0.065, num_pts)
+    pos_pool = jnp.stack([jnp.full(num_pts, 0.040), jnp.zeros(num_pts), z_col], axis=-1)
+    vel_rest = jnp.zeros((num_pts, 3), dtype=jnp.float32)
+
+    accel, _, _ = _compute_particle_forces_subroutine(
+        pos_curr=pos_pool,
+        vel_world=vel_rest,
+        omega=0.0,
+        t_curr=0.0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        K_boundary=100.0,
+        D_boundary=10.0,
+        r_s=r_s,
+        mass=mass,
+        gravity=gravity,
+        solid_mask=jnp.zeros((32, 32, 32), dtype=jnp.bool_),
+        solid_friction=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        normal_grid=jnp.zeros((3, 32, 32, 32), dtype=jnp.float32),
+        smooth_occ=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        dx=0.0035,
+        origin=origin,
+        base_idx=0,
+        nx=32,
+        ny=32,
+        nz=32,
+    )
+
+    mean_az = float(jnp.mean(accel[:, 2]))
+    # Invariant 1: Resting pool particles must NOT be hammered with -9.3 m/s^2 plunge acceleration!
+    # Net vertical acceleration in equilibrium should be near zero (mean_az > -2.0 m/s^2, was -9.3 m/s^2)
+    assert mean_az > -2.0, f"Pool particles erroneously received waterfall plunge: mean_az={mean_az} m/s^2"
+
+    # Invariant 2: Horizontal velocity in pool must be damped
+    vel_slosh = jnp.stack([jnp.full(num_pts, 0.20), jnp.zeros(num_pts), jnp.zeros(num_pts)], axis=-1)
+    accel_slosh, _, _ = _compute_particle_forces_subroutine(
+        pos_curr=pos_pool,
+        vel_world=vel_slosh,
+        omega=0.0,
+        t_curr=0.0,
+        b_shapes=b_shapes,
+        b_types=b_types,
+        b_params=b_params,
+        b_pos_arr=b_pos_arr,
+        b_orn_arr=b_orn_arr,
+        K_boundary=100.0,
+        D_boundary=10.0,
+        r_s=r_s,
+        mass=mass,
+        gravity=gravity,
+        solid_mask=jnp.zeros((32, 32, 32), dtype=jnp.bool_),
+        solid_friction=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        normal_grid=jnp.zeros((3, 32, 32, 32), dtype=jnp.float32),
+        smooth_occ=jnp.zeros((32, 32, 32), dtype=jnp.float32),
+        dx=0.0035,
+        origin=origin,
+        base_idx=0,
+        nx=32,
+        ny=32,
+        nz=32,
+    )
+    mean_ax = float(jnp.mean(accel_slosh[:, 0]))
+    assert mean_ax < -1.0, f"Pool horizontal sloshing velocity was not damped: mean_ax={mean_ax} m/s^2"
