@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ board.name }} - Interactive BOM</title>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; margin: 0; padding: 24px; background: #0f172a; color: #f8fafc; }
+    h1 { color: #38bdf8; margin: 0 0 6px 0; font-size: 24px; font-weight: 700; }
+    .subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); }
+    th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #334155; font-size: 13px; }
+    th { background: #0284c7; color: #ffffff; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; }
+    tr:hover { background: #334155; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #3b82f6; color: white; }
+  </style>
+</head>
+<body>
+  <h1>{{ board.name }} - Interactive Bill of Materials</h1>
+  <div class="subtitle">Layers: {{ board.stackup.copper_layer_count }} | Type: {{ board.board_type | upper }} | Finish: {{ board.stackup.finish }}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Ref</th>
+        <th>Value</th>
+        <th>Package</th>
+        <th>MPN</th>
+        <th>Supplier P/N</th>
+        <th>Location (X, Y)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for comp in components %}
+      <tr>
+        <td><strong>{{ comp.ref }}</strong></td>
+        <td>{{ comp.val }}</td>
+        <td><span class="badge">{{ comp.package }}</span></td>
+        <td>{{ comp.mpn }}</td>
+        <td>{{ comp.supplier_pn }}</td>
+        <td>({{ "%.2f" | format(comp.x) }}, {{ "%.2f" | format(comp.y) }}) mm</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

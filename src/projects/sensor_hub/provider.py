@@ -92,7 +92,8 @@ class SensorHubProvider(Provider):
             self.settings.enclosure_clearance + self.settings.enclosure_wall_thickness
         )
         wall = self.settings.enclosure_wall_thickness
-        standoff_h = 5.0
+        standoff_h = self.settings.standoff_height
+        standoff_r = self.settings.standoff_radius
         h_shell = standoff_h + self.settings.board_thickness + 10.0
 
         with BuildPart() as shell:
@@ -113,7 +114,7 @@ class SensorHubProvider(Provider):
                 (-hole_x, -hole_y, -h_shell / 2.0 + wall + standoff_h / 2.0),
                 (hole_x, -hole_y, -h_shell / 2.0 + wall + standoff_h / 2.0),
             ):
-                Cylinder(radius=3.0, height=standoff_h)
+                Cylinder(radius=standoff_r, height=standoff_h)
 
         return shell
 

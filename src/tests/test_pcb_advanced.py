@@ -335,3 +335,49 @@ def test_sensor_hub_provider_cad_and_assembly():
     assert provider.pcb_config.board_type == "rigid-flex"
     assert len(provider.pcb_config.stackup.layers) == 11
     assert len(provider.pcb_config.capacitive_sensors) == 2
+
+
+def test_schematic_diagram_dynamic_scaling(tmp_path: Path):
+    """Verify that SchematicDiagram dynamically scales canvas height for components with dense pin counts."""
+    from provider.schematic_diagram import SchematicDiagram
+    from unittest.mock import MagicMock
+    from model.wiring import LabelModel
+
+    # Create an IC with 40 pins
+    dense_pins = [
+        PinModel(
+            name=f"IO_{i}",
+            position=(0.0, float(i), 0.0),
+            label=f"IO_{i}",
+            side=PinSide.LEFT if i < 20 else PinSide.RIGHT,
+        )
+        for i in range(40)
+    ]
+    dense_fp = FootprintModel(
+        name="U_DENSE",
+        package="QFP-40",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(10.0, 10.0, 1.0),
+        pins=dense_pins,
+        label=LabelModel(text="MCU_40P", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+    wiring = MagicMock()
+    wiring.footprints = [dense_fp]
+    wiring.nets = []
+
+    diag = SchematicDiagram(wiring)
+    out_svg = tmp_path / "dense_schematic.svg"
+    res = diag.render_svg(out_svg)
+
+    assert res.exists()
+    content = res.read_text(encoding="utf-8")
+    assert "U_DENSE" in content
+    # With 40 pins (20 pins per side), height is > 700
+    assert 'viewBox="0 0 ' in content
+    # Extract height from SVG header
+    import re
+
+    match = re.search(r'height="(\d+)"', content)
+    assert match is not None
+    svg_height = int(match.group(1))
+    assert svg_height >= 700

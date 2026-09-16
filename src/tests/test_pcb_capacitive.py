@@ -60,6 +60,7 @@ def test_hatched_ground_lines(interdigital_sensor_config: CapacitiveElectrodeMod
     geom: CapacitiveGeometry = gen.generate()
 
     assert len(geom.hatch_lines) > 0
+    slopes = []
     for line in geom.hatch_lines:
         assert math.isclose(line.width_mm, 0.15, abs_tol=1e-4)
         # Verify lines are within or at boundary bounds
@@ -67,6 +68,14 @@ def test_hatched_ground_lines(interdigital_sensor_config: CapacitiveElectrodeMod
         assert -10.0 <= line.start[1] <= 20.0
         assert -5.0 <= line.end[0] <= 15.0
         assert -10.0 <= line.end[1] <= 20.0
+        dx = line.end[0] - line.start[0]
+        dy = line.end[1] - line.start[1]
+        if abs(dx) > 1e-4:
+            slopes.append(round(dy / dx, 2))
+
+    # Must contain both +45 deg (+1.0 slope) and -45 deg (-1.0 slope) lines
+    assert any(math.isclose(s, 1.0, abs_tol=0.1) for s in slopes)
+    assert any(math.isclose(s, -1.0, abs_tol=0.1) for s in slopes)
 
 
 def test_solid_touch_pad_generation():

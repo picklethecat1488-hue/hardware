@@ -5,6 +5,9 @@ from enum import StrEnum
 from typing import List, Optional, Tuple
 from pydantic import BaseModel, Field, model_validator
 
+# Default relative permittivity (epsilon_r) for standard FR-4 dielectric substrates
+DEFAULT_FR4_DIELECTRIC_PERMITTIVITY: float = 4.2
+
 
 class LayerType(StrEnum):
     """Functional categorization of a physical stackup layer."""
@@ -86,7 +89,7 @@ class StackupModel(BaseModel):
         # Search downwards and upwards for the closest GROUND or POWER plane
         best_ref = None
         min_dist = float("inf")
-        best_er = 4.2
+        best_er = DEFAULT_FR4_DIELECTRIC_PERMITTIVITY
 
         for direction in (-1, 1):
             curr_idx = target_idx + direction
@@ -99,7 +102,7 @@ class StackupModel(BaseModel):
                     if accum_dist < min_dist and accum_dist > 0.0:
                         min_dist = accum_dist
                         best_ref = l
-                        best_er = (er_sum / er_count) if er_count > 0 else 4.2
+                        best_er = (er_sum / er_count) if er_count > 0 else DEFAULT_FR4_DIELECTRIC_PERMITTIVITY
                     break
                 elif l.layer_type == LayerType.DIELECTRIC:
                     accum_dist += l.thickness_mm
@@ -112,7 +115,7 @@ class StackupModel(BaseModel):
             # Fallback default for surface microstrip against inner ground
             best_ref = self.copper_layers[1] if len(self.copper_layers) > 1 else self.copper_layers[0]
             min_dist = 0.100
-            best_er = 4.2
+            best_er = DEFAULT_FR4_DIELECTRIC_PERMITTIVITY
 
         return best_ref, min_dist, best_er
 

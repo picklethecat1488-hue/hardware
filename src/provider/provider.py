@@ -30,6 +30,9 @@ from .orchestrator import Orchestrator
 from .utils import load_manifest, get_rgba_color
 from .room import Room
 
+if TYPE_CHECKING:
+    from model.pcb import PCBConfig
+
 # Monkeypatch build123d.BuildPart.__exit__ to copy urdf_* attributes to the final part
 from build123d import BuildPart  # type: ignore
 
@@ -320,7 +323,7 @@ class Provider:
         return None
 
     @property
-    def pcb_config(self) -> Optional[Any]:
+    def pcb_config(self) -> Optional[PCBConfig]:
         """Return parsed PCBConfig Pydantic model from pcb.yaml if available."""
         data = self.pcb_manifest
         if data:

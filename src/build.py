@@ -535,48 +535,7 @@ class Builder:
 
             pcb_config = provider.pcb_config
             if not pcb_config:
-                # Default 6-layer ENIG stackup
-                stackup = StackupModel(
-                    layers=[
-                        StackupLayerModel(name="F.Cu", layer_type=LayerType.SIGNAL, thickness_mm=0.035),
-                        StackupLayerModel(
-                            name="Prepreg1",
-                            layer_type=LayerType.DIELECTRIC,
-                            thickness_mm=0.100,
-                            dielectric_constant=4.2,
-                        ),
-                        StackupLayerModel(name="In1.Cu", layer_type=LayerType.GROUND, thickness_mm=0.035),
-                        StackupLayerModel(
-                            name="Core1", layer_type=LayerType.DIELECTRIC, thickness_mm=0.450, dielectric_constant=4.4
-                        ),
-                        StackupLayerModel(name="In2.Cu", layer_type=LayerType.SIGNAL, thickness_mm=0.035),
-                        StackupLayerModel(
-                            name="Prepreg2",
-                            layer_type=LayerType.DIELECTRIC,
-                            thickness_mm=0.200,
-                            dielectric_constant=4.2,
-                        ),
-                        StackupLayerModel(name="In3.Cu", layer_type=LayerType.POWER, thickness_mm=0.035),
-                        StackupLayerModel(
-                            name="Core2", layer_type=LayerType.DIELECTRIC, thickness_mm=0.450, dielectric_constant=4.4
-                        ),
-                        StackupLayerModel(name="In4.Cu", layer_type=LayerType.GROUND, thickness_mm=0.035),
-                        StackupLayerModel(
-                            name="Prepreg3",
-                            layer_type=LayerType.DIELECTRIC,
-                            thickness_mm=0.100,
-                            dielectric_constant=4.2,
-                        ),
-                        StackupLayerModel(name="B.Cu", layer_type=LayerType.SIGNAL, thickness_mm=0.035),
-                    ],
-                    finish="ENIG",
-                )
-                pcb_config = PCBConfig(
-                    name=f"{provider.name}_pcb",
-                    board_type="rigid-flex",
-                    dimensions_mm=(80.0, 60.0, 1.6),
-                    stackup=stackup,
-                )
+                continue
 
             # Run DRC check
             drc_checker = PCBDesignRulesChecker(pcb_config)

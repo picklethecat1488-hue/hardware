@@ -23,10 +23,18 @@ class SchematicDiagram:
         layer_count = self.config.stackup.copper_layer_count if self.config else 2
         board_type = self.config.board_type.upper() if self.config else "RIGID"
 
-        # Calculate bounding dimensions
+        # Arrange components in schematic grid
+        comp_spacing_x = 240.0
+        start_x = 60.0
+        start_y = 120.0
+
+        # Calculate dynamic bounding dimensions
         fps = self.wiring.footprints
-        svg_w = max(900, len(fps) * 220)
-        svg_h = 700
+        svg_w = max(900, int(start_x + len(fps) * comp_spacing_x + 60.0))
+        max_pins = max((len(fp.pins) for fp in fps), default=2)
+        half_pins = max(2, (max_pins + 1) // 2)
+        max_bh = max(100.0, half_pins * 28.0 + 80.0)
+        svg_h = max(700, int(start_y + 100.0 + max_bh + 60.0))
 
         svg_lines = [
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {svg_w} {svg_h}" width="{svg_w}" height="{svg_h}">',
@@ -40,11 +48,6 @@ class SchematicDiagram:
             f'  <text x="30" y="40" font-family="system-ui, sans-serif" font-size="20" font-weight="bold" fill="#0f172a">{board_name} Schematic</text>',
             f'  <text x="30" y="65" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">Layer Count: {layer_count} | Type: {board_type} | Components: {len(fps)}</text>',
         ]
-
-        # Arrange components in schematic grid
-        comp_spacing_x = 240.0
-        start_x = 60.0
-        start_y = 120.0
 
         pin_coords = {}  # (comp_name, pin_name) -> (x, y)
 

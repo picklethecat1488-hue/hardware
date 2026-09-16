@@ -8,6 +8,7 @@ from typing import Tuple, List, Optional, Callable, Any
 from functools import cached_property
 from pydantic import BaseModel, Field, validate_call
 from build123d import Vector, Location
+from model.pcb import BgaFanoutModel
 
 # Footprint Layout Registry
 PIN_LAYOUT_REGISTRY = {}
@@ -89,7 +90,7 @@ class FootprintModel(BaseModel):
     pins: List[PinModel] = Field(default_factory=list, description="List of pins on the footprint")
     mpn: Optional[str] = Field(default=None, description="Manufacturer part number for BOM generation")
     supplier_pn: Optional[str] = Field(default=None, description="Supplier part number (e.g. LCSC, DigiKey)")
-    bga_fanout: Optional[Any] = Field(default=None, description="Optional BGA fanout configuration")
+    bga_fanout: Optional[BgaFanoutModel] = Field(default=None, description="Optional BGA fanout configuration")
 
 
 class NetModel(BaseModel):

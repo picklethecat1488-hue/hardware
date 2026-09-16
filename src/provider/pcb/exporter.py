@@ -352,53 +352,12 @@ class PCBExporter:
                 }
             )
 
-        html_content = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>{self.config.name} - Interactive BOM</title>
-  <style>
-    body {{ font-family: system-ui, sans-serif; margin: 0; padding: 20px; background: #0f172a; color: #f8fafc; }}
-    h1 {{ color: #38bdf8; margin-bottom: 5px; }}
-    .subtitle {{ color: #94a3b8; font-size: 14px; margin-bottom: 20px; }}
-    table {{ width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }}
-    th, td {{ padding: 12px 16px; text-align: left; border-bottom: 1px solid #334155; }}
-    th {{ background: #0284c7; color: #ffffff; font-weight: 600; text-transform: uppercase; font-size: 12px; }}
-    tr:hover {{ background: #334155; }}
-    .badge {{ display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #3b82f6; color: white; }}
-  </style>
-</head>
-<body>
-  <h1>{self.config.name} - Interactive Bill of Materials</h1>
-  <div class="subtitle">Layers: {self.config.stackup.copper_layer_count} | Type: {self.config.board_type.upper()} | Finish: {self.config.stackup.finish}</div>
-  <table>
-    <thead>
-      <tr>
-        <th>Ref</th>
-        <th>Value</th>
-        <th>Package</th>
-        <th>MPN</th>
-        <th>Supplier P/N</th>
-        <th>Location (X, Y)</th>
-      </tr>
-    </thead>
-    <tbody>
-"""
-        for comp in components_data:
-            html_content += f"""      <tr>
-        <td><strong>{comp["ref"]}</strong></td>
-        <td>{comp["val"]}</td>
-        <td><span class="badge">{comp["package"]}</span></td>
-        <td>{comp["mpn"]}</td>
-        <td>{comp["supplier_pn"]}</td>
-        <td>({comp["x"]:.2f}, {comp["y"]:.2f}) mm</td>
-      </tr>\n"""
+        template = self.jinja_env.get_template("ibom.html.j2")
+        html_content = template.render(
+            board=self.config,
+            components=components_data,
+        )
 
-        html_content += """    </tbody>
-  </table>
-</body>
-</html>
-"""
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
