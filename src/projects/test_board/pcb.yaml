@@ -1,4 +1,4 @@
-name: SensorHub_Carrier
+name: TestBoard_Carrier
 board_type: rigid-flex
 dimensions_mm: [60.0, 90.0, 1.6]
 shape_ref: carrier_board
@@ -167,3 +167,40 @@ capacitive_sensors:
     rx_pin: CAP_RX1
     threshold_raw: 2800
     shape_ref: flex_tail
+
+assembly_test:
+  test_fixture: flying_probe
+  pass_criteria: all_steps_within_tolerance
+  instructions:
+    - step_id: TEST_CONTINUITY_GND
+      description: Verify solid low-impedance ground plane continuity across all copper layers
+      test_type: continuity
+      net_or_points: [GND, IN1_GND, IN3_PWR]
+      expected_nominal: 0.05
+      tolerance_pct: 20.0
+      unit: ohm
+    - step_id: TEST_IMP_PCIE_DIFF
+      description: Measure PCIe Gen4 differential impedance on TX1+/TX1-
+      test_type: impedance
+      net_or_points: [PCIE_TX1_P, PCIE_TX1_N]
+      expected_nominal: 85.0
+      tolerance_pct: 10.0
+      unit: ohm
+      stimulus: 100ps TDR step
+    - step_id: TEST_CAP_SENSE_CHAN0
+      description: Measure baseline mutual capacitance on liquid level electrode Channel 0
+      test_type: capacitance
+      net_or_points: [CAP_TX0, CAP_RX0]
+      expected_nominal: 12.5
+      tolerance_pct: 15.0
+      unit: pF
+      stimulus: 250kHz 1.8V square
+    - step_id: TEST_CAP_SENSE_CHAN1
+      description: Measure baseline mutual capacitance on liquid level electrode Channel 1
+      test_type: capacitance
+      net_or_points: [CAP_TX1, CAP_RX1]
+      expected_nominal: 14.0
+      tolerance_pct: 15.0
+      unit: pF
+      stimulus: 250kHz 1.8V square
+

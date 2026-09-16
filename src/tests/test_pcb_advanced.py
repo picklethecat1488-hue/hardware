@@ -18,7 +18,7 @@ from provider.pcb.exporter import PCBExporter
 from provider.pcb.eye_diagram import EyeDiagramSimulator, EyeDiagramConfig, generate_prbs9
 from provider.pcb.rerun_logger import log_drc_report, log_eye_diagram
 from provider import Room, Mode
-from projects.sensor_hub.provider import SensorHubProvider
+from projects.test_board.provider import TestBoardProvider, SensorHubProvider
 
 
 @pytest.fixture
@@ -299,8 +299,8 @@ def test_rerun_logger_drc_and_eye(advanced_pcb_stackup: StackupModel):
 
 
 def test_sensor_hub_provider_cad_and_assembly():
-    """Verify SensorHubProvider builds valid 3D shapes, loads measurements, and populates Room."""
-    provider = SensorHubProvider()
+    """Verify TestBoardProvider builds valid 3D shapes, loads measurements, and populates Room."""
+    provider = TestBoardProvider()
     assert provider.settings.board_width == 60.0
     assert provider.settings.board_length == 90.0
 
@@ -330,10 +330,19 @@ def test_sensor_hub_provider_cad_and_assembly():
 
     # Check PCB config loading
     assert provider.pcb_config is not None
-    assert provider.pcb_config.name == "SensorHub_Carrier"
+    assert provider.pcb_config.name == "TestBoard_Carrier"
     assert provider.pcb_config.board_type == "rigid-flex"
     assert len(provider.pcb_config.stackup.layers) == 11
     assert len(provider.pcb_config.capacitive_sensors) == 2
+
+    # Check assembly test instructions from manifest/pcb.yaml
+    assert provider.pcb_config.assembly_test is not None
+    assert provider.pcb_config.assembly_test.test_fixture == "flying_probe"
+    assert len(provider.pcb_config.assembly_test.instructions) == 4
+    step0 = provider.pcb_config.assembly_test.instructions[0]
+    assert step0.step_id == "TEST_CONTINUITY_GND"
+    assert step0.test_type == "continuity"
+    assert step0.expected_nominal == 0.05
 
 
 def test_schematic_diagram_dynamic_scaling(tmp_path: Path):

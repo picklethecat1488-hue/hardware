@@ -1,5 +1,7 @@
 imports:
   - ../print_materials.yaml
+  - ../pcb_materials.yaml
+
 
 carrier_board:
   part:

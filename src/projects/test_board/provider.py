@@ -1,4 +1,4 @@
-"""Sensor Hub rigid-flex PCB and enclosure geometry provider."""
+"""Test Board rigid-flex PCB and enclosure geometry provider."""
 
 from pathlib import Path
 from typing import cast, Callable, Sequence, Any, Optional
@@ -20,23 +20,25 @@ from provider import (
     Mode,
     WiringDiagram,
 )
-from projects_config import SensorHubConfig
+from projects_config import TestBoardConfig
 
 
 @discover_provider
-class SensorHubProvider(Provider):
-    """Provider for 6-layer rigid-flex sensor hub and enclosure geometry."""
+class TestBoardProvider(Provider):
+    """Provider for 6-layer rigid-flex test board and enclosure geometry."""
+
+    __test__ = False
 
     @cached_property
-    def default_config(self) -> SensorHubConfig:
-        """Return the default configuration for the sensor hub project."""
+    def default_config(self) -> TestBoardConfig:
+        """Return the default configuration for the test board project."""
         measurements_file = str(Path(__file__).parent / "measurements.yaml")
-        return SensorHubConfig(measurements_path=measurements_file)
+        return TestBoardConfig(measurements_path=measurements_file)
 
     @property
-    def settings(self) -> SensorHubConfig:
+    def settings(self) -> TestBoardConfig:
         """Return typed configuration settings."""
-        return cast(SensorHubConfig, super().settings)
+        return cast(TestBoardConfig, super().settings)
 
     def carrier_board(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
         """Build the rigid 6-layer carrier board substrate with rounded corners and mounting holes."""
@@ -184,3 +186,7 @@ class SensorHubProvider(Provider):
             "product": self.diagram_product,
             "wiring": self.diagram_wiring,
         }
+
+
+# Alias for backward compatibility
+SensorHubProvider = TestBoardProvider

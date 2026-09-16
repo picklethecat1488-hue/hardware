@@ -30,5 +30,9 @@ from .pcb import (
     BgaFanoutModel,
     FlexZoneModel,
     CapacitiveElectrodeModel,
+    AssemblyTestStepModel,
+    AssemblyTestModel,
+    PCBMaterialModel,
+    PCBMaterialsModel,
     PCBConfig,
 )

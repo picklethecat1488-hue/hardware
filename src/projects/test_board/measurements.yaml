@@ -1,4 +1,4 @@
-# Parameterized geometric specifications for Sensor Hub rigid-flex assembly
+# Parameterized geometric specifications for Test Board rigid-flex assembly
 board_width: 60.0
 board_length: 90.0
 corner_radius: 4.0
@@ -13,3 +13,9 @@ mounting_hole_diameter: 3.2
 mounting_hole_inset: 4.5
 standoff_height: 5.0
 standoff_radius: 3.0
+
+# Factory assembly test limits and parameters
+test_tdr_rise_time_ps: 100.0
+test_cap_stimulus_freq_khz: 250.0
+test_pcie_diff_target_ohm: 85.0
+

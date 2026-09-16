@@ -8,6 +8,10 @@ from model.pcb import (
     StackupModel,
     DifferentialPairModel,
     NetClassModel,
+    AssemblyTestStepModel,
+    AssemblyTestModel,
+    PCBMaterialModel,
+    PCBMaterialsModel,
     PCBConfig,
 )
 
@@ -112,3 +116,64 @@ def test_get_reference_plane(standard_6_layer_stackup):
     assert ref_layer.name == "In1.Cu"
     assert math.isclose(h, 0.100, abs_tol=1e-5)
     assert math.isclose(er, 4.2, abs_tol=1e-5)
+
+
+def test_stackup_layer_thickness_and_dielectric_validation():
+    """Verify non-negative and positive thickness and dielectric permittivity constraints."""
+    # Thickness must be strictly positive (> 0)
+    with pytest.raises(ValueError):
+        StackupLayerModel(name="ZeroThick", layer_type=LayerType.DIELECTRIC, thickness_mm=0.0)
+
+    with pytest.raises(ValueError):
+        StackupLayerModel(name="NegThick", layer_type=LayerType.DIELECTRIC, thickness_mm=-0.1)
+
+    # Dielectric permittivity must be positive (> 0)
+    with pytest.raises(ValueError):
+        StackupLayerModel(name="NegEr", layer_type=LayerType.DIELECTRIC, thickness_mm=0.100, dielectric_constant=-2.0)
+
+    # Loss tangent must be non-negative (>= 0)
+    with pytest.raises(ValueError):
+        StackupLayerModel(name="NegLoss", layer_type=LayerType.DIELECTRIC, thickness_mm=0.100, loss_tangent=-0.01)
+
+
+def test_pcb_materials_model_from_yaml():
+    """Verify loading dedicated pcb_materials.yaml into PCBMaterialsModel."""
+    materials = PCBMaterialsModel.default()
+    assert "fr4_core" in materials.material
+    assert "polyimide_flex" in materials.material
+    assert "copper_1oz" in materials.material
+
+    fr4 = materials["fr4_core"]
+    assert fr4.dielectric_constant == 4.4
+    assert fr4.loss_tangent == 0.018
+
+    polyimide = materials.get("polyimide_flex")
+    assert polyimide is not None
+    assert polyimide.dielectric_constant == 3.4
+    assert polyimide.loss_tangent == 0.002
+
+    copper = materials["copper_1oz"]
+    assert copper.conductivity_ms_m == 58.0
+
+
+def test_assembly_test_model_validation():
+    """Verify factory assembly test plan and instruction validation."""
+    step = AssemblyTestStepModel(
+        step_id="TEST_IMP_1",
+        description="Check 50-ohm single-ended impedance",
+        test_type="impedance",
+        net_or_points=["RF_ANT"],
+        expected_nominal=50.0,
+        tolerance_pct=10.0,
+        unit="ohm",
+    )
+    assert step.expected_nominal == 50.0
+    assert step.tolerance_pct == 10.0
+
+    test_plan = AssemblyTestModel(
+        instructions=[step],
+        test_fixture="flying_probe",
+        pass_criteria="all_steps_within_tolerance",
+    )
+    assert len(test_plan.instructions) == 1
+    assert test_plan.test_fixture == "flying_probe"

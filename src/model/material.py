@@ -35,21 +35,6 @@ class MaterialModel(BaseModel):
     use_ssfr: Optional[bool] = Field(
         default=None, description="Whether to enable screen-space fluid rendering bilateral blur."
     )
-    dielectric_constant: Optional[float] = Field(
-        default=None, description="Relative dielectric permittivity (epsilon_r) for PCB substrates and insulators."
-    )
-    loss_tangent: Optional[float] = Field(
-        default=None, description="Dielectric loss tangent (tan delta) for high-frequency signal attenuation."
-    )
-    breakdown_voltage_v_per_mm: Optional[float] = Field(
-        default=None, description="Dielectric breakdown voltage in V/mm."
-    )
-    sheet_resistance_mohm_sq: Optional[float] = Field(
-        default=None, description="Conductor sheet resistance in mOhm/sq."
-    )
-    conductivity_ms_m: Optional[float] = Field(
-        default=None, description="Electrical conductivity in MS/m (MegaSiemens/meter)."
-    )
 
 
 class MaterialsModel(BaseModel):

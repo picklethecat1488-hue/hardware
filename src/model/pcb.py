@@ -2,6 +2,7 @@
 
 import math
 from enum import StrEnum
+from pathlib import Path
 from typing import List, Optional, Tuple
 from pydantic import BaseModel, Field, model_validator
 
@@ -28,11 +29,102 @@ class StackupLayerModel(BaseModel):
     thickness_mm: float = Field(gt=0.0, description="Layer thickness in millimeters")
     material: str = Field(default="copper", description="Layer material (e.g. copper, FR4, polyimide)")
     dielectric_constant: Optional[float] = Field(
-        default=None, description="Relative dielectric permittivity (epsilon_r) for dielectric layers"
+        default=None, gt=0.0, description="Relative dielectric permittivity (epsilon_r) for dielectric layers"
     )
     loss_tangent: Optional[float] = Field(
-        default=None, description="Dielectric loss tangent (tan delta) for high-speed signal integrity"
+        default=None, ge=0.0, description="Dielectric loss tangent (tan delta) for high-speed signal integrity"
     )
+
+    @model_validator(mode="after")
+    def validate_dielectric_properties(self) -> "StackupLayerModel":
+        """Validate that layer thickness is strictly positive and dielectric permittivity is valid."""
+        if self.thickness_mm <= 0.0:
+            raise ValueError(
+                f"Stackup layer '{self.name}' thickness must be strictly positive (> 0), got {self.thickness_mm} mm."
+            )
+        if self.layer_type in (LayerType.DIELECTRIC, LayerType.COVERLAY) and self.dielectric_constant is not None:
+            if self.dielectric_constant <= 0.0:
+                raise ValueError(
+                    f"Dielectric layer '{self.name}' relative permittivity must be positive (> 0), got {self.dielectric_constant}."
+                )
+        if self.loss_tangent is not None and self.loss_tangent < 0.0:
+            raise ValueError(f"Layer '{self.name}' loss tangent must be non-negative (>= 0), got {self.loss_tangent}.")
+        return self
+
+
+class PCBMaterialModel(BaseModel):
+    """Physical and electrical specifications for a PCB substrate, foil, or finish material."""
+
+    density: float = Field(default=1.85, gt=0.0, description="Material density in g/cm³.")
+    boundary_friction: float = Field(default=0.25, ge=0.0, description="Boundary friction coefficient.")
+    contact_angle: float = Field(default=70.0, ge=0.0, le=180.0, description="Contact angle in degrees.")
+    roughness: float = Field(default=0.30, ge=0.0, le=1.0, description="Surface roughness factor.")
+    ior: float = Field(default=1.54, gt=0.0, description="Index of refraction.")
+    transmission: float = Field(default=0.0, ge=0.0, le=1.0, description="Optical transmission weight.")
+    metallic: float = Field(default=0.0, ge=0.0, le=1.0, description="Metallic reflection weight.")
+    specular: float = Field(default=0.50, ge=0.0, le=1.0, description="Specular reflection factor.")
+    dielectric_constant: Optional[float] = Field(
+        default=None, gt=0.0, description="Relative dielectric permittivity (epsilon_r) for substrates and insulators."
+    )
+    loss_tangent: Optional[float] = Field(
+        default=None, ge=0.0, description="Dielectric loss tangent (tan delta) for high-frequency attenuation."
+    )
+    breakdown_voltage_v_per_mm: Optional[float] = Field(
+        default=None, gt=0.0, description="Dielectric breakdown voltage in V/mm."
+    )
+    sheet_resistance_mohm_sq: Optional[float] = Field(
+        default=None, gt=0.0, description="Conductor sheet resistance in mOhm/sq."
+    )
+    conductivity_ms_m: Optional[float] = Field(
+        default=None, gt=0.0, description="Electrical conductivity in MS/m (MegaSiemens/meter)."
+    )
+
+
+class PCBMaterialsModel(BaseModel):
+    """Collection of PCB material specifications indexed by material identifier."""
+
+    material: dict[str, PCBMaterialModel] = Field(
+        default_factory=dict, description="Dictionary of PCB material models keyed by material name."
+    )
+
+    def get(self, name: Optional[str], default: Optional[PCBMaterialModel] = None) -> Optional[PCBMaterialModel]:
+        """Resolve a PCB material model by name with case-insensitive normalization."""
+        if not name:
+            return default
+        clean_key = str(name).lower().replace("_", "").replace("-", "")
+        for k, v in self.material.items():
+            if k.lower().replace("_", "").replace("-", "") == clean_key:
+                return v
+        return default
+
+    def __getitem__(self, key: str) -> PCBMaterialModel:
+        """Access PCB material model by key with normalization."""
+        res = self.get(key)
+        if res is None:
+            raise KeyError(f"PCB material '{key}' not found in PCBMaterialsModel.")
+        return res
+
+    @classmethod
+    def from_yaml(cls, yaml_path: Path | str) -> "PCBMaterialsModel":
+        """Load PCB materials from a YAML file."""
+        from provider.utils import load_manifest
+
+        data = load_manifest(str(yaml_path))
+        mat_dict = data.get("material", data)
+        materials = {
+            k: PCBMaterialModel.model_validate(v) if isinstance(v, dict) else v
+            for k, v in mat_dict.items()
+            if isinstance(v, (dict, PCBMaterialModel))
+        }
+        return cls(material=materials)
+
+    @classmethod
+    def default(cls) -> "PCBMaterialsModel":
+        """Load default PCB materials from standard pcb_materials.yaml."""
+        materials_path = Path(__file__).parent.parent / "projects" / "pcb_materials.yaml"
+        if materials_path.exists():
+            return cls.from_yaml(materials_path)
+        return cls()
 
 
 class StackupModel(BaseModel):
@@ -428,6 +520,35 @@ class CapacitiveElectrodeModel(BaseModel):
     channel_id: Optional[int] = Field(default=None, description="Hardware capacitive controller channel index (0..15)")
 
 
+class AssemblyTestStepModel(BaseModel):
+    """Factory assembly testing step for automated test fixtures (bed-of-nails, flying probe)."""
+
+    step_id: str = Field(description="Unique test step identifier (e.g. TEST_IMP_DIFF_100)")
+    description: str = Field(description="Test procedure description")
+    test_type: str = Field(description="Type of test: continuity, isolation, impedance, capacitance, voltage")
+    net_or_points: List[str] = Field(description="Nets, component pins, or test coupon pads under test")
+    expected_nominal: Optional[float] = Field(default=None, description="Nominal expected value")
+    tolerance_pct: Optional[float] = Field(
+        default=None, ge=0.0, description="Acceptable percentage tolerance (e.g. 10.0 for +/-10%)"
+    )
+    unit: str = Field(default="", description="Measurement unit (e.g. ohm, pF, V, mA)")
+    stimulus: Optional[str] = Field(default=None, description="Optional stimulus signal (e.g. 100kHz 1V RMS)")
+
+
+class AssemblyTestModel(BaseModel):
+    """Factory assembly test plan containing ordered verification instructions."""
+
+    instructions: List[AssemblyTestStepModel] = Field(
+        default_factory=list, description="Ordered sequence of factory assembly test steps"
+    )
+    test_fixture: str = Field(
+        default="bed_of_nails", description="Target test fixture: bed_of_nails, flying_probe, manual"
+    )
+    pass_criteria: str = Field(
+        default="all_steps_within_tolerance", description="Overall pass criteria for assembly QC"
+    )
+
+
 class PCBConfig(BaseModel):
     """Top-level configuration model defining complete physical board, stackup, and high-speed rules."""
 
@@ -449,4 +570,7 @@ class PCBConfig(BaseModel):
     )
     capacitive_sensors: List[CapacitiveElectrodeModel] = Field(
         default_factory=list, description="Capacitive sensing electrodes and ground shield definitions"
+    )
+    assembly_test: Optional[AssemblyTestModel] = Field(
+        default=None, description="Factory assembly test instructions and tolerances"
     )

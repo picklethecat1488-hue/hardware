@@ -12,6 +12,9 @@ from model.pcb import (
     FlexZoneModel,
     LayerType,
 )
+from provider.geometry_utils import point_in_polygon
+
+_point_in_polygon = point_in_polygon
 
 
 class DRCSeverity(StrEnum):
@@ -40,24 +43,6 @@ class DRCViolation:
         actual = f" [actual: {self.actual_value:.4f}]" if self.actual_value is not None else ""
         loc = f" at ({self.location[0]:.2f}, {self.location[1]:.2f})" if self.location else ""
         return f"[{self.severity.upper()}] {self.rule_name} on '{self.net_or_zone}'{loc}: {self.description}{actual}{expected}"
-
-
-def _point_in_polygon(x: float, y: float, polygon: List[Tuple[float, float]]) -> bool:
-    """Ray casting algorithm for 2D point-in-polygon test."""
-    n = len(polygon)
-    if n < 3:
-        return False
-    inside = False
-    p1x, p1y = polygon[0]
-    for i in range(1, n + 1):
-        p2x, p2y = polygon[i % n]
-        if y > min(p1y, p2y) and y <= max(p1y, p2y) and x <= max(p1x, p2x):
-            if p1y != p2y:
-                xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
-                if p1x == p2x or x <= xinters:
-                    inside = not inside
-        p1x, p1y = p2x, p2y
-    return inside
 
 
 @dataclass

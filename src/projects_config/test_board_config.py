@@ -1,4 +1,4 @@
-"""Sensor hub configuration and parameterized measurements."""
+"""Test board configuration and parameterized measurements."""
 
 from typing import Any, Optional, Union, cast
 from functools import cached_property
@@ -6,8 +6,8 @@ from pydantic import BaseModel, Field
 from model import load_measurements, DiagramOptions, DiagramStyle
 
 
-class SensorHubConfig(BaseModel):
-    """Configuration settings and parameterized dimensions for the sensor hub rigid-flex assembly."""
+class TestBoardConfig(BaseModel):
+    """Configuration settings and parameterized dimensions for the test board rigid-flex assembly."""
 
     measurements_path: Optional[str] = Field(
         default=None,
@@ -102,3 +102,22 @@ class SensorHubConfig(BaseModel):
     def standoff_radius(self) -> float:
         """Radius of enclosure mounting standoffs in mm."""
         return float(self._raw_data["standoff_radius"])
+
+    @property
+    def test_tdr_rise_time_ps(self) -> float:
+        """TDR step rise time in picoseconds for factory impedance testing."""
+        return float(self._raw_data.get("test_tdr_rise_time_ps", 100.0))
+
+    @property
+    def test_cap_stimulus_freq_khz(self) -> float:
+        """Stimulus frequency in kHz for factory capacitive touch testing."""
+        return float(self._raw_data.get("test_cap_stimulus_freq_khz", 250.0))
+
+    @property
+    def test_pcie_diff_target_ohm(self) -> float:
+        """Target differential impedance in ohms for PCIe lines."""
+        return float(self._raw_data.get("test_pcie_diff_target_ohm", 85.0))
+
+
+# Alias for backward compatibility
+SensorHubConfig = TestBoardConfig

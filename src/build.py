@@ -517,7 +517,7 @@ class Builder:
     def generate_pcbs(self, out_dir: str, names: list[str] | None = None, force_update: Optional[bool] = None):
         """Export PCB Gerber archives, supplier BOM/CPL, vector schematics, and 3D STEP models."""
         from provider.pcb import PCBExporter, PCBDesignRulesChecker
-        from model.pcb import PCBConfig, StackupModel, StackupLayerModel, LayerType
+        from model.pcb import PCBConfig
         from model.wiring import Wiring
 
         for provider in self.manager.router.providers:
@@ -535,6 +535,8 @@ class Builder:
 
             pcb_config = provider.pcb_config
             if not pcb_config:
+                if names and any(provider.name in n and (Section.PCB in n or ":pcb" in n) for n in names):
+                    raise ValueError(f"Project '{provider.name}' does not configure a PCB manifest or PCBConfig.")
                 continue
 
             # Run DRC check
