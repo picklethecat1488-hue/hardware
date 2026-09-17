@@ -18,7 +18,7 @@ import webbrowser
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from provider.code_review.git_utils import get_git_root
+from provider.code_review.git_utils import GitReviewEngine, get_git_root
 from provider.code_review.server import ReviewServer
 
 
@@ -35,7 +35,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "commits",
         nargs="*",
-        help="Optional commits or revision hashes to inspect (e.g. HEAD~1, 542007d).",
+        help="Optional commits, revision hashes, or ranges to inspect (e.g. HEAD~1, 542007d, commit1..commit2).",
     )
     parser.add_argument(
         "--port",
@@ -61,6 +61,11 @@ def parse_arguments() -> argparse.Namespace:
         type=Path,
         default=Path("build/cr_feedback.json"),
         help="Persistent JSON file storing review comments and status.",
+    )
+    parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Start a fresh review session, discarding previously concluded feedback.",
     )
     parser.add_argument(
         "--browser",
@@ -111,13 +116,27 @@ def main() -> None:
     output_path = args.output if args.output.is_absolute() else (repo_root / args.output)
     state_path = args.state_file if args.state_file.is_absolute() else (repo_root / args.state_file)
 
+    git_engine = GitReviewEngine(repo_root=repo_root)
+    if not args.commits:
+        if git_engine.has_working_tree_changes():
+            revisions = ["working"]
+        else:
+            revisions = ["HEAD"]
+    else:
+        try:
+            revisions = git_engine.resolve_revisions(args.commits)
+        except ValueError as err:
+            print(f"Error resolving revisions: {err}", file=sys.stderr)
+            sys.exit(1)
+
     server = ReviewServer(
         host=args.host,
         port=args.port,
         repo_root=repo_root,
         markdown_output=output_path,
         state_file=state_path,
-        revisions=args.commits,
+        revisions=revisions,
+        fresh=args.fresh,
     )
 
     if args.export_only:
@@ -128,6 +147,14 @@ def main() -> None:
     # Initial sync to ensure build/CR.md exists immediately
     server.save_and_sync()
     url = server.get_url()
+
+    if args.commits:
+        if len(args.commits) == 1 and ".." in args.commits[0]:
+            rev_desc = f"{args.commits[0]} ({len(revisions)} commits)"
+        else:
+            rev_desc = ", ".join(args.commits)
+    else:
+        rev_desc = "Working Tree / Recent Commits"
 
     banner = r"""
 ======================================================================
@@ -145,7 +172,7 @@ def main() -> None:
 """.format(
         url=url,
         output=output_path,
-        revs=", ".join(args.commits) if args.commits else "Working Tree / Recent Commits",
+        revs=rev_desc,
         browser="VS Code (Integrated Simple Browser)" if args.browser == "vscode" else args.browser.upper(),
     )
     print(banner)

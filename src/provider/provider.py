@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import inspect
 import math
+from pathlib import Path
 from contextvars import ContextVar
 from typing import Optional, Any, Callable, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor
@@ -81,8 +82,8 @@ class ProviderOrchestrator(Orchestrator):
         modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:
         """Perform the requested build action."""
-        # Diagram action does not use subassemblies during build execution
-        handler_subs = () if action == Section.DIAGRAM else subassemblies
+        # Diagram and PCB actions do not use subassemblies during build execution
+        handler_subs = () if action in (Section.DIAGRAM, Section.PCB) else subassemblies
         self.pre_handler(targets, action, handler_subs, modes)
 
         if action == Section.DIAGRAM:
@@ -155,16 +156,21 @@ class ProviderOrchestrator(Orchestrator):
                     out_dir = Path("build") / self.provider.name / "pcb"
                     out_dir.mkdir(parents=True, exist_ok=True)
 
-                    gerber_zip = exporter.export_gerber_archive(out_dir / f"{target}_gerber.zip")
+                    board_dir = out_dir / "board"
+                    exporter.export_board(board_dir)
+                    cad_zip = exporter.export_board_archive(out_dir / f"{target}_cad.zip")
                     bom_csv = exporter.export_bom_csv(out_dir / f"{target}_bom.csv")
                     cpl_csv = exporter.export_pick_and_place_csv(out_dir / f"{target}_cpl.csv")
                     sch_svg = exporter.export_schematic_svg(out_dir / f"{target}_schematic.svg")
+                    sch_pdf = exporter.export_schematic_pdf(out_dir / f"{target}_schematic.pdf")
                     cap_json = exporter.export_capacitive_config_json(out_dir / f"{target}_capacitive_config.json")
                     return {
-                        "gerber": gerber_zip,
+                        "board": board_dir,
+                        "cad": cad_zip,
                         "bom": bom_csv,
                         "cpl": cpl_csv,
                         "schematic": sch_svg,
+                        "schematic_pdf": sch_pdf,
                         "capacitive_config": cap_json,
                     }
                 return handler(target, sa, m)
@@ -192,7 +198,7 @@ class ProviderOrchestrator(Orchestrator):
     ) -> None:
         """Validate input parameters before the handler execution."""
         # Ensure the action is recognized by the orchestrator
-        if action not in [Section.VIEW, Section.CONFIG, Section.PART, Section.DIAGRAM]:
+        if action not in [Section.VIEW, Section.CONFIG, Section.PART, Section.DIAGRAM, Section.PCB]:
             raise ValueError(f"No handler registered for action '{action}' in {self.provider.__class__.__name__}")
 
         # Diagrams operate on all targets at once, so we validate the first target has a handler.
@@ -219,6 +225,9 @@ class ProviderOrchestrator(Orchestrator):
             if action == Section.PART and name not in self.provider.part:
                 raise ValueError(f"No part handler registered for '{name}' in {self.provider.name}")
 
+            if action == Section.PCB and name not in self.provider.pcb and not self.provider.pcb_config:
+                raise ValueError(f"No PCB configuration registered for '{name}' in {self.provider.name}")
+
             if action == Section.CONFIG:
                 for mode in modes:
                     if mode not in self.provider.config:
@@ -237,7 +246,7 @@ class ProviderOrchestrator(Orchestrator):
             if subassemblies:
                 supported_subs = action_config.get(SUBASSEMBLIES, [])
                 for sa in subassemblies:
-                    if sa not in supported_subs:
+                    if sa is not None and sa not in supported_subs:
                         raise ValueError(
                             f"Subassembly '{sa}' is not supported for part '{name}'. "
                             f"Supported subassemblies: {supported_subs}"
@@ -322,6 +331,17 @@ class Provider:
                 return yaml.safe_load(f)
         return None
 
+    def silkscreen(self) -> List[Any]:
+        """Define CAD-located silkscreen text markings and annotations for PCB exports.
+
+        Subclasses should override this method to place silkscreen text annotations
+        using BuildSilkscreen and standard CAD locating primitives (Locations, PolarLocations).
+
+        Returns:
+            List of SilkscreenTextModel instances, or empty list if none defined.
+        """
+        return []
+
     @property
     def pcb_config(self) -> Optional[PCBConfig]:
         """Return parsed PCBConfig Pydantic model from pcb.yaml if available."""
@@ -329,7 +349,11 @@ class Provider:
         if data:
             from model.pcb import PCBConfig
 
-            return PCBConfig.model_validate(data)
+            config = PCBConfig.model_validate(data)
+            provider_texts = self.silkscreen()
+            if provider_texts:
+                config.silkscreen_texts = list(provider_texts)
+            return config
         return None
 
     @property

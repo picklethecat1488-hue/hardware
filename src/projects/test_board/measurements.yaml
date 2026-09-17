@@ -13,6 +13,7 @@ mounting_hole_diameter: 3.2
 mounting_hole_inset: 4.5
 standoff_height: 5.0
 standoff_radius: 3.0
+silkscreen_margin: 7.0
 
 # Factory assembly test limits and parameters
 test_tdr_rise_time_ps: 100.0

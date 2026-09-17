@@ -6,6 +6,7 @@ from .capacitive import CapacitiveSensingGenerator, CapacitiveGeometry, HatchLin
 from .exporter import PCBExporter
 from .eye_diagram import EyeDiagramSimulator, EyeDiagramConfig, EyeDiagramResult
 from .rerun_logger import log_drc_report, log_eye_diagram
+from .silkscreen import BuildSilkscreen, SilkscreenText
 
 __all__ = [
     "PCBDesignRulesChecker",
@@ -24,4 +25,6 @@ __all__ = [
     "EyeDiagramResult",
     "log_drc_report",
     "log_eye_diagram",
+    "BuildSilkscreen",
+    "SilkscreenText",
 ]

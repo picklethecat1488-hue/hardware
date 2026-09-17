@@ -17,5 +17,9 @@
             "uri": "http://localhost:*",
             "id": "simpleBrowser.open"
         }
-    ]
+    ],
+    "workbench.editorAssociations": {
+        "*.kicad_pcb": "KiCode.preview",
+        "*.kicad_sch": "KiCode.preview"
+    }
 }

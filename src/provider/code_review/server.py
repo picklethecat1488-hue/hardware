@@ -88,7 +88,12 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
 
         match path:
             case "/api/comment":
-                self._handle_add_comment(data)
+                if "id" in data and "body" in data and not data.get("file_path"):
+                    self._handle_edit_comment(data)
+                else:
+                    self._handle_add_comment(data)
+            case "/api/comment/edit":
+                self._handle_edit_comment(data)
             case "/api/file_status":
                 self._handle_update_file_status(data)
             case "/api/verdict":
@@ -176,13 +181,16 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "Missing file_path or comment body"}, status=400)
             return
 
-        snippet = extract_line_snippet(
-            file_path=file_path,
-            start_line=start_line,
-            end_line=end_line,
-            commit="working",
-            repo_root=self.server.repo_root,
-        )
+        snippet = data.get("code_snippet")
+        if not snippet:
+            commit = data.get("commit", "working")
+            snippet = extract_line_snippet(
+                file_path=file_path,
+                start_line=start_line,
+                end_line=end_line,
+                commit=commit,
+                repo_root=self.server.repo_root,
+            )
 
         comment = CommentModel(
             id=uuid.uuid4().hex[:12],
@@ -202,6 +210,32 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
         self._send_json(
             {"status": "ok", "comment": comment.model_dump(mode="json"), "verdict": self.server.session.verdict.value}
         )
+
+    def _handle_edit_comment(self, data: dict) -> None:
+        """Edit body and optional severity of an existing comment."""
+        cid = data.get("id", "").strip()
+        new_body = data.get("body", "").strip()
+        if not cid or not new_body:
+            self._send_json({"error": "Missing id or body"}, status=400)
+            return
+
+        for comment in self.server.session.comments:
+            if comment.id == cid:
+                comment.body = new_body
+                if "severity" in data:
+                    sev_raw = str(data["severity"]).strip().upper().replace(" ", "_").replace("-", "_")
+                    match sev_raw:
+                        case "MUST_FIX" | "MUSTFIX" | "FIX" | "MF":
+                            comment.severity = ReviewSeverity.MUST_FIX
+                        case "PROPOSAL" | "PROP":
+                            comment.severity = ReviewSeverity.PROPOSAL
+                        case "NIT":
+                            comment.severity = ReviewSeverity.NIT
+                self.server.save_and_sync()
+                self._send_json({"status": "ok", "comment": comment.model_dump(mode="json")})
+                return
+
+        self._send_json({"error": f"Comment {cid} not found"}, status=404)
 
     def _handle_update_file_status(self, data: dict) -> None:
         """Update reviewed status and optional notes for a file."""
@@ -274,6 +308,7 @@ class ReviewServer(ThreadingHTTPServer):
         markdown_output: Optional[Path] = None,
         state_file: Optional[Path] = None,
         revisions: Optional[list[str]] = None,
+        fresh: bool = False,
     ) -> None:
         """Initialize review HTTP server with config and persistent paths."""
         self.repo_root = repo_root or get_git_root()
@@ -284,17 +319,27 @@ class ReviewServer(ThreadingHTTPServer):
         self.state_file = state_file or (self.repo_root / "build" / "cr_feedback.json")
         self.is_serving = False
 
-        # Load or initialize session
-        loaded_session = self.exporter.load_session_json(self.state_file)
+        resolved_revisions = self.git_engine.resolve_revisions(revisions) if revisions else None
+
+        # Load or initialize session: discard stale feedback if previously concluded or requested fresh
+        loaded_session = None
+        if not fresh and self.state_file.exists():
+            candidate = self.exporter.load_session_json(self.state_file)
+            if candidate is not None and candidate.verdict not in (
+                ReviewStatus.APPROVED,
+                ReviewStatus.CHANGES_REQUESTED,
+            ):
+                loaded_session = candidate
+
         if loaded_session is not None:
             self.session = loaded_session
-            if revisions:
-                self.session.revisions = revisions
+            if resolved_revisions is not None:
+                self.session.revisions = resolved_revisions
         else:
             self.session = ReviewSessionModel(
                 title=f"Code Review: {self.repo_root.name}",
                 repo_name=self.repo_root.name,
-                revisions=revisions or [],
+                revisions=resolved_revisions or [],
                 created_at=datetime.now(timezone.utc).isoformat(),
                 updated_at=datetime.now(timezone.utc).isoformat(),
             )

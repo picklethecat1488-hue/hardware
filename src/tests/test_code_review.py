@@ -653,3 +653,236 @@ def test_diff_navigation_and_next_prev_change_cli(tmp_path: Path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_untracked_files_diff_and_working_tree_handling(tmp_path: Path) -> None:
+    """Verify that untracked and uncommitted files are properly diffed with additions."""
+    repo_root = get_git_root()
+    engine = GitReviewEngine(repo_root=repo_root)
+
+    # Create a temporary untracked file in the repo
+    temp_untracked = repo_root / "test_untracked_sample.txt"
+    try:
+        temp_untracked.write_text("line 1\nline 2\nline 3\n", encoding="utf-8")
+        assert engine.has_working_tree_changes()
+
+        working_files = engine.get_changed_files("working")
+        match_untracked = [f for f in working_files if f["path"] == "test_untracked_sample.txt"]
+        assert len(match_untracked) == 1
+        assert match_untracked[0]["status"] == "??"
+        assert int(match_untracked[0]["additions"]) == 3
+
+        # Verify synthetic diff generation for untracked file
+        diff = engine.get_file_diff("working", "test_untracked_sample.txt")
+        assert not diff.is_binary
+        assert diff.additions == 3
+        assert diff.deletions == 0
+        assert len(diff.hunks) == 1
+        assert "+line 1" in diff.raw_diff
+    finally:
+        if temp_untracked.exists():
+            temp_untracked.unlink()
+
+
+def test_code_review_comment_editing_and_custom_snippet(tmp_path: Path) -> None:
+    """Verify that comments can be edited via API and custom code snippets/commits are preserved."""
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_edit.md",
+        state_file=tmp_path / "cr_edit.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        # Add comment with explicit code snippet and commit
+        add_req = urllib.request.Request(
+            f"{server.get_url()}/api/comment",
+            data=json.dumps(
+                {
+                    "file_path": "pyproject.toml",
+                    "start_line": 1,
+                    "end_line": 2,
+                    "severity": "MUST_FIX",
+                    "body": "Initial comment text",
+                    "code_snippet": "[project]\nname = 'hardware'",
+                    "commit": "HEAD",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(add_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            comment = data["comment"]
+            cid = comment["id"]
+            assert comment["body"] == "Initial comment text"
+            assert "[project]" in comment["code_snippet"]
+
+        # Edit the comment via /api/comment/edit
+        edit_req = urllib.request.Request(
+            f"{server.get_url()}/api/comment/edit",
+            data=json.dumps(
+                {
+                    "id": cid,
+                    "body": "Updated comment text via CLI",
+                    "severity": "PROPOSAL",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(edit_req) as resp:
+            edit_data = json.loads(resp.read().decode("utf-8"))
+            assert edit_data["status"] == "ok"
+            updated_c = edit_data["comment"]
+            assert updated_c["body"] == "Updated comment text via CLI"
+            assert updated_c["severity"] == "PROPOSAL"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_code_review_stale_session_reset_on_startup(tmp_path: Path) -> None:
+    """Verify that concluded reviews (APPROVED or CHANGES_REQUESTED) do not leak stale feedback."""
+    repo_root = get_git_root()
+    state_file = tmp_path / "cr_stale.json"
+
+    # Write a concluded session
+    stale_session = ReviewSessionModel(
+        title="Concluded Review",
+        verdict=ReviewStatus.APPROVED,
+        comments=[
+            CommentModel(
+                id="old1",
+                file_path="src/build.py",
+                start_line=1,
+                end_line=1,
+                severity=ReviewSeverity.MUST_FIX,
+                body="Old feedback",
+                created_at=datetime.now(timezone.utc).isoformat(),
+            )
+        ],
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+    )
+    state_file.write_text(stale_session.model_dump_json(), encoding="utf-8")
+
+    # Launch ReviewServer without fresh flag: should automatically start fresh because previous review concluded
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_clean.md",
+        state_file=state_file,
+    )
+    assert len(server.session.comments) == 0
+    assert server.session.verdict == ReviewStatus.IN_REVIEW
+    server.server_close()
+
+
+def test_code_review_ui_cli_focus_and_edit_button(tmp_path: Path) -> None:
+    """Verify that the served UI template contains the Edit button and CLI console focus handler."""
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_ui.md",
+        state_file=tmp_path / "cr_ui.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        with urllib.request.urlopen(server.get_url()) as resp:
+            html = resp.read().decode("utf-8")
+            assert "editCommentViaCli" in html
+            assert "Edit ✎" in html
+            assert 'case "edit":' in html
+            assert "editComment(" in html
+            assert 'cliDrawer.addEventListener("click"' in html
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_git_review_engine_resolve_revisions_range_syntax() -> None:
+    """Verify GitReviewEngine resolves A..B commit ranges, individual hashes, and raises on invalid ranges."""
+    root = get_git_root()
+    engine = GitReviewEngine(repo_root=root)
+
+    # 1. Resolving HEAD~2..HEAD should return exactly 2 commit hashes
+    revs = engine.resolve_revisions(["HEAD~2..HEAD"])
+    assert len(revs) == 2
+    assert all(len(h) == 40 for h in revs)
+
+    # 2. Resolving single ref or working tree token
+    rev_single = engine.resolve_revisions(["HEAD", "working"])
+    assert len(rev_single) == 2
+    assert rev_single[1] == "working"
+    assert len(rev_single[0]) == 40
+
+    # 3. get_commits accepts range syntax directly
+    commits = engine.get_commits(rev_args=["HEAD~2..HEAD"])
+    assert len(commits) == 2
+    assert commits[0].commit_hash == revs[0]
+    assert commits[1].commit_hash == revs[1]
+
+    # 4. Invalid revision range raises descriptive ValueError
+    with pytest.raises(ValueError, match="Invalid git revision range"):
+        engine.resolve_revisions(["invalid_ref_xyz..also_invalid_abc"])
+
+
+def test_review_server_with_range_revisions(tmp_path: Path) -> None:
+    """Verify ReviewServer resolves revision ranges on initialization and records concrete commits."""
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_range.md",
+        state_file=tmp_path / "cr_range.json",
+        revisions=["HEAD~2..HEAD"],
+    )
+    assert len(server.session.revisions) == 2
+    assert all(len(r) == 40 for r in server.session.revisions)
+    server.server_close()
+
+
+def test_code_review_html_unified_diff_delete_styling(tmp_path: Path) -> None:
+    """Verify code_review HTML template styles deleted diff lines with red background in unified diff view.
+
+    Regression test: Ensures deleted/unmodified lines in unified diffs are styled with .delete/.del
+    and var(--bg-diff-del) rather than appearing as unstyled context lines.
+    """
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        with urllib.request.urlopen(server.get_url()) as resp:
+            html = resp.read().decode("utf-8")
+            # Must contain both .delete and .del selectors for deleted unified diff rows
+            assert ".unified-row.delete" in html
+            assert "var(--bg-diff-del)" in html
+            # Must map l.type delete in renderUnified
+            assert 'l.type === "delete"' in html
+            assert "del delete" in html
+    finally:
+        server.shutdown()
+        server.server_close()

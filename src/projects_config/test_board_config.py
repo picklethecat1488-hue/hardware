@@ -104,6 +104,11 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["standoff_radius"])
 
     @property
+    def silkscreen_margin(self) -> float:
+        """Margin between board edge and silkscreen text markings in mm."""
+        return float(self._raw_data["silkscreen_margin"])
+
+    @property
     def test_tdr_rise_time_ps(self) -> float:
         """TDR step rise time in picoseconds for factory impedance testing."""
         return float(self._raw_data.get("test_tdr_rise_time_ps", 100.0))

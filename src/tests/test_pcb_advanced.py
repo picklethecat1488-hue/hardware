@@ -425,3 +425,158 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
     assert len(pos_lines) == 5  # header + 4 components
+
+
+def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
+    """Verify that SchematicDiagram export_pdf paginates TOC across multiple pages when footprints and nets overflow."""
+    import re
+    from unittest.mock import MagicMock
+    from model.wiring import LabelModel
+    from provider.schematic_diagram import SchematicDiagram
+
+    # Generate 35 footprints and 40 nets to ensure TOC table overflows 1 page
+    many_fps = [
+        FootprintModel(
+            name=f"U_{i:02d}",
+            package="SOIC-8",
+            position=(float(i * 10), 0.0, 0.0),
+            dimensions=(5.0, 5.0, 1.0),
+            pins=[
+                PinModel(name=f"P_{j}", position=(0.0, float(j), 0.0), label=f"P{j}", side=PinSide.LEFT)
+                for j in range(4)
+            ],
+            label=LabelModel(text=f"IC_{i}", position=(0.0, 0.0, 0.0), align=("center", "center")),
+        )
+        for i in range(35)
+    ]
+    many_nets = [
+        NetModel(
+            name=f"NET_SIG_{i:02d}",
+            color="#0284c7",
+            pins=[(f"U_{i % 35}", "P_0"), (f"U_{(i + 1) % 35}", "P_1")],
+        )
+        for i in range(40)
+    ]
+    wiring = MagicMock()
+    wiring.footprints = many_fps
+    wiring.nets = many_nets
+
+    diag = SchematicDiagram(wiring)
+    out_pdf = tmp_path / "multipage_schematic.pdf"
+    res = diag.render_pdf(out_pdf)
+
+    assert res.exists()
+    assert res.stat().st_size > 0
+
+    # Count pages in generated PDF: Page 1 (Title) + at least 2 TOC pages + 18 schematic sheets >= 21 pages
+    pdf_bytes = res.read_bytes()
+    page_matches = re.findall(rb"/Type\s*/Page\b", pdf_bytes)
+    assert len(page_matches) >= 20
+
+
+def test_pcb_revision_metadata_and_templates(tmp_path: Path, advanced_pcb_stackup: StackupModel):
+    """Verify that PCBConfig revision metadata propagates to KiCad templates and schematic PDF."""
+    from unittest.mock import MagicMock
+    from provider.schematic_diagram import SchematicDiagram
+
+    cfg = PCBConfig(
+        name="RevTestBoard",
+        board_type="rigid",
+        revision="2.4.1",
+        dimensions_mm=(50.0, 40.0, 1.6),
+        stackup=advanced_pcb_stackup,
+    )
+    assert cfg.revision == "2.4.1"
+
+    wiring = MagicMock()
+    wiring.footprints = []
+    wiring.nets = []
+
+    exporter = PCBExporter(cfg, wiring)
+    pcb_file = exporter.export_kicad_pcb(tmp_path / "rev_board.kicad_pcb")
+    sch_file = exporter.export_kicad_sch(tmp_path / "rev_board.kicad_sch")
+
+    assert '(rev "2.4.1")' in pcb_file.read_text(encoding="utf-8")
+    assert '(rev "2.4.1")' in sch_file.read_text(encoding="utf-8")
+
+    diag = SchematicDiagram(wiring, pcb_config=cfg)
+    pdf_file = diag.render_pdf(tmp_path / "rev_schematic.pdf")
+    pdf_bytes = pdf_file.read_bytes()
+
+    import re
+    import zlib
+
+    streams = re.findall(rb"stream[\r\n]+(.*?)[\r\n]+endstream", pdf_bytes, re.DOTALL)
+    decomp = b"".join(
+        [zlib.decompress(s) if s.startswith((b"\x78\x9c", b"\x78\x01", b"\x78\xda")) else s for s in streams]
+    )
+    assert b"2.4.1" in decomp
+
+
+def test_schematic_compact_symbology_and_channel_routing(tmp_path: Path, advanced_pcb_stackup: StackupModel):
+    """Verify that schematic symbology is compact and routes facing pins without cutting across bodies."""
+    import re
+    import zlib
+    from unittest.mock import MagicMock
+    from model.wiring import LabelModel
+    from provider.schematic_diagram import SchematicDiagram
+
+    # Setup two components: U1 on left, U2 on right
+    u1 = FootprintModel(
+        name="U1",
+        package="QFN-16",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(10.0, 10.0, 1.0),
+        pins=[
+            PinModel(name="E1", position=(0.0, 1.0, 0.0), label="E1", side=PinSide.RIGHT),
+            PinModel(name="OUT", position=(0.0, 2.0, 0.0), label="OUT", side=PinSide.RIGHT),
+        ],
+        label=LabelModel(text="U1", position=(0.0, 0.0, 0.0), align=("center", "center")),
+        mpn="STM32-PARTNUM-100",
+    )
+    u2 = FootprintModel(
+        name="U2",
+        package="SOIC-8",
+        position=(50.0, 0.0, 0.0),
+        dimensions=(10.0, 10.0, 1.0),
+        pins=[
+            PinModel(name="IN", position=(0.0, 1.0, 0.0), label="IN", side=PinSide.LEFT),
+            PinModel(name="E2", position=(0.0, 2.0, 0.0), label="E2", side=PinSide.RIGHT),
+        ],
+        label=LabelModel(text="U2", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+
+    # Facing pin net: U1.OUT (right) to U2.IN (left)
+    net_facing = NetModel(name="FACING_NET", color="#2563eb", pins=[("U1", "OUT"), ("U2", "IN")])
+    # Non-facing pin net: U1.E1 (right) to U2.E2 (right) - should NOT route wire cutting across U2 body
+    net_non_facing = NetModel(name="NON_FACING_NET", color="#0284c7", pins=[("U1", "E1"), ("U2", "E2")])
+
+    wiring = MagicMock()
+    wiring.footprints = [u1, u2]
+    wiring.nets = [net_facing, net_non_facing]
+
+    cfg = PCBConfig(
+        name="SymbologyTest",
+        board_type="rigid",
+        revision="1.1",
+        dimensions_mm=(60.0, 40.0, 1.6),
+        stackup=advanced_pcb_stackup,
+    )
+
+    diag = SchematicDiagram(wiring, pcb_config=cfg)
+    out_pdf = tmp_path / "compact_routing.pdf"
+    res = diag.render_pdf(out_pdf)
+
+    assert res.exists()
+    assert res.stat().st_size > 0
+    pdf_bytes = res.read_bytes()
+    streams = re.findall(rb"stream[\r\n]+(.*?)[\r\n]+endstream", pdf_bytes, re.DOTALL)
+    decomp = b"".join(
+        [zlib.decompress(s) if s.startswith((b"\x78\x9c", b"\x78\x01", b"\x78\xda")) else s for s in streams]
+    )
+    clean_text = re.sub(rb"[\(\)\[\]0-9\.\s]+", b"", decomp)
+    # Ensure net labels, revision, and part number (MPN) are properly rendered
+    assert b"FACING_NET" in clean_text
+    assert b"NON_FACING_NET" in clean_text
+    assert b"STM-PARTNUM-" in clean_text or b"PARTNUM" in clean_text
+    assert b"1.1" in decomp

@@ -244,6 +244,36 @@ When designing parts or writing simulation hooks, adhere to these dynamic stabil
 - **Test Markers**:
   - Heavy PyBullet and JAX fluid tests should be marked with `@pytest.mark.slow` so they are excluded from the fast CLI validation pass.
 
+## PCB Design & KiCad Toolchain
+
+The repository incorporates an end-to-end PCB design, simulation, and manufacturing pipeline:
+
+### 1. Declarative Pipeline Flow
+```
+pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files
+```
+- **Materials Library**: Physical and electrical properties (dielectric constants, loss tangents, copper thickness, solder mask) are declared in `src/projects/pcb_materials.yaml` and imported into project manifests.
+- **Manifest Integration**: PCB targets are registered in the project's `manifest.yaml` under `pcb:`.
+- **Native KiCad Generation**: Board geometry and schematics are generated directly into canonical `.kicad_pcb` and `.kicad_sch` formats via clean Jinja templates (`src/provider/templates/kicad_pcb.j2`).
+- **Headless CAM Compilation**: Manufacturing files (RS-274X Gerbers, Excellon NC drills, Gerber job files) are compiled strictly by `kicad-cli` rather than hand-rolled custom formatters.
+
+### 2. KiCad Dependency & Multi-Platform Support
+- **Local Installation**: Install KiCad (v7+ or v8+) locally via Homebrew on macOS (`brew install --cask kicad`), apt on Linux (`sudo apt-get install -y kicad`), or the Windows installer from [kicad.org](https://www.kicad.org/).
+- **Discovery & Binary Override**: `KiCadCLI` automatically discovers standard installation paths across macOS, Linux, and Windows, and respects PATH and the `KICAD_CLI_BIN` environment variable override. Remote execution can be dispatched via `bin/anvil run`.
+
+### 3. Viewing & Inspecting Board Files
+- **In VS Code (KiCode)**: Install the recommended [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) (`sajadghorbani.kicode`) extension (powered by KiCanvas). Opening any `.kicad_pcb` or `.kicad_sch` file opens an interactive webview tab with layer toggling, zoom/pan, net highlighting, and component inspection directly in VS Code.
+- **Interactive Viewer CLI (`view.py`)**:
+  ```bash
+  # View PCB target (opens KiCode tab in VS Code and renders 3D substrate in ocp_vscode):
+  python src/view.py test_board:pcb
+
+  # View a direct board or schematic file:
+  python src/view.py build/board/test_board/test_board.kicad_pcb
+  ```
+- **In-Browser Gerber Viewers**: Drag the `build/board/<project>/` folder into open-source [tracespace.io/view](https://tracespace.io/view/) or online fab viewers (JLCPCB, PCBWay).
+- **Vector Schematics**: Open `build/schematics/<project>/<project>_schematic.svg` in any browser or SVG editor.
+
 ## Testing
 Add validation tests in `src/projects/tests/`. Your tests should:
 - Verify geometry volumes are non-zero.
