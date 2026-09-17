@@ -854,3 +854,35 @@ def test_review_server_with_range_revisions(tmp_path: Path) -> None:
     assert len(server.session.revisions) == 2
     assert all(len(r) == 40 for r in server.session.revisions)
     server.server_close()
+
+
+def test_code_review_html_unified_diff_delete_styling(tmp_path: Path) -> None:
+    """Verify code_review HTML template styles deleted diff lines with red background in unified diff view.
+
+    Regression test: Ensures deleted/unmodified lines in unified diffs are styled with .delete/.del
+    and var(--bg-diff-del) rather than appearing as unstyled context lines.
+    """
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        with urllib.request.urlopen(server.get_url()) as resp:
+            html = resp.read().decode("utf-8")
+            # Must contain both .delete and .del selectors for deleted unified diff rows
+            assert ".unified-row.delete" in html
+            assert "var(--bg-diff-del)" in html
+            # Must map l.type delete in renderUnified
+            assert 'l.type === "delete"' in html
+            assert "del delete" in html
+    finally:
+        server.shutdown()
+        server.server_close()

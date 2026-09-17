@@ -545,8 +545,8 @@
       word-break: break-all;
       padding-left: 8px;
     }
-    .unified-row.add { background: var(--bg-diff-add); color: #86efac; }
-    .unified-row.del { background: var(--bg-diff-del); color: #fca5a5; }
+    .unified-row.add, .unified-row.insert { background: var(--bg-diff-add); color: #86efac; }
+    .unified-row.del, .unified-row.delete { background: var(--bg-diff-del); color: #fca5a5; }
 
     /* Inline Comment Box */
     .inline-comment-card {
@@ -1629,7 +1629,7 @@
       hunks.forEach(h => {
         html += `<div class="unified-hunk-bar">${escapeHtml(h.header)}</div>`;
         h.lines.forEach(l => {
-          const rowType = l.type;
+          const rowType = (l.type === "delete" || l.type === "del") ? "del delete" : ((l.type === "add" || l.type === "insert") ? "add insert" : l.type);
           const lineNo = l.new_line_no || l.old_line_no;
           const isSelected = isLineInRange(lineNo);
           const selClass = isSelected ? " selected" : "";
