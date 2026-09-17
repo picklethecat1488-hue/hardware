@@ -1,0 +1,2653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Code Review: {{ session.repo_name or 'hardware' }}</title>
+  <style>
+    /* =========================================================
+       QUAKE I / GLQUAKE CONSOLE & RETRO HUD ENGINE THEME
+       ========================================================= */
+    :root {
+      --quake-bg: #120c08;
+      --quake-panel: #1b120a;
+      --quake-panel-hover: #261a0f;
+      --quake-header-bg: #291a10;
+      --quake-border-light: #8d5d33;
+      --quake-border-mid: #5a381e;
+      --quake-border-dark: #120a05;
+
+      --quake-gold: #ffb800;
+      --quake-gold-dim: #c98c00;
+      --quake-amber: #e59400;
+      --quake-copper: #c87a32;
+      --quake-red: #ef4444;
+      --quake-green: #22c55e;
+      --quake-cyan: #38bdf8;
+      --quake-purple: #c084fc;
+      --quake-text-light: #dedede;
+      --quake-text-muted: #9e8a78;
+      --quake-text-dim: #716053;
+
+      --bg-diff-del: rgba(239, 68, 68, 0.22);
+      --bg-diff-add: rgba(34, 197, 94, 0.22);
+      --bg-diff-sel: rgba(255, 184, 0, 0.28);
+      --border-diff-sel: #ffb800;
+
+      --font-mono: ui-monospace, "SF Mono", "Courier New", "Lucida Console", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--quake-bg);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.45) 0px, rgba(0, 0, 0, 0.45) 2px, transparent 2px, transparent 4px),
+        radial-gradient(ellipse at 50% 0%, #2e1d13 0%, #0d0704 100%);
+      color: var(--quake-text-light);
+      font-family: var(--font-mono);
+      letter-spacing: 0.02em;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Quake Stone Plaque / Beveled Panels */
+    .quake-card {
+      background-color: var(--quake-panel);
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 1px 1px 0px var(--quake-border-light), inset -1px -1px 0px var(--quake-border-dark), 0 6px 18px rgba(0,0,0,0.85);
+      border-radius: 4px;
+    }
+
+    /* Buttons */
+    .quake-btn {
+      font-family: var(--font-mono);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+    .quake-btn-default {
+      background: linear-gradient(180deg, #3a2618 0%, #20140c 100%);
+      border: 2px solid;
+      border-color: #7d4e28 #1a0f07 #1a0f07 #7d4e28;
+      color: #d6c6b2;
+      box-shadow: inset 1px 1px 0 #9c6838, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-default:hover {
+      background: linear-gradient(180deg, #4d3320 0%, #2c1c11 100%);
+      border-color: #9c6838 #1a0f07 #1a0f07 #9c6838;
+      color: var(--quake-gold);
+      text-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
+    .quake-btn-gold {
+      background: linear-gradient(180deg, #664614 0%, #3d2807 100%);
+      border: 2px solid;
+      border-color: #a8792a #1c1102 #1c1102 #a8792a;
+      color: #ffe699;
+      box-shadow: inset 1px 1px 0 #d49d3b, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-gold:hover {
+      background: linear-gradient(180deg, #805719 0%, #4a3209 100%);
+      color: #fff;
+      box-shadow: inset 1px 1px 0 #ffc107, 0 0 10px rgba(255, 184, 0, 0.5);
+    }
+    .quake-btn-green {
+      background: linear-gradient(180deg, #164e22 0%, #0d2e14 100%);
+      border: 2px solid;
+      border-color: #22c55e #071f0c #071f0c #22c55e;
+      color: #86efac;
+      box-shadow: inset 1px 1px 0 #4ade80, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-red {
+      background: linear-gradient(180deg, #571616 0%, #330b0b 100%);
+      border: 2px solid;
+      border-color: #ef4444 #1f0707 #1f0707 #ef4444;
+      color: #fca5a5;
+      box-shadow: inset 1px 1px 0 #f87171, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-active {
+      background: linear-gradient(180deg, #130a05 0%, #24140a 100%) !important;
+      border: 2px solid !important;
+      border-color: #1a0f07 #7d4e28 #7d4e28 #1a0f07 !important;
+      color: var(--quake-gold) !important;
+      box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9) !important;
+      text-shadow: 0 0 8px rgba(255, 184, 0, 0.6);
+    }
+
+    /* Badges */
+    .quake-badge {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      padding: 2px 6px;
+      border-radius: 2px;
+      border: 1px solid;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .quake-badge-gold { background: #331f08; color: var(--quake-gold); border-color: #8d5d33; }
+    .quake-badge-red { background: #380808; color: #f87171; border-color: #991b1b; }
+    .quake-badge-green { background: #082d12; color: #4ade80; border-color: #166534; }
+    .quake-badge-cyan { background: #082436; color: #38bdf8; border-color: #075985; }
+    .quake-badge-amber { background: #3a1c06; color: #fbbf24; border-color: #92400e; }
+
+    /* Inputs */
+    input[type="text"], select, textarea {
+      background-color: #0d0704;
+      border: 2px solid;
+      border-color: #140b06 #663f21 #663f21 #140b06;
+      color: var(--quake-gold);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 3px;
+      box-shadow: inset 2px 2px 4px rgba(0,0,0,0.8);
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--quake-gold);
+      box-shadow: 0 0 8px rgba(255, 184, 0, 0.3), inset 2px 2px 4px rgba(0,0,0,0.8);
+    }
+
+    /* =========================================================
+       TOP REVIEW STATUS BAR
+       ========================================================= */
+    header.review-header {
+      height: 54px;
+      background: var(--quake-header-bg);
+      border-bottom: 2px solid var(--quake-border-mid);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+    .brand-block {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--quake-gold);
+      text-shadow: 1px 1px 0 #000, 0 0 8px rgba(255, 184, 0, 0.4);
+    }
+    .metrics-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .metric-pill {
+      font-size: 11px;
+      color: var(--quake-text-muted);
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--quake-border-mid);
+      padding: 3px 8px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .metric-highlight {
+      color: var(--quake-gold);
+      font-weight: 700;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* =========================================================
+       MAIN 3-COLUMN APP BODY
+       ========================================================= */
+    .app-body {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Pane 1: Commits Timeline */
+    .pane-commits {
+      width: 310px;
+      background: #140d08;
+      border-right: 2px solid var(--quake-border-mid);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.2s ease, opacity 0.2s ease;
+      overflow: hidden;
+    }
+    .pane-commits.collapsed {
+      width: 0 !important;
+      border-right: none !important;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .pane-header {
+      padding: 10px 12px;
+      background: #1b120a;
+      border-bottom: 1px solid var(--quake-border-mid);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+      min-width: 310px;
+    }
+    .pane-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--quake-text-muted);
+      text-transform: uppercase;
+    }
+    .commits-list {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+      min-width: 310px;
+    }
+    .commit-item {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(90, 56, 30, 0.4);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .commit-item:hover {
+      background: var(--quake-panel-hover);
+    }
+    .commit-item.active {
+      background: rgba(255, 184, 0, 0.12);
+      border-left: 3px solid var(--quake-gold);
+    }
+    .commit-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3px;
+    }
+    .commit-hash {
+      color: var(--quake-gold);
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .commit-date {
+      color: var(--quake-text-dim);
+      font-size: 10px;
+    }
+    .commit-subject {
+      color: var(--quake-text-light);
+      font-size: 11.5px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .commit-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: var(--quake-text-muted);
+    }
+    .stat-add { color: var(--quake-green); }
+    .stat-del { color: var(--quake-red); }
+
+    /* Pane 2: Changed Files */
+    .pane-files {
+      width: 280px;
+      background: #170f09;
+      border-right: 2px solid var(--quake-border-mid);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.2s ease, opacity 0.2s ease;
+      overflow: hidden;
+    }
+    .pane-files.collapsed {
+      width: 0 !important;
+      border-right: none !important;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .pane-files .pane-header {
+      min-width: 280px;
+    }
+    .files-list {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+      min-width: 280px;
+    }
+    .file-item {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(90, 56, 30, 0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.15s;
+    }
+    .file-item:hover {
+      background: var(--quake-panel-hover);
+    }
+    .file-item.active {
+      background: rgba(255, 184, 0, 0.12);
+      border-left: 3px solid var(--quake-gold);
+    }
+    .file-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .file-name-col {
+      min-width: 0;
+    }
+    .file-title {
+      font-size: 11.5px;
+      color: var(--quake-text-light);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+    .file-subpath {
+      font-size: 9.5px;
+      color: var(--quake-text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+    .file-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .checkbox-reviewed {
+      cursor: pointer;
+      accent-color: var(--quake-gold);
+    }
+
+    /* Pane 3: Diff Viewer & Inspector */
+    .pane-diff {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: #0d0704;
+    }
+    .diff-toolbar {
+      height: 44px;
+      background: #19100a;
+      border-bottom: 2px solid var(--quake-border-mid);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      flex-shrink: 0;
+      gap: 10px;
+    }
+    .diff-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .active-file-label {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .selection-label {
+      font-size: 11px;
+      color: var(--quake-gold);
+      background: rgba(255, 184, 0, 0.15);
+      border: 1px solid var(--quake-gold);
+      padding: 2px 6px;
+      border-radius: 2px;
+    }
+    .diff-toolbar-center {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .diff-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Diff Content View */
+    .diff-container {
+      flex: 1;
+      overflow: auto;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    /* Side-by-Side Table */
+    .sbs-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .sbs-table col.col-lineno { width: 50px; }
+    .sbs-table col.col-code { width: calc(50% - 50px); }
+    .sbs-table th {
+      background: #170f09;
+      color: var(--quake-text-muted);
+      font-size: 10.5px;
+      text-align: left;
+      padding: 5px 8px;
+      border-bottom: 2px solid var(--quake-border-mid);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .sbs-row td {
+      padding: 1px 6px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      vertical-align: top;
+    }
+    .lineno {
+      user-select: none;
+      color: var(--quake-text-dim);
+      text-align: right;
+      padding-right: 8px !important;
+      border-right: 1px solid rgba(90, 56, 30, 0.4);
+      background: rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+    .lineno:hover {
+      color: var(--quake-gold);
+      background: rgba(255, 184, 0, 0.15);
+    }
+    .sbs-row.row-delete td.old-code, .sbs-row.row-delete td.old-lineno {
+      background: var(--bg-diff-del);
+      color: #fca5a5;
+    }
+    .sbs-row.row-insert td.new-code, .sbs-row.row-insert td.new-lineno {
+      background: var(--bg-diff-add);
+      color: #86efac;
+    }
+    .sbs-row.row-replace td.old-code { background: var(--bg-diff-del); color: #fca5a5; }
+    .sbs-row.row-replace td.new-code { background: var(--bg-diff-add); color: #86efac; }
+    .sbs-row.selected td {
+      background: var(--bg-diff-sel) !important;
+      box-shadow: inset 0 1px 0 var(--border-diff-sel), inset 0 -1px 0 var(--border-diff-sel);
+    }
+
+    /* Unified View */
+    .unified-wrap {
+      padding: 10px 14px;
+    }
+    .unified-hunk-bar {
+      background: #201309;
+      border-left: 3px solid var(--quake-gold);
+      color: var(--quake-gold);
+      padding: 4px 8px;
+      margin: 8px 0 4px 0;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .unified-row {
+      display: flex;
+      cursor: pointer;
+      padding: 1px 4px;
+      border-radius: 2px;
+    }
+    .unified-row.selected {
+      background: var(--bg-diff-sel) !important;
+      box-shadow: inset 0 1px 0 var(--border-diff-sel), inset 0 -1px 0 var(--border-diff-sel);
+    }
+    .unified-num-old, .unified-num-new {
+      width: 44px;
+      text-align: right;
+      padding-right: 6px;
+      user-select: none;
+      color: var(--quake-text-dim);
+      flex-shrink: 0;
+    }
+    .unified-num-old:hover, .unified-num-new:hover {
+      color: var(--quake-gold);
+    }
+    .unified-text {
+      flex: 1;
+      white-space: pre-wrap;
+      word-break: break-all;
+      padding-left: 8px;
+    }
+    .unified-row.add { background: var(--bg-diff-add); color: #86efac; }
+    .unified-row.del { background: var(--bg-diff-del); color: #fca5a5; }
+
+    /* Inline Comment Box */
+    .inline-comment-card {
+      margin: 4px 10px;
+      padding: 8px 12px;
+      background: #24160c;
+      border: 2px solid var(--quake-border-light);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.8);
+    }
+    .inline-comment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .inline-comment-body {
+      font-size: 12px;
+      color: var(--quake-text-light);
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+
+    /* =========================================================
+       BOTTOM QUAKE TERMINAL CLI CONSOLE
+       ========================================================= */
+    .pane-cli-drawer {
+      height: 230px;
+      background: #110a05;
+      border-top: 3px solid var(--quake-border-light);
+      box-shadow: 0 -6px 20px rgba(0,0,0,0.9);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: height 0.2s ease;
+      position: relative;
+      z-index: 50;
+    }
+    .pane-cli-drawer.minimized {
+      height: 38px !important;
+    }
+    .cli-bar-header {
+      height: 36px;
+      background: #1c1108;
+      border-bottom: 1px solid var(--quake-border-mid);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      flex-shrink: 0;
+    }
+    .cli-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .cli-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--quake-gold);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cli-target-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      background: rgba(255, 184, 0, 0.12);
+      border: 1px solid var(--quake-gold);
+      color: var(--quake-gold);
+      border-radius: 3px;
+    }
+    .cli-quick-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cli-log-screen {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 14px;
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: #cbd5e1;
+      background: rgba(0,0,0,0.4);
+    }
+    .cli-log-line {
+      margin-bottom: 3px;
+      word-break: break-all;
+    }
+    .cli-log-gold { color: var(--quake-gold); }
+    .cli-log-green { color: var(--quake-green); }
+    .cli-log-red { color: var(--quake-red); }
+    .cli-log-cyan { color: var(--quake-cyan); }
+    .cli-log-dim { color: var(--quake-text-dim); }
+
+    .cli-input-tray {
+      height: 40px;
+      background: #170f08;
+      border-top: 1px solid var(--quake-border-mid);
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .cli-prompt-prefix {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--quake-gold);
+      white-space: nowrap;
+      user-select: none;
+    }
+    .cli-cmd-input {
+      flex: 1;
+      height: 28px;
+      background: #080402 !important;
+      border: 1px solid var(--quake-border-mid) !important;
+      color: var(--quake-gold) !important;
+      font-size: 12px !important;
+      padding: 2px 8px !important;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #100905; border: 1px solid #3d2311; }
+    ::-webkit-scrollbar-thumb { background: #5a381e; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #8d5d33; }
+
+    /* Toast Notification */
+    #quakeToast {
+      position: fixed;
+      top: 64px;
+      right: 20px;
+      background: #24160c;
+      border: 2px solid var(--quake-gold);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 4px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.9);
+      font-size: 12px;
+      font-weight: 700;
+      display: none;
+      z-index: 9999;
+      animation: fadeIn 0.2s;
+    }
+
+    /* Session Termination Overlay */
+    #terminationOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 6, 4, 0.94);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .termination-modal {
+      background: #1c130c;
+      border: 3px solid var(--quake-border-light);
+      padding: 36px 48px;
+      max-width: 600px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(0,0,0,0.9), inset 0 0 15px rgba(139, 87, 42, 0.3);
+    }
+    .termination-title {
+      color: var(--quake-gold);
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 8px rgba(255, 184, 0, 0.5);
+    }
+    .termination-badge {
+      font-size: 14px;
+      padding: 4px 12px;
+      margin-left: 8px;
+    }
+    .termination-status-box {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--quake-border-mid);
+      padding: 14px;
+      margin: 20px 0;
+      font-size: 12px;
+      color: var(--quake-green);
+      line-height: 1.8;
+      font-family: var(--font-mono);
+      text-align: left;
+    }
+
+    /* =========================================================
+       SYNTAX HIGHLIGHTING (QUAKE RETRO HUD THEME)
+       ========================================================= */
+    .hljs {
+      color: var(--quake-text-light);
+    }
+    .hljs-keyword,
+    .hljs-selector-tag {
+      color: #ffb800; /* Quake Gold */
+      font-weight: 600;
+    }
+    .hljs-literal,
+    .hljs-boolean {
+      color: #fb923c; /* Quake Amber/Orange */
+      font-weight: 600;
+    }
+    .hljs-built_in,
+    .hljs-type {
+      color: #c084fc; /* Mystic Purple / Lavender */
+    }
+    .hljs-number {
+      color: #38bdf8; /* Plasma Cyan */
+    }
+    .hljs-string,
+    .hljs-regexp,
+    .hljs-template-variable {
+      color: #4ade80; /* Slime Green / Emerald */
+    }
+    .hljs-subst {
+      color: #dedede;
+    }
+    .hljs-comment,
+    .hljs-quote,
+    .hljs-doctag {
+      color: #8c735d; /* Bronze / Weathered Stone */
+      font-style: italic;
+    }
+    .hljs-title,
+    .hljs-title.function_,
+    .hljs-title.class_ {
+      color: #fde047; /* Bright Yellow / Gold */
+      font-weight: 600;
+    }
+    .hljs-attr,
+    .hljs-attribute {
+      color: #e59400; /* Warm Amber */
+    }
+    .hljs-variable,
+    .hljs-template-tag {
+      color: #fca5a5; /* Soft Coral */
+    }
+    .hljs-meta,
+    .hljs-meta .hljs-keyword {
+      color: #f43f5e; /* Lava Red / Salmon */
+    }
+    .hljs-tag,
+    .hljs-name {
+      color: #ffb800;
+    }
+    .hljs-punctuation,
+    .hljs-operator {
+      color: #a8a29e; /* Light Stone */
+    }
+    .hljs-addition {
+      background-color: var(--bg-diff-add);
+      color: #86efac;
+    }
+    .hljs-deletion {
+      background-color: var(--bg-diff-del);
+      color: #fca5a5;
+    }
+
+    /* Snippet preview in comments */
+    .inline-comment-snippet {
+      margin: 6px 0 8px 0;
+      background: #120a05;
+      border: 1px solid var(--quake-border-mid);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .snippet-label {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--quake-text-dim);
+      padding: 3px 8px;
+      background: rgba(0,0,0,0.3);
+      border-bottom: 1px solid rgba(90, 56, 30, 0.4);
+      letter-spacing: 0.05em;
+    }
+    .snippet-pre {
+      margin: 0;
+      padding: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    .comment-code-block {
+      margin: 6px 0;
+      padding: 6px 10px;
+      background: #100905;
+      border: 1px solid var(--quake-border-mid);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+    .comment-inline-code {
+      background: rgba(255, 184, 0, 0.12);
+      border: 1px solid rgba(255, 184, 0, 0.3);
+      color: var(--quake-gold);
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    /* Interactive File References (@path and @[path]) */
+    .quake-file-ref {
+      color: var(--quake-cyan);
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s ease;
+      user-select: text;
+    }
+    .quake-file-ref:hover {
+      background: rgba(56, 189, 248, 0.28);
+      border-color: var(--quake-cyan);
+      color: #fff;
+      text-shadow: 0 0 6px var(--quake-cyan);
+      transform: translateY(-1px);
+    }
+
+    /* CLI Autocomplete Suggestions */
+    .cli-suggestions {
+      position: absolute;
+      bottom: 40px;
+      left: 0;
+      right: 0;
+      max-height: 190px;
+      overflow-y: auto;
+      background: #180e07;
+      border: 2px solid var(--quake-gold);
+      border-bottom: none;
+      box-shadow: 0 -6px 20px rgba(0,0,0,0.85);
+      z-index: 2000;
+    }
+    .cli-suggestion-item {
+      padding: 6px 12px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(90, 56, 30, 0.4);
+      background: #180e07;
+    }
+    .cli-suggestion-item:hover, .cli-suggestion-item.active {
+      background: rgba(255, 184, 0, 0.2);
+      color: var(--quake-gold);
+    }
+    .cli-suggestion-path {
+      color: var(--quake-cyan);
+      font-weight: 700;
+    }
+    .cli-suggestion-meta {
+      font-size: 10px;
+      color: var(--quake-text-dim);
+    }
+  </style>
+
+  <!-- Syntax Highlighting Engine (Local vendor with CDN fallback) -->
+  <script src="/static/highlight.min.js"></script>
+  <script>
+    if (typeof hljs === "undefined") {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"><\\/script>');
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Top Status Bar -->
+  <header class="review-header">
+    <div class="brand-block">
+      <span class="brand-title">QUAKE // CODE REVIEW TERMINAL</span>
+      <span class="quake-badge quake-badge-gold">GLQUAKE v1.09</span>
+      <span id="reviewVerdictBadge" class="quake-badge quake-badge-amber">{{ session.verdict.value }}</span>
+    </div>
+
+    <div class="metrics-group">
+      <div class="metric-pill">
+        <span>Files:</span>
+        <span id="filesProgressText" class="metric-highlight">0/0 (0%)</span>
+      </div>
+      <div class="metric-pill">
+        <span>Comments:</span>
+        <span id="commentsCountText" class="metric-highlight">0 findings</span>
+      </div>
+      <div class="metric-pill" id="severityPills">
+        <!-- Dynamic severity breakdown -->
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button id="btnVerdictApprove" class="quake-btn quake-btn-green" onclick="setVerdict('APPROVED')" title="Conclude review with Approval (LGTM), export build/CR.md, and release terminal">
+        ✓ Approve
+      </button>
+      <button id="btnVerdictChanges" class="quake-btn quake-btn-red" onclick="setVerdict('CHANGES_REQUESTED')" title="Conclude review with Changes Requested, export build/CR.md, and release terminal">
+        ✗ Request Changes
+      </button>
+    </div>
+  </header>
+
+  <!-- 3-Column Middle Body -->
+  <div class="app-body">
+
+    <!-- Pane 1: Commits Timeline -->
+    {% set single_commit = session.revisions and session.revisions | length == 1 %}
+    <aside id="paneCommits" class="pane-commits{% if single_commit %} collapsed{% endif %}">
+      <div class="pane-header">
+        <div class="pane-title-row">
+          <span>Commit Stream</span>
+          <button class="quake-btn quake-btn-default" style="padding: 2px 6px;" onclick="togglePane('commits')" title="Collapse Pane (Shortcut: [)">◀</button>
+        </div>
+        <input type="text" id="commitSearchInput" placeholder="Filter commits, hash, author..." oninput="filterCommits()">
+      </div>
+      <ul id="commitsList" class="commits-list">
+        <!-- Rendered dynamically -->
+      </ul>
+    </aside>
+
+    <!-- Pane 2: Changed Files -->
+    <section id="paneFiles" class="pane-files">
+      <div class="pane-header">
+        <div class="pane-title-row">
+          <span id="filesCountHeader">Changed Files (0)</span>
+          <button class="quake-btn quake-btn-default" style="padding: 2px 6px;" onclick="togglePane('files')" title="Collapse Pane (Shortcut: ])">◀</button>
+        </div>
+        <input type="text" id="fileSearchInput" placeholder="Filter files by name..." oninput="filterFiles()">
+      </div>
+      <ul id="filesList" class="files-list">
+        <!-- Rendered dynamically -->
+      </ul>
+    </section>
+
+    <!-- Pane 3: Diff Viewer & Inspector -->
+    <main class="pane-diff">
+      <div class="diff-toolbar">
+        <div class="diff-toolbar-left">
+          <div style="display: flex; gap: 4px;">
+            <button id="btnToggleCommits" class="quake-btn quake-btn-default{% if not single_commit %} quake-btn-active{% endif %}" onclick="togglePane('commits')">📜 Stream</button>
+            <button id="btnToggleFiles" class="quake-btn quake-btn-default" onclick="togglePane('files')">📁 Files</button>
+            <button id="btnFocus" class="quake-btn quake-btn-default" onclick="toggleFocusMode()" title="Focus Mode (Shortcut: \)">⛶ Focus</button>
+          </div>
+          <span id="activeFilePath" class="active-file-label">Select a file</span>
+          <span id="activeFileLang" class="quake-badge quake-badge-cyan" style="display:none; font-size:9px; padding:1px 6px;"></span>
+          <span id="selectionLabel" class="selection-label" style="display:none;"></span>
+        </div>
+
+        <div class="diff-toolbar-center">
+          <button id="btnPrevChange" class="quake-btn quake-btn-default" onclick="navigateChange(-1)" title="Previous Change (CLI: prev change / pc, Shortcut: K)">◀ Prev Change</button>
+          <button id="btnNextChange" class="quake-btn quake-btn-default" onclick="navigateChange(1)" title="Next Change (CLI: next change / nc, Shortcut: J)">Next Change ▶</button>
+          <span style="border-left: 1px solid var(--quake-border); margin: 0 4px; height: 16px; align-self: center;"></span>
+          <button id="btnModeSbs" class="quake-btn quake-btn-default quake-btn-active" onclick="setDiffMode('side_by_side')" title="Side-by-Side View (Shortcut: S)">Split</button>
+          <button id="btnModeUnified" class="quake-btn quake-btn-default" onclick="setDiffMode('unified')" title="Unified View (Shortcut: U)">Unified</button>
+          <button id="btnModeFull" class="quake-btn quake-btn-default" onclick="setDiffMode('full_file')" title="Full File (Shortcut: F)">Full</button>
+        </div>
+
+        <div class="diff-toolbar-right">
+          <button class="quake-btn quake-btn-default" onclick="copyFilePath()" title="Copy file path">📋 Copy Path</button>
+          <button class="quake-btn quake-btn-default" onclick="loadDiff()" title="Reload Diff">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <div id="diffContent" class="diff-container">
+        <div style="padding: 40px; text-align: center; color: var(--quake-text-dim);">
+          Select a file from the changed files list to inspect its diff and start code review.
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Bottom: Quake Terminal CLI Console -->
+  <footer id="cliDrawer" class="pane-cli-drawer">
+    <div class="cli-bar-header">
+      <div class="cli-title-group">
+        <span class="cli-title">⚡ QUAKE // CONSOLE CLI</span>
+        <span id="cliTargetPill" class="cli-target-pill">TARGET: NO LINE SELECTED</span>
+      </div>
+
+      <div class="cli-quick-actions">
+        <span style="font-size: 10px; color: var(--quake-text-muted); margin-right: 4px;">Severity:</span>
+        <button class="quake-btn quake-btn-red" style="padding: 2px 6px;" onclick="setCliSeverity('MUST_FIX')">MUST FIX</button>
+        <button class="quake-btn quake-btn-gold" style="padding: 2px 6px;" onclick="setCliSeverity('PROPOSAL')">PROPOSAL</button>
+        <button class="quake-btn quake-btn-default" style="padding: 2px 6px;" onclick="setCliSeverity('NIT')">NIT</button>
+        <button class="quake-btn quake-btn-default" style="padding: 2px 6px; margin-left: 8px;" onclick="toggleCliDrawer()" title="Minimize/Expand Console">▲/▼</button>
+      </div>
+    </div>
+
+    <div id="cliLog" class="cli-log-screen">
+      <div class="cli-log-line cli-log-gold">> GLQUAKE CODE REVIEW ENGINE INITIALIZED.</div>
+      <div class="cli-log-line cli-log-dim">> Click any line or drag across lines to prime CLI target. Type comment text and press ENTER.</div>
+      <div class="cli-log-line cli-log-dim">> Type 'help' to view all available commands (must_fix, proposal, nit, reviewed, next, prev, export).</div>
+    </div>
+
+    <div class="cli-input-tray" style="position: relative;">
+      <div id="cliSuggestions" class="cli-suggestions" style="display:none;"></div>
+      <span id="cliPromptPrefix" class="cli-prompt-prefix">[READY] ></span>
+      <input type="text" id="cliInput" class="cli-cmd-input" placeholder="Type review comment, command, or @file reference (e.g. '@src/model/pcb.py:42', 'must_fix ...', 'feedback')..." autocomplete="off">
+      <button class="quake-btn quake-btn-gold" onclick="executeCliCommand()">Send [↵]</button>
+    </div>
+  </footer>
+
+  <div id="quakeToast"></div>
+
+  <div id="terminationOverlay">
+    <div class="termination-modal">
+      <div class="termination-title">// REVIEW CONCLUDED //</div>
+      <p style="color: var(--quake-text); font-size: 15px; margin-bottom: 12px;">
+        Verdict: <span id="termOverlayVerdict" class="quake-badge quake-badge-green termination-badge">APPROVED</span>
+      </p>
+      <p style="color: var(--quake-text-muted); font-size: 13px; line-height: 1.6; margin-bottom: 12px;">
+        All findings and review summary have been exported to:
+        <br><strong id="termOverlayFile" style="color: var(--quake-gold); font-family: var(--font-mono);">build/CR.md</strong>
+      </p>
+      <div class="termination-status-box">
+        ✓ Markdown report automatically exported<br>
+        ✓ Session state persisted to JSON<br>
+        ✓ Local review server shut down<br>
+        ✓ Terminal session released to shell
+      </div>
+      <button class="quake-btn quake-btn-gold" onclick="window.close()" style="padding: 8px 24px; font-size: 13px;">
+        CLOSE TAB
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // State management
+    const state = {
+      session: null,
+      commits: [],
+      files: [],
+      selectedCommit: "working",
+      selectedFile: null,
+      diffMode: "side_by_side",
+      currentDiff: null,
+      activeLanguage: "plaintext",
+      oldHighlightedLines: [],
+      newHighlightedLines: [],
+      selectedRange: { start: null, end: null },
+      currentSeverity: "MUST_FIX",
+      cmdHistory: [],
+      cmdHistoryIdx: -1,
+      panes: { commits: {% if single_commit %}false{% else %}true{% endif %}, files: true, cli: true }
+    };
+
+    function detectLanguage(filePath) {
+      if (!filePath) return "plaintext";
+      const ext = filePath.split(".").pop().toLowerCase();
+      switch (ext) {
+        case "py":
+        case "pyi":
+          return "python";
+        case "yaml":
+        case "yml":
+          return "yaml";
+        case "json":
+          return "json";
+        case "md":
+        case "markdown":
+          return "markdown";
+        case "sh":
+        case "bash":
+        case "zsh":
+          return "bash";
+        case "toml":
+        case "ini":
+          return "ini";
+        case "html":
+        case "j2":
+        case "jinja":
+        case "jinja2":
+        case "xml":
+        case "svg":
+          return "xml";
+        case "c":
+        case "h":
+          return "c";
+        case "cpp":
+        case "hpp":
+        case "cc":
+          return "cpp";
+        case "js":
+        case "mjs":
+          return "javascript";
+        case "ts":
+          return "typescript";
+        case "css":
+          return "css";
+        case "sql":
+          return "sql";
+        case "diff":
+        case "patch":
+          return "diff";
+        default:
+          return "plaintext";
+      }
+    }
+
+    function unescapeHtml(str) {
+      if (!str) return "";
+      return str
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'");
+    }
+
+    function highlightLine(text, lang) {
+      if (!text) return "";
+      if (typeof hljs !== "undefined") {
+        try {
+          if (lang && hljs.getLanguage(lang)) {
+            return hljs.highlight(text, { language: lang, ignoreIllegals: true }).value;
+          }
+          return hljs.highlightAuto(text).value;
+        } catch (e) {
+          // Fallback to escaped HTML on any error
+        }
+      }
+      return escapeHtml(text);
+    }
+
+    function highlightFullDocument(code, lang) {
+      if (!code) return [];
+      if (typeof hljs === "undefined") {
+        return code.split(/\r?\n/).map(l => escapeHtml(l));
+      }
+      try {
+        const highlighted = (lang && hljs.getLanguage(lang))
+          ? hljs.highlight(code, { language: lang, ignoreIllegals: true }).value
+          : hljs.highlightAuto(code).value;
+
+        const rawLines = highlighted.split(/\r?\n/);
+        const resultLines = [];
+        let openTags = [];
+
+        for (const line of rawLines) {
+          let balancedLine = "";
+          for (const tag of openTags) {
+            balancedLine += tag;
+          }
+
+          const tagRegex = /<(\/?)span([^>]*)>/g;
+          let match;
+
+          while ((match = tagRegex.exec(line)) !== null) {
+            const isClosing = match[1] === "/";
+            const fullTag = match[0];
+            if (isClosing) {
+              if (openTags.length > 0) openTags.pop();
+            } else {
+              openTags.push(fullTag);
+            }
+          }
+
+          balancedLine += line;
+
+          for (let i = openTags.length - 1; i >= 0; i--) {
+            balancedLine += "</span>";
+          }
+
+          resultLines.push(balancedLine);
+        }
+        return resultLines;
+      } catch (e) {
+        return code.split(/\r?\n/).map(l => escapeHtml(l));
+      }
+    }
+
+    function highlightCodeBlock(codeText, lang) {
+      if (!codeText) return "";
+      if (typeof hljs !== "undefined") {
+        try {
+          if (lang && hljs.getLanguage(lang)) {
+            return hljs.highlight(codeText, { language: lang, ignoreIllegals: true }).value;
+          }
+          return hljs.highlightAuto(codeText).value;
+        } catch (e) {
+          // Fallback
+        }
+      }
+      return escapeHtml(codeText);
+    }
+
+    function parseFileReferences(text) {
+      if (!text) return "";
+      return text.replace(/(@\[([^\]]+)\]|(?:^|(?<=\s))@([a-zA-Z0-9_./\\-]+(?::L?\d+(?:-L?\d+)?)?))/g, (match, full, bracketed, plain) => {
+        let trailingPunct = "";
+        let rawRef = bracketed || plain;
+        if (plain) {
+          const punctMatch = plain.match(/[.,;:!?)]+$/);
+          if (punctMatch) {
+            trailingPunct = punctMatch[0];
+            rawRef = plain.slice(0, -trailingPunct.length);
+          }
+        }
+        if (!rawRef) return match;
+        if (plain && !(rawRef.includes("/") || rawRef.includes(".") || rawRef.includes(":"))) {
+          return match;
+        }
+        const trimmed = rawRef.trim();
+        let filePart = trimmed;
+        let linePart = null;
+        if (trimmed.includes(":")) {
+          const colonIdx = trimmed.indexOf(":");
+          filePart = trimmed.slice(0, colonIdx);
+          const rawLine = trimmed.slice(colonIdx + 1).replace(/^L/i, "");
+          const parsedLine = parseInt(rawLine, 10);
+          if (!isNaN(parsedLine)) {
+            linePart = parsedLine;
+          }
+        }
+        const lineArg = linePart !== null ? `, ${linePart}` : "";
+        const escapedFile = escapeHtml(filePart).replace(/'/g, "\\'");
+        return `<span class="quake-file-ref" onclick="event.stopPropagation(); goto('${escapedFile}'${lineArg})" title="Jump to @${escapeHtml(trimmed)}">📁 @${escapeHtml(trimmed)}</span>${trailingPunct}`;
+      });
+    }
+
+    function renderCommentBody(text) {
+      if (!text) return "";
+      let html = escapeHtml(text);
+      const codeBlocks = [];
+
+      // Preserve and highlight code blocks ```lang\ncode```
+      html = html.replace(/```(\w*)\r?\n([\s\S]*?)```/g, (match, lang, code) => {
+        const unescaped = unescapeHtml(code);
+        const highlighted = highlightCodeBlock(unescaped, lang || state.activeLanguage);
+        const token = `__CODE_BLOCK_${codeBlocks.length}__`;
+        codeBlocks.push(`<pre class="hljs comment-code-block"><code>${highlighted}</code></pre>`);
+        return token;
+      });
+
+      // Preserve inline code `code`
+      const inlineCodes = [];
+      html = html.replace(/`([^`\r\n]+)`/g, (match, code) => {
+        const token = `__INLINE_CODE_${inlineCodes.length}__`;
+        inlineCodes.push(`<code class="comment-inline-code">${code}</code>`);
+        return token;
+      });
+
+      // Parse file references @path and @[path] safely in comment prose
+      html = parseFileReferences(html);
+
+      // Restore inline code and code blocks
+      inlineCodes.forEach((codeHtml, idx) => {
+        html = html.replace(`__INLINE_CODE_${idx}__`, codeHtml);
+      });
+      codeBlocks.forEach((blockHtml, idx) => {
+        html = html.replace(`__CODE_BLOCK_${idx}__`, blockHtml);
+      });
+
+      return html;
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      await loadSession();
+      await loadCommits();
+      setupKeyboardShortcuts();
+      setupCliInput();
+      setupDiffSelectionListener();
+    });
+
+    async function loadSession() {
+      try {
+        const res = await fetch("/api/session");
+        state.session = await res.json();
+        updateSessionUI();
+      } catch (e) {
+        logCli("Error loading review session: " + e.message, "red");
+      }
+    }
+
+    async function loadCommits() {
+      try {
+        const res = await fetch("/api/commits");
+        state.commits = await res.json();
+        renderCommitsList();
+        if (state.commits.length > 0) {
+          selectCommit(state.commits[0].commit_hash);
+        }
+        // If only one commit is being reviewed, default the commit stream to collapsed
+        if (state.commits.length <= 1) {
+          state.panes.commits = false;
+          document.getElementById("paneCommits").classList.add("collapsed");
+          const btnToggle = document.getElementById("btnToggleCommits");
+          if (btnToggle) {
+            btnToggle.classList.remove("quake-btn-active");
+          }
+        }
+      } catch (e) {
+        logCli("Error loading commits: " + e.message, "red");
+      }
+    }
+
+    function renderCommitsList() {
+      const listEl = document.getElementById("commitsList");
+      listEl.innerHTML = "";
+      state.commits.forEach(c => {
+        const li = document.createElement("li");
+        li.className = "commit-item" + (c.commit_hash === state.selectedCommit ? " active" : "");
+        li.onclick = () => selectCommit(c.commit_hash);
+        li.innerHTML = `
+          <div class="commit-top">
+            <span class="commit-hash">${c.short_hash}</span>
+            <span class="commit-date">${c.date.slice(0, 10)}</span>
+          </div>
+          <div class="commit-subject" title="${c.subject}">${c.subject}</div>
+          <div class="commit-bottom">
+            <span>${c.author}</span>
+            <span><span class="stat-add">+${c.additions}</span> / <span class="stat-del">-${c.deletions}</span></span>
+          </div>
+        `;
+        listEl.appendChild(li);
+      });
+    }
+
+    async function selectCommit(commitHash) {
+      state.selectedCommit = commitHash;
+      renderCommitsList();
+      logCli(`Selected revision: ${commitHash}`, "cyan");
+
+      try {
+        const res = await fetch(`/api/files?commit=${encodeURIComponent(commitHash)}`);
+        state.files = await res.json();
+        renderFilesList();
+        if (state.files.length > 0) {
+          selectFile(state.files[0].path);
+        } else {
+          document.getElementById("diffContent").innerHTML = `
+            <div style="padding: 40px; text-align: center; color: var(--quake-text-dim);">
+              No files modified in revision ${commitHash}.
+            </div>`;
+        }
+      } catch (e) {
+        logCli("Error loading files: " + e.message, "red");
+      }
+    }
+
+    function renderFilesList() {
+      const listEl = document.getElementById("filesList");
+      document.getElementById("filesCountHeader").innerText = `Changed Files (${state.files.length})`;
+      listEl.innerHTML = "";
+
+      const filter = (document.getElementById("fileSearchInput").value || "").toLowerCase();
+
+      state.files.forEach(f => {
+        if (filter && !f.path.toLowerCase().includes(filter)) return;
+
+        const isReviewed = state.session && state.session.files[f.path]?.status === "REVIEWED";
+        const comments = (state.session?.comments || []).filter(c => c.file_path === f.path);
+
+        const li = document.createElement("li");
+        li.className = "file-item" + (f.path === state.selectedFile ? " active" : "");
+        li.onclick = () => goto(f.path);
+
+        const statusClass = f.status === "A" ? "quake-badge-green" : (f.status === "D" ? "quake-badge-red" : "quake-badge-cyan");
+        const parts = f.path.split("/");
+        const baseName = parts.pop();
+        const dirName = parts.join("/");
+
+        li.innerHTML = `
+          <div class="file-left">
+            <input type="checkbox" class="checkbox-reviewed" ${isReviewed ? "checked" : ""} onclick="event.stopPropagation(); toggleFileReviewed('${f.path}')" title="Mark reviewed">
+            <span class="quake-badge ${statusClass}">${f.status}</span>
+            <div class="file-name-col">
+              <span class="file-title" title="${f.path}">${baseName}</span>
+              <span class="file-subpath" title="${dirName}">${dirName}</span>
+            </div>
+          </div>
+          <div class="file-right">
+            ${comments.length > 0 ? `<span class="quake-badge quake-badge-amber">💬 ${comments.length}</span>` : ""}
+            <span style="font-size: 10px; color: var(--quake-text-dim);">+${f.additions}/-${f.deletions}</span>
+          </div>
+        `;
+        listEl.appendChild(li);
+      });
+    }
+
+    async function goto(target, targetLine = null) {
+      if (!target) return;
+
+      let fileTarget = target.trim();
+      let lineTarget = targetLine;
+
+      // Strip leading @ and bracketed @[...] syntax
+      if (fileTarget.startsWith("@")) fileTarget = fileTarget.slice(1).trim();
+      if (fileTarget.startsWith("[") && fileTarget.endsWith("]")) fileTarget = fileTarget.slice(1, -1).trim();
+
+      // Handle "goto <line>" when a file is already active
+      if (/^\d+$/.test(fileTarget) && state.selectedFile) {
+        lineTarget = parseInt(fileTarget, 10);
+        fileTarget = state.selectedFile;
+      } else if (fileTarget.includes(":")) {
+        // Handle "goto <file>:<line>"
+        const colonParts = fileTarget.split(":");
+        fileTarget = colonParts[0].trim();
+        const rawLine = colonParts[1].trim().replace(/^L/i, "");
+        lineTarget = parseInt(rawLine, 10);
+      }
+
+      // Fuzzy match file path against loaded changed files
+      let matchedFile = state.files.find(f => f.path === fileTarget);
+      if (!matchedFile) {
+        matchedFile = state.files.find(f =>
+          f.path.toLowerCase().endsWith(fileTarget.toLowerCase()) ||
+          f.path.toLowerCase().includes(fileTarget.toLowerCase())
+        );
+      }
+
+      const activePath = matchedFile ? matchedFile.path : fileTarget;
+      state.selectedFile = activePath;
+      state.selectedRange = { start: null, end: null };
+      updateTargetUI();
+      renderFilesList();
+      await loadDiff();
+
+      if (lineTarget && !isNaN(lineTarget)) {
+        jumpToLine(lineTarget);
+        logCli(`> goto @${activePath}:${lineTarget}`, "cyan");
+      } else {
+        logCli(`> goto @${activePath}`, "cyan");
+      }
+    }
+
+    function jumpToLine(lineNo) {
+      state.selectedRange = { start: lineNo, end: lineNo };
+      ensureCliOpen();
+      updateTargetUI();
+      renderDiff();
+
+      setTimeout(() => {
+        const row = document.querySelector(`[data-line="${lineNo}"]`);
+        if (row) {
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 50);
+
+      const cliInput = document.getElementById("cliInput");
+      if (cliInput) {
+        cliInput.focus();
+        cliInput.placeholder = `Type comment for L${lineNo} and press Enter...`;
+      }
+    }
+
+    async function selectFile(filePath) {
+      await goto(filePath);
+    }
+
+    async function loadDiff() {
+      if (!state.selectedFile) return;
+      document.getElementById("activeFilePath").innerText = state.selectedFile;
+      document.title = `${state.selectedFile} — Code Review: ${state.session ? state.session.repo_name : 'hardware'}`;
+
+      try {
+        const url = `/api/diff?commit=${encodeURIComponent(state.selectedCommit)}&file=${encodeURIComponent(state.selectedFile)}`;
+        const res = await fetch(url);
+        state.currentDiff = await res.json();
+        state.activeLanguage = detectLanguage(state.selectedFile);
+
+        const langBadge = document.getElementById("activeFileLang");
+        if (langBadge) {
+          langBadge.innerText = state.activeLanguage.toUpperCase();
+          langBadge.style.display = "inline-block";
+        }
+
+        // Tokenize full old and new files for multi-line aware syntax highlighting
+        state.oldHighlightedLines = highlightFullDocument(state.currentDiff.old_content || "", state.activeLanguage);
+        state.newHighlightedLines = highlightFullDocument(state.currentDiff.new_content || state.currentDiff.full_content || "", state.activeLanguage);
+
+        renderDiff();
+      } catch (e) {
+        logCli("Error loading diff: " + e.message, "red");
+      }
+    }
+
+    function renderDiff() {
+      const container = document.getElementById("diffContent");
+      if (!state.currentDiff) return;
+
+      if (state.currentDiff.is_binary) {
+        container.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--quake-text-muted);">Binary file differs. Preview unavailable.</div>`;
+        return;
+      }
+
+      if (state.diffMode === "side_by_side") {
+        renderSideBySide(container);
+      } else if (state.diffMode === "unified") {
+        renderUnified(container);
+      } else {
+        renderFullFile(container);
+      }
+    }
+
+    function renderSideBySide(container) {
+      const rows = state.currentDiff.side_by_side || [];
+      const fileComments = (state.session?.comments || []).filter(c => c.file_path === state.selectedFile);
+
+      let html = `
+        <table class="sbs-table">
+          <colgroup>
+            <col class="col-lineno"><col class="col-code">
+            <col class="col-lineno"><col class="col-code">
+          </colgroup>
+          <thead>
+            <tr>
+              <th colspan="2">Old Revision</th>
+              <th colspan="2">New Revision</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      rows.forEach(r => {
+        const rowClass = r.row_type === "equal" ? "row-equal" : ("row-" + r.row_type);
+        const lineNo = r.new_no || r.old_no;
+        const isSelected = isLineInRange(lineNo);
+        const selectedClass = isSelected ? " selected" : "";
+
+        let oldHtml = "";
+        if (r.old_no && state.oldHighlightedLines && state.oldHighlightedLines[r.old_no - 1] !== undefined) {
+          oldHtml = state.oldHighlightedLines[r.old_no - 1];
+        } else if (r.old_text) {
+          oldHtml = highlightLine(r.old_text, state.activeLanguage);
+        }
+
+        let newHtml = "";
+        if (r.new_no && state.newHighlightedLines && state.newHighlightedLines[r.new_no - 1] !== undefined) {
+          newHtml = state.newHighlightedLines[r.new_no - 1];
+        } else if (r.new_text) {
+          newHtml = highlightLine(r.new_text, state.activeLanguage);
+        }
+
+        html += `
+          <tr class="sbs-row ${rowClass}${selectedClass}" data-line="${lineNo || ''}">
+            <td class="lineno old-lineno" onclick="onLineClick(${r.old_no || r.new_no}, event)">${r.old_no || ''}</td>
+            <td class="old-code hljs" onclick="onLineClick(${r.old_no || r.new_no}, event)">${oldHtml}</td>
+            <td class="lineno new-lineno" onclick="onLineClick(${r.new_no || r.old_no}, event)">${r.new_no || ''}</td>
+            <td class="new-code hljs" onclick="onLineClick(${r.new_no || r.old_no}, event)">${newHtml}</td>
+          </tr>
+        `;
+
+        // Render inline comments below line
+        if (lineNo) {
+          const matched = fileComments.filter(c => c.end_line === lineNo);
+          matched.forEach(c => {
+            html += renderInlineCommentRow(c);
+          });
+        }
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
+
+    function renderUnified(container) {
+      const hunks = state.currentDiff.hunks || [];
+      const fileComments = (state.session?.comments || []).filter(c => c.file_path === state.selectedFile);
+
+      let html = `<div class="unified-wrap">`;
+      hunks.forEach(h => {
+        html += `<div class="unified-hunk-bar">${escapeHtml(h.header)}</div>`;
+        h.lines.forEach(l => {
+          const rowType = l.type;
+          const lineNo = l.new_line_no || l.old_line_no;
+          const isSelected = isLineInRange(lineNo);
+          const selClass = isSelected ? " selected" : "";
+
+          let lineHtml = "";
+          if (l.type === "add" && l.new_line_no && state.newHighlightedLines && state.newHighlightedLines[l.new_line_no - 1] !== undefined) {
+            lineHtml = state.newHighlightedLines[l.new_line_no - 1];
+          } else if (l.type === "delete" && l.old_line_no && state.oldHighlightedLines && state.oldHighlightedLines[l.old_line_no - 1] !== undefined) {
+            lineHtml = state.oldHighlightedLines[l.old_line_no - 1];
+          } else if (l.new_line_no && state.newHighlightedLines && state.newHighlightedLines[l.new_line_no - 1] !== undefined) {
+            lineHtml = state.newHighlightedLines[l.new_line_no - 1];
+          } else if (l.old_line_no && state.oldHighlightedLines && state.oldHighlightedLines[l.old_line_no - 1] !== undefined) {
+            lineHtml = state.oldHighlightedLines[l.old_line_no - 1];
+          } else {
+            lineHtml = highlightLine(l.content, state.activeLanguage);
+          }
+
+          html += `
+            <div class="unified-row ${rowType}${selClass}" data-line="${lineNo || ''}" onclick="onLineClick(${lineNo}, event)">
+              <span class="unified-num-old">${l.old_line_no || ''}</span>
+              <span class="unified-num-new">${l.new_line_no || ''}</span>
+              <span class="unified-text hljs">${lineHtml}</span>
+            </div>
+          `;
+
+          if (lineNo) {
+            const matched = fileComments.filter(c => c.end_line === lineNo);
+            matched.forEach(c => {
+              html += renderInlineCommentRow(c);
+            });
+          }
+        });
+      });
+      html += `</div>`;
+      container.innerHTML = html;
+    }
+
+    function renderFullFile(container) {
+      const content = state.currentDiff.full_content || "";
+      const lines = content.split("\n");
+      const fileComments = (state.session?.comments || []).filter(c => c.file_path === state.selectedFile);
+
+      let html = `<table class="sbs-table"><colgroup><col class="col-lineno"><col class="col-code" style="width: calc(100% - 50px);"></colgroup><tbody>`;
+      lines.forEach((line, idx) => {
+        const lineNo = idx + 1;
+        const isSelected = isLineInRange(lineNo);
+        const selClass = isSelected ? " selected" : "";
+        const lineHtml = (state.newHighlightedLines && state.newHighlightedLines[idx] !== undefined)
+          ? state.newHighlightedLines[idx]
+          : highlightLine(line, state.activeLanguage);
+
+        html += `
+          <tr class="sbs-row row-equal${selClass}" data-line="${lineNo}">
+            <td class="lineno" onclick="onLineClick(${lineNo}, event)">${lineNo}</td>
+            <td class="new-code hljs" onclick="onLineClick(${lineNo}, event)">${lineHtml}</td>
+          </tr>
+        `;
+
+        const matched = fileComments.filter(c => c.end_line === lineNo);
+        matched.forEach(c => {
+          html += renderInlineCommentRow(c);
+        });
+      });
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
+
+    function renderInlineCommentRow(comment) {
+      let badgeClass = "quake-badge-cyan";
+      let displayLabel = "NIT";
+      const sev = (comment.severity || "").toUpperCase();
+      if (sev === "MUST_FIX") {
+        badgeClass = "quake-badge-red";
+        displayLabel = "MUST FIX";
+      } else if (sev === "PROPOSAL") {
+        badgeClass = "quake-badge-gold";
+        displayLabel = "PROPOSAL";
+      }
+
+      let snippetHtml = "";
+      if (comment.code_snippet) {
+        const highlightedSnippet = highlightCodeBlock(comment.code_snippet, state.activeLanguage);
+        snippetHtml = `
+          <div class="inline-comment-snippet">
+            <div class="snippet-label">SNIPPET:</div>
+            <pre class="hljs snippet-pre"><code>${highlightedSnippet}</code></pre>
+          </div>
+        `;
+      }
+
+      return `
+        <tr>
+          <td colspan="4" style="padding: 0;">
+            <div class="inline-comment-card">
+              <div class="inline-comment-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="quake-badge ${badgeClass}">[${displayLabel}]</span>
+                  <span style="font-size: 11px; color: var(--quake-gold); font-weight:700;">Lines L${comment.start_line}${comment.start_line !== comment.end_line ? '-L' + comment.end_line : ''}</span>
+                  <span style="font-size: 10px; color: var(--quake-text-dim);">by ${comment.author} (${comment.created_at.slice(11, 19)})</span>
+                </div>
+                <button class="quake-btn quake-btn-default" style="padding: 1px 6px; font-size:10px;" onclick="deleteComment('${comment.id}')">Delete ✕</button>
+              </div>
+              ${snippetHtml}
+              <div class="inline-comment-body">${renderCommentBody(comment.body)}</div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function isLineInRange(lineNo) {
+      if (!lineNo || !state.selectedRange.start) return false;
+      const s = Math.min(state.selectedRange.start, state.selectedRange.end || state.selectedRange.start);
+      const e = Math.max(state.selectedRange.start, state.selectedRange.end || state.selectedRange.start);
+      return lineNo >= s && lineNo <= e;
+    }
+
+    function onLineClick(lineNo, event) {
+      if (!lineNo) return;
+
+      if (event && event.shiftKey && state.selectedRange.start) {
+        state.selectedRange.end = lineNo;
+      } else {
+        state.selectedRange.start = lineNo;
+        state.selectedRange.end = lineNo;
+      }
+
+      ensureCliOpen();
+      updateTargetUI();
+      renderDiff();
+
+      // Automatically focus CLI input and set contextual placeholder
+      const cliInput = document.getElementById("cliInput");
+      if (cliInput) {
+        cliInput.focus();
+        const s = Math.min(state.selectedRange.start, state.selectedRange.end);
+        const e = Math.max(state.selectedRange.start, state.selectedRange.end);
+        cliInput.placeholder = `Type comment for L${s}${s !== e ? '-L' + e : ''} and press Enter...`;
+      }
+    }
+
+    function ensureCliOpen() {
+      if (!state.panes.cli) {
+        state.panes.cli = true;
+        const drawer = document.getElementById("cliDrawer");
+        if (drawer) drawer.classList.remove("minimized");
+      }
+    }
+
+    function setupDiffSelectionListener() {
+      const diffContainer = document.getElementById("diffContent");
+      if (!diffContainer) return;
+
+      diffContainer.addEventListener("mouseup", () => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || selection.toString().trim().length === 0) return;
+
+        const anchorRow = selection.anchorNode?.parentElement?.closest("[data-line]");
+        const focusRow = selection.focusNode?.parentElement?.closest("[data-line]");
+
+        if (anchorRow && focusRow) {
+          const l1 = parseInt(anchorRow.getAttribute("data-line"), 10);
+          const l2 = parseInt(focusRow.getAttribute("data-line"), 10);
+          if (!isNaN(l1) && !isNaN(l2) && l1 > 0 && l2 > 0) {
+            state.selectedRange.start = Math.min(l1, l2);
+            state.selectedRange.end = Math.max(l1, l2);
+            ensureCliOpen();
+            updateTargetUI();
+            renderDiff();
+
+            const cliInput = document.getElementById("cliInput");
+            if (cliInput) {
+              cliInput.focus();
+              cliInput.placeholder = `Type comment for L${state.selectedRange.start}-L${state.selectedRange.end} and press Enter...`;
+            }
+          }
+        }
+      });
+    }
+
+    function updateTargetUI() {
+      const targetPill = document.getElementById("cliTargetPill");
+      const promptPrefix = document.getElementById("cliPromptPrefix");
+      const selLabel = document.getElementById("selectionLabel");
+
+      if (!state.selectedFile) {
+        targetPill.innerText = "TARGET: NO FILE SELECTED";
+        promptPrefix.innerText = "[NO FILE] >";
+        selLabel.style.display = "none";
+        return;
+      }
+
+      const s = Math.min(state.selectedRange.start || 0, state.selectedRange.end || state.selectedRange.start || 0);
+      const e = Math.max(state.selectedRange.start || 0, state.selectedRange.end || state.selectedRange.start || 0);
+
+      if (s > 0) {
+        const rangeText = s === e ? `L${s}` : `L${s}-L${e}`;
+        const targetStr = `${state.selectedFile}:${rangeText}`;
+        targetPill.innerText = `TARGET: ${targetStr}`;
+        promptPrefix.innerText = `[${rangeText}] >`;
+        selLabel.innerText = `Selected: ${rangeText}`;
+        selLabel.style.display = "inline-block";
+        logCli(`Target primed: ${targetStr}`, "dim");
+      } else {
+        targetPill.innerText = `TARGET: ${state.selectedFile} (FILE LEVEL)`;
+        promptPrefix.innerText = `[FILE] >`;
+        selLabel.style.display = "none";
+      }
+    }
+
+    function setCliSeverity(sev) {
+      state.currentSeverity = sev;
+      logCli(`Severity preset set to: [${sev}]`, "gold");
+      document.getElementById("cliInput").focus();
+    }
+
+    function setupCliInput() {
+      const input = document.getElementById("cliInput");
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          executeCliCommand();
+        } else if (e.key === "ArrowUp") {
+          if (state.cmdHistoryIdx > 0) {
+            state.cmdHistoryIdx--;
+            input.value = state.cmdHistory[state.cmdHistoryIdx];
+          }
+        } else if (e.key === "ArrowDown") {
+          if (state.cmdHistoryIdx < state.cmdHistory.length - 1) {
+            state.cmdHistoryIdx++;
+            input.value = state.cmdHistory[state.cmdHistoryIdx];
+          } else {
+            state.cmdHistoryIdx = state.cmdHistory.length;
+            input.value = "";
+          }
+        }
+      });
+
+      setupCliAutocomplete();
+    }
+
+    function setupCliAutocomplete() {
+      const input = document.getElementById("cliInput");
+      const suggestionsEl = document.getElementById("cliSuggestions");
+      if (!input || !suggestionsEl) return;
+
+      let activeSuggestionIdx = -1;
+
+      input.addEventListener("input", () => {
+        const val = input.value;
+        const cursor = input.selectionStart || val.length;
+        const beforeCursor = val.slice(0, cursor);
+
+        // Match @prefix currently being typed
+        const match = beforeCursor.match(/@([a-zA-Z0-9_./\\-]*)$/);
+        if (!match) {
+          suggestionsEl.style.display = "none";
+          activeSuggestionIdx = -1;
+          return;
+        }
+
+        const query = match[1].toLowerCase();
+        const matches = (state.files || []).filter(f =>
+          f.path.toLowerCase().includes(query)
+        ).slice(0, 8);
+
+        if (matches.length === 0) {
+          suggestionsEl.style.display = "none";
+          activeSuggestionIdx = -1;
+          return;
+        }
+
+        activeSuggestionIdx = 0;
+        renderSuggestions(matches, match.index, match[0]);
+      });
+
+      function renderSuggestions(matches, atIndex, fullMatch) {
+        suggestionsEl.innerHTML = "";
+        matches.forEach((f, idx) => {
+          const item = document.createElement("div");
+          item.className = "cli-suggestion-item" + (idx === activeSuggestionIdx ? " active" : "");
+          item.innerHTML = `
+            <span class="cli-suggestion-path">@${f.path}</span>
+            <span class="cli-suggestion-meta">+${f.additions}/-${f.deletions}</span>
+          `;
+          item.onclick = (e) => {
+            e.stopPropagation();
+            insertSuggestion(`@${f.path} `, atIndex, fullMatch.length);
+          };
+          suggestionsEl.appendChild(item);
+        });
+        suggestionsEl.style.display = "block";
+      }
+
+      function insertSuggestion(textToInsert, atIndex, matchLen) {
+        const val = input.value;
+        const before = val.slice(0, atIndex);
+        const after = val.slice(atIndex + matchLen);
+        input.value = before + textToInsert + after;
+        suggestionsEl.style.display = "none";
+        activeSuggestionIdx = -1;
+        input.focus();
+        const newCursor = before.length + textToInsert.length;
+        input.setSelectionRange(newCursor, newCursor);
+      }
+
+      input.addEventListener("keydown", (e) => {
+        if (suggestionsEl.style.display === "block") {
+          const items = suggestionsEl.querySelectorAll(".cli-suggestion-item");
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            activeSuggestionIdx = (activeSuggestionIdx + 1) % items.length;
+            updateItemSelection(items);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            activeSuggestionIdx = (activeSuggestionIdx - 1 + items.length) % items.length;
+            updateItemSelection(items);
+          } else if (e.key === "Tab" || (e.key === "Enter" && activeSuggestionIdx >= 0 && items.length > 0)) {
+            e.preventDefault();
+            items[activeSuggestionIdx].click();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            suggestionsEl.style.display = "none";
+            activeSuggestionIdx = -1;
+          }
+        }
+      });
+
+      function updateItemSelection(items) {
+        items.forEach((item, idx) => {
+          item.classList.toggle("active", idx === activeSuggestionIdx);
+          if (idx === activeSuggestionIdx) {
+            item.scrollIntoView({ block: "nearest" });
+          }
+        });
+      }
+
+      document.addEventListener("click", (e) => {
+        if (!suggestionsEl.contains(e.target) && e.target !== input) {
+          suggestionsEl.style.display = "none";
+          activeSuggestionIdx = -1;
+        }
+      });
+    }
+
+    async function executeCliCommand() {
+      const input = document.getElementById("cliInput");
+      const suggestionsEl = document.getElementById("cliSuggestions");
+      if (suggestionsEl) suggestionsEl.style.display = "none";
+
+      const rawCmd = input.value.trim();
+      if (!rawCmd) return;
+
+      state.cmdHistory.push(rawCmd);
+      state.cmdHistoryIdx = state.cmdHistory.length;
+      input.value = "";
+
+      // Direct @file navigation (e.g. "@src/model/pcb.py:42" or "@pcb.py")
+      if (rawCmd.startsWith("@")) {
+        logCli(`> ${rawCmd}`, "gold");
+        await goto(rawCmd);
+        return;
+      }
+
+      const parts = rawCmd.split(/\s+/);
+      const rawVerb = parts[0].toLowerCase();
+      const verb = rawVerb.startsWith("/") ? rawVerb.slice(1) : rawVerb;
+
+      logCli(`> ${rawCmd}`, "gold");
+
+      matchCommand(verb, rawCmd, parts);
+    }
+
+    async function matchCommand(verb, fullText, parts) {
+      switch (verb) {
+        case "help":
+          logCli("--- GLQUAKE REVIEW CLI COMMANDS ---", "cyan");
+          logCli("  goto / g <file> [line]       : Navigate to file or line in active file", "cyan");
+          logCli("  next change / nc             : Jump to next change/hunk in diff", "cyan");
+          logCli("  prev change / pc             : Jump to previous change/hunk in diff", "cyan");
+          logCli("  next / n, prev / p           : Jump to next or previous file", "cyan");
+          logCli("  must_fix / fix / mf <text>   : Post comment as MUST FIX", "cyan");
+          logCli("  proposal / prop <text>       : Post comment as PROPOSAL", "cyan");
+          logCli("  nit <text>                   : Post comment as NIT", "cyan");
+          logCli("  comment / c <text>           : Post comment on currently selected lines", "cyan");
+          logCli("  reviewed / done / todo       : Toggle reviewed status on current file", "cyan");
+          logCli("  sel / line <start> [end]     : Select line range in active file", "cyan");
+          logCli("  approve / lgtm               : Conclude review with APPROVAL, export CR.md, and release terminal", "cyan");
+          logCli("  reject / changes             : Conclude review with CHANGES REQUESTED, export CR.md, and release terminal", "cyan");
+          logCli("  clear                        : Clear CLI screen log or selection", "cyan");
+          break;
+
+        case "goto":
+        case "g": {
+          const target = parts[1];
+          const lineParam = parts[2] ? parseInt(parts[2], 10) : null;
+          if (!target) {
+            logCli("Usage: goto <file> [line] or goto <line> (e.g. 'goto pcb.py:42', 'goto 80')", "red");
+          } else {
+            await goto(target, lineParam);
+          }
+          break;
+        }
+
+        case "must_fix":
+        case "mustfix":
+        case "fix":
+        case "mf": {
+          const body = fullText.slice(parts[0].length).trim();
+          if (!body) {
+            logCli(`Error: Please supply comment text after ${verb.toUpperCase()}`, "red");
+            return;
+          }
+          await postComment(body, "MUST_FIX");
+          break;
+        }
+
+        case "proposal":
+        case "prop": {
+          const body = fullText.slice(parts[0].length).trim();
+          if (!body) {
+            logCli(`Error: Please supply comment text after ${verb.toUpperCase()}`, "red");
+            return;
+          }
+          await postComment(body, "PROPOSAL");
+          break;
+        }
+
+        case "nit": {
+          const body = fullText.slice(parts[0].length).trim();
+          if (!body) {
+            logCli("Error: Please supply comment text after NIT", "red");
+            return;
+          }
+          await postComment(body, "NIT");
+          break;
+        }
+
+        case "comment":
+        case "c": {
+          const body = fullText.slice(parts[0].length).trim();
+          if (!body) {
+            logCli("Error: Comment body cannot be empty", "red");
+            return;
+          }
+          await postComment(body, state.currentSeverity);
+          break;
+        }
+
+        case "reviewed":
+        case "done":
+          if (state.selectedFile) {
+            await setFileStatus(state.selectedFile, "REVIEWED");
+          }
+          break;
+
+        case "todo":
+        case "unreview":
+          if (state.selectedFile) {
+            await setFileStatus(state.selectedFile, "PENDING");
+          }
+          break;
+
+        case "next":
+        case "n": {
+          const sub = parts[1] ? parts[1].toLowerCase() : "";
+          if (sub === "change" || sub === "hunk" || sub === "c" || sub === "diff") {
+            await navigateChange(1);
+          } else {
+            await navigateFile(1);
+          }
+          break;
+        }
+
+        case "prev":
+        case "p": {
+          const sub = parts[1] ? parts[1].toLowerCase() : "";
+          if (sub === "change" || sub === "hunk" || sub === "c" || sub === "diff") {
+            await navigateChange(-1);
+          } else {
+            await navigateFile(-1);
+          }
+          break;
+        }
+
+        case "next_change":
+        case "next-change":
+        case "nextchange":
+        case "nc":
+        case "next_hunk":
+        case "nexthunk":
+          await navigateChange(1);
+          break;
+
+        case "prev_change":
+        case "prev-change":
+        case "prevchange":
+        case "pc":
+        case "prev_hunk":
+        case "prevhunk":
+          await navigateChange(-1);
+          break;
+
+        case "sel":
+        case "line": {
+          const s = parseInt(parts[1], 10);
+          const e = parts[2] ? parseInt(parts[2], 10) : s;
+          if (isNaN(s)) {
+            logCli("Usage: sel <start_line> [end_line]", "red");
+          } else {
+            state.selectedRange = { start: s, end: e };
+            updateTargetUI();
+            renderDiff();
+          }
+          break;
+        }
+
+        case "feedback":
+        case "export":
+        case "save":
+          await exportMarkdown();
+          break;
+
+        case "approve":
+        case "lgtm":
+          await setVerdict("APPROVED");
+          break;
+
+        case "review":
+        case "in_review":
+        case "in-review":
+          logCli("Note: Review session is currently active. Conclude the review with 'approve' or 'reject'.", "amber");
+          break;
+
+        case "changes":
+        case "reject":
+        case "request_changes":
+        case "request-changes":
+          await setVerdict("CHANGES_REQUESTED");
+          break;
+
+        case "clear":
+          document.getElementById("cliLog").innerHTML = "";
+          state.selectedRange = { start: null, end: null };
+          updateTargetUI();
+          renderDiff();
+          break;
+
+        default:
+          // Default: If lines are selected, treat entered text directly as a comment!
+          if (state.selectedFile && state.selectedRange.start) {
+            await postComment(fullText, state.currentSeverity);
+          } else {
+            logCli(`Unrecognized command '${verb}'. Type 'help' for available commands.`, "red");
+          }
+          break;
+      }
+    }
+
+    async function postComment(body, severity) {
+      if (!state.selectedFile) {
+        logCli("Error: Select a file before adding a comment", "red");
+        return;
+      }
+
+      const s = state.selectedRange.start || 1;
+      const e = state.selectedRange.end || s;
+      const startLine = Math.min(s, e);
+      const endLine = Math.max(s, e);
+
+      const payload = {
+        file_path: state.selectedFile,
+        start_line: startLine,
+        end_line: endLine,
+        severity: severity,
+        body: body,
+        author: "Reviewer"
+      };
+
+      try {
+        const res = await fetch("/api/comment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          logCli(`[${severity}] Added comment to ${state.selectedFile}:L${startLine}${startLine !== endLine ? '-L' + endLine : ''}`, "green");
+          await loadSession();
+          renderDiff();
+          renderFilesList();
+          showToast(`Comment saved [${severity}]`);
+        } else {
+          logCli("Error saving comment: " + data.message, "red");
+        }
+      } catch (e) {
+        logCli("Error submitting comment: " + e.message, "red");
+      }
+    }
+
+    async function deleteComment(commentId) {
+      try {
+        const res = await fetch(`/api/comment?id=${encodeURIComponent(commentId)}`, { method: "DELETE" });
+        const data = await res.json();
+        if (data.status === "ok") {
+          logCli(`Deleted comment ${commentId}`, "dim");
+          await loadSession();
+          renderDiff();
+          renderFilesList();
+        }
+      } catch (e) {
+        logCli("Error deleting comment: " + e.message, "red");
+      }
+    }
+
+    async function toggleFileReviewed(filePath) {
+      const isReviewed = state.session?.files[filePath]?.status === "REVIEWED";
+      const newStatus = isReviewed ? "PENDING" : "REVIEWED";
+      await setFileStatus(filePath, newStatus);
+    }
+
+    async function setFileStatus(filePath, status) {
+      try {
+        const res = await fetch("/api/file_status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: filePath, status: status })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          logCli(`File status updated: ${filePath} -> [${status}]`, "green");
+          await loadSession();
+          renderFilesList();
+        }
+      } catch (e) {
+        logCli("Error updating file status: " + e.message, "red");
+      }
+    }
+
+    async function setVerdict(verdict) {
+      try {
+        const res = await fetch("/api/verdict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ verdict: verdict })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          logCli(`Review verdict updated to: [${verdict}]`, "gold");
+          if (data.session) {
+            state.session = data.session;
+            updateSessionUI();
+          }
+          if (data.terminating) {
+            handleSessionTermination(verdict, data.exported_to);
+          } else {
+            showToast(`Review verdict: ${verdict}`);
+          }
+        } else {
+          logCli("Error updating verdict: " + data.message, "red");
+        }
+      } catch (e) {
+        logCli("Error updating verdict: " + e.message, "red");
+      }
+    }
+
+    function handleSessionTermination(verdict, exportedTo) {
+      logCli("==================================================", "gold");
+      logCli(`*** REVIEW CONCLUDED: [${verdict}] ***`, verdict === "APPROVED" ? "green" : "red");
+      if (exportedTo) {
+        logCli(`Findings exported to: ${exportedTo}`, "cyan");
+      }
+      logCli("Review server shutting down. Terminal released.", "gold");
+
+      const overlay = document.getElementById("terminationOverlay");
+      if (overlay) {
+        const titleEl = document.getElementById("termOverlayVerdict");
+        if (titleEl) {
+          titleEl.innerText = verdict;
+          titleEl.className = "quake-badge termination-badge " + (verdict === "APPROVED" ? "quake-badge-green" : "quake-badge-red");
+        }
+        const fileEl = document.getElementById("termOverlayFile");
+        if (fileEl && exportedTo) {
+          fileEl.innerText = exportedTo;
+        }
+        overlay.style.display = "flex";
+      }
+
+      try {
+        window.close();
+      } catch (e) {
+        // Ignored if browser security blocks window.close
+      }
+    }
+
+    async function exportMarkdown() {
+      try {
+        const res = await fetch("/api/export", { method: "POST" });
+        const data = await res.json();
+        if (data.status === "ok") {
+          logCli(`✓ Review successfully exported to: ${data.path}`, "green");
+          showToast(`Exported to ${data.path}`);
+        } else {
+          logCli("Export error: " + data.message, "red");
+        }
+      } catch (e) {
+        logCli("Export failed: " + e.message, "red");
+      }
+    }
+
+    function updateSessionUI() {
+      if (!state.session) return;
+
+      const repo = state.session.repo_name || "hardware";
+      const filePrefix = state.selectedFile ? `${state.selectedFile} — ` : "";
+      document.title = `${filePrefix}Code Review: ${repo}`;
+
+      const badge = document.getElementById("reviewVerdictBadge");
+      badge.innerText = state.session.verdict;
+      badge.className = "quake-badge " + (state.session.verdict === "APPROVED" ? "quake-badge-green" : (state.session.verdict === "CHANGES_REQUESTED" ? "quake-badge-red" : "quake-badge-amber"));
+
+      const btnApprove = document.getElementById("btnVerdictApprove");
+      const btnChanges = document.getElementById("btnVerdictChanges");
+      if (btnApprove) btnApprove.classList.toggle("quake-btn-active", state.session.verdict === "APPROVED");
+      if (btnChanges) btnChanges.classList.toggle("quake-btn-active", state.session.verdict === "CHANGES_REQUESTED");
+
+      // Progress
+      const reviewed = Object.values(state.session.files || {}).filter(f => f.status === "REVIEWED").length;
+      const total = state.files.length || Object.keys(state.session.files || {}).length || 1;
+      const pct = Math.round((reviewed / total) * 100);
+      document.getElementById("filesProgressText").innerText = `${reviewed}/${total} (${pct}%)`;
+
+      // Comments
+      const comments = state.session.comments || [];
+      document.getElementById("commentsCountText").innerText = `${comments.length} findings`;
+
+      // Severity pills
+      const counts = { MUST_FIX: 0, PROPOSAL: 0, NIT: 0 };
+      comments.forEach(c => {
+        const s = (c.severity || "").toUpperCase();
+        if (s === "MUST_FIX") {
+          counts.MUST_FIX++;
+        } else if (s === "PROPOSAL") {
+          counts.PROPOSAL++;
+        } else {
+          counts.NIT++;
+        }
+      });
+
+      document.getElementById("severityPills").innerHTML = `
+        <span class="quake-badge quake-badge-red">MUST FIX: ${counts.MUST_FIX}</span>
+        <span class="quake-badge quake-badge-gold">PROPOSAL: ${counts.PROPOSAL}</span>
+        <span class="quake-badge quake-badge-cyan">NIT: ${counts.NIT}</span>
+      `;
+    }
+
+    async function navigateFile(direction) {
+      if (!state.files.length) return;
+      let idx = state.files.findIndex(f => f.path === state.selectedFile);
+      idx += direction;
+      if (idx < 0) idx = state.files.length - 1;
+      if (idx >= state.files.length) idx = 0;
+      await selectFile(state.files[idx].path);
+    }
+
+    function getFileChanges() {
+      if (!state.currentDiff) return [];
+      const rows = state.currentDiff.side_by_side || [];
+      const changes = [];
+      let currentChange = null;
+
+      rows.forEach((r, idx) => {
+        if (r.row_type && r.row_type !== "equal") {
+          const lineNo = r.new_no || r.old_no;
+          if (!currentChange) {
+            currentChange = {
+              startLine: lineNo || 1,
+              endLine: lineNo || 1,
+              type: r.row_type,
+            };
+          } else {
+            if (lineNo) {
+              currentChange.endLine = lineNo;
+            }
+          }
+        } else {
+          if (currentChange) {
+            changes.push(currentChange);
+            currentChange = null;
+          }
+        }
+      });
+      if (currentChange) {
+        changes.push(currentChange);
+      }
+
+      if (changes.length === 0 && state.currentDiff.hunks && state.currentDiff.hunks.length > 0) {
+        state.currentDiff.hunks.forEach(h => {
+          const start = h.new_start || h.old_start || 1;
+          const count = Math.max(h.new_count, h.old_count, 1);
+          changes.push({
+            startLine: start,
+            endLine: start + count - 1,
+            type: "hunk",
+          });
+        });
+      }
+      return changes;
+    }
+
+    async function navigateChange(direction) {
+      if (!state.files || state.files.length === 0) return;
+
+      if (!state.selectedFile) {
+        await selectFile(state.files[0].path);
+      }
+
+      let changes = getFileChanges();
+      const curLine = state.selectedRange ? state.selectedRange.start : null;
+
+      if (direction === 1) {
+        let nextChange = null;
+        if (curLine === null || curLine === undefined) {
+          nextChange = changes[0];
+        } else {
+          nextChange = changes.find(c => c.startLine > curLine);
+        }
+
+        if (nextChange) {
+          applyChange(nextChange);
+          return;
+        }
+
+        let fileIdx = state.files.findIndex(f => f.path === state.selectedFile);
+        let nextIdx = fileIdx;
+        let found = false;
+
+        while (true) {
+          nextIdx += 1;
+          if (nextIdx >= state.files.length) break;
+          const nextFile = state.files[nextIdx];
+          await selectFile(nextFile.path);
+          changes = getFileChanges();
+          if (changes.length > 0) {
+            applyChange(changes[0], true);
+            found = true;
+            break;
+          }
+        }
+
+        if (!found) {
+          logCli("Reached the last change across all files.", "amber");
+          showToast("Reached last change");
+        }
+      } else {
+        let prevChange = null;
+        if (curLine === null || curLine === undefined) {
+          prevChange = changes[changes.length - 1];
+        } else {
+          for (let i = changes.length - 1; i >= 0; i--) {
+            if (changes[i].endLine < curLine || (changes[i].startLine < curLine && changes[i].endLine <= curLine)) {
+              prevChange = changes[i];
+              break;
+            }
+          }
+        }
+
+        if (prevChange) {
+          applyChange(prevChange);
+          return;
+        }
+
+        let fileIdx = state.files.findIndex(f => f.path === state.selectedFile);
+        let prevIdx = fileIdx;
+        let found = false;
+
+        while (true) {
+          prevIdx -= 1;
+          if (prevIdx < 0) break;
+          const prevFile = state.files[prevIdx];
+          await selectFile(prevFile.path);
+          changes = getFileChanges();
+          if (changes.length > 0) {
+            applyChange(changes[changes.length - 1], true);
+            found = true;
+            break;
+          }
+        }
+
+        if (!found) {
+          logCli("Reached the first change across all files.", "amber");
+          showToast("Reached first change");
+        }
+      }
+    }
+
+    function applyChange(c, isNewFile = false) {
+      state.selectedRange = { start: c.startLine, end: c.endLine };
+      ensureCliOpen();
+      updateTargetUI();
+      renderDiff();
+
+      setTimeout(() => {
+        const row = document.querySelector(`[data-line="${c.startLine}"]`);
+        if (row) {
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 50);
+
+      const filePrefix = isNewFile ? `[${state.selectedFile}] ` : "";
+      const lineStr = c.startLine === c.endLine ? `L${c.startLine}` : `L${c.startLine}-L${c.endLine}`;
+      logCli(`${filePrefix}Jumped to change (${c.type.toUpperCase()}) at ${lineStr}`, "cyan");
+
+      const cliInput = document.getElementById("cliInput");
+      if (cliInput) {
+        cliInput.focus();
+        cliInput.placeholder = `Type comment for ${lineStr} and press Enter...`;
+      }
+    }
+
+    function setDiffMode(mode) {
+      state.diffMode = mode;
+      document.getElementById("btnModeSbs").classList.toggle("quake-btn-active", mode === "side_by_side");
+      document.getElementById("btnModeUnified").classList.toggle("quake-btn-active", mode === "unified");
+      document.getElementById("btnModeFull").classList.toggle("quake-btn-active", mode === "full_file");
+      renderDiff();
+    }
+
+    function togglePane(pane) {
+      if (pane === "commits") {
+        state.panes.commits = !state.panes.commits;
+        document.getElementById("paneCommits").classList.toggle("collapsed", !state.panes.commits);
+        document.getElementById("btnToggleCommits").classList.toggle("quake-btn-active", state.panes.commits);
+      } else if (pane === "files") {
+        state.panes.files = !state.panes.files;
+        document.getElementById("paneFiles").classList.toggle("collapsed", !state.panes.files);
+        document.getElementById("btnToggleFiles").classList.toggle("quake-btn-active", state.panes.files);
+      }
+    }
+
+    function toggleFocusMode() {
+      const isFocus = !state.panes.commits && !state.panes.files;
+      if (isFocus) {
+        state.panes.commits = true;
+        state.panes.files = true;
+      } else {
+        state.panes.commits = false;
+        state.panes.files = false;
+      }
+      document.getElementById("paneCommits").classList.toggle("collapsed", !state.panes.commits);
+      document.getElementById("paneFiles").classList.toggle("collapsed", !state.panes.files);
+      document.getElementById("btnFocus").classList.toggle("quake-btn-active", !state.panes.commits && !state.panes.files);
+    }
+
+    function toggleCliDrawer() {
+      state.panes.cli = !state.panes.cli;
+      document.getElementById("cliDrawer").classList.toggle("minimized", !state.panes.cli);
+    }
+
+    function logCli(msg, colorClass) {
+      const screen = document.getElementById("cliLog");
+      const line = document.createElement("div");
+      line.className = "cli-log-line" + (colorClass ? ` cli-log-${colorClass}` : "");
+      line.innerText = msg;
+      screen.appendChild(line);
+      screen.scrollTop = screen.scrollHeight;
+    }
+
+    function filterCommits() {
+      renderCommitsList();
+    }
+
+    function filterFiles() {
+      renderFilesList();
+    }
+
+    function copyFilePath() {
+      if (!state.selectedFile) return;
+      navigator.clipboard.writeText(state.selectedFile);
+      showToast("Copied: " + state.selectedFile);
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("quakeToast");
+      t.innerText = msg;
+      t.style.display = "block";
+      setTimeout(() => { t.style.display = "none"; }, 2500);
+    }
+
+    function setupKeyboardShortcuts() {
+      window.addEventListener("keydown", async (e) => {
+        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+        if (e.key === "[") togglePane("commits");
+        if (e.key === "]") togglePane("files");
+        if (e.key === "\\") toggleFocusMode();
+        if (e.key.toLowerCase() === "s") setDiffMode("side_by_side");
+        if (e.key.toLowerCase() === "u") setDiffMode("unified");
+        if (e.key.toLowerCase() === "f") setDiffMode("full_file");
+        if (e.key.toLowerCase() === "j" || (e.altKey && e.key === "ArrowDown")) {
+          e.preventDefault();
+          await navigateChange(1);
+        }
+        if (e.key.toLowerCase() === "k" || (e.altKey && e.key === "ArrowUp")) {
+          e.preventDefault();
+          await navigateChange(-1);
+        }
+        if (e.key === "Escape") {
+          state.selectedRange = { start: null, end: null };
+          updateTargetUI();
+          renderDiff();
+        }
+      });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+  </script>
+</body>
+</html>

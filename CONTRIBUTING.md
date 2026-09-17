@@ -5,6 +5,7 @@
  - **src/build.py** - Orchestrates the generation and export of 3D-printable geometry.
  - **src/config.py** - Automated utility for part placement and geometry optimization.
  - **src/view.py** - Interactive CAD visualization tool for inspection and debugging.
+ - **src/code_review.py** - Interactive Quake-themed code review tool and Markdown report generator.
  - **src/model/** - Core application data models and configuration schemas.
  - **src/provider/** - Framework for geometry generation and build orchestration.
  - **src/projects/** - Specific geometry provider implementations.
@@ -267,6 +268,32 @@ python build.py
 ```
 
 **Note:** All CI gates (tests, linting, and build checks) must pass successfully in the GitHub Actions workflow before a pull request can be merged.
+
+## Interactive Code Review
+
+Before submitting or approving pull requests, you can audit commits and staged changes using the interactive Quake-styled code review tool:
+
+```bash
+# Review uncommitted working tree changes (staged and unstaged)
+python src/code_review.py
+
+# Review specific commits or revision ranges
+python src/code_review.py HEAD~1 HEAD
+python src/code_review.py 542007d
+
+# Launch on custom port or output path
+python src/code_review.py --port 8765 --output build/CR.md
+
+# Directly export Markdown report from existing review state without launching the server
+python src/code_review.py --export-only
+```
+
+### Review Features & Workflow
+- **Retro Console UI**: 3-column layout displaying the revision stream, changed files list, and side-by-side or unified syntax-highlighted diffs.
+- **Line Selection & Inline Feedback**: Click or shift-click diff line numbers to select line ranges and submit structured review findings tagged as `[MUST FIX]`, `[PROPOSAL]`, or `[NIT]`.
+- **Integrated Quake CLI**: Bottom terminal console supporting commands such as `goto <path> [line]`, `must_fix <msg>`, `proposal <msg>`, `nit <msg>`, `reviewed`, `approve`, and `reject`.
+- **Automated Termination & Markdown Export**: Submitting a final verdict (`approve` / `lgtm` or `reject` / `changes`) automatically compiles and exports the full review audit log to `build/CR.md` and gracefully shuts down the local server, returning control to your terminal.
+- **VS Code Integration**: By default, opens inside VS Code via Simple Browser (`--browser vscode`) with task bindings in `.vscode/tasks.json`.
 
 ## Debugging
 
