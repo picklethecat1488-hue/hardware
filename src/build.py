@@ -513,6 +513,77 @@ class Builder:
         for fut in futures:
             fut.result()
 
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def generate_pcbs(self, out_dir: str, names: list[str] | None = None, force_update: Optional[bool] = None):
+        """Export PCB Gerber archives, supplier BOM/CPL, vector schematics, and 3D STEP models."""
+        from provider.pcb import PCBExporter, PCBDesignRulesChecker
+        from model.pcb import PCBConfig
+        from model.wiring import Wiring
+
+        for provider in self.manager.router.providers:
+            wiring_file = getattr(provider, "wiring_path", None)
+            if not wiring_file or not Path(wiring_file).exists():
+                continue
+
+            if names:
+                matches = [n for n in names if provider.name in n and (Section.PCB in n or ":pcb" in n or "*" in n)]
+                if not matches:
+                    continue
+
+            self.logger.print(f"Compiling PCBs: {provider.name}", symbol="🔌 ")
+            wiring = Wiring(Path(wiring_file))
+
+            pcb_config = provider.pcb_config
+            if not pcb_config:
+                if names and any(provider.name in n and (Section.PCB in n or ":pcb" in n) for n in names):
+                    raise ValueError(f"Project '{provider.name}' does not configure a PCB manifest or PCBConfig.")
+                continue
+
+            # Run DRC check
+            drc_checker = PCBDesignRulesChecker(pcb_config)
+            drc_report = drc_checker.check_all(wiring=wiring)
+            if not drc_report.passed:
+                self.logger.print(f"PCB DRC Violations in {provider.name}:\n{drc_report.summary()}", symbol="⚠️")
+
+            exporter = PCBExporter(pcb_config, wiring)
+
+            board_dir = Path(out_dir) / "board" / provider.name
+            schematics_dir = Path(out_dir) / "schematics" / provider.name
+            bom_dir = Path(out_dir) / "bom" / provider.name
+            step_file = Path(out_dir) / "step" / provider.name / f"{provider.name}_pcb.step"
+
+            # 1. Export native KiCad targets (.kicad_pcb and .kicad_sch)
+            kicad_pcb = board_dir / f"{provider.name}.kicad_pcb"
+            kicad_sch = schematics_dir / f"{provider.name}.kicad_sch"
+            exporter.export_kicad_sch(kicad_sch)
+
+            # 2. Export manufacturing board files via kicad-cli (gerbers + drill + .kicad_pcb)
+            exporter.export_board(board_dir, pcb_filename=f"{provider.name}.kicad_pcb")
+
+            # 3. Export manufacturing BOM, CPL, Schematic vector SVG, and 3D STEP
+            bom_csv = bom_dir / "bom.csv"
+            pos_csv = bom_dir / "pos.csv"
+            schematic_svg = schematics_dir / f"{provider.name}_schematic.svg"
+            schematic_pdf = schematics_dir / f"{provider.name}_schematic.pdf"
+
+            exporter.export_bom_csv(bom_csv)
+            exporter.export_pick_and_place_csv(pos_csv)
+            exporter.export_schematic_svg(schematic_svg)
+            exporter.export_schematic_pdf(schematic_pdf)
+            exporter.export_step_solid(step_file)
+
+            if pcb_config.capacitive_sensors:
+                cap_json = Path(out_dir) / "config" / provider.name / "capacitive_config.json"
+                exporter.export_capacitive_config_json(cap_json)
+                self.logger.print(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
+
+            self.logger.print(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
+            self.logger.print(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
+            self.logger.print(f"Generated Board Files: {board_dir}", symbol="📦")
+            self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
+            self.logger.print(f"Generated Schematic SVG: {schematic_svg}", symbol="📐")
+            self.logger.print(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
+
     def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
 
@@ -554,6 +625,7 @@ class Builder:
         self.generate_parts(out_dir=out_dir, names=names)
         self.generate_diagram(out_dir=out_dir, names=names)
         self.generate_urdfs(out_dir=out_dir, names=names)
+        self.generate_pcbs(out_dir=out_dir, names=names)
 
         # Compress the build
         zip_path = Path(out_dir) / zip_name
