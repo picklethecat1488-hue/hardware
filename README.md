@@ -73,7 +73,7 @@ python src/list.py outputs 'exhaust_manifolds/*'
 ```
 
 ### Geometry Visualization
-Use the viewer to inspect geometry in VS Code using the `ocp_vscode` extension.
+Use the viewer to inspect geometry in VS Code using the `ocp_vscode` extension. For PCB targets, `view.py` also opens the native board file in VS Code using the interactive [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) extension.
 
 ```bash
 # List all available targets and their supported visual actions:
@@ -87,6 +87,13 @@ python src/view.py exhaust_manifolds/wire
 
 # View all printable parts for all manifolds 
 python src/view.py 'exhaust_manifolds/*:part/print'
+
+# View PCB target (opens interactive KiCode tab in VS Code and shows 3D substrate in ocp_vscode):
+python src/view.py test_board:pcb
+python src/view.py test_board/carrier_pcb
+
+# View any compiled KiCad PCB or schematic file directly in VS Code:
+python src/view.py build/board/test_board/test_board.kicad_pcb
 ```
 
 ### Simulating Rooms and Visualizing in Rerun
@@ -107,18 +114,25 @@ python src/view.py cat_fountain/product:view/simulate --no-build
 python src/view.py cat_fountain/product:view/simulate --save-rrd output.rrd
 ```
 
-### Wiring Diagrams
+### Wiring Diagrams & PCB Manufacturing Pipeline
 
-This project includes a declarative wiring and footprint routing engine to generate 2D system-level wiring diagrams:
+This project includes a declarative wiring and PCB engine driven by native KiCad headless compilation:
 
-*   **Declarative Configuration**: Component footprints, physical dimensions, pin configurations, and net connections are declared in a project's `wiring.yaml` file.
-*   **Automated Layouts**: Pin coordinates are computed dynamically by layout algorithms (supporting standard DIP board edges, custom motors, and LEDs) and can be namespaced to individual projects.
-*   **Orthogonal Routing**: Wire paths are routed automatically using an A* pathfinding algorithm that navigates around obstacles and draws crossover bridge bumps at wire intersections.
-*   **Layered SVG Export**: Wiring diagrams are exported as vector SVGs styled with custom stroke widths, colors, and text alignment.
+*   **Pipeline Architecture**:
+    `pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files`
+*   **KiCad Dependency (`kicad-cli`)**:
+    The build toolchain uses `kicad-cli` (v7+ or v8+) to generate industry-standard CAM manufacturing files (RS-274X Gerbers, Excellon drills, IPC-2581/gbrjob). It automatically detects local KiCad installations (`brew install --cask kicad` on macOS or `apt-get install kicad` on Linux) and seamlessly falls back to remote cloud execution on `anvil` when not installed locally.
+*   **Viewing PCB & Schematic Files**:
+    *   **In VS Code**: Install the recommended [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) (`sajadghorbani.kicode`) extension (powered by KiCanvas) to inspect `.kicad_pcb` and `.kicad_sch` with interactive zoom, pan, layer toggling, net highlighting, and component inspection directly in VS Code editor tabs. Alternatively, use the **KiCad PCB Viewer** (`kicad-pcb-viewer`) or **Gerber Viewer** extension for `.gbr` layers.
+    *   **In Browser**: Inspect layer stacks instantly by dragging the `build/board/<project>/` folder into [tracespace.io/view](https://tracespace.io/view/) or online fab viewers (JLCPCB / PCBWay).
+    *   **SVG Schematics**: Vector schematics (`build/schematics/<project>/<project>_schematic.svg`) can be opened directly in any browser or SVG viewer.
 
-To generate the wiring diagram:
+To build PCB and wiring outputs:
 ```bash
-# Build the cat fountain wiring diagram
+# Build PCB board, schematics, CAM files, and BOM/CPL:
+python src/build.py test_board:pcb
+
+# Build wiring diagrams:
 python src/build.py cat_fountain/wiring
 ```
 ---
