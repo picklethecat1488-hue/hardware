@@ -4,7 +4,7 @@
   (general
     (thickness {{ board.stackup.total_thickness_mm }})
   )
-  (paper "A4")
+  (paper "{{ board.sheet_size or 'A4' }}")
   (layers
     (0 "F.Cu" signal)
 {% for layer in copper_inner_layers %}
@@ -73,4 +73,7 @@
 {% endfor %}
 
   (gr_rect (start {{ outline.x1 }} {{ outline.y1 }}) (end {{ outline.x2 }} {{ outline.y2 }}) (stroke (width 0.1) (type default)) (fill none) (layer "Edge.Cuts"))
+{% for text in silkscreen_texts %}
+  (gr_text "{{ text.text }}" (at {{ text.x_mm }} {{ text.y_mm }}{% if text.rotation %} {{ text.rotation }}{% endif %}) (layer "{{ text.layer }}") (effects (font (size {{ text.font_size }} {{ text.font_size }}) (thickness {{ text.thickness }})){% if text.mirror %} (justify mirror){% endif %}))
+{% endfor %}
 )

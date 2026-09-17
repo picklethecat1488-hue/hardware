@@ -13,6 +13,8 @@ from model.pcb import (
     PCBMaterialModel,
     PCBMaterialsModel,
     PCBConfig,
+    SheetSize,
+    SilkscreenTextModel,
 )
 
 
@@ -177,3 +179,36 @@ def test_assembly_test_model_validation():
     )
     assert len(test_plan.instructions) == 1
     assert test_plan.test_fixture == "flying_probe"
+
+
+def test_sheet_size_and_silkscreen_model(standard_6_layer_stackup):
+    """Verify drawing sheet dimensions and silkscreen text modeling."""
+    cfg = PCBConfig(
+        name="TestCarrier",
+        board_type="rigid",
+        dimensions_mm=(60.0, 90.0, 1.6),
+        stackup=standard_6_layer_stackup,
+        sheet_size=SheetSize.A4,
+        silkscreen_texts=[
+            SilkscreenTextModel(
+                text="REV 1.0",
+                layer="F.SilkS",
+                position=(0.0, 35.0),
+                font_size=1.2,
+            ),
+            SilkscreenTextModel(
+                text="BOTTOM SHIELD",
+                layer="B.SilkS",
+                position=(0.0, -35.0),
+                mirror=True,
+            ),
+        ],
+    )
+    assert cfg.sheet_size == SheetSize.A4
+    assert cfg.sheet_width_mm == 297.0
+    assert cfg.sheet_height_mm == 210.0
+    assert cfg.sheet_center_x_mm == 148.5
+    assert cfg.sheet_center_y_mm == 105.0
+    assert len(cfg.silkscreen_texts) == 2
+    assert cfg.silkscreen_texts[0].text == "REV 1.0"
+    assert cfg.silkscreen_texts[1].mirror is True

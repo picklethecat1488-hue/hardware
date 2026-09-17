@@ -17,10 +17,6 @@ from model.pcb import PCBConfig, StackupModel
 from model.wiring import Wiring, FootprintModel, NetModel
 
 
-A4_SHEET_WIDTH_MM: float = 297.0
-A4_SHEET_HEIGHT_MM: float = 210.0
-A4_SHEET_CENTER_X_MM: float = A4_SHEET_WIDTH_MM / 2.0
-A4_SHEET_CENTER_Y_MM: float = A4_SHEET_HEIGHT_MM / 2.0
 SCH_PIN_LEN_MM: float = 5.08
 SCH_PIN_SPACING_MM: float = 5.08
 SCH_BOX_MIN_HALF_H_MM: float = 10.16
@@ -56,7 +52,7 @@ class PCBExporter:
             net_name_to_idx[n.name] = idx
             nets.append({"idx": idx, "name": n.name})
 
-        # Process component footprints and pads (centered on A4 drawing sheet)
+        # Process component footprints and pads (centered on drawing sheet)
         footprints_data = []
         for fp in self.wiring.footprints:
             fp_pins = []
@@ -89,26 +85,42 @@ class PCBExporter:
                     "package": fp.package,
                     "value": fp.label.text if fp.label else fp.package,
                     "uuid": str(uuid.uuid4()),
-                    "x_mm": round(A4_SHEET_CENTER_X_MM + fp.position[0], 4),
-                    "y_mm": round(A4_SHEET_CENTER_Y_MM + fp.position[1], 4),
+                    "x_mm": round(self.config.sheet_center_x_mm + fp.position[0], 4),
+                    "y_mm": round(self.config.sheet_center_y_mm + fp.position[1], 4),
                     "pins": fp_pins,
                 }
             )
 
         copper_inners = [l for l in self.config.stackup.copper_layers[1:-1]]
 
+        silkscreen_data = []
+        for st in self.config.silkscreen_texts:
+            silkscreen_data.append(
+                {
+                    "text": st.text,
+                    "layer": st.layer,
+                    "x_mm": round(self.config.sheet_center_x_mm + st.position[0], 4),
+                    "y_mm": round(self.config.sheet_center_y_mm + st.position[1], 4),
+                    "font_size": st.font_size,
+                    "thickness": st.thickness,
+                    "rotation": st.rotation,
+                    "mirror": st.mirror or (st.layer == "B.SilkS"),
+                }
+            )
+
         rendered = template.render(
             board=self.config,
             copper_inner_layers=copper_inners,
             nets=nets,
             footprints=footprints_data,
+            silkscreen_texts=silkscreen_data,
             segments=[],
             vias=[],
             outline={
-                "x1": round(A4_SHEET_CENTER_X_MM - half_w, 4),
-                "y1": round(A4_SHEET_CENTER_Y_MM - half_l, 4),
-                "x2": round(A4_SHEET_CENTER_X_MM + half_w, 4),
-                "y2": round(A4_SHEET_CENTER_Y_MM + half_l, 4),
+                "x1": round(self.config.sheet_center_x_mm - half_w, 4),
+                "y1": round(self.config.sheet_center_y_mm - half_l, 4),
+                "x2": round(self.config.sheet_center_x_mm + half_w, 4),
+                "y2": round(self.config.sheet_center_y_mm + half_l, 4),
             },
         )
 

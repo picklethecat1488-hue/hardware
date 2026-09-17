@@ -549,6 +549,33 @@ class AssemblyTestModel(BaseModel):
     )
 
 
+class SheetSize(StrEnum):
+    """Standard drawing sheet format for KiCad PCB and schematic layouts."""
+
+    A4 = "A4"
+    A3 = "A3"
+    A2 = "A2"
+    A1 = "A1"
+    A0 = "A0"
+    LETTER = "Letter"
+    LEGAL = "Legal"
+    USER = "User"
+
+
+class SilkscreenTextModel(BaseModel):
+    """Declarative silkscreen text label placed on PCB copper outer layers."""
+
+    text: str = Field(description="Content string printed on silkscreen")
+    layer: str = Field(default="F.SilkS", description="Target layer ('F.SilkS' for top, 'B.SilkS' for bottom)")
+    position: Tuple[float, float] = Field(
+        default=(0.0, 0.0), description="Coordinates (x, y) in mm on board relative to board center"
+    )
+    font_size: float = Field(default=1.0, gt=0.0, description="Font height and width in mm")
+    thickness: float = Field(default=0.15, gt=0.0, description="Stroke thickness in mm")
+    rotation: float = Field(default=0.0, description="Text rotation angle in degrees")
+    mirror: bool = Field(default=False, description="Whether text is mirrored (default True for B.SilkS)")
+
+
 class PCBConfig(BaseModel):
     """Top-level configuration model defining complete physical board, stackup, and high-speed rules."""
 
@@ -562,6 +589,14 @@ class PCBConfig(BaseModel):
         description="Name of build123d shape or part in manifest defining board outline",
     )
     stackup: StackupModel = Field(description="Multi-layer physical stackup definition")
+    sheet_size: SheetSize = Field(
+        default=SheetSize.A4,
+        description="Standard drawing sheet format for PCB and schematic exports ('A4', 'A3', etc.)",
+    )
+    silkscreen_texts: List[SilkscreenTextModel] = Field(
+        default_factory=list,
+        description="Top and bottom silkscreen text markings and annotations",
+    )
     net_classes: List[NetClassModel] = Field(
         default_factory=list, description="High-speed and standard electrical net classes"
     )
@@ -574,3 +609,38 @@ class PCBConfig(BaseModel):
     assembly_test: Optional[AssemblyTestModel] = Field(
         default=None, description="Factory assembly test instructions and tolerances"
     )
+
+    @property
+    def sheet_dimensions_mm(self) -> Tuple[float, float]:
+        """Drawing sheet dimensions (width_mm, height_mm)."""
+        dims = {
+            SheetSize.A4: (297.0, 210.0),
+            SheetSize.A3: (420.0, 297.0),
+            SheetSize.A2: (594.0, 420.0),
+            SheetSize.A1: (841.0, 594.0),
+            SheetSize.A0: (1189.0, 841.0),
+            SheetSize.LETTER: (279.4, 215.9),
+            SheetSize.LEGAL: (355.6, 215.9),
+            SheetSize.USER: (297.0, 210.0),
+        }
+        return dims.get(self.sheet_size, (297.0, 210.0))
+
+    @property
+    def sheet_width_mm(self) -> float:
+        """Drawing sheet width in mm."""
+        return self.sheet_dimensions_mm[0]
+
+    @property
+    def sheet_height_mm(self) -> float:
+        """Drawing sheet height in mm."""
+        return self.sheet_dimensions_mm[1]
+
+    @property
+    def sheet_center_x_mm(self) -> float:
+        """X coordinate of sheet center in mm."""
+        return self.sheet_width_mm / 2.0
+
+    @property
+    def sheet_center_y_mm(self) -> float:
+        """Y coordinate of sheet center in mm."""
+        return self.sheet_height_mm / 2.0

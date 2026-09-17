@@ -2,6 +2,25 @@ name: TestBoard_Carrier
 board_type: rigid-flex
 dimensions_mm: [60.0, 90.0, 1.6]
 shape_ref: carrier_board
+sheet_size: A4
+
+silkscreen_texts:
+  - text: "TEST BOARD CARRIER REV 1.0"
+    layer: "F.SilkS"
+    position: [0.0, 38.0]
+    font_size: 1.2
+    thickness: 0.18
+  - text: "LAYER 1-6 RIGID-FLEX"
+    layer: "F.SilkS"
+    position: [0.0, -38.0]
+    font_size: 1.0
+    thickness: 0.15
+  - text: "BOTTOM SHIELD / GROUND REF"
+    layer: "B.SilkS"
+    position: [0.0, 0.0]
+    font_size: 1.0
+    thickness: 0.15
+    mirror: true
 
 stackup:
   finish: ENIG

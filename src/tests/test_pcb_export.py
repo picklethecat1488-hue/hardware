@@ -8,9 +8,10 @@ import pytest
 from unittest.mock import MagicMock
 from model.pcb import (
     LayerType,
+    PCBConfig,
+    SilkscreenTextModel,
     StackupLayerModel,
     StackupModel,
-    PCBConfig,
 )
 from model.wiring import Wiring, FootprintModel, PinModel, PinSide, NetModel, LabelModel
 from provider.pcb.exporter import PCBExporter
@@ -84,11 +85,12 @@ def mock_pcb_config() -> PCBConfig:
         board_type="rigid",
         dimensions_mm=(50.0, 40.0, 1.6),
         stackup=stackup,
+        silkscreen_texts=[SilkscreenTextModel(text="TEST PCB REV 1.0", layer="F.SilkS", position=(0.0, 15.0))],
     )
 
 
 def test_export_kicad_pcb(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
-    """Verify export of KiCad 8 .kicad_pcb S-expression file."""
+    """Verify export of KiCad 7/8 compatible .kicad_pcb S-expression file."""
     exporter = PCBExporter(mock_pcb_config, mock_wiring)
     out_file = tmp_path / "test.kicad_pcb"
     res = exporter.export_kicad_pcb(out_file)
@@ -97,6 +99,8 @@ def test_export_kicad_pcb(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wirin
     content = res.read_text(encoding="utf-8")
     assert "(kicad_pcb" in content
     assert "(version" in content
+    assert '(paper "A4")' in content
+    assert 'gr_text "TEST PCB REV 1.0"' in content
     assert "F.Cu" in content
     assert "In1.Cu" in content
     assert "B.Cu" in content
