@@ -49,12 +49,12 @@ try:
                 if dev_type in device_types:
                     cprefs.compute_device_type = dev_type
                     cprefs.get_devices()
-                    gpu_devices = [d for d in cprefs.devices if d.type == dev_type]
+                    gpu_devices = [d for d in cprefs.devices if d.type != "CPU"]
                     if gpu_devices:
                         for d in cprefs.devices:
-                            d.use = (d.type == dev_type)
+                            d.use = (d.type != "CPU")
                         if hasattr(cprefs, "peer_memory"):
-                            cprefs.peer_memory = True
+                            cprefs.peer_memory = False
                         scene.cycles.device = "GPU"
                         break
 
