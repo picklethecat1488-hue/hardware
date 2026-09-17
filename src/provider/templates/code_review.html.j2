@@ -1730,7 +1730,10 @@
                   <span style="font-size: 11px; color: var(--quake-gold); font-weight:700;">Lines L${comment.start_line}${comment.start_line !== comment.end_line ? '-L' + comment.end_line : ''}</span>
                   <span style="font-size: 10px; color: var(--quake-text-dim);">by ${comment.author} (${comment.created_at.slice(11, 19)})</span>
                 </div>
-                <button class="quake-btn quake-btn-default" style="padding: 1px 6px; font-size:10px;" onclick="deleteComment('${comment.id}')">Delete ✕</button>
+                <div style="display:flex; align-items:center; gap:4px;">
+                  <button class="quake-btn quake-btn-default" style="padding: 1px 6px; font-size:10px;" onclick="editCommentViaCli('${comment.id}')">Edit ✎</button>
+                  <button class="quake-btn quake-btn-default" style="padding: 1px 6px; font-size:10px;" onclick="deleteComment('${comment.id}')">Delete ✕</button>
+                </div>
               </div>
               ${snippetHtml}
               <div class="inline-comment-body">${renderCommentBody(comment.body)}</div>
@@ -1867,6 +1870,15 @@
           }
         }
       });
+
+      const cliDrawer = document.getElementById("cliDrawer");
+      if (cliDrawer) {
+        cliDrawer.addEventListener("click", (e) => {
+          if (e.target.tagName !== "BUTTON" && e.target.tagName !== "INPUT" && !window.getSelection().toString()) {
+            input.focus();
+          }
+        });
+      }
 
       setupCliAutocomplete();
     }
@@ -2017,6 +2029,7 @@
           logCli("  comment / c <text>           : Post comment on currently selected lines", "cyan");
           logCli("  reviewed / done / todo       : Toggle reviewed status on current file", "cyan");
           logCli("  sel / line <start> [end]     : Select line range in active file", "cyan");
+          logCli("  edit <id> <text>             : Edit existing comment body", "cyan");
           logCli("  approve / lgtm               : Conclude review with APPROVAL, export CR.md, and release terminal", "cyan");
           logCli("  reject / changes             : Conclude review with CHANGES REQUESTED, export CR.md, and release terminal", "cyan");
           logCli("  clear                        : Clear CLI screen log or selection", "cyan");
@@ -2076,6 +2089,17 @@
             return;
           }
           await postComment(body, state.currentSeverity);
+          break;
+        }
+
+        case "edit": {
+          const commentId = parts[1];
+          const newBody = fullText.slice(parts[0].length).trim().slice(commentId ? commentId.length : 0).trim();
+          if (!commentId || !newBody) {
+            logCli("Usage: edit <comment_id> <new text>", "red");
+            return;
+          }
+          await editComment(commentId, newBody);
           break;
         }
 
@@ -2200,13 +2224,23 @@
       const startLine = Math.min(s, e);
       const endLine = Math.max(s, e);
 
+      let codeSnippet = "";
+      if (state.currentDiff && state.currentDiff.full_content) {
+        const lines = state.currentDiff.full_content.split("\n");
+        const sIdx = Math.max(0, startLine - 1);
+        const eIdx = Math.min(lines.length, endLine);
+        codeSnippet = lines.slice(sIdx, eIdx).join("\n");
+      }
+
       const payload = {
         file_path: state.selectedFile,
         start_line: startLine,
         end_line: endLine,
         severity: severity,
         body: body,
-        author: "Reviewer"
+        author: "Reviewer",
+        commit: state.selectedCommit || "working",
+        code_snippet: codeSnippet
       };
 
       try {
@@ -2227,6 +2261,40 @@
         }
       } catch (e) {
         logCli("Error submitting comment: " + e.message, "red");
+      }
+    }
+
+    function editCommentViaCli(commentId) {
+      const comment = (state.session?.comments || []).find(c => c.id === commentId);
+      if (!comment) return;
+      const input = document.getElementById("cliInput");
+      if (input) {
+        input.value = `edit ${commentId} ${comment.body}`;
+        input.focus();
+        input.selectionStart = input.selectionEnd = input.value.length;
+      }
+      logCli(`> Editing comment [${commentId}]. Update text and press Enter to save.`, "gold");
+    }
+
+    async function editComment(commentId, newBody) {
+      try {
+        const res = await fetch("/api/comment/edit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: commentId, body: newBody }),
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          logCli(`> Comment [${commentId}] updated successfully.`, "green");
+          await loadSession();
+          renderDiff();
+          renderFilesList();
+          showToast("Comment updated");
+        } else {
+          logCli(`Error updating comment: ${data.error || "Unknown error"}`, "red");
+        }
+      } catch (err) {
+        logCli(`Network error updating comment: ${err.message}`, "red");
       }
     }
 

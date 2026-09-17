@@ -79,11 +79,13 @@ class GitReviewEngine:
 
         # Check for working tree changes first
         working_info = self._get_working_tree_info()
-        if working_info is not None:
+        if working_info is not None and (rev_args is None or "working" in rev_args):
             commits.append(working_info)
 
         if rev_args and len(rev_args) > 0:
             for rev in rev_args:
+                if rev == "working":
+                    continue
                 commit = self._get_single_commit_info(rev)
                 if commit and commit.commit_hash not in [c.commit_hash for c in commits]:
                     commits.append(commit)
@@ -126,8 +128,13 @@ class GitReviewEngine:
 
         return commits
 
+    def has_working_tree_changes(self) -> bool:
+        """Check whether repository contains any uncommitted or untracked changes."""
+        status_output = run_git_command(["status", "--porcelain"], cwd=self.repo_root).strip()
+        return bool(status_output)
+
     def _get_working_tree_info(self) -> Optional[CommitInfoModel]:
-        """Check if working tree has unstaged or staged modifications."""
+        """Check if working tree has unstaged, staged, or untracked modifications."""
         status_output = run_git_command(["status", "--porcelain"], cwd=self.repo_root).strip()
         if not status_output:
             return None
@@ -144,6 +151,18 @@ class GitReviewEngine:
                     additions += int(cols[0])
                 if cols[1].isdigit():
                     deletions += int(cols[1])
+
+        # Include untracked files in count and additions
+        for line in status_output.splitlines():
+            if line.startswith("?? "):
+                file_path = line[3:].strip()
+                file_count += 1
+                full_path = self.repo_root / file_path
+                if full_path.is_file():
+                    try:
+                        additions += len(full_path.read_text(encoding="utf-8", errors="replace").splitlines())
+                    except OSError:
+                        pass
 
         return CommitInfoModel(
             commit_hash="working",
@@ -280,6 +299,13 @@ class GitReviewEngine:
             if " -> " in file_path:
                 file_path = file_path.split(" -> ")[1].strip()
             adds, dels = stats_map.get(file_path, (0, 0))
+            if status_code == "??" and adds == 0 and dels == 0:
+                full_path = self.repo_root / file_path
+                if full_path.is_file():
+                    try:
+                        adds = len(full_path.read_text(encoding="utf-8", errors="replace").splitlines())
+                    except OSError:
+                        pass
             files.append(
                 {
                     "path": file_path,
@@ -325,6 +351,18 @@ class GitReviewEngine:
                 raw_diff = run_git_command(["diff", f"{commit}^", commit, "--", file_path], cwd=self.repo_root)
         except RuntimeError:
             raw_diff = ""
+
+        if commit == "working" and not raw_diff and new_content:
+            old_lines = old_content.splitlines(keepends=True) if old_content else []
+            new_lines = new_content.splitlines(keepends=True)
+            raw_diff = "".join(
+                difflib.unified_diff(
+                    old_lines,
+                    new_lines,
+                    fromfile=f"a/{file_path}",
+                    tofile=f"b/{file_path}",
+                )
+            )
 
         is_binary = "\x00" in old_content[:8000] or "\x00" in new_content[:8000]
         if is_binary:

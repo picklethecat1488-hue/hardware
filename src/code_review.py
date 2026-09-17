@@ -18,7 +18,7 @@ import webbrowser
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from provider.code_review.git_utils import get_git_root
+from provider.code_review.git_utils import GitReviewEngine, get_git_root
 from provider.code_review.server import ReviewServer
 
 
@@ -61,6 +61,11 @@ def parse_arguments() -> argparse.Namespace:
         type=Path,
         default=Path("build/cr_feedback.json"),
         help="Persistent JSON file storing review comments and status.",
+    )
+    parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Start a fresh review session, discarding previously concluded feedback.",
     )
     parser.add_argument(
         "--browser",
@@ -111,13 +116,23 @@ def main() -> None:
     output_path = args.output if args.output.is_absolute() else (repo_root / args.output)
     state_path = args.state_file if args.state_file.is_absolute() else (repo_root / args.state_file)
 
+    git_engine = GitReviewEngine(repo_root=repo_root)
+    if not args.commits:
+        if git_engine.has_working_tree_changes():
+            revisions = ["working"]
+        else:
+            revisions = ["HEAD"]
+    else:
+        revisions = args.commits
+
     server = ReviewServer(
         host=args.host,
         port=args.port,
         repo_root=repo_root,
         markdown_output=output_path,
         state_file=state_path,
-        revisions=args.commits,
+        revisions=revisions,
+        fresh=args.fresh,
     )
 
     if args.export_only:
