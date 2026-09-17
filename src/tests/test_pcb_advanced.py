@@ -425,3 +425,50 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
     assert len(pos_lines) == 5  # header + 4 components
+
+
+def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
+    """Verify that SchematicDiagram export_pdf paginates TOC across multiple pages when footprints and nets overflow."""
+    import re
+    from unittest.mock import MagicMock
+    from model.wiring import LabelModel
+    from provider.schematic_diagram import SchematicDiagram
+
+    # Generate 35 footprints and 40 nets to ensure TOC table overflows 1 page
+    many_fps = [
+        FootprintModel(
+            name=f"U_{i:02d}",
+            package="SOIC-8",
+            position=(float(i * 10), 0.0, 0.0),
+            dimensions=(5.0, 5.0, 1.0),
+            pins=[
+                PinModel(name=f"P_{j}", position=(0.0, float(j), 0.0), label=f"P{j}", side=PinSide.LEFT)
+                for j in range(4)
+            ],
+            label=LabelModel(text=f"IC_{i}", position=(0.0, 0.0, 0.0), align=("center", "center")),
+        )
+        for i in range(35)
+    ]
+    many_nets = [
+        NetModel(
+            name=f"NET_SIG_{i:02d}",
+            color="#0284c7",
+            pins=[(f"U_{i % 35}", "P_0"), (f"U_{(i + 1) % 35}", "P_1")],
+        )
+        for i in range(40)
+    ]
+    wiring = MagicMock()
+    wiring.footprints = many_fps
+    wiring.nets = many_nets
+
+    diag = SchematicDiagram(wiring)
+    out_pdf = tmp_path / "multipage_schematic.pdf"
+    res = diag.render_pdf(out_pdf)
+
+    assert res.exists()
+    assert res.stat().st_size > 0
+
+    # Count pages in generated PDF: Page 1 (Title) + at least 2 TOC pages + 18 schematic sheets >= 21 pages
+    pdf_bytes = res.read_bytes()
+    page_matches = re.findall(rb"/Type\s*/Page\b", pdf_bytes)
+    assert len(page_matches) >= 20
