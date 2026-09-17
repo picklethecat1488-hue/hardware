@@ -513,6 +513,100 @@ class Builder:
         for fut in futures:
             fut.result()
 
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def generate_pcbs(self, out_dir: str, names: list[str] | None = None, force_update: Optional[bool] = None):
+        """Export PCB Gerber archives, supplier BOM/CPL, vector schematics, and 3D STEP models."""
+        from provider.pcb import PCBExporter, PCBDesignRulesChecker
+        from model.pcb import PCBConfig, StackupModel, StackupLayerModel, LayerType
+        from model.wiring import Wiring
+
+        for provider in self.manager.router.providers:
+            wiring_file = getattr(provider, "wiring_path", None)
+            if not wiring_file or not Path(wiring_file).exists():
+                continue
+
+            if names:
+                matches = [n for n in names if provider.name in n and (Section.PCB in n or ":pcb" in n or "*" in n)]
+                if not matches:
+                    continue
+
+            self.logger.print(f"Compiling PCBs: {provider.name}", symbol="🔌 ")
+            wiring = Wiring(Path(wiring_file))
+
+            pcb_config = provider.pcb_config
+            if not pcb_config:
+                # Default 6-layer ENIG stackup
+                stackup = StackupModel(
+                    layers=[
+                        StackupLayerModel(name="F.Cu", layer_type=LayerType.SIGNAL, thickness_mm=0.035),
+                        StackupLayerModel(
+                            name="Prepreg1",
+                            layer_type=LayerType.DIELECTRIC,
+                            thickness_mm=0.100,
+                            dielectric_constant=4.2,
+                        ),
+                        StackupLayerModel(name="In1.Cu", layer_type=LayerType.GROUND, thickness_mm=0.035),
+                        StackupLayerModel(
+                            name="Core1", layer_type=LayerType.DIELECTRIC, thickness_mm=0.450, dielectric_constant=4.4
+                        ),
+                        StackupLayerModel(name="In2.Cu", layer_type=LayerType.SIGNAL, thickness_mm=0.035),
+                        StackupLayerModel(
+                            name="Prepreg2",
+                            layer_type=LayerType.DIELECTRIC,
+                            thickness_mm=0.200,
+                            dielectric_constant=4.2,
+                        ),
+                        StackupLayerModel(name="In3.Cu", layer_type=LayerType.POWER, thickness_mm=0.035),
+                        StackupLayerModel(
+                            name="Core2", layer_type=LayerType.DIELECTRIC, thickness_mm=0.450, dielectric_constant=4.4
+                        ),
+                        StackupLayerModel(name="In4.Cu", layer_type=LayerType.GROUND, thickness_mm=0.035),
+                        StackupLayerModel(
+                            name="Prepreg3",
+                            layer_type=LayerType.DIELECTRIC,
+                            thickness_mm=0.100,
+                            dielectric_constant=4.2,
+                        ),
+                        StackupLayerModel(name="B.Cu", layer_type=LayerType.SIGNAL, thickness_mm=0.035),
+                    ],
+                    finish="ENIG",
+                )
+                pcb_config = PCBConfig(
+                    name=f"{provider.name}_pcb",
+                    board_type="rigid-flex",
+                    dimensions_mm=(80.0, 60.0, 1.6),
+                    stackup=stackup,
+                )
+
+            # Run DRC check
+            drc_checker = PCBDesignRulesChecker(pcb_config)
+            drc_report = drc_checker.check_all(wiring=wiring)
+            if not drc_report.passed:
+                self.logger.print(f"PCB DRC Violations in {provider.name}:\n{drc_report.summary()}", symbol="⚠️")
+
+            exporter = PCBExporter(pcb_config, wiring)
+
+            gerber_zip = Path(out_dir) / "gerber" / provider.name / f"{provider.name}_gerbers.zip"
+            bom_csv = Path(out_dir) / "bom" / provider.name / "bom.csv"
+            pos_csv = Path(out_dir) / "bom" / provider.name / "pos.csv"
+            schematic_svg = Path(out_dir) / "schematics" / provider.name / f"{provider.name}_schematic.svg"
+            step_file = Path(out_dir) / "step" / provider.name / f"{provider.name}_pcb.step"
+
+            exporter.export_gerber_archive(gerber_zip)
+            exporter.export_bom_csv(bom_csv)
+            exporter.export_pick_and_place_csv(pos_csv)
+            exporter.export_schematic_svg(schematic_svg)
+            exporter.export_step_solid(step_file)
+
+            if pcb_config.capacitive_sensors:
+                cap_json = Path(out_dir) / "config" / provider.name / "capacitive_config.json"
+                exporter.export_capacitive_config_json(cap_json)
+                self.logger.print(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
+
+            self.logger.print(f"Generated Gerbers: {gerber_zip}", symbol="📦")
+            self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
+            self.logger.print(f"Generated Schematic: {schematic_svg}", symbol="📐")
+
     def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
 
@@ -554,6 +648,7 @@ class Builder:
         self.generate_parts(out_dir=out_dir, names=names)
         self.generate_diagram(out_dir=out_dir, names=names)
         self.generate_urdfs(out_dir=out_dir, names=names)
+        self.generate_pcbs(out_dir=out_dir, names=names)
 
         # Compress the build
         zip_path = Path(out_dir) / zip_name

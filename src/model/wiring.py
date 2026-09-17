@@ -87,6 +87,9 @@ class FootprintModel(BaseModel):
     slots_per_side: Optional[int] = Field(default=None, description="Optional total number of DIP slots per side")
     label: LabelModel = Field(description="Label settings for the footprint")
     pins: List[PinModel] = Field(default_factory=list, description="List of pins on the footprint")
+    mpn: Optional[str] = Field(default=None, description="Manufacturer part number for BOM generation")
+    supplier_pn: Optional[str] = Field(default=None, description="Supplier part number (e.g. LCSC, DigiKey)")
+    bga_fanout: Optional[Any] = Field(default=None, description="Optional BGA fanout configuration")
 
 
 class NetModel(BaseModel):
@@ -164,6 +167,9 @@ class Wiring:
                     slots_per_side=c.get("slots_per_side"),
                     label=label,
                     pins=pins,
+                    mpn=c.get("mpn"),
+                    supplier_pn=c.get("supplier_pn"),
+                    bga_fanout=c.get("bga_fanout"),
                 )
             )
         return components
