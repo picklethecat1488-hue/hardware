@@ -5,6 +5,7 @@
  - **src/build.py** - Orchestrates the generation and export of 3D-printable geometry.
  - **src/config.py** - Automated utility for part placement and geometry optimization.
  - **src/view.py** - Interactive CAD visualization tool for inspection and debugging.
+ - **src/code_review.py** - Interactive Quake-themed code review tool and Markdown report generator.
  - **src/model/** - Core application data models and configuration schemas.
  - **src/provider/** - Framework for geometry generation and build orchestration.
  - **src/projects/** - Specific geometry provider implementations.
@@ -243,6 +244,36 @@ When designing parts or writing simulation hooks, adhere to these dynamic stabil
 - **Test Markers**:
   - Heavy PyBullet and JAX fluid tests should be marked with `@pytest.mark.slow` so they are excluded from the fast CLI validation pass.
 
+## PCB Design & KiCad Toolchain
+
+The repository incorporates an end-to-end PCB design, simulation, and manufacturing pipeline:
+
+### 1. Declarative Pipeline Flow
+```
+pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files
+```
+- **Materials Library**: Physical and electrical properties (dielectric constants, loss tangents, copper thickness, solder mask) are declared in `src/projects/pcb_materials.yaml` and imported into project manifests.
+- **Manifest Integration**: PCB targets are registered in the project's `manifest.yaml` under `pcb:`.
+- **Native KiCad Generation**: Board geometry and schematics are generated directly into canonical `.kicad_pcb` and `.kicad_sch` formats via clean Jinja templates (`src/provider/templates/kicad_pcb.j2`).
+- **Headless CAM Compilation**: Manufacturing files (RS-274X Gerbers, Excellon NC drills, Gerber job files) are compiled strictly by `kicad-cli` rather than hand-rolled custom formatters.
+
+### 2. KiCad Dependency & Cloud Execution
+- **Local Installation**: Install KiCad (v7+ or v8+) locally via Homebrew on macOS (`brew install --cask kicad`) or apt on Linux (`sudo apt-get install -y kicad`).
+- **Cloud Fallback (`anvil`)**: If `kicad-cli` is not installed locally, `KiCadCLI` automatically offloads CAM compilation to the `anvil` remote server via SSH and synchronizes the generated files back into your local build directory.
+
+### 3. Viewing & Inspecting Board Files
+- **In VS Code (KiCode)**: Install the recommended [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) (`sajadghorbani.kicode`) extension (powered by KiCanvas). Opening any `.kicad_pcb` or `.kicad_sch` file opens an interactive webview tab with layer toggling, zoom/pan, net highlighting, and component inspection directly in VS Code.
+- **Interactive Viewer CLI (`view.py`)**:
+  ```bash
+  # View PCB target (opens KiCode tab in VS Code and renders 3D substrate in ocp_vscode):
+  python src/view.py test_board:pcb
+
+  # View a direct board or schematic file:
+  python src/view.py build/board/test_board/test_board.kicad_pcb
+  ```
+- **In-Browser Gerber Viewers**: Drag the `build/board/<project>/` folder into open-source [tracespace.io/view](https://tracespace.io/view/) or online fab viewers (JLCPCB, PCBWay).
+- **Vector Schematics**: Open `build/schematics/<project>/<project>_schematic.svg` in any browser or SVG editor.
+
 ## Testing
 Add validation tests in `src/projects/tests/`. Your tests should:
 - Verify geometry volumes are non-zero.
@@ -267,6 +298,32 @@ python build.py
 ```
 
 **Note:** All CI gates (tests, linting, and build checks) must pass successfully in the GitHub Actions workflow before a pull request can be merged.
+
+## Interactive Code Review
+
+Before submitting or approving pull requests, you can audit commits and staged changes using the interactive Quake-styled code review tool:
+
+```bash
+# Review uncommitted working tree changes (staged and unstaged)
+python src/code_review.py
+
+# Review specific commits or revision ranges
+python src/code_review.py HEAD~1 HEAD
+python src/code_review.py 542007d
+
+# Launch on custom port or output path
+python src/code_review.py --port 8765 --output build/CR.md
+
+# Directly export Markdown report from existing review state without launching the server
+python src/code_review.py --export-only
+```
+
+### Review Features & Workflow
+- **Retro Console UI**: 3-column layout displaying the revision stream, changed files list, and side-by-side or unified syntax-highlighted diffs.
+- **Line Selection & Inline Feedback**: Click or shift-click diff line numbers to select line ranges and submit structured review findings tagged as `[MUST FIX]`, `[PROPOSAL]`, or `[NIT]`.
+- **Integrated Quake CLI**: Bottom terminal console supporting commands such as `goto <path> [line]`, `must_fix <msg>`, `proposal <msg>`, `nit <msg>`, `reviewed`, `approve`, and `reject`.
+- **Automated Termination & Markdown Export**: Submitting a final verdict (`approve` / `lgtm` or `reject` / `changes`) automatically compiles and exports the full review audit log to `build/CR.md` and gracefully shuts down the local server, returning control to your terminal.
+- **VS Code Integration**: By default, opens inside VS Code via Simple Browser (`--browser vscode`) with task bindings in `.vscode/tasks.json`.
 
 ## Debugging
 
