@@ -116,6 +116,41 @@ class TargetParser:
         # Finally, return the list of resolved subassemblies
         return list(subs) if subs else None
 
+    def can_resolve(self, raw_target: str, action: Section) -> bool:
+        """Check if a raw target string can be resolved for a specific action."""
+        target_info = self.parse(raw_target, action)
+        if not target_info:
+            return False
+
+        if "*" in target_info.target:
+            names = self.resolve_targets(target_info.target, action, target_info.mode)
+            return bool(names)
+
+        if target_info.target in [p.name for p in self.router.providers]:
+            names = self.resolve_targets(f"{target_info.target}/*", action, target_info.mode)
+            if names:
+                return True
+            target_manifest = self.router.manifest.get(target_info.target, {})
+            return action in target_manifest
+
+        target_manifest = self.router.manifest.get(target_info.target, {})
+        if action not in target_manifest:
+            return False
+
+        if target_info.subassembly:
+            supported_subs = target_manifest[action].get(SUBASSEMBLIES, [])
+            if "*" in target_info.subassembly:
+                if not any(fnmatch.fnmatch(s, target_info.subassembly) for s in supported_subs):
+                    return False
+            elif target_info.subassembly not in supported_subs:
+                return False
+
+        if target_info.mode != Mode.DEFAULT:
+            modes = target_manifest[action].get(MODES, [])
+            return target_info.mode in modes
+
+        return True
+
     def resolve(
         self,
         raw_target: str,
@@ -129,16 +164,13 @@ class TargetParser:
 
         # Resolve target names
         if "*" in target_info.target:
-            resolved_names = self.resolve_targets(target_info.target, action, target_info.mode)
+            resolved_names = self.resolve_targets(target_info.target, action, target_info.mode) or []
         elif target_info.target in [p.name for p in self.router.providers]:
             resolved_names = self.resolve_targets(f"{target_info.target}/*", action, target_info.mode) or [
                 target_info.target
             ]
         else:
             resolved_names = [target_info.target]
-
-        if not resolved_names:
-            raise ValueError(f"Failed to resolve target names from {raw_target}.")
 
         res = self.router.targets.supporting(action).for_targets(resolved_names)
 

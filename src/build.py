@@ -344,7 +344,9 @@ class Builder:
             target_lists = []
             for name in names:
                 # Only resolve targets that are intended for the PART action
-                if self.target_parser.parse(name, Section.PART):
+                if self.target_parser.parse(name, Section.PART) and self.target_parser.can_resolve(name, Section.PART):
+                    target_lists.append(self.target_parser.resolve(name, Section.PART))
+                elif ":" in name and self.target_parser.parse(name, Section.PART):
                     target_lists.append(self.target_parser.resolve(name, Section.PART))
         else:
             target_lists = [self.manager.router.targets.supporting(Section.PART).for_modes([Mode.PRINT])]
@@ -380,7 +382,11 @@ class Builder:
             target_lists = []
             for name in names:
                 # Only resolve targets that are intended for the DIAGRAM action
-                if self.target_parser.parse(name, Section.DIAGRAM):
+                if self.target_parser.parse(name, Section.DIAGRAM) and self.target_parser.can_resolve(
+                    name, Section.DIAGRAM
+                ):
+                    target_lists.append(self.target_parser.resolve(name, Section.DIAGRAM))
+                elif ":" in name and self.target_parser.parse(name, Section.DIAGRAM):
                     target_lists.append(self.target_parser.resolve(name, Section.DIAGRAM))
         else:
             target_lists = [self.manager.router.targets.supporting(Section.DIAGRAM).for_modes([Mode.DEFAULT])]
@@ -431,7 +437,9 @@ class Builder:
         if names:
             target_lists = []
             for name in names:
-                if self.target_parser.parse(name, Section.VIEW):
+                if self.target_parser.parse(name, Section.VIEW) and self.target_parser.can_resolve(name, Section.VIEW):
+                    target_lists.append(self.target_parser.resolve(name, Section.VIEW))
+                elif ":" in name and self.target_parser.parse(name, Section.VIEW):
                     target_lists.append(self.target_parser.resolve(name, Section.VIEW))
         else:
             target_lists = [self.manager.router.targets.supporting(Section.VIEW).for_modes([Mode.SIMULATE])]
@@ -525,19 +533,24 @@ class Builder:
             if not wiring_file or not Path(wiring_file).exists():
                 continue
 
-            if names:
-                matches = [n for n in names if provider.name in n and (Section.PCB in n or ":pcb" in n or "*" in n)]
-                if not matches:
-                    continue
-
-            self.logger.print(f"Compiling PCBs: {provider.name}", symbol="🔌 ")
-            wiring = Wiring(Path(wiring_file))
-
             pcb_config = provider.pcb_config
             if not pcb_config:
                 if names and any(provider.name in n and (Section.PCB in n or ":pcb" in n) for n in names):
                     raise ValueError(f"Project '{provider.name}' does not configure a PCB manifest or PCBConfig.")
                 continue
+
+            if names:
+                matches = [
+                    n
+                    for n in names
+                    if provider.name in n
+                    and (Section.PCB in n or ":pcb" in n or self.target_parser.can_resolve(n, Section.PCB))
+                ]
+                if not matches:
+                    continue
+
+            self.logger.print(f"Compiling PCBs: {provider.name}", symbol="🔌 ")
+            wiring = Wiring(Path(wiring_file))
 
             # Run DRC check
             drc_checker = PCBDesignRulesChecker(pcb_config)
@@ -621,6 +634,17 @@ class Builder:
         # Export the diagram and files
         if not self.manager.router.providers:
             raise ValueError("No projects discovered. Nothing to build.")
+
+        if names:
+            all_supported_sections = [Section.PART, Section.DIAGRAM, Section.VIEW, Section.PCB]
+            for name in names:
+                if not any(self.target_parser.can_resolve(name, s) for s in all_supported_sections):
+                    target_action = Section.PART
+                    if ":" in name:
+                        action_str = name.split(":", 1)[1].split("/")[0]
+                        if action_str in [s.value for s in Section]:
+                            target_action = Section(action_str)
+                    self.target_parser.resolve(name, target_action)
 
         self.generate_parts(out_dir=out_dir, names=names)
         self.generate_diagram(out_dir=out_dir, names=names)

@@ -89,13 +89,26 @@ class Lister:
         if names:
             target_lists = []
             for name in names:
-                if self.target_parser.parse(name, section):
+                if self.target_parser.parse(name, section) and self.target_parser.can_resolve(name, section):
+                    target_lists.append(self.target_parser.resolve(name, section))
+                elif ":" in name and self.target_parser.parse(name, section):
                     target_lists.append(self.target_parser.resolve(name, section))
             return target_lists
         return [self.manager.router.targets.supporting(section).for_modes([default_mode])]
 
     def get_outputs(self, names: list[str] | None = None) -> list[str]:
         """Compute all expected build outputs."""
+        if names:
+            all_supported_sections = [Section.PART, Section.DIAGRAM, Section.VIEW, Section.PCB]
+            for name in names:
+                if not any(self.target_parser.can_resolve(name, s) for s in all_supported_sections):
+                    target_action = Section.PART
+                    if ":" in name:
+                        action_str = name.split(":", 1)[1].split("/")[0]
+                        if action_str in [s.value for s in Section]:
+                            target_action = Section(action_str)
+                    self.target_parser.resolve(name, target_action)
+
         outputs = []
 
         # 1. Parts
