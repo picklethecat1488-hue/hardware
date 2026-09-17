@@ -319,6 +319,8 @@ class ReviewServer(ThreadingHTTPServer):
         self.state_file = state_file or (self.repo_root / "build" / "cr_feedback.json")
         self.is_serving = False
 
+        resolved_revisions = self.git_engine.resolve_revisions(revisions) if revisions else None
+
         # Load or initialize session: discard stale feedback if previously concluded or requested fresh
         loaded_session = None
         if not fresh and self.state_file.exists():
@@ -331,13 +333,13 @@ class ReviewServer(ThreadingHTTPServer):
 
         if loaded_session is not None:
             self.session = loaded_session
-            if revisions:
-                self.session.revisions = revisions
+            if resolved_revisions is not None:
+                self.session.revisions = resolved_revisions
         else:
             self.session = ReviewSessionModel(
                 title=f"Code Review: {self.repo_root.name}",
                 repo_name=self.repo_root.name,
-                revisions=revisions or [],
+                revisions=resolved_revisions or [],
                 created_at=datetime.now(timezone.utc).isoformat(),
                 updated_at=datetime.now(timezone.utc).isoformat(),
             )

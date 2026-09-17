@@ -35,7 +35,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "commits",
         nargs="*",
-        help="Optional commits or revision hashes to inspect (e.g. HEAD~1, 542007d).",
+        help="Optional commits, revision hashes, or ranges to inspect (e.g. HEAD~1, 542007d, commit1..commit2).",
     )
     parser.add_argument(
         "--port",
@@ -123,7 +123,11 @@ def main() -> None:
         else:
             revisions = ["HEAD"]
     else:
-        revisions = args.commits
+        try:
+            revisions = git_engine.resolve_revisions(args.commits)
+        except ValueError as err:
+            print(f"Error resolving revisions: {err}", file=sys.stderr)
+            sys.exit(1)
 
     server = ReviewServer(
         host=args.host,
@@ -144,6 +148,14 @@ def main() -> None:
     server.save_and_sync()
     url = server.get_url()
 
+    if args.commits:
+        if len(args.commits) == 1 and ".." in args.commits[0]:
+            rev_desc = f"{args.commits[0]} ({len(revisions)} commits)"
+        else:
+            rev_desc = ", ".join(args.commits)
+    else:
+        rev_desc = "Working Tree / Recent Commits"
+
     banner = r"""
 ======================================================================
   GLQUAKE CODE REVIEW TERMINAL // HUD v1.09
@@ -160,7 +172,7 @@ def main() -> None:
 """.format(
         url=url,
         output=output_path,
-        revs=", ".join(args.commits) if args.commits else "Working Tree / Recent Commits",
+        revs=rev_desc,
         browser="VS Code (Integrated Simple Browser)" if args.browser == "vscode" else args.browser.upper(),
     )
     print(banner)

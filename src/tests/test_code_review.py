@@ -811,3 +811,46 @@ def test_code_review_ui_cli_focus_and_edit_button(tmp_path: Path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_git_review_engine_resolve_revisions_range_syntax() -> None:
+    """Verify GitReviewEngine resolves A..B commit ranges, individual hashes, and raises on invalid ranges."""
+    root = get_git_root()
+    engine = GitReviewEngine(repo_root=root)
+
+    # 1. Resolving HEAD~2..HEAD should return exactly 2 commit hashes
+    revs = engine.resolve_revisions(["HEAD~2..HEAD"])
+    assert len(revs) == 2
+    assert all(len(h) == 40 for h in revs)
+
+    # 2. Resolving single ref or working tree token
+    rev_single = engine.resolve_revisions(["HEAD", "working"])
+    assert len(rev_single) == 2
+    assert rev_single[1] == "working"
+    assert len(rev_single[0]) == 40
+
+    # 3. get_commits accepts range syntax directly
+    commits = engine.get_commits(rev_args=["HEAD~2..HEAD"])
+    assert len(commits) == 2
+    assert commits[0].commit_hash == revs[0]
+    assert commits[1].commit_hash == revs[1]
+
+    # 4. Invalid revision range raises descriptive ValueError
+    with pytest.raises(ValueError, match="Invalid git revision range"):
+        engine.resolve_revisions(["invalid_ref_xyz..also_invalid_abc"])
+
+
+def test_review_server_with_range_revisions(tmp_path: Path) -> None:
+    """Verify ReviewServer resolves revision ranges on initialization and records concrete commits."""
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_range.md",
+        state_file=tmp_path / "cr_range.json",
+        revisions=["HEAD~2..HEAD"],
+    )
+    assert len(server.session.revisions) == 2
+    assert all(len(r) == 40 for r in server.session.revisions)
+    server.server_close()
