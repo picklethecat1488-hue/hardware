@@ -130,6 +130,10 @@ class TargetParser:
         # Resolve target names
         if "*" in target_info.target:
             resolved_names = self.resolve_targets(target_info.target, action, target_info.mode)
+        elif target_info.target in [p.name for p in self.router.providers]:
+            resolved_names = self.resolve_targets(f"{target_info.target}/*", action, target_info.mode) or [
+                target_info.target
+            ]
         else:
             resolved_names = [target_info.target]
 

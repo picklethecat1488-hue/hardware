@@ -67,6 +67,22 @@ class Lister:
         p_name, t_name = TargetParser.split_target(target)
         return f"urdf/{p_name}/{t_name}.urdf"
 
+    def get_pcb_outputs(self, target: str) -> list[str]:
+        """Get output paths for PCB manufacturing and schematics."""
+        p_name = TargetParser.get_project_name(target)
+        provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
+        outputs = [
+            f"board/{p_name}/{p_name}.kicad_pcb",
+            f"schematics/{p_name}/{p_name}.kicad_sch",
+            f"schematics/{p_name}/{p_name}_schematic.svg",
+            f"bom/{p_name}/bom.csv",
+            f"bom/{p_name}/pos.csv",
+            f"step/{p_name}/{p_name}_pcb.step",
+        ]
+        if provider and provider.pcb_config and provider.pcb_config.capacitive_sensors:
+            outputs.append(f"config/{p_name}/capacitive_config.json")
+        return outputs
+
     def _resolve_targets(self, names: list[str] | None, section: Section, default_mode: Mode):
         """Resolve targets for a specific section and default mode."""
         if names:
@@ -127,6 +143,15 @@ class Lister:
                 continue
             for target in base_targets:
                 outputs.append(self.get_urdf_output(target))
+
+        # 4. PCBs
+        pcb_targets = self._resolve_targets(names, Section.PCB, Mode.DEFAULT)
+
+        for base_targets in pcb_targets:
+            if not base_targets:
+                continue
+            for target in base_targets:
+                outputs.extend(self.get_pcb_outputs(target))
 
         return sorted(list(set(outputs)))
 
