@@ -882,3 +882,80 @@ class TestViewer:
             assert kwargs.get("config").view_from == "front"
             assert kwargs.get("config").fps == 60
             assert kwargs.get("config").resolution == (2560, 1440)
+
+    @patch("view.show")
+    @patch.object(Viewer, "launch_pcb_viewer")
+    def test_show_view_pcb_target(self, mock_launch_pcb, mock_show, viewer, tmp_path):
+        """Verify show_view handles Section.PCB targets, populates room, and calls launch_pcb_viewer."""
+        target_name = "test_board/carrier_pcb"
+        mock_targets = MagicMock(spec=TargetList)
+        mock_targets.__iter__.return_value = iter([target_name])
+        mock_targets.__len__.return_value = 1
+        viewer.target_parser.resolve = MagicMock(side_effect=[None, None, None, mock_targets])
+
+        mock_provider = MagicMock()
+        mock_provider.name = "test_board"
+        mock_provider.wiring_path = tmp_path / "wiring.yaml"
+        mock_provider.pcb_config = MagicMock()
+        mock_provider.pcb_config.dimensions_mm = (50.0, 50.0, 1.6)
+        mock_provider.pcb_config.stackup.total_thickness_mm = 1.6
+        mock_provider.pcb_config.stackup.soldermask_color = "matte_black"
+
+        viewer.manager.router.providers = [mock_provider]
+
+        with (
+            patch("view.ProviderResolver.resolve", return_value=mock_provider),
+            patch("provider.pcb.exporter.PCBExporter.build_solid", return_value=Box(10, 10, 1.6)),
+            patch("provider.pcb.exporter.PCBExporter.export_board") as mock_exp_board,
+            patch("provider.pcb.exporter.PCBExporter.export_kicad_sch") as mock_exp_sch,
+        ):
+            viewer.show_view([target_name], build_dir=str(tmp_path), no_gui=False)
+
+            mock_exp_board.assert_called_once()
+            mock_exp_sch.assert_called_once()
+            mock_launch_pcb.assert_called_once()
+            kicad_file_arg = mock_launch_pcb.call_args[0][0]
+            assert kicad_file_arg.name == "test_board.kicad_pcb"
+            mock_show.assert_called_once()
+
+    @patch.object(Viewer, "launch_pcb_viewer")
+    def test_show_view_direct_kicad_file(self, mock_launch_pcb, viewer, tmp_path):
+        """Verify passing a direct .kicad_pcb file invokes launch_pcb_viewer directly without manifest lookup."""
+        pcb_file = tmp_path / "custom_board.kicad_pcb"
+        pcb_file.write_text("(kicad_pcb (version 20221018))")
+
+        viewer.show_view([str(pcb_file)], no_gui=False)
+
+        mock_launch_pcb.assert_called_once_with(pcb_file, no_gui=False)
+
+    def test_locate_vscode_cli(self):
+        """Verify locate_vscode_cli finds the code binary or returns None."""
+        from view import Viewer
+
+        with patch("shutil.which", return_value="/custom/bin/code"):
+            assert Viewer.locate_vscode_cli() == "/custom/bin/code"
+
+        with (
+            patch("shutil.which", return_value=None),
+            patch("pathlib.Path.exists", return_value=False),
+        ):
+            assert Viewer.locate_vscode_cli() is None
+
+    @patch("subprocess.run")
+    def test_launch_pcb_viewer_spawns_code(self, mock_subproc_run, viewer, tmp_path):
+        """Verify launch_pcb_viewer executes code CLI with the target board path."""
+        pcb_file = tmp_path / "board.kicad_pcb"
+        pcb_file.touch()
+
+        with patch.object(Viewer, "locate_vscode_cli", return_value="/bin/code"):
+            viewer.launch_pcb_viewer(pcb_file, no_gui=False)
+            mock_subproc_run.assert_called_once_with(["/bin/code", str(pcb_file.resolve())], check=False)
+
+    @patch("subprocess.run")
+    def test_launch_pcb_viewer_no_gui(self, mock_subproc_run, viewer, tmp_path):
+        """Verify launch_pcb_viewer does not spawn subprocess when no_gui=True."""
+        pcb_file = tmp_path / "board.kicad_pcb"
+        pcb_file.touch()
+
+        viewer.launch_pcb_viewer(pcb_file, no_gui=True)
+        mock_subproc_run.assert_not_called()

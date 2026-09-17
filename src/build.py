@@ -547,13 +547,24 @@ class Builder:
 
             exporter = PCBExporter(pcb_config, wiring)
 
-            gerber_zip = Path(out_dir) / "gerber" / provider.name / f"{provider.name}_gerbers.zip"
-            bom_csv = Path(out_dir) / "bom" / provider.name / "bom.csv"
-            pos_csv = Path(out_dir) / "bom" / provider.name / "pos.csv"
-            schematic_svg = Path(out_dir) / "schematics" / provider.name / f"{provider.name}_schematic.svg"
+            board_dir = Path(out_dir) / "board" / provider.name
+            schematics_dir = Path(out_dir) / "schematics" / provider.name
+            bom_dir = Path(out_dir) / "bom" / provider.name
             step_file = Path(out_dir) / "step" / provider.name / f"{provider.name}_pcb.step"
 
-            exporter.export_gerber_archive(gerber_zip)
+            # 1. Export native KiCad targets (.kicad_pcb and .kicad_sch)
+            kicad_pcb = board_dir / f"{provider.name}.kicad_pcb"
+            kicad_sch = schematics_dir / f"{provider.name}.kicad_sch"
+            exporter.export_kicad_sch(kicad_sch)
+
+            # 2. Export manufacturing board files via kicad-cli (gerbers + drill + .kicad_pcb)
+            exporter.export_board(board_dir, pcb_filename=f"{provider.name}.kicad_pcb")
+
+            # 3. Export manufacturing BOM, CPL, Schematic vector SVG, and 3D STEP
+            bom_csv = bom_dir / "bom.csv"
+            pos_csv = bom_dir / "pos.csv"
+            schematic_svg = schematics_dir / f"{provider.name}_schematic.svg"
+
             exporter.export_bom_csv(bom_csv)
             exporter.export_pick_and_place_csv(pos_csv)
             exporter.export_schematic_svg(schematic_svg)
@@ -564,7 +575,9 @@ class Builder:
                 exporter.export_capacitive_config_json(cap_json)
                 self.logger.print(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
 
-            self.logger.print(f"Generated Gerbers: {gerber_zip}", symbol="📦")
+            self.logger.print(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
+            self.logger.print(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
+            self.logger.print(f"Generated Board Files: {board_dir}", symbol="📦")
             self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
             self.logger.print(f"Generated Schematic: {schematic_svg}", symbol="📐")
 

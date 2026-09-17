@@ -155,13 +155,14 @@ class ProviderOrchestrator(Orchestrator):
                     out_dir = Path("build") / self.provider.name / "pcb"
                     out_dir.mkdir(parents=True, exist_ok=True)
 
-                    gerber_zip = exporter.export_gerber_archive(out_dir / f"{target}_gerber.zip")
+                    board_dir = out_dir / "board"
+                    exporter.export_board(board_dir)
                     bom_csv = exporter.export_bom_csv(out_dir / f"{target}_bom.csv")
                     cpl_csv = exporter.export_pick_and_place_csv(out_dir / f"{target}_cpl.csv")
                     sch_svg = exporter.export_schematic_svg(out_dir / f"{target}_schematic.svg")
                     cap_json = exporter.export_capacitive_config_json(out_dir / f"{target}_capacitive_config.json")
                     return {
-                        "gerber": gerber_zip,
+                        "board": board_dir,
                         "bom": bom_csv,
                         "cpl": cpl_csv,
                         "schematic": sch_svg,

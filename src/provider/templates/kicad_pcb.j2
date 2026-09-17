@@ -1,7 +1,6 @@
 (kicad_pcb
-  (version 20240108)
+  (version 20221018)
   (generator "hardware_pcb_engine")
-  (generator_version "8.0")
   (general
     (thickness {{ board.stackup.total_thickness_mm }})
   )
@@ -9,7 +8,7 @@
   (layers
     (0 "F.Cu" signal)
 {% for layer in copper_inner_layers %}
-    ({{ loop.index }} "{{ layer.name }}" {{ layer.layer_type }})
+    ({{ loop.index }} "{{ layer.name }}" signal)
 {% endfor %}
     (31 "B.Cu" signal)
     (32 "B.Adhes" user "B.Adhesive")
@@ -20,16 +19,25 @@
     (37 "F.SilkS" user "F.Silkscreen")
     (38 "B.Mask" user)
     (39 "F.Mask" user)
-    (40 "User.Drawings" user)
-    (41 "User.Comments" user)
-    (42 "User.Eco1" user)
-    (43 "User.Eco2" user)
+    (40 "Dwgs.User" user "User.Drawings")
+    (41 "Cmts.User" user "User.Comments")
+    (42 "Eco1.User" user "User.Eco1")
+    (43 "Eco2.User" user "User.Eco2")
     (44 "Edge.Cuts" user)
     (45 "Margin" user)
     (46 "B.CrtYd" user "B.Courtyard")
     (47 "F.CrtYd" user "F.Courtyard")
     (48 "B.Fab" user)
     (49 "F.Fab" user)
+    (50 "User.1" user)
+    (51 "User.2" user)
+    (52 "User.3" user)
+    (53 "User.4" user)
+    (54 "User.5" user)
+    (55 "User.6" user)
+    (56 "User.7" user)
+    (57 "User.8" user)
+    (58 "User.9" user)
   )
   (setup
     (stackup
@@ -46,12 +54,10 @@
 {% endfor %}
 
 {% for fp in footprints %}
-  (footprint "{{ fp.package }}"
-    (layer "F.Cu")
-    (uuid "{{ fp.uuid }}")
+  (footprint "{{ fp.package }}" (layer "F.Cu")
     (at {{ fp.x_mm }} {{ fp.y_mm }})
-    (property "Reference" "{{ fp.name }}" (at 0 -2.5 0) (layer "F.SilkS"))
-    (property "Value" "{{ fp.value }}" (at 0 2.5 0) (layer "F.Fab"))
+    (fp_text reference "{{ fp.name }}" (at 0 -2.5) (layer "F.SilkS") (effects (font (size 1 1) (thickness 0.15))))
+    (fp_text value "{{ fp.value }}" (at 0 2.5) (layer "F.Fab") (effects (font (size 1 1) (thickness 0.15))))
 {% for pin in fp.pins %}
     (pad "{{ pin.name }}" smd circle (at {{ pin.x_mm }} {{ pin.y_mm }}) (size {{ pin.pad_dia_mm }} {{ pin.pad_dia_mm }}) (layers "F.Cu" "F.Paste" "F.Mask") (net {{ pin.net_idx }} "{{ pin.net_name }}"))
 {% endfor %}
@@ -66,5 +72,5 @@
   (via (at {{ via.x }} {{ via.y }}) (size {{ via.dia }}) (drill {{ via.drill }}) (layers "{{ via.layer1 }}" "{{ via.layer2 }}") (net {{ via.net_idx }}))
 {% endfor %}
 
-  (gr_rect (start {{ outline.x1 }} {{ outline.y1 }}) (end {{ outline.x2 }} {{ outline.y2 }}) (stroke (width 0.1) (type solid)) (fill none) (layer "Edge.Cuts"))
+  (gr_rect (start {{ outline.x1 }} {{ outline.y1 }}) (end {{ outline.x2 }} {{ outline.y2 }}) (stroke (width 0.1) (type default)) (fill none) (layer "Edge.Cuts"))
 )

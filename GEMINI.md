@@ -114,6 +114,13 @@ pytest
 * **Clean Rendering & Context Separation**: Render external Jinja2 templates via `jinja2.Environment(loader=jinja2.FileSystemLoader(...), trim_blocks=True, lstrip_blocks=True)` or package loaders, passing configuration parameters as explicit dictionaries or strongly typed models.
 * **No Silent Exception Swallowing in Templates**: Templated scripts (`.py.j2`) MUST follow the same code quality standards as Python source files. Never generate `try/except/pass` fallback ladders inside Jinja2 templates; inspect environment capabilities, platform parameters, or application versions deterministically via template variables or standard version properties.
 
+### 10. PCB Design & Headless KiCad Toolchain
+* **Declarative Pipeline**: The PCB engine follows the strict pipeline:
+  `pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files`.
+* **Standard CAM Generation**: Manufacturing board files (RS-274X Gerbers, Excellon NC drills, Gerber job files) must be generated strictly via headless `kicad-cli` (`KiCadCLI`), not custom DIY string formatting or hand-rolled formatters.
+* **Remote Fallback**: If `kicad-cli` is not installed locally, `KiCadCLI` must offload compilation transparently to the `anvil` cloud server.
+* **Interactive Visualization**: Native `.kicad_pcb` and `.kicad_sch` files are rendered interactively in VS Code via the KiCode extension (`sajadghorbani.kicode`, powered by KiCanvas) and in 3D CAD via `ocp_vscode`.
+
 ---
 
 ## Remote Cloud Server (`anvil`)

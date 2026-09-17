@@ -105,7 +105,7 @@ def test_export_kicad_pcb(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wirin
 
 
 def test_export_kicad_sch(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
-    """Verify export of KiCad 8 .kicad_sch schematic file."""
+    """Verify export of KiCad 8 .kicad_sch schematic file with embedded lib_symbols and net labels."""
     exporter = PCBExporter(mock_pcb_config, mock_wiring)
     out_file = tmp_path / "test.kicad_sch"
     res = exporter.export_kicad_sch(out_file)
@@ -114,8 +114,14 @@ def test_export_kicad_sch(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wirin
     content = res.read_text(encoding="utf-8")
     assert "(kicad_sch" in content
     assert "(version" in content
+    assert "(lib_symbols" in content
+    assert "BGA-196" in content
+    assert "rectangle" in content
+    assert "pin passive line" in content
     assert "U1" in content
     assert "C1" in content
+    assert "VDD_3V3" in content
+    assert "GND" in content
 
 
 def test_export_bom_csv(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
@@ -171,25 +177,35 @@ def test_export_schematic_svg(tmp_path: Path, mock_pcb_config: PCBConfig, mock_w
     assert "MCU_HOST" in content
 
 
-def test_export_gerber_archive(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
-    """Verify creation of Gerber RS-274X and Excellon drill zip archive."""
+def test_export_board_archive(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
+    """Verify creation of board layer and Excellon drill zip archive."""
     exporter = PCBExporter(mock_pcb_config, mock_wiring)
-    out_file = tmp_path / "gerbers.zip"
-    res = exporter.export_gerber_archive(out_file)
+    out_file = tmp_path / "board.zip"
+    res = exporter.export_board_archive(out_file)
 
     assert res.exists()
     with zipfile.ZipFile(res, "r") as zf:
         namelist = zf.namelist()
-        assert "Edge_Cuts.gbr" in namelist
-        assert "F_Cu.gbr" in namelist
-        assert "In1_Cu.gbr" in namelist
-        assert "In2_Cu.gbr" in namelist
-        assert "B_Cu.gbr" in namelist
-        assert "F_Mask.gbr" in namelist
-        assert "B_Mask.gbr" in namelist
-        assert "F_SilkS.gbr" in namelist
-        assert "B_SilkS.gbr" in namelist
-        assert "drill.drl" in namelist
+        assert "TestBoard.kicad_pcb" in namelist
+        assert any(n.endswith("-F_Cu.gbr") for n in namelist)
+        assert any(n.endswith("-B_Cu.gbr") for n in namelist)
+        assert any(n.endswith("-Edge_Cuts.gbr") for n in namelist)
+        assert any(n.endswith(".drl") for n in namelist)
+
+
+def test_export_board_directory(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
+    """Verify export of canonical KiCad board and kicad-cli manufacturing files into directory."""
+    exporter = PCBExporter(mock_pcb_config, mock_wiring)
+    out_dir = tmp_path / "board"
+    exported = exporter.export_board(out_dir)
+
+    assert (out_dir / "TestBoard.kicad_pcb").is_file()
+    assert "TestBoard.kicad_pcb" in exported
+    assert (out_dir / "TestBoard-F_Cu.gbr").is_file()
+    assert (out_dir / "TestBoard-B_Cu.gbr").is_file()
+    assert (out_dir / "TestBoard-Edge_Cuts.gbr").is_file()
+    assert (out_dir / "TestBoard.drl").is_file()
+    assert (out_dir / "TestBoard-job.gbrjob").is_file()
 
 
 def test_export_interactive_bom(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
