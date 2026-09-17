@@ -236,18 +236,33 @@ class Viewer:
         else:
             res_tuple = tuple(resolution)
 
-        # Check if all or any targets are direct KiCad / board files
+        # Check if all or any targets are direct KiCad / board files or STEP models
         direct_files = []
         for target in input_targets:
             p = Path(target)
             if p.is_file() and p.suffix.lower() in (".kicad_pcb", ".kicad_sch", ".gbr", ".drl", ".svg"):
                 direct_files.append(p)
                 self.launch_pcb_viewer(p, no_gui=no_gui)
+            elif p.is_file() and p.suffix.lower() in (".step", ".stp"):
+                direct_files.append(p)
+                imported = import_step(str(p.resolve()))
+                display_items.append((imported, p.stem, None, 1.0))
 
-        if direct_files and len(direct_files) == len(input_targets):
+        if direct_files and len(direct_files) == len(input_targets) and not display_items:
             return
 
         for target in input_targets:
+            p = Path(target)
+            if p.is_file() and p.suffix.lower() in (
+                ".kicad_pcb",
+                ".kicad_sch",
+                ".gbr",
+                ".drl",
+                ".svg",
+                ".step",
+                ".stp",
+            ):
+                continue
             for action in self.VISUAL_ACTIONS:
                 try:
                     targets = self.target_parser.resolve(target, action)

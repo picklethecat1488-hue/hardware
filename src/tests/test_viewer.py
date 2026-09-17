@@ -976,3 +976,15 @@ class TestViewer:
 
         viewer.launch_pcb_viewer(pcb_file, no_gui=True)
         mock_subproc_run.assert_not_called()
+
+    @patch("view.ocp_show")
+    def test_show_view_direct_step_file(self, mock_ocp_show, viewer, tmp_path):
+        """Verify show_view directly loads and displays STEP CAD assembly files."""
+        from build123d import Box, export_step
+
+        step_file = tmp_path / "assembly.step"
+        export_step(Box(10.0, 10.0, 10.0), str(step_file))
+
+        with patch("provider.room.Compound", side_effect=lambda children: MagicMock(children=children)):
+            viewer.show_view([str(step_file)], no_gui=False)
+            mock_ocp_show.assert_called_once()
