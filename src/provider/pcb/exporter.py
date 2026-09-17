@@ -108,12 +108,31 @@ class PCBExporter:
                 }
             )
 
+        mounting_holes_data = []
+        for mh in self.config.mounting_holes:
+            net_name = mh.net or ""
+            net_idx = net_name_to_idx.get(net_name, 0)
+            pad_dia = mh.pad_diameter_mm or (mh.drill_diameter_mm + 1.2 if mh.plated else mh.drill_diameter_mm)
+            mounting_holes_data.append(
+                {
+                    "name": mh.name,
+                    "x_mm": round(self.config.sheet_center_x_mm + mh.position_mm[0], 4),
+                    "y_mm": round(self.config.sheet_center_y_mm + mh.position_mm[1], 4),
+                    "drill_mm": round(mh.drill_diameter_mm, 4),
+                    "pad_mm": round(pad_dia, 4),
+                    "plated": mh.plated,
+                    "net_idx": net_idx,
+                    "net_name": net_name,
+                }
+            )
+
         rendered = template.render(
             board=self.config,
             copper_inner_layers=copper_inners,
             nets=nets,
             footprints=footprints_data,
             silkscreen_texts=silkscreen_data,
+            mounting_holes=mounting_holes_data,
             segments=[],
             vias=[],
             outline={

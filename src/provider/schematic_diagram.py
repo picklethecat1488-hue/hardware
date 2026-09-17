@@ -17,6 +17,16 @@ from model.wiring import FootprintModel, NetModel, Wiring
 
 
 @dataclass
+class _SchematicSheetPlan:
+    """Planned contents and metadata for an individual schematic drawing sheet."""
+
+    sheet_idx: int
+    title: str
+    description: str = ""
+    footprints: List[FootprintModel] = field(default_factory=list)
+
+
+@dataclass
 class _TOCPagePlan:
     """Planned contents for a single paginated Table of Contents sheet."""
 
@@ -24,7 +34,7 @@ class _TOCPagePlan:
     doc_entries: List[Tuple[str, str]] = field(default_factory=list)
     show_footprints_header: bool = False
     is_footprints_continuation: bool = False
-    footprints: List[Tuple[int, FootprintModel, int]] = field(default_factory=list)
+    footprints: List[Tuple[int, FootprintModel, str]] = field(default_factory=list)
     show_nets_header: bool = False
     is_nets_continuation: bool = False
     net_rows: List[List[NetModel]] = field(default_factory=list)
@@ -162,6 +172,48 @@ class SchematicDiagram:
 
         return out_path
 
+    def _build_sheet_plans(self) -> List[_SchematicSheetPlan]:
+        """Build the sequence of schematic sheet plans either from declarative config or auto-chunking."""
+        fps = self.wiring.footprints
+        if self.config and self.config.schematic_sheets:
+            fp_map = {fp.name: fp for fp in fps}
+            plans: List[_SchematicSheetPlan] = []
+            for s_idx, sheet_def in enumerate(self.config.schematic_sheets, start=1):
+                sheet_fps: List[FootprintModel] = []
+                for comp_name in sheet_def.components:
+                    if comp_name in fp_map:
+                        orig_fp = fp_map[comp_name]
+                        if sheet_def.pin_breakouts and comp_name in sheet_def.pin_breakouts:
+                            allowed_pins = set(sheet_def.pin_breakouts[comp_name])
+                            filtered_pins = [
+                                p for p in orig_fp.pins if p.name in allowed_pins or p.label in allowed_pins
+                            ]
+                            sheet_fps.append(orig_fp.model_copy(update={"pins": filtered_pins}))
+                        else:
+                            sheet_fps.append(orig_fp)
+                plans.append(
+                    _SchematicSheetPlan(
+                        sheet_idx=s_idx,
+                        title=sheet_def.title,
+                        description=sheet_def.description,
+                        footprints=sheet_fps,
+                    )
+                )
+            return plans
+
+        # Auto-chunking fallback (up to 2 components per sheet)
+        chunk_size = 2 if len(fps) > 2 else len(fps)
+        fp_chunks = [fps[i : i + chunk_size] for i in range(0, len(fps), max(1, chunk_size))]
+        return [
+            _SchematicSheetPlan(
+                sheet_idx=s_idx,
+                title=f"Schematic Sheet {s_idx}",
+                description=", ".join(f"{c.name} ({c.package})" for c in chunk),
+                footprints=chunk,
+            )
+            for s_idx, chunk in enumerate(fp_chunks, start=1)
+        ]
+
     def render_pdf(self, output_file: str | Path) -> Path:
         """Generate a multi-page PDF schematic including Title page, TOC, and schematic sheets.
 
@@ -179,12 +231,11 @@ class SchematicDiagram:
         board_type = self.config.board_type.upper() if self.config else "RIGID"
 
         fps = self.wiring.footprints
-        chunk_size = 2 if len(fps) > 2 else len(fps)
-        fp_chunks = [fps[i : i + chunk_size] for i in range(0, len(fps), max(1, chunk_size))]
-        total_sheets = max(1, len(fp_chunks))
+        sheet_plans = self._build_sheet_plans()
+        total_sheets = max(1, len(sheet_plans))
 
         # Plan multi-page Table of Contents sheets dynamically
-        toc_plans = self._plan_pdf_toc_pages(fps, self.wiring.nets, fp_chunks)
+        toc_plans = self._plan_pdf_toc_pages(fps, self.wiring.nets, sheet_plans)
         toc_page_count = len(toc_plans)
         total_pages = 1 + toc_page_count + total_sheets
 
@@ -205,13 +256,12 @@ class SchematicDiagram:
                 )
 
             # Pages (1 + toc_page_count + 1) .. total_pages: Schematic Drawing Sheets
-            for sheet_idx, sheet_fps in enumerate(fp_chunks, start=1):
+            for sheet_idx, plan in enumerate(sheet_plans, start=1):
                 self._render_pdf_schematic_sheet(
                     pdf=pdf,
                     board_name=board_name,
-                    sheet_idx=sheet_idx,
+                    sheet_plan=plan,
                     total_sheets=total_sheets,
-                    sheet_fps=sheet_fps,
                     all_nets=self.wiring.nets,
                     page_num=1 + toc_page_count + sheet_idx,
                     total_pages=total_pages,
@@ -288,7 +338,7 @@ class SchematicDiagram:
         self,
         fps: List[FootprintModel],
         nets: List[NetModel],
-        fp_chunks: List[List[FootprintModel]],
+        sheet_plans: List[_SchematicSheetPlan],
     ) -> List["_TOCPagePlan"]:
         """Plan and paginate the Table of Contents across one or more drawing sheets."""
         y_start = 166.0
@@ -306,9 +356,11 @@ class SchematicDiagram:
             ("Page 1", "Document Cover & Engineering Specifications"),
             ("Page 2", "Table of Contents, Bill of Footprints & Netlist Summary"),
         ]
-        for s_idx, chunk in enumerate(fp_chunks, start=1):
-            comps = ", ".join(f"{c.name} ({c.package})" for c in chunk)
-            doc_entries.append(("Page ?", f"Schematic Sheet {s_idx} - {comps}"))
+        for sp in sheet_plans:
+            desc = f"Schematic Sheet {sp.sheet_idx} - {sp.title}"
+            if sp.description:
+                desc += f" ({sp.description})"
+            doc_entries.append(("Page ?", desc))
 
         pages: List[_TOCPagePlan] = [_TOCPagePlan(page_index=1)]
         y = y_start
@@ -334,17 +386,16 @@ class SchematicDiagram:
             y -= fp_header_h + fp_table_header_h
 
             for idx, fp in enumerate(fps):
-                sheet_num = 1
-                for c_idx, c in enumerate(fp_chunks, start=1):
-                    if fp in c:
-                        sheet_num = c_idx
-                        break
+                matching_sheets = [
+                    str(sp.sheet_idx) for sp in sheet_plans if any(f.name == fp.name for f in sp.footprints)
+                ]
+                sheet_str = ", ".join(matching_sheets) if matching_sheets else "1"
                 if y - fp_row_h < y_min:
                     pages.append(_TOCPagePlan(page_index=len(pages) + 1))
                     y = y_start
                     pages[-1].is_footprints_continuation = True
                     y -= fp_table_header_h
-                pages[-1].footprints.append((idx, fp, sheet_num))
+                pages[-1].footprints.append((idx, fp, sheet_str))
                 y -= fp_row_h
 
         # Section 3: Primary Signal Nets Summary
@@ -470,7 +521,8 @@ class SchematicDiagram:
                 ax.text(55, y - 3.5, fp.package, fontsize=8, color="#334155")
                 ax.text(105, y - 3.5, str(mpn), fontsize=8, color="#334155")
                 ax.text(185, y - 3.5, str(len(fp.pins)), fontsize=8, color="#334155")
-                ax.text(210, y - 3.5, f"Sheet {sheet_num}", fontsize=8, color="#0284c7")
+                sheet_label = str(sheet_num) if str(sheet_num).startswith("Sheet") else f"Sheet {sheet_num}"
+                ax.text(210, y - 3.5, sheet_label, fontsize=8, color="#0284c7")
                 y -= 5.5
 
         # Section 3: Primary Signal Nets Summary
@@ -505,9 +557,8 @@ class SchematicDiagram:
         self,
         pdf: PdfPages,
         board_name: str,
-        sheet_idx: int,
+        sheet_plan: _SchematicSheetPlan,
         total_sheets: int,
-        sheet_fps: List[FootprintModel],
         all_nets: List[NetModel],
         page_num: int,
         total_pages: int,
@@ -536,6 +587,18 @@ class SchematicDiagram:
             ax.text(mid_x, 199.2, str(i + 1), ha="center", va="center", fontsize=6.5, color="#64748b")
             ax.text(mid_x, 10.8, str(i + 1), ha="center", va="center", fontsize=6.5, color="#64748b")
 
+        # Top banner for sheet title & description
+        ax.text(
+            20,
+            191.0,
+            f"SHEET {sheet_plan.sheet_idx}: {sheet_plan.title.upper()}",
+            fontsize=10,
+            fontweight="bold",
+            color="#1e293b",
+        )
+        if sheet_plan.description:
+            ax.text(20, 185.5, sheet_plan.description, fontsize=7.5, color="#64748b")
+
         # Standard KiCad/Engineering Title Block (Bottom-Right)
         tb_x, tb_y, tb_w, tb_h = 202.0, 12.0, 83.0, 32.0
         ax.add_patch(
@@ -545,11 +608,12 @@ class SchematicDiagram:
         ax.plot([tb_x, tb_x + tb_w], [tb_y + 10, tb_y + 10], color="#cbd5e1", linewidth=0.8)
         ax.plot([tb_x + 45, tb_x + 45], [tb_y, tb_y + 20], color="#cbd5e1", linewidth=0.8)
 
-        ax.text(tb_x + 3, tb_y + 26, f"{board_name} Schematic", fontsize=9, fontweight="bold", color="#0f172a")
+        sheet_title_display = sheet_plan.title if len(sheet_plan.title) <= 24 else sheet_plan.title[:22] + "..."
+        ax.text(tb_x + 3, tb_y + 26, sheet_title_display, fontsize=8.5, fontweight="bold", color="#0f172a")
         ax.text(
             tb_x + 3,
             tb_y + 21.5,
-            f"Sheet {sheet_idx} of {total_sheets} (Page {page_num} of {total_pages})",
+            f"Sheet {sheet_plan.sheet_idx} of {total_sheets} (Page {page_num} of {total_pages})",
             fontsize=7.5,
             color="#475569",
         )
@@ -571,20 +635,37 @@ class SchematicDiagram:
             for pair in net.pins:
                 pin_to_net[pair] = net.name
 
+        sheet_fps = sheet_plan.footprints
         num_comps = len(sheet_fps)
-        cw = 38.0
         pin_pitch = 5.0
         stub_len = 5.0
 
         if num_comps == 1:
+            cols_per_row = 1
             col_x_positions = [120.0]
+            col_y_positions = [180.0]
+            cw = 38.0
         elif num_comps == 2:
-            col_x_positions = [42.0, 175.0]
+            cols_per_row = 2
+            col_x_positions = [45.0, 175.0]
+            col_y_positions = [180.0, 180.0]
+            cw = 38.0
+        elif num_comps == 3:
+            cols_per_row = 3
+            col_x_positions = [30.0, 110.0, 190.0]
+            col_y_positions = [180.0, 180.0, 180.0]
+            cw = 36.0
         else:
-            avail_w = 230.0
-            col_w = avail_w / max(1, num_comps)
-            cw = min(38.0, col_w * 0.70)
-            col_x_positions = [25.0 + i * col_w + (col_w - cw) / 2.0 for i in range(num_comps)]
+            cols_per_row = (num_comps + 1) // 2
+            col_w = 230.0 / max(1, cols_per_row)
+            cw = min(36.0, col_w * 0.55)
+            col_x_positions = []
+            col_y_positions = []
+            for i in range(num_comps):
+                r_idx = i // cols_per_row
+                c_idx_col = i % cols_per_row
+                col_x_positions.append(22.0 + c_idx_col * col_w + (col_w - cw) / 2.0)
+                col_y_positions.append(180.0 - (r_idx * 68.0))
 
         sheet_pin_coords: Dict[Tuple[str, str], Tuple[float, float]] = {}
         pin_side_map: Dict[Tuple[str, str], str] = {}
@@ -593,6 +674,7 @@ class SchematicDiagram:
 
         for c_idx, fp in enumerate(sheet_fps):
             cx = col_x_positions[c_idx]
+            row_top_y = col_y_positions[c_idx]
 
             left_pins = [p for p in fp.pins if p.side.value in ("left", "bottom")]
             right_pins = [p for p in fp.pins if p.side.value in ("right", "top")]
@@ -605,7 +687,7 @@ class SchematicDiagram:
             header_offset = 18.0 if has_mpn else 15.0
             max_pin_rows = max(len(left_pins), len(right_pins), 2)
             ch = max(34.0, header_offset + (max_pin_rows - 1) * pin_pitch + 6.0)
-            cy = 180.0 - ch
+            cy = row_top_y - ch
             comp_boxes.append((cx, cy, cw, ch))
 
             # IC Body Box
@@ -694,60 +776,67 @@ class SchematicDiagram:
         # and does not cross or touch any component body
         for net in all_nets:
             present_pins = [pair for pair in net.pins if pair in sheet_pin_coords]
-            if len(present_pins) == 2:
-                pair1, pair2 = present_pins[0], present_pins[1]
-                c1, c2 = comp_of_pin[pair1], comp_of_pin[pair2]
-                s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
+            if len(present_pins) >= 2:
+                for i in range(len(present_pins)):
+                    for j in range(i + 1, len(present_pins)):
+                        pair1, pair2 = present_pins[i], present_pins[j]
+                        if pair1 in wired_pins or pair2 in wired_pins:
+                            continue
+                        c1, c2 = comp_of_pin[pair1], comp_of_pin[pair2]
+                        s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
 
-                # Ensure pair1 is on the left component and pair2 is on the right component
-                if c1 > c2:
-                    pair1, pair2 = pair2, pair1
-                    c1, c2 = c2, c1
-                    s1, s2 = s2, s1
+                        # Ensure pair1 is on the left component and pair2 is on the right component
+                        if c1 > c2:
+                            pair1, pair2 = pair2, pair1
+                            c1, c2 = c2, c1
+                            s1, s2 = s2, s1
 
-                # Wires are cleanly drawn when connecting facing pins across the channel
-                # (e.g. left comp right pin to right comp left pin)
-                if c1 != c2 and s1 == "right" and s2 == "left":
-                    p1 = sheet_pin_coords[pair1]
-                    p2 = sheet_pin_coords[pair2]
-                    mid_x = (p1[0] + p2[0]) / 2.0
+                        r1 = c1 // cols_per_row
+                        r2 = c2 // cols_per_row
 
-                    if abs(p1[1] - p2[1]) < 0.1:
-                        # Straight horizontal wire
-                        ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color="#2563eb", linewidth=1.2, zorder=2)
-                        ax.text(
-                            mid_x,
-                            p1[1] + 1.2,
-                            net.name,
-                            ha="center",
-                            va="bottom",
-                            fontsize=6.5,
-                            fontweight="bold",
-                            color="#0369a1",
-                            zorder=3,
-                        )
-                    else:
-                        # Orthogonal dogleg wire
-                        ax.plot(
-                            [p1[0], mid_x, mid_x, p2[0]],
-                            [p1[1], p1[1], p2[1], p2[1]],
-                            color="#2563eb",
-                            linewidth=1.2,
-                            zorder=2,
-                        )
-                        ax.text(
-                            mid_x,
-                            max(p1[1], p2[1]) + 1.2,
-                            net.name,
-                            ha="center",
-                            va="bottom",
-                            fontsize=6.5,
-                            fontweight="bold",
-                            color="#0369a1",
-                            zorder=3,
-                        )
-                    wired_pins.add(pair1)
-                    wired_pins.add(pair2)
+                        # Wires are cleanly drawn when connecting facing pins across the channel
+                        # on the same row between adjacent columns
+                        if r1 == r2 and c1 != c2 and (c2 == c1 + 1) and s1 == "right" and s2 == "left":
+                            p1 = sheet_pin_coords[pair1]
+                            p2 = sheet_pin_coords[pair2]
+                            mid_x = (p1[0] + p2[0]) / 2.0
+
+                            if abs(p1[1] - p2[1]) < 0.1:
+                                # Straight horizontal wire
+                                ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color="#2563eb", linewidth=1.2, zorder=2)
+                                ax.text(
+                                    mid_x,
+                                    p1[1] + 1.2,
+                                    net.name,
+                                    ha="center",
+                                    va="bottom",
+                                    fontsize=6.5,
+                                    fontweight="bold",
+                                    color="#0369a1",
+                                    zorder=3,
+                                )
+                            else:
+                                # Orthogonal dogleg wire
+                                ax.plot(
+                                    [p1[0], mid_x, mid_x, p2[0]],
+                                    [p1[1], p1[1], p2[1], p2[1]],
+                                    color="#2563eb",
+                                    linewidth=1.2,
+                                    zorder=2,
+                                )
+                                ax.text(
+                                    mid_x,
+                                    max(p1[1], p2[1]) + 1.2,
+                                    net.name,
+                                    ha="center",
+                                    va="bottom",
+                                    fontsize=6.5,
+                                    fontweight="bold",
+                                    color="#0369a1",
+                                    zorder=3,
+                                )
+                            wired_pins.add(pair1)
+                            wired_pins.add(pair2)
 
         # Place net labels for all unwired pins (off-sheet nets, or nets connected via net flags)
         for pair, (px, py) in sheet_pin_coords.items():

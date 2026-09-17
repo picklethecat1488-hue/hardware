@@ -576,6 +576,30 @@ class SilkscreenTextModel(BaseModel):
     mirror: bool = Field(default=False, description="Whether text is mirrored (default True for B.SilkS)")
 
 
+class SchematicSheetModel(BaseModel):
+    """Configuration for an individual functional schematic drawing sheet."""
+
+    title: str = Field(description="Sheet title in engineering title block")
+    description: str = Field(default="", description="Functional description of circuitry")
+    components: List[str] = Field(
+        default_factory=list, description="List of component reference designators on this sheet"
+    )
+    pin_breakouts: dict[str, List[str]] = Field(
+        default_factory=dict, description="Component -> subset of pin names to display on this sheet"
+    )
+
+
+class MountingHoleModel(BaseModel):
+    """Physical mounting or tooling drill hole on PCB."""
+
+    name: str = Field(description="Hole identifier (e.g. MH1, MH2)")
+    position_mm: Tuple[float, float] = Field(description="Coordinates (x, y) in mm relative to board center")
+    drill_diameter_mm: float = Field(gt=0.0, description="Finished hole drill diameter in mm")
+    pad_diameter_mm: Optional[float] = Field(default=None, description="Copper annular ring diameter for plated holes")
+    plated: bool = Field(default=False, description="Whether hole is plated through")
+    net: Optional[str] = Field(default=None, description="Net name if plated (typically GND)")
+
+
 class PCBConfig(BaseModel):
     """Top-level configuration model defining complete physical board, stackup, and high-speed rules."""
 
@@ -609,6 +633,14 @@ class PCBConfig(BaseModel):
     )
     assembly_test: Optional[AssemblyTestModel] = Field(
         default=None, description="Factory assembly test instructions and tolerances"
+    )
+    schematic_sheets: List[SchematicSheetModel] = Field(
+        default_factory=list,
+        description="Defined schematic sheets for multi-page functional signal breakout",
+    )
+    mounting_holes: List[MountingHoleModel] = Field(
+        default_factory=list,
+        description="Drill and mounting holes for carrier assembly",
     )
 
     @property
