@@ -75,6 +75,7 @@ class Lister:
             f"board/{p_name}/{p_name}.kicad_pcb",
             f"schematics/{p_name}/{p_name}.kicad_sch",
             f"schematics/{p_name}/{p_name}_schematic.svg",
+            f"schematics/{p_name}/{p_name}_schematic.pdf",
             f"bom/{p_name}/bom.csv",
             f"bom/{p_name}/pos.csv",
             f"step/{p_name}/{p_name}_pcb.step",

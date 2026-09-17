@@ -378,6 +378,13 @@ class PCBExporter:
         diagram = SchematicDiagram(self.wiring, pcb_config=self.config)
         return diagram.render_svg(output_file)
 
+    def export_schematic_pdf(self, output_file: str | Path) -> Path:
+        """Generate a multi-page PDF schematic showing title page, TOC, and schematic sheets."""
+        from provider.schematic_diagram import SchematicDiagram
+
+        diagram = SchematicDiagram(self.wiring, pcb_config=self.config)
+        return diagram.render_pdf(output_file)
+
     def export_capacitive_config_json(self, output_file: str | Path) -> Path:
         """Export firmware-ready capacitive electrode channel, threshold, and geometry configuration."""
         out_path = Path(output_file).resolve()

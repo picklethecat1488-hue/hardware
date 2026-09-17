@@ -230,3 +230,19 @@ def test_export_step_solid(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiri
 
     assert res.exists()
     assert res.stat().st_size > 500  # Non-trivial STEP file size
+
+
+def test_export_schematic_pdf(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
+    """Verify generation of multi-page schematic PDF with title page, TOC, and schematic sheets."""
+    exporter = PCBExporter(mock_pcb_config, mock_wiring)
+    out_file = tmp_path / "schematic.pdf"
+    res = exporter.export_schematic_pdf(out_file)
+
+    assert res.exists()
+    assert res.is_file()
+    assert res.stat().st_size > 5000  # Multi-page vector PDF
+
+    # Read binary content to verify PDF header and trailer
+    data = res.read_bytes()
+    assert data.startswith(b"%PDF")
+    assert b"%%EOF" in data

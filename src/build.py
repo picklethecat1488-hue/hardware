@@ -564,10 +564,12 @@ class Builder:
             bom_csv = bom_dir / "bom.csv"
             pos_csv = bom_dir / "pos.csv"
             schematic_svg = schematics_dir / f"{provider.name}_schematic.svg"
+            schematic_pdf = schematics_dir / f"{provider.name}_schematic.pdf"
 
             exporter.export_bom_csv(bom_csv)
             exporter.export_pick_and_place_csv(pos_csv)
             exporter.export_schematic_svg(schematic_svg)
+            exporter.export_schematic_pdf(schematic_pdf)
             exporter.export_step_solid(step_file)
 
             if pcb_config.capacitive_sensors:
@@ -579,7 +581,8 @@ class Builder:
             self.logger.print(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
             self.logger.print(f"Generated Board Files: {board_dir}", symbol="📦")
             self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
-            self.logger.print(f"Generated Schematic: {schematic_svg}", symbol="📐")
+            self.logger.print(f"Generated Schematic SVG: {schematic_svg}", symbol="📐")
+            self.logger.print(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
 
     def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
