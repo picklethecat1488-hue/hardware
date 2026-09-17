@@ -5,7 +5,9 @@ import zipfile
 from pathlib import Path
 import pytest
 
-from unittest.mock import MagicMock
+import os
+import sys
+from unittest.mock import MagicMock, patch
 from model.pcb import (
     LayerType,
     PCBConfig,
@@ -15,6 +17,7 @@ from model.pcb import (
 )
 from model.wiring import Wiring, FootprintModel, PinModel, PinSide, NetModel, LabelModel
 from provider.pcb.exporter import PCBExporter
+from provider.pcb.kicad_cli import KiCadCLI
 
 
 @pytest.fixture
@@ -250,3 +253,87 @@ def test_export_schematic_pdf(tmp_path: Path, mock_pcb_config: PCBConfig, mock_w
     data = res.read_bytes()
     assert data.startswith(b"%PDF")
     assert b"%%EOF" in data
+
+
+def test_kicad_cli_discovery_platforms():
+    """Verify kicad-cli locates standard paths across macOS, Linux, and Windows."""
+    # macOS discovery
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch("shutil.which", return_value=None),
+        patch("sys.platform", "darwin"),
+        patch.object(
+            Path, "is_file", autospec=True, side_effect=lambda self: str(self) == "/opt/homebrew/bin/kicad-cli"
+        ),
+    ):
+        cli = KiCadCLI()
+        assert cli.is_available
+        assert cli._local_bin == Path("/opt/homebrew/bin/kicad-cli")
+
+    # Linux discovery
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch("shutil.which", return_value=None),
+        patch("sys.platform", "linux"),
+        patch.object(Path, "is_file", autospec=True, side_effect=lambda self: str(self) == "/usr/bin/kicad-cli"),
+    ):
+        cli = KiCadCLI()
+        assert cli.is_available
+        assert cli._local_bin == Path("/usr/bin/kicad-cli")
+
+    # Windows discovery
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch("shutil.which", return_value=None),
+        patch("sys.platform", "win32"),
+        patch.object(Path, "is_file", autospec=True, side_effect=lambda self: "8.0" in str(self)),
+    ):
+        cli = KiCadCLI()
+        assert cli.is_available
+        assert "8.0" in str(cli._local_bin)
+
+
+def test_kicad_cli_env_override(tmp_path: Path):
+    """Verify KICAD_CLI_BIN environment variable overrides PATH discovery."""
+    fake_bin = tmp_path / "custom_kicad_cli"
+    fake_bin.touch()
+
+    with patch.dict(os.environ, {"KICAD_CLI_BIN": str(fake_bin)}):
+        cli = KiCadCLI()
+        assert cli.is_available
+        assert cli._local_bin == fake_bin
+
+
+def test_kicad_cli_custom_path(tmp_path: Path):
+    """Verify custom cli_path passed to constructor takes highest precedence."""
+    custom_bin = tmp_path / "my_cli"
+    custom_bin.touch()
+
+    cli = KiCadCLI(cli_path=custom_bin)
+    assert cli.is_available
+    assert cli._local_bin == custom_bin
+
+
+def test_kicad_cli_missing_raises():
+    """Verify run_command raises descriptive RuntimeError when kicad-cli is not installed."""
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        patch("shutil.which", return_value=None),
+        patch.object(Path, "is_file", autospec=True, return_value=False),
+    ):
+        cli = KiCadCLI()
+        assert not cli.is_available
+        with pytest.raises(RuntimeError, match="kicad-cli is not installed locally"):
+            cli.run_command(["version"])
+
+
+def test_kicad_cli_nonzero_exit_raises(tmp_path: Path):
+    """Verify run_command raises descriptive RuntimeError when kicad-cli returns non-zero."""
+    fake_bin = tmp_path / "kicad-cli"
+    fake_bin.touch()
+
+    cli = KiCadCLI(cli_path=fake_bin)
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=1, stderr="Syntax error in board file", stdout="")
+        with pytest.raises(RuntimeError, match="kicad-cli error \\(1\\): Syntax error in board file"):
+            cli.run_command(["pcb", "export"])

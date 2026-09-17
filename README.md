@@ -121,7 +121,7 @@ This project includes a declarative wiring and PCB engine driven by native KiCad
 *   **Pipeline Architecture**:
     `pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files`
 *   **KiCad Dependency (`kicad-cli`)**:
-    The build toolchain uses `kicad-cli` (v7+ or v8+) to generate industry-standard CAM manufacturing files (RS-274X Gerbers, Excellon drills, IPC-2581/gbrjob). It automatically detects local KiCad installations (`brew install --cask kicad` on macOS or `apt-get install kicad` on Linux) and seamlessly falls back to remote cloud execution on `anvil` when not installed locally.
+    The build toolchain uses `kicad-cli` (v7+ or v8+) to generate industry-standard CAM manufacturing files (RS-274X Gerbers, Excellon drills, IPC-2581/gbrjob). It automatically detects local KiCad installations (`brew install --cask kicad` on macOS, `apt-get install kicad` on Linux, or Windows installation) or custom paths via `KICAD_CLI_BIN`. Remote execution can be dispatched via `bin/anvil run`.
 *   **Viewing PCB & Schematic Files**:
     *   **In VS Code**: Install the recommended [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) (`sajadghorbani.kicode`) extension (powered by KiCanvas) to inspect `.kicad_pcb` and `.kicad_sch` with interactive zoom, pan, layer toggling, net highlighting, and component inspection directly in VS Code editor tabs. Alternatively, use the **KiCad PCB Viewer** (`kicad-pcb-viewer`) or **Gerber Viewer** extension for `.gbr` layers.
     *   **In Browser**: Inspect layer stacks instantly by dragging the `build/board/<project>/` folder into [tracespace.io/view](https://tracespace.io/view/) or online fab viewers (JLCPCB / PCBWay).

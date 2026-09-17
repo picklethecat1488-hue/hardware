@@ -930,14 +930,31 @@ class TestViewer:
 
     def test_locate_vscode_cli(self):
         """Verify locate_vscode_cli finds the code binary or returns None."""
+        import os
         from view import Viewer
 
-        with patch("shutil.which", return_value="/custom/bin/code"):
-            assert Viewer.locate_vscode_cli() == "/custom/bin/code"
+        # 1. VSCODE_BIN environment variable takes precedence
+        with patch.dict(os.environ, {"VSCODE_BIN": "/custom/env/code"}):
+            assert Viewer.locate_vscode_cli() == "/custom/env/code"
 
+        # 2. Standard code executable in PATH
         with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("shutil.which", side_effect=lambda cmd: "/usr/bin/code" if cmd == "code" else None),
+        ):
+            assert Viewer.locate_vscode_cli() == "/usr/bin/code"
+
+        # 3. Fallback to code-insiders if code is not present
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("shutil.which", side_effect=lambda cmd: "/usr/bin/code-insiders" if cmd == "code-insiders" else None),
+        ):
+            assert Viewer.locate_vscode_cli() == "/usr/bin/code-insiders"
+
+        # 4. Neither found
+        with (
+            patch.dict(os.environ, {}, clear=True),
             patch("shutil.which", return_value=None),
-            patch("pathlib.Path.exists", return_value=False),
         ):
             assert Viewer.locate_vscode_cli() is None
 

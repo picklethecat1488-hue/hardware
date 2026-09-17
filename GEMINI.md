@@ -118,7 +118,7 @@ pytest
 * **Declarative Pipeline**: The PCB engine follows the strict pipeline:
   `pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files`.
 * **Standard CAM Generation**: Manufacturing board files (RS-274X Gerbers, Excellon NC drills, Gerber job files) must be generated strictly via headless `kicad-cli` (`KiCadCLI`), not custom DIY string formatting or hand-rolled formatters.
-* **Remote Fallback**: If `kicad-cli` is not installed locally, `KiCadCLI` must offload compilation transparently to the `anvil` cloud server.
+* **Remote Offload via Anvil**: In environments lacking local KiCad or GUI dependencies, run test suites and manufacturing builds on the `anvil` cloud server via `bin/anvil run`.
 * **Interactive Visualization**: Native `.kicad_pcb` and `.kicad_sch` files are rendered interactively in VS Code via the KiCode extension (`sajadghorbani.kicode`, powered by KiCanvas) and in 3D CAD via `ocp_vscode`.
 
 ---

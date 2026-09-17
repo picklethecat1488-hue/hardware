@@ -112,15 +112,21 @@ class Viewer:
     @staticmethod
     def locate_vscode_cli() -> Optional[str]:
         """Locate the VS Code executable command."""
+        env_code = os.environ.get("VSCODE_BIN")
+        if env_code:
+            p = Path(env_code)
+            if p.is_file() and os.access(str(p), os.X_OK):
+                return str(p)
+            which_env = shutil.which(env_code)
+            if which_env:
+                return which_env
+            return env_code
         code_bin = shutil.which("code")
         if code_bin:
             return code_bin
-        mac_code = Path("/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code")
-        if mac_code.exists() and os.access(str(mac_code), os.X_OK):
-            return str(mac_code)
-        mac_insiders = Path("/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code")
-        if mac_insiders.exists() and os.access(str(mac_insiders), os.X_OK):
-            return str(mac_insiders)
+        code_insiders = shutil.which("code-insiders")
+        if code_insiders:
+            return code_insiders
         return None
 
     def launch_pcb_viewer(self, file_path: Path, no_gui: bool = False):

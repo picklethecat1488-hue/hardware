@@ -257,9 +257,9 @@ pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -
 - **Native KiCad Generation**: Board geometry and schematics are generated directly into canonical `.kicad_pcb` and `.kicad_sch` formats via clean Jinja templates (`src/provider/templates/kicad_pcb.j2`).
 - **Headless CAM Compilation**: Manufacturing files (RS-274X Gerbers, Excellon NC drills, Gerber job files) are compiled strictly by `kicad-cli` rather than hand-rolled custom formatters.
 
-### 2. KiCad Dependency & Cloud Execution
-- **Local Installation**: Install KiCad (v7+ or v8+) locally via Homebrew on macOS (`brew install --cask kicad`) or apt on Linux (`sudo apt-get install -y kicad`).
-- **Cloud Fallback (`anvil`)**: If `kicad-cli` is not installed locally, `KiCadCLI` automatically offloads CAM compilation to the `anvil` remote server via SSH and synchronizes the generated files back into your local build directory.
+### 2. KiCad Dependency & Multi-Platform Support
+- **Local Installation**: Install KiCad (v7+ or v8+) locally via Homebrew on macOS (`brew install --cask kicad`), apt on Linux (`sudo apt-get install -y kicad`), or the Windows installer from [kicad.org](https://www.kicad.org/).
+- **Discovery & Binary Override**: `KiCadCLI` automatically discovers standard installation paths across macOS, Linux, and Windows, and respects PATH and the `KICAD_CLI_BIN` environment variable override. Remote execution can be dispatched via `bin/anvil run`.
 
 ### 3. Viewing & Inspecting Board Files
 - **In VS Code (KiCode)**: Install the recommended [KiCode](https://marketplace.visualstudio.com/items?itemName=SajadGhorbani.KiCode) (`sajadghorbani.kicode`) extension (powered by KiCanvas). Opening any `.kicad_pcb` or `.kicad_sch` file opens an interactive webview tab with layer toggling, zoom/pan, net highlighting, and component inspection directly in VS Code.
