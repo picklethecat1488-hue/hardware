@@ -67,18 +67,48 @@ class Lister:
         p_name, t_name = TargetParser.split_target(target)
         return f"urdf/{p_name}/{t_name}.urdf"
 
+    def get_pcb_outputs(self, target: str) -> list[str]:
+        """Get output paths for PCB manufacturing and schematics."""
+        p_name = TargetParser.get_project_name(target)
+        provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
+        outputs = [
+            f"board/{p_name}/{p_name}.kicad_pcb",
+            f"schematics/{p_name}/{p_name}.kicad_sch",
+            f"schematics/{p_name}/{p_name}_schematic.svg",
+            f"schematics/{p_name}/{p_name}_schematic.pdf",
+            f"bom/{p_name}/bom.csv",
+            f"bom/{p_name}/pos.csv",
+            f"step/{p_name}/{p_name}_pcb.step",
+        ]
+        if provider and provider.pcb_config and provider.pcb_config.capacitive_sensors:
+            outputs.append(f"config/{p_name}/capacitive_config.json")
+        return outputs
+
     def _resolve_targets(self, names: list[str] | None, section: Section, default_mode: Mode):
         """Resolve targets for a specific section and default mode."""
         if names:
             target_lists = []
             for name in names:
-                if self.target_parser.parse(name, section):
+                if self.target_parser.parse(name, section) and self.target_parser.can_resolve(name, section):
+                    target_lists.append(self.target_parser.resolve(name, section))
+                elif ":" in name and self.target_parser.parse(name, section):
                     target_lists.append(self.target_parser.resolve(name, section))
             return target_lists
         return [self.manager.router.targets.supporting(section).for_modes([default_mode])]
 
     def get_outputs(self, names: list[str] | None = None) -> list[str]:
         """Compute all expected build outputs."""
+        if names:
+            all_supported_sections = [Section.PART, Section.DIAGRAM, Section.VIEW, Section.PCB]
+            for name in names:
+                if not any(self.target_parser.can_resolve(name, s) for s in all_supported_sections):
+                    target_action = Section.PART
+                    if ":" in name:
+                        action_str = name.split(":", 1)[1].split("/")[0]
+                        if action_str in [s.value for s in Section]:
+                            target_action = Section(action_str)
+                    self.target_parser.resolve(name, target_action)
+
         outputs = []
 
         # 1. Parts
@@ -127,6 +157,15 @@ class Lister:
                 continue
             for target in base_targets:
                 outputs.append(self.get_urdf_output(target))
+
+        # 4. PCBs
+        pcb_targets = self._resolve_targets(names, Section.PCB, Mode.DEFAULT)
+
+        for base_targets in pcb_targets:
+            if not base_targets:
+                continue
+            for target in base_targets:
+                outputs.extend(self.get_pcb_outputs(target))
 
         return sorted(list(set(outputs)))
 
