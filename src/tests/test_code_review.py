@@ -615,3 +615,41 @@ def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
     finally:
         server_multi.shutdown()
         server_multi.server_close()
+
+
+def test_diff_navigation_and_next_prev_change_cli(tmp_path: Path) -> None:
+    """Verify that the review UI and CLI support next/prev change navigation across diff hunks."""
+    repo_root = get_git_root()
+
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_nav.md",
+        state_file=tmp_path / "cr_nav.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        with urllib.request.urlopen(server.get_url()) as resp:
+            html = resp.read().decode("utf-8")
+            # Verify toolbar buttons for change navigation exist
+            assert 'id="btnPrevChange"' in html
+            assert 'id="btnNextChange"' in html
+            assert "navigateChange(-1)" in html
+            assert "navigateChange(1)" in html
+
+            # Verify CLI commands and helper functions are defined in frontend logic
+            assert "navigateChange" in html
+            assert "getFileChanges" in html
+            assert 'case "next_change":' in html
+            assert 'case "prev_change":' in html
+            assert 'case "nc":' in html
+            assert 'case "pc":' in html
+            assert "next change / nc" in html
+            assert "prev change / pc" in html
+    finally:
+        server.shutdown()
+        server.server_close()

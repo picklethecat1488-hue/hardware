@@ -1013,6 +1013,9 @@
         </div>
 
         <div class="diff-toolbar-center">
+          <button id="btnPrevChange" class="quake-btn quake-btn-default" onclick="navigateChange(-1)" title="Previous Change (CLI: prev change / pc, Shortcut: K)">◀ Prev Change</button>
+          <button id="btnNextChange" class="quake-btn quake-btn-default" onclick="navigateChange(1)" title="Next Change (CLI: next change / nc, Shortcut: J)">Next Change ▶</button>
+          <span style="border-left: 1px solid var(--quake-border); margin: 0 4px; height: 16px; align-self: center;"></span>
           <button id="btnModeSbs" class="quake-btn quake-btn-default quake-btn-active" onclick="setDiffMode('side_by_side')" title="Side-by-Side View (Shortcut: S)">Split</button>
           <button id="btnModeUnified" class="quake-btn quake-btn-default" onclick="setDiffMode('unified')" title="Unified View (Shortcut: U)">Unified</button>
           <button id="btnModeFull" class="quake-btn quake-btn-default" onclick="setDiffMode('full_file')" title="Full File (Shortcut: F)">Full</button>
@@ -2005,12 +2008,14 @@
         case "help":
           logCli("--- GLQUAKE REVIEW CLI COMMANDS ---", "cyan");
           logCli("  goto / g <file> [line]       : Navigate to file or line in active file", "cyan");
+          logCli("  next change / nc             : Jump to next change/hunk in diff", "cyan");
+          logCli("  prev change / pc             : Jump to previous change/hunk in diff", "cyan");
+          logCli("  next / n, prev / p           : Jump to next or previous file", "cyan");
           logCli("  must_fix / fix / mf <text>   : Post comment as MUST FIX", "cyan");
           logCli("  proposal / prop <text>       : Post comment as PROPOSAL", "cyan");
           logCli("  nit <text>                   : Post comment as NIT", "cyan");
           logCli("  comment / c <text>           : Post comment on currently selected lines", "cyan");
           logCli("  reviewed / done / todo       : Toggle reviewed status on current file", "cyan");
-          logCli("  next / n, prev / p           : Jump to next or previous file", "cyan");
           logCli("  sel / line <start> [end]     : Select line range in active file", "cyan");
           logCli("  approve / lgtm               : Conclude review with APPROVAL, export CR.md, and release terminal", "cyan");
           logCli("  reject / changes             : Conclude review with CHANGES REQUESTED, export CR.md, and release terminal", "cyan");
@@ -2089,13 +2094,43 @@
           break;
 
         case "next":
-        case "n":
-          navigateFile(1);
+        case "n": {
+          const sub = parts[1] ? parts[1].toLowerCase() : "";
+          if (sub === "change" || sub === "hunk" || sub === "c" || sub === "diff") {
+            await navigateChange(1);
+          } else {
+            await navigateFile(1);
+          }
           break;
+        }
 
         case "prev":
-        case "p":
-          navigateFile(-1);
+        case "p": {
+          const sub = parts[1] ? parts[1].toLowerCase() : "";
+          if (sub === "change" || sub === "hunk" || sub === "c" || sub === "diff") {
+            await navigateChange(-1);
+          } else {
+            await navigateFile(-1);
+          }
+          break;
+        }
+
+        case "next_change":
+        case "next-change":
+        case "nextchange":
+        case "nc":
+        case "next_hunk":
+        case "nexthunk":
+          await navigateChange(1);
+          break;
+
+        case "prev_change":
+        case "prev-change":
+        case "prevchange":
+        case "pc":
+        case "prev_hunk":
+        case "prevhunk":
+          await navigateChange(-1);
           break;
 
         case "sel":
@@ -2351,13 +2386,168 @@
       `;
     }
 
-    function navigateFile(direction) {
+    async function navigateFile(direction) {
       if (!state.files.length) return;
       let idx = state.files.findIndex(f => f.path === state.selectedFile);
       idx += direction;
       if (idx < 0) idx = state.files.length - 1;
       if (idx >= state.files.length) idx = 0;
-      selectFile(state.files[idx].path);
+      await selectFile(state.files[idx].path);
+    }
+
+    function getFileChanges() {
+      if (!state.currentDiff) return [];
+      const rows = state.currentDiff.side_by_side || [];
+      const changes = [];
+      let currentChange = null;
+
+      rows.forEach((r, idx) => {
+        if (r.row_type && r.row_type !== "equal") {
+          const lineNo = r.new_no || r.old_no;
+          if (!currentChange) {
+            currentChange = {
+              startLine: lineNo || 1,
+              endLine: lineNo || 1,
+              type: r.row_type,
+            };
+          } else {
+            if (lineNo) {
+              currentChange.endLine = lineNo;
+            }
+          }
+        } else {
+          if (currentChange) {
+            changes.push(currentChange);
+            currentChange = null;
+          }
+        }
+      });
+      if (currentChange) {
+        changes.push(currentChange);
+      }
+
+      if (changes.length === 0 && state.currentDiff.hunks && state.currentDiff.hunks.length > 0) {
+        state.currentDiff.hunks.forEach(h => {
+          const start = h.new_start || h.old_start || 1;
+          const count = Math.max(h.new_count, h.old_count, 1);
+          changes.push({
+            startLine: start,
+            endLine: start + count - 1,
+            type: "hunk",
+          });
+        });
+      }
+      return changes;
+    }
+
+    async function navigateChange(direction) {
+      if (!state.files || state.files.length === 0) return;
+
+      if (!state.selectedFile) {
+        await selectFile(state.files[0].path);
+      }
+
+      let changes = getFileChanges();
+      const curLine = state.selectedRange ? state.selectedRange.start : null;
+
+      if (direction === 1) {
+        let nextChange = null;
+        if (curLine === null || curLine === undefined) {
+          nextChange = changes[0];
+        } else {
+          nextChange = changes.find(c => c.startLine > curLine);
+        }
+
+        if (nextChange) {
+          applyChange(nextChange);
+          return;
+        }
+
+        let fileIdx = state.files.findIndex(f => f.path === state.selectedFile);
+        let nextIdx = fileIdx;
+        let found = false;
+
+        while (true) {
+          nextIdx += 1;
+          if (nextIdx >= state.files.length) break;
+          const nextFile = state.files[nextIdx];
+          await selectFile(nextFile.path);
+          changes = getFileChanges();
+          if (changes.length > 0) {
+            applyChange(changes[0], true);
+            found = true;
+            break;
+          }
+        }
+
+        if (!found) {
+          logCli("Reached the last change across all files.", "amber");
+          showToast("Reached last change");
+        }
+      } else {
+        let prevChange = null;
+        if (curLine === null || curLine === undefined) {
+          prevChange = changes[changes.length - 1];
+        } else {
+          for (let i = changes.length - 1; i >= 0; i--) {
+            if (changes[i].endLine < curLine || (changes[i].startLine < curLine && changes[i].endLine <= curLine)) {
+              prevChange = changes[i];
+              break;
+            }
+          }
+        }
+
+        if (prevChange) {
+          applyChange(prevChange);
+          return;
+        }
+
+        let fileIdx = state.files.findIndex(f => f.path === state.selectedFile);
+        let prevIdx = fileIdx;
+        let found = false;
+
+        while (true) {
+          prevIdx -= 1;
+          if (prevIdx < 0) break;
+          const prevFile = state.files[prevIdx];
+          await selectFile(prevFile.path);
+          changes = getFileChanges();
+          if (changes.length > 0) {
+            applyChange(changes[changes.length - 1], true);
+            found = true;
+            break;
+          }
+        }
+
+        if (!found) {
+          logCli("Reached the first change across all files.", "amber");
+          showToast("Reached first change");
+        }
+      }
+    }
+
+    function applyChange(c, isNewFile = false) {
+      state.selectedRange = { start: c.startLine, end: c.endLine };
+      ensureCliOpen();
+      updateTargetUI();
+      renderDiff();
+
+      setTimeout(() => {
+        const row = document.querySelector(`[data-line="${c.startLine}"]`);
+        if (row) {
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 50);
+
+      const filePrefix = isNewFile ? `[${state.selectedFile}] ` : "";
+      const lineStr = c.startLine === c.endLine ? `L${c.startLine}` : `L${c.startLine}-L${c.endLine}`;
+      logCli(`${filePrefix}Jumped to change (${c.type.toUpperCase()}) at ${lineStr}`, "cyan");
+
+      const cliInput = document.getElementById("cliInput");
+      if (cliInput) {
+        cliInput.focus();
+        cliInput.placeholder = `Type comment for ${lineStr} and press Enter...`;
+      }
     }
 
     function setDiffMode(mode) {
@@ -2430,7 +2620,7 @@
     }
 
     function setupKeyboardShortcuts() {
-      window.addEventListener("keydown", (e) => {
+      window.addEventListener("keydown", async (e) => {
         if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
         if (e.key === "[") togglePane("commits");
         if (e.key === "]") togglePane("files");
@@ -2438,6 +2628,14 @@
         if (e.key.toLowerCase() === "s") setDiffMode("side_by_side");
         if (e.key.toLowerCase() === "u") setDiffMode("unified");
         if (e.key.toLowerCase() === "f") setDiffMode("full_file");
+        if (e.key.toLowerCase() === "j" || (e.altKey && e.key === "ArrowDown")) {
+          e.preventDefault();
+          await navigateChange(1);
+        }
+        if (e.key.toLowerCase() === "k" || (e.altKey && e.key === "ArrowUp")) {
+          e.preventDefault();
+          await navigateChange(-1);
+        }
         if (e.key === "Escape") {
           state.selectedRange = { start: null, end: null };
           updateTargetUI();
