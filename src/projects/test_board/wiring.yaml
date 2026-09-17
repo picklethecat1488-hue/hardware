@@ -9,10 +9,10 @@ footprints:
     pins:
       - name: A1
         position: [-5.0, 5.0]
-        side: top
+        side: left
       - name: A2
         position: [-4.2, 5.0]
-        side: top
+        side: left
       - name: B1
         position: [-5.0, 4.2]
         side: left
@@ -21,10 +21,16 @@ footprints:
         side: left
       - name: H7
         position: [0.0, 0.0]
-        side: bottom
+        side: left
       - name: H8
         position: [0.8, 0.0]
-        side: bottom
+        side: left
+      - name: D1
+        position: [-3.0, 0.0]
+        side: right
+      - name: D2
+        position: [-3.0, -1.0]
+        side: right
       - name: N14
         position: [5.0, -5.0]
         side: right
@@ -32,38 +38,65 @@ footprints:
         position: [5.0, -5.8]
         side: right
       - name: C1
-        position: [-3.0, 5.0]
-        side: top
-      - name: C2
-        position: [-2.2, 5.0]
-        side: top
-      - name: E1
-        position: [5.0, 0.0]
+        position: [3.0, 5.0]
         side: right
-      - name: E2
-        position: [5.0, -0.8]
+      - name: C2
+        position: [3.8, 5.0]
+        side: right
+      - name: F1
+        position: [4.0, 0.0]
+        side: right
+      - name: F2
+        position: [4.0, -1.0]
         side: right
 
   - name: U2
-    package: QFN-20
-    position: [20.0, -15.0, 0.8]
+    package: QFN-24
+    position: [18.0, -15.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [4.0, 4.0, 0.85]
     mpn: CY8CMBR3116-LQI
     supplier_pn: 428-CY8CMBR3116-ND
     pins:
       - name: VDD
-        position: [-2.0, 1.0]
+        position: [-2.0, 1.5]
         side: left
       - name: VSS
-        position: [-2.0, -1.0]
+        position: [-2.0, -1.5]
         side: left
+      - name: SDA
+        position: [-2.0, 0.5]
+        side: left
+      - name: SCL
+        position: [-2.0, -0.5]
+        side: left
+      - name: INT
+        position: [-1.0, -2.0]
+        side: bottom
       - name: CS0
-        position: [2.0, 1.0]
+        position: [2.0, 1.5]
         side: right
       - name: CS1
+        position: [2.0, 1.0]
+        side: right
+      - name: CS2
+        position: [2.0, 0.5]
+        side: right
+      - name: CS3
+        position: [2.0, 0.0]
+        side: right
+      - name: CS4
+        position: [2.0, -0.5]
+        side: right
+      - name: CS5
         position: [2.0, -1.0]
         side: right
+      - name: CS6
+        position: [2.0, -1.5]
+        side: right
+      - name: SHIELD
+        position: [0.0, 2.0]
+        side: top
 
   - name: J1
     package: M.2-KEY-M
@@ -75,21 +108,24 @@ footprints:
     pins:
       - name: GND
         position: [-10.0, 0.0]
-        side: left
-      - name: PETp0
-        position: [-5.0, 0.0]
-        side: left
-      - name: PETn0
-        position: [-4.0, 0.0]
-        side: left
-      - name: PERp0
-        position: [4.0, 0.0]
-        side: right
-      - name: PERn0
-        position: [5.0, 0.0]
         side: right
       - name: 3V3
-        position: [10.0, 0.0]
+        position: [-8.0, 0.0]
+        side: right
+      - name: VLOAD_SW
+        position: [-6.0, 0.0]
+        side: left
+      - name: PETp0
+        position: [2.0, 0.0]
+        side: right
+      - name: PETn0
+        position: [4.0, 0.0]
+        side: right
+      - name: PERp0
+        position: [6.0, 0.0]
+        side: right
+      - name: PERn0
+        position: [8.0, 0.0]
         side: right
 
   - name: J2
@@ -100,17 +136,140 @@ footprints:
     mpn: HIROSE-FH35C-30S
     supplier_pn: H1234-ND
     pins:
+      - name: GND
+        position: [-8.0, 0.0]
+        side: right
+      - name: 3V3
+        position: [-7.0, 0.0]
+        side: right
       - name: D0_P
-        position: [-4.0, 0.0]
+        position: [-5.0, 0.0]
         side: left
       - name: D0_N
-        position: [-3.0, 0.0]
+        position: [-4.0, 0.0]
         side: left
       - name: CLK_P
-        position: [3.0, 0.0]
-        side: right
+        position: [-2.0, 0.0]
+        side: left
       - name: CLK_N
+        position: [-1.0, 0.0]
+        side: left
+      - name: CAP_TX0
+        position: [1.0, 0.0]
+        side: left
+      - name: CAP_RX0
+        position: [2.0, 0.0]
+        side: left
+      - name: CAP_TX1
+        position: [3.0, 0.0]
+        side: left
+      - name: CAP_RX1
         position: [4.0, 0.0]
+        side: left
+      - name: CAP_TX2
+        position: [5.0, 0.0]
+        side: left
+      - name: CAP_RX2
+        position: [6.0, 0.0]
+        side: left
+      - name: CAP_RX3
+        position: [7.0, 0.0]
+        side: left
+      - name: CAP_SHIELD
+        position: [8.0, 0.0]
+        side: left
+
+  - name: R1
+    package: "0402"
+    position: [10.0, -8.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [1.0, 0.5, 0.35]
+    mpn: RC0402FR-074K7L
+    supplier_pn: 311-4.7KLRCT-ND
+    pins:
+      - name: "1"
+        position: [-0.5, 0.0]
+        side: left
+      - name: "2"
+        position: [0.5, 0.0]
+        side: right
+
+  - name: R2
+    package: "0402"
+    position: [10.0, -10.5, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [1.0, 0.5, 0.35]
+    mpn: RC0402FR-074K7L
+    supplier_pn: 311-4.7KLRCT-ND
+    pins:
+      - name: "1"
+        position: [-0.5, 0.0]
+        side: left
+      - name: "2"
+        position: [0.5, 0.0]
+        side: right
+
+  - name: C1
+    package: "0402"
+    position: [18.0, -21.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [1.0, 0.5, 0.35]
+    mpn: CC0402KRX7R9BB104
+    supplier_pn: 311-1438-1-ND
+    pins:
+      - name: "1"
+        position: [-0.5, 0.0]
+        side: left
+      - name: "2"
+        position: [0.5, 0.0]
+        side: right
+
+  - name: C2
+    package: "0402"
+    position: [-8.0, -5.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [1.0, 0.5, 0.35]
+    mpn: CC0402KRX7R9BB104
+    supplier_pn: 311-1438-1-ND
+    pins:
+      - name: "1"
+        position: [-0.5, 0.0]
+        side: left
+      - name: "2"
+        position: [0.5, 0.0]
+        side: right
+
+  - name: C3
+    package: "0603"
+    position: [-12.0, -8.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [1.6, 0.8, 0.8]
+    mpn: CL10A106KP8NNNC
+    supplier_pn: 1276-1004-1-ND
+    pins:
+      - name: "1"
+        position: [-0.8, 0.0]
+        side: left
+      - name: "2"
+        position: [0.8, 0.0]
+        side: right
+
+  - name: Q1
+    package: SOT-23
+    position: [-18.0, -15.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [2.9, 1.3, 1.1]
+    mpn: BSS138
+    supplier_pn: BSS138CT-ND
+    pins:
+      - name: G
+        position: [-0.95, -1.0]
+        side: left
+      - name: S
+        position: [0.95, -1.0]
+        side: bottom
+      - name: D
+        position: [0.0, 1.0]
         side: right
 
 nets:
@@ -120,6 +279,11 @@ nets:
       - [U1, H7]
       - [U2, VSS]
       - [J1, GND]
+      - [J2, GND]
+      - [C1, "2"]
+      - [C2, "2"]
+      - [C3, "2"]
+      - [Q1, S]
 
   - name: 3V3
     color: "#dc2626"
@@ -127,6 +291,44 @@ nets:
       - [U1, H8]
       - [U2, VDD]
       - [J1, 3V3]
+      - [J2, 3V3]
+      - [R1, "1"]
+      - [R2, "1"]
+      - [C1, "1"]
+      - [C2, "1"]
+      - [C3, "1"]
+
+  - name: PWR_EN
+    color: "#ea580c"
+    pins:
+      - [U1, D1]
+      - [Q1, G]
+
+  - name: VLOAD_SW
+    color: "#f97316"
+    pins:
+      - [Q1, D]
+      - [J1, VLOAD_SW]
+
+  - name: I2C_SDA
+    color: "#16a34a"
+    pins:
+      - [U1, F1]
+      - [U2, SDA]
+      - [R1, "2"]
+
+  - name: I2C_SCL
+    color: "#22c55e"
+    pins:
+      - [U1, F2]
+      - [U2, SCL]
+      - [R2, "2"]
+
+  - name: CAP_INT
+    color: "#84cc16"
+    pins:
+      - [U1, D2]
+      - [U2, INT]
 
   - name: PCIE_TX0_P
     color: "#2563eb"
@@ -167,23 +369,59 @@ nets:
   - name: MIPI_CLK_P
     color: "#d97706"
     pins:
-      - [J2, CLK_P]
       - [U1, C1]
+      - [J2, CLK_P]
 
   - name: MIPI_CLK_N
     color: "#f59e0b"
     pins:
-      - [J2, CLK_N]
       - [U1, C2]
+      - [J2, CLK_N]
 
-  - name: CAP_SENSE_LOW
+  - name: CAP_TX0
     color: "#06b6d4"
     pins:
       - [U2, CS0]
-      - [U1, E1]
+      - [J2, CAP_TX0]
 
-  - name: CAP_SENSE_HIGH
+  - name: CAP_RX0
     color: "#0891b2"
     pins:
       - [U2, CS1]
-      - [U1, E2]
+      - [J2, CAP_RX0]
+
+  - name: CAP_TX1
+    color: "#0284c7"
+    pins:
+      - [U2, CS2]
+      - [J2, CAP_TX1]
+
+  - name: CAP_RX1
+    color: "#0369a1"
+    pins:
+      - [U2, CS3]
+      - [J2, CAP_RX1]
+
+  - name: CAP_TX2
+    color: "#0ea5e9"
+    pins:
+      - [U2, CS4]
+      - [J2, CAP_TX2]
+
+  - name: CAP_RX2
+    color: "#38bdf8"
+    pins:
+      - [U2, CS5]
+      - [J2, CAP_RX2]
+
+  - name: CAP_RX3
+    color: "#67e8f9"
+    pins:
+      - [U2, CS6]
+      - [J2, CAP_RX3]
+
+  - name: CAP_SHIELD
+    color: "#64748b"
+    pins:
+      - [U2, SHIELD]
+      - [J2, CAP_SHIELD]
