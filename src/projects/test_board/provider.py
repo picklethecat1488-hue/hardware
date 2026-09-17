@@ -140,6 +140,18 @@ class TestBoardProvider(Provider):
             ):
                 Cylinder(radius=standoff_r, height=standoff_h)
 
+            # Standoff screw mounting pilot holes
+            standoff_hole_r = self.settings.standoff_hole_diameter / 2.0
+            standoff_hole_depth = self.settings.standoff_hole_depth
+            hole_z = -h_shell / 2.0 + wall + standoff_h - (standoff_hole_depth / 2.0)
+            with Locations(
+                (hole_x, hole_y, hole_z),
+                (-hole_x, hole_y, hole_z),
+                (-hole_x, -hole_y, hole_z),
+                (hole_x, -hole_y, hole_z),
+            ):
+                Cylinder(radius=standoff_hole_r, height=standoff_hole_depth, mode=BuildMode.SUBTRACT)
+
         return shell
 
     def enclosure_lid(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:

@@ -104,6 +104,16 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["standoff_radius"])
 
     @property
+    def standoff_hole_diameter(self) -> float:
+        """Pilot drill hole diameter inside enclosure mounting standoffs in mm."""
+        return float(self._raw_data["standoff_hole_diameter"])
+
+    @property
+    def standoff_hole_depth(self) -> float:
+        """Pilot drill hole depth inside enclosure mounting standoffs in mm."""
+        return float(self._raw_data["standoff_hole_depth"])
+
+    @property
     def silkscreen_margin(self) -> float:
         """Margin between board edge and silkscreen text markings in mm."""
         return float(self._raw_data["silkscreen_margin"])
