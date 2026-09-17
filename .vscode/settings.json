@@ -6,5 +6,20 @@
     "python.testing.pytestEnabled": true,
     "python.analysis.extraPaths": [
         "./src"
-    ]
+    ],
+    "workbench.browser.openLocalhostLinks": true,
+    "workbench.externalUriOpeners": [
+        {
+            "uri": "http://127.0.0.1:*",
+            "id": "simpleBrowser.open"
+        },
+        {
+            "uri": "http://localhost:*",
+            "id": "simpleBrowser.open"
+        }
+    ],
+    "workbench.editorAssociations": {
+        "*.kicad_pcb": "KiCode.preview",
+        "*.kicad_sch": "KiCode.preview"
+    }
 }

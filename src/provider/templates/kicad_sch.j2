@@ -1,0 +1,69 @@
+(kicad_sch
+  (version 20231120)
+  (generator "hardware_pcb_engine")
+  (generator_version "8.0")
+  (uuid "{{ sch_uuid }}")
+  (paper "A4")
+  (title_block
+    (title "{{ board.name }} Schematic")
+    (company "Hardware Project")
+    (comment 1 "Generated automatically via CLI Manifest Engine")
+  )
+  (lib_symbols
+{% for sym in lib_symbols %}
+    (symbol "{{ sym.package }}"
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "{{ sym.prefix }}" (at 0 {{ sym.half_h + 3.0 }} 0)
+        (effects (font (size 1.27 1.27)))
+      )
+      (property "Value" "{{ sym.package }}" (at 0 -{{ sym.half_h + 3.0 }} 0)
+        (effects (font (size 1.27 1.27)))
+      )
+      (symbol "{{ sym.package }}_1_1"
+        (rectangle (start -{{ sym.half_w }} {{ sym.half_h }}) (end {{ sym.half_w }} -{{ sym.half_h }})
+          (stroke (width 0.254) (type default))
+          (fill (type background))
+        )
+{% for p in sym.pins %}
+        (pin passive line (at {{ p.x }} {{ p.y }} {{ p.angle }}) (length {{ p.length }})
+          (name "{{ p.name }}" (effects (font (size 1.27 1.27))))
+          (number "{{ p.number }}" (effects (font (size 1.27 1.27))))
+        )
+{% endfor %}
+      )
+    )
+{% endfor %}
+  )
+{% for symbol in symbols %}
+  (symbol
+    (lib_id "{{ symbol.package }}")
+    (at {{ symbol.x }} {{ symbol.y }} 0)
+    (unit 1)
+    (uuid "{{ symbol.uuid }}")
+    (property "Reference" "{{ symbol.name }}" (at {{ symbol.x }} {{ symbol.y - symbol.half_h - 2.54 }} 0)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Value" "{{ symbol.value }}" (at {{ symbol.x }} {{ symbol.y + symbol.half_h + 2.54 }} 0)
+      (effects (font (size 1.27 1.27)))
+    )
+{% for pin in symbol.pins %}
+    (pin "{{ pin.number }}" (uuid "{{ pin.uuid }}"))
+{% endfor %}
+  )
+{% endfor %}
+
+{% for wire in wires %}
+  (wire (pts (xy {{ wire.x1 }} {{ wire.y1 }}) (xy {{ wire.x2 }} {{ wire.y2 }}))
+    (stroke (width 0) (type default))
+    (uuid "{{ wire.uuid }}")
+  )
+{% endfor %}
+
+{% for label in labels %}
+  (label "{{ label.text }}" (at {{ label.x }} {{ label.y }} {{ label.angle }})
+    (effects (font (size 1.27 1.27)) (justify {{ label.justify }}))
+    (uuid "{{ label.uuid }}")
+  )
+{% endfor %}
+)

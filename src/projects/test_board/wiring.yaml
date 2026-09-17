@@ -1,0 +1,189 @@
+footprints:
+  - name: U1
+    package: BGA-196
+    position: [0.0, 0.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [12.0, 12.0, 1.4]
+    mpn: STM32MP157-BGA196
+    supplier_pn: 497-STM32MP157-ND
+    pins:
+      - name: A1
+        position: [-5.0, 5.0]
+        side: top
+      - name: A2
+        position: [-4.2, 5.0]
+        side: top
+      - name: B1
+        position: [-5.0, 4.2]
+        side: left
+      - name: B2
+        position: [-4.2, 4.2]
+        side: left
+      - name: H7
+        position: [0.0, 0.0]
+        side: bottom
+      - name: H8
+        position: [0.8, 0.0]
+        side: bottom
+      - name: N14
+        position: [5.0, -5.0]
+        side: right
+      - name: P14
+        position: [5.0, -5.8]
+        side: right
+      - name: C1
+        position: [-3.0, 5.0]
+        side: top
+      - name: C2
+        position: [-2.2, 5.0]
+        side: top
+      - name: E1
+        position: [5.0, 0.0]
+        side: right
+      - name: E2
+        position: [5.0, -0.8]
+        side: right
+
+  - name: U2
+    package: QFN-20
+    position: [20.0, -15.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [4.0, 4.0, 0.85]
+    mpn: CY8CMBR3116-LQI
+    supplier_pn: 428-CY8CMBR3116-ND
+    pins:
+      - name: VDD
+        position: [-2.0, 1.0]
+        side: left
+      - name: VSS
+        position: [-2.0, -1.0]
+        side: left
+      - name: CS0
+        position: [2.0, 1.0]
+        side: right
+      - name: CS1
+        position: [2.0, -1.0]
+        side: right
+
+  - name: J1
+    package: M.2-KEY-M
+    position: [-18.0, 20.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [22.0, 6.0, 3.2]
+    mpn: LOTES-APCI0082
+    supplier_pn: LOTES-M2-ND
+    pins:
+      - name: GND
+        position: [-10.0, 0.0]
+        side: left
+      - name: PETp0
+        position: [-5.0, 0.0]
+        side: left
+      - name: PETn0
+        position: [-4.0, 0.0]
+        side: left
+      - name: PERp0
+        position: [4.0, 0.0]
+        side: right
+      - name: PERn0
+        position: [5.0, 0.0]
+        side: right
+      - name: 3V3
+        position: [10.0, 0.0]
+        side: right
+
+  - name: J2
+    package: FPC-30P-0.5MM
+    position: [15.0, 25.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [18.0, 4.5, 1.2]
+    mpn: HIROSE-FH35C-30S
+    supplier_pn: H1234-ND
+    pins:
+      - name: D0_P
+        position: [-4.0, 0.0]
+        side: left
+      - name: D0_N
+        position: [-3.0, 0.0]
+        side: left
+      - name: CLK_P
+        position: [3.0, 0.0]
+        side: right
+      - name: CLK_N
+        position: [4.0, 0.0]
+        side: right
+
+nets:
+  - name: GND
+    color: "#475569"
+    pins:
+      - [U1, H7]
+      - [U2, VSS]
+      - [J1, GND]
+
+  - name: 3V3
+    color: "#dc2626"
+    pins:
+      - [U1, H8]
+      - [U2, VDD]
+      - [J1, 3V3]
+
+  - name: PCIE_TX0_P
+    color: "#2563eb"
+    pins:
+      - [U1, A1]
+      - [J1, PETp0]
+
+  - name: PCIE_TX0_N
+    color: "#3b82f6"
+    pins:
+      - [U1, A2]
+      - [J1, PETn0]
+
+  - name: PCIE_RX0_P
+    color: "#059669"
+    pins:
+      - [U1, B1]
+      - [J1, PERp0]
+
+  - name: PCIE_RX0_N
+    color: "#10b981"
+    pins:
+      - [U1, B2]
+      - [J1, PERn0]
+
+  - name: MIPI_DATA0_P
+    color: "#7c3aed"
+    pins:
+      - [U1, N14]
+      - [J2, D0_P]
+
+  - name: MIPI_DATA0_N
+    color: "#8b5cf6"
+    pins:
+      - [U1, P14]
+      - [J2, D0_N]
+
+  - name: MIPI_CLK_P
+    color: "#d97706"
+    pins:
+      - [J2, CLK_P]
+      - [U1, C1]
+
+  - name: MIPI_CLK_N
+    color: "#f59e0b"
+    pins:
+      - [J2, CLK_N]
+      - [U1, C2]
+
+  - name: CAP_SENSE_LOW
+    color: "#06b6d4"
+    pins:
+      - [U2, CS0]
+      - [U1, E1]
+
+  - name: CAP_SENSE_HIGH
+    color: "#0891b2"
+    pins:
+      - [U2, CS1]
+      - [U1, E2]
