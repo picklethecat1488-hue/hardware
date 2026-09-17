@@ -212,3 +212,60 @@ def test_sheet_size_and_silkscreen_model(standard_6_layer_stackup):
     assert len(cfg.silkscreen_texts) == 2
     assert cfg.silkscreen_texts[0].text == "REV 1.0"
     assert cfg.silkscreen_texts[1].mirror is True
+
+
+def test_build_silkscreen_context_manager_and_locations():
+    """Verify that BuildSilkscreen captures texts using build123d Locations and PolarLocations."""
+    from build123d import Locations, PolarLocations
+    from provider.pcb.silkscreen import BuildSilkscreen, SilkscreenText
+
+    with BuildSilkscreen(default_layer="F.SilkS") as silk:
+        with Locations((10.0, 20.0)):
+            SilkscreenText("TOP_LABEL", font_size=1.5, thickness=0.2)
+        with Locations((-10.0, -20.0)):
+            SilkscreenText("BOTTOM_LABEL", layer="B.SilkS", font_size=1.0)
+        with PolarLocations(radius=25.0, count=4):
+            t_polar = SilkscreenText("PIN", font_size=0.8)
+
+    assert len(silk.texts) == 6  # 1 + 1 + 4
+    assert silk.texts[0].text == "TOP_LABEL"
+    assert silk.texts[0].position == (10.0, 20.0)
+    assert silk.texts[0].layer == "F.SilkS"
+    assert silk.texts[0].mirror is False
+
+    assert silk.texts[1].text == "BOTTOM_LABEL"
+    assert silk.texts[1].position == (-10.0, -20.0)
+    assert silk.texts[1].layer == "B.SilkS"
+    assert silk.texts[1].mirror is True  # Auto-mirrored on B.SilkS
+
+    assert len(t_polar.models) == 4
+    for pt in t_polar.models:
+        assert pt.text == "PIN"
+
+    # Verify conversion to 2D CAD shapes
+    shapes = silk.to_shapes()
+    assert len(shapes) == 6
+
+
+def test_test_board_provider_cad_silkscreen():
+    """Verify that TestBoardProvider dynamically generates silkscreen text from CAD geometry."""
+    from projects.test_board.provider import TestBoardProvider
+
+    provider = TestBoardProvider()
+    texts = provider.silkscreen()
+    assert len(texts) == 3
+    assert texts[0].text == "TEST BOARD CARRIER REV 1.0"
+    assert texts[0].position == (0.0, 38.0)
+    assert texts[0].layer == "F.SilkS"
+
+    assert texts[1].text == "LAYER 1-6 RIGID-FLEX"
+    assert texts[1].position == (0.0, -38.0)
+
+    assert texts[2].text == "BOTTOM SHIELD / GROUND REF"
+    assert texts[2].layer == "B.SilkS"
+    assert texts[2].mirror is True
+
+    # Check that pcb_config inherits them
+    pcb_cfg = provider.pcb_config
+    assert pcb_cfg is not None
+    assert len(pcb_cfg.silkscreen_texts) == 3

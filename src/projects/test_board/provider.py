@@ -13,12 +13,15 @@ from build123d import (
     Mode as BuildMode,
 )
 from model import Wiring
+from model.pcb import SilkscreenTextModel
 from provider import (
     Provider,
     discover_provider,
     Room,
     Mode,
     WiringDiagram,
+    BuildSilkscreen,
+    SilkscreenText,
 )
 from projects_config import TestBoardConfig
 
@@ -84,6 +87,25 @@ class TestBoardProvider(Provider):
                 Box(w_tail, l_tail, t_tail)
 
         return tail
+
+    def silkscreen(self) -> list[SilkscreenTextModel]:
+        """Define silkscreen text markings located relative to board geometry using CAD primitives."""
+        length_board = self.settings.board_length
+        margin = self.settings.silkscreen_margin
+        y_top = (length_board / 2.0) - margin
+        y_bottom = -(length_board / 2.0) + margin
+
+        with BuildSilkscreen() as silk:
+            with Locations((0.0, y_top)):
+                SilkscreenText("TEST BOARD CARRIER REV 1.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
+            with Locations((0.0, y_bottom)):
+                SilkscreenText("LAYER 1-6 RIGID-FLEX", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((0.0, 0.0)):
+                SilkscreenText(
+                    "BOTTOM SHIELD / GROUND REF", layer="B.SilkS", font_size=1.0, thickness=0.15, mirror=True
+                )
+
+        return silk.texts
 
     def enclosure_bottom(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
         """Build the protective lower enclosure shell with mounting standoffs."""

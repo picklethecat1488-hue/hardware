@@ -331,6 +331,17 @@ class Provider:
                 return yaml.safe_load(f)
         return None
 
+    def silkscreen(self) -> List[Any]:
+        """Define CAD-located silkscreen text markings and annotations for PCB exports.
+
+        Subclasses should override this method to place silkscreen text annotations
+        using BuildSilkscreen and standard CAD locating primitives (Locations, PolarLocations).
+
+        Returns:
+            List of SilkscreenTextModel instances, or empty list if none defined.
+        """
+        return []
+
     @property
     def pcb_config(self) -> Optional[PCBConfig]:
         """Return parsed PCBConfig Pydantic model from pcb.yaml if available."""
@@ -338,7 +349,11 @@ class Provider:
         if data:
             from model.pcb import PCBConfig
 
-            return PCBConfig.model_validate(data)
+            config = PCBConfig.model_validate(data)
+            provider_texts = self.silkscreen()
+            if provider_texts:
+                config.silkscreen_texts = list(provider_texts)
+            return config
         return None
 
     @property
