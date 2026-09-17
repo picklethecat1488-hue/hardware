@@ -581,6 +581,7 @@ class PCBConfig(BaseModel):
 
     name: str = Field(description="PCB project or sub-assembly name")
     board_type: str = Field(default="rigid-flex", description="Substrate type: 'rigid', 'flex', or 'rigid-flex'")
+    revision: str = Field(default="1.0", description="Board revision identifier (e.g. '1.0', 'A', 'rev2')")
     dimensions_mm: Tuple[float, float, float] = Field(
         description="Physical board bounding envelope (width, length, overall_thickness)"
     )

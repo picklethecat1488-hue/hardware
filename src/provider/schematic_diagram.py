@@ -90,14 +90,25 @@ class SchematicDiagram:
             # Component reference designator and value/label
             ref = fp.name
             val = fp.label.text if fp.label else fp.package
+            mpn = getattr(fp, "mpn", None)
             svg_lines.append(
-                f'  <text x="{cx + bw / 2.0:.1f}" y="{cy + 22:.1f}" font-family="system-ui, sans-serif" '
+                f'  <text x="{cx + bw / 2.0:.1f}" y="{cy + 20:.1f}" font-family="system-ui, sans-serif" '
                 f'font-size="13" font-weight="bold" text-anchor="middle" fill="#0f172a">{ref}</text>'
             )
-            svg_lines.append(
-                f'  <text x="{cx + bw / 2.0:.1f}" y="{cy + 38:.1f}" font-family="system-ui, sans-serif" '
-                f'font-size="10" text-anchor="middle" fill="#64748b">{val}</text>'
-            )
+            if mpn and mpn != val:
+                svg_lines.append(
+                    f'  <text x="{cx + bw / 2.0:.1f}" y="{cy + 34:.1f}" font-family="system-ui, sans-serif" '
+                    f'font-size="10" font-weight="bold" text-anchor="middle" fill="#0369a1">{mpn}</text>'
+                )
+                svg_lines.append(
+                    f'  <text x="{cx + bw / 2.0:.1f}" y="{cy + 47:.1f}" font-family="system-ui, sans-serif" '
+                    f'font-size="9" text-anchor="middle" fill="#64748b">{val}</text>'
+                )
+            else:
+                svg_lines.append(
+                    f'  <text x="{cx + bw / 2.0:.1f}" y="{cy + 38:.1f}" font-family="system-ui, sans-serif" '
+                    f'font-size="10" text-anchor="middle" fill="#64748b">{val}</text>'
+                )
 
             # Draw pins
             left_pins = [p for p in fp.pins if p.side.value in ("left", "bottom")]
@@ -266,8 +277,8 @@ class SchematicDiagram:
 
         ax.text(168, 96, "Classification: ENGINEERING SPEC", fontsize=9, fontweight="bold", color="#0369a1")
         ax.text(168, 84, "Status: RELEASED", fontsize=9.5, fontweight="bold", color="#16a34a")
-        ax.text(168, 72, f"Total Footprints: {len(fps)} | Nets: {len(nets)}", fontsize=9.5, color="#334155")
-        ax.text(168, 60, f"Date: {date_str} | Rev: 1.0", fontsize=9.5, color="#334155")
+        board_rev = self.config.revision if self.config and self.config.revision else "1.0"
+        ax.text(168, 60, f"Date: {date_str} | Rev: {board_rev}", fontsize=9.5, color="#334155")
 
         # Footer
         ax.text(148.5, 20, f"Page 1 of {total_pages}", ha="center", fontsize=9, color="#64748b")
@@ -406,8 +417,14 @@ class SchematicDiagram:
         else:
             title = f"TABLE OF CONTENTS & INTERCONNECT SCHEDULE (PAGE {plan.page_index} OF {total_toc_pages})"
 
-        ax.text(20, 188, title, fontsize=15, fontweight="bold", color="#0f172a")
-        ax.text(20, 180, f"{board_name} | {board_type} | {layer_count}-Layer Stackup", fontsize=10, color="#475569")
+        board_rev = self.config.revision if self.config and self.config.revision else "1.0"
+        ax.text(
+            20,
+            180,
+            f"{board_name} | {board_type} | {layer_count}-Layer Stackup | Rev: {board_rev}",
+            fontsize=10,
+            color="#475569",
+        )
         ax.plot([20, 277], [175, 175], color="#0284c7", linewidth=1.5)
 
         y = 166.0
@@ -536,7 +553,8 @@ class SchematicDiagram:
             fontsize=7.5,
             color="#475569",
         )
-        ax.text(tb_x + 3, tb_y + 14, "Rev: 1.0", fontsize=7.5, color="#334155")
+        board_rev = self.config.revision if self.config and self.config.revision else "1.0"
+        ax.text(tb_x + 3, tb_y + 14, f"Rev: {board_rev}", fontsize=7.5, color="#334155")
         ax.text(
             tb_x + 3,
             tb_y + 4,
@@ -554,12 +572,27 @@ class SchematicDiagram:
                 pin_to_net[pair] = net.name
 
         num_comps = len(sheet_fps)
-        col_width = (185.0 - 20.0) / max(1, num_comps)
+        cw = 38.0
+        pin_pitch = 5.0
+        stub_len = 5.0
+
+        if num_comps == 1:
+            col_x_positions = [120.0]
+        elif num_comps == 2:
+            col_x_positions = [42.0, 175.0]
+        else:
+            avail_w = 230.0
+            col_w = avail_w / max(1, num_comps)
+            cw = min(38.0, col_w * 0.70)
+            col_x_positions = [25.0 + i * col_w + (col_w - cw) / 2.0 for i in range(num_comps)]
+
         sheet_pin_coords: Dict[Tuple[str, str], Tuple[float, float]] = {}
+        pin_side_map: Dict[Tuple[str, str], str] = {}
+        comp_of_pin: Dict[Tuple[str, str], int] = {}
+        comp_boxes: List[Tuple[float, float, float, float]] = []
 
         for c_idx, fp in enumerate(sheet_fps):
-            cx = 25.0 + (c_idx * col_width) + (col_width * 0.15)
-            cw = min(60.0, col_width * 0.70)
+            cx = col_x_positions[c_idx]
 
             left_pins = [p for p in fp.pins if p.side.value in ("left", "bottom")]
             right_pins = [p for p in fp.pins if p.side.value in ("right", "top")]
@@ -567,9 +600,13 @@ class SchematicDiagram:
                 left_pins = fp.pins[: len(fp.pins) // 2]
                 right_pins = fp.pins[len(fp.pins) // 2 :]
 
+            mpn = getattr(fp, "mpn", None)
+            has_mpn = bool(mpn)
+            header_offset = 18.0 if has_mpn else 15.0
             max_pin_rows = max(len(left_pins), len(right_pins), 2)
-            ch = max(45.0, max_pin_rows * 8.0 + 20.0)
-            cy = 185.0 - ch
+            ch = max(34.0, header_offset + (max_pin_rows - 1) * pin_pitch + 6.0)
+            cy = 180.0 - ch
+            comp_boxes.append((cx, cy, cw, ch))
 
             # IC Body Box
             ax.add_patch(
@@ -579,87 +616,171 @@ class SchematicDiagram:
             # Component header inside box
             ax.text(
                 cx + cw / 2.0,
-                cy + ch - 5,
+                cy + ch - 4.2,
                 fp.name,
                 ha="center",
                 va="center",
-                fontsize=11,
+                fontsize=9.0,
                 fontweight="bold",
                 color="#0f172a",
                 zorder=3,
             )
-            val = fp.label.text if fp.label else fp.package
-            ax.text(
-                cx + cw / 2.0,
-                cy + ch - 10.5,
-                str(val),
-                ha="center",
-                va="center",
-                fontsize=7.5,
-                color="#64748b",
-                zorder=3,
-            )
-            ax.plot([cx + 3, cx + cw - 3], [cy + ch - 13, cy + ch - 13], color="#e2e8f0", linewidth=0.8, zorder=3)
+            if mpn:
+                # Part number (MPN)
+                ax.text(
+                    cx + cw / 2.0,
+                    cy + ch - 8.0,
+                    str(mpn),
+                    ha="center",
+                    va="center",
+                    fontsize=5.8,
+                    fontweight="bold",
+                    color="#0369a1",
+                    zorder=3,
+                )
+                # Package
+                ax.text(
+                    cx + cw / 2.0,
+                    cy + ch - 11.5,
+                    str(fp.package),
+                    ha="center",
+                    va="center",
+                    fontsize=5.5,
+                    color="#64748b",
+                    zorder=3,
+                )
+                divider_y = cy + ch - 13.8
+            else:
+                val = fp.label.text if fp.label and fp.label.text != fp.name else fp.package
+                ax.text(
+                    cx + cw / 2.0,
+                    cy + ch - 8.5,
+                    str(val),
+                    ha="center",
+                    va="center",
+                    fontsize=6.5,
+                    color="#64748b",
+                    zorder=3,
+                )
+                divider_y = cy + ch - 11.5
+
+            ax.plot([cx + 2.5, cx + cw - 2.5], [divider_y, divider_y], color="#e2e8f0", linewidth=0.8, zorder=3)
 
             # Left Pins
-            stub_len = 8.0
             for p_idx, p in enumerate(left_pins):
-                py = cy + ch - 19.0 - (p_idx * 7.5)
+                py = cy + ch - header_offset - (p_idx * pin_pitch)
                 ax.plot([cx - stub_len, cx], [py, py], color="#475569", linewidth=1.0, zorder=2)
-                ax.plot(cx - stub_len, py, marker="o", markersize=3, color="#0284c7", zorder=3)
-                ax.text(cx + 2.0, py, p.name, ha="left", va="center", fontsize=7, color="#1e293b", zorder=3)
+                ax.plot(cx - stub_len, py, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                ax.text(cx + 1.5, py, p.name, ha="left", va="center", fontsize=6.5, color="#1e293b", zorder=3)
                 sheet_pin_coords[(fp.name, p.name)] = (cx - stub_len, py)
-
-                net_name = pin_to_net.get((fp.name, p.name))
-                if net_name:
-                    ax.text(
-                        cx - stub_len - 1.5,
-                        py,
-                        net_name,
-                        ha="right",
-                        va="center",
-                        fontsize=6.5,
-                        fontweight="bold",
-                        color="#0369a1",
-                        zorder=3,
-                    )
+                pin_side_map[(fp.name, p.name)] = "left"
+                comp_of_pin[(fp.name, p.name)] = c_idx
 
             # Right Pins
             for p_idx, p in enumerate(right_pins):
-                py = cy + ch - 19.0 - (p_idx * 7.5)
+                py = cy + ch - header_offset - (p_idx * pin_pitch)
                 ax.plot([cx + cw, cx + cw + stub_len], [py, py], color="#475569", linewidth=1.0, zorder=2)
-                ax.plot(cx + cw + stub_len, py, marker="o", markersize=3, color="#0284c7", zorder=3)
-                ax.text(cx + cw - 2.0, py, p.name, ha="right", va="center", fontsize=7, color="#1e293b", zorder=3)
+                ax.plot(cx + cw + stub_len, py, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                ax.text(cx + cw - 1.5, py, p.name, ha="right", va="center", fontsize=6.5, color="#1e293b", zorder=3)
                 sheet_pin_coords[(fp.name, p.name)] = (cx + cw + stub_len, py)
+                pin_side_map[(fp.name, p.name)] = "right"
+                comp_of_pin[(fp.name, p.name)] = c_idx
 
-                net_name = pin_to_net.get((fp.name, p.name))
-                if net_name:
-                    ax.text(
-                        cx + cw + stub_len + 1.5,
-                        py,
-                        net_name,
-                        ha="left",
-                        va="center",
-                        fontsize=6.5,
-                        fontweight="bold",
-                        color="#0369a1",
-                        zorder=3,
-                    )
+        # Set of pins that are directly wired across the open channel
+        wired_pins: set[Tuple[str, str]] = set()
 
         # Wire connections between pins on this sheet sharing a net
+        # Only route a direct wire if the path stays completely within the open channel
+        # and does not cross or touch any component body
         for net in all_nets:
             present_pins = [pair for pair in net.pins if pair in sheet_pin_coords]
-            if len(present_pins) >= 2:
-                for i in range(len(present_pins) - 1):
-                    p1 = sheet_pin_coords[present_pins[i]]
-                    p2 = sheet_pin_coords[present_pins[i + 1]]
+            if len(present_pins) == 2:
+                pair1, pair2 = present_pins[0], present_pins[1]
+                c1, c2 = comp_of_pin[pair1], comp_of_pin[pair2]
+                s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
+
+                # Ensure pair1 is on the left component and pair2 is on the right component
+                if c1 > c2:
+                    pair1, pair2 = pair2, pair1
+                    c1, c2 = c2, c1
+                    s1, s2 = s2, s1
+
+                # Wires are cleanly drawn when connecting facing pins across the channel
+                # (e.g. left comp right pin to right comp left pin)
+                if c1 != c2 and s1 == "right" and s2 == "left":
+                    p1 = sheet_pin_coords[pair1]
+                    p2 = sheet_pin_coords[pair2]
                     mid_x = (p1[0] + p2[0]) / 2.0
-                    ax.plot(
-                        [p1[0], mid_x, mid_x, p2[0]],
-                        [p1[1], p1[1], p2[1], p2[1]],
-                        color="#2563eb",
-                        linewidth=1.2,
-                        zorder=1,
-                    )
+
+                    if abs(p1[1] - p2[1]) < 0.1:
+                        # Straight horizontal wire
+                        ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color="#2563eb", linewidth=1.2, zorder=2)
+                        ax.text(
+                            mid_x,
+                            p1[1] + 1.2,
+                            net.name,
+                            ha="center",
+                            va="bottom",
+                            fontsize=6.5,
+                            fontweight="bold",
+                            color="#0369a1",
+                            zorder=3,
+                        )
+                    else:
+                        # Orthogonal dogleg wire
+                        ax.plot(
+                            [p1[0], mid_x, mid_x, p2[0]],
+                            [p1[1], p1[1], p2[1], p2[1]],
+                            color="#2563eb",
+                            linewidth=1.2,
+                            zorder=2,
+                        )
+                        ax.text(
+                            mid_x,
+                            max(p1[1], p2[1]) + 1.2,
+                            net.name,
+                            ha="center",
+                            va="bottom",
+                            fontsize=6.5,
+                            fontweight="bold",
+                            color="#0369a1",
+                            zorder=3,
+                        )
+                    wired_pins.add(pair1)
+                    wired_pins.add(pair2)
+
+        # Place net labels for all unwired pins (off-sheet nets, or nets connected via net flags)
+        for pair, (px, py) in sheet_pin_coords.items():
+            if pair in wired_pins:
+                continue
+            net_name = pin_to_net.get(pair)
+            if not net_name:
+                continue
+
+            side = pin_side_map[pair]
+            if side == "left":
+                ax.text(
+                    px - 1.5,
+                    py,
+                    net_name,
+                    ha="right",
+                    va="center",
+                    fontsize=6.5,
+                    fontweight="bold",
+                    color="#0369a1",
+                    zorder=3,
+                )
+            else:
+                ax.text(
+                    px + 1.5,
+                    py,
+                    net_name,
+                    ha="left",
+                    va="center",
+                    fontsize=6.5,
+                    fontweight="bold",
+                    color="#0369a1",
+                    zorder=3,
+                )
 
         pdf.savefig(fig)

@@ -5,6 +5,10 @@
     (thickness {{ board.stackup.total_thickness_mm }})
   )
   (paper "{{ board.sheet_size or 'A4' }}")
+  (title_block
+    (title "{{ board.name }}")
+    (rev "{{ board.revision or '1.0' }}")
+  )
   (layers
     (0 "F.Cu" signal)
 {% for layer in copper_inner_layers %}

@@ -143,6 +143,7 @@ class KiCadCLI:
             layers,
             "--page-size-mode",
             "2",
+            "--exclude-drawing-sheet",
             "-o",
             str(out_svg),
             str(pcb_file),

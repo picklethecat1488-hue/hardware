@@ -6,6 +6,7 @@
   (paper "A4")
   (title_block
     (title "{{ board.name }} Schematic")
+    (rev "{{ board.revision or '1.0' }}")
     (company "Hardware Project")
     (comment 1 "Generated automatically via CLI Manifest Engine")
   )
@@ -47,6 +48,11 @@
     (property "Value" "{{ symbol.value }}" (at {{ symbol.x }} {{ symbol.y + symbol.half_h + 2.54 }} 0)
       (effects (font (size 1.27 1.27)))
     )
+{% if symbol.mpn %}
+    (property "MPN" "{{ symbol.mpn }}" (at {{ symbol.x }} {{ symbol.y + symbol.half_h + 5.08 }} 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+{% endif %}
 {% for pin in symbol.pins %}
     (pin "{{ pin.number }}" (uuid "{{ pin.uuid }}"))
 {% endfor %}
