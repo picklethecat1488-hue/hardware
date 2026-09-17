@@ -1,0 +1,43 @@
+(kicad_sch
+  (version 20231120)
+  (generator "hardware_pcb_engine")
+  (generator_version "8.0")
+  (uuid "{{ sch_uuid }}")
+  (paper "A4")
+  (title_block
+    (title "{{ board.name }} Schematic")
+    (company "Hardware Project")
+    (comment 1 "Generated automatically via CLI Manifest Engine")
+  )
+{% for symbol in symbols %}
+  (symbol
+    (lib_id "{{ symbol.package }}")
+    (at {{ symbol.x }} {{ symbol.y }} 0)
+    (unit 1)
+    (uuid "{{ symbol.uuid }}")
+    (property "Reference" "{{ symbol.name }}" (at {{ symbol.x }} {{ symbol.y - 12.7 }} 0)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Value" "{{ symbol.value }}" (at {{ symbol.x }} {{ symbol.y + 12.7 }} 0)
+      (effects (font (size 1.27 1.27)))
+    )
+{% for pin in symbol.pins %}
+    (pin "{{ pin.name }}" (uuid "{{ pin.uuid }}"))
+{% endfor %}
+  )
+{% endfor %}
+
+{% for wire in wires %}
+  (wire (pts (xy {{ wire.x1 }} {{ wire.y1 }}) (xy {{ wire.x2 }} {{ wire.y2 }}))
+    (stroke (width 0) (type default))
+    (uuid "{{ wire.uuid }}")
+  )
+{% endfor %}
+
+{% for label in labels %}
+  (label "{{ label.text }}" (at {{ label.x }} {{ label.y }} 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid "{{ label.uuid }}")
+  )
+{% endfor %}
+)
