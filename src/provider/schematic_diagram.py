@@ -612,7 +612,7 @@ class SchematicDiagram:
         if not caps:
             return
 
-        delta_x = 24.0
+        delta_x = 34.0
         n_caps = len(caps)
         total_w = (n_caps - 1) * delta_x
 
@@ -622,7 +622,7 @@ class SchematicDiagram:
 
         # Background dashed bounding card
         card_x = base_x - 14.0
-        card_w = max(total_w + 38.0, 72.0)
+        card_w = max(total_w + 42.0, 80.0)
         card_y = y_bot - 12.0
         card_h = (y_top - y_bot) + 26.0
 
@@ -840,16 +840,27 @@ class SchematicDiagram:
         same_pwr = len(pwr_nets) == 1
         common_pwr = list(pwr_nets)[0] if same_pwr else "3V3"
 
-        y_top_rail = max(p[1] for p in pullup_points) + 18.0
+        # Position resistor bodies strictly above all horizontal wires in the channel
+        channel_wire_ys = [seg[2] for seg in h_wire_segments]
+        channel_top_y = max(channel_wire_ys) if channel_wire_ys else max(p[1] for p in pullup_points)
+        y_zz_bot = channel_top_y + 8.0
+        y_zz_top = y_zz_bot + 9.0
+        y_top_rail = y_zz_top + 6.0
 
         for x_pull, y_base, fp, sig_net, pwr_net in pullup_points:
             # Junction dot on the signal wire
             ax.plot(x_pull, y_base, marker="o", markersize=3.0, color="#2563eb", zorder=4)
 
-            # Lead up to resistor body
-            y_zz_bot = y_base + 4.0
-            y_zz_top = y_base + 13.0
-            ax.plot([x_pull, x_pull], [y_base, y_zz_bot], color="#475569", linewidth=1.2, zorder=2)
+            # Lead up to resistor body with jumper bridges over crossing wires
+            self._draw_vertical_wire_with_jumpers(
+                ax,
+                x_v=x_pull,
+                y_start=y_base,
+                y_end=y_zz_bot,
+                col="#475569",
+                h_wire_segments=h_wire_segments,
+                net_name=sig_net,
+            )
 
             # Vertical zig-zag resistor body (height 9mm)
             zz_y = [
@@ -1059,9 +1070,9 @@ class SchematicDiagram:
         ax: matplotlib.axes.Axes,
         fp: FootprintModel,
         tt: TruthTableModel,
-        base_x: float = 105.0,
+        base_x: float = 118.0,
         base_y: float = 52.0,
-        card_w: float = 93.0,
+        card_w: float = 125.0,
     ) -> None:
         """Render an engineering truth table box displaying TRUE, FALSE, and INVALID circuit states."""
         n_rows = len(tt.rows)
@@ -1111,10 +1122,10 @@ class SchematicDiagram:
 
         # Column headers
         y_col = y_top - header_h - 3.5
-        col_state_x = base_x + 3.5
-        col_in_x = base_x + 19.5
-        col_out_x = base_x + 42.5
-        col_desc_x = base_x + 65.5
+        col_state_x = base_x + 3.0
+        col_in_x = base_x + 20.0
+        col_out_x = base_x + 48.0
+        col_desc_x = base_x + 78.0
 
         ax.text(
             col_state_x + 6.5,
@@ -1131,7 +1142,7 @@ class SchematicDiagram:
         ax.text(
             col_in_x,
             y_col,
-            in_lbl[:16],
+            in_lbl,
             ha="left",
             va="center",
             fontsize=5.0,
@@ -1143,7 +1154,7 @@ class SchematicDiagram:
         ax.text(
             col_out_x,
             y_col,
-            out_lbl[:16],
+            out_lbl,
             ha="left",
             va="center",
             fontsize=5.0,
@@ -1227,17 +1238,17 @@ class SchematicDiagram:
 
             # Inputs values
             in_val = ", ".join(row.inputs.values())
-            ax.text(col_in_x, y_row_mid, in_val[:20], ha="left", va="center", fontsize=5.0, color="#1e293b", zorder=3)
+            ax.text(col_in_x, y_row_mid, in_val, ha="left", va="center", fontsize=5.0, color="#1e293b", zorder=3)
 
             # Outputs values
             out_val = ", ".join(row.outputs.values())
-            ax.text(col_out_x, y_row_mid, out_val[:20], ha="left", va="center", fontsize=5.0, color="#1e293b", zorder=3)
+            ax.text(col_out_x, y_row_mid, out_val, ha="left", va="center", fontsize=5.0, color="#1e293b", zorder=3)
 
             # Description
             ax.text(
                 col_desc_x,
                 y_row_mid,
-                row.description[:34],
+                row.description,
                 ha="left",
                 va="center",
                 fontsize=4.8,
@@ -1348,32 +1359,59 @@ class SchematicDiagram:
         num_comps = len(main_fps)
         pin_pitch = PIN_PITCH_MM
 
+        has_bottom_cards = bool(decoupling_caps) or any(
+            getattr(fp, "truth_table", None) is not None
+            or fp.name.upper().startswith("Q")
+            or "SOT" in fp.package.upper()
+            or "FET" in fp.package.upper()
+            for fp in sheet_fps
+        )
+
+        page_center_x = 147.5
+        page_center_y = 115.0
+
+        if has_bottom_cards:
+            top_row_y = 158.0
+            bottom_cards_y = 66.0
+        elif pullup_resistors:
+            top_row_y = 138.0
+            bottom_cards_y = 60.0
+        else:
+            top_row_y = 138.0
+            bottom_cards_y = 60.0
+
         if num_comps == 1:
             cols_per_row = 1
-            col_x_positions = [120.0]
-            col_y_positions = [180.0]
             cw = 38.0
+            col_x_positions = [page_center_x - cw / 2.0]
+            col_y_positions = [top_row_y]
         elif num_comps == 2:
             cols_per_row = 2
-            col_x_positions = [55.0, 175.0]
-            col_y_positions = [180.0, 180.0]
             cw = 38.0
+            gap = 55.0
+            total_w = 2 * cw + gap
+            start_x = page_center_x - total_w / 2.0
+            col_x_positions = [start_x, start_x + cw + gap]
+            col_y_positions = [top_row_y, top_row_y]
         elif num_comps == 3:
             cols_per_row = 3
-            col_x_positions = [30.0, 110.0, 190.0]
-            col_y_positions = [180.0, 180.0, 180.0]
             cw = 36.0
+            gap = 35.0
+            total_w = 3 * cw + 2 * gap
+            start_x = max(50.0, page_center_x - total_w / 2.0)
+            col_x_positions = [start_x, start_x + cw + gap, start_x + 2 * (cw + gap)]
+            col_y_positions = [top_row_y, top_row_y, top_row_y]
         else:
             cols_per_row = (num_comps + 1) // 2
-            col_w = 230.0 / max(1, cols_per_row)
+            col_w = 210.0 / max(1, cols_per_row)
             cw = min(36.0, col_w * 0.55)
             col_x_positions = []
             col_y_positions = []
             for i in range(num_comps):
                 r_idx = i // cols_per_row
                 c_idx_col = i % cols_per_row
-                col_x_positions.append(22.0 + c_idx_col * col_w + (col_w - cw) / 2.0)
-                col_y_positions.append(180.0 - (r_idx * 68.0))
+                col_x_positions.append(45.0 + c_idx_col * col_w + (col_w - cw) / 2.0)
+                col_y_positions.append(top_row_y - (r_idx * 55.0))
 
         # Build pin side map and component column index map
         fp_col_map = {fp.name: idx for idx, fp in enumerate(main_fps)}
@@ -1899,41 +1937,150 @@ class SchematicDiagram:
             side = pin_side_map.get(pair, "left")
             net_upper = net_name.upper()
 
-            # GND 3-bar symbol
-            if net_upper in GROUND_NET_NAMES:
-                ax.plot([px, px], [py, py - 3.0], color="#475569", linewidth=1.2, zorder=2)
-                ax.plot([px - 2.8, px + 2.8], [py - 3.0, py - 3.0], color="#475569", linewidth=1.4, zorder=2)
-                ax.plot([px - 1.8, px + 1.8], [py - 4.2, py - 4.2], color="#475569", linewidth=1.2, zorder=2)
-                ax.plot([px - 0.8, px + 0.8], [py - 5.4, py - 5.4], color="#475569", linewidth=1.0, zorder=2)
-                ax.text(
-                    px,
-                    py - 6.8,
-                    "GND",
-                    ha="center",
-                    va="top",
-                    fontsize=5.5,
-                    fontweight="bold",
-                    color="#475569",
-                    zorder=3,
-                )
+            has_pin_above = any(
+                p2 != pair
+                and p2[0] == pair[0]
+                and pin_side_map.get(p2) == side
+                and sheet_pin_coords[p2][1] > py
+                and sheet_pin_coords[p2][1] - py < 8.0
+                for p2 in sheet_pin_coords
+            )
+            has_pin_below = any(
+                p2 != pair
+                and p2[0] == pair[0]
+                and pin_side_map.get(p2) == side
+                and sheet_pin_coords[p2][1] < py
+                and py - sheet_pin_coords[p2][1] < 8.0
+                for p2 in sheet_pin_coords
+            )
+            has_wire_above = any(
+                0.1 < seg[2] - py < 7.0 and min(seg[0], seg[1]) - 1.0 <= px <= max(seg[0], seg[1]) + 1.0
+                for seg in h_segments
+            )
+            has_wire_below = any(
+                0.1 < py - seg[2] < 7.0 and min(seg[0], seg[1]) - 1.0 <= px <= max(seg[0], seg[1]) + 1.0
+                for seg in h_segments
+            )
 
-            # Power upward arrow symbol
+            # GND symbol
+            if net_upper in GROUND_NET_NAMES:
+                if not has_pin_below and not has_wire_below:
+                    # Standard vertical 3-bar hanging DOWN
+                    ax.plot([px, px], [py, py - 3.0], color="#475569", linewidth=1.2, zorder=2)
+                    ax.plot([px - 2.8, px + 2.8], [py - 3.0, py - 3.0], color="#475569", linewidth=1.4, zorder=2)
+                    ax.plot([px - 1.8, px + 1.8], [py - 4.2, py - 4.2], color="#475569", linewidth=1.2, zorder=2)
+                    ax.plot([px - 0.8, px + 0.8], [py - 5.4, py - 5.4], color="#475569", linewidth=1.0, zorder=2)
+                    ax.text(
+                        px,
+                        py - 6.8,
+                        "GND",
+                        ha="center",
+                        va="top",
+                        fontsize=5.5,
+                        fontweight="bold",
+                        color="#475569",
+                        zorder=3,
+                    )
+                else:
+                    # Horizontal 3-bar pointing outward away from component
+                    if side == "left":
+                        ax.plot([px, px - 2.0], [py, py], color="#475569", linewidth=1.2, zorder=2)
+                        ax.plot([px - 2.0, px - 2.0], [py - 2.8, py + 2.8], color="#475569", linewidth=1.4, zorder=2)
+                        ax.plot([px - 3.2, px - 3.2], [py - 1.8, py + 1.8], color="#475569", linewidth=1.2, zorder=2)
+                        ax.plot([px - 4.4, px - 4.4], [py - 0.8, py + 0.8], color="#475569", linewidth=1.0, zorder=2)
+                        ax.text(
+                            px - 5.8,
+                            py,
+                            "GND",
+                            ha="right",
+                            va="center",
+                            fontsize=5.5,
+                            fontweight="bold",
+                            color="#475569",
+                            zorder=3,
+                        )
+                    else:
+                        ax.plot([px, px + 2.0], [py, py], color="#475569", linewidth=1.2, zorder=2)
+                        ax.plot([px + 2.0, px + 2.0], [py - 2.8, py + 2.8], color="#475569", linewidth=1.4, zorder=2)
+                        ax.plot([px + 3.2, px + 3.2], [py - 1.8, py + 1.8], color="#475569", linewidth=1.2, zorder=2)
+                        ax.plot([px + 4.4, px + 4.4], [py - 0.8, py + 0.8], color="#475569", linewidth=1.0, zorder=2)
+                        ax.text(
+                            px + 5.8,
+                            py,
+                            "GND",
+                            ha="left",
+                            va="center",
+                            fontsize=5.5,
+                            fontweight="bold",
+                            color="#475569",
+                            zorder=3,
+                        )
+
+            # Power symbol
             elif net_upper in POWER_NET_NAMES:
-                ax.plot([px, px], [py, py + 3.0], color="#dc2626", linewidth=1.2, zorder=2)
-                ax.plot(
-                    [px - 2.5, px, px + 2.5], [py + 2.0, py + 4.5, py + 2.0], color="#dc2626", linewidth=1.2, zorder=2
-                )
-                ax.text(
-                    px,
-                    py + 5.5,
-                    net_name,
-                    ha="center",
-                    va="bottom",
-                    fontsize=5.8,
-                    fontweight="bold",
-                    color="#dc2626",
-                    zorder=3,
-                )
+                if not has_pin_above and not has_wire_above:
+                    # Standard upward arrow
+                    ax.plot([px, px], [py, py + 3.0], color="#dc2626", linewidth=1.2, zorder=2)
+                    ax.plot(
+                        [px - 2.5, px, px + 2.5],
+                        [py + 2.0, py + 4.5, py + 2.0],
+                        color="#dc2626",
+                        linewidth=1.2,
+                        zorder=2,
+                    )
+                    ax.text(
+                        px,
+                        py + 5.5,
+                        net_name,
+                        ha="center",
+                        va="bottom",
+                        fontsize=5.8,
+                        fontweight="bold",
+                        color="#dc2626",
+                        zorder=3,
+                    )
+                else:
+                    # Horizontal power arrow pointing outward away from component
+                    if side == "left":
+                        ax.plot([px, px - 2.5], [py, py], color="#dc2626", linewidth=1.2, zorder=2)
+                        ax.plot(
+                            [px - 0.5, px - 3.0, px - 0.5],
+                            [py + 2.2, py, py - 2.2],
+                            color="#dc2626",
+                            linewidth=1.2,
+                            zorder=2,
+                        )
+                        ax.text(
+                            px - 4.5,
+                            py,
+                            net_name,
+                            ha="right",
+                            va="center",
+                            fontsize=5.8,
+                            fontweight="bold",
+                            color="#dc2626",
+                            zorder=3,
+                        )
+                    else:
+                        ax.plot([px, px + 2.5], [py, py], color="#dc2626", linewidth=1.2, zorder=2)
+                        ax.plot(
+                            [px + 0.5, px + 3.0, px + 0.5],
+                            [py + 2.2, py, py - 2.2],
+                            color="#dc2626",
+                            linewidth=1.2,
+                            zorder=2,
+                        )
+                        ax.text(
+                            px + 4.5,
+                            py,
+                            net_name,
+                            ha="left",
+                            va="center",
+                            fontsize=5.8,
+                            fontweight="bold",
+                            color="#dc2626",
+                            zorder=3,
+                        )
 
             # Signal net flag / label
             else:
@@ -1978,8 +2125,8 @@ class SchematicDiagram:
                 ax=ax,
                 caps=decoupling_caps,
                 pin_to_net=pin_to_net,
-                base_x=35.0,
-                base_y=62.0,
+                base_x=26.0,
+                base_y=bottom_cards_y,
             )
 
         # Draw Truth Tables for discrete component networks (e.g. transistor networks)
@@ -1995,6 +2142,12 @@ class SchematicDiagram:
                 tt = self._generate_default_transistor_truth_table(fp, pin_to_net)
 
             if tt:
-                self._draw_truth_table(ax=ax, fp=fp, tt=tt, base_x=105.0, base_y=52.0, card_w=93.0)
+                tt_card_w = 125.0
+                tt_x = 118.0
+                if fp.name in fp_col_map:
+                    c_idx = fp_col_map[fp.name]
+                    comp_cx = col_x_positions[c_idx]
+                    tt_x = max(112.0, min(145.0, comp_cx + cw / 2.0 - tt_card_w / 2.0 + 20.0))
+                self._draw_truth_table(ax=ax, fp=fp, tt=tt, base_x=tt_x, base_y=bottom_cards_y, card_w=tt_card_w)
 
         pdf.savefig(fig)
