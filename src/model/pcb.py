@@ -21,6 +21,14 @@ class LayerType(StrEnum):
     STIFFENER = "stiffener"
 
 
+class BoardType(StrEnum):
+    """Substrate construction categorization for printed circuit boards."""
+
+    RIGID = "rigid"
+    FLEX = "flex"
+    RIGID_FLEX = "rigid-flex"
+
+
 class StackupLayerModel(BaseModel):
     """Data model representing an individual layer in a multi-layer stackup."""
 
@@ -681,7 +689,9 @@ class PCBConfig(BaseModel):
     """Top-level configuration model defining complete physical board, stackup, and high-speed rules."""
 
     name: str = Field(description="PCB project or sub-assembly name")
-    board_type: str = Field(default="rigid-flex", description="Substrate type: 'rigid', 'flex', or 'rigid-flex'")
+    board_type: BoardType = Field(
+        default=BoardType.RIGID_FLEX, description="Substrate type: 'rigid', 'flex', or 'rigid-flex'"
+    )
     revision: str = Field(default="1.0", description="Board revision identifier (e.g. '1.0', 'A', 'rev2')")
     dimensions_mm: Optional[Tuple[float, float, float]] = Field(
         default=None,

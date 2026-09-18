@@ -402,6 +402,12 @@
       background: rgba(255, 184, 0, 0.12);
       border-left: 3px solid var(--quake-gold);
     }
+    .file-item.viewed {
+      opacity: 0.55;
+    }
+    .file-item.viewed .file-title {
+      color: var(--quake-text-dim);
+    }
     .file-left {
       display: flex;
       align-items: center;
@@ -519,8 +525,8 @@
     }
     .sbs-row td {
       padding: 1px 6px;
-      white-space: pre-wrap;
-      word-break: break-all;
+      white-space: pre;
+      word-break: normal;
       vertical-align: top;
     }
     .lineno {
@@ -587,8 +593,8 @@
     }
     .unified-text {
       flex: 1;
-      white-space: pre-wrap;
-      word-break: break-all;
+      white-space: pre;
+      word-break: normal;
       padding-left: 8px;
     }
     .unified-row.add, .unified-row.insert { background: var(--bg-diff-add); color: #86efac; }
@@ -1483,8 +1489,12 @@
 
         const comments = (state.session?.comments || []).filter(c => c.file_path === f.path);
 
+        const openedInCommit = state.openedFilesByCommit && state.openedFilesByCommit[state.selectedCommit];
+        const isViewed = openedInCommit && openedInCommit.has(f.path) && f.path !== state.selectedFile;
+        const isActive = f.path === state.selectedFile;
+
         const li = document.createElement("li");
-        li.className = "file-item" + (f.path === state.selectedFile ? " active" : "");
+        li.className = "file-item" + (isActive ? " active" : (isViewed ? " viewed" : ""));
         li.onclick = () => goto(f.path);
 
         const statusClass = f.status === "A" ? "quake-badge-green" : (f.status === "D" ? "quake-badge-red" : "quake-badge-cyan");
@@ -1596,6 +1606,17 @@
         }
         state.openedFilesByCommit[state.selectedCommit].add(activePath);
         renderCommitsList();
+
+        const openedSet = state.openedFilesByCommit[state.selectedCommit];
+        const allReviewed = state.files.length > 0 && state.files.every(f => openedSet.has(f.path));
+        state.allReviewedNotified = state.allReviewedNotified || {};
+        if (allReviewed && !state.allReviewedNotified[state.selectedCommit]) {
+          state.allReviewedNotified[state.selectedCommit] = true;
+          logCli(`✨ All ${state.files.length} changed file(s) in commit ${state.selectedCommit.slice(0, 8)} have been reviewed! You can now move to the next commit.`, "gold");
+          try {
+            fetch(`/api/commit_reviewed?commit=${encodeURIComponent(state.selectedCommit)}`, { method: "POST" });
+          } catch (_) {}
+        }
       }
       state.selectedRange = { start: null, end: null };
       updateTargetUI();

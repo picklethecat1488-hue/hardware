@@ -25,16 +25,13 @@ def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None
     routing_file = project_dir / "routing.yaml"
     router.save_routing_yaml(routing_file, auto_traces, auto_vias)
 
-    # 2. Persist path to per-project .env and root .env so routes can be manually inspected or overridden
-    try:
+    # 2. Persist path to root application .env so routes can be manually inspected or overridden
+    if routing_file.is_relative_to(Path.cwd()):
         rel_path = routing_file.relative_to(Path.cwd())
-    except ValueError:
+    else:
         rel_path = routing_file
 
     env_entry = f"APP_TEST_BOARD__ROUTING_PATH={rel_path}\n"
-    project_env = project_dir / ".env"
-    project_env.write_text(f"# Test board persisted routing\n{env_entry}")
-
     root_env = Path(".env")
     if root_env.exists():
         existing_lines = [

@@ -7,6 +7,7 @@ from build123d import BuildPart
 from build123d.build_common import operations_apply_to
 
 from model.pcb import (
+    BoardType,
     CopperRegionModel,
     MountingHoleModel,
     PCBConfig,
@@ -40,7 +41,7 @@ class BuildPcb(BuildPart):
     def __init__(
         self,
         name: str = "board",
-        board_type: str = "rigid",
+        board_type: Union[BoardType, str] = BoardType.RIGID,
         revision: str = "1.0",
         stackup: Optional[Union[BuildStackup, StackupModel]] = None,
         mode: Any = None,
@@ -56,7 +57,7 @@ class BuildPcb(BuildPart):
         """
         super().__init__(mode=mode)
         self.name = name
-        self.board_type = board_type
+        self.board_type: BoardType = BoardType(board_type) if isinstance(board_type, str) else board_type
         self.revision = revision
 
         if isinstance(stackup, BuildStackup):
@@ -139,4 +140,4 @@ class BuildFlexTail(BuildPcb):
         mode: Any = None,
     ) -> None:
         """Initialize flexible tail context."""
-        super().__init__(name=name, board_type="flex", revision=revision, stackup=stackup, mode=mode)
+        super().__init__(name=name, board_type=BoardType.FLEX, revision=revision, stackup=stackup, mode=mode)

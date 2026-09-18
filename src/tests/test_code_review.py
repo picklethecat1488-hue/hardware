@@ -299,6 +299,19 @@ def test_review_server_api_flow(tmp_path: Path) -> None:
             assert verdict_data["session"]["verdict"] == "APPROVED"
             assert verdict_data["exported_to"] != ""
 
+        # 9. Test POST /api/commit_reviewed
+        reviewed_req = urllib.request.Request(
+            f"{base_url}api/commit_reviewed",
+            data=json.dumps({"commit": "abcdef123456"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(reviewed_req) as response:
+            assert response.status == 200
+            reviewed_data = json.loads(response.read().decode("utf-8"))
+            assert reviewed_data["status"] == "ok"
+            assert reviewed_data["commit"] == "abcdef123456"
+
     finally:
         server.shutdown()
         server.server_close()

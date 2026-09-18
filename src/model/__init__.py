@@ -31,6 +31,7 @@ from .wiring import (
 )
 from .material import MaterialModel, MaterialsModel
 from .pcb import (
+    BoardType,
     LayerType,
     StackupLayerModel,
     StackupModel,

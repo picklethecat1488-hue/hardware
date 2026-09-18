@@ -105,6 +105,15 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
                 self._handle_update_verdict(data)
             case "/api/export":
                 self._handle_export()
+            case "/api/commit_reviewed":
+                query = urllib.parse.parse_qs(parsed.query)
+                commit = query.get("commit", [""])[0] or (data.get("commit", "") if isinstance(data, dict) else "")
+                short_rev = commit[:8] if commit else "current"
+                print(
+                    f"\n[CodeReview] ✨ All changed files reviewed for commit {short_rev}! Ready to move to the next commit.\n",
+                    flush=True,
+                )
+                self._send_json({"status": "ok", "commit": commit})
             case _:
                 self.send_error(404, "Endpoint not found")
 
