@@ -152,6 +152,7 @@ class Section(StrEnum):
     CONFIG = "config"
     VIEW = "view"
     MATERIAL = "material"
+    PCB = "pcb"
 
 
 class Mode(StrEnum):
