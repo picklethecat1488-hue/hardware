@@ -612,7 +612,7 @@ class SchematicDiagram:
         if not caps:
             return
 
-        delta_x = 34.0
+        delta_x = 28.0
         n_caps = len(caps)
         total_w = (n_caps - 1) * delta_x
 
@@ -621,8 +621,8 @@ class SchematicDiagram:
         y_mid = (y_top + y_bot) / 2.0
 
         # Background dashed bounding card
-        card_x = base_x - 14.0
-        card_w = max(total_w + 42.0, 80.0)
+        card_x = base_x - 12.0
+        card_w = max(total_w + 32.0, 75.0)
         card_y = y_bot - 12.0
         card_h = (y_top - y_bot) + 26.0
 
@@ -808,6 +808,27 @@ class SchematicDiagram:
 
         pullup_points: List[Tuple[float, float, FootprintModel, str, str]] = []
 
+        # Determine common horizontal span across all pullup signal wires in the channel
+        matching_segs = []
+        for fp in pullups:
+            n1 = pin_to_net.get((fp.name, fp.pins[0].name), "")
+            n2 = pin_to_net.get((fp.name, fp.pins[1].name), "")
+            sig = n2 if n1.upper() in POWER_NET_NAMES else n1
+            seg = next((s for s in h_wire_segments if s[3] == sig), None)
+            if seg:
+                matching_segs.append(seg)
+
+        x_min_all = max(min(s[0], s[1]) for s in matching_segs) if matching_segs else 80.0
+        x_max_all = min(max(s[0], s[1]) for s in matching_segs) if matching_segs else 120.0
+        pitch = 8.5
+        total_span = (len(pullups) - 1) * pitch
+        center_x = (x_min_all + x_max_all) / 2.0
+        # Enforce at least 14.0 mm clearance from the right-hand component pins/symbols
+        if center_x + total_span / 2.0 > x_max_all - 14.0:
+            center_x = (x_max_all - 14.0) - total_span / 2.0
+        if center_x - total_span / 2.0 < x_min_all + 6.0:
+            center_x = (x_min_all + 6.0) + total_span / 2.0
+
         for idx, fp in enumerate(pullups):
             n1 = pin_to_net.get((fp.name, fp.pins[0].name), "")
             n2 = pin_to_net.get((fp.name, fp.pins[1].name), "")
@@ -819,20 +840,15 @@ class SchematicDiagram:
                 sig_net = n1
 
             matching_seg = next((s for s in h_wire_segments if s[3] == sig_net), None)
+            x_pull = center_x - total_span / 2.0 + idx * pitch
             if matching_seg:
-                x_start, x_end, y_wire, _, _ = matching_seg
-                x_min = min(x_start, x_end)
-                x_pull = x_min + 7.0 + idx * 10.0
-                y_base = y_wire
+                y_base = matching_seg[2]
             else:
                 target_pair = next(
                     (p for p, c in sheet_pin_coords.items() if pin_to_net.get(p) == sig_net and p[0] != fp.name),
                     None,
                 )
-                if target_pair:
-                    x_pull, y_base = sheet_pin_coords[target_pair]
-                else:
-                    x_pull, y_base = 50.0 + idx * 25.0, 120.0
+                y_base = sheet_pin_coords[target_pair][1] if target_pair else 120.0
 
             pullup_points.append((x_pull, y_base, fp, sig_net, pwr_net))
 
@@ -1123,9 +1139,9 @@ class SchematicDiagram:
         # Column headers
         y_col = y_top - header_h - 3.5
         col_state_x = base_x + 3.0
-        col_in_x = base_x + 20.0
-        col_out_x = base_x + 48.0
-        col_desc_x = base_x + 78.0
+        col_in_x = base_x + 18.0
+        col_out_x = base_x + 42.0
+        col_desc_x = base_x + 82.0
 
         ax.text(
             col_state_x + 6.5,
@@ -1145,7 +1161,7 @@ class SchematicDiagram:
             in_lbl,
             ha="left",
             va="center",
-            fontsize=5.0,
+            fontsize=4.8,
             fontweight="bold",
             color="#64748b",
             zorder=3,
@@ -1157,7 +1173,7 @@ class SchematicDiagram:
             out_lbl,
             ha="left",
             va="center",
-            fontsize=5.0,
+            fontsize=4.6,
             fontweight="bold",
             color="#64748b",
             zorder=3,
@@ -1883,7 +1899,7 @@ class SchematicDiagram:
                 else:
                     # Staggered vertical corridor
                     if has_pullups_in_channel:
-                        x_v = (p2[0] - 6.0) + dogleg_idx * 1.6
+                        x_v = (p2[0] - 14.0) + dogleg_idx * 2.0
                     else:
                         mid_base = (p1[0] + p2[0]) / 2.0
                         offset = (dogleg_idx - (num_doglegs - 1) / 2.0) * 8.0 if num_doglegs > 1 else 0.0
@@ -1941,6 +1957,7 @@ class SchematicDiagram:
                 p2 != pair
                 and p2[0] == pair[0]
                 and pin_side_map.get(p2) == side
+                and abs(sheet_pin_coords[p2][0] - px) < 4.0
                 and sheet_pin_coords[p2][1] > py
                 and sheet_pin_coords[p2][1] - py < 8.0
                 for p2 in sheet_pin_coords
@@ -1949,16 +1966,17 @@ class SchematicDiagram:
                 p2 != pair
                 and p2[0] == pair[0]
                 and pin_side_map.get(p2) == side
+                and abs(sheet_pin_coords[p2][0] - px) < 4.0
                 and sheet_pin_coords[p2][1] < py
                 and py - sheet_pin_coords[p2][1] < 8.0
                 for p2 in sheet_pin_coords
             )
             has_wire_above = any(
-                0.1 < seg[2] - py < 7.0 and min(seg[0], seg[1]) - 1.0 <= px <= max(seg[0], seg[1]) + 1.0
+                0.1 < seg[2] - py < 10.0 and min(seg[0], seg[1]) - 1.0 <= px <= max(seg[0], seg[1]) + 1.0
                 for seg in h_segments
             )
             has_wire_below = any(
-                0.1 < py - seg[2] < 7.0 and min(seg[0], seg[1]) - 1.0 <= px <= max(seg[0], seg[1]) + 1.0
+                0.1 < py - seg[2] < 10.0 and min(seg[0], seg[1]) - 1.0 <= px <= max(seg[0], seg[1]) + 1.0
                 for seg in h_segments
             )
 
@@ -2147,7 +2165,7 @@ class SchematicDiagram:
                 if fp.name in fp_col_map:
                     c_idx = fp_col_map[fp.name]
                     comp_cx = col_x_positions[c_idx]
-                    tt_x = max(112.0, min(145.0, comp_cx + cw / 2.0 - tt_card_w / 2.0 + 20.0))
+                    tt_x = max(116.0, min(145.0, comp_cx + cw / 2.0 - tt_card_w / 2.0 + 20.0))
                 self._draw_truth_table(ax=ax, fp=fp, tt=tt, base_x=tt_x, base_y=bottom_cards_y, card_w=tt_card_w)
 
         pdf.savefig(fig)
