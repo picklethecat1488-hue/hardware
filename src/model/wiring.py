@@ -57,6 +57,10 @@ class PinModel(BaseModel):
     label: str = Field(description="Display label text for the pin")
     side: PinSide = Field(description="Placement side for the pin label (left, right, top, bottom)")
     slot: Optional[int] = Field(default=None, description="Optional slot index for DIP spacing")
+    pad_type: str = Field(default="smd", description="Pad type: smd or thru_hole")
+    pad_shape: str = Field(default="circle", description="Pad shape: circle, rect, oval, roundrect")
+    pad_size_mm: Tuple[float, float] = Field(default=(0.5, 0.5), description="Pad dimensions (width, height)")
+    drill_dia_mm: Optional[float] = Field(default=None, description="Drill hole diameter in mm for thru_hole pads")
 
 
 class LabelModel(BaseModel):

@@ -15,6 +15,7 @@ from build123d import (
 )
 from model import Wiring
 from model.pcb import (
+    BoardType,
     LayerType,
     MountingHoleModel,
     SilkscreenTextModel,
@@ -114,7 +115,7 @@ class TestBoardProvider(Provider):
         hole_dia = self.settings.mounting_hole_diameter
         inset = self.settings.mounting_hole_inset
 
-        with BuildPcb(name="carrier_board", board_type="rigid", stackup=self.stackup()) as pcb:
+        with BuildPcb(name="carrier_board", board_type=BoardType.RIGID, stackup=self.stackup()) as pcb:
             # Main board outline block
             b = Box(w, length, thickness)
             # Fillet corner vertical edges
@@ -166,9 +167,10 @@ class TestBoardProvider(Provider):
         y_bottom = -(length_board / 2.0) + margin
 
         with BuildSilkscreen() as silk:
-            with Locations((0.0, y_top)):
+            # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
+            with Locations((0.0, 26.0)):
                 SilkscreenText("TEST BOARD CARRIER REV 1.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
-            with Locations((0.0, y_bottom)):
+            with Locations((0.0, -28.0)):
                 SilkscreenText("LAYER 1-6 RIGID-FLEX", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((0.0, 0.0)):
                 SilkscreenText(
