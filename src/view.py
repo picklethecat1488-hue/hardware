@@ -166,24 +166,11 @@ class Viewer:
             from model.wiring import Wiring
             from provider.pcb.exporter import PCBExporter
 
-            wiring = Wiring(provider.wiring_path) if os.path.exists(provider.wiring_path) else None
-            exporter = PCBExporter(provider.pcb_config, wiring)
-
-            board_dir = Path(build_dir) / "board" / provider.name
-            kicad_pcb_path = board_dir / f"{provider.name}.kicad_pcb"
-            schematics_dir = Path(build_dir) / "schematics" / provider.name
-            kicad_sch_path = schematics_dir / f"{provider.name}.kicad_sch"
-
-            if not no_build:
-                board_dir.mkdir(parents=True, exist_ok=True)
-                schematics_dir.mkdir(parents=True, exist_ok=True)
-                if not kicad_pcb_path.exists():
-                    exporter.export_board(board_dir, pcb_filename=f"{provider.name}.kicad_pcb")
-                if not kicad_sch_path.exists():
-                    exporter.export_kicad_sch(kicad_sch_path)
-
             subassembly = TargetParser.split_target(target)[1]
+            wiring = Wiring(provider.wiring_path) if os.path.exists(provider.wiring_path) else None
+
             solid = None
+            sub_pcb_config = None
             item_name = f"{provider.name}_pcb"
             item_color = None
 
@@ -196,6 +183,35 @@ class Viewer:
                 color = manifest_entry.get("color")
                 if color:
                     item_color = (color[0], color[1], color[2])
+
+                if hasattr(part_res, "to_pcb_config"):
+                    sub_pcb_config = part_res.to_pcb_config()
+                elif hasattr(part_res, "pcb_metadata"):
+                    sub_pcb_config = part_res.pcb_metadata
+
+            pcb_cfg = sub_pcb_config or provider.pcb_config
+            if subassembly and not sub_pcb_config:
+                pcb_cfg = provider.pcb_config.model_copy(update={"name": subassembly})
+            elif sub_pcb_config and not sub_pcb_config.stackup:
+                pcb_cfg = sub_pcb_config.model_copy(update={"stackup": provider.pcb_config.stackup})
+
+            exporter = PCBExporter(pcb_cfg, wiring)
+
+            pcb_filename = f"{subassembly}.kicad_pcb" if subassembly else f"{provider.name}.kicad_pcb"
+            sch_filename = f"{subassembly}.kicad_sch" if subassembly else f"{provider.name}.kicad_sch"
+
+            board_dir = Path(build_dir) / "board" / provider.name
+            kicad_pcb_path = board_dir / pcb_filename
+            schematics_dir = Path(build_dir) / "schematics" / provider.name
+            kicad_sch_path = schematics_dir / sch_filename
+
+            if not no_build:
+                board_dir.mkdir(parents=True, exist_ok=True)
+                schematics_dir.mkdir(parents=True, exist_ok=True)
+                if not kicad_pcb_path.exists():
+                    exporter.export_board(board_dir, pcb_filename=pcb_filename)
+                if not kicad_sch_path.exists():
+                    exporter.export_kicad_sch(kicad_sch_path)
 
             if solid is None:
                 solid = exporter.build_solid()
@@ -210,7 +226,7 @@ class Viewer:
                     "white": (0.90, 0.90, 0.90),
                     "purple": (0.45, 0.15, 0.55),
                 }
-                item_color = color_map.get(provider.pcb_config.stackup.soldermask_color.lower(), (0.08, 0.40, 0.20))
+                item_color = color_map.get(pcb_cfg.stackup.soldermask_color.lower(), (0.08, 0.40, 0.20))
 
             items.append((solid, item_name, item_color, 1.0))
 
