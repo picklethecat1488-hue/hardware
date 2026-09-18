@@ -182,18 +182,37 @@ class Viewer:
                 if not kicad_sch_path.exists():
                     exporter.export_kicad_sch(kicad_sch_path)
 
-            solid = exporter.build_solid()
-            color_map = {
-                "matte_black": (0.12, 0.12, 0.12),
-                "black": (0.12, 0.12, 0.12),
-                "green": (0.08, 0.40, 0.20),
-                "blue": (0.10, 0.25, 0.65),
-                "red": (0.65, 0.10, 0.10),
-                "white": (0.90, 0.90, 0.90),
-                "purple": (0.45, 0.15, 0.55),
-            }
-            mask_color = color_map.get(provider.pcb_config.stackup.soldermask_color.lower(), (0.08, 0.40, 0.20))
-            items.append((solid, f"{provider.name}_pcb", mask_color, 1.0))
+            subassembly = TargetParser.split_target(target)[1]
+            solid = None
+            item_name = f"{provider.name}_pcb"
+            item_color = None
+
+            if subassembly and subassembly in provider.part:
+                part_func = provider.part[subassembly]
+                part_res = part_func(subassembly, None, Mode.DEFAULT)
+                solid = getattr(part_res, "part", part_res)
+                item_name = f"{provider.name}_{subassembly}_pcb"
+                manifest_entry = self.manager.router.manifest.get(subassembly, {})
+                color = manifest_entry.get("color")
+                if color:
+                    item_color = (color[0], color[1], color[2])
+
+            if solid is None:
+                solid = exporter.build_solid()
+
+            if item_color is None:
+                color_map = {
+                    "matte_black": (0.12, 0.12, 0.12),
+                    "black": (0.12, 0.12, 0.12),
+                    "green": (0.08, 0.40, 0.20),
+                    "blue": (0.10, 0.25, 0.65),
+                    "red": (0.65, 0.10, 0.10),
+                    "white": (0.90, 0.90, 0.90),
+                    "purple": (0.45, 0.15, 0.55),
+                }
+                item_color = color_map.get(provider.pcb_config.stackup.soldermask_color.lower(), (0.08, 0.40, 0.20))
+
+            items.append((solid, item_name, item_color, 1.0))
 
             if not no_gui:
                 self.launch_pcb_viewer(kicad_pcb_path, no_gui=no_gui)

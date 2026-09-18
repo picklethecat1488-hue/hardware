@@ -52,7 +52,8 @@ footprints:
 
   - name: U2
     package: QFN-24
-    position: [18.0, -15.0, 0.8]
+    position: [18.0, -15.0, -0.8]
+    layer: B.Cu
     rotation: [0.0, 0.0, 0.0]
     dimensions: [4.0, 4.0, 0.85]
     mpn: CY8CMBR3116-LQI
@@ -100,7 +101,7 @@ footprints:
 
   - name: J1
     package: M.2-KEY-M
-    position: [-18.0, 20.0, 0.8]
+    position: [0.0, -36.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [22.0, 6.0, 3.2]
     mpn: LOTES-APCI0082
@@ -130,7 +131,7 @@ footprints:
 
   - name: J2
     package: FPC-30P-0.5MM
-    position: [15.0, 25.0, 0.8]
+    position: [0.0, 38.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [18.0, 4.5, 1.2]
     mpn: HIROSE-FH35C-30S
@@ -226,7 +227,8 @@ footprints:
 
   - name: C2
     package: "0402"
-    position: [-8.0, -5.0, 0.8]
+    position: [-8.0, -5.0, -0.8]
+    layer: B.Cu
     rotation: [0.0, 0.0, 0.0]
     dimensions: [1.0, 0.5, 0.35]
     mpn: CC0402KRX7R9BB104
@@ -256,7 +258,8 @@ footprints:
 
   - name: Q1
     package: SOT-23
-    position: [-18.0, -15.0, 0.8]
+    position: [-18.0, -15.0, -0.8]
+    layer: B.Cu
     rotation: [0.0, 0.0, 0.0]
     dimensions: [2.9, 1.3, 1.1]
     mpn: BSS138
