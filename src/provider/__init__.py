@@ -125,4 +125,17 @@ from .utils import load_manifest, discover_provider
 from .wiring_diagram import WiringDiagram
 from .blender import BlenderRenderer, CameraViewport, RenderConfig
 from .pcb.silkscreen import BuildSilkscreen, SilkscreenText
+from .pcb.stackup import BuildStackup, StackupLayer
+from .pcb.drill_holes import BuildDrillHoles, MountingHole, DrillHole
+from .pcb.routing import (
+    BuildTraces,
+    Trace,
+    BuildVias,
+    Via,
+    BuildCopperRegions,
+    CopperRegion,
+    CopperZone,
+    BuildTestPoints,
+    TestPoint,
+)
 from model.wiring import Wiring

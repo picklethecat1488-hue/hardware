@@ -126,6 +126,13 @@ class PCBDesignRulesChecker:
         if wiring and hasattr(wiring, "nets"):
             violations.extend(self.check_netlist_connectivity(wiring))
 
+        # 7. Routing completeness validation (traces, airwires, dangling components)
+        if wiring:
+            violations.extend(self.check_routing_connectivity(wiring))
+
+        # 8. Physical clearance and overlap validation (pads, vias, drill holes)
+        violations.extend(self.check_clearances_and_overlaps(wiring))
+
         passed = not any(v.severity == DRCSeverity.ERROR for v in violations)
         return DRCReport(passed=passed, violations=violations)
 
@@ -527,5 +534,116 @@ class PCBDesignRulesChecker:
                         ),
                     )
                 )
+
+        return violations
+
+    def check_routing_connectivity(self, wiring: Any) -> List[DRCViolation]:
+        """Verify routing completeness: ensuring multi-pin nets have traces and no dangling components."""
+        violations = []
+        if not wiring or not hasattr(wiring, "nets"):
+            return violations
+
+        # If board has no traces defined yet, skip routing enforcement
+        if not self.config.traces:
+            return violations
+
+        # Track nets that have copper traces
+        routed_nets = {tr.net for tr in self.config.traces}
+
+        # Check for unrouted nets (airwires)
+        for net in wiring.nets:
+            if len(net.pins) >= 2:
+                # Disregard plane nets if net is GND or in copper regions
+                is_plane_net = any(cr.net == net.name for cr in self.config.copper_regions)
+                if net.name not in routed_nets and not is_plane_net:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="UNROUTED_NET_AIRWIRE",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=net.name,
+                            description=f"Net '{net.name}' with {len(net.pins)} pins has no routed copper traces",
+                            actual_value=float(len(net.pins)),
+                        )
+                    )
+
+        # Check for dangling components (components where all pins are unassigned or disconnected)
+        connected_components = {comp_name for net in wiring.nets for comp_name, _ in net.pins}
+        for fp in getattr(wiring, "footprints", []):
+            if fp.name not in connected_components and getattr(fp, "pins", []):
+                violations.append(
+                    DRCViolation(
+                        rule_name="DANGLING_COMPONENT",
+                        severity=DRCSeverity.WARNING,
+                        net_or_zone=fp.name,
+                        description=f"Component '{fp.name}' ({fp.package}) has no pins assigned to any electrical net",
+                        location=(fp.position[0], fp.position[1], 0.0),
+                    )
+                )
+
+        return violations
+
+    def check_clearances_and_overlaps(self, wiring: Any) -> List[DRCViolation]:
+        """Verify that pads, vias, and drill holes do not overlap or violate clearance rules."""
+        violations = []
+        holes = self.config.mounting_holes
+        vias = self.config.vias
+
+        # 1. Check via to drill hole overlaps
+        for mh in holes:
+            mh_r = mh.drill_diameter_mm / 2.0
+            mh_x, mh_y = mh.position_mm
+            for v in vias:
+                vx, vy = v.position_mm
+                dist = math.hypot(mh_x - vx, mh_y - vy)
+                min_clearance = mh_r + (v.pad_diameter_mm / 2.0) + 0.20
+                if dist < min_clearance:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="VIA_DRILL_HOLE_COLLISION",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"{mh.name}<->{v.net}",
+                            description=(
+                                f"Via on net '{v.net}' at ({vx:.2f}, {vy:.2f}) collides with "
+                                f"drill hole '{mh.name}' at ({mh_x:.2f}, {mh_y:.2f}) (dist: {dist:.2f}mm < {min_clearance:.2f}mm)"
+                            ),
+                            actual_value=dist,
+                            expected_range=(min_clearance, 100.0),
+                            location=(vx, vy, 0.0),
+                        )
+                    )
+
+        # 2. Check component pads to drill hole overlaps
+        if wiring and hasattr(wiring, "footprints"):
+            for mh in holes:
+                mh_r = mh.drill_diameter_mm / 2.0
+                mh_x, mh_y = mh.position_mm
+                for fp in wiring.footprints:
+                    fx, fy = fp.position[0], fp.position[1]
+                    f_diag = (
+                        math.hypot(fp.dimensions[0], fp.dimensions[1]) / 2.0 if getattr(fp, "dimensions", None) else 5.0
+                    )
+                    if math.hypot(mh_x - fx, mh_y - fy) > mh_r + f_diag + 0.2:
+                        continue
+
+                    for p in getattr(fp, "pins", []):
+                        px = fx + p.position[0]
+                        py = fy + p.position[1]
+                        dist = math.hypot(mh_x - px, mh_y - py)
+                        min_dist = mh_r + 0.30
+                        if dist < min_dist:
+                            violations.append(
+                                DRCViolation(
+                                    rule_name="PAD_DRILL_HOLE_COLLISION",
+                                    severity=DRCSeverity.ERROR,
+                                    net_or_zone=f"{fp.name}.{p.name}",
+                                    description=(
+                                        f"Pad '{p.name}' on component '{fp.name}' at ({px:.2f}, {py:.2f}) "
+                                        f"overlaps drill hole '{mh.name}' at ({mh_x:.2f}, {mh_y:.2f})"
+                                    ),
+                                    actual_value=dist,
+                                    expected_range=(min_dist, 100.0),
+                                    location=(px, py, 0.0),
+                                )
+                            )
 
         return violations
