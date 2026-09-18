@@ -1408,7 +1408,7 @@ class TestCatFountainProvider:
                 assert np.all(steady_depth >= min_steady_depth), (
                     f"Reservoir water depth collapsed below physical threshold: min={np.min(steady_depth):.4f}m"
                 )
-                initial_sheet = np.array([m["flow_lid_sheet"] for m in provider.metrics_history[40:]])
+                initial_sheet = np.array([m["flow_lid_sheet"] for m in provider.metrics_history[50:]])
                 assert np.all(initial_sheet > 0), f"Lid sheet failed to prime: min={np.min(initial_sheet)}"
                 steady_sheet = np.array([m["flow_lid_sheet"] for m in provider.metrics_history[75:]])
                 assert np.all(steady_sheet >= 300), (

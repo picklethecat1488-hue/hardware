@@ -8,6 +8,7 @@ from typing import Tuple, List, Optional, Callable, Any
 from functools import cached_property
 from pydantic import BaseModel, Field, validate_call
 from build123d import Vector, Location
+from model.pcb import BgaFanoutModel
 
 # Footprint Layout Registry
 PIN_LAYOUT_REGISTRY = {}
@@ -87,6 +88,9 @@ class FootprintModel(BaseModel):
     slots_per_side: Optional[int] = Field(default=None, description="Optional total number of DIP slots per side")
     label: LabelModel = Field(description="Label settings for the footprint")
     pins: List[PinModel] = Field(default_factory=list, description="List of pins on the footprint")
+    mpn: Optional[str] = Field(default=None, description="Manufacturer part number for BOM generation")
+    supplier_pn: Optional[str] = Field(default=None, description="Supplier part number (e.g. LCSC, DigiKey)")
+    bga_fanout: Optional[BgaFanoutModel] = Field(default=None, description="Optional BGA fanout configuration")
 
 
 class NetModel(BaseModel):
@@ -116,7 +120,8 @@ class Wiring:
     def footprints(self) -> List[FootprintModel]:
         """Load and compute all component footprints with resolved positions and pin layouts."""
         components = []
-        for c in self.config.get("components", []):
+        raw_items = self.config.get("components") or self.config.get("footprints") or []
+        for c in raw_items:
             position = c.get("position", [0.0, 0.0, 0.0])
             rotation = c.get("rotation", [0.0, 0.0, 0.0])
 
@@ -128,7 +133,15 @@ class Wiring:
                 loc = joint_loc * Location(tuple(offset))
                 position = [loc.position.X, loc.position.Y, loc.position.Z]
 
-            pins = [PinModel(**p) for p in c.get("pins", [])]
+            pins = []
+            for p in c.get("pins", []):
+                p_dict = dict(p)
+                if "label" not in p_dict:
+                    p_dict["label"] = p_dict["name"]
+                if "position" in p_dict and len(p_dict["position"]) == 2:
+                    p_dict["position"] = (p_dict["position"][0], p_dict["position"][1], 0.0)
+                pins.append(PinModel(**p_dict))
+
             w, l, thickness = c["dimensions"]
 
             # Parse package and namespace from the YAML value
@@ -150,7 +163,12 @@ class Wiring:
             if layout_func is not None:
                 layout_func(pins, w, l, c.get("slots_per_side"))
 
-            label = LabelModel(**c["label"])
+            label_data = c.get("label")
+            label = (
+                LabelModel(**label_data)
+                if label_data
+                else LabelModel(text=c["name"], position=(0.0, 0.0, 0.0), align=("center", "center"))
+            )
 
             components.append(
                 FootprintModel(
@@ -164,6 +182,9 @@ class Wiring:
                     slots_per_side=c.get("slots_per_side"),
                     label=label,
                     pins=pins,
+                    mpn=c.get("mpn"),
+                    supplier_pn=c.get("supplier_pn"),
+                    bga_fanout=c.get("bga_fanout"),
                 )
             )
         return components

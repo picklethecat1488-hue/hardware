@@ -1,0 +1,22 @@
+# Parameterized geometric specifications for Test Board rigid-flex assembly
+board_width: 60.0
+board_length: 90.0
+corner_radius: 4.0
+board_thickness: 1.6
+flex_tail_width: 16.0
+flex_tail_length: 50.0
+flex_tail_thickness: 0.20
+flex_bend_radius: 3.0
+enclosure_wall_thickness: 2.0
+enclosure_clearance: 1.5
+mounting_hole_diameter: 3.2
+mounting_hole_inset: 4.5
+standoff_height: 5.0
+standoff_radius: 3.0
+silkscreen_margin: 7.0
+
+# Factory assembly test limits and parameters
+test_tdr_rise_time_ps: 100.0
+test_cap_stimulus_freq_khz: 250.0
+test_pcie_diff_target_ohm: 85.0
+
