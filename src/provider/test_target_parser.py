@@ -25,8 +25,9 @@ class TestTargetParser:
                 Section.PART: {MODES: [Mode.DEFAULT, Mode.PRINT]},
             },
         }
-        # Mock router.targets to return a TargetList-like behavior
-        router.targets.supporting.side_effect = lambda a: MagicMock()
+        from provider.target_list import TargetList
+
+        router.targets = TargetList(router, router.manifest.keys())
         return router
 
     @pytest.fixture
@@ -101,6 +102,25 @@ class TestTargetParser:
 
         with pytest.raises(ValueError, match="No part targets matched wildcard pattern"):
             parser.resolve("ghost/*", Section.PART)
+
+    def test_can_resolve(self, parser):
+        """Verify can_resolve accurately detects whether a target string supports an action."""
+        # Exact target supporting PART
+        assert parser.can_resolve("tube/driver", Section.PART) is True
+        # Exact target not supporting DIAGRAM
+        assert parser.can_resolve("tube/driver", Section.DIAGRAM) is False
+        # Exact target with subassembly supporting PART
+        assert parser.can_resolve("tube/driver_left", Section.PART) is True
+        # Exact target with invalid subassembly
+        assert parser.can_resolve("tube/driver_invalid", Section.PART) is False
+        # Wildcard supporting PART
+        assert parser.can_resolve("tube/*", Section.PART) is True
+        # Wildcard not supporting DIAGRAM
+        assert parser.can_resolve("tube/*", Section.DIAGRAM) is False
+        # Nonexistent target
+        assert parser.can_resolve("non_existent", Section.PART) is False
+        # Nonexistent wildcard
+        assert parser.can_resolve("ghost/*", Section.PART) is False
 
     def test_get_base_target(self):
         """Verify get_base_target static helper."""

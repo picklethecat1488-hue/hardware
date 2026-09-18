@@ -35,6 +35,12 @@
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "justMyCode": true
+        },
+        {
+            "name": "View Code Review (Integrated Browser)",
+            "type": "editor-browser",
+            "request": "launch",
+            "url": "http://127.0.0.1:8765/"
         }
     ]
 }
