@@ -76,6 +76,14 @@
   (via (at {{ via.x }} {{ via.y }}) (size {{ via.dia }}) (drill {{ via.drill }}) (layers "{{ via.layer1 }}" "{{ via.layer2 }}") (net {{ via.net_idx }}))
 {% endfor %}
 
+{% for mh in mounting_holes %}
+  (footprint "MountingHole:MountingHole_{{ mh.drill_mm }}mm_Pad" (layer "F.Cu")
+    (at {{ mh.x_mm }} {{ mh.y_mm }})
+    (fp_text reference "{{ mh.name }}" (at 0 -{{ mh.drill_mm }}) (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))
+    (pad "1" {% if mh.plated %}thru_hole circle (at 0 0) (size {{ mh.pad_mm }} {{ mh.pad_mm }}) (drill {{ mh.drill_mm }}) (layers "*.Cu" "*.Mask") (net {{ mh.net_idx }} "{{ mh.net_name }}"){% else %}np_thru_hole circle (at 0 0) (size {{ mh.drill_mm }} {{ mh.drill_mm }}) (drill {{ mh.drill_mm }}) (layers "*.Mask"){% endif %})
+  )
+{% endfor %}
+
   (gr_rect (start {{ outline.x1 }} {{ outline.y1 }}) (end {{ outline.x2 }} {{ outline.y2 }}) (stroke (width 0.1) (type default)) (fill none) (layer "Edge.Cuts"))
 {% for text in silkscreen_texts %}
   (gr_text "{{ text.text }}" (at {{ text.x_mm }} {{ text.y_mm }}{% if text.rotation %} {{ text.rotation }}{% endif %}) (layer "{{ text.layer }}") (effects (font (size {{ text.font_size }} {{ text.font_size }}) (thickness {{ text.thickness }})){% if text.mirror %} (justify mirror){% endif %}))

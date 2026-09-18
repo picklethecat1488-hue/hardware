@@ -15,6 +15,8 @@ from model.pcb import (
     PCBConfig,
     SheetSize,
     SilkscreenTextModel,
+    SchematicSheetModel,
+    MountingHoleModel,
 )
 
 
@@ -269,3 +271,44 @@ def test_test_board_provider_cad_silkscreen():
     pcb_cfg = provider.pcb_config
     assert pcb_cfg is not None
     assert len(pcb_cfg.silkscreen_texts) == 3
+
+
+def test_schematic_sheet_model():
+    """Verify SchematicSheetModel creation and field validations."""
+    sheet = SchematicSheetModel(
+        title="Power Regulation & Inrush Control",
+        description="Regulates 5V to 3.3V system rail",
+        components=["U1", "Q1", "C1"],
+        pin_breakouts={"U1": ["VIN", "VOUT", "GND"]},
+    )
+    assert sheet.title == "Power Regulation & Inrush Control"
+    assert sheet.description == "Regulates 5V to 3.3V system rail"
+    assert sheet.components == ["U1", "Q1", "C1"]
+    assert sheet.pin_breakouts["U1"] == ["VIN", "VOUT", "GND"]
+
+
+def test_mounting_hole_model():
+    """Verify MountingHoleModel creation, drill/pad dimensions, and plated nets."""
+    hole_plated = MountingHoleModel(
+        name="MH1",
+        position_mm=(-25.5, -40.5),
+        drill_diameter_mm=3.2,
+        pad_diameter_mm=4.5,
+        plated=True,
+        net="GND",
+    )
+    assert hole_plated.name == "MH1"
+    assert hole_plated.position_mm == (-25.5, -40.5)
+    assert hole_plated.drill_diameter_mm == 3.2
+    assert hole_plated.pad_diameter_mm == 4.5
+    assert hole_plated.plated is True
+    assert hole_plated.net == "GND"
+
+    hole_unplated = MountingHoleModel(
+        name="MH5",
+        position_mm=(0.0, 0.0),
+        drill_diameter_mm=2.5,
+        plated=False,
+    )
+    assert hole_unplated.plated is False
+    assert hole_unplated.net is None
