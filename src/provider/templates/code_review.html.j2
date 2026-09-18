@@ -280,6 +280,52 @@
       background: rgba(255, 184, 0, 0.12);
       border-left: 3px solid var(--quake-gold);
     }
+    .commit-item.reviewed {
+      opacity: 0.55;
+      filter: grayscale(0.75);
+    }
+    .commit-item.reviewed:hover {
+      opacity: 0.85;
+      filter: grayscale(0.2);
+    }
+    .quake-modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .search-result-row {
+      padding: 6px 10px;
+      border: 1px solid var(--quake-border-mid);
+      background: var(--quake-panel);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      border-radius: 3px;
+      transition: background 0.15s;
+    }
+    .search-result-row:hover {
+      background: var(--quake-panel-hover);
+      border-color: var(--quake-gold);
+    }
+    .search-result-loc {
+      color: var(--quake-gold);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .search-result-content {
+      color: var(--quake-text-light);
+      font-size: 11px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
     .commit-top {
       display: flex;
       justify-content: space-between;
@@ -1022,8 +1068,20 @@
         </div>
 
         <div class="diff-toolbar-right">
+          <input id="codeSearchInput" class="quake-input" style="width: 175px; font-size: 11px; padding: 4px 6px; background: #130a05; border: 1px solid var(--quake-border-mid); color: var(--quake-text-light);" placeholder="🔍 Search code... (Enter)" onkeydown="if (event.key === 'Enter') executeCodeSearch()">
+          <button class="quake-btn quake-btn-default" onclick="executeCodeSearch()" title="Search code/symbol references">🔍 Find</button>
           <button class="quake-btn quake-btn-default" onclick="copyFilePath()" title="Copy file path">📋 Copy Path</button>
           <button class="quake-btn quake-btn-default" onclick="loadDiff()" title="Reload Diff">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <div id="codeSearchResultsModal" class="quake-modal-backdrop" style="display:none;" onclick="if(event.target===this)closeCodeSearchModal()">
+        <div class="quake-card" style="width: 720px; max-height: 80vh; margin: 40px auto; padding: 14px; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--quake-border-light); padding-bottom: 8px; margin-bottom: 10px;">
+            <span style="color: var(--quake-gold); font-weight: bold; font-size: 12px;" id="codeSearchTitle">Code Search Results</span>
+            <button class="quake-btn quake-btn-red" style="padding: 2px 6px;" onclick="closeCodeSearchModal()">✕ Close</button>
+          </div>
+          <div id="codeSearchResultsList" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px;"></div>
         </div>
       </div>
 
@@ -1364,14 +1422,19 @@
     function renderCommitsList() {
       const listEl = document.getElementById("commitsList");
       listEl.innerHTML = "";
+      state.openedFilesByCommit = state.openedFilesByCommit || {};
       state.commits.forEach(c => {
         const li = document.createElement("li");
-        li.className = "commit-item" + (c.commit_hash === state.selectedCommit ? " active" : "");
+        const commitFiles = state.commitFiles ? state.commitFiles[c.commit_hash] : null;
+        const openedSet = state.openedFilesByCommit[c.commit_hash];
+        const isReviewed = commitFiles && commitFiles.length > 0 && commitFiles.every(p => openedSet && openedSet.has(p));
+        li.className = "commit-item" + (c.commit_hash === state.selectedCommit ? " active" : "") + (isReviewed ? " reviewed" : "");
         li.onclick = () => selectCommit(c.commit_hash);
+        const timeDisplay = c.time ? ` ${c.time}` : (c.date.includes('T') ? ` ${c.date.split('T')[1].slice(0, 8)}` : '');
         li.innerHTML = `
           <div class="commit-top">
             <span class="commit-hash">${c.short_hash}</span>
-            <span class="commit-date">${c.date.slice(0, 10)}</span>
+            <span class="commit-date">${c.date.slice(0, 10)}${timeDisplay}</span>
           </div>
           <div class="commit-subject" title="${c.subject}">${c.subject}</div>
           <div class="commit-bottom">
@@ -1391,7 +1454,10 @@
       try {
         const res = await fetch(`/api/files?commit=${encodeURIComponent(commitHash)}`);
         state.files = await res.json();
+        state.commitFiles = state.commitFiles || {};
+        state.commitFiles[commitHash] = state.files.map(f => f.path);
         renderFilesList();
+        renderCommitsList();
         if (state.files.length > 0) {
           selectFile(state.files[0].path);
         } else {
@@ -1415,7 +1481,6 @@
       state.files.forEach(f => {
         if (filter && !f.path.toLowerCase().includes(filter)) return;
 
-        const isReviewed = state.session && state.session.files[f.path]?.status === "REVIEWED";
         const comments = (state.session?.comments || []).filter(c => c.file_path === f.path);
 
         const li = document.createElement("li");
@@ -1429,7 +1494,6 @@
 
         li.innerHTML = `
           <div class="file-left">
-            <input type="checkbox" class="checkbox-reviewed" ${isReviewed ? "checked" : ""} onclick="event.stopPropagation(); toggleFileReviewed('${f.path}')" title="Mark reviewed">
             <span class="quake-badge ${statusClass}">${f.status}</span>
             <div class="file-name-col">
               <span class="file-title" title="${f.path}">${baseName}</span>
@@ -1443,6 +1507,53 @@
         `;
         listEl.appendChild(li);
       });
+    }
+
+    async function executeCodeSearch() {
+      const inputEl = document.getElementById("codeSearchInput");
+      const query = (inputEl.value || "").trim();
+      if (!query) return;
+
+      logCli(`Searching code references for: "${query}"...`, "cyan");
+      const modal = document.getElementById("codeSearchResultsModal");
+      const listEl = document.getElementById("codeSearchResultsList");
+      const titleEl = document.getElementById("codeSearchTitle");
+      titleEl.innerText = `Search Results for "${query}"`;
+      listEl.innerHTML = `<div style="padding: 15px; color: var(--quake-text-dim);">Searching...</div>`;
+      modal.style.display = "flex";
+
+      try {
+        const commit = state.selectedCommit || "working";
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&commit=${encodeURIComponent(commit)}`);
+        const data = await res.json();
+        const results = data.results || [];
+        if (results.length === 0) {
+          listEl.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--quake-text-dim);">No occurrences found.</div>`;
+          return;
+        }
+
+        listEl.innerHTML = "";
+        results.forEach(m => {
+          const row = document.createElement("div");
+          row.className = "search-result-row";
+          row.onclick = () => {
+            goto(`${m.file_path}:${m.line_number}`);
+            closeCodeSearchModal();
+          };
+          row.innerHTML = `
+            <div class="search-result-loc">${m.file_path}:${m.line_number}</div>
+            <div class="search-result-content">${escapeHtml(m.line_content)}</div>
+          `;
+          listEl.appendChild(row);
+        });
+      } catch (e) {
+        listEl.innerHTML = `<div style="padding: 15px; color: var(--quake-red);">Error searching code: ${e.message}</div>`;
+      }
+    }
+
+    function closeCodeSearchModal() {
+      const modal = document.getElementById("codeSearchResultsModal");
+      if (modal) modal.style.display = "none";
     }
 
     async function goto(target, targetLine = null) {
@@ -1478,6 +1589,14 @@
 
       const activePath = matchedFile ? matchedFile.path : fileTarget;
       state.selectedFile = activePath;
+      if (state.selectedCommit && activePath) {
+        state.openedFilesByCommit = state.openedFilesByCommit || {};
+        if (!state.openedFilesByCommit[state.selectedCommit]) {
+          state.openedFilesByCommit[state.selectedCommit] = new Set();
+        }
+        state.openedFilesByCommit[state.selectedCommit].add(activePath);
+        renderCommitsList();
+      }
       state.selectedRange = { start: null, end: null };
       updateTargetUI();
       renderFilesList();

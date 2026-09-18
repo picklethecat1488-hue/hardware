@@ -17,6 +17,68 @@ from provider.geometry_utils import point_in_polygon
 _point_in_polygon = point_in_polygon
 
 
+def _dist_point_to_segment(
+    p: Tuple[float, float],
+    a: Tuple[float, float],
+    b: Tuple[float, float],
+) -> float:
+    """Compute the shortest Euclidean distance from a 2D point p to line segment (a, b)."""
+    dx = b[0] - a[0]
+    dy = b[1] - a[1]
+    seg_len_sq = dx * dx + dy * dy
+    if seg_len_sq < 1e-12:
+        return math.hypot(p[0] - a[0], p[1] - a[1])
+    t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / seg_len_sq))
+    proj_x = a[0] + t * dx
+    proj_y = a[1] + t * dy
+    return math.hypot(p[0] - proj_x, p[1] - proj_y)
+
+
+def _segments_intersect(
+    p0: Tuple[float, float],
+    p1: Tuple[float, float],
+    q0: Tuple[float, float],
+    q1: Tuple[float, float],
+) -> bool:
+    """Determine whether two 2D line segments (p0, p1) and (q0, q1) intersect."""
+
+    def ccw(a: Tuple[float, float], b: Tuple[float, float], c: Tuple[float, float]) -> float:
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    d1 = ccw(p0, p1, q0)
+    d2 = ccw(p0, p1, q1)
+    d3 = ccw(q0, q1, p0)
+    d4 = ccw(q0, q1, p1)
+
+    if ((d1 > 1e-9 and d2 < -1e-9) or (d1 < -1e-9 and d2 > 1e-9)) and (
+        (d3 > 1e-9 and d4 < -1e-9) or (d3 < -1e-9 and d4 > 1e-9)
+    ):
+        return True
+
+    # Check collinear or touching endpoints
+    for pt, seg_a, seg_b in [(q0, p0, p1), (q1, p0, p1), (p0, q0, q1), (p1, q0, q1)]:
+        if _dist_point_to_segment(pt, seg_a, seg_b) < 1e-6:
+            return True
+    return False
+
+
+def _dist_segment_to_segment(
+    p0: Tuple[float, float],
+    p1: Tuple[float, float],
+    q0: Tuple[float, float],
+    q1: Tuple[float, float],
+) -> float:
+    """Compute the minimum Euclidean distance between two 2D line segments."""
+    if _segments_intersect(p0, p1, q0, q1):
+        return 0.0
+    return min(
+        _dist_point_to_segment(p0, q0, q1),
+        _dist_point_to_segment(p1, q0, q1),
+        _dist_point_to_segment(q0, p0, p1),
+        _dist_point_to_segment(q1, p0, p1),
+    )
+
+
 class DRCSeverity(StrEnum):
     """Severity classification for DRC violations."""
 
@@ -118,9 +180,9 @@ class PCBDesignRulesChecker:
         # 4. Flexible PCB mechanical bend radius checks
         violations.extend(self.check_flex_rules())
 
-        # 5. Boundary containment check
-        if wiring and hasattr(wiring, "footprints"):
-            violations.extend(self.check_boundary_containment(wiring.footprints, outline_polygon))
+        # 5. Boundary containment check (footprints, traces, vias, test points)
+        fps = getattr(wiring, "footprints", []) if wiring else []
+        violations.extend(self.check_boundary_containment(fps, outline_polygon))
 
         # 6. Netlist connectivity validation
         if wiring and hasattr(wiring, "nets"):
@@ -428,14 +490,11 @@ class PCBDesignRulesChecker:
             List of DRCViolation instances for any boundary clearance violations.
         """
         violations = []
-        if not footprints:
-            return violations
-
         w_board, l_board, _ = self.config.dimensions_mm
         half_w = w_board / 2.0
         half_l = l_board / 2.0
 
-        for fp in footprints:
+        for fp in footprints or []:
             fx, fy = fp.position[0], fp.position[1]
             fw, fl = (fp.dimensions[0], fp.dimensions[1]) if hasattr(fp, "dimensions") else (2.0, 2.0)
 
@@ -485,6 +544,99 @@ class PCBDesignRulesChecker:
                             ),
                             location=(fx, fy, 0.0),
                             expected_range=(edge_clearance_mm, half_w),
+                        )
+                    )
+
+        # Check trace segments containment
+        for tr in self.config.traces:
+            for pt in (tr.start_mm, tr.end_mm):
+                if outline_polygon:
+                    if not _point_in_polygon(pt[0], pt[1], outline_polygon):
+                        violations.append(
+                            DRCViolation(
+                                rule_name="TRACE_OUTSIDE_BOARD_BOUNDARY",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=tr.net,
+                                description=(
+                                    f"Trace on net '{tr.net}' on layer '{tr.layer}' at ({pt[0]:.2f}, {pt[1]:.2f}) "
+                                    f"extends outside CAD board boundary outline"
+                                ),
+                                location=(pt[0], pt[1], 0.0),
+                            )
+                        )
+                        break
+                else:
+                    if pt[0] < -half_w or pt[0] > half_w or pt[1] < -half_l or pt[1] > half_l:
+                        in_flex = any(
+                            getattr(fz, "start_x_mm", -1e9)
+                            <= pt[0]
+                            <= getattr(fz, "start_x_mm", -1e9) + getattr(fz, "length_mm", 0.0)
+                            for fz in self.config.flex_zones
+                        )
+                        if not in_flex:
+                            violations.append(
+                                DRCViolation(
+                                    rule_name="TRACE_OUTSIDE_BOARD_BOUNDARY",
+                                    severity=DRCSeverity.ERROR,
+                                    net_or_zone=tr.net,
+                                    description=(
+                                        f"Trace on net '{tr.net}' on layer '{tr.layer}' at ({pt[0]:.2f}, {pt[1]:.2f}) "
+                                        f"extends outside board envelope"
+                                    ),
+                                    location=(pt[0], pt[1], 0.0),
+                                )
+                            )
+                            break
+
+        # Check via locations containment
+        for v in self.config.vias:
+            vx, vy = v.position_mm
+            if outline_polygon:
+                if not _point_in_polygon(vx, vy, outline_polygon):
+                    violations.append(
+                        DRCViolation(
+                            rule_name="VIA_OUTSIDE_BOARD_BOUNDARY",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=v.net,
+                            description=f"Via on net '{v.net}' at ({vx:.2f}, {vy:.2f}) is outside CAD board boundary outline",
+                            location=(vx, vy, 0.0),
+                        )
+                    )
+            else:
+                if vx < -half_w or vx > half_w or vy < -half_l or vy > half_l:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="VIA_OUTSIDE_BOARD_BOUNDARY",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=v.net,
+                            description=f"Via on net '{v.net}' at ({vx:.2f}, {vy:.2f}) is outside board envelope",
+                            location=(vx, vy, 0.0),
+                        )
+                    )
+
+        # Check test points containment
+        for tp in self.config.test_points:
+            tx, ty = tp.position_mm
+            if outline_polygon:
+                if not _point_in_polygon(tx, ty, outline_polygon):
+                    violations.append(
+                        DRCViolation(
+                            rule_name="TEST_POINT_OUTSIDE_BOARD_BOUNDARY",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=tp.name,
+                            description=f"Test point '{tp.name}' at ({tx:.2f}, {ty:.2f}) is outside CAD board boundary outline",
+                            location=(tx, ty, 0.0),
+                        )
+                    )
+            else:
+                if tx < -half_w or tx > half_w or ty < -half_l or ty > half_l:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="TEST_POINT_OUTSIDE_BOARD_BOUNDARY",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=tp.name,
+                            description=f"Test point '{tp.name}' at ({tx:.2f}, {ty:.2f}) is outside board envelope",
+                            location=(tx, ty, 0.0),
                         )
                     )
 
@@ -543,28 +695,29 @@ class PCBDesignRulesChecker:
         if not wiring or not hasattr(wiring, "nets"):
             return violations
 
-        # If board has no traces defined yet, skip routing enforcement
-        if not self.config.traces:
+        # If board has no traces and no test points defined yet, skip routing enforcement
+        if not self.config.traces and not self.config.test_points:
             return violations
 
         # Track nets that have copper traces
         routed_nets = {tr.net for tr in self.config.traces}
 
-        # Check for unrouted nets (airwires)
-        for net in wiring.nets:
-            if len(net.pins) >= 2:
-                # Disregard plane nets if net is GND or in copper regions
-                is_plane_net = any(cr.net == net.name for cr in self.config.copper_regions)
-                if net.name not in routed_nets and not is_plane_net:
-                    violations.append(
-                        DRCViolation(
-                            rule_name="UNROUTED_NET_AIRWIRE",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=net.name,
-                            description=f"Net '{net.name}' with {len(net.pins)} pins has no routed copper traces",
-                            actual_value=float(len(net.pins)),
+        # Check for unrouted nets (airwires) if routing has been performed
+        if self.config.traces:
+            for net in wiring.nets:
+                if len(net.pins) >= 2:
+                    # Disregard plane nets if net is GND or in copper regions
+                    is_plane_net = any(cr.net == net.name for cr in self.config.copper_regions)
+                    if net.name not in routed_nets and not is_plane_net:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="UNROUTED_NET_AIRWIRE",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=net.name,
+                                description=f"Net '{net.name}' with {len(net.pins)} pins has no routed copper traces",
+                                actual_value=float(len(net.pins)),
+                            )
                         )
-                    )
 
         # Check for dangling components (components where all pins are unassigned or disconnected)
         connected_components = {comp_name for net in wiring.nets for comp_name, _ in net.pins}
@@ -580,13 +733,43 @@ class PCBDesignRulesChecker:
                     )
                 )
 
+        # Check disconnected test points (airwires on test points)
+        for tp in self.config.test_points:
+            tp_x, tp_y = tp.position_mm
+            tp_r = tp.pad_diameter_mm / 2.0
+            connected = False
+            for tr in self.config.traces:
+                if tr.net == tp.net:
+                    dist = _dist_point_to_segment((tp_x, tp_y), tr.start_mm, tr.end_mm)
+                    if dist <= tp_r + (tr.width_mm / 2.0) + 0.15:
+                        connected = True
+                        break
+            # Also consider connected if covered by copper region of the same net
+            if not connected:
+                connected = any(cr.net == tp.net for cr in self.config.copper_regions)
+            if not connected:
+                violations.append(
+                    DRCViolation(
+                        rule_name="DISCONNECTED_TEST_POINT_AIRWIRE",
+                        severity=DRCSeverity.ERROR,
+                        net_or_zone=tp.name,
+                        description=(
+                            f"Test point '{tp.name}' on net '{tp.net}' at ({tp_x:.2f}, {tp_y:.2f}) "
+                            f"is not connected to any routed copper trace"
+                        ),
+                        location=(tp_x, tp_y, 0.0),
+                    )
+                )
+
         return violations
 
     def check_clearances_and_overlaps(self, wiring: Any) -> List[DRCViolation]:
-        """Verify that pads, vias, and drill holes do not overlap or violate clearance rules."""
+        """Verify that pads, vias, traces, and drill holes do not overlap or violate clearance rules."""
         violations = []
         holes = self.config.mounting_holes
         vias = self.config.vias
+        traces = self.config.traces
+        clearance_default = 0.10  # Standard fab minimum clearance
 
         # 1. Check via to drill hole overlaps
         for mh in holes:
@@ -645,5 +828,140 @@ class PCBDesignRulesChecker:
                                     location=(px, py, 0.0),
                                 )
                             )
+
+        # 3. Check trace-to-trace short circuits and clearance violations
+        for i, t1 in enumerate(traces):
+            t1_min_x = min(t1.start_mm[0], t1.end_mm[0])
+            t1_max_x = max(t1.start_mm[0], t1.end_mm[0])
+            t1_min_y = min(t1.start_mm[1], t1.end_mm[1])
+            t1_max_y = max(t1.start_mm[1], t1.end_mm[1])
+            for j in range(i + 1, len(traces)):
+                t2 = traces[j]
+                if t1.layer != t2.layer or t1.net == t2.net:
+                    continue
+
+                # Bounding box filter
+                margin = (t1.width_mm + t2.width_mm) / 2.0 + clearance_default
+                if (
+                    t1_min_x - margin > max(t2.start_mm[0], t2.end_mm[0])
+                    or t1_max_x + margin < min(t2.start_mm[0], t2.end_mm[0])
+                    or t1_min_y - margin > max(t2.start_mm[1], t2.end_mm[1])
+                    or t1_max_y + margin < min(t2.start_mm[1], t2.end_mm[1])
+                ):
+                    continue
+
+                dist = _dist_segment_to_segment(t1.start_mm, t1.end_mm, t2.start_mm, t2.end_mm)
+                copper_thresh = (t1.width_mm + t2.width_mm) / 2.0
+                if dist < copper_thresh - 1e-4:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="TRACE_SHORT_CIRCUIT",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"{t1.net}<->{t2.net}",
+                            description=(
+                                f"Trace on net '{t1.net}' collides with trace on net '{t2.net}' on layer '{t1.layer}' "
+                                f"(dist: {dist:.3f}mm < copper threshold {copper_thresh:.3f}mm)"
+                            ),
+                            actual_value=dist,
+                            expected_range=(copper_thresh, 100.0),
+                            location=(t1.start_mm[0], t1.start_mm[1], 0.0),
+                        )
+                    )
+                elif dist < copper_thresh + clearance_default - 1e-4:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="CLEARANCE_VIOLATION",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"{t1.net}<->{t2.net}",
+                            description=(
+                                f"Trace clearance violation between net '{t1.net}' and net '{t2.net}' on layer '{t1.layer}' "
+                                f"(dist: {dist:.3f}mm < required {copper_thresh + clearance_default:.3f}mm)"
+                            ),
+                            actual_value=dist,
+                            expected_range=(copper_thresh + clearance_default, 100.0),
+                            location=(t1.start_mm[0], t1.start_mm[1], 0.0),
+                        )
+                    )
+
+        # 4. Check via-to-trace short circuits and clearance violations
+        for v in vias:
+            vx, vy = v.position_mm
+            v_r = v.pad_diameter_mm / 2.0
+            for tr in traces:
+                if v.net == tr.net:
+                    continue
+                # Check layer overlap
+                if tr.layer not in (v.layer_start, v.layer_end) and v.layer_start != "F.Cu":
+                    continue
+                dist = _dist_point_to_segment((vx, vy), tr.start_mm, tr.end_mm)
+                min_copper = v_r + (tr.width_mm / 2.0)
+                if dist < min_copper - 1e-4:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="VIA_TRACE_COLLISION",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"{v.net}<->{tr.net}",
+                            description=(
+                                f"Via on net '{v.net}' at ({vx:.2f}, {vy:.2f}) collides with trace on net '{tr.net}' "
+                                f"on layer '{tr.layer}' (dist: {dist:.3f}mm < {min_copper:.3f}mm)"
+                            ),
+                            actual_value=dist,
+                            expected_range=(min_copper, 100.0),
+                            location=(vx, vy, 0.0),
+                        )
+                    )
+                elif dist < min_copper + clearance_default - 1e-4:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="CLEARANCE_VIOLATION",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"{v.net}<->{tr.net}",
+                            description=(
+                                f"Clearance violation between via on net '{v.net}' at ({vx:.2f}, {vy:.2f}) and trace on net '{tr.net}' "
+                                f"(dist: {dist:.3f}mm < required {min_copper + clearance_default:.3f}mm)"
+                            ),
+                            actual_value=dist,
+                            expected_range=(min_copper + clearance_default, 100.0),
+                            location=(vx, vy, 0.0),
+                        )
+                    )
+
+        # 5. Check silkscreen-to-pad overlap
+        for st in self.config.silkscreen_texts:
+            sx, sy = st.position
+            for mh in holes:
+                dist = math.hypot(sx - mh.position_mm[0], sy - mh.position_mm[1])
+                min_dist = (mh.drill_diameter_mm / 2.0) + 0.30
+                if dist < min_dist:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="SILKSCREEN_PAD_OVERLAP",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=st.text,
+                            description=(
+                                f"Silkscreen text '{st.text}' at ({sx:.2f}, {sy:.2f}) overlaps drill hole '{mh.name}'"
+                            ),
+                            actual_value=dist,
+                            expected_range=(min_dist, 100.0),
+                            location=(sx, sy, 0.0),
+                        )
+                    )
+            for tp in self.config.test_points:
+                dist = math.hypot(sx - tp.position_mm[0], sy - tp.position_mm[1])
+                min_dist = (tp.pad_diameter_mm / 2.0) + 0.30
+                if dist < min_dist:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="SILKSCREEN_PAD_OVERLAP",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=st.text,
+                            description=(
+                                f"Silkscreen text '{st.text}' at ({sx:.2f}, {sy:.2f}) overlaps test point pad '{tp.name}'"
+                            ),
+                            actual_value=dist,
+                            expected_range=(min_dist, 100.0),
+                            location=(sx, sy, 0.0),
+                        )
+                    )
 
         return violations

@@ -462,23 +462,43 @@ class Provider:
                 else:
                     config.test_points = list(p_tps)
 
-            # 8. Derive dimensions_mm from build123d shape if missing
-            if config.dimensions_mm is None and config.shape_ref and config.shape_ref in self.part:
+            # 8. Merge metadata and derive dimensions_mm from build123d shape if shape_ref is present
+            if config.shape_ref and config.shape_ref in self.part:
                 part_builder = self.part[config.shape_ref]
                 part_obj = part_builder(config.shape_ref, None, Mode.DEFAULT)
-                bb = getattr(part_obj, "bounding_box", None)
-                if bb is None and hasattr(part_obj, "part"):
-                    bb = getattr(part_obj.part, "bounding_box", None)
-                if callable(bb):
-                    bbox = bb()
-                elif bb is not None:
-                    bbox = bb
-                else:
-                    bbox = None
+                pcb_meta = getattr(part_obj, "pcb_metadata", None)
+                if pcb_meta is None and hasattr(part_obj, "part"):
+                    pcb_meta = getattr(part_obj.part, "pcb_metadata", None)
+                if pcb_meta is not None:
+                    if config.stackup is None and pcb_meta.stackup is not None:
+                        config.stackup = pcb_meta.stackup
+                    if not config.mounting_holes and pcb_meta.mounting_holes:
+                        config.mounting_holes = pcb_meta.mounting_holes
+                    if not config.silkscreen_texts and pcb_meta.silkscreen_texts:
+                        config.silkscreen_texts = pcb_meta.silkscreen_texts
+                    if not config.traces and pcb_meta.traces:
+                        config.traces = pcb_meta.traces
+                    if not config.vias and pcb_meta.vias:
+                        config.vias = pcb_meta.vias
+                    if not config.copper_regions and pcb_meta.copper_regions:
+                        config.copper_regions = pcb_meta.copper_regions
+                    if not config.test_points and pcb_meta.test_points:
+                        config.test_points = pcb_meta.test_points
 
-                if bbox is not None:
-                    th_z = config.stackup.total_thickness_mm if config.stackup else bbox.size.Z
-                    config.dimensions_mm = (round(bbox.size.X, 4), round(bbox.size.Y, 4), round(th_z, 4))
+                if config.dimensions_mm is None:
+                    bb = getattr(part_obj, "bounding_box", None)
+                    if bb is None and hasattr(part_obj, "part"):
+                        bb = getattr(part_obj.part, "bounding_box", None)
+                    if callable(bb):
+                        bbox = bb()
+                    elif bb is not None:
+                        bbox = bb
+                    else:
+                        bbox = None
+
+                    if bbox is not None:
+                        th_z = config.stackup.total_thickness_mm if config.stackup else bbox.size.Z
+                        config.dimensions_mm = (round(bbox.size.X, 4), round(bbox.size.Y, 4), round(th_z, 4))
 
             return config
         return None

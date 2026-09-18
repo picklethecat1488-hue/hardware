@@ -274,6 +274,27 @@ footprints:
       - name: D
         position: [0.0, 1.0]
         side: right
+    truth_table:
+      title: "Q1 Load Switch Truth Table"
+      input_headers: ["PWR_EN (Gate)"]
+      output_headers: ["VLOAD_SW (Drain)", "Channel State"]
+      rows:
+        - inputs: {"PWR_EN (Gate)": "0 (Low, <0.8V)"}
+          outputs: {"VLOAD_SW (Drain)": "Hi-Z / Pull-up", "Channel State": "Cutoff"}
+          state: "FALSE"
+          description: "Load switch disabled; output isolated"
+        - inputs: {"PWR_EN (Gate)": "1 (High, >1.5V)"}
+          outputs: {"VLOAD_SW (Drain)": "0V (Low, GND)", "Channel State": "Conduction"}
+          state: "TRUE"
+          description: "Active saturation; load energized"
+        - inputs: {"PWR_EN (Gate)": "Float / High-Z"}
+          outputs: {"VLOAD_SW (Drain)": "Indeterminate", "Channel State": "Undefined"}
+          state: "INVALID"
+          description: "Prohibited floating gate; leakage risk"
+        - inputs: {"PWR_EN (Gate)": "Over-Voltage (>20V)"}
+          outputs: {"VLOAD_SW (Drain)": "Breakdown / Short", "Channel State": "Damaged"}
+          state: "INVALID"
+          description: "Gate dielectric breakdown; fault"
 
 nets:
   - name: GND

@@ -4,9 +4,9 @@ import math
 import yaml
 from enum import StrEnum
 from pathlib import Path
-from typing import Tuple, List, Optional, Callable, Any
+from typing import Tuple, List, Optional, Callable, Any, Dict
 from functools import cached_property
-from pydantic import BaseModel, Field, validate_call
+from pydantic import BaseModel, Field, validate_call, field_validator
 from build123d import Vector, Location
 from model.pcb import BgaFanoutModel
 
@@ -67,6 +67,44 @@ class LabelModel(BaseModel):
     align: Tuple[str, str] = Field(description="Horizontal and vertical text alignment (e.g. ['center', 'max'])")
 
 
+class TruthTableState(StrEnum):
+    """Classification of discrete component network truth table states."""
+
+    TRUE = "TRUE"
+    FALSE = "FALSE"
+    INVALID = "INVALID"
+
+
+class TruthTableRowModel(BaseModel):
+    """Row in a component truth table capturing inputs, outputs, state, and functional mode."""
+
+    inputs: Dict[str, str] = Field(description="Input pin or signal logic levels (e.g. {'PWR_EN': 'HIGH'})")
+    outputs: Dict[str, str] = Field(description="Output pin or signal logic levels (e.g. {'VLOAD_SW': 'LOW (0V)'})")
+    state: TruthTableState = Field(description="State classification: TRUE, FALSE, or INVALID")
+    description: str = Field(description="Functional operational mode or circuit note")
+
+    @field_validator("state", mode="before")
+    @classmethod
+    def parse_state(cls, v: Any) -> TruthTableState:
+        """Coerce strings to TruthTableState enum values."""
+        if isinstance(v, TruthTableState):
+            return v
+        if isinstance(v, str):
+            v_upper = v.strip().upper()
+            if v_upper in TruthTableState.__members__:
+                return TruthTableState[v_upper]
+        return v
+
+
+class TruthTableModel(BaseModel):
+    """Truth table representing true, false, and invalid states for discrete component networks."""
+
+    title: str = Field(default="Truth Table", description="Table title or circuit functional name")
+    input_headers: List[str] = Field(default_factory=list, description="Column headers for input signals")
+    output_headers: List[str] = Field(default_factory=list, description="Column headers for output signals")
+    rows: List[TruthTableRowModel] = Field(default_factory=list, description="Truth table rows")
+
+
 class FootprintModel(BaseModel):
     """Data model representing a physical/electrical footprint package."""
 
@@ -92,6 +130,9 @@ class FootprintModel(BaseModel):
     supplier_pn: Optional[str] = Field(default=None, description="Supplier part number (e.g. LCSC, DigiKey)")
     bga_fanout: Optional[BgaFanoutModel] = Field(default=None, description="Optional BGA fanout configuration")
     layer: str = Field(default="F.Cu", description="PCB copper placement layer ('F.Cu' for top, 'B.Cu' for bottom)")
+    truth_table: Optional[TruthTableModel] = Field(
+        default=None, description="Optional truth table capturing true, false, and invalid states for discrete networks"
+    )
 
 
 class NetModel(BaseModel):
@@ -171,6 +212,9 @@ class Wiring:
                 else LabelModel(text=c["name"], position=(0.0, 0.0, 0.0), align=("center", "center"))
             )
 
+            tt_data = c.get("truth_table")
+            truth_table = TruthTableModel(**tt_data) if tt_data else None
+
             components.append(
                 FootprintModel(
                     name=c["name"],
@@ -187,6 +231,7 @@ class Wiring:
                     supplier_pn=c.get("supplier_pn"),
                     bga_fanout=c.get("bga_fanout"),
                     layer=c.get("layer") or ("B.Cu" if position[2] < 0 else "F.Cu"),
+                    truth_table=truth_table,
                 )
             )
         return components

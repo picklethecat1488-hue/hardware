@@ -34,6 +34,12 @@ class BuildSilkscreen:
             _current_silkscreen.reset(self._token)
             self._token = None
 
+        from provider.pcb.board import BuildPcb
+
+        active_pcb = BuildPcb.current()
+        if active_pcb is not None:
+            active_pcb.silkscreen_texts.extend(self.texts)
+
     @classmethod
     def _get_context(cls) -> Optional["BuildSilkscreen"]:
         """Retrieve active silkscreen builder context if present."""

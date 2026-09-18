@@ -36,6 +36,12 @@ class BuildDrillHoles:
             _current_drill_holes.reset(self._token)
             self._token = None
 
+        from provider.pcb.board import BuildPcb
+
+        active_pcb = BuildPcb.current()
+        if active_pcb is not None:
+            active_pcb.mounting_holes.extend(self.holes)
+
     @classmethod
     def _get_context(cls) -> Optional["BuildDrillHoles"]:
         """Retrieve active drill holes builder context if present."""

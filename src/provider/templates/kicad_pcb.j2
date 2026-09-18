@@ -75,10 +75,10 @@
 {% endfor %}
 
 {% for tp in test_points %}
-  (footprint "TestPoint:TestPoint_Pad_D{{ tp.dia_mm }}mm" (layer "{{ tp.layer }}")
+  (footprint "TestPoint:TestPoint_THTPad_D{{ tp.dia_mm }}mm_Drill{{ tp.drill_mm }}mm" (layer "{{ tp.layer }}")
     (at {{ tp.x_mm }} {{ tp.y_mm }})
-    (fp_text reference "{{ tp.name }}" (at 0 -{{ tp.dia_mm + 0.6 }}) (layer "{{ tp.silk_layer }}") (effects (font (size 0.8 0.8) (thickness 0.12)){% if tp.layer == "B.Cu" %} (justify mirror){% endif %}))
-    (pad "1" smd circle (at 0 0) (size {{ tp.dia_mm }} {{ tp.dia_mm }}) (layers "{{ tp.layer }}" "{{ tp.mask_layer }}") (net {{ tp.net_idx }} "{{ tp.net_name }}"))
+    (fp_text reference "{{ tp.name }}" (at {{ tp.label_x }} {{ tp.label_y }}{% if tp.label_angle %} {{ tp.label_angle }}{% endif %}) (layer "{{ tp.silk_layer }}") (effects (font (size 0.7 0.7) (thickness 0.1)){% if tp.layer == "B.Cu" %} (justify mirror){% endif %}))
+    (pad "1" thru_hole circle (at 0 0) (size {{ tp.dia_mm }} {{ tp.dia_mm }}) (drill {{ tp.drill_mm }}) (layers "*.Cu" "*.Mask") (net {{ tp.net_idx }} "{{ tp.net_name }}"))
   )
 {% endfor %}
 

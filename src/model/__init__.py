@@ -19,7 +19,16 @@ from .boundary_config import (
 from .fluid_config import FluidConfig
 from .fluid_body import FluidBody, FluidBodyType, FluidBodyTracker
 from .coordinates import CoordinateSpace, CoordinateSystem, SpatialPose
-from .wiring import PinModel, LabelModel, FootprintModel, NetModel, Wiring
+from .wiring import (
+    PinModel,
+    LabelModel,
+    FootprintModel,
+    NetModel,
+    Wiring,
+    TruthTableState,
+    TruthTableRowModel,
+    TruthTableModel,
+)
 from .material import MaterialModel, MaterialsModel
 from .pcb import (
     LayerType,

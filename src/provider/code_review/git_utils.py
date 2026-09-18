@@ -4,11 +4,12 @@ Provides routines to query commits, list changed files, parse unified diffs,
 generate side-by-side split lines, and retrieve code line snippets.
 """
 
+from datetime import datetime, timezone
 import difflib
 from pathlib import Path
 import re
 import subprocess
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from model.code_review import (
     CommitInfoModel,
@@ -18,6 +19,18 @@ from model.code_review import (
     DiffSideBySideRow,
     FileDiffModel,
 )
+
+
+def extract_time_str(date_str: str) -> str:
+    """Extract HH:MM:SS from ISO or git timestamp string."""
+    if not date_str:
+        return ""
+    if "T" in date_str:
+        return date_str.split("T")[1][:8]
+    parts = date_str.split()
+    if len(parts) >= 2 and ":" in parts[1]:
+        return parts[1][:8]
+    return ""
 
 
 def run_git_command(args: List[str], cwd: Optional[Path] = None) -> str:
@@ -96,7 +109,7 @@ class GitReviewEngine:
                     resolved.append("working")
             elif ".." in arg_str:
                 try:
-                    out = run_git_command(["rev-list", arg_str], cwd=self.repo_root).strip()
+                    out = run_git_command(["rev-list", "--reverse", arg_str], cwd=self.repo_root).strip()
                 except RuntimeError as err:
                     raise ValueError(f"Invalid git revision range '{arg_str}': {err}") from err
 
@@ -121,7 +134,7 @@ class GitReviewEngine:
         return resolved
 
     def get_commits(self, limit: int = 30, rev_args: Optional[List[str]] = None) -> List[CommitInfoModel]:
-        """Fetch list of commits or requested revisions.
+        """Fetch list of commits or requested revisions in ascending chronological order.
 
         Args:
             limit: Maximum commits to return if no explicit revisions given.
@@ -132,24 +145,24 @@ class GitReviewEngine:
         """
         commits: List[CommitInfoModel] = []
 
-        # Check for working tree changes first
+        # Check for working tree changes
         working_info = self._get_working_tree_info()
-        if working_info is not None and (rev_args is None or "working" in rev_args):
-            commits.append(working_info)
 
         if rev_args and len(rev_args) > 0:
             resolved_revs = self.resolve_revisions(rev_args)
             for rev in resolved_revs:
                 if rev == "working":
+                    if working_info and working_info.commit_hash not in [c.commit_hash for c in commits]:
+                        commits.append(working_info)
                     continue
                 commit = self._get_single_commit_info(rev)
                 if commit and commit.commit_hash not in [c.commit_hash for c in commits]:
                     commits.append(commit)
             return commits
 
-        # Query recent commit history
+        # Query recent commit history in ascending chronological order
         fmt = "%H%x1f%h%x1f%an%x1f%ae%x1f%ad%x1f%s%x1f%b%x1e"
-        cmd = ["log", f"-n{limit}", f"--format={fmt}", "--date=iso-strict"]
+        cmd = ["log", f"-n{limit}", f"--format={fmt}", "--date=iso-strict", "--reverse"]
         output = run_git_command(cmd, cwd=self.repo_root)
 
         records = output.strip().split("\x1e")
@@ -174,6 +187,7 @@ class GitReviewEngine:
                         author=author,
                         email=email,
                         date=date_str,
+                        time=extract_time_str(date_str),
                         subject=subject,
                         body=body,
                         additions=additions,
@@ -181,6 +195,9 @@ class GitReviewEngine:
                         files_count=file_count,
                     )
                 )
+
+        if working_info is not None:
+            commits.append(working_info)
 
         return commits
 
@@ -220,12 +237,14 @@ class GitReviewEngine:
                     except OSError:
                         pass
 
+        now = datetime.now(timezone.utc)
         return CommitInfoModel(
             commit_hash="working",
             short_hash="WORKING",
             author="Local Working Tree",
             email="local@workspace",
-            date="Now (Uncommitted)",
+            date=f"Now ({now.strftime('%Y-%m-%d')})",
+            time=now.strftime("%H:%M:%S"),
             subject=f"Uncommitted Changes ({file_count} modified files)",
             body=status_output,
             additions=additions,
@@ -258,6 +277,7 @@ class GitReviewEngine:
                 author=author,
                 email=email,
                 date=date_str,
+                time=extract_time_str(date_str),
                 subject=subject,
                 body=body,
                 additions=additions,
@@ -265,6 +285,60 @@ class GitReviewEngine:
                 files_count=file_count,
             )
         return None
+
+    def search_code(self, query: str, commit: str = "working", max_results: int = 50) -> List[Dict[str, Any]]:
+        """Search for symbol, identifier, or text occurrences across files in revision or repository.
+
+        Args:
+            query: Search query pattern.
+            commit: Revision hash, "HEAD", or "working".
+            max_results: Maximum number of matches to return.
+
+        Returns:
+            List of match dictionaries containing file_path, line_number, and line_content.
+        """
+        if not query.strip():
+            return []
+
+        results: List[Dict[str, Any]] = []
+        q = query.strip()
+
+        if commit == "working":
+            try:
+                out = run_git_command(["grep", "-n", "-I", "-i", q], cwd=self.repo_root)
+                for line in out.splitlines():
+                    if len(results) >= max_results:
+                        break
+                    parts = line.split(":", 2)
+                    if len(parts) >= 3 and parts[1].isdigit():
+                        results.append(
+                            {
+                                "file_path": parts[0],
+                                "line_number": int(parts[1]),
+                                "line_content": parts[2].strip(),
+                            }
+                        )
+            except RuntimeError:
+                pass
+        else:
+            try:
+                out = run_git_command(["grep", "-n", "-I", "-i", q, commit], cwd=self.repo_root)
+                for line in out.splitlines():
+                    if len(results) >= max_results:
+                        break
+                    parts = line.split(":", 3)
+                    if len(parts) >= 4 and parts[2].isdigit():
+                        results.append(
+                            {
+                                "file_path": parts[1],
+                                "line_number": int(parts[2]),
+                                "line_content": parts[3].strip(),
+                            }
+                        )
+            except RuntimeError:
+                pass
+
+        return results
 
     def _get_commit_stat_summary(self, commit_hash: str) -> Tuple[int, int, int]:
         """Calculate additions, deletions, and file count for a commit."""

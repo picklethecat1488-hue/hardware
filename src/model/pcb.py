@@ -652,12 +652,16 @@ class CopperRegionModel(BaseModel):
 
 
 class TestPointModel(BaseModel):
-    """Exposed copper test point pad for probing and validation."""
+    """Exposed copper test point pad or through-hole probe point for probing and validation."""
 
     name: str = Field(description="Test point identifier (e.g. TP_SDA, TP_TX0_P)")
     net: str = Field(description="Electrical net name monitored by this test point")
     position_mm: Tuple[float, float] = Field(description="Test point coordinate (x, y) in mm relative to board center")
-    pad_diameter_mm: float = Field(default=1.0, gt=0.0, description="Exposed copper pad diameter in mm")
+    pad_diameter_mm: float = Field(default=1.40, gt=0.0, description="Exposed copper annular pad diameter in mm")
+    drill_diameter_mm: float = Field(
+        default=0.80, gt=0.0, description="Drilled plated hole diameter in mm for probe / fly wire insertion"
+    )
+    plated: bool = Field(default=True, description="Whether test point drill hole is through-hole plated")
     layer: str = Field(default="F.Cu", description="Copper layer for test point pad ('F.Cu' or 'B.Cu')")
     label: Optional[str] = Field(default=None, description="Optional silkscreen label annotation")
 
