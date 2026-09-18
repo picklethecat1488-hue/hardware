@@ -195,6 +195,10 @@ class PCBDesignRulesChecker:
         # 8. Physical clearance and overlap validation (pads, vias, drill holes)
         violations.extend(self.check_clearances_and_overlaps(wiring))
 
+        # 9. Antenna and dangling trace validation
+        if wiring:
+            violations.extend(self.check_antennae(wiring))
+
         passed = not any(v.severity == DRCSeverity.ERROR for v in violations)
         return DRCReport(passed=passed, violations=violations)
 
@@ -926,7 +930,47 @@ class PCBDesignRulesChecker:
                         )
                     )
 
-        # 5. Check silkscreen-to-pad overlap
+        # 5. Check test point to trace collisions and clearance violations
+        for tp in self.config.test_points:
+            tx, ty = tp.position_mm
+            tp_r = tp.pad_diameter_mm / 2.0
+            for tr in traces:
+                if tp.net == tr.net:
+                    continue
+                dist = _dist_point_to_segment((tx, ty), tr.start_mm, tr.end_mm)
+                min_copper = tp_r + (tr.width_mm / 2.0)
+                if dist < min_copper - 1e-4:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="TEST_POINT_TRACE_COLLISION",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"{tp.name}<->{tr.net}",
+                            description=(
+                                f"Test point '{tp.name}' on net '{tp.net}' at ({tx:.2f}, {ty:.2f}) collides with "
+                                f"trace on net '{tr.net}' on layer '{tr.layer}' (dist: {dist:.3f}mm < {min_copper:.3f}mm)"
+                            ),
+                            actual_value=dist,
+                            expected_range=(min_copper, 100.0),
+                            location=(tx, ty, 0.0),
+                        )
+                    )
+                elif dist < min_copper + clearance_default - 1e-4:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="CLEARANCE_VIOLATION",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"{tp.name}<->{tr.net}",
+                            description=(
+                                f"Clearance violation between test point '{tp.name}' on net '{tp.net}' at ({tx:.2f}, {ty:.2f}) "
+                                f"and trace on net '{tr.net}' (dist: {dist:.3f}mm < required {min_copper + clearance_default:.3f}mm)"
+                            ),
+                            actual_value=dist,
+                            expected_range=(min_copper + clearance_default, 100.0),
+                            location=(tx, ty, 0.0),
+                        )
+                    )
+
+        # 6. Check silkscreen-to-pad and courtyard overlap
         for st in self.config.silkscreen_texts:
             sx, sy = st.position
             for mh in holes:
@@ -963,5 +1007,167 @@ class PCBDesignRulesChecker:
                             location=(sx, sy, 0.0),
                         )
                     )
+            if wiring and hasattr(wiring, "footprints"):
+                for fp in wiring.footprints:
+                    fp_layer = getattr(fp, "layer", "F.Cu") or ("B.Cu" if fp.position[2] < 0 else "F.Cu")
+                    pad_silk_layer = "B.SilkS" if fp_layer == "B.Cu" else "F.SilkS"
+                    fx, fy = fp.position[0], fp.position[1]
+                    for p in getattr(fp, "pins", []):
+                        pad_type = getattr(p, "pad_type", "smd")
+                        if pad_type != "thru_hole" and st.layer != pad_silk_layer:
+                            continue
+                        px = fx + p.position[0]
+                        py = fy + p.position[1]
+                        pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
+                        p_r = max(pad_size) / 2.0
+                        dist = math.hypot(sx - px, sy - py)
+                        min_dist = p_r + 0.30
+                        if dist < min_dist:
+                            violations.append(
+                                DRCViolation(
+                                    rule_name="SILKSCREEN_PAD_OVERLAP",
+                                    severity=DRCSeverity.ERROR,
+                                    net_or_zone=st.text,
+                                    description=(
+                                        f"Silkscreen text '{st.text}' at ({sx:.2f}, {sy:.2f}) overlaps pad '{p.name}' "
+                                        f"on component '{fp.name}' at ({px:.2f}, {py:.2f})"
+                                    ),
+                                    actual_value=dist,
+                                    expected_range=(min_dist, 100.0),
+                                    location=(sx, sy, 0.0),
+                                )
+                            )
+
+        return violations
+
+    def check_antennae(self, wiring: Any) -> List[DRCViolation]:
+        """Detect open-ended stubs and antenna traces that radiate EMI or fail signal integrity."""
+        violations: List[DRCViolation] = []
+        traces = self.config.traces
+        vias = self.config.vias
+        test_points = self.config.test_points
+        copper_regions = self.config.copper_regions
+
+        if not traces:
+            return violations
+
+        # Pre-collect all valid termination targets per net and layer
+        # 1. Component pin pads
+        footprints = getattr(wiring, "footprints", []) if wiring else []
+        pin_targets: Dict[str, List[Tuple[float, float, str, float]]] = {}
+        for fp in footprints:
+            fp_x, fp_y = fp.position[0], fp.position[1]
+            fp_layer = getattr(fp, "layer", "F.Cu") or ("B.Cu" if fp.position[2] < 0 else "F.Cu")
+            for p in getattr(fp, "pins", []):
+                p_net = ""
+                if wiring and hasattr(wiring, "nets"):
+                    for n in wiring.nets:
+                        for comp_name, pin_name in n.pins:
+                            if comp_name == fp.name and pin_name == p.name:
+                                p_net = n.name
+                                break
+                        if p_net:
+                            break
+                if not p_net:
+                    continue
+
+                px = fp_x + p.position[0]
+                py = fp_y + p.position[1]
+                pad_type = getattr(p, "pad_type", "smd")
+                pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
+                pad_r = max(pad_size) / 2.0
+                target_layer = "all" if pad_type == "thru_hole" else fp_layer
+                if p_net not in pin_targets:
+                    pin_targets[p_net] = []
+                pin_targets[p_net].append((px, py, target_layer, pad_r))
+
+        # 2. Vias per net
+        via_targets: Dict[str, List[Tuple[float, float, str, str, float]]] = {}
+        for v in vias:
+            if v.net not in via_targets:
+                via_targets[v.net] = []
+            via_targets[v.net].append(
+                (v.position_mm[0], v.position_mm[1], v.layer_start, v.layer_end, v.pad_diameter_mm / 2.0)
+            )
+
+        # 3. Test points per net (through-hole, valid on all copper layers)
+        tp_targets: Dict[str, List[Tuple[float, float, str, float]]] = {}
+        for tp in test_points:
+            if tp.net not in tp_targets:
+                tp_targets[tp.net] = []
+            tp_targets[tp.net].append((tp.position_mm[0], tp.position_mm[1], "all", tp.pad_diameter_mm / 2.0))
+
+        # Check both endpoints (start_mm, end_mm) of each trace segment
+        for tr_idx, tr in enumerate(traces):
+            for pt in (tr.start_mm, tr.end_mm):
+                pt_x, pt_y = pt[0], pt[1]
+
+                # Check connection to another trace of the same net and layer
+                connected_to_trace = False
+                for other_idx, other_tr in enumerate(traces):
+                    if other_idx == tr_idx or other_tr.net != tr.net or other_tr.layer != tr.layer:
+                        continue
+                    if (
+                        _dist_point_to_segment(pt, other_tr.start_mm, other_tr.end_mm)
+                        <= (other_tr.width_mm / 2.0) + 0.05
+                    ):
+                        connected_to_trace = True
+                        break
+                if connected_to_trace:
+                    continue
+
+                # Check connection to a via of the same net
+                connected_to_via = False
+                for vx, vy, l_start, l_end, v_r in via_targets.get(tr.net, []):
+                    if tr.layer in (l_start, l_end) or l_start == "all":
+                        if math.hypot(pt_x - vx, pt_y - vy) <= v_r + 0.10:
+                            connected_to_via = True
+                            break
+                if connected_to_via:
+                    continue
+
+                # Check connection to a pin pad of the same net
+                connected_to_pin = False
+                for px, py, p_lay, p_r in pin_targets.get(tr.net, []):
+                    if p_lay in (tr.layer, "all"):
+                        if math.hypot(pt_x - px, pt_y - py) <= p_r + 0.10:
+                            connected_to_pin = True
+                            break
+                if connected_to_pin:
+                    continue
+
+                # Check connection to a test point of the same net
+                connected_to_tp = False
+                for tx, ty, t_lay, tp_r in tp_targets.get(tr.net, []):
+                    if t_lay in (tr.layer, "all"):
+                        if math.hypot(pt_x - tx, pt_y - ty) <= tp_r + 0.10:
+                            connected_to_tp = True
+                            break
+                if connected_to_tp:
+                    continue
+
+                # Check connection to a copper region / plane of the same net
+                connected_to_plane = False
+                for cr in copper_regions:
+                    if cr.net == tr.net and cr.layer == tr.layer:
+                        if _point_in_polygon(pt_x, pt_y, cr.polygon_points_mm):
+                            connected_to_plane = True
+                            break
+                if connected_to_plane:
+                    continue
+
+                # If not connected to anything, flag antenna violation
+                violations.append(
+                    DRCViolation(
+                        rule_name="ANTENNA_TRACE_DETECTED",
+                        severity=DRCSeverity.ERROR,
+                        net_or_zone=tr.net,
+                        description=(
+                            f"Dangling trace stub / antenna detected on net '{tr.net}' on layer '{tr.layer}' "
+                            f"at ({pt_x:.2f}, {pt_y:.2f}) with no pad, via, test point, or connected trace"
+                        ),
+                        location=(pt_x, pt_y, 0.0),
+                    )
+                )
 
         return violations

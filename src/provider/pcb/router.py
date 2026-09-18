@@ -292,6 +292,10 @@ class PCBAutoRouter:
         # All 4 signals run down to their respective test points at Y = -22.0,
         # then turn horizontal into J1 connector at Y = -36.0.
         # Spacing >= 1.0mm everywhere.
+        # 1. PCIe Differential Pairs
+        # All 4 signals run down to their respective test points at Y = -22.0.
+        # TX0_P, RX0_P, RX0_N run entirely on F.Cu inline with test points.
+        # TX0_N routes on F.Cu through TP_TX0_N, bridges to B.Cu with vias to clear TX0_P, and enters J1.
         if "PCIE_TX0_P" not in skip_nets:
             traces.extend(
                 polyline_to_trace_segments(
@@ -313,25 +317,38 @@ class PCBAutoRouter:
             w_pcie = self.get_net_trace_width("PCIE_TX0_N")
             vias.append(
                 ViaModel(
-                    position_mm=(4.0, -35.0),
+                    position_mm=(-14.0, -24.0),
                     drill_diameter_mm=0.20,
                     pad_diameter_mm=0.45,
-                    layer_start="B.Cu",
-                    layer_end="F.Cu",
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
                     net="PCIE_TX0_N",
                 )
             )
-            # F.Cu: U1.A2 -> TP_TX0_N
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(-4.2, 5.0), (-4.2, 6.5), (-14.0, 6.5), (-14.0, -22.0)], w_pcie, "F.Cu", "PCIE_TX0_N"
+            vias.append(
+                ViaModel(
+                    position_mm=(4.0, -35.0),
+                    drill_diameter_mm=0.20,
+                    pad_diameter_mm=0.45,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="PCIE_TX0_N",
                 )
             )
-            # B.Cu: TP_TX0_N -> J1 drop via at (4.0, -35.0) (passes below VLOAD_SW via at Y = -33.5)
+            # F.Cu: U1.A2 -> TP_TX0_N -> via at (-14.0, -24.0)
             traces.extend(
-                polyline_to_trace_segments([(-14.0, -22.0), (-14.0, -35.0), (4.0, -35.0)], w_pcie, "B.Cu", "PCIE_TX0_N")
+                polyline_to_trace_segments(
+                    [(-4.2, 5.0), (-4.2, 6.5), (-14.0, 6.5), (-14.0, -22.0), (-14.0, -24.0)],
+                    w_pcie,
+                    "F.Cu",
+                    "PCIE_TX0_N",
+                )
             )
-            # F.Cu: drop via into J1 pin
+            # B.Cu: via at (-14.0, -24.0) -> via at (4.0, -35.0)
+            traces.extend(
+                polyline_to_trace_segments([(-14.0, -24.0), (-14.0, -35.0), (4.0, -35.0)], w_pcie, "B.Cu", "PCIE_TX0_N")
+            )
+            # F.Cu: drop via into J1 pin at Y = -36.0
             traces.extend(polyline_to_trace_segments([(4.0, -35.0), (4.0, -36.0)], w_pcie, "F.Cu", "PCIE_TX0_N"))
 
         if "PCIE_RX0_P" not in skip_nets:
@@ -370,7 +387,7 @@ class PCBAutoRouter:
             )
 
         # 2. MIPI Differential Pairs
-        # DATA0 pair routes via B.Cu across to test points; CLK pair routes on F.Cu.
+        # DATA0 pair routes via B.Cu across to test points with explicit vias; CLK pair routes on F.Cu.
         # This completely avoids 2D planar trace collisions.
         if "MIPI_DATA0_P" not in skip_nets:
             w_mipi = self.get_net_trace_width("MIPI_DATA0_P")
@@ -384,11 +401,23 @@ class PCBAutoRouter:
                     net="MIPI_DATA0_P",
                 )
             )
+            vias.append(
+                ViaModel(
+                    position_mm=(6.0, 24.0),
+                    drill_diameter_mm=0.20,
+                    pad_diameter_mm=0.45,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="MIPI_DATA0_P",
+                )
+            )
             traces.extend(polyline_to_trace_segments([(5.0, -5.0), (6.0, -5.0)], w_mipi, "F.Cu", "MIPI_DATA0_P"))
-            traces.extend(polyline_to_trace_segments([(6.0, -5.0), (6.0, 22.0)], w_mipi, "B.Cu", "MIPI_DATA0_P"))
+            traces.extend(
+                polyline_to_trace_segments([(6.0, -5.0), (6.0, 22.0), (6.0, 24.0)], w_mipi, "B.Cu", "MIPI_DATA0_P")
+            )
             traces.extend(
                 polyline_to_trace_segments(
-                    [(6.0, 22.0), (6.0, 26.0), (-5.0, 26.0), (-5.0, 38.0)], w_mipi, "F.Cu", "MIPI_DATA0_P"
+                    [(6.0, 24.0), (6.0, 26.0), (-5.0, 26.0), (-5.0, 38.0)], w_mipi, "F.Cu", "MIPI_DATA0_P"
                 )
             )
 
@@ -404,13 +433,25 @@ class PCBAutoRouter:
                     net="MIPI_DATA0_N",
                 )
             )
+            vias.append(
+                ViaModel(
+                    position_mm=(10.0, 24.0),
+                    drill_diameter_mm=0.20,
+                    pad_diameter_mm=0.45,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="MIPI_DATA0_N",
+                )
+            )
             traces.extend(polyline_to_trace_segments([(5.0, -5.8), (8.0, -5.8)], w_mipi, "F.Cu", "MIPI_DATA0_N"))
             traces.extend(
-                polyline_to_trace_segments([(8.0, -5.8), (10.0, -5.8), (10.0, 22.0)], w_mipi, "B.Cu", "MIPI_DATA0_N")
+                polyline_to_trace_segments(
+                    [(8.0, -5.8), (10.0, -5.8), (10.0, 22.0), (10.0, 24.0)], w_mipi, "B.Cu", "MIPI_DATA0_N"
+                )
             )
             traces.extend(
                 polyline_to_trace_segments(
-                    [(10.0, 22.0), (10.0, 28.0), (-4.0, 28.0), (-4.0, 38.0)], w_mipi, "F.Cu", "MIPI_DATA0_N"
+                    [(10.0, 24.0), (10.0, 28.0), (-4.0, 28.0), (-4.0, 38.0)], w_mipi, "F.Cu", "MIPI_DATA0_N"
                 )
             )
 
@@ -458,6 +499,16 @@ class PCBAutoRouter:
         # On B.Cu, signals drop directly from through-hole test point pads to U2.
         if "I2C_SDA" not in skip_nets:
             w_i2c = self.get_net_trace_width("I2C_SDA")
+            vias.append(
+                ViaModel(
+                    position_mm=(18.0, -4.0),
+                    drill_diameter_mm=0.20,
+                    pad_diameter_mm=0.45,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="I2C_SDA",
+                )
+            )
             # F.Cu: U1.F1 -> R1 pin 2 and TP_SDA
             traces.extend(polyline_to_trace_segments([(4.0, 0.0), (18.0, 0.0), (18.0, -4.0)], w_i2c, "F.Cu", "I2C_SDA"))
             traces.extend(polyline_to_trace_segments([(10.5, 0.0), (10.5, -8.0)], w_i2c, "F.Cu", "I2C_SDA"))
@@ -470,6 +521,16 @@ class PCBAutoRouter:
 
         if "I2C_SCL" not in skip_nets:
             w_i2c = self.get_net_trace_width("I2C_SCL")
+            vias.append(
+                ViaModel(
+                    position_mm=(14.0, -4.0),
+                    drill_diameter_mm=0.20,
+                    pad_diameter_mm=0.45,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="I2C_SCL",
+                )
+            )
             # F.Cu: U1.F2 -> R2 pin 2 and TP_SCL (routes down at X = 4.0 to avoid MIPI at X = 5.0)
             traces.extend(
                 polyline_to_trace_segments(
@@ -520,21 +581,23 @@ class PCBAutoRouter:
 
         if "VLOAD_SW" not in skip_nets:
             w_vload = self.get_net_trace_width("VLOAD_SW")
-            # Route on B.Cu from Q1.D down to J1, via to F.Cu at Y = -33.5
+            # Route on B.Cu from Q1.D down along X = -7.0 (clearing test points at X=-6.0 and X=-10.0), via to F.Cu at Y = -32.0
             vias.append(
                 ViaModel(
-                    position_mm=(-6.0, -33.5),
+                    position_mm=(-6.0, -32.0),
                     drill_diameter_mm=0.20,
                     pad_diameter_mm=0.45,
-                    layer_start="B.Cu",
-                    layer_end="F.Cu",
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
                     net="VLOAD_SW",
                 )
             )
             traces.extend(
-                polyline_to_trace_segments([(-18.0, -14.0), (-6.0, -14.0), (-6.0, -33.5)], w_vload, "B.Cu", "VLOAD_SW")
+                polyline_to_trace_segments(
+                    [(-18.0, -14.0), (-7.0, -14.0), (-7.0, -32.0), (-6.0, -32.0)], w_vload, "B.Cu", "VLOAD_SW"
+                )
             )
-            traces.extend(polyline_to_trace_segments([(-6.0, -33.5), (-6.0, -36.0)], w_vload, "F.Cu", "VLOAD_SW"))
+            traces.extend(polyline_to_trace_segments([(-6.0, -32.0), (-6.0, -36.0)], w_vload, "F.Cu", "VLOAD_SW"))
 
         # 5. Capacitive sensing nets (8 nets)
         # U2 is on B.Cu with CS pins on the right edge (X = 20.0).
@@ -559,8 +622,8 @@ class PCBAutoRouter:
                     position_mm=(xj, y_turn),
                     drill_diameter_mm=0.20,
                     pad_diameter_mm=0.45,
-                    layer_start="B.Cu",
-                    layer_end="F.Cu",
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
                     net=cnet,
                 )
             )
@@ -581,8 +644,8 @@ class PCBAutoRouter:
                     position_mm=(8.0, 33.4),
                     drill_diameter_mm=0.20,
                     pad_diameter_mm=0.45,
-                    layer_start="B.Cu",
-                    layer_end="F.Cu",
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
                     net="CAP_SHIELD",
                 )
             )
