@@ -25,7 +25,7 @@ class StackupLayerModel(BaseModel):
     """Data model representing an individual layer in a multi-layer stackup."""
 
     name: str = Field(description="Layer identifier (e.g. F.Cu, In1.Cu, Prepreg1, B.Cu)")
-    layer_type: LayerType = Field(description="Layer functional type")
+    layer_type: Optional[LayerType] = Field(default=None, description="Layer functional type")
     thickness_mm: float = Field(gt=0.0, description="Layer thickness in millimeters")
     material: str = Field(default="copper", description="Layer material (e.g. copper, FR4, polyimide)")
     dielectric_constant: Optional[float] = Field(
@@ -55,6 +55,7 @@ class StackupLayerModel(BaseModel):
 class PCBMaterialModel(BaseModel):
     """Physical and electrical specifications for a PCB substrate, foil, or finish material."""
 
+    layer_type: Optional[LayerType] = Field(default=None, description="Default stackup layer type for this material.")
     density: float = Field(default=1.85, gt=0.0, description="Material density in g/cm³.")
     boundary_friction: float = Field(default=0.25, ge=0.0, description="Boundary friction coefficient.")
     contact_angle: float = Field(default=70.0, ge=0.0, le=180.0, description="Contact angle in degrees.")
@@ -138,6 +139,7 @@ class StackupModel(BaseModel):
     @model_validator(mode="after")
     def validate_layer_symmetry_and_count(self) -> "StackupModel":
         """Validate that stackup contains valid conductive layers (4, 6, 8, etc.) and dielectrics."""
+        self.resolve_materials()
         copper_layers = [
             l for l in self.layers if l.layer_type in (LayerType.SIGNAL, LayerType.GROUND, LayerType.POWER)
         ]
@@ -146,6 +148,33 @@ class StackupModel(BaseModel):
             raise ValueError(f"PCB stackup must contain at least 2 conductive copper layers, found {count}")
         if count % 2 != 0:
             raise ValueError(f"Multi-layer PCB stackups must have an even copper layer count, found {count}")
+        return self
+
+    def resolve_materials(self, materials: Optional[PCBMaterialsModel] = None) -> "StackupModel":
+        """Resolve layer types, dielectric constants, and loss tangents from materials catalog."""
+        if materials is None:
+            materials = PCBMaterialsModel.default()
+        for layer in self.layers:
+            mat = materials.get(layer.material)
+            if layer.layer_type is None:
+                if mat and mat.layer_type is not None:
+                    layer.layer_type = mat.layer_type
+                else:
+                    lower = layer.name.lower()
+                    if "gnd" in lower:
+                        layer.layer_type = LayerType.GROUND
+                    elif "pwr" in lower:
+                        layer.layer_type = LayerType.POWER
+                    elif ".cu" in lower:
+                        layer.layer_type = LayerType.SIGNAL
+                    else:
+                        layer.layer_type = LayerType.DIELECTRIC
+
+            if layer.dielectric_constant is None and mat and mat.dielectric_constant is not None:
+                layer.dielectric_constant = mat.dielectric_constant
+
+            if layer.loss_tangent is None and mat and mat.loss_tangent is not None:
+                layer.loss_tangent = mat.loss_tangent
         return self
 
     @property
@@ -589,6 +618,50 @@ class SchematicSheetModel(BaseModel):
     )
 
 
+class TraceSegmentModel(BaseModel):
+    """Linear copper trace segment routing a net on a specific layer."""
+
+    start_mm: Tuple[float, float] = Field(description="Start coordinate (x, y) in mm relative to board center")
+    end_mm: Tuple[float, float] = Field(description="End coordinate (x, y) in mm relative to board center")
+    width_mm: float = Field(gt=0.0, description="Trace conductor width in mm")
+    layer: str = Field(default="F.Cu", description="Copper layer name (e.g. F.Cu, In1.Cu, B.Cu)")
+    net: str = Field(description="Electrical net name connected by this trace segment")
+
+
+class ViaModel(BaseModel):
+    """Through-hole or microvia connecting traces between copper layers."""
+
+    position_mm: Tuple[float, float] = Field(description="Via center coordinate (x, y) in mm relative to board center")
+    drill_diameter_mm: float = Field(default=0.20, gt=0.0, description="Via hole drill diameter in mm")
+    pad_diameter_mm: float = Field(default=0.45, gt=0.0, description="Via annular copper pad outer diameter in mm")
+    layer_start: str = Field(default="F.Cu", description="Starting copper layer name")
+    layer_end: str = Field(default="B.Cu", description="Ending copper layer name")
+    net: str = Field(description="Electrical net name for this via")
+
+
+class CopperRegionModel(BaseModel):
+    """Filled polygonal copper pour, plane, or shield zone."""
+
+    net: str = Field(default="GND", description="Net name to which the copper region connects (typically GND)")
+    layer: str = Field(default="In1.Cu", description="Copper layer on which the plane is poured")
+    polygon_points_mm: List[Tuple[float, float]] = Field(
+        description="Boundary vertices (x, y) in mm relative to board center"
+    )
+    clearance_mm: float = Field(default=0.20, ge=0.0, description="Clearance from copper region to foreign traces/pads")
+    priority: int = Field(default=1, ge=0, description="Filling priority (higher numbers fill first)")
+
+
+class TestPointModel(BaseModel):
+    """Exposed copper test point pad for probing and validation."""
+
+    name: str = Field(description="Test point identifier (e.g. TP_SDA, TP_TX0_P)")
+    net: str = Field(description="Electrical net name monitored by this test point")
+    position_mm: Tuple[float, float] = Field(description="Test point coordinate (x, y) in mm relative to board center")
+    pad_diameter_mm: float = Field(default=1.0, gt=0.0, description="Exposed copper pad diameter in mm")
+    layer: str = Field(default="F.Cu", description="Copper layer for test point pad ('F.Cu' or 'B.Cu')")
+    label: Optional[str] = Field(default=None, description="Optional silkscreen label annotation")
+
+
 class MountingHoleModel(BaseModel):
     """Physical mounting or tooling drill hole on PCB."""
 
@@ -606,14 +679,15 @@ class PCBConfig(BaseModel):
     name: str = Field(description="PCB project or sub-assembly name")
     board_type: str = Field(default="rigid-flex", description="Substrate type: 'rigid', 'flex', or 'rigid-flex'")
     revision: str = Field(default="1.0", description="Board revision identifier (e.g. '1.0', 'A', 'rev2')")
-    dimensions_mm: Tuple[float, float, float] = Field(
-        description="Physical board bounding envelope (width, length, overall_thickness)"
+    dimensions_mm: Optional[Tuple[float, float, float]] = Field(
+        default=None,
+        description="Physical board bounding envelope (width, length, overall_thickness), dynamically calculated from CAD shape and stackup if omitted",
     )
     shape_ref: Optional[str] = Field(
         default=None,
         description="Name of build123d shape or part in manifest defining board outline",
     )
-    stackup: StackupModel = Field(description="Multi-layer physical stackup definition")
+    stackup: Optional[StackupModel] = Field(default=None, description="Multi-layer physical stackup definition")
     sheet_size: SheetSize = Field(
         default=SheetSize.A4,
         description="Standard drawing sheet format for PCB and schematic exports ('A4', 'A3', etc.)",
@@ -642,6 +716,14 @@ class PCBConfig(BaseModel):
         default_factory=list,
         description="Drill and mounting holes for carrier assembly",
     )
+    traces: List[TraceSegmentModel] = Field(
+        default_factory=list, description="Copper traces routing electrical nets across layers"
+    )
+    vias: List[ViaModel] = Field(default_factory=list, description="Through-hole and blind/buried interlayer vias")
+    copper_regions: List[CopperRegionModel] = Field(
+        default_factory=list, description="Filled copper pours, planes, and shielding zones"
+    )
+    test_points: List[TestPointModel] = Field(default_factory=list, description="Exposed test point probing pads")
 
     @property
     def sheet_dimensions_mm(self) -> Tuple[float, float]:

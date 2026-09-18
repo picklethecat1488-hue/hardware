@@ -7,6 +7,19 @@ from .exporter import PCBExporter
 from .eye_diagram import EyeDiagramSimulator, EyeDiagramConfig, EyeDiagramResult
 from .rerun_logger import log_drc_report, log_eye_diagram
 from .silkscreen import BuildSilkscreen, SilkscreenText
+from .stackup import BuildStackup, StackupLayer
+from .drill_holes import BuildDrillHoles, MountingHole, DrillHole
+from .routing import (
+    BuildTraces,
+    Trace,
+    BuildVias,
+    Via,
+    BuildCopperRegions,
+    CopperRegion,
+    CopperZone,
+    BuildTestPoints,
+    TestPoint,
+)
 
 __all__ = [
     "PCBDesignRulesChecker",
@@ -27,4 +40,18 @@ __all__ = [
     "log_eye_diagram",
     "BuildSilkscreen",
     "SilkscreenText",
+    "BuildStackup",
+    "StackupLayer",
+    "BuildDrillHoles",
+    "MountingHole",
+    "DrillHole",
+    "BuildTraces",
+    "Trace",
+    "BuildVias",
+    "Via",
+    "BuildCopperRegions",
+    "CopperRegion",
+    "CopperZone",
+    "BuildTestPoints",
+    "TestPoint",
 ]

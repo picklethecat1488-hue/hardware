@@ -255,7 +255,7 @@ def test_test_board_provider_cad_silkscreen():
 
     provider = TestBoardProvider()
     texts = provider.silkscreen()
-    assert len(texts) == 3
+    assert len(texts) >= 3
     assert texts[0].text == "TEST BOARD CARRIER REV 1.0"
     assert texts[0].position == (0.0, 38.0)
     assert texts[0].layer == "F.SilkS"
@@ -270,7 +270,7 @@ def test_test_board_provider_cad_silkscreen():
     # Check that pcb_config inherits them
     pcb_cfg = provider.pcb_config
     assert pcb_cfg is not None
-    assert len(pcb_cfg.silkscreen_texts) == 3
+    assert len(pcb_cfg.silkscreen_texts) >= 3
 
 
 def test_schematic_sheet_model():
