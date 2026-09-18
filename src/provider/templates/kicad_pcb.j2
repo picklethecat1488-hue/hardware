@@ -58,13 +58,27 @@
 {% endfor %}
 
 {% for fp in footprints %}
-  (footprint "{{ fp.package }}" (layer "F.Cu")
+  (footprint "{{ fp.package }}" (layer "{{ fp.layer }}")
     (at {{ fp.x_mm }} {{ fp.y_mm }})
-    (fp_text reference "{{ fp.name }}" (at 0 -2.5) (layer "F.SilkS") (effects (font (size 1 1) (thickness 0.15))))
-    (fp_text value "{{ fp.value }}" (at 0 2.5) (layer "F.Fab") (effects (font (size 1 1) (thickness 0.15))))
-{% for pin in fp.pins %}
-    (pad "{{ pin.name }}" smd circle (at {{ pin.x_mm }} {{ pin.y_mm }}) (size {{ pin.pad_dia_mm }} {{ pin.pad_dia_mm }}) (layers "F.Cu" "F.Paste" "F.Mask") (net {{ pin.net_idx }} "{{ pin.net_name }}"))
+    (fp_text reference "{{ fp.name }}" (at 0 {{ fp.ref_y }}) (layer "{{ fp.silk_layer }}") (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
+    (fp_text value "{{ fp.value }}" (at 0 {{ fp.val_y }}) (layer "{{ fp.fab_layer }}") (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
+{% for line in fp.alignment_lines %}
+    (fp_line (start {{ line.x1 }} {{ line.y1 }}) (end {{ line.x2 }} {{ line.y2 }}) (stroke (width 0.15) (type default)) (layer "{{ fp.silk_layer }}"))
 {% endfor %}
+{% if fp.pin1_dot %}
+    (fp_circle (center {{ fp.pin1_dot.cx }} {{ fp.pin1_dot.cy }}) (end {{ fp.pin1_dot.ex }} {{ fp.pin1_dot.ey }}) (stroke (width 0.15) (type default)) (fill solid) (layer "{{ fp.silk_layer }}"))
+{% endif %}
+{% for pin in fp.pins %}
+    (pad "{{ pin.name }}" smd circle (at {{ pin.x_mm }} {{ pin.y_mm }}) (size {{ pin.pad_dia_mm }} {{ pin.pad_dia_mm }}) (layers "{{ fp.layer }}" "{{ fp.paste_layer }}" "{{ fp.mask_layer }}") (net {{ pin.net_idx }} "{{ pin.net_name }}"))
+{% endfor %}
+  )
+{% endfor %}
+
+{% for tp in test_points %}
+  (footprint "TestPoint:TestPoint_Pad_D{{ tp.dia_mm }}mm" (layer "{{ tp.layer }}")
+    (at {{ tp.x_mm }} {{ tp.y_mm }})
+    (fp_text reference "{{ tp.name }}" (at 0 -{{ tp.dia_mm + 0.6 }}) (layer "{{ tp.silk_layer }}") (effects (font (size 0.8 0.8) (thickness 0.12)){% if tp.layer == "B.Cu" %} (justify mirror){% endif %}))
+    (pad "1" smd circle (at 0 0) (size {{ tp.dia_mm }} {{ tp.dia_mm }}) (layers "{{ tp.layer }}" "{{ tp.mask_layer }}") (net {{ tp.net_idx }} "{{ tp.net_name }}"))
   )
 {% endfor %}
 
@@ -74,6 +88,25 @@
 
 {% for via in vias %}
   (via (at {{ via.x }} {{ via.y }}) (size {{ via.dia }}) (drill {{ via.drill }}) (layers "{{ via.layer1 }}" "{{ via.layer2 }}") (net {{ via.net_idx }}))
+{% endfor %}
+
+{% for zone in zones %}
+  (zone (net {{ zone.net_idx }}) (net_name "{{ zone.net_name }}") (layer "{{ zone.layer }}")
+    (hatch edge 0.5)
+    (priority {{ zone.priority }})
+    (connect_pads (clearance {{ zone.clearance_mm }}))
+    (min_thickness 0.15)
+    (filled_polygon
+      (pts
+        {% for pt in zone.pts %}(xy {{ pt.x }} {{ pt.y }}) {% endfor %}
+      )
+    )
+    (polygon
+      (pts
+        {% for pt in zone.pts %}(xy {{ pt.x }} {{ pt.y }}) {% endfor %}
+      )
+    )
+  )
 {% endfor %}
 
 {% for mh in mounting_holes %}

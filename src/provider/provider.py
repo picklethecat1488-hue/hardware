@@ -161,7 +161,6 @@ class ProviderOrchestrator(Orchestrator):
                     cad_zip = exporter.export_board_archive(out_dir / f"{target}_cad.zip")
                     bom_csv = exporter.export_bom_csv(out_dir / f"{target}_bom.csv")
                     cpl_csv = exporter.export_pick_and_place_csv(out_dir / f"{target}_cpl.csv")
-                    sch_svg = exporter.export_schematic_svg(out_dir / f"{target}_schematic.svg")
                     sch_pdf = exporter.export_schematic_pdf(out_dir / f"{target}_schematic.pdf")
                     cap_json = exporter.export_capacitive_config_json(out_dir / f"{target}_capacitive_config.json")
                     return {
@@ -169,7 +168,7 @@ class ProviderOrchestrator(Orchestrator):
                         "cad": cad_zip,
                         "bom": bom_csv,
                         "cpl": cpl_csv,
-                        "schematic": sch_svg,
+                        "schematic": sch_pdf,
                         "schematic_pdf": sch_pdf,
                         "capacitive_config": cap_json,
                     }
@@ -331,6 +330,28 @@ class Provider:
                 return yaml.safe_load(f)
         return None
 
+    def stackup(self) -> Optional[Any]:
+        """Define multi-layer PCB physical stackup using BuildStackup context manager.
+
+        Subclasses should override this method to declare stackup layers, copper foils,
+        and core/prepreg dielectrics using BuildStackup and StackupLayer.
+
+        Returns:
+            BuildStackup, StackupModel, or None if configured via YAML.
+        """
+        return None
+
+    def mounting_holes(self) -> List[Any]:
+        """Define CAD-located PCB drill and mounting holes using BuildDrillHoles context manager.
+
+        Subclasses should override this method to place mounting holes using BuildDrillHoles,
+        MountingHole, and build123d Locations.
+
+        Returns:
+            List of MountingHoleModel instances, or empty list if none defined.
+        """
+        return []
+
     def silkscreen(self) -> List[Any]:
         """Define CAD-located silkscreen text markings and annotations for PCB exports.
 
@@ -342,17 +363,123 @@ class Provider:
         """
         return []
 
+    def traces(self) -> List[Any]:
+        """Define routed copper trace segments using BuildTraces context manager.
+
+        Returns:
+            List of TraceSegmentModel instances, or BuildTraces context.
+        """
+        return []
+
+    def vias(self) -> List[Any]:
+        """Define interlayer vias using BuildVias context manager.
+
+        Returns:
+            List of ViaModel instances, or BuildVias context.
+        """
+        return []
+
+    def copper_regions(self) -> List[Any]:
+        """Define copper planes, ground fills, and shielding zones using BuildCopperRegions.
+
+        Returns:
+            List of CopperRegionModel instances, or BuildCopperRegions context.
+        """
+        return []
+
+    def test_points(self) -> List[Any]:
+        """Define exposed copper test points using BuildTestPoints context manager.
+
+        Returns:
+            List of TestPointModel instances, or BuildTestPoints context.
+        """
+        return []
+
     @property
     def pcb_config(self) -> Optional[PCBConfig]:
         """Return parsed PCBConfig Pydantic model from pcb.yaml if available."""
         data = self.pcb_manifest
         if data:
-            from model.pcb import PCBConfig
+            from model.pcb import PCBConfig, PCBMaterialsModel, StackupModel
+            from provider.pcb.stackup import BuildStackup
+            from provider.pcb.drill_holes import BuildDrillHoles
+            from provider.pcb.routing import BuildTraces, BuildVias, BuildCopperRegions, BuildTestPoints
 
             config = PCBConfig.model_validate(data)
+
+            # 1. Stackup from provider context manager
+            provider_stackup = self.stackup()
+            if provider_stackup is not None:
+                if isinstance(provider_stackup, BuildStackup):
+                    config.stackup = provider_stackup.to_model()
+                elif isinstance(provider_stackup, StackupModel):
+                    config.stackup = provider_stackup
+            elif config.stackup is not None:
+                config.stackup.resolve_materials(PCBMaterialsModel.default())
+
+            # 2. Drill / mounting holes from provider context manager
+            provider_holes = self.mounting_holes()
+            if provider_holes:
+                if isinstance(provider_holes, BuildDrillHoles):
+                    config.mounting_holes = list(provider_holes.holes)
+                else:
+                    config.mounting_holes = list(provider_holes)
+
+            # 3. Silkscreen texts from provider context manager
             provider_texts = self.silkscreen()
             if provider_texts:
                 config.silkscreen_texts = list(provider_texts)
+
+            # 4. Traces from provider context manager
+            p_traces = self.traces()
+            if p_traces:
+                if isinstance(p_traces, BuildTraces):
+                    config.traces = list(p_traces.traces)
+                else:
+                    config.traces = list(p_traces)
+
+            # 5. Vias from provider context manager
+            p_vias = self.vias()
+            if p_vias:
+                if isinstance(p_vias, BuildVias):
+                    config.vias = list(p_vias.vias)
+                else:
+                    config.vias = list(p_vias)
+
+            # 6. Copper regions from provider context manager
+            p_regions = self.copper_regions()
+            if p_regions:
+                if isinstance(p_regions, BuildCopperRegions):
+                    config.copper_regions = list(p_regions.regions)
+                else:
+                    config.copper_regions = list(p_regions)
+
+            # 7. Test points from provider context manager
+            p_tps = self.test_points()
+            if p_tps:
+                if isinstance(p_tps, BuildTestPoints):
+                    config.test_points = list(p_tps.test_points)
+                else:
+                    config.test_points = list(p_tps)
+
+            # 8. Derive dimensions_mm from build123d shape if missing
+            if config.dimensions_mm is None and config.shape_ref and config.shape_ref in self.part:
+                part_builder = self.part[config.shape_ref]
+                part_obj = part_builder(config.shape_ref, None, Mode.DEFAULT)
+                bb = getattr(part_obj, "bounding_box", None)
+                if bb is None and hasattr(part_obj, "part"):
+                    bb = getattr(part_obj.part, "bounding_box", None)
+                if callable(bb):
+                    bbox = bb()
+                elif bb is not None:
+                    bbox = bb
+                else:
+                    bbox = None
+
+                if bbox is not None:
+                    th_z = config.stackup.total_thickness_mm if config.stackup else bbox.size.Z
+                    config.dimensions_mm = (round(bbox.size.X, 4), round(bbox.size.Y, 4), round(th_z, 4))
+
             return config
         return None
 

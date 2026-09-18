@@ -79,6 +79,38 @@ class PCBExporter:
                     }
                 )
 
+            fp_layer = getattr(fp, "layer", None) or ("B.Cu" if fp.position[2] < 0 else "F.Cu")
+            silk_layer = "B.SilkS" if fp_layer == "B.Cu" else "F.SilkS"
+            fab_layer = "B.Fab" if fp_layer == "B.Cu" else "F.Fab"
+            paste_layer = "B.Paste" if fp_layer == "B.Cu" else "F.Paste"
+            mask_layer = "B.Mask" if fp_layer == "B.Cu" else "F.Mask"
+
+            dim_w = fp.dimensions[0] if fp.dimensions else 4.0
+            dim_h = fp.dimensions[1] if fp.dimensions else 4.0
+            w_half = round(dim_w / 2.0 + 0.4, 4)
+            h_half = round(dim_h / 2.0 + 0.4, 4)
+            ref_y = round(-h_half - 1.2, 4)
+            val_y = round(h_half + 1.2, 4)
+
+            tick_w = round(min(1.0, max(0.2, w_half * 0.4)), 4)
+            tick_h = round(min(1.0, max(0.2, h_half * 0.4)), 4)
+            alignment_lines = [
+                {"x1": -w_half, "y1": -h_half, "x2": round(-w_half + tick_w, 4), "y2": -h_half},
+                {"x1": -w_half, "y1": -h_half, "x2": -w_half, "y2": round(-h_half + tick_h, 4)},
+                {"x1": w_half, "y1": -h_half, "x2": round(w_half - tick_w, 4), "y2": -h_half},
+                {"x1": w_half, "y1": -h_half, "x2": w_half, "y2": round(-h_half + tick_h, 4)},
+                {"x1": -w_half, "y1": h_half, "x2": round(-w_half + tick_w, 4), "y2": h_half},
+                {"x1": -w_half, "y1": h_half, "x2": -w_half, "y2": round(h_half - tick_h, 4)},
+                {"x1": w_half, "y1": h_half, "x2": round(w_half - tick_w, 4), "y2": h_half},
+                {"x1": w_half, "y1": h_half, "x2": w_half, "y2": round(h_half - tick_h, 4)},
+            ]
+            pin1_dot = {
+                "cx": round(-w_half - 0.5, 4),
+                "cy": round(-h_half - 0.5, 4),
+                "ex": round(-w_half - 0.25, 4),
+                "ey": round(-h_half - 0.5, 4),
+            }
+
             footprints_data.append(
                 {
                     "name": fp.name,
@@ -87,6 +119,15 @@ class PCBExporter:
                     "uuid": str(uuid.uuid4()),
                     "x_mm": round(self.config.sheet_center_x_mm + fp.position[0], 4),
                     "y_mm": round(self.config.sheet_center_y_mm + fp.position[1], 4),
+                    "layer": fp_layer,
+                    "silk_layer": silk_layer,
+                    "fab_layer": fab_layer,
+                    "paste_layer": paste_layer,
+                    "mask_layer": mask_layer,
+                    "ref_y": ref_y,
+                    "val_y": val_y,
+                    "alignment_lines": alignment_lines,
+                    "pin1_dot": pin1_dot,
                     "pins": fp_pins,
                 }
             )
@@ -126,6 +167,80 @@ class PCBExporter:
                 }
             )
 
+        # Traces
+        segments_data = []
+        for tr in self.config.traces:
+            net_idx = net_name_to_idx.get(tr.net, 0)
+            segments_data.append(
+                {
+                    "x1": round(self.config.sheet_center_x_mm + tr.start_mm[0], 4),
+                    "y1": round(self.config.sheet_center_y_mm + tr.start_mm[1], 4),
+                    "x2": round(self.config.sheet_center_x_mm + tr.end_mm[0], 4),
+                    "y2": round(self.config.sheet_center_y_mm + tr.end_mm[1], 4),
+                    "width": tr.width_mm,
+                    "layer": tr.layer,
+                    "net_idx": net_idx,
+                }
+            )
+
+        # Vias
+        vias_data = []
+        for v in self.config.vias:
+            net_idx = net_name_to_idx.get(v.net, 0)
+            vias_data.append(
+                {
+                    "x": round(self.config.sheet_center_x_mm + v.position_mm[0], 4),
+                    "y": round(self.config.sheet_center_y_mm + v.position_mm[1], 4),
+                    "dia": round(v.pad_diameter_mm, 4),
+                    "drill": round(v.drill_diameter_mm, 4),
+                    "layer1": v.layer_start,
+                    "layer2": v.layer_end,
+                    "net_idx": net_idx,
+                }
+            )
+
+        # Copper Zones
+        zones_data = []
+        for z in self.config.copper_regions:
+            net_idx = net_name_to_idx.get(z.net, 0)
+            pts = [
+                {
+                    "x": round(self.config.sheet_center_x_mm + pt[0], 4),
+                    "y": round(self.config.sheet_center_y_mm + pt[1], 4),
+                }
+                for pt in z.polygon_points_mm
+            ]
+            zones_data.append(
+                {
+                    "net_idx": net_idx,
+                    "net_name": z.net,
+                    "layer": z.layer,
+                    "priority": z.priority,
+                    "clearance_mm": z.clearance_mm,
+                    "pts": pts,
+                }
+            )
+
+        # Test Points
+        test_points_data = []
+        for tp in self.config.test_points:
+            net_idx = net_name_to_idx.get(tp.net, 0)
+            silk_layer = "B.SilkS" if tp.layer == "B.Cu" else "F.SilkS"
+            mask_layer = "B.Mask" if tp.layer == "B.Cu" else "F.Mask"
+            test_points_data.append(
+                {
+                    "name": tp.name,
+                    "x_mm": round(self.config.sheet_center_x_mm + tp.position_mm[0], 4),
+                    "y_mm": round(self.config.sheet_center_y_mm + tp.position_mm[1], 4),
+                    "dia_mm": round(tp.pad_diameter_mm, 4),
+                    "layer": tp.layer,
+                    "silk_layer": silk_layer,
+                    "mask_layer": mask_layer,
+                    "net_idx": net_idx,
+                    "net_name": tp.net,
+                }
+            )
+
         rendered = template.render(
             board=self.config,
             copper_inner_layers=copper_inners,
@@ -133,8 +248,10 @@ class PCBExporter:
             footprints=footprints_data,
             silkscreen_texts=silkscreen_data,
             mounting_holes=mounting_holes_data,
-            segments=[],
-            vias=[],
+            test_points=test_points_data,
+            segments=segments_data,
+            vias=vias_data,
+            zones=zones_data,
             outline={
                 "x1": round(self.config.sheet_center_x_mm - half_w, 4),
                 "y1": round(self.config.sheet_center_y_mm - half_l, 4),
@@ -392,7 +509,7 @@ class PCBExporter:
                     "Mid X": f"{fp.position[0]:.4f}mm",
                     "Mid Y": f"{fp.position[1]:.4f}mm",
                     "Rotation": f"{fp.rotation[2]:.1f}",
-                    "Layer": "Top",
+                    "Layer": "Bottom" if getattr(fp, "layer", "F.Cu") == "B.Cu" or fp.position[2] < 0 else "Top",
                 }
             )
 

@@ -799,3 +799,73 @@ def test_test_board_full_milestones_integration(tmp_path: Path):
     assert len(cap_data["channels"]) == 4
     assert cap_data["channels"][3]["electrode_type"] == "self"
     assert cap_data["channels"][3]["drive_shield"] is True
+
+
+def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
+    """Verify test_board manufacturing exports (.kicad_pcb, .drl, *.gbr) and pos.csv pad alignment."""
+    import csv
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = TestBoardProvider()
+    cfg = provider.pcb_config
+    assert cfg is not None
+    wiring = Wiring(provider.wiring_path)
+
+    # 1. DRC validation: ensure all nets connected, no airwires, zero collisions
+    drc_checker = PCBDesignRulesChecker(cfg)
+    report = drc_checker.check_all(wiring=wiring)
+    assert report.passed, f"DRC failed:\n{report.summary()}"
+    assert report.error_count == 0
+
+    # 2. Export board files (.kicad_pcb, .drl, .gbr) and pos.csv
+    exporter = PCBExporter(cfg, wiring)
+    board_dir = tmp_path / "board"
+    exporter.export_board(board_dir, pcb_filename="test_board.kicad_pcb")
+
+    pos_file = tmp_path / "pos.csv"
+    exporter.export_pick_and_place_csv(pos_file)
+
+    # 3. Verify .kicad_pcb and .drl exist
+    kicad_pcb = board_dir / "test_board.kicad_pcb"
+    drill_file = board_dir / "test_board.drl"
+    assert kicad_pcb.exists()
+    assert drill_file.exists()
+
+    pcb_text = kicad_pcb.read_text(encoding="utf-8")
+    # Verify connectors J1 and J2 edge placement
+    assert 'footprint "M.2-KEY-M"' in pcb_text
+    assert 'footprint "FPC-30P-0.5MM"' in pcb_text
+    # Verify bottom layer components
+    assert '(layer "B.Cu")' in pcb_text
+
+    # Verify drill file coordinates match mounting holes
+    drl_text = drill_file.read_text(encoding="utf-8")
+    assert "C3.200" in drl_text  # 3.2mm mounting hole tool definition
+    assert "X123.0Y-64.5" in drl_text
+    assert "X174.0Y-145.5" in drl_text
+
+    # 4. Verify pos.csv aligns with component placement and correct layers
+    assert pos_file.exists()
+    with open(pos_file, mode="r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        rows = {r["Designator"]: r for r in reader}
+
+    assert "U1" in rows
+    assert "U2" in rows
+    assert "J1" in rows
+    assert "J2" in rows
+    assert "Q1" in rows
+    assert "C2" in rows
+
+    # Layers: Q1, U2, C2 on Bottom; U1, J1, J2 on Top
+    assert rows["U1"]["Layer"] == "Top"
+    assert rows["J1"]["Layer"] == "Top"
+    assert rows["J2"]["Layer"] == "Top"
+    assert rows["U2"]["Layer"] == "Bottom"
+    assert rows["Q1"]["Layer"] == "Bottom"
+    assert rows["C2"]["Layer"] == "Bottom"
+
+    # Edge connector coordinates
+    assert float(rows["J1"]["Mid Y"].replace("mm", "")) == -36.0
+    assert float(rows["J2"]["Mid Y"].replace("mm", "")) == 38.0

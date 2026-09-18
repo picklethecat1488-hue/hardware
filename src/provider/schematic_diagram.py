@@ -690,83 +690,397 @@ class SchematicDiagram:
             cy = row_top_y - ch
             comp_boxes.append((cx, cy, cw, ch))
 
-            # IC Body Box
-            ax.add_patch(
-                patches.Rectangle((cx, cy), cw, ch, facecolor="#ffffff", edgecolor="#334155", linewidth=1.5, zorder=2)
-            )
+            fp_name_upper = fp.name.upper()
+            fp_pkg_upper = fp.package.upper()
 
-            # Component header inside box
-            ax.text(
-                cx + cw / 2.0,
-                cy + ch - 4.2,
-                fp.name,
-                ha="center",
-                va="center",
-                fontsize=9.0,
-                fontweight="bold",
-                color="#0f172a",
-                zorder=3,
-            )
-            if mpn:
-                # Part number (MPN)
+            # 1. Resistor standard symbol (zig-zag)
+            if fp_name_upper.startswith("R") or "RES" in fp_pkg_upper:
+                ym = cy + ch / 2.0
+                x_mid = cx + cw / 2.0
                 ax.text(
-                    cx + cw / 2.0,
-                    cy + ch - 8.0,
-                    str(mpn),
+                    x_mid,
+                    cy + ch - 5.0,
+                    fp.name,
                     ha="center",
                     va="center",
-                    fontsize=5.8,
+                    fontsize=9.0,
                     fontweight="bold",
-                    color="#0369a1",
+                    color="#0f172a",
                     zorder=3,
                 )
-                # Package
+                label_val = mpn or (fp.label.text if fp.label else fp.package)
                 ax.text(
-                    cx + cw / 2.0,
-                    cy + ch - 11.5,
-                    str(fp.package),
-                    ha="center",
-                    va="center",
-                    fontsize=5.5,
-                    color="#64748b",
-                    zorder=3,
-                )
-                divider_y = cy + ch - 13.8
-            else:
-                val = fp.label.text if fp.label and fp.label.text != fp.name else fp.package
-                ax.text(
-                    cx + cw / 2.0,
-                    cy + ch - 8.5,
-                    str(val),
+                    x_mid,
+                    cy + ch - 10.5,
+                    str(label_val),
                     ha="center",
                     va="center",
                     fontsize=6.5,
-                    color="#64748b",
+                    color="#0369a1",
                     zorder=3,
                 )
-                divider_y = cy + ch - 11.5
 
-            ax.plot([cx + 2.5, cx + cw - 2.5], [divider_y, divider_y], color="#e2e8f0", linewidth=0.8, zorder=3)
+                # Left lead and right lead
+                ax.plot([cx - stub_len, x_mid - 10.0], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
+                ax.plot([x_mid + 10.0, cx + cw + stub_len], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
 
-            # Left Pins
-            for p_idx, p in enumerate(left_pins):
-                py = cy + ch - header_offset - (p_idx * pin_pitch)
-                ax.plot([cx - stub_len, cx], [py, py], color="#475569", linewidth=1.0, zorder=2)
-                ax.plot(cx - stub_len, py, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                ax.text(cx + 1.5, py, p.name, ha="left", va="center", fontsize=6.5, color="#1e293b", zorder=3)
-                sheet_pin_coords[(fp.name, p.name)] = (cx - stub_len, py)
-                pin_side_map[(fp.name, p.name)] = "left"
-                comp_of_pin[(fp.name, p.name)] = c_idx
+                # Zig-zag body
+                zz_x = [
+                    x_mid - 10.0,
+                    x_mid - 7.5,
+                    x_mid - 5.0,
+                    x_mid - 2.5,
+                    x_mid,
+                    x_mid + 2.5,
+                    x_mid + 5.0,
+                    x_mid + 7.5,
+                    x_mid + 10.0,
+                ]
+                zz_y = [ym, ym + 3.0, ym - 3.0, ym + 3.0, ym - 3.0, ym + 3.0, ym - 3.0, ym + 3.0, ym]
+                ax.plot(zz_x, zz_y, color="#334155", linewidth=1.5, zorder=2)
 
-            # Right Pins
-            for p_idx, p in enumerate(right_pins):
-                py = cy + ch - header_offset - (p_idx * pin_pitch)
-                ax.plot([cx + cw, cx + cw + stub_len], [py, py], color="#475569", linewidth=1.0, zorder=2)
-                ax.plot(cx + cw + stub_len, py, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                ax.text(cx + cw - 1.5, py, p.name, ha="right", va="center", fontsize=6.5, color="#1e293b", zorder=3)
-                sheet_pin_coords[(fp.name, p.name)] = (cx + cw + stub_len, py)
-                pin_side_map[(fp.name, p.name)] = "right"
-                comp_of_pin[(fp.name, p.name)] = c_idx
+                # Terminal markers and pin mappings
+                p1 = fp.pins[0] if fp.pins else None
+                p2 = fp.pins[1] if len(fp.pins) > 1 else None
+                if p1:
+                    ax.plot(cx - stub_len, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                    sig1 = pin_to_net.get((fp.name, p1.name)) or p1.name
+                    ax.text(
+                        cx - stub_len / 2.0,
+                        ym + 1.5,
+                        str(sig1),
+                        ha="center",
+                        va="bottom",
+                        fontsize=5.5,
+                        color="#1e293b",
+                        zorder=3,
+                    )
+                    sheet_pin_coords[(fp.name, p1.name)] = (cx - stub_len, ym)
+                    pin_side_map[(fp.name, p1.name)] = "left"
+                    comp_of_pin[(fp.name, p1.name)] = c_idx
+                if p2:
+                    ax.plot(cx + cw + stub_len, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                    sig2 = pin_to_net.get((fp.name, p2.name)) or p2.name
+                    ax.text(
+                        cx + cw + stub_len / 2.0,
+                        ym + 1.5,
+                        str(sig2),
+                        ha="center",
+                        va="bottom",
+                        fontsize=5.5,
+                        color="#1e293b",
+                        zorder=3,
+                    )
+                    sheet_pin_coords[(fp.name, p2.name)] = (cx + cw + stub_len, ym)
+                    pin_side_map[(fp.name, p2.name)] = "right"
+                    comp_of_pin[(fp.name, p2.name)] = c_idx
+
+            # 2. Capacitor standard symbol (parallel plates)
+            elif fp_name_upper.startswith("C") or "CAP" in fp_pkg_upper:
+                ym = cy + ch / 2.0
+                x_mid = cx + cw / 2.0
+                ax.text(
+                    x_mid,
+                    cy + ch - 5.0,
+                    fp.name,
+                    ha="center",
+                    va="center",
+                    fontsize=9.0,
+                    fontweight="bold",
+                    color="#0f172a",
+                    zorder=3,
+                )
+                label_val = mpn or (fp.label.text if fp.label else fp.package)
+                ax.text(
+                    x_mid,
+                    cy + ch - 10.5,
+                    str(label_val),
+                    ha="center",
+                    va="center",
+                    fontsize=6.5,
+                    color="#0369a1",
+                    zorder=3,
+                )
+
+                # Leads
+                ax.plot([cx - stub_len, x_mid - 2.2], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
+                ax.plot([x_mid + 2.2, cx + cw + stub_len], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
+
+                # Parallel plates
+                plate_h = 7.5
+                ax.plot(
+                    [x_mid - 2.2, x_mid - 2.2], [ym - plate_h, ym + plate_h], color="#334155", linewidth=2.0, zorder=2
+                )
+                ax.plot(
+                    [x_mid + 2.2, x_mid + 2.2], [ym - plate_h, ym + plate_h], color="#334155", linewidth=2.0, zorder=2
+                )
+
+                # Terminal markers and pin mappings
+                p1 = fp.pins[0] if fp.pins else None
+                p2 = fp.pins[1] if len(fp.pins) > 1 else None
+                if p1:
+                    ax.plot(cx - stub_len, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                    sig1 = pin_to_net.get((fp.name, p1.name)) or p1.name
+                    ax.text(
+                        cx - stub_len / 2.0,
+                        ym + 1.5,
+                        str(sig1),
+                        ha="center",
+                        va="bottom",
+                        fontsize=5.5,
+                        color="#1e293b",
+                        zorder=3,
+                    )
+                    sheet_pin_coords[(fp.name, p1.name)] = (cx - stub_len, ym)
+                    pin_side_map[(fp.name, p1.name)] = "left"
+                    comp_of_pin[(fp.name, p1.name)] = c_idx
+                if p2:
+                    ax.plot(cx + cw + stub_len, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                    sig2 = pin_to_net.get((fp.name, p2.name)) or p2.name
+                    ax.text(
+                        cx + cw + stub_len / 2.0,
+                        ym + 1.5,
+                        str(sig2),
+                        ha="center",
+                        va="bottom",
+                        fontsize=5.5,
+                        color="#1e293b",
+                        zorder=3,
+                    )
+                    sheet_pin_coords[(fp.name, p2.name)] = (cx + cw + stub_len, ym)
+                    pin_side_map[(fp.name, p2.name)] = "right"
+                    comp_of_pin[(fp.name, p2.name)] = c_idx
+
+            # 3. Transistor standard symbol (MOSFET / BJT)
+            elif fp_name_upper.startswith("Q") or "SOT" in fp_pkg_upper or "FET" in fp_pkg_upper:
+                ym = cy + ch / 2.0
+                x_mid = cx + cw / 2.0
+                ax.text(
+                    x_mid,
+                    cy + ch - 4.5,
+                    fp.name,
+                    ha="center",
+                    va="center",
+                    fontsize=9.0,
+                    fontweight="bold",
+                    color="#0f172a",
+                    zorder=3,
+                )
+                label_val = mpn or (fp.label.text if fp.label else fp.package)
+                ax.text(
+                    x_mid,
+                    cy + ch - 9.5,
+                    str(label_val),
+                    ha="center",
+                    va="center",
+                    fontsize=6.0,
+                    color="#0369a1",
+                    zorder=3,
+                )
+
+                # Gate bar and lead
+                ax.plot([cx - stub_len, x_mid - 3.5], [ym - 2.0, ym - 2.0], color="#475569", linewidth=1.2, zorder=2)
+                ax.plot([x_mid - 3.5, x_mid - 3.5], [ym - 7.0, ym + 4.0], color="#334155", linewidth=2.0, zorder=2)
+
+                # Channel bar
+                ax.plot([x_mid - 1.2, x_mid - 1.2], [ym - 8.0, ym + 6.0], color="#334155", linewidth=2.4, zorder=2)
+
+                # Drain lead
+                ax.plot(
+                    [x_mid - 1.2, x_mid + 4.5, cx + cw + stub_len],
+                    [ym + 5.0, ym + 5.0, ym + 5.0],
+                    color="#475569",
+                    linewidth=1.2,
+                    zorder=2,
+                )
+                # Source lead
+                ax.plot(
+                    [x_mid - 1.2, x_mid + 4.5, cx + cw + stub_len],
+                    [ym - 5.0, ym - 5.0, ym - 5.0],
+                    color="#475569",
+                    linewidth=1.2,
+                    zorder=2,
+                )
+                # Source arrow
+                ax.annotate(
+                    "",
+                    xy=(x_mid - 1.2, ym - 5.0),
+                    xytext=(x_mid + 3.0, ym - 5.0),
+                    arrowprops=dict(arrowstyle="->", color="#334155", lw=1.2),
+                )
+
+                # Map pins G, D, S
+                pin_g = next(
+                    (p for p in fp.pins if p.name.upper() in ("G", "GATE", "1")), fp.pins[0] if fp.pins else None
+                )
+                pin_d = next(
+                    (p for p in fp.pins if p.name.upper() in ("D", "DRAIN", "3")),
+                    fp.pins[1] if len(fp.pins) > 1 else None,
+                )
+                pin_s = next(
+                    (p for p in fp.pins if p.name.upper() in ("S", "SOURCE", "2")),
+                    fp.pins[2] if len(fp.pins) > 2 else None,
+                )
+
+                if pin_g:
+                    ax.plot(cx - stub_len, ym - 2.0, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                    sig_g = pin_to_net.get((fp.name, pin_g.name)) or "G"
+                    ax.text(
+                        cx - stub_len / 2.0,
+                        ym - 0.5,
+                        str(sig_g),
+                        ha="center",
+                        va="bottom",
+                        fontsize=5.5,
+                        color="#1e293b",
+                        zorder=3,
+                    )
+                    sheet_pin_coords[(fp.name, pin_g.name)] = (cx - stub_len, ym - 2.0)
+                    pin_side_map[(fp.name, pin_g.name)] = "left"
+                    comp_of_pin[(fp.name, pin_g.name)] = c_idx
+
+                if pin_d:
+                    ax.plot(cx + cw + stub_len, ym + 5.0, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                    sig_d = pin_to_net.get((fp.name, pin_d.name)) or "D"
+                    ax.text(
+                        cx + cw + stub_len / 2.0,
+                        ym + 6.5,
+                        str(sig_d),
+                        ha="center",
+                        va="bottom",
+                        fontsize=5.5,
+                        color="#1e293b",
+                        zorder=3,
+                    )
+                    sheet_pin_coords[(fp.name, pin_d.name)] = (cx + cw + stub_len, ym + 5.0)
+                    pin_side_map[(fp.name, pin_d.name)] = "right"
+                    comp_of_pin[(fp.name, pin_d.name)] = c_idx
+
+                if pin_s:
+                    ax.plot(cx + cw + stub_len, ym - 5.0, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                    sig_s = pin_to_net.get((fp.name, pin_s.name)) or "S"
+                    ax.text(
+                        cx + cw + stub_len / 2.0,
+                        ym - 3.5,
+                        str(sig_s),
+                        ha="center",
+                        va="bottom",
+                        fontsize=5.5,
+                        color="#1e293b",
+                        zorder=3,
+                    )
+                    sheet_pin_coords[(fp.name, pin_s.name)] = (cx + cw + stub_len, ym - 5.0)
+                    pin_side_map[(fp.name, pin_s.name)] = "right"
+                    comp_of_pin[(fp.name, pin_s.name)] = c_idx
+
+            # 4. Standard IC Body Box & Pins
+            else:
+                ax.add_patch(
+                    patches.Rectangle(
+                        (cx, cy), cw, ch, facecolor="#ffffff", edgecolor="#334155", linewidth=1.5, zorder=2
+                    )
+                )
+
+                # Component header inside box
+                ax.text(
+                    cx + cw / 2.0,
+                    cy + ch - 4.2,
+                    fp.name,
+                    ha="center",
+                    va="center",
+                    fontsize=9.0,
+                    fontweight="bold",
+                    color="#0f172a",
+                    zorder=3,
+                )
+                if mpn:
+                    # Part number (MPN)
+                    ax.text(
+                        cx + cw / 2.0,
+                        cy + ch - 8.0,
+                        str(mpn),
+                        ha="center",
+                        va="center",
+                        fontsize=5.8,
+                        fontweight="bold",
+                        color="#0369a1",
+                        zorder=3,
+                    )
+                    # Package
+                    ax.text(
+                        cx + cw / 2.0,
+                        cy + ch - 11.5,
+                        str(fp.package),
+                        ha="center",
+                        va="center",
+                        fontsize=5.5,
+                        color="#64748b",
+                        zorder=3,
+                    )
+                    divider_y = cy + ch - 13.8
+                else:
+                    val = fp.label.text if fp.label and fp.label.text != fp.name else fp.package
+                    ax.text(
+                        cx + cw / 2.0,
+                        cy + ch - 8.5,
+                        str(val),
+                        ha="center",
+                        va="center",
+                        fontsize=6.5,
+                        color="#64748b",
+                        zorder=3,
+                    )
+                    divider_y = cy + ch - 11.5
+
+                ax.plot([cx + 2.5, cx + cw - 2.5], [divider_y, divider_y], color="#e2e8f0", linewidth=0.8, zorder=3)
+
+                # Left Pins (Signal names inside box, pad numbers above stub)
+                for p_idx, p in enumerate(left_pins):
+                    py = cy + ch - header_offset - (p_idx * pin_pitch)
+                    ax.plot([cx - stub_len, cx], [py, py], color="#475569", linewidth=1.0, zorder=2)
+                    ax.plot(cx - stub_len, py, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                    signal_name = pin_to_net.get((fp.name, p.name))
+                    pin_display = signal_name if signal_name else (p.label if p.label and p.label != p.name else p.name)
+                    ax.text(cx + 1.5, py, pin_display, ha="left", va="center", fontsize=6.5, color="#1e293b", zorder=3)
+                    if signal_name and p.name != signal_name:
+                        ax.text(
+                            cx - stub_len / 2.0,
+                            py + 1.2,
+                            p.name,
+                            ha="center",
+                            va="bottom",
+                            fontsize=5.0,
+                            color="#64748b",
+                            zorder=3,
+                        )
+                    sheet_pin_coords[(fp.name, p.name)] = (cx - stub_len, py)
+                    pin_side_map[(fp.name, p.name)] = "left"
+                    comp_of_pin[(fp.name, p.name)] = c_idx
+
+                # Right Pins (Signal names inside box, pad numbers above stub)
+                for p_idx, p in enumerate(right_pins):
+                    py = cy + ch - header_offset - (p_idx * pin_pitch)
+                    ax.plot([cx + cw, cx + cw + stub_len], [py, py], color="#475569", linewidth=1.0, zorder=2)
+                    ax.plot(cx + cw + stub_len, py, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+                    signal_name = pin_to_net.get((fp.name, p.name))
+                    pin_display = signal_name if signal_name else (p.label if p.label and p.label != p.name else p.name)
+                    ax.text(
+                        cx + cw - 1.5, py, pin_display, ha="right", va="center", fontsize=6.5, color="#1e293b", zorder=3
+                    )
+                    if signal_name and p.name != signal_name:
+                        ax.text(
+                            cx + cw + stub_len / 2.0,
+                            py + 1.2,
+                            p.name,
+                            ha="center",
+                            va="bottom",
+                            fontsize=5.0,
+                            color="#64748b",
+                            zorder=3,
+                        )
+                    sheet_pin_coords[(fp.name, p.name)] = (cx + cw + stub_len, py)
+                    pin_side_map[(fp.name, p.name)] = "right"
+                    comp_of_pin[(fp.name, p.name)] = c_idx
 
         # Set of pins that are directly wired across the open channel
         wired_pins: set[Tuple[str, str]] = set()
@@ -838,7 +1152,7 @@ class SchematicDiagram:
                             wired_pins.add(pair1)
                             wired_pins.add(pair2)
 
-        # Place net labels for all unwired pins (off-sheet nets, or nets connected via net flags)
+        # Place net labels and power/ground symbols for all unwired pins
         for pair, (px, py) in sheet_pin_coords.items():
             if pair in wired_pins:
                 continue
@@ -847,29 +1161,69 @@ class SchematicDiagram:
                 continue
 
             side = pin_side_map[pair]
-            if side == "left":
+            net_upper = net_name.upper()
+
+            # Standard GND 3-bar symbol
+            if net_upper in ("GND", "GROUND", "VSS"):
+                ax.plot([px, px], [py, py - 3.0], color="#475569", linewidth=1.2, zorder=2)
+                ax.plot([px - 3.5, px + 3.5], [py - 3.0, py - 3.0], color="#475569", linewidth=1.4, zorder=2)
+                ax.plot([px - 2.2, px + 2.2], [py - 4.5, py - 4.5], color="#475569", linewidth=1.2, zorder=2)
+                ax.plot([px - 1.0, px + 1.0], [py - 6.0, py - 6.0], color="#475569", linewidth=1.0, zorder=2)
                 ax.text(
-                    px - 1.5,
-                    py,
-                    net_name,
-                    ha="right",
-                    va="center",
-                    fontsize=6.5,
+                    px,
+                    py - 7.5,
+                    "GND",
+                    ha="center",
+                    va="top",
+                    fontsize=5.5,
                     fontweight="bold",
-                    color="#0369a1",
+                    color="#475569",
                     zorder=3,
                 )
+
+            # Standard Power upward arrow symbol
+            elif net_upper in ("3V3", "5V", "1V8", "1V2", "VCC", "VDD", "VLOAD_SW"):
+                ax.plot([px, px], [py, py + 3.0], color="#dc2626", linewidth=1.2, zorder=2)
+                ax.plot(
+                    [px - 2.5, px, px + 2.5], [py + 2.0, py + 4.5, py + 2.0], color="#dc2626", linewidth=1.2, zorder=2
+                )
+                ax.text(
+                    px,
+                    py + 5.5,
+                    net_name,
+                    ha="center",
+                    va="bottom",
+                    fontsize=5.8,
+                    fontweight="bold",
+                    color="#dc2626",
+                    zorder=3,
+                )
+
+            # Standard signal net flag / label
             else:
-                ax.text(
-                    px + 1.5,
-                    py,
-                    net_name,
-                    ha="left",
-                    va="center",
-                    fontsize=6.5,
-                    fontweight="bold",
-                    color="#0369a1",
-                    zorder=3,
-                )
+                if side == "left":
+                    ax.text(
+                        px - 1.5,
+                        py,
+                        net_name,
+                        ha="right",
+                        va="center",
+                        fontsize=6.5,
+                        fontweight="bold",
+                        color="#0369a1",
+                        zorder=3,
+                    )
+                else:
+                    ax.text(
+                        px + 1.5,
+                        py,
+                        net_name,
+                        ha="left",
+                        va="center",
+                        fontsize=6.5,
+                        fontweight="bold",
+                        color="#0369a1",
+                        zorder=3,
+                    )
 
         pdf.savefig(fig)

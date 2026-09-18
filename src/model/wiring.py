@@ -86,11 +86,12 @@ class FootprintModel(BaseModel):
         default=None, description="Optional x/y spacing for mounting holes"
     )
     slots_per_side: Optional[int] = Field(default=None, description="Optional total number of DIP slots per side")
-    label: LabelModel = Field(description="Label settings for the footprint")
+    label: Optional[LabelModel] = Field(default=None, description="Label settings for the footprint")
     pins: List[PinModel] = Field(default_factory=list, description="List of pins on the footprint")
     mpn: Optional[str] = Field(default=None, description="Manufacturer part number for BOM generation")
     supplier_pn: Optional[str] = Field(default=None, description="Supplier part number (e.g. LCSC, DigiKey)")
     bga_fanout: Optional[BgaFanoutModel] = Field(default=None, description="Optional BGA fanout configuration")
+    layer: str = Field(default="F.Cu", description="PCB copper placement layer ('F.Cu' for top, 'B.Cu' for bottom)")
 
 
 class NetModel(BaseModel):
@@ -185,6 +186,7 @@ class Wiring:
                     mpn=c.get("mpn"),
                     supplier_pn=c.get("supplier_pn"),
                     bga_fanout=c.get("bga_fanout"),
+                    layer=c.get("layer") or ("B.Cu" if position[2] < 0 else "F.Cu"),
                 )
             )
         return components
