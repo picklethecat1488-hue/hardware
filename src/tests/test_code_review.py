@@ -7,6 +7,7 @@ REST API endpoints, and session persistence.
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import subprocess
 import threading
 import time
 import urllib.request
@@ -29,6 +30,33 @@ from provider.code_review.git_utils import (
 from provider.code_review.markdown_exporter import MarkdownReviewExporter
 from provider.code_review.server import ReviewServer
 from code_review import launch_browser, parse_arguments
+
+
+def create_isolated_git_repo(path: Path) -> tuple[Path, list[str]]:
+    """Create a minimal isolated git repository with commits for deterministic tests."""
+    repo_dir = path / "git_fixture"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    commit_shas: list[str] = []
+    for i in range(1, 4):
+        file_path = repo_dir / f"test_{i}.txt"
+        file_path.write_text(f"content {i}\n", encoding="utf-8")
+        subprocess.run(["git", "add", file_path.name], cwd=repo_dir, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", f"Commit {i}"], cwd=repo_dir, check=True, capture_output=True)
+        sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        commit_shas.append(sha)
+
+    return repo_dir, commit_shas
 
 
 def test_git_review_engine_basics() -> None:
@@ -570,7 +598,7 @@ def test_launch_browser_and_webpage_title(tmp_path: Path) -> None:
 
 def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
     """Verify that the commit stream pane defaults to collapsed when only one commit is reviewed."""
-    repo_root = get_git_root()
+    repo_root, shas = create_isolated_git_repo(tmp_path)
 
     # 1. Single commit: paneCommits should be collapsed
     server_single = ReviewServer(
@@ -579,7 +607,7 @@ def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
         repo_root=repo_root,
         markdown_output=tmp_path / "CR_single.md",
         state_file=tmp_path / "cr_single.json",
-        revisions=["542007da5e1e120a3376fc8b3081fbb06112a78c"],
+        revisions=[shas[0]],
     )
     thread_single = threading.Thread(target=server_single.serve_forever, daemon=True)
     thread_single.start()
@@ -601,7 +629,7 @@ def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
         repo_root=repo_root,
         markdown_output=tmp_path / "CR_multi.md",
         state_file=tmp_path / "cr_multi.json",
-        revisions=["HEAD~1", "HEAD"],
+        revisions=[shas[0], shas[1]],
     )
     thread_multi = threading.Thread(target=server_multi.serve_forever, daemon=True)
     thread_multi.start()
@@ -813,10 +841,10 @@ def test_code_review_ui_cli_focus_and_edit_button(tmp_path: Path) -> None:
         server.server_close()
 
 
-def test_git_review_engine_resolve_revisions_range_syntax() -> None:
+def test_git_review_engine_resolve_revisions_range_syntax(tmp_path: Path) -> None:
     """Verify GitReviewEngine resolves A..B commit ranges, individual hashes, and raises on invalid ranges."""
-    root = get_git_root()
-    engine = GitReviewEngine(repo_root=root)
+    repo_root, _ = create_isolated_git_repo(tmp_path)
+    engine = GitReviewEngine(repo_root=repo_root)
 
     # 1. Resolving HEAD~2..HEAD should return exactly 2 commit hashes
     revs = engine.resolve_revisions(["HEAD~2..HEAD"])
@@ -842,7 +870,7 @@ def test_git_review_engine_resolve_revisions_range_syntax() -> None:
 
 def test_review_server_with_range_revisions(tmp_path: Path) -> None:
     """Verify ReviewServer resolves revision ranges on initialization and records concrete commits."""
-    repo_root = get_git_root()
+    repo_root, _ = create_isolated_git_repo(tmp_path)
     server = ReviewServer(
         host="127.0.0.1",
         port=0,
