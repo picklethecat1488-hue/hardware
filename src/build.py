@@ -344,7 +344,9 @@ class Builder:
             target_lists = []
             for name in names:
                 # Only resolve targets that are intended for the PART action
-                if self.target_parser.parse(name, Section.PART):
+                if self.target_parser.parse(name, Section.PART) and self.target_parser.can_resolve(name, Section.PART):
+                    target_lists.append(self.target_parser.resolve(name, Section.PART))
+                elif ":" in name and self.target_parser.parse(name, Section.PART):
                     target_lists.append(self.target_parser.resolve(name, Section.PART))
         else:
             target_lists = [self.manager.router.targets.supporting(Section.PART).for_modes([Mode.PRINT])]
@@ -380,7 +382,11 @@ class Builder:
             target_lists = []
             for name in names:
                 # Only resolve targets that are intended for the DIAGRAM action
-                if self.target_parser.parse(name, Section.DIAGRAM):
+                if self.target_parser.parse(name, Section.DIAGRAM) and self.target_parser.can_resolve(
+                    name, Section.DIAGRAM
+                ):
+                    target_lists.append(self.target_parser.resolve(name, Section.DIAGRAM))
+                elif ":" in name and self.target_parser.parse(name, Section.DIAGRAM):
                     target_lists.append(self.target_parser.resolve(name, Section.DIAGRAM))
         else:
             target_lists = [self.manager.router.targets.supporting(Section.DIAGRAM).for_modes([Mode.DEFAULT])]
@@ -431,7 +437,9 @@ class Builder:
         if names:
             target_lists = []
             for name in names:
-                if self.target_parser.parse(name, Section.VIEW):
+                if self.target_parser.parse(name, Section.VIEW) and self.target_parser.can_resolve(name, Section.VIEW):
+                    target_lists.append(self.target_parser.resolve(name, Section.VIEW))
+                elif ":" in name and self.target_parser.parse(name, Section.VIEW):
                     target_lists.append(self.target_parser.resolve(name, Section.VIEW))
         else:
             target_lists = [self.manager.router.targets.supporting(Section.VIEW).for_modes([Mode.SIMULATE])]
@@ -513,6 +521,84 @@ class Builder:
         for fut in futures:
             fut.result()
 
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def generate_pcbs(self, out_dir: str, names: list[str] | None = None, force_update: Optional[bool] = None):
+        """Export PCB Gerber archives, supplier BOM/CPL, vector schematics, and 3D STEP models."""
+        from provider.pcb import PCBExporter, PCBDesignRulesChecker
+        from model.pcb import PCBConfig
+        from model.wiring import Wiring
+
+        for provider in self.manager.router.providers:
+            wiring_file = getattr(provider, "wiring_path", None)
+            if not wiring_file or not Path(wiring_file).exists():
+                continue
+
+            pcb_config = provider.pcb_config
+            if not pcb_config:
+                if names and any(provider.name in n and (Section.PCB in n or ":pcb" in n) for n in names):
+                    raise ValueError(f"Project '{provider.name}' does not configure a PCB manifest or PCBConfig.")
+                continue
+
+            if names:
+                matches = [
+                    n
+                    for n in names
+                    if provider.name in n
+                    and (Section.PCB in n or ":pcb" in n or self.target_parser.can_resolve(n, Section.PCB))
+                ]
+                if not matches:
+                    continue
+
+            self.logger.print(f"Compiling PCBs: {provider.name}", symbol="🔌 ")
+            wiring = Wiring(Path(wiring_file))
+
+            # Run DRC and routing connectivity checks
+            drc_checker = PCBDesignRulesChecker(pcb_config)
+            drc_report = drc_checker.check_all(wiring=wiring)
+            if not drc_report.passed:
+                self.logger.print(f"PCB DRC Violations in {provider.name}:\n{drc_report.summary()}", symbol="⚠️")
+                if drc_report.error_count > 0:
+                    raise ValueError(
+                        f"PCB DRC check failed with {drc_report.error_count} error(s) in {provider.name}:\n"
+                        f"{drc_report.summary()}"
+                    )
+
+            exporter = PCBExporter(pcb_config, wiring)
+
+            board_dir = Path(out_dir) / "board" / provider.name
+            schematics_dir = Path(out_dir) / "schematics" / provider.name
+            bom_dir = Path(out_dir) / "bom" / provider.name
+            step_file = Path(out_dir) / "step" / provider.name / f"{provider.name}_pcb.step"
+
+            # 1. Export native KiCad targets (.kicad_pcb and .kicad_sch)
+            kicad_pcb = board_dir / f"{provider.name}.kicad_pcb"
+            kicad_sch = schematics_dir / f"{provider.name}.kicad_sch"
+            exporter.export_kicad_sch(kicad_sch)
+
+            # 2. Export manufacturing board files via kicad-cli (gerbers + drill + .kicad_pcb)
+            exporter.export_board(board_dir, pcb_filename=f"{provider.name}.kicad_pcb")
+
+            # 3. Export manufacturing BOM, CPL, Schematic vector PDF, and 3D STEP
+            bom_csv = bom_dir / "bom.csv"
+            pos_csv = bom_dir / "pos.csv"
+            schematic_pdf = schematics_dir / f"{provider.name}_schematic.pdf"
+
+            exporter.export_bom_csv(bom_csv)
+            exporter.export_pick_and_place_csv(pos_csv)
+            exporter.export_schematic_pdf(schematic_pdf)
+            exporter.export_step_solid(step_file)
+
+            if pcb_config.capacitive_sensors:
+                cap_json = Path(out_dir) / "config" / provider.name / "capacitive_config.json"
+                exporter.export_capacitive_config_json(cap_json)
+                self.logger.print(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
+
+            self.logger.print(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
+            self.logger.print(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
+            self.logger.print(f"Generated Board Files: {board_dir}", symbol="📦")
+            self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
+            self.logger.print(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
+
     def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
 
@@ -551,9 +637,21 @@ class Builder:
         if not self.manager.router.providers:
             raise ValueError("No projects discovered. Nothing to build.")
 
+        if names:
+            all_supported_sections = [Section.PART, Section.DIAGRAM, Section.VIEW, Section.PCB]
+            for name in names:
+                if not any(self.target_parser.can_resolve(name, s) for s in all_supported_sections):
+                    target_action = Section.PART
+                    if ":" in name:
+                        action_str = name.split(":", 1)[1].split("/")[0]
+                        if action_str in [s.value for s in Section]:
+                            target_action = Section(action_str)
+                    self.target_parser.resolve(name, target_action)
+
         self.generate_parts(out_dir=out_dir, names=names)
         self.generate_diagram(out_dir=out_dir, names=names)
         self.generate_urdfs(out_dir=out_dir, names=names)
+        self.generate_pcbs(out_dir=out_dir, names=names)
 
         # Compress the build
         zip_path = Path(out_dir) / zip_name
