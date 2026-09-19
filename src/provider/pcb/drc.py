@@ -11,6 +11,7 @@ from model.pcb import (
     NetClassModel,
     FlexZoneModel,
     LayerType,
+    BoardType,
 )
 from provider.geometry_utils import point_in_polygon
 
@@ -125,12 +126,17 @@ class DRCReport:
         """Count total warnings."""
         return sum(1 for v in self.violations if v.severity == DRCSeverity.WARNING)
 
+    @property
+    def info_count(self) -> int:
+        """Count total informational notifications."""
+        return sum(1 for v in self.violations if v.severity == DRCSeverity.INFO)
+
     def summary(self) -> str:
         """Return a formatted text summary of the DRC audit."""
         status = "PASSED" if self.passed else "FAILED"
         lines = [
             f"=== PCB Design Rule Check (DRC) Report: {status} ===",
-            f"Total Errors: {self.error_count}, Total Warnings: {self.warning_count}",
+            f"Total Errors: {self.error_count}, Total Warnings: {self.warning_count}, Total Info: {self.info_count}",
         ]
         for v in self.violations:
             lines.append(f"  * {v}")
@@ -143,6 +149,26 @@ class PCBDesignRulesChecker:
     def __init__(self, config: PCBConfig):
         """Initialize the checker with the board configuration."""
         self.config = config
+        self.is_flex = (
+            (getattr(self.config, "name", "") == "flex_tail")
+            or (getattr(self.config, "shape_ref", "") == "flex_tail")
+            or (getattr(self.config, "board_type", None) == BoardType.FLEX)
+        )
+
+    def get_footprints_for_board(self, wiring: Any) -> List[Any]:
+        """Filter and coordinate-transform footprints belonging specifically to this board target."""
+        if not wiring or not hasattr(wiring, "footprints"):
+            return []
+        fps = list(wiring.footprints)
+        if self.is_flex:
+            flex_fps = []
+            for fp in fps:
+                if fp.name == "J2" or getattr(fp, "shape_ref", None) == "flex_tail":
+                    if fp.name == "J2":
+                        fp = fp.model_copy(update={"position": (0.0, -21.0, fp.position[2])})
+                    flex_fps.append(fp)
+            return flex_fps
+        return [fp for fp in fps if getattr(fp, "shape_ref", None) != "flex_tail"]
 
     def check_all(
         self,
@@ -181,7 +207,7 @@ class PCBDesignRulesChecker:
         violations.extend(self.check_flex_rules())
 
         # 5. Boundary containment check (footprints, traces, vias, test points)
-        fps = getattr(wiring, "footprints", []) if wiring else []
+        fps = self.get_footprints_for_board(wiring)
         violations.extend(self.check_boundary_containment(fps, outline_polygon))
 
         # 6. Netlist connectivity validation
@@ -352,6 +378,21 @@ class PCBDesignRulesChecker:
                                 expected_range=(0.0, diff_pair.max_intra_pair_skew_mm),
                             )
                         )
+                    else:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="DIFFERENTIAL_SKEW_COMPLIANT",
+                                severity=DRCSeverity.INFO,
+                                net_or_zone=diff_pair.name,
+                                description=(
+                                    f"Intra-pair skew between '{diff_pair.pos_net}' ({l_pos:.3f}mm) and "
+                                    f"'{diff_pair.neg_net}' ({l_neg:.3f}mm) is compliant "
+                                    f"({intra_skew:.3f}mm <= {diff_pair.max_intra_pair_skew_mm}mm)"
+                                ),
+                                actual_value=intra_skew,
+                                expected_range=(0.0, diff_pair.max_intra_pair_skew_mm),
+                            )
+                        )
                     pair_avg_lengths.append((diff_pair.name, (l_pos + l_neg) / 2.0))
 
             # Inter-pair / lane-to-lane matching across the net class
@@ -469,6 +510,20 @@ class PCBDesignRulesChecker:
                             f"Flex zone '{zone.name}' bend radius ({zone.min_bend_radius_mm:.2f}mm) permits "
                             f"one-time static installation, but is below recommended dynamic flexing radius "
                             f"({min_recommended_dynamic:.2f}mm)"
+                        ),
+                        actual_value=zone.min_bend_radius_mm,
+                        expected_range=(min_recommended_dynamic, 50.0),
+                    )
+                )
+            else:
+                violations.append(
+                    DRCViolation(
+                        rule_name="FLEX_DYNAMIC_BEND_COMPLIANT",
+                        severity=DRCSeverity.INFO,
+                        net_or_zone=zone.name,
+                        description=(
+                            f"Flex zone '{zone.name}' bend radius ({zone.min_bend_radius_mm:.2f}mm) "
+                            f"complies with IPC-2223 dynamic flexing guidelines (>={min_recommended_dynamic:.2f}mm)"
                         ),
                         actual_value=zone.min_bend_radius_mm,
                         expected_range=(min_recommended_dynamic, 50.0),
@@ -725,7 +780,8 @@ class PCBDesignRulesChecker:
 
         # Check for dangling components (components where all pins are unassigned or disconnected)
         connected_components = {comp_name for net in wiring.nets for comp_name, _ in net.pins}
-        for fp in getattr(wiring, "footprints", []):
+        board_footprints = self.get_footprints_for_board(wiring)
+        for fp in board_footprints:
             if fp.name not in connected_components and getattr(fp, "pins", []):
                 violations.append(
                     DRCViolation(
@@ -765,6 +821,287 @@ class PCBDesignRulesChecker:
                     )
                 )
 
+        # 4. Check end-to-end net continuity between source and target component pins
+        violations.extend(self.check_net_continuity(wiring))
+
+        return violations
+
+    def check_net_continuity(self, wiring: Any) -> List[DRCViolation]:
+        """Verify that all net segments form an unbroken electrical path between source and target component pins."""
+        violations: List[DRCViolation] = []
+        if not wiring or not hasattr(wiring, "nets") or not self.config.traces:
+            return violations
+
+        board_footprints = self.get_footprints_for_board(wiring)
+        carrier_fps = {fp.name: fp for fp in board_footprints}
+
+        traces = self.config.traces
+        vias = self.config.vias
+        copper_regions = self.config.copper_regions
+
+        class _UnionFind:
+            def __init__(self) -> None:
+                self.parent: Dict[Any, Any] = {}
+
+            def find(self, i: Any) -> Any:
+                if i not in self.parent:
+                    self.parent[i] = i
+                if self.parent[i] != i:
+                    self.parent[i] = self.find(self.parent[i])
+                return self.parent[i]
+
+            def union(self, i: Any, j: Any) -> None:
+                ri, rj = self.find(i), self.find(j)
+                if ri != rj:
+                    self.parent[ri] = rj
+
+        for net in wiring.nets:
+            pins_on_board = [(comp, pin) for comp, pin in net.pins if comp in carrier_fps]
+            if len(pins_on_board) < 2:
+                continue
+
+            # Check if net is distributed via copper plane (e.g. GND, 3V3 inner planes)
+            is_plane_net = any(cr.net == net.name for cr in copper_regions)
+            if is_plane_net:
+                for comp, pin in pins_on_board:
+                    fp = carrier_fps[comp]
+                    p_obj = next((p for p in getattr(fp, "pins", []) if p.name == pin), None)
+                    if not p_obj:
+                        continue
+                    px = fp.position[0] + p_obj.position[0]
+                    py = fp.position[1] + p_obj.position[1]
+                    pad_type = getattr(p_obj, "pad_type", "smd")
+                    pad_s = getattr(p_obj, "pad_size_mm", (0.8, 0.8))
+                    pad_r = max(pad_s) / 2.0
+
+                    connected = pad_type == "thru_hole"
+                    if not connected:
+                        for v in vias:
+                            if v.net == net.name:
+                                if (
+                                    math.hypot(px - v.position_mm[0], py - v.position_mm[1])
+                                    <= pad_r + v.pad_diameter_mm / 2.0 + 0.50
+                                ):
+                                    connected = True
+                                    break
+                    if not connected:
+                        for tr in traces:
+                            if tr.net == net.name:
+                                if (
+                                    _dist_point_to_segment((px, py), tr.start_mm, tr.end_mm)
+                                    <= pad_r + tr.width_mm / 2.0 + 0.35
+                                ):
+                                    connected = True
+                                    break
+                    if not connected:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="PIN_NOT_CONNECTED_TO_PLANE",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=f"{comp}.{pin}",
+                                description=f"Pin '{comp}.{pin}' on plane net '{net.name}' has no via or trace connection to the copper plane",
+                                location=(px, py, 0.0),
+                            )
+                        )
+                continue
+
+            net_tr = [tr for tr in traces if tr.net == net.name]
+            net_v = [v for v in vias if v.net == net.name]
+            net_tp = [tp for tp in self.config.test_points if tp.net == net.name]
+            net_mh = [mh for mh in self.config.mounting_holes if mh.plated and mh.net == net.name]
+
+            uf = _UnionFind()
+
+            # 1. Add trace segment internal connections
+            for tr in net_tr:
+                p1 = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                p2 = (round(tr.end_mm[0], 2), round(tr.end_mm[1], 2), tr.layer)
+                uf.union(p1, p2)
+
+            # 2. Add via connections across layers
+            for v in net_v:
+                p_f = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "F.Cu")
+                p_b = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "B.Cu")
+                uf.union(p_f, p_b)
+
+            # 3. Connect co-located trace vertices, vias, and T-junctions
+            all_nodes = list(uf.parent.keys())
+            for n in all_nodes:
+                for tr in net_tr:
+                    if tr.layer == n[2]:
+                        d = _dist_point_to_segment((n[0], n[1]), tr.start_mm, tr.end_mm)
+                        if d <= tr.width_mm / 2.0 + 0.10:
+                            tr_node = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                            uf.union(n, tr_node)
+
+            # 4. Connect component pin pads to copper features
+            pin_connected: Dict[str, bool] = {}
+            for comp, pin in pins_on_board:
+                fp = carrier_fps[comp]
+                p_obj = next((p for p in getattr(fp, "pins", []) if p.name == pin), None)
+                if not p_obj:
+                    continue
+                px = fp.position[0] + p_obj.position[0]
+                py = fp.position[1] + p_obj.position[1]
+                fp_layer = getattr(fp, "layer", "F.Cu") or ("B.Cu" if fp.position[2] < 0 else "F.Cu")
+                pad_type = getattr(p_obj, "pad_type", "smd")
+                pad_s = getattr(p_obj, "pad_size_mm", (0.8, 0.8))
+                pad_r = max(pad_s) / 2.0
+
+                pin_key = f"{comp}.{pin}"
+                connected = False
+
+                for tr in net_tr:
+                    if pad_type != "thru_hole" and tr.layer != fp_layer:
+                        continue
+                    d = _dist_point_to_segment((px, py), tr.start_mm, tr.end_mm)
+                    if d <= pad_r + tr.width_mm / 2.0 + 0.20:
+                        node = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                        uf.union(pin_key, node)
+                        connected = True
+
+                for v in net_v:
+                    dv = math.hypot(px - v.position_mm[0], py - v.position_mm[1])
+                    if dv <= pad_r + v.pad_diameter_mm / 2.0 + 0.20:
+                        node_f = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "F.Cu")
+                        uf.union(pin_key, node_f)
+                        connected = True
+
+                pin_connected[pin_key] = connected
+                if not connected:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="PIN_NOT_CONNECTED_TO_TRACE",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=pin_key,
+                            description=f"Pin '{pin_key}' on net '{net.name}' is not connected to any routed copper trace or via",
+                            location=(px, py, 0.0),
+                        )
+                    )
+
+            # 5. Connect test points (pads/holes) to net copper features
+            for tp in net_tp:
+                tp_key = f"TP.{tp.name}"
+                tx, ty = tp.position_mm
+                tp_r = tp.pad_diameter_mm / 2.0
+                for tr in net_tr:
+                    d = _dist_point_to_segment((tx, ty), tr.start_mm, tr.end_mm)
+                    if d <= tp_r + tr.width_mm / 2.0 + 0.20:
+                        node = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                        uf.union(tp_key, node)
+                for v in net_v:
+                    dv = math.hypot(tx - v.position_mm[0], ty - v.position_mm[1])
+                    if dv <= tp_r + v.pad_diameter_mm / 2.0 + 0.20:
+                        node_f = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "F.Cu")
+                        uf.union(tp_key, node_f)
+
+            # 6. Connect plated mounting holes to net copper features
+            for mh in net_mh:
+                mh_key = f"MH.{mh.name}"
+                mx, my = mh.position_mm
+                mh_r = (mh.pad_diameter_mm or mh.drill_diameter_mm) / 2.0
+                for tr in net_tr:
+                    d = _dist_point_to_segment((mx, my), tr.start_mm, tr.end_mm)
+                    if d <= mh_r + tr.width_mm / 2.0 + 0.20:
+                        node = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                        uf.union(mh_key, node)
+                for v in net_v:
+                    dv = math.hypot(mx - v.position_mm[0], my - v.position_mm[1])
+                    if dv <= mh_r + v.pad_diameter_mm / 2.0 + 0.20:
+                        node_f = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "F.Cu")
+                        uf.union(mh_key, node_f)
+
+            # 7. Verify all net segments (pins, traces, vias, test points, holes) belong to the same component
+            first_pin_key = f"{pins_on_board[0][0]}.{pins_on_board[0][1]}"
+            if pin_connected.get(first_pin_key):
+                root = uf.find(first_pin_key)
+
+                # Verify all other component pins reach root
+                for comp, pin in pins_on_board[1:]:
+                    target_key = f"{comp}.{pin}"
+                    if pin_connected.get(target_key) and uf.find(target_key) != root:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="NET_ROUTING_INCOMPLETE",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=net.name,
+                                description=(
+                                    f"Net '{net.name}' routing is broken: source pin '{first_pin_key}' "
+                                    f"is not electrically continuous with target pin '{target_key}'"
+                                ),
+                            )
+                        )
+
+                # Verify all trace segments reach root
+                for tr in net_tr:
+                    p1 = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                    if uf.find(p1) != root:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="DISCONNECTED_TRACE_SEGMENT",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=net.name,
+                                description=(
+                                    f"Trace segment on net '{net.name}' from ({tr.start_mm[0]:.2f}, {tr.start_mm[1]:.2f}) "
+                                    f"to ({tr.end_mm[0]:.2f}, {tr.end_mm[1]:.2f}) on layer '{tr.layer}' "
+                                    f"is disconnected from source/target component pins"
+                                ),
+                                location=(tr.start_mm[0], tr.start_mm[1], 0.0),
+                            )
+                        )
+
+                # Verify all vias reach root
+                for v in net_v:
+                    p_f = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "F.Cu")
+                    if uf.find(p_f) != root:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="DISCONNECTED_VIA",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=net.name,
+                                description=(
+                                    f"Via on net '{net.name}' at ({v.position_mm[0]:.2f}, {v.position_mm[1]:.2f}) "
+                                    f"is disconnected from source/target component pins"
+                                ),
+                                location=(v.position_mm[0], v.position_mm[1], 0.0),
+                            )
+                        )
+
+                # Verify all test points reach root
+                for tp in net_tp:
+                    tp_key = f"TP.{tp.name}"
+                    if tp_key not in uf.parent or uf.find(tp_key) != root:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="TEST_POINT_DISCONNECTED",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=tp.name,
+                                description=(
+                                    f"Test point '{tp.name}' on net '{net.name}' at "
+                                    f"({tp.position_mm[0]:.2f}, {tp.position_mm[1]:.2f}) is disconnected "
+                                    f"from source/target component pins"
+                                ),
+                                location=(tp.position_mm[0], tp.position_mm[1], 0.0),
+                            )
+                        )
+
+                # Verify all plated mounting holes reach root
+                for mh in net_mh:
+                    mh_key = f"MH.{mh.name}"
+                    if mh_key not in uf.parent or uf.find(mh_key) != root:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="MOUNTING_HOLE_DISCONNECTED",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=mh.name,
+                                description=(
+                                    f"Plated mounting hole '{mh.name}' on net '{net.name}' at "
+                                    f"({mh.position_mm[0]:.2f}, {mh.position_mm[1]:.2f}) is disconnected "
+                                    f"from source/target component pins"
+                                ),
+                                location=(mh.position_mm[0], mh.position_mm[1], 0.0),
+                            )
+                        )
         return violations
 
     def check_clearances_and_overlaps(self, wiring: Any) -> List[DRCViolation]:
@@ -800,11 +1137,12 @@ class PCBDesignRulesChecker:
                     )
 
         # 2. Check component pads to drill hole overlaps
-        if wiring and hasattr(wiring, "footprints"):
+        if wiring:
+            board_footprints = self.get_footprints_for_board(wiring)
             for mh in holes:
                 mh_r = mh.drill_diameter_mm / 2.0
                 mh_x, mh_y = mh.position_mm
-                for fp in wiring.footprints:
+                for fp in board_footprints:
                     fx, fy = fp.position[0], fp.position[1]
                     f_diag = (
                         math.hypot(fp.dimensions[0], fp.dimensions[1]) / 2.0 if getattr(fp, "dimensions", None) else 5.0
@@ -1007,8 +1345,9 @@ class PCBDesignRulesChecker:
                             location=(sx, sy, 0.0),
                         )
                     )
-            if wiring and hasattr(wiring, "footprints"):
-                for fp in wiring.footprints:
+            if wiring:
+                board_footprints = self.get_footprints_for_board(wiring)
+                for fp in board_footprints:
                     fp_layer = getattr(fp, "layer", "F.Cu") or ("B.Cu" if fp.position[2] < 0 else "F.Cu")
                     pad_silk_layer = "B.SilkS" if fp_layer == "B.Cu" else "F.SilkS"
                     fx, fy = fp.position[0], fp.position[1]
@@ -1053,7 +1392,7 @@ class PCBDesignRulesChecker:
 
         # Pre-collect all valid termination targets per net and layer
         # 1. Component pin pads
-        footprints = getattr(wiring, "footprints", []) if wiring else []
+        footprints = self.get_footprints_for_board(wiring)
         pin_targets: Dict[str, List[Tuple[float, float, str, float]]] = {}
         for fp in footprints:
             fp_x, fp_y = fp.position[0], fp.position[1]

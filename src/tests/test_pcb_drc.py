@@ -1,5 +1,6 @@
 """Unit tests for PCB Design Rules Checking (DRC) engine."""
 
+import math
 import pytest
 from model.pcb import (
     LayerType,
@@ -15,7 +16,7 @@ from model.pcb import (
     TestPointModel as PcbTestPointModel,
     SilkscreenTextModel,
 )
-from provider.pcb.drc import PCBDesignRulesChecker, DRCSeverity
+from provider.pcb.drc import PCBDesignRulesChecker, DRCSeverity, DRCReport
 
 
 @pytest.fixture
@@ -495,3 +496,251 @@ def test_drc_test_point_trace_collision(base_pcb_config: PCBConfig):
     assert any(
         v.rule_name == "TEST_POINT_TRACE_COLLISION" and "TP_RX0_P<->VLOAD_SW" in v.net_or_zone for v in violations
     )
+
+
+def test_drc_severity_coverage_info_warning_error(base_pcb_config: PCBConfig):
+    """Verify DRCReport properly classifies and tabulates ERROR, WARNING, and INFO severities."""
+    # 1. INFO: Compliant flex zone bend radius
+    info_zone = FlexZoneModel(
+        name="compliant_flex",
+        start_x_mm=10.0,
+        length_mm=20.0,
+        substrate_thickness_mm=0.05,
+        coverlay_thickness_mm=0.025,
+        min_bend_radius_mm=5.0,  # > 10x thickness (1.7mm)
+    )
+    # 2. WARNING: Flex zone bend radius between static and dynamic limit
+    warning_zone = FlexZoneModel(
+        name="warning_flex",
+        start_x_mm=40.0,
+        length_mm=20.0,
+        substrate_thickness_mm=0.05,
+        coverlay_thickness_mm=0.025,
+        min_bend_radius_mm=1.2,  # Between static (1.02mm) and dynamic (1.7mm)
+    )
+    # 3. ERROR: Flex zone bend radius below static limit
+    error_zone = FlexZoneModel(
+        name="error_flex",
+        start_x_mm=70.0,
+        length_mm=20.0,
+        substrate_thickness_mm=0.05,
+        coverlay_thickness_mm=0.025,
+        min_bend_radius_mm=0.5,  # < static (1.02mm)
+    )
+    base_pcb_config.flex_zones = [info_zone, warning_zone, error_zone]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    violations = checker.check_flex_rules()
+
+    has_info = any(v.severity == DRCSeverity.INFO for v in violations)
+    has_warning = any(v.severity == DRCSeverity.WARNING for v in violations)
+    has_error = any(v.severity == DRCSeverity.ERROR for v in violations)
+
+    assert has_info, "Expected at least one INFO severity violation"
+    assert has_warning, "Expected at least one WARNING severity violation"
+    assert has_error, "Expected at least one ERROR severity violation"
+
+    report = DRCReport(passed=False, violations=violations)
+    assert report.info_count >= 1
+    assert report.warning_count >= 1
+    assert report.error_count >= 1
+    assert "Total Info:" in report.summary()
+
+
+def test_find_empty_space_for_silkscreen_label():
+    """Verify find_empty_space_for_label finds collision-free coordinates avoiding pads and holes."""
+    from provider.pcb.silkscreen import find_empty_space_for_label
+
+    # Obstacle at (10.0, 10.0) with radius 1.5mm (e.g. test point pad)
+    obstacles = [(10.0, 10.0, 1.5)]
+    board_bounds = (0.0, 0.0, 50.0, 50.0)
+
+    # Search for label at base (10.0, 10.0)
+    off_x, off_y = find_empty_space_for_label(
+        base_x=10.0,
+        base_y=10.0,
+        label_w=3.0,
+        label_h=1.0,
+        circular_obstacles=obstacles,
+        board_bounds=board_bounds,
+        clearance=0.30,
+        preferred_direction="north",
+    )
+
+    cand_x = 10.0 + off_x
+    cand_y = 10.0 + off_y
+
+    # Verify label center is at least (pad_r + label_h/2 + clearance) away from obstacle
+    dist = math.hypot(cand_x - 10.0, cand_y - 10.0)
+    min_dist = 1.5 + 0.5 + 0.30
+    assert dist >= min_dist - 1e-4, f"Distance {dist} < required clearance {min_dist}"
+
+    # Verify inside board bounds
+    assert cand_x - 1.5 >= board_bounds[0]
+    assert cand_x + 1.5 <= board_bounds[2]
+    assert cand_y - 0.5 >= board_bounds[1]
+    assert cand_y + 0.5 <= board_bounds[3]
+
+
+def test_test_board_carrier_and_flex_tail_zero_drc_errors_and_warnings():
+    """Verify test_board carrier and flex tail subassembly both pass DRC with 0 errors and 0 warnings."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+
+    provider = TestBoardProvider()
+    wiring = Wiring(provider.wiring_path)
+
+    # 1. Carrier PCB check
+    carrier_checker = PCBDesignRulesChecker(provider.pcb_config)
+    carrier_report = carrier_checker.check_all(wiring=wiring)
+    assert carrier_report.passed, f"Carrier DRC failed: {carrier_report.summary()}"
+    assert carrier_report.error_count == 0, f"Carrier has {carrier_report.error_count} errors"
+    assert carrier_report.warning_count == 0, f"Carrier has {carrier_report.warning_count} warnings"
+
+    # 2. Flex tail PCB check
+    flex_part = provider.part["flex_tail"]("flex_tail", None, None)
+    flex_config = flex_part.to_pcb_config()
+    if not flex_config.stackup:
+        flex_config = flex_config.model_copy(update={"stackup": provider.pcb_config.stackup})
+    flex_checker = PCBDesignRulesChecker(flex_config)
+    flex_report = flex_checker.check_all(wiring=wiring)
+    assert flex_report.passed, f"Flex tail DRC failed: {flex_report.summary()}"
+    assert flex_report.error_count == 0, f"Flex tail has {flex_report.error_count} errors"
+    assert flex_report.warning_count == 0, f"Flex tail has {flex_report.warning_count} warnings"
+
+
+def test_drc_net_continuity_source_target_reachability(base_pcb_config: PCBConfig):
+    """Verify DRC validates net segments are fully connected between source and target components."""
+    from unittest.mock import MagicMock
+    from model.wiring import FootprintModel, PinModel, NetModel
+
+    # Source component U1 at (0.0, 0.0) with pin 1 at (-2.0, 0.0)
+    fp_u1 = FootprintModel(
+        name="U1",
+        package="SOIC-8",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(4.0, 4.0, 1.0),
+        pins=[PinModel(name="1", position=(-2.0, 0.0, 0.0), label="OUT", side="left", pad_type="smd")],
+    )
+    # Target component U2 at (20.0, 0.0) with pin 2 at (-2.0, 0.0) -> global pos (18.0, 0.0)
+    fp_u2 = FootprintModel(
+        name="U2",
+        package="SOIC-8",
+        position=(20.0, 0.0, 0.0),
+        dimensions=(4.0, 4.0, 1.0),
+        pins=[PinModel(name="2", position=(-2.0, 0.0, 0.0), label="IN", side="left", pad_type="smd")],
+    )
+    net = NetModel(name="CTRL_SIG", color="green", pins=[("U1", "1"), ("U2", "2")])
+
+    wiring_mock = MagicMock()
+    wiring_mock.footprints = [fp_u1, fp_u2]
+    wiring_mock.nets = [net]
+
+    # Case 1: Pin not connected (U2.2 has no trace)
+    tr_partial = TraceSegmentModel(
+        net="CTRL_SIG",
+        layer="F.Cu",
+        width_mm=0.20,
+        start_mm=(-2.0, 0.0),
+        end_mm=(5.0, 0.0),
+    )
+    base_pcb_config.traces = [tr_partial]
+    base_pcb_config.vias = []
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    violations_missing = checker.check_net_continuity(wiring_mock)
+    assert any(v.rule_name == "PIN_NOT_CONNECTED_TO_TRACE" and "U2.2" in v.net_or_zone for v in violations_missing)
+
+    # Case 2: Broken trace in middle (U1 has a trace and U2 has a trace, but airwire/gap between them)
+    tr_u2 = TraceSegmentModel(
+        net="CTRL_SIG",
+        layer="F.Cu",
+        width_mm=0.20,
+        start_mm=(10.0, 0.0),
+        end_mm=(18.0, 0.0),
+    )
+    base_pcb_config.traces = [tr_partial, tr_u2]  # Gap between (5.0, 0.0) and (10.0, 0.0)
+    violations_broken = checker.check_net_continuity(wiring_mock)
+    assert any(v.rule_name == "NET_ROUTING_INCOMPLETE" and v.net_or_zone == "CTRL_SIG" for v in violations_broken)
+
+    # Case 3: Fully connected from source U1 to target U2
+    tr_bridge = TraceSegmentModel(
+        net="CTRL_SIG",
+        layer="F.Cu",
+        width_mm=0.20,
+        start_mm=(5.0, 0.0),
+        end_mm=(10.0, 0.0),
+    )
+    base_pcb_config.traces = [tr_partial, tr_bridge, tr_u2]
+    violations_complete = checker.check_net_continuity(wiring_mock)
+    assert len(violations_complete) == 0, f"Expected 0 violations, got {violations_complete}"
+
+    # Case 4: Disconnected trace segment floating on the net
+    tr_orphan = TraceSegmentModel(
+        net="CTRL_SIG",
+        layer="F.Cu",
+        width_mm=0.20,
+        start_mm=(30.0, 30.0),
+        end_mm=(35.0, 30.0),
+    )
+    base_pcb_config.traces = [tr_partial, tr_bridge, tr_u2, tr_orphan]
+    violations_orphan_tr = checker.check_net_continuity(wiring_mock)
+    assert any(
+        v.rule_name == "DISCONNECTED_TRACE_SEGMENT" and v.net_or_zone == "CTRL_SIG" for v in violations_orphan_tr
+    )
+
+    # Case 5: Disconnected via on the net
+    base_pcb_config.traces = [tr_partial, tr_bridge, tr_u2]
+    from model.pcb import ViaModel, TestPointModel, MountingHoleModel
+
+    via_orphan = ViaModel(
+        net="CTRL_SIG",
+        position_mm=(40.0, 40.0),
+        pad_diameter_mm=0.6,
+        drill_diameter_mm=0.3,
+        layer_start="F.Cu",
+        layer_end="B.Cu",
+    )
+    base_pcb_config.vias = [via_orphan]
+    violations_orphan_via = checker.check_net_continuity(wiring_mock)
+    assert any(v.rule_name == "DISCONNECTED_VIA" and v.net_or_zone == "CTRL_SIG" for v in violations_orphan_via)
+
+    # Case 6: Disconnected test point pad/hole on the net
+    base_pcb_config.vias = []
+    tp_orphan = TestPointModel(
+        name="TP_CTRL",
+        net="CTRL_SIG",
+        position_mm=(50.0, 50.0),
+        pad_diameter_mm=1.0,
+        hole_diameter_mm=0.5,
+    )
+    base_pcb_config.test_points = [tp_orphan]
+    violations_orphan_tp = checker.check_net_continuity(wiring_mock)
+    assert any(v.rule_name == "TEST_POINT_DISCONNECTED" and v.net_or_zone == "TP_CTRL" for v in violations_orphan_tp)
+
+    # Case 7: Disconnected plated mounting hole on the net
+    base_pcb_config.test_points = []
+    mh_orphan = MountingHoleModel(
+        name="MH_CTRL",
+        net="CTRL_SIG",
+        position_mm=(60.0, 60.0),
+        drill_diameter_mm=2.0,
+        pad_diameter_mm=3.0,
+        plated=True,
+    )
+    base_pcb_config.mounting_holes = [mh_orphan]
+    violations_orphan_mh = checker.check_net_continuity(wiring_mock)
+    assert any(v.rule_name == "MOUNTING_HOLE_DISCONNECTED" and v.net_or_zone == "MH_CTRL" for v in violations_orphan_mh)
+
+    # Case 8: All segments properly connected inline
+    base_pcb_config.mounting_holes = []
+    tp_connected = TestPointModel(
+        name="TP_CTRL",
+        net="CTRL_SIG",
+        position_mm=(2.0, 0.0),  # directly along tr_partial
+        pad_diameter_mm=1.0,
+        hole_diameter_mm=0.5,
+    )
+    base_pcb_config.test_points = [tp_connected]
+    violations_all_ok = checker.check_net_continuity(wiring_mock)
+    assert len(violations_all_ok) == 0, f"Expected 0 violations, got {violations_all_ok}"
