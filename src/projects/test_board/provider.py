@@ -15,6 +15,7 @@ from build123d import (
 )
 from model import Wiring
 from model.pcb import (
+    BoardType,
     LayerType,
     MountingHoleModel,
     SilkscreenTextModel,
@@ -41,6 +42,8 @@ from provider import (
     Trace,
     BuildVias,
     Via,
+    BuildPcb,
+    BuildFlexTail,
 )
 from projects_config import TestBoardConfig
 
@@ -103,7 +106,7 @@ class TestBoardProvider(Provider):
                 MountingHole(name="MH", drill_diameter_mm=hole_dia, pad_diameter_mm=hole_dia + 1.3)
         return dh.holes
 
-    def carrier_board(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
+    def carrier_board(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPcb:
         """Build the rigid 6-layer carrier board substrate with rounded corners and mounting holes."""
         w = self.settings.board_width
         length = self.settings.board_length
@@ -112,7 +115,7 @@ class TestBoardProvider(Provider):
         hole_dia = self.settings.mounting_hole_diameter
         inset = self.settings.mounting_hole_inset
 
-        with BuildPart() as pcb:
+        with BuildPcb(name="carrier_board", board_type=BoardType.RIGID, stackup=self.stackup()) as pcb:
             # Main board outline block
             b = Box(w, length, thickness)
             # Fillet corner vertical edges
@@ -134,16 +137,21 @@ class TestBoardProvider(Provider):
             for cyl in dh.to_shapes(depth_mm=thickness * 2.0):
                 add(cyl, mode=BuildMode.SUBTRACT)
 
+            # Test point drilled through-holes
+            tp = self.test_points()
+            for cyl in tp.to_shapes(depth_mm=thickness * 2.0):
+                add(cyl, mode=BuildMode.SUBTRACT)
+
         return pcb
 
-    def flex_tail(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
+    def flex_tail(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildFlexTail:
         """Build the flexible polyimide sensing tail extending from the carrier board edge."""
         w_tail = self.settings.flex_tail_width
         l_tail = self.settings.flex_tail_length
         t_tail = self.settings.flex_tail_thickness
         length_board = self.settings.board_length
 
-        with BuildPart() as tail:
+        with BuildFlexTail(name="flex_tail") as tail:
             # Place flex tail protruding along +Y from the top edge of the board
             y_center = (length_board / 2.0) + (l_tail / 2.0)
             with Locations((0.0, y_center, 0.0)):
@@ -159,9 +167,10 @@ class TestBoardProvider(Provider):
         y_bottom = -(length_board / 2.0) + margin
 
         with BuildSilkscreen() as silk:
-            with Locations((0.0, y_top)):
+            # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
+            with Locations((0.0, 26.0)):
                 SilkscreenText("TEST BOARD CARRIER REV 1.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
-            with Locations((0.0, y_bottom)):
+            with Locations((0.0, -28.0)):
                 SilkscreenText("LAYER 1-6 RIGID-FLEX", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((0.0, 0.0)):
                 SilkscreenText(
@@ -332,6 +341,13 @@ class TestBoardProvider(Provider):
                 clearance_mm=0.25,
             )
             CopperRegion(
+                net="3V3",
+                layer="In2.Cu",
+                outline=polygon,
+                priority=1,
+                clearance_mm=0.25,
+            )
+            CopperRegion(
                 net="GND",
                 layer="In4.Cu",
                 outline=polygon,
@@ -341,54 +357,50 @@ class TestBoardProvider(Provider):
         return cr
 
     def test_points(self) -> BuildTestPoints:
-        """Define exposed copper test points for I2C, PCIe, and MIPI using BuildTestPoints."""
-        with BuildTestPoints(default_layer="F.Cu", default_diameter_mm=1.0) as tp:
-            # I2C test points
-            TestPoint("TP_SDA", net="I2C_SDA", at=(12.0, -4.0))
-            TestPoint("TP_SCL", net="I2C_SCL", at=(12.0, -6.0))
+        """Define drilled through-hole test points for GND, I2C, PCIe, and MIPI using BuildTestPoints."""
+        with BuildTestPoints(default_layer="F.Cu", default_diameter_mm=1.40, default_drill_diameter_mm=0.80) as tp:
+            # GND through-hole probe test point
+            TestPoint("TP_GND", net="GND", at=(-18.0, -22.0))
 
-            # PCIe Gen4 differential pair test points
-            TestPoint("TP_TX0_P", net="PCIE_TX0_P", at=(-15.0, -22.0))
-            TestPoint("TP_TX0_N", net="PCIE_TX0_N", at=(-13.0, -22.0))
-            TestPoint("TP_RX0_P", net="PCIE_RX0_P", at=(-11.0, -22.0))
-            TestPoint("TP_RX0_N", net="PCIE_RX0_N", at=(-9.0, -22.0))
+            # PCIe Gen4 differential pair test points (spaced with 4mm pitch)
+            TestPoint("TP_TX0_N", net="PCIE_TX0_N", at=(-14.0, -22.0))
+            TestPoint("TP_TX0_P", net="PCIE_TX0_P", at=(-10.0, -22.0))
+            TestPoint("TP_RX0_P", net="PCIE_RX0_P", at=(-6.0, -22.0))
+            TestPoint("TP_RX0_N", net="PCIE_RX0_N", at=(-2.0, -22.0))
 
-            # MIPI display differential pair test points
-            TestPoint("TP_D0_P", net="MIPI_DATA0_P", at=(10.0, 22.0))
-            TestPoint("TP_D0_N", net="MIPI_DATA0_N", at=(12.0, 22.0))
+            # I2C test points (spaced with 4mm pitch)
+            TestPoint("TP_SCL", net="I2C_SCL", at=(14.0, -4.0))
+            TestPoint("TP_SDA", net="I2C_SDA", at=(18.0, -4.0))
+
+            # MIPI display differential pair test points (spaced with 4mm pitch)
+            TestPoint("TP_D0_P", net="MIPI_DATA0_P", at=(6.0, 22.0))
+            TestPoint("TP_D0_N", net="MIPI_DATA0_N", at=(10.0, 22.0))
             TestPoint("TP_CLK_P", net="MIPI_CLK_P", at=(14.0, 22.0))
-            TestPoint("TP_CLK_N", net="MIPI_CLK_N", at=(16.0, 22.0))
+            TestPoint("TP_CLK_N", net="MIPI_CLK_N", at=(18.0, 22.0))
         return tp
 
     @cached_property
     def _routed_network(self) -> tuple[list[TraceSegmentModel], list[ViaModel]]:
-        """Compute complete routed traces and vias combining manual flex tail routes and auto-routed nets."""
-        # 1. Manual flex tail routing using BuildTraces context manager
-        with BuildTraces(default_layer="F.Cu", default_width_mm=0.15) as tr:
-            Trace("CAP_TX0", start=(1.0, 38.0), end=(1.0, 55.0))
-            Trace("CAP_RX0", start=(2.0, 38.0), end=(2.0, 55.0))
-            Trace("CAP_TX1", start=(3.0, 38.0), end=(3.0, 65.0))
-            Trace("CAP_RX1", start=(4.0, 38.0), end=(4.0, 65.0))
-            Trace("CAP_TX2", start=(5.0, 38.0), end=(5.0, 75.0))
-            Trace("CAP_RX2", start=(6.0, 38.0), end=(6.0, 75.0))
-            Trace("CAP_RX3", start=(7.0, 38.0), end=(7.0, 85.0))
-            Trace("CAP_SHIELD", start=(8.0, 38.0), end=(8.0, 85.0))
+        """Compute complete routed traces and vias, using persisted routing if available or routing dynamically."""
+        from provider.pcb.router import PCBAutoRouter
 
-        flex_traces = list(tr.traces)
-        manual_nets = {"CAP_TX0", "CAP_RX0", "CAP_TX1", "CAP_RX1", "CAP_TX2", "CAP_RX2", "CAP_RX3", "CAP_SHIELD"}
+        # 1. Check for configured or persisted routing file
+        routing_file = getattr(self.settings, "routing_path", None)
+        if routing_file and Path(routing_file).exists():
+            return PCBAutoRouter.load_routing_yaml(routing_file)
 
-        # 2. Automated routing for remaining nets via PCBAutoRouter
+        default_routing = self.wiring_path.parent / "routing.yaml"
+        if default_routing.exists():
+            return PCBAutoRouter.load_routing_yaml(default_routing)
+
+        # 2. Automated routing across all nets via PCBAutoRouter
         raw_cfg = self.pcb_manifest
         wiring = Wiring(str(self.wiring_path)) if self.wiring_path.exists() else None
-        auto_traces: list[TraceSegmentModel] = []
-        auto_vias: list[ViaModel] = []
         if raw_cfg and wiring:
-            from provider.pcb.router import PCBAutoRouter
-
             router = PCBAutoRouter(raw_cfg, wiring)
-            auto_traces, auto_vias = router.route_all_nets(exclude_nets=manual_nets)
+            return router.route_all_nets()
 
-        return flex_traces + auto_traces, auto_vias
+        return [], []
 
     def traces(self) -> list[TraceSegmentModel]:
         """Return routed copper traces for the test board."""

@@ -71,6 +71,11 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
                     return
                 diff_model = self.server.git_engine.get_file_diff(commit, file_path)
                 self._send_json(diff_model.model_dump(mode="json"))
+            case "/api/search":
+                q = query.get("q", [""])[0]
+                commit = query.get("commit", ["working"])[0]
+                results = self.server.git_engine.search_code(q, commit=commit)
+                self._send_json({"query": q, "commit": commit, "results": results})
             case _:
                 self.send_error(404, "Endpoint not found")
 
@@ -100,6 +105,15 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
                 self._handle_update_verdict(data)
             case "/api/export":
                 self._handle_export()
+            case "/api/commit_reviewed":
+                query = urllib.parse.parse_qs(parsed.query)
+                commit = query.get("commit", [""])[0] or (data.get("commit", "") if isinstance(data, dict) else "")
+                short_rev = commit[:8] if commit else "current"
+                print(
+                    f"\n[CodeReview] ✨ All changed files reviewed for commit {short_rev}! Ready to move to the next commit.\n",
+                    flush=True,
+                )
+                self._send_json({"status": "ok", "commit": commit})
             case _:
                 self.send_error(404, "Endpoint not found")
 

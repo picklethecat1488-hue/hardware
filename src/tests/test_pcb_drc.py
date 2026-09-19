@@ -9,6 +9,11 @@ from model.pcb import (
     NetClassModel,
     FlexZoneModel,
     PCBConfig,
+    TraceSegmentModel,
+    ViaModel,
+    MountingHoleModel,
+    TestPointModel as PcbTestPointModel,
+    SilkscreenTextModel,
 )
 from provider.pcb.drc import PCBDesignRulesChecker, DRCSeverity
 
@@ -224,4 +229,269 @@ def test_drc_flex_bend_radius_rules(base_pcb_config: PCBConfig):
     )
     assert any(
         v.rule_name == "FLEX_DYNAMIC_BEND_WARNING" and v.severity == DRCSeverity.WARNING for v in report.violations
+    )
+
+
+def test_drc_trace_short_circuit(base_pcb_config: PCBConfig):
+    """Verify error when two traces of different nets intersect on the same layer."""
+    t1 = TraceSegmentModel(
+        start_mm=(-5.0, 0.0),
+        end_mm=(5.0, 0.0),
+        width_mm=0.20,
+        layer="F.Cu",
+        net="NET_A",
+    )
+    t2 = TraceSegmentModel(
+        start_mm=(0.0, -5.0),
+        end_mm=(0.0, 5.0),
+        width_mm=0.20,
+        layer="F.Cu",
+        net="NET_B",
+    )
+    base_pcb_config.traces = [t1, t2]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    report = checker.check_all()
+
+    assert not report.passed
+    assert any(v.rule_name == "TRACE_SHORT_CIRCUIT" and v.severity == DRCSeverity.ERROR for v in report.violations)
+
+
+def test_drc_trace_clearance_violation(base_pcb_config: PCBConfig):
+    """Verify error when two traces of different nets pass closer than the required clearance."""
+    t1 = TraceSegmentModel(
+        start_mm=(-5.0, 0.0),
+        end_mm=(5.0, 0.0),
+        width_mm=0.20,
+        layer="F.Cu",
+        net="NET_A",
+    )
+    # Distance between centerlines is 0.25mm. Copper threshold is (0.2+0.2)/2 = 0.20mm.
+    # Center distance 0.25mm means surface-to-surface gap is 0.05mm < 0.10mm clearance default.
+    t2 = TraceSegmentModel(
+        start_mm=(-5.0, 0.25),
+        end_mm=(5.0, 0.25),
+        width_mm=0.20,
+        layer="F.Cu",
+        net="NET_B",
+    )
+    base_pcb_config.traces = [t1, t2]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    report = checker.check_all()
+
+    assert not report.passed
+    assert any(v.rule_name == "CLEARANCE_VIOLATION" and v.severity == DRCSeverity.ERROR for v in report.violations)
+
+
+def test_drc_via_trace_collision_and_clearance(base_pcb_config: PCBConfig):
+    """Verify error when a via collides with or breaches clearance to a foreign net trace."""
+    via = ViaModel(
+        position_mm=(0.0, 0.0),
+        pad_diameter_mm=0.45,
+        drill_diameter_mm=0.20,
+        layer_start="F.Cu",
+        layer_end="B.Cu",
+        net="NET_VIA",
+    )
+    # Collision: trace passes through center of via
+    tr_collide = TraceSegmentModel(
+        start_mm=(-2.0, 0.0),
+        end_mm=(2.0, 0.0),
+        width_mm=0.20,
+        layer="F.Cu",
+        net="NET_TRACE",
+    )
+    base_pcb_config.vias = [via]
+    base_pcb_config.traces = [tr_collide]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    report = checker.check_all()
+
+    assert not report.passed
+    assert any(v.rule_name == "VIA_TRACE_COLLISION" and v.severity == DRCSeverity.ERROR for v in report.violations)
+
+
+def test_drc_trace_outside_board_boundary(base_pcb_config: PCBConfig):
+    """Verify error when a trace extends outside the board envelope or CAD outline."""
+    # Board dimensions are 80.0 x 50.0 (half_w = 40.0, half_l = 25.0)
+    t_outside = TraceSegmentModel(
+        start_mm=(35.0, 0.0),
+        end_mm=(45.0, 0.0),  # 45.0 > 40.0
+        width_mm=0.20,
+        layer="F.Cu",
+        net="NET_A",
+    )
+    base_pcb_config.traces = [t_outside]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    report = checker.check_all()
+
+    assert not report.passed
+    assert any(
+        v.rule_name == "TRACE_OUTSIDE_BOARD_BOUNDARY" and v.severity == DRCSeverity.ERROR for v in report.violations
+    )
+
+
+def test_drc_via_and_test_point_outside_board_boundary(base_pcb_config: PCBConfig):
+    """Verify error when vias or test points are placed outside the board boundary."""
+    via_outside = ViaModel(
+        position_mm=(45.0, 0.0),  # 45.0 > 40.0
+        pad_diameter_mm=0.45,
+        drill_diameter_mm=0.20,
+        layer_start="F.Cu",
+        layer_end="B.Cu",
+        net="NET_VIA",
+    )
+    tp_outside = PcbTestPointModel(
+        name="TP_OUT",
+        net="NET_TP",
+        position_mm=(0.0, 30.0),  # 30.0 > 25.0
+        pad_diameter_mm=1.40,
+        drill_diameter_mm=0.80,
+    )
+    base_pcb_config.vias = [via_outside]
+    base_pcb_config.test_points = [tp_outside]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    report = checker.check_all()
+
+    assert not report.passed
+    assert any(
+        v.rule_name == "VIA_OUTSIDE_BOARD_BOUNDARY" and v.severity == DRCSeverity.ERROR for v in report.violations
+    )
+    assert any(
+        v.rule_name == "TEST_POINT_OUTSIDE_BOARD_BOUNDARY" and v.severity == DRCSeverity.ERROR
+        for v in report.violations
+    )
+
+
+def test_drc_disconnected_test_point_airwire(base_pcb_config: PCBConfig):
+    """Verify error when a test point with an active net has no connecting trace."""
+    from unittest.mock import MagicMock
+
+    tp = PcbTestPointModel(
+        name="TP_DISCONNECTED",
+        net="NET_MONITOR",
+        position_mm=(10.0, 10.0),
+        pad_diameter_mm=1.40,
+        drill_diameter_mm=0.80,
+    )
+    base_pcb_config.test_points = [tp]
+    base_pcb_config.traces = []  # No traces connected to TP_DISCONNECTED
+
+    wiring_mock = MagicMock()
+    wiring_mock.footprints = []
+    wiring_mock.nets = []
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    report = checker.check_all(wiring=wiring_mock)
+
+    assert not report.passed
+    assert any(
+        v.rule_name == "DISCONNECTED_TEST_POINT_AIRWIRE" and v.severity == DRCSeverity.ERROR for v in report.violations
+    )
+
+
+def test_drc_silkscreen_pad_overlap(base_pcb_config: PCBConfig):
+    """Verify error when silkscreen text overlaps an exposed test point pad or mounting hole."""
+    tp = PcbTestPointModel(
+        name="TP1",
+        net="NET_1",
+        position_mm=(10.0, 10.0),
+        pad_diameter_mm=1.40,
+        drill_diameter_mm=0.80,
+    )
+    # Silkscreen placed directly on top of test point pad
+    silk_overlap = SilkscreenTextModel(
+        text="TP1",
+        position=(10.1, 10.1),
+        layer="F.Silkscreen",
+    )
+    base_pcb_config.test_points = [tp]
+    base_pcb_config.silkscreen_texts = [silk_overlap]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    report = checker.check_all()
+
+    assert not report.passed
+    assert any(v.rule_name == "SILKSCREEN_PAD_OVERLAP" and v.severity == DRCSeverity.ERROR for v in report.violations)
+
+
+def test_drc_antenna_detection(base_pcb_config: PCBConfig):
+    """Verify DRC flags open-ended dangling trace stubs as ANTENNA_TRACE_DETECTED."""
+    from unittest.mock import MagicMock
+    from model.wiring import FootprintModel, PinModel, NetModel
+
+    fp = FootprintModel(
+        name="U1",
+        package="SOIC-8",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(4.0, 4.0, 1.0),
+        pins=[PinModel(name="1", position=(-2.0, 0.0, 0.0), label="IN", side="left", pad_type="smd")],
+    )
+    net = NetModel(name="SIG_A", color="blue", pins=[("U1", "1")])
+
+    wiring_mock = MagicMock()
+    wiring_mock.footprints = [fp]
+    wiring_mock.nets = [net]
+
+    # Trace starts at U1.1 (-2.0, 0.0) and ends in open space (15.0, 0.0) without a via or pad
+    dangling_tr = TraceSegmentModel(
+        net="SIG_A",
+        layer="F.Cu",
+        width_mm=0.15,
+        start_mm=(-2.0, 0.0),
+        end_mm=(15.0, 0.0),
+    )
+    base_pcb_config.traces = [dangling_tr]
+    base_pcb_config.vias = []
+    base_pcb_config.test_points = []
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    report = checker.check_all(wiring=wiring_mock)
+
+    assert not report.passed
+    assert any(v.rule_name == "ANTENNA_TRACE_DETECTED" and v.severity == DRCSeverity.ERROR for v in report.violations)
+
+    # Now bridge the antenna with a via at (15.0, 0.0)
+    base_pcb_config.vias = [
+        ViaModel(
+            position_mm=(15.0, 0.0),
+            drill_diameter_mm=0.20,
+            pad_diameter_mm=0.45,
+            layer_start="F.Cu",
+            layer_end="B.Cu",
+            net="SIG_A",
+        )
+    ]
+    report_fixed = checker.check_all(wiring=wiring_mock)
+    assert not any(v.rule_name == "ANTENNA_TRACE_DETECTED" for v in report_fixed.violations)
+
+
+def test_drc_test_point_trace_collision(base_pcb_config: PCBConfig):
+    """Verify DRC catches traces of a different net short-circuiting into test point pads."""
+    tp = PcbTestPointModel(
+        name="TP_RX0_P",
+        net="PCIE_RX0_P",
+        position_mm=(-6.0, -22.0),
+        pad_diameter_mm=1.40,
+        drill_diameter_mm=0.80,
+    )
+    # A trace on net VLOAD_SW cuts through TP_RX0_P at (-6.0, -22.0)
+    colliding_tr = TraceSegmentModel(
+        net="VLOAD_SW",
+        layer="B.Cu",
+        width_mm=0.35,
+        start_mm=(-6.0, -14.0),
+        end_mm=(-6.0, -30.0),
+    )
+    base_pcb_config.test_points = [tp]
+    base_pcb_config.traces = [colliding_tr]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    violations = checker.check_clearances_and_overlaps(wiring=None)
+
+    assert any(
+        v.rule_name == "TEST_POINT_TRACE_COLLISION" and "TP_RX0_P<->VLOAD_SW" in v.net_or_zone for v in violations
     )

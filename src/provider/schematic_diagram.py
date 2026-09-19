@@ -13,7 +13,7 @@ from matplotlib.figure import Figure
 import matplotlib.patches as patches
 
 from model.pcb import PCBConfig
-from model.wiring import FootprintModel, NetModel, Wiring
+from model.wiring import FootprintModel, NetModel, Wiring, TruthTableModel, TruthTableRowModel
 
 
 @dataclass
@@ -38,6 +38,16 @@ class _TOCPagePlan:
     show_nets_header: bool = False
     is_nets_continuation: bool = False
     net_rows: List[List[NetModel]] = field(default_factory=list)
+
+
+POWER_NET_NAMES = {"3V3", "5V", "1V8", "1V2", "VCC", "VDD", "VLOAD_SW"}
+GROUND_NET_NAMES = {"GND", "GROUND", "VSS"}
+JUMPER_BRIDGE_RADIUS_MM = 1.2
+PIN_PITCH_MM = 5.0
+PIN_NUMBER_OFFSET_MM = 2.5
+STUB_SIGNAL_MM = 5.0
+STUB_POWER_MM = 10.0
+STUB_GROUND_MM = 18.0
 
 
 class SchematicDiagram:
@@ -553,6 +563,719 @@ class SchematicDiagram:
         ax.text(148.5, 15, f"Page {current_page_num} of {total_pages}", ha="center", fontsize=9, color="#64748b")
         pdf.savefig(fig)
 
+    def _is_decoupling_cap(self, fp: FootprintModel, pin_to_net: Dict[Tuple[str, str], str]) -> bool:
+        """Check if a footprint is a 2-terminal decoupling capacitor connected between power and ground."""
+        name_u = fp.name.upper()
+        pkg_u = fp.package.upper()
+        if not (name_u.startswith("C") or "CAP" in pkg_u) or len(fp.pins) != 2:
+            return False
+        n1 = pin_to_net.get((fp.name, fp.pins[0].name), "").upper()
+        n2 = pin_to_net.get((fp.name, fp.pins[1].name), "").upper()
+        return (n1 in POWER_NET_NAMES and n2 in GROUND_NET_NAMES) or (n2 in POWER_NET_NAMES and n1 in GROUND_NET_NAMES)
+
+    def _is_pullup_resistor(
+        self,
+        fp: FootprintModel,
+        pin_to_net: Dict[Tuple[str, str], str],
+        all_fps: List[FootprintModel],
+    ) -> bool:
+        """Check if a footprint is a 2-terminal pullup resistor connected to a signal line on the sheet."""
+        name_u = fp.name.upper()
+        pkg_u = fp.package.upper()
+        if not (name_u.startswith("R") or "RES" in pkg_u) or len(fp.pins) != 2:
+            return False
+        n1 = pin_to_net.get((fp.name, fp.pins[0].name), "")
+        n2 = pin_to_net.get((fp.name, fp.pins[1].name), "")
+        is_pwr_1 = n1.upper() in POWER_NET_NAMES
+        is_pwr_2 = n2.upper() in POWER_NET_NAMES
+        if not (is_pwr_1 or is_pwr_2):
+            return False
+        sig_net = n2 if is_pwr_1 else n1
+        # The signal line must connect to another footprint on this sheet
+        for other in all_fps:
+            if other.name == fp.name:
+                continue
+            for p in other.pins:
+                if pin_to_net.get((other.name, p.name)) == sig_net:
+                    return True
+        return False
+
+    def _draw_decoupling_cap_bank(
+        self,
+        ax: matplotlib.axes.Axes,
+        caps: List[FootprintModel],
+        pin_to_net: Dict[Tuple[str, str], str],
+        base_x: float = 35.0,
+        base_y: float = 62.0,
+    ) -> None:
+        """Render a compact vertical decoupling capacitor bank sharing single VCC and GND rails."""
+        if not caps:
+            return
+
+        delta_x = 28.0
+        n_caps = len(caps)
+        total_w = (n_caps - 1) * delta_x
+
+        y_top = base_y + 16.0
+        y_bot = base_y - 12.0
+        y_mid = (y_top + y_bot) / 2.0
+
+        # Background dashed bounding card
+        card_x = base_x - 12.0
+        card_w = max(total_w + 32.0, 75.0)
+        card_y = y_bot - 12.0
+        card_h = (y_top - y_bot) + 26.0
+
+        ax.add_patch(
+            patches.Rectangle(
+                (card_x, card_y),
+                card_w,
+                card_h,
+                facecolor="#f8fafc",
+                edgecolor="#cbd5e1",
+                linestyle="--",
+                linewidth=0.8,
+                zorder=1,
+            )
+        )
+        ax.text(
+            card_x + 4.0,
+            y_top + 8.5,
+            "DECOUPLING CAPACITORS",
+            fontsize=7.5,
+            fontweight="bold",
+            color="#334155",
+            zorder=2,
+        )
+
+        # Common Power Rail (Top)
+        rail_left = base_x - 4.0
+        rail_right = base_x + total_w + 4.0
+        ax.plot([rail_left, rail_right], [y_top, y_top], color="#dc2626", linewidth=1.2, zorder=2)
+
+        # Common Power Arrow (Left of rail)
+        ax.plot([rail_left, rail_left], [y_top, y_top + 3.5], color="#dc2626", linewidth=1.2, zorder=2)
+        ax.plot(
+            [rail_left - 2.5, rail_left, rail_left + 2.5],
+            [y_top + 2.0, y_top + 4.5, y_top + 2.0],
+            color="#dc2626",
+            linewidth=1.2,
+            zorder=2,
+        )
+        pwr_net_name = "3V3"
+        for cap in caps:
+            for p in cap.pins:
+                net = pin_to_net.get((cap.name, p.name), "")
+                if net.upper() in POWER_NET_NAMES:
+                    pwr_net_name = net
+                    break
+        ax.text(
+            rail_left,
+            y_top + 5.5,
+            pwr_net_name,
+            ha="center",
+            va="bottom",
+            fontsize=5.8,
+            fontweight="bold",
+            color="#dc2626",
+            zorder=3,
+        )
+
+        # Common Ground Rail (Bottom)
+        ax.plot([rail_left, rail_right], [y_bot, y_bot], color="#475569", linewidth=1.2, zorder=2)
+
+        # Common Ground 3-bar symbol (Left of rail)
+        ax.plot([rail_left, rail_left], [y_bot, y_bot - 3.0], color="#475569", linewidth=1.2, zorder=2)
+        ax.plot(
+            [rail_left - 3.5, rail_left + 3.5],
+            [y_bot - 3.0, y_bot - 3.0],
+            color="#475569",
+            linewidth=1.4,
+            zorder=2,
+        )
+        ax.plot(
+            [rail_left - 2.2, rail_left + 2.2],
+            [y_bot - 4.2, y_bot - 4.2],
+            color="#475569",
+            linewidth=1.2,
+            zorder=2,
+        )
+        ax.plot(
+            [rail_left - 1.0, rail_left + 1.0],
+            [y_bot - 5.4, y_bot - 5.4],
+            color="#475569",
+            linewidth=1.0,
+            zorder=2,
+        )
+        ax.text(
+            rail_left,
+            y_bot - 6.8,
+            "GND",
+            ha="center",
+            va="top",
+            fontsize=5.5,
+            fontweight="bold",
+            color="#475569",
+            zorder=3,
+        )
+
+        # Draw each vertical capacitor
+        for idx, cap in enumerate(caps):
+            cx = base_x + idx * delta_x
+
+            # Power junction dot and lead
+            ax.plot(cx, y_top, marker="o", markersize=2.5, color="#dc2626", zorder=3)
+            ax.plot([cx, cx], [y_top, y_mid + 1.2], color="#475569", linewidth=1.2, zorder=2)
+
+            # Parallel plates (compact, width 7mm)
+            plate_w = 7.0
+            ax.plot(
+                [cx - plate_w / 2.0, cx + plate_w / 2.0],
+                [y_mid + 1.2, y_mid + 1.2],
+                color="#334155",
+                linewidth=2.0,
+                zorder=2,
+            )
+            ax.plot(
+                [cx - plate_w / 2.0, cx + plate_w / 2.0],
+                [y_mid - 1.2, y_mid - 1.2],
+                color="#334155",
+                linewidth=2.0,
+                zorder=2,
+            )
+
+            # Ground lead and junction dot
+            ax.plot([cx, cx], [y_mid - 1.2, y_bot], color="#475569", linewidth=1.2, zorder=2)
+            ax.plot(cx, y_bot, marker="o", markersize=2.5, color="#475569", zorder=3)
+
+            # Designator and Value text
+            ax.text(
+                cx + plate_w / 2.0 + 1.5,
+                y_mid + 2.5,
+                cap.name,
+                ha="left",
+                va="center",
+                fontsize=7.5,
+                fontweight="bold",
+                color="#0f172a",
+                zorder=3,
+            )
+            val = cap.mpn or (cap.label.text if cap.label else cap.package)
+            ax.text(
+                cx + plate_w / 2.0 + 1.5,
+                y_mid - 2.5,
+                str(val),
+                ha="left",
+                va="center",
+                fontsize=5.5,
+                color="#0369a1",
+                zorder=3,
+            )
+
+    @staticmethod
+    def _format_resistor_value(fp: FootprintModel) -> str:
+        """Format a human-readable, concise resistance string from footprint metadata."""
+        if fp.label and fp.label.text and fp.label.text != fp.name:
+            return fp.label.text
+        mpn = getattr(fp, "mpn", None)
+        if mpn:
+            import re
+
+            if "4K7" in mpn or "4.7K" in mpn.upper():
+                return "4.7k"
+            m = re.search(r"(\d+[RKMGT]\d*|\d+\.\d+[kKMG]?)", mpn)
+            if m:
+                val = m.group(1).replace("K", "k")
+                if "k" in val and not val.endswith("k"):
+                    val = val.replace("k", ".") + "k"
+                return val
+            if len(mpn) > 8:
+                return mpn[:8]
+            return mpn
+        return fp.package
+
+    def _draw_pullup_resistors(
+        self,
+        ax: matplotlib.axes.Axes,
+        pullups: List[FootprintModel],
+        pin_to_net: Dict[Tuple[str, str], str],
+        h_wire_segments: List[Tuple[float, float, float, str, str]],
+        sheet_pin_coords: Dict[Tuple[str, str], Tuple[float, float]],
+    ) -> None:
+        """Render pullup resistors as vertical branches directly off the signal net wires."""
+        if not pullups:
+            return
+
+        pullup_points: List[Tuple[float, float, FootprintModel, str, str]] = []
+
+        # Determine common horizontal span across all pullup signal wires in the channel
+        matching_segs = []
+        for fp in pullups:
+            n1 = pin_to_net.get((fp.name, fp.pins[0].name), "")
+            n2 = pin_to_net.get((fp.name, fp.pins[1].name), "")
+            sig = n2 if n1.upper() in POWER_NET_NAMES else n1
+            seg = next((s for s in h_wire_segments if s[3] == sig), None)
+            if seg:
+                matching_segs.append(seg)
+
+        x_min_all = max(min(s[0], s[1]) for s in matching_segs) if matching_segs else 80.0
+        x_max_all = min(max(s[0], s[1]) for s in matching_segs) if matching_segs else 120.0
+        pitch = 8.5
+        total_span = (len(pullups) - 1) * pitch
+        center_x = (x_min_all + x_max_all) / 2.0
+        # Enforce at least 14.0 mm clearance from the right-hand component pins/symbols
+        if center_x + total_span / 2.0 > x_max_all - 14.0:
+            center_x = (x_max_all - 14.0) - total_span / 2.0
+        if center_x - total_span / 2.0 < x_min_all + 6.0:
+            center_x = (x_min_all + 6.0) + total_span / 2.0
+
+        for idx, fp in enumerate(pullups):
+            n1 = pin_to_net.get((fp.name, fp.pins[0].name), "")
+            n2 = pin_to_net.get((fp.name, fp.pins[1].name), "")
+            if n1.upper() in POWER_NET_NAMES:
+                pwr_net = n1
+                sig_net = n2
+            else:
+                pwr_net = n2
+                sig_net = n1
+
+            matching_seg = next((s for s in h_wire_segments if s[3] == sig_net), None)
+            x_pull = center_x - total_span / 2.0 + idx * pitch
+            if matching_seg:
+                y_base = matching_seg[2]
+            else:
+                target_pair = next(
+                    (p for p, c in sheet_pin_coords.items() if pin_to_net.get(p) == sig_net and p[0] != fp.name),
+                    None,
+                )
+                y_base = sheet_pin_coords[target_pair][1] if target_pair else 120.0
+
+            pullup_points.append((x_pull, y_base, fp, sig_net, pwr_net))
+
+        pwr_nets = {p[4] for p in pullup_points}
+        same_pwr = len(pwr_nets) == 1
+        common_pwr = list(pwr_nets)[0] if same_pwr else "3V3"
+
+        # Position resistor bodies strictly above all horizontal wires in the channel
+        channel_wire_ys = [seg[2] for seg in h_wire_segments]
+        channel_top_y = max(channel_wire_ys) if channel_wire_ys else max(p[1] for p in pullup_points)
+        y_zz_bot = channel_top_y + 8.0
+        y_zz_top = y_zz_bot + 9.0
+        y_top_rail = y_zz_top + 6.0
+
+        for x_pull, y_base, fp, sig_net, pwr_net in pullup_points:
+            # Junction dot on the signal wire
+            ax.plot(x_pull, y_base, marker="o", markersize=3.0, color="#2563eb", zorder=4)
+
+            # Lead up to resistor body with jumper bridges over crossing wires
+            self._draw_vertical_wire_with_jumpers(
+                ax,
+                x_v=x_pull,
+                y_start=y_base,
+                y_end=y_zz_bot,
+                col="#475569",
+                h_wire_segments=h_wire_segments,
+                net_name=sig_net,
+            )
+
+            # Vertical zig-zag resistor body (height 9mm)
+            zz_y = [
+                y_zz_bot,
+                y_zz_bot + 1.125,
+                y_zz_bot + 2.25,
+                y_zz_bot + 3.375,
+                y_zz_bot + 4.5,
+                y_zz_bot + 5.625,
+                y_zz_bot + 6.75,
+                y_zz_bot + 7.875,
+                y_zz_top,
+            ]
+            zz_x = [
+                x_pull,
+                x_pull + 1.6,
+                x_pull - 1.6,
+                x_pull + 1.6,
+                x_pull - 1.6,
+                x_pull + 1.6,
+                x_pull - 1.6,
+                x_pull + 1.6,
+                x_pull,
+            ]
+            ax.plot(zz_x, zz_y, color="#334155", linewidth=1.5, zorder=3)
+
+            # Resistor RefDes & Value text to the right of the zig-zag
+            val_text = self._format_resistor_value(fp)
+            ax.text(
+                x_pull + 2.2,
+                y_zz_bot + 6.2,
+                fp.name,
+                ha="left",
+                va="center",
+                fontsize=7.0,
+                fontweight="bold",
+                color="#0f172a",
+                zorder=4,
+            )
+            ax.text(
+                x_pull + 2.2,
+                y_zz_bot + 2.2,
+                val_text,
+                ha="left",
+                va="center",
+                fontsize=5.5,
+                color="#0369a1",
+                zorder=4,
+            )
+
+            # Lead from resistor top to power rail / arrow
+            if same_pwr:
+                ax.plot([x_pull, x_pull], [y_zz_top, y_top_rail], color="#dc2626", linewidth=1.2, zorder=2)
+                ax.plot(x_pull, y_top_rail, marker="o", markersize=2.0, color="#dc2626", zorder=3)
+            else:
+                y_arrow = y_zz_top + 4.0
+                ax.plot([x_pull, x_pull], [y_zz_top, y_arrow], color="#dc2626", linewidth=1.2, zorder=2)
+                ax.plot(
+                    [x_pull - 2.5, x_pull, x_pull + 2.5],
+                    [y_arrow - 1.5, y_arrow + 1.0, y_arrow - 1.5],
+                    color="#dc2626",
+                    linewidth=1.2,
+                    zorder=2,
+                )
+                ax.text(
+                    x_pull,
+                    y_arrow + 2.2,
+                    pwr_net,
+                    ha="center",
+                    va="bottom",
+                    fontsize=5.8,
+                    fontweight="bold",
+                    color="#dc2626",
+                    zorder=4,
+                )
+
+        if same_pwr and len(pullup_points) > 1:
+            x_min_pull = min(p[0] for p in pullup_points)
+            x_max_pull = max(p[0] for p in pullup_points)
+            # Draw shared top power rail
+            ax.plot([x_min_pull, x_max_pull], [y_top_rail, y_top_rail], color="#dc2626", linewidth=1.2, zorder=2)
+            # Draw single power arrow in the middle
+            x_arrow = (x_min_pull + x_max_pull) / 2.0
+            ax.plot([x_arrow, x_arrow], [y_top_rail, y_top_rail + 3.5], color="#dc2626", linewidth=1.2, zorder=2)
+            ax.plot(
+                [x_arrow - 2.5, x_arrow, x_arrow + 2.5],
+                [y_top_rail + 2.0, y_top_rail + 4.5, y_top_rail + 2.0],
+                color="#dc2626",
+                linewidth=1.2,
+                zorder=2,
+            )
+            ax.text(
+                x_arrow,
+                y_top_rail + 5.5,
+                common_pwr,
+                ha="center",
+                va="bottom",
+                fontsize=5.8,
+                fontweight="bold",
+                color="#dc2626",
+                zorder=4,
+            )
+
+    def _draw_vertical_wire_with_jumpers(
+        self,
+        ax: matplotlib.axes.Axes,
+        x_v: float,
+        y_start: float,
+        y_end: float,
+        col: str,
+        h_wire_segments: List[Tuple[float, float, float, str, str]],
+        net_name: str = "",
+    ) -> None:
+        """Render a vertical wire segment with semicircular jumper bridge loops over crossing horizontal wires."""
+        r = JUMPER_BRIDGE_RADIUS_MM
+        y_min = min(y_start, y_end)
+        y_max = max(y_start, y_end)
+
+        crossings: List[float] = []
+        for h_start, h_end, h_y, h_net, _ in h_wire_segments:
+            if h_net and net_name and h_net == net_name:
+                continue
+            hx_min = min(h_start, h_end)
+            hx_max = max(h_start, h_end)
+            if (hx_min + 0.5 < x_v < hx_max - 0.5) and (y_min + 0.5 < h_y < y_max - 0.5):
+                crossings.append(h_y)
+
+        s = 1.0 if y_end >= y_start else -1.0
+        crossings.sort(reverse=(s < 0))
+
+        y_curr = y_start
+        for y_c in crossings:
+            # Vertical segment up to jumper loop
+            ax.plot([x_v, x_v], [y_curr, y_c - s * r], color=col, linewidth=1.2, zorder=2)
+            # Semicircular jumper bridge loop bulging to the right
+            arc = patches.Arc(
+                (x_v, y_c),
+                width=2 * r,
+                height=2 * r,
+                angle=0,
+                theta1=270,
+                theta2=90,
+                color=col,
+                linewidth=1.2,
+                zorder=3,
+            )
+            ax.add_patch(arc)
+            y_curr = y_c + s * r
+
+        # Final vertical segment to endpoint
+        ax.plot([x_v, x_v], [y_curr, y_end], color=col, linewidth=1.2, zorder=2)
+
+    @staticmethod
+    def _generate_default_transistor_truth_table(
+        fp: FootprintModel,
+        pin_to_net: Dict[Tuple[str, str], str],
+    ) -> TruthTableModel:
+        """Generate a default truth table capturing true, false, and invalid states for a discrete transistor network."""
+        gate_pin = next((p for p in fp.pins if p.name.upper() in ("G", "GATE", "B", "BASE", "1")), None)
+        drain_pin = next((p for p in fp.pins if p.name.upper() in ("D", "DRAIN", "C", "COLL", "3")), None)
+        source_pin = next((p for p in fp.pins if p.name.upper() in ("S", "SOURCE", "E", "EMIT", "2")), None)
+
+        gate_net = pin_to_net.get((fp.name, gate_pin.name), "GATE") if gate_pin else "GATE"
+        drain_net = pin_to_net.get((fp.name, drain_pin.name), "DRAIN") if drain_pin else "DRAIN"
+        source_net = pin_to_net.get((fp.name, source_pin.name), "GND") if source_pin else "GND"
+
+        in_header = f"{gate_net} (Gate)"
+        out_header = f"{drain_net} (Drain)"
+
+        rows = [
+            TruthTableRowModel(
+                inputs={in_header: "0 (Low, <0.8V)"},
+                outputs={out_header: "Hi-Z (Pull-up)"},
+                state="FALSE",
+                description="Cutoff; load de-asserted / isolated",
+            ),
+            TruthTableRowModel(
+                inputs={in_header: "1 (High, >1.5V)"},
+                outputs={out_header: f"0V ({source_net})"},
+                state="TRUE",
+                description="Saturation; active conduction to ground",
+            ),
+            TruthTableRowModel(
+                inputs={in_header: "Float / High-Z"},
+                outputs={out_header: "Indeterminate"},
+                state="INVALID",
+                description="Prohibited floating gate; leakage/glitch risk",
+            ),
+            TruthTableRowModel(
+                inputs={in_header: "Over-Voltage (>20V)"},
+                outputs={out_header: "Fault / Breakdown"},
+                state="INVALID",
+                description="Dielectric rupture; permanent gate short",
+            ),
+        ]
+
+        title = f"{fp.name} ({fp.mpn or fp.package}) Network Logic"
+        return TruthTableModel(
+            title=title,
+            input_headers=[in_header],
+            output_headers=[out_header],
+            rows=rows,
+        )
+
+    def _draw_truth_table(
+        self,
+        ax: matplotlib.axes.Axes,
+        fp: FootprintModel,
+        tt: TruthTableModel,
+        base_x: float = 118.0,
+        base_y: float = 52.0,
+        card_w: float = 125.0,
+    ) -> None:
+        """Render an engineering truth table box displaying TRUE, FALSE, and INVALID circuit states."""
+        n_rows = len(tt.rows)
+        row_h = 5.4
+        header_h = 7.0
+        col_hdr_h = 5.5
+        card_h = header_h + col_hdr_h + n_rows * row_h + 3.0
+        card_y = base_y - card_h / 2.0
+
+        # Card container with subtle shadow border
+        ax.add_patch(
+            patches.Rectangle(
+                (base_x, card_y),
+                card_w,
+                card_h,
+                facecolor="#ffffff",
+                edgecolor="#cbd5e1",
+                linewidth=1.0,
+                zorder=1,
+            )
+        )
+
+        # Title bar
+        y_top = card_y + card_h
+        ax.add_patch(
+            patches.Rectangle(
+                (base_x, y_top - header_h),
+                card_w,
+                header_h,
+                facecolor="#0f172a",
+                edgecolor="none",
+                zorder=2,
+            )
+        )
+        title_text = f"⚡ {tt.title.upper()} - {fp.name}"
+        ax.text(
+            base_x + 3.0,
+            y_top - (header_h / 2.0),
+            title_text,
+            ha="left",
+            va="center",
+            fontsize=6.5,
+            fontweight="bold",
+            color="#ffffff",
+            zorder=3,
+        )
+
+        # Column headers
+        y_col = y_top - header_h - 3.5
+        col_state_x = base_x + 3.0
+        col_in_x = base_x + 18.0
+        col_out_x = base_x + 42.0
+        col_desc_x = base_x + 82.0
+
+        ax.text(
+            col_state_x + 6.5,
+            y_col,
+            "STATE",
+            ha="center",
+            va="center",
+            fontsize=5.0,
+            fontweight="bold",
+            color="#64748b",
+            zorder=3,
+        )
+        in_lbl = "/".join(tt.input_headers) if tt.input_headers else "INPUT"
+        ax.text(
+            col_in_x,
+            y_col,
+            in_lbl,
+            ha="left",
+            va="center",
+            fontsize=4.8,
+            fontweight="bold",
+            color="#64748b",
+            zorder=3,
+        )
+        out_lbl = "/".join(tt.output_headers) if tt.output_headers else "OUTPUT"
+        ax.text(
+            col_out_x,
+            y_col,
+            out_lbl,
+            ha="left",
+            va="center",
+            fontsize=4.6,
+            fontweight="bold",
+            color="#64748b",
+            zorder=3,
+        )
+        ax.text(
+            col_desc_x,
+            y_col,
+            "FUNCTIONAL MODE",
+            ha="left",
+            va="center",
+            fontsize=5.0,
+            fontweight="bold",
+            color="#64748b",
+            zorder=3,
+        )
+
+        # Header divider line
+        y_div = y_col - 2.5
+        ax.plot([base_x, base_x + card_w], [y_div, y_div], color="#e2e8f0", linewidth=0.8, zorder=2)
+
+        # Rows
+        for r_idx, row in enumerate(tt.rows):
+            y_row_mid = y_div - ((r_idx + 0.5) * row_h)
+
+            # Zebra striping
+            if r_idx % 2 == 1:
+                ax.add_patch(
+                    patches.Rectangle(
+                        (base_x + 0.5, y_row_mid - (row_h / 2.0)),
+                        card_w - 1.0,
+                        row_h,
+                        facecolor="#f8fafc",
+                        edgecolor="none",
+                        zorder=2,
+                    )
+                )
+
+            # State badge pill
+            state_str = str(row.state).upper()
+            if "TRUE" in state_str:
+                pill_bg = "#dcfce7"
+                pill_fg = "#15803d"
+                pill_edge = "#86efac"
+            elif "FALSE" in state_str:
+                pill_bg = "#f1f5f9"
+                pill_fg = "#475569"
+                pill_edge = "#cbd5e1"
+            else:  # INVALID / PROHIBITED / FLOAT
+                pill_bg = "#fee2e2"
+                pill_fg = "#b91c1c"
+                pill_edge = "#fca5a5"
+
+            pill_w = 13.0
+            pill_h = 3.6
+            ax.add_patch(
+                patches.FancyBboxPatch(
+                    (col_state_x, y_row_mid - pill_h / 2.0),
+                    pill_w,
+                    pill_h,
+                    boxstyle="round,pad=0.2,rounding_size=1.0",
+                    facecolor=pill_bg,
+                    edgecolor=pill_edge,
+                    linewidth=0.6,
+                    zorder=3,
+                )
+            )
+            ax.text(
+                col_state_x + pill_w / 2.0,
+                y_row_mid,
+                state_str[:7],
+                ha="center",
+                va="center",
+                fontsize=4.5,
+                fontweight="bold",
+                color=pill_fg,
+                zorder=4,
+            )
+
+            # Inputs values
+            in_val = ", ".join(row.inputs.values())
+            ax.text(col_in_x, y_row_mid, in_val, ha="left", va="center", fontsize=5.0, color="#1e293b", zorder=3)
+
+            # Outputs values
+            out_val = ", ".join(row.outputs.values())
+            ax.text(col_out_x, y_row_mid, out_val, ha="left", va="center", fontsize=5.0, color="#1e293b", zorder=3)
+
+            # Description
+            ax.text(
+                col_desc_x,
+                y_row_mid,
+                row.description,
+                ha="left",
+                va="center",
+                fontsize=4.8,
+                color="#64748b",
+                zorder=3,
+            )
+
+            # Row bottom divider
+            y_row_bot = y_row_mid - (row_h / 2.0)
+            ax.plot([base_x, base_x + card_w], [y_row_bot, y_row_bot], color="#f1f5f9", linewidth=0.5, zorder=2)
+
     def _render_pdf_schematic_sheet(
         self,
         pdf: PdfPages,
@@ -636,43 +1359,119 @@ class SchematicDiagram:
                 pin_to_net[pair] = net.name
 
         sheet_fps = sheet_plan.footprints
-        num_comps = len(sheet_fps)
-        pin_pitch = 5.0
-        stub_len = 5.0
+
+        # Classify footprints into main components, decoupling capacitors, and pullup resistors
+        decoupling_caps = [fp for fp in sheet_fps if self._is_decoupling_cap(fp, pin_to_net)]
+        pullup_resistors = [fp for fp in sheet_fps if self._is_pullup_resistor(fp, pin_to_net, sheet_fps)]
+
+        # If other main components exist on the sheet, extract decoupling caps & pullup passives
+        if (decoupling_caps or pullup_resistors) and (len(decoupling_caps) + len(pullup_resistors) < len(sheet_fps)):
+            main_fps = [fp for fp in sheet_fps if fp not in decoupling_caps and fp not in pullup_resistors]
+        else:
+            decoupling_caps = []
+            pullup_resistors = []
+            main_fps = sheet_fps
+
+        num_comps = len(main_fps)
+        pin_pitch = PIN_PITCH_MM
+
+        has_bottom_cards = bool(decoupling_caps) or any(
+            getattr(fp, "truth_table", None) is not None
+            or fp.name.upper().startswith("Q")
+            or "SOT" in fp.package.upper()
+            or "FET" in fp.package.upper()
+            for fp in sheet_fps
+        )
+
+        page_center_x = 147.5
+        page_center_y = 115.0
+
+        if has_bottom_cards:
+            top_row_y = 158.0
+            bottom_cards_y = 66.0
+        elif pullup_resistors:
+            top_row_y = 138.0
+            bottom_cards_y = 60.0
+        else:
+            top_row_y = 138.0
+            bottom_cards_y = 60.0
 
         if num_comps == 1:
             cols_per_row = 1
-            col_x_positions = [120.0]
-            col_y_positions = [180.0]
             cw = 38.0
+            col_x_positions = [page_center_x - cw / 2.0]
+            col_y_positions = [top_row_y]
         elif num_comps == 2:
             cols_per_row = 2
-            col_x_positions = [45.0, 175.0]
-            col_y_positions = [180.0, 180.0]
             cw = 38.0
+            gap = 55.0
+            total_w = 2 * cw + gap
+            start_x = page_center_x - total_w / 2.0
+            col_x_positions = [start_x, start_x + cw + gap]
+            col_y_positions = [top_row_y, top_row_y]
         elif num_comps == 3:
             cols_per_row = 3
-            col_x_positions = [30.0, 110.0, 190.0]
-            col_y_positions = [180.0, 180.0, 180.0]
             cw = 36.0
+            gap = 35.0
+            total_w = 3 * cw + 2 * gap
+            start_x = max(50.0, page_center_x - total_w / 2.0)
+            col_x_positions = [start_x, start_x + cw + gap, start_x + 2 * (cw + gap)]
+            col_y_positions = [top_row_y, top_row_y, top_row_y]
         else:
             cols_per_row = (num_comps + 1) // 2
-            col_w = 230.0 / max(1, cols_per_row)
+            col_w = 210.0 / max(1, cols_per_row)
             cw = min(36.0, col_w * 0.55)
             col_x_positions = []
             col_y_positions = []
             for i in range(num_comps):
                 r_idx = i // cols_per_row
                 c_idx_col = i % cols_per_row
-                col_x_positions.append(22.0 + c_idx_col * col_w + (col_w - cw) / 2.0)
-                col_y_positions.append(180.0 - (r_idx * 68.0))
+                col_x_positions.append(45.0 + c_idx_col * col_w + (col_w - cw) / 2.0)
+                col_y_positions.append(top_row_y - (r_idx * 55.0))
+
+        # Build pin side map and component column index map
+        fp_col_map = {fp.name: idx for idx, fp in enumerate(main_fps)}
+        pin_side_map: Dict[Tuple[str, str], str] = {}
+        for fp in main_fps:
+            left_p = [p for p in fp.pins if p.side.value in ("left", "bottom")]
+            right_p = [p for p in fp.pins if p.side.value in ("right", "top")]
+            if not left_p and not right_p:
+                left_p = fp.pins[: len(fp.pins) // 2]
+                right_p = fp.pins[len(fp.pins) // 2 :]
+            for p in left_p:
+                pin_side_map[(fp.name, p.name)] = "left"
+            for p in right_p:
+                pin_side_map[(fp.name, p.name)] = "right"
+
+        # Discover direct wire pairs between facing pins of adjacent components on the same row
+        direct_wire_pairs: List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]] = []
+        wired_pins: set[Tuple[str, str]] = set()
+
+        for net in all_nets:
+            present_pins = [pair for pair in net.pins if pair in pin_side_map]
+            if len(present_pins) >= 2:
+                for i in range(len(present_pins)):
+                    for j in range(i + 1, len(present_pins)):
+                        pair1, pair2 = present_pins[i], present_pins[j]
+                        if pair1 in wired_pins or pair2 in wired_pins:
+                            continue
+                        c1, c2 = fp_col_map[pair1[0]], fp_col_map[pair2[0]]
+                        s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
+                        if c1 > c2:
+                            pair1, pair2 = pair2, pair1
+                            c1, c2 = c2, c1
+                            s1, s2 = s2, s1
+                        r1 = c1 // cols_per_row
+                        r2 = c2 // cols_per_row
+                        if r1 == r2 and (c2 == c1 + 1) and s1 == "right" and s2 == "left":
+                            direct_wire_pairs.append((pair1, pair2, net))
+                            wired_pins.add(pair1)
+                            wired_pins.add(pair2)
 
         sheet_pin_coords: Dict[Tuple[str, str], Tuple[float, float]] = {}
-        pin_side_map: Dict[Tuple[str, str], str] = {}
-        comp_of_pin: Dict[Tuple[str, str], int] = {}
         comp_boxes: List[Tuple[float, float, float, float]] = []
 
-        for c_idx, fp in enumerate(sheet_fps):
+        for c_idx, fp in enumerate(main_fps):
             cx = col_x_positions[c_idx]
             row_top_y = col_y_positions[c_idx]
 
@@ -693,7 +1492,7 @@ class SchematicDiagram:
             fp_name_upper = fp.name.upper()
             fp_pkg_upper = fp.package.upper()
 
-            # 1. Resistor standard symbol (zig-zag)
+            # 1. Resistor standard symbol (if in main_fps)
             if fp_name_upper.startswith("R") or "RES" in fp_pkg_upper:
                 ym = cy + ch / 2.0
                 x_mid = cx + cw / 2.0
@@ -720,11 +1519,31 @@ class SchematicDiagram:
                     zorder=3,
                 )
 
-                # Left lead and right lead
-                ax.plot([cx - stub_len, x_mid - 10.0], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
-                ax.plot([x_mid + 10.0, cx + cw + stub_len], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
+                # Leads and zig-zag
+                p1 = fp.pins[0] if fp.pins else None
+                p2 = fp.pins[1] if len(fp.pins) > 1 else None
+                stub1 = STUB_SIGNAL_MM
+                stub2 = STUB_SIGNAL_MM
+                if p1:
+                    n1 = pin_to_net.get((fp.name, p1.name), "").upper()
+                    if (fp.name, p1.name) not in wired_pins:
+                        stub1 = (
+                            STUB_GROUND_MM
+                            if n1 in GROUND_NET_NAMES
+                            else (STUB_POWER_MM if n1 in POWER_NET_NAMES else STUB_SIGNAL_MM)
+                        )
+                if p2:
+                    n2 = pin_to_net.get((fp.name, p2.name), "").upper()
+                    if (fp.name, p2.name) not in wired_pins:
+                        stub2 = (
+                            STUB_GROUND_MM
+                            if n2 in GROUND_NET_NAMES
+                            else (STUB_POWER_MM if n2 in POWER_NET_NAMES else STUB_SIGNAL_MM)
+                        )
 
-                # Zig-zag body
+                ax.plot([cx - stub1, x_mid - 10.0], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
+                ax.plot([x_mid + 10.0, cx + cw + stub2], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
+
                 zz_x = [
                     x_mid - 10.0,
                     x_mid - 7.5,
@@ -739,43 +1558,16 @@ class SchematicDiagram:
                 zz_y = [ym, ym + 3.0, ym - 3.0, ym + 3.0, ym - 3.0, ym + 3.0, ym - 3.0, ym + 3.0, ym]
                 ax.plot(zz_x, zz_y, color="#334155", linewidth=1.5, zorder=2)
 
-                # Terminal markers and pin mappings
-                p1 = fp.pins[0] if fp.pins else None
-                p2 = fp.pins[1] if len(fp.pins) > 1 else None
                 if p1:
-                    ax.plot(cx - stub_len, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                    sig1 = pin_to_net.get((fp.name, p1.name)) or p1.name
-                    ax.text(
-                        cx - stub_len / 2.0,
-                        ym + 1.5,
-                        str(sig1),
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.5,
-                        color="#1e293b",
-                        zorder=3,
-                    )
-                    sheet_pin_coords[(fp.name, p1.name)] = (cx - stub_len, ym)
-                    pin_side_map[(fp.name, p1.name)] = "left"
-                    comp_of_pin[(fp.name, p1.name)] = c_idx
+                    px1 = cx - stub1
+                    sheet_pin_coords[(fp.name, p1.name)] = (px1, ym)
+                    ax.plot(px1, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
                 if p2:
-                    ax.plot(cx + cw + stub_len, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                    sig2 = pin_to_net.get((fp.name, p2.name)) or p2.name
-                    ax.text(
-                        cx + cw + stub_len / 2.0,
-                        ym + 1.5,
-                        str(sig2),
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.5,
-                        color="#1e293b",
-                        zorder=3,
-                    )
-                    sheet_pin_coords[(fp.name, p2.name)] = (cx + cw + stub_len, ym)
-                    pin_side_map[(fp.name, p2.name)] = "right"
-                    comp_of_pin[(fp.name, p2.name)] = c_idx
+                    px2 = cx + cw + stub2
+                    sheet_pin_coords[(fp.name, p2.name)] = (px2, ym)
+                    ax.plot(px2, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
 
-            # 2. Capacitor standard symbol (parallel plates)
+            # 2. Capacitor standard symbol (if in main_fps)
             elif fp_name_upper.startswith("C") or "CAP" in fp_pkg_upper:
                 ym = cy + ch / 2.0
                 x_mid = cx + cw / 2.0
@@ -802,11 +1594,30 @@ class SchematicDiagram:
                     zorder=3,
                 )
 
-                # Leads
-                ax.plot([cx - stub_len, x_mid - 2.2], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
-                ax.plot([x_mid + 2.2, cx + cw + stub_len], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
+                p1 = fp.pins[0] if fp.pins else None
+                p2 = fp.pins[1] if len(fp.pins) > 1 else None
+                stub1 = STUB_SIGNAL_MM
+                stub2 = STUB_SIGNAL_MM
+                if p1:
+                    n1 = pin_to_net.get((fp.name, p1.name), "").upper()
+                    if (fp.name, p1.name) not in wired_pins:
+                        stub1 = (
+                            STUB_GROUND_MM
+                            if n1 in GROUND_NET_NAMES
+                            else (STUB_POWER_MM if n1 in POWER_NET_NAMES else STUB_SIGNAL_MM)
+                        )
+                if p2:
+                    n2 = pin_to_net.get((fp.name, p2.name), "").upper()
+                    if (fp.name, p2.name) not in wired_pins:
+                        stub2 = (
+                            STUB_GROUND_MM
+                            if n2 in GROUND_NET_NAMES
+                            else (STUB_POWER_MM if n2 in POWER_NET_NAMES else STUB_SIGNAL_MM)
+                        )
 
-                # Parallel plates
+                ax.plot([cx - stub1, x_mid - 2.2], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
+                ax.plot([x_mid + 2.2, cx + cw + stub2], [ym, ym], color="#475569", linewidth=1.2, zorder=2)
+
                 plate_h = 7.5
                 ax.plot(
                     [x_mid - 2.2, x_mid - 2.2], [ym - plate_h, ym + plate_h], color="#334155", linewidth=2.0, zorder=2
@@ -815,41 +1626,14 @@ class SchematicDiagram:
                     [x_mid + 2.2, x_mid + 2.2], [ym - plate_h, ym + plate_h], color="#334155", linewidth=2.0, zorder=2
                 )
 
-                # Terminal markers and pin mappings
-                p1 = fp.pins[0] if fp.pins else None
-                p2 = fp.pins[1] if len(fp.pins) > 1 else None
                 if p1:
-                    ax.plot(cx - stub_len, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                    sig1 = pin_to_net.get((fp.name, p1.name)) or p1.name
-                    ax.text(
-                        cx - stub_len / 2.0,
-                        ym + 1.5,
-                        str(sig1),
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.5,
-                        color="#1e293b",
-                        zorder=3,
-                    )
-                    sheet_pin_coords[(fp.name, p1.name)] = (cx - stub_len, ym)
-                    pin_side_map[(fp.name, p1.name)] = "left"
-                    comp_of_pin[(fp.name, p1.name)] = c_idx
+                    px1 = cx - stub1
+                    sheet_pin_coords[(fp.name, p1.name)] = (px1, ym)
+                    ax.plot(px1, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
                 if p2:
-                    ax.plot(cx + cw + stub_len, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                    sig2 = pin_to_net.get((fp.name, p2.name)) or p2.name
-                    ax.text(
-                        cx + cw + stub_len / 2.0,
-                        ym + 1.5,
-                        str(sig2),
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.5,
-                        color="#1e293b",
-                        zorder=3,
-                    )
-                    sheet_pin_coords[(fp.name, p2.name)] = (cx + cw + stub_len, ym)
-                    pin_side_map[(fp.name, p2.name)] = "right"
-                    comp_of_pin[(fp.name, p2.name)] = c_idx
+                    px2 = cx + cw + stub2
+                    sheet_pin_coords[(fp.name, p2.name)] = (px2, ym)
+                    ax.plot(px2, ym, marker="o", markersize=2.5, color="#0284c7", zorder=3)
 
             # 3. Transistor standard symbol (MOSFET / BJT)
             elif fp_name_upper.startswith("Q") or "SOT" in fp_pkg_upper or "FET" in fp_pkg_upper:
@@ -878,8 +1662,24 @@ class SchematicDiagram:
                     zorder=3,
                 )
 
+                pin_g = next(
+                    (p for p in fp.pins if p.name.upper() in ("G", "GATE", "1")), fp.pins[0] if fp.pins else None
+                )
+                pin_d = next(
+                    (p for p in fp.pins if p.name.upper() in ("D", "DRAIN", "3")),
+                    fp.pins[1] if len(fp.pins) > 1 else None,
+                )
+                pin_s = next(
+                    (p for p in fp.pins if p.name.upper() in ("S", "SOURCE", "2")),
+                    fp.pins[2] if len(fp.pins) > 2 else None,
+                )
+
+                stub_g = STUB_SIGNAL_MM
+                stub_d = STUB_SIGNAL_MM
+                stub_s = STUB_GROUND_MM
+
                 # Gate bar and lead
-                ax.plot([cx - stub_len, x_mid - 3.5], [ym - 2.0, ym - 2.0], color="#475569", linewidth=1.2, zorder=2)
+                ax.plot([cx - stub_g, x_mid - 3.5], [ym - 2.0, ym - 2.0], color="#475569", linewidth=1.2, zorder=2)
                 ax.plot([x_mid - 3.5, x_mid - 3.5], [ym - 7.0, ym + 4.0], color="#334155", linewidth=2.0, zorder=2)
 
                 # Channel bar
@@ -887,7 +1687,7 @@ class SchematicDiagram:
 
                 # Drain lead
                 ax.plot(
-                    [x_mid - 1.2, x_mid + 4.5, cx + cw + stub_len],
+                    [x_mid - 1.2, x_mid + 4.5, cx + cw + stub_d],
                     [ym + 5.0, ym + 5.0, ym + 5.0],
                     color="#475569",
                     linewidth=1.2,
@@ -895,7 +1695,7 @@ class SchematicDiagram:
                 )
                 # Source lead
                 ax.plot(
-                    [x_mid - 1.2, x_mid + 4.5, cx + cw + stub_len],
+                    [x_mid - 1.2, x_mid + 4.5, cx + cw + stub_s],
                     [ym - 5.0, ym - 5.0, ym - 5.0],
                     color="#475569",
                     linewidth=1.2,
@@ -909,69 +1709,15 @@ class SchematicDiagram:
                     arrowprops=dict(arrowstyle="->", color="#334155", lw=1.2),
                 )
 
-                # Map pins G, D, S
-                pin_g = next(
-                    (p for p in fp.pins if p.name.upper() in ("G", "GATE", "1")), fp.pins[0] if fp.pins else None
-                )
-                pin_d = next(
-                    (p for p in fp.pins if p.name.upper() in ("D", "DRAIN", "3")),
-                    fp.pins[1] if len(fp.pins) > 1 else None,
-                )
-                pin_s = next(
-                    (p for p in fp.pins if p.name.upper() in ("S", "SOURCE", "2")),
-                    fp.pins[2] if len(fp.pins) > 2 else None,
-                )
-
                 if pin_g:
-                    ax.plot(cx - stub_len, ym - 2.0, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                    sig_g = pin_to_net.get((fp.name, pin_g.name)) or "G"
-                    ax.text(
-                        cx - stub_len / 2.0,
-                        ym - 0.5,
-                        str(sig_g),
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.5,
-                        color="#1e293b",
-                        zorder=3,
-                    )
-                    sheet_pin_coords[(fp.name, pin_g.name)] = (cx - stub_len, ym - 2.0)
-                    pin_side_map[(fp.name, pin_g.name)] = "left"
-                    comp_of_pin[(fp.name, pin_g.name)] = c_idx
-
+                    sheet_pin_coords[(fp.name, pin_g.name)] = (cx - stub_g, ym - 2.0)
+                    ax.plot(cx - stub_g, ym - 2.0, marker="o", markersize=2.5, color="#0284c7", zorder=3)
                 if pin_d:
-                    ax.plot(cx + cw + stub_len, ym + 5.0, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                    sig_d = pin_to_net.get((fp.name, pin_d.name)) or "D"
-                    ax.text(
-                        cx + cw + stub_len / 2.0,
-                        ym + 6.5,
-                        str(sig_d),
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.5,
-                        color="#1e293b",
-                        zorder=3,
-                    )
-                    sheet_pin_coords[(fp.name, pin_d.name)] = (cx + cw + stub_len, ym + 5.0)
-                    pin_side_map[(fp.name, pin_d.name)] = "right"
-                    comp_of_pin[(fp.name, pin_d.name)] = c_idx
-
+                    sheet_pin_coords[(fp.name, pin_d.name)] = (cx + cw + stub_d, ym + 5.0)
+                    ax.plot(cx + cw + stub_d, ym + 5.0, marker="o", markersize=2.5, color="#0284c7", zorder=3)
                 if pin_s:
-                    ax.plot(cx + cw + stub_len, ym - 5.0, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                    sig_s = pin_to_net.get((fp.name, pin_s.name)) or "S"
-                    ax.text(
-                        cx + cw + stub_len / 2.0,
-                        ym - 3.5,
-                        str(sig_s),
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.5,
-                        color="#1e293b",
-                        zorder=3,
-                    )
-                    sheet_pin_coords[(fp.name, pin_s.name)] = (cx + cw + stub_len, ym - 5.0)
-                    pin_side_map[(fp.name, pin_s.name)] = "right"
-                    comp_of_pin[(fp.name, pin_s.name)] = c_idx
+                    sheet_pin_coords[(fp.name, pin_s.name)] = (cx + cw + stub_s, ym - 5.0)
+                    ax.plot(cx + cw + stub_s, ym - 5.0, marker="o", markersize=2.5, color="#0284c7", zorder=3)
 
             # 4. Standard IC Body Box & Pins
             else:
@@ -980,8 +1726,6 @@ class SchematicDiagram:
                         (cx, cy), cw, ch, facecolor="#ffffff", edgecolor="#334155", linewidth=1.5, zorder=2
                     )
                 )
-
-                # Component header inside box
                 ax.text(
                     cx + cw / 2.0,
                     cy + ch - 4.2,
@@ -994,7 +1738,6 @@ class SchematicDiagram:
                     zorder=3,
                 )
                 if mpn:
-                    # Part number (MPN)
                     ax.text(
                         cx + cw / 2.0,
                         cy + ch - 8.0,
@@ -1006,7 +1749,6 @@ class SchematicDiagram:
                         color="#0369a1",
                         zorder=3,
                     )
-                    # Package
                     ax.text(
                         cx + cw / 2.0,
                         cy + ch - 11.5,
@@ -1034,17 +1776,37 @@ class SchematicDiagram:
 
                 ax.plot([cx + 2.5, cx + cw - 2.5], [divider_y, divider_y], color="#e2e8f0", linewidth=0.8, zorder=3)
 
-                # Left Pins (Signal names inside box, pad numbers above stub)
+                # Left Pins
                 for p_idx, p in enumerate(left_pins):
                     py = cy + ch - header_offset - (p_idx * pin_pitch)
-                    ax.plot([cx - stub_len, cx], [py, py], color="#475569", linewidth=1.0, zorder=2)
-                    ax.plot(cx - stub_len, py, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                    signal_name = pin_to_net.get((fp.name, p.name))
-                    pin_display = signal_name if signal_name else (p.label if p.label and p.label != p.name else p.name)
+                    pair = (fp.name, p.name)
+                    sig_name = pin_to_net.get(pair, "")
+                    net_u = sig_name.upper()
+
+                    if pair in wired_pins:
+                        pin_stub = STUB_SIGNAL_MM
+                    elif net_u in GROUND_NET_NAMES:
+                        pin_stub = STUB_GROUND_MM
+                    elif net_u in POWER_NET_NAMES:
+                        pin_stub = STUB_POWER_MM
+                    else:
+                        pin_stub = STUB_SIGNAL_MM
+
+                    px = cx - pin_stub
+                    sheet_pin_coords[pair] = (px, py)
+
+                    # Stub line and terminal dot
+                    ax.plot([cx, px], [py, py], color="#475569", linewidth=1.0, zorder=2)
+                    ax.plot(px, py, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+
+                    # Signal name inside IC box
+                    pin_display = sig_name if sig_name else (p.label if p.label and p.label != p.name else p.name)
                     ax.text(cx + 1.5, py, pin_display, ha="left", va="center", fontsize=6.5, color="#1e293b", zorder=3)
-                    if signal_name and p.name != signal_name:
+
+                    # Pin number next to IC box (only if distinct from pin_display)
+                    if p.name != pin_display:
                         ax.text(
-                            cx - stub_len / 2.0,
+                            cx - PIN_NUMBER_OFFSET_MM,
                             py + 1.2,
                             p.name,
                             ha="center",
@@ -1053,23 +1815,47 @@ class SchematicDiagram:
                             color="#64748b",
                             zorder=3,
                         )
-                    sheet_pin_coords[(fp.name, p.name)] = (cx - stub_len, py)
-                    pin_side_map[(fp.name, p.name)] = "left"
-                    comp_of_pin[(fp.name, p.name)] = c_idx
 
-                # Right Pins (Signal names inside box, pad numbers above stub)
+                # Right Pins
                 for p_idx, p in enumerate(right_pins):
                     py = cy + ch - header_offset - (p_idx * pin_pitch)
-                    ax.plot([cx + cw, cx + cw + stub_len], [py, py], color="#475569", linewidth=1.0, zorder=2)
-                    ax.plot(cx + cw + stub_len, py, marker="o", markersize=2.5, color="#0284c7", zorder=3)
-                    signal_name = pin_to_net.get((fp.name, p.name))
-                    pin_display = signal_name if signal_name else (p.label if p.label and p.label != p.name else p.name)
+                    pair = (fp.name, p.name)
+                    sig_name = pin_to_net.get(pair, "")
+                    net_u = sig_name.upper()
+
+                    if pair in wired_pins:
+                        pin_stub = STUB_SIGNAL_MM
+                    elif net_u in GROUND_NET_NAMES:
+                        pin_stub = STUB_GROUND_MM
+                    elif net_u in POWER_NET_NAMES:
+                        pin_stub = STUB_POWER_MM
+                    else:
+                        pin_stub = STUB_SIGNAL_MM
+
+                    px = cx + cw + pin_stub
+                    sheet_pin_coords[pair] = (px, py)
+
+                    # Stub line and terminal dot
+                    ax.plot([cx + cw, px], [py, py], color="#475569", linewidth=1.0, zorder=2)
+                    ax.plot(px, py, marker="o", markersize=2.5, color="#0284c7", zorder=3)
+
+                    # Signal name inside IC box
+                    pin_display = sig_name if sig_name else (p.label if p.label and p.label != p.name else p.name)
                     ax.text(
-                        cx + cw - 1.5, py, pin_display, ha="right", va="center", fontsize=6.5, color="#1e293b", zorder=3
+                        cx + cw - 1.5,
+                        py,
+                        pin_display,
+                        ha="right",
+                        va="center",
+                        fontsize=6.5,
+                        color="#1e293b",
+                        zorder=3,
                     )
-                    if signal_name and p.name != signal_name:
+
+                    # Pin number next to IC box (only if distinct from pin_display)
+                    if p.name != pin_display:
                         ax.text(
-                            cx + cw + stub_len / 2.0,
+                            cx + cw + PIN_NUMBER_OFFSET_MM,
                             py + 1.2,
                             p.name,
                             ha="center",
@@ -1078,81 +1864,85 @@ class SchematicDiagram:
                             color="#64748b",
                             zorder=3,
                         )
-                    sheet_pin_coords[(fp.name, p.name)] = (cx + cw + stub_len, py)
-                    pin_side_map[(fp.name, p.name)] = "right"
-                    comp_of_pin[(fp.name, p.name)] = c_idx
 
-        # Set of pins that are directly wired across the open channel
-        wired_pins: set[Tuple[str, str]] = set()
+        # Draw wire routes between facing components
+        h_segments: List[Tuple[float, float, float, str, str]] = []  # (x_start, x_end, y, net_name, color)
+        v_segments: List[Tuple[float, float, float, str, str]] = []  # (x, y_start, y_end, net_name, color)
+        wire_labels: List[Tuple[float, float, str]] = []
 
-        # Wire connections between pins on this sheet sharing a net
-        # Only route a direct wire if the path stays completely within the open channel
-        # and does not cross or touch any component body
-        for net in all_nets:
-            present_pins = [pair for pair in net.pins if pair in sheet_pin_coords]
-            if len(present_pins) >= 2:
-                for i in range(len(present_pins)):
-                    for j in range(i + 1, len(present_pins)):
-                        pair1, pair2 = present_pins[i], present_pins[j]
-                        if pair1 in wired_pins or pair2 in wired_pins:
-                            continue
-                        c1, c2 = comp_of_pin[pair1], comp_of_pin[pair2]
-                        s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
+        # Group direct wire pairs by adjacent column transitions
+        trans_map: Dict[Tuple[int, int], List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]]] = {}
+        for pair1, pair2, net in direct_wire_pairs:
+            c1, c2 = fp_col_map[pair1[0]], fp_col_map[pair2[0]]
+            trans_map.setdefault((c1, c2), []).append((pair1, pair2, net))
 
-                        # Ensure pair1 is on the left component and pair2 is on the right component
-                        if c1 > c2:
-                            pair1, pair2 = pair2, pair1
-                            c1, c2 = c2, c1
-                            s1, s2 = s2, s1
+        for (c1, c2), pairs in trans_map.items():
+            dogleg_pairs = [p for p in pairs if abs(sheet_pin_coords[p[0]][1] - sheet_pin_coords[p[1]][1]) >= 0.1]
+            num_doglegs = len(dogleg_pairs)
 
-                        r1 = c1 // cols_per_row
-                        r2 = c2 // cols_per_row
+            has_pullups_in_channel = any(
+                any(p[2].name == pin_to_net.get((fp.name, pin.name)) for pin in fp.pins for p in pairs)
+                for fp in pullup_resistors
+            )
 
-                        # Wires are cleanly drawn when connecting facing pins across the channel
-                        # on the same row between adjacent columns
-                        if r1 == r2 and c1 != c2 and (c2 == c1 + 1) and s1 == "right" and s2 == "left":
-                            p1 = sheet_pin_coords[pair1]
-                            p2 = sheet_pin_coords[pair2]
-                            mid_x = (p1[0] + p2[0]) / 2.0
+            dogleg_idx = 0
+            for pair1, pair2, net in pairs:
+                p1 = sheet_pin_coords[pair1]
+                p2 = sheet_pin_coords[pair2]
+                col = net.color if hasattr(net, "color") and net.color else "#2563eb"
 
-                            if abs(p1[1] - p2[1]) < 0.1:
-                                # Straight horizontal wire
-                                ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color="#2563eb", linewidth=1.2, zorder=2)
-                                ax.text(
-                                    mid_x,
-                                    p1[1] + 1.2,
-                                    net.name,
-                                    ha="center",
-                                    va="bottom",
-                                    fontsize=6.5,
-                                    fontweight="bold",
-                                    color="#0369a1",
-                                    zorder=3,
-                                )
-                            else:
-                                # Orthogonal dogleg wire
-                                ax.plot(
-                                    [p1[0], mid_x, mid_x, p2[0]],
-                                    [p1[1], p1[1], p2[1], p2[1]],
-                                    color="#2563eb",
-                                    linewidth=1.2,
-                                    zorder=2,
-                                )
-                                ax.text(
-                                    mid_x,
-                                    max(p1[1], p2[1]) + 1.2,
-                                    net.name,
-                                    ha="center",
-                                    va="bottom",
-                                    fontsize=6.5,
-                                    fontweight="bold",
-                                    color="#0369a1",
-                                    zorder=3,
-                                )
-                            wired_pins.add(pair1)
-                            wired_pins.add(pair2)
+                if abs(p1[1] - p2[1]) < 0.1:
+                    # Straight horizontal wire
+                    h_segments.append((p1[0], p2[0], p1[1], net.name, col))
+                    if not has_pullups_in_channel:
+                        wire_labels.append(((p1[0] + p2[0]) / 2.0, p1[1] + 1.2, net.name))
+                else:
+                    # Staggered vertical corridor
+                    if has_pullups_in_channel:
+                        x_v = (p2[0] - 14.0) + dogleg_idx * 2.0
+                    else:
+                        mid_base = (p1[0] + p2[0]) / 2.0
+                        offset = (dogleg_idx - (num_doglegs - 1) / 2.0) * 8.0 if num_doglegs > 1 else 0.0
+                        x_v = mid_base + offset
+                    dogleg_idx += 1
 
-        # Place net labels and power/ground symbols for all unwired pins
+                    h_segments.append((p1[0], x_v, p1[1], net.name, col))
+                    v_segments.append((x_v, p1[1], p2[1], net.name, col))
+                    h_segments.append((x_v, p2[0], p2[1], net.name, col))
+                    if not has_pullups_in_channel:
+                        wire_labels.append((p1[0] + 6.0, p1[1] + 1.2, net.name))
+
+        # Render all horizontal wire segments
+        for x_start, x_end, y, net_name, col in h_segments:
+            ax.plot([x_start, x_end], [y, y], color=col, linewidth=1.2, zorder=2)
+
+        # Render all vertical wire segments with jumper bridge loops at crossings
+        for x_v, y_start, y_end, net_name, col in v_segments:
+            self._draw_vertical_wire_with_jumpers(
+                ax,
+                x_v=x_v,
+                y_start=y_start,
+                y_end=y_end,
+                col=col,
+                h_wire_segments=h_segments,
+                net_name=net_name,
+            )
+
+        # Render wire labels
+        for lx, ly, l_name in wire_labels:
+            ax.text(
+                lx,
+                ly,
+                l_name,
+                ha="center",
+                va="bottom",
+                fontsize=6.5,
+                fontweight="bold",
+                color="#0369a1",
+                zorder=4,
+            )
+
+        # Draw power/ground symbols and net labels for all UNWIRED pins
         for pair, (px, py) in sheet_pin_coords.items():
             if pair in wired_pins:
                 continue
@@ -1160,46 +1950,157 @@ class SchematicDiagram:
             if not net_name:
                 continue
 
-            side = pin_side_map[pair]
+            side = pin_side_map.get(pair, "left")
             net_upper = net_name.upper()
 
-            # Standard GND 3-bar symbol
-            if net_upper in ("GND", "GROUND", "VSS"):
-                ax.plot([px, px], [py, py - 3.0], color="#475569", linewidth=1.2, zorder=2)
-                ax.plot([px - 3.5, px + 3.5], [py - 3.0, py - 3.0], color="#475569", linewidth=1.4, zorder=2)
-                ax.plot([px - 2.2, px + 2.2], [py - 4.5, py - 4.5], color="#475569", linewidth=1.2, zorder=2)
-                ax.plot([px - 1.0, px + 1.0], [py - 6.0, py - 6.0], color="#475569", linewidth=1.0, zorder=2)
-                ax.text(
-                    px,
-                    py - 7.5,
-                    "GND",
-                    ha="center",
-                    va="top",
-                    fontsize=5.5,
-                    fontweight="bold",
-                    color="#475569",
-                    zorder=3,
-                )
+            has_pin_above = any(
+                p2 != pair
+                and p2[0] == pair[0]
+                and pin_side_map.get(p2) == side
+                and abs(sheet_pin_coords[p2][0] - px) < 4.0
+                and sheet_pin_coords[p2][1] > py
+                and sheet_pin_coords[p2][1] - py < 8.0
+                for p2 in sheet_pin_coords
+            )
+            has_pin_below = any(
+                p2 != pair
+                and p2[0] == pair[0]
+                and pin_side_map.get(p2) == side
+                and abs(sheet_pin_coords[p2][0] - px) < 4.0
+                and sheet_pin_coords[p2][1] < py
+                and py - sheet_pin_coords[p2][1] < 8.0
+                for p2 in sheet_pin_coords
+            )
+            has_wire_above = any(
+                0.1 < seg[2] - py < 10.0 and min(seg[0], seg[1]) - 1.0 <= px <= max(seg[0], seg[1]) + 1.0
+                for seg in h_segments
+            )
+            has_wire_below = any(
+                0.1 < py - seg[2] < 10.0 and min(seg[0], seg[1]) - 1.0 <= px <= max(seg[0], seg[1]) + 1.0
+                for seg in h_segments
+            )
 
-            # Standard Power upward arrow symbol
-            elif net_upper in ("3V3", "5V", "1V8", "1V2", "VCC", "VDD", "VLOAD_SW"):
-                ax.plot([px, px], [py, py + 3.0], color="#dc2626", linewidth=1.2, zorder=2)
-                ax.plot(
-                    [px - 2.5, px, px + 2.5], [py + 2.0, py + 4.5, py + 2.0], color="#dc2626", linewidth=1.2, zorder=2
-                )
-                ax.text(
-                    px,
-                    py + 5.5,
-                    net_name,
-                    ha="center",
-                    va="bottom",
-                    fontsize=5.8,
-                    fontweight="bold",
-                    color="#dc2626",
-                    zorder=3,
-                )
+            # GND symbol
+            if net_upper in GROUND_NET_NAMES:
+                if not has_pin_below and not has_wire_below:
+                    # Standard vertical 3-bar hanging DOWN
+                    ax.plot([px, px], [py, py - 3.0], color="#475569", linewidth=1.2, zorder=2)
+                    ax.plot([px - 2.8, px + 2.8], [py - 3.0, py - 3.0], color="#475569", linewidth=1.4, zorder=2)
+                    ax.plot([px - 1.8, px + 1.8], [py - 4.2, py - 4.2], color="#475569", linewidth=1.2, zorder=2)
+                    ax.plot([px - 0.8, px + 0.8], [py - 5.4, py - 5.4], color="#475569", linewidth=1.0, zorder=2)
+                    ax.text(
+                        px,
+                        py - 6.8,
+                        "GND",
+                        ha="center",
+                        va="top",
+                        fontsize=5.5,
+                        fontweight="bold",
+                        color="#475569",
+                        zorder=3,
+                    )
+                else:
+                    # Horizontal 3-bar pointing outward away from component
+                    if side == "left":
+                        ax.plot([px, px - 2.0], [py, py], color="#475569", linewidth=1.2, zorder=2)
+                        ax.plot([px - 2.0, px - 2.0], [py - 2.8, py + 2.8], color="#475569", linewidth=1.4, zorder=2)
+                        ax.plot([px - 3.2, px - 3.2], [py - 1.8, py + 1.8], color="#475569", linewidth=1.2, zorder=2)
+                        ax.plot([px - 4.4, px - 4.4], [py - 0.8, py + 0.8], color="#475569", linewidth=1.0, zorder=2)
+                        ax.text(
+                            px - 5.8,
+                            py,
+                            "GND",
+                            ha="right",
+                            va="center",
+                            fontsize=5.5,
+                            fontweight="bold",
+                            color="#475569",
+                            zorder=3,
+                        )
+                    else:
+                        ax.plot([px, px + 2.0], [py, py], color="#475569", linewidth=1.2, zorder=2)
+                        ax.plot([px + 2.0, px + 2.0], [py - 2.8, py + 2.8], color="#475569", linewidth=1.4, zorder=2)
+                        ax.plot([px + 3.2, px + 3.2], [py - 1.8, py + 1.8], color="#475569", linewidth=1.2, zorder=2)
+                        ax.plot([px + 4.4, px + 4.4], [py - 0.8, py + 0.8], color="#475569", linewidth=1.0, zorder=2)
+                        ax.text(
+                            px + 5.8,
+                            py,
+                            "GND",
+                            ha="left",
+                            va="center",
+                            fontsize=5.5,
+                            fontweight="bold",
+                            color="#475569",
+                            zorder=3,
+                        )
 
-            # Standard signal net flag / label
+            # Power symbol
+            elif net_upper in POWER_NET_NAMES:
+                if not has_pin_above and not has_wire_above:
+                    # Standard upward arrow
+                    ax.plot([px, px], [py, py + 3.0], color="#dc2626", linewidth=1.2, zorder=2)
+                    ax.plot(
+                        [px - 2.5, px, px + 2.5],
+                        [py + 2.0, py + 4.5, py + 2.0],
+                        color="#dc2626",
+                        linewidth=1.2,
+                        zorder=2,
+                    )
+                    ax.text(
+                        px,
+                        py + 5.5,
+                        net_name,
+                        ha="center",
+                        va="bottom",
+                        fontsize=5.8,
+                        fontweight="bold",
+                        color="#dc2626",
+                        zorder=3,
+                    )
+                else:
+                    # Horizontal power arrow pointing outward away from component
+                    if side == "left":
+                        ax.plot([px, px - 2.5], [py, py], color="#dc2626", linewidth=1.2, zorder=2)
+                        ax.plot(
+                            [px - 0.5, px - 3.0, px - 0.5],
+                            [py + 2.2, py, py - 2.2],
+                            color="#dc2626",
+                            linewidth=1.2,
+                            zorder=2,
+                        )
+                        ax.text(
+                            px - 4.5,
+                            py,
+                            net_name,
+                            ha="right",
+                            va="center",
+                            fontsize=5.8,
+                            fontweight="bold",
+                            color="#dc2626",
+                            zorder=3,
+                        )
+                    else:
+                        ax.plot([px, px + 2.5], [py, py], color="#dc2626", linewidth=1.2, zorder=2)
+                        ax.plot(
+                            [px + 0.5, px + 3.0, px + 0.5],
+                            [py + 2.2, py, py - 2.2],
+                            color="#dc2626",
+                            linewidth=1.2,
+                            zorder=2,
+                        )
+                        ax.text(
+                            px + 4.5,
+                            py,
+                            net_name,
+                            ha="left",
+                            va="center",
+                            fontsize=5.8,
+                            fontweight="bold",
+                            color="#dc2626",
+                            zorder=3,
+                        )
+
+            # Signal net flag / label
             else:
                 if side == "left":
                     ax.text(
@@ -1225,5 +2126,46 @@ class SchematicDiagram:
                         color="#0369a1",
                         zorder=3,
                     )
+
+        # Draw Pullup Resistors branching inline off signal wires
+        if pullup_resistors:
+            self._draw_pullup_resistors(
+                ax=ax,
+                pullups=pullup_resistors,
+                pin_to_net=pin_to_net,
+                h_wire_segments=h_segments,
+                sheet_pin_coords=sheet_pin_coords,
+            )
+
+        # Draw Decoupling Capacitor Bank
+        if decoupling_caps:
+            self._draw_decoupling_cap_bank(
+                ax=ax,
+                caps=decoupling_caps,
+                pin_to_net=pin_to_net,
+                base_x=26.0,
+                base_y=bottom_cards_y,
+            )
+
+        # Draw Truth Tables for discrete component networks (e.g. transistor networks)
+        for fp in sheet_fps:
+            tt = getattr(fp, "truth_table", None)
+            is_transistor = (
+                fp.name.upper().startswith("Q")
+                or "SOT" in fp.package.upper()
+                or "FET" in fp.package.upper()
+                or "BJT" in fp.package.upper()
+            )
+            if tt is None and is_transistor:
+                tt = self._generate_default_transistor_truth_table(fp, pin_to_net)
+
+            if tt:
+                tt_card_w = 125.0
+                tt_x = 118.0
+                if fp.name in fp_col_map:
+                    c_idx = fp_col_map[fp.name]
+                    comp_cx = col_x_positions[c_idx]
+                    tt_x = max(116.0, min(145.0, comp_cx + cw / 2.0 - tt_card_w / 2.0 + 20.0))
+                self._draw_truth_table(ax=ax, fp=fp, tt=tt, base_x=tt_x, base_y=bottom_cards_y, card_w=tt_card_w)
 
         pdf.savefig(fig)

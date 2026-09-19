@@ -9,6 +9,7 @@ from .rerun_logger import log_drc_report, log_eye_diagram
 from .silkscreen import BuildSilkscreen, SilkscreenText
 from .stackup import BuildStackup, StackupLayer
 from .drill_holes import BuildDrillHoles, MountingHole, DrillHole
+from .board import BuildPcb, BuildFlexTail
 from .routing import (
     BuildTraces,
     Trace,
@@ -54,4 +55,6 @@ __all__ = [
     "CopperZone",
     "BuildTestPoints",
     "TestPoint",
+    "BuildPcb",
+    "BuildFlexTail",
 ]

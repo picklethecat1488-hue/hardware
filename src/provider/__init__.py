@@ -127,6 +127,7 @@ from .blender import BlenderRenderer, CameraViewport, RenderConfig
 from .pcb.silkscreen import BuildSilkscreen, SilkscreenText
 from .pcb.stackup import BuildStackup, StackupLayer
 from .pcb.drill_holes import BuildDrillHoles, MountingHole, DrillHole
+from .pcb.board import BuildPcb, BuildFlexTail
 from .pcb.routing import (
     BuildTraces,
     Trace,

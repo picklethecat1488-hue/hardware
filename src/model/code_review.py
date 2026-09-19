@@ -104,6 +104,7 @@ class CommitInfoModel(BaseModel):
     author: str
     email: str = ""
     date: str
+    time: str = ""
     subject: str
     body: str = ""
     additions: int = 0

@@ -110,24 +110,52 @@ footprints:
       - name: GND
         position: [-10.0, 0.0]
         side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: 3V3
         position: [-8.0, 0.0]
         side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: VLOAD_SW
         position: [-6.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: PETp0
         position: [2.0, 0.0]
         side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: PETn0
         position: [4.0, 0.0]
         side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: PERp0
         position: [6.0, 0.0]
         side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: PERn0
         position: [8.0, 0.0]
         side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
 
   - name: J2
     package: FPC-30P-0.5MM
@@ -140,45 +168,101 @@ footprints:
       - name: GND
         position: [-8.0, 0.0]
         side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: 3V3
         position: [-7.0, 0.0]
         side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: D0_P
         position: [-5.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: D0_N
         position: [-4.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: CLK_P
         position: [-2.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: CLK_N
         position: [-1.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: CAP_TX0
         position: [1.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: CAP_RX0
         position: [2.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: CAP_TX1
         position: [3.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: CAP_RX1
         position: [4.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: CAP_TX2
         position: [5.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: CAP_RX2
         position: [6.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: CAP_RX3
         position: [7.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
       - name: CAP_SHIELD
         position: [8.0, 0.0]
         side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.2, 1.2]
+        drill_dia_mm: 0.70
 
   - name: R1
     package: "0402"
@@ -274,6 +358,27 @@ footprints:
       - name: D
         position: [0.0, 1.0]
         side: right
+    truth_table:
+      title: "Q1 Load Switch Truth Table"
+      input_headers: ["PWR_EN (Gate)"]
+      output_headers: ["VLOAD_SW (Drain)", "Channel State"]
+      rows:
+        - inputs: {"PWR_EN (Gate)": "0 (Low, <0.8V)"}
+          outputs: {"VLOAD_SW (Drain)": "Hi-Z / Pull-up", "Channel State": "Cutoff"}
+          state: "FALSE"
+          description: "Load switch disabled; output isolated"
+        - inputs: {"PWR_EN (Gate)": "1 (High, >1.5V)"}
+          outputs: {"VLOAD_SW (Drain)": "0V (Low, GND)", "Channel State": "Conduction"}
+          state: "TRUE"
+          description: "Active saturation; load energized"
+        - inputs: {"PWR_EN (Gate)": "Float / High-Z"}
+          outputs: {"VLOAD_SW (Drain)": "Indeterminate", "Channel State": "Undefined"}
+          state: "INVALID"
+          description: "Prohibited floating gate; leakage risk"
+        - inputs: {"PWR_EN (Gate)": "Over-Voltage (>20V)"}
+          outputs: {"VLOAD_SW (Drain)": "Breakdown / Short", "Channel State": "Damaged"}
+          state: "INVALID"
+          description: "Gate dielectric breakdown; fault"
 
 nets:
   - name: GND

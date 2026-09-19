@@ -68,12 +68,29 @@ class PCBExporter:
                         break
 
                 net_idx = net_name_to_idx.get(net_name, 0)
+                pad_type = getattr(p, "pad_type", "smd")
+                drill_dia = getattr(p, "drill_dia_mm", None)
+                pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
+                pad_shape = getattr(p, "pad_shape", "circle")
+
+                # Default connectors to through-hole if not otherwise specified
+                if pad_type == "smd" and (
+                    fp.name.startswith("J") or "KEY-M" in fp.package.upper() or "FPC" in fp.package.upper()
+                ):
+                    pad_type = "thru_hole"
+                    drill_dia = drill_dia or 0.70
+                    pad_size = (1.2, 1.2) if pad_size == (0.5, 0.5) else pad_size
+
                 fp_pins.append(
                     {
                         "name": p.name,
                         "x_mm": round(p.position[0], 4),
                         "y_mm": round(p.position[1], 4),
-                        "pad_dia_mm": 0.35,
+                        "pad_type": pad_type,
+                        "pad_shape": pad_shape,
+                        "pad_size_x": round(pad_size[0], 4),
+                        "pad_size_y": round(pad_size[1], 4),
+                        "drill_dia_mm": round(drill_dia, 4) if drill_dia else None,
                         "net_idx": net_idx,
                         "net_name": net_name,
                     }
@@ -187,14 +204,17 @@ class PCBExporter:
         vias_data = []
         for v in self.config.vias:
             net_idx = net_name_to_idx.get(v.net, 0)
+            l1, l2 = v.layer_start, v.layer_end
+            if l1 == "B.Cu" and l2 == "F.Cu":
+                l1, l2 = "F.Cu", "B.Cu"
             vias_data.append(
                 {
                     "x": round(self.config.sheet_center_x_mm + v.position_mm[0], 4),
                     "y": round(self.config.sheet_center_y_mm + v.position_mm[1], 4),
                     "dia": round(v.pad_diameter_mm, 4),
                     "drill": round(v.drill_diameter_mm, 4),
-                    "layer1": v.layer_start,
-                    "layer2": v.layer_end,
+                    "layer1": l1,
+                    "layer2": l2,
                     "net_idx": net_idx,
                 }
             )
@@ -233,6 +253,10 @@ class PCBExporter:
                     "x_mm": round(self.config.sheet_center_x_mm + tp.position_mm[0], 4),
                     "y_mm": round(self.config.sheet_center_y_mm + tp.position_mm[1], 4),
                     "dia_mm": round(tp.pad_diameter_mm, 4),
+                    "drill_mm": round(tp.drill_diameter_mm, 4),
+                    "label_x": 0.0,
+                    "label_y": -round(tp.pad_diameter_mm / 2.0 + 0.8, 4),
+                    "label_angle": 90,
                     "layer": tp.layer,
                     "silk_layer": silk_layer,
                     "mask_layer": mask_layer,

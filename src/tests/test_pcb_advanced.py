@@ -17,6 +17,7 @@ from model.pcb import (
 from model.wiring import Wiring, FootprintModel, PinModel, PinSide, NetModel
 from provider.pcb.drc import PCBDesignRulesChecker, DRCSeverity
 from provider.pcb.exporter import PCBExporter
+from provider.pcb.kicad_cli import KiCadCLI
 from provider.pcb.eye_diagram import EyeDiagramSimulator, EyeDiagramConfig, generate_prbs9
 from provider.pcb.rerun_logger import log_drc_report, log_eye_diagram
 from provider import Room, Mode
@@ -830,7 +831,6 @@ def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     kicad_pcb = board_dir / "test_board.kicad_pcb"
     drill_file = board_dir / "test_board.drl"
     assert kicad_pcb.exists()
-    assert drill_file.exists()
 
     pcb_text = kicad_pcb.read_text(encoding="utf-8")
     # Verify connectors J1 and J2 edge placement
@@ -839,11 +839,13 @@ def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     # Verify bottom layer components
     assert '(layer "B.Cu")' in pcb_text
 
-    # Verify drill file coordinates match mounting holes
-    drl_text = drill_file.read_text(encoding="utf-8")
-    assert "C3.200" in drl_text  # 3.2mm mounting hole tool definition
-    assert "X123.0Y-64.5" in drl_text
-    assert "X174.0Y-145.5" in drl_text
+    # Verify drill file coordinates match mounting holes when kicad-cli is available
+    if KiCadCLI().is_available:
+        assert drill_file.exists()
+        drl_text = drill_file.read_text(encoding="utf-8")
+        assert "C3.200" in drl_text  # 3.2mm mounting hole tool definition
+        assert "X123.0Y-64.5" in drl_text
+        assert "X174.0Y-145.5" in drl_text
 
     # 4. Verify pos.csv aligns with component placement and correct layers
     assert pos_file.exists()
@@ -869,3 +871,257 @@ def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     # Edge connector coordinates
     assert float(rows["J1"]["Mid Y"].replace("mm", "")) == -36.0
     assert float(rows["J2"]["Mid Y"].replace("mm", "")) == 38.0
+
+
+def test_build_pcb_and_build_flex_tail_context_managers(advanced_pcb_stackup: StackupModel):
+    """Verify BuildPcb and BuildFlexTail custom context managers attach stackup and dimensions metadata."""
+    from build123d import Box
+    from provider.pcb.board import BuildPcb, BuildFlexTail
+
+    with BuildPcb(
+        name="main_carrier",
+        board_type="rigid",
+        revision="2.0",
+        stackup=advanced_pcb_stackup,
+    ) as pcb_builder:
+        Box(60.0, 40.0, pcb_builder.thickness_mm)
+
+    assert pcb_builder.part is not None
+    assert pcb_builder.part.is_valid()
+    assert hasattr(pcb_builder.part, "pcb_metadata")
+    meta = getattr(pcb_builder.part, "pcb_metadata")
+    assert meta.name == "main_carrier"
+    assert meta.board_type == "rigid"
+    assert meta.revision == "2.0"
+    assert meta.stackup is not None
+    assert meta.dimensions_mm == (60.0, 40.0, round(advanced_pcb_stackup.total_thickness_mm, 4))
+
+    # Test BuildFlexTail
+    with BuildFlexTail(
+        name="camera_flex",
+        revision="1.0",
+        stackup=advanced_pcb_stackup,
+    ) as flex_builder:
+        Box(40.0, 15.0, 0.20)
+
+    assert flex_builder.part is not None
+    assert flex_builder.board_type == "flex"
+    meta_flex = getattr(flex_builder.part, "pcb_metadata")
+    assert meta_flex.board_type == "flex"
+    assert meta_flex.name == "camera_flex"
+
+
+def test_schematic_staggered_pin_stubs_and_loop_crossings(tmp_path: Path):
+    """Verify staggered pin stubs (GND > PWR > SIG), pin number offset, and jumper loops at 90-degree crossings."""
+    import matplotlib.pyplot as plt
+    from provider.schematic_diagram import (
+        SchematicDiagram,
+        STUB_SIGNAL_MM,
+        STUB_POWER_MM,
+        STUB_GROUND_MM,
+        PIN_NUMBER_OFFSET_MM,
+        JUMPER_BRIDGE_RADIUS_MM,
+    )
+
+    # Invariant: Pin stubs must be strictly ordered GND (18mm) > PWR (10mm) > SIG (5mm)
+    assert STUB_GROUND_MM == 18.0
+    assert STUB_POWER_MM == 10.0
+    assert STUB_SIGNAL_MM == 5.0
+    assert STUB_GROUND_MM - STUB_POWER_MM >= 8.0  # Guarantees GND and 3V3 rail symbols never collide
+    assert PIN_NUMBER_OFFSET_MM == 2.5  # Pin numbers stay clear of power/ground symbols
+    assert JUMPER_BRIDGE_RADIUS_MM == 1.2
+
+    # Verify jumper arc rendering on crossing wires
+    fig, ax = plt.subplots()
+    diag = SchematicDiagram(None, pcb_config=None)
+    # Horizontal wire segment crossing x=50, y=50
+    h_segments = [(30.0, 70.0, 50.0, "NET_HORIZ", "#000000")]
+    # Draw vertical wire with crossing at y=50
+    diag._draw_vertical_wire_with_jumpers(
+        ax,
+        x_v=50.0,
+        y_start=30.0,
+        y_end=70.0,
+        col="#2563eb",
+        h_wire_segments=h_segments,
+    )
+    # Verify patch contains Arc jumper loop
+    arcs = [p for p in ax.patches if isinstance(p, plt.matplotlib.patches.Arc)]
+    assert len(arcs) == 1
+    arc = arcs[0]
+    assert arc.center == (50.0, 50.0)
+    assert arc.width == 2 * JUMPER_BRIDGE_RADIUS_MM
+    plt.close(fig)
+
+
+def test_schematic_decoupling_cap_bank_and_pullup_resistors():
+    """Verify decoupling capacitor bank and pullup resistor vertical extraction and rendering."""
+    import matplotlib.pyplot as plt
+    from provider.schematic_diagram import SchematicDiagram
+
+    fig, ax = plt.subplots()
+    diag = SchematicDiagram(None, pcb_config=None)
+
+    c1 = FootprintModel(
+        name="C1",
+        package="0402",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(1.0, 0.5, 0.5),
+        pins=[
+            PinModel(name="1", position=(0.0, 0.25, 0.0), label="1", side=PinSide.TOP),
+            PinModel(name="2", position=(0.0, -0.25, 0.0), label="2", side=PinSide.BOTTOM),
+        ],
+    )
+    c2 = FootprintModel(
+        name="C2",
+        package="0402",
+        position=(5.0, 0.0, 0.0),
+        dimensions=(1.0, 0.5, 0.5),
+        pins=[
+            PinModel(name="1", position=(0.0, 0.25, 0.0), label="1", side=PinSide.TOP),
+            PinModel(name="2", position=(0.0, -0.25, 0.0), label="2", side=PinSide.BOTTOM),
+        ],
+    )
+    pin_to_net = {
+        ("C1", "1"): "3V3",
+        ("C1", "2"): "GND",
+        ("C2", "1"): "3V3",
+        ("C2", "2"): "GND",
+    }
+
+    diag._draw_decoupling_cap_bank(ax, [c1, c2], pin_to_net, base_x=40.0, base_y=50.0)
+    # Verify dashed container rectangle was added
+    rects = [p for p in ax.patches if isinstance(p, plt.matplotlib.patches.Rectangle)]
+    assert len(rects) >= 1
+    dashed_boxes = [r for r in rects if r.get_linestyle() == "--"]
+    assert len(dashed_boxes) == 1
+
+    # Pullup resistor extraction
+    r1 = FootprintModel(
+        name="R1",
+        package="0402",
+        position=(10.0, 0.0, 0.0),
+        dimensions=(1.0, 0.5, 0.5),
+        pins=[
+            PinModel(name="1", position=(0.0, 0.25, 0.0), label="1", side=PinSide.TOP),
+            PinModel(name="2", position=(0.0, -0.25, 0.0), label="2", side=PinSide.BOTTOM),
+        ],
+    )
+    pin_to_net_pu = {
+        ("R1", "1"): "3V3",
+        ("R1", "2"): "I2C_SDA",
+    }
+    h_segments = [(20.0, 60.0, 30.0, "I2C_SDA", "#0284c7")]
+    diag._draw_pullup_resistors(
+        ax,
+        [r1],
+        pin_to_net_pu,
+        h_wire_segments=h_segments,
+        sheet_pin_coords={},
+    )
+    plt.close(fig)
+
+
+def test_test_board_test_points_and_zero_drc_errors():
+    """Verify test_board has drilled test points with 4mm pitch, TP_GND, and 0 DRC violations."""
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    import math
+
+    provider = TestBoardProvider()
+    cfg = provider.pcb_config
+    assert cfg is not None
+
+    # Check test points
+    tps = {tp.name: tp for tp in cfg.test_points}
+    assert "TP_GND" in tps
+    assert tps["TP_GND"].net == "GND"
+    assert tps["TP_GND"].position_mm == (-18.0, -22.0)
+
+    # All test points must be plated drilled holes for probe / fly wire insertion
+    for tp in cfg.test_points:
+        assert tp.drill_diameter_mm == 0.80
+        assert tp.pad_diameter_mm == 1.40
+        assert tp.plated is True
+
+    # 4mm pitch verification on paired test points
+    def point_dist(name1: str, name2: str) -> float:
+        p1 = tps[name1].position_mm
+        p2 = tps[name2].position_mm
+        return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+
+    assert abs(point_dist("TP_TX0_P", "TP_TX0_N") - 4.0) < 1e-3
+    assert abs(point_dist("TP_D0_P", "TP_D0_N") - 4.0) < 1e-3
+    assert abs(point_dist("TP_SDA", "TP_SCL") - 4.0) < 1e-3
+
+    # DRC check: 0 errors on test_board
+    wiring = Wiring(provider.wiring_path)
+    drc = PCBDesignRulesChecker(cfg)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"DRC failed:\n{report.summary()}"
+    assert report.error_count == 0
+    assert not any(v.rule_name == "DISCONNECTED_TEST_POINT_AIRWIRE" for v in report.violations)
+    assert not any(v.rule_name == "TRACE_SHORT_CIRCUIT" for v in report.violations)
+    assert not any(v.rule_name == "CLEARANCE_VIOLATION" for v in report.violations)
+    assert not any(v.rule_name == "SILKSCREEN_PAD_OVERLAP" for v in report.violations)
+
+
+def test_schematic_discrete_component_truth_table(tmp_path: Path):
+    """Verify TruthTableModel parsing, transistor truth table generation, and schematic rendering."""
+    from model.wiring import TruthTableModel, TruthTableRowModel, TruthTableState, LabelModel
+    from provider.schematic_diagram import SchematicDiagram
+
+    # 1. Verify parsing of declarative truth table in test_board/wiring.yaml
+    provider = TestBoardProvider()
+    wiring = Wiring(provider.wiring_path)
+    q1 = next(fp for fp in wiring.footprints if fp.name == "Q1")
+    assert q1.truth_table is not None
+    assert isinstance(q1.truth_table, TruthTableModel)
+    assert q1.truth_table.title == "Q1 Load Switch Truth Table"
+    assert q1.truth_table.input_headers == ["PWR_EN (Gate)"]
+    assert q1.truth_table.output_headers == ["VLOAD_SW (Drain)", "Channel State"]
+    assert len(q1.truth_table.rows) == 4
+
+    states = [r.state for r in q1.truth_table.rows]
+    assert TruthTableState.FALSE in states
+    assert TruthTableState.TRUE in states
+    assert TruthTableState.INVALID in states
+
+    # Verify custom row model
+    first_row = q1.truth_table.rows[0]
+    assert isinstance(first_row, TruthTableRowModel)
+    assert first_row.state == TruthTableState.FALSE
+    assert "disabled" in first_row.description
+    assert first_row.outputs.get("Channel State") == "Cutoff"
+
+    # 2. Verify auto-generated default transistor truth table for discrete transistor without explicit truth table
+    q_auto = FootprintModel(
+        name="Q2",
+        package="SOT-23",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(2.9, 1.3, 1.0),
+        pins=[
+            PinModel(name="1", position=(0.0, 0.0, 0.0), label="G", side=PinSide.LEFT),
+            PinModel(name="2", position=(0.0, 1.0, 0.0), label="S", side=PinSide.BOTTOM),
+            PinModel(name="3", position=(0.0, 2.0, 0.0), label="D", side=PinSide.RIGHT),
+        ],
+        mpn="2N7002",
+        label=LabelModel(text="2N7002", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+    auto_tt = SchematicDiagram._generate_default_transistor_truth_table(
+        q_auto, {("Q2", "1"): "GATE_CTRL", ("Q2", "3"): "VOUT"}
+    )
+    assert auto_tt is not None
+    assert "2N7002" in auto_tt.title
+    assert "GATE_CTRL (Gate)" in auto_tt.input_headers
+    assert "VOUT (Drain)" in auto_tt.output_headers
+    assert len(auto_tt.rows) == 4
+    auto_states = {r.state for r in auto_tt.rows}
+    assert auto_states == {TruthTableState.FALSE, TruthTableState.TRUE, TruthTableState.INVALID}
+
+    # 3. Verify schematic PDF rendering of test_board wiring produces valid multi-page document with truth table
+    diag = SchematicDiagram(wiring)
+    out_pdf = tmp_path / "test_board_schematic.pdf"
+    res = diag.render_pdf(out_pdf)
+    assert res.exists()
+    assert res.stat().st_size > 0

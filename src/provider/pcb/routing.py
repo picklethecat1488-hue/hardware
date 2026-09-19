@@ -1,7 +1,7 @@
 """build123d context managers and primitives for declarative PCB routing, vias, copper regions, and test points."""
 
 from contextvars import ContextVar, Token
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import Any, List, Optional, Sequence, Tuple, Union
 
 from model.pcb import CopperRegionModel, TestPointModel, TraceSegmentModel, ViaModel
 
@@ -31,6 +31,12 @@ class BuildTraces:
         if self._token is not None:
             _current_traces.reset(self._token)
             self._token = None
+
+        from provider.pcb.board import BuildPcb
+
+        active_pcb = BuildPcb.current()
+        if active_pcb is not None:
+            active_pcb.traces.extend(self.traces)
 
     @classmethod
     def _get_context(cls) -> Optional["BuildTraces"]:
@@ -120,6 +126,12 @@ class BuildVias:
             _current_vias.reset(self._token)
             self._token = None
 
+        from provider.pcb.board import BuildPcb
+
+        active_pcb = BuildPcb.current()
+        if active_pcb is not None:
+            active_pcb.vias.extend(self.vias)
+
     @classmethod
     def _get_context(cls) -> Optional["BuildVias"]:
         """Retrieve active via builder context if present."""
@@ -194,6 +206,12 @@ class BuildCopperRegions:
             _current_regions.reset(self._token)
             self._token = None
 
+        from provider.pcb.board import BuildPcb
+
+        active_pcb = BuildPcb.current()
+        if active_pcb is not None:
+            active_pcb.copper_regions.extend(self.regions)
+
     @classmethod
     def _get_context(cls) -> Optional["BuildCopperRegions"]:
         """Retrieve active copper region builder context if present."""
@@ -250,10 +268,22 @@ CopperZone = CopperRegion
 class BuildTestPoints:
     """Context manager for declarative PCB test point placement."""
 
-    def __init__(self, default_layer: str = "F.Cu", default_diameter_mm: float = 1.0) -> None:
-        """Initialize test point builder context."""
+    def __init__(
+        self,
+        default_layer: str = "F.Cu",
+        default_diameter_mm: float = 1.40,
+        default_drill_diameter_mm: float = 0.80,
+    ) -> None:
+        """Initialize test point builder context.
+
+        Args:
+            default_layer: Default copper layer ('F.Cu' or 'B.Cu').
+            default_diameter_mm: Default outer pad annular ring diameter in mm.
+            default_drill_diameter_mm: Default plated through-hole drill diameter in mm for probe / fly wire insertion.
+        """
         self.default_layer = default_layer
         self.default_diameter_mm = default_diameter_mm
+        self.default_drill_diameter_mm = default_drill_diameter_mm
         self.test_points: List[TestPointModel] = []
         self._token: Optional[Token] = None
 
@@ -268,6 +298,12 @@ class BuildTestPoints:
             _current_test_points.reset(self._token)
             self._token = None
 
+        from provider.pcb.board import BuildPcb
+
+        active_pcb = BuildPcb.current()
+        if active_pcb is not None:
+            active_pcb.test_points.extend(self.test_points)
+
     @classmethod
     def _get_context(cls) -> Optional["BuildTestPoints"]:
         """Retrieve active test point builder context if present."""
@@ -280,6 +316,24 @@ class BuildTestPoints:
         else:
             self.test_points.extend(item)
 
+    def to_shapes(self, depth_mm: float = 10.0) -> List[Any]:
+        """Convert collected test point drill holes to 3D cylinders for subtraction from CAD solids.
+
+        Args:
+            depth_mm: Height of cylinder along Z for clean boolean cutouts.
+
+        Returns:
+            List of build123d Cylinder shapes located at test point coordinates.
+        """
+        from build123d import Cylinder, Location, Pos
+
+        shapes = []
+        for tp in self.test_points:
+            cyl = Cylinder(radius=tp.drill_diameter_mm / 2.0, height=depth_mm)
+            loc = Location(Pos(tp.position_mm[0], tp.position_mm[1], 0.0))
+            shapes.append(cyl.locate(loc))
+        return shapes
+
 
 class TestPoint:
     """Declarative test point primitive evaluated inside a BuildTestPoints context."""
@@ -290,21 +344,26 @@ class TestPoint:
         net: str,
         at: Tuple[float, float],
         diameter_mm: Optional[float] = None,
+        drill_diameter_mm: Optional[float] = None,
+        plated: bool = True,
         layer: Optional[str] = None,
         label: Optional[str] = None,
     ) -> None:
-        """Place an exposed copper test point.
+        """Place an exposed copper / through-hole test point for probing or wire soldering.
 
         Args:
-            name: Test point identifier (e.g. TP_SDA).
+            name: Test point identifier (e.g. TP_SDA, TP_GND).
             net: Electrical net name.
             at: Position coordinate (x, y) in mm relative to board center.
-            diameter_mm: Pad diameter in mm.
+            diameter_mm: Outer pad annular diameter in mm.
+            drill_diameter_mm: Hole drill diameter in mm for probe / fly wire insertion.
+            plated: Whether test point through-hole is copper plated.
             layer: Copper layer ('F.Cu' or 'B.Cu').
             label: Optional silkscreen text annotation.
         """
         ctx = BuildTestPoints._get_context()
-        resolved_dia = diameter_mm or (ctx.default_diameter_mm if ctx else 1.0)
+        resolved_dia = diameter_mm or (ctx.default_diameter_mm if ctx else 1.40)
+        resolved_drill = drill_diameter_mm or (ctx.default_drill_diameter_mm if ctx else 0.80)
         resolved_layer = layer or (ctx.default_layer if ctx else "F.Cu")
 
         self.model = TestPointModel(
@@ -312,6 +371,8 @@ class TestPoint:
             net=net,
             position_mm=(round(at[0], 4), round(at[1], 4)),
             pad_diameter_mm=resolved_dia,
+            drill_diameter_mm=resolved_drill,
+            plated=plated,
             layer=resolved_layer,
             label=label or name,
         )

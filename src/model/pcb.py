@@ -21,6 +21,14 @@ class LayerType(StrEnum):
     STIFFENER = "stiffener"
 
 
+class BoardType(StrEnum):
+    """Substrate construction categorization for printed circuit boards."""
+
+    RIGID = "rigid"
+    FLEX = "flex"
+    RIGID_FLEX = "rigid-flex"
+
+
 class StackupLayerModel(BaseModel):
     """Data model representing an individual layer in a multi-layer stackup."""
 
@@ -652,12 +660,16 @@ class CopperRegionModel(BaseModel):
 
 
 class TestPointModel(BaseModel):
-    """Exposed copper test point pad for probing and validation."""
+    """Exposed copper test point pad or through-hole probe point for probing and validation."""
 
     name: str = Field(description="Test point identifier (e.g. TP_SDA, TP_TX0_P)")
     net: str = Field(description="Electrical net name monitored by this test point")
     position_mm: Tuple[float, float] = Field(description="Test point coordinate (x, y) in mm relative to board center")
-    pad_diameter_mm: float = Field(default=1.0, gt=0.0, description="Exposed copper pad diameter in mm")
+    pad_diameter_mm: float = Field(default=1.40, gt=0.0, description="Exposed copper annular pad diameter in mm")
+    drill_diameter_mm: float = Field(
+        default=0.80, gt=0.0, description="Drilled plated hole diameter in mm for probe / fly wire insertion"
+    )
+    plated: bool = Field(default=True, description="Whether test point drill hole is through-hole plated")
     layer: str = Field(default="F.Cu", description="Copper layer for test point pad ('F.Cu' or 'B.Cu')")
     label: Optional[str] = Field(default=None, description="Optional silkscreen label annotation")
 
@@ -677,7 +689,9 @@ class PCBConfig(BaseModel):
     """Top-level configuration model defining complete physical board, stackup, and high-speed rules."""
 
     name: str = Field(description="PCB project or sub-assembly name")
-    board_type: str = Field(default="rigid-flex", description="Substrate type: 'rigid', 'flex', or 'rigid-flex'")
+    board_type: BoardType = Field(
+        default=BoardType.RIGID_FLEX, description="Substrate type: 'rigid', 'flex', or 'rigid-flex'"
+    )
     revision: str = Field(default="1.0", description="Board revision identifier (e.g. '1.0', 'A', 'rev2')")
     dimensions_mm: Optional[Tuple[float, float, float]] = Field(
         default=None,

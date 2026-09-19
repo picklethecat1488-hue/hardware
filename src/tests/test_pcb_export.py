@@ -94,6 +94,30 @@ def mock_pcb_config() -> PCBConfig:
     )
 
 
+@pytest.fixture
+def mock_kicad_cam_files_if_unavailable(monkeypatch):
+    """Ensure CAM files are produced for export tests when kicad-cli is not installed locally."""
+    if not KiCadCLI().is_available:
+
+        def fake_export_all(self, kicad_pcb_path, output_dir, layers=None):
+            stem = Path(kicad_pcb_path).stem
+            out = Path(output_dir)
+            out.mkdir(parents=True, exist_ok=True)
+            cam = {
+                f"{stem}-F_Cu.gbr": out / f"{stem}-F_Cu.gbr",
+                f"{stem}-B_Cu.gbr": out / f"{stem}-B_Cu.gbr",
+                f"{stem}-Edge_Cuts.gbr": out / f"{stem}-Edge_Cuts.gbr",
+                f"{stem}.drl": out / f"{stem}.drl",
+                f"{stem}-job.gbrjob": out / f"{stem}-job.gbrjob",
+            }
+            for p in cam.values():
+                p.touch()
+            return cam
+
+        monkeypatch.setattr(KiCadCLI, "is_available", True)
+        monkeypatch.setattr(KiCadCLI, "export_all_board_files", fake_export_all)
+
+
 def test_export_kicad_pcb(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
     """Verify export of KiCad 7/8 compatible .kicad_pcb S-expression file."""
     exporter = PCBExporter(mock_pcb_config, mock_wiring)
@@ -186,7 +210,9 @@ def test_export_schematic_svg(tmp_path: Path, mock_pcb_config: PCBConfig, mock_w
     assert "MCU_HOST" in content
 
 
-def test_export_board_archive(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
+def test_export_board_archive(
+    tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring, mock_kicad_cam_files_if_unavailable
+):
     """Verify creation of board layer and Excellon drill zip archive."""
     exporter = PCBExporter(mock_pcb_config, mock_wiring)
     out_file = tmp_path / "board.zip"
@@ -202,7 +228,23 @@ def test_export_board_archive(tmp_path: Path, mock_pcb_config: PCBConfig, mock_w
         assert any(n.endswith(".drl") for n in namelist)
 
 
-def test_export_board_directory(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
+def test_export_board_archive_without_kicad_cli(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
+    """Verify export_board_archive cleanly creates zip with .kicad_pcb when kicad-cli is missing."""
+    with patch.object(KiCadCLI, "is_available", False):
+        exporter = PCBExporter(mock_pcb_config, mock_wiring)
+        out_file = tmp_path / "board_no_cli.zip"
+        res = exporter.export_board_archive(out_file)
+
+        assert res.exists()
+        with zipfile.ZipFile(res, "r") as zf:
+            namelist = zf.namelist()
+            assert "TestBoard.kicad_pcb" in namelist
+            assert not any(n.endswith(".gbr") for n in namelist)
+
+
+def test_export_board_directory(
+    tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring, mock_kicad_cam_files_if_unavailable
+):
     """Verify export of canonical KiCad board and kicad-cli manufacturing files into directory."""
     exporter = PCBExporter(mock_pcb_config, mock_wiring)
     out_dir = tmp_path / "board"
@@ -341,7 +383,9 @@ def test_kicad_cli_nonzero_exit_raises(tmp_path: Path):
             cli.run_command(["pcb", "export"])
 
 
-def test_pcb_exporter_all_methods_integration(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
+def test_pcb_exporter_all_methods_integration(
+    tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring, mock_kicad_cam_files_if_unavailable
+):
     """Verify integration testing of kicad_pcb.j2 and kicad_sch.j2 code generators for all export methods in PCBExporter."""
     from provider.room import Room
 

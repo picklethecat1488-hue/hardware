@@ -915,7 +915,42 @@ class TestViewer:
             mock_exp_sch.assert_called_once()
             mock_launch_pcb.assert_called_once()
             kicad_file_arg = mock_launch_pcb.call_args[0][0]
-            assert kicad_file_arg.name == "test_board.kicad_pcb"
+            assert kicad_file_arg.name == "carrier_pcb.kicad_pcb"
+            mock_show.assert_called_once()
+
+    @patch("view.show")
+    @patch.object(Viewer, "launch_pcb_viewer")
+    def test_show_view_pcb_subassembly_flex_tail(self, mock_launch_pcb, mock_show, viewer, tmp_path):
+        """Verify show_view on test_board/flex_tail exports and launches flex_tail.kicad_pcb."""
+        target_name = "test_board/flex_tail"
+        mock_targets = MagicMock(spec=TargetList)
+        mock_targets.__iter__.return_value = iter([target_name])
+        mock_targets.__len__.return_value = 1
+        viewer.target_parser.resolve = MagicMock(side_effect=[None, None, None, mock_targets])
+
+        mock_provider = MagicMock()
+        mock_provider.name = "test_board"
+        mock_provider.wiring_path = tmp_path / "wiring.yaml"
+        mock_provider.pcb_config = MagicMock()
+        mock_provider.pcb_config.dimensions_mm = (100.0, 15.0, 0.2)
+        mock_provider.pcb_config.stackup.total_thickness_mm = 0.2
+        mock_provider.pcb_config.stackup.soldermask_color = "amber"
+
+        viewer.manager.router.providers = [mock_provider]
+
+        with (
+            patch("view.ProviderResolver.resolve", return_value=mock_provider),
+            patch("provider.pcb.exporter.PCBExporter.build_solid", return_value=Box(10, 10, 0.2)),
+            patch("provider.pcb.exporter.PCBExporter.export_board") as mock_exp_board,
+            patch("provider.pcb.exporter.PCBExporter.export_kicad_sch") as mock_exp_sch,
+        ):
+            viewer.show_view([target_name], build_dir=str(tmp_path), no_gui=False)
+
+            mock_exp_board.assert_called_once()
+            mock_exp_sch.assert_called_once()
+            mock_launch_pcb.assert_called_once()
+            kicad_file_arg = mock_launch_pcb.call_args[0][0]
+            assert kicad_file_arg.name == "flex_tail.kicad_pcb"
             mock_show.assert_called_once()
 
     @patch.object(Viewer, "launch_pcb_viewer")

@@ -299,6 +299,19 @@ def test_review_server_api_flow(tmp_path: Path) -> None:
             assert verdict_data["session"]["verdict"] == "APPROVED"
             assert verdict_data["exported_to"] != ""
 
+        # 9. Test POST /api/commit_reviewed
+        reviewed_req = urllib.request.Request(
+            f"{base_url}api/commit_reviewed",
+            data=json.dumps({"commit": "abcdef123456"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(reviewed_req) as response:
+            assert response.status == 200
+            reviewed_data = json.loads(response.read().decode("utf-8"))
+            assert reviewed_data["status"] == "ok"
+            assert reviewed_data["commit"] == "abcdef123456"
+
     finally:
         server.shutdown()
         server.server_close()
@@ -911,6 +924,46 @@ def test_code_review_html_unified_diff_delete_styling(tmp_path: Path) -> None:
             # Must map l.type delete in renderUnified
             assert 'l.type === "delete"' in html
             assert "del delete" in html
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_code_review_commit_time_ascending_and_code_search(tmp_path: Path) -> None:
+    """Verify commits include formatted time HH:MM:SS, are in ascending order, and search API returns matches."""
+    repo_root, shas = create_isolated_git_repo(tmp_path)
+    engine = GitReviewEngine(repo_root=repo_root)
+
+    # 1. Verify commits have time formatted as HH:MM:SS
+    commits = engine.get_commits(rev_args=["HEAD~2..HEAD"])
+    assert len(commits) == 2
+    for c in commits:
+        assert len(c.time) == 8
+        assert c.time.count(":") == 2
+
+    # 2. Verify ascending chronological order: commits[0] is older commit (Commit 2), commits[1] is Commit 3
+    assert commits[0].commit_hash == shas[1]
+    assert commits[1].commit_hash == shas[2]
+
+    # 3. Test search API via server
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}api/search?q=content") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["query"] == "content"
+            assert len(data["results"]) >= 1
+            assert any("test_" in r["file_path"] for r in data["results"])
     finally:
         server.shutdown()
         server.server_close()

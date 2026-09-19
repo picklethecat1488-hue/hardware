@@ -24,6 +24,11 @@ class TestBoardConfig(BaseModel):
         description="Material for enclosure and mechanical mounts.",
     )
 
+    routing_path: Optional[str] = Field(
+        default=None,
+        description="Path to persisted routing YAML file defining traces and vias.",
+    )
+
     @cached_property
     def _raw_data(self) -> dict[Union[int, str], Any]:
         """Load and normalize raw measurements from the YAML file."""
