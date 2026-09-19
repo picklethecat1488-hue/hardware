@@ -1,0 +1,21 @@
+"""Code Review provider package.
+
+Provides Git diff inspection, Quake-styled interactive web UI, REST API endpoints,
+and Markdown export utilities.
+"""
+
+from .git_utils import (
+    GitReviewEngine,
+    get_git_root,
+    extract_line_snippet,
+)
+from .markdown_exporter import MarkdownReviewExporter
+from .server import ReviewServer
+
+__all__ = [
+    "GitReviewEngine",
+    "get_git_root",
+    "extract_line_snippet",
+    "MarkdownReviewExporter",
+    "ReviewServer",
+]

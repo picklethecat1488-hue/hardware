@@ -6,6 +6,7 @@ import fnmatch
 import os
 import sys
 import shutil
+import subprocess
 import tempfile
 import time
 import pybullet as p
@@ -58,7 +59,7 @@ class ProviderResolver:
 class Viewer:
     """Builds and displays geometry rooms for visualization."""
 
-    VISUAL_ACTIONS = [Section.VIEW, Section.PART, Section.DIAGRAM]
+    VISUAL_ACTIONS = [Section.VIEW, Section.PART, Section.DIAGRAM, Section.PCB]
 
     def __init__(self, manager: ProviderManager, logger: Logger):
         """Initialize the viewer."""
@@ -108,6 +109,132 @@ class Viewer:
             items.append((room.compound, f"{p_name}_diagram", None, 1.0))
         return items
 
+    @staticmethod
+    def locate_vscode_cli() -> Optional[str]:
+        """Locate the VS Code executable command."""
+        env_code = os.environ.get("VSCODE_BIN")
+        if env_code:
+            p = Path(env_code)
+            if p.is_file() and os.access(str(p), os.X_OK):
+                return str(p)
+            which_env = shutil.which(env_code)
+            if which_env:
+                return which_env
+            return env_code
+        code_bin = shutil.which("code")
+        if code_bin:
+            return code_bin
+        code_insiders = shutil.which("code-insiders")
+        if code_insiders:
+            return code_insiders
+        return None
+
+    def launch_pcb_viewer(self, file_path: Path, no_gui: bool = False):
+        """Open KiCad PCB or schematic file in VS Code using the KiCode extension."""
+        resolved_path = file_path.resolve()
+        self.logger.print(f"Viewing KiCad file: {resolved_path}", symbol="🖥️")
+        if no_gui:
+            return
+
+        code_cmd = self.locate_vscode_cli()
+        if code_cmd:
+            try:
+                subprocess.run([code_cmd, str(resolved_path)], check=False)
+                self.logger.print(f"Opened in VS Code (KiCode): {resolved_path.name}", symbol="✨")
+            except Exception as err:
+                self.logger.print(f"Could not spawn VS Code CLI: {err}", symbol="⚠️")
+        else:
+            self.logger.print(
+                f"Open in VS Code (KiCode extension): file://{resolved_path}",
+                symbol="💡",
+            )
+
+    def _get_pcb_items(
+        self,
+        targets: TargetList,
+        build_dir: str = "build",
+        no_build: bool = False,
+        no_gui: bool = False,
+    ) -> List[tuple[Any, str, Optional[tuple[float, float, float]], float]]:
+        """Collect 3D PCB models for ocp_vscode and launch KiCode in VS Code."""
+        items = []
+        for target in targets:
+            provider = ProviderResolver.resolve(self.manager.router, target)
+            if not provider or not provider.pcb_config:
+                continue
+
+            from model.wiring import Wiring
+            from provider.pcb.exporter import PCBExporter
+
+            subassembly = TargetParser.split_target(target)[1]
+            wiring = Wiring(provider.wiring_path) if os.path.exists(provider.wiring_path) else None
+
+            solid = None
+            sub_pcb_config = None
+            item_name = f"{provider.name}_pcb"
+            item_color = None
+
+            if subassembly and subassembly in provider.part:
+                part_func = provider.part[subassembly]
+                part_res = part_func(subassembly, None, Mode.DEFAULT)
+                solid = getattr(part_res, "part", part_res)
+                item_name = f"{provider.name}_{subassembly}_pcb"
+                manifest_entry = self.manager.router.manifest.get(subassembly, {})
+                color = manifest_entry.get("color")
+                if color:
+                    item_color = (color[0], color[1], color[2])
+
+                if hasattr(part_res, "to_pcb_config"):
+                    sub_pcb_config = part_res.to_pcb_config()
+                elif hasattr(part_res, "pcb_metadata"):
+                    sub_pcb_config = part_res.pcb_metadata
+
+            pcb_cfg = sub_pcb_config or provider.pcb_config
+            if subassembly and not sub_pcb_config:
+                pcb_cfg = provider.pcb_config.model_copy(update={"name": subassembly})
+            elif sub_pcb_config and not sub_pcb_config.stackup:
+                pcb_cfg = sub_pcb_config.model_copy(update={"stackup": provider.pcb_config.stackup})
+
+            exporter = PCBExporter(pcb_cfg, wiring)
+
+            pcb_filename = f"{subassembly}.kicad_pcb" if subassembly else f"{provider.name}.kicad_pcb"
+            sch_filename = f"{subassembly}.kicad_sch" if subassembly else f"{provider.name}.kicad_sch"
+
+            board_dir = Path(build_dir) / "board" / provider.name
+            kicad_pcb_path = board_dir / pcb_filename
+            schematics_dir = Path(build_dir) / "schematics" / provider.name
+            kicad_sch_path = schematics_dir / sch_filename
+
+            if not no_build:
+                board_dir.mkdir(parents=True, exist_ok=True)
+                schematics_dir.mkdir(parents=True, exist_ok=True)
+                if not kicad_pcb_path.exists():
+                    exporter.export_board(board_dir, pcb_filename=pcb_filename)
+                if not kicad_sch_path.exists():
+                    exporter.export_kicad_sch(kicad_sch_path)
+
+            if solid is None:
+                solid = exporter.build_solid()
+
+            if item_color is None:
+                color_map = {
+                    "matte_black": (0.12, 0.12, 0.12),
+                    "black": (0.12, 0.12, 0.12),
+                    "green": (0.08, 0.40, 0.20),
+                    "blue": (0.10, 0.25, 0.65),
+                    "red": (0.65, 0.10, 0.10),
+                    "white": (0.90, 0.90, 0.90),
+                    "purple": (0.45, 0.15, 0.55),
+                }
+                item_color = color_map.get(pcb_cfg.stackup.soldermask_color.lower(), (0.08, 0.40, 0.20))
+
+            items.append((solid, item_name, item_color, 1.0))
+
+            if not no_gui:
+                self.launch_pcb_viewer(kicad_pcb_path, no_gui=no_gui)
+
+        return items
+
     @validate_call(config={"arbitrary_types_allowed": True})
     def show_view(
         self,
@@ -144,7 +271,33 @@ class Viewer:
         else:
             res_tuple = tuple(resolution)
 
+        # Check if all or any targets are direct KiCad / board files or STEP models
+        direct_files = []
         for target in input_targets:
+            p = Path(target)
+            if p.is_file() and p.suffix.lower() in (".kicad_pcb", ".kicad_sch", ".gbr", ".drl", ".svg"):
+                direct_files.append(p)
+                self.launch_pcb_viewer(p, no_gui=no_gui)
+            elif p.is_file() and p.suffix.lower() in (".step", ".stp"):
+                direct_files.append(p)
+                imported = import_step(str(p.resolve()))
+                display_items.append((imported, p.stem, None, 1.0))
+
+        if direct_files and len(direct_files) == len(input_targets) and not display_items:
+            return
+
+        for target in input_targets:
+            p = Path(target)
+            if p.is_file() and p.suffix.lower() in (
+                ".kicad_pcb",
+                ".kicad_sch",
+                ".gbr",
+                ".drl",
+                ".svg",
+                ".step",
+                ".stp",
+            ):
+                continue
             for action in self.VISUAL_ACTIONS:
                 try:
                     targets = self.target_parser.resolve(target, action)
@@ -163,6 +316,11 @@ class Viewer:
                             break
                         case Section.DIAGRAM:
                             display_items.extend(self._get_diagram_items(targets))
+                            break
+                        case Section.PCB:
+                            display_items.extend(
+                                self._get_pcb_items(targets, build_dir=build_dir, no_build=no_build, no_gui=no_gui)
+                            )
                             break
                 except ValueError:
                     continue
