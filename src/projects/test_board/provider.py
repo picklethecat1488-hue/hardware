@@ -43,7 +43,8 @@ from provider import (
     BuildVias,
     Via,
     BuildPcb,
-    BuildFlexTail,
+    BuildFlexPCB,
+    FlexType,
 )
 from projects_config import TestBoardConfig
 
@@ -144,15 +145,16 @@ class TestBoardProvider(Provider):
 
         return pcb
 
-    def flex_tail(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildFlexTail:
+    def flex_tail(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildFlexPCB:
         """Build the flexible polyimide sensing tail extending from the carrier board edge."""
         w_tail = self.settings.flex_tail_width
         l_tail = self.settings.flex_tail_length
         t_tail = self.settings.flex_tail_thickness
         length_board = self.settings.board_length
 
-        with BuildFlexTail(
+        with BuildFlexPCB(
             name="flex_tail",
+            flex_type=FlexType.CAPACITIVE,
             capacitive_sensors=self.pcb_config.capacitive_sensors if self.pcb_config else None,
         ) as tail:
             # Place flex tail protruding along +Y from the top edge of the board
@@ -370,11 +372,11 @@ class TestBoardProvider(Provider):
             TestPoint("TP_SCL", net="I2C_SCL", at=(14.0, -4.0))
             TestPoint("TP_SDA", net="I2C_SDA", at=(18.0, -4.0))
 
-            # MIPI display differential pair test points (spaced with 4mm pitch)
-            TestPoint("TP_D0_P", net="MIPI_DATA0_P", at=(6.0, 22.0))
-            TestPoint("TP_D0_N", net="MIPI_DATA0_N", at=(10.0, 22.0))
-            TestPoint("TP_CLK_P", net="MIPI_CLK_P", at=(14.0, 22.0))
-            TestPoint("TP_CLK_N", net="MIPI_CLK_N", at=(18.0, 22.0))
+            # MIPI display differential pair test points (spaced with 4mm pitch on left half of board)
+            TestPoint("TP_D0_P", net="MIPI_DATA0_P", at=(-14.0, 22.0))
+            TestPoint("TP_D0_N", net="MIPI_DATA0_N", at=(-10.0, 22.0))
+            TestPoint("TP_CLK_P", net="MIPI_CLK_P", at=(-6.0, 22.0))
+            TestPoint("TP_CLK_N", net="MIPI_CLK_N", at=(-2.0, 22.0))
         return tp
 
     @cached_property
@@ -392,10 +394,10 @@ class TestBoardProvider(Provider):
             return PCBAutoRouter.load_routing_yaml(default_routing)
 
         # 2. Automated routing across all nets via PCBAutoRouter
-        raw_cfg = self.pcb_manifest
+        base_cfg = self.get_pcb_config_without_routes()
         wiring = Wiring(str(self.wiring_path)) if self.wiring_path.exists() else None
-        if raw_cfg and wiring:
-            router = PCBAutoRouter(raw_cfg, wiring)
+        if base_cfg and wiring:
+            router = PCBAutoRouter(base_cfg, wiring)
             return router.route_all_nets()
 
         return [], []

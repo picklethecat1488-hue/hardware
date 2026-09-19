@@ -10,6 +10,7 @@ from model.pcb import (
     BoardType,
     CapacitiveElectrodeModel,
     CopperRegionModel,
+    FlexType,
     MountingHoleModel,
     PCBConfig,
     SilkscreenTextModel,
@@ -27,8 +28,8 @@ for builders in operations_apply_to.values():
     if "BuildPart" in builders:
         if "BuildPcb" not in builders:
             builders.append("BuildPcb")
-        if "BuildFlexTail" not in builders:
-            builders.append("BuildFlexTail")
+        if "BuildFlexPCB" not in builders:
+            builders.append("BuildFlexPCB")
 
 
 class BuildPcb(BuildPart):
@@ -134,18 +135,22 @@ class BuildPcb(BuildPart):
         return _current_build_pcb.get()
 
 
-class BuildFlexTail(BuildPcb):
-    """Convenience context manager for flexible polyimide tail PCB subassemblies."""
+class BuildFlexPCB(BuildPcb):
+    """Context manager for flexible polyimide PCB subassemblies.
+
+    Supports different flexible PCB types: 'connector', 'component', and 'capacitive'.
+    """
 
     def __init__(
         self,
-        name: str = "flex_tail",
+        name: str = "flex_pcb",
+        flex_type: Union[FlexType, str] = FlexType.CAPACITIVE,
         revision: str = "1.0",
         stackup: Optional[Union[BuildStackup, StackupModel]] = None,
         capacitive_sensors: Optional[Sequence[CapacitiveElectrodeModel]] = None,
         mode: Any = None,
     ) -> None:
-        """Initialize flexible tail context."""
+        """Initialize flexible PCB context with typed flex_type."""
         super().__init__(
             name=name,
             board_type=BoardType.FLEX,
@@ -154,3 +159,9 @@ class BuildFlexTail(BuildPcb):
             capacitive_sensors=capacitive_sensors,
             mode=mode,
         )
+        self.flex_type: FlexType = FlexType(flex_type) if isinstance(flex_type, str) else flex_type
+
+    def to_pcb_config(self) -> PCBConfig:
+        """Construct strongly-typed PCBConfig including flex_type metadata."""
+        cfg = super().to_pcb_config()
+        return cfg.model_copy(update={"flex_type": self.flex_type})

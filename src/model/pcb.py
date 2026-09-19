@@ -29,6 +29,14 @@ class BoardType(StrEnum):
     RIGID_FLEX = "rigid-flex"
 
 
+class FlexType(StrEnum):
+    """Classification of flexible PCB subassembly application types."""
+
+    CONNECTOR = "connector"
+    COMPONENT = "component"
+    CAPACITIVE = "capacitive"
+
+
 class StackupLayerModel(BaseModel):
     """Data model representing an individual layer in a multi-layer stackup."""
 
@@ -697,6 +705,9 @@ class PCBConfig(BaseModel):
     name: str = Field(description="PCB project or sub-assembly name")
     board_type: BoardType = Field(
         default=BoardType.RIGID_FLEX, description="Substrate type: 'rigid', 'flex', or 'rigid-flex'"
+    )
+    flex_type: Optional[FlexType] = Field(
+        default=None, description="Flexible PCB application type ('connector', 'component', 'capacitive')"
     )
     revision: str = Field(default="1.0", description="Board revision identifier (e.g. '1.0', 'A', 'rev2')")
     dimensions_mm: Optional[Tuple[float, float, float]] = Field(
