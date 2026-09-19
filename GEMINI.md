@@ -59,6 +59,7 @@ pytest
 * **Configuration Persistence**: For configuration actions, they should persist saved settings to the Pydantic environment file (`.env`) in addition to updating any source project data files (like `measurements.yaml`). This ensures they are immediately active in the build environment.
 * **No Fallback Constants**: Do NOT place fallback constants directly in the codebase when parsing configs or settings (e.g., using a ternary fallback or `getattr` defaults like `0.004` or `0.90`). All configuration fields must be strongly typed and resolved dynamically via configuration models, metadata definitions, or joint state queries rather than having hardcoded fallback/default values defined in python source code. Fallback constants of `0`, `0.0`, or `None` are acceptable to represent unconfigured properties or missing dimensions. This ensures configuration changes propagate cleanly and prevents silent regressions.
 * **No Dead Code**: Unused code (such as dangling clauses, functions, or parameters that do nothing) and settings that do not affect or update anything must be removed from the repository. Maintain a clean, minimalist codebase to prevent confusion and bugs.
+* **No Backward Compatibility Shims**: Do NOT introduce, retain, or propose backward compatibility shims, aliases, legacy wrappers, deprecated fallbacks, or obsolete re-exports (such as `OldClass = NewClass`, `old_module = new_module`, or maintaining duplicate legacy functions/parameters). This repository does NOT support backward compatibility. When refactoring or renaming symbols, packages, or settings, all callers, imports, configurations, and tests MUST be updated directly to canonical current names, and obsolete identifiers must be purged completely.
 * **Parameter & Signature Hygiene**: Whenever modifying, refactoring, or simplifying functions, subroutines, or methods, any parameters that become unused (such as legacy flags, signs like `normal_sign: float`, unused tolerances, or obsolete scalars) MUST be immediately pruned from both the function signature and all caller invocations with each change. Do NOT leave unused parameters in signatures, accept dummy parameters, or pass dead constant arguments.
 * **Material Schema Encapsulation & CLI Purity**: Material properties—including optical attributes, surface rendering, fluid meshing parameters (such as voxel sizes, splat radii, surface thresholds, adaptivity, and screen-space fluid rendering toggles), and physical characteristics—MUST be declared within the declarative material YAML schema (`print_materials.yaml`) and encapsulated in strongly typed models (`MaterialModel`, `MaterialsModel`) rather than exposed as ad-hoc CLI flags or function arguments. CLI interfaces and runner entrypoints (such as `view.py`) must remain focused on operational orchestration (targets, steps, output paths, FPS, view angles) without polluting CLI options with material-level subparameters.
 
@@ -106,12 +107,28 @@ pytest
 
 ### 8. Work Tracking & Task Management
 * **Task List (`TODO.md`)**: Maintain and track planned tasks, active implementation steps, outstanding engineering checklist items, and completed work in a `TODO.md` file in the workspace root. Keep the checklist updated (`[ ]` -> `[x]`) as subtasks progress to provide clear visibility and alignment.
+* **Pending Code Review Inspection (`build/CR.md`)**: Whenever beginning a new task, turn, or feature implementation, you MUST inspect `build/CR.md` for pending code review feedback, active review comments, or requested revisions. Any unaddressed feedback in `build/CR.md` must be prioritized and resolved before progressing to new development tasks.
 
 ### 9. Code Generation & Jinja2 Templates
 * **Jinja2 Templating Engine**: Always use Jinja2 (`jinja2`) to generate templated Python scripts, Blender headless scripts, URDF models, or simulation configurations rather than embedding large multi-line f-strings directly inside Python source files.
 * **Dedicated Templates Directory**: All templated script files (`.py.j2`, `.yaml.j2`, `.urdf.j2`, `.sh.j2`) MUST be stored in a dedicated `templates/` folder nested within the respective package or module (e.g., `src/provider/templates/`).
 * **Clean Rendering & Context Separation**: Render external Jinja2 templates via `jinja2.Environment(loader=jinja2.FileSystemLoader(...), trim_blocks=True, lstrip_blocks=True)` or package loaders, passing configuration parameters as explicit dictionaries or strongly typed models.
 * **No Silent Exception Swallowing in Templates**: Templated scripts (`.py.j2`) MUST follow the same code quality standards as Python source files. Never generate `try/except/pass` fallback ladders inside Jinja2 templates; inspect environment capabilities, platform parameters, or application versions deterministically via template variables or standard version properties.
+
+### 10. PCB Design & Headless KiCad Toolchain
+* **Declarative Pipeline**: The PCB engine follows the strict pipeline:
+  `pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files`.
+* **Standard CAM Generation**: Manufacturing board files (RS-274X Gerbers, Excellon NC drills, Gerber job files) must be generated strictly via headless `kicad-cli` (`KiCadCLI`), not custom DIY string formatting or hand-rolled formatters.
+* **Remote Offload via Anvil**: In environments lacking local KiCad or GUI dependencies, run test suites and manufacturing builds on the `anvil` cloud server via `bin/anvil run`.
+* **Interactive Visualization**: Native `.kicad_pcb` and `.kicad_sch` files are rendered interactively in VS Code via the KiCode extension (`sajadghorbani.kicode`, powered by KiCanvas) and in 3D CAD via `ocp_vscode`.
+
+### 11. Component Selection & Bare-Metal Firmware Co-Design
+* **Target Firmware Environment**: The downstream target execution environment is bare-metal Rust (`no_std`, Embassy asynchronous executor, `embedded-hal` driver abstractions, `defmt` logging, stack-based zero-allocation concurrency, and static memory analysis) as detailed in the firmware repository guidelines (`/Users/daparker/gh/firmware/CONTRIBUTING.md`).
+* **Programmable Component Qualification**: Any active electronic component, sensor IC, PMIC, touch controller, motor driver, or microcontroller integrated into hardware designs, schematics, manifests, or BOMs that requires software configuration or control MUST meet the following co-design criteria:
+  - **Open-Source Driver Code**: An existing, permissive open-source driver (preferably a Rust crate implementing `embedded-hal` traits, or a clean, readily portable C library) must be publicly available.
+  - **Public Datasheet**: Complete, non-confidential datasheets covering electrical characteristics, pinouts, timing, and typical application circuits must be available.
+  - **Comprehensive Register Maps**: Full register maps documenting all register addresses, bit fields, reset defaults, and initialization/configuration sequences must be accessible.
+  - **No Binary Blobs**: Components requiring proprietary closed-source binary firmware blobs, undocumented black-box registers, or NDA-encumbered software stacks are strictly prohibited.
 
 ---
 

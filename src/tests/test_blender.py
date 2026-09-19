@@ -217,7 +217,7 @@ class TestBlenderRenderer:
         assert "b_blur.sigma_color = 0.05" in code
         assert "key_light_data.energy = 28.0" in code
         assert 'scene.view_settings.view_transform = "AgX"' in code
-        assert "cprefs.peer_memory = True" in code
+        assert "cprefs.peer_memory = False" in code
         # Check Python compilation of generated script
         compile(code, str(script_file), "exec")
 
