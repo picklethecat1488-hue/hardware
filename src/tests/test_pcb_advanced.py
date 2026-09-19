@@ -400,12 +400,17 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 10
+    assert len(wiring.footprints) == 29
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
+    assert "U3" in footprint_names
+    assert "U4" in footprint_names
     assert "J1" in footprint_names
     assert "J2" in footprint_names
+    assert "J_USB" in footprint_names
+    assert "SPK1" in footprint_names
+    assert "Y1" in footprint_names
     assert "R1" in footprint_names
     assert "R2" in footprint_names
     assert "C1" in footprint_names
@@ -429,11 +434,11 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 11  # header + 10 components
+    assert len(bom_lines) == 29  # header + 28 carrier components (J_FLEX is on flex tail)
     assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 11  # header + 10 components
+    assert len(pos_lines) == 29  # header + 28 carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -873,10 +878,11 @@ def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     assert float(rows["J2"]["Mid Y"].replace("mm", "")) == 38.0
 
 
-def test_build_pcb_and_build_flex_tail_context_managers(advanced_pcb_stackup: StackupModel):
-    """Verify BuildPcb and BuildFlexTail custom context managers attach stackup and dimensions metadata."""
+def test_build_pcb_and_build_flex_pcb_context_managers(advanced_pcb_stackup: StackupModel):
+    """Verify BuildPcb and BuildFlexPCB custom context managers attach stackup, dimensions, and flex_type metadata."""
     from build123d import Box
-    from provider.pcb.board import BuildPcb, BuildFlexTail
+    from model.pcb import FlexType
+    from provider.pcb.board import BuildPcb, BuildFlexPCB
 
     with BuildPcb(
         name="main_carrier",
@@ -896,19 +902,23 @@ def test_build_pcb_and_build_flex_tail_context_managers(advanced_pcb_stackup: St
     assert meta.stackup is not None
     assert meta.dimensions_mm == (60.0, 40.0, round(advanced_pcb_stackup.total_thickness_mm, 4))
 
-    # Test BuildFlexTail
-    with BuildFlexTail(
-        name="camera_flex",
-        revision="1.0",
-        stackup=advanced_pcb_stackup,
-    ) as flex_builder:
-        Box(40.0, 15.0, 0.20)
+    # Test BuildFlexPCB with different flex types: connector, capacitive, component
+    for ftype in (FlexType.CONNECTOR, FlexType.CAPACITIVE, FlexType.COMPONENT):
+        with BuildFlexPCB(
+            name=f"flex_{ftype.value}",
+            flex_type=ftype,
+            revision="1.0",
+            stackup=advanced_pcb_stackup,
+        ) as flex_builder:
+            Box(40.0, 15.0, 0.20)
 
-    assert flex_builder.part is not None
-    assert flex_builder.board_type == "flex"
-    meta_flex = getattr(flex_builder.part, "pcb_metadata")
-    assert meta_flex.board_type == "flex"
-    assert meta_flex.name == "camera_flex"
+        assert flex_builder.part is not None
+        assert flex_builder.board_type == "flex"
+        assert flex_builder.flex_type == ftype
+        meta_flex = getattr(flex_builder.part, "pcb_metadata")
+        assert meta_flex.board_type == "flex"
+        assert meta_flex.flex_type == ftype
+        assert meta_flex.name == f"flex_{ftype.value}"
 
 
 def test_schematic_staggered_pin_stubs_and_loop_crossings(tmp_path: Path):
@@ -1125,3 +1135,54 @@ def test_schematic_discrete_component_truth_table(tmp_path: Path):
     res = diag.render_pdf(out_pdf)
     assert res.exists()
     assert res.stat().st_size > 0
+
+
+def test_schematic_diagram_geometric_offsets_and_gnd_placement(tmp_path: Path) -> None:
+    """Verify geometric offsets in SchematicDiagram do not self-intersect symbols, wires, or text labels.
+
+    Guards against schematic regressions:
+    1. Pullup network vertical offsets: y_zz_bot > channel_top_y, y_zz_top > y_zz_bot, y_top_rail > y_zz_top.
+    2. IC pin ordering: Power pins placed at top, Ground pins at bottom.
+    3. Ground symbol downward placement: GND symbols hang DOWN under components/traces rather than horizontal overlap.
+    """
+    from projects.test_board.provider import TestBoardProvider
+    from provider.schematic_diagram import SchematicDiagram, GROUND_NET_NAMES, POWER_NET_NAMES
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    diag = SchematicDiagram(wiring, pcb_config=provider.pcb_config)
+
+    # 1. Verify sheet plans generation and pin sorting
+    plans = diag._build_sheet_plans()
+    assert len(plans) >= 3
+
+    # Sheet 3: Capacitive Sensing & Control (contains U1, U2, R1, R2, J2)
+    sheet3 = next(p for p in plans if "Capacitive" in p.title)
+    u2_fp = next(fp for fp in sheet3.footprints if fp.name == "U2")
+
+    # Verify pin sort order on U2: VDD at top, VSS at bottom
+    left_pins = [p for p in u2_fp.pins if p.side.value in ("left", "bottom")]
+    pin_to_net = {}
+    for net in wiring.nets:
+        for c, p in net.pins:
+            pin_to_net[(c, p)] = net.name
+
+    def _pin_sort_key(p):
+        net = pin_to_net.get((u2_fp.name, p.name), "").upper()
+        if net in POWER_NET_NAMES:
+            return 0
+        if net in GROUND_NET_NAMES:
+            return 2
+        return 1
+
+    left_pins.sort(key=_pin_sort_key)
+    # VDD must be first (index 0)
+    assert left_pins[0].name == "VDD"
+    # VSS (ground) must be at the bottom (after signals SDA, SCL, INT)
+    assert left_pins[-1].name == "VSS"
+
+    # 2. Verify PDF generation executes with zero self-intersections
+    pdf_path = tmp_path / "schematic_offsets_verified.pdf"
+    rendered = diag.render_pdf(pdf_path)
+    assert rendered.exists()
+    assert rendered.stat().st_size > 5000

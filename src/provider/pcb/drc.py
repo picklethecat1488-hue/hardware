@@ -11,6 +11,7 @@ from model.pcb import (
     NetClassModel,
     FlexZoneModel,
     LayerType,
+    BoardType,
 )
 from provider.geometry_utils import point_in_polygon
 
@@ -107,12 +108,169 @@ class DRCViolation:
         return f"[{self.severity.upper()}] {self.rule_name} on '{self.net_or_zone}'{loc}: {self.description}{actual}{expected}"
 
 
+class DRCViolationCollection(List[DRCViolation]):
+    """Custom collection for DRC violations providing structured helper factory methods."""
+
+    def add_violation(
+        self,
+        rule_name: str,
+        severity: DRCSeverity,
+        net_or_zone: str,
+        description: str,
+        actual_value: Optional[float] = None,
+        expected_range: Optional[Tuple[float, float]] = None,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append a DRC violation to the collection."""
+        v = DRCViolation(
+            rule_name=rule_name,
+            severity=severity,
+            net_or_zone=net_or_zone,
+            description=description,
+            actual_value=actual_value,
+            expected_range=expected_range,
+            location=location,
+        )
+        self.append(v)
+        return v
+
+    def add_error(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        description: str,
+        actual_value: Optional[float] = None,
+        expected_range: Optional[Tuple[float, float]] = None,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append an ERROR DRC violation."""
+        return self.add_violation(
+            rule_name=rule_name,
+            severity=DRCSeverity.ERROR,
+            net_or_zone=net_or_zone,
+            description=description,
+            actual_value=actual_value,
+            expected_range=expected_range,
+            location=location,
+        )
+
+    def add_warning(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        description: str,
+        actual_value: Optional[float] = None,
+        expected_range: Optional[Tuple[float, float]] = None,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append a WARNING DRC violation."""
+        return self.add_violation(
+            rule_name=rule_name,
+            severity=DRCSeverity.WARNING,
+            net_or_zone=net_or_zone,
+            description=description,
+            actual_value=actual_value,
+            expected_range=expected_range,
+            location=location,
+        )
+
+    def add_info(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        description: str,
+        actual_value: Optional[float] = None,
+        expected_range: Optional[Tuple[float, float]] = None,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append an INFO DRC violation."""
+        return self.add_violation(
+            rule_name=rule_name,
+            severity=DRCSeverity.INFO,
+            net_or_zone=net_or_zone,
+            description=description,
+            actual_value=actual_value,
+            expected_range=expected_range,
+            location=location,
+        )
+
+    def add_boundary_violation(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        element_name: str,
+        x: float,
+        y: float,
+        is_outline: bool = False,
+    ) -> DRCViolation:
+        """Construct and append a boundary containment violation."""
+        boundary_type = "CAD board boundary outline" if is_outline else "board envelope"
+        description = f"{element_name} at ({x:.2f}, {y:.2f}) is outside {boundary_type}"
+        return self.add_error(
+            rule_name=rule_name,
+            net_or_zone=net_or_zone,
+            description=description,
+            location=(x, y, 0.0),
+        )
+
+    def add_clearance_violation(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        description: str,
+        actual_distance: float,
+        min_clearance: float,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append a clearance distance violation."""
+        return self.add_error(
+            rule_name=rule_name,
+            net_or_zone=net_or_zone,
+            description=description,
+            actual_value=actual_distance,
+            expected_range=(min_clearance, float("inf")),
+            location=location,
+        )
+
+    def add_continuity_violation(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        description: str,
+        severity: DRCSeverity = DRCSeverity.ERROR,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append a netlist or routing continuity violation."""
+        return self.add_violation(
+            rule_name=rule_name,
+            severity=severity,
+            net_or_zone=net_or_zone,
+            description=description,
+            location=location,
+        )
+
+    @property
+    def errors(self) -> List[DRCViolation]:
+        """Return all violations with ERROR severity."""
+        return [v for v in self if v.severity == DRCSeverity.ERROR]
+
+    @property
+    def warnings(self) -> List[DRCViolation]:
+        """Return all violations with WARNING severity."""
+        return [v for v in self if v.severity == DRCSeverity.WARNING]
+
+    @property
+    def infos(self) -> List[DRCViolation]:
+        """Return all violations with INFO severity."""
+        return [v for v in self if v.severity == DRCSeverity.INFO]
+
+
 @dataclass
 class DRCReport:
     """Collection of DRC violations and overall constraint conformance status."""
 
     passed: bool
-    violations: List[DRCViolation] = field(default_factory=list)
+    violations: DRCViolationCollection = field(default_factory=DRCViolationCollection)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -125,12 +283,17 @@ class DRCReport:
         """Count total warnings."""
         return sum(1 for v in self.violations if v.severity == DRCSeverity.WARNING)
 
+    @property
+    def info_count(self) -> int:
+        """Count total informational notifications."""
+        return sum(1 for v in self.violations if v.severity == DRCSeverity.INFO)
+
     def summary(self) -> str:
         """Return a formatted text summary of the DRC audit."""
         status = "PASSED" if self.passed else "FAILED"
         lines = [
             f"=== PCB Design Rule Check (DRC) Report: {status} ===",
-            f"Total Errors: {self.error_count}, Total Warnings: {self.warning_count}",
+            f"Total Errors: {self.error_count}, Total Warnings: {self.warning_count}, Total Info: {self.info_count}",
         ]
         for v in self.violations:
             lines.append(f"  * {v}")
@@ -143,6 +306,26 @@ class PCBDesignRulesChecker:
     def __init__(self, config: PCBConfig):
         """Initialize the checker with the board configuration."""
         self.config = config
+        self.is_flex = (
+            (getattr(self.config, "name", "") == "flex_tail")
+            or (getattr(self.config, "shape_ref", "") == "flex_tail")
+            or (getattr(self.config, "board_type", None) == BoardType.FLEX)
+        )
+
+    def get_footprints_for_board(self, wiring: Any) -> List[Any]:
+        """Filter and coordinate-transform footprints belonging specifically to this board target."""
+        if not wiring or not hasattr(wiring, "footprints"):
+            return []
+        fps = list(wiring.footprints)
+        if self.is_flex:
+            flex_fps = []
+            for fp in fps:
+                if fp.name == "J2" or getattr(fp, "shape_ref", None) == "flex_tail":
+                    if fp.name == "J2":
+                        fp = fp.model_copy(update={"position": (0.0, -21.0, fp.position[2])})
+                    flex_fps.append(fp)
+            return flex_fps
+        return [fp for fp in fps if getattr(fp, "shape_ref", None) != "flex_tail"]
 
     def check_all(
         self,
@@ -164,7 +347,7 @@ class PCBDesignRulesChecker:
         Returns:
             DRCReport detailing all passed/failed constraints.
         """
-        violations: List[DRCViolation] = []
+        violations = DRCViolationCollection()
 
         # 1. Stackup impedance verification (differential, CPWG RF, display)
         violations.extend(self.check_impedances())
@@ -181,7 +364,7 @@ class PCBDesignRulesChecker:
         violations.extend(self.check_flex_rules())
 
         # 5. Boundary containment check (footprints, traces, vias, test points)
-        fps = getattr(wiring, "footprints", []) if wiring else []
+        fps = self.get_footprints_for_board(wiring)
         violations.extend(self.check_boundary_containment(fps, outline_polygon))
 
         # 6. Netlist connectivity validation
@@ -352,6 +535,21 @@ class PCBDesignRulesChecker:
                                 expected_range=(0.0, diff_pair.max_intra_pair_skew_mm),
                             )
                         )
+                    else:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="DIFFERENTIAL_SKEW_COMPLIANT",
+                                severity=DRCSeverity.INFO,
+                                net_or_zone=diff_pair.name,
+                                description=(
+                                    f"Intra-pair skew between '{diff_pair.pos_net}' ({l_pos:.3f}mm) and "
+                                    f"'{diff_pair.neg_net}' ({l_neg:.3f}mm) is compliant "
+                                    f"({intra_skew:.3f}mm <= {diff_pair.max_intra_pair_skew_mm}mm)"
+                                ),
+                                actual_value=intra_skew,
+                                expected_range=(0.0, diff_pair.max_intra_pair_skew_mm),
+                            )
+                        )
                     pair_avg_lengths.append((diff_pair.name, (l_pos + l_neg) / 2.0))
 
             # Inter-pair / lane-to-lane matching across the net class
@@ -474,6 +672,20 @@ class PCBDesignRulesChecker:
                         expected_range=(min_recommended_dynamic, 50.0),
                     )
                 )
+            else:
+                violations.append(
+                    DRCViolation(
+                        rule_name="FLEX_DYNAMIC_BEND_COMPLIANT",
+                        severity=DRCSeverity.INFO,
+                        net_or_zone=zone.name,
+                        description=(
+                            f"Flex zone '{zone.name}' bend radius ({zone.min_bend_radius_mm:.2f}mm) "
+                            f"complies with IPC-2223 dynamic flexing guidelines (>={min_recommended_dynamic:.2f}mm)"
+                        ),
+                        actual_value=zone.min_bend_radius_mm,
+                        expected_range=(min_recommended_dynamic, 50.0),
+                    )
+                )
 
         return violations
 
@@ -493,7 +705,7 @@ class PCBDesignRulesChecker:
         Returns:
             List of DRCViolation instances for any boundary clearance violations.
         """
-        violations = []
+        violations = DRCViolationCollection()
         w_board, l_board, _ = self.config.dimensions_mm
         half_w = w_board / 2.0
         half_l = l_board / 2.0
@@ -512,16 +724,13 @@ class PCBDesignRulesChecker:
                 ]
                 for cx, cy in corners:
                     if not _point_in_polygon(cx, cy, outline_polygon):
-                        violations.append(
-                            DRCViolation(
-                                rule_name="BOUNDARY_CONTAINMENT_ERROR",
-                                severity=DRCSeverity.ERROR,
-                                net_or_zone=fp.name,
-                                description=(
-                                    f"Component '{fp.name}' extends outside CAD board boundary outline at ({cx:.2f}, {cy:.2f})"
-                                ),
-                                location=(cx, cy, 0.0),
-                            )
+                        violations.add_boundary_violation(
+                            "BOUNDARY_CONTAINMENT_ERROR",
+                            fp.name,
+                            f"Component '{fp.name}'",
+                            cx,
+                            cy,
+                            is_outline=True,
                         )
                         break
             else:
@@ -537,18 +746,16 @@ class PCBDesignRulesChecker:
                 fp_max_y = fy + (fl / 2.0)
 
                 if fp_min_x < min_x or fp_max_x > max_x or fp_min_y < min_y or fp_max_y > max_y:
-                    violations.append(
-                        DRCViolation(
-                            rule_name="BOUNDARY_CLEARANCE_VIOLATION",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=fp.name,
-                            description=(
-                                f"Component '{fp.name}' at ({fx:.2f}, {fy:.2f}) with size {fw:.1f}x{fl:.1f}mm violates "
-                                f"{edge_clearance_mm}mm edge clearance constraint to board boundary"
-                            ),
-                            location=(fx, fy, 0.0),
-                            expected_range=(edge_clearance_mm, half_w),
-                        )
+                    violations.add_clearance_violation(
+                        "BOUNDARY_CLEARANCE_VIOLATION",
+                        fp.name,
+                        (
+                            f"Component '{fp.name}' at ({fx:.2f}, {fy:.2f}) with size {fw:.1f}x{fl:.1f}mm violates "
+                            f"{edge_clearance_mm}mm edge clearance constraint to board boundary"
+                        ),
+                        actual_distance=min(half_w - abs(fx), half_l - abs(fy)),
+                        min_clearance=edge_clearance_mm,
+                        location=(fx, fy, 0.0),
                     )
 
         # Check trace segments containment
@@ -556,17 +763,13 @@ class PCBDesignRulesChecker:
             for pt in (tr.start_mm, tr.end_mm):
                 if outline_polygon:
                     if not _point_in_polygon(pt[0], pt[1], outline_polygon):
-                        violations.append(
-                            DRCViolation(
-                                rule_name="TRACE_OUTSIDE_BOARD_BOUNDARY",
-                                severity=DRCSeverity.ERROR,
-                                net_or_zone=tr.net,
-                                description=(
-                                    f"Trace on net '{tr.net}' on layer '{tr.layer}' at ({pt[0]:.2f}, {pt[1]:.2f}) "
-                                    f"extends outside CAD board boundary outline"
-                                ),
-                                location=(pt[0], pt[1], 0.0),
-                            )
+                        violations.add_boundary_violation(
+                            "TRACE_OUTSIDE_BOARD_BOUNDARY",
+                            tr.net,
+                            f"Trace on net '{tr.net}' on layer '{tr.layer}'",
+                            pt[0],
+                            pt[1],
+                            is_outline=True,
                         )
                         break
                 else:
@@ -578,17 +781,13 @@ class PCBDesignRulesChecker:
                             for fz in self.config.flex_zones
                         )
                         if not in_flex:
-                            violations.append(
-                                DRCViolation(
-                                    rule_name="TRACE_OUTSIDE_BOARD_BOUNDARY",
-                                    severity=DRCSeverity.ERROR,
-                                    net_or_zone=tr.net,
-                                    description=(
-                                        f"Trace on net '{tr.net}' on layer '{tr.layer}' at ({pt[0]:.2f}, {pt[1]:.2f}) "
-                                        f"extends outside board envelope"
-                                    ),
-                                    location=(pt[0], pt[1], 0.0),
-                                )
+                            violations.add_boundary_violation(
+                                "TRACE_OUTSIDE_BOARD_BOUNDARY",
+                                tr.net,
+                                f"Trace on net '{tr.net}' on layer '{tr.layer}'",
+                                pt[0],
+                                pt[1],
+                                is_outline=False,
                             )
                             break
 
@@ -597,25 +796,23 @@ class PCBDesignRulesChecker:
             vx, vy = v.position_mm
             if outline_polygon:
                 if not _point_in_polygon(vx, vy, outline_polygon):
-                    violations.append(
-                        DRCViolation(
-                            rule_name="VIA_OUTSIDE_BOARD_BOUNDARY",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=v.net,
-                            description=f"Via on net '{v.net}' at ({vx:.2f}, {vy:.2f}) is outside CAD board boundary outline",
-                            location=(vx, vy, 0.0),
-                        )
+                    violations.add_boundary_violation(
+                        "VIA_OUTSIDE_BOARD_BOUNDARY",
+                        v.net,
+                        f"Via on net '{v.net}'",
+                        vx,
+                        vy,
+                        is_outline=True,
                     )
             else:
                 if vx < -half_w or vx > half_w or vy < -half_l or vy > half_l:
-                    violations.append(
-                        DRCViolation(
-                            rule_name="VIA_OUTSIDE_BOARD_BOUNDARY",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=v.net,
-                            description=f"Via on net '{v.net}' at ({vx:.2f}, {vy:.2f}) is outside board envelope",
-                            location=(vx, vy, 0.0),
-                        )
+                    violations.add_boundary_violation(
+                        "VIA_OUTSIDE_BOARD_BOUNDARY",
+                        v.net,
+                        f"Via on net '{v.net}'",
+                        vx,
+                        vy,
+                        is_outline=False,
                     )
 
         # Check test points containment
@@ -623,25 +820,23 @@ class PCBDesignRulesChecker:
             tx, ty = tp.position_mm
             if outline_polygon:
                 if not _point_in_polygon(tx, ty, outline_polygon):
-                    violations.append(
-                        DRCViolation(
-                            rule_name="TEST_POINT_OUTSIDE_BOARD_BOUNDARY",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=tp.name,
-                            description=f"Test point '{tp.name}' at ({tx:.2f}, {ty:.2f}) is outside CAD board boundary outline",
-                            location=(tx, ty, 0.0),
-                        )
+                    violations.add_boundary_violation(
+                        "TEST_POINT_OUTSIDE_BOARD_BOUNDARY",
+                        tp.name,
+                        f"Test point '{tp.name}'",
+                        tx,
+                        ty,
+                        is_outline=True,
                     )
             else:
                 if tx < -half_w or tx > half_w or ty < -half_l or ty > half_l:
-                    violations.append(
-                        DRCViolation(
-                            rule_name="TEST_POINT_OUTSIDE_BOARD_BOUNDARY",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=tp.name,
-                            description=f"Test point '{tp.name}' at ({tx:.2f}, {ty:.2f}) is outside board envelope",
-                            location=(tx, ty, 0.0),
-                        )
+                    violations.add_boundary_violation(
+                        "TEST_POINT_OUTSIDE_BOARD_BOUNDARY",
+                        tp.name,
+                        f"Test point '{tp.name}'",
+                        tx,
+                        ty,
+                        is_outline=False,
                     )
 
         return violations
@@ -725,7 +920,8 @@ class PCBDesignRulesChecker:
 
         # Check for dangling components (components where all pins are unassigned or disconnected)
         connected_components = {comp_name for net in wiring.nets for comp_name, _ in net.pins}
-        for fp in getattr(wiring, "footprints", []):
+        board_footprints = self.get_footprints_for_board(wiring)
+        for fp in board_footprints:
             if fp.name not in connected_components and getattr(fp, "pins", []):
                 violations.append(
                     DRCViolation(
@@ -765,6 +961,287 @@ class PCBDesignRulesChecker:
                     )
                 )
 
+        # 4. Check end-to-end net continuity between source and target component pins
+        violations.extend(self.check_net_continuity(wiring))
+
+        return violations
+
+    def check_net_continuity(self, wiring: Any) -> List[DRCViolation]:
+        """Verify that all net segments form an unbroken electrical path between source and target component pins."""
+        violations: List[DRCViolation] = []
+        if not wiring or not hasattr(wiring, "nets") or not self.config.traces:
+            return violations
+
+        board_footprints = self.get_footprints_for_board(wiring)
+        carrier_fps = {fp.name: fp for fp in board_footprints}
+
+        traces = self.config.traces
+        vias = self.config.vias
+        copper_regions = self.config.copper_regions
+
+        class _UnionFind:
+            def __init__(self) -> None:
+                self.parent: Dict[Any, Any] = {}
+
+            def find(self, i: Any) -> Any:
+                if i not in self.parent:
+                    self.parent[i] = i
+                if self.parent[i] != i:
+                    self.parent[i] = self.find(self.parent[i])
+                return self.parent[i]
+
+            def union(self, i: Any, j: Any) -> None:
+                ri, rj = self.find(i), self.find(j)
+                if ri != rj:
+                    self.parent[ri] = rj
+
+        for net in wiring.nets:
+            pins_on_board = [(comp, pin) for comp, pin in net.pins if comp in carrier_fps]
+            if len(pins_on_board) < 2:
+                continue
+
+            # Check if net is distributed via copper plane (e.g. GND, 3V3 inner planes)
+            is_plane_net = any(cr.net == net.name for cr in copper_regions)
+            if is_plane_net:
+                for comp, pin in pins_on_board:
+                    fp = carrier_fps[comp]
+                    p_obj = next((p for p in getattr(fp, "pins", []) if p.name == pin), None)
+                    if not p_obj:
+                        continue
+                    px = fp.position[0] + p_obj.position[0]
+                    py = fp.position[1] + p_obj.position[1]
+                    pad_type = getattr(p_obj, "pad_type", "smd")
+                    pad_s = getattr(p_obj, "pad_size_mm", (0.8, 0.8))
+                    pad_r = max(pad_s) / 2.0
+
+                    connected = pad_type == "thru_hole"
+                    if not connected:
+                        for v in vias:
+                            if v.net == net.name:
+                                if (
+                                    math.hypot(px - v.position_mm[0], py - v.position_mm[1])
+                                    <= pad_r + v.pad_diameter_mm / 2.0 + 0.50
+                                ):
+                                    connected = True
+                                    break
+                    if not connected:
+                        for tr in traces:
+                            if tr.net == net.name:
+                                if (
+                                    _dist_point_to_segment((px, py), tr.start_mm, tr.end_mm)
+                                    <= pad_r + tr.width_mm / 2.0 + 0.35
+                                ):
+                                    connected = True
+                                    break
+                    if not connected:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="PIN_NOT_CONNECTED_TO_PLANE",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=f"{comp}.{pin}",
+                                description=f"Pin '{comp}.{pin}' on plane net '{net.name}' has no via or trace connection to the copper plane",
+                                location=(px, py, 0.0),
+                            )
+                        )
+                continue
+
+            net_tr = [tr for tr in traces if tr.net == net.name]
+            net_v = [v for v in vias if v.net == net.name]
+            net_tp = [tp for tp in self.config.test_points if tp.net == net.name]
+            net_mh = [mh for mh in self.config.mounting_holes if mh.plated and mh.net == net.name]
+
+            uf = _UnionFind()
+
+            # 1. Add trace segment internal connections
+            for tr in net_tr:
+                p1 = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                p2 = (round(tr.end_mm[0], 2), round(tr.end_mm[1], 2), tr.layer)
+                uf.union(p1, p2)
+
+            # 2. Add via connections across layers
+            for v in net_v:
+                p_f = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "F.Cu")
+                p_b = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "B.Cu")
+                uf.union(p_f, p_b)
+
+            # 3. Connect co-located trace vertices, vias, and T-junctions
+            all_nodes = list(uf.parent.keys())
+            for n in all_nodes:
+                for tr in net_tr:
+                    if tr.layer == n[2]:
+                        d = _dist_point_to_segment((n[0], n[1]), tr.start_mm, tr.end_mm)
+                        if d <= tr.width_mm / 2.0 + 0.10:
+                            tr_node = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                            uf.union(n, tr_node)
+
+            # 4. Connect component pin pads to copper features
+            pin_connected: Dict[str, bool] = {}
+            for comp, pin in pins_on_board:
+                fp = carrier_fps[comp]
+                p_obj = next((p for p in getattr(fp, "pins", []) if p.name == pin), None)
+                if not p_obj:
+                    continue
+                px = fp.position[0] + p_obj.position[0]
+                py = fp.position[1] + p_obj.position[1]
+                fp_layer = getattr(fp, "layer", "F.Cu") or ("B.Cu" if fp.position[2] < 0 else "F.Cu")
+                pad_type = getattr(p_obj, "pad_type", "smd")
+                pad_s = getattr(p_obj, "pad_size_mm", (0.8, 0.8))
+                pad_r = max(pad_s) / 2.0
+
+                pin_key = f"{comp}.{pin}"
+                connected = False
+
+                for tr in net_tr:
+                    if pad_type != "thru_hole" and tr.layer != fp_layer:
+                        continue
+                    d = _dist_point_to_segment((px, py), tr.start_mm, tr.end_mm)
+                    if d <= pad_r + tr.width_mm / 2.0 + 0.20:
+                        node = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                        uf.union(pin_key, node)
+                        connected = True
+
+                for v in net_v:
+                    dv = math.hypot(px - v.position_mm[0], py - v.position_mm[1])
+                    if dv <= pad_r + v.pad_diameter_mm / 2.0 + 0.20:
+                        node_f = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "F.Cu")
+                        uf.union(pin_key, node_f)
+                        connected = True
+
+                pin_connected[pin_key] = connected
+                if not connected:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="PIN_NOT_CONNECTED_TO_TRACE",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=pin_key,
+                            description=f"Pin '{pin_key}' on net '{net.name}' is not connected to any routed copper trace or via",
+                            location=(px, py, 0.0),
+                        )
+                    )
+
+            # 5. Connect test points (pads/holes) to net copper features
+            for tp in net_tp:
+                tp_key = f"TP.{tp.name}"
+                tx, ty = tp.position_mm
+                tp_r = tp.pad_diameter_mm / 2.0
+                for tr in net_tr:
+                    d = _dist_point_to_segment((tx, ty), tr.start_mm, tr.end_mm)
+                    if d <= tp_r + tr.width_mm / 2.0 + 0.20:
+                        node = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                        uf.union(tp_key, node)
+                for v in net_v:
+                    dv = math.hypot(tx - v.position_mm[0], ty - v.position_mm[1])
+                    if dv <= tp_r + v.pad_diameter_mm / 2.0 + 0.20:
+                        node_f = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "F.Cu")
+                        uf.union(tp_key, node_f)
+
+            # 6. Connect plated mounting holes to net copper features
+            for mh in net_mh:
+                mh_key = f"MH.{mh.name}"
+                mx, my = mh.position_mm
+                mh_r = (mh.pad_diameter_mm or mh.drill_diameter_mm) / 2.0
+                for tr in net_tr:
+                    d = _dist_point_to_segment((mx, my), tr.start_mm, tr.end_mm)
+                    if d <= mh_r + tr.width_mm / 2.0 + 0.20:
+                        node = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                        uf.union(mh_key, node)
+                for v in net_v:
+                    dv = math.hypot(mx - v.position_mm[0], my - v.position_mm[1])
+                    if dv <= mh_r + v.pad_diameter_mm / 2.0 + 0.20:
+                        node_f = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "F.Cu")
+                        uf.union(mh_key, node_f)
+
+            # 7. Verify all net segments (pins, traces, vias, test points, holes) belong to the same component
+            first_pin_key = f"{pins_on_board[0][0]}.{pins_on_board[0][1]}"
+            if pin_connected.get(first_pin_key):
+                root = uf.find(first_pin_key)
+
+                # Verify all other component pins reach root
+                for comp, pin in pins_on_board[1:]:
+                    target_key = f"{comp}.{pin}"
+                    if pin_connected.get(target_key) and uf.find(target_key) != root:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="NET_ROUTING_INCOMPLETE",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=net.name,
+                                description=(
+                                    f"Net '{net.name}' routing is broken: source pin '{first_pin_key}' "
+                                    f"is not electrically continuous with target pin '{target_key}'"
+                                ),
+                            )
+                        )
+
+                # Verify all trace segments reach root
+                for tr in net_tr:
+                    p1 = (round(tr.start_mm[0], 2), round(tr.start_mm[1], 2), tr.layer)
+                    if uf.find(p1) != root:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="DISCONNECTED_TRACE_SEGMENT",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=net.name,
+                                description=(
+                                    f"Trace segment on net '{net.name}' from ({tr.start_mm[0]:.2f}, {tr.start_mm[1]:.2f}) "
+                                    f"to ({tr.end_mm[0]:.2f}, {tr.end_mm[1]:.2f}) on layer '{tr.layer}' "
+                                    f"is disconnected from source/target component pins"
+                                ),
+                                location=(tr.start_mm[0], tr.start_mm[1], 0.0),
+                            )
+                        )
+
+                # Verify all vias reach root
+                for v in net_v:
+                    p_f = (round(v.position_mm[0], 2), round(v.position_mm[1], 2), "F.Cu")
+                    if uf.find(p_f) != root:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="DISCONNECTED_VIA",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=net.name,
+                                description=(
+                                    f"Via on net '{net.name}' at ({v.position_mm[0]:.2f}, {v.position_mm[1]:.2f}) "
+                                    f"is disconnected from source/target component pins"
+                                ),
+                                location=(v.position_mm[0], v.position_mm[1], 0.0),
+                            )
+                        )
+
+                # Verify all test points reach root
+                for tp in net_tp:
+                    tp_key = f"TP.{tp.name}"
+                    if tp_key not in uf.parent or uf.find(tp_key) != root:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="TEST_POINT_DISCONNECTED",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=tp.name,
+                                description=(
+                                    f"Test point '{tp.name}' on net '{net.name}' at "
+                                    f"({tp.position_mm[0]:.2f}, {tp.position_mm[1]:.2f}) is disconnected "
+                                    f"from source/target component pins"
+                                ),
+                                location=(tp.position_mm[0], tp.position_mm[1], 0.0),
+                            )
+                        )
+
+                # Verify all plated mounting holes reach root
+                for mh in net_mh:
+                    mh_key = f"MH.{mh.name}"
+                    if mh_key not in uf.parent or uf.find(mh_key) != root:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="MOUNTING_HOLE_DISCONNECTED",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=mh.name,
+                                description=(
+                                    f"Plated mounting hole '{mh.name}' on net '{net.name}' at "
+                                    f"({mh.position_mm[0]:.2f}, {mh.position_mm[1]:.2f}) is disconnected "
+                                    f"from source/target component pins"
+                                ),
+                                location=(mh.position_mm[0], mh.position_mm[1], 0.0),
+                            )
+                        )
         return violations
 
     def check_clearances_and_overlaps(self, wiring: Any) -> List[DRCViolation]:
@@ -800,11 +1277,12 @@ class PCBDesignRulesChecker:
                     )
 
         # 2. Check component pads to drill hole overlaps
-        if wiring and hasattr(wiring, "footprints"):
+        if wiring:
+            board_footprints = self.get_footprints_for_board(wiring)
             for mh in holes:
                 mh_r = mh.drill_diameter_mm / 2.0
                 mh_x, mh_y = mh.position_mm
-                for fp in wiring.footprints:
+                for fp in board_footprints:
                     fx, fy = fp.position[0], fp.position[1]
                     f_diag = (
                         math.hypot(fp.dimensions[0], fp.dimensions[1]) / 2.0 if getattr(fp, "dimensions", None) else 5.0
@@ -1007,8 +1485,9 @@ class PCBDesignRulesChecker:
                             location=(sx, sy, 0.0),
                         )
                     )
-            if wiring and hasattr(wiring, "footprints"):
-                for fp in wiring.footprints:
+            if wiring:
+                board_footprints = self.get_footprints_for_board(wiring)
+                for fp in board_footprints:
                     fp_layer = getattr(fp, "layer", "F.Cu") or ("B.Cu" if fp.position[2] < 0 else "F.Cu")
                     pad_silk_layer = "B.SilkS" if fp_layer == "B.Cu" else "F.SilkS"
                     fx, fy = fp.position[0], fp.position[1]
@@ -1053,7 +1532,7 @@ class PCBDesignRulesChecker:
 
         # Pre-collect all valid termination targets per net and layer
         # 1. Component pin pads
-        footprints = getattr(wiring, "footprints", []) if wiring else []
+        footprints = self.get_footprints_for_board(wiring)
         pin_targets: Dict[str, List[Tuple[float, float, str, float]]] = {}
         for fp in footprints:
             fp_x, fp_y = fp.position[0], fp.position[1]

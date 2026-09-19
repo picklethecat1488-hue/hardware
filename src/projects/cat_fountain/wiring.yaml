@@ -1,4 +1,9 @@
 # Declarative 3D Component Layout & Netlist Configuration
+imports:
+  - footprints/smd.yaml
+  - footprints/thru_hole.yaml
+  - footprints/ic.yaml
+
 components:
   - name: battery
     package: battery

@@ -1,11 +1,13 @@
 """PCB auto-router engine computing collision-free multi-layer routes for component netlists."""
 
+import heapq
 import math
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 import yaml
 
-from model.pcb import PCBConfig, TraceSegmentModel, ViaModel
+from model.pcb import BoardType, PCBConfig, TraceSegmentModel, ViaModel, TestPointModel
 from model.wiring import Wiring
 
 
@@ -73,7 +75,7 @@ def polyline_to_trace_segments(
     width_mm: float,
     layer: str,
     net: str,
-    fillet_radius: float = 0.60,
+    fillet_radius: float = 0.20,
 ) -> List[TraceSegmentModel]:
     """Convert an orthogonal polyline sequence into TraceSegmentModels with filleted 90-degree corners.
 
@@ -140,6 +142,317 @@ def polyline_to_trace_segments(
     return traces
 
 
+@dataclass
+class Obstacle:
+    """Bounding box obstacle on a copper layer or across all layers."""
+
+    min_x: float
+    min_y: float
+    max_x: float
+    max_y: float
+    layer: str = "ALL"
+    net: Optional[str] = None
+
+
+class AStarPCBRouter:
+    """Multi-layer and flexible PCB grid auto-router using obstacle-aware A* search."""
+
+    def __init__(
+        self,
+        board_bounds: Tuple[float, float, float, float],
+        grid_step: float = 0.25,
+        layers: Optional[List[str]] = None,
+        obstacles: Optional[List[Obstacle]] = None,
+        turn_penalty: float = 0.35,
+        via_penalty: float = 2.50,
+    ) -> None:
+        """Initialize the grid router with board boundaries and layer configuration."""
+        self.min_x, self.min_y, self.max_x, self.max_y = board_bounds
+        self.grid_step = grid_step
+        self.layers = layers or ["F.Cu", "B.Cu"]
+        self.layer_to_idx = {lay: i for i, lay in enumerate(self.layers)}
+        self.idx_to_layer = {i: lay for i, lay in enumerate(self.layers)}
+        self.obstacles: List[Obstacle] = []
+        self.turn_penalty = turn_penalty
+        self.via_penalty = via_penalty
+        self.routed_cells: Dict[Tuple[int, int, int], str] = {}
+        self.blocked_cells: Dict[Tuple[int, int, str], Optional[str]] = {}
+        if obstacles:
+            for obs in obstacles:
+                self.add_obstacle(obs)
+
+    def add_obstacle(self, obs: Obstacle) -> None:
+        """Register an obstacle in the routing domain and index into spatial grid."""
+        self.obstacles.append(obs)
+        gx_min = math.ceil(obs.min_x / self.grid_step)
+        gx_max = math.floor(obs.max_x / self.grid_step)
+        if gx_min > gx_max:
+            gx_mid = round((obs.min_x + obs.max_x) / (2.0 * self.grid_step))
+            gx_min, gx_max = gx_mid, gx_mid
+
+        gy_min = math.ceil(obs.min_y / self.grid_step)
+        gy_max = math.floor(obs.max_y / self.grid_step)
+        if gy_min > gy_max:
+            gy_mid = round((obs.min_y + obs.max_y) / (2.0 * self.grid_step))
+            gy_min, gy_max = gy_mid, gy_mid
+
+        layers = self.layers if obs.layer == "ALL" else [obs.layer]
+        for lay in layers:
+            for gx in range(gx_min, gx_max + 1):
+                for gy in range(gy_min, gy_max + 1):
+                    key = (gx, gy, lay)
+                    existing = self.blocked_cells.get(key)
+                    if existing is None or obs.net is not None:
+                        self.blocked_cells[key] = obs.net
+
+    def is_cell_blocked(
+        self,
+        px: float,
+        py: float,
+        layer_idx: int,
+        net_name: str,
+        start_pt: Tuple[float, float],
+        end_pt: Tuple[float, float],
+    ) -> bool:
+        """Check if physical coordinate (px, py) on layer is blocked by obstacles or existing nets."""
+        layer_name = self.idx_to_layer.get(layer_idx, "F.Cu")
+        gx = round(px / self.grid_step)
+        gy = round(py / self.grid_step)
+
+        # 1. Check routed grid cells from other nets
+        cell_net = self.routed_cells.get((gx, gy, layer_idx))
+        if cell_net is not None and cell_net != net_name:
+            return True
+
+        # 2. Check spatial obstacle map (O(1) dictionary lookup)
+        key = (gx, gy, layer_name)
+        if key in self.blocked_cells:
+            obs_net = self.blocked_cells[key]
+            if obs_net == net_name:
+                return False
+            if obs_net is not None and obs_net != net_name:
+                return True
+            # Unassigned obstacle (e.g. sensor envelope): allow connecting at start/end
+            d_start = math.hypot(px - start_pt[0], py - start_pt[1])
+            d_end = math.hypot(px - end_pt[0], py - end_pt[1])
+            if d_start < 0.30 or d_end < 0.30:
+                return False
+            return True
+
+        return False
+
+    def route_net(
+        self,
+        start_pt: Tuple[float, float],
+        start_layer: str,
+        end_pt: Tuple[float, float],
+        end_layer: str,
+        net_name: str,
+        width_mm: float = 0.20,
+        fillet_radius: float = 0.20,
+    ) -> Tuple[List[TraceSegmentModel], List[ViaModel]]:
+        """Find an obstacle-avoiding orthogonal path between start and end using A* search."""
+        l0 = self.layer_to_idx.get(start_layer, 0)
+        l1 = self.layer_to_idx.get(end_layer, 0)
+        gx0 = round(start_pt[0] / self.grid_step)
+        gy0 = round(start_pt[1] / self.grid_step)
+        gx1 = round(end_pt[0] / self.grid_step)
+        gy1 = round(end_pt[1] / self.grid_step)
+
+        queue: List[Tuple[float, float, int, int, int, Optional[Tuple[int, int]]]] = []
+        h0 = (abs(gx0 - gx1) + abs(gy0 - gy1)) * self.grid_step + abs(l0 - l1) * self.via_penalty
+        heapq.heappush(queue, (h0, 0.0, gx0, gy0, l0, None))
+
+        g_scores: Dict[Tuple[int, int, int], float] = {(gx0, gy0, l0): 0.0}
+        came_from: Dict[Tuple[int, int, int], Tuple[int, int, int]] = {}
+
+        found_state: Optional[Tuple[int, int, int]] = None
+
+        dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        max_expansions = 150000
+        expansions = 0
+
+        while queue and expansions < max_expansions:
+            expansions += 1
+            f, curr_g, gx, gy, l_idx, last_dir = heapq.heappop(queue)
+            state = (gx, gy, l_idx)
+
+            if curr_g > g_scores.get(state, float("inf")):
+                continue
+
+            if gx == gx1 and gy == gy1 and l_idx == l1:
+                found_state = state
+                break
+
+            # 1. Planar moves on same layer
+            for dx, dy in dirs:
+                ngx, ngy = gx + dx, gy + dy
+                px = ngx * self.grid_step
+                py = ngy * self.grid_step
+
+                if not (self.min_x <= px <= self.max_x and self.min_y <= py <= self.max_y):
+                    continue
+
+                if self.is_cell_blocked(px, py, l_idx, net_name, start_pt, end_pt):
+                    continue
+
+                step_cost = self.grid_step
+                if last_dir is not None and (dx, dy) != last_dir:
+                    step_cost += self.turn_penalty
+                if abs(dx) > 0 and (34.5 <= py <= 41.5 or -39.5 <= py <= -32.5):
+                    step_cost += 3.5
+
+                tentative_g = curr_g + step_cost
+                next_state = (ngx, ngy, l_idx)
+
+                if tentative_g < g_scores.get(next_state, float("inf")):
+                    g_scores[next_state] = tentative_g
+                    came_from[next_state] = state
+                    h = ((abs(ngx - gx1) + abs(ngy - gy1)) * self.grid_step) * 1.2 + abs(l_idx - l1) * self.via_penalty
+                    heapq.heappush(queue, (tentative_g + h, tentative_g, ngx, ngy, l_idx, (dx, dy)))
+
+            # 2. Layer transitions (Vias) - only if multi-layer
+            if len(self.layers) > 1:
+                for target_l_idx in range(len(self.layers)):
+                    if target_l_idx == l_idx:
+                        continue
+
+                    px = gx * self.grid_step
+                    py = gy * self.grid_step
+
+                    via_r = 0.225
+                    blocked = False
+                    for obs in self.obstacles:
+                        if obs.layer in ("ALL", self.idx_to_layer[l_idx], self.idx_to_layer[target_l_idx]):
+                            if obs.net is not None and obs.net == net_name:
+                                continue
+                            if (obs.min_x - via_r <= px <= obs.max_x + via_r) and (
+                                obs.min_y - via_r <= py <= obs.max_y + via_r
+                            ):
+                                blocked = True
+                                break
+                    if blocked:
+                        continue
+
+                    if self.is_cell_blocked(px, py, l_idx, net_name, start_pt, end_pt) or self.is_cell_blocked(
+                        px, py, target_l_idx, net_name, start_pt, end_pt
+                    ):
+                        continue
+
+                    tentative_g = curr_g + self.via_penalty
+                    next_state = (gx, gy, target_l_idx)
+
+                    if tentative_g < g_scores.get(next_state, float("inf")):
+                        g_scores[next_state] = tentative_g
+                        came_from[next_state] = state
+                        h = ((abs(gx - gx1) + abs(gy - gy1)) * self.grid_step) * 1.2 + abs(
+                            target_l_idx - l1
+                        ) * self.via_penalty
+                        heapq.heappush(queue, (tentative_g + h, tentative_g, gx, gy, target_l_idx, last_dir))
+
+        raw_path: List[Tuple[float, float, str]] = []
+        if found_state is not None:
+            curr = found_state
+            while curr in came_from:
+                gx, gy, l_idx = curr
+                raw_path.append((gx * self.grid_step, gy * self.grid_step, self.idx_to_layer[l_idx]))
+                curr = came_from[curr]
+            raw_path.append((gx0 * self.grid_step, gy0 * self.grid_step, self.idx_to_layer[l0]))
+            raw_path.reverse()
+            if raw_path:
+                raw_path[0] = (start_pt[0], start_pt[1], start_layer)
+                raw_path[-1] = (end_pt[0], end_pt[1], end_layer)
+        else:
+            raise RuntimeError(
+                f"A* router could not find collision-free path for net '{net_name}' "
+                f"from ({start_pt[0]:.2f}, {start_pt[1]:.2f}) [{start_layer}] "
+                f"to ({end_pt[0]:.2f}, {end_pt[1]:.2f}) [{end_layer}]"
+            )
+
+        traces: List[TraceSegmentModel] = []
+        vias: List[ViaModel] = []
+
+        if len(raw_path) < 2:
+            return traces, vias
+
+        current_layer_pts: List[Tuple[float, float]] = [(raw_path[0][0], raw_path[0][1])]
+        current_layer = raw_path[0][2]
+
+        for i in range(1, len(raw_path)):
+            px, py, lay = raw_path[i]
+            if lay == current_layer:
+                current_layer_pts.append((px, py))
+            else:
+                if len(current_layer_pts) >= 2:
+                    traces.extend(
+                        polyline_to_trace_segments(
+                            current_layer_pts, width_mm, current_layer, net_name, fillet_radius=fillet_radius
+                        )
+                    )
+                vias.append(
+                    ViaModel(
+                        net=net_name,
+                        position_mm=(px, py),
+                        pad_diameter_mm=0.45,
+                        drill_diameter_mm=0.20,
+                        layer_start=min(current_layer, lay),
+                        layer_end=max(current_layer, lay),
+                    )
+                )
+                current_layer = lay
+                current_layer_pts = [(px, py)]
+
+        if len(current_layer_pts) >= 2:
+            traces.extend(
+                polyline_to_trace_segments(
+                    current_layer_pts, width_mm, current_layer, net_name, fillet_radius=fillet_radius
+                )
+            )
+
+        for v in vias:
+            v_r = v.pad_diameter_mm / 2.0 + 0.22
+            self.add_obstacle(
+                Obstacle(
+                    min_x=v.position_mm[0] - v_r,
+                    min_y=v.position_mm[1] - v_r,
+                    max_x=v.position_mm[0] + v_r,
+                    max_y=v.position_mm[1] + v_r,
+                    layer="ALL",
+                    net=net_name,
+                )
+            )
+            gx_v = round(v.position_mm[0] / self.grid_step)
+            gy_v = round(v.position_mm[1] / self.grid_step)
+            for l_i in range(len(self.layers)):
+                self.routed_cells[(gx_v, gy_v, l_i)] = net_name
+
+        for tr in traces:
+            w_half = tr.width_mm / 2.0 + 0.12
+            self.add_obstacle(
+                Obstacle(
+                    min_x=min(tr.start_mm[0], tr.end_mm[0]) - w_half,
+                    min_y=min(tr.start_mm[1], tr.end_mm[1]) - w_half,
+                    max_x=max(tr.start_mm[0], tr.end_mm[0]) + w_half,
+                    max_y=max(tr.start_mm[1], tr.end_mm[1]) + w_half,
+                    layer=tr.layer,
+                    net=net_name,
+                )
+            )
+            gx_s = round(tr.start_mm[0] / self.grid_step)
+            gy_s = round(tr.start_mm[1] / self.grid_step)
+            gx_e = round(tr.end_mm[0] / self.grid_step)
+            gy_e = round(tr.end_mm[1] / self.grid_step)
+            l_idx = self.layer_to_idx.get(tr.layer, 0)
+            dist_cells = max(abs(gx_e - gx_s), abs(gy_e - gy_s), 1)
+            for s in range(dist_cells + 1):
+                t = s / dist_cells
+                cgx = round(gx_s + t * (gx_e - gx_s))
+                cgy = round(gy_s + t * (gy_e - gy_s))
+                self.routed_cells[(cgx, cgy, l_idx)] = net_name
+
+        return traces, vias
+
+
 class PCBAutoRouter:
     """Automated routing engine generating copper traces and interlayer vias for board nets."""
 
@@ -172,8 +485,12 @@ class PCBAutoRouter:
             return 0.22
         if any(pwr in net_upper for pwr in ("GND", "3V3", "5V", "VCC", "VDD", "VLOAD")):
             return 0.30
+        if "PDM" in net_upper or "SPK" in net_upper or "AUDIO" in net_upper or "I2S" in net_upper:
+            return 0.14
+        if "I2C" in net_upper:
+            return 0.14
 
-        return 0.20
+        return 0.15
 
     @classmethod
     def save_routing_yaml(
@@ -288,433 +605,307 @@ class PCBAutoRouter:
         for m_net in manual_net_names:
             skip_nets.add(m_net)
 
-        # 1. PCIe Differential Pairs (strictly non-intersecting nested paths)
-        # All 4 signals run down to their respective test points at Y = -22.0,
-        # then turn horizontal into J1 connector at Y = -36.0.
-        # Spacing >= 1.0mm everywhere.
-        # 1. PCIe Differential Pairs
-        # All 4 signals run down to their respective test points at Y = -22.0.
-        # TX0_P, RX0_P, RX0_N run entirely on F.Cu inline with test points.
-        # TX0_N routes on F.Cu through TP_TX0_N, bridges to B.Cu with vias to clear TX0_P, and enters J1.
-        if "PCIE_TX0_P" not in skip_nets:
-            traces.extend(
-                polyline_to_trace_segments(
-                    [
-                        (-5.0, 5.0),
-                        (-10.0, 5.0),
-                        (-10.0, -22.0),
-                        (-10.0, -29.0),
-                        (2.0, -29.0),
-                        (2.0, -36.0),
-                    ],
-                    self.get_net_trace_width("PCIE_TX0_P"),
-                    "F.Cu",
-                    "PCIE_TX0_P",
-                )
-            )
+        if self.config.dimensions_mm:
+            w_board, l_board, _ = self.config.dimensions_mm
+        else:
+            w_board, l_board = 100.0, 100.0
+        half_w = w_board / 2.0
+        half_l = l_board / 2.0
+        board_bounds = (-half_w, -half_l, half_w, half_l)
 
-        if "PCIE_TX0_N" not in skip_nets:
-            w_pcie = self.get_net_trace_width("PCIE_TX0_N")
-            vias.append(
-                ViaModel(
-                    position_mm=(-14.0, -24.0),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="PCIE_TX0_N",
-                )
-            )
-            vias.append(
-                ViaModel(
-                    position_mm=(4.0, -35.0),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="PCIE_TX0_N",
-                )
-            )
-            # F.Cu: U1.A2 -> TP_TX0_N -> via at (-14.0, -24.0)
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(-4.2, 5.0), (-4.2, 6.5), (-14.0, 6.5), (-14.0, -22.0), (-14.0, -24.0)],
-                    w_pcie,
-                    "F.Cu",
-                    "PCIE_TX0_N",
-                )
-            )
-            # B.Cu: via at (-14.0, -24.0) -> via at (4.0, -35.0)
-            traces.extend(
-                polyline_to_trace_segments([(-14.0, -24.0), (-14.0, -35.0), (4.0, -35.0)], w_pcie, "B.Cu", "PCIE_TX0_N")
-            )
-            # F.Cu: drop via into J1 pin at Y = -36.0
-            traces.extend(polyline_to_trace_segments([(4.0, -35.0), (4.0, -36.0)], w_pcie, "F.Cu", "PCIE_TX0_N"))
+        is_flex = getattr(self.config, "board_type", None) == BoardType.FLEX or getattr(self.config, "is_flex", False)
+        layers = ["F.Cu"] if is_flex else ["F.Cu", "B.Cu"]
 
-        if "PCIE_RX0_P" not in skip_nets:
-            traces.extend(
-                polyline_to_trace_segments(
-                    [
-                        (-5.0, 4.2),
-                        (-6.0, 4.2),
-                        (-6.0, -22.0),
-                        (-6.0, -28.0),
-                        (6.0, -28.0),
-                        (6.0, -36.0),
-                    ],
-                    self.get_net_trace_width("PCIE_RX0_P"),
-                    "F.Cu",
-                    "PCIE_RX0_P",
-                )
-            )
+        obstacles: List[Obstacle] = []
 
-        if "PCIE_RX0_N" not in skip_nets:
-            traces.extend(
-                polyline_to_trace_segments(
-                    [
-                        (-4.2, 4.2),
-                        (-4.2, 3.2),
-                        (-2.0, 3.2),
-                        (-2.0, -22.0),
-                        (-2.0, -27.0),
-                        (8.0, -27.0),
-                        (8.0, -36.0),
-                    ],
-                    self.get_net_trace_width("PCIE_RX0_N"),
-                    "F.Cu",
-                    "PCIE_RX0_N",
-                )
-            )
+        pin_to_net: Dict[Tuple[str, str], str] = {}
+        if self.wiring and hasattr(self.wiring, "nets"):
+            for net in self.wiring.nets:
+                for c_name, p_name in net.pins:
+                    pin_to_net[(c_name, p_name)] = net.name
 
-        # 2. MIPI Differential Pairs
-        # DATA0 pair routes via B.Cu across to test points with explicit vias; CLK pair routes on F.Cu.
-        # This completely avoids 2D planar trace collisions.
-        if "MIPI_DATA0_P" not in skip_nets:
-            w_mipi = self.get_net_trace_width("MIPI_DATA0_P")
-            vias.append(
-                ViaModel(
-                    position_mm=(6.0, -5.0),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="MIPI_DATA0_P",
-                )
-            )
-            vias.append(
-                ViaModel(
-                    position_mm=(6.0, 24.0),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="MIPI_DATA0_P",
-                )
-            )
-            traces.extend(polyline_to_trace_segments([(5.0, -5.0), (6.0, -5.0)], w_mipi, "F.Cu", "MIPI_DATA0_P"))
-            traces.extend(
-                polyline_to_trace_segments([(6.0, -5.0), (6.0, 22.0), (6.0, 24.0)], w_mipi, "B.Cu", "MIPI_DATA0_P")
-            )
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(6.0, 24.0), (6.0, 26.0), (-5.0, 26.0), (-5.0, 38.0)], w_mipi, "F.Cu", "MIPI_DATA0_P"
-                )
-            )
-
-        if "MIPI_DATA0_N" not in skip_nets:
-            w_mipi = self.get_net_trace_width("MIPI_DATA0_N")
-            vias.append(
-                ViaModel(
-                    position_mm=(8.0, -5.8),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="MIPI_DATA0_N",
-                )
-            )
-            vias.append(
-                ViaModel(
-                    position_mm=(10.0, 24.0),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="MIPI_DATA0_N",
-                )
-            )
-            traces.extend(polyline_to_trace_segments([(5.0, -5.8), (8.0, -5.8)], w_mipi, "F.Cu", "MIPI_DATA0_N"))
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(8.0, -5.8), (10.0, -5.8), (10.0, 22.0), (10.0, 24.0)], w_mipi, "B.Cu", "MIPI_DATA0_N"
-                )
-            )
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(10.0, 24.0), (10.0, 28.0), (-4.0, 28.0), (-4.0, 38.0)], w_mipi, "F.Cu", "MIPI_DATA0_N"
-                )
-            )
-
-        if "MIPI_CLK_P" not in skip_nets:
-            w_clk = self.get_net_trace_width("MIPI_CLK_P")
-            traces.extend(
-                polyline_to_trace_segments(
-                    [
-                        (3.0, 5.0),
-                        (3.0, 18.0),
-                        (14.0, 18.0),
-                        (14.0, 22.0),
-                        (14.0, 30.0),
-                        (-2.0, 30.0),
-                        (-2.0, 38.0),
-                    ],
-                    w_clk,
-                    "F.Cu",
-                    "MIPI_CLK_P",
-                )
-            )
-
-        if "MIPI_CLK_N" not in skip_nets:
-            w_clk = self.get_net_trace_width("MIPI_CLK_N")
-            traces.extend(
-                polyline_to_trace_segments(
-                    [
-                        (3.8, 5.0),
-                        (3.8, 16.0),
-                        (18.0, 16.0),
-                        (18.0, 22.0),
-                        (18.0, 32.0),
-                        (-1.0, 32.0),
-                        (-1.0, 38.0),
-                    ],
-                    w_clk,
-                    "F.Cu",
-                    "MIPI_CLK_N",
-                )
-            )
-
-        # 3. I2C Bus with Test Points & Pullups
-        # TP_SCL at (14.0, -4.0) and TP_SDA at (18.0, -4.0) (drilled through-holes).
-        # On F.Cu, signals route to test points and discrete pullups R1/R2.
-        # On B.Cu, signals drop directly from through-hole test point pads to U2.
-        if "I2C_SDA" not in skip_nets:
-            w_i2c = self.get_net_trace_width("I2C_SDA")
-            vias.append(
-                ViaModel(
-                    position_mm=(18.0, -4.0),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="I2C_SDA",
-                )
-            )
-            # F.Cu: U1.F1 -> R1 pin 2 and TP_SDA
-            traces.extend(polyline_to_trace_segments([(4.0, 0.0), (18.0, 0.0), (18.0, -4.0)], w_i2c, "F.Cu", "I2C_SDA"))
-            traces.extend(polyline_to_trace_segments([(10.5, 0.0), (10.5, -8.0)], w_i2c, "F.Cu", "I2C_SDA"))
-            # B.Cu: TP_SDA -> U2.SDA (routes along X = 15.0 to avoid U2 VDD at (16.0, -13.5))
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(18.0, -4.0), (15.0, -4.0), (15.0, -14.5), (16.0, -14.5)], w_i2c, "B.Cu", "I2C_SDA"
-                )
-            )
-
-        if "I2C_SCL" not in skip_nets:
-            w_i2c = self.get_net_trace_width("I2C_SCL")
-            vias.append(
-                ViaModel(
-                    position_mm=(14.0, -4.0),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="I2C_SCL",
-                )
-            )
-            # F.Cu: U1.F2 -> R2 pin 2 and TP_SCL (routes down at X = 4.0 to avoid MIPI at X = 5.0)
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(4.0, -1.0), (4.0, -10.5), (14.0, -10.5), (14.0, -4.0)], w_i2c, "F.Cu", "I2C_SCL"
-                )
-            )
-            # B.Cu: TP_SCL -> U2.SCL
-            traces.extend(
-                polyline_to_trace_segments([(14.0, -4.0), (14.0, -15.5), (16.0, -15.5)], w_i2c, "B.Cu", "I2C_SCL")
-            )
-
-        # 4. CAP_INT, PWR_EN, VLOAD_SW
-        if "CAP_INT" not in skip_nets:
-            w_sig = self.get_net_trace_width("CAP_INT")
-            # Drop to B.Cu right at U1 pin D2 (-3.0, -1.0), route east to U2.INT
-            vias.append(
-                ViaModel(
-                    position_mm=(-3.0, -1.0),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="CAP_INT",
-                )
-            )
-            traces.extend(
-                polyline_to_trace_segments([(-3.0, -1.0), (-3.0, -17.0), (17.0, -17.0)], w_sig, "B.Cu", "CAP_INT")
-            )
-
-        if "PWR_EN" not in skip_nets:
-            w_pwr_en = self.get_net_trace_width("PWR_EN")
-            # Drop to B.Cu right at U1 pin D1 (-3.0, 0.0), route west to Q1.G at (-18.95, -16.0)
-            vias.append(
-                ViaModel(
-                    position_mm=(-3.0, 0.0),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="PWR_EN",
-                )
-            )
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(-3.0, 0.0), (-19.5, 0.0), (-19.5, -16.0), (-18.95, -16.0)], w_pwr_en, "B.Cu", "PWR_EN"
-                )
-            )
-
-        if "VLOAD_SW" not in skip_nets:
-            w_vload = self.get_net_trace_width("VLOAD_SW")
-            # Route on B.Cu from Q1.D down along X = -7.0 (clearing test points at X=-6.0 and X=-10.0), via to F.Cu at Y = -32.0
-            vias.append(
-                ViaModel(
-                    position_mm=(-6.0, -32.0),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="VLOAD_SW",
-                )
-            )
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(-18.0, -14.0), (-7.0, -14.0), (-7.0, -32.0), (-6.0, -32.0)], w_vload, "B.Cu", "VLOAD_SW"
-                )
-            )
-            traces.extend(polyline_to_trace_segments([(-6.0, -32.0), (-6.0, -36.0)], w_vload, "F.Cu", "VLOAD_SW"))
-
-        # 5. Capacitive sensing nets (8 nets)
-        # U2 is on B.Cu with CS pins on the right edge (X = 20.0).
-        # Escape cleanly to the right into dedicated vertical corridors on B.Cu,
-        # then route up to Y >= 34.0, turn left to x_j2, and via to F.Cu to enter connector J2.
-        # Staggered X corridors and monotonically increasing Y turn elevations guarantee zero crossings.
-        cs_channels = [
-            ("CAP_TX0", 20.0, -13.5, 20.4, 34.0, 1.0),
-            ("CAP_RX0", 20.0, -14.0, 21.0, 34.6, 2.0),
-            ("CAP_TX1", 20.0, -14.5, 21.6, 35.2, 3.0),
-            ("CAP_RX1", 20.0, -15.0, 22.2, 35.8, 4.0),
-            ("CAP_TX2", 20.0, -15.5, 22.8, 36.4, 5.0),
-            ("CAP_RX2", 20.0, -16.0, 23.4, 37.0, 6.0),
-            ("CAP_RX3", 20.0, -16.5, 24.0, 37.6, 7.0),
-        ]
-        w_cap = 0.15
-        for cnet, xu, yu, x_corr, y_turn, xj in cs_channels:
-            if cnet in skip_nets:
+        fps = list(self.wiring.footprints) if self.wiring else []
+        for fp in fps:
+            comp_shape_ref = getattr(fp, "shape_ref", None)
+            target_shape_ref = getattr(self.config, "shape_ref", None)
+            if target_shape_ref and comp_shape_ref and comp_shape_ref != target_shape_ref:
                 continue
-            vias.append(
-                ViaModel(
-                    position_mm=(xj, y_turn),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net=cnet,
-                )
-            )
-            # On B.Cu: escape right to corridor, route up to y_turn, turn left to xj
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(xu, yu), (x_corr, yu), (x_corr, y_turn), (xj, y_turn)], w_cap, "B.Cu", cnet
-                )
-            )
-            # On F.Cu: route from via directly into J2 pin at Y = 38.0
-            traces.extend(polyline_to_trace_segments([(xj, y_turn), (xj, 38.0)], w_cap, "F.Cu", cnet))
+            if is_flex and comp_shape_ref != target_shape_ref:
+                continue
+            if not is_flex and comp_shape_ref and comp_shape_ref != target_shape_ref:
+                continue
 
-        if "CAP_SHIELD" not in skip_nets:
-            # CAP_SHIELD escapes from U2 top (18.0, -13.0), routes on B.Cu along X = 19.4,
-            # turns left at Y = 33.4 (below all CS turns), vias to F.Cu at (8.0, 33.4), and enters J2
-            vias.append(
-                ViaModel(
-                    position_mm=(8.0, 33.4),
-                    drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
-                    layer_start="F.Cu",
-                    layer_end="B.Cu",
-                    net="CAP_SHIELD",
-                )
-            )
-            traces.extend(
-                polyline_to_trace_segments(
-                    [(18.0, -13.0), (19.4, -13.0), (19.4, 33.4), (8.0, 33.4)], w_cap, "B.Cu", "CAP_SHIELD"
-                )
-            )
-            traces.extend(polyline_to_trace_segments([(8.0, 33.4), (8.0, 38.0)], w_cap, "F.Cu", "CAP_SHIELD"))
-
-        # 6. GND Network (TP_GND, J1, U1, U2, Passives, J2, and Plane Vias)
-        if "GND" not in skip_nets:
-            w_gnd = self.get_net_trace_width("GND")
-            # Connect TP_GND to In1.Cu plane via
-            vias.append(
-                ViaModel(
-                    position_mm=(-18.0, -24.0),
-                    drill_diameter_mm=0.25,
-                    pad_diameter_mm=0.50,
-                    layer_start="F.Cu",
-                    layer_end="In1.Cu",
-                    net="GND",
-                )
-            )
-            traces.extend(polyline_to_trace_segments([(-18.0, -22.0), (-18.0, -24.0)], w_gnd, "F.Cu", "GND"))
-            # Stubs to GND plane for all components
-            gnd_plane_pts = [
-                (0.0, 1.5, "F.Cu", (0.0, 0.0)),
-                (14.5, -16.5, "B.Cu", (16.0, -16.5)),
-                (-17.05, -17.5, "B.Cu", (-17.05, -16.0)),
-                (-7.5, -6.5, "B.Cu", (-7.5, -5.0)),
-                (-11.2, -9.5, "F.Cu", (-11.2, -8.0)),
-                (-10.0, -34.0, "F.Cu", (-10.0, -36.0)),
-                (-8.0, 36.5, "F.Cu", (-8.0, 38.0)),
-            ]
-            for vx, vy, lay, p_orig in gnd_plane_pts:
-                vias.append(
-                    ViaModel(
-                        position_mm=(vx, vy),
-                        drill_diameter_mm=0.25,
-                        pad_diameter_mm=0.50,
-                        layer_start=lay,
-                        layer_end="In1.Cu",
-                        net="GND",
+            fp_layer = getattr(fp, "layer", "F.Cu")
+            for pin in fp.pins:
+                px = fp.position[0] + pin.position[0]
+                py = fp.position[1] + pin.position[1]
+                pw, pl = getattr(pin, "pad_size_mm", (0.5, 0.5))
+                pin_lay = "ALL" if getattr(pin, "pad_type", "smd") == "thru_hole" else fp_layer
+                pad_margin = 0.05
+                obstacles.append(
+                    Obstacle(
+                        min_x=px - pw / 2.0 - pad_margin,
+                        min_y=py - pl / 2.0 - pad_margin,
+                        max_x=px + pw / 2.0 + pad_margin,
+                        max_y=py + pl / 2.0 + pad_margin,
+                        layer=pin_lay,
+                        net=pin_to_net.get((fp.name, pin.name)),
                     )
                 )
-                traces.extend(polyline_to_trace_segments([p_orig, (vx, vy)], w_gnd, lay, "GND"))
 
-        # 7. 3V3 Power Distribution (dedicated In2.Cu power plane with local drop vias)
-        if "3V3" not in skip_nets:
-            w_3v3 = self.get_net_trace_width("3V3")
-            pwr_plane_pts = [
-                (-8.0, -33.5, "F.Cu", (-8.0, -36.0)),
-                (-7.0, 35.5, "F.Cu", (-7.0, 38.0)),
-                (-12.8, -6.0, "F.Cu", (-12.8, -8.0)),
-                (0.8, -2.0, "F.Cu", (0.8, 0.0)),
-                (17.2, -13.5, "B.Cu", (16.0, -13.5)),
-            ]
-            for vx, vy, lay, p_orig in pwr_plane_pts:
-                vias.append(
-                    ViaModel(
-                        position_mm=(vx, vy),
-                        drill_diameter_mm=0.25,
-                        pad_diameter_mm=0.50,
-                        layer_start=lay,
-                        layer_end="In2.Cu",
-                        net="3V3",
-                    )
+        for mh in getattr(self.config, "mounting_holes", []):
+            mx, my = mh.position_mm
+            r = (mh.pad_diameter_mm or mh.drill_diameter_mm) / 2.0
+            obstacles.append(
+                Obstacle(
+                    min_x=mx - r - 0.25,
+                    min_y=my - r - 0.25,
+                    max_x=mx + r + 0.25,
+                    max_y=my + r + 0.25,
+                    layer="ALL",
+                    net=getattr(mh, "net", None),
                 )
-                traces.extend(polyline_to_trace_segments([p_orig, (vx, vy)], w_3v3, lay, "3V3"))
+            )
+
+        for tp in getattr(self.config, "test_points", []):
+            tx, ty = tp.position_mm
+            r = tp.pad_diameter_mm / 2.0
+            tp_drill = getattr(tp, "drill_diameter_mm", 0) or 0
+            obstacles.append(
+                Obstacle(
+                    min_x=tx - r - 0.22,
+                    min_y=ty - r - 0.22,
+                    max_x=tx + r + 0.22,
+                    max_y=ty + r + 0.22,
+                    layer="ALL" if tp_drill > 0 else (tp.layer if hasattr(tp, "layer") else "F.Cu"),
+                    net=tp.net,
+                )
+            )
+
+        target_shape_ref = getattr(self.config, "shape_ref", None)
+        for sensor in getattr(self.config, "capacitive_sensors", []):
+            sensor_shape = getattr(sensor, "shape_ref", None)
+            if target_shape_ref and sensor_shape and sensor_shape != target_shape_ref:
+                continue
+            if not is_flex and sensor_shape != target_shape_ref:
+                continue
+            scx, scy = getattr(sensor, "center_mm", (0.0, 0.0))
+            sw, sl = getattr(sensor, "area_mm", (10.0, 10.0))
+            obstacles.append(
+                Obstacle(
+                    min_x=scx - sw / 2.0 - 0.20,
+                    min_y=scy - sl / 2.0 - 0.20,
+                    max_x=scx + sw / 2.0 + 0.20,
+                    max_y=scy + sl / 2.0 + 0.20,
+                    layer="ALL",
+                )
+            )
+
+        for tr in traces:
+            w_half = tr.width_mm / 2.0 + 0.12
+            obstacles.append(
+                Obstacle(
+                    min_x=min(tr.start_mm[0], tr.end_mm[0]) - w_half,
+                    min_y=min(tr.start_mm[1], tr.end_mm[1]) - w_half,
+                    max_x=max(tr.start_mm[0], tr.end_mm[0]) + w_half,
+                    max_y=max(tr.start_mm[1], tr.end_mm[1]) + w_half,
+                    layer=tr.layer,
+                    net=tr.net,
+                )
+            )
+
+        router = AStarPCBRouter(
+            board_bounds=board_bounds,
+            grid_step=0.25,
+            layers=layers,
+            obstacles=obstacles,
+            turn_penalty=0.50,
+            via_penalty=8.00,
+        )
+
+        fp_by_name = {fp.name: fp for fp in fps}
+        tp_by_net: Dict[str, List[TestPointModel]] = {}
+        for tp in getattr(self.config, "test_points", []):
+            tp_by_net.setdefault(tp.net, []).append(tp)
+
+        sensor_terminals: Dict[str, Tuple[float, float]] = {}
+        for s in getattr(self.config, "capacitive_sensors", []):
+            sensor_shape = getattr(s, "shape_ref", None)
+            if target_shape_ref and sensor_shape and sensor_shape != target_shape_ref:
+                continue
+            if not is_flex and sensor_shape != target_shape_ref:
+                continue
+            scx, scy = getattr(s, "center_mm", (0.0, 0.0))
+            sw, sl = getattr(s, "area_mm", (10.0, 10.0))
+            if s.shape == "interdigital":
+                if s.tx_pin:
+                    sensor_terminals[s.tx_pin] = (scx - sw / 2.0, scy)
+                if s.rx_pin:
+                    sensor_terminals[s.rx_pin] = (scx + sw / 2.0, scy)
+            else:
+                if s.rx_pin:
+                    sensor_terminals[s.rx_pin] = (scx, scy - sl / 2.0)
+
+        plane_nets = {cr.net for cr in getattr(self.config, "copper_regions", [])}
+
+        if self.wiring and hasattr(self.wiring, "nets"):
+            for net in self.wiring.nets:
+                if net.name in skip_nets:
+                    continue
+
+                width_mm = self.get_net_trace_width(net.name)
+
+                endpoints: List[Tuple[float, float, str]] = []
+                smd_endpoints: List[Tuple[float, float, str]] = []
+
+                for comp_name, pin_name in net.pins:
+                    fp = fp_by_name.get(comp_name)
+                    if not fp:
+                        continue
+                    comp_shape_ref = getattr(fp, "shape_ref", None)
+                    if target_shape_ref and comp_shape_ref and comp_shape_ref != target_shape_ref:
+                        continue
+
+                    pin_match = next((p for p in fp.pins if p.name == pin_name), None)
+                    if pin_match:
+                        gx = fp.position[0] + pin_match.position[0]
+                        gy = fp.position[1] + pin_match.position[1]
+                        pad_type = getattr(pin_match, "pad_type", "smd")
+                        glay = "F.Cu" if pad_type == "thru_hole" else getattr(fp, "layer", "F.Cu")
+                        endpoints.append((gx, gy, glay))
+                        if pad_type != "thru_hole":
+                            smd_endpoints.append((gx, gy, glay))
+
+                for tp in tp_by_net.get(net.name, []):
+                    tp_layer = getattr(tp, "layer", "F.Cu")
+                    endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer))
+                    if getattr(tp, "drill_diameter_mm", 0) <= 0:
+                        smd_endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer))
+
+                if net.name in sensor_terminals:
+                    st_pos = sensor_terminals[net.name]
+                    endpoints.append((st_pos[0], st_pos[1], "F.Cu"))
+
+                if not endpoints:
+                    continue
+
+                # Plane nets connect via local stitching vias directly to inner copper planes
+                if net.name in plane_nets and not is_flex:
+                    for px, py, lay in smd_endpoints:
+                        # Try offsets around the pad for a stitching via
+                        candidate_offsets = [
+                            (0.0, 0.75),
+                            (0.0, -0.75),
+                            (0.75, 0.0),
+                            (-0.75, 0.0),
+                            (0.75, 0.75),
+                            (-0.75, -0.75),
+                            (0.75, -0.75),
+                            (-0.75, 0.75),
+                            (0.0, 1.0),
+                            (0.0, -1.0),
+                            (1.0, 0.0),
+                            (-1.0, 0.0),
+                        ]
+                        best_vx, best_vy = px, py
+                        found_via_spot = False
+                        via_pad_r = 0.225 + 0.16
+                        for dx, dy in candidate_offsets:
+                            cand_x, cand_y = px + dx, py + dy
+                            if not (half_w - 1.0 > cand_x > -half_w + 1.0 and half_l - 1.0 > cand_y > -half_l + 1.0):
+                                continue
+                            conflict = False
+                            for obs in router.obstacles:
+                                if obs.net is not None and obs.net == net.name:
+                                    continue
+                                if (obs.min_x - via_pad_r <= cand_x <= obs.max_x + via_pad_r) and (
+                                    obs.min_y - via_pad_r <= cand_y <= obs.max_y + via_pad_r
+                                ):
+                                    conflict = True
+                                    break
+                            if not conflict:
+                                best_vx, best_vy = cand_x, cand_y
+                                found_via_spot = True
+                                break
+
+                        if found_via_spot:
+                            stitching_via = ViaModel(
+                                net=net.name,
+                                position_mm=(best_vx, best_vy),
+                                pad_diameter_mm=0.45,
+                                drill_diameter_mm=0.20,
+                                layer_start="F.Cu",
+                                layer_end="B.Cu",
+                            )
+                            vias.append(stitching_via)
+                            trace_seg = TraceSegmentModel(
+                                net=net.name,
+                                layer=lay,
+                                width_mm=width_mm,
+                                start_mm=(px, py),
+                                end_mm=(best_vx, best_vy),
+                            )
+                            traces.append(trace_seg)
+
+                            # Register obstacle for the stitching via and trace
+                            v_r = 0.45
+                            router.add_obstacle(
+                                Obstacle(
+                                    min_x=best_vx - v_r,
+                                    min_y=best_vy - v_r,
+                                    max_x=best_vx + v_r,
+                                    max_y=best_vy + v_r,
+                                    layer="ALL",
+                                    net=net.name,
+                                )
+                            )
+                            w_h = width_mm / 2.0 + 0.12
+                            router.add_obstacle(
+                                Obstacle(
+                                    min_x=min(px, best_vx) - w_h,
+                                    min_y=min(py, best_vy) - w_h,
+                                    max_x=max(px, best_vx) + w_h,
+                                    max_y=max(py, best_vy) + w_h,
+                                    layer=lay,
+                                    net=net.name,
+                                )
+                            )
+                    continue
+
+                # Signal nets: order endpoints spatially to avoid self-crossing and backtracking
+                if len(endpoints) > 2:
+                    unvisited = list(endpoints)
+                    ordered = [unvisited.pop(0)]
+                    while unvisited:
+                        curr = ordered[-1]
+                        best_idx = 0
+                        best_d = float("inf")
+                        for idx, pt in enumerate(unvisited):
+                            d = math.hypot(pt[0] - curr[0], pt[1] - curr[1]) + (0.0 if pt[2] == curr[2] else 3.0)
+                            if d < best_d:
+                                best_d = d
+                                best_idx = idx
+                        ordered.append(unvisited.pop(best_idx))
+                    endpoints = ordered
+
+                for i in range(len(endpoints) - 1):
+                    start_pt = (endpoints[i][0], endpoints[i][1])
+                    start_layer = endpoints[i][2]
+                    end_pt = (endpoints[i + 1][0], endpoints[i + 1][1])
+                    end_layer = endpoints[i + 1][2]
+
+                    if math.hypot(end_pt[0] - start_pt[0], end_pt[1] - start_pt[1]) < 1e-3 and start_layer == end_layer:
+                        continue
+
+                    net_traces, net_vias = router.route_net(
+                        start_pt=start_pt,
+                        start_layer=start_layer,
+                        end_pt=end_pt,
+                        end_layer=end_layer,
+                        net_name=net.name,
+                        width_mm=width_mm,
+                    )
+                    traces.extend(net_traces)
+                    vias.extend(net_vias)
 
         return traces, vias

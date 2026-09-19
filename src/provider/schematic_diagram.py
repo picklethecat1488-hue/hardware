@@ -13,7 +13,7 @@ from matplotlib.figure import Figure
 import matplotlib.patches as patches
 
 from model.pcb import PCBConfig
-from model.wiring import FootprintModel, NetModel, Wiring, TruthTableModel, TruthTableRowModel
+from model.wiring import FootprintModel, NetModel, Wiring, TruthTableModel, TruthTableRowModel, PinModel
 
 
 @dataclass
@@ -1481,6 +1481,18 @@ class SchematicDiagram:
                 left_pins = fp.pins[: len(fp.pins) // 2]
                 right_pins = fp.pins[len(fp.pins) // 2 :]
 
+            # Sort pins on IC sides so Power pins are placed at the top and Ground pins at the bottom
+            def _pin_sort_key(p: PinModel) -> int:
+                net = pin_to_net.get((fp.name, p.name), "").upper()
+                if net in POWER_NET_NAMES:
+                    return 0
+                if net in GROUND_NET_NAMES:
+                    return 2
+                return 1
+
+            left_pins.sort(key=_pin_sort_key)
+            right_pins.sort(key=_pin_sort_key)
+
             mpn = getattr(fp, "mpn", None)
             has_mpn = bool(mpn)
             header_offset = 18.0 if has_mpn else 15.0
@@ -1982,57 +1994,37 @@ class SchematicDiagram:
 
             # GND symbol
             if net_upper in GROUND_NET_NAMES:
-                if not has_pin_below and not has_wire_below:
-                    # Standard vertical 3-bar hanging DOWN
-                    ax.plot([px, px], [py, py - 3.0], color="#475569", linewidth=1.2, zorder=2)
-                    ax.plot([px - 2.8, px + 2.8], [py - 3.0, py - 3.0], color="#475569", linewidth=1.4, zorder=2)
-                    ax.plot([px - 1.8, px + 1.8], [py - 4.2, py - 4.2], color="#475569", linewidth=1.2, zorder=2)
-                    ax.plot([px - 0.8, px + 0.8], [py - 5.4, py - 5.4], color="#475569", linewidth=1.0, zorder=2)
-                    ax.text(
-                        px,
-                        py - 6.8,
-                        "GND",
-                        ha="center",
-                        va="top",
-                        fontsize=5.5,
-                        fontweight="bold",
-                        color="#475569",
-                        zorder=3,
+                # Always prefer standard vertical 3-bar hanging DOWN under components and traces
+                y_drop = py - 3.0
+                if has_pin_below or has_wire_below:
+                    # Drop down below the component and any nearby wires in the channel
+                    comp_box = next(
+                        (b for b in comp_boxes if abs(b[0] - px) < 15.0 or (b[0] <= px <= b[0] + b[2])), None
                     )
-                else:
-                    # Horizontal 3-bar pointing outward away from component
-                    if side == "left":
-                        ax.plot([px, px - 2.0], [py, py], color="#475569", linewidth=1.2, zorder=2)
-                        ax.plot([px - 2.0, px - 2.0], [py - 2.8, py + 2.8], color="#475569", linewidth=1.4, zorder=2)
-                        ax.plot([px - 3.2, px - 3.2], [py - 1.8, py + 1.8], color="#475569", linewidth=1.2, zorder=2)
-                        ax.plot([px - 4.4, px - 4.4], [py - 0.8, py + 0.8], color="#475569", linewidth=1.0, zorder=2)
-                        ax.text(
-                            px - 5.8,
-                            py,
-                            "GND",
-                            ha="right",
-                            va="center",
-                            fontsize=5.5,
-                            fontweight="bold",
-                            color="#475569",
-                            zorder=3,
-                        )
-                    else:
-                        ax.plot([px, px + 2.0], [py, py], color="#475569", linewidth=1.2, zorder=2)
-                        ax.plot([px + 2.0, px + 2.0], [py - 2.8, py + 2.8], color="#475569", linewidth=1.4, zorder=2)
-                        ax.plot([px + 3.2, px + 3.2], [py - 1.8, py + 1.8], color="#475569", linewidth=1.2, zorder=2)
-                        ax.plot([px + 4.4, px + 4.4], [py - 0.8, py + 0.8], color="#475569", linewidth=1.0, zorder=2)
-                        ax.text(
-                            px + 5.8,
-                            py,
-                            "GND",
-                            ha="left",
-                            va="center",
-                            fontsize=5.5,
-                            fontweight="bold",
-                            color="#475569",
-                            zorder=3,
-                        )
+                    comp_bottom = comp_box[1] if comp_box else py - 10.0
+                    channel_wires = [
+                        seg[2] for seg in h_segments if min(seg[0], seg[1]) - 2.0 <= px <= max(seg[0], seg[1]) + 2.0
+                    ]
+                    min_wire_y = min(channel_wires) if channel_wires else py
+                    y_drop = min(comp_bottom - 2.0, min_wire_y - 3.0, py - 4.0)
+
+                # Vertical connection lead down to ground bar
+                ax.plot([px, px], [py, y_drop], color="#475569", linewidth=1.2, zorder=2)
+                # Standard vertical 3-bar hanging DOWN
+                ax.plot([px - 2.8, px + 2.8], [y_drop, y_drop], color="#475569", linewidth=1.4, zorder=2)
+                ax.plot([px - 1.8, px + 1.8], [y_drop - 1.2, y_drop - 1.2], color="#475569", linewidth=1.2, zorder=2)
+                ax.plot([px - 0.8, px + 0.8], [y_drop - 2.4, y_drop - 2.4], color="#475569", linewidth=1.0, zorder=2)
+                ax.text(
+                    px,
+                    y_drop - 3.8,
+                    "GND",
+                    ha="center",
+                    va="top",
+                    fontsize=5.5,
+                    fontweight="bold",
+                    color="#475569",
+                    zorder=3,
+                )
 
             # Power symbol
             elif net_upper in POWER_NET_NAMES:

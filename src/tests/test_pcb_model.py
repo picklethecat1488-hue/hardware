@@ -1,6 +1,7 @@
 """Unit tests for multi-layer PCB stackup models, layer symmetry, and impedance calculations."""
 
 import math
+from pathlib import Path
 import pytest
 from model.pcb import (
     LayerType,
@@ -312,3 +313,53 @@ def test_mounting_hole_model():
     )
     assert hole_unplated.plated is False
     assert hole_unplated.net is None
+
+
+def test_shared_footprint_libraries_loading_and_resolution(tmp_path: Path):
+    """Verify loading shared SMD, TH, and IC footprint libraries and merging into Wiring models."""
+    from model.wiring import Wiring, load_shared_footprints
+
+    shared = load_shared_footprints()
+    assert "0402" in shared
+    assert "0603" in shared
+    assert "SOT-23" in shared
+    assert "pin_header_1x2" in shared
+    assert "QFN-24" in shared
+    assert "USB-C-16P" in shared
+
+    # Verify that a custom wiring YAML with imports resolves package footprints automatically
+    custom_yaml = tmp_path / "custom_wiring.yaml"
+    custom_yaml.write_text(
+        """
+imports:
+  - footprints/smd.yaml
+  - footprints/thru_hole.yaml
+  - footprints/ic.yaml
+
+footprints:
+  - name: R_TEST
+    package: "0402"
+    position: [5.0, 10.0, 0.8]
+  - name: J_HEADER
+    package: "pin_header_1x2"
+    position: [-5.0, -10.0, 0.8]
+"""
+    )
+
+    w = Wiring(custom_yaml)
+    fps = w.footprints
+    assert len(fps) == 2
+
+    # R_TEST inherited dimensions and 2 pins from 0402
+    r_test = next(fp for fp in fps if fp.name == "R_TEST")
+    assert r_test.dimensions == (1.0, 0.5, 0.35)
+    assert len(r_test.pins) == 2
+    assert r_test.pins[0].name == "1"
+    assert r_test.pins[0].pad_type == "smd"
+
+    # J_HEADER inherited dimensions and 2 pins from pin_header_1x2
+    j_hdr = next(fp for fp in fps if fp.name == "J_HEADER")
+    assert j_hdr.dimensions == (5.08, 2.54, 8.5)
+    assert len(j_hdr.pins) == 2
+    assert j_hdr.pins[0].pad_type == "thru_hole"
+    assert j_hdr.pins[0].drill_dia_mm == 1.00

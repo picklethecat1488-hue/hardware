@@ -127,7 +127,8 @@ from .blender import BlenderRenderer, CameraViewport, RenderConfig
 from .pcb.silkscreen import BuildSilkscreen, SilkscreenText
 from .pcb.stackup import BuildStackup, StackupLayer
 from .pcb.drill_holes import BuildDrillHoles, MountingHole, DrillHole
-from .pcb.board import BuildPcb, BuildFlexTail
+from .pcb.board import BuildPcb, BuildFlexPCB
+from model.pcb import FlexType
 from .pcb.routing import (
     BuildTraces,
     Trace,
@@ -139,4 +140,5 @@ from .pcb.routing import (
     BuildTestPoints,
     TestPoint,
 )
+from .pcb.drc import PCBDesignRulesChecker, DRCReport, DRCViolation, DRCSeverity, DRCViolationCollection
 from model.wiring import Wiring

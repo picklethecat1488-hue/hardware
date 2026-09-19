@@ -211,7 +211,10 @@ class WiringDiagram:
         path.append(start_pt)
         path.reverse()
 
-        if path:
+        if len(path) == 1:
+            if (end_pt - start_pt).length > 1e-5:
+                path.append(end_pt)
+        elif len(path) > 1:
             path[0] = start_pt
             path[-1] = end_pt
 
@@ -227,10 +230,13 @@ class WiringDiagram:
 
             if (dir1 - dir2).length > 1e-5:
                 simplified.append(curr)
-        simplified.append(path[-1])
+        if len(path) > 1 and (path[-1] - simplified[-1]).length > 1e-5:
+            simplified.append(path[-1])
 
         if len(simplified) < 2:
-            return [start_pt, end_pt]
+            if (end_pt - start_pt).length > 1e-5:
+                return [start_pt, end_pt]
+            return []
         return simplified
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -455,9 +461,10 @@ class WiringDiagram:
                         for gy in range(y_start, y_end + 1):
                             routed_cells.add((gx, gy))
 
-                # Append the segment path directly to sub_paths
-                sub_paths.append(segment_path)
-                segments_info.append((segment_path, start_side, end_side))
+                # Append the segment path directly to sub_paths if valid
+                if len(segment_path) >= 2:
+                    sub_paths.append(segment_path)
+                    segments_info.append((segment_path, start_side, end_side))
 
                 # Move the active routing pin forward only if the target is not surface mount
                 if not self.wiring.is_surface_mount(component_b):
@@ -566,17 +573,19 @@ class WiringDiagram:
                     if not dedup_pts or (pt - dedup_pts[-1]).length > 1e-5:
                         dedup_pts.append(pt)
 
-                wire_name = name_i if sub_idx == 0 else f"{name_i}_{sub_idx}"
-                processed_paths.append((wire_name, color_i, dedup_pts))
+                if len(dedup_pts) >= 2:
+                    wire_name = name_i if sub_idx == 0 else f"{name_i}_{sub_idx}"
+                    processed_paths.append((wire_name, color_i, dedup_pts))
 
         # 3. Add all processed polylines/wires to the room
         for name, color, pts in processed_paths:
+            if len(pts) < 2:
+                continue
             wire_geom = smart_fillet(pts, WIRE_FILLET_RADIUS)
             room.add(f"wire_{name}", wire_geom, color=color)
 
             # Add connection dots at the start and end of the wire segment
-            if len(pts) >= 2:
-                with BuildSketch() as dot_sketch:
-                    Circle(radius=WIRE_DOT_RADIUS)
-                room.add(f"wire_dot_start_{name}", dot_sketch.sketch.moved(Location(pts[0])), color=color)
-                room.add(f"wire_dot_end_{name}", dot_sketch.sketch.moved(Location(pts[-1])), color=color)
+            with BuildSketch() as dot_sketch:
+                Circle(radius=WIRE_DOT_RADIUS)
+            room.add(f"wire_dot_start_{name}", dot_sketch.sketch.moved(Location(pts[0])), color=color)
+            room.add(f"wire_dot_end_{name}", dot_sketch.sketch.moved(Location(pts[-1])), color=color)

@@ -1,344 +1,82 @@
+imports:
+  - footprints/smd.yaml
+  - footprints/thru_hole.yaml
+  - footprints/ic.yaml
+
 footprints:
   - name: U1
     package: BGA-196
     position: [0.0, 0.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [12.0, 12.0, 1.4]
     mpn: STM32MP157-BGA196
     supplier_pn: 497-STM32MP157-ND
-    pins:
-      - name: A1
-        position: [-5.0, 5.0]
-        side: left
-      - name: A2
-        position: [-4.2, 5.0]
-        side: left
-      - name: B1
-        position: [-5.0, 4.2]
-        side: left
-      - name: B2
-        position: [-4.2, 4.2]
-        side: left
-      - name: H7
-        position: [0.0, 0.0]
-        side: left
-      - name: H8
-        position: [0.8, 0.0]
-        side: left
-      - name: D1
-        position: [-3.0, 0.0]
-        side: right
-      - name: D2
-        position: [-3.0, -1.0]
-        side: right
-      - name: N14
-        position: [5.0, -5.0]
-        side: right
-      - name: P14
-        position: [5.0, -5.8]
-        side: right
-      - name: C1
-        position: [3.0, 5.0]
-        side: right
-      - name: C2
-        position: [3.8, 5.0]
-        side: right
-      - name: F1
-        position: [4.0, 0.0]
-        side: right
-      - name: F2
-        position: [4.0, -1.0]
-        side: right
 
   - name: U2
     package: QFN-24
     position: [18.0, -15.0, -0.8]
     layer: B.Cu
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [4.0, 4.0, 0.85]
     mpn: CY8CMBR3116-LQI
     supplier_pn: 428-CY8CMBR3116-ND
-    pins:
-      - name: VDD
-        position: [-2.0, 1.5]
-        side: left
-      - name: VSS
-        position: [-2.0, -1.5]
-        side: left
-      - name: SDA
-        position: [-2.0, 0.5]
-        side: left
-      - name: SCL
-        position: [-2.0, -0.5]
-        side: left
-      - name: INT
-        position: [-1.0, -2.0]
-        side: bottom
-      - name: CS0
-        position: [2.0, 1.5]
-        side: right
-      - name: CS1
-        position: [2.0, 1.0]
-        side: right
-      - name: CS2
-        position: [2.0, 0.5]
-        side: right
-      - name: CS3
-        position: [2.0, 0.0]
-        side: right
-      - name: CS4
-        position: [2.0, -0.5]
-        side: right
-      - name: CS5
-        position: [2.0, -1.0]
-        side: right
-      - name: CS6
-        position: [2.0, -1.5]
-        side: right
-      - name: SHIELD
-        position: [0.0, 2.0]
-        side: top
 
   - name: J1
     package: M.2-KEY-M
     position: [0.0, -36.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [22.0, 6.0, 3.2]
     mpn: LOTES-APCI0082
     supplier_pn: LOTES-M2-ND
-    pins:
-      - name: GND
-        position: [-10.0, 0.0]
-        side: right
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: 3V3
-        position: [-8.0, 0.0]
-        side: right
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: VLOAD_SW
-        position: [-6.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: PETp0
-        position: [2.0, 0.0]
-        side: right
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: PETn0
-        position: [4.0, 0.0]
-        side: right
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: PERp0
-        position: [6.0, 0.0]
-        side: right
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: PERn0
-        position: [8.0, 0.0]
-        side: right
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
 
   - name: J2
     package: FPC-30P-0.5MM
     position: [0.0, 38.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [18.0, 4.5, 1.2]
+    shape_ref: carrier_board
     mpn: HIROSE-FH35C-30S
     supplier_pn: H1234-ND
-    pins:
-      - name: GND
-        position: [-8.0, 0.0]
-        side: right
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: 3V3
-        position: [-7.0, 0.0]
-        side: right
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: D0_P
-        position: [-5.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: D0_N
-        position: [-4.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: CLK_P
-        position: [-2.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: CLK_N
-        position: [-1.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: CAP_TX0
-        position: [1.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: CAP_RX0
-        position: [2.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: CAP_TX1
-        position: [3.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: CAP_RX1
-        position: [4.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: CAP_TX2
-        position: [5.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: CAP_RX2
-        position: [6.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: CAP_RX3
-        position: [7.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
-      - name: CAP_SHIELD
-        position: [8.0, 0.0]
-        side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.2, 1.2]
-        drill_dia_mm: 0.70
+
+  - name: J_FLEX
+    package: FPC-30P-0.5MM
+    position: [0.0, -21.0, 0.0]
+    rotation: [0.0, 0.0, 0.0]
+    shape_ref: flex_tail
+    mpn: HIROSE-FH35C-30S
+    supplier_pn: H1234-ND
 
   - name: R1
     package: "0402"
     position: [10.0, -8.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [1.0, 0.5, 0.35]
     mpn: RC0402FR-074K7L
     supplier_pn: 311-4.7KLRCT-ND
-    pins:
-      - name: "1"
-        position: [-0.5, 0.0]
-        side: left
-      - name: "2"
-        position: [0.5, 0.0]
-        side: right
 
   - name: R2
     package: "0402"
     position: [10.0, -10.5, 0.8]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [1.0, 0.5, 0.35]
     mpn: RC0402FR-074K7L
     supplier_pn: 311-4.7KLRCT-ND
-    pins:
-      - name: "1"
-        position: [-0.5, 0.0]
-        side: left
-      - name: "2"
-        position: [0.5, 0.0]
-        side: right
 
   - name: C1
     package: "0402"
     position: [18.0, -21.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [1.0, 0.5, 0.35]
     mpn: CC0402KRX7R9BB104
     supplier_pn: 311-1438-1-ND
-    pins:
-      - name: "1"
-        position: [-0.5, 0.0]
-        side: left
-      - name: "2"
-        position: [0.5, 0.0]
-        side: right
 
   - name: C2
     package: "0402"
     position: [-8.0, -5.0, -0.8]
     layer: B.Cu
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [1.0, 0.5, 0.35]
     mpn: CC0402KRX7R9BB104
     supplier_pn: 311-1438-1-ND
-    pins:
-      - name: "1"
-        position: [-0.5, 0.0]
-        side: left
-      - name: "2"
-        position: [0.5, 0.0]
-        side: right
 
   - name: C3
     package: "0603"
     position: [-12.0, -8.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [1.6, 0.8, 0.8]
     mpn: CL10A106KP8NNNC
     supplier_pn: 1276-1004-1-ND
-    pins:
-      - name: "1"
-        position: [-0.8, 0.0]
-        side: left
-      - name: "2"
-        position: [0.8, 0.0]
-        side: right
 
   - name: Q1
     package: SOT-23
@@ -352,12 +90,21 @@ footprints:
       - name: G
         position: [-0.95, -1.0]
         side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 1.0]
       - name: S
         position: [0.95, -1.0]
         side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 1.0]
       - name: D
         position: [0.0, 1.0]
         side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 1.0]
     truth_table:
       title: "Q1 Load Switch Truth Table"
       input_headers: ["PWR_EN (Gate)"]
@@ -380,6 +127,137 @@ footprints:
           state: "INVALID"
           description: "Gate dielectric breakdown; fault"
 
+  # Power Supply Circuit: USB-C -> VBUS -> LDO -> 3V3
+  - name: J_USB
+    package: USB-C-16P
+    position: [-22.0, 0.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: TYPE-C-16P
+    supplier_pn: C2765186
+
+  - name: R_CC1
+    package: "0402"
+    position: [-16.0, 2.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: RC0402FR-075K1L
+    supplier_pn: 311-5.1KLRCT-ND
+
+  - name: R_CC2
+    package: "0402"
+    position: [-16.0, -2.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: RC0402FR-075K1L
+    supplier_pn: 311-5.1KLRCT-ND
+
+  - name: U3
+    package: SOT-23-5
+    position: [-18.0, 8.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: AP2112K-3.3TRG1
+    supplier_pn: AP2112K-3.3-ND
+
+  - name: C_IN
+    package: "0603"
+    position: [-22.0, 8.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CL10A475KP8NNNC
+    supplier_pn: 1276-1188-1-ND
+
+  - name: C_OUT
+    package: "0603"
+    position: [-14.0, 8.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CL10A475KP8NNNC
+    supplier_pn: 1276-1188-1-ND
+
+  # Audio Subsystem: U1 PDM -> MAX98357A Audio Amp -> Speaker
+  - name: U4
+    package: QFN-16-AMP
+    position: [-16.0, 20.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: MAX98357AETE+
+    supplier_pn: MAX98357A-ND
+
+  - name: C_AMP
+    package: "0603"
+    position: [-20.0, 20.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CL10A105KP8NNNC
+    supplier_pn: 1276-1002-1-ND
+
+  - name: SPK1
+    package: pin_header_1x2
+    position: [-22.0, 26.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: 2PIN-2.54MM-HDR
+    supplier_pn: S1012E-02-ND
+
+  # U1 High Speed Crystal Oscillator & Decoupling Passives
+  - name: Y1
+    package: XTAL-3225-4P
+    position: [0.0, 12.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: ECS-240-8-30B-CKM
+    supplier_pn: XC2345-ND
+
+  - name: C_OSC1
+    package: "0402"
+    position: [-3.0, 12.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CC0402JRNPO9BN120
+    supplier_pn: 311-1032-1-ND
+
+  - name: C_OSC2
+    package: "0402"
+    position: [3.0, 12.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CC0402JRNPO9BN120
+    supplier_pn: 311-1032-1-ND
+
+  - name: R_RST
+    package: "0402"
+    position: [-8.0, 8.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: RC0402FR-0710KL
+    supplier_pn: 311-10.0KLRCT-ND
+
+  - name: C_RST
+    package: "0402"
+    position: [-10.5, 8.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CC0402KRX7R9BB104
+    supplier_pn: 311-1438-1-ND
+
+  - name: R_BOOT
+    package: "0402"
+    position: [-8.0, -8.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: RC0402FR-0710KL
+    supplier_pn: 311-10.0KLRCT-ND
+
+  - name: C4
+    package: "0402"
+    position: [6.0, 8.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CC0402KRX7R9BB104
+    supplier_pn: 311-1438-1-ND
+
+  - name: C5
+    package: "0402"
+    position: [-6.0, -8.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CC0402KRX7R9BB104
+    supplier_pn: 311-1438-1-ND
+
+  # U2 CY8CMBR3116 Internal Regulator Bypass Capacitor
+  - name: C_VREG
+    package: "0402"
+    position: [18.0, -10.0, -0.8]
+    layer: B.Cu
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CC0402KRX5R6BB105
+    supplier_pn: 311-1440-1-ND
+
 nets:
   - name: GND
     color: "#475569"
@@ -388,10 +266,32 @@ nets:
       - [U2, VSS]
       - [J1, GND]
       - [J2, GND]
+      - [J2, MP1]
+      - [J2, MP2]
       - [C1, "2"]
       - [C2, "2"]
       - [C3, "2"]
       - [Q1, S]
+      - [J_USB, GND]
+      - [J_USB, SHIELD1]
+      - [J_USB, SHIELD2]
+      - [R_CC1, "2"]
+      - [R_CC2, "2"]
+      - [U3, "2"]
+      - [C_IN, "2"]
+      - [C_OUT, "2"]
+      - [U4, GND]
+      - [U4, GAIN]
+      - [C_AMP, "2"]
+      - [Y1, "2"]
+      - [Y1, "4"]
+      - [C_OSC1, "2"]
+      - [C_OSC2, "2"]
+      - [C_RST, "2"]
+      - [R_BOOT, "2"]
+      - [C4, "2"]
+      - [C5, "2"]
+      - [C_VREG, "2"]
 
   - name: 3V3
     color: "#dc2626"
@@ -405,6 +305,34 @@ nets:
       - [C1, "1"]
       - [C2, "1"]
       - [C3, "1"]
+      - [U3, "5"]
+      - [C_OUT, "1"]
+      - [U4, VDD]
+      - [U4, SD_MODE]
+      - [C_AMP, "1"]
+      - [R_RST, "1"]
+      - [C4, "1"]
+      - [C5, "1"]
+
+  - name: VBUS
+    color: "#b91c1c"
+    pins:
+      - [J_USB, VBUS]
+      - [U3, "1"]
+      - [U3, "3"]
+      - [C_IN, "1"]
+
+  - name: CC1
+    color: "#0284c7"
+    pins:
+      - [J_USB, CC1]
+      - [R_CC1, "1"]
+
+  - name: CC2
+    color: "#0284c7"
+    pins:
+      - [J_USB, CC2]
+      - [R_CC2, "1"]
 
   - name: PWR_EN
     color: "#ea580c"
@@ -491,45 +419,116 @@ nets:
     pins:
       - [U2, CS0]
       - [J2, CAP_TX0]
+      - [J_FLEX, CAP_TX0]
 
   - name: CAP_RX0
     color: "#0891b2"
     pins:
       - [U2, CS1]
       - [J2, CAP_RX0]
+      - [J_FLEX, CAP_RX0]
 
   - name: CAP_TX1
     color: "#0284c7"
     pins:
       - [U2, CS2]
       - [J2, CAP_TX1]
+      - [J_FLEX, CAP_TX1]
 
   - name: CAP_RX1
     color: "#0369a1"
     pins:
       - [U2, CS3]
       - [J2, CAP_RX1]
+      - [J_FLEX, CAP_RX1]
 
   - name: CAP_TX2
     color: "#0ea5e9"
     pins:
       - [U2, CS4]
       - [J2, CAP_TX2]
+      - [J_FLEX, CAP_TX2]
 
   - name: CAP_RX2
     color: "#38bdf8"
     pins:
       - [U2, CS5]
       - [J2, CAP_RX2]
+      - [J_FLEX, CAP_RX2]
 
   - name: CAP_RX3
     color: "#67e8f9"
     pins:
       - [U2, CS6]
       - [J2, CAP_RX3]
+      - [J_FLEX, CAP_RX3]
 
   - name: CAP_SHIELD
     color: "#64748b"
     pins:
       - [U2, SHIELD]
       - [J2, CAP_SHIELD]
+      - [J_FLEX, CAP_SHIELD]
+
+  - name: PDM_DAT
+    color: "#9333ea"
+    pins:
+      - [U1, G1]
+      - [U4, DIN]
+
+  - name: PDM_CLK
+    color: "#a855f7"
+    pins:
+      - [U1, G2]
+      - [U4, BCLK]
+
+  - name: PDM_LRCLK
+    color: "#c084fc"
+    pins:
+      - [U1, G3]
+      - [U4, LRCLK]
+
+  - name: SPK_P
+    color: "#e11d48"
+    pins:
+      - [U4, OUTP]
+      - [SPK1, "1"]
+
+  - name: SPK_N
+    color: "#be123c"
+    pins:
+      - [U4, OUTN]
+      - [SPK1, "2"]
+
+  - name: OSC_IN
+    color: "#059669"
+    pins:
+      - [U1, K1]
+      - [Y1, "1"]
+      - [C_OSC1, "1"]
+
+  - name: OSC_OUT
+    color: "#10b981"
+    pins:
+      - [U1, K2]
+      - [Y1, "3"]
+      - [C_OSC2, "1"]
+
+  - name: NRST
+    color: "#eab308"
+    pins:
+      - [U1, M1]
+      - [R_RST, "2"]
+      - [C_RST, "1"]
+
+  - name: BOOT0
+    color: "#ca8a04"
+    pins:
+      - [U1, M2]
+      - [R_BOOT, "1"]
+
+  - name: VREG
+    color: "#0891b2"
+    pins:
+      - [U2, VREG]
+      - [C_VREG, "1"]

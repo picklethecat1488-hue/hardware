@@ -1,15 +1,16 @@
 """PCB design engine package for 4-8 layer rigid and flex boards, high-speed signals, and capacitive sensing."""
 
-from .drc import PCBDesignRulesChecker, DRCReport, DRCViolation, DRCSeverity
+from .drc import PCBDesignRulesChecker, DRCReport, DRCViolation, DRCSeverity, DRCViolationCollection
 from .bga_fanout import BGAFanoutRouter, BGAPad, BGAEscapeRoute
 from .capacitive import CapacitiveSensingGenerator, CapacitiveGeometry, HatchLine
 from .exporter import PCBExporter
 from .eye_diagram import EyeDiagramSimulator, EyeDiagramConfig, EyeDiagramResult
 from .rerun_logger import log_drc_report, log_eye_diagram
-from .silkscreen import BuildSilkscreen, SilkscreenText
+from .silkscreen import BuildSilkscreen, SilkscreenText, find_empty_space_for_label
 from .stackup import BuildStackup, StackupLayer
 from .drill_holes import BuildDrillHoles, MountingHole, DrillHole
-from .board import BuildPcb, BuildFlexTail
+from .board import BuildPcb, BuildFlexPCB
+from model.pcb import FlexType
 from .routing import (
     BuildTraces,
     Trace,
@@ -27,6 +28,7 @@ __all__ = [
     "DRCReport",
     "DRCViolation",
     "DRCSeverity",
+    "DRCViolationCollection",
     "BGAFanoutRouter",
     "BGAPad",
     "BGAEscapeRoute",
@@ -56,5 +58,7 @@ __all__ = [
     "BuildTestPoints",
     "TestPoint",
     "BuildPcb",
-    "BuildFlexTail",
+    "BuildFlexPCB",
+    "FlexType",
+    "find_empty_space_for_label",
 ]

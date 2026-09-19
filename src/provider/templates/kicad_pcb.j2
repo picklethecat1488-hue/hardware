@@ -60,8 +60,8 @@
 {% for fp in footprints %}
   (footprint "{{ fp.package }}" (layer "{{ fp.layer }}")
     (at {{ fp.x_mm }} {{ fp.y_mm }})
-    (fp_text reference "{{ fp.name }}" (at 0 {{ fp.ref_y }}) (layer "{{ fp.silk_layer }}") (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
-    (fp_text value "{{ fp.value }}" (at 0 {{ fp.val_y }}) (layer "{{ fp.fab_layer }}") (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
+    (fp_text reference "{{ fp.name }}" (at {{ fp.ref_x|default(0) }} {{ fp.ref_y }}) (layer "{{ fp.silk_layer }}") (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
+    (fp_text value "{{ fp.value }}" (at 0 {{ fp.val_y }}) (layer "{{ fp.fab_layer }}") hide (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
 {% for line in fp.alignment_lines %}
     (fp_line (start {{ line.x1 }} {{ line.y1 }}) (end {{ line.x2 }} {{ line.y2 }}) (stroke (width 0.15) (type default)) (layer "{{ fp.silk_layer }}"))
 {% endfor %}
