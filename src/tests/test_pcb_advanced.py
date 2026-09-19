@@ -400,12 +400,17 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 10
+    assert len(wiring.footprints) == 29
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
+    assert "U3" in footprint_names
+    assert "U4" in footprint_names
     assert "J1" in footprint_names
     assert "J2" in footprint_names
+    assert "J_USB" in footprint_names
+    assert "SPK1" in footprint_names
+    assert "Y1" in footprint_names
     assert "R1" in footprint_names
     assert "R2" in footprint_names
     assert "C1" in footprint_names
@@ -429,11 +434,11 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 11  # header + 10 components
+    assert len(bom_lines) == 29  # header + 28 carrier components (J_FLEX is on flex tail)
     assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 11  # header + 10 components
+    assert len(pos_lines) == 29  # header + 28 carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -873,10 +878,11 @@ def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     assert float(rows["J2"]["Mid Y"].replace("mm", "")) == 38.0
 
 
-def test_build_pcb_and_build_flex_tail_context_managers(advanced_pcb_stackup: StackupModel):
-    """Verify BuildPcb and BuildFlexTail custom context managers attach stackup and dimensions metadata."""
+def test_build_pcb_and_build_flex_pcb_context_managers(advanced_pcb_stackup: StackupModel):
+    """Verify BuildPcb and BuildFlexPCB custom context managers attach stackup, dimensions, and flex_type metadata."""
     from build123d import Box
-    from provider.pcb.board import BuildPcb, BuildFlexTail
+    from model.pcb import FlexType
+    from provider.pcb.board import BuildPcb, BuildFlexPCB
 
     with BuildPcb(
         name="main_carrier",
@@ -896,19 +902,23 @@ def test_build_pcb_and_build_flex_tail_context_managers(advanced_pcb_stackup: St
     assert meta.stackup is not None
     assert meta.dimensions_mm == (60.0, 40.0, round(advanced_pcb_stackup.total_thickness_mm, 4))
 
-    # Test BuildFlexTail
-    with BuildFlexTail(
-        name="camera_flex",
-        revision="1.0",
-        stackup=advanced_pcb_stackup,
-    ) as flex_builder:
-        Box(40.0, 15.0, 0.20)
+    # Test BuildFlexPCB with different flex types: connector, capacitive, component
+    for ftype in (FlexType.CONNECTOR, FlexType.CAPACITIVE, FlexType.COMPONENT):
+        with BuildFlexPCB(
+            name=f"flex_{ftype.value}",
+            flex_type=ftype,
+            revision="1.0",
+            stackup=advanced_pcb_stackup,
+        ) as flex_builder:
+            Box(40.0, 15.0, 0.20)
 
-    assert flex_builder.part is not None
-    assert flex_builder.board_type == "flex"
-    meta_flex = getattr(flex_builder.part, "pcb_metadata")
-    assert meta_flex.board_type == "flex"
-    assert meta_flex.name == "camera_flex"
+        assert flex_builder.part is not None
+        assert flex_builder.board_type == "flex"
+        assert flex_builder.flex_type == ftype
+        meta_flex = getattr(flex_builder.part, "pcb_metadata")
+        assert meta_flex.board_type == "flex"
+        assert meta_flex.flex_type == ftype
+        assert meta_flex.name == f"flex_{ftype.value}"
 
 
 def test_schematic_staggered_pin_stubs_and_loop_crossings(tmp_path: Path):

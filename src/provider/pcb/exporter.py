@@ -258,10 +258,10 @@ class PCBExporter:
         if self.is_flex:
             flex_silk = [
                 ("FLEX TAIL SENSOR REV 1.0", "F.SilkS", (0.0, -23.5), 0.8, 0.12),
-                ("LOW", "F.SilkS", (0.0, -6.0), 0.7, 0.10),
-                ("MID", "F.SilkS", (0.0, 5.5), 0.7, 0.10),
-                ("HIGH", "F.SilkS", (0.0, 17.0), 0.7, 0.10),
-                ("PROX", "F.SilkS", (0.0, 24.0), 0.7, 0.10),
+                ("CH0: LOW", "F.SilkS", (0.0, -6.0), 0.7, 0.10),
+                ("CH1: MID", "F.SilkS", (0.0, 5.5), 0.7, 0.10),
+                ("CH2: HIGH", "F.SilkS", (0.0, 16.5), 0.7, 0.10),
+                ("CH3: PROX", "F.SilkS", (0.0, 23.8), 0.7, 0.10),
                 ("• Pin 1", "F.SilkS", (-9.5, -21.0), 0.6, 0.09),
             ]
             for text, lay, pos, fsize, thk in flex_silk:
@@ -367,8 +367,14 @@ class PCBExporter:
                     }
                 )
 
-        # Process capacitive sensors (for flex tail or any board with capacitive_sensors defined)
-        capacitive_sensors = list(self.config.capacitive_sensors)
+        # Process capacitive sensors (scoped to this board's shape_ref)
+        target_shape = getattr(self.config, "shape_ref", None)
+        capacitive_sensors = [
+            sensor
+            for sensor in self.config.capacitive_sensors
+            if getattr(sensor, "shape_ref", None) == target_shape
+            or (self.is_flex and not getattr(sensor, "shape_ref", None))
+        ]
         for idx, sensor in enumerate(capacitive_sensors):
             center = getattr(sensor, "center_mm", None)
             if center is None:
@@ -460,34 +466,24 @@ class PCBExporter:
                     }
                 )
 
-        if self.is_flex:
-            # Routing traces connecting J2 pins to the 4 capacitive sensing channels
-            flex_routes = [
-                ("CAP_TX0", [(1.0, -21.0), (1.0, -18.0), (-6.0, -18.0), (-6.0, -17.0)]),
-                ("CAP_RX0", [(2.0, -21.0), (2.0, -18.0), (6.0, -18.0), (6.0, -17.0)]),
-                ("CAP_TX1", [(3.0, -21.0), (3.0, -19.0), (-7.0, -19.0), (-7.0, -0.5), (-6.0, -0.5)]),
-                ("CAP_RX1", [(4.0, -21.0), (4.0, -19.0), (7.0, -19.0), (7.0, -0.5), (6.0, -0.5)]),
-                ("CAP_TX2", [(5.0, -21.0), (5.0, -20.0), (-7.4, -20.0), (-7.4, 11.0), (-6.0, 11.0)]),
-                ("CAP_RX2", [(6.0, -21.0), (6.0, -20.0), (7.4, -20.0), (7.4, 11.0), (6.0, 11.0)]),
-                ("CAP_RX3", [(7.0, -21.0), (7.0, 16.5), (0.0, 16.5)]),
-                ("CAP_SHIELD", [(8.0, -21.0), (8.0, -12.0)]),
-            ]
-            for net_name, rpts in flex_routes:
-                n_idx = net_name_to_idx.get(net_name, 0)
-                for k in range(len(rpts) - 1):
-                    p1 = rpts[k]
-                    p2 = rpts[k + 1]
-                    segments_data.append(
-                        {
-                            "x1": round(self.config.sheet_center_x_mm + p1[0], 4),
-                            "y1": round(self.config.sheet_center_y_mm + p1[1], 4),
-                            "x2": round(self.config.sheet_center_x_mm + p2[0], 4),
-                            "y2": round(self.config.sheet_center_y_mm + p2[1], 4),
-                            "width": 0.15,
-                            "layer": "F.Cu",
-                            "net_idx": n_idx,
-                        }
-                    )
+        if self.is_flex and not self.config.traces:
+            from provider.pcb.router import PCBAutoRouter
+
+            auto_router = PCBAutoRouter(self.config, self.wiring)
+            flex_traces, _ = auto_router.route_all_nets()
+            for tr in flex_traces:
+                n_idx = net_name_to_idx.get(tr.net, 0)
+                segments_data.append(
+                    {
+                        "x1": round(self.config.sheet_center_x_mm + tr.start_mm[0], 4),
+                        "y1": round(self.config.sheet_center_y_mm + tr.start_mm[1], 4),
+                        "x2": round(self.config.sheet_center_x_mm + tr.end_mm[0], 4),
+                        "y2": round(self.config.sheet_center_y_mm + tr.end_mm[1], 4),
+                        "width": tr.width_mm,
+                        "layer": tr.layer,
+                        "net_idx": n_idx,
+                    }
+                )
 
         # Test Points (carrier board only)
         test_points_data = []
@@ -745,11 +741,17 @@ class PCBExporter:
         return out_path
 
     def get_footprints_for_board(self) -> List[FootprintModel]:
-        """Return the list of footprints belonging to this board target (filtering flex vs carrier)."""
+        """Return the list of footprints belonging to this board target (filtering by shape_ref)."""
         fps = list(self.wiring.footprints) if self.wiring else []
-        if self.is_flex:
-            return [fp for fp in fps if fp.name == "J2" or getattr(fp, "shape_ref", None) == "flex_tail"]
-        return [fp for fp in fps if getattr(fp, "shape_ref", None) != "flex_tail"]
+        target_ref = getattr(self.config, "shape_ref", None)
+        if target_ref:
+            return [
+                fp
+                for fp in fps
+                if getattr(fp, "shape_ref", None) == target_ref
+                or (not getattr(fp, "shape_ref", None) and not self.is_flex)
+            ]
+        return fps
 
     def export_bom_csv(self, output_file: str | Path) -> Path:
         """Export Bill of Materials (BOM) in CSV format for component procurement and assembly."""
@@ -798,8 +800,8 @@ class PCBExporter:
         rows = []
         fps_to_process = self.get_footprints_for_board()
         for fp in fps_to_process:
-            mid_x = 0.0 if (self.is_flex and fp.name == "J2") else fp.position[0]
-            mid_y = -21.0 if (self.is_flex and fp.name == "J2") else fp.position[1]
+            mid_x = fp.position[0]
+            mid_y = fp.position[1]
             rows.append(
                 {
                     "Designator": fp.name,
