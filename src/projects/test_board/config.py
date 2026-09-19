@@ -13,7 +13,7 @@ def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None
         raise FileNotFoundError(f"Wiring specification not found at {provider.wiring_path}")
 
     wiring = Wiring(str(provider.wiring_path))
-    cfg = provider.pcb_manifest or provider.pcb_config
+    cfg = provider.get_pcb_config_without_routes()
     if cfg is None:
         raise ValueError("PCB configuration not found for test_board")
 

@@ -395,113 +395,133 @@ class Provider:
         """
         return []
 
+    def get_pcb_config_without_routes(self) -> Optional[PCBConfig]:
+        """Return PCBConfig populated with stackup, holes, copper regions, and test points, omitting traces and vias."""
+        data = self.pcb_manifest
+        if not data:
+            return None
+
+        from model.pcb import PCBConfig, PCBMaterialsModel, StackupModel
+        from provider.pcb.stackup import BuildStackup
+        from provider.pcb.drill_holes import BuildDrillHoles
+        from provider.pcb.routing import BuildCopperRegions, BuildTestPoints
+
+        config = PCBConfig.model_validate(data)
+
+        # 1. Stackup from provider context manager
+        provider_stackup = self.stackup()
+        if provider_stackup is not None:
+            if isinstance(provider_stackup, BuildStackup):
+                config.stackup = provider_stackup.to_model()
+            elif isinstance(provider_stackup, StackupModel):
+                config.stackup = provider_stackup
+        elif config.stackup is not None:
+            config.stackup.resolve_materials(PCBMaterialsModel.default())
+
+        # 2. Drill / mounting holes from provider context manager
+        provider_holes = self.mounting_holes()
+        if provider_holes:
+            if isinstance(provider_holes, BuildDrillHoles):
+                config.mounting_holes = list(provider_holes.holes)
+            else:
+                config.mounting_holes = list(provider_holes)
+
+        # 3. Silkscreen texts from provider context manager
+        provider_texts = self.silkscreen()
+        if provider_texts:
+            config.silkscreen_texts = list(provider_texts)
+
+        # 4. Copper regions from provider context manager
+        p_regions = self.copper_regions()
+        if p_regions:
+            if isinstance(p_regions, BuildCopperRegions):
+                config.copper_regions = list(p_regions.regions)
+            else:
+                config.copper_regions = list(p_regions)
+
+        # 5. Test points from provider context manager
+        p_tps = self.test_points()
+        if p_tps:
+            if isinstance(p_tps, BuildTestPoints):
+                config.test_points = list(p_tps.test_points)
+            else:
+                config.test_points = list(p_tps)
+
+        # 6. Merge metadata and derive dimensions_mm from build123d shape if shape_ref is present
+        if config.shape_ref and config.shape_ref in self.part:
+            part_builder = self.part[config.shape_ref]
+            part_obj = part_builder(config.shape_ref, None, Mode.DEFAULT)
+            pcb_meta = getattr(part_obj, "pcb_metadata", None)
+            if pcb_meta is None and hasattr(part_obj, "part"):
+                pcb_meta = getattr(part_obj.part, "pcb_metadata", None)
+            if pcb_meta is not None:
+                if config.stackup is None and pcb_meta.stackup is not None:
+                    config.stackup = pcb_meta.stackup
+                if not config.mounting_holes and pcb_meta.mounting_holes:
+                    config.mounting_holes = pcb_meta.mounting_holes
+                if not config.silkscreen_texts and pcb_meta.silkscreen_texts:
+                    config.silkscreen_texts = pcb_meta.silkscreen_texts
+                if not config.copper_regions and pcb_meta.copper_regions:
+                    config.copper_regions = pcb_meta.copper_regions
+                if not config.test_points and pcb_meta.test_points:
+                    config.test_points = pcb_meta.test_points
+
+            if config.dimensions_mm is None:
+                bb = getattr(part_obj, "bounding_box", None)
+                if bb is None and hasattr(part_obj, "part"):
+                    bb = getattr(part_obj.part, "bounding_box", None)
+                if callable(bb):
+                    bbox = bb()
+                elif bb is not None:
+                    bbox = bb
+                else:
+                    bbox = None
+
+                if bbox is not None:
+                    th_z = config.stackup.total_thickness_mm if config.stackup else bbox.size.Z
+                    config.dimensions_mm = (round(bbox.size.X, 4), round(bbox.size.Y, 4), round(th_z, 4))
+
+        return config
+
     @property
     def pcb_config(self) -> Optional[PCBConfig]:
         """Return parsed PCBConfig Pydantic model from pcb.yaml if available."""
-        data = self.pcb_manifest
-        if data:
-            from model.pcb import PCBConfig, PCBMaterialsModel, StackupModel
-            from provider.pcb.stackup import BuildStackup
-            from provider.pcb.drill_holes import BuildDrillHoles
-            from provider.pcb.routing import BuildTraces, BuildVias, BuildCopperRegions, BuildTestPoints
+        config = self.get_pcb_config_without_routes()
+        if config is None:
+            return None
 
-            config = PCBConfig.model_validate(data)
+        from provider.pcb.routing import BuildTraces, BuildVias
 
-            # 1. Stackup from provider context manager
-            provider_stackup = self.stackup()
-            if provider_stackup is not None:
-                if isinstance(provider_stackup, BuildStackup):
-                    config.stackup = provider_stackup.to_model()
-                elif isinstance(provider_stackup, StackupModel):
-                    config.stackup = provider_stackup
-            elif config.stackup is not None:
-                config.stackup.resolve_materials(PCBMaterialsModel.default())
+        # Traces from provider context manager
+        p_traces = self.traces()
+        if p_traces:
+            if isinstance(p_traces, BuildTraces):
+                config.traces = list(p_traces.traces)
+            else:
+                config.traces = list(p_traces)
 
-            # 2. Drill / mounting holes from provider context manager
-            provider_holes = self.mounting_holes()
-            if provider_holes:
-                if isinstance(provider_holes, BuildDrillHoles):
-                    config.mounting_holes = list(provider_holes.holes)
-                else:
-                    config.mounting_holes = list(provider_holes)
+        # Vias from provider context manager
+        p_vias = self.vias()
+        if p_vias:
+            if isinstance(p_vias, BuildVias):
+                config.vias = list(p_vias.vias)
+            else:
+                config.vias = list(p_vias)
 
-            # 3. Silkscreen texts from provider context manager
-            provider_texts = self.silkscreen()
-            if provider_texts:
-                config.silkscreen_texts = list(provider_texts)
+        # Fall back to shape metadata traces/vias if not present
+        if config.shape_ref and config.shape_ref in self.part:
+            part_builder = self.part[config.shape_ref]
+            part_obj = part_builder(config.shape_ref, None, Mode.DEFAULT)
+            pcb_meta = getattr(part_obj, "pcb_metadata", None)
+            if pcb_meta is None and hasattr(part_obj, "part"):
+                pcb_meta = getattr(part_obj.part, "pcb_metadata", None)
+            if pcb_meta is not None:
+                if not config.traces and pcb_meta.traces:
+                    config.traces = pcb_meta.traces
+                if not config.vias and pcb_meta.vias:
+                    config.vias = pcb_meta.vias
 
-            # 4. Traces from provider context manager
-            p_traces = self.traces()
-            if p_traces:
-                if isinstance(p_traces, BuildTraces):
-                    config.traces = list(p_traces.traces)
-                else:
-                    config.traces = list(p_traces)
-
-            # 5. Vias from provider context manager
-            p_vias = self.vias()
-            if p_vias:
-                if isinstance(p_vias, BuildVias):
-                    config.vias = list(p_vias.vias)
-                else:
-                    config.vias = list(p_vias)
-
-            # 6. Copper regions from provider context manager
-            p_regions = self.copper_regions()
-            if p_regions:
-                if isinstance(p_regions, BuildCopperRegions):
-                    config.copper_regions = list(p_regions.regions)
-                else:
-                    config.copper_regions = list(p_regions)
-
-            # 7. Test points from provider context manager
-            p_tps = self.test_points()
-            if p_tps:
-                if isinstance(p_tps, BuildTestPoints):
-                    config.test_points = list(p_tps.test_points)
-                else:
-                    config.test_points = list(p_tps)
-
-            # 8. Merge metadata and derive dimensions_mm from build123d shape if shape_ref is present
-            if config.shape_ref and config.shape_ref in self.part:
-                part_builder = self.part[config.shape_ref]
-                part_obj = part_builder(config.shape_ref, None, Mode.DEFAULT)
-                pcb_meta = getattr(part_obj, "pcb_metadata", None)
-                if pcb_meta is None and hasattr(part_obj, "part"):
-                    pcb_meta = getattr(part_obj.part, "pcb_metadata", None)
-                if pcb_meta is not None:
-                    if config.stackup is None and pcb_meta.stackup is not None:
-                        config.stackup = pcb_meta.stackup
-                    if not config.mounting_holes and pcb_meta.mounting_holes:
-                        config.mounting_holes = pcb_meta.mounting_holes
-                    if not config.silkscreen_texts and pcb_meta.silkscreen_texts:
-                        config.silkscreen_texts = pcb_meta.silkscreen_texts
-                    if not config.traces and pcb_meta.traces:
-                        config.traces = pcb_meta.traces
-                    if not config.vias and pcb_meta.vias:
-                        config.vias = pcb_meta.vias
-                    if not config.copper_regions and pcb_meta.copper_regions:
-                        config.copper_regions = pcb_meta.copper_regions
-                    if not config.test_points and pcb_meta.test_points:
-                        config.test_points = pcb_meta.test_points
-
-                if config.dimensions_mm is None:
-                    bb = getattr(part_obj, "bounding_box", None)
-                    if bb is None and hasattr(part_obj, "part"):
-                        bb = getattr(part_obj.part, "bounding_box", None)
-                    if callable(bb):
-                        bbox = bb()
-                    elif bb is not None:
-                        bbox = bb
-                    else:
-                        bbox = None
-
-                    if bbox is not None:
-                        th_z = config.stackup.total_thickness_mm if config.stackup else bbox.size.Z
-                        config.dimensions_mm = (round(bbox.size.X, 4), round(bbox.size.Y, 4), round(th_z, 4))
-
-            return config
-        return None
+        return config
 
     @property
     def manifest(self) -> dict[str, dict[str, Any]]:
