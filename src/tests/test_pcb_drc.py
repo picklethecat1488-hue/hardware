@@ -744,3 +744,63 @@ def test_drc_net_continuity_source_target_reachability(base_pcb_config: PCBConfi
     base_pcb_config.test_points = [tp_connected]
     violations_all_ok = checker.check_net_continuity(wiring_mock)
     assert len(violations_all_ok) == 0, f"Expected 0 violations, got {violations_all_ok}"
+
+
+def test_drc_violation_collection_helpers():
+    """Verify DRCViolationCollection methods construct typed violations with expected attributes."""
+    from provider.pcb.drc import DRCViolationCollection, DRCViolation, DRCSeverity, DRCReport
+
+    collection = DRCViolationCollection()
+    assert len(collection) == 0
+    assert isinstance(collection, list)
+
+    # Test add_error
+    err = collection.add_error("TEST_ERR", "NET_A", "An error occurred", actual_value=1.5, expected_range=(2.0, 3.0))
+    assert isinstance(err, DRCViolation)
+    assert err.severity == DRCSeverity.ERROR
+    assert err.rule_name == "TEST_ERR"
+    assert err.net_or_zone == "NET_A"
+    assert len(collection) == 1
+
+    # Test add_warning
+    warn = collection.add_warning("TEST_WARN", "NET_B", "A warning occurred")
+    assert warn.severity == DRCSeverity.WARNING
+    assert len(collection) == 2
+
+    # Test add_info
+    info = collection.add_info("TEST_INFO", "ZONE_C", "Informational note")
+    assert info.severity == DRCSeverity.INFO
+    assert len(collection) == 3
+
+    # Test add_boundary_violation
+    bv_outline = collection.add_boundary_violation(
+        "VIA_OUTSIDE_BOARD_BOUNDARY", "NET_V", "Via on net 'NET_V'", 12.5, -4.2, is_outline=True
+    )
+    assert bv_outline.severity == DRCSeverity.ERROR
+    assert "CAD board boundary outline" in bv_outline.description
+    assert bv_outline.location == (12.5, -4.2, 0.0)
+
+    bv_env = collection.add_boundary_violation(
+        "TEST_POINT_OUTSIDE_BOARD_BOUNDARY", "TP1", "Test point 'TP1'", 30.0, 10.0, is_outline=False
+    )
+    assert "board envelope" in bv_env.description
+
+    # Test add_clearance_violation
+    cv = collection.add_clearance_violation(
+        "PAD_TO_PAD_CLEARANCE", "NET_P", "Clearance violation between pads", actual_distance=0.15, min_clearance=0.20
+    )
+    assert cv.actual_value == 0.15
+    assert cv.expected_range == (0.20, float("inf"))
+
+    # Test add_continuity_violation
+    cont = collection.add_continuity_violation(
+        "DISCONNECTED_NET", "NET_D", "Net is completely disconnected", severity=DRCSeverity.ERROR
+    )
+    assert cont.rule_name == "DISCONNECTED_NET"
+    assert cont.severity == DRCSeverity.ERROR
+
+    # Verify report integration
+    report = DRCReport(passed=False, violations=collection)
+    assert report.error_count == 5
+    assert report.warning_count == 1
+    assert report.info_count == 1

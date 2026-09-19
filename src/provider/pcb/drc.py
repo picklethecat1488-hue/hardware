@@ -108,12 +108,169 @@ class DRCViolation:
         return f"[{self.severity.upper()}] {self.rule_name} on '{self.net_or_zone}'{loc}: {self.description}{actual}{expected}"
 
 
+class DRCViolationCollection(List[DRCViolation]):
+    """Custom collection for DRC violations providing structured helper factory methods."""
+
+    def add_violation(
+        self,
+        rule_name: str,
+        severity: DRCSeverity,
+        net_or_zone: str,
+        description: str,
+        actual_value: Optional[float] = None,
+        expected_range: Optional[Tuple[float, float]] = None,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append a DRC violation to the collection."""
+        v = DRCViolation(
+            rule_name=rule_name,
+            severity=severity,
+            net_or_zone=net_or_zone,
+            description=description,
+            actual_value=actual_value,
+            expected_range=expected_range,
+            location=location,
+        )
+        self.append(v)
+        return v
+
+    def add_error(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        description: str,
+        actual_value: Optional[float] = None,
+        expected_range: Optional[Tuple[float, float]] = None,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append an ERROR DRC violation."""
+        return self.add_violation(
+            rule_name=rule_name,
+            severity=DRCSeverity.ERROR,
+            net_or_zone=net_or_zone,
+            description=description,
+            actual_value=actual_value,
+            expected_range=expected_range,
+            location=location,
+        )
+
+    def add_warning(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        description: str,
+        actual_value: Optional[float] = None,
+        expected_range: Optional[Tuple[float, float]] = None,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append a WARNING DRC violation."""
+        return self.add_violation(
+            rule_name=rule_name,
+            severity=DRCSeverity.WARNING,
+            net_or_zone=net_or_zone,
+            description=description,
+            actual_value=actual_value,
+            expected_range=expected_range,
+            location=location,
+        )
+
+    def add_info(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        description: str,
+        actual_value: Optional[float] = None,
+        expected_range: Optional[Tuple[float, float]] = None,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append an INFO DRC violation."""
+        return self.add_violation(
+            rule_name=rule_name,
+            severity=DRCSeverity.INFO,
+            net_or_zone=net_or_zone,
+            description=description,
+            actual_value=actual_value,
+            expected_range=expected_range,
+            location=location,
+        )
+
+    def add_boundary_violation(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        element_name: str,
+        x: float,
+        y: float,
+        is_outline: bool = False,
+    ) -> DRCViolation:
+        """Construct and append a boundary containment violation."""
+        boundary_type = "CAD board boundary outline" if is_outline else "board envelope"
+        description = f"{element_name} at ({x:.2f}, {y:.2f}) is outside {boundary_type}"
+        return self.add_error(
+            rule_name=rule_name,
+            net_or_zone=net_or_zone,
+            description=description,
+            location=(x, y, 0.0),
+        )
+
+    def add_clearance_violation(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        description: str,
+        actual_distance: float,
+        min_clearance: float,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append a clearance distance violation."""
+        return self.add_error(
+            rule_name=rule_name,
+            net_or_zone=net_or_zone,
+            description=description,
+            actual_value=actual_distance,
+            expected_range=(min_clearance, float("inf")),
+            location=location,
+        )
+
+    def add_continuity_violation(
+        self,
+        rule_name: str,
+        net_or_zone: str,
+        description: str,
+        severity: DRCSeverity = DRCSeverity.ERROR,
+        location: Optional[Tuple[float, float, float]] = None,
+    ) -> DRCViolation:
+        """Construct and append a netlist or routing continuity violation."""
+        return self.add_violation(
+            rule_name=rule_name,
+            severity=severity,
+            net_or_zone=net_or_zone,
+            description=description,
+            location=location,
+        )
+
+    @property
+    def errors(self) -> List[DRCViolation]:
+        """Return all violations with ERROR severity."""
+        return [v for v in self if v.severity == DRCSeverity.ERROR]
+
+    @property
+    def warnings(self) -> List[DRCViolation]:
+        """Return all violations with WARNING severity."""
+        return [v for v in self if v.severity == DRCSeverity.WARNING]
+
+    @property
+    def infos(self) -> List[DRCViolation]:
+        """Return all violations with INFO severity."""
+        return [v for v in self if v.severity == DRCSeverity.INFO]
+
+
 @dataclass
 class DRCReport:
     """Collection of DRC violations and overall constraint conformance status."""
 
     passed: bool
-    violations: List[DRCViolation] = field(default_factory=list)
+    violations: DRCViolationCollection = field(default_factory=DRCViolationCollection)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -190,7 +347,7 @@ class PCBDesignRulesChecker:
         Returns:
             DRCReport detailing all passed/failed constraints.
         """
-        violations: List[DRCViolation] = []
+        violations = DRCViolationCollection()
 
         # 1. Stackup impedance verification (differential, CPWG RF, display)
         violations.extend(self.check_impedances())
@@ -548,7 +705,7 @@ class PCBDesignRulesChecker:
         Returns:
             List of DRCViolation instances for any boundary clearance violations.
         """
-        violations = []
+        violations = DRCViolationCollection()
         w_board, l_board, _ = self.config.dimensions_mm
         half_w = w_board / 2.0
         half_l = l_board / 2.0
@@ -567,16 +724,13 @@ class PCBDesignRulesChecker:
                 ]
                 for cx, cy in corners:
                     if not _point_in_polygon(cx, cy, outline_polygon):
-                        violations.append(
-                            DRCViolation(
-                                rule_name="BOUNDARY_CONTAINMENT_ERROR",
-                                severity=DRCSeverity.ERROR,
-                                net_or_zone=fp.name,
-                                description=(
-                                    f"Component '{fp.name}' extends outside CAD board boundary outline at ({cx:.2f}, {cy:.2f})"
-                                ),
-                                location=(cx, cy, 0.0),
-                            )
+                        violations.add_boundary_violation(
+                            "BOUNDARY_CONTAINMENT_ERROR",
+                            fp.name,
+                            f"Component '{fp.name}'",
+                            cx,
+                            cy,
+                            is_outline=True,
                         )
                         break
             else:
@@ -592,18 +746,16 @@ class PCBDesignRulesChecker:
                 fp_max_y = fy + (fl / 2.0)
 
                 if fp_min_x < min_x or fp_max_x > max_x or fp_min_y < min_y or fp_max_y > max_y:
-                    violations.append(
-                        DRCViolation(
-                            rule_name="BOUNDARY_CLEARANCE_VIOLATION",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=fp.name,
-                            description=(
-                                f"Component '{fp.name}' at ({fx:.2f}, {fy:.2f}) with size {fw:.1f}x{fl:.1f}mm violates "
-                                f"{edge_clearance_mm}mm edge clearance constraint to board boundary"
-                            ),
-                            location=(fx, fy, 0.0),
-                            expected_range=(edge_clearance_mm, half_w),
-                        )
+                    violations.add_clearance_violation(
+                        "BOUNDARY_CLEARANCE_VIOLATION",
+                        fp.name,
+                        (
+                            f"Component '{fp.name}' at ({fx:.2f}, {fy:.2f}) with size {fw:.1f}x{fl:.1f}mm violates "
+                            f"{edge_clearance_mm}mm edge clearance constraint to board boundary"
+                        ),
+                        actual_distance=min(half_w - abs(fx), half_l - abs(fy)),
+                        min_clearance=edge_clearance_mm,
+                        location=(fx, fy, 0.0),
                     )
 
         # Check trace segments containment
@@ -611,17 +763,13 @@ class PCBDesignRulesChecker:
             for pt in (tr.start_mm, tr.end_mm):
                 if outline_polygon:
                     if not _point_in_polygon(pt[0], pt[1], outline_polygon):
-                        violations.append(
-                            DRCViolation(
-                                rule_name="TRACE_OUTSIDE_BOARD_BOUNDARY",
-                                severity=DRCSeverity.ERROR,
-                                net_or_zone=tr.net,
-                                description=(
-                                    f"Trace on net '{tr.net}' on layer '{tr.layer}' at ({pt[0]:.2f}, {pt[1]:.2f}) "
-                                    f"extends outside CAD board boundary outline"
-                                ),
-                                location=(pt[0], pt[1], 0.0),
-                            )
+                        violations.add_boundary_violation(
+                            "TRACE_OUTSIDE_BOARD_BOUNDARY",
+                            tr.net,
+                            f"Trace on net '{tr.net}' on layer '{tr.layer}'",
+                            pt[0],
+                            pt[1],
+                            is_outline=True,
                         )
                         break
                 else:
@@ -633,17 +781,13 @@ class PCBDesignRulesChecker:
                             for fz in self.config.flex_zones
                         )
                         if not in_flex:
-                            violations.append(
-                                DRCViolation(
-                                    rule_name="TRACE_OUTSIDE_BOARD_BOUNDARY",
-                                    severity=DRCSeverity.ERROR,
-                                    net_or_zone=tr.net,
-                                    description=(
-                                        f"Trace on net '{tr.net}' on layer '{tr.layer}' at ({pt[0]:.2f}, {pt[1]:.2f}) "
-                                        f"extends outside board envelope"
-                                    ),
-                                    location=(pt[0], pt[1], 0.0),
-                                )
+                            violations.add_boundary_violation(
+                                "TRACE_OUTSIDE_BOARD_BOUNDARY",
+                                tr.net,
+                                f"Trace on net '{tr.net}' on layer '{tr.layer}'",
+                                pt[0],
+                                pt[1],
+                                is_outline=False,
                             )
                             break
 
@@ -652,25 +796,23 @@ class PCBDesignRulesChecker:
             vx, vy = v.position_mm
             if outline_polygon:
                 if not _point_in_polygon(vx, vy, outline_polygon):
-                    violations.append(
-                        DRCViolation(
-                            rule_name="VIA_OUTSIDE_BOARD_BOUNDARY",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=v.net,
-                            description=f"Via on net '{v.net}' at ({vx:.2f}, {vy:.2f}) is outside CAD board boundary outline",
-                            location=(vx, vy, 0.0),
-                        )
+                    violations.add_boundary_violation(
+                        "VIA_OUTSIDE_BOARD_BOUNDARY",
+                        v.net,
+                        f"Via on net '{v.net}'",
+                        vx,
+                        vy,
+                        is_outline=True,
                     )
             else:
                 if vx < -half_w or vx > half_w or vy < -half_l or vy > half_l:
-                    violations.append(
-                        DRCViolation(
-                            rule_name="VIA_OUTSIDE_BOARD_BOUNDARY",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=v.net,
-                            description=f"Via on net '{v.net}' at ({vx:.2f}, {vy:.2f}) is outside board envelope",
-                            location=(vx, vy, 0.0),
-                        )
+                    violations.add_boundary_violation(
+                        "VIA_OUTSIDE_BOARD_BOUNDARY",
+                        v.net,
+                        f"Via on net '{v.net}'",
+                        vx,
+                        vy,
+                        is_outline=False,
                     )
 
         # Check test points containment
@@ -678,25 +820,23 @@ class PCBDesignRulesChecker:
             tx, ty = tp.position_mm
             if outline_polygon:
                 if not _point_in_polygon(tx, ty, outline_polygon):
-                    violations.append(
-                        DRCViolation(
-                            rule_name="TEST_POINT_OUTSIDE_BOARD_BOUNDARY",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=tp.name,
-                            description=f"Test point '{tp.name}' at ({tx:.2f}, {ty:.2f}) is outside CAD board boundary outline",
-                            location=(tx, ty, 0.0),
-                        )
+                    violations.add_boundary_violation(
+                        "TEST_POINT_OUTSIDE_BOARD_BOUNDARY",
+                        tp.name,
+                        f"Test point '{tp.name}'",
+                        tx,
+                        ty,
+                        is_outline=True,
                     )
             else:
                 if tx < -half_w or tx > half_w or ty < -half_l or ty > half_l:
-                    violations.append(
-                        DRCViolation(
-                            rule_name="TEST_POINT_OUTSIDE_BOARD_BOUNDARY",
-                            severity=DRCSeverity.ERROR,
-                            net_or_zone=tp.name,
-                            description=f"Test point '{tp.name}' at ({tx:.2f}, {ty:.2f}) is outside board envelope",
-                            location=(tx, ty, 0.0),
-                        )
+                    violations.add_boundary_violation(
+                        "TEST_POINT_OUTSIDE_BOARD_BOUNDARY",
+                        tp.name,
+                        f"Test point '{tp.name}'",
+                        tx,
+                        ty,
+                        is_outline=False,
                     )
 
         return violations
