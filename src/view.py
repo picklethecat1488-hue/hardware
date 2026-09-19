@@ -194,8 +194,10 @@ class Viewer:
                 pcb_cfg = provider.pcb_config.model_copy(update={"name": subassembly})
             elif sub_pcb_config and not sub_pcb_config.stackup:
                 pcb_cfg = sub_pcb_config.model_copy(update={"stackup": provider.pcb_config.stackup})
+            if sub_pcb_config and not pcb_cfg.capacitive_sensors and provider.pcb_config.capacitive_sensors:
+                pcb_cfg = pcb_cfg.model_copy(update={"capacitive_sensors": provider.pcb_config.capacitive_sensors})
 
-            exporter = PCBExporter(pcb_cfg, wiring)
+            exporter = PCBExporter(pcb_cfg, wiring, subassembly=subassembly)
 
             pcb_filename = f"{subassembly}.kicad_pcb" if subassembly else f"{provider.name}.kicad_pcb"
             sch_filename = f"{subassembly}.kicad_sch" if subassembly else f"{provider.name}.kicad_sch"
@@ -208,10 +210,8 @@ class Viewer:
             if not no_build:
                 board_dir.mkdir(parents=True, exist_ok=True)
                 schematics_dir.mkdir(parents=True, exist_ok=True)
-                if not kicad_pcb_path.exists():
-                    exporter.export_board(board_dir, pcb_filename=pcb_filename)
-                if not kicad_sch_path.exists():
-                    exporter.export_kicad_sch(kicad_sch_path)
+                exporter.export_board(board_dir, pcb_filename=pcb_filename)
+                exporter.export_kicad_sch(kicad_sch_path)
 
             if solid is None:
                 solid = exporter.build_solid()

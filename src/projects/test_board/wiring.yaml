@@ -263,6 +263,20 @@ footprints:
         pad_shape: circle
         pad_size_mm: [1.2, 1.2]
         drill_dia_mm: 0.70
+      - name: MP1
+        position: [-9.5, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.6, 1.6]
+        drill_dia_mm: 1.00
+      - name: MP2
+        position: [9.5, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.6, 1.6]
+        drill_dia_mm: 1.00
 
   - name: R1
     package: "0402"
@@ -275,9 +289,15 @@ footprints:
       - name: "1"
         position: [-0.5, 0.0]
         side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 0.5]
       - name: "2"
         position: [0.5, 0.0]
         side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 0.5]
 
   - name: R2
     package: "0402"
@@ -290,9 +310,15 @@ footprints:
       - name: "1"
         position: [-0.5, 0.0]
         side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 0.5]
       - name: "2"
         position: [0.5, 0.0]
         side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 0.5]
 
   - name: C1
     package: "0402"
@@ -305,9 +331,15 @@ footprints:
       - name: "1"
         position: [-0.5, 0.0]
         side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 0.5]
       - name: "2"
         position: [0.5, 0.0]
         side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 0.5]
 
   - name: C2
     package: "0402"
@@ -321,9 +353,15 @@ footprints:
       - name: "1"
         position: [-0.5, 0.0]
         side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 0.5]
       - name: "2"
         position: [0.5, 0.0]
         side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 0.5]
 
   - name: C3
     package: "0603"
@@ -336,9 +374,15 @@ footprints:
       - name: "1"
         position: [-0.8, 0.0]
         side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.8, 0.8]
       - name: "2"
         position: [0.8, 0.0]
         side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.8, 0.8]
 
   - name: Q1
     package: SOT-23
@@ -352,12 +396,21 @@ footprints:
       - name: G
         position: [-0.95, -1.0]
         side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 1.0]
       - name: S
         position: [0.95, -1.0]
         side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 1.0]
       - name: D
         position: [0.0, 1.0]
         side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.6, 1.0]
     truth_table:
       title: "Q1 Load Switch Truth Table"
       input_headers: ["PWR_EN (Gate)"]
@@ -388,6 +441,8 @@ nets:
       - [U2, VSS]
       - [J1, GND]
       - [J2, GND]
+      - [J2, MP1]
+      - [J2, MP2]
       - [C1, "2"]
       - [C2, "2"]
       - [C3, "2"]

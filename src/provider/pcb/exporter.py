@@ -13,8 +13,10 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import jinja2
 from build123d import Box, BuildPart, Compound, Part, Solid, export_step
-from model.pcb import PCBConfig, StackupModel
+from model.pcb import BoardType, CapacitiveElectrodeModel, PCBConfig, StackupModel
 from model.wiring import Wiring, FootprintModel, NetModel
+from provider.pcb.capacitive import CapacitiveSensingGenerator
+from provider.pcb.silkscreen import find_empty_space_for_label
 
 
 SCH_PIN_LEN_MM: float = 5.08
@@ -26,10 +28,23 @@ SCH_BOX_MIN_HALF_W_MM: float = 15.24
 class PCBExporter:
     """Orchestrates generation of manufacturing packages, supplier BOM/CPL, schematics, and 3D STEP models."""
 
-    def __init__(self, pcb_config: PCBConfig, wiring: Wiring):
+    def __init__(
+        self,
+        pcb_config: PCBConfig,
+        wiring: Optional[Wiring] = None,
+        subassembly: Optional[str] = None,
+    ):
         """Initialize the exporter with PCB stackup configuration and netlist."""
         self.config = pcb_config
         self.wiring = wiring
+        self.subassembly = subassembly or (
+            pcb_config.shape_ref if getattr(pcb_config, "board_type", None) == BoardType.FLEX else None
+        )
+        self.is_flex = (
+            (self.subassembly == "flex_tail")
+            or (self.config.name == "flex_tail")
+            or (getattr(self.config, "board_type", None) == BoardType.FLEX)
+        )
         self.jinja_env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(str(Path(__file__).parent.parent / "templates")),
             trim_blocks=True,
@@ -48,38 +63,104 @@ class PCBExporter:
         # Build net mapping
         nets = []
         net_name_to_idx = {"": 0}
-        for idx, n in enumerate(self.wiring.nets, start=1):
-            net_name_to_idx[n.name] = idx
-            nets.append({"idx": idx, "name": n.name})
+        existing_net_names = set()
+        if self.wiring:
+            for idx, n in enumerate(self.wiring.nets, start=1):
+                net_name_to_idx[n.name] = idx
+                nets.append({"idx": idx, "name": n.name})
+                existing_net_names.add(n.name)
+
+        for sensor in getattr(self.config, "capacitive_sensors", []):
+            for s_net in (sensor.tx_pin, sensor.rx_pin, "CAP_SHIELD"):
+                if s_net and s_net not in existing_net_names:
+                    idx = len(nets) + 1
+                    net_name_to_idx[s_net] = idx
+                    nets.append({"idx": idx, "name": s_net})
+                    existing_net_names.add(s_net)
 
         # Process component footprints and pads (centered on drawing sheet)
         footprints_data = []
-        for fp in self.wiring.footprints:
+        fps_to_process = self.wiring.footprints if self.wiring else []
+        if self.is_flex:
+            fps_to_process = [
+                fp for fp in fps_to_process if fp.name == "J2" or getattr(fp, "shape_ref", None) == "flex_tail"
+            ]
+        else:
+            fps_to_process = [fp for fp in fps_to_process if getattr(fp, "shape_ref", None) != "flex_tail"]
+
+        # Collect board perimeter and obstacle circles for silkscreen placement
+        w_board, l_board, _ = self.config.dimensions_mm
+        board_bounds = (-w_board / 2.0, -l_board / 2.0, w_board / 2.0, l_board / 2.0)
+        circ_obstacles: List[Tuple[float, float, float]] = []
+        for mh in getattr(self.config, "mounting_holes", []):
+            circ_obstacles.append((mh.position_mm[0], mh.position_mm[1], mh.drill_diameter_mm / 2.0))
+        for v in getattr(self.config, "vias", []):
+            circ_obstacles.append((v.position_mm[0], v.position_mm[1], v.pad_diameter_mm / 2.0))
+        for tp_obs in getattr(self.config, "test_points", []):
+            circ_obstacles.append((tp_obs.position_mm[0], tp_obs.position_mm[1], tp_obs.pad_diameter_mm / 2.0))
+        for fp_obs in fps_to_process:
+            for p_obs in getattr(fp_obs, "pins", []):
+                pad_s = getattr(p_obs, "pad_size_mm", (0.5, 0.5))
+                circ_obstacles.append(
+                    (fp_obs.position[0] + p_obs.position[0], fp_obs.position[1] + p_obs.position[1], max(pad_s) / 2.0)
+                )
+
+        for fp in fps_to_process:
             fp_pins = []
             for p in fp.pins:
                 # Find net connected to this pin
                 net_name = ""
-                for net in self.wiring.nets:
-                    for comp_name, pin_name in net.pins:
-                        if comp_name == fp.name and pin_name == p.name:
-                            net_name = net.name
+                if self.wiring:
+                    for net in self.wiring.nets:
+                        for comp_name, pin_name in net.pins:
+                            if comp_name == fp.name and pin_name == p.name:
+                                net_name = net.name
+                                break
+                        if net_name:
                             break
-                    if net_name:
-                        break
 
                 net_idx = net_name_to_idx.get(net_name, 0)
-                pad_type = getattr(p, "pad_type", "smd")
+                pad_type = getattr(p, "pad_type", None)
                 drill_dia = getattr(p, "drill_dia_mm", None)
-                pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
-                pad_shape = getattr(p, "pad_shape", "circle")
+                pad_size = getattr(p, "pad_size_mm", None)
+                pad_shape = getattr(p, "pad_shape", None)
 
                 # Default connectors to through-hole if not otherwise specified
-                if pad_type == "smd" and (
-                    fp.name.startswith("J") or "KEY-M" in fp.package.upper() or "FPC" in fp.package.upper()
-                ):
-                    pad_type = "thru_hole"
+                if fp.name.startswith("J") or "KEY-M" in fp.package.upper() or "FPC" in fp.package.upper():
+                    pad_type = pad_type or "thru_hole"
                     drill_dia = drill_dia or 0.70
-                    pad_size = (1.2, 1.2) if pad_size == (0.5, 0.5) else pad_size
+                    pad_shape = pad_shape or "circle"
+                    pad_size = pad_size or (1.2, 1.2)
+                else:
+                    pkg_upper = fp.package.upper()
+                    if "0402" in pkg_upper:
+                        pad_type = pad_type or "smd"
+                        pad_shape = pad_shape or "roundrect"
+                        pad_size = pad_size or (0.60, 0.50)
+                    elif "0603" in pkg_upper:
+                        pad_type = pad_type or "smd"
+                        pad_shape = pad_shape or "roundrect"
+                        pad_size = pad_size or (0.80, 0.80)
+                    elif "SOT-23" in pkg_upper or "SOT23" in pkg_upper:
+                        pad_type = pad_type or "smd"
+                        pad_shape = pad_shape or "roundrect"
+                        pad_size = pad_size or (0.60, 1.00)
+                    elif "QFN" in pkg_upper:
+                        pad_type = pad_type or "smd"
+                        pad_shape = pad_shape or "roundrect"
+                        side = getattr(p, "side", None)
+                        if side in ("top", "bottom"):
+                            pad_size = pad_size or (0.25, 0.60)
+                        else:
+                            pad_size = pad_size or (0.60, 0.25)
+                    elif "BGA" in pkg_upper:
+                        pad_type = pad_type or "smd"
+                        pad_shape = pad_shape or "circle"
+                        pad_size = pad_size or (0.35, 0.35)
+                    else:
+                        pad_type = pad_type or "smd"
+                        pad_shape = pad_shape or "circle"
+                        pad_size = pad_size or (0.5, 0.5)
 
                 fp_pins.append(
                     {
@@ -106,8 +187,22 @@ class PCBExporter:
             dim_h = fp.dimensions[1] if fp.dimensions else 4.0
             w_half = round(dim_w / 2.0 + 0.4, 4)
             h_half = round(dim_h / 2.0 + 0.4, 4)
-            ref_y = round(-h_half - 1.2, 4)
             val_y = round(h_half + 1.2, 4)
+
+            # Find empty space for component reference label
+            ref_w = len(fp.name) * 0.7 + 0.4
+            ref_h = 1.0 + 0.4
+            ref_off_x, ref_off_y = find_empty_space_for_label(
+                base_x=fp.position[0],
+                base_y=fp.position[1],
+                label_w=ref_w,
+                label_h=ref_h,
+                circular_obstacles=circ_obstacles,
+                board_bounds=board_bounds,
+                clearance=0.30,
+                preferred_direction="north",
+                step_multiplier=1.2,
+            )
 
             tick_w = round(min(1.0, max(0.2, w_half * 0.4)), 4)
             tick_h = round(min(1.0, max(0.2, h_half * 0.4)), 4)
@@ -116,7 +211,7 @@ class PCBExporter:
                 {"x1": -w_half, "y1": -h_half, "x2": -w_half, "y2": round(-h_half + tick_h, 4)},
                 {"x1": w_half, "y1": -h_half, "x2": round(w_half - tick_w, 4), "y2": -h_half},
                 {"x1": w_half, "y1": -h_half, "x2": w_half, "y2": round(-h_half + tick_h, 4)},
-                {"x1": -w_half, "y1": h_half, "x2": round(-w_half + tick_w, 4), "y2": h_half},
+                {"x1": -w_half, "y1": h_half, "x2": round(-w_half + tick_w, 4), "y2": -h_half},
                 {"x1": -w_half, "y1": h_half, "x2": -w_half, "y2": round(h_half - tick_h, 4)},
                 {"x1": w_half, "y1": h_half, "x2": round(w_half - tick_w, 4), "y2": h_half},
                 {"x1": w_half, "y1": h_half, "x2": w_half, "y2": round(h_half - tick_h, 4)},
@@ -128,20 +223,28 @@ class PCBExporter:
                 "ey": round(-h_half - 0.5, 4),
             }
 
+            if self.is_flex and fp.name == "J2":
+                fp_x = round(self.config.sheet_center_x_mm + 0.0, 4)
+                fp_y = round(self.config.sheet_center_y_mm - 21.0, 4)
+            else:
+                fp_x = round(self.config.sheet_center_x_mm + fp.position[0], 4)
+                fp_y = round(self.config.sheet_center_y_mm + fp.position[1], 4)
+
             footprints_data.append(
                 {
                     "name": fp.name,
                     "package": fp.package,
                     "value": fp.label.text if fp.label else fp.package,
                     "uuid": str(uuid.uuid4()),
-                    "x_mm": round(self.config.sheet_center_x_mm + fp.position[0], 4),
-                    "y_mm": round(self.config.sheet_center_y_mm + fp.position[1], 4),
+                    "x_mm": fp_x,
+                    "y_mm": fp_y,
                     "layer": fp_layer,
                     "silk_layer": silk_layer,
                     "fab_layer": fab_layer,
                     "paste_layer": paste_layer,
                     "mask_layer": mask_layer,
-                    "ref_y": ref_y,
+                    "ref_x": round(ref_off_x, 4),
+                    "ref_y": round(ref_off_y, 4),
                     "val_y": val_y,
                     "alignment_lines": alignment_lines,
                     "pin1_dot": pin1_dot,
@@ -152,118 +255,279 @@ class PCBExporter:
         copper_inners = [l for l in self.config.stackup.copper_layers[1:-1]]
 
         silkscreen_data = []
-        for st in self.config.silkscreen_texts:
-            silkscreen_data.append(
-                {
-                    "text": st.text,
-                    "layer": st.layer,
-                    "x_mm": round(self.config.sheet_center_x_mm + st.position[0], 4),
-                    "y_mm": round(self.config.sheet_center_y_mm + st.position[1], 4),
-                    "font_size": st.font_size,
-                    "thickness": st.thickness,
-                    "rotation": st.rotation,
-                    "mirror": st.mirror or (st.layer == "B.SilkS"),
-                }
-            )
+        if self.is_flex:
+            flex_silk = [
+                ("FLEX TAIL SENSOR REV 1.0", "F.SilkS", (0.0, -23.5), 0.8, 0.12),
+                ("LOW", "F.SilkS", (0.0, -6.0), 0.7, 0.10),
+                ("MID", "F.SilkS", (0.0, 5.5), 0.7, 0.10),
+                ("HIGH", "F.SilkS", (0.0, 17.0), 0.7, 0.10),
+                ("PROX", "F.SilkS", (0.0, 24.0), 0.7, 0.10),
+                ("• Pin 1", "F.SilkS", (-9.5, -21.0), 0.6, 0.09),
+            ]
+            for text, lay, pos, fsize, thk in flex_silk:
+                silkscreen_data.append(
+                    {
+                        "text": text,
+                        "layer": lay,
+                        "x_mm": round(self.config.sheet_center_x_mm + pos[0], 4),
+                        "y_mm": round(self.config.sheet_center_y_mm + pos[1], 4),
+                        "font_size": fsize,
+                        "thickness": thk,
+                        "rotation": None,
+                        "mirror": False,
+                    }
+                )
+        else:
+            for st in self.config.silkscreen_texts:
+                silkscreen_data.append(
+                    {
+                        "text": st.text,
+                        "layer": st.layer,
+                        "x_mm": round(self.config.sheet_center_x_mm + st.position[0], 4),
+                        "y_mm": round(self.config.sheet_center_y_mm + st.position[1], 4),
+                        "font_size": st.font_size,
+                        "thickness": st.thickness,
+                        "rotation": st.rotation,
+                        "mirror": st.mirror or (st.layer == "B.SilkS"),
+                    }
+                )
 
         mounting_holes_data = []
-        for mh in self.config.mounting_holes:
-            net_name = mh.net or ""
-            net_idx = net_name_to_idx.get(net_name, 0)
-            pad_dia = mh.pad_diameter_mm or (mh.drill_diameter_mm + 1.2 if mh.plated else mh.drill_diameter_mm)
-            mounting_holes_data.append(
-                {
-                    "name": mh.name,
-                    "x_mm": round(self.config.sheet_center_x_mm + mh.position_mm[0], 4),
-                    "y_mm": round(self.config.sheet_center_y_mm + mh.position_mm[1], 4),
-                    "drill_mm": round(mh.drill_diameter_mm, 4),
-                    "pad_mm": round(pad_dia, 4),
-                    "plated": mh.plated,
-                    "net_idx": net_idx,
-                    "net_name": net_name,
-                }
-            )
+        if not self.is_flex:
+            for mh in self.config.mounting_holes:
+                net_name = mh.net or ""
+                net_idx = net_name_to_idx.get(net_name, 0)
+                pad_dia = mh.pad_diameter_mm or (mh.drill_diameter_mm + 1.2 if mh.plated else mh.drill_diameter_mm)
+                mounting_holes_data.append(
+                    {
+                        "name": mh.name,
+                        "x_mm": round(self.config.sheet_center_x_mm + mh.position_mm[0], 4),
+                        "y_mm": round(self.config.sheet_center_y_mm + mh.position_mm[1], 4),
+                        "drill_mm": round(mh.drill_diameter_mm, 4),
+                        "pad_mm": round(pad_dia, 4),
+                        "plated": mh.plated,
+                        "net_idx": net_idx,
+                        "net_name": net_name,
+                    }
+                )
 
-        # Traces
         segments_data = []
-        for tr in self.config.traces:
-            net_idx = net_name_to_idx.get(tr.net, 0)
-            segments_data.append(
-                {
-                    "x1": round(self.config.sheet_center_x_mm + tr.start_mm[0], 4),
-                    "y1": round(self.config.sheet_center_y_mm + tr.start_mm[1], 4),
-                    "x2": round(self.config.sheet_center_x_mm + tr.end_mm[0], 4),
-                    "y2": round(self.config.sheet_center_y_mm + tr.end_mm[1], 4),
-                    "width": tr.width_mm,
-                    "layer": tr.layer,
-                    "net_idx": net_idx,
-                }
-            )
-
-        # Vias
         vias_data = []
-        for v in self.config.vias:
-            net_idx = net_name_to_idx.get(v.net, 0)
-            l1, l2 = v.layer_start, v.layer_end
-            if l1 == "B.Cu" and l2 == "F.Cu":
-                l1, l2 = "F.Cu", "B.Cu"
-            vias_data.append(
-                {
-                    "x": round(self.config.sheet_center_x_mm + v.position_mm[0], 4),
-                    "y": round(self.config.sheet_center_y_mm + v.position_mm[1], 4),
-                    "dia": round(v.pad_diameter_mm, 4),
-                    "drill": round(v.drill_diameter_mm, 4),
-                    "layer1": l1,
-                    "layer2": l2,
-                    "net_idx": net_idx,
-                }
-            )
-
-        # Copper Zones
         zones_data = []
-        for z in self.config.copper_regions:
-            net_idx = net_name_to_idx.get(z.net, 0)
-            pts = [
-                {
-                    "x": round(self.config.sheet_center_x_mm + pt[0], 4),
-                    "y": round(self.config.sheet_center_y_mm + pt[1], 4),
-                }
-                for pt in z.polygon_points_mm
-            ]
-            zones_data.append(
-                {
-                    "net_idx": net_idx,
-                    "net_name": z.net,
-                    "layer": z.layer,
-                    "priority": z.priority,
-                    "clearance_mm": z.clearance_mm,
-                    "pts": pts,
-                }
-            )
 
-        # Test Points
-        test_points_data = []
-        for tp in self.config.test_points:
-            net_idx = net_name_to_idx.get(tp.net, 0)
-            silk_layer = "B.SilkS" if tp.layer == "B.Cu" else "F.SilkS"
-            mask_layer = "B.Mask" if tp.layer == "B.Cu" else "F.Mask"
-            test_points_data.append(
-                {
-                    "name": tp.name,
-                    "x_mm": round(self.config.sheet_center_x_mm + tp.position_mm[0], 4),
-                    "y_mm": round(self.config.sheet_center_y_mm + tp.position_mm[1], 4),
-                    "dia_mm": round(tp.pad_diameter_mm, 4),
-                    "drill_mm": round(tp.drill_diameter_mm, 4),
-                    "label_x": 0.0,
-                    "label_y": -round(tp.pad_diameter_mm / 2.0 + 0.8, 4),
-                    "label_angle": 90,
-                    "layer": tp.layer,
-                    "silk_layer": silk_layer,
-                    "mask_layer": mask_layer,
-                    "net_idx": net_idx,
-                    "net_name": tp.net,
+        if not self.is_flex:
+            for tr in self.config.traces:
+                net_idx = net_name_to_idx.get(tr.net, 0)
+                segments_data.append(
+                    {
+                        "x1": round(self.config.sheet_center_x_mm + tr.start_mm[0], 4),
+                        "y1": round(self.config.sheet_center_y_mm + tr.start_mm[1], 4),
+                        "x2": round(self.config.sheet_center_x_mm + tr.end_mm[0], 4),
+                        "y2": round(self.config.sheet_center_y_mm + tr.end_mm[1], 4),
+                        "width": tr.width_mm,
+                        "layer": tr.layer,
+                        "net_idx": net_idx,
+                    }
+                )
+
+            for v in self.config.vias:
+                net_idx = net_name_to_idx.get(v.net, 0)
+                l1, l2 = v.layer_start, v.layer_end
+                if l1 == "B.Cu" and l2 == "F.Cu":
+                    l1, l2 = "F.Cu", "B.Cu"
+                vias_data.append(
+                    {
+                        "x": round(self.config.sheet_center_x_mm + v.position_mm[0], 4),
+                        "y": round(self.config.sheet_center_y_mm + v.position_mm[1], 4),
+                        "dia": round(v.pad_diameter_mm, 4),
+                        "drill": round(v.drill_diameter_mm, 4),
+                        "layer1": l1,
+                        "layer2": l2,
+                        "net_idx": net_idx,
+                    }
+                )
+
+            for z in self.config.copper_regions:
+                net_idx = net_name_to_idx.get(z.net, 0)
+                pts = [
+                    {
+                        "x": round(self.config.sheet_center_x_mm + pt[0], 4),
+                        "y": round(self.config.sheet_center_y_mm + pt[1], 4),
+                    }
+                    for pt in z.polygon_points_mm
+                ]
+                zones_data.append(
+                    {
+                        "net_idx": net_idx,
+                        "net_name": z.net,
+                        "layer": z.layer,
+                        "priority": z.priority,
+                        "clearance_mm": z.clearance_mm,
+                        "pts": pts,
+                    }
+                )
+
+        # Process capacitive sensors (for flex tail or any board with capacitive_sensors defined)
+        capacitive_sensors = list(self.config.capacitive_sensors)
+        for idx, sensor in enumerate(capacitive_sensors):
+            center = getattr(sensor, "center_mm", None)
+            if center is None:
+                default_centers = {
+                    0: (0.0, -12.0),
+                    1: (0.0, -0.5),
+                    2: (0.0, 11.0),
+                    3: (0.0, 20.5),
                 }
-            )
+                center = default_centers.get(idx, (0.0, 0.0))
+
+            gen = CapacitiveSensingGenerator(sensor, center=center)
+            geom = gen.generate()
+
+            tx_net = getattr(sensor, "tx_pin", f"CAP_TX{idx}")
+            rx_net = getattr(sensor, "rx_pin", f"CAP_RX{idx}")
+            tx_net_idx = net_name_to_idx.get(tx_net, 0)
+            rx_net_idx = net_name_to_idx.get(rx_net, 0)
+            shield_net_idx = net_name_to_idx.get("CAP_SHIELD", net_name_to_idx.get("GND", 0))
+
+            # TX comb fingers / self pad
+            for poly in geom.tx_fingers:
+                pts = [
+                    {
+                        "x": round(self.config.sheet_center_x_mm + pt[0], 4),
+                        "y": round(self.config.sheet_center_y_mm + pt[1], 4),
+                    }
+                    for pt in poly
+                ]
+                zones_data.append(
+                    {
+                        "net_idx": tx_net_idx if sensor.shape == "interdigital" else rx_net_idx,
+                        "net_name": tx_net if sensor.shape == "interdigital" else rx_net,
+                        "layer": "F.Cu",
+                        "priority": 2,
+                        "clearance_mm": 0.20,
+                        "pts": pts,
+                    }
+                )
+
+            # RX comb fingers
+            for poly in geom.rx_fingers:
+                pts = [
+                    {
+                        "x": round(self.config.sheet_center_x_mm + pt[0], 4),
+                        "y": round(self.config.sheet_center_y_mm + pt[1], 4),
+                    }
+                    for pt in poly
+                ]
+                zones_data.append(
+                    {
+                        "net_idx": rx_net_idx,
+                        "net_name": rx_net,
+                        "layer": "F.Cu",
+                        "priority": 2,
+                        "clearance_mm": 0.20,
+                        "pts": pts,
+                    }
+                )
+
+            # Guard ring around electrode
+            if geom.guard_ring and len(geom.guard_ring) >= 2:
+                for k in range(len(geom.guard_ring) - 1):
+                    p1 = geom.guard_ring[k]
+                    p2 = geom.guard_ring[k + 1]
+                    segments_data.append(
+                        {
+                            "x1": round(self.config.sheet_center_x_mm + p1[0], 4),
+                            "y1": round(self.config.sheet_center_y_mm + p1[1], 4),
+                            "x2": round(self.config.sheet_center_x_mm + p2[0], 4),
+                            "y2": round(self.config.sheet_center_y_mm + p2[1], 4),
+                            "width": 0.25,
+                            "layer": "F.Cu",
+                            "net_idx": shield_net_idx,
+                        }
+                    )
+
+            # Back layer 45-degree cross-hatch ground fill
+            for hl in geom.hatch_lines:
+                segments_data.append(
+                    {
+                        "x1": round(self.config.sheet_center_x_mm + hl.start[0], 4),
+                        "y1": round(self.config.sheet_center_y_mm + hl.start[1], 4),
+                        "x2": round(self.config.sheet_center_x_mm + hl.end[0], 4),
+                        "y2": round(self.config.sheet_center_y_mm + hl.end[1], 4),
+                        "width": hl.width_mm,
+                        "layer": "B.Cu",
+                        "net_idx": shield_net_idx,
+                    }
+                )
+
+        if self.is_flex:
+            # Routing traces connecting J2 pins to the 4 capacitive sensing channels
+            flex_routes = [
+                ("CAP_TX0", [(1.0, -21.0), (1.0, -18.0), (-6.0, -18.0), (-6.0, -17.0)]),
+                ("CAP_RX0", [(2.0, -21.0), (2.0, -18.0), (6.0, -18.0), (6.0, -17.0)]),
+                ("CAP_TX1", [(3.0, -21.0), (3.0, -19.0), (-7.0, -19.0), (-7.0, -0.5), (-6.0, -0.5)]),
+                ("CAP_RX1", [(4.0, -21.0), (4.0, -19.0), (7.0, -19.0), (7.0, -0.5), (6.0, -0.5)]),
+                ("CAP_TX2", [(5.0, -21.0), (5.0, -20.0), (-7.4, -20.0), (-7.4, 11.0), (-6.0, 11.0)]),
+                ("CAP_RX2", [(6.0, -21.0), (6.0, -20.0), (7.4, -20.0), (7.4, 11.0), (6.0, 11.0)]),
+                ("CAP_RX3", [(7.0, -21.0), (7.0, 16.5), (0.0, 16.5)]),
+                ("CAP_SHIELD", [(8.0, -21.0), (8.0, -12.0)]),
+            ]
+            for net_name, rpts in flex_routes:
+                n_idx = net_name_to_idx.get(net_name, 0)
+                for k in range(len(rpts) - 1):
+                    p1 = rpts[k]
+                    p2 = rpts[k + 1]
+                    segments_data.append(
+                        {
+                            "x1": round(self.config.sheet_center_x_mm + p1[0], 4),
+                            "y1": round(self.config.sheet_center_y_mm + p1[1], 4),
+                            "x2": round(self.config.sheet_center_x_mm + p2[0], 4),
+                            "y2": round(self.config.sheet_center_y_mm + p2[1], 4),
+                            "width": 0.15,
+                            "layer": "F.Cu",
+                            "net_idx": n_idx,
+                        }
+                    )
+
+        # Test Points (carrier board only)
+        test_points_data = []
+        if not self.is_flex:
+            for tp in self.config.test_points:
+                net_idx = net_name_to_idx.get(tp.net, 0)
+                silk_layer = "B.SilkS" if tp.layer == "B.Cu" else "F.SilkS"
+                mask_layer = "B.Mask" if tp.layer == "B.Cu" else "F.Mask"
+                tp_r = tp.pad_diameter_mm / 2.0
+                preferred = "north" if tp.position_mm[1] >= 0 else "south"
+                lbl_w = len(tp.name) * 0.5 + 0.4
+                lbl_h = 0.7 + 0.4
+                lbl_off_x, lbl_off_y = find_empty_space_for_label(
+                    base_x=tp.position_mm[0],
+                    base_y=tp.position_mm[1],
+                    label_w=lbl_w,
+                    label_h=lbl_h,
+                    circular_obstacles=circ_obstacles,
+                    board_bounds=board_bounds,
+                    clearance=0.35,
+                    preferred_direction=preferred,
+                    step_multiplier=1.3,
+                )
+                test_points_data.append(
+                    {
+                        "name": tp.name,
+                        "x_mm": round(self.config.sheet_center_x_mm + tp.position_mm[0], 4),
+                        "y_mm": round(self.config.sheet_center_y_mm + tp.position_mm[1], 4),
+                        "dia_mm": round(tp.pad_diameter_mm, 4),
+                        "drill_mm": round(tp.drill_diameter_mm, 4),
+                        "label_x": round(lbl_off_x, 4),
+                        "label_y": round(lbl_off_y, 4),
+                        "label_angle": 0,
+                        "layer": tp.layer,
+                        "silk_layer": silk_layer,
+                        "mask_layer": mask_layer,
+                        "net_idx": net_idx,
+                        "net_name": tp.net,
+                    }
+                )
 
         rendered = template.render(
             board=self.config,
@@ -480,8 +744,15 @@ class PCBExporter:
 
         return out_path
 
+    def get_footprints_for_board(self) -> List[FootprintModel]:
+        """Return the list of footprints belonging to this board target (filtering flex vs carrier)."""
+        fps = list(self.wiring.footprints) if self.wiring else []
+        if self.is_flex:
+            return [fp for fp in fps if fp.name == "J2" or getattr(fp, "shape_ref", None) == "flex_tail"]
+        return [fp for fp in fps if getattr(fp, "shape_ref", None) != "flex_tail"]
+
     def export_bom_csv(self, output_file: str | Path) -> Path:
-        """Export supplier-ready Bill of Materials (BOM) in standard CSV format."""
+        """Export Bill of Materials (BOM) in CSV format for component procurement and assembly."""
         out_path = Path(output_file).resolve()
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -497,7 +768,8 @@ class PCBExporter:
 
         # Group components by package and MPN to aggregate quantities
         rows = []
-        for idx, fp in enumerate(self.wiring.footprints, start=1):
+        fps_to_process = self.get_footprints_for_board()
+        for idx, fp in enumerate(fps_to_process, start=1):
             rows.append(
                 {
                     "Id": idx,
@@ -524,14 +796,17 @@ class PCBExporter:
 
         fieldnames = ["Designator", "Val", "Package", "Mid X", "Mid Y", "Rotation", "Layer"]
         rows = []
-        for fp in self.wiring.footprints:
+        fps_to_process = self.get_footprints_for_board()
+        for fp in fps_to_process:
+            mid_x = 0.0 if (self.is_flex and fp.name == "J2") else fp.position[0]
+            mid_y = -21.0 if (self.is_flex and fp.name == "J2") else fp.position[1]
             rows.append(
                 {
                     "Designator": fp.name,
                     "Val": fp.label.text if fp.label else fp.package,
                     "Package": fp.package,
-                    "Mid X": f"{fp.position[0]:.4f}mm",
-                    "Mid Y": f"{fp.position[1]:.4f}mm",
+                    "Mid X": f"{mid_x:.4f}mm",
+                    "Mid Y": f"{mid_y:.4f}mm",
                     "Rotation": f"{fp.rotation[2]:.1f}",
                     "Layer": "Bottom" if getattr(fp, "layer", "F.Cu") == "B.Cu" or fp.position[2] < 0 else "Top",
                 }
@@ -657,7 +932,10 @@ class PCBExporter:
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
         components_data = []
-        for idx, fp in enumerate(self.wiring.footprints, start=1):
+        fps_to_process = self.get_footprints_for_board()
+        for idx, fp in enumerate(fps_to_process, start=1):
+            x = 0.0 if (self.is_flex and fp.name == "J2") else fp.position[0]
+            y = -21.0 if (self.is_flex and fp.name == "J2") else fp.position[1]
             components_data.append(
                 {
                     "ref": fp.name,
@@ -665,8 +943,8 @@ class PCBExporter:
                     "package": fp.package,
                     "mpn": fp.mpn or "N/A",
                     "supplier_pn": fp.supplier_pn or "N/A",
-                    "x": fp.position[0],
-                    "y": fp.position[1],
+                    "x": x,
+                    "y": y,
                 }
             )
 

@@ -531,12 +531,14 @@ class PCBAutoRouter:
                     net="I2C_SCL",
                 )
             )
-            # F.Cu: U1.F2 -> R2 pin 2 and TP_SCL (routes down at X = 4.0 to avoid MIPI at X = 5.0)
+            # F.Cu: U1.F2 -> route along Y = -12.0 to clear R2 pin 1 (3V3) -> TP_SCL at (14.0, -4.0)
             traces.extend(
                 polyline_to_trace_segments(
-                    [(4.0, -1.0), (4.0, -10.5), (14.0, -10.5), (14.0, -4.0)], w_i2c, "F.Cu", "I2C_SCL"
+                    [(4.0, -1.0), (4.0, -12.0), (14.0, -12.0), (14.0, -4.0)], w_i2c, "F.Cu", "I2C_SCL"
                 )
             )
+            # F.Cu branch to R2 pin 2 at (10.5, -10.5)
+            traces.extend(polyline_to_trace_segments([(10.5, -10.5), (10.5, -12.0)], w_i2c, "F.Cu", "I2C_SCL"))
             # B.Cu: TP_SCL -> U2.SCL
             traces.extend(
                 polyline_to_trace_segments([(14.0, -4.0), (14.0, -15.5), (16.0, -15.5)], w_i2c, "B.Cu", "I2C_SCL")
@@ -545,19 +547,46 @@ class PCBAutoRouter:
         # 4. CAP_INT, PWR_EN, VLOAD_SW
         if "CAP_INT" not in skip_nets:
             w_sig = self.get_net_trace_width("CAP_INT")
-            # Drop to B.Cu right at U1 pin D2 (-3.0, -1.0), route east to U2.INT
+            # Bridge under PCIE_RX0_N: drop to B.Cu at U1.D2 (-3.0, -0.6), cross east to (-1.0, -0.6),
+            # via up to F.Cu, route south along X = -1.0 to Y = -18.0, across to X = 15.0 (clearing 3V3 at X = 16.0),
+            # then via to B.Cu at (15.0, -18.0) into U2.INT at (17.0, -17.0)
             vias.append(
                 ViaModel(
-                    position_mm=(-3.0, -1.0),
+                    position_mm=(-3.0, -0.6),
                     drill_diameter_mm=0.20,
-                    pad_diameter_mm=0.45,
+                    pad_diameter_mm=0.40,
                     layer_start="F.Cu",
                     layer_end="B.Cu",
                     net="CAP_INT",
                 )
             )
+            vias.append(
+                ViaModel(
+                    position_mm=(-1.0, -0.6),
+                    drill_diameter_mm=0.20,
+                    pad_diameter_mm=0.40,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="CAP_INT",
+                )
+            )
+            vias.append(
+                ViaModel(
+                    position_mm=(15.0, -18.0),
+                    drill_diameter_mm=0.20,
+                    pad_diameter_mm=0.40,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="CAP_INT",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(-3.0, -1.0), (-3.0, -0.6)], w_sig, "F.Cu", "CAP_INT"))
+            traces.extend(polyline_to_trace_segments([(-3.0, -0.6), (-1.0, -0.6)], w_sig, "B.Cu", "CAP_INT"))
             traces.extend(
-                polyline_to_trace_segments([(-3.0, -1.0), (-3.0, -17.0), (17.0, -17.0)], w_sig, "B.Cu", "CAP_INT")
+                polyline_to_trace_segments([(-1.0, -0.6), (-1.0, -18.0), (15.0, -18.0)], w_sig, "F.Cu", "CAP_INT")
+            )
+            traces.extend(
+                polyline_to_trace_segments([(15.0, -18.0), (17.0, -18.0), (17.0, -17.0)], w_sig, "B.Cu", "CAP_INT")
             )
 
         if "PWR_EN" not in skip_nets:
@@ -581,10 +610,11 @@ class PCBAutoRouter:
 
         if "VLOAD_SW" not in skip_nets:
             w_vload = self.get_net_trace_width("VLOAD_SW")
-            # Route on B.Cu from Q1.D down along X = -7.0 (clearing test points at X=-6.0 and X=-10.0), via to F.Cu at Y = -32.0
+            # Route on B.Cu south along X = -16.0 from Q1.D (-18.0, -14.0) down to Y = -30.0 (clearing TP_GND at -18.0),
+            # via to F.Cu at (-16.0, -30.0), then route east and south into J1 pin VLOAD_SW at (-6.0, -36.0)
             vias.append(
                 ViaModel(
-                    position_mm=(-6.0, -32.0),
+                    position_mm=(-16.0, -30.0),
                     drill_diameter_mm=0.20,
                     pad_diameter_mm=0.45,
                     layer_start="F.Cu",
@@ -594,10 +624,12 @@ class PCBAutoRouter:
             )
             traces.extend(
                 polyline_to_trace_segments(
-                    [(-18.0, -14.0), (-7.0, -14.0), (-7.0, -32.0), (-6.0, -32.0)], w_vload, "B.Cu", "VLOAD_SW"
+                    [(-18.0, -14.0), (-16.0, -14.0), (-16.0, -30.0)], w_vload, "B.Cu", "VLOAD_SW"
                 )
             )
-            traces.extend(polyline_to_trace_segments([(-6.0, -32.0), (-6.0, -36.0)], w_vload, "F.Cu", "VLOAD_SW"))
+            traces.extend(
+                polyline_to_trace_segments([(-16.0, -30.0), (-6.0, -30.0), (-6.0, -36.0)], w_vload, "F.Cu", "VLOAD_SW")
+            )
 
         # 5. Capacitive sensing nets (8 nets)
         # U2 is on B.Cu with CS pins on the right edge (X = 20.0).
@@ -659,62 +691,208 @@ class PCBAutoRouter:
         # 6. GND Network (TP_GND, J1, U1, U2, Passives, J2, and Plane Vias)
         if "GND" not in skip_nets:
             w_gnd = self.get_net_trace_width("GND")
-            # Connect TP_GND to In1.Cu plane via
+            # Connect TP_GND to via at (-18.0, -24.0) and to Q1.S at (-17.05, -16.0)
             vias.append(
                 ViaModel(
                     position_mm=(-18.0, -24.0),
                     drill_diameter_mm=0.25,
                     pad_diameter_mm=0.50,
                     layer_start="F.Cu",
-                    layer_end="In1.Cu",
+                    layer_end="B.Cu",
                     net="GND",
                 )
             )
             traces.extend(polyline_to_trace_segments([(-18.0, -22.0), (-18.0, -24.0)], w_gnd, "F.Cu", "GND"))
-            # Stubs to GND plane for all components
-            gnd_plane_pts = [
-                (0.0, 1.5, "F.Cu", (0.0, 0.0)),
-                (14.5, -16.5, "B.Cu", (16.0, -16.5)),
-                (-17.05, -17.5, "B.Cu", (-17.05, -16.0)),
-                (-7.5, -6.5, "B.Cu", (-7.5, -5.0)),
-                (-11.2, -9.5, "F.Cu", (-11.2, -8.0)),
-                (-10.0, -34.0, "F.Cu", (-10.0, -36.0)),
-                (-8.0, 36.5, "F.Cu", (-8.0, 38.0)),
-            ]
-            for vx, vy, lay, p_orig in gnd_plane_pts:
-                vias.append(
-                    ViaModel(
-                        position_mm=(vx, vy),
-                        drill_diameter_mm=0.25,
-                        pad_diameter_mm=0.50,
-                        layer_start=lay,
-                        layer_end="In1.Cu",
-                        net="GND",
-                    )
+            # Q1.S is on B.Cu at (-17.05, -16.0)
+            vias.append(
+                ViaModel(
+                    position_mm=(-17.05, -18.0),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="GND",
                 )
-                traces.extend(polyline_to_trace_segments([p_orig, (vx, vy)], w_gnd, lay, "GND"))
+            )
+            traces.extend(polyline_to_trace_segments([(-17.05, -16.0), (-17.05, -18.0)], w_gnd, "B.Cu", "GND"))
 
-        # 7. 3V3 Power Distribution (dedicated In2.Cu power plane with local drop vias)
+            # Through-hole vias connecting all component ground pins and decoupling return paths
+            # C1 decoupling capacitor: Pin 2 at (18.5, -21.0) on F.Cu connects via at (18.5, -22.5) to B.Cu,
+            # then routes on B.Cu along X = 14.5 into U2.VSS at (16.0, -16.5)
+            vias.append(
+                ViaModel(
+                    position_mm=(18.5, -22.5),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="GND",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(18.5, -21.0), (18.5, -22.5)], w_gnd, "F.Cu", "GND"))
+            traces.extend(
+                polyline_to_trace_segments(
+                    [(18.5, -22.5), (14.5, -22.5), (14.5, -16.5), (16.0, -16.5)], w_gnd, "B.Cu", "GND"
+                )
+            )
+
+            # U1.H7 to C2 on B.Cu and C3 on F.Cu:
+            # Drop via at U1.H7 (0.0, -3.0) to B.Cu, route west on B.Cu along Y = -3.0 into C2.2 at (-7.5, -5.0)
+            vias.append(
+                ViaModel(
+                    position_mm=(0.0, -3.0),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="GND",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(0.0, 0.0), (0.0, -3.0)], w_gnd, "F.Cu", "GND"))
+            traces.extend(polyline_to_trace_segments([(0.0, -3.0), (-7.5, -3.0), (-7.5, -5.0)], w_gnd, "B.Cu", "GND"))
+            # C3 Pin 2 (GND) at (-11.2, -8.0) connects via to ground plane
+            vias.append(
+                ViaModel(
+                    position_mm=(-11.2, -9.5),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="GND",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(-11.2, -8.0), (-11.2, -9.5)], w_gnd, "F.Cu", "GND"))
+
+            # J1 ground: Pin GND at (-10.0, -36.0)
+            vias.append(
+                ViaModel(
+                    position_mm=(-10.0, -34.0),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="GND",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(-10.0, -36.0), (-10.0, -34.0)], w_gnd, "F.Cu", "GND"))
+
+            # J2 ground & mounting tabs: GND (-8.0, 38.0), MP1 (-9.5, 38.0), MP2 (9.5, 38.0)
+            vias.append(
+                ViaModel(
+                    position_mm=(-8.0, 35.0),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="GND",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(-9.5, 38.0), (-8.0, 38.0), (-8.0, 35.0)], w_gnd, "F.Cu", "GND"))
+            vias.append(
+                ViaModel(
+                    position_mm=(9.5, 39.0),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="GND",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(9.5, 38.0), (9.5, 39.0)], w_gnd, "F.Cu", "GND"))
+
+        # 7. 3V3 Power Distribution (dedicated power rail with direct decoupling and through-hole vias)
         if "3V3" not in skip_nets:
             w_3v3 = self.get_net_trace_width("3V3")
-            pwr_plane_pts = [
-                (-8.0, -33.5, "F.Cu", (-8.0, -36.0)),
-                (-7.0, 35.5, "F.Cu", (-7.0, 38.0)),
-                (-12.8, -6.0, "F.Cu", (-12.8, -8.0)),
-                (0.8, -2.0, "F.Cu", (0.8, 0.0)),
-                (17.2, -13.5, "B.Cu", (16.0, -13.5)),
-            ]
-            for vx, vy, lay, p_orig in pwr_plane_pts:
-                vias.append(
-                    ViaModel(
-                        position_mm=(vx, vy),
-                        drill_diameter_mm=0.25,
-                        pad_diameter_mm=0.50,
-                        layer_start=lay,
-                        layer_end="In2.Cu",
-                        net="3V3",
-                    )
+            # C1 decoupling capacitor: Pin 1 at (17.5, -21.0) on F.Cu connects north on F.Cu to (16.0, -13.5)
+            # and drops via directly into U2.VDD at (16.0, -13.5) on B.Cu
+            vias.append(
+                ViaModel(
+                    position_mm=(16.0, -13.5),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="3V3",
                 )
-                traces.extend(polyline_to_trace_segments([p_orig, (vx, vy)], w_3v3, lay, "3V3"))
+            )
+            traces.extend(
+                polyline_to_trace_segments([(17.5, -21.0), (16.0, -21.0), (16.0, -13.5)], w_3v3, "F.Cu", "3V3")
+            )
+
+            # U1.H8 to C2 and C3 on B.Cu:
+            # Drop via at U1.H8 (0.8, -1.5) to B.Cu, route west on B.Cu along Y = -1.5 into C2.1 (-8.5, -5.0)
+            # and continue west on B.Cu into C3.1 via at (-12.8, -9.5)
+            vias.append(
+                ViaModel(
+                    position_mm=(0.8, -1.5),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="3V3",
+                )
+            )
+            vias.append(
+                ViaModel(
+                    position_mm=(-12.8, -9.5),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="3V3",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(0.8, 0.0), (0.8, -1.5)], w_3v3, "F.Cu", "3V3"))
+            traces.extend(
+                polyline_to_trace_segments(
+                    [(0.8, -1.5), (-8.5, -1.5), (-8.5, -5.0), (-12.8, -5.0), (-12.8, -9.5)],
+                    w_3v3,
+                    "B.Cu",
+                    "3V3",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(-12.8, -9.5), (-12.8, -8.0)], w_3v3, "F.Cu", "3V3"))
+
+            # R1 and R2 pull-up power feeds: Pin 1 of R1 at (9.5, -8.0) and R2 at (9.5, -10.5)
+            # Via at (8.0, -7.5) midway between MIPI differential pair traces on B.Cu
+            vias.append(
+                ViaModel(
+                    position_mm=(8.0, -7.5),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="3V3",
+                )
+            )
+            traces.extend(
+                polyline_to_trace_segments([(8.0, -7.5), (9.5, -7.5), (9.5, -8.0), (9.5, -10.5)], w_3v3, "F.Cu", "3V3")
+            )
+
+            # J1 3V3: Pin 3V3 at (-8.0, -36.0)
+            vias.append(
+                ViaModel(
+                    position_mm=(-8.0, -34.0),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="3V3",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(-8.0, -36.0), (-8.0, -34.0)], w_3v3, "F.Cu", "3V3"))
+
+            # J2 3V3: Pin 3V3 at (-7.0, 38.0)
+            vias.append(
+                ViaModel(
+                    position_mm=(-7.0, 35.0),
+                    drill_diameter_mm=0.25,
+                    pad_diameter_mm=0.50,
+                    layer_start="F.Cu",
+                    layer_end="B.Cu",
+                    net="3V3",
+                )
+            )
+            traces.extend(polyline_to_trace_segments([(-7.0, 38.0), (-7.0, 35.0)], w_3v3, "F.Cu", "3V3"))
 
         return traces, vias

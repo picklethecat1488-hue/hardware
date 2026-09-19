@@ -555,6 +555,12 @@ class CapacitiveElectrodeModel(BaseModel):
         default=None, description="Raw touch/liquid trigger threshold for microcontroller firmware"
     )
     channel_id: Optional[int] = Field(default=None, description="Hardware capacitive controller channel index (0..15)")
+    center_mm: Optional[Tuple[float, float]] = Field(
+        default=None, description="Center coordinate (x, y) relative to the substrate center"
+    )
+    shape_ref: Optional[str] = Field(
+        default=None, description="Subassembly or shape reference for this electrode (e.g. 'flex_tail')"
+    )
 
 
 class AssemblyTestStepModel(BaseModel):

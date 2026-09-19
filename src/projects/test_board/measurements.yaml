@@ -3,7 +3,7 @@ board_width: 60.0
 board_length: 90.0
 corner_radius: 4.0
 board_thickness: 1.6
-flex_tail_width: 16.0
+flex_tail_width: 22.0
 flex_tail_length: 50.0
 flex_tail_thickness: 0.20
 flex_bend_radius: 3.0

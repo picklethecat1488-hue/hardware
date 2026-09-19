@@ -137,6 +137,10 @@ class FootprintModel(BaseModel):
     truth_table: Optional[TruthTableModel] = Field(
         default=None, description="Optional truth table capturing true, false, and invalid states for discrete networks"
     )
+    shape_ref: Optional[str] = Field(
+        default=None,
+        description="Optional subassembly or shape reference for this footprint (e.g. 'carrier_board', 'flex_tail')",
+    )
 
 
 class NetModel(BaseModel):

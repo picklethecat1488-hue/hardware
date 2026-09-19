@@ -151,7 +151,10 @@ class TestBoardProvider(Provider):
         t_tail = self.settings.flex_tail_thickness
         length_board = self.settings.board_length
 
-        with BuildFlexTail(name="flex_tail") as tail:
+        with BuildFlexTail(
+            name="flex_tail",
+            capacitive_sensors=self.pcb_config.capacitive_sensors if self.pcb_config else None,
+        ) as tail:
             # Place flex tail protruding along +Y from the top edge of the board
             y_center = (length_board / 2.0) + (l_tail / 2.0)
             with Locations((0.0, y_center, 0.0)):
@@ -183,7 +186,7 @@ class TestBoardProvider(Provider):
             with Locations((-24.0, 38.0), (24.0, -38.0), (-24.0, -38.0)):
                 SilkscreenText("+", layer="B.SilkS", font_size=1.5, thickness=0.25, mirror=True)
 
-            # Alignment markers for ICs, connectors, and capacitors
+            # Alignment markers for ICs and connectors
             # U1 BGA pin-1 indicator
             with Locations((-7.0, 7.0)):
                 SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.8, thickness=0.12)
@@ -196,11 +199,6 @@ class TestBoardProvider(Provider):
             # J2 FPC connector alignment markers
             with Locations((-10.0, 39.5), (10.0, 39.5)):
                 SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
-            # Capacitor polarity and alignment marks
-            with Locations((18.0, -22.0), (-12.0, -9.5)):
-                SilkscreenText("╶╴", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-8.0, -6.0)):
-                SilkscreenText("╶╴", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
 
         return silk.texts
 

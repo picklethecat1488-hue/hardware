@@ -6,7 +6,7 @@ from .capacitive import CapacitiveSensingGenerator, CapacitiveGeometry, HatchLin
 from .exporter import PCBExporter
 from .eye_diagram import EyeDiagramSimulator, EyeDiagramConfig, EyeDiagramResult
 from .rerun_logger import log_drc_report, log_eye_diagram
-from .silkscreen import BuildSilkscreen, SilkscreenText
+from .silkscreen import BuildSilkscreen, SilkscreenText, find_empty_space_for_label
 from .stackup import BuildStackup, StackupLayer
 from .drill_holes import BuildDrillHoles, MountingHole, DrillHole
 from .board import BuildPcb, BuildFlexTail
@@ -57,4 +57,5 @@ __all__ = [
     "TestPoint",
     "BuildPcb",
     "BuildFlexTail",
+    "find_empty_space_for_label",
 ]
