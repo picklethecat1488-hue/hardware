@@ -335,14 +335,11 @@ class ReviewServer(ThreadingHTTPServer):
 
         resolved_revisions = self.git_engine.resolve_revisions(revisions) if revisions else None
 
-        # Load or initialize session: discard stale feedback if previously concluded or requested fresh
+        # Load or initialize session: preserve feedback unless previously approved or requested fresh
         loaded_session = None
         if not fresh and self.state_file.exists():
             candidate = self.exporter.load_session_json(self.state_file)
-            if candidate is not None and candidate.verdict not in (
-                ReviewStatus.APPROVED,
-                ReviewStatus.CHANGES_REQUESTED,
-            ):
+            if candidate is not None and candidate.verdict != ReviewStatus.APPROVED:
                 loaded_session = candidate
 
         if loaded_session is not None:
