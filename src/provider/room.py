@@ -26,8 +26,11 @@ from build123d import (
     RevoluteJoint,
     LinearJoint,
     BallJoint,
+    Color,
     LineType,
     Shape,
+    export_step,
+    import_step,
 )
 from build123d.exporters import ExportSVG, Drawing
 from .utils import get_env_bool
@@ -111,6 +114,12 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         if name in self:
             raise ValueError(f"An item with the name '{name}' already exists in the Room.")
 
+        # Support file paths to STEP CAD models (.step / .stp)
+        if isinstance(geometry, (str, Path)):
+            step_p = Path(geometry).resolve()
+            if step_p.is_file() and step_p.suffix.lower() in (".step", ".stp"):
+                geometry = import_step(str(step_p))
+
         # Support BuildPart objects by extracting the underlying geometry
         if isinstance(geometry, BuildPart):
             geometry = geometry.part
@@ -136,6 +145,45 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         if line_weight is not None:
             self.line_weights[name] = line_weight
 
+    def add_step(
+        self,
+        name: str,
+        step_path: Union[str, Path],
+        color: Optional[Union[str, ColorType, tuple[float, float, float]]] = None,
+        alpha: float = 1.0,
+        line_weight: Optional[float] = None,
+    ) -> None:
+        """
+        Import a STEP CAD file (.step / .stp) and add it to the room.
+
+        Args:
+            name: Unique name for the item.
+            step_path: Path to the .step or .stp CAD file.
+            color: The color name, enum member, RGB 3-tuple, or None to use default.
+            alpha: Transparency value from 0.0 to 1.0.
+            line_weight: Custom thickness scaling factor.
+        """
+        p = Path(step_path).resolve()
+        if not p.is_file():
+            raise FileNotFoundError(f"STEP file not found: {p}")
+        imported = import_step(str(p))
+        self.add(name, imported, color=color, alpha=alpha, line_weight=line_weight)
+
+    def export_step(self, path: Union[str, Path]) -> Path:
+        """
+        Export the room compound geometry to a STEP CAD file.
+
+        Args:
+            path: Destination file path for the .step file.
+
+        Returns:
+            Resolved Path to the saved STEP file.
+        """
+        p = Path(path).resolve()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        export_step(self.compound, str(p))
+        return p
+
     def add_label(self, name: str, text: str, location: Any, options: Optional[TextArgs] = None) -> None:
         """Add a camera-aligned text annotation at a 3D location."""
         self._labels.append((name, text, Vector(location), options or TextArgs()))
@@ -149,9 +197,12 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             if hasattr(obj, "label"):
                 # Setting the label allows visualization tools like ocp_vscode to identify parts.
                 setattr(obj, "label", name)
-                # Setting the color metadata for visualization.
+                # Setting the color metadata for visualization and STEP export.
                 if hasattr(obj, "color"):
-                    setattr(obj, "color", rgba)
+                    if isinstance(rgba, (tuple, list)) and len(rgba) == 4:
+                        setattr(obj, "color", Color(*rgba))
+                    elif isinstance(rgba, Color):
+                        setattr(obj, "color", rgba)
                 children.append(obj)
             else:
                 raise ValueError(f"Item '{name}' in Room could not be converted to a build123d object.")

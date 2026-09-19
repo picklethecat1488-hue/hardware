@@ -94,3 +94,27 @@ class TestListerLogic:
         """Test computing output for a URDF."""
         assert lister.get_urdf_output("proj/part") == "urdf/proj/part.urdf"
         assert lister.get_urdf_output("part") == "urdf/default/part.urdf"
+
+    def test_get_outputs_wildcard_resolution(self, lister):
+        """Verify that get_outputs gracefully resolves wildcard targets across sections."""
+        from provider import Section
+
+        # Setup can_resolve and resolve mocks
+        lister.target_parser.can_resolve = MagicMock(side_effect=lambda name, section: section != Section.PCB)
+        mock_targets = MagicMock()
+        mock_targets.__iter__.side_effect = lambda: iter(["proj/part1"])
+        mock_targets.subassemblies = []
+        lister.target_parser.resolve = MagicMock(return_value=mock_targets)
+        lister.manager.router.manifest = {"proj/part1": {}}
+        lister.manager.router.get_export_types.return_value = ["stl"]
+
+        outputs = lister.get_outputs(["proj/*"])
+        assert "stl/proj/part1.stl" in outputs
+
+    def test_get_outputs_invalid_target_raises(self, lister):
+        """Verify that get_outputs raises ValueError when no section can resolve the target."""
+        lister.target_parser.can_resolve = MagicMock(return_value=False)
+        lister.target_parser.resolve = MagicMock(side_effect=ValueError("Target not found"))
+
+        with pytest.raises(ValueError, match="Target not found"):
+            lister.get_outputs(["non_existent"])
