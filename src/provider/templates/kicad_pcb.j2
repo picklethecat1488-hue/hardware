@@ -1,0 +1,128 @@
+(kicad_pcb
+  (version 20221018)
+  (generator "hardware_pcb_engine")
+  (general
+    (thickness {{ board.stackup.total_thickness_mm }})
+  )
+  (paper "{{ board.sheet_size or 'A4' }}")
+  (title_block
+    (title "{{ board.name }}")
+    (rev "{{ board.revision or '1.0' }}")
+  )
+  (layers
+    (0 "F.Cu" signal)
+{% for layer in copper_inner_layers %}
+    ({{ loop.index }} "{{ layer.name }}" signal)
+{% endfor %}
+    (31 "B.Cu" signal)
+    (32 "B.Adhes" user "B.Adhesive")
+    (33 "F.Adhes" user "F.Adhesive")
+    (34 "B.Paste" user)
+    (35 "F.Paste" user)
+    (36 "B.SilkS" user "B.Silkscreen")
+    (37 "F.SilkS" user "F.Silkscreen")
+    (38 "B.Mask" user)
+    (39 "F.Mask" user)
+    (40 "Dwgs.User" user "User.Drawings")
+    (41 "Cmts.User" user "User.Comments")
+    (42 "Eco1.User" user "User.Eco1")
+    (43 "Eco2.User" user "User.Eco2")
+    (44 "Edge.Cuts" user)
+    (45 "Margin" user)
+    (46 "B.CrtYd" user "B.Courtyard")
+    (47 "F.CrtYd" user "F.Courtyard")
+    (48 "B.Fab" user)
+    (49 "F.Fab" user)
+    (50 "User.1" user)
+    (51 "User.2" user)
+    (52 "User.3" user)
+    (53 "User.4" user)
+    (54 "User.5" user)
+    (55 "User.6" user)
+    (56 "User.7" user)
+    (57 "User.8" user)
+    (58 "User.9" user)
+  )
+  (setup
+    (stackup
+{% for layer in board.stackup.layers %}
+      (layer "{{ layer.name }}" (type "{{ layer.layer_type }}") (color "{{ layer.material }}") (thickness {{ layer.thickness_mm }}){% if layer.dielectric_constant %} (epsilon_r {{ layer.dielectric_constant }}){% endif %})
+{% endfor %}
+      (copper_finish "{{ board.stackup.finish }}")
+    )
+    (pad_to_mask_clearance 0.05)
+  )
+  (net 0 "")
+{% for net_info in nets %}
+  (net {{ net_info.idx }} "{{ net_info.name }}")
+{% endfor %}
+
+{% for fp in footprints %}
+  (footprint "{{ fp.package }}" (layer "{{ fp.layer }}")
+    (at {{ fp.x_mm }} {{ fp.y_mm }})
+    (fp_text reference "{{ fp.name }}" (at 0 {{ fp.ref_y }}) (layer "{{ fp.silk_layer }}") (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
+    (fp_text value "{{ fp.value }}" (at 0 {{ fp.val_y }}) (layer "{{ fp.fab_layer }}") (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
+{% for line in fp.alignment_lines %}
+    (fp_line (start {{ line.x1 }} {{ line.y1 }}) (end {{ line.x2 }} {{ line.y2 }}) (stroke (width 0.15) (type default)) (layer "{{ fp.silk_layer }}"))
+{% endfor %}
+{% if fp.pin1_dot %}
+    (fp_circle (center {{ fp.pin1_dot.cx }} {{ fp.pin1_dot.cy }}) (end {{ fp.pin1_dot.ex }} {{ fp.pin1_dot.ey }}) (stroke (width 0.15) (type default)) (fill solid) (layer "{{ fp.silk_layer }}"))
+{% endif %}
+{% for pin in fp.pins %}
+{% if pin.pad_type == "thru_hole" %}
+    (pad "{{ pin.name }}" thru_hole {{ pin.pad_shape }} (at {{ pin.x_mm }} {{ pin.y_mm }}) (size {{ pin.pad_size_x }} {{ pin.pad_size_y }}) (drill {{ pin.drill_dia_mm or 0.7 }}) (layers "*.Cu" "*.Mask") (net {{ pin.net_idx }} "{{ pin.net_name }}"))
+{% else %}
+    (pad "{{ pin.name }}" smd {{ pin.pad_shape }} (at {{ pin.x_mm }} {{ pin.y_mm }}) (size {{ pin.pad_size_x }} {{ pin.pad_size_y }}) (layers "{{ fp.layer }}" "{{ fp.paste_layer }}" "{{ fp.mask_layer }}") (net {{ pin.net_idx }} "{{ pin.net_name }}"))
+{% endif %}
+{% endfor %}
+  )
+{% endfor %}
+
+{% for tp in test_points %}
+  (footprint "TestPoint:TestPoint_THTPad_D{{ tp.dia_mm }}mm_Drill{{ tp.drill_mm }}mm" (layer "{{ tp.layer }}")
+    (at {{ tp.x_mm }} {{ tp.y_mm }})
+    (fp_text reference "{{ tp.name }}" (at {{ tp.label_x }} {{ tp.label_y }}{% if tp.label_angle %} {{ tp.label_angle }}{% endif %}) (layer "{{ tp.silk_layer }}") (effects (font (size 0.7 0.7) (thickness 0.1)){% if tp.layer == "B.Cu" %} (justify mirror){% endif %}))
+    (pad "1" thru_hole circle (at 0 0) (size {{ tp.dia_mm }} {{ tp.dia_mm }}) (drill {{ tp.drill_mm }}) (layers "*.Cu" "*.Mask") (net {{ tp.net_idx }} "{{ tp.net_name }}"))
+  )
+{% endfor %}
+
+{% for seg in segments %}
+  (segment (start {{ seg.x1 }} {{ seg.y1 }}) (end {{ seg.x2 }} {{ seg.y2 }}) (width {{ seg.width }}) (layer "{{ seg.layer }}") (net {{ seg.net_idx }}))
+{% endfor %}
+
+{% for via in vias %}
+  (via (at {{ via.x }} {{ via.y }}) (size {{ via.dia }}) (drill {{ via.drill }}) (layers "{{ via.layer1 }}" "{{ via.layer2 }}") (net {{ via.net_idx }}))
+{% endfor %}
+
+{% for zone in zones %}
+  (zone (net {{ zone.net_idx }}) (net_name "{{ zone.net_name }}") (layer "{{ zone.layer }}")
+    (hatch edge 0.5)
+    (priority {{ zone.priority }})
+    (connect_pads (clearance {{ zone.clearance_mm }}))
+    (min_thickness 0.15)
+    (filled_polygon
+      (pts
+        {% for pt in zone.pts %}(xy {{ pt.x }} {{ pt.y }}) {% endfor %}
+      )
+    )
+    (polygon
+      (pts
+        {% for pt in zone.pts %}(xy {{ pt.x }} {{ pt.y }}) {% endfor %}
+      )
+    )
+  )
+{% endfor %}
+
+{% for mh in mounting_holes %}
+  (footprint "MountingHole:MountingHole_{{ mh.drill_mm }}mm_Pad" (layer "F.Cu")
+    (at {{ mh.x_mm }} {{ mh.y_mm }})
+    (fp_text reference "{{ mh.name }}" (at 0 -{{ mh.drill_mm }}) (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))
+    (pad "1" {% if mh.plated %}thru_hole circle (at 0 0) (size {{ mh.pad_mm }} {{ mh.pad_mm }}) (drill {{ mh.drill_mm }}) (layers "*.Cu" "*.Mask") (net {{ mh.net_idx }} "{{ mh.net_name }}"){% else %}np_thru_hole circle (at 0 0) (size {{ mh.drill_mm }} {{ mh.drill_mm }}) (drill {{ mh.drill_mm }}) (layers "*.Mask"){% endif %})
+  )
+{% endfor %}
+
+  (gr_rect (start {{ outline.x1 }} {{ outline.y1 }}) (end {{ outline.x2 }} {{ outline.y2 }}) (stroke (width 0.1) (type default)) (fill none) (layer "Edge.Cuts"))
+{% for text in silkscreen_texts %}
+  (gr_text "{{ text.text }}" (at {{ text.x_mm }} {{ text.y_mm }}{% if text.rotation %} {{ text.rotation }}{% endif %}) (layer "{{ text.layer }}") (effects (font (size {{ text.font_size }} {{ text.font_size }}) (thickness {{ text.thickness }})){% if text.mirror %} (justify mirror){% endif %}))
+{% endfor %}
+)
