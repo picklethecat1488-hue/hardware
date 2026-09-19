@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import inspect
 import math
+from pathlib import Path
 from contextvars import ContextVar
 from typing import Optional, Any, Callable, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor
@@ -29,6 +30,9 @@ from .target_list import TargetList
 from .orchestrator import Orchestrator
 from .utils import load_manifest, get_rgba_color
 from .room import Room
+
+if TYPE_CHECKING:
+    from model.pcb import PCBConfig
 
 # Monkeypatch build123d.BuildPart.__exit__ to copy urdf_* attributes to the final part
 from build123d import BuildPart  # type: ignore
@@ -78,8 +82,8 @@ class ProviderOrchestrator(Orchestrator):
         modes: tuple[Mode | str, ...] = (Mode.DEFAULT,),
     ) -> Any:
         """Perform the requested build action."""
-        # Diagram action does not use subassemblies during build execution
-        handler_subs = () if action == Section.DIAGRAM else subassemblies
+        # Diagram and PCB actions do not use subassemblies during build execution
+        handler_subs = () if action in (Section.DIAGRAM, Section.PCB) else subassemblies
         self.pre_handler(targets, action, handler_subs, modes)
 
         if action == Section.DIAGRAM:
@@ -124,6 +128,53 @@ class ProviderOrchestrator(Orchestrator):
                 return handler(target, sa, m)
 
             raw_results = list(self.executor.map(build_task, work))
+        elif action == Section.PCB:
+
+            def pcb_task(item: tuple[str, Optional[str], Mode]) -> Any:
+                target, sa, m = item
+                handler = self.provider.pcb.get(target)
+                if handler is None:
+                    from provider.pcb.exporter import PCBExporter
+                    from model.wiring import Wiring
+                    import yaml
+
+                    pcb_cfg = self.provider.pcb_config
+                    if not pcb_cfg:
+                        raise ValueError(
+                            f"No pcb.yaml found for project '{self.provider.name}' to build PCB target '{target}'"
+                        )
+
+                    import types
+
+                    wiring = None
+                    if os.path.exists(self.provider.wiring_path):
+                        wiring = Wiring(self.provider.wiring_path)
+                    else:
+                        wiring = types.SimpleNamespace(footprints=[], nets=[])
+
+                    exporter = PCBExporter(pcb_cfg, wiring)
+                    out_dir = Path("build") / self.provider.name / "pcb"
+                    out_dir.mkdir(parents=True, exist_ok=True)
+
+                    board_dir = out_dir / "board"
+                    exporter.export_board(board_dir)
+                    cad_zip = exporter.export_board_archive(out_dir / f"{target}_cad.zip")
+                    bom_csv = exporter.export_bom_csv(out_dir / f"{target}_bom.csv")
+                    cpl_csv = exporter.export_pick_and_place_csv(out_dir / f"{target}_cpl.csv")
+                    sch_pdf = exporter.export_schematic_pdf(out_dir / f"{target}_schematic.pdf")
+                    cap_json = exporter.export_capacitive_config_json(out_dir / f"{target}_capacitive_config.json")
+                    return {
+                        "board": board_dir,
+                        "cad": cad_zip,
+                        "bom": bom_csv,
+                        "cpl": cpl_csv,
+                        "schematic": sch_pdf,
+                        "schematic_pdf": sch_pdf,
+                        "capacitive_config": cap_json,
+                    }
+                return handler(target, sa, m)
+
+            raw_results = list(self.executor.map(pcb_task, work))
         else:
             raise ValueError(f"Unsupported action: {action}")
 
@@ -146,7 +197,7 @@ class ProviderOrchestrator(Orchestrator):
     ) -> None:
         """Validate input parameters before the handler execution."""
         # Ensure the action is recognized by the orchestrator
-        if action not in [Section.VIEW, Section.CONFIG, Section.PART, Section.DIAGRAM]:
+        if action not in [Section.VIEW, Section.CONFIG, Section.PART, Section.DIAGRAM, Section.PCB]:
             raise ValueError(f"No handler registered for action '{action}' in {self.provider.__class__.__name__}")
 
         # Diagrams operate on all targets at once, so we validate the first target has a handler.
@@ -173,6 +224,9 @@ class ProviderOrchestrator(Orchestrator):
             if action == Section.PART and name not in self.provider.part:
                 raise ValueError(f"No part handler registered for '{name}' in {self.provider.name}")
 
+            if action == Section.PCB and name not in self.provider.pcb and not self.provider.pcb_config:
+                raise ValueError(f"No PCB configuration registered for '{name}' in {self.provider.name}")
+
             if action == Section.CONFIG:
                 for mode in modes:
                     if mode not in self.provider.config:
@@ -191,7 +245,7 @@ class ProviderOrchestrator(Orchestrator):
             if subassemblies:
                 supported_subs = action_config.get(SUBASSEMBLIES, [])
                 for sa in subassemblies:
-                    if sa not in supported_subs:
+                    if sa is not None and sa not in supported_subs:
                         raise ValueError(
                             f"Subassembly '{sa}' is not supported for part '{name}'. "
                             f"Supported subassemblies: {supported_subs}"
@@ -249,13 +303,213 @@ class Provider:
         return getattr(self.app_config, self.name.lower(), self.default_config)
 
     @property
+    def project_dir(self) -> Path:
+        """Return the directory containing the provider's definition."""
+        from pathlib import Path
+
+        return Path(inspect.getfile(self.__class__)).resolve().parent
+
+    @property
+    def wiring_path(self) -> Path:
+        """Return the path to the provider's wiring specification file."""
+        return self.project_dir / "wiring.yaml"
+
+    @property
+    def pcb_manifest_path(self) -> Path:
+        """Return the path to the provider's PCB configuration file (pcb.yaml)."""
+        return self.project_dir / "pcb.yaml"
+
+    @property
+    def pcb_manifest(self) -> Optional[dict[str, Any]]:
+        """Return raw YAML data from pcb.yaml if it exists."""
+        p = self.pcb_manifest_path
+        if os.path.exists(p):
+            import yaml
+
+            with open(p, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f)
+        return None
+
+    def stackup(self) -> Optional[Any]:
+        """Define multi-layer PCB physical stackup using BuildStackup context manager.
+
+        Subclasses should override this method to declare stackup layers, copper foils,
+        and core/prepreg dielectrics using BuildStackup and StackupLayer.
+
+        Returns:
+            BuildStackup, StackupModel, or None if configured via YAML.
+        """
+        return None
+
+    def mounting_holes(self) -> List[Any]:
+        """Define CAD-located PCB drill and mounting holes using BuildDrillHoles context manager.
+
+        Subclasses should override this method to place mounting holes using BuildDrillHoles,
+        MountingHole, and build123d Locations.
+
+        Returns:
+            List of MountingHoleModel instances, or empty list if none defined.
+        """
+        return []
+
+    def silkscreen(self) -> List[Any]:
+        """Define CAD-located silkscreen text markings and annotations for PCB exports.
+
+        Subclasses should override this method to place silkscreen text annotations
+        using BuildSilkscreen and standard CAD locating primitives (Locations, PolarLocations).
+
+        Returns:
+            List of SilkscreenTextModel instances, or empty list if none defined.
+        """
+        return []
+
+    def traces(self) -> List[Any]:
+        """Define routed copper trace segments using BuildTraces context manager.
+
+        Returns:
+            List of TraceSegmentModel instances, or BuildTraces context.
+        """
+        return []
+
+    def vias(self) -> List[Any]:
+        """Define interlayer vias using BuildVias context manager.
+
+        Returns:
+            List of ViaModel instances, or BuildVias context.
+        """
+        return []
+
+    def copper_regions(self) -> List[Any]:
+        """Define copper planes, ground fills, and shielding zones using BuildCopperRegions.
+
+        Returns:
+            List of CopperRegionModel instances, or BuildCopperRegions context.
+        """
+        return []
+
+    def test_points(self) -> List[Any]:
+        """Define exposed copper test points using BuildTestPoints context manager.
+
+        Returns:
+            List of TestPointModel instances, or BuildTestPoints context.
+        """
+        return []
+
+    @property
+    def pcb_config(self) -> Optional[PCBConfig]:
+        """Return parsed PCBConfig Pydantic model from pcb.yaml if available."""
+        data = self.pcb_manifest
+        if data:
+            from model.pcb import PCBConfig, PCBMaterialsModel, StackupModel
+            from provider.pcb.stackup import BuildStackup
+            from provider.pcb.drill_holes import BuildDrillHoles
+            from provider.pcb.routing import BuildTraces, BuildVias, BuildCopperRegions, BuildTestPoints
+
+            config = PCBConfig.model_validate(data)
+
+            # 1. Stackup from provider context manager
+            provider_stackup = self.stackup()
+            if provider_stackup is not None:
+                if isinstance(provider_stackup, BuildStackup):
+                    config.stackup = provider_stackup.to_model()
+                elif isinstance(provider_stackup, StackupModel):
+                    config.stackup = provider_stackup
+            elif config.stackup is not None:
+                config.stackup.resolve_materials(PCBMaterialsModel.default())
+
+            # 2. Drill / mounting holes from provider context manager
+            provider_holes = self.mounting_holes()
+            if provider_holes:
+                if isinstance(provider_holes, BuildDrillHoles):
+                    config.mounting_holes = list(provider_holes.holes)
+                else:
+                    config.mounting_holes = list(provider_holes)
+
+            # 3. Silkscreen texts from provider context manager
+            provider_texts = self.silkscreen()
+            if provider_texts:
+                config.silkscreen_texts = list(provider_texts)
+
+            # 4. Traces from provider context manager
+            p_traces = self.traces()
+            if p_traces:
+                if isinstance(p_traces, BuildTraces):
+                    config.traces = list(p_traces.traces)
+                else:
+                    config.traces = list(p_traces)
+
+            # 5. Vias from provider context manager
+            p_vias = self.vias()
+            if p_vias:
+                if isinstance(p_vias, BuildVias):
+                    config.vias = list(p_vias.vias)
+                else:
+                    config.vias = list(p_vias)
+
+            # 6. Copper regions from provider context manager
+            p_regions = self.copper_regions()
+            if p_regions:
+                if isinstance(p_regions, BuildCopperRegions):
+                    config.copper_regions = list(p_regions.regions)
+                else:
+                    config.copper_regions = list(p_regions)
+
+            # 7. Test points from provider context manager
+            p_tps = self.test_points()
+            if p_tps:
+                if isinstance(p_tps, BuildTestPoints):
+                    config.test_points = list(p_tps.test_points)
+                else:
+                    config.test_points = list(p_tps)
+
+            # 8. Merge metadata and derive dimensions_mm from build123d shape if shape_ref is present
+            if config.shape_ref and config.shape_ref in self.part:
+                part_builder = self.part[config.shape_ref]
+                part_obj = part_builder(config.shape_ref, None, Mode.DEFAULT)
+                pcb_meta = getattr(part_obj, "pcb_metadata", None)
+                if pcb_meta is None and hasattr(part_obj, "part"):
+                    pcb_meta = getattr(part_obj.part, "pcb_metadata", None)
+                if pcb_meta is not None:
+                    if config.stackup is None and pcb_meta.stackup is not None:
+                        config.stackup = pcb_meta.stackup
+                    if not config.mounting_holes and pcb_meta.mounting_holes:
+                        config.mounting_holes = pcb_meta.mounting_holes
+                    if not config.silkscreen_texts and pcb_meta.silkscreen_texts:
+                        config.silkscreen_texts = pcb_meta.silkscreen_texts
+                    if not config.traces and pcb_meta.traces:
+                        config.traces = pcb_meta.traces
+                    if not config.vias and pcb_meta.vias:
+                        config.vias = pcb_meta.vias
+                    if not config.copper_regions and pcb_meta.copper_regions:
+                        config.copper_regions = pcb_meta.copper_regions
+                    if not config.test_points and pcb_meta.test_points:
+                        config.test_points = pcb_meta.test_points
+
+                if config.dimensions_mm is None:
+                    bb = getattr(part_obj, "bounding_box", None)
+                    if bb is None and hasattr(part_obj, "part"):
+                        bb = getattr(part_obj.part, "bounding_box", None)
+                    if callable(bb):
+                        bbox = bb()
+                    elif bb is not None:
+                        bbox = bb
+                    else:
+                        bbox = None
+
+                    if bbox is not None:
+                        th_z = config.stackup.total_thickness_mm if config.stackup else bbox.size.Z
+                        config.dimensions_mm = (round(bbox.size.X, 4), round(bbox.size.Y, 4), round(th_z, 4))
+
+            return config
+        return None
+
+    @property
     def manifest(self) -> dict[str, dict[str, Any]]:
         """Map part names to their supported capabilities and colors.
 
         By default, attempts to load "manifest.yaml" relative to the provider module.
         """
-        base_dir = os.path.dirname(os.path.abspath(inspect.getfile(self.__class__)))
-        manifest_path = os.path.join(base_dir, "manifest.yaml")
+        manifest_path = os.path.join(str(self.project_dir), "manifest.yaml")
         if os.path.exists(manifest_path):
             return load_manifest(manifest_path)
         return {}
@@ -263,6 +517,11 @@ class Provider:
     @property
     def part(self) -> dict[str, Callable[..., Any]]:
         """Map part names to their build handler methods."""
+        return {}
+
+    @property
+    def pcb(self) -> dict[str, Callable[..., Any]]:
+        """Map PCB target names to their build handler methods."""
         return {}
 
     @property

@@ -861,3 +861,39 @@ def test_room_log_rerun_show_boundary_voxels(monkeypatch):
         )
         logged_paths = [call[0][0] for call in mock_rr_log.call_args_list]
         assert any("world/boundaries/lid" in p for p in logged_paths)
+
+
+def test_room_step_support(tmp_path):
+    """Verify Room can import, add, and export STEP CAD files."""
+    from build123d import Box, export_step
+    from pathlib import Path
+
+    step_file = tmp_path / "part.step"
+    test_box = Box(10.0, 20.0, 5.0)
+    export_step(test_box, str(step_file))
+
+    room = Room()
+
+    # 1. add_step method
+    room.add_step("step_box", step_file, color=ColorType.BLUE, alpha=0.8)
+    assert "step_box" in room
+    geom, rgba = room["step_box"]
+    assert rgba == (0.0, 0.0, 1.0, 0.8)
+
+    # 2. add method with direct STEP path
+    room.add("direct_step_box", str(step_file))
+    assert "direct_step_box" in room
+
+    # 3. room.compound contains both imported solids
+    comp = room.compound
+    assert len(comp.children) == 2
+
+    # 4. export_step method
+    out_step = tmp_path / "exported_room.step"
+    res = room.export_step(out_step)
+    assert res.is_file()
+    assert res.stat().st_size > 500
+
+    # 5. Missing STEP file raises FileNotFoundError
+    with pytest.raises(FileNotFoundError, match="STEP file not found"):
+        room.add_step("bad", tmp_path / "nonexistent.step")
