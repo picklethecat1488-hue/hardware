@@ -967,3 +967,41 @@ def test_code_review_commit_time_ascending_and_code_search(tmp_path: Path) -> No
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_code_review_html_responsive_and_cli_navigation(tmp_path: Path) -> None:
+    """Verify that code review HTML template includes responsive toolbar styles and commit navigation commands."""
+    repo_root, _ = create_isolated_git_repo(tmp_path)
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(base_url) as resp:
+            html = resp.read().decode("utf-8")
+
+            # 1. Responsive toolbar styles
+            assert "flex-wrap: wrap" in html
+            assert "codeSearchInput" in html
+            assert "min-height: 48px" in html
+            assert "min-height: 42px" in html
+
+            # 2. Empty line repeating last command
+            assert "state.cmdHistory[state.cmdHistory.length - 1]" in html
+
+            # 3. Stack commit navigation
+            assert "navigateCommit" in html
+            assert "next_commit" in html
+            assert "prev_commit" in html
+            assert "next commit" in html or 'sub === "commit"' in html
+    finally:
+        server.shutdown()
+        server.server_close()
