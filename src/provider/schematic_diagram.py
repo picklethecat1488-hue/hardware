@@ -931,8 +931,8 @@ class SchematicDiagram:
                 seg_len = x_end - x_start
                 if seg_len >= 18.0:
                     # Inter-component channel: space within segment with clearance from both ends
-                    safe_min = x_start + 6.0
-                    safe_max = x_end - 8.0
+                    safe_min = x_start + 14.0
+                    safe_max = x_end - 10.0
                     cand_x = safe_min + (idx % 2) * 8.0
                     if cand_x > safe_max:
                         cand_x = safe_max
@@ -987,9 +987,20 @@ class SchematicDiagram:
 
                     step = 14.0
                     if side == "right":
+                        next_comp_left = min(
+                            (c[0] for p, c in sheet_pin_coords.items() if c[0] > p_x + 10.0 and p[0] != target_pair[0]),
+                            default=280.0,
+                        )
                         cand_x = p_x + 14.0 + idx * 16.0
+                        if cand_x > next_comp_left - 12.0:
+                            cand_x = (p_x + next_comp_left) / 2.0
                         while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
-                            cand_x += step
+                            if cand_x - 7.0 > p_x + 6.0:
+                                cand_x -= 7.0
+                            elif cand_x + 7.0 < next_comp_left - 8.0:
+                                cand_x += 7.0
+                            else:
+                                break
                     else:
                         cand_x = p_x - 28.0 - idx * 20.0
                         while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
@@ -1246,10 +1257,10 @@ class SchematicDiagram:
             y_top_rail = y_zz_top + 6.0
 
             # Dedicated dashed section card for pull-up resistors
-            card_x = x_min_pull - 6.0
+            card_x = x_min_pull - 5.0
             card_w = (x_max_pull - x_min_pull) + 16.0
             card_y = min(p[1] for p in pwr_pullups) + 4.0
-            card_h = (y_top_rail + 10.0) - card_y
+            card_h = (y_top_rail + 16.0) - card_y
             is_i2c = any("SDA" in p[3].upper() or "SCL" in p[3].upper() for p in pwr_pullups)
             card_title = "I2C PULL-UP RESISTORS" if is_i2c else "PULL-UP RESISTORS"
 
@@ -1267,7 +1278,7 @@ class SchematicDiagram:
             )
             ax.text(
                 card_x + 3.0,
-                card_y + card_h - 3.5,
+                card_y + card_h - 2.8,
                 card_title,
                 fontsize=5.5,
                 fontweight="bold",

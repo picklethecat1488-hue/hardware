@@ -252,6 +252,31 @@ schematic_sheets:
   - title: Capacitive Sensing & Control
     description: CY8CMBR3116 CapSense controller, 4-channel liquid level flex tail, and I2C bus
     components: [U1, U2, J2, R1, R2, C12]
+    pin_sides:
+      U2:
+        SDA: left
+        SCL: left
+        INT: left
+        VDD: left
+        VSS: left
+        CS0: right
+        CS1: right
+        CS2: right
+        CS3: right
+        CS4: right
+        CS5: right
+        CS6: right
+        SHIELD: right
+        VREG: right
+      J2:
+        CAP_TX0: left
+        CAP_RX0: left
+        CAP_TX1: left
+        CAP_RX1: left
+        CAP_TX2: left
+        CAP_RX2: left
+        CAP_RX3: left
+        CAP_SHIELD: left
     pin_breakouts:
       U1: [F1, F2, D2]
       U2: [VDD, VSS, SDA, SCL, INT, CS0, CS1, CS2, CS3, CS4, CS5, CS6, SHIELD, VREG]
