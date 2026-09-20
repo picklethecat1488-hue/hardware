@@ -214,32 +214,58 @@ footprints:
         label: "GND"
         position: [-3.2, 2.5]
         side: left
-        pad_type: thru_hole
-        pad_shape: roundrect
-        pad_size_mm: [1.6, 1.2]
-        drill_dia_mm: 0.80
+        pad_type: smd
+        pad_shape: rect
+        pad_size_mm: [0.35, 1.2]
       - name: VBUS
         label: "VBUS"
         position: [-2.4, 2.5]
         side: left
-        pad_type: thru_hole
-        pad_shape: circle
-        pad_size_mm: [1.4, 1.2]
-        drill_dia_mm: 0.70
+        pad_type: smd
+        pad_shape: rect
+        pad_size_mm: [0.35, 1.2]
       - name: CC1
         label: "CC1"
         position: [-0.8, 2.5]
+        side: right
+        pad_type: smd
+        pad_shape: rect
+        pad_size_mm: [0.35, 1.2]
+      - name: DP1
+        label: "D+"
+        position: [-0.25, 2.5]
         side: left
         pad_type: smd
-        pad_shape: roundrect
-        pad_size_mm: [0.6, 1.2]
+        pad_shape: rect
+        pad_size_mm: [0.30, 1.2]
+      - name: DN1
+        label: "D-"
+        position: [0.25, 2.5]
+        side: right
+        pad_type: smd
+        pad_shape: rect
+        pad_size_mm: [0.30, 1.2]
       - name: CC2
         label: "CC2"
         position: [0.8, 2.5]
         side: right
         pad_type: smd
-        pad_shape: roundrect
-        pad_size_mm: [0.6, 1.2]
+        pad_shape: rect
+        pad_size_mm: [0.35, 1.2]
+      - name: VBUS2
+        label: "VBUS"
+        position: [2.4, 2.5]
+        side: left
+        pad_type: smd
+        pad_shape: rect
+        pad_size_mm: [0.35, 1.2]
+      - name: GND2
+        label: "GND"
+        position: [3.2, 2.5]
+        side: left
+        pad_type: smd
+        pad_shape: rect
+        pad_size_mm: [0.35, 1.2]
       - name: SHIELD1
         label: "SHIELD"
         position: [-4.2, 0.0]
@@ -247,15 +273,15 @@ footprints:
         pad_type: thru_hole
         pad_shape: roundrect
         pad_size_mm: [1.8, 2.2]
-        drill_dia_mm: 1.20
+        drill_dia_mm: 1.00
       - name: SHIELD2
         label: "SHIELD"
         position: [4.2, 0.0]
-        side: right
+        side: left
         pad_type: thru_hole
         pad_shape: roundrect
         pad_size_mm: [1.8, 2.2]
-        drill_dia_mm: 1.20
+        drill_dia_mm: 1.00
 
   "BGA-196":
     dimensions: [12.0, 12.0, 1.4]
@@ -304,10 +330,10 @@ footprints:
         side: right
       - name: K1
         position: [-4.0, 2.0]
-        side: left
+        side: right
       - name: K2
         position: [-4.0, 1.2]
-        side: left
+        side: right
       - name: M1
         position: [-5.0, 2.0]
         side: left
@@ -378,7 +404,7 @@ footprints:
         drill_dia_mm: 0.70
 
   "FPC-30P-0.5MM":
-    dimensions: [18.0, 4.5, 1.2]
+    dimensions: [21.6, 4.5, 1.2]
     pins:
       - name: GND
         position: [-8.0, 0.0]

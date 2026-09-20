@@ -76,6 +76,7 @@ def polyline_to_trace_segments(
     layer: str,
     net: str,
     fillet_radius: float = 0.20,
+    junction_points: Optional[Sequence[Tuple[float, float]]] = None,
 ) -> List[TraceSegmentModel]:
     """Convert an orthogonal polyline sequence into TraceSegmentModels with filleted 90-degree corners.
 
@@ -85,6 +86,7 @@ def polyline_to_trace_segments(
         layer: Copper layer (e.g. 'F.Cu' or 'B.Cu').
         net: Electrical net name.
         fillet_radius: Radius in mm for filleting 90-degree corners.
+        junction_points: Optional coordinates of T-junctions or pins that must remain straight.
 
     Returns:
         List of TraceSegmentModel primitives.
@@ -112,7 +114,7 @@ def polyline_to_trace_segments(
         simplified.append(p_curr)
     simplified.append(pts[-1])
 
-    # Apply fillets at turns
+    # Apply fillets at turns, keeping junction points straight
     if len(simplified) <= 2 or fillet_radius <= 0:
         final_pts = simplified
     else:
@@ -121,8 +123,17 @@ def polyline_to_trace_segments(
             p_prev = final_pts[-1]
             p_curr = simplified[i]
             p_next = simplified[i + 1]
-            arc = fillet_corner(p_prev, p_curr, p_next, radius=fillet_radius)
-            final_pts.extend(arc[1:-1])
+            is_junction = False
+            if junction_points:
+                for jp in junction_points:
+                    if math.hypot(p_curr[0] - jp[0], p_curr[1] - jp[1]) <= (fillet_radius + 0.15):
+                        is_junction = True
+                        break
+            if is_junction:
+                final_pts.append(p_curr)
+            else:
+                arc = fillet_corner(p_prev, p_curr, p_next, radius=fillet_radius)
+                final_pts.extend(arc[1:-1])
         final_pts.append(simplified[-1])
 
     traces: List[TraceSegmentModel] = []
@@ -140,6 +151,70 @@ def polyline_to_trace_segments(
                 )
             )
     return traces
+
+
+def straighten_junction_traces(
+    traces: List[TraceSegmentModel],
+    fillet_radius: float = 0.20,
+) -> List[TraceSegmentModel]:
+    """Ensure all trace segments meeting at a junction (3 or more connections) are straightened without rounded fillets."""
+    if not traces:
+        return traces
+
+    from collections import defaultdict
+
+    def quant(pt: Tuple[float, float]) -> Tuple[float, float]:
+        return (round(pt[0], 2), round(pt[1], 2))
+
+    degree: Dict[Tuple[str, str, Tuple[float, float]], int] = defaultdict(int)
+    for tr in traces:
+        degree[(tr.layer, tr.net, quant(tr.start_mm))] += 1
+        degree[(tr.layer, tr.net, quant(tr.end_mm))] += 1
+
+    junctions = {k for k, count in degree.items() if count >= 3}
+    if not junctions:
+        return traces
+
+    cleaned: List[TraceSegmentModel] = []
+    for tr in traces:
+        p1 = quant(tr.start_mm)
+        p2 = quant(tr.end_mm)
+        is_near_junction = (tr.layer, tr.net, p1) in junctions or (tr.layer, tr.net, p2) in junctions
+
+        dx = abs(tr.end_mm[0] - tr.start_mm[0])
+        dy = abs(tr.end_mm[1] - tr.start_mm[1])
+        is_orthogonal = (dx < 1e-4) or (dy < 1e-4)
+        length = math.hypot(dx, dy)
+
+        if is_near_junction and not is_orthogonal and length <= (fillet_radius * 2.0):
+            j_key = (tr.layer, tr.net, p1) if (tr.layer, tr.net, p1) in junctions else (tr.layer, tr.net, p2)
+            j_pt = j_key[2]
+            other_pt = tr.end_mm if j_pt == p1 else tr.start_mm
+            corner = (other_pt[0], j_pt[1])
+            if math.hypot(corner[0] - other_pt[0], corner[1] - other_pt[1]) > 1e-4:
+                cleaned.append(
+                    TraceSegmentModel(
+                        start_mm=(round(other_pt[0], 4), round(other_pt[1], 4)),
+                        end_mm=(round(corner[0], 4), round(corner[1], 4)),
+                        width_mm=tr.width_mm,
+                        layer=tr.layer,
+                        net=tr.net,
+                    )
+                )
+            if math.hypot(j_pt[0] - corner[0], j_pt[1] - corner[1]) > 1e-4:
+                cleaned.append(
+                    TraceSegmentModel(
+                        start_mm=(round(corner[0], 4), round(corner[1], 4)),
+                        end_mm=(round(j_pt[0], 4), round(j_pt[1], 4)),
+                        width_mm=tr.width_mm,
+                        layer=tr.layer,
+                        net=tr.net,
+                    )
+                )
+        else:
+            cleaned.append(tr)
+
+    return cleaned
 
 
 @dataclass
@@ -250,6 +325,7 @@ class AStarPCBRouter:
         net_name: str,
         width_mm: float = 0.20,
         fillet_radius: float = 0.20,
+        junction_points: Optional[Sequence[Tuple[float, float]]] = None,
     ) -> Tuple[List[TraceSegmentModel], List[ViaModel]]:
         """Find an obstacle-avoiding orthogonal path between start and end using A* search."""
         l0 = self.layer_to_idx.get(start_layer, 0)
@@ -386,7 +462,12 @@ class AStarPCBRouter:
                 if len(current_layer_pts) >= 2:
                     traces.extend(
                         polyline_to_trace_segments(
-                            current_layer_pts, width_mm, current_layer, net_name, fillet_radius=fillet_radius
+                            current_layer_pts,
+                            width_mm,
+                            current_layer,
+                            net_name,
+                            fillet_radius=fillet_radius,
+                            junction_points=junction_points,
                         )
                     )
                 vias.append(
@@ -405,7 +486,12 @@ class AStarPCBRouter:
         if len(current_layer_pts) >= 2:
             traces.extend(
                 polyline_to_trace_segments(
-                    current_layer_pts, width_mm, current_layer, net_name, fillet_radius=fillet_radius
+                    current_layer_pts,
+                    width_mm,
+                    current_layer,
+                    net_name,
+                    fillet_radius=fillet_radius,
+                    junction_points=junction_points,
                 )
             )
 
@@ -905,6 +991,8 @@ class PCBAutoRouter:
                         ordered.append(unvisited.pop(best_idx))
                     endpoints = ordered
 
+                junction_pts = [(pt[0], pt[1]) for pt in endpoints] if len(endpoints) > 2 else []
+
                 for i in range(len(endpoints) - 1):
                     start_pt = (endpoints[i][0], endpoints[i][1])
                     start_layer = endpoints[i][2]
@@ -921,8 +1009,10 @@ class PCBAutoRouter:
                         end_layer=end_layer,
                         net_name=net.name,
                         width_mm=width_mm,
+                        junction_points=junction_pts,
                     )
                     traces.extend(net_traces)
                     vias.extend(net_vias)
 
+        traces = straighten_junction_traces(traces, fillet_radius=0.20)
         return traces, vias

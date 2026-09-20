@@ -5,6 +5,9 @@ from typing import cast, Callable, Sequence, Any, Optional
 from functools import cached_property
 from build123d import (
     BuildPart,
+    BuildSketch,
+    Polygon,
+    extrude,
     Box,
     Cylinder,
     fillet,
@@ -143,6 +146,9 @@ class TestBoardProvider(Provider):
             for cyl in tp.to_shapes(depth_mm=thickness * 2.0):
                 add(cyl, mode=BuildMode.SUBTRACT)
 
+            cr = self.copper_regions()
+            pcb.copper_regions.extend(cr.regions)
+
         return pcb
 
     def flex_tail(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildFlexPCB:
@@ -150,31 +156,42 @@ class TestBoardProvider(Provider):
         w_tail = self.settings.flex_tail_width
         l_tail = self.settings.flex_tail_length
         t_tail = self.settings.flex_tail_thickness
-        length_board = self.settings.board_length
 
         with BuildFlexPCB(
             name="flex_tail",
             flex_type=FlexType.CAPACITIVE,
             capacitive_sensors=self.pcb_config.capacitive_sensors if self.pcb_config else None,
         ) as tail:
-            # Place flex tail protruding along +Y from the top edge of the board
-            y_center = (length_board / 2.0) + (l_tail / 2.0)
-            with Locations((0.0, y_center, 0.0)):
-                Box(w_tail, l_tail, t_tail)
+            # Manifold hull enclosing connector and sensing channels with minimal wasted space
+            with BuildSketch() as s:
+                pts = [
+                    (-w_tail / 2.0, -l_tail / 2.0),
+                    (w_tail / 2.0, -l_tail / 2.0),
+                    (w_tail / 2.0, -l_tail / 2.0 + 5.5),
+                    (7.5, -l_tail / 2.0 + 7.5),
+                    (7.5, l_tail / 2.0 - 1.5),
+                    (5.0, l_tail / 2.0),
+                    (-5.0, l_tail / 2.0),
+                    (-7.5, l_tail / 2.0 - 1.5),
+                    (-7.5, -l_tail / 2.0 + 7.5),
+                    (-w_tail / 2.0, -l_tail / 2.0 + 5.5),
+                ]
+                Polygon(*pts)
+            extrude(s.sketch, amount=t_tail)
 
             with BuildSilkscreen() as silk:
-                with Locations((0.0, -23.5)):
-                    SilkscreenText("FLEX TAIL SENSOR REV 1.0", layer="F.SilkS", font_size=0.8, thickness=0.12)
+                with Locations((0.0, -22.75)):
+                    SilkscreenText("FLEX TAIL SENSOR REV 1.0", layer="F.SilkS", font_size=0.6, thickness=0.09)
+                with Locations((-8.0, -21.5)):
+                    SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.5, thickness=0.08)
                 with Locations((0.0, -6.0)):
                     SilkscreenText("CH0: LOW", layer="F.SilkS", font_size=0.7, thickness=0.10)
                 with Locations((0.0, 5.5)):
                     SilkscreenText("CH1: MID", layer="F.SilkS", font_size=0.7, thickness=0.10)
                 with Locations((0.0, 16.5)):
                     SilkscreenText("CH2: HIGH", layer="F.SilkS", font_size=0.7, thickness=0.10)
-                with Locations((0.0, 23.8)):
+                with Locations((0.0, 23.0)):
                     SilkscreenText("CH3: PROX", layer="F.SilkS", font_size=0.7, thickness=0.10)
-                with Locations((-9.5, -23.0)):
-                    SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.6, thickness=0.09)
 
             routing_flex_file = self.wiring_path.parent / "routing_flex.yaml"
             if routing_flex_file.exists():

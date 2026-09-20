@@ -782,7 +782,7 @@ def test_test_board_full_milestones_integration(tmp_path: Path):
     assert "SENSE_WATER_PROXIMITY" in electrodes_by_name
     assert electrodes_by_name["SENSE_WATER_PROXIMITY"].channel_id == 3
     assert electrodes_by_name["SENSE_WATER_PROXIMITY"].electrode_type == "self"
-    assert electrodes_by_name["SENSE_WATER_PROXIMITY"].drive_shield is True
+    assert electrodes_by_name["SENSE_WATER_PROXIMITY"].drive_shield is False
 
     # Milestone 2: Carrier standoff pilot holes
     assert provider.settings.standoff_hole_diameter == 2.2
@@ -804,7 +804,7 @@ def test_test_board_full_milestones_integration(tmp_path: Path):
     assert cap_data["channel_count"] == 4
     assert len(cap_data["channels"]) == 4
     assert cap_data["channels"][3]["electrode_type"] == "self"
-    assert cap_data["channels"][3]["drive_shield"] is True
+    assert cap_data["channels"][3]["drive_shield"] is False
 
 
 def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
@@ -1285,3 +1285,231 @@ def test_regression_subassembly_footprint_isolation() -> None:
     assert "J_FLEX" in flex_names
     assert "U1" not in flex_names
     assert "J1" not in flex_names
+
+
+def test_schematic_drc_test_board_passes() -> None:
+    """Verify that test_board schematic satisfies all schematic DRC rules with zero errors."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+
+    violations = checker.check_schematic(wiring)
+    errors = [v for v in violations if v.severity == "error"]
+    assert len(errors) == 0, f"Expected 0 schematic DRC errors on test_board, got: {errors}"
+
+
+def test_schematic_drc_detects_dangling_component(advanced_pcb_stackup: StackupModel) -> None:
+    """Verify that check_schematic detects dangling components with no netlist connections."""
+    from model.pcb import PCBConfig, SchematicSheetModel
+    from model.wiring import FootprintModel, PinModel, LabelModel
+    from provider.pcb.drc import PCBDesignRulesChecker, DRCRuleName
+    from unittest.mock import MagicMock
+
+    u1 = FootprintModel(
+        name="U_DANGLING",
+        package="SOIC-8",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(8.0, 8.0, 1.0),
+        pins=[PinModel(name="1", position=(0.0, 0.0, 0.0), label="1", side="left")],
+        label=LabelModel(text="U_DANGLING", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+
+    wiring = MagicMock()
+    wiring.footprints = [u1]
+    wiring.nets = []
+
+    cfg = PCBConfig(
+        name="DanglingTest",
+        board_type="rigid",
+        revision="1.0",
+        dimensions_mm=(60.0, 40.0, 1.6),
+        stackup=advanced_pcb_stackup,
+        schematic_sheets=[
+            SchematicSheetModel(
+                title="Dangling Sheet",
+                description="Sheet with floating component",
+                components=["U_DANGLING"],
+            ),
+        ],
+    )
+
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring)
+    dangling = [v for v in violations if v.rule_name == DRCRuleName.SCHEMATIC_DANGLING_COMPONENT]
+    assert len(dangling) == 1
+    assert "U_DANGLING" in dangling[0].description
+
+
+def test_schematic_drc_detects_net_antenna(advanced_pcb_stackup: StackupModel) -> None:
+    """Verify that check_schematic detects 1-pin floating nets without terminations."""
+    from model.pcb import PCBConfig, SchematicSheetModel
+    from model.wiring import FootprintModel, PinModel, LabelModel, NetModel
+    from provider.pcb.drc import PCBDesignRulesChecker, DRCRuleName
+    from unittest.mock import MagicMock
+
+    u1 = FootprintModel(
+        name="U1",
+        package="SOIC-8",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(8.0, 8.0, 1.0),
+        pins=[PinModel(name="1", position=(0.0, 0.0, 0.0), label="1", side="left")],
+        label=LabelModel(text="U1", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+
+    wiring = MagicMock()
+    wiring.footprints = [u1]
+    wiring.nets = [
+        NetModel(name="ANTENNA_SIG", color="#ef4444", pins=[("U1", "1")]),
+    ]
+
+    cfg = PCBConfig(
+        name="AntennaTest",
+        board_type="rigid",
+        revision="1.0",
+        dimensions_mm=(60.0, 40.0, 1.6),
+        stackup=advanced_pcb_stackup,
+        schematic_sheets=[
+            SchematicSheetModel(
+                title="Antenna Sheet",
+                description="Sheet with floating antenna net",
+                components=["U1"],
+            ),
+        ],
+    )
+
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring)
+    antennas = [v for v in violations if v.rule_name == DRCRuleName.SCHEMATIC_NET_ANTENNA]
+    assert len(antennas) == 1
+    assert "ANTENNA_SIG" in antennas[0].net_or_zone
+
+
+def test_schematic_drc_detects_symbol_overlap(advanced_pcb_stackup: StackupModel) -> None:
+    """Verify that check_schematic detects vertically overlapping symbols on the same column."""
+    from model.pcb import PCBConfig, SchematicSheetModel
+    from model.wiring import FootprintModel, PinModel, LabelModel, NetModel
+    from provider.pcb.drc import PCBDesignRulesChecker, DRCRuleName
+    from unittest.mock import MagicMock
+
+    # Create a 30-pin oversized IC that exceeds default row pitch
+    pins_30 = [PinModel(name=str(i), position=(0.0, float(i), 0.0), label=str(i), side="left") for i in range(30)]
+    u_tall = FootprintModel(
+        name="U_TALL",
+        package="DIP-30",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(15.0, 45.0, 1.0),
+        pins=pins_30,
+        label=LabelModel(text="U_TALL", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+    pins_2 = [PinModel(name=str(i), position=(0.0, float(i), 0.0), label=str(i), side="left") for i in range(2)]
+    u_row1 = FootprintModel(
+        name="U_ROW1",
+        package="SOIC-8",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(8.0, 8.0, 1.0),
+        pins=pins_2,
+        label=LabelModel(text="U_ROW1", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+    # Put 4 components so cols_per_row = 3, forcing u_row1 into row 1 directly below U_TALL (col 0)
+    u_c1 = FootprintModel(
+        name="U_C1",
+        package="SOIC-8",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(8.0, 8.0, 1.0),
+        pins=pins_2,
+        label=LabelModel(text="U_C1", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+    u_c2 = FootprintModel(
+        name="U_C2",
+        package="SOIC-8",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(8.0, 8.0, 1.0),
+        pins=pins_2,
+        label=LabelModel(text="U_C2", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+
+    wiring = MagicMock()
+    wiring.footprints = [u_tall, u_c1, u_c2, u_row1]
+    wiring.nets = [
+        NetModel(name="NET_A", color="#ef4444", pins=[("U_TALL", "0"), ("U_ROW1", "0")]),
+        NetModel(name="NET_B", color="#2563eb", pins=[("U_C1", "0"), ("U_C2", "0")]),
+    ]
+
+    cfg = PCBConfig(
+        name="OverlapTest",
+        board_type="rigid",
+        revision="1.0",
+        dimensions_mm=(60.0, 40.0, 1.6),
+        stackup=advanced_pcb_stackup,
+        schematic_sheets=[
+            SchematicSheetModel(
+                title="Overlap Sheet",
+                description="Sheet with tall overlapping IC",
+                components=["U_TALL", "U_C1", "U_C2", "U_ROW1"],
+            ),
+        ],
+    )
+
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring)
+    overlaps = [v for v in violations if v.rule_name == DRCRuleName.SCHEMATIC_SYMBOL_OVERLAP]
+    assert len(overlaps) >= 1
+    assert "U_TALL" in overlaps[0].net_or_zone
+
+
+def test_schematic_drc_detects_missing_page_transition(advanced_pcb_stackup: StackupModel) -> None:
+    """Verify that check_schematic detects multi-sheet nets referencing orphan components not placed on any sheet."""
+    from model.pcb import PCBConfig, SchematicSheetModel
+    from model.wiring import FootprintModel, PinModel, LabelModel, NetModel
+    from provider.pcb.drc import PCBDesignRulesChecker, DRCRuleName
+    from unittest.mock import MagicMock
+
+    pins_1 = [PinModel(name="1", position=(0.0, 1.0, 0.0), label="1", side="left")]
+    u1 = FootprintModel(
+        name="U1",
+        package="SOIC-8",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(8.0, 8.0, 1.0),
+        pins=pins_1,
+        label=LabelModel(text="U1", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+    u_orphan = FootprintModel(
+        name="U_ORPHAN",
+        package="SOIC-8",
+        position=(10.0, 0.0, 0.0),
+        dimensions=(8.0, 8.0, 1.0),
+        pins=pins_1,
+        label=LabelModel(text="U_ORPHAN", position=(0.0, 0.0, 0.0), align=("center", "center")),
+    )
+
+    wiring = MagicMock()
+    wiring.footprints = [u1, u_orphan]
+    wiring.nets = [
+        NetModel(name="INTER_PAGE_NET", color="#2563eb", pins=[("U1", "1"), ("U_ORPHAN", "1")]),
+    ]
+
+    # Only U1 is placed on Sheet 1; U_ORPHAN is never placed on any sheet
+    cfg = PCBConfig(
+        name="TransitionTest",
+        board_type="rigid",
+        revision="1.0",
+        dimensions_mm=(60.0, 40.0, 1.6),
+        stackup=advanced_pcb_stackup,
+        schematic_sheets=[
+            SchematicSheetModel(
+                title="Sheet 1",
+                description="Sheet with U1 only",
+                components=["U1"],
+            ),
+        ],
+    )
+
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring)
+    missing = [v for v in violations if v.rule_name == DRCRuleName.SCHEMATIC_PAGE_TRANSITION_MISSING]
+    assert len(missing) == 1
+    assert "INTER_PAGE_NET" in missing[0].net_or_zone

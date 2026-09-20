@@ -120,7 +120,11 @@
 {% for mh in mounting_holes %}
   (footprint "MountingHole:MountingHole_{{ mh.drill_mm }}mm_Pad" (layer "F.Cu")
     (at {{ mh.x_mm }} {{ mh.y_mm }})
+    {% if mh.name in ["MH3", "MH4"] %}
+    (fp_text reference "{{ mh.name }}" (at 0 {{ mh.drill_mm }}) (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))
+    {% else %}
     (fp_text reference "{{ mh.name }}" (at 0 -{{ mh.drill_mm }}) (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))
+    {% endif %}
     (pad "1" {% if mh.plated %}thru_hole circle (at 0 0) (size {{ mh.pad_mm }} {{ mh.pad_mm }}) (drill {{ mh.drill_mm }}) (layers "*.Cu" "*.Mask") (net {{ mh.net_idx }} "{{ mh.net_name }}"){% else %}np_thru_hole circle (at 0 0) (size {{ mh.drill_mm }} {{ mh.drill_mm }}) (drill {{ mh.drill_mm }}) (layers "*.Mask"){% endif %})
   )
 {% endfor %}
