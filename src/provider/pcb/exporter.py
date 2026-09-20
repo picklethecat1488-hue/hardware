@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -80,13 +81,7 @@ class PCBExporter:
 
         # Process component footprints and pads (centered on drawing sheet)
         footprints_data = []
-        fps_to_process = self.wiring.footprints if self.wiring else []
-        if self.is_flex:
-            fps_to_process = [
-                fp for fp in fps_to_process if fp.name == "J2" or getattr(fp, "shape_ref", None) == "flex_tail"
-            ]
-        else:
-            fps_to_process = [fp for fp in fps_to_process if getattr(fp, "shape_ref", None) != "flex_tail"]
+        fps_to_process = self.get_footprints_for_board()
 
         # Collect board perimeter and obstacle circles for silkscreen placement
         w_board, l_board, _ = self.config.dimensions_mm
@@ -98,12 +93,16 @@ class PCBExporter:
             circ_obstacles.append((v.position_mm[0], v.position_mm[1], v.pad_diameter_mm / 2.0))
         for tp_obs in getattr(self.config, "test_points", []):
             circ_obstacles.append((tp_obs.position_mm[0], tp_obs.position_mm[1], tp_obs.pad_diameter_mm / 2.0))
+        placed_component_label_boxes: List[Tuple[float, float, float, float]] = []
         for fp_obs in fps_to_process:
+            rot_deg = fp_obs.rotation[2] if hasattr(fp_obs, "rotation") and len(fp_obs.rotation) >= 3 else 0.0
+            rad = math.radians(rot_deg) if abs(rot_deg) > 1e-4 else 0.0
+            cos_r, sin_r = (math.cos(rad), math.sin(rad)) if rad else (1.0, 0.0)
             for p_obs in getattr(fp_obs, "pins", []):
+                rx = p_obs.position[0] * cos_r - p_obs.position[1] * sin_r
+                ry = p_obs.position[0] * sin_r + p_obs.position[1] * cos_r
                 pad_s = getattr(p_obs, "pad_size_mm", (0.5, 0.5))
-                circ_obstacles.append(
-                    (fp_obs.position[0] + p_obs.position[0], fp_obs.position[1] + p_obs.position[1], max(pad_s) / 2.0)
-                )
+                circ_obstacles.append((fp_obs.position[0] + rx, fp_obs.position[1] + ry, max(pad_s) / 2.0))
 
         for fp in fps_to_process:
             fp_pins = []
@@ -189,6 +188,14 @@ class PCBExporter:
             h_half = round(dim_h / 2.0 + 0.4, 4)
             val_y = round(h_half + 1.2, 4)
 
+            is_round = (
+                getattr(fp, "shape", None) == "circle"
+                or "PIEZO" in fp.package.upper()
+                or "SPK" in fp.name.upper()
+                or "SPEAKER" in fp.package.upper()
+            )
+            radius = round((fp.dimensions[0] / 2.0) if fp.dimensions else 6.0, 4)
+
             # Find empty space for component reference label
             ref_w = len(fp.name) * 0.7 + 0.4
             ref_h = 1.0 + 0.4
@@ -198,10 +205,21 @@ class PCBExporter:
                 label_w=ref_w,
                 label_h=ref_h,
                 circular_obstacles=circ_obstacles,
+                bounding_boxes=placed_component_label_boxes,
                 board_bounds=board_bounds,
                 clearance=0.30,
                 preferred_direction="north",
                 step_multiplier=1.2,
+            )
+            cand_ref_x = fp.position[0] + ref_off_x
+            cand_ref_y = fp.position[1] + ref_off_y
+            placed_component_label_boxes.append(
+                (
+                    cand_ref_x - ref_w / 2.0,
+                    cand_ref_y - ref_h / 2.0,
+                    cand_ref_x + ref_w / 2.0,
+                    cand_ref_y + ref_h / 2.0,
+                )
             )
 
             tick_w = round(min(1.0, max(0.2, w_half * 0.4)), 4)
@@ -223,12 +241,8 @@ class PCBExporter:
                 "ey": round(-h_half - 0.5, 4),
             }
 
-            if self.is_flex and fp.name == "J2":
-                fp_x = round(self.config.sheet_center_x_mm + 0.0, 4)
-                fp_y = round(self.config.sheet_center_y_mm - 21.0, 4)
-            else:
-                fp_x = round(self.config.sheet_center_x_mm + fp.position[0], 4)
-                fp_y = round(self.config.sheet_center_y_mm + fp.position[1], 4)
+            fp_x = round(self.config.sheet_center_x_mm + fp.position[0], 4)
+            fp_y = round(self.config.sheet_center_y_mm + fp.position[1], 4)
 
             footprints_data.append(
                 {
@@ -238,6 +252,7 @@ class PCBExporter:
                     "uuid": str(uuid.uuid4()),
                     "x_mm": fp_x,
                     "y_mm": fp_y,
+                    "rotation": fp.rotation if hasattr(fp, "rotation") and fp.rotation else None,
                     "layer": fp_layer,
                     "silk_layer": silk_layer,
                     "fab_layer": fab_layer,
@@ -246,6 +261,8 @@ class PCBExporter:
                     "ref_x": round(ref_off_x, 4),
                     "ref_y": round(ref_off_y, 4),
                     "val_y": val_y,
+                    "is_round": is_round,
+                    "radius": radius,
                     "alignment_lines": alignment_lines,
                     "pin1_dot": pin1_dot,
                     "pins": fp_pins,
@@ -255,42 +272,19 @@ class PCBExporter:
         copper_inners = [l for l in self.config.stackup.copper_layers[1:-1]]
 
         silkscreen_data = []
-        if self.is_flex:
-            flex_silk = [
-                ("FLEX TAIL SENSOR REV 1.0", "F.SilkS", (0.0, -23.5), 0.8, 0.12),
-                ("CH0: LOW", "F.SilkS", (0.0, -6.0), 0.7, 0.10),
-                ("CH1: MID", "F.SilkS", (0.0, 5.5), 0.7, 0.10),
-                ("CH2: HIGH", "F.SilkS", (0.0, 16.5), 0.7, 0.10),
-                ("CH3: PROX", "F.SilkS", (0.0, 23.8), 0.7, 0.10),
-                ("• Pin 1", "F.SilkS", (-9.5, -21.0), 0.6, 0.09),
-            ]
-            for text, lay, pos, fsize, thk in flex_silk:
-                silkscreen_data.append(
-                    {
-                        "text": text,
-                        "layer": lay,
-                        "x_mm": round(self.config.sheet_center_x_mm + pos[0], 4),
-                        "y_mm": round(self.config.sheet_center_y_mm + pos[1], 4),
-                        "font_size": fsize,
-                        "thickness": thk,
-                        "rotation": None,
-                        "mirror": False,
-                    }
-                )
-        else:
-            for st in self.config.silkscreen_texts:
-                silkscreen_data.append(
-                    {
-                        "text": st.text,
-                        "layer": st.layer,
-                        "x_mm": round(self.config.sheet_center_x_mm + st.position[0], 4),
-                        "y_mm": round(self.config.sheet_center_y_mm + st.position[1], 4),
-                        "font_size": st.font_size,
-                        "thickness": st.thickness,
-                        "rotation": st.rotation,
-                        "mirror": st.mirror or (st.layer == "B.SilkS"),
-                    }
-                )
+        for st in self.config.silkscreen_texts:
+            silkscreen_data.append(
+                {
+                    "text": st.text,
+                    "layer": st.layer,
+                    "x_mm": round(self.config.sheet_center_x_mm + st.position[0], 4),
+                    "y_mm": round(self.config.sheet_center_y_mm + st.position[1], 4),
+                    "font_size": st.font_size,
+                    "thickness": st.thickness,
+                    "rotation": st.rotation,
+                    "mirror": st.mirror or (st.layer == "B.SilkS"),
+                }
+            )
 
         mounting_holes_data = []
         if not self.is_flex:
@@ -466,46 +460,33 @@ class PCBExporter:
                     }
                 )
 
-        if self.is_flex and not self.config.traces:
-            from provider.pcb.router import PCBAutoRouter
-
-            auto_router = PCBAutoRouter(self.config, self.wiring)
-            flex_traces, _ = auto_router.route_all_nets()
-            for tr in flex_traces:
-                n_idx = net_name_to_idx.get(tr.net, 0)
-                segments_data.append(
-                    {
-                        "x1": round(self.config.sheet_center_x_mm + tr.start_mm[0], 4),
-                        "y1": round(self.config.sheet_center_y_mm + tr.start_mm[1], 4),
-                        "x2": round(self.config.sheet_center_x_mm + tr.end_mm[0], 4),
-                        "y2": round(self.config.sheet_center_y_mm + tr.end_mm[1], 4),
-                        "width": tr.width_mm,
-                        "layer": tr.layer,
-                        "net_idx": n_idx,
-                    }
-                )
-
         # Test Points (carrier board only)
         test_points_data = []
         if not self.is_flex:
+            placed_label_boxes: List[Tuple[float, float, float, float]] = []
             for tp in self.config.test_points:
                 net_idx = net_name_to_idx.get(tp.net, 0)
                 silk_layer = "B.SilkS" if tp.layer == "B.Cu" else "F.SilkS"
                 mask_layer = "B.Mask" if tp.layer == "B.Cu" else "F.Mask"
-                tp_r = tp.pad_diameter_mm / 2.0
                 preferred = "north" if tp.position_mm[1] >= 0 else "south"
-                lbl_w = len(tp.name) * 0.5 + 0.4
-                lbl_h = 0.7 + 0.4
+                lbl_w = 0.8
+                lbl_h = len(tp.name) * 0.5 + 0.6
                 lbl_off_x, lbl_off_y = find_empty_space_for_label(
                     base_x=tp.position_mm[0],
                     base_y=tp.position_mm[1],
                     label_w=lbl_w,
                     label_h=lbl_h,
                     circular_obstacles=circ_obstacles,
+                    bounding_boxes=placed_label_boxes,
                     board_bounds=board_bounds,
                     clearance=0.35,
                     preferred_direction=preferred,
-                    step_multiplier=1.3,
+                    step_multiplier=1.4,
+                )
+                cand_x = tp.position_mm[0] + lbl_off_x
+                cand_y = tp.position_mm[1] + lbl_off_y
+                placed_label_boxes.append(
+                    (cand_x - lbl_w / 2.0, cand_y - lbl_h / 2.0, cand_x + lbl_w / 2.0, cand_y + lbl_h / 2.0)
                 )
                 test_points_data.append(
                     {
@@ -516,7 +497,7 @@ class PCBExporter:
                         "drill_mm": round(tp.drill_diameter_mm, 4),
                         "label_x": round(lbl_off_x, 4),
                         "label_y": round(lbl_off_y, 4),
-                        "label_angle": 0,
+                        "label_angle": 90,
                         "layer": tp.layer,
                         "silk_layer": silk_layer,
                         "mask_layer": mask_layer,
@@ -541,6 +522,9 @@ class PCBExporter:
                 "y1": round(self.config.sheet_center_y_mm - half_l, 4),
                 "x2": round(self.config.sheet_center_x_mm + half_w, 4),
                 "y2": round(self.config.sheet_center_y_mm + half_l, 4),
+                "corner_radius": round(
+                    getattr(self.config, "corner_radius", 0.0) or (6.0 if not self.is_flex else 0.0), 4
+                ),
             },
         )
 
@@ -936,8 +920,8 @@ class PCBExporter:
         components_data = []
         fps_to_process = self.get_footprints_for_board()
         for idx, fp in enumerate(fps_to_process, start=1):
-            x = 0.0 if (self.is_flex and fp.name == "J2") else fp.position[0]
-            y = -21.0 if (self.is_flex and fp.name == "J2") else fp.position[1]
+            x = fp.position[0]
+            y = fp.position[1]
             components_data.append(
                 {
                     "ref": fp.name,

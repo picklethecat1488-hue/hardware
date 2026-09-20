@@ -1,6 +1,6 @@
 """PCB design engine package for 4-8 layer rigid and flex boards, high-speed signals, and capacitive sensing."""
 
-from .drc import PCBDesignRulesChecker, DRCReport, DRCViolation, DRCSeverity, DRCViolationCollection
+from .drc import PCBDesignRulesChecker, DRCReport, DRCViolation, DRCSeverity, DRCViolationCollection, DRCRuleName
 from .bga_fanout import BGAFanoutRouter, BGAPad, BGAEscapeRoute
 from .capacitive import CapacitiveSensingGenerator, CapacitiveGeometry, HatchLine
 from .exporter import PCBExporter
@@ -28,6 +28,7 @@ __all__ = [
     "DRCReport",
     "DRCViolation",
     "DRCSeverity",
+    "DRCRuleName",
     "DRCViolationCollection",
     "BGAFanoutRouter",
     "BGAPad",

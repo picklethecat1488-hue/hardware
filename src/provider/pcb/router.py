@@ -106,7 +106,7 @@ def polyline_to_trace_segments(
         if len1 < 1e-4 or len2 < 1e-4:
             continue
         cross = abs((d1[0] / len1) * (d2[1] / len2) - (d1[1] / len1) * (d2[0] / len2))
-        dot = (d1[0] / len1) * (d2[0] / len2) + (d1[1] / len1) * (d2[0] / len2)
+        dot = (d1[0] / len1) * (d2[0] / len2) + (d1[1] / len1) * (d2[1] / len2)
         if cross < 1e-3 and dot > 0.99:
             continue
         simplified.append(p_curr)
@@ -577,6 +577,31 @@ class PCBAutoRouter:
         ]
         return traces, vias
 
+    def get_footprints_for_board(self) -> List[Any]:
+        """Return footprints belonging specifically to this board target (filtering by shape_ref)."""
+        fps = list(self.wiring.footprints) if self.wiring else []
+        target_ref = getattr(self.config, "shape_ref", None)
+        is_flex = getattr(self.config, "board_type", None) == BoardType.FLEX or getattr(self.config, "is_flex", False)
+        if target_ref:
+            return [
+                fp
+                for fp in fps
+                if getattr(fp, "shape_ref", None) == target_ref or (not getattr(fp, "shape_ref", None) and not is_flex)
+            ]
+        return [fp for fp in fps if not is_flex or getattr(fp, "shape_ref", None)]
+
+    @staticmethod
+    def get_pin_absolute_position(fp: Any, pin: Any) -> Tuple[float, float]:
+        """Compute absolute (x, y) coordinates for a footprint pin taking rotation into account."""
+        rot_deg = fp.rotation[2] if hasattr(fp, "rotation") and len(fp.rotation) >= 3 else 0.0
+        if abs(rot_deg) > 1e-4:
+            rad = math.radians(rot_deg)
+            cos_r, sin_r = math.cos(rad), math.sin(rad)
+            rx = pin.position[0] * cos_r - pin.position[1] * sin_r
+            ry = pin.position[0] * sin_r + pin.position[1] * cos_r
+            return (fp.position[0] + rx, fp.position[1] + ry)
+        return (fp.position[0] + pin.position[0], fp.position[1] + pin.position[1])
+
     def route_all_nets(
         self,
         exclude_nets: Optional[Set[str]] = None,
@@ -624,30 +649,26 @@ class PCBAutoRouter:
                 for c_name, p_name in net.pins:
                     pin_to_net[(c_name, p_name)] = net.name
 
-        fps = list(self.wiring.footprints) if self.wiring else []
-        for fp in fps:
-            comp_shape_ref = getattr(fp, "shape_ref", None)
-            target_shape_ref = getattr(self.config, "shape_ref", None)
-            if target_shape_ref and comp_shape_ref and comp_shape_ref != target_shape_ref:
-                continue
-            if is_flex and comp_shape_ref != target_shape_ref:
-                continue
-            if not is_flex and comp_shape_ref and comp_shape_ref != target_shape_ref:
-                continue
+        board_fps = self.get_footprints_for_board()
+        for fp in board_fps:
+            rot_deg = fp.rotation[2] if hasattr(fp, "rotation") and len(fp.rotation) >= 3 else 0.0
+            rad = math.radians(rot_deg)
+            cos_r, sin_r = abs(math.cos(rad)), abs(math.sin(rad))
 
             fp_layer = getattr(fp, "layer", "F.Cu")
             for pin in fp.pins:
-                px = fp.position[0] + pin.position[0]
-                py = fp.position[1] + pin.position[1]
+                px, py = self.get_pin_absolute_position(fp, pin)
                 pw, pl = getattr(pin, "pad_size_mm", (0.5, 0.5))
+                eff_w = pw * cos_r + pl * sin_r
+                eff_l = pw * sin_r + pl * cos_r
                 pin_lay = "ALL" if getattr(pin, "pad_type", "smd") == "thru_hole" else fp_layer
                 pad_margin = 0.05
                 obstacles.append(
                     Obstacle(
-                        min_x=px - pw / 2.0 - pad_margin,
-                        min_y=py - pl / 2.0 - pad_margin,
-                        max_x=px + pw / 2.0 + pad_margin,
-                        max_y=py + pl / 2.0 + pad_margin,
+                        min_x=px - eff_w / 2.0 - pad_margin,
+                        min_y=py - eff_l / 2.0 - pad_margin,
+                        max_x=px + eff_w / 2.0 + pad_margin,
+                        max_y=py + eff_l / 2.0 + pad_margin,
                         layer=pin_lay,
                         net=pin_to_net.get((fp.name, pin.name)),
                     )
@@ -723,7 +744,7 @@ class PCBAutoRouter:
             via_penalty=8.00,
         )
 
-        fp_by_name = {fp.name: fp for fp in fps}
+        fp_by_name = {fp.name: fp for fp in board_fps}
         tp_by_net: Dict[str, List[TestPointModel]] = {}
         for tp in getattr(self.config, "test_points", []):
             tp_by_net.setdefault(tp.net, []).append(tp)
@@ -762,14 +783,10 @@ class PCBAutoRouter:
                     fp = fp_by_name.get(comp_name)
                     if not fp:
                         continue
-                    comp_shape_ref = getattr(fp, "shape_ref", None)
-                    if target_shape_ref and comp_shape_ref and comp_shape_ref != target_shape_ref:
-                        continue
 
                     pin_match = next((p for p in fp.pins if p.name == pin_name), None)
                     if pin_match:
-                        gx = fp.position[0] + pin_match.position[0]
-                        gy = fp.position[1] + pin_match.position[1]
+                        gx, gy = self.get_pin_absolute_position(fp, pin_match)
                         pad_type = getattr(pin_match, "pad_type", "smd")
                         glay = "F.Cu" if pad_type == "thru_hole" else getattr(fp, "layer", "F.Cu")
                         endpoints.append((gx, gy, glay))
