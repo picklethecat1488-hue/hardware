@@ -96,6 +96,10 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             case "/api/export":
                 out_path = self.server.save_and_sync()
                 self._send_json({"status": "exported", "path": str(out_path)})
+            case "/api/exit":
+                out_path = self.server.save_and_sync()
+                self._send_json({"status": "saved_and_exited", "path": str(out_path)})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
             case _:
                 self.send_error(404, "Endpoint not found")
 
@@ -140,12 +144,17 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             ".png": "image/png",
             ".jpg": "image/jpeg",
             ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
             ".svg": "image/svg+xml",
+            ".webp": "image/webp",
+            ".pdf": "application/pdf",
             ".txt": "text/plain",
             ".log": "text/plain",
             ".json": "application/json",
             ".yaml": "text/yaml",
             ".yml": "text/yaml",
+            ".md": "text/markdown",
+            ".csv": "text/csv",
         }.get(suffix, "application/octet-stream")
 
         self.send_response(200)

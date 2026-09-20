@@ -148,3 +148,65 @@ def test_bug_report_server_initialization(tmp_path: Path) -> None:
     assert len(reloaded_server.database.bugs) == 1
     assert reloaded_server.database.bugs[0].id == "BUG-001"
     reloaded_server.server_close()
+
+
+def test_bug_report_server_api_exit_and_document_upload(tmp_path: Path) -> None:
+    """Verify BugReportServer document upload handling and exit endpoint."""
+    import base64
+    import threading
+    import urllib.request
+
+    md_file = tmp_path / "BUGS.md"
+    json_file = tmp_path / "bugs_state.json"
+    att_dir = tmp_path / "attachments"
+
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=8798,
+        repo_root=tmp_path,
+        markdown_output=md_file,
+        state_file=json_file,
+        attachments_dir=att_dir,
+        fresh=True,
+    )
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+
+    try:
+        # Test document upload via /api/upload
+        doc_content = b"%PDF-1.4 Mock PDF Content"
+        b64_doc = base64.b64encode(doc_content).decode("ascii")
+        req_data = json.dumps(
+            {
+                "filename": "test_spec.pdf",
+                "file_type": "document",
+                "content_base64": b64_doc,
+                "description": "Pasted specification document",
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            f"{server.get_url()}/api/upload",
+            data=req_data,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["filename"] == "test_spec.pdf"
+            assert res["file_type"] == "document"
+            assert (att_dir / "test_spec.pdf").exists()
+
+        # Test /api/exit endpoint
+        exit_req = urllib.request.Request(
+            f"{server.get_url()}/api/exit",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(exit_req) as resp:
+            assert resp.status == 200
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["status"] == "saved_and_exited"
+
+        t.join(timeout=2.0)
+    finally:
+        server.server_close()
