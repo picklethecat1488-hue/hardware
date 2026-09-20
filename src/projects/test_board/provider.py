@@ -354,9 +354,11 @@ class TestBoardProvider(Provider):
         self.view_product(room, mode)
 
     def diagram_wiring(self, room: Room, targets: Sequence[str], mode: Mode) -> None:
-        """Render electrical netlist and component layout in vector diagram."""
-        if self.wiring_path.exists():
-            wiring = Wiring(self.wiring_path)
+        """Render top-down system architecture wiring diagram with clean interconnects."""
+        system_wiring_path = self.wiring_path.parent / "system_wiring.yaml"
+        wiring_file = system_wiring_path if system_wiring_path.exists() else self.wiring_path
+        if wiring_file.exists():
+            wiring = Wiring(wiring_file)
             diagram = WiringDiagram(wiring)
             diagram.build(room)
 

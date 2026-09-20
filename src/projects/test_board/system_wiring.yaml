@@ -1,0 +1,275 @@
+# Declarative top-down system architecture wiring diagram for Test Board
+imports:
+  - footprints/smd.yaml
+  - footprints/thru_hole.yaml
+  - footprints/ic.yaml
+
+components:
+  - name: m2_host
+    package: board
+    position: [-80.0, 0.0, 0.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [22.0, 50.0, 1.6]
+    label:
+      text: "M.2 Host PCIe"
+      position: [-16.0, 0.0, 0.0]
+      align: [max, center]
+    pins:
+      - name: "PCIE_TX"
+        label: "TX±"
+        side: right
+      - name: "PCIE_RX"
+        label: "RX±"
+        side: right
+      - name: "REFCLK"
+        label: "CLK±"
+        side: right
+      - name: "3V3"
+        label: "3V3"
+        side: right
+      - name: "GND"
+        label: "GND"
+        side: right
+
+  - name: usb_c
+    package: board
+    position: [0.0, -80.0, 0.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [30.0, 18.0, 1.6]
+    label:
+      text: "USB-C Source (5V)"
+      position: [0.0, -14.0, 0.0]
+      align: [center, max]
+    pins:
+      - name: "VBUS"
+        label: "VBUS (5V)"
+        side: top
+      - name: "CC"
+        label: "CC1/CC2"
+        side: top
+      - name: "USB_D"
+        label: "D+/D-"
+        side: top
+      - name: "GND"
+        label: "GND"
+        side: top
+
+  - name: carrier_pcb
+    package: board
+    position: [0.0, 0.0, 0.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [60.0, 90.0, 1.6]
+    label:
+      text: "Test Board Carrier PCB"
+      position: [0.0, 0.0, 0.0]
+      align: [center, center]
+    pins:
+      # Left interface (facing m2_host)
+      - name: "M2_TX"
+        label: "PCIE_TX"
+        side: left
+      - name: "M2_RX"
+        label: "PCIE_RX"
+        side: left
+      - name: "M2_CLK"
+        label: "REFCLK"
+        side: left
+      - name: "M2_3V3"
+        label: "3V3_IN"
+        side: left
+      - name: "M2_GND"
+        label: "GND"
+        side: left
+
+      # Bottom interface (facing usb_c)
+      - name: "USB_VBUS"
+        label: "VBUS"
+        side: bottom
+      - name: "USB_CC"
+        label: "CC"
+        side: bottom
+      - name: "USB_DATA"
+        label: "USB_D"
+        side: bottom
+      - name: "USB_GND"
+        label: "GND"
+        side: bottom
+
+      # Top interface (facing flex_tail)
+      - name: "FPC_TX0"
+        label: "CAP_TX0"
+        side: top
+      - name: "FPC_RX0"
+        label: "CAP_RX0"
+        side: top
+      - name: "FPC_TX1"
+        label: "CAP_TX1"
+        side: top
+      - name: "FPC_RX1"
+        label: "CAP_RX1"
+        side: top
+      - name: "FPC_TX2"
+        label: "CAP_TX2"
+        side: top
+      - name: "FPC_RX2"
+        label: "CAP_RX2"
+        side: top
+      - name: "FPC_RX3"
+        label: "CAP_RX3"
+        side: top
+      - name: "FPC_SHIELD"
+        label: "SHIELD"
+        side: top
+      - name: "FPC_GND"
+        label: "GND"
+        side: top
+
+  - name: flex_tail
+    package: board
+    position: [0.0, 85.0, 0.0]
+    rotation: [0.0, 0.0, 0.0]
+    dimensions: [24.0, 54.0, 0.2]
+    label:
+      text: "Capacitive Flex Tail Sensor"
+      position: [0.0, 32.0, 0.0]
+      align: [center, min]
+    pins:
+      - name: "TX0"
+        label: "CH0_TX"
+        side: bottom
+      - name: "RX0"
+        label: "CH0_RX"
+        side: bottom
+      - name: "TX1"
+        label: "CH1_TX"
+        side: bottom
+      - name: "RX1"
+        label: "CH1_RX"
+        side: bottom
+      - name: "TX2"
+        label: "CH2_TX"
+        side: bottom
+      - name: "RX2"
+        label: "CH2_RX"
+        side: bottom
+      - name: "RX3"
+        label: "CH3_PROX"
+        side: bottom
+      - name: "SHIELD"
+        label: "SHIELD"
+        side: bottom
+      - name: "GND"
+        label: "GND"
+        side: bottom
+
+nets:
+  # PCIe and power from M.2 Host to Carrier PCB
+  - name: pcie_tx
+    color: blue
+    pins:
+      - [m2_host, PCIE_TX]
+      - [carrier_pcb, M2_TX]
+
+  - name: pcie_rx
+    color: blue
+    pins:
+      - [m2_host, PCIE_RX]
+      - [carrier_pcb, M2_RX]
+
+  - name: pcie_clk
+    color: purple
+    pins:
+      - [m2_host, REFCLK]
+      - [carrier_pcb, M2_CLK]
+
+  - name: pwr_3v3
+    color: red
+    pins:
+      - [m2_host, 3V3]
+      - [carrier_pcb, M2_3V3]
+
+  - name: gnd_m2
+    color: black
+    pins:
+      - [m2_host, GND]
+      - [carrier_pcb, M2_GND]
+
+  # USB-C 5V and control to Carrier PCB
+  - name: vbus_5v
+    color: red
+    pins:
+      - [usb_c, VBUS]
+      - [carrier_pcb, USB_VBUS]
+
+  - name: usb_cc
+    color: orange
+    pins:
+      - [usb_c, CC]
+      - [carrier_pcb, USB_CC]
+
+  - name: usb_data
+    color: cyan
+    pins:
+      - [usb_c, USB_D]
+      - [carrier_pcb, USB_DATA]
+
+  - name: gnd_usb
+    color: black
+    pins:
+      - [usb_c, GND]
+      - [carrier_pcb, USB_GND]
+
+  # Capacitive Sensing interconnects from Carrier PCB to Flex Tail
+  - name: cap_tx0
+    color: magenta
+    pins:
+      - [carrier_pcb, FPC_TX0]
+      - [flex_tail, TX0]
+
+  - name: cap_rx0
+    color: green
+    pins:
+      - [carrier_pcb, FPC_RX0]
+      - [flex_tail, RX0]
+
+  - name: cap_tx1
+    color: magenta
+    pins:
+      - [carrier_pcb, FPC_TX1]
+      - [flex_tail, TX1]
+
+  - name: cap_rx1
+    color: green
+    pins:
+      - [carrier_pcb, FPC_RX1]
+      - [flex_tail, RX1]
+
+  - name: cap_tx2
+    color: magenta
+    pins:
+      - [carrier_pcb, FPC_TX2]
+      - [flex_tail, TX2]
+
+  - name: cap_rx2
+    color: green
+    pins:
+      - [carrier_pcb, FPC_RX2]
+      - [flex_tail, RX2]
+
+  - name: cap_rx3
+    color: green
+    pins:
+      - [carrier_pcb, FPC_RX3]
+      - [flex_tail, RX3]
+
+  - name: cap_shield
+    color: yellow
+    pins:
+      - [carrier_pcb, FPC_SHIELD]
+      - [flex_tail, SHIELD]
+
+  - name: gnd_flex
+    color: black
+    pins:
+      - [carrier_pcb, FPC_GND]
+      - [flex_tail, GND]
