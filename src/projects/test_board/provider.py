@@ -149,6 +149,9 @@ class TestBoardProvider(Provider):
             cr = self.copper_regions()
             pcb.copper_regions.extend(cr.regions)
 
+            pcb.traces.extend(self.traces())
+            pcb.vias.extend(self.vias())
+
         return pcb
 
     def flex_tail(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildFlexPCB:
@@ -177,6 +180,8 @@ class TestBoardProvider(Provider):
                     (-w_tail / 2.0, -l_tail / 2.0 + 5.5),
                 ]
                 Polygon(*pts)
+                r_corner = self.settings.flex_tail_corner_radius
+                fillet(s.vertices(), radius=r_corner)
             extrude(s.sketch, amount=t_tail)
 
             with BuildSilkscreen() as silk:

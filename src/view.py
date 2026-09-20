@@ -206,6 +206,10 @@ class Viewer:
                 pcb_cfg = pcb_cfg.model_copy(update={"copper_regions": provider.pcb_config.copper_regions})
             if sub_pcb_config and not pcb_cfg.net_classes and provider.pcb_config.net_classes:
                 pcb_cfg = pcb_cfg.model_copy(update={"net_classes": provider.pcb_config.net_classes})
+            if sub_pcb_config and not pcb_cfg.traces and provider.pcb_config.traces:
+                pcb_cfg = pcb_cfg.model_copy(update={"traces": provider.pcb_config.traces})
+            if sub_pcb_config and not pcb_cfg.vias and provider.pcb_config.vias:
+                pcb_cfg = pcb_cfg.model_copy(update={"vias": provider.pcb_config.vias})
 
             exporter = PCBExporter(pcb_cfg, wiring, subassembly=subassembly)
 
