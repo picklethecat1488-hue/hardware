@@ -89,7 +89,7 @@ net_classes:
 flex_zones:
   - name: flex_tail_ribbon
     start_x_mm: 30.0
-    length_mm: 50.0
+    length_mm: 54.0
     substrate_thickness_mm: 0.050
     coverlay_thickness_mm: 0.025
     min_bend_radius_mm: 3.0
@@ -152,7 +152,7 @@ capacitive_sensors:
     electrode_type: self
     shape: pad
     area_mm: [10.0, 6.0]
-    center_mm: [0.0, 19.5]
+    center_mm: [0.0, 20.5]
     drive_shield: false
     hatch_ground_pour: true
     hatch_line_width_mm: 0.15

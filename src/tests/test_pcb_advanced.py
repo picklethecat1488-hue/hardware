@@ -1307,6 +1307,43 @@ def test_regression_subassembly_footprint_isolation() -> None:
     assert "J1" not in flex_names
 
 
+def test_regression_flex_tail_front_routing_and_silkscreen(tmp_path: Path) -> None:
+    """Verify flex tail has routed traces on F.Cu, silkscreen on B.SilkS, and valid spacing (BUG-038)."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.exporter import PCBExporter
+    from provider import Mode
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    flex_part = provider.part.get("flex_tail")
+    assert flex_part is not None
+    flex_res = flex_part("flex_tail", None, Mode.DEFAULT)
+    flex_cfg = flex_res.to_pcb_config()
+
+    # Traces must be loaded from routing_flex.yaml on F.Cu
+    assert len(flex_cfg.traces) > 0, "Flex tail must have routed traces"
+    assert all(tr.layer == "F.Cu" for tr in flex_cfg.traces), "All flex tail traces must route on F.Cu"
+
+    # Export flex_tail.kicad_pcb and verify traces and back silkscreen are present in output file
+    exporter = PCBExporter(flex_cfg, wiring)
+    kicad_pcb_file = tmp_path / "flex_tail.kicad_pcb"
+    exporter.export_kicad_pcb(kicad_pcb_file)
+    content = kicad_pcb_file.read_text()
+
+    assert "(segment (start" in content, "flex_tail.kicad_pcb must contain exported (segment entries"
+    assert "F.Cu" in content, "flex_tail.kicad_pcb must have traces on F.Cu"
+    assert "FLEX TAIL SENSOR REV 1.0" in content
+    assert '"B.SilkS"' in content, "FLEX TAIL SENSOR REV 1.0 must be on B.SilkS"
+
+    # Verify CH3 is spaced from CH2
+    ch2 = next(s for s in flex_cfg.capacitive_sensors if s.channel_id == 2)
+    ch3 = next(s for s in flex_cfg.capacitive_sensors if s.channel_id == 3)
+    ch2_top = ch2.center_mm[1] + (ch2.area_mm[1] / 2.0)
+    ch3_bottom = ch3.center_mm[1] - (ch3.area_mm[1] / 2.0)
+    assert ch3_bottom > ch2_top, f"CH3 bottom ({ch3_bottom}) must be strictly above CH2 top ({ch2_top})"
+
+
 def test_schematic_drc_test_board_passes() -> None:
     """Verify that test_board schematic satisfies all schematic DRC rules with zero errors."""
     from projects.test_board.provider import TestBoardProvider

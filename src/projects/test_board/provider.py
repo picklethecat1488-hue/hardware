@@ -163,14 +163,14 @@ class TestBoardProvider(Provider):
         pts = [
             (-w_tail / 2.0, -l_tail / 2.0),
             (w_tail / 2.0, -l_tail / 2.0),
-            (w_tail / 2.0, -l_tail / 2.0 + 5.5),
-            (7.5, -l_tail / 2.0 + 7.5),
+            (w_tail / 2.0, -l_tail / 2.0 + 7.0),
+            (7.5, -l_tail / 2.0 + 9.0),
             (7.5, l_tail / 2.0 - 1.5),
             (5.0, l_tail / 2.0),
             (-5.0, l_tail / 2.0),
             (-7.5, l_tail / 2.0 - 1.5),
-            (-7.5, -l_tail / 2.0 + 7.5),
-            (-w_tail / 2.0, -l_tail / 2.0 + 5.5),
+            (-7.5, -l_tail / 2.0 + 9.0),
+            (-w_tail / 2.0, -l_tail / 2.0 + 7.0),
         ]
 
         with BuildFlexPCB(
@@ -188,16 +188,18 @@ class TestBoardProvider(Provider):
 
             with BuildSilkscreen() as silk:
                 with Locations((0.0, -22.75)):
-                    SilkscreenText("FLEX TAIL SENSOR REV 1.0", layer="F.SilkS", font_size=0.6, thickness=0.09)
-                with Locations((-8.0, -21.5)):
+                    SilkscreenText(
+                        "FLEX TAIL SENSOR REV 1.0", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True
+                    )
+                with Locations((-8.0, -21.0)):
                     SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.5, thickness=0.08)
-                with Locations((0.0, -6.0)):
+                with Locations((0.0, -6.25)):
                     SilkscreenText("CH0: LOW", layer="F.SilkS", font_size=0.7, thickness=0.10)
-                with Locations((0.0, 5.5)):
+                with Locations((0.0, 5.25)):
                     SilkscreenText("CH1: MID", layer="F.SilkS", font_size=0.7, thickness=0.10)
-                with Locations((0.0, 16.5)):
+                with Locations((0.0, 16.75)):
                     SilkscreenText("CH2: HIGH", layer="F.SilkS", font_size=0.7, thickness=0.10)
-                with Locations((0.0, 23.0)):
+                with Locations((0.0, 24.75)):
                     SilkscreenText("CH3: PROX", layer="F.SilkS", font_size=0.7, thickness=0.10)
 
             routing_flex_file = self.wiring_path.parent / "routing_flex.yaml"
