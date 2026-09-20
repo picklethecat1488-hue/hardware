@@ -87,8 +87,8 @@ def _get_pin_absolute_pos(fp: Any, pin: Any) -> Tuple[float, float]:
     if abs(rot_deg) > 1e-4:
         rad = math.radians(rot_deg)
         cos_r, sin_r = math.cos(rad), math.sin(rad)
-        rx = pin.position[0] * cos_r - pin.position[1] * sin_r
-        ry = pin.position[0] * sin_r + pin.position[1] * cos_r
+        rx = pin.position[0] * cos_r + pin.position[1] * sin_r
+        ry = -pin.position[0] * sin_r + pin.position[1] * cos_r
         return (fp.position[0] + rx, fp.position[1] + ry)
     return (fp.position[0] + pin.position[0], fp.position[1] + pin.position[1])
 

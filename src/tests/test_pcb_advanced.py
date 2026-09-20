@@ -1611,5 +1611,71 @@ def test_regression_smd_no_connect_pads_included_on_pcb(tmp_path: Path) -> None:
     exporter.export_kicad_pcb(board_file)
     content = board_file.read_text()
 
-    # Must contain no-connect pads (net 0 "")
-    assert '(net 0 "")' in content, "carrier_board.kicad_pcb must contain no-connect pads with (net 0 '')"
+    # Must contain no-connect pads (e.g. U1 ball A3 and J3 pin SBU1)
+    assert '(pad "A3"' in content, "carrier_board.kicad_pcb must contain no-connect pad A3 on U1"
+    assert '(pad "SBU1"' in content, "carrier_board.kicad_pcb must contain no-connect pad SBU1 on J3"
+
+
+def test_regression_inner_copper_layers_and_auto_routing_connectivity(tmp_path: Path) -> None:
+    """Verify inner copper layer refill, pin rotation math, and BGA dogbone stitching connectivity."""
+    import math
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.router import PCBAutoRouter
+    from provider.pcb.drc import _get_pin_absolute_pos
+    from provider.pcb.exporter import PCBExporter
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. Verify KiCad screen-space pin rotation math for rotated footprints (J3 at 270 deg)
+    j3 = next((fp for fp in wiring.footprints if fp.name == "J3"), None)
+    assert j3 is not None
+    cc1_pin = next((p for p in j3.pins if p.name == "CC1"), None)
+    assert cc1_pin is not None
+    rx, ry = PCBAutoRouter.get_pin_absolute_position(j3, cc1_pin)
+    drc_rx, drc_ry = _get_pin_absolute_pos(j3, cc1_pin)
+    # J3 is at (-25.0, 0.0), rot=270 deg. CC1 local pos is (-0.8, 2.5).
+    # In KiCad screen coordinates (where Y points down):
+    # rx = -25.0 + (-2.5) = -27.5
+    # ry = 0.0 + (-0.8) = -0.8
+    assert math.isclose(rx, -27.5, abs_tol=1e-3), f"Expected rx=-27.5, got {rx}"
+    assert math.isclose(ry, -0.8, abs_tol=1e-3), f"Expected ry=-0.8, got {ry}"
+    assert math.isclose(drc_rx, -27.5, abs_tol=1e-3)
+    assert math.isclose(drc_ry, -0.8, abs_tol=1e-3)
+
+    # 2. Verify carrier board routing has stitching vias for U1 BGA pins H7 (GND) and H8 (3V3)
+    cfg = provider.pcb_config
+    assert cfg is not None
+    vias = cfg.vias
+    h7_via = next(
+        (v for v in vias if v.net == "GND" and abs(v.position_mm[0]) < 1.0 and abs(v.position_mm[1]) < 1.0),
+        None,
+    )
+    assert h7_via is not None, "U1 BGA GND pin H7 must have a stitching via connecting to the GND plane"
+
+    h8_via = next(
+        (v for v in vias if v.net == "3V3" and abs(v.position_mm[0] - 0.8) < 1.0 and abs(v.position_mm[1]) < 1.0),
+        None,
+    )
+    assert h8_via is not None, "U1 BGA 3V3 pin H8 must have a stitching via connecting to the 3V3 plane"
+
+    # 3. Verify PCB export generates filled copper regions for inner planes In1.Cu (GND) and In3.Cu (3V3)
+    board_file = tmp_path / "carrier_board.kicad_pcb"
+    exporter = PCBExporter(cfg, wiring)
+    exporter.export_kicad_pcb(board_file)
+    content = board_file.read_text()
+
+    assert '"In1.Cu"' in content
+    assert '"In3.Cu"' in content
+
+    cli = KiCadCLI()
+    if cli.is_available:
+        # File size must be large (> 300KB) reflecting filled polygon geometry
+        assert board_file.stat().st_size > 300_000, "Board file must include filled zone geometry"
+        # Run DRC and assert zero unconnected pads
+        drc_rpt = tmp_path / "drc.rpt"
+        cli.run_command(["pcb", "drc", "--output", str(drc_rpt), str(board_file)])
+        rpt_text = drc_rpt.read_text()
+        assert "** Found 0 unconnected pads **" in rpt_text

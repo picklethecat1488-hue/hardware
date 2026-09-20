@@ -276,6 +276,8 @@ nets:
       - [J3, GND2]
       - [J3, SHIELD1]
       - [J3, SHIELD2]
+      - [J3, SHIELD3]
+      - [J3, SHIELD4]
       - [R3, "2"]
       - [R4, "2"]
       - [U3, "2"]

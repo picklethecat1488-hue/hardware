@@ -1577,11 +1577,21 @@ footprints:
       - 0.0
       - 0.0
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: H8
       position:
       - 0.8
       - 0.0
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: H9
       label: H9
       position:
