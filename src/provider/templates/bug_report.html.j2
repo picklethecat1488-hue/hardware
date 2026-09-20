@@ -491,8 +491,13 @@
   <div class="main-container">
     <!-- Sidebar -->
     <div class="sidebar">
-      <div class="sidebar-header">
+      <div class="sidebar-header" style="flex-direction:column; gap:8px;">
         <input type="text" id="search-input" class="sidebar-search" placeholder="Search bugs..." oninput="renderBugList()">
+        <div class="filter-pills" style="display:flex; gap:6px; width:100%;">
+          <button id="filter-open" class="quake-btn quake-btn-default quake-btn-active" style="flex:1; padding:4px 6px; font-size:10px;" onclick="setBugFilter('open')">OPEN</button>
+          <button id="filter-all" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:10px;" onclick="setBugFilter('all')">ALL</button>
+          <button id="filter-resolved" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:10px;" onclick="setBugFilter('resolved')">RESOLVED</button>
+        </div>
       </div>
       <ul id="bug-list" class="bug-list"></ul>
     </div>
@@ -609,15 +614,41 @@
   <script>
     let db = {{ database_json | safe }};
     let activeBugId = null;
+    let currentFilter = 'open';
 
     function init() {
-      if (db.bugs && db.bugs.length > 0) {
+      const openBugs = db.bugs.filter(b => b.status !== "RESOLVED" && b.status !== "CLOSED");
+      if (openBugs.length > 0) {
+        activeBugId = openBugs[0].id;
+      } else if (db.bugs && db.bugs.length > 0) {
         activeBugId = db.bugs[0].id;
+        currentFilter = 'all';
       }
       updateMetrics();
-      renderBugList();
+      setBugFilter(currentFilter);
       loadActiveBug();
       setupPasteDrop();
+    }
+
+    function setBugFilter(filter) {
+      currentFilter = filter;
+      const btnOpen = document.getElementById("filter-open");
+      const btnAll = document.getElementById("filter-all");
+      const btnResolved = document.getElementById("filter-resolved");
+      if (btnOpen) btnOpen.classList.toggle("quake-btn-active", filter === "open");
+      if (btnAll) btnAll.classList.toggle("quake-btn-active", filter === "all");
+      if (btnResolved) btnResolved.classList.toggle("quake-btn-active", filter === "resolved");
+      renderBugList();
+
+      const visibleBugs = db.bugs.filter(b => {
+        const isRes = (b.status === "RESOLVED" || b.status === "CLOSED");
+        if (currentFilter === "open" && isRes) return false;
+        if (currentFilter === "resolved" && !isRes) return false;
+        return true;
+      });
+      if (visibleBugs.length > 0 && !visibleBugs.some(b => b.id === activeBugId)) {
+        selectBug(visibleBugs[0].id);
+      }
     }
 
     function showToast(msg) {
@@ -642,7 +673,14 @@
       const query = (document.getElementById("search-input").value || "").toLowerCase();
 
       db.bugs.forEach(bug => {
-        if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query)) {
+        const isResolved = (bug.status === "RESOLVED" || bug.status === "CLOSED");
+        if (currentFilter === "open" && isResolved) {
+          return;
+        }
+        if (currentFilter === "resolved" && !isResolved) {
+          return;
+        }
+        if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query) && !(bug.component || "").toLowerCase().includes(query)) {
           return;
         }
 

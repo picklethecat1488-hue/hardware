@@ -88,6 +88,11 @@ def parse_arguments() -> argparse.Namespace:
         help="List all active bugs directly in the terminal.",
     )
     parser.add_argument(
+        "--open",
+        action="store_true",
+        help="When used with --list, only show open / unresolved issues.",
+    )
+    parser.add_argument(
         "--add",
         type=str,
         help="Quickly register a new bug with the specified title.",
@@ -156,6 +161,7 @@ def main() -> None:
     output_path = args.output if args.output.is_absolute() else (repo_root / args.output)
     state_path = args.state_file if args.state_file.is_absolute() else (repo_root / args.state_file)
 
+    is_cli_only = bool(args.add or args.resolve or args.list or args.export_only)
     server = BugReportServer(
         host=args.host,
         port=args.port,
@@ -163,6 +169,7 @@ def main() -> None:
         markdown_output=output_path,
         state_file=state_path,
         fresh=args.fresh,
+        bind_and_activate=not is_cli_only,
     )
 
     # Handle quick add
@@ -201,10 +208,18 @@ def main() -> None:
         if not server.database.bugs:
             print("No bugs registered.")
         else:
-            for b in server.database.bugs:
+            bugs = [
+                b
+                for b in server.database.bugs
+                if not args.open or b.status not in (BugStatus.RESOLVED, BugStatus.CLOSED)
+            ]
+            for b in bugs:
                 chk = "[X]" if b.status in (BugStatus.RESOLVED, BugStatus.CLOSED) else "[ ]"
                 comp = f" ({b.component})" if b.component else ""
                 print(f"  {chk} [{b.id}] [{b.severity.value}] [{b.category.value}] {b.title}{comp} -> {b.status.value}")
+            total_open = sum(1 for b in server.database.bugs if b.status not in (BugStatus.RESOLVED, BugStatus.CLOSED))
+            total_all = len(server.database.bugs)
+            print(f"\nShowing {len(bugs)} issues ({total_open} open, {total_all} total).")
         print()
         return
 

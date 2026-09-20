@@ -330,7 +330,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
 
 
 class BugReportServer(ThreadingHTTPServer):
-    """Threaded HTTP server hosting Bug Report workstation."""
+    """Local Threading HTTP web server hosting the interactive bug report dashboard."""
 
     allow_reuse_address = True
 
@@ -343,6 +343,7 @@ class BugReportServer(ThreadingHTTPServer):
         state_file: Optional[Path] = None,
         attachments_dir: Optional[Path] = None,
         fresh: bool = False,
+        bind_and_activate: bool = True,
     ) -> None:
         """Initialize server with persistent storage paths."""
         self.host = host
@@ -352,11 +353,13 @@ class BugReportServer(ThreadingHTTPServer):
         self.state_file = state_file or (self.repo_root / "build" / "bugs_state.json")
         self.attachments_dir = attachments_dir or (self.repo_root / "build" / "attachments")
         self.fresh = fresh
+        self.bind_and_activate = bind_and_activate
 
         self.exporter = MarkdownBugExporter(repo_root=self.repo_root)
         self.database = self._initialize_database()
 
-        super().__init__((host, port), BugReportRequestHandler)
+        if bind_and_activate:
+            super().__init__((host, port), BugReportRequestHandler)
 
     def _initialize_database(self) -> BugDatabaseModel:
         """Load existing database state or initialize fresh database."""

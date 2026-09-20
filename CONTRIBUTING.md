@@ -6,6 +6,7 @@
  - **src/config.py** - Automated utility for part placement and geometry optimization.
  - **src/view.py** - Interactive CAD visualization tool for inspection and debugging.
  - **src/code_review.py** - Interactive Quake-themed code review tool and Markdown report generator.
+ - **src/bug_report.py** - Interactive bug reporting terminal, web workstation, and Markdown tracker.
  - **src/model/** - Core application data models and configuration schemas.
  - **src/provider/** - Framework for geometry generation and build orchestration.
  - **src/projects/** - Specific geometry provider implementations.
@@ -324,6 +325,38 @@ python src/code_review.py --export-only
 - **Integrated Quake CLI**: Bottom terminal console supporting commands such as `goto <path> [line]`, `must_fix <msg>`, `proposal <msg>`, `nit <msg>`, `reviewed`, `approve`, and `reject`.
 - **Automated Termination & Markdown Export**: Submitting a final verdict (`approve` / `lgtm` or `reject` / `changes`) automatically compiles and exports the full review audit log to `build/CR.md` and gracefully shuts down the local server, returning control to your terminal.
 - **VS Code Integration**: By default, opens inside VS Code via Simple Browser (`--browser vscode`) with task bindings in `.vscode/tasks.json`.
+
+## Interactive Bug Tracker & Issue Management
+
+You can log, triage, track, and resolve bugs using the interactive Quake-styled bug tracking workstation:
+
+```bash
+# Launch interactive bug reporting web workstation
+python src/bug_report.py
+
+# List active / open bugs directly in the terminal
+python src/bug_report.py --list
+python src/bug_report.py --list --open
+
+# Quickly register an issue from the CLI
+python src/bug_report.py --add "Antenna on Q1" --severity HIGH --category PCB --component carrier_board
+
+# Resolve a bug with notes
+python src/bug_report.py --resolve BUG-014 --notes "Added bug filtering and status toggles"
+
+# Launch on custom port or output path
+python src/bug_report.py --port 8766 --output build/BUGS.md
+
+# Directly export Markdown report from existing state without launching the server
+python src/bug_report.py --export-only
+```
+
+### Bug Tracker Features & Workflow
+- **Retro Quake Workstation UI**: Styled with the GLQuake console aesthetic, featuring CRT scanlines, beveled stone plaque panels, and interactive Quake 3D embossed controls.
+- **Bug Status Filtering**: Filter issues by status (`OPEN`, `ALL`, `RESOLVED`), with resolved bugs hidden by default so developers focus immediately on active blockers.
+- **Clipboard & File Attachments**: Drag and drop or paste (⌘V / Ctrl+V) screenshots, images, logs, PDFs, and code references directly into issue reports with live previews.
+- **Automated Markdown Synchronization**: Changes made in the workstation or CLI automatically persist to `build/bugs_state.json` and sync seamlessly to GitHub-flavored Markdown in `build/BUGS.md`.
+- **Graceful Termination**: Clicking "Save and Exit" saves the active bug, syncs `build/BUGS.md`, and gracefully shuts down the server, releasing terminal control.
 
 ## Debugging
 
