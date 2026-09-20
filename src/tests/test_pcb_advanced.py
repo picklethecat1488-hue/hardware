@@ -408,8 +408,8 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert "U4" in footprint_names
     assert "J1" in footprint_names
     assert "J2" in footprint_names
-    assert "J_USB" in footprint_names
-    assert "SPK1" in footprint_names
+    assert "J3" in footprint_names
+    assert "U5" in footprint_names
     assert "Y1" in footprint_names
     assert "R1" in footprint_names
     assert "R2" in footprint_names
@@ -434,7 +434,7 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 29  # header + 28 carrier components (J_FLEX is on flex tail)
+    assert len(bom_lines) == 29  # header + 28 carrier components (J4 is on flex tail)
     assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
@@ -1189,29 +1189,29 @@ def test_schematic_diagram_geometric_offsets_and_gnd_placement(tmp_path: Path) -
 
 
 def test_regression_j_usb_edge_facing_and_drc_exemption() -> None:
-    """Verify J_USB connector faces outward to board edge and is exempt from internal DRC margin."""
+    """Verify J3 USB-C connector faces outward to board edge and is exempt from internal DRC margin."""
     from projects.test_board.provider import TestBoardProvider
     from model.wiring import Wiring
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = TestBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
-    j_usb = next(fp for fp in wiring.footprints if fp.name == "J_USB")
+    j3 = next(fp for fp in wiring.footprints if fp.name == "J3")
 
     # Rotation 270 degrees orients connector mouth toward -X (left board edge at X=-30.0)
-    assert j_usb.rotation[2] == 270.0
-    assert j_usb.position[0] < -20.0  # Near left board perimeter
+    assert j3.rotation[2] == 270.0
+    assert j3.position[0] < -20.0  # Near left board perimeter
 
-    # DRC boundary check must treat J_USB as an edge-mounted connector
+    # DRC boundary check must treat J3 as an edge-mounted connector
     checker = PCBDesignRulesChecker(provider.pcb_config)
     carrier_fps = checker.get_footprints_for_board(wiring)
     violations = checker.check_boundary_containment(carrier_fps, edge_clearance_mm=0.5)
-    j_usb_violations = [v for v in violations if v.net_or_zone == "J_USB"]
-    assert len(j_usb_violations) == 0, f"J_USB should be exempt from edge clearance: {j_usb_violations}"
+    j3_violations = [v for v in violations if v.net_or_zone == "J3"]
+    assert len(j3_violations) == 0, f"J3 should be exempt from edge clearance: {j3_violations}"
 
 
 def test_regression_piezo_speaker_circular_silkscreen_and_placement() -> None:
-    """Verify SPK1 piezo speaker has circular footprint and is positioned near MH2."""
+    """Verify U5 piezo speaker has circular footprint and is positioned near MH2."""
     from projects.test_board.provider import TestBoardProvider
     from model.wiring import Wiring
     import math
@@ -1219,9 +1219,9 @@ def test_regression_piezo_speaker_circular_silkscreen_and_placement() -> None:
 
     provider = TestBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
-    spk1 = next(fp for fp in wiring.footprints if fp.name == "SPK1")
+    u5 = next(fp for fp in wiring.footprints if fp.name == "U5")
 
-    assert spk1.package == "piezo_speaker_12mm"
+    assert u5.package == "piezo_speaker_12mm"
 
     # Verify footprint definition in thru_hole.yaml has circular geometry
     thru_hole_yaml = provider.wiring_path.parent.parent / "footprints" / "thru_hole.yaml"
@@ -1231,8 +1231,8 @@ def test_regression_piezo_speaker_circular_silkscreen_and_placement() -> None:
     assert piezo["shape"] == "circle"
     assert piezo["radius_mm"] == 6.0
 
-    # MH2 position: (-26.0, 36.0). SPK1 at (-18.0, 31.0) -> distance < 12mm
-    dist_to_mh2 = math.hypot(spk1.position[0] - (-26.0), spk1.position[1] - 36.0)
+    # MH2 position: (-26.0, 36.0). U5 at (-18.0, 31.0) -> distance < 12mm
+    dist_to_mh2 = math.hypot(u5.position[0] - (-26.0), u5.position[1] - 36.0)
     assert dist_to_mh2 <= 12.0
 
 
@@ -1273,7 +1273,7 @@ def test_regression_subassembly_footprint_isolation() -> None:
     assert "U1" in carrier_names
     assert "J1" in carrier_names
     assert "J2" in carrier_names
-    assert "J_FLEX" not in carrier_names
+    assert "J4" not in carrier_names
 
     # Flex tail router
     flex_part = provider.part.get("flex_tail")
@@ -1282,7 +1282,7 @@ def test_regression_subassembly_footprint_isolation() -> None:
     flex_router = PCBAutoRouter(flex_cfg, wiring)
     flex_fps = flex_router.get_footprints_for_board()
     flex_names = {fp.name for fp in flex_fps}
-    assert "J_FLEX" in flex_names
+    assert "J4" in flex_names
     assert "U1" not in flex_names
     assert "J1" not in flex_names
 

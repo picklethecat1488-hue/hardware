@@ -329,8 +329,14 @@ class TestBoardProvider(Provider):
             from build123d import Location
 
             wiring = Wiring(self.wiring_path)
-            j2_comp = next((c for c in wiring.footprints if c.name == "J2"), None)
-            j_flex_comp = next((c for c in wiring.footprints if c.name == "J_FLEX"), None)
+            j2_comp = next(
+                (c for c in wiring.footprints if c.name == "J2" or getattr(c, "shape_ref", None) == "carrier_board"),
+                None,
+            )
+            j_flex_comp = next(
+                (c for c in wiring.footprints if c.name == "J4" or getattr(c, "shape_ref", None) == "flex_tail"),
+                None,
+            )
             if j2_comp and j_flex_comp:
                 dx = j2_comp.position[0] - j_flex_comp.position[0]
                 dy = j2_comp.position[1] - j_flex_comp.position[1]

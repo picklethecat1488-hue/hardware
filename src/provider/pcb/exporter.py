@@ -218,7 +218,7 @@ class PCBExporter:
             )
             cand_ref_x = fp.position[0] + ref_off_x
             cand_ref_y = fp.position[1] + ref_off_y
-            if fp.name == "J_FLEX":
+            if self.is_flex or getattr(fp, "shape_ref", None) == "flex_tail":
                 cand_ref_x = fp.position[0]
                 cand_ref_y = fp.position[1]
             placed_component_label_boxes.append(

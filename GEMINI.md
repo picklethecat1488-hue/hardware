@@ -123,6 +123,15 @@ pytest
 * **Remote Offload via Anvil**: In environments lacking local KiCad or GUI dependencies, run test suites and manufacturing builds on the `anvil` cloud server via `bin/anvil run`.
 * **Interactive Visualization**: Native `.kicad_pcb` and `.kicad_sch` files are rendered interactively in VS Code via the KiCode extension (`sajadghorbani.kicode`, powered by KiCanvas) and in 3D CAD via `ocp_vscode`.
 * **Subassembly Footprint Scoping & Isolation**: Multi-board and rigid-flex assemblies must scope footprints, passives, and connectors explicitly to target subassemblies (via `shape_ref: carrier_board` or `shape_ref: flex_tail`). Never duplicate components across subassemblies or rely on hardcoded component names (e.g. `J2`) for footprint queries.
+* **Canonical Component Reference Designator Naming**: All components across PCB designs, schematics, netlists, manifests, and BOMs MUST adhere to standard canonical reference designators using single-letter type prefixes followed by sequential digits:
+  - `Rn`: Resistors (`R1`, `R2`, `R3`, ...)
+  - `Cn`: Capacitors (`C1`, `C2`, `C3`, ...)
+  - `Dn`: Diodes (`D1`, `D2`, ...)
+  - `Qn`: Transistors and FETs (`Q1`, `Q2`, ...)
+  - `Yn`: Crystals and resonators (`Y1`, `Y2`, ...)
+  - `Jn`: Connectors, receptacles, and headers (`J1`, `J2`, `J3`, `J4`, ...)
+  - `Un`: Integrated circuits (ICs) and other complex components/transducers (`U1`, `U2`, `U3`, `U4`, `U5`, ...)
+  Never use ad-hoc descriptive names (such as `J_USB`, `J_FLEX`, `SPK1`, `C_IN`, `C_AMP`, `R_CC1`, `R_BOOT`) in production footprints, netlists, or schematic sheet models.
 * **Planar Flex Routing & Silkscreen Labeling**: Flexible PCB tails and ribbons must maintain planar single-layer routing without trace crossovers, ensure non-overlapping capacitive electrode traces with generous keepouts ($\ge 1.5$ mm clearance to flex outline edges), and provide silkscreen channel callouts directly on the substrate.
 * **Auto-Router Grid & Clearance Parity**: The PCB A* auto-router and DRC clearance definitions must maintain mathematical parity: trace widths and obstacle expansion margins must ensure adjacent grid corridors do not violate trace-to-trace spacing constraints ($s \ge (w_1 + w_2)/2 + \text{clearance}$). Stitching vias to internal power/ground planes and escape corridors must be generated dynamically from netlist graph topology rather than hardcoded polyline routes.
 * **Review Session Feedback Persistence**: The interactive code review web dashboard (`code_review.py`) and server (`ReviewServer`) must persist session feedback, comments, and file review statuses across server restarts to prevent losing active reviewer notes during development iterations.

@@ -34,7 +34,7 @@ footprints:
     mpn: HIROSE-FH35C-30S
     supplier_pn: H1234-ND
 
-  - name: J_FLEX
+  - name: J4
     package: FPC-30P-0.5MM
     position: [0.0, -22.75, 0.0]
     rotation: [0.0, 0.0, 0.0]
@@ -128,21 +128,21 @@ footprints:
           description: "Gate dielectric breakdown; fault"
 
   # Power Supply Circuit: USB-C -> VBUS -> LDO -> 3V3
-  - name: J_USB
+  - name: J3
     package: USB-C-16P
     position: [-25.0, 0.0, 0.8]
     rotation: [0.0, 0.0, 270.0]
     mpn: TYPE-C-16P
     supplier_pn: C2765186
 
-  - name: R_CC1
+  - name: R3
     package: "0402"
     position: [-17.0, 4.5, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: RC0402FR-075K1L
     supplier_pn: 311-5.1KLRCT-ND
 
-  - name: R_CC2
+  - name: R4
     package: "0402"
     position: [-17.0, -4.5, 0.8]
     rotation: [0.0, 0.0, 0.0]
@@ -156,14 +156,14 @@ footprints:
     mpn: AP2112K-3.3TRG1
     supplier_pn: AP2112K-3.3-ND
 
-  - name: C_IN
+  - name: C6
     package: "0603"
     position: [-24.0, 10.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CL10A475KP8NNNC
     supplier_pn: 1276-1188-1-ND
 
-  - name: C_OUT
+  - name: C7
     package: "0603"
     position: [-14.0, 10.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
@@ -178,14 +178,14 @@ footprints:
     mpn: MAX98357AETE+
     supplier_pn: MAX98357A-ND
 
-  - name: C_AMP
+  - name: C8
     package: "0603"
     position: [-23.0, 21.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CL10A105KP8NNNC
     supplier_pn: 1276-1002-1-ND
 
-  - name: SPK1
+  - name: U5
     package: piezo_speaker_12mm
     position: [-18.0, 31.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
@@ -200,35 +200,35 @@ footprints:
     mpn: ECS-240-8-30B-CKM
     supplier_pn: XC2345-ND
 
-  - name: C_OSC1
+  - name: C9
     package: "0402"
     position: [-5.0, 14.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402JRNPO9BN120
     supplier_pn: 311-1032-1-ND
 
-  - name: C_OSC2
+  - name: C10
     package: "0402"
     position: [5.0, 14.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402JRNPO9BN120
     supplier_pn: 311-1032-1-ND
 
-  - name: R_RST
+  - name: R5
     package: "0402"
     position: [-8.0, 8.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: RC0402FR-0710KL
     supplier_pn: 311-10.0KLRCT-ND
 
-  - name: C_RST
+  - name: C11
     package: "0402"
     position: [-10.5, 8.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402KRX7R9BB104
     supplier_pn: 311-1438-1-ND
 
-  - name: R_BOOT
+  - name: R6
     package: "0402"
     position: [-9.0, -12.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
@@ -250,7 +250,7 @@ footprints:
     supplier_pn: 311-1438-1-ND
 
   # U2 CY8CMBR3116 Internal Regulator Bypass Capacitor
-  - name: C_VREG
+  - name: C12
     package: "0402"
     position: [18.0, -10.0, -0.8]
     layer: B.Cu
@@ -272,27 +272,27 @@ nets:
       - [C2, "2"]
       - [C3, "2"]
       - [Q1, S]
-      - [J_USB, GND]
-      - [J_USB, GND2]
-      - [J_USB, SHIELD1]
-      - [J_USB, SHIELD2]
-      - [R_CC1, "2"]
-      - [R_CC2, "2"]
+      - [J3, GND]
+      - [J3, GND2]
+      - [J3, SHIELD1]
+      - [J3, SHIELD2]
+      - [R3, "2"]
+      - [R4, "2"]
       - [U3, "2"]
-      - [C_IN, "2"]
-      - [C_OUT, "2"]
+      - [C6, "2"]
+      - [C7, "2"]
       - [U4, GND]
       - [U4, GAIN]
-      - [C_AMP, "2"]
+      - [C8, "2"]
       - [Y1, "2"]
       - [Y1, "4"]
-      - [C_OSC1, "2"]
-      - [C_OSC2, "2"]
-      - [C_RST, "2"]
-      - [R_BOOT, "2"]
+      - [C9, "2"]
+      - [C10, "2"]
+      - [C11, "2"]
+      - [R6, "2"]
       - [C4, "2"]
       - [C5, "2"]
-      - [C_VREG, "2"]
+      - [C12, "2"]
 
   - name: 3V3
     color: "#dc2626"
@@ -307,34 +307,34 @@ nets:
       - [C2, "1"]
       - [C3, "1"]
       - [U3, "5"]
-      - [C_OUT, "1"]
+      - [C7, "1"]
       - [U4, VDD]
       - [U4, SD_MODE]
-      - [C_AMP, "1"]
-      - [R_RST, "1"]
+      - [C8, "1"]
+      - [R5, "1"]
       - [C4, "1"]
       - [C5, "1"]
 
   - name: VBUS
     color: "#b91c1c"
     pins:
-      - [J_USB, VBUS]
-      - [J_USB, VBUS2]
+      - [J3, VBUS]
+      - [J3, VBUS2]
       - [U3, "1"]
       - [U3, "3"]
-      - [C_IN, "1"]
+      - [C6, "1"]
 
   - name: CC1
     color: "#0284c7"
     pins:
-      - [J_USB, CC1]
-      - [R_CC1, "1"]
+      - [J3, CC1]
+      - [R3, "1"]
 
   - name: CC2
     color: "#0284c7"
     pins:
-      - [J_USB, CC2]
-      - [R_CC2, "1"]
+      - [J3, CC2]
+      - [R4, "1"]
 
   - name: PWR_EN
     color: "#ea580c"
@@ -373,27 +373,27 @@ nets:
     pins:
       - [U1, K1]
       - [Y1, "1"]
-      - [C_OSC1, "1"]
+      - [C9, "1"]
 
   - name: OSC_OUT
     color: "#10b981"
     pins:
       - [U1, K2]
       - [Y1, "3"]
-      - [C_OSC2, "1"]
+      - [C10, "1"]
 
   - name: NRST
     color: "#eab308"
     pins:
       - [U1, M1]
-      - [R_RST, "2"]
-      - [C_RST, "1"]
+      - [R5, "2"]
+      - [C11, "1"]
 
   - name: BOOT0
     color: "#ca8a04"
     pins:
       - [U1, M2]
-      - [R_BOOT, "1"]
+      - [R6, "1"]
 
   - name: PCIE_TX0_P
     color: "#2563eb"
@@ -448,56 +448,56 @@ nets:
     pins:
       - [U2, CS0]
       - [J2, CAP_TX0]
-      - [J_FLEX, CAP_TX0]
+      - [J4, CAP_TX0]
 
   - name: CAP_RX0
     color: "#0891b2"
     pins:
       - [U2, CS1]
       - [J2, CAP_RX0]
-      - [J_FLEX, CAP_RX0]
+      - [J4, CAP_RX0]
 
   - name: CAP_TX1
     color: "#0284c7"
     pins:
       - [U2, CS2]
       - [J2, CAP_TX1]
-      - [J_FLEX, CAP_TX1]
+      - [J4, CAP_TX1]
 
   - name: CAP_RX1
     color: "#0369a1"
     pins:
       - [U2, CS3]
       - [J2, CAP_RX1]
-      - [J_FLEX, CAP_RX1]
+      - [J4, CAP_RX1]
 
   - name: CAP_TX2
     color: "#0ea5e9"
     pins:
       - [U2, CS4]
       - [J2, CAP_TX2]
-      - [J_FLEX, CAP_TX2]
+      - [J4, CAP_TX2]
 
   - name: CAP_RX2
     color: "#38bdf8"
     pins:
       - [U2, CS5]
       - [J2, CAP_RX2]
-      - [J_FLEX, CAP_RX2]
+      - [J4, CAP_RX2]
 
   - name: CAP_RX3
     color: "#67e8f9"
     pins:
       - [U2, CS6]
       - [J2, CAP_RX3]
-      - [J_FLEX, CAP_RX3]
+      - [J4, CAP_RX3]
 
   - name: CAP_SHIELD
     color: "#64748b"
     pins:
       - [U2, SHIELD]
       - [J2, CAP_SHIELD]
-      - [J_FLEX, CAP_SHIELD]
+      - [J4, CAP_SHIELD]
 
   - name: PDM_DAT
     color: "#9333ea"
@@ -521,16 +521,16 @@ nets:
     color: "#e11d48"
     pins:
       - [U4, OUTP]
-      - [SPK1, "1"]
+      - [U5, "1"]
 
   - name: SPK_N
     color: "#be123c"
     pins:
       - [U4, OUTN]
-      - [SPK1, "2"]
+      - [U5, "2"]
 
   - name: VREG
     color: "#0891b2"
     pins:
       - [U2, VREG]
-      - [C_VREG, "1"]
+      - [C12, "1"]
