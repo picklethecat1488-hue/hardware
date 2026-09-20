@@ -23,6 +23,9 @@ import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning, module="ocp_vscode.*")
 warnings.filterwarnings("ignore", message=".*collapse value from viewer.*")
+warnings.filterwarnings("ignore", message=".*Connection error.*")
+warnings.filterwarnings("ignore", message=".*Port could not be cast.*")
+warnings.filterwarnings("ignore", message=".*Unexpected error.*")
 
 from ocp_vscode import set_port, Collapse, Camera, show as ocp_show  # type: ignore
 from build import Builder
@@ -32,10 +35,13 @@ SPINNER_TEXT = "Visualizing..."
 
 
 def show(*args, **kwargs):
-    """Bypass ocp_vscode visualization during headless runs."""
+    """Bypass ocp_vscode visualization during headless runs or when viewer is disconnected."""
     if "--no-gui" in sys.argv:
-        return
-    return ocp_show(*args, **kwargs)
+        return None
+    try:
+        return ocp_show(*args, **kwargs)
+    except Exception:
+        return None
 
 
 class ProviderResolver:
@@ -196,6 +202,10 @@ class Viewer:
                 pcb_cfg = sub_pcb_config.model_copy(update={"stackup": provider.pcb_config.stackup})
             if sub_pcb_config and not pcb_cfg.capacitive_sensors and provider.pcb_config.capacitive_sensors:
                 pcb_cfg = pcb_cfg.model_copy(update={"capacitive_sensors": provider.pcb_config.capacitive_sensors})
+            if sub_pcb_config and not pcb_cfg.copper_regions and provider.pcb_config.copper_regions:
+                pcb_cfg = pcb_cfg.model_copy(update={"copper_regions": provider.pcb_config.copper_regions})
+            if sub_pcb_config and not pcb_cfg.net_classes and provider.pcb_config.net_classes:
+                pcb_cfg = pcb_cfg.model_copy(update={"net_classes": provider.pcb_config.net_classes})
 
             exporter = PCBExporter(pcb_cfg, wiring, subassembly=subassembly)
 
@@ -492,9 +502,8 @@ def main():
 
     args = get_args()
 
-    # Allow overriding the OCP Viewer port
-    if args.port:
-        set_port(args.port)
+    # Allow overriding the OCP Viewer port (default to standard 3939)
+    set_port(args.port if args.port else 3939)
 
     logger = Logger(text="Visualizing...")
 
