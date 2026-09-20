@@ -81,6 +81,15 @@ class KiCadCLI:
             raise RuntimeError(f"kicad-cli error ({result.returncode}): {result.stderr.strip() or result.stdout}")
         return result.stdout
 
+    def refill_zones(self, kicad_pcb_path: str | Path) -> None:
+        """Refill copper zones and save the board file in-place using kicad-cli."""
+        pcb_file = Path(kicad_pcb_path).resolve()
+        if not pcb_file.is_file():
+            raise FileNotFoundError(f"KiCad PCB file not found: {pcb_file}")
+
+        args = ["pcb", "drc", "--refill-zones", "--save-board", str(pcb_file)]
+        self.run_command(args)
+
     def export_gerbers(
         self,
         kicad_pcb_path: str | Path,
@@ -95,7 +104,7 @@ class KiCadCLI:
         if not pcb_file.is_file():
             raise FileNotFoundError(f"KiCad PCB file not found: {pcb_file}")
 
-        args = ["pcb", "export", "gerbers", "--no-protel-ext", "-o", f"{out_dir}/"]
+        args = ["pcb", "export", "gerbers", "--no-protel-ext", "--check-zones", "-o", f"{out_dir}/"]
         if layers:
             args.extend(["-l", ",".join(layers)])
         args.append(str(pcb_file))

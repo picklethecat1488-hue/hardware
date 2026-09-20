@@ -476,8 +476,8 @@ class AStarPCBRouter:
                         position_mm=(px, py),
                         pad_diameter_mm=0.45,
                         drill_diameter_mm=0.20,
-                        layer_start=min(current_layer, lay),
-                        layer_end=max(current_layer, lay),
+                        layer_start="F.Cu",
+                        layer_end="B.Cu",
                     )
                 )
                 current_layer = lay
@@ -683,8 +683,8 @@ class PCBAutoRouter:
         if abs(rot_deg) > 1e-4:
             rad = math.radians(rot_deg)
             cos_r, sin_r = math.cos(rad), math.sin(rad)
-            rx = pin.position[0] * cos_r - pin.position[1] * sin_r
-            ry = pin.position[0] * sin_r + pin.position[1] * cos_r
+            rx = pin.position[0] * cos_r + pin.position[1] * sin_r
+            ry = -pin.position[0] * sin_r + pin.position[1] * cos_r
             return (fp.position[0] + rx, fp.position[1] + ry)
         return (fp.position[0] + pin.position[0], fp.position[1] + pin.position[1])
 
@@ -882,7 +882,7 @@ class PCBAutoRouter:
                 for tp in tp_by_net.get(net.name, []):
                     tp_layer = getattr(tp, "layer", "F.Cu")
                     endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer))
-                    if getattr(tp, "drill_diameter_mm", 0) <= 0:
+                    if getattr(tp, "drill_diameter_mm", 0) <= 0 or net.name in plane_nets:
                         smd_endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer))
 
                 if net.name in sensor_terminals:
@@ -897,6 +897,26 @@ class PCBAutoRouter:
                     for px, py, lay in smd_endpoints:
                         # Try offsets around the pad for a stitching via
                         candidate_offsets = [
+                            (-0.25, -0.50),
+                            (0.25, -0.50),
+                            (-0.25, 0.50),
+                            (0.25, 0.50),
+                            (-0.20, -0.45),
+                            (0.20, -0.45),
+                            (-0.20, 0.45),
+                            (0.20, 0.45),
+                            (-0.50, -0.25),
+                            (0.50, -0.25),
+                            (-0.50, 0.25),
+                            (0.50, 0.25),
+                            (0.40, 0.40),
+                            (-0.40, -0.40),
+                            (0.40, -0.40),
+                            (-0.40, 0.40),
+                            (0.0, 0.50),
+                            (0.0, -0.50),
+                            (0.50, 0.0),
+                            (-0.50, 0.0),
                             (0.0, 0.75),
                             (0.0, -0.75),
                             (0.75, 0.0),
@@ -912,46 +932,54 @@ class PCBAutoRouter:
                         ]
                         best_vx, best_vy = px, py
                         found_via_spot = False
-                        via_pad_r = 0.225 + 0.16
+                        best_offset = (0.0, 0.0)
                         for dx, dy in candidate_offsets:
                             cand_x, cand_y = px + dx, py + dy
                             if not (half_w - 1.0 > cand_x > -half_w + 1.0 and half_l - 1.0 > cand_y > -half_l + 1.0):
                                 continue
+                            is_dense = math.hypot(dx, dy) < 0.65
+                            v_dia = 0.36 if is_dense else 0.45
+                            via_pad_r = v_dia / 2.0 + 0.15
                             conflict = False
                             for obs in router.obstacles:
                                 if obs.net is not None and obs.net == net.name:
                                     continue
-                                if (obs.min_x - via_pad_r <= cand_x <= obs.max_x + via_pad_r) and (
-                                    obs.min_y - via_pad_r <= cand_y <= obs.max_y + via_pad_r
-                                ):
+                                edx = max(obs.min_x - cand_x, 0.0, cand_x - obs.max_x)
+                                edy = max(obs.min_y - cand_y, 0.0, cand_y - obs.max_y)
+                                if math.hypot(edx, edy) < via_pad_r:
                                     conflict = True
                                     break
                             if not conflict:
                                 best_vx, best_vy = cand_x, cand_y
+                                best_offset = (dx, dy)
                                 found_via_spot = True
                                 break
 
                         if found_via_spot:
+                            is_dense = math.hypot(best_offset[0], best_offset[1]) < 0.65
+                            v_dia = 0.36 if is_dense else 0.45
+                            v_drill = 0.16 if is_dense else 0.20
                             stitching_via = ViaModel(
                                 net=net.name,
                                 position_mm=(best_vx, best_vy),
-                                pad_diameter_mm=0.45,
-                                drill_diameter_mm=0.20,
+                                pad_diameter_mm=v_dia,
+                                drill_diameter_mm=v_drill,
                                 layer_start="F.Cu",
                                 layer_end="B.Cu",
                             )
                             vias.append(stitching_via)
+                            seg_w = min(width_mm, 0.20) if is_dense else width_mm
                             trace_seg = TraceSegmentModel(
                                 net=net.name,
                                 layer=lay,
-                                width_mm=width_mm,
+                                width_mm=seg_w,
                                 start_mm=(px, py),
                                 end_mm=(best_vx, best_vy),
                             )
                             traces.append(trace_seg)
 
                             # Register obstacle for the stitching via and trace
-                            v_r = 0.45
+                            v_r = v_dia / 2.0 + 0.15
                             router.add_obstacle(
                                 Obstacle(
                                     min_x=best_vx - v_r,
@@ -962,7 +990,7 @@ class PCBAutoRouter:
                                     net=net.name,
                                 )
                             )
-                            w_h = width_mm / 2.0 + 0.12
+                            w_h = seg_w / 2.0 + 0.12
                             router.add_obstacle(
                                 Obstacle(
                                     min_x=min(px, best_vx) - w_h,

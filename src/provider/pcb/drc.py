@@ -87,8 +87,8 @@ def _get_pin_absolute_pos(fp: Any, pin: Any) -> Tuple[float, float]:
     if abs(rot_deg) > 1e-4:
         rad = math.radians(rot_deg)
         cos_r, sin_r = math.cos(rad), math.sin(rad)
-        rx = pin.position[0] * cos_r - pin.position[1] * sin_r
-        ry = pin.position[0] * sin_r + pin.position[1] * cos_r
+        rx = pin.position[0] * cos_r + pin.position[1] * sin_r
+        ry = -pin.position[0] * sin_r + pin.position[1] * cos_r
         return (fp.position[0] + rx, fp.position[1] + ry)
     return (fp.position[0] + pin.position[0], fp.position[1] + pin.position[1])
 
@@ -1837,7 +1837,20 @@ class PCBDesignRulesChecker:
 
         # 3. Per-sheet checks: Dangling components and symbol overlaps
         for sheet_idx, sheet in enumerate(self.config.schematic_sheets):
-            sheet_fps = [footprints_map[c] for c in sheet.components if c in footprints_map]
+            sheet_fps = []
+            for c in sheet.components:
+                if c in footprints_map:
+                    orig_fp = footprints_map[c]
+                    if sheet.pin_breakouts and c in sheet.pin_breakouts:
+                        allowed_pins = set(sheet.pin_breakouts[c])
+                        matched_pins = [
+                            p
+                            for p in orig_fp.pins
+                            if p.name in allowed_pins or getattr(p, "label", None) in allowed_pins
+                        ]
+                        sheet_fps.append(orig_fp.model_copy(update={"pins": matched_pins}))
+                    else:
+                        sheet_fps.append(orig_fp)
 
             # 3a. Dangling component check
             for fp in sheet_fps:

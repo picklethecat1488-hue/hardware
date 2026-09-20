@@ -218,7 +218,7 @@ class PCBExporter:
             )
             cand_ref_x = fp.position[0] + ref_off_x
             cand_ref_y = fp.position[1] + ref_off_y
-            if fp.name == "J_FLEX":
+            if self.is_flex or getattr(fp, "shape_ref", None) == "flex_tail":
                 cand_ref_x = fp.position[0]
                 cand_ref_y = fp.position[1]
             placed_component_label_boxes.append(
@@ -277,7 +277,11 @@ class PCBExporter:
                 }
             )
 
-        copper_inners = [l for l in self.config.stackup.copper_layers[1:-1]]
+        copper_inners = (
+            [l for l in self.config.stackup.copper_layers[1:-1]]
+            if self.config.stackup and hasattr(self.config.stackup, "copper_layers")
+            else []
+        )
 
         silkscreen_data = []
         for st in self.config.silkscreen_texts:
@@ -317,57 +321,56 @@ class PCBExporter:
         vias_data = []
         zones_data = []
 
-        if not self.is_flex:
-            for tr in self.config.traces:
-                net_idx = net_name_to_idx.get(tr.net, 0)
-                segments_data.append(
-                    {
-                        "x1": round(self.config.sheet_center_x_mm + tr.start_mm[0], 4),
-                        "y1": round(self.config.sheet_center_y_mm + tr.start_mm[1], 4),
-                        "x2": round(self.config.sheet_center_x_mm + tr.end_mm[0], 4),
-                        "y2": round(self.config.sheet_center_y_mm + tr.end_mm[1], 4),
-                        "width": tr.width_mm,
-                        "layer": tr.layer,
-                        "net_idx": net_idx,
-                    }
-                )
+        for tr in self.config.traces:
+            net_idx = net_name_to_idx.get(tr.net, 0)
+            segments_data.append(
+                {
+                    "x1": round(self.config.sheet_center_x_mm + tr.start_mm[0], 4),
+                    "y1": round(self.config.sheet_center_y_mm + tr.start_mm[1], 4),
+                    "x2": round(self.config.sheet_center_x_mm + tr.end_mm[0], 4),
+                    "y2": round(self.config.sheet_center_y_mm + tr.end_mm[1], 4),
+                    "width": tr.width_mm,
+                    "layer": tr.layer,
+                    "net_idx": net_idx,
+                }
+            )
 
-            for v in self.config.vias:
-                net_idx = net_name_to_idx.get(v.net, 0)
-                l1, l2 = v.layer_start, v.layer_end
-                if l1 == "B.Cu" and l2 == "F.Cu":
-                    l1, l2 = "F.Cu", "B.Cu"
-                vias_data.append(
-                    {
-                        "x": round(self.config.sheet_center_x_mm + v.position_mm[0], 4),
-                        "y": round(self.config.sheet_center_y_mm + v.position_mm[1], 4),
-                        "dia": round(v.pad_diameter_mm, 4),
-                        "drill": round(v.drill_diameter_mm, 4),
-                        "layer1": l1,
-                        "layer2": l2,
-                        "net_idx": net_idx,
-                    }
-                )
+        for v in self.config.vias:
+            net_idx = net_name_to_idx.get(v.net, 0)
+            l1, l2 = v.layer_start, v.layer_end
+            if l1 == "B.Cu" and l2 == "F.Cu":
+                l1, l2 = "F.Cu", "B.Cu"
+            vias_data.append(
+                {
+                    "x": round(self.config.sheet_center_x_mm + v.position_mm[0], 4),
+                    "y": round(self.config.sheet_center_y_mm + v.position_mm[1], 4),
+                    "dia": round(v.pad_diameter_mm, 4),
+                    "drill": round(v.drill_diameter_mm, 4),
+                    "layer1": l1,
+                    "layer2": l2,
+                    "net_idx": net_idx,
+                }
+            )
 
-            for z in self.config.copper_regions:
-                net_idx = net_name_to_idx.get(z.net, 0)
-                pts = [
-                    {
-                        "x": round(self.config.sheet_center_x_mm + pt[0], 4),
-                        "y": round(self.config.sheet_center_y_mm + pt[1], 4),
-                    }
-                    for pt in z.polygon_points_mm
-                ]
-                zones_data.append(
-                    {
-                        "net_idx": net_idx,
-                        "net_name": z.net,
-                        "layer": z.layer,
-                        "priority": z.priority,
-                        "clearance_mm": z.clearance_mm,
-                        "pts": pts,
-                    }
-                )
+        for z in self.config.copper_regions:
+            net_idx = net_name_to_idx.get(z.net, 0)
+            pts = [
+                {
+                    "x": round(self.config.sheet_center_x_mm + pt[0], 4),
+                    "y": round(self.config.sheet_center_y_mm + pt[1], 4),
+                }
+                for pt in z.polygon_points_mm
+            ]
+            zones_data.append(
+                {
+                    "net_idx": net_idx,
+                    "net_name": z.net,
+                    "layer": z.layer,
+                    "priority": z.priority,
+                    "clearance_mm": z.clearance_mm,
+                    "pts": pts,
+                }
+            )
 
         # Process capacitive sensors (scoped to this board's shape_ref)
         target_shape = getattr(self.config, "shape_ref", None)
@@ -595,6 +598,14 @@ class PCBExporter:
 
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(rendered)
+
+        # Automatically compute zone fill geometries and thermal reliefs so inner planes are never empty
+        if getattr(self.config, "copper_regions", None):
+            from provider.pcb.kicad_cli import KiCadCLI
+
+            cli = KiCadCLI()
+            if cli.is_available:
+                cli.refill_zones(out_path)
 
         return out_path
 

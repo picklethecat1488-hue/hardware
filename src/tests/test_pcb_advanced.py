@@ -1,6 +1,7 @@
 """Unit tests for advanced PCB features: CPWG impedance, RF/Display DRC, CAD boundary containment, Eye diagram, and TestBoard."""
 
 import json
+import math
 from pathlib import Path
 import pytest
 from model.pcb import (
@@ -408,8 +409,8 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert "U4" in footprint_names
     assert "J1" in footprint_names
     assert "J2" in footprint_names
-    assert "J_USB" in footprint_names
-    assert "SPK1" in footprint_names
+    assert "J3" in footprint_names
+    assert "U5" in footprint_names
     assert "Y1" in footprint_names
     assert "R1" in footprint_names
     assert "R2" in footprint_names
@@ -422,6 +423,11 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     room = Room(config=provider.app_config, materials=provider.materials)
     provider.diagram_wiring(room, ["wiring"], Mode.DEFAULT)
     assert len(room.keys()) > 0
+    system_wiring_file = provider.wiring_path.parent / "system_wiring.yaml"
+    assert system_wiring_file.exists(), "system_wiring.yaml must exist for top-down architecture diagram"
+    sys_wiring = Wiring(system_wiring_file)
+    sys_comp_names = {c.name for c in sys_wiring.footprints}
+    assert {"m2_host", "usb_c", "carrier_pcb", "flex_tail"}.issubset(sys_comp_names)
 
     # Verify BOM and CPL export
     pcb_config = provider.pcb_config
@@ -434,7 +440,7 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 29  # header + 28 carrier components (J_FLEX is on flex tail)
+    assert len(bom_lines) == 29  # header + 28 carrier components (J4 is on flex tail)
     assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
@@ -824,6 +830,25 @@ def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     assert report.passed, f"DRC failed:\n{report.summary()}"
     assert report.error_count == 0
 
+    # Verify TP_GND has routed trace and via connecting to ground (BUG-040)
+    tp_gnd = next((tp for tp in cfg.test_points if tp.name == "TP_GND"), None)
+    assert tp_gnd is not None
+    assert tp_gnd.net == "GND"
+    tp_x, tp_y = tp_gnd.position_mm
+    tp_trace = next(
+        (
+            tr
+            for tr in cfg.traces
+            if tr.net == "GND"
+            and (
+                math.hypot(tr.start_mm[0] - tp_x, tr.start_mm[1] - tp_y) < 0.1
+                or math.hypot(tr.end_mm[0] - tp_x, tr.end_mm[1] - tp_y) < 0.1
+            )
+        ),
+        None,
+    )
+    assert tp_trace is not None, "TP_GND must have a routed copper trace connecting to ground"
+
     # 2. Export board files (.kicad_pcb, .drl, .gbr) and pos.csv
     exporter = PCBExporter(cfg, wiring)
     board_dir = tmp_path / "board"
@@ -1189,29 +1214,29 @@ def test_schematic_diagram_geometric_offsets_and_gnd_placement(tmp_path: Path) -
 
 
 def test_regression_j_usb_edge_facing_and_drc_exemption() -> None:
-    """Verify J_USB connector faces outward to board edge and is exempt from internal DRC margin."""
+    """Verify J3 USB-C connector faces outward to board edge and is exempt from internal DRC margin."""
     from projects.test_board.provider import TestBoardProvider
     from model.wiring import Wiring
     from provider.pcb.drc import PCBDesignRulesChecker
 
     provider = TestBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
-    j_usb = next(fp for fp in wiring.footprints if fp.name == "J_USB")
+    j3 = next(fp for fp in wiring.footprints if fp.name == "J3")
 
     # Rotation 270 degrees orients connector mouth toward -X (left board edge at X=-30.0)
-    assert j_usb.rotation[2] == 270.0
-    assert j_usb.position[0] < -20.0  # Near left board perimeter
+    assert j3.rotation[2] == 270.0
+    assert j3.position[0] < -20.0  # Near left board perimeter
 
-    # DRC boundary check must treat J_USB as an edge-mounted connector
+    # DRC boundary check must treat J3 as an edge-mounted connector
     checker = PCBDesignRulesChecker(provider.pcb_config)
     carrier_fps = checker.get_footprints_for_board(wiring)
     violations = checker.check_boundary_containment(carrier_fps, edge_clearance_mm=0.5)
-    j_usb_violations = [v for v in violations if v.net_or_zone == "J_USB"]
-    assert len(j_usb_violations) == 0, f"J_USB should be exempt from edge clearance: {j_usb_violations}"
+    j3_violations = [v for v in violations if v.net_or_zone == "J3"]
+    assert len(j3_violations) == 0, f"J3 should be exempt from edge clearance: {j3_violations}"
 
 
 def test_regression_piezo_speaker_circular_silkscreen_and_placement() -> None:
-    """Verify SPK1 piezo speaker has circular footprint and is positioned near MH2."""
+    """Verify U5 piezo speaker has circular footprint and is positioned near MH2."""
     from projects.test_board.provider import TestBoardProvider
     from model.wiring import Wiring
     import math
@@ -1219,9 +1244,9 @@ def test_regression_piezo_speaker_circular_silkscreen_and_placement() -> None:
 
     provider = TestBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
-    spk1 = next(fp for fp in wiring.footprints if fp.name == "SPK1")
+    u5 = next(fp for fp in wiring.footprints if fp.name == "U5")
 
-    assert spk1.package == "piezo_speaker_12mm"
+    assert u5.package == "piezo_speaker_12mm"
 
     # Verify footprint definition in thru_hole.yaml has circular geometry
     thru_hole_yaml = provider.wiring_path.parent.parent / "footprints" / "thru_hole.yaml"
@@ -1231,8 +1256,8 @@ def test_regression_piezo_speaker_circular_silkscreen_and_placement() -> None:
     assert piezo["shape"] == "circle"
     assert piezo["radius_mm"] == 6.0
 
-    # MH2 position: (-26.0, 36.0). SPK1 at (-18.0, 31.0) -> distance < 12mm
-    dist_to_mh2 = math.hypot(spk1.position[0] - (-26.0), spk1.position[1] - 36.0)
+    # MH2 position: (-26.0, 36.0). U5 at (-18.0, 31.0) -> distance < 12mm
+    dist_to_mh2 = math.hypot(u5.position[0] - (-26.0), u5.position[1] - 36.0)
     assert dist_to_mh2 <= 12.0
 
 
@@ -1273,7 +1298,7 @@ def test_regression_subassembly_footprint_isolation() -> None:
     assert "U1" in carrier_names
     assert "J1" in carrier_names
     assert "J2" in carrier_names
-    assert "J_FLEX" not in carrier_names
+    assert "J4" not in carrier_names
 
     # Flex tail router
     flex_part = provider.part.get("flex_tail")
@@ -1282,9 +1307,46 @@ def test_regression_subassembly_footprint_isolation() -> None:
     flex_router = PCBAutoRouter(flex_cfg, wiring)
     flex_fps = flex_router.get_footprints_for_board()
     flex_names = {fp.name for fp in flex_fps}
-    assert "J_FLEX" in flex_names
+    assert "J4" in flex_names
     assert "U1" not in flex_names
     assert "J1" not in flex_names
+
+
+def test_regression_flex_tail_front_routing_and_silkscreen(tmp_path: Path) -> None:
+    """Verify flex tail has routed traces on F.Cu, silkscreen on B.SilkS, and valid spacing (BUG-038)."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.exporter import PCBExporter
+    from provider import Mode
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    flex_part = provider.part.get("flex_tail")
+    assert flex_part is not None
+    flex_res = flex_part("flex_tail", None, Mode.DEFAULT)
+    flex_cfg = flex_res.to_pcb_config()
+
+    # Traces must be loaded from routing_flex.yaml on F.Cu
+    assert len(flex_cfg.traces) > 0, "Flex tail must have routed traces"
+    assert all(tr.layer == "F.Cu" for tr in flex_cfg.traces), "All flex tail traces must route on F.Cu"
+
+    # Export flex_tail.kicad_pcb and verify traces and back silkscreen are present in output file
+    exporter = PCBExporter(flex_cfg, wiring)
+    kicad_pcb_file = tmp_path / "flex_tail.kicad_pcb"
+    exporter.export_kicad_pcb(kicad_pcb_file)
+    content = kicad_pcb_file.read_text()
+
+    assert "(segment (start" in content, "flex_tail.kicad_pcb must contain exported (segment entries"
+    assert "F.Cu" in content, "flex_tail.kicad_pcb must have traces on F.Cu"
+    assert "FLEX TAIL SENSOR REV 1.0" in content
+    assert '"B.SilkS"' in content, "FLEX TAIL SENSOR REV 1.0 must be on B.SilkS"
+
+    # Verify CH3 is spaced from CH2
+    ch2 = next(s for s in flex_cfg.capacitive_sensors if s.channel_id == 2)
+    ch3 = next(s for s in flex_cfg.capacitive_sensors if s.channel_id == 3)
+    ch2_top = ch2.center_mm[1] + (ch2.area_mm[1] / 2.0)
+    ch3_bottom = ch3.center_mm[1] - (ch3.area_mm[1] / 2.0)
+    assert ch3_bottom > ch2_top, f"CH3 bottom ({ch3_bottom}) must be strictly above CH2 top ({ch2_top})"
 
 
 def test_schematic_drc_test_board_passes() -> None:
@@ -1513,3 +1575,107 @@ def test_schematic_drc_detects_missing_page_transition(advanced_pcb_stackup: Sta
     missing = [v for v in violations if v.rule_name == DRCRuleName.SCHEMATIC_PAGE_TRANSITION_MISSING]
     assert len(missing) == 1
     assert "INTER_PAGE_NET" in missing[0].net_or_zone
+
+
+def test_regression_smd_no_connect_pads_included_on_pcb(tmp_path: Path) -> None:
+    """Verify that SMD components (U1 BGA-196, J3 USB-C, J2/J4 FPC-30) place no-connect pads on the board (BUG-043)."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.exporter import PCBExporter
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. Verify U1 has all 196 balls defined
+    u1 = next((fp for fp in wiring.footprints if fp.name == "U1"), None)
+    assert u1 is not None
+    assert len(u1.pins) == 196, f"Expected 196 balls on U1 BGA-196, got {len(u1.pins)}"
+
+    # 2. Verify J3 (USB-C-16P) includes all pins and tabs (including SBU1, SBU2, SHIELD3, SHIELD4)
+    j3 = next((fp for fp in wiring.footprints if fp.name == "J3"), None)
+    assert j3 is not None
+    assert len(j3.pins) >= 14, f"Expected at least 14 pins/tabs on J3 USB-C, got {len(j3.pins)}"
+    j3_pin_names = {p.name for p in j3.pins}
+    assert {"SBU1", "SBU2", "SHIELD3", "SHIELD4"}.issubset(j3_pin_names)
+
+    # 3. Verify J2 (FPC-30P-0.5MM) includes all 30 pins + mounting pads
+    j2 = next((fp for fp in wiring.footprints if fp.name == "J2"), None)
+    assert j2 is not None
+    assert len(j2.pins) >= 30, f"Expected at least 30 pins on J2 FPC connector, got {len(j2.pins)}"
+
+    # 4. Verify PCB export emits no-connect pads with (net 0 "")
+    cfg = provider.pcb_config
+    assert cfg is not None
+    exporter = PCBExporter(cfg, wiring)
+    board_file = tmp_path / "carrier_board.kicad_pcb"
+    exporter.export_kicad_pcb(board_file)
+    content = board_file.read_text()
+
+    # Must contain no-connect pads (e.g. U1 ball A3 and J3 pin SBU1)
+    assert '(pad "A3"' in content, "carrier_board.kicad_pcb must contain no-connect pad A3 on U1"
+    assert '(pad "SBU1"' in content, "carrier_board.kicad_pcb must contain no-connect pad SBU1 on J3"
+
+
+def test_regression_inner_copper_layers_and_auto_routing_connectivity(tmp_path: Path) -> None:
+    """Verify inner copper layer refill, pin rotation math, and BGA dogbone stitching connectivity."""
+    import math
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.router import PCBAutoRouter
+    from provider.pcb.drc import _get_pin_absolute_pos
+    from provider.pcb.exporter import PCBExporter
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. Verify KiCad screen-space pin rotation math for rotated footprints (J3 at 270 deg)
+    j3 = next((fp for fp in wiring.footprints if fp.name == "J3"), None)
+    assert j3 is not None
+    cc1_pin = next((p for p in j3.pins if p.name == "CC1"), None)
+    assert cc1_pin is not None
+    rx, ry = PCBAutoRouter.get_pin_absolute_position(j3, cc1_pin)
+    drc_rx, drc_ry = _get_pin_absolute_pos(j3, cc1_pin)
+    # J3 is at (-25.0, 0.0), rot=270 deg. CC1 local pos is (-0.8, 2.5).
+    # In KiCad screen coordinates (where Y points down):
+    # rx = -25.0 + (-2.5) = -27.5
+    # ry = 0.0 + (-0.8) = -0.8
+    assert math.isclose(rx, -27.5, abs_tol=1e-3), f"Expected rx=-27.5, got {rx}"
+    assert math.isclose(ry, -0.8, abs_tol=1e-3), f"Expected ry=-0.8, got {ry}"
+    assert math.isclose(drc_rx, -27.5, abs_tol=1e-3)
+    assert math.isclose(drc_ry, -0.8, abs_tol=1e-3)
+
+    # 2. Verify carrier board routing has stitching vias for U1 BGA pins H7 (GND) and H8 (3V3)
+    cfg = provider.pcb_config
+    assert cfg is not None
+    vias = cfg.vias
+    h7_via = next(
+        (v for v in vias if v.net == "GND" and abs(v.position_mm[0]) < 1.0 and abs(v.position_mm[1]) < 1.0),
+        None,
+    )
+    assert h7_via is not None, "U1 BGA GND pin H7 must have a stitching via connecting to the GND plane"
+
+    h8_via = next(
+        (v for v in vias if v.net == "3V3" and abs(v.position_mm[0] - 0.8) < 1.0 and abs(v.position_mm[1]) < 1.0),
+        None,
+    )
+    assert h8_via is not None, "U1 BGA 3V3 pin H8 must have a stitching via connecting to the 3V3 plane"
+
+    # 3. Verify PCB export generates filled copper regions for inner planes In1.Cu (GND) and In3.Cu (3V3)
+    board_file = tmp_path / "carrier_board.kicad_pcb"
+    exporter = PCBExporter(cfg, wiring)
+    exporter.export_kicad_pcb(board_file)
+    content = board_file.read_text()
+
+    assert '"In1.Cu"' in content
+    assert '"In3.Cu"' in content
+
+    cli = KiCadCLI()
+    if cli.is_available:
+        # File size must be large (> 300KB) reflecting filled polygon geometry
+        assert board_file.stat().st_size > 300_000, "Board file must include filled zone geometry"
+        # Run DRC and assert zero unconnected pads
+        drc_rpt = tmp_path / "drc.rpt"
+        cli.run_command(["pcb", "drc", "--output", str(drc_rpt), str(board_file)])
+        rpt_text = drc_rpt.read_text()
+        assert "** Found 0 unconnected pads **" in rpt_text

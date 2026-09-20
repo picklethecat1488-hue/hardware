@@ -931,8 +931,8 @@ class SchematicDiagram:
                 seg_len = x_end - x_start
                 if seg_len >= 18.0:
                     # Inter-component channel: space within segment with clearance from both ends
-                    safe_min = x_start + 6.0
-                    safe_max = x_end - 8.0
+                    safe_min = x_start + 14.0
+                    safe_max = x_end - 10.0
                     cand_x = safe_min + (idx % 2) * 8.0
                     if cand_x > safe_max:
                         cand_x = safe_max
@@ -945,7 +945,7 @@ class SchematicDiagram:
                             break
                 elif x_start < 100.0:
                     # Left breakout stub: extend outward to the left well clear of GND symbols
-                    cand_x = x_start - 26.0 - idx * 20.0
+                    cand_x = x_start - 28.0 - idx * 20.0
                     while any(abs(cand_x - ux) < 14.0 for ux in used_x_positions):
                         cand_x -= 14.0
                     ax.plot(
@@ -987,11 +987,22 @@ class SchematicDiagram:
 
                     step = 14.0
                     if side == "right":
+                        next_comp_left = min(
+                            (c[0] for p, c in sheet_pin_coords.items() if c[0] > p_x + 10.0 and p[0] != target_pair[0]),
+                            default=280.0,
+                        )
                         cand_x = p_x + 14.0 + idx * 16.0
+                        if cand_x > next_comp_left - 12.0:
+                            cand_x = (p_x + next_comp_left) / 2.0
                         while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
-                            cand_x += step
+                            if cand_x - 7.0 > p_x + 6.0:
+                                cand_x -= 7.0
+                            elif cand_x + 7.0 < next_comp_left - 8.0:
+                                cand_x += 7.0
+                            else:
+                                break
                     else:
-                        cand_x = p_x - 26.0 - idx * 20.0
+                        cand_x = p_x - 28.0 - idx * 20.0
                         while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
                             cand_x -= step
                     x_pull = cand_x
@@ -1193,10 +1204,11 @@ class SchematicDiagram:
                     ]
                     ax.plot(zz_x, zz_y, color="#334155", linewidth=1.5, zorder=3)
 
-                # Resistor RefDes & Value text to the right
+                # Resistor / Capacitor RefDes & Value text to the right
                 val_text = self._format_resistor_value(fp)
+                text_x_off = 4.8 if fp.name.upper().startswith("C") else 2.2
                 ax.text(
-                    x_pull + 2.2,
+                    x_pull + text_x_off,
                     y_zz_bot + 6.2,
                     fp.name,
                     ha="left",
@@ -1207,7 +1219,7 @@ class SchematicDiagram:
                     zorder=4,
                 )
                 ax.text(
-                    x_pull + 2.2,
+                    x_pull + text_x_off,
                     y_zz_bot + 2.2,
                     val_text,
                     ha="left",
@@ -1245,10 +1257,10 @@ class SchematicDiagram:
             y_top_rail = y_zz_top + 6.0
 
             # Dedicated dashed section card for pull-up resistors
-            card_x = x_min_pull - 6.0
+            card_x = x_min_pull - 5.0
             card_w = (x_max_pull - x_min_pull) + 16.0
             card_y = min(p[1] for p in pwr_pullups) + 4.0
-            card_h = (y_top_rail + 10.0) - card_y
+            card_h = (y_top_rail + 16.0) - card_y
             is_i2c = any("SDA" in p[3].upper() or "SCL" in p[3].upper() for p in pwr_pullups)
             card_title = "I2C PULL-UP RESISTORS" if is_i2c else "PULL-UP RESISTORS"
 
@@ -1266,7 +1278,7 @@ class SchematicDiagram:
             )
             ax.text(
                 card_x + 3.0,
-                card_y + card_h - 3.5,
+                card_y + card_h - 2.8,
                 card_title,
                 fontsize=5.5,
                 fontweight="bold",
@@ -2602,11 +2614,18 @@ class SchematicDiagram:
                         zorder=3,
                     )
 
+        # Check if truth table is present on this sheet
+        has_truth_table = any(
+            (getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q")) for fp in sheet_fps
+        )
+
         # Draw Decoupling Capacitor Bank
         if decoupling_caps:
             n_caps = len(decoupling_caps)
             total_w = (n_caps - 1) * 28.0
-            if cols_override == 2:
+            if has_truth_table:
+                cap_base_x = 35.0
+            elif cols_override == 2:
                 cap_base_x = col_x_positions[0]
             else:
                 cap_base_x = max(35.0, page_center_x - (total_w / 2.0))
@@ -2627,11 +2646,14 @@ class SchematicDiagram:
 
             if tt:
                 tt_card_w = 125.0
-                tt_x = 118.0
-                c_idx = next((i for i, f in enumerate(main_fps) if f.name == fp.name), None)
-                if c_idx is not None:
-                    comp_cx = col_x_positions[c_idx]
-                    tt_x = max(116.0, min(145.0, comp_cx + cw / 2.0 - tt_card_w / 2.0 + 20.0))
+                if decoupling_caps:
+                    tt_x = 135.0
+                else:
+                    tt_x = 118.0
+                    c_idx = next((i for i, f in enumerate(main_fps) if f.name == fp.name), None)
+                    if c_idx is not None:
+                        comp_cx = col_x_positions[c_idx]
+                        tt_x = max(116.0, min(145.0, comp_cx + cw / 2.0 - tt_card_w / 2.0 + 20.0))
                 self._draw_truth_table(ax=ax, fp=fp, tt=tt, base_x=tt_x, base_y=bottom_cards_y, card_w=tt_card_w)
 
         pdf.savefig(fig)

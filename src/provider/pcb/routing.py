@@ -210,7 +210,9 @@ class BuildCopperRegions:
 
         active_pcb = BuildPcb.current()
         if active_pcb is not None:
-            active_pcb.copper_regions.extend(self.regions)
+            for r in self.regions:
+                if r not in active_pcb.copper_regions:
+                    active_pcb.copper_regions.append(r)
 
     @classmethod
     def _get_context(cls) -> Optional["BuildCopperRegions"]:
