@@ -273,6 +273,7 @@ nets:
       - [C3, "2"]
       - [Q1, S]
       - [J_USB, GND]
+      - [J_USB, GND2]
       - [J_USB, SHIELD1]
       - [J_USB, SHIELD2]
       - [R_CC1, "2"]
@@ -318,6 +319,7 @@ nets:
     color: "#b91c1c"
     pins:
       - [J_USB, VBUS]
+      - [J_USB, VBUS2]
       - [U3, "1"]
       - [U3, "3"]
       - [C_IN, "1"]
