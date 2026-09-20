@@ -44,28 +44,28 @@ footprints:
 
   - name: R1
     package: "0402"
-    position: [10.0, -8.0, 0.8]
+    position: [12.0, -6.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: RC0402FR-074K7L
     supplier_pn: 311-4.7KLRCT-ND
 
   - name: R2
     package: "0402"
-    position: [10.0, -10.5, 0.8]
+    position: [12.0, -11.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: RC0402FR-074K7L
     supplier_pn: 311-4.7KLRCT-ND
 
   - name: C1
     package: "0402"
-    position: [18.0, -21.0, 0.8]
+    position: [20.0, -15.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402KRX7R9BB104
     supplier_pn: 311-1438-1-ND
 
   - name: C2
     package: "0402"
-    position: [-8.0, -5.0, -0.8]
+    position: [-8.0, -4.0, -0.8]
     layer: B.Cu
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402KRX7R9BB104
@@ -73,7 +73,7 @@ footprints:
 
   - name: C3
     package: "0603"
-    position: [-12.0, -8.0, 0.8]
+    position: [-13.0, -8.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CL10A106KP8NNNC
     supplier_pn: 1276-1004-1-ND
@@ -130,42 +130,42 @@ footprints:
   # Power Supply Circuit: USB-C -> VBUS -> LDO -> 3V3
   - name: J_USB
     package: USB-C-16P
-    position: [-22.0, 0.0, 0.8]
-    rotation: [0.0, 0.0, 0.0]
+    position: [-26.0, 0.0, 0.8]
+    rotation: [0.0, 0.0, 270.0]
     mpn: TYPE-C-16P
     supplier_pn: C2765186
 
   - name: R_CC1
     package: "0402"
-    position: [-16.0, 2.0, 0.8]
+    position: [-21.0, 3.5, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: RC0402FR-075K1L
     supplier_pn: 311-5.1KLRCT-ND
 
   - name: R_CC2
     package: "0402"
-    position: [-16.0, -2.0, 0.8]
+    position: [-21.0, -3.5, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: RC0402FR-075K1L
     supplier_pn: 311-5.1KLRCT-ND
 
   - name: U3
     package: SOT-23-5
-    position: [-18.0, 8.0, 0.8]
+    position: [-19.0, 10.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: AP2112K-3.3TRG1
     supplier_pn: AP2112K-3.3-ND
 
   - name: C_IN
     package: "0603"
-    position: [-22.0, 8.0, 0.8]
+    position: [-24.0, 10.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CL10A475KP8NNNC
     supplier_pn: 1276-1188-1-ND
 
   - name: C_OUT
     package: "0603"
-    position: [-14.0, 8.0, 0.8]
+    position: [-14.0, 10.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CL10A475KP8NNNC
     supplier_pn: 1276-1188-1-ND
@@ -173,43 +173,43 @@ footprints:
   # Audio Subsystem: U1 PDM -> MAX98357A Audio Amp -> Speaker
   - name: U4
     package: QFN-16-AMP
-    position: [-16.0, 20.0, 0.8]
+    position: [-18.0, 21.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: MAX98357AETE+
     supplier_pn: MAX98357A-ND
 
   - name: C_AMP
     package: "0603"
-    position: [-20.0, 20.0, 0.8]
+    position: [-23.0, 21.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CL10A105KP8NNNC
     supplier_pn: 1276-1002-1-ND
 
   - name: SPK1
-    package: pin_header_1x2
-    position: [-22.0, 26.0, 0.8]
+    package: piezo_speaker_12mm
+    position: [-18.0, 31.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
-    mpn: 2PIN-2.54MM-HDR
-    supplier_pn: S1012E-02-ND
+    mpn: PKM13EPYH4000-B0
+    supplier_pn: 490-4700-ND
 
   # U1 High Speed Crystal Oscillator & Decoupling Passives
   - name: Y1
     package: XTAL-3225-4P
-    position: [0.0, 12.0, 0.8]
+    position: [0.0, 14.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: ECS-240-8-30B-CKM
     supplier_pn: XC2345-ND
 
   - name: C_OSC1
     package: "0402"
-    position: [-3.0, 12.0, 0.8]
+    position: [-5.0, 14.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402JRNPO9BN120
     supplier_pn: 311-1032-1-ND
 
   - name: C_OSC2
     package: "0402"
-    position: [3.0, 12.0, 0.8]
+    position: [5.0, 14.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402JRNPO9BN120
     supplier_pn: 311-1032-1-ND
@@ -230,21 +230,21 @@ footprints:
 
   - name: R_BOOT
     package: "0402"
-    position: [-8.0, -8.0, 0.8]
+    position: [-9.0, -12.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: RC0402FR-0710KL
     supplier_pn: 311-10.0KLRCT-ND
 
   - name: C4
     package: "0402"
-    position: [6.0, 8.0, 0.8]
+    position: [8.0, 8.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402KRX7R9BB104
     supplier_pn: 311-1438-1-ND
 
   - name: C5
     package: "0402"
-    position: [-6.0, -8.0, 0.8]
+    position: [-6.0, -9.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402KRX7R9BB104
     supplier_pn: 311-1438-1-ND
@@ -365,6 +365,33 @@ nets:
     pins:
       - [U1, D2]
       - [U2, INT]
+
+  - name: OSC_IN
+    color: "#059669"
+    pins:
+      - [U1, K1]
+      - [Y1, "1"]
+      - [C_OSC1, "1"]
+
+  - name: OSC_OUT
+    color: "#10b981"
+    pins:
+      - [U1, K2]
+      - [Y1, "3"]
+      - [C_OSC2, "1"]
+
+  - name: NRST
+    color: "#eab308"
+    pins:
+      - [U1, M1]
+      - [R_RST, "2"]
+      - [C_RST, "1"]
+
+  - name: BOOT0
+    color: "#ca8a04"
+    pins:
+      - [U1, M2]
+      - [R_BOOT, "1"]
 
   - name: PCIE_TX0_P
     color: "#2563eb"
@@ -499,33 +526,6 @@ nets:
     pins:
       - [U4, OUTN]
       - [SPK1, "2"]
-
-  - name: OSC_IN
-    color: "#059669"
-    pins:
-      - [U1, K1]
-      - [Y1, "1"]
-      - [C_OSC1, "1"]
-
-  - name: OSC_OUT
-    color: "#10b981"
-    pins:
-      - [U1, K2]
-      - [Y1, "3"]
-      - [C_OSC2, "1"]
-
-  - name: NRST
-    color: "#eab308"
-    pins:
-      - [U1, M1]
-      - [R_RST, "2"]
-      - [C_RST, "1"]
-
-  - name: BOOT0
-    color: "#ca8a04"
-    pins:
-      - [U1, M2]
-      - [R_BOOT, "1"]
 
   - name: VREG
     color: "#0891b2"

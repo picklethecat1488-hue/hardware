@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bug Report Workstation - Hardware Engineering</title>
+  <style>
+    /* =========================================================
+       QUAKE I / GLQUAKE CONSOLE & RETRO HUD ENGINE THEME
+       ========================================================= */
+    :root {
+      --quake-bg: #120c08;
+      --quake-panel: #1b120a;
+      --quake-panel-hover: #261a0f;
+      --quake-header-bg: #291a10;
+      --quake-border-light: #8d5d33;
+      --quake-border-mid: #5a381e;
+      --quake-border-dark: #120a05;
+
+      --quake-gold: #ffb800;
+      --quake-gold-dim: #c98c00;
+      --quake-amber: #e59400;
+      --quake-copper: #c87a32;
+      --quake-red: #ef4444;
+      --quake-green: #22c55e;
+      --quake-cyan: #38bdf8;
+      --quake-purple: #c084fc;
+      --quake-text-light: #dedede;
+      --quake-text-muted: #9e8a78;
+      --quake-text-dim: #716053;
+
+      --font-mono: ui-monospace, "SF Mono", "Courier New", "Lucida Console", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--quake-bg);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.45) 0px, rgba(0, 0, 0, 0.45) 2px, transparent 2px, transparent 4px),
+        radial-gradient(ellipse at 50% 0%, #2e1d13 0%, #0d0704 100%);
+      color: var(--quake-text-light);
+      font-family: var(--font-mono);
+      letter-spacing: 0.02em;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Custom Quake Scrollbars */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #120c08; border: 1px solid #291a10; }
+    ::-webkit-scrollbar-thumb { background: #5a381e; border: 1px solid #8d5d33; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #8d5d33; }
+
+    /* Quake Stone Plaque / Beveled Panels */
+    .quake-card {
+      background-color: var(--quake-panel);
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 1px 1px 0px var(--quake-border-light), inset -1px -1px 0px var(--quake-border-dark), 0 6px 18px rgba(0,0,0,0.85);
+      border-radius: 4px;
+    }
+
+    /* Quake Buttons */
+    .quake-btn {
+      font-family: var(--font-mono);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+    .quake-btn-default {
+      background: linear-gradient(180deg, #3a2618 0%, #20140c 100%);
+      border: 2px solid;
+      border-color: #7d4e28 #1a0f07 #1a0f07 #7d4e28;
+      color: #d6c6b2;
+      box-shadow: inset 1px 1px 0 #9c6838, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-default:hover {
+      background: linear-gradient(180deg, #4d3320 0%, #2c1c11 100%);
+      border-color: #9c6838 #1a0f07 #1a0f07 #9c6838;
+      color: var(--quake-gold);
+      text-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
+    .quake-btn-gold {
+      background: linear-gradient(180deg, #664614 0%, #3d2807 100%);
+      border: 2px solid;
+      border-color: #a8792a #1c1102 #1c1102 #a8792a;
+      color: #ffe699;
+      box-shadow: inset 1px 1px 0 #d49d3b, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-gold:hover {
+      background: linear-gradient(180deg, #805719 0%, #4a3209 100%);
+      color: #fff;
+      box-shadow: inset 1px 1px 0 #ffc107, 0 0 10px rgba(255, 184, 0, 0.5);
+    }
+    .quake-btn-green {
+      background: linear-gradient(180deg, #164e22 0%, #0d2e14 100%);
+      border: 2px solid;
+      border-color: #22c55e #071f0c #071f0c #22c55e;
+      color: #86efac;
+      box-shadow: inset 1px 1px 0 #4ade80, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-green:hover {
+      background: linear-gradient(180deg, #226b31 0%, #123d1a 100%);
+      box-shadow: inset 1px 1px 0 #86efac, 0 0 10px rgba(34, 197, 94, 0.5);
+    }
+    .quake-btn-red {
+      background: linear-gradient(180deg, #571616 0%, #330b0b 100%);
+      border: 2px solid;
+      border-color: #ef4444 #1f0707 #1f0707 #ef4444;
+      color: #fca5a5;
+      box-shadow: inset 1px 1px 0 #f87171, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-red:hover {
+      background: linear-gradient(180deg, #751f1f 0%, #450f0f 100%);
+      box-shadow: inset 1px 1px 0 #fca5a5, 0 0 10px rgba(239, 68, 68, 0.5);
+    }
+    .quake-btn-active {
+      background: linear-gradient(180deg, #130a05 0%, #24140a 100%) !important;
+      border: 2px solid !important;
+      border-color: #1a0f07 #7d4e28 #7d4e28 #1a0f07 !important;
+      color: var(--quake-gold) !important;
+      box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9) !important;
+      text-shadow: 0 0 8px rgba(255, 184, 0, 0.6);
+    }
+
+    /* Badges */
+    .quake-badge {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      padding: 2px 6px;
+      border-radius: 2px;
+      border: 1px solid;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .quake-badge-gold { background: #331f08; color: var(--quake-gold); border-color: #8d5d33; }
+    .quake-badge-red { background: #380808; color: #f87171; border-color: #991b1b; }
+    .quake-badge-green { background: #082d12; color: #4ade80; border-color: #166534; }
+    .quake-badge-cyan { background: #082436; color: #38bdf8; border-color: #075985; }
+    .quake-badge-amber { background: #3a1c06; color: #fbbf24; border-color: #92400e; }
+    .quake-badge-muted { background: #1c130d; color: var(--quake-text-muted); border-color: #4a301a; }
+
+    /* Inputs */
+    input[type="text"], select, textarea {
+      background-color: #0d0704;
+      border: 2px solid;
+      border-color: #140b06 #663f21 #663f21 #140b06;
+      color: var(--quake-gold);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 3px;
+      box-shadow: inset 2px 2px 4px rgba(0,0,0,0.8);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--quake-gold);
+      box-shadow: 0 0 8px rgba(255, 184, 0, 0.3), inset 2px 2px 4px rgba(0,0,0,0.8);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+      line-height: 1.5;
+    }
+
+    /* Top Review / Status Bar */
+    header.quake-header {
+      min-height: 50px;
+      height: auto;
+      background: var(--quake-header-bg);
+      border-bottom: 2px solid var(--quake-border-mid);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      flex-shrink: 0;
+      gap: 8px 12px;
+      z-index: 100;
+    }
+    .brand-block {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .brand-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--quake-gold);
+      text-shadow: 1px 1px 0 #000, 0 0 8px rgba(255, 184, 0, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .metrics-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .metric-pill {
+      font-size: 11px;
+      color: var(--quake-text-muted);
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--quake-border-mid);
+      padding: 4px 10px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .metric-highlight {
+      color: var(--quake-gold);
+      font-weight: 700;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    /* Main Container */
+    .main-container {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 340px;
+      background: #140d08;
+      border-right: 2px solid var(--quake-border-mid);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .sidebar-header {
+      padding: 10px 12px;
+      background: #1b120a;
+      border-bottom: 2px solid var(--quake-border-mid);
+      display: flex;
+      gap: 8px;
+    }
+    .sidebar-search {
+      flex: 1;
+      width: 100%;
+    }
+    .bug-list {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+    }
+    .bug-item {
+      padding: 12px 14px;
+      border-bottom: 1px solid #2d1b0f;
+      cursor: pointer;
+      transition: background 0.12s ease;
+      border-left: 3px solid transparent;
+    }
+    .bug-item:hover {
+      background: #22150b;
+    }
+    .bug-item.active {
+      background: #2b180a;
+      border-left: 3px solid var(--quake-gold);
+      box-shadow: inset 2px 0 8px rgba(255, 184, 0, 0.15);
+    }
+    .bug-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+    .bug-id {
+      font-weight: 800;
+      color: var(--quake-gold);
+    }
+    .bug-item-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--quake-text-light);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Content Area */
+    .content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: transparent;
+      overflow-y: auto;
+      padding: 20px 28px;
+      gap: 18px;
+    }
+
+    .form-section {
+      background-color: var(--quake-panel);
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 1px 1px 0px var(--quake-border-light), inset -1px -1px 0px var(--quake-border-dark), 0 4px 12px rgba(0,0,0,0.7);
+      border-radius: 4px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--quake-gold);
+      text-shadow: 1px 1px 0 #000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #3d2413;
+      padding-bottom: 6px;
+    }
+
+    .row { display: flex; gap: 14px; flex-wrap: wrap; }
+    .col { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 6px; }
+
+    label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--quake-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Dropzone & Paste Area */
+    .dropzone {
+      border: 2px dashed var(--quake-border-mid);
+      background: rgba(18, 12, 8, 0.6);
+      box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
+      border-radius: 4px;
+      padding: 22px 18px;
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--quake-text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--quake-gold);
+      background: rgba(255, 184, 0, 0.08);
+      color: var(--quake-gold);
+      box-shadow: 0 0 12px rgba(255, 184, 0, 0.25);
+    }
+    .dropzone-prompt {
+      font-weight: 700;
+      color: var(--quake-gold);
+    }
+    .dropzone-hint {
+      font-size: 10.5px;
+      color: var(--quake-text-dim);
+    }
+
+    /* Attachments & Previews */
+    .attachments-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+      margin-top: 6px;
+    }
+    .attachment-card {
+      background: #120a05;
+      border: 1px solid var(--quake-border-mid);
+      box-shadow: inset 1px 1px 0 #3d2413, 0 3px 6px rgba(0,0,0,0.6);
+      border-radius: 3px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .attachment-preview {
+      width: 100%;
+      height: 120px;
+      background: #000;
+      border-radius: 2px;
+      object-fit: contain;
+      border: 1px solid #331f0f;
+    }
+    .document-preview-box {
+      width: 100%;
+      height: 120px;
+      background: linear-gradient(180deg, #1c120a 0%, #0d0704 100%);
+      border: 1px solid #331f0f;
+      border-radius: 2px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 12px;
+      text-align: center;
+    }
+    .document-preview-box .doc-icon {
+      font-size: 28px;
+    }
+    .document-preview-box .doc-type {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--quake-gold);
+      letter-spacing: 0.05em;
+    }
+    .attachment-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--quake-text-light);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .attachment-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: var(--quake-text-muted);
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: linear-gradient(180deg, #3a2618 0%, #1a0f07 100%);
+      color: var(--quake-gold);
+      border: 2px solid var(--quake-gold);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.9), 0 0 10px rgba(255, 184, 0, 0.3);
+      padding: 10px 18px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: 700;
+      display: none;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Quake Top Bar Header -->
+  <header class="quake-header">
+    <div class="brand-block">
+      <span class="brand-title">⚡ QUAKE BUG REPORT WORKSTATION</span>
+    </div>
+    <div class="metrics-group">
+      <div class="metric-pill">TOTAL: <span id="m-total" class="metric-highlight">0</span></div>
+      <div class="metric-pill">OPEN: <span id="m-open" class="metric-highlight" style="color:var(--quake-amber);">0</span></div>
+      <div class="metric-pill">RESOLVED: <span id="m-resolved" class="metric-highlight" style="color:var(--quake-green);">0</span></div>
+    </div>
+    <div class="header-actions">
+      <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
+      <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="main-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <input type="text" id="search-input" class="sidebar-search" placeholder="Search bugs..." oninput="renderBugList()">
+      </div>
+      <ul id="bug-list" class="bug-list"></ul>
+    </div>
+
+    <!-- Content Area -->
+    <div class="content-area">
+      <!-- Bug Identity Section -->
+      <div class="form-section quake-card">
+        <div class="section-title">
+          <span>Issue Identity</span>
+          <div style="display:flex; gap:8px;">
+            <button id="btn-save" class="quake-btn quake-btn-green" onclick="saveActiveBug()">Save Bug</button>
+            <button id="btn-delete" class="quake-btn quake-btn-red" onclick="deleteActiveBug()">Delete</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col" style="flex:2;">
+            <label>Bug Title</label>
+            <input type="text" id="bug-title" placeholder="Descriptive title of the issue...">
+          </div>
+          <div class="col">
+            <label>Severity</label>
+            <select id="bug-severity">
+              {% for sev in severities %}
+              <option value="{{ sev }}">{{ sev }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col">
+            <label>Status</label>
+            <select id="bug-status">
+              {% for st in statuses %}
+              <option value="{{ st }}">{{ st }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col">
+            <label>Category</label>
+            <select id="bug-category">
+              {% for cat in categories %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col">
+            <label>Component</label>
+            <input type="text" id="bug-component" placeholder="e.g. carrier_board, flex_tail, U1">
+          </div>
+        </div>
+      </div>
+
+      <!-- Description Section -->
+      <div class="form-section quake-card">
+        <div class="section-title">Description & Details</div>
+        <div class="col">
+          <label>Problem Description</label>
+          <textarea id="bug-description" placeholder="Comprehensive explanation of defect or invariant failure..."></textarea>
+        </div>
+        <div class="col">
+          <label>Reproduction Steps (one per line)</label>
+          <textarea id="bug-steps" placeholder="1. python src/view.py test_board/carrier_board:pcb&#10;2. Inspect net NRST&#10;3. Observe collision"></textarea>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label>Expected Behavior</label>
+            <textarea id="bug-expected" style="min-height:60px;" placeholder="What should have happened..."></textarea>
+          </div>
+          <div class="col">
+            <label>Actual Behavior</label>
+            <textarea id="bug-actual" style="min-height:60px;" placeholder="What actually occurred..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs Section -->
+      <div class="form-section quake-card">
+        <div class="section-title">Execution Logs & Tracebacks</div>
+        <div class="col">
+          <label>Console Output / Python Traceback</label>
+          <textarea id="bug-logs" style="font-family:var(--font-mono); min-height:100px;" placeholder="Paste runtime failure logs or traceback here..."></textarea>
+        </div>
+      </div>
+
+      <!-- Attachments & References Section -->
+      <div class="form-section quake-card" id="attachments-section">
+        <div class="section-title">
+          <span>Attachments & References</span>
+          <div style="display:flex; gap:8px;">
+            <button class="quake-btn quake-btn-default" onclick="pasteFromClipboard()">📋 Paste from Clipboard</button>
+            <button class="quake-btn quake-btn-default" onclick="document.getElementById('file-upload').click()">📁 Browse Files</button>
+          </div>
+        </div>
+        <div id="dropzone" class="dropzone" onclick="document.getElementById('file-upload').click()">
+          <span class="dropzone-prompt">📋 DRAG & DROP OR PASTE (⌘V / Ctrl+V) SCREENSHOTS & DOCUMENTS</span>
+          <span class="dropzone-hint">Supports Images (.png, .jpg, .svg), Documents (.pdf, .txt, .log, .md, .json, .yaml), or Clipboard files</span>
+          <input type="file" id="file-upload" multiple style="display:none;" onchange="handleFileUpload(this.files)">
+        </div>
+        <div id="attachments-grid" class="attachments-grid"></div>
+      </div>
+
+      <!-- Resolution Section -->
+      <div class="form-section quake-card">
+        <div class="section-title">Resolution Notes</div>
+        <div class="col">
+          <label>Fix Details & Commit References</label>
+          <textarea id="bug-resolution" placeholder="Document root cause, code changes made, and test regression verifications..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    let db = {{ database_json | safe }};
+    let activeBugId = null;
+
+    function init() {
+      if (db.bugs && db.bugs.length > 0) {
+        activeBugId = db.bugs[0].id;
+      }
+      updateMetrics();
+      renderBugList();
+      loadActiveBug();
+      setupPasteDrop();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.innerText = msg;
+      t.style.display = "block";
+      setTimeout(() => { t.style.display = "none"; }, 3500);
+    }
+
+    function updateMetrics() {
+      const total = db.bugs.length;
+      const open = db.bugs.filter(b => b.status === "OPEN" || b.status === "IN_PROGRESS").length;
+      const resolved = db.bugs.filter(b => b.status === "RESOLVED" || b.status === "CLOSED").length;
+      document.getElementById("m-total").innerText = total;
+      document.getElementById("m-open").innerText = open;
+      document.getElementById("m-resolved").innerText = resolved;
+    }
+
+    function renderBugList() {
+      const list = document.getElementById("bug-list");
+      list.innerHTML = "";
+      const query = (document.getElementById("search-input").value || "").toLowerCase();
+
+      db.bugs.forEach(bug => {
+        if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query)) {
+          return;
+        }
+
+        const li = document.createElement("li");
+        li.className = "bug-item" + (bug.id === activeBugId ? " active" : "");
+        li.onclick = () => selectBug(bug.id);
+
+        let sevBadgeClass = "quake-badge quake-badge-muted";
+        if (bug.severity === "CRITICAL") sevBadgeClass = "quake-badge quake-badge-red";
+        else if (bug.severity === "HIGH") sevBadgeClass = "quake-badge quake-badge-amber";
+        else if (bug.severity === "MEDIUM") sevBadgeClass = "quake-badge quake-badge-gold";
+        else if (bug.severity === "LOW") sevBadgeClass = "quake-badge quake-badge-muted";
+
+        let stBadgeClass = "quake-badge quake-badge-amber";
+        if (bug.status === "RESOLVED" || bug.status === "CLOSED") {
+          stBadgeClass = "quake-badge quake-badge-green";
+        }
+
+        li.innerHTML = `
+          <div class="bug-item-top">
+            <span class="bug-id">${bug.id}</span>
+            <span class="${sevBadgeClass}">${bug.severity}</span>
+            <span class="${stBadgeClass}">${bug.status}</span>
+          </div>
+          <div class="bug-item-title">${bug.title || "Untitled Bug"}</div>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function selectBug(id) {
+      activeBugId = id;
+      renderBugList();
+      loadActiveBug();
+    }
+
+    function loadActiveBug() {
+      const bug = db.bugs.find(b => b.id === activeBugId);
+      if (!bug) return;
+
+      document.getElementById("bug-title").value = bug.title || "";
+      document.getElementById("bug-severity").value = bug.severity || "MEDIUM";
+      document.getElementById("bug-status").value = bug.status || "OPEN";
+      document.getElementById("bug-category").value = bug.category || "PCB";
+      document.getElementById("bug-component").value = bug.component || "";
+      document.getElementById("bug-description").value = bug.description || "";
+      document.getElementById("bug-steps").value = (bug.reproduction_steps || []).join("\n");
+      document.getElementById("bug-expected").value = bug.expected_behavior || "";
+      document.getElementById("bug-actual").value = bug.actual_behavior || "";
+      document.getElementById("bug-logs").value = bug.logs || "";
+      document.getElementById("bug-resolution").value = bug.resolution_notes || "";
+
+      renderAttachments(bug.attachments || []);
+    }
+
+    function renderAttachments(attachments) {
+      const grid = document.getElementById("attachments-grid");
+      grid.innerHTML = "";
+      attachments.forEach((att, idx) => {
+        const card = document.createElement("div");
+        card.className = "attachment-card";
+        const fname = att.filename.toLowerCase();
+        const isImg = fname.endsWith(".png") || fname.endsWith(".jpg") || fname.endsWith(".jpeg") || fname.endsWith(".svg") || fname.endsWith(".gif") || fname.endsWith(".webp");
+        const isPdf = fname.endsWith(".pdf");
+
+        let previewHtml = "";
+        if (isImg) {
+          previewHtml = `<a href="/${att.file_path}" target="_blank"><img src="/${att.file_path}" class="attachment-preview" alt="${att.filename}"></a>`;
+        } else {
+          const icon = isPdf ? "📕" : "📄";
+          const docTypeLabel = isPdf ? "PDF DOCUMENT" : (att.file_type ? att.file_type.toUpperCase() : "DOCUMENT");
+          previewHtml = `
+            <a href="/${att.file_path}" target="_blank" style="text-decoration:none;">
+              <div class="document-preview-box">
+                <div class="doc-icon">${icon}</div>
+                <div class="doc-type">${docTypeLabel}</div>
+              </div>
+            </a>
+          `;
+        }
+
+        const sizeStr = att.size_bytes ? (att.size_bytes > 1024 ? Math.round(att.size_bytes / 1024) + " KB" : att.size_bytes + " B") : "";
+
+        card.innerHTML = `
+          ${previewHtml}
+          <div class="attachment-name" title="${att.filename}">${att.filename}</div>
+          <div class="attachment-footer">
+            <span>${sizeStr}</span>
+            <button class="quake-btn quake-btn-red" style="font-size:9.5px;padding:2px 6px;" onclick="removeAttachment(${idx})">Remove</button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function newBug() {
+      const newId = "BUG-" + String(db.bugs.length + 1).padStart(3, "0");
+      const bug = {
+        id: newId,
+        title: "New Bug Report",
+        status: "OPEN",
+        severity: "MEDIUM",
+        category: "PCB",
+        component: "",
+        description: "",
+        reproduction_steps: [],
+        expected_behavior: "",
+        actual_behavior: "",
+        logs: "",
+        attachments: [],
+        resolution_notes: ""
+      };
+      db.bugs.unshift(bug);
+      activeBugId = newId;
+      updateMetrics();
+      renderBugList();
+      loadActiveBug();
+      saveActiveBug();
+    }
+
+    async function saveActiveBug() {
+      const bug = db.bugs.find(b => b.id === activeBugId);
+      if (!bug) return;
+
+      bug.title = document.getElementById("bug-title").value;
+      bug.severity = document.getElementById("bug-severity").value;
+      bug.status = document.getElementById("bug-status").value;
+      bug.category = document.getElementById("bug-category").value;
+      bug.component = document.getElementById("bug-component").value;
+      bug.description = document.getElementById("bug-description").value;
+      bug.reproduction_steps = document.getElementById("bug-steps").value.split("\n").filter(s => s.trim());
+      bug.expected_behavior = document.getElementById("bug-expected").value;
+      bug.actual_behavior = document.getElementById("bug-actual").value;
+      bug.logs = document.getElementById("bug-logs").value;
+      bug.resolution_notes = document.getElementById("bug-resolution").value;
+
+      const res = await fetch("/api/bugs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bug)
+      });
+      const saved = await res.json();
+      updateMetrics();
+      renderBugList();
+      showToast("Saved bug " + saved.id + " & synced BUGS.md");
+      return saved;
+    }
+
+    async function deleteActiveBug() {
+      if (!confirm("Are you sure you want to delete this bug report?")) return;
+      await fetch("/api/bugs/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: activeBugId })
+      });
+      db.bugs = db.bugs.filter(b => b.id !== activeBugId);
+      activeBugId = db.bugs.length > 0 ? db.bugs[0].id : null;
+      updateMetrics();
+      renderBugList();
+      loadActiveBug();
+      showToast("Deleted bug & updated BUGS.md");
+    }
+
+    async function saveAndExit() {
+      const btn = document.getElementById("btn-save-exit");
+      btn.innerText = "⏳ Saving...";
+      btn.disabled = true;
+
+      try {
+        await saveActiveBug();
+        const res = await fetch("/api/exit", { method: "POST" });
+        const data = await res.json();
+        showToast("Session saved to BUGS.md. Server exited.");
+      } catch (err) {
+        showToast("Saved state. Shutting down...");
+      }
+
+      setTimeout(() => {
+        window.close();
+        document.body.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;color:#ffb800;font-family:var(--font-mono);font-size:16px;text-align:center;">
+            <span style="font-size:24px;">⚡ BUGS.MD SAVED & SYNCED</span>
+            <span style="color:#dedede;font-size:13px;">The Bug Report server has shut down. You can safely close this window.</span>
+          </div>
+        `;
+      }, 700);
+    }
+
+    function removeAttachment(idx) {
+      const bug = db.bugs.find(b => b.id === activeBugId);
+      if (bug && bug.attachments) {
+        bug.attachments.splice(idx, 1);
+        renderAttachments(bug.attachments);
+        saveActiveBug();
+      }
+    }
+
+    function setupPasteDrop() {
+      const dz = document.getElementById("dropzone");
+      dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("dragover"); };
+      dz.ondragleave = () => dz.classList.remove("dragover");
+      dz.ondrop = (e) => {
+        e.preventDefault();
+        dz.classList.remove("dragover");
+        handleFileUpload(e.dataTransfer.files);
+      };
+
+      // Global and targeted paste event handler supporting screenshots & documents
+      window.addEventListener("paste", (e) => {
+        // If the focused element is a text input and clipboard has ONLY plain text, allow standard paste
+        const activeElem = document.activeElement;
+        const isTextInput = activeElem && (activeElem.tagName === "INPUT" || activeElem.tagName === "TEXTAREA");
+        const hasFiles = e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0;
+
+        if (isTextInput && !hasFiles) {
+          // If the user is specifically pasting inside dropzone or attachments, capture text as document
+          if (activeElem.closest && activeElem.closest("#attachments-section")) {
+            e.preventDefault();
+            const text = e.clipboardData.getData("text");
+            if (text && text.trim()) {
+              uploadTextDocument(text, "clipboard_doc_" + Date.now() + ".txt");
+            }
+          }
+          return;
+        }
+
+        if (hasFiles) {
+          e.preventDefault();
+          handleFileUpload(e.clipboardData.files);
+          return;
+        }
+
+        // Check clipboard items
+        if (e.clipboardData && e.clipboardData.items) {
+          let handled = false;
+          for (let item of e.clipboardData.items) {
+            if (item.kind === "file") {
+              const blob = item.getAsFile();
+              if (blob) {
+                const fname = blob.name || (blob.type.startsWith("image/") ? "screenshot_paste_" + Date.now() + ".png" : "doc_paste_" + Date.now() + ".txt");
+                const ftype = blob.type.startsWith("image/") ? "screenshot" : "document";
+                uploadBlob(blob, fname, ftype);
+                handled = true;
+              }
+            }
+          }
+          if (handled) {
+            e.preventDefault();
+            return;
+          }
+        }
+
+        // If target is dropzone and clipboard has text, save text document
+        if (e.clipboardData) {
+          const text = e.clipboardData.getData("text");
+          if (text && text.trim() && (!isTextInput || activeElem.id === "dropzone")) {
+            e.preventDefault();
+            uploadTextDocument(text, "clipboard_text_" + Date.now() + ".txt");
+          }
+        }
+      });
+    }
+
+    async function pasteFromClipboard() {
+      try {
+        if (navigator.clipboard && navigator.clipboard.read) {
+          const clipboardItems = await navigator.clipboard.read();
+          for (const item of clipboardItems) {
+            for (const type of item.types) {
+              if (type.startsWith("image/")) {
+                const blob = await item.getType(type);
+                uploadBlob(blob, "pasted_screenshot_" + Date.now() + ".png", "screenshot");
+                return;
+              } else if (type === "application/pdf") {
+                const blob = await item.getType(type);
+                uploadBlob(blob, "pasted_document_" + Date.now() + ".pdf", "document");
+                return;
+              }
+            }
+          }
+        }
+        // Fallback to clipboard text
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          const text = await navigator.clipboard.readText();
+          if (text && text.trim()) {
+            uploadTextDocument(text, "pasted_document_" + Date.now() + ".txt");
+            return;
+          }
+        }
+      } catch (err) {
+        showToast("Tip: Press ⌘V / Ctrl+V to paste screenshot or document");
+      }
+    }
+
+    function handleFileUpload(files) {
+      if (!files || files.length === 0) return;
+      for (let f of files) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const b64 = reader.result.split(",")[1];
+          const lowerName = f.name.toLowerCase();
+          const isImg = lowerName.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i);
+          const isDoc = lowerName.match(/\.(pdf|txt|log|json|yaml|yml|md|csv)$/i);
+          const fileType = isImg ? "screenshot" : (isDoc ? "document" : "reference");
+          uploadPayload({
+            filename: f.name,
+            file_type: fileType,
+            content_base64: b64,
+            description: "Uploaded " + fileType + " " + f.name
+          });
+        };
+        reader.readAsDataURL(f);
+      }
+    }
+
+    function uploadBlob(blob, filename, fileType) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const b64 = reader.result.split(",")[1];
+        uploadPayload({
+          filename: filename,
+          file_type: fileType,
+          content_base64: b64,
+          description: "Pasted " + fileType
+        });
+      };
+      reader.readAsDataURL(blob);
+    }
+
+    function uploadTextDocument(text, filename) {
+      uploadPayload({
+        filename: filename,
+        file_type: "document",
+        content_text: text,
+        description: "Pasted text document"
+      });
+    }
+
+    async function uploadPayload(payload) {
+      showToast("Uploading " + payload.filename + "...");
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const att = await res.json();
+      const bug = db.bugs.find(b => b.id === activeBugId);
+      if (bug) {
+        if (!bug.attachments) bug.attachments = [];
+        bug.attachments.push(att);
+        renderAttachments(bug.attachments);
+        saveActiveBug();
+        showToast("Attached " + att.filename);
+      }
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>

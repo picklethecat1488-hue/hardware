@@ -1,7 +1,7 @@
 # Parameterized geometric specifications for Test Board rigid-flex assembly
 board_width: 60.0
 board_length: 90.0
-corner_radius: 4.0
+corner_radius: 6.0
 board_thickness: 1.6
 flex_tail_width: 22.0
 flex_tail_length: 50.0

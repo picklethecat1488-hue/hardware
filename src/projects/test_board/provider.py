@@ -162,6 +162,28 @@ class TestBoardProvider(Provider):
             with Locations((0.0, y_center, 0.0)):
                 Box(w_tail, l_tail, t_tail)
 
+            with BuildSilkscreen() as silk:
+                with Locations((0.0, -23.5)):
+                    SilkscreenText("FLEX TAIL SENSOR REV 1.0", layer="F.SilkS", font_size=0.8, thickness=0.12)
+                with Locations((0.0, -6.0)):
+                    SilkscreenText("CH0: LOW", layer="F.SilkS", font_size=0.7, thickness=0.10)
+                with Locations((0.0, 5.5)):
+                    SilkscreenText("CH1: MID", layer="F.SilkS", font_size=0.7, thickness=0.10)
+                with Locations((0.0, 16.5)):
+                    SilkscreenText("CH2: HIGH", layer="F.SilkS", font_size=0.7, thickness=0.10)
+                with Locations((0.0, 23.8)):
+                    SilkscreenText("CH3: PROX", layer="F.SilkS", font_size=0.7, thickness=0.10)
+                with Locations((-9.5, -23.0)):
+                    SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.6, thickness=0.09)
+
+            routing_flex_file = self.wiring_path.parent / "routing_flex.yaml"
+            if routing_flex_file.exists():
+                from provider.pcb.router import PCBAutoRouter
+
+                f_traces, f_vias = PCBAutoRouter.load_routing_yaml(routing_flex_file)
+                tail.traces.extend(f_traces)
+                tail.vias.extend(f_vias)
+
         return tail
 
     def silkscreen(self) -> list[SilkscreenTextModel]:

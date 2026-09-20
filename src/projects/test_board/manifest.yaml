@@ -6,6 +6,8 @@ imports:
 carrier_board:
   part:
     modes: [default, print]
+  pcb:
+    modes: [default]
   material: fr4_core
   export: [stl, step]
   color: [0.08, 0.40, 0.20, 1.0]
