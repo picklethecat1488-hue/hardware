@@ -627,6 +627,22 @@ class SilkscreenTextModel(BaseModel):
     mirror: bool = Field(default=False, description="Whether text is mirrored (default True for B.SilkS)")
 
 
+class SchematicLayoutModel(BaseModel):
+    """Layout grid and dimension parameters for schematic diagram sheets."""
+
+    col_width: float = Field(default=60.0, description="Nominal column width in mm for multi-column layout")
+    col_gap: float = Field(default=15.0, description="Gap between columns in mm")
+    sheet_center_x: float = Field(default=148.5, description="Drawing sheet center X coordinate in mm")
+    sheet_center_y: float = Field(default=105.0, description="Drawing sheet center Y coordinate in mm")
+    row_step_y: float = Field(default=55.0, description="Vertical pitch step between symbol rows in mm")
+    default_symbol_width: float = Field(default=45.0, description="Default symbol width in mm for DRC overlap checks")
+    default_symbol_height: float = Field(default=35.0, description="Default symbol height in mm for DRC overlap checks")
+    cols_per_row: Optional[int] = Field(default=None, description="Optional forced columns per row for schematic sheet")
+    grid_positions: dict[str, List[int]] = Field(
+        default_factory=dict, description="Component -> [row, col] grid position override"
+    )
+
+
 class SchematicSheetModel(BaseModel):
     """Configuration for an individual functional schematic drawing sheet."""
 
@@ -637,6 +653,12 @@ class SchematicSheetModel(BaseModel):
     )
     pin_breakouts: dict[str, List[str]] = Field(
         default_factory=dict, description="Component -> subset of pin names to display on this sheet"
+    )
+    pin_sides: dict[str, dict[str, str]] = Field(
+        default_factory=dict, description="Component -> {pin_name: 'left' | 'right'} pin side placement overrides"
+    )
+    layout: SchematicLayoutModel = Field(
+        default_factory=SchematicLayoutModel, description="Layout grid and dimension parameters for this sheet"
     )
 
 
@@ -743,6 +765,10 @@ class PCBConfig(BaseModel):
         default_factory=list,
         description="Defined schematic sheets for multi-page functional signal breakout",
     )
+    schematic_layout: SchematicLayoutModel = Field(
+        default_factory=SchematicLayoutModel,
+        description="Default grid layout and dimension parameters for schematic sheets",
+    )
     mounting_holes: List[MountingHoleModel] = Field(
         default_factory=list,
         description="Drill and mounting holes for carrier assembly",
@@ -753,6 +779,9 @@ class PCBConfig(BaseModel):
     vias: List[ViaModel] = Field(default_factory=list, description="Through-hole and blind/buried interlayer vias")
     copper_regions: List[CopperRegionModel] = Field(
         default_factory=list, description="Filled copper pours, planes, and shielding zones"
+    )
+    outline_polygon: Optional[List[Tuple[float, float]]] = Field(
+        default=None, description="2D polygon vertices defining non-rectangular or hull board outline"
     )
     test_points: List[TestPointModel] = Field(default_factory=list, description="Exposed test point probing pads")
 

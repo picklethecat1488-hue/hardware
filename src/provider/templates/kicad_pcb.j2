@@ -129,7 +129,11 @@
   )
 {% endfor %}
 
-{% if outline.corner_radius and outline.corner_radius > 0 %}
+{% if outline.polygon_segments and outline.polygon_segments|length >= 3 %}
+  {% for seg in outline.polygon_segments %}
+  (gr_line (start {{ seg.x1 }} {{ seg.y1 }}) (end {{ seg.x2 }} {{ seg.y2 }}) (stroke (width 0.1) (type default)) (layer "Edge.Cuts"))
+  {% endfor %}
+{% elif outline.corner_radius and outline.corner_radius > 0 %}
   {% set r = outline.corner_radius %}
   {% set diag = r * 0.29289322 %}
   (gr_line (start {{ (outline.x1 + r)|round(4) }} {{ outline.y1 }}) (end {{ (outline.x2 - r)|round(4) }} {{ outline.y1 }}) (stroke (width 0.1) (type default)) (layer "Edge.Cuts"))

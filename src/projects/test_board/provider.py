@@ -149,6 +149,9 @@ class TestBoardProvider(Provider):
             cr = self.copper_regions()
             pcb.copper_regions.extend(cr.regions)
 
+            pcb.traces.extend(self.traces())
+            pcb.vias.extend(self.vias())
+
         return pcb
 
     def flex_tail(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildFlexPCB:
@@ -157,26 +160,30 @@ class TestBoardProvider(Provider):
         l_tail = self.settings.flex_tail_length
         t_tail = self.settings.flex_tail_thickness
 
+        pts = [
+            (-w_tail / 2.0, -l_tail / 2.0),
+            (w_tail / 2.0, -l_tail / 2.0),
+            (w_tail / 2.0, -l_tail / 2.0 + 5.5),
+            (7.5, -l_tail / 2.0 + 7.5),
+            (7.5, l_tail / 2.0 - 1.5),
+            (5.0, l_tail / 2.0),
+            (-5.0, l_tail / 2.0),
+            (-7.5, l_tail / 2.0 - 1.5),
+            (-7.5, -l_tail / 2.0 + 7.5),
+            (-w_tail / 2.0, -l_tail / 2.0 + 5.5),
+        ]
+
         with BuildFlexPCB(
             name="flex_tail",
             flex_type=FlexType.CAPACITIVE,
             capacitive_sensors=self.pcb_config.capacitive_sensors if self.pcb_config else None,
+            outline_polygon=pts,
         ) as tail:
             # Manifold hull enclosing connector and sensing channels with minimal wasted space
             with BuildSketch() as s:
-                pts = [
-                    (-w_tail / 2.0, -l_tail / 2.0),
-                    (w_tail / 2.0, -l_tail / 2.0),
-                    (w_tail / 2.0, -l_tail / 2.0 + 5.5),
-                    (7.5, -l_tail / 2.0 + 7.5),
-                    (7.5, l_tail / 2.0 - 1.5),
-                    (5.0, l_tail / 2.0),
-                    (-5.0, l_tail / 2.0),
-                    (-7.5, l_tail / 2.0 - 1.5),
-                    (-7.5, -l_tail / 2.0 + 7.5),
-                    (-w_tail / 2.0, -l_tail / 2.0 + 5.5),
-                ]
                 Polygon(*pts)
+                r_corner = self.settings.flex_tail_corner_radius
+                fillet(s.vertices(), radius=r_corner)
             extrude(s.sketch, amount=t_tail)
 
             with BuildSilkscreen() as silk:
@@ -317,8 +324,21 @@ class TestBoardProvider(Provider):
         tail = self.flex_tail("flex_tail", None, mode)
         enclosure = self.enclosure_bottom("enclosure_bottom", None, mode)
 
+        tail_geom: Any = tail
+        if self.wiring_path.exists():
+            from build123d import Location
+
+            wiring = Wiring(self.wiring_path)
+            j2_comp = next((c for c in wiring.footprints if c.name == "J2"), None)
+            j_flex_comp = next((c for c in wiring.footprints if c.name == "J_FLEX"), None)
+            if j2_comp and j_flex_comp:
+                dx = j2_comp.position[0] - j_flex_comp.position[0]
+                dy = j2_comp.position[1] - j_flex_comp.position[1]
+                dz = j2_comp.position[2] - j_flex_comp.position[2]
+                tail_geom = tail.part.locate(Location((dx, dy, dz)))
+
         room.add("carrier_board", carrier, color=(0.08, 0.40, 0.20), alpha=1.0)
-        room.add("flex_tail", tail, color=(0.85, 0.65, 0.15), alpha=0.9)
+        room.add("flex_tail", tail_geom, color=(0.85, 0.65, 0.15), alpha=0.9)
         room.add("enclosure_bottom", enclosure, color=(0.15, 0.16, 0.20), alpha=0.4)
 
     def diagram_product(self, room: Room, targets: Sequence[str], mode: Mode) -> None:

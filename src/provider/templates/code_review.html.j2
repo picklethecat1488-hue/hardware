@@ -1643,6 +1643,10 @@
         jumpToLine(lineTarget);
         logCli(`> goto @${activePath}:${lineTarget}`, "cyan");
       } else {
+        const changes = getFileChanges();
+        if (changes && changes.length > 0) {
+          applyChange(changes[0], true);
+        }
         logCli(`> goto @${activePath}`, "cyan");
       }
     }

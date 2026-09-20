@@ -74,6 +74,11 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["flex_tail_thickness"])
 
     @property
+    def flex_tail_corner_radius(self) -> float:
+        """Fillet corner radius of flex tail contour in mm."""
+        return float(self._raw_data.get("flex_tail_corner_radius", 1.0))
+
+    @property
     def flex_bend_radius(self) -> float:
         """Allowable dynamic bend radius in mm."""
         return float(self._raw_data["flex_bend_radius"])

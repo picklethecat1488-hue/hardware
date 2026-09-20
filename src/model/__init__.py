@@ -45,4 +45,6 @@ from .pcb import (
     PCBMaterialModel,
     PCBMaterialsModel,
     PCBConfig,
+    SchematicLayoutModel,
+    SchematicSheetModel,
 )

@@ -108,6 +108,7 @@ pytest
 ### 8. Work Tracking & Task Management
 * **Task List (`TODO.md`)**: Maintain and track planned tasks, active implementation steps, outstanding engineering checklist items, and completed work in a `TODO.md` file in the workspace root. Keep the checklist updated (`[ ]` -> `[x]`) as subtasks progress to provide clear visibility and alignment.
 * **Pending Code Review Inspection (`build/CR.md`)**: Whenever beginning a new task, turn, or feature implementation, you MUST inspect `build/CR.md` for pending code review feedback, active review comments, or requested revisions. Any unaddressed feedback in `build/CR.md` must be prioritized and resolved before progressing to new development tasks.
+* **Bug Tracker & Historical Context Inspection (`build/BUGS.md`, `BUGS.txt`)**: Whenever working on tasks, investigating issues, or modifying existing subsystems, you MUST inspect the bug tracker (`build/BUGS.md`, `build/bugs_state.json`, or `BUGS.txt`) for past context, historical failure modes, reproduction steps, and resolved invariants. Leveraging past context prevents re-introducing known regressions and ensures new implementations respect architectural fixes established in prior resolutions.
 
 ### 9. Code Generation & Jinja2 Templates
 * **Jinja2 Templating Engine**: Always use Jinja2 (`jinja2`) to generate templated Python scripts, Blender headless scripts, URDF models, or simulation configurations rather than embedding large multi-line f-strings directly inside Python source files.

@@ -12,7 +12,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 import matplotlib.patches as patches
 
-from model.pcb import PCBConfig
+from model.pcb import PCBConfig, SchematicLayoutModel
 from model.wiring import FootprintModel, NetModel, Wiring, TruthTableModel, TruthTableRowModel, PinModel
 
 
@@ -194,10 +194,16 @@ class SchematicDiagram:
                     if comp_name in fp_map:
                         orig_fp = fp_map[comp_name]
                         if sheet_def.pin_breakouts and comp_name in sheet_def.pin_breakouts:
-                            allowed_pins = set(sheet_def.pin_breakouts[comp_name])
-                            filtered_pins = [
+                            pin_order_list = sheet_def.pin_breakouts[comp_name]
+                            pin_order_map = {name: idx for idx, name in enumerate(pin_order_list)}
+                            allowed_pins = set(pin_order_map.keys())
+                            matched_pins = [
                                 p for p in orig_fp.pins if p.name in allowed_pins or p.label in allowed_pins
                             ]
+                            filtered_pins = sorted(
+                                matched_pins,
+                                key=lambda p: pin_order_map.get(p.name, pin_order_map.get(p.label, 999)),
+                            )
                             sheet_fps.append(orig_fp.model_copy(update={"pins": filtered_pins}))
                         else:
                             sheet_fps.append(orig_fp)
@@ -708,30 +714,54 @@ class SchematicDiagram:
 
         for pwr_net in pwr_nets_ordered:
             sub_indices = [idx for idx, c in enumerate(caps) if cap_pwr_map[c.name] == pwr_net]
-            sub_left = base_x + sub_indices[0] * delta_x - 4.0
-            sub_right = base_x + sub_indices[-1] * delta_x + 4.0
-            ax.plot([sub_left, sub_right], [y_top, y_top], color="#dc2626", linewidth=1.2, zorder=2)
-            ax.plot([sub_left, sub_left], [y_top, y_top + 3.5], color="#dc2626", linewidth=1.2, zorder=2)
-            ax.plot(
-                [sub_left - 2.5, sub_left, sub_left + 2.5],
-                [y_top + 2.0, y_top + 4.5, y_top + 2.0],
-                color="#dc2626",
-                linewidth=1.2,
-                zorder=2,
-            )
-            ax.text(
-                sub_left,
-                y_top + 5.5,
-                pwr_net,
-                ha="center",
-                va="bottom",
-                fontsize=5.8,
-                fontweight="bold",
-                color="#dc2626",
-                zorder=3,
-            )
+            if len(sub_indices) == 1:
+                cx_single = base_x + sub_indices[0] * delta_x
+                ax.plot([cx_single, cx_single], [y_top, y_top + 3.5], color="#dc2626", linewidth=1.2, zorder=2)
+                ax.plot(
+                    [cx_single - 2.5, cx_single, cx_single + 2.5],
+                    [y_top + 2.0, y_top + 4.5, y_top + 2.0],
+                    color="#dc2626",
+                    linewidth=1.2,
+                    zorder=2,
+                )
+                ax.text(
+                    cx_single,
+                    y_top + 5.5,
+                    pwr_net,
+                    ha="center",
+                    va="bottom",
+                    fontsize=5.8,
+                    fontweight="bold",
+                    color="#dc2626",
+                    zorder=3,
+                )
+            else:
+                sub_left = base_x + sub_indices[0] * delta_x
+                sub_right = base_x + sub_indices[-1] * delta_x
+                ax.plot([sub_left, sub_right], [y_top, y_top], color="#dc2626", linewidth=1.2, zorder=2)
+                ax.plot([sub_left, sub_left], [y_top, y_top + 3.5], color="#dc2626", linewidth=1.2, zorder=2)
+                ax.plot(
+                    [sub_left - 2.5, sub_left, sub_left + 2.5],
+                    [y_top + 2.0, y_top + 4.5, y_top + 2.0],
+                    color="#dc2626",
+                    linewidth=1.2,
+                    zorder=2,
+                )
+                ax.text(
+                    sub_left,
+                    y_top + 5.5,
+                    pwr_net,
+                    ha="center",
+                    va="bottom",
+                    fontsize=5.8,
+                    fontweight="bold",
+                    color="#dc2626",
+                    zorder=3,
+                )
 
-        # Common Ground Rail (Bottom)
+        # Common Ground Rail (Bottom) - ends exactly at the last capacitor to prevent antennae
+        rail_left = base_x - 6.0
+        rail_right = base_x + total_w
         ax.plot([rail_left, rail_right], [y_bot, y_bot], color="#475569", linewidth=1.2, zorder=2)
 
         # Common Ground 3-bar symbol (Left of rail)
@@ -894,35 +924,53 @@ class SchematicDiagram:
                 rail_net = n2
                 sig_net = n1
 
-            matching_seg = next((s for s in h_wire_segments if s[3] == sig_net), None)
-            if matching_seg:
-                x_start, x_end = min(matching_seg[0], matching_seg[1]), max(matching_seg[0], matching_seg[1])
+            matching_segs = [s for s in h_wire_segments if s[3] == sig_net]
+            if matching_segs:
+                x_start = min(min(s[0], s[1]) for s in matching_segs)
+                x_end = max(max(s[0], s[1]) for s in matching_segs)
                 seg_len = x_end - x_start
-                if seg_len > 25.0:
-                    # Inter-component channel: space within segment
-                    cand_x = x_start + seg_len * 0.35 + (idx % 2) * 12.0
-                    while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
-                        cand_x += 10.0
+                if seg_len >= 18.0:
+                    # Inter-component channel: space within segment with clearance from both ends
+                    safe_min = x_start + 6.0
+                    safe_max = x_end - 8.0
+                    cand_x = safe_min + (idx % 2) * 8.0
+                    if cand_x > safe_max:
+                        cand_x = safe_max
+                    while any(abs(cand_x - ux) < 7.0 for ux in used_x_positions):
+                        if cand_x + 7.0 <= safe_max:
+                            cand_x += 7.0
+                        elif cand_x - 7.0 >= safe_min:
+                            cand_x -= 7.0
+                        else:
+                            break
                 elif x_start < 100.0:
-                    # Left breakout stub: extend outward to the left
-                    cand_x = x_start - 12.0
-                    while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
-                        cand_x -= 12.0
+                    # Left breakout stub: extend outward to the left well clear of GND symbols
+                    cand_x = x_start - 26.0 - idx * 20.0
+                    while any(abs(cand_x - ux) < 14.0 for ux in used_x_positions):
+                        cand_x -= 14.0
                     ax.plot(
-                        [cand_x, x_start], [matching_seg[2], matching_seg[2]], color="#2563eb", linewidth=1.2, zorder=2
+                        [cand_x, x_start],
+                        [matching_segs[0][2], matching_segs[0][2]],
+                        color="#2563eb",
+                        linewidth=1.2,
+                        zorder=2,
                     )
-                    h_wire_segments.append((cand_x, x_start, matching_seg[2], sig_net, "#2563eb"))
+                    h_wire_segments.append((cand_x, x_start, matching_segs[0][2], sig_net, "#2563eb"))
                 else:
                     # Right breakout stub: extend outward to the right
-                    cand_x = x_end + 12.0
-                    while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
-                        cand_x += 12.0
+                    cand_x = x_end + 14.0 + idx * 16.0
+                    while any(abs(cand_x - ux) < 14.0 for ux in used_x_positions):
+                        cand_x += 14.0
                     ax.plot(
-                        [x_end, cand_x], [matching_seg[2], matching_seg[2]], color="#2563eb", linewidth=1.2, zorder=2
+                        [x_end, cand_x],
+                        [matching_segs[0][2], matching_segs[0][2]],
+                        color="#2563eb",
+                        linewidth=1.2,
+                        zorder=2,
                     )
-                    h_wire_segments.append((x_end, cand_x, matching_seg[2], sig_net, "#2563eb"))
+                    h_wire_segments.append((x_end, cand_x, matching_segs[0][2], sig_net, "#2563eb"))
                 x_pull = cand_x
-                y_base = matching_seg[2]
+                y_base = matching_segs[0][2]
             else:
                 target_pair = next(
                     (p for p, c in sheet_pin_coords.items() if pin_to_net.get(p) == sig_net and p[0] != fp.name),
@@ -937,13 +985,13 @@ class SchematicDiagram:
                     elif p_x < 148.5:
                         side = "left"
 
-                    step = 12.0
+                    step = 14.0
                     if side == "right":
-                        cand_x = p_x + 14.0
+                        cand_x = p_x + 14.0 + idx * 16.0
                         while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
                             cand_x += step
                     else:
-                        cand_x = p_x - 14.0
+                        cand_x = p_x - 26.0 - idx * 20.0
                         while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
                             cand_x -= step
                     x_pull = cand_x
@@ -976,6 +1024,7 @@ class SchematicDiagram:
         pwr_pullups = [p for p in pullup_points if p[4].upper() in POWER_NET_NAMES]
         same_pwr = len({p[4] for p in pwr_pullups}) == 1 and len(pwr_pullups) > 1
         common_pwr = pwr_pullups[0][4] if same_pwr else "3V3"
+        pullup_max_y = max((p[1] for p in pwr_pullups), default=120.0)
 
         for x_pull, y_base, fp, sig_net, rail_net in pullup_points:
             # Junction dot on the signal wire
@@ -983,7 +1032,7 @@ class SchematicDiagram:
 
             is_pullup = rail_net.upper() in POWER_NET_NAMES
             if is_pullup:
-                y_zz_bot = channel_top_y + 8.0
+                y_zz_bot = pullup_max_y + 8.0
                 y_zz_top = y_zz_bot + 9.0
                 y_top_rail = y_zz_top + 6.0
 
@@ -1104,6 +1153,20 @@ class SchematicDiagram:
                         linewidth=2.0,
                         zorder=3,
                     )
+                    ax.plot(
+                        [x_pull, x_pull],
+                        [y_zz_top, y_zz_top - 2.5],
+                        color="#475569",
+                        linewidth=1.2,
+                        zorder=2,
+                    )
+                    ax.plot(
+                        [x_pull, x_pull],
+                        [y_zz_top - 4.9, y_zz_bot],
+                        color="#475569",
+                        linewidth=1.2,
+                        zorder=2,
+                    )
                 else:
                     # Vertical zig-zag resistor body
                     zz_y = [
@@ -1178,8 +1241,39 @@ class SchematicDiagram:
         if same_pwr and len(pwr_pullups) > 1:
             x_min_pull = min(p[0] for p in pwr_pullups)
             x_max_pull = max(p[0] for p in pwr_pullups)
-            y_zz_top = channel_top_y + 17.0
+            y_zz_top = pullup_max_y + 17.0
             y_top_rail = y_zz_top + 6.0
+
+            # Dedicated dashed section card for pull-up resistors
+            card_x = x_min_pull - 6.0
+            card_w = (x_max_pull - x_min_pull) + 16.0
+            card_y = min(p[1] for p in pwr_pullups) + 4.0
+            card_h = (y_top_rail + 10.0) - card_y
+            is_i2c = any("SDA" in p[3].upper() or "SCL" in p[3].upper() for p in pwr_pullups)
+            card_title = "I2C PULL-UP RESISTORS" if is_i2c else "PULL-UP RESISTORS"
+
+            ax.add_patch(
+                patches.Rectangle(
+                    (card_x, card_y),
+                    card_w,
+                    card_h,
+                    facecolor="#f8fafc",
+                    edgecolor="#cbd5e1",
+                    linestyle="--",
+                    linewidth=0.8,
+                    zorder=1,
+                )
+            )
+            ax.text(
+                card_x + 3.0,
+                card_y + card_h - 3.5,
+                card_title,
+                fontsize=5.5,
+                fontweight="bold",
+                color="#334155",
+                zorder=2,
+            )
+
             ax.plot([x_min_pull, x_max_pull], [y_top_rail, y_top_rail], color="#dc2626", linewidth=1.2, zorder=2)
             x_arrow = (x_min_pull + x_max_pull) / 2.0
             ax.plot([x_arrow, x_arrow], [y_top_rail, y_top_rail + 3.5], color="#dc2626", linewidth=1.2, zorder=2)
@@ -1604,8 +1698,22 @@ class SchematicDiagram:
             getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q") for fp in sheet_fps
         )
 
-        page_center_x = 147.5
-        page_center_y = 115.0
+        sheet_model = (
+            self.config.schematic_sheets[sheet_plan.sheet_idx - 1]
+            if (
+                self.config
+                and self.config.schematic_sheets
+                and (0 <= (sheet_plan.sheet_idx - 1) < len(self.config.schematic_sheets))
+            )
+            else None
+        )
+        layout = (
+            getattr(sheet_model, "layout", None)
+            or getattr(self.config, "schematic_layout", None)
+            or SchematicLayoutModel()
+        )
+        page_center_x = layout.sheet_center_x
+        page_center_y = layout.sheet_center_y
 
         if has_bottom_cards:
             top_row_y = 158.0
@@ -1617,11 +1725,36 @@ class SchematicDiagram:
             top_row_y = 138.0
             bottom_cards_y = 60.0
 
-        if num_comps == 1:
+        cols_override = getattr(layout, "cols_per_row", None)
+        grid_positions = getattr(layout, "grid_positions", {}) or {}
+
+        if cols_override is not None:
+            cols_per_row = cols_override
+            col_w = 210.0 / max(1, cols_per_row)
+            cw = min(38.0, col_w * 0.55)
+            gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
+            start_x = 45.0
+            col_x_positions = []
+            col_y_positions = []
+            comp_col_map = {}
+            comp_row_map = {}
+            for i, fp in enumerate(main_fps):
+                if fp.name in grid_positions:
+                    r_idx, c_idx_col = grid_positions[fp.name]
+                else:
+                    r_idx = i // cols_per_row
+                    c_idx_col = i % cols_per_row
+                comp_row_map[fp.name] = r_idx
+                comp_col_map[fp.name] = c_idx_col
+                col_x_positions.append(start_x + c_idx_col * (cw + gap))
+                col_y_positions.append(top_row_y - (r_idx * layout.row_step_y))
+        elif num_comps == 1:
             cols_per_row = 1
             cw = 38.0
             col_x_positions = [page_center_x - cw / 2.0]
             col_y_positions = [top_row_y]
+            comp_col_map = {main_fps[0].name: 0}
+            comp_row_map = {main_fps[0].name: 0}
         elif num_comps == 2:
             cols_per_row = 2
             cw = 38.0
@@ -1630,6 +1763,8 @@ class SchematicDiagram:
             start_x = page_center_x - total_w / 2.0
             col_x_positions = [start_x, start_x + cw + gap]
             col_y_positions = [top_row_y, top_row_y]
+            comp_col_map = {main_fps[0].name: 0, main_fps[1].name: 1}
+            comp_row_map = {main_fps[0].name: 0, main_fps[1].name: 0}
         elif num_comps == 3:
             cols_per_row = 3
             cw = 36.0
@@ -1638,24 +1773,40 @@ class SchematicDiagram:
             start_x = max(50.0, page_center_x - total_w / 2.0)
             col_x_positions = [start_x, start_x + cw + gap, start_x + 2 * (cw + gap)]
             col_y_positions = [top_row_y, top_row_y, top_row_y]
+            comp_col_map = {fp.name: idx for idx, fp in enumerate(main_fps)}
+            comp_row_map = {fp.name: 0 for fp in main_fps}
         else:
             cols_per_row = (num_comps + 1) // 2
             col_w = 210.0 / max(1, cols_per_row)
             cw = min(36.0, col_w * 0.55)
             col_x_positions = []
             col_y_positions = []
-            for i in range(num_comps):
+            comp_col_map = {}
+            comp_row_map = {}
+            for i, fp in enumerate(main_fps):
                 r_idx = i // cols_per_row
                 c_idx_col = i % cols_per_row
+                comp_row_map[fp.name] = r_idx
+                comp_col_map[fp.name] = c_idx_col
                 col_x_positions.append(45.0 + c_idx_col * col_w + (col_w - cw) / 2.0)
-                col_y_positions.append(top_row_y - (r_idx * 55.0))
+                col_y_positions.append(top_row_y - (r_idx * layout.row_step_y))
 
-        # Build pin side map and component column index map
-        fp_col_map = {fp.name: idx for idx, fp in enumerate(main_fps)}
+        sheet_pin_sides = getattr(sheet_model, "pin_sides", {}) or {}
         pin_side_map: Dict[Tuple[str, str], str] = {}
         for fp in main_fps:
-            left_p = [p for p in fp.pins if p.side.value in ("left", "bottom")]
-            right_p = [p for p in fp.pins if p.side.value in ("right", "top")]
+            comp_side_overrides = sheet_pin_sides.get(fp.name, {})
+            left_p = []
+            right_p = []
+            for p in fp.pins:
+                if p.name in comp_side_overrides:
+                    if comp_side_overrides[p.name] == "right":
+                        right_p.append(p)
+                    else:
+                        left_p.append(p)
+                elif p.side.value in ("right", "top"):
+                    right_p.append(p)
+                elif p.side.value in ("left", "bottom"):
+                    left_p.append(p)
             if not left_p and not right_p:
                 left_p = fp.pins[: len(fp.pins) // 2]
                 right_p = fp.pins[len(fp.pins) // 2 :]
@@ -1664,27 +1815,24 @@ class SchematicDiagram:
             for p in right_p:
                 pin_side_map[(fp.name, p.name)] = "right"
 
-        # Discover direct wire pairs between facing pins of adjacent components on the same row
+        # Discover direct wire pairs between facing pins of adjacent components
         direct_wire_pairs: List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]] = []
         wired_pins: set[Tuple[str, str]] = set()
 
         for net in all_nets:
             present_pins = [pair for pair in net.pins if pair in pin_side_map]
             if len(present_pins) >= 2:
-                for i in range(len(present_pins)):
-                    for j in range(i + 1, len(present_pins)):
-                        pair1, pair2 = present_pins[i], present_pins[j]
+                for i, pair1 in enumerate(present_pins):
+                    for pair2 in present_pins[i + 1 :]:
                         if pair1 in wired_pins or pair2 in wired_pins:
                             continue
-                        c1, c2 = fp_col_map[pair1[0]], fp_col_map[pair2[0]]
+                        c1, c2 = comp_col_map[pair1[0]], comp_col_map[pair2[0]]
                         s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
                         if c1 > c2:
                             pair1, pair2 = pair2, pair1
                             c1, c2 = c2, c1
                             s1, s2 = s2, s1
-                        r1 = c1 // cols_per_row
-                        r2 = c2 // cols_per_row
-                        if r1 == r2 and (c2 == c1 + 1) and s1 == "right" and s2 == "left":
+                        if (c2 == c1 + 1) and s1 == "right" and s2 == "left":
                             direct_wire_pairs.append((pair1, pair2, net))
                             wired_pins.add(pair1)
                             wired_pins.add(pair2)
@@ -1696,8 +1844,19 @@ class SchematicDiagram:
             cx = col_x_positions[c_idx]
             row_top_y = col_y_positions[c_idx]
 
-            left_pins = [p for p in fp.pins if p.side.value in ("left", "bottom")]
-            right_pins = [p for p in fp.pins if p.side.value in ("right", "top")]
+            comp_side_overrides = sheet_pin_sides.get(fp.name, {})
+            left_pins = []
+            right_pins = []
+            for p in fp.pins:
+                if p.name in comp_side_overrides:
+                    if comp_side_overrides[p.name] == "right":
+                        right_pins.append(p)
+                    else:
+                        left_pins.append(p)
+                elif p.side.value in ("right", "top"):
+                    right_pins.append(p)
+                elif p.side.value in ("left", "bottom"):
+                    left_pins.append(p)
             if not left_pins and not right_pins:
                 left_pins = fp.pins[: len(fp.pins) // 2]
                 right_pins = fp.pins[len(fp.pins) // 2 :]
@@ -2104,10 +2263,9 @@ class SchematicDiagram:
         wire_labels: List[Tuple[float, float, str]] = []
 
         # Group direct wire pairs by adjacent column transitions
-        trans_map: Dict[Tuple[int, int], List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]]] = {}
+        trans_map: Dict[Tuple[str, str], List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]]] = {}
         for pair1, pair2, net in direct_wire_pairs:
-            c1, c2 = fp_col_map[pair1[0]], fp_col_map[pair2[0]]
-            trans_map.setdefault((c1, c2), []).append((pair1, pair2, net))
+            trans_map.setdefault((pair1[0], pair2[0]), []).append((pair1, pair2, net))
 
         for (c1, c2), pairs in trans_map.items():
             dogleg_pairs = [p for p in pairs if abs(sheet_pin_coords[p[0]][1] - sheet_pin_coords[p[1]][1]) >= 0.1]
@@ -2446,11 +2604,17 @@ class SchematicDiagram:
 
         # Draw Decoupling Capacitor Bank
         if decoupling_caps:
+            n_caps = len(decoupling_caps)
+            total_w = (n_caps - 1) * 28.0
+            if cols_override == 2:
+                cap_base_x = col_x_positions[0]
+            else:
+                cap_base_x = max(35.0, page_center_x - (total_w / 2.0))
             self._draw_decoupling_cap_bank(
                 ax=ax,
                 caps=decoupling_caps,
                 pin_to_net=pin_to_net,
-                base_x=26.0,
+                base_x=cap_base_x,
                 base_y=bottom_cards_y,
             )
 
@@ -2464,8 +2628,8 @@ class SchematicDiagram:
             if tt:
                 tt_card_w = 125.0
                 tt_x = 118.0
-                if fp.name in fp_col_map:
-                    c_idx = fp_col_map[fp.name]
+                c_idx = next((i for i, f in enumerate(main_fps) if f.name == fp.name), None)
+                if c_idx is not None:
                     comp_cx = col_x_positions[c_idx]
                     tt_x = max(116.0, min(145.0, comp_cx + cw / 2.0 - tt_card_w / 2.0 + 20.0))
                 self._draw_truth_table(ax=ax, fp=fp, tt=tt, base_x=tt_x, base_y=bottom_cards_y, card_w=tt_card_w)

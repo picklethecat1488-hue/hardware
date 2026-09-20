@@ -1,7 +1,7 @@
 """build123d custom context manager for declarative PCB part modeling with integrated stackup and metadata."""
 
 from contextvars import ContextVar, Token
-from typing import Any, List, Optional, Sequence, Union
+from typing import Any, List, Optional, Sequence, Tuple, Union
 
 from build123d import BuildPart
 from build123d.build_common import operations_apply_to
@@ -47,6 +47,7 @@ class BuildPcb(BuildPart):
         revision: str = "1.0",
         stackup: Optional[Union[BuildStackup, StackupModel]] = None,
         capacitive_sensors: Optional[Sequence[CapacitiveElectrodeModel]] = None,
+        outline_polygon: Optional[Sequence[Tuple[float, float]]] = None,
         mode: Any = None,
     ) -> None:
         """Initialize PCB part builder context.
@@ -76,6 +77,9 @@ class BuildPcb(BuildPart):
         self.copper_regions: List[CopperRegionModel] = []
         self.test_points: List[TestPointModel] = []
         self.capacitive_sensors: List[CapacitiveElectrodeModel] = list(capacitive_sensors or [])
+        self.outline_polygon: Optional[List[Tuple[float, float]]] = (
+            [tuple(p) for p in outline_polygon] if outline_polygon else None
+        )
         self._token: Optional[Token] = None
 
     @property
@@ -125,6 +129,7 @@ class BuildPcb(BuildPart):
             traces=list(self.traces),
             vias=list(self.vias),
             copper_regions=list(self.copper_regions),
+            outline_polygon=list(self.outline_polygon) if self.outline_polygon else None,
             test_points=list(self.test_points),
             capacitive_sensors=list(self.capacitive_sensors),
         )
@@ -148,6 +153,7 @@ class BuildFlexPCB(BuildPcb):
         revision: str = "1.0",
         stackup: Optional[Union[BuildStackup, StackupModel]] = None,
         capacitive_sensors: Optional[Sequence[CapacitiveElectrodeModel]] = None,
+        outline_polygon: Optional[Sequence[Tuple[float, float]]] = None,
         mode: Any = None,
     ) -> None:
         """Initialize flexible PCB context with typed flex_type."""
@@ -157,6 +163,7 @@ class BuildFlexPCB(BuildPcb):
             revision=revision,
             stackup=stackup,
             capacitive_sensors=capacitive_sensors,
+            outline_polygon=outline_polygon,
             mode=mode,
         )
         self.flex_type: FlexType = FlexType(flex_type) if isinstance(flex_type, str) else flex_type

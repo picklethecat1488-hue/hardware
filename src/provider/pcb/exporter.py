@@ -557,6 +557,19 @@ class PCBExporter:
                     }
                 )
 
+        poly_segments = []
+        if getattr(self.config, "outline_polygon", None):
+            poly_pts = [
+                (
+                    round(self.config.sheet_center_x_mm + pt[0], 4),
+                    round(self.config.sheet_center_y_mm + pt[1], 4),
+                )
+                for pt in self.config.outline_polygon
+            ]
+            for idx, p1 in enumerate(poly_pts):
+                p2 = poly_pts[(idx + 1) % len(poly_pts)]
+                poly_segments.append({"x1": p1[0], "y1": p1[1], "x2": p2[0], "y2": p2[1]})
+
         rendered = template.render(
             board=self.config,
             copper_inner_layers=copper_inners,
@@ -576,6 +589,7 @@ class PCBExporter:
                 "corner_radius": round(
                     getattr(self.config, "corner_radius", 0.0) or (6.0 if not self.is_flex else 0.0), 4
                 ),
+                "polygon_segments": poly_segments,
             },
         )
 
