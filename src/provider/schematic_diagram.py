@@ -945,7 +945,7 @@ class SchematicDiagram:
                             break
                 elif x_start < 100.0:
                     # Left breakout stub: extend outward to the left well clear of GND symbols
-                    cand_x = x_start - 26.0 - idx * 20.0
+                    cand_x = x_start - 28.0 - idx * 20.0
                     while any(abs(cand_x - ux) < 14.0 for ux in used_x_positions):
                         cand_x -= 14.0
                     ax.plot(
@@ -991,7 +991,7 @@ class SchematicDiagram:
                         while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
                             cand_x += step
                     else:
-                        cand_x = p_x - 26.0 - idx * 20.0
+                        cand_x = p_x - 28.0 - idx * 20.0
                         while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
                             cand_x -= step
                     x_pull = cand_x
@@ -1193,10 +1193,11 @@ class SchematicDiagram:
                     ]
                     ax.plot(zz_x, zz_y, color="#334155", linewidth=1.5, zorder=3)
 
-                # Resistor RefDes & Value text to the right
+                # Resistor / Capacitor RefDes & Value text to the right
                 val_text = self._format_resistor_value(fp)
+                text_x_off = 4.8 if fp.name.upper().startswith("C") else 2.2
                 ax.text(
-                    x_pull + 2.2,
+                    x_pull + text_x_off,
                     y_zz_bot + 6.2,
                     fp.name,
                     ha="left",
@@ -1207,7 +1208,7 @@ class SchematicDiagram:
                     zorder=4,
                 )
                 ax.text(
-                    x_pull + 2.2,
+                    x_pull + text_x_off,
                     y_zz_bot + 2.2,
                     val_text,
                     ha="left",

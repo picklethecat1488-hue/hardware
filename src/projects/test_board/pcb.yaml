@@ -199,6 +199,20 @@ schematic_sheets:
   - title: Microcontroller Clock, Reset & Boot
     description: 24MHz crystal oscillator, reset network, boot configuration, and MCU decoupling
     components: [U1, Y1, C9, C10, R5, C11, R6, C4, C5]
+    pin_sides:
+      U1:
+        H7: right
+        H8: right
+        D1: left
+        K1: left
+        K2: left
+        M1: left
+        M2: left
+      Y1:
+        "1": left
+        "3": left
+        "2": bottom
+        "4": bottom
     pin_breakouts:
       U1: [H7, H8, D1, K1, K2, M1, M2]
       Y1: ["1", "2", "3", "4"]
