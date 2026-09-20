@@ -1186,3 +1186,102 @@ def test_schematic_diagram_geometric_offsets_and_gnd_placement(tmp_path: Path) -
     rendered = diag.render_pdf(pdf_path)
     assert rendered.exists()
     assert rendered.stat().st_size > 5000
+
+
+def test_regression_j_usb_edge_facing_and_drc_exemption() -> None:
+    """Verify J_USB connector faces outward to board edge and is exempt from internal DRC margin."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    j_usb = next(fp for fp in wiring.footprints if fp.name == "J_USB")
+
+    # Rotation 270 degrees orients connector mouth toward -X (left board edge at X=-30.0)
+    assert j_usb.rotation[2] == 270.0
+    assert j_usb.position[0] < -20.0  # Near left board perimeter
+
+    # DRC boundary check must treat J_USB as an edge-mounted connector
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+    carrier_fps = checker.get_footprints_for_board(wiring)
+    violations = checker.check_boundary_containment(carrier_fps, edge_clearance_mm=0.5)
+    j_usb_violations = [v for v in violations if v.net_or_zone == "J_USB"]
+    assert len(j_usb_violations) == 0, f"J_USB should be exempt from edge clearance: {j_usb_violations}"
+
+
+def test_regression_piezo_speaker_circular_silkscreen_and_placement() -> None:
+    """Verify SPK1 piezo speaker has circular footprint and is positioned near MH2."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    import math
+    import yaml
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    spk1 = next(fp for fp in wiring.footprints if fp.name == "SPK1")
+
+    assert spk1.package == "piezo_speaker_12mm"
+
+    # Verify footprint definition in thru_hole.yaml has circular geometry
+    thru_hole_yaml = provider.wiring_path.parent.parent / "footprints" / "thru_hole.yaml"
+    with open(thru_hole_yaml, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    piezo = data["footprints"]["piezo_speaker_12mm"]
+    assert piezo["shape"] == "circle"
+    assert piezo["radius_mm"] == 6.0
+
+    # MH2 position: (-26.0, 36.0). SPK1 at (-18.0, 31.0) -> distance < 12mm
+    dist_to_mh2 = math.hypot(spk1.position[0] - (-26.0), spk1.position[1] - 36.0)
+    assert dist_to_mh2 <= 12.0
+
+
+def test_regression_collinear_vector_simplification() -> None:
+    """Verify polyline_to_trace_segments simplifies collinear vertical and horizontal segments."""
+    from provider.pcb.router import polyline_to_trace_segments
+
+    # Vertical 3-point collinear polyline
+    vertical_pts = [(5.0, 0.0), (5.0, 5.0), (5.0, 10.0)]
+    v_traces = polyline_to_trace_segments(vertical_pts, width_mm=0.2, layer="F.Cu", net="TEST_V")
+    assert len(v_traces) == 1
+    assert v_traces[0].start_mm == (5.0, 0.0)
+    assert v_traces[0].end_mm == (5.0, 10.0)
+
+    # Horizontal 3-point collinear polyline
+    horizontal_pts = [(0.0, 3.0), (5.0, 3.0), (10.0, 3.0)]
+    h_traces = polyline_to_trace_segments(horizontal_pts, width_mm=0.2, layer="F.Cu", net="TEST_H")
+    assert len(h_traces) == 1
+    assert h_traces[0].start_mm == (0.0, 3.0)
+    assert h_traces[0].end_mm == (10.0, 3.0)
+
+
+def test_regression_subassembly_footprint_isolation() -> None:
+    """Verify PCBAutoRouter and PCBExporter cleanly isolate carrier and flex subassemblies."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.router import PCBAutoRouter
+    from provider import Mode
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # Carrier board router
+    carrier_cfg = provider.get_pcb_config_without_routes()
+    carrier_router = PCBAutoRouter(carrier_cfg, wiring)
+    carrier_fps = carrier_router.get_footprints_for_board()
+    carrier_names = {fp.name for fp in carrier_fps}
+    assert "U1" in carrier_names
+    assert "J1" in carrier_names
+    assert "J2" in carrier_names
+    assert "J_FLEX" not in carrier_names
+
+    # Flex tail router
+    flex_part = provider.part.get("flex_tail")
+    flex_res = flex_part("flex_tail", None, Mode.DEFAULT)
+    flex_cfg = flex_res.to_pcb_config()
+    flex_router = PCBAutoRouter(flex_cfg, wiring)
+    flex_fps = flex_router.get_footprints_for_board()
+    flex_names = {fp.name for fp in flex_fps}
+    assert "J_FLEX" in flex_names
+    assert "U1" not in flex_names
+    assert "J1" not in flex_names

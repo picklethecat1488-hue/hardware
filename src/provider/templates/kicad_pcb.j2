@@ -59,13 +59,17 @@
 
 {% for fp in footprints %}
   (footprint "{{ fp.package }}" (layer "{{ fp.layer }}")
-    (at {{ fp.x_mm }} {{ fp.y_mm }})
+    (at {{ fp.x_mm }} {{ fp.y_mm }}{% if fp.rotation and fp.rotation[2] %} {{ fp.rotation[2] }}{% endif %})
     (fp_text reference "{{ fp.name }}" (at {{ fp.ref_x|default(0) }} {{ fp.ref_y }}) (layer "{{ fp.silk_layer }}") (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
     (fp_text value "{{ fp.value }}" (at 0 {{ fp.val_y }}) (layer "{{ fp.fab_layer }}") hide (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
+{% if fp.is_round %}
+    (fp_circle (center 0 0) (end {{ fp.radius }} 0) (stroke (width 0.15) (type default)) (fill none) (layer "{{ fp.silk_layer }}"))
+{% else %}
 {% for line in fp.alignment_lines %}
     (fp_line (start {{ line.x1 }} {{ line.y1 }}) (end {{ line.x2 }} {{ line.y2 }}) (stroke (width 0.15) (type default)) (layer "{{ fp.silk_layer }}"))
 {% endfor %}
-{% if fp.pin1_dot %}
+{% endif %}
+{% if fp.pin1_dot and not fp.is_round %}
     (fp_circle (center {{ fp.pin1_dot.cx }} {{ fp.pin1_dot.cy }}) (end {{ fp.pin1_dot.ex }} {{ fp.pin1_dot.ey }}) (stroke (width 0.15) (type default)) (fill solid) (layer "{{ fp.silk_layer }}"))
 {% endif %}
 {% for pin in fp.pins %}
@@ -121,7 +125,20 @@
   )
 {% endfor %}
 
+{% if outline.corner_radius and outline.corner_radius > 0 %}
+  {% set r = outline.corner_radius %}
+  {% set diag = r * 0.29289322 %}
+  (gr_line (start {{ (outline.x1 + r)|round(4) }} {{ outline.y1 }}) (end {{ (outline.x2 - r)|round(4) }} {{ outline.y1 }}) (stroke (width 0.1) (type default)) (layer "Edge.Cuts"))
+  (gr_arc (start {{ (outline.x2 - r)|round(4) }} {{ outline.y1 }}) (mid {{ (outline.x2 - diag)|round(4) }} {{ (outline.y1 + diag)|round(4) }}) (end {{ outline.x2 }} {{ (outline.y1 + r)|round(4) }}) (stroke (width 0.1) (type default)) (layer "Edge.Cuts"))
+  (gr_line (start {{ outline.x2 }} {{ (outline.y1 + r)|round(4) }}) (end {{ outline.x2 }} {{ (outline.y2 - r)|round(4) }}) (stroke (width 0.1) (type default)) (layer "Edge.Cuts"))
+  (gr_arc (start {{ outline.x2 }} {{ (outline.y2 - r)|round(4) }}) (mid {{ (outline.x2 - diag)|round(4) }} {{ (outline.y2 - diag)|round(4) }}) (end {{ (outline.x2 - r)|round(4) }} {{ outline.y2 }}) (stroke (width 0.1) (type default)) (layer "Edge.Cuts"))
+  (gr_line (start {{ (outline.x2 - r)|round(4) }} {{ outline.y2 }}) (end {{ (outline.x1 + r)|round(4) }} {{ outline.y2 }}) (stroke (width 0.1) (type default)) (layer "Edge.Cuts"))
+  (gr_arc (start {{ (outline.x1 + r)|round(4) }} {{ outline.y2 }}) (mid {{ (outline.x1 + diag)|round(4) }} {{ (outline.y2 - diag)|round(4) }}) (end {{ outline.x1 }} {{ (outline.y2 - r)|round(4) }}) (stroke (width 0.1) (type default)) (layer "Edge.Cuts"))
+  (gr_line (start {{ outline.x1 }} {{ (outline.y2 - r)|round(4) }}) (end {{ outline.x1 }} {{ (outline.y1 + r)|round(4) }}) (stroke (width 0.1) (type default)) (layer "Edge.Cuts"))
+  (gr_arc (start {{ outline.x1 }} {{ (outline.y1 + r)|round(4) }}) (mid {{ (outline.x1 + diag)|round(4) }} {{ (outline.y1 + diag)|round(4) }}) (end {{ (outline.x1 + r)|round(4) }} {{ outline.y1 }}) (stroke (width 0.1) (type default)) (layer "Edge.Cuts"))
+{% else %}
   (gr_rect (start {{ outline.x1 }} {{ outline.y1 }}) (end {{ outline.x2 }} {{ outline.y2 }}) (stroke (width 0.1) (type default)) (fill none) (layer "Edge.Cuts"))
+{% endif %}
 {% for text in silkscreen_texts %}
   (gr_text "{{ text.text }}" (at {{ text.x_mm }} {{ text.y_mm }}{% if text.rotation %} {{ text.rotation }}{% endif %}) (layer "{{ text.layer }}") (effects (font (size {{ text.font_size }} {{ text.font_size }}) (thickness {{ text.thickness }})){% if text.mirror %} (justify mirror){% endif %}))
 {% endfor %}

@@ -3,7 +3,7 @@
 import math
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any, Union
 from model.pcb import (
     PCBConfig,
     StackupModel,
@@ -80,6 +80,18 @@ def _dist_segment_to_segment(
     )
 
 
+def _get_pin_absolute_pos(fp: Any, pin: Any) -> Tuple[float, float]:
+    """Compute absolute (x, y) coordinates for a footprint pin taking rotation into account."""
+    rot_deg = fp.rotation[2] if hasattr(fp, "rotation") and len(fp.rotation) >= 3 else 0.0
+    if abs(rot_deg) > 1e-4:
+        rad = math.radians(rot_deg)
+        cos_r, sin_r = math.cos(rad), math.sin(rad)
+        rx = pin.position[0] * cos_r - pin.position[1] * sin_r
+        ry = pin.position[0] * sin_r + pin.position[1] * cos_r
+        return (fp.position[0] + rx, fp.position[1] + ry)
+    return (fp.position[0] + pin.position[0], fp.position[1] + pin.position[1])
+
+
 class DRCSeverity(StrEnum):
     """Severity classification for DRC violations."""
 
@@ -88,11 +100,54 @@ class DRCSeverity(StrEnum):
     INFO = "info"
 
 
+class DRCRuleName(StrEnum):
+    """Enumeration of standard Design Rule Checking (DRC) rule identifiers."""
+
+    MIN_TRACE_WIDTH = "MIN_TRACE_WIDTH"
+    MIN_ANNULAR_RING = "MIN_ANNULAR_RING"
+    DIFF_IMPEDANCE_MISMATCH = "DIFF_IMPEDANCE_MISMATCH"
+    RF_CPWG_IMPEDANCE_MISMATCH = "RF_CPWG_IMPEDANCE_MISMATCH"
+    DISPLAY_IMPEDANCE_TARGET_INVALID = "DISPLAY_IMPEDANCE_TARGET_INVALID"
+    INTRA_PAIR_SKEW_EXCEEDED = "INTRA_PAIR_SKEW_EXCEEDED"
+    DIFFERENTIAL_SKEW_COMPLIANT = "DIFFERENTIAL_SKEW_COMPLIANT"
+    INTER_PAIR_SKEW_EXCEEDED = "INTER_PAIR_SKEW_EXCEEDED"
+    MAX_VIA_COUNT_EXCEEDED = "MAX_VIA_COUNT_EXCEEDED"
+    RETURN_PATH_GND_STITCH_MISSING = "RETURN_PATH_GND_STITCH_MISSING"
+    FLEX_BEND_RADIUS_TOO_TIGHT = "FLEX_BEND_RADIUS_TOO_TIGHT"
+    FLEX_DYNAMIC_BEND_WARNING = "FLEX_DYNAMIC_BEND_WARNING"
+    FLEX_DYNAMIC_BEND_COMPLIANT = "FLEX_DYNAMIC_BEND_COMPLIANT"
+    BOUNDARY_CONTAINMENT_ERROR = "BOUNDARY_CONTAINMENT_ERROR"
+    BOUNDARY_CLEARANCE_VIOLATION = "BOUNDARY_CLEARANCE_VIOLATION"
+    TRACE_OUTSIDE_BOARD_BOUNDARY = "TRACE_OUTSIDE_BOARD_BOUNDARY"
+    VIA_OUTSIDE_BOARD_BOUNDARY = "VIA_OUTSIDE_BOARD_BOUNDARY"
+    TEST_POINT_OUTSIDE_BOARD_BOUNDARY = "TEST_POINT_OUTSIDE_BOARD_BOUNDARY"
+    SINGLE_PIN_NET = "SINGLE_PIN_NET"
+    SHORT_CIRCUIT_DETECTED = "SHORT_CIRCUIT_DETECTED"
+    UNROUTED_NET_AIRWIRE = "UNROUTED_NET_AIRWIRE"
+    DANGLING_COMPONENT = "DANGLING_COMPONENT"
+    DISCONNECTED_TEST_POINT_AIRWIRE = "DISCONNECTED_TEST_POINT_AIRWIRE"
+    PIN_NOT_CONNECTED_TO_PLANE = "PIN_NOT_CONNECTED_TO_PLANE"
+    PIN_NOT_CONNECTED_TO_TRACE = "PIN_NOT_CONNECTED_TO_TRACE"
+    NET_ROUTING_INCOMPLETE = "NET_ROUTING_INCOMPLETE"
+    DISCONNECTED_TRACE_SEGMENT = "DISCONNECTED_TRACE_SEGMENT"
+    DISCONNECTED_VIA = "DISCONNECTED_VIA"
+    TEST_POINT_DISCONNECTED = "TEST_POINT_DISCONNECTED"
+    MOUNTING_HOLE_DISCONNECTED = "MOUNTING_HOLE_DISCONNECTED"
+    VIA_DRILL_HOLE_COLLISION = "VIA_DRILL_HOLE_COLLISION"
+    PAD_DRILL_HOLE_COLLISION = "PAD_DRILL_HOLE_COLLISION"
+    TRACE_SHORT_CIRCUIT = "TRACE_SHORT_CIRCUIT"
+    CLEARANCE_VIOLATION = "CLEARANCE_VIOLATION"
+    VIA_TRACE_COLLISION = "VIA_TRACE_COLLISION"
+    TEST_POINT_TRACE_COLLISION = "TEST_POINT_TRACE_COLLISION"
+    SILKSCREEN_PAD_OVERLAP = "SILKSCREEN_PAD_OVERLAP"
+    ANTENNA_TRACE_DETECTED = "ANTENNA_TRACE_DETECTED"
+
+
 @dataclass
 class DRCViolation:
     """Represents a specific design constraint violation."""
 
-    rule_name: str
+    rule_name: Union[DRCRuleName, str]
     severity: DRCSeverity
     net_or_zone: str
     description: str
@@ -113,7 +168,7 @@ class DRCViolationCollection(List[DRCViolation]):
 
     def add_violation(
         self,
-        rule_name: str,
+        rule_name: Union[DRCRuleName, str],
         severity: DRCSeverity,
         net_or_zone: str,
         description: str,
@@ -136,7 +191,7 @@ class DRCViolationCollection(List[DRCViolation]):
 
     def add_error(
         self,
-        rule_name: str,
+        rule_name: Union[DRCRuleName, str],
         net_or_zone: str,
         description: str,
         actual_value: Optional[float] = None,
@@ -156,7 +211,7 @@ class DRCViolationCollection(List[DRCViolation]):
 
     def add_warning(
         self,
-        rule_name: str,
+        rule_name: Union[DRCRuleName, str],
         net_or_zone: str,
         description: str,
         actual_value: Optional[float] = None,
@@ -176,7 +231,7 @@ class DRCViolationCollection(List[DRCViolation]):
 
     def add_info(
         self,
-        rule_name: str,
+        rule_name: Union[DRCRuleName, str],
         net_or_zone: str,
         description: str,
         actual_value: Optional[float] = None,
@@ -196,7 +251,7 @@ class DRCViolationCollection(List[DRCViolation]):
 
     def add_boundary_violation(
         self,
-        rule_name: str,
+        rule_name: Union[DRCRuleName, str],
         net_or_zone: str,
         element_name: str,
         x: float,
@@ -215,7 +270,7 @@ class DRCViolationCollection(List[DRCViolation]):
 
     def add_clearance_violation(
         self,
-        rule_name: str,
+        rule_name: Union[DRCRuleName, str],
         net_or_zone: str,
         description: str,
         actual_distance: float,
@@ -234,7 +289,7 @@ class DRCViolationCollection(List[DRCViolation]):
 
     def add_continuity_violation(
         self,
-        rule_name: str,
+        rule_name: Union[DRCRuleName, str],
         net_or_zone: str,
         description: str,
         severity: DRCSeverity = DRCSeverity.ERROR,
@@ -313,19 +368,19 @@ class PCBDesignRulesChecker:
         )
 
     def get_footprints_for_board(self, wiring: Any) -> List[Any]:
-        """Filter and coordinate-transform footprints belonging specifically to this board target."""
+        """Filter footprints belonging specifically to this board target."""
         if not wiring or not hasattr(wiring, "footprints"):
             return []
         fps = list(wiring.footprints)
-        if self.is_flex:
-            flex_fps = []
-            for fp in fps:
-                if fp.name == "J2" or getattr(fp, "shape_ref", None) == "flex_tail":
-                    if fp.name == "J2":
-                        fp = fp.model_copy(update={"position": (0.0, -21.0, fp.position[2])})
-                    flex_fps.append(fp)
-            return flex_fps
-        return [fp for fp in fps if getattr(fp, "shape_ref", None) != "flex_tail"]
+        target_ref = getattr(self.config, "shape_ref", None)
+        if target_ref:
+            return [
+                fp
+                for fp in fps
+                if getattr(fp, "shape_ref", None) == target_ref
+                or (not getattr(fp, "shape_ref", None) and not self.is_flex)
+            ]
+        return [fp for fp in fps if not self.is_flex or getattr(fp, "shape_ref", None)]
 
     def check_all(
         self,
@@ -740,6 +795,18 @@ class PCBDesignRulesChecker:
                 min_y = -half_l + edge_clearance_mm
                 max_y = half_l - edge_clearance_mm
 
+                # Edge connectors (USB receptacles, FPC connectors, card edge) are mounted at the perimeter
+                pkg = getattr(fp, "package", "").upper()
+                fp_n = fp.name.upper()
+                is_conn = fp_n.startswith("J") or fp_n.startswith("P") or fp_n.startswith("CONN")
+                is_edge_connector = (
+                    any(tok in pkg for tok in ("USB", "FPC", "M.2", "CARD-EDGE", "EDGE_CONNECTOR", "JACK"))
+                    or (is_conn and any(tok in fp_n for tok in ("USB", "FPC", "EDGE")))
+                    or getattr(fp, "edge_connector", False)
+                )
+                if is_edge_connector and abs(fx) <= half_w and abs(fy) <= half_l:
+                    continue
+
                 fp_min_x = fx - (fw / 2.0)
                 fp_max_x = fx + (fw / 2.0)
                 fp_min_y = fy - (fl / 2.0)
@@ -900,11 +967,21 @@ class PCBDesignRulesChecker:
 
         # Track nets that have copper traces
         routed_nets = {tr.net for tr in self.config.traces}
+        board_footprints = self.get_footprints_for_board(wiring)
+        board_fp_names = {fp.name for fp in board_footprints}
+        board_sensor_nets = {
+            s.rx_pin for s in getattr(self.config, "capacitive_sensors", []) if getattr(s, "rx_pin", None)
+        } | {s.tx_pin for s in getattr(self.config, "capacitive_sensors", []) if getattr(s, "tx_pin", None)}
 
         # Check for unrouted nets (airwires) if routing has been performed
         if self.config.traces:
             for net in wiring.nets:
-                if len(net.pins) >= 2:
+                # Count terminals belonging specifically to this board target
+                board_pins_count = sum(1 for c_name, _ in net.pins if c_name in board_fp_names)
+                if net.name in board_sensor_nets:
+                    board_pins_count += 1
+
+                if board_pins_count >= 2:
                     # Disregard plane nets if net is GND or in copper regions
                     is_plane_net = any(cr.net == net.name for cr in self.config.copper_regions)
                     if net.name not in routed_nets and not is_plane_net:
@@ -913,8 +990,8 @@ class PCBDesignRulesChecker:
                                 rule_name="UNROUTED_NET_AIRWIRE",
                                 severity=DRCSeverity.ERROR,
                                 net_or_zone=net.name,
-                                description=f"Net '{net.name}' with {len(net.pins)} pins has no routed copper traces",
-                                actual_value=float(len(net.pins)),
+                                description=f"Net '{net.name}' with {board_pins_count} pins has no routed copper traces",
+                                actual_value=float(board_pins_count),
                             )
                         )
 
@@ -1008,8 +1085,7 @@ class PCBDesignRulesChecker:
                     p_obj = next((p for p in getattr(fp, "pins", []) if p.name == pin), None)
                     if not p_obj:
                         continue
-                    px = fp.position[0] + p_obj.position[0]
-                    py = fp.position[1] + p_obj.position[1]
+                    px, py = _get_pin_absolute_pos(fp, p_obj)
                     pad_type = getattr(p_obj, "pad_type", "smd")
                     pad_s = getattr(p_obj, "pad_size_mm", (0.8, 0.8))
                     pad_r = max(pad_s) / 2.0
@@ -1081,8 +1157,7 @@ class PCBDesignRulesChecker:
                 p_obj = next((p for p in getattr(fp, "pins", []) if p.name == pin), None)
                 if not p_obj:
                     continue
-                px = fp.position[0] + p_obj.position[0]
-                py = fp.position[1] + p_obj.position[1]
+                px, py = _get_pin_absolute_pos(fp, p_obj)
                 fp_layer = getattr(fp, "layer", "F.Cu") or ("B.Cu" if fp.position[2] < 0 else "F.Cu")
                 pad_type = getattr(p_obj, "pad_type", "smd")
                 pad_s = getattr(p_obj, "pad_size_mm", (0.8, 0.8))
@@ -1550,8 +1625,7 @@ class PCBDesignRulesChecker:
                 if not p_net:
                     continue
 
-                px = fp_x + p.position[0]
-                py = fp_y + p.position[1]
+                px, py = _get_pin_absolute_pos(fp, p)
                 pad_type = getattr(p, "pad_type", "smd")
                 pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
                 pad_r = max(pad_size) / 2.0
@@ -1575,6 +1649,21 @@ class PCBDesignRulesChecker:
             if tp.net not in tp_targets:
                 tp_targets[tp.net] = []
             tp_targets[tp.net].append((tp.position_mm[0], tp.position_mm[1], "all", tp.pad_diameter_mm / 2.0))
+
+        # 4. Capacitive sensor terminals per net
+        for s in getattr(self.config, "capacitive_sensors", []):
+            scx, scy = getattr(s, "center_mm", (0.0, 0.0))
+            sw, sl = getattr(s, "area_mm", (10.0, 10.0))
+            s_layer = getattr(s, "layer", "F.Cu")
+            term_r = 1.0
+            if s.shape == "interdigital":
+                if s.tx_pin:
+                    pin_targets.setdefault(s.tx_pin, []).append((scx - sw / 2.0, scy, s_layer, term_r))
+                if s.rx_pin:
+                    pin_targets.setdefault(s.rx_pin, []).append((scx + sw / 2.0, scy, s_layer, term_r))
+            else:
+                if s.rx_pin:
+                    pin_targets.setdefault(s.rx_pin, []).append((scx, scy - sl / 2.0, s_layer, term_r))
 
         # Check both endpoints (start_mm, end_mm) of each trace segment
         for tr_idx, tr in enumerate(traces):
