@@ -146,50 +146,68 @@ class CapacitiveSensingGenerator:
 
         half_w = width_mm / 2.0
         half_l = length_mm / 2.0
-        x_min, x_max = self.cx - half_w, self.cx + half_w
-        y_min, y_max = self.cy - half_l, self.cy + half_l
 
-        # Generate diagonal lines at +45 deg (y = x + offset) and -45 deg (y = -x + offset)
-        diag_span = width_mm + length_mm
-        num_lines = int(diag_span / pitch)
+        # Generate diagonal lines in local coordinates centered at (cx, cy)
+        diag_span = half_w + half_l
+        num_lines = int(math.ceil(diag_span / pitch))
 
         for i in range(-num_lines, num_lines + 1):
             offset = i * pitch
 
-            # 1. +45 degree line: y - x = offset
-            pts_pos = []
-            y_at_xmin = x_min + offset
-            if y_min <= y_at_xmin <= y_max:
-                pts_pos.append((x_min, y_at_xmin))
-            y_at_xmax = x_max + offset
-            if y_min <= y_at_xmax <= y_max:
-                pts_pos.append((x_max, y_at_xmax))
-            x_at_ymin = y_min - offset
-            if x_min <= x_at_ymin <= x_max and (x_at_ymin, y_min) not in pts_pos:
-                pts_pos.append((x_at_ymin, y_min))
-            x_at_ymax = y_max - offset
-            if x_min <= x_at_ymax <= x_max and (x_at_ymax, y_max) not in pts_pos:
-                pts_pos.append((x_at_ymax, y_max))
+            # 1. +45 degree line: v - u = offset -> v = u + offset
+            pts_pos: List[Tuple[float, float]] = []
+            v_at_umin = -half_w + offset
+            if -half_l <= v_at_umin <= half_l:
+                pts_pos.append((-half_w, v_at_umin))
+            v_at_umax = half_w + offset
+            if -half_l <= v_at_umax <= half_l:
+                pts_pos.append((half_w, v_at_umax))
+            u_at_vmin = -half_l - offset
+            if -half_w <= u_at_vmin <= half_w and not any(
+                math.hypot(u_at_vmin - p[0], -half_l - p[1]) < 1e-4 for p in pts_pos
+            ):
+                pts_pos.append((u_at_vmin, -half_l))
+            u_at_vmax = half_l - offset
+            if -half_w <= u_at_vmax <= half_w and not any(
+                math.hypot(u_at_vmax - p[0], half_l - p[1]) < 1e-4 for p in pts_pos
+            ):
+                pts_pos.append((u_at_vmax, half_l))
 
             if len(pts_pos) == 2:
-                lines.append(HatchLine(start=pts_pos[0], end=pts_pos[1], width_mm=line_w))
+                lines.append(
+                    HatchLine(
+                        start=(round(self.cx + pts_pos[0][0], 4), round(self.cy + pts_pos[0][1], 4)),
+                        end=(round(self.cx + pts_pos[1][0], 4), round(self.cy + pts_pos[1][1], 4)),
+                        width_mm=line_w,
+                    )
+                )
 
-            # 2. -45 degree line: y + x = offset
-            pts_neg = []
-            y_at_xmin_neg = -x_min + offset
-            if y_min <= y_at_xmin_neg <= y_max:
-                pts_neg.append((x_min, y_at_xmin_neg))
-            y_at_xmax_neg = -x_max + offset
-            if y_min <= y_at_xmax_neg <= y_max:
-                pts_neg.append((x_max, y_at_xmax_neg))
-            x_at_ymin_neg = -y_min + offset
-            if x_min <= x_at_ymin_neg <= x_max and (x_at_ymin_neg, y_min) not in pts_neg:
-                pts_neg.append((x_at_ymin_neg, y_min))
-            x_at_ymax_neg = -y_max + offset
-            if x_min <= x_at_ymax_neg <= x_max and (x_at_ymax_neg, y_max) not in pts_neg:
-                pts_neg.append((x_at_ymax_neg, y_max))
+            # 2. -45 degree line: v + u = offset -> v = -u + offset
+            pts_neg: List[Tuple[float, float]] = []
+            v_at_umin_neg = half_w + offset
+            if -half_l <= v_at_umin_neg <= half_l:
+                pts_neg.append((-half_w, v_at_umin_neg))
+            v_at_umax_neg = -half_w + offset
+            if -half_l <= v_at_umax_neg <= half_l:
+                pts_neg.append((half_w, v_at_umax_neg))
+            u_at_vmin_neg = offset + half_l
+            if -half_w <= u_at_vmin_neg <= half_w and not any(
+                math.hypot(u_at_vmin_neg - p[0], -half_l - p[1]) < 1e-4 for p in pts_neg
+            ):
+                pts_neg.append((u_at_vmin_neg, -half_l))
+            u_at_vmax_neg = offset - half_l
+            if -half_w <= u_at_vmax_neg <= half_w and not any(
+                math.hypot(u_at_vmax_neg - p[0], half_l - p[1]) < 1e-4 for p in pts_neg
+            ):
+                pts_neg.append((u_at_vmax_neg, half_l))
 
             if len(pts_neg) == 2:
-                lines.append(HatchLine(start=pts_neg[0], end=pts_neg[1], width_mm=line_w))
+                lines.append(
+                    HatchLine(
+                        start=(round(self.cx + pts_neg[0][0], 4), round(self.cy + pts_neg[0][1], 4)),
+                        end=(round(self.cx + pts_neg[1][0], 4), round(self.cy + pts_neg[1][1], 4)),
+                        width_mm=line_w,
+                    )
+                )
 
         return lines

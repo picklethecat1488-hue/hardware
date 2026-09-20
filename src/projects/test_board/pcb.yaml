@@ -104,7 +104,7 @@ capacitive_sensors:
     pitch_mm: 1.2
     gap_mm: 0.3
     center_mm: [0.0, -12.0]
-    drive_shield: true
+    drive_shield: false
     hatch_ground_pour: true
     hatch_line_width_mm: 0.15
     hatch_pitch_mm: 0.50
@@ -121,7 +121,7 @@ capacitive_sensors:
     pitch_mm: 1.2
     gap_mm: 0.3
     center_mm: [0.0, -0.5]
-    drive_shield: true
+    drive_shield: false
     hatch_ground_pour: true
     hatch_line_width_mm: 0.15
     hatch_pitch_mm: 0.50
@@ -138,7 +138,7 @@ capacitive_sensors:
     pitch_mm: 1.2
     gap_mm: 0.3
     center_mm: [0.0, 11.0]
-    drive_shield: true
+    drive_shield: false
     hatch_ground_pour: true
     hatch_line_width_mm: 0.15
     hatch_pitch_mm: 0.50
@@ -153,7 +153,7 @@ capacitive_sensors:
     shape: pad
     area_mm: [10.0, 6.0]
     center_mm: [0.0, 19.5]
-    drive_shield: true
+    drive_shield: false
     hatch_ground_pour: true
     hatch_line_width_mm: 0.15
     hatch_pitch_mm: 0.50
@@ -162,16 +162,26 @@ capacitive_sensors:
     shape_ref: flex_tail
 
 schematic_sheets:
-  - title: Power Supply & Distribution
-    description: USB-C connector, 3.3V LDO regulator, primary rails, and load switch MOSFET
-    components: [J_USB, R_CC1, R_CC2, U3, C_IN, C_OUT, Q1, J1, C1, C2, C3]
+  - title: USB-C Interface
+    description: USB-C connector with CC configuration channel pull-down termination
+    components: [J_USB, R_CC1, R_CC2]
     pin_breakouts:
       J_USB: [VBUS, GND, CC1, CC2, SHIELD1, SHIELD2]
       R_CC1: ["1", "2"]
       R_CC2: ["1", "2"]
+
+  - title: 3.3V LDO Voltage Regulation
+    description: Low-dropout linear voltage regulator converting VBUS to 3.3V system rail
+    components: [U3, C_IN, C_OUT]
+    pin_breakouts:
       U3: ["1", "2", "3", "5"]
       C_IN: ["1", "2"]
       C_OUT: ["1", "2"]
+
+  - title: Power Distribution & Load Switch
+    description: Switched power rail MOSFET switch and primary system decoupling
+    components: [Q1, J1, C1, C2, C3]
+    pin_breakouts:
       Q1: [G, S, D]
       J1: [GND, 3V3, VLOAD_SW]
       C1: ["1", "2"]
@@ -186,11 +196,11 @@ schematic_sheets:
       U1: [A1, A2, B1, B2, N14, P14, C1, C2]
       J2: [D0_P, D0_N, CLK_P, CLK_N]
 
-  - title: Microcontroller Clock, Reset & Audio Subsystem
-    description: 24MHz crystal oscillator, reset network, boot configuration, and MAX98357A PDM audio amplifier
-    components: [U1, Y1, C_OSC1, C_OSC2, R_RST, C_RST, R_BOOT, C4, C5, U4, C_AMP, SPK1]
+  - title: Microcontroller Clock, Reset & Boot
+    description: 24MHz crystal oscillator, reset network, boot configuration, and MCU decoupling
+    components: [U1, Y1, C_OSC1, C_OSC2, R_RST, C_RST, R_BOOT, C4, C5]
     pin_breakouts:
-      U1: [H7, H8, D1, K1, K2, M1, M2, G1, G2, G3]
+      U1: [H7, H8, D1, K1, K2, M1, M2]
       Y1: ["1", "2", "3", "4"]
       C_OSC1: ["1", "2"]
       C_OSC2: ["1", "2"]
@@ -199,6 +209,12 @@ schematic_sheets:
       R_BOOT: ["1", "2"]
       C4: ["1", "2"]
       C5: ["1", "2"]
+
+  - title: Audio Subsystem
+    description: MAX98357A I2S/PDM digital audio amplifier and piezo speaker
+    components: [U1, U4, C_AMP, SPK1]
+    pin_breakouts:
+      U1: [G1, G2, G3]
       U4: [DIN, BCLK, LRCLK, GAIN, SD_MODE, GND, VDD, OUTP, OUTN]
       C_AMP: ["1", "2"]
       SPK1: ["1", "2"]
