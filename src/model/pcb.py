@@ -627,6 +627,18 @@ class SilkscreenTextModel(BaseModel):
     mirror: bool = Field(default=False, description="Whether text is mirrored (default True for B.SilkS)")
 
 
+class SchematicLayoutModel(BaseModel):
+    """Layout grid and dimension parameters for schematic diagram sheets."""
+
+    col_width: float = Field(default=60.0, description="Nominal column width in mm for multi-column layout")
+    col_gap: float = Field(default=15.0, description="Gap between columns in mm")
+    sheet_center_x: float = Field(default=148.5, description="Drawing sheet center X coordinate in mm")
+    sheet_center_y: float = Field(default=105.0, description="Drawing sheet center Y coordinate in mm")
+    row_step_y: float = Field(default=55.0, description="Vertical pitch step between symbol rows in mm")
+    default_symbol_width: float = Field(default=45.0, description="Default symbol width in mm for DRC overlap checks")
+    default_symbol_height: float = Field(default=35.0, description="Default symbol height in mm for DRC overlap checks")
+
+
 class SchematicSheetModel(BaseModel):
     """Configuration for an individual functional schematic drawing sheet."""
 
@@ -637,6 +649,9 @@ class SchematicSheetModel(BaseModel):
     )
     pin_breakouts: dict[str, List[str]] = Field(
         default_factory=dict, description="Component -> subset of pin names to display on this sheet"
+    )
+    layout: SchematicLayoutModel = Field(
+        default_factory=SchematicLayoutModel, description="Layout grid and dimension parameters for this sheet"
     )
 
 
@@ -742,6 +757,10 @@ class PCBConfig(BaseModel):
     schematic_sheets: List[SchematicSheetModel] = Field(
         default_factory=list,
         description="Defined schematic sheets for multi-page functional signal breakout",
+    )
+    schematic_layout: SchematicLayoutModel = Field(
+        default_factory=SchematicLayoutModel,
+        description="Default grid layout and dimension parameters for schematic sheets",
     )
     mounting_holes: List[MountingHoleModel] = Field(
         default_factory=list,

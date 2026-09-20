@@ -12,7 +12,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 import matplotlib.patches as patches
 
-from model.pcb import PCBConfig
+from model.pcb import PCBConfig, SchematicLayoutModel
 from model.wiring import FootprintModel, NetModel, Wiring, TruthTableModel, TruthTableRowModel, PinModel
 
 
@@ -1604,8 +1604,22 @@ class SchematicDiagram:
             getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q") for fp in sheet_fps
         )
 
-        page_center_x = 147.5
-        page_center_y = 115.0
+        sheet_model = (
+            self.config.schematic_sheets[sheet_plan.sheet_idx - 1]
+            if (
+                self.config
+                and self.config.schematic_sheets
+                and (0 <= (sheet_plan.sheet_idx - 1) < len(self.config.schematic_sheets))
+            )
+            else None
+        )
+        layout = (
+            getattr(sheet_model, "layout", None)
+            or getattr(self.config, "schematic_layout", None)
+            or SchematicLayoutModel()
+        )
+        page_center_x = layout.sheet_center_x
+        page_center_y = layout.sheet_center_y
 
         if has_bottom_cards:
             top_row_y = 158.0
@@ -1648,7 +1662,7 @@ class SchematicDiagram:
                 r_idx = i // cols_per_row
                 c_idx_col = i % cols_per_row
                 col_x_positions.append(45.0 + c_idx_col * col_w + (col_w - cw) / 2.0)
-                col_y_positions.append(top_row_y - (r_idx * 55.0))
+                col_y_positions.append(top_row_y - (r_idx * layout.row_step_y))
 
         # Build pin side map and component column index map
         fp_col_map = {fp.name: idx for idx, fp in enumerate(main_fps)}
