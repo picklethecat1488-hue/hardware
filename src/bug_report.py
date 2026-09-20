@@ -1,0 +1,240 @@
+"""Interactive Bug Report Tool and Markdown Tracker CLI.
+
+Launches a local browser-based bug reporting workstation, allowing issue triage,
+reproduction step logging, attachment uploads (screenshots, logs, CAD refs),
+and automated export to GitHub-flavored Markdown (build/BUGS.md).
+
+Usage:
+    python src/bug_report.py
+    python src/bug_report.py --port 8766 --output build/BUGS.md
+    python src/bug_report.py --list
+    python src/bug_report.py --add "Antenna on Q2" --severity HIGH --category PCB
+    python src/bug_report.py --export-only
+"""
+
+import argparse
+from pathlib import Path
+import sys
+import threading
+import time
+import webbrowser
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from model.bug_report import BugCategory, BugReportModel, BugSeverity, BugStatus
+from provider.bug_report.server import BugReportServer
+from provider.code_review.git_utils import get_git_root
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments for bug report launcher.
+
+    Returns:
+        Parsed argument namespace.
+    """
+    parser = argparse.ArgumentParser(
+        description="Hardware Bug Report Terminal & Markdown Tracker",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8766,
+        help="Local port number for the bug report web dashboard.",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host interface address to bind.",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=Path("build/BUGS.md"),
+        help="Destination markdown file for bug tracker registry.",
+    )
+    parser.add_argument(
+        "--state-file",
+        type=Path,
+        default=Path("build/bugs_state.json"),
+        help="Persistent JSON file storing bug database.",
+    )
+    parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Start a fresh bug tracking session, ignoring previous JSON state.",
+    )
+    parser.add_argument(
+        "--browser",
+        choices=["vscode", "system", "none"],
+        default="vscode",
+        help="Target browser environment to display dashboard (default: vscode).",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Disable automatic browser opening on server launch.",
+    )
+    parser.add_argument(
+        "--export-only",
+        action="store_true",
+        help="Immediately export build/BUGS.md from existing state without launching server.",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List all active bugs directly in the terminal.",
+    )
+    parser.add_argument(
+        "--add",
+        type=str,
+        help="Quickly register a new bug with the specified title.",
+    )
+    parser.add_argument(
+        "--severity",
+        choices=[s.value for s in BugSeverity],
+        default=BugSeverity.MEDIUM.value,
+        help="Severity level when registering a new bug.",
+    )
+    parser.add_argument(
+        "--category",
+        choices=[c.value for c in BugCategory],
+        default=BugCategory.PCB.value,
+        help="Subsystem category when registering a new bug.",
+    )
+    parser.add_argument(
+        "--component",
+        type=str,
+        default="",
+        help="Component or file name affected by the bug.",
+    )
+    parser.add_argument(
+        "--description",
+        type=str,
+        default="",
+        help="Detailed description for quick-added bug.",
+    )
+    parser.add_argument(
+        "--resolve",
+        type=str,
+        help="Mark a bug ID as RESOLVED (e.g. --resolve BUG-001).",
+    )
+    parser.add_argument(
+        "--notes",
+        type=str,
+        default="",
+        help="Resolution notes when resolving a bug.",
+    )
+    return parser.parse_args()
+
+
+def launch_browser(url: str, target: str = "vscode") -> None:
+    """Open bug report dashboard URL.
+
+    Args:
+        url: The web URL of the bug report dashboard.
+        target: Target browser environment ('vscode', 'system', 'none').
+    """
+    match target:
+        case "none":
+            return
+        case "vscode":
+            return
+        case "system":
+            webbrowser.open(url)
+        case _:
+            webbrowser.open(url)
+
+
+def main() -> None:
+    """Run bug report server or perform direct CLI actions."""
+    args = parse_arguments()
+    repo_root = get_git_root()
+
+    output_path = args.output if args.output.is_absolute() else (repo_root / args.output)
+    state_path = args.state_file if args.state_file.is_absolute() else (repo_root / args.state_file)
+
+    server = BugReportServer(
+        host=args.host,
+        port=args.port,
+        repo_root=repo_root,
+        markdown_output=output_path,
+        state_file=state_path,
+        fresh=args.fresh,
+    )
+
+    # Handle quick add
+    if args.add:
+        bug_id = server.database.generate_bug_id()
+        bug = BugReportModel(
+            id=bug_id,
+            title=args.add,
+            status=BugStatus.OPEN,
+            severity=BugSeverity(args.severity),
+            category=BugCategory(args.category),
+            component=args.component,
+            description=args.description,
+        )
+        server.database.add_or_update(bug)
+        server.save_and_sync()
+        print(f"Registered bug [{bug.id}]: {bug.title} ({bug.severity.value})")
+        return
+
+    # Handle quick resolve
+    if args.resolve:
+        bug = server.database.get_bug(args.resolve)
+        if not bug:
+            print(f"Bug '{args.resolve}' not found in database.", file=sys.stderr)
+            sys.exit(1)
+        bug.status = BugStatus.RESOLVED
+        if args.notes:
+            bug.resolution_notes = args.notes
+        server.save_and_sync()
+        print(f"Resolved bug [{bug.id}]: {bug.title}")
+        return
+
+    # Handle terminal list
+    if args.list:
+        print("\n=== Hardware Bug Tracker ===")
+        if not server.database.bugs:
+            print("No bugs registered.")
+        else:
+            for b in server.database.bugs:
+                chk = "[X]" if b.status in (BugStatus.RESOLVED, BugStatus.CLOSED) else "[ ]"
+                comp = f" ({b.component})" if b.component else ""
+                print(f"  {chk} [{b.id}] [{b.severity.value}] [{b.category.value}] {b.title}{comp} -> {b.status.value}")
+        print()
+        return
+
+    if args.export_only:
+        saved_md = server.save_and_sync()
+        print(f"Exported bug tracker markdown report to: {saved_md}")
+        return
+
+    # Initial sync to ensure build/BUGS.md exists immediately
+    server.save_and_sync()
+    url = server.get_url()
+
+    print("=================================================================")
+    print("  HARDWARE BUG REPORT TERMINAL & WORKSTATION")
+    print(f"  Dashboard URL: {url}")
+    print(f"  Report File:   {output_path}")
+    print(f"  State File:    {state_path}")
+    print("  Press Ctrl+C to terminate the bug reporting session.")
+    print("=================================================================")
+
+    browser_mode = "none" if args.no_browser else args.browser
+    threading.Thread(target=launch_browser, args=(url, browser_mode), daemon=True).start()
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nSaving bug database and shutting down server...")
+        server.save_and_sync()
+        print(f"Markdown report synced to: {output_path}")
+
+
+if __name__ == "__main__":
+    main()
