@@ -1837,7 +1837,20 @@ class PCBDesignRulesChecker:
 
         # 3. Per-sheet checks: Dangling components and symbol overlaps
         for sheet_idx, sheet in enumerate(self.config.schematic_sheets):
-            sheet_fps = [footprints_map[c] for c in sheet.components if c in footprints_map]
+            sheet_fps = []
+            for c in sheet.components:
+                if c in footprints_map:
+                    orig_fp = footprints_map[c]
+                    if sheet.pin_breakouts and c in sheet.pin_breakouts:
+                        allowed_pins = set(sheet.pin_breakouts[c])
+                        matched_pins = [
+                            p
+                            for p in orig_fp.pins
+                            if p.name in allowed_pins or getattr(p, "label", None) in allowed_pins
+                        ]
+                        sheet_fps.append(orig_fp.model_copy(update={"pins": matched_pins}))
+                    else:
+                        sheet_fps.append(orig_fp)
 
             # 3a. Dangling component check
             for fp in sheet_fps:

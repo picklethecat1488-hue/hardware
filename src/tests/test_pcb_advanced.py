@@ -1575,3 +1575,41 @@ def test_schematic_drc_detects_missing_page_transition(advanced_pcb_stackup: Sta
     missing = [v for v in violations if v.rule_name == DRCRuleName.SCHEMATIC_PAGE_TRANSITION_MISSING]
     assert len(missing) == 1
     assert "INTER_PAGE_NET" in missing[0].net_or_zone
+
+
+def test_regression_smd_no_connect_pads_included_on_pcb(tmp_path: Path) -> None:
+    """Verify that SMD components (U1 BGA-196, J3 USB-C, J2/J4 FPC-30) place no-connect pads on the board (BUG-043)."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.exporter import PCBExporter
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. Verify U1 has all 196 balls defined
+    u1 = next((fp for fp in wiring.footprints if fp.name == "U1"), None)
+    assert u1 is not None
+    assert len(u1.pins) == 196, f"Expected 196 balls on U1 BGA-196, got {len(u1.pins)}"
+
+    # 2. Verify J3 (USB-C-16P) includes all pins and tabs (including SBU1, SBU2, SHIELD3, SHIELD4)
+    j3 = next((fp for fp in wiring.footprints if fp.name == "J3"), None)
+    assert j3 is not None
+    assert len(j3.pins) >= 14, f"Expected at least 14 pins/tabs on J3 USB-C, got {len(j3.pins)}"
+    j3_pin_names = {p.name for p in j3.pins}
+    assert {"SBU1", "SBU2", "SHIELD3", "SHIELD4"}.issubset(j3_pin_names)
+
+    # 3. Verify J2 (FPC-30P-0.5MM) includes all 30 pins + mounting pads
+    j2 = next((fp for fp in wiring.footprints if fp.name == "J2"), None)
+    assert j2 is not None
+    assert len(j2.pins) >= 30, f"Expected at least 30 pins on J2 FPC connector, got {len(j2.pins)}"
+
+    # 4. Verify PCB export emits no-connect pads with (net 0 "")
+    cfg = provider.pcb_config
+    assert cfg is not None
+    exporter = PCBExporter(cfg, wiring)
+    board_file = tmp_path / "carrier_board.kicad_pcb"
+    exporter.export_kicad_pcb(board_file)
+    content = board_file.read_text()
+
+    # Must contain no-connect pads (net 0 "")
+    assert '(net 0 "")' in content, "carrier_board.kicad_pcb must contain no-connect pads with (net 0 '')"
