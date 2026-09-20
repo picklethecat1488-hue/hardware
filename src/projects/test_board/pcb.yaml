@@ -166,7 +166,7 @@ schematic_sheets:
     description: USB-C connector with CC configuration channel pull-down termination
     components: [J_USB, R_CC1, R_CC2]
     pin_breakouts:
-      J_USB: [VBUS, GND, CC1, CC2, SHIELD1, SHIELD2]
+      J_USB: [VBUS, VBUS2, GND, GND2, CC1, CC2, SHIELD1, SHIELD2]
       R_CC1: ["1", "2"]
       R_CC2: ["1", "2"]
 
@@ -212,12 +212,28 @@ schematic_sheets:
 
   - title: Audio Subsystem
     description: MAX98357A I2S/PDM digital audio amplifier and piezo speaker
-    components: [U1, U4, C_AMP, SPK1]
+    layout:
+      cols_per_row: 2
+      grid_positions:
+        U4: [0, 0]
+        SPK1: [0, 1]
+        U1: [1, 1]
+    components: [U4, SPK1, U1, C_AMP]
+    pin_sides:
+      U4:
+        OUTP: right
+        OUTN: right
+        DIN: right
+        BCLK: right
+        LRCLK: right
+      SPK1:
+        "1": left
+        "2": left
     pin_breakouts:
-      U1: [G1, G2, G3]
-      U4: [DIN, BCLK, LRCLK, GAIN, SD_MODE, GND, VDD, OUTP, OUTN]
-      C_AMP: ["1", "2"]
+      U4: [GAIN, SD_MODE, GND, VDD, OUTP, OUTN, DIN, BCLK, LRCLK]
       SPK1: ["1", "2"]
+      U1: [G1, G2, G3]
+      C_AMP: ["1", "2"]
 
   - title: Capacitive Sensing & Control
     description: CY8CMBR3116 CapSense controller, 4-channel liquid level flex tail, and I2C bus
