@@ -882,7 +882,7 @@ class PCBAutoRouter:
                 for tp in tp_by_net.get(net.name, []):
                     tp_layer = getattr(tp, "layer", "F.Cu")
                     endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer))
-                    if getattr(tp, "drill_diameter_mm", 0) <= 0:
+                    if getattr(tp, "drill_diameter_mm", 0) <= 0 or net.name in plane_nets:
                         smd_endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer))
 
                 if net.name in sensor_terminals:

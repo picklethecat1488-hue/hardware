@@ -1,6 +1,7 @@
 """Unit tests for advanced PCB features: CPWG impedance, RF/Display DRC, CAD boundary containment, Eye diagram, and TestBoard."""
 
 import json
+import math
 from pathlib import Path
 import pytest
 from model.pcb import (
@@ -823,6 +824,25 @@ def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     report = drc_checker.check_all(wiring=wiring)
     assert report.passed, f"DRC failed:\n{report.summary()}"
     assert report.error_count == 0
+
+    # Verify TP_GND has routed trace and via connecting to ground (BUG-040)
+    tp_gnd = next((tp for tp in cfg.test_points if tp.name == "TP_GND"), None)
+    assert tp_gnd is not None
+    assert tp_gnd.net == "GND"
+    tp_x, tp_y = tp_gnd.position_mm
+    tp_trace = next(
+        (
+            tr
+            for tr in cfg.traces
+            if tr.net == "GND"
+            and (
+                math.hypot(tr.start_mm[0] - tp_x, tr.start_mm[1] - tp_y) < 0.1
+                or math.hypot(tr.end_mm[0] - tp_x, tr.end_mm[1] - tp_y) < 0.1
+            )
+        ),
+        None,
+    )
+    assert tp_trace is not None, "TP_GND must have a routed copper trace connecting to ground"
 
     # 2. Export board files (.kicad_pcb, .drl, .gbr) and pos.csv
     exporter = PCBExporter(cfg, wiring)
