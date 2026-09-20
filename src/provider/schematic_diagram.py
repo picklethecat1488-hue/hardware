@@ -2602,11 +2602,19 @@ class SchematicDiagram:
                         zorder=3,
                     )
 
+        # Check if truth table is present on this sheet
+        has_truth_table = any(
+            (getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q"))
+            for fp in sheet_fps
+        )
+
         # Draw Decoupling Capacitor Bank
         if decoupling_caps:
             n_caps = len(decoupling_caps)
             total_w = (n_caps - 1) * 28.0
-            if cols_override == 2:
+            if has_truth_table:
+                cap_base_x = 35.0
+            elif cols_override == 2:
                 cap_base_x = col_x_positions[0]
             else:
                 cap_base_x = max(35.0, page_center_x - (total_w / 2.0))
@@ -2627,11 +2635,14 @@ class SchematicDiagram:
 
             if tt:
                 tt_card_w = 125.0
-                tt_x = 118.0
-                c_idx = next((i for i, f in enumerate(main_fps) if f.name == fp.name), None)
-                if c_idx is not None:
-                    comp_cx = col_x_positions[c_idx]
-                    tt_x = max(116.0, min(145.0, comp_cx + cw / 2.0 - tt_card_w / 2.0 + 20.0))
+                if decoupling_caps:
+                    tt_x = 135.0
+                else:
+                    tt_x = 118.0
+                    c_idx = next((i for i, f in enumerate(main_fps) if f.name == fp.name), None)
+                    if c_idx is not None:
+                        comp_cx = col_x_positions[c_idx]
+                        tt_x = max(116.0, min(145.0, comp_cx + cw / 2.0 - tt_card_w / 2.0 + 20.0))
                 self._draw_truth_table(ax=ax, fp=fp, tt=tt, base_x=tt_x, base_y=bottom_cards_y, card_w=tt_card_w)
 
         pdf.savefig(fig)
