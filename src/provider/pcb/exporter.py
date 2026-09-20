@@ -186,6 +186,11 @@ class PCBExporter:
             dim_h = fp.dimensions[1] if fp.dimensions else 4.0
             w_half = round(dim_w / 2.0 + 0.4, 4)
             h_half = round(dim_h / 2.0 + 0.4, 4)
+            if hasattr(fp, "pins") and fp.pins:
+                pad_max_x = max(abs(p.position[0]) + getattr(p, "pad_size_mm", (0.35, 1.2))[0] / 2.0 for p in fp.pins)
+                pad_max_y = max(abs(p.position[1]) + getattr(p, "pad_size_mm", (0.35, 1.2))[1] / 2.0 for p in fp.pins)
+                w_half = max(w_half, round(pad_max_x + 0.35, 4))
+                h_half = max(h_half, round(pad_max_y + 0.35, 4))
             val_y = round(h_half + 1.2, 4)
 
             is_round = (
@@ -213,6 +218,9 @@ class PCBExporter:
             )
             cand_ref_x = fp.position[0] + ref_off_x
             cand_ref_y = fp.position[1] + ref_off_y
+            if fp.name == "J_FLEX":
+                cand_ref_x = fp.position[0]
+                cand_ref_y = fp.position[1]
             placed_component_label_boxes.append(
                 (
                     cand_ref_x - ref_w / 2.0,
@@ -389,6 +397,43 @@ class PCBExporter:
             rx_net_idx = net_name_to_idx.get(rx_net, 0)
             shield_net_idx = net_name_to_idx.get("CAP_SHIELD", net_name_to_idx.get("GND", 0))
 
+            # Helper to emit polyline fingers/busbars as copper trace segments
+            def _poly_to_segments(poly: List[Tuple[float, float]], net_idx: int) -> None:
+                xs = [p[0] for p in poly]
+                ys = [p[1] for p in poly]
+                min_x, max_x = min(xs), max(xs)
+                min_y, max_y = min(ys), max(ys)
+                dx = max_x - min_x
+                dy = max_y - min_y
+                if dx >= dy:
+                    # Horizontal finger
+                    y_mid = (min_y + max_y) / 2.0
+                    segments_data.append(
+                        {
+                            "x1": round(self.config.sheet_center_x_mm + min_x, 4),
+                            "y1": round(self.config.sheet_center_y_mm + y_mid, 4),
+                            "x2": round(self.config.sheet_center_x_mm + max_x, 4),
+                            "y2": round(self.config.sheet_center_y_mm + y_mid, 4),
+                            "width": round(max(0.15, dy), 4),
+                            "layer": "F.Cu",
+                            "net_idx": net_idx,
+                        }
+                    )
+                else:
+                    # Vertical busbar
+                    x_mid = (min_x + max_x) / 2.0
+                    segments_data.append(
+                        {
+                            "x1": round(self.config.sheet_center_x_mm + x_mid, 4),
+                            "y1": round(self.config.sheet_center_y_mm + min_y, 4),
+                            "x2": round(self.config.sheet_center_x_mm + x_mid, 4),
+                            "y2": round(self.config.sheet_center_y_mm + max_y, 4),
+                            "width": round(max(0.15, dx), 4),
+                            "layer": "F.Cu",
+                            "net_idx": net_idx,
+                        }
+                    )
+
             # TX comb fingers / self pad
             for poly in geom.tx_fingers:
                 pts = [
@@ -398,16 +443,38 @@ class PCBExporter:
                     }
                     for pt in poly
                 ]
+                active_net_idx = tx_net_idx if sensor.shape == "interdigital" else rx_net_idx
+                active_net_name = tx_net if sensor.shape == "interdigital" else rx_net
                 zones_data.append(
                     {
-                        "net_idx": tx_net_idx if sensor.shape == "interdigital" else rx_net_idx,
-                        "net_name": tx_net if sensor.shape == "interdigital" else rx_net,
+                        "net_idx": active_net_idx,
+                        "net_name": active_net_name,
                         "layer": "F.Cu",
                         "priority": 2,
                         "clearance_mm": 0.20,
                         "pts": pts,
                     }
                 )
+                if sensor.shape == "interdigital":
+                    _poly_to_segments(poly, active_net_idx)
+                else:
+                    # Fill self-cap touch pad with solid copper trace strips
+                    pad_w, pad_l = sensor.area_mm
+                    pad_cx, pad_cy = center
+                    y_c = pad_cy - pad_l / 2.0 + 0.15
+                    while y_c <= (pad_cy + pad_l / 2.0):
+                        segments_data.append(
+                            {
+                                "x1": round(self.config.sheet_center_x_mm + pad_cx - pad_w / 2.0, 4),
+                                "y1": round(self.config.sheet_center_y_mm + y_c, 4),
+                                "x2": round(self.config.sheet_center_x_mm + pad_cx + pad_w / 2.0, 4),
+                                "y2": round(self.config.sheet_center_y_mm + y_c, 4),
+                                "width": 0.25,
+                                "layer": "F.Cu",
+                                "net_idx": active_net_idx,
+                            }
+                        )
+                        y_c += 0.30
 
             # RX comb fingers
             for poly in geom.rx_fingers:
@@ -428,23 +495,7 @@ class PCBExporter:
                         "pts": pts,
                     }
                 )
-
-            # Guard ring around electrode
-            if geom.guard_ring and len(geom.guard_ring) >= 2:
-                for k in range(len(geom.guard_ring) - 1):
-                    p1 = geom.guard_ring[k]
-                    p2 = geom.guard_ring[k + 1]
-                    segments_data.append(
-                        {
-                            "x1": round(self.config.sheet_center_x_mm + p1[0], 4),
-                            "y1": round(self.config.sheet_center_y_mm + p1[1], 4),
-                            "x2": round(self.config.sheet_center_x_mm + p2[0], 4),
-                            "y2": round(self.config.sheet_center_y_mm + p2[1], 4),
-                            "width": 0.25,
-                            "layer": "F.Cu",
-                            "net_idx": shield_net_idx,
-                        }
-                    )
+                _poly_to_segments(poly, rx_net_idx)
 
             # Back layer 45-degree cross-hatch ground fill
             for hl in geom.hatch_lines:

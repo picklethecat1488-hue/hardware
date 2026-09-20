@@ -17,6 +17,14 @@ from provider.geometry_utils import point_in_polygon
 
 _point_in_polygon = point_in_polygon
 
+SCHEMATIC_COL_WIDTH: float = 60.0
+SCHEMATIC_COL_GAP: float = 15.0
+SCHEMATIC_SHEET_CENTER_X: float = 148.5
+SCHEMATIC_SHEET_CENTER_Y: float = 105.0
+SCHEMATIC_ROW_STEP_Y: float = 55.0
+SCHEMATIC_DEFAULT_SYMBOL_WIDTH: float = 45.0
+SCHEMATIC_DEFAULT_SYMBOL_HEIGHT: float = 35.0
+
 
 def _dist_point_to_segment(
     p: Tuple[float, float],
@@ -141,6 +149,12 @@ class DRCRuleName(StrEnum):
     TEST_POINT_TRACE_COLLISION = "TEST_POINT_TRACE_COLLISION"
     SILKSCREEN_PAD_OVERLAP = "SILKSCREEN_PAD_OVERLAP"
     ANTENNA_TRACE_DETECTED = "ANTENNA_TRACE_DETECTED"
+    SCHEMATIC_SYMBOL_OVERLAP = "SCHEMATIC_SYMBOL_OVERLAP"
+    SCHEMATIC_TEXT_COLLISION = "SCHEMATIC_TEXT_COLLISION"
+    SCHEMATIC_UNCONNECTED_PIN = "SCHEMATIC_UNCONNECTED_PIN"
+    SCHEMATIC_NET_ANTENNA = "SCHEMATIC_NET_ANTENNA"
+    SCHEMATIC_PAGE_TRANSITION_MISSING = "SCHEMATIC_PAGE_TRANSITION_MISSING"
+    SCHEMATIC_DANGLING_COMPONENT = "SCHEMATIC_DANGLING_COMPONENT"
 
 
 @dataclass
@@ -436,6 +450,10 @@ class PCBDesignRulesChecker:
         # 9. Antenna and dangling trace validation
         if wiring:
             violations.extend(self.check_antennae(wiring))
+
+        # 10. Schematic design rule checks (symbol overlaps, dangling components, page transitions, antennas)
+        if self.config.schematic_sheets and wiring:
+            violations.extend(self.check_schematic(wiring))
 
         passed = not any(v.severity == DRCSeverity.ERROR for v in violations)
         return DRCReport(passed=passed, violations=violations)
@@ -1737,5 +1755,179 @@ class PCBDesignRulesChecker:
                         location=(pt_x, pt_y, 0.0),
                     )
                 )
+
+        return violations
+
+    def check_schematic(self, wiring: Any) -> List[DRCViolation]:
+        """Perform Schematic Design Rule Checks (DRC).
+
+        Enforces:
+        - SCHEMATIC_DANGLING_COMPONENT: Every component on every sheet has at least one connected pin in the netlist.
+        - SCHEMATIC_SYMBOL_OVERLAP: No two component symbols on a sheet overlap in bounding envelope.
+        - SCHEMATIC_NET_ANTENNA: No schematic net is an open 1-pin antenna without an off-page destination or termination.
+        - SCHEMATIC_PAGE_TRANSITION_MISSING: Multi-sheet nets connect across all participating sheets without orphaned sheet nodes.
+        """
+        violations: List[DRCViolation] = []
+        if not self.config.schematic_sheets or not wiring:
+            return violations
+
+        footprints_map = {}
+        if hasattr(wiring, "footprints"):
+            if isinstance(wiring.footprints, dict):
+                footprints_map = wiring.footprints
+            elif isinstance(wiring.footprints, list):
+                footprints_map = {fp.name: fp for fp in wiring.footprints}
+
+        all_nets = getattr(wiring, "nets", [])
+        pin_to_net: Dict[Tuple[str, str], str] = {}
+        for net in all_nets:
+            for pair in net.pins:
+                if len(pair) >= 2:
+                    pin_to_net[(pair[0], pair[1])] = net.name
+
+        # 1. Check for single-pin nets / schematic antennas across the entire schematic
+        for net in all_nets:
+            net_u = net.name.upper()
+            if net_u in ("GND", "VBUS", "3V3", "5V", "1V8", "1V2", "VBAT"):
+                continue
+            if len(net.pins) < 2:
+                violations.append(
+                    DRCViolation(
+                        rule_name=DRCRuleName.SCHEMATIC_NET_ANTENNA,
+                        severity=DRCSeverity.ERROR,
+                        net_or_zone=net.name,
+                        description=(
+                            f"Schematic net '{net.name}' is an open antenna with only {len(net.pins)} connected pin "
+                            f"({net.pins[0] if net.pins else 'none'}) without an off-page destination or termination"
+                        ),
+                    )
+                )
+
+        # 2. Check multi-sheet page transitions ("page transitions replacing vias")
+        comp_to_sheets: Dict[str, List[str]] = {}
+        for sheet in self.config.schematic_sheets:
+            for comp_name in sheet.components:
+                comp_to_sheets.setdefault(comp_name, []).append(sheet.title)
+
+        board_fps = self.get_footprints_for_board(wiring)
+        board_comp_names = {fp.name for fp in board_fps}
+
+        for net in all_nets:
+            participating_sheets = set()
+            orphan_pins = []
+            for pair in net.pins:
+                c_name = pair[0]
+                if c_name in comp_to_sheets:
+                    participating_sheets.update(comp_to_sheets[c_name])
+                elif c_name in board_comp_names:
+                    orphan_pins.append(pair)
+
+            if orphan_pins and participating_sheets:
+                violations.append(
+                    DRCViolation(
+                        rule_name=DRCRuleName.SCHEMATIC_PAGE_TRANSITION_MISSING,
+                        severity=DRCSeverity.ERROR,
+                        net_or_zone=net.name,
+                        description=(
+                            f"Schematic net '{net.name}' connects to pin(s) {orphan_pins} belonging to component(s) "
+                            f"not placed on any schematic sheet, resulting in a missing page transition"
+                        ),
+                    )
+                )
+
+            if len(participating_sheets) > 1:
+                for sheet_title in participating_sheets:
+                    sheet_pins = [p for p in net.pins if sheet_title in comp_to_sheets.get(p[0], [])]
+                    if not sheet_pins:
+                        violations.append(
+                            DRCViolation(
+                                rule_name=DRCRuleName.SCHEMATIC_PAGE_TRANSITION_MISSING,
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=net.name,
+                                description=(
+                                    f"Schematic net '{net.name}' connects across sheets {list(participating_sheets)} "
+                                    f"but missing valid page transition or pin connections on sheet '{sheet_title}'"
+                                ),
+                            )
+                        )
+
+        # 3. Per-sheet checks: Dangling components and symbol overlaps
+        for sheet_idx, sheet in enumerate(self.config.schematic_sheets):
+            sheet_fps = [footprints_map[c] for c in sheet.components if c in footprints_map]
+
+            # 3a. Dangling component check
+            for fp in sheet_fps:
+                connected_pins = [p for p in fp.pins if (fp.name, p.name) in pin_to_net]
+                if not connected_pins:
+                    violations.append(
+                        DRCViolation(
+                            rule_name=DRCRuleName.SCHEMATIC_DANGLING_COMPONENT,
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=fp.name,
+                            description=(
+                                f"Component '{fp.name}' on schematic sheet {sheet_idx + 1} ('{sheet.title}') "
+                                f"has no pins connected to any nets in the netlist"
+                            ),
+                        )
+                    )
+
+            # 3b. Symbol overlap check
+            passive_names = set()
+            for fp in sheet_fps:
+                name_u = fp.name.upper()
+                pkg_u = fp.package.upper()
+                if (name_u.startswith("R") or "RES" in pkg_u) and len(fp.pins) == 2:
+                    n1 = pin_to_net.get((fp.name, fp.pins[0].name), "").upper()
+                    n2 = pin_to_net.get((fp.name, fp.pins[1].name), "").upper()
+                    if n1 in ("3V3", "VBUS", "GND") or n2 in ("3V3", "VBUS", "GND"):
+                        passive_names.add(fp.name)
+                elif (name_u.startswith("C") or "CAP" in pkg_u) and len(fp.pins) == 2:
+                    n1 = pin_to_net.get((fp.name, fp.pins[0].name), "").upper()
+                    n2 = pin_to_net.get((fp.name, fp.pins[1].name), "").upper()
+                    if (n1 in ("3V3", "VBUS", "GND") and n2) or (n2 in ("3V3", "VBUS", "GND") and n1):
+                        passive_names.add(fp.name)
+
+            main_fps = [fp for fp in sheet_fps if fp.name not in passive_names]
+            if not main_fps:
+                main_fps = sheet_fps
+
+            num_comps = len(main_fps)
+            cols_per_row = max(1, min(num_comps, 3))
+            num_rows = (num_comps + cols_per_row - 1) // cols_per_row
+            total_content_w = (cols_per_row * SCHEMATIC_COL_WIDTH) + ((cols_per_row - 1) * SCHEMATIC_COL_GAP)
+            start_x = SCHEMATIC_SHEET_CENTER_X - (total_content_w / 2.0)
+            top_row_y = SCHEMATIC_SHEET_CENTER_Y + ((num_rows - 1) * 27.5)
+
+            boxes: List[Tuple[float, float, float, float, str]] = []
+            for c_idx, fp in enumerate(main_fps):
+                col = c_idx % cols_per_row
+                r_idx = c_idx // cols_per_row
+                cx = start_x + (col * (SCHEMATIC_COL_WIDTH + SCHEMATIC_COL_GAP)) + (SCHEMATIC_COL_WIDTH / 2.0)
+                cy = top_row_y - (r_idx * SCHEMATIC_ROW_STEP_Y)
+                cw = SCHEMATIC_DEFAULT_SYMBOL_WIDTH
+                num_pins = len(fp.pins)
+                ch = max(SCHEMATIC_DEFAULT_SYMBOL_HEIGHT, (num_pins // 2) * 5.0 + 10.0)
+                boxes.append((cx, cy, cw, ch, fp.name))
+
+            for i, b1 in enumerate(boxes):
+                for b2 in boxes[i + 1 :]:
+                    dx = abs(b1[0] - b2[0])
+                    dy = abs(b1[1] - b2[1])
+                    min_dx = (b1[2] + b2[2]) / 2.0
+                    min_dy = (b1[3] + b2[3]) / 2.0
+                    if dx < min_dx and dy < min_dy:
+                        violations.append(
+                            DRCViolation(
+                                rule_name=DRCRuleName.SCHEMATIC_SYMBOL_OVERLAP,
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=f"{b1[4]} & {b2[4]}",
+                                description=(
+                                    f"Schematic symbol overlap on sheet {sheet_idx + 1} ('{sheet.title}'): "
+                                    f"Symbol '{b1[4]}' overlaps with '{b2[4]}' "
+                                    f"(dx={dx:.1f}mm < {min_dx:.1f}mm, dy={dy:.1f}mm < {min_dy:.1f}mm)"
+                                ),
+                                location=(b1[0], b1[1], 0.0),
+                            )
+                        )
 
         return violations
