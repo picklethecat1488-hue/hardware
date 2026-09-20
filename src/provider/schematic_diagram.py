@@ -2616,8 +2616,7 @@ class SchematicDiagram:
 
         # Check if truth table is present on this sheet
         has_truth_table = any(
-            (getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q"))
-            for fp in sheet_fps
+            (getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q")) for fp in sheet_fps
         )
 
         # Draw Decoupling Capacitor Bank
