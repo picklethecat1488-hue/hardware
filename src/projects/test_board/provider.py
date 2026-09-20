@@ -147,7 +147,9 @@ class TestBoardProvider(Provider):
                 add(cyl, mode=BuildMode.SUBTRACT)
 
             cr = self.copper_regions()
-            pcb.copper_regions.extend(cr.regions)
+            for r in cr.regions:
+                if r not in pcb.copper_regions:
+                    pcb.copper_regions.append(r)
 
             pcb.traces.extend(self.traces())
             pcb.vias.extend(self.vias())
@@ -411,7 +413,7 @@ class TestBoardProvider(Provider):
             )
             CopperRegion(
                 net="3V3",
-                layer="In2.Cu",
+                layer="In3.Cu",
                 outline=polygon,
                 priority=1,
                 clearance_mm=0.25,

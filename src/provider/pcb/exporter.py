@@ -599,6 +599,14 @@ class PCBExporter:
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(rendered)
 
+        # Automatically compute zone fill geometries and thermal reliefs so inner planes are never empty
+        if getattr(self.config, "copper_regions", None):
+            from provider.pcb.kicad_cli import KiCadCLI
+
+            cli = KiCadCLI()
+            if cli.is_available:
+                cli.refill_zones(out_path)
+
         return out_path
 
     def export_kicad_sch(self, output_file: str | Path) -> Path:
