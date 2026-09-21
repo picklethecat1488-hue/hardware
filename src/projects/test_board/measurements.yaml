@@ -20,6 +20,10 @@ silkscreen_margin: 7.0
 enclosure_foot_diameter: 8.0
 enclosure_foot_depth: 1.0
 enclosure_foot_inset: 8.0
+enclosure_corner_radius: 8.0
+enclosure_usb_cutout_width: 12.0
+enclosure_usb_cutout_height: 6.5
+enclosure_lip_height: 2.0
 
 # Factory assembly test limits and parameters
 test_tdr_rise_time_ps: 100.0

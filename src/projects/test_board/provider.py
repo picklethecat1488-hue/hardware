@@ -7,6 +7,9 @@ from build123d import (
     BuildPart,
     BuildSketch,
     Polygon,
+    RectangleRounded,
+    Plane,
+    Location,
     extrude,
     Box,
     Cylinder,
@@ -138,12 +141,12 @@ class TestBoardProvider(Provider):
                     (hole_x, -hole_y),
                 ):
                     MountingHole(name="MH", drill_diameter_mm=hole_dia, pad_diameter_mm=hole_dia + 1.3)
-            for cyl in dh.to_shapes(depth_mm=thickness * 2.0):
+            for cyl in dh.to_shapes(depth_mm=thickness):
                 add(cyl, mode=BuildMode.SUBTRACT)
 
             # Test point drilled through-holes
             tp = self.test_points()
-            for cyl in tp.to_shapes(depth_mm=thickness * 2.0):
+            for cyl in tp.to_shapes(depth_mm=thickness):
                 add(cyl, mode=BuildMode.SUBTRACT)
 
             cr = self.copper_regions()
@@ -222,7 +225,7 @@ class TestBoardProvider(Provider):
         return tail
 
     def enclosure_bottom(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
-        """Build the protective lower enclosure shell with mounting standoffs."""
+        """Build the protective lower enclosure shell with mounting standoffs, fillets, and cutouts."""
         w = self.settings.board_width + 2.0 * (
             self.settings.enclosure_clearance + self.settings.enclosure_wall_thickness
         )
@@ -233,15 +236,21 @@ class TestBoardProvider(Provider):
         standoff_h = self.settings.standoff_height
         standoff_r = self.settings.standoff_radius
         h_shell = standoff_h + self.settings.board_thickness + 10.0
+        r_outer = self.settings.enclosure_corner_radius
+        r_inner = self.settings.corner_radius
+        w_cavity = w - (2.0 * wall)
+        l_cavity = length - (2.0 * wall)
 
         with BuildPart() as shell:
-            # Outer enclosure box
-            Box(w, length, h_shell)
-            # Cavity pocket
-            w_cavity = w - (2.0 * wall)
-            l_cavity = length - (2.0 * wall)
-            with Locations((0.0, 0.0, wall)):
-                Box(w_cavity, l_cavity, h_shell, mode=BuildMode.SUBTRACT)
+            # Outer enclosure profile with rounded corners
+            with BuildSketch(Plane.XY.offset(-h_shell / 2.0)) as s_outer:
+                RectangleRounded(w, length, r_outer)
+            extrude(s_outer.sketch, amount=h_shell)
+
+            # Cavity pocket with matching corner fillets
+            with BuildSketch(Plane.XY.offset(-h_shell / 2.0 + wall)) as s_inner:
+                RectangleRounded(w_cavity, l_cavity, r_inner)
+            extrude(s_inner.sketch, amount=h_shell + 1.0, mode=BuildMode.SUBTRACT)
 
             # Corner standoffs
             hole_x = (self.settings.board_width / 2.0) - self.settings.mounting_hole_inset
@@ -281,10 +290,22 @@ class TestBoardProvider(Provider):
             ):
                 Cylinder(radius=foot_r, height=foot_depth, mode=BuildMode.SUBTRACT)
 
+            # USB-C connector cutout through left exterior wall (aligned with J3 at [-25.0, 0.0, 0.8])
+            usb_w = self.settings.enclosure_usb_cutout_width
+            usb_h = self.settings.enclosure_usb_cutout_height
+            usb_z = -h_shell / 2.0 + wall + standoff_h + (usb_h / 2.0) - 0.5
+            with Locations((-w / 2.0, 0.0, usb_z)):
+                Box(wall * 3.0, usb_w, usb_h, mode=BuildMode.SUBTRACT)
+
+            # Flex tail passage exit slot at front rim (aligned with J2 at [0.0, 38.0, 0.8])
+            slot_w = self.settings.flex_tail_width + 2.0
+            with Locations((0.0, length / 2.0, h_shell / 2.0)):
+                Box(slot_w, wall * 3.0, 6.0, mode=BuildMode.SUBTRACT)
+
         return shell
 
     def enclosure_lid(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
-        """Build the top snap enclosure lid with flex tail exit slot."""
+        """Build the top snap enclosure lid with flex tail exit slot and locating rim."""
         w = self.settings.board_width + 2.0 * (
             self.settings.enclosure_clearance + self.settings.enclosure_wall_thickness
         )
@@ -292,15 +313,39 @@ class TestBoardProvider(Provider):
             self.settings.enclosure_clearance + self.settings.enclosure_wall_thickness
         )
         wall = self.settings.enclosure_wall_thickness
+        w_cavity = w - (2.0 * wall)
+        l_cavity = length - (2.0 * wall)
+        r_outer = self.settings.enclosure_corner_radius
+        r_inner = self.settings.corner_radius
+        lip_h = self.settings.enclosure_lip_height
         slot_w = self.settings.flex_tail_width + 2.0
-        slot_t = self.settings.flex_tail_thickness + 1.0
+        hole_dia = self.settings.mounting_hole_diameter
+        hole_x = (self.settings.board_width / 2.0) - self.settings.mounting_hole_inset
+        hole_y = (self.settings.board_length / 2.0) - self.settings.mounting_hole_inset
 
         with BuildPart() as lid:
-            Box(w, length, wall)
-            # Slot for flex ribbon passage
-            slot_y = length / 2.0 - (wall + self.settings.enclosure_clearance)
-            with Locations((0.0, slot_y, 0.0)):
-                Box(slot_w, wall * 4.0, slot_t, mode=BuildMode.SUBTRACT)
+            with BuildSketch() as s_lid:
+                RectangleRounded(w, length, r_outer)
+            extrude(s_lid.sketch, amount=wall)
+
+            # Locating rim extending into lower enclosure cavity
+            with BuildSketch(Plane.XY) as s_lip:
+                RectangleRounded(w_cavity - 0.5, l_cavity - 0.5, r_inner - 0.2)
+                RectangleRounded(w_cavity - 3.5, l_cavity - 3.5, max(0.5, r_inner - 1.5), mode=BuildMode.SUBTRACT)
+            extrude(s_lip.sketch, amount=-lip_h)
+
+            # Screw clearance holes matching standoff pilot holes
+            with Locations(
+                (hole_x, hole_y, 0.0),
+                (-hole_x, hole_y, 0.0),
+                (-hole_x, -hole_y, 0.0),
+                (hole_x, -hole_y, 0.0),
+            ):
+                Cylinder(radius=hole_dia / 2.0, height=wall * 4.0, mode=BuildMode.SUBTRACT)
+
+            # Flex ribbon passage slot at front edge
+            with Locations((0.0, length / 2.0, 0.0)):
+                Box(slot_w, wall * 3.0, wall * 4.0, mode=BuildMode.SUBTRACT)
 
         return lid
 
@@ -309,11 +354,17 @@ class TestBoardProvider(Provider):
         carrier = self.carrier_board("carrier_board", None, mode)
         tail = self.flex_tail("flex_tail", None, mode)
         enclosure = self.enclosure_bottom("enclosure_bottom", None, mode)
+        lid = self.enclosure_lid("enclosure_lid", None, mode)
+
+        wall = self.settings.enclosure_wall_thickness
+        standoff_h = self.settings.standoff_height
+        h_shell = standoff_h + self.settings.board_thickness + 10.0
+        z_carrier = -h_shell / 2.0 + wall + standoff_h + (self.settings.board_thickness / 2.0)
+
+        carrier_geom = carrier.part.locate(Location((0.0, 0.0, z_carrier)))
 
         tail_geom: Any = tail
         if self.wiring_path.exists():
-            from build123d import Location
-
             wiring = Wiring(self.wiring_path)
             j2_comp = next(
                 (c for c in wiring.footprints if c.name == "J2" or getattr(c, "shape_ref", None) == "carrier_board"),
@@ -327,11 +378,15 @@ class TestBoardProvider(Provider):
                 dx = j2_comp.position[0] - j_flex_comp.position[0]
                 dy = j2_comp.position[1] - j_flex_comp.position[1]
                 dz = j2_comp.position[2] - j_flex_comp.position[2]
-                tail_geom = tail.part.locate(Location((dx, dy, dz)))
+                tail_geom = tail.part.locate(Location((dx, dy, z_carrier + dz)))
 
-        room.add("carrier_board", carrier, color=(0.08, 0.40, 0.20), alpha=1.0)
+        z_lid = (h_shell / 2.0) + (wall / 2.0)
+        lid_geom = lid.part.locate(Location((0.0, 0.0, z_lid)))
+
+        room.add("carrier_board", carrier_geom, color=(0.08, 0.40, 0.20), alpha=1.0)
         room.add("flex_tail", tail_geom, color=(0.85, 0.65, 0.15), alpha=0.9)
-        room.add("enclosure_bottom", enclosure, color=(0.15, 0.16, 0.20), alpha=0.4)
+        room.add("enclosure_bottom", enclosure.part, color=(0.15, 0.16, 0.20), alpha=0.4)
+        room.add("enclosure_lid", lid_geom, color=(0.20, 0.22, 0.28), alpha=0.4)
 
     def diagram_product(self, room: Room, targets: Sequence[str], mode: Mode) -> None:
         """Populate product mechanical diagram elements."""

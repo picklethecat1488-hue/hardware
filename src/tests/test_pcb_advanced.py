@@ -1821,3 +1821,52 @@ def test_regression_test_board_wiring_diagram_top_down_and_colored() -> None:
     assert room_prod.diagram_options is not None
     assert room_prod.diagram_options.view_from == "iso"
     assert room_prod.diagram_options.style == DiagramStyle.HIDDEN
+
+
+def test_regression_enclosure_cad_feedback_and_assembly() -> None:
+    """Verify enclosure CAD feedback: rounded fillets, cutouts, locating lip, and product assembly."""
+    provider = TestBoardProvider()
+
+    # 1. Verify bottom enclosure geometry
+    bottom = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    assert bottom is not None and bottom.part is not None
+    b_part = bottom.part
+    bb = b_part.bounding_box()
+    expected_w = provider.settings.board_width + 2.0 * (
+        provider.settings.enclosure_clearance + provider.settings.enclosure_wall_thickness
+    )
+    expected_l = provider.settings.board_length + 2.0 * (
+        provider.settings.enclosure_clearance + provider.settings.enclosure_wall_thickness
+    )
+    expected_h = provider.settings.standoff_height + provider.settings.board_thickness + 10.0
+
+    assert abs((bb.max.X - bb.min.X) - expected_w) < 0.1
+    assert abs((bb.max.Y - bb.min.Y) - expected_l) < 0.1
+    assert abs((bb.max.Z - bb.min.Z) - expected_h) < 0.1
+    assert b_part.volume < (expected_w * expected_l * expected_h)
+
+    # 2. Verify enclosure lid geometry
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid is not None and lid.part is not None
+    l_part = lid.part
+    l_bb = l_part.bounding_box()
+    assert abs((l_bb.max.X - l_bb.min.X) - expected_w) < 0.1
+    assert abs((l_bb.max.Y - l_bb.min.Y) - expected_l) < 0.1
+    expected_lid_h = provider.settings.enclosure_wall_thickness + provider.settings.enclosure_lip_height
+    assert abs((l_bb.max.Z - l_bb.min.Z) - expected_lid_h) < 0.1
+
+    # 3. Verify view_product populates all 4 parts and seats carrier board on standoffs
+    room = Room()
+    provider.view_product(room, Mode.DEFAULT)
+    assert "carrier_board" in room
+    assert "flex_tail" in room
+    assert "enclosure_bottom" in room
+    assert "enclosure_lid" in room
+
+    carrier_geom = room["carrier_board"][0]
+    carrier_part = getattr(carrier_geom, "part", carrier_geom)
+    carrier_bb = carrier_part.bounding_box()
+    expected_carrier_bottom_z = (
+        -expected_h / 2.0 + provider.settings.enclosure_wall_thickness + provider.settings.standoff_height
+    )
+    assert abs(carrier_bb.min.Z - expected_carrier_bottom_z) < 0.05

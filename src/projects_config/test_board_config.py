@@ -131,17 +131,37 @@ class TestBoardConfig(BaseModel):
     @property
     def enclosure_foot_diameter(self) -> float:
         """Diameter of rubber foot indentations on enclosure bottom in mm."""
-        return float(self._raw_data.get("enclosure_foot_diameter", 8.0))
+        return float(self._raw_data["enclosure_foot_diameter"])
 
     @property
     def enclosure_foot_depth(self) -> float:
         """Depth of rubber foot indentations on enclosure bottom in mm."""
-        return float(self._raw_data.get("enclosure_foot_depth", 1.0))
+        return float(self._raw_data["enclosure_foot_depth"])
 
     @property
     def enclosure_foot_inset(self) -> float:
         """Inset distance of foot indentations from enclosure edge in mm."""
-        return float(self._raw_data.get("enclosure_foot_inset", 8.0))
+        return float(self._raw_data["enclosure_foot_inset"])
+
+    @property
+    def enclosure_corner_radius(self) -> float:
+        """Outer corner radius of protective enclosure in mm."""
+        return float(self._raw_data["enclosure_corner_radius"])
+
+    @property
+    def enclosure_usb_cutout_width(self) -> float:
+        """Width of USB-C connector cutout on enclosure side in mm."""
+        return float(self._raw_data["enclosure_usb_cutout_width"])
+
+    @property
+    def enclosure_usb_cutout_height(self) -> float:
+        """Height of USB-C connector cutout on enclosure side in mm."""
+        return float(self._raw_data["enclosure_usb_cutout_height"])
+
+    @property
+    def enclosure_lip_height(self) -> float:
+        """Height of enclosure lid locating rim in mm."""
+        return float(self._raw_data["enclosure_lip_height"])
 
     @property
     def test_tdr_rise_time_ps(self) -> float:
