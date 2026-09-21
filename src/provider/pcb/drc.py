@@ -148,6 +148,7 @@ class DRCRuleName(StrEnum):
     SCHEMATIC_NET_ANTENNA = "SCHEMATIC_NET_ANTENNA"
     SCHEMATIC_PAGE_TRANSITION_MISSING = "SCHEMATIC_PAGE_TRANSITION_MISSING"
     SCHEMATIC_DANGLING_COMPONENT = "SCHEMATIC_DANGLING_COMPONENT"
+    SCHEMATIC_PAGE_BOUNDARY_EXCEEDED = "SCHEMATIC_PAGE_BOUNDARY_EXCEEDED"
 
 
 @dataclass
@@ -2070,6 +2071,10 @@ class PCBDesignRulesChecker:
             def_sym_h = layout.default_symbol_height
 
             num_comps = len(main_fps)
+            if num_comps == 2 and layout.cols_per_row is None and not grid_positions:
+                col_gap = 55.0
+            elif num_comps == 3 and layout.cols_per_row is None and not grid_positions:
+                col_gap = 35.0
             cols_per_row = layout.cols_per_row if layout.cols_per_row is not None else max(1, min(num_comps, 3))
             num_rows = (num_comps + cols_per_row - 1) // cols_per_row
             total_content_w = (cols_per_row * col_width) + ((cols_per_row - 1) * col_gap)
@@ -2112,7 +2117,7 @@ class PCBDesignRulesChecker:
                 for idx, cap in enumerate(decoupling_caps):
                     boxes.append((base_x + idx * 28.0, base_y, 14.0, 24.0, cap.name))
 
-            comp_passive_count: Dict[str, int] = {}
+            comp_passive_count: Dict[Tuple[str, str], int] = {}
             for p_fp in vert_passives:
                 n1 = pin_to_net.get((p_fp.name, p_fp.pins[0].name), "").upper()
                 n2 = pin_to_net.get((p_fp.name, p_fp.pins[1].name), "").upper()
@@ -2120,13 +2125,14 @@ class PCBDesignRulesChecker:
                 sig_net = n2 if (n1 in ("3V3", "VBUS", "GND")) else n1
                 target_comp = next((c for (c, _), n in pin_to_net.items() if n == sig_net and c in main_box_map), None)
                 if target_comp:
-                    local_idx = comp_passive_count.get(target_comp, 0)
-                    comp_passive_count[target_comp] = local_idx + 1
                     m_cx, m_cy, m_cw, _ = main_box_map[target_comp]
                     other_comps = [
                         c for (c, _), n in pin_to_net.items() if n == sig_net and c in main_box_map and c != target_comp
                     ]
                     if other_comps:
+                        side_key = (target_comp, "channel")
+                        local_idx = comp_passive_count.get(side_key, 0)
+                        comp_passive_count[side_key] = local_idx + 1
                         o_cx, _, o_cw, _ = main_box_map[other_comps[0]]
                         ch_left = min(m_cx + m_cw / 2.0, o_cx + o_cw / 2.0)
                         px = ch_left + 10.0 + (local_idx % 2) * 9.0
@@ -2134,11 +2140,16 @@ class PCBDesignRulesChecker:
                     else:
                         m_fp = next(f for f in main_fps if f.name == target_comp)
                         p_obj = next((p for p in m_fp.pins if pin_to_net.get((target_comp, p.name)) == sig_net), None)
-                        p_side = p_obj.side.value if p_obj else "left"
+                        sheet_sides = getattr(sheet, "pin_sides", {}) or {}
+                        comp_sides = sheet_sides.get(target_comp, {})
+                        p_side = comp_sides.get(p_obj.name, p_obj.side.value if p_obj else "left") if p_obj else "left"
+                        side_key = (target_comp, p_side)
+                        local_idx = comp_passive_count.get(side_key, 0)
+                        comp_passive_count[side_key] = local_idx + 1
                         if p_side in ("right", "top"):
                             px = m_cx + (m_cw / 2.0) + 12.0 + (local_idx * 12.0)
                         else:
-                            px = m_cx - (m_cw / 2.0) - 24.0 - (local_idx * 12.0)
+                            px = m_cx - (m_cw / 2.0) - 14.0 - (local_idx * 10.0)
                         py = m_cy + (12.0 if is_pullup else -12.0)
                     boxes.append((px, py, 8.0, 18.0, p_fp.name))
                 elif main_fps:
@@ -2164,5 +2175,22 @@ class PCBDesignRulesChecker:
                             ),
                             location=(b1[0], b1[1], 0.0),
                         )
+
+            # 3c. Schematic page boundary check (BUG-068)
+            for b in boxes:
+                b_xmin = b[0] - b[2] / 2.0
+                b_xmax = b[0] + b[2] / 2.0
+                b_ymin = b[1] - b[3] / 2.0
+                b_ymax = b[1] + b[3] / 2.0
+                if b_xmin < 15.0 or b_xmax > 282.0 or b_ymin < 15.0 or b_ymax > 195.0:
+                    violations.add_error(
+                        rule_name=DRCRuleName.SCHEMATIC_PAGE_BOUNDARY_EXCEEDED,
+                        net_or_zone=b[4],
+                        description=(
+                            f"Component '{b[4]}' on schematic sheet {sheet_idx + 1} ('{sheet.title}') "
+                            f"exceeds page printable boundaries: bounds=({b_xmin:.1f}, {b_ymin:.1f}, {b_xmax:.1f}, {b_ymax:.1f})"
+                        ),
+                        location=(b[0], b[1], 0.0),
+                    )
 
         return violations

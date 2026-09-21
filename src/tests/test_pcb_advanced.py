@@ -1898,3 +1898,27 @@ def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
     checker = PCBDesignRulesChecker(provider.pcb_config)
     violations = checker.check_all(wiring=wiring)
     assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.errors]}"
+
+
+def test_regression_schematic_page_boundary_drc_and_layout(tmp_path: Path) -> None:
+    """Verify BUG-068 (page boundary DRC and Sheet 5 passives) and BUG-071 (Sheet 7 I2C pullups)."""
+    from provider.schematic_diagram import SchematicDiagram
+    from provider.pcb.drc import DRCRuleName
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+
+    # 1. Verify 0 schematic DRC violations across all 7 sheets
+    violations = checker.check_schematic(wiring)
+    page_boundary_errors = [v for v in violations.errors if v.rule_name == DRCRuleName.SCHEMATIC_PAGE_BOUNDARY_EXCEEDED]
+    assert len(page_boundary_errors) == 0, (
+        f"Page boundary violations found: {[v.description for v in page_boundary_errors]}"
+    )
+    assert len(violations.errors) == 0, f"Schematic DRC errors found: {[v.description for v in violations.errors]}"
+
+    # 2. Verify schematic multi-page PDF generation without clipping
+    diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
+    pdf_out = diag.render_pdf(tmp_path / "test_board_schematic.pdf")
+    assert pdf_out.is_file()
+    assert pdf_out.stat().st_size > 5000
