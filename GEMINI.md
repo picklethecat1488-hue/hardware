@@ -118,6 +118,14 @@ pytest
   2. **SQLite Backing Store (`build/bugs.sqlite`)**: ACID SQLite store (`SQLiteBugStore` in [src/provider/bug_report/sqlite_store.py](file:///Users/daparker/gh/hardware/src/provider/bug_report/sqlite_store.py)). Inspect or query via `sqlite3` (e.g. `sqlite3 build/bugs.sqlite "SELECT id, severity, category, title, status FROM bugs WHERE status = 'OPEN';"`) or Python models.
   3. **Bug Report CLI (`python src/bug_report.py`)**: List active bugs (`python src/bug_report.py --list`), list open bugs only (`python src/bug_report.py --list --open`), quickly register bugs (`python src/bug_report.py --add "<title>" --severity <SEV> --category <CAT>`), mark issues resolved (`python src/bug_report.py --resolve <BUG-ID> --notes "<notes>"`), or launch the web workstation (`python src/bug_report.py`).
 * **Proactive GitHub CI Monitoring & Stack Auto-Remediation**: Whenever finalizing a task, updating a PR stack, or committing changes, you MUST proactively inspect GitHub Actions CI run results using the GitHub CLI (`gh run list`, `gh pr checks`, `gh run view <run-id> --log-failed`). If any CI checks fail on your active commit stack or branch, do NOT conclude the task or leave broken CI for the user. Immediately inspect the failed step logs, isolate the root cause, verify the fix locally or on Anvil, and submit dedicated fix commits until all checks pass.
+* **Single-Bug Focus & Atomic Issue Remediation**: To prevent context pollution and attention degradation ("AI senility") during extended problem-solving sessions, you MUST investigate, diagnose, and resolve only ONE bug or defect at a time. Do NOT attempt to batch, multiplex, or concurrently remediate multiple unrelated bugs in a single turn, PR, or commit stack.
+  For each identified defect:
+  1. **Registry & Context**: Query the bug tracker (`build/BUGS.md`, `python src/bug_report.py`) or register the new defect with reproduction steps and classification.
+  2. **Isolated Reproduction**: Construct an isolated reproduction script or minimal failing unit test asserting the flawed invariant *before* editing production code.
+  3. **Targeted Fix**: Implement the minimal necessary change strictly scoped to the defect.
+  4. **Dedicated Regression Test**: Codify the reproduction into an active unit test asserting the correct invariant.
+  5. **Verification**: Run pre-commit checks (`compileall`, `ruff`, and `pytest`) to verify 100% pass rate.
+  6. **Resolution & Commit**: Mark the bug resolved in `src/bug_report.py` and commit the fix atomically before picking up the next task.
 
 ### 9. Code Generation & Jinja2 Templates
 * **Jinja2 Templating Engine**: Always use Jinja2 (`jinja2`) to generate templated Python scripts, Blender headless scripts, URDF models, or simulation configurations rather than embedding large multi-line f-strings directly inside Python source files.
