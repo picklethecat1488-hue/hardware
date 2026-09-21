@@ -28,6 +28,8 @@ enclosure_m2_cutout_width: 24.0
 enclosure_m2_cutout_height: 5.0
 enclosure_gpio_cutout_width: 5.0
 enclosure_gpio_cutout_length: 28.0
+enclosure_swd_cutout_width: 14.0
+enclosure_swd_cutout_height: 5.5
 
 # Factory assembly test limits and parameters
 test_tdr_rise_time_ps: 100.0

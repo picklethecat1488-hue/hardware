@@ -291,6 +291,8 @@ class TestBoardProvider(Provider):
             ):
                 Cylinder(radius=foot_r, height=foot_depth, mode=BuildMode.SUBTRACT)
 
+            z_carrier = -h_shell / 2.0 + wall + standoff_h + (self.settings.board_thickness / 2.0)
+
             # USB-C connector cutout through left exterior wall (aligned with J3 at [-25.0, 0.0, 0.8])
             usb_w = self.settings.enclosure_usb_cutout_width
             usb_h = self.settings.enclosure_usb_cutout_height
@@ -298,9 +300,21 @@ class TestBoardProvider(Provider):
             with Locations((-w / 2.0, 0.0, usb_z)):
                 Box(wall * 3.0, usb_w, usb_h, mode=BuildMode.SUBTRACT)
 
+            # SWD connector cutout through left exterior wall (aligned with J5 at [-21.0, -7.0, 0.8]) (BUG-075)
+            swd_y = -7.0
+            if self.wiring_path.exists():
+                wiring = Wiring(str(self.wiring_path))
+                comp_map = {c.name: c for c in wiring.footprints}
+                if "J5" in comp_map:
+                    swd_y = comp_map["J5"].position[1]
+            swd_w = self.settings.enclosure_swd_cutout_width
+            swd_h = self.settings.enclosure_swd_cutout_height
+            swd_z = z_carrier + (self.settings.board_thickness / 2.0) + (swd_h / 2.0) - 0.5
+            with Locations((-w / 2.0, swd_y, swd_z)):
+                Box(wall * 3.0, swd_w, swd_h, mode=BuildMode.SUBTRACT)
+
             # Flex tail passage exit slot at front rim (aligned with J2 at [0.0, 38.0, 0.8] and flex tail)
             slot_w = self.settings.flex_tail_width + 2.0
-            z_carrier = -h_shell / 2.0 + wall + standoff_h + (self.settings.board_thickness / 2.0)
             z_cut_bot = z_carrier - 1.0
             z_cut_top = (h_shell / 2.0) + 0.5
             slot_h = z_cut_top - z_cut_bot

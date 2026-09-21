@@ -69,3 +69,21 @@ def test_regression_bug_074_peripheral_cutouts_and_identifiers() -> None:
         assert not enclosure.part.is_inside((wall_x, y, z_conn)), (
             f"Enclosure bottom must have cutout for {bus} at Y={y}"
         )
+
+
+def test_regression_bug_075_swd_cutout() -> None:
+    """Verify BUG-075: enclosure bottom has SWD cutout through the left exterior wall."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
+    z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
+    z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
+
+    # Probe point centered inside the left exterior wall (X = -w/2 + wall/2) at J5 SWD connector Y=-7.0
+    wall_x = (-w / 2.0) + (wall / 2.0)
+    assert not enclosure.part.is_inside((wall_x, -7.0, z_conn)), (
+        "Enclosure bottom must have an SWD cutout through the left exterior wall at J5 position"
+    )
