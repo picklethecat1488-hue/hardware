@@ -14,6 +14,7 @@ from model.bug_report import (
 )
 from provider.bug_report.markdown_exporter import MarkdownBugExporter
 from provider.bug_report.server import BugReportServer
+from provider.bug_report.sqlite_store import SQLiteBugStore
 
 
 def test_bug_report_model_lifecycle() -> None:
@@ -210,3 +211,129 @@ def test_bug_report_server_api_exit_and_document_upload(tmp_path: Path) -> None:
         t.join(timeout=2.0)
     finally:
         server.server_close()
+
+
+def test_sqlite_bug_store_lifecycle(tmp_path: Path) -> None:
+    """Verify SQLiteBugStore schema initialization, atomic upsert, query, and cascade delete."""
+    db_file = tmp_path / "bugs.sqlite"
+    store = SQLiteBugStore(db_file)
+    assert db_file.exists()
+
+    # 1. Test empty database load
+    db = store.load_database()
+    assert db.title == "Hardware Engineering Bug Tracker"
+    assert len(db.bugs) == 0
+
+    # 2. Add bug with attachment and reproduction steps
+    att = BugAttachmentModel(
+        id="att-001",
+        filename="schematic_error.png",
+        file_type="screenshot",
+        file_path="build/attachments/schematic_error.png",
+        size_bytes=1024,
+        description="Error screenshot",
+        created_at="2026-09-20 12:00:00 UTC",
+    )
+    bug = BugReportModel(
+        id="BUG-001",
+        title="Sample Defect",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.HIGH,
+        category=BugCategory.PCB,
+        component="carrier_board",
+        description="Trace clearance violation",
+        reproduction_steps=["Open schematic", "Run DRC"],
+        expected_behavior="0 errors",
+        actual_behavior="1 error",
+        logs="Error log output",
+        attachments=[att],
+        created_at="2026-09-20 12:00:00 UTC",
+        updated_at="2026-09-20 12:00:00 UTC",
+    )
+    db.add_or_update(bug)
+    store.save_database(db)
+
+    # 3. Reload and assert all data preserved
+    reloaded = store.load_database()
+    assert len(reloaded.bugs) == 1
+    b = reloaded.get_bug("BUG-001")
+    assert b is not None
+    assert b.title == "Sample Defect"
+    assert b.status == BugStatus.OPEN
+    assert b.severity == BugSeverity.HIGH
+    assert b.reproduction_steps == ["Open schematic", "Run DRC"]
+    assert len(b.attachments) == 1
+    assert b.attachments[0].filename == "schematic_error.png"
+
+    # 4. Update status and notes
+    b.status = BugStatus.RESOLVED
+    b.resolution_notes = "Rerouted trace on F.Cu"
+    b.resolved_at = "2026-09-20 12:30:00 UTC"
+    store.save_bug(b)
+
+    reloaded2 = store.load_database()
+    b2 = reloaded2.get_bug("BUG-001")
+    assert b2 is not None
+    assert b2.status == BugStatus.RESOLVED
+    assert b2.resolution_notes == "Rerouted trace on F.Cu"
+
+    # 5. Test JSON export and import round trip
+    json_path = tmp_path / "exported.json"
+    store.export_to_json(json_path)
+    assert json_path.exists()
+
+    db_file2 = tmp_path / "imported.sqlite"
+    store2 = SQLiteBugStore(db_file2)
+    imported = store2.import_from_json(json_path)
+    assert len(imported.bugs) == 1
+    assert imported.bugs[0].id == "BUG-001"
+
+    # 6. Delete bug
+    store.delete_bug("BUG-001")
+    reloaded3 = store.load_database()
+    assert len(reloaded3.bugs) == 0
+
+
+def test_server_sqlite_integration(tmp_path: Path) -> None:
+    """Verify BugReportServer seamlessly syncs between SQLite backing store, JSON, and Markdown."""
+    sqlite_file = tmp_path / "bugs.sqlite"
+    state_file = tmp_path / "bugs_state.json"
+    md_file = tmp_path / "BUGS.md"
+
+    server = BugReportServer(
+        repo_root=tmp_path,
+        sqlite_file=sqlite_file,
+        state_file=state_file,
+        markdown_output=md_file,
+        bind_and_activate=False,
+    )
+
+    # 1. Add a bug through server database
+    bug = BugReportModel(
+        id="BUG-069",
+        title="SQLite Backing Store Verification",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.INFRASTRUCTURE,
+        description="Verify SQLite database integration",
+    )
+    server.database.add_or_update(bug)
+    server.save_and_sync()
+
+    # 2. Verify files created and synced
+    assert sqlite_file.exists()
+    assert state_file.exists()
+    assert md_file.exists()
+
+    # 3. Spawn a new server instance pointing to the same SQLite store
+    server2 = BugReportServer(
+        repo_root=tmp_path,
+        sqlite_file=sqlite_file,
+        state_file=state_file,
+        markdown_output=md_file,
+        bind_and_activate=False,
+    )
+    loaded_bug = server2.database.get_bug("BUG-069")
+    assert loaded_bug is not None
+    assert loaded_bug.title == "SQLite Backing Store Verification"
+    assert loaded_bug.status == BugStatus.OPEN
