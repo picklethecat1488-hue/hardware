@@ -70,6 +70,8 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             case "/api/files":
                 files = self._list_reference_files()
                 self._send_json(files)
+            case "/api/next_bug_id":
+                self._send_json({"next_id": self.server.database.generate_bug_id()})
             case _:
                 self.send_error(404, "Endpoint not found")
 
@@ -351,7 +353,7 @@ class BugReportServer(ThreadingHTTPServer):
         self.host = host
         self.port = port
         self.repo_root = repo_root or Path.cwd()
-        self.markdown_output = markdown_output or (self.repo_root / "build" / "BUGS.md")
+        self.markdown_output = markdown_output or (self.repo_root / "BUGS.md")
         self.state_file = state_file or (self.repo_root / "build" / "bugs_state.json")
         self.sqlite_file = sqlite_file or (self.repo_root / "build" / "bugs.sqlite")
         self.attachments_dir = attachments_dir or (self.repo_root / "build" / "attachments")
@@ -365,17 +367,27 @@ class BugReportServer(ThreadingHTTPServer):
         if bind_and_activate:
             super().__init__((host, port), BugReportRequestHandler)
 
+    def _ensure_unique_bug_ids(self, db: BugDatabaseModel) -> None:
+        """Ensure all bug IDs in database are unique, disambiguating any duplicates."""
+        seen: set[str] = set()
+        for bug in db.bugs:
+            if bug.id in seen:
+                bug.id = db.generate_bug_id()
+            seen.add(bug.id)
+
     def _initialize_database(self) -> BugDatabaseModel:
         """Load existing database state from SQLite, fallback to JSON state, or initialize fresh database."""
         if not self.fresh:
             if self.sqlite_file.exists():
                 db = self.sqlite_store.load_database()
                 if db and db.bugs:
+                    self._ensure_unique_bug_ids(db)
                     return db
 
             if self.state_file.exists():
                 loaded = self.exporter.load_state_json(self.state_file)
                 if loaded:
+                    self._ensure_unique_bug_ids(loaded)
                     self.sqlite_store.save_database(loaded)
                     return loaded
 
