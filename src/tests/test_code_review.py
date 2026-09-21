@@ -1272,3 +1272,28 @@ def test_code_review_cli_features(
     main()
     open_out = capsys.readouterr().out
     assert "0 unresolved" in open_out
+
+
+def test_regression_bug_078_code_review_highlight_markers_preserve_diff_colors() -> None:
+    """Verify BUG-078: highlight markers are in a column grid on the left side of text and do not elide diff colors."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    template_file = templates_dir / "code_review.html.j2"
+    assert template_file.exists()
+    content = template_file.read_text(encoding="utf-8")
+
+    # 1. Ensure selection on code text does not overwrite background with !important eliding diff colors
+    assert ".sbs-row.selected td {\n      background: var(--bg-diff-sel) !important;" not in content, (
+        "Selected SBS rows must not wipe out diff colors on code cells with !important background"
+    )
+    assert ".unified-row.selected {\n      background: var(--bg-diff-sel) !important;" not in content, (
+        "Selected unified rows must not wipe out diff colors across the entire row with !important background"
+    )
+
+    # 2. Ensure marker column grid exists for highlight markers on the left side of text
+    assert "col-marker" in content, "Table column grid must include col-marker"
+    assert "diff-marker" in content, "Diff row structure must have diff-marker cell on left of code text"
+    assert "unified-marker" in content, "Unified row structure must have unified-marker cell on left of code text"
+
+    # 3. Highlight markers on the left column grid receive selection highlight
+    assert "td.diff-marker" in content, "diff-marker styles must exist"
+    assert ".unified-marker" in content, "unified-marker styles must exist"

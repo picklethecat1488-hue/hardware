@@ -524,8 +524,9 @@
       border-collapse: collapse;
       table-layout: fixed;
     }
-    .sbs-table col.col-lineno { width: 50px; }
-    .sbs-table col.col-code { width: calc(50% - 50px); }
+    .sbs-table col.col-lineno { width: 44px; }
+    .sbs-table col.col-marker { width: 22px; }
+    .sbs-table col.col-code { width: calc(50% - 66px); }
     .sbs-table th {
       background: #170f09;
       color: var(--quake-text-muted);
@@ -558,18 +559,40 @@
       color: var(--quake-gold);
       background: rgba(255, 184, 0, 0.15);
     }
-    .sbs-row.row-delete td.old-code, .sbs-row.row-delete td.old-lineno {
+    .diff-marker {
+      width: 22px;
+      user-select: none;
+      text-align: center;
+      font-weight: 700;
+      color: var(--quake-text-dim);
+      background: rgba(0, 0, 0, 0.25);
+      border-right: 1px solid rgba(90, 56, 30, 0.25);
+      padding: 1px 2px !important;
+      cursor: pointer;
+    }
+    .sbs-row.row-delete td.old-code, .sbs-row.row-delete td.old-lineno, .sbs-row.row-delete td.old-marker {
       background: var(--bg-diff-del);
       color: #fca5a5;
     }
-    .sbs-row.row-insert td.new-code, .sbs-row.row-insert td.new-lineno {
+    .sbs-row.row-insert td.new-code, .sbs-row.row-insert td.new-lineno, .sbs-row.row-insert td.new-marker {
       background: var(--bg-diff-add);
       color: #86efac;
     }
-    .sbs-row.row-replace td.old-code { background: var(--bg-diff-del); color: #fca5a5; }
-    .sbs-row.row-replace td.new-code { background: var(--bg-diff-add); color: #86efac; }
-    .sbs-row.selected td {
+    .sbs-row.row-replace td.old-code, .sbs-row.row-replace td.old-marker { background: var(--bg-diff-del); color: #fca5a5; }
+    .sbs-row.row-replace td.new-code, .sbs-row.row-replace td.new-marker { background: var(--bg-diff-add); color: #86efac; }
+    
+    /* Selection highlight markers placed on left column grid to preserve diff colors */
+    .sbs-row.selected td.lineno,
+    .sbs-row.selected td.diff-marker {
       background: var(--bg-diff-sel) !important;
+      color: var(--quake-gold) !important;
+      box-shadow: inset 0 1px 0 var(--border-diff-sel), inset 0 -1px 0 var(--border-diff-sel);
+    }
+    .sbs-row.selected td.diff-marker {
+      border-left: 3px solid var(--quake-gold);
+    }
+    .sbs-row.selected td.old-code,
+    .sbs-row.selected td.new-code {
       box-shadow: inset 0 1px 0 var(--border-diff-sel), inset 0 -1px 0 var(--border-diff-sel);
     }
 
@@ -587,14 +610,21 @@
       font-weight: 700;
     }
     .unified-row {
-      display: flex;
+      display: grid;
+      grid-template-columns: 44px 44px 22px 1fr;
       cursor: pointer;
-      padding: 1px 4px;
+      padding: 1px 0;
       border-radius: 2px;
     }
-    .unified-row.selected {
-      background: var(--bg-diff-sel) !important;
-      box-shadow: inset 0 1px 0 var(--border-diff-sel), inset 0 -1px 0 var(--border-diff-sel);
+    .unified-marker {
+      width: 22px;
+      text-align: center;
+      user-select: none;
+      font-weight: 700;
+      color: var(--quake-text-dim);
+      background: rgba(0, 0, 0, 0.25);
+      border-right: 1px solid rgba(90, 56, 30, 0.25);
+      flex-shrink: 0;
     }
     .unified-num-old, .unified-num-new {
       width: 44px;
@@ -608,13 +638,29 @@
       color: var(--quake-gold);
     }
     .unified-text {
-      flex: 1;
       white-space: pre;
       word-break: normal;
       padding-left: 8px;
+      overflow-x: auto;
     }
     .unified-row.add, .unified-row.insert { background: var(--bg-diff-add); color: #86efac; }
     .unified-row.del, .unified-row.delete { background: var(--bg-diff-del); color: #fca5a5; }
+    .unified-row.add .unified-marker, .unified-row.insert .unified-marker { color: #86efac; }
+    .unified-row.del .unified-marker, .unified-row.delete .unified-marker { color: #fca5a5; }
+
+    .unified-row.selected .unified-num-old,
+    .unified-row.selected .unified-num-new,
+    .unified-row.selected .unified-marker {
+      background: var(--bg-diff-sel) !important;
+      color: var(--quake-gold) !important;
+      box-shadow: inset 0 1px 0 var(--border-diff-sel), inset 0 -1px 0 var(--border-diff-sel);
+    }
+    .unified-row.selected .unified-marker {
+      border-left: 3px solid var(--quake-gold);
+    }
+    .unified-row.selected .unified-text {
+      box-shadow: inset 0 1px 0 var(--border-diff-sel), inset 0 -1px 0 var(--border-diff-sel);
+    }
 
     /* Inline Comment Box */
     .inline-comment-card {
@@ -1727,13 +1773,13 @@
       let html = `
         <table class="sbs-table">
           <colgroup>
-            <col class="col-lineno"><col class="col-code">
-            <col class="col-lineno"><col class="col-code">
+            <col class="col-lineno"><col class="col-marker"><col class="col-code">
+            <col class="col-lineno"><col class="col-marker"><col class="col-code">
           </colgroup>
           <thead>
             <tr>
-              <th colspan="2">Old Revision</th>
-              <th colspan="2">New Revision</th>
+              <th colspan="3">Old Revision</th>
+              <th colspan="3">New Revision</th>
             </tr>
           </thead>
           <tbody>
@@ -1759,11 +1805,26 @@
           newHtml = highlightLine(r.new_text, state.activeLanguage);
         }
 
+        let oldMarker = " ";
+        if (r.row_type === "delete" || r.row_type === "replace") {
+          oldMarker = "-";
+        }
+        let newMarker = " ";
+        if (r.row_type === "insert" || r.row_type === "replace") {
+          newMarker = "+";
+        }
+        if (isSelected) {
+          if (oldMarker === " " && r.old_no) oldMarker = "▶";
+          if (newMarker === " " && r.new_no) newMarker = "▶";
+        }
+
         html += `
           <tr class="sbs-row ${rowClass}${selectedClass}" data-line="${lineNo || ''}">
             <td class="lineno old-lineno" onclick="onLineClick(${r.old_no || r.new_no}, event)">${r.old_no || ''}</td>
+            <td class="diff-marker old-marker" onclick="onLineClick(${r.old_no || r.new_no}, event)">${oldMarker}</td>
             <td class="old-code hljs" onclick="onLineClick(${r.old_no || r.new_no}, event)">${oldHtml}</td>
             <td class="lineno new-lineno" onclick="onLineClick(${r.new_no || r.old_no}, event)">${r.new_no || ''}</td>
+            <td class="diff-marker new-marker" onclick="onLineClick(${r.new_no || r.old_no}, event)">${newMarker}</td>
             <td class="new-code hljs" onclick="onLineClick(${r.new_no || r.old_no}, event)">${newHtml}</td>
           </tr>
         `;
@@ -1807,10 +1868,21 @@
             lineHtml = highlightLine(l.content, state.activeLanguage);
           }
 
+          let markerChar = " ";
+          if (l.type === "add" || l.type === "insert") {
+            markerChar = "+";
+          } else if (l.type === "delete" || l.type === "del") {
+            markerChar = "-";
+          }
+          if (isSelected && markerChar === " ") {
+            markerChar = "▶";
+          }
+
           html += `
             <div class="unified-row ${rowType}${selClass}" data-line="${lineNo || ''}" onclick="onLineClick(${lineNo}, event)">
               <span class="unified-num-old">${l.old_line_no || ''}</span>
               <span class="unified-num-new">${l.new_line_no || ''}</span>
+              <span class="unified-marker">${markerChar}</span>
               <span class="unified-text hljs">${lineHtml}</span>
             </div>
           `;
@@ -1832,7 +1904,7 @@
       const lines = content.split("\n");
       const fileComments = (state.session?.comments || []).filter(c => c.file_path === state.selectedFile);
 
-      let html = `<table class="sbs-table"><colgroup><col class="col-lineno"><col class="col-code" style="width: calc(100% - 50px);"></colgroup><tbody>`;
+      let html = `<table class="sbs-table"><colgroup><col class="col-lineno"><col class="col-marker"><col class="col-code" style="width: calc(100% - 66px);"></colgroup><tbody>`;
       lines.forEach((line, idx) => {
         const lineNo = idx + 1;
         const isSelected = isLineInRange(lineNo);
@@ -1844,6 +1916,7 @@
         html += `
           <tr class="sbs-row row-equal${selClass}" data-line="${lineNo}">
             <td class="lineno" onclick="onLineClick(${lineNo}, event)">${lineNo}</td>
+            <td class="diff-marker" onclick="onLineClick(${lineNo}, event)">${isSelected ? "▶" : " "}</td>
             <td class="new-code hljs" onclick="onLineClick(${lineNo}, event)">${lineHtml}</td>
           </tr>
         `;
@@ -1882,7 +1955,7 @@
 
       return `
         <tr>
-          <td colspan="4" style="padding: 0;">
+          <td colspan="6" style="padding: 0;">
             <div class="inline-comment-card">
               <div class="inline-comment-header">
                 <div style="display:flex; align-items:center; gap:8px;">
