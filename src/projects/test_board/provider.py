@@ -315,6 +315,34 @@ class TestBoardProvider(Provider):
             with Locations((0.0, -length / 2.0, m2_z)):
                 Box(m2_w, wall * 3.0, m2_h, mode=BuildMode.SUBTRACT)
 
+            # Peripheral cutouts and bus identifiers through right exterior wall (BUG-074)
+            periph_cutout_h = 5.0
+            periph_z = z_carrier + (self.settings.board_thickness / 2.0) + (periph_cutout_h / 2.0) - 0.5
+            periph_specs = [
+                ("J6", 26.0, 10.5, "I2C"),
+                ("J7", 16.0, 10.5, "I3C0"),
+                ("J8", 6.0, 10.5, "I3C1"),
+                ("J9", -6.0, 15.5, "SPI"),
+                ("J10", -17.0, 15.5, "UART"),
+            ]
+            if self.wiring_path.exists():
+                wiring = Wiring(str(self.wiring_path))
+                comp_map = {c.name: c for c in wiring.footprints}
+                for idx, (des, def_y, cut_l, label) in enumerate(periph_specs):
+                    if des in comp_map:
+                        periph_specs[idx] = (des, comp_map[des].position[1], cut_l, label)
+
+            for _, py, cut_l, _ in periph_specs:
+                with Locations((w / 2.0, py, periph_z)):
+                    Box(wall * 3.0, cut_l, periph_cutout_h, mode=BuildMode.SUBTRACT)
+
+            # Bus identifier labels on exterior right wall
+            with BuildSketch(Plane.YZ.offset(w / 2.0)) as s_periph_labels:
+                for _, py, _, label in periph_specs:
+                    with Locations((py, periph_z + (periph_cutout_h / 2.0) + 1.2)):
+                        Text(label, font_size=1.6)
+            extrude(s_periph_labels.sketch, amount=-0.3, mode=BuildMode.SUBTRACT)
+
         return shell
 
     def enclosure_lid(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:

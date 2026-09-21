@@ -50,3 +50,22 @@ def test_regression_bug_073_gpio_cutout_and_key() -> None:
     assert not lid.part.is_inside((gpio_x, gpio_y, wall / 2.0)), "Lid must have a cutout at J14 position"
     assert not lid.part.is_inside((gpio_x, gpio_y + 10.0, wall / 2.0)), "Cutout must cover top GPIO pins"
     assert not lid.part.is_inside((gpio_x, gpio_y - 10.0, wall / 2.0)), "Cutout must cover bottom GPIO pins"
+
+
+def test_regression_bug_074_peripheral_cutouts_and_identifiers() -> None:
+    """Verify BUG-074: enclosure bottom has peripheral cutouts for I2C, I3C, and SPI with identifiers."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
+    z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
+    z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
+
+    # Probe points centered inside the right exterior wall (X = w/2 - wall/2) at each peripheral connector Y
+    wall_x = (w / 2.0) - (wall / 2.0)
+    for y, bus in [(26.0, "I2C"), (16.0, "I3C0"), (6.0, "I3C1"), (-6.0, "SPI"), (-17.0, "UART")]:
+        assert not enclosure.part.is_inside((wall_x, y, z_conn)), (
+            f"Enclosure bottom must have cutout for {bus} at Y={y}"
+        )
