@@ -297,10 +297,15 @@ class TestBoardProvider(Provider):
             with Locations((-w / 2.0, 0.0, usb_z)):
                 Box(wall * 3.0, usb_w, usb_h, mode=BuildMode.SUBTRACT)
 
-            # Flex tail passage exit slot at front rim (aligned with J2 at [0.0, 38.0, 0.8])
+            # Flex tail passage exit slot at front rim (aligned with J2 at [0.0, 38.0, 0.8] and flex tail)
             slot_w = self.settings.flex_tail_width + 2.0
-            with Locations((0.0, length / 2.0, h_shell / 2.0)):
-                Box(slot_w, wall * 3.0, 6.0, mode=BuildMode.SUBTRACT)
+            z_carrier = -h_shell / 2.0 + wall + standoff_h + (self.settings.board_thickness / 2.0)
+            z_cut_bot = z_carrier - 1.0
+            z_cut_top = (h_shell / 2.0) + 0.5
+            slot_h = z_cut_top - z_cut_bot
+            slot_z = (z_cut_top + z_cut_bot) / 2.0
+            with Locations((0.0, length / 2.0, slot_z)):
+                Box(slot_w, wall * 3.0, slot_h, mode=BuildMode.SUBTRACT)
 
             # M.2 connector cutout through rear exterior wall (aligned with J1 at [0.0, -36.0, 0.8])
             m2_w = self.settings.enclosure_m2_cutout_width
