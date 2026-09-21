@@ -62,6 +62,14 @@ def parse_arguments() -> argparse.Namespace:
         help="Persistent JSON file storing bug database.",
     )
     parser.add_argument(
+        "--db-file",
+        "--sqlite-file",
+        dest="db_file",
+        type=Path,
+        default=Path("build/bugs.sqlite"),
+        help="Persistent SQLite database file storing bug workstation records.",
+    )
+    parser.add_argument(
         "--fresh",
         action="store_true",
         help="Start a fresh bug tracking session, ignoring previous JSON state.",
@@ -160,6 +168,7 @@ def main() -> None:
 
     output_path = args.output if args.output.is_absolute() else (repo_root / args.output)
     state_path = args.state_file if args.state_file.is_absolute() else (repo_root / args.state_file)
+    db_path = args.db_file if args.db_file.is_absolute() else (repo_root / args.db_file)
 
     is_cli_only = bool(args.add or args.resolve or args.list or args.export_only)
     server = BugReportServer(
@@ -168,6 +177,7 @@ def main() -> None:
         repo_root=repo_root,
         markdown_output=output_path,
         state_file=state_path,
+        sqlite_file=db_path,
         fresh=args.fresh,
         bind_and_activate=not is_cli_only,
     )

@@ -170,13 +170,15 @@ schematic_sheets:
       R3: ["1", "2"]
       R4: ["1", "2"]
 
-  - title: 3.3V LDO Voltage Regulation
-    description: Low-dropout linear voltage regulator converting VBUS to 3.3V system rail
-    components: [U3, C6, C7]
+  - title: 3.3V LDO Voltage Regulation & Battery Power
+    description: Low-dropout linear voltage regulator and 1S Li-Ion battery power input
+    components: [U3, C6, C7, J13, C13]
     pin_breakouts:
-      U3: ["1", "2", "3", "5"]
+      U3: ["1", "2", "3", "4", "5"]
       C6: ["1", "2"]
       C7: ["1", "2"]
+      J13: ["1", "2"]
+      C13: ["1", "2"]
 
   - title: Power Distribution & Load Switch
     description: Switched power rail MOSFET switch and primary system decoupling
@@ -203,9 +205,9 @@ schematic_sheets:
       U1:
         H7: right
         H8: right
+        K1: right
+        K2: right
         D1: left
-        K1: left
-        K2: left
         M1: left
         M2: left
       Y1:
@@ -253,6 +255,10 @@ schematic_sheets:
     description: CY8CMBR3116 CapSense controller, 4-channel liquid level flex tail, and I2C bus
     components: [U1, U2, J2, R1, R2, C12]
     pin_sides:
+      U1:
+        F1: right
+        F2: right
+        D2: right
       U2:
         SDA: left
         SCL: left

@@ -18,6 +18,7 @@ import pytest
 from model.code_review import (
     CommentModel,
     FileReviewStatus,
+    FileStateModel,
     ReviewSessionModel,
     ReviewSeverity,
     ReviewStatus,
@@ -29,6 +30,7 @@ from provider.code_review.git_utils import (
 )
 from provider.code_review.markdown_exporter import MarkdownReviewExporter
 from provider.code_review.server import ReviewServer
+from provider.code_review.sqlite_store import SQLiteReviewStore
 from code_review import launch_browser, parse_arguments
 
 
@@ -1005,3 +1007,286 @@ def test_code_review_html_responsive_and_cli_navigation(tmp_path: Path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_sqlite_review_store_lifecycle(tmp_path: Path) -> None:
+    """Verify SQLiteReviewStore handles session loading, saving, comments, files, and json import/export."""
+    db_path = tmp_path / "test_cr.sqlite"
+    store = SQLiteReviewStore(db_path)
+
+    # 1. Empty store returns None
+    assert store.load_session() is None
+
+    # 2. Save new session
+    session = ReviewSessionModel(
+        title="Hardware Core Review",
+        summary="Initial review of core subsystem.",
+        verdict=ReviewStatus.IN_REVIEW,
+        repo_name="hardware",
+        revisions=["working", "HEAD"],
+        created_at="2026-09-20T23:00:00Z",
+        updated_at="2026-09-20T23:00:00Z",
+    )
+    store.save_session(session)
+
+    loaded = store.load_session()
+    assert loaded is not None
+    assert loaded.title == "Hardware Core Review"
+    assert loaded.verdict == ReviewStatus.IN_REVIEW
+    assert loaded.revisions == ["working", "HEAD"]
+
+    # 3. Add and update comments
+    comment = CommentModel(
+        id="c101",
+        file_path="src/model/pcb.py",
+        start_line=10,
+        end_line=12,
+        severity=ReviewSeverity.MUST_FIX,
+        body="Missing ground return path.",
+        author="Alice",
+        code_snippet="wire = Net('GND')",
+        created_at="2026-09-20T23:01:00Z",
+        resolved=False,
+    )
+    store.save_comment(comment)
+
+    loaded = store.load_session()
+    assert loaded is not None
+    assert len(loaded.comments) == 1
+    assert loaded.comments[0].id == "c101"
+    assert loaded.comments[0].body == "Missing ground return path."
+    assert loaded.comments[0].severity == ReviewSeverity.MUST_FIX
+
+    # 4. Edit comment
+    comment.body = "Updated comment: check coplanar waveguide."
+    comment.severity = ReviewSeverity.PROPOSAL
+    comment.resolved = True
+    store.save_comment(comment)
+
+    loaded = store.load_session()
+    assert loaded is not None
+    assert loaded.comments[0].body == "Updated comment: check coplanar waveguide."
+    assert loaded.comments[0].severity == ReviewSeverity.PROPOSAL
+    assert loaded.comments[0].resolved is True
+
+    # 5. Save file state
+    file_state = FileStateModel(
+        path="src/model/pcb.py",
+        status=FileReviewStatus.REVIEWED,
+        notes="Reviewed and confirmed OK",
+    )
+    store.save_file_state(file_state)
+
+    loaded = store.load_session()
+    assert loaded is not None
+    assert "src/model/pcb.py" in loaded.files
+    assert loaded.files["src/model/pcb.py"].status == FileReviewStatus.REVIEWED
+
+    # 6. Update verdict
+    store.update_verdict(ReviewStatus.CHANGES_REQUESTED, summary="Needs waveguide review.")
+    loaded = store.load_session()
+    assert loaded is not None
+    assert loaded.verdict == ReviewStatus.CHANGES_REQUESTED
+    assert loaded.summary == "Needs waveguide review."
+
+    # 7. JSON export and import
+    json_path = tmp_path / "cr_export.json"
+    store.export_to_json(json_path)
+    assert json_path.exists()
+
+    db_path2 = tmp_path / "test_cr2.sqlite"
+    store2 = SQLiteReviewStore(db_path2)
+    imported = store2.import_from_json(json_path)
+    assert imported.title == "Hardware Core Review"
+    assert imported.verdict == ReviewStatus.CHANGES_REQUESTED
+    assert len(imported.comments) == 1
+
+    # 8. Delete comment
+    store.delete_comment("c101")
+    loaded = store.load_session()
+    assert loaded is not None
+    assert len(loaded.comments) == 0
+
+
+def test_review_server_sqlite_integration(tmp_path: Path) -> None:
+    """Verify ReviewServer automatically loads from and syncs to SQLite backing store."""
+    repo_root = get_git_root()
+    db_file = tmp_path / "server_test.sqlite"
+    state_file = tmp_path / "server_test.json"
+    md_file = tmp_path / "server_test.md"
+
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=md_file,
+        state_file=state_file,
+        sqlite_file=db_file,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        # Add comment via HTTP
+        payload = {
+            "file_path": "pyproject.toml",
+            "start_line": 1,
+            "end_line": 2,
+            "severity": "MUST_FIX",
+            "body": "SQLite integration comment",
+            "author": "Tester",
+        }
+        req = urllib.request.Request(
+            f"{base_url}api/comment",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            cid = data["comment"]["id"]
+
+        # Check SQLite file exists and has the comment
+        assert db_file.exists()
+        store = SQLiteReviewStore(db_file)
+        session_from_db = store.load_session()
+        assert session_from_db is not None
+        assert len(session_from_db.comments) == 1
+        assert session_from_db.comments[0].id == cid
+        assert session_from_db.comments[0].body == "SQLite integration comment"
+
+        # Update verdict
+        v_payload = {"verdict": "CHANGES_REQUESTED", "summary": "DB verdict test", "terminate": False}
+        v_req = urllib.request.Request(
+            f"{base_url}api/verdict",
+            data=json.dumps(v_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(v_req) as resp:
+            assert resp.status == 200
+
+        session_from_db2 = store.load_session()
+        assert session_from_db2 is not None
+        assert session_from_db2.verdict == ReviewStatus.CHANGES_REQUESTED
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    # Now verify a new ReviewServer recovers state directly from the SQLite store
+    server2 = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=md_file,
+        state_file=tmp_path / "non_existent.json",
+        sqlite_file=db_file,
+        bind_and_activate=False,
+    )
+    assert server2.session.verdict == ReviewStatus.CHANGES_REQUESTED
+    assert len(server2.session.comments) == 1
+    assert server2.session.comments[0].body == "SQLite integration comment"
+
+
+def test_code_review_cli_features(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """Verify code_review.py CLI commands for comment addition, resolution, and listing."""
+    db_file = tmp_path / "cli_test.sqlite"
+    state_file = tmp_path / "cli_test.json"
+    md_file = tmp_path / "cli_test.md"
+
+    from code_review import main
+
+    # 1. Quick add comment
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "code_review.py",
+            "--db-file",
+            str(db_file),
+            "--state-file",
+            str(state_file),
+            "--output",
+            str(md_file),
+            "--add-comment",
+            "Check crystal routing",
+            "--file",
+            "src/code_review.py",
+            "--line",
+            "10",
+            "--severity",
+            "MUST_FIX",
+        ],
+    )
+    main()
+    captured = capsys.readouterr().out
+    assert "Added comment [" in captured
+
+    # 2. List comments
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "code_review.py",
+            "--db-file",
+            str(db_file),
+            "--state-file",
+            str(state_file),
+            "--output",
+            str(md_file),
+            "--list",
+        ],
+    )
+    main()
+    list_out = capsys.readouterr().out
+    assert "Check crystal routing" in list_out
+    assert "[MUST_FIX]" in list_out
+    assert "[ ]" in list_out
+
+    # Extract comment ID
+    store = SQLiteReviewStore(db_file)
+    session = store.load_session()
+    assert session is not None
+    cid = session.comments[0].id
+
+    # 3. Resolve comment
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "code_review.py",
+            "--db-file",
+            str(db_file),
+            "--state-file",
+            str(state_file),
+            "--output",
+            str(md_file),
+            "--resolve-comment",
+            cid,
+        ],
+    )
+    main()
+    res_out = capsys.readouterr().out
+    assert f"Resolved comment [{cid}]" in res_out
+
+    # 4. List with --open -> should show 0 unresolved
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "code_review.py",
+            "--db-file",
+            str(db_file),
+            "--state-file",
+            str(state_file),
+            "--output",
+            str(md_file),
+            "--list",
+            "--open",
+        ],
+    )
+    main()
+    open_out = capsys.readouterr().out
+    assert "0 unresolved" in open_out

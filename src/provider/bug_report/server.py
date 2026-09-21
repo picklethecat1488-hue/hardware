@@ -26,6 +26,7 @@ from model.bug_report import (
     BugStatus,
 )
 from provider.bug_report.markdown_exporter import MarkdownBugExporter
+from provider.bug_report.sqlite_store import SQLiteBugStore
 
 
 class BugReportRequestHandler(BaseHTTPRequestHandler):
@@ -341,6 +342,7 @@ class BugReportServer(ThreadingHTTPServer):
         repo_root: Optional[Path] = None,
         markdown_output: Optional[Path] = None,
         state_file: Optional[Path] = None,
+        sqlite_file: Optional[Path] = None,
         attachments_dir: Optional[Path] = None,
         fresh: bool = False,
         bind_and_activate: bool = True,
@@ -351,10 +353,12 @@ class BugReportServer(ThreadingHTTPServer):
         self.repo_root = repo_root or Path.cwd()
         self.markdown_output = markdown_output or (self.repo_root / "build" / "BUGS.md")
         self.state_file = state_file or (self.repo_root / "build" / "bugs_state.json")
+        self.sqlite_file = sqlite_file or (self.repo_root / "build" / "bugs.sqlite")
         self.attachments_dir = attachments_dir or (self.repo_root / "build" / "attachments")
         self.fresh = fresh
         self.bind_and_activate = bind_and_activate
 
+        self.sqlite_store = SQLiteBugStore(self.sqlite_file)
         self.exporter = MarkdownBugExporter(repo_root=self.repo_root)
         self.database = self._initialize_database()
 
@@ -362,11 +366,18 @@ class BugReportServer(ThreadingHTTPServer):
             super().__init__((host, port), BugReportRequestHandler)
 
     def _initialize_database(self) -> BugDatabaseModel:
-        """Load existing database state or initialize fresh database."""
-        if not self.fresh and self.state_file.exists():
-            loaded = self.exporter.load_state_json(self.state_file)
-            if loaded:
-                return loaded
+        """Load existing database state from SQLite, fallback to JSON state, or initialize fresh database."""
+        if not self.fresh:
+            if self.sqlite_file.exists():
+                db = self.sqlite_store.load_database()
+                if db and db.bugs:
+                    return db
+
+            if self.state_file.exists():
+                loaded = self.exporter.load_state_json(self.state_file)
+                if loaded:
+                    self.sqlite_store.save_database(loaded)
+                    return loaded
 
         db = BugDatabaseModel(
             title="Hardware Bug Tracker",
@@ -375,8 +386,9 @@ class BugReportServer(ThreadingHTTPServer):
         return db
 
     def save_and_sync(self) -> Path:
-        """Persist bug database to JSON state file and export to Markdown."""
+        """Persist bug database to SQLite backing store, JSON state file, and export to Markdown."""
         self.database.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.sqlite_store.save_database(self.database)
         self.exporter.export_state_json(self.database, self.state_file)
         return self.exporter.export_markdown(self.database, self.markdown_output)
 

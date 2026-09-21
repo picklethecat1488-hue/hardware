@@ -944,10 +944,16 @@ class SchematicDiagram:
                         else:
                             break
                 elif x_start < 100.0:
-                    # Left breakout stub: extend outward to the left well clear of GND symbols
-                    cand_x = x_start - 28.0 - idx * 20.0
-                    while any(abs(cand_x - ux) < 14.0 for ux in used_x_positions):
-                        cand_x -= 14.0
+                    # Left breakout stub: extend outward to the left well clear of GND symbols while staying on-page
+                    min_page_x = 22.0
+                    cand_x = max(min_page_x, x_start - 24.0 - idx * 16.0)
+                    while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
+                        if cand_x - 10.0 >= min_page_x:
+                            cand_x -= 10.0
+                        elif cand_x + 10.0 <= x_start - 6.0:
+                            cand_x += 10.0
+                        else:
+                            break
                     ax.plot(
                         [cand_x, x_start],
                         [matching_segs[0][2], matching_segs[0][2]],
@@ -957,10 +963,16 @@ class SchematicDiagram:
                     )
                     h_wire_segments.append((cand_x, x_start, matching_segs[0][2], sig_net, "#2563eb"))
                 else:
-                    # Right breakout stub: extend outward to the right
-                    cand_x = x_end + 14.0 + idx * 16.0
-                    while any(abs(cand_x - ux) < 14.0 for ux in used_x_positions):
-                        cand_x += 14.0
+                    # Right breakout stub: extend outward to the right while staying on-page
+                    max_page_x = 275.0
+                    cand_x = min(max_page_x, x_end + 14.0 + idx * 16.0)
+                    while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
+                        if cand_x + 10.0 <= max_page_x:
+                            cand_x += 10.0
+                        elif cand_x - 10.0 >= x_end + 6.0:
+                            cand_x -= 10.0
+                        else:
+                            break
                     ax.plot(
                         [x_end, cand_x],
                         [matching_segs[0][2], matching_segs[0][2]],
@@ -1002,9 +1014,15 @@ class SchematicDiagram:
                             else:
                                 break
                     else:
-                        cand_x = p_x - 28.0 - idx * 20.0
+                        min_page_x = 22.0
+                        cand_x = max(min_page_x, p_x - 24.0 - idx * 16.0)
                         while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
-                            cand_x -= step
+                            if cand_x - step >= min_page_x:
+                                cand_x -= step
+                            elif cand_x + step <= p_x - 6.0:
+                                cand_x += step
+                            else:
+                                break
                     x_pull = cand_x
 
                     # Draw connecting line from component pin to pullup junction

@@ -92,6 +92,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         self._labels: list[tuple[str, str, Any, TextArgs]] = []
         self.gravity: tuple[float, float, float] = (0.0, 0.0, -9.81)
         self.line_weights: dict[str, float] = {}
+        self.diagram_options: Optional["DiagramOptions"] = None
 
     def add(
         self,

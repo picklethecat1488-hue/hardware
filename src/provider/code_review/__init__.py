@@ -11,6 +11,7 @@ from .git_utils import (
 )
 from .markdown_exporter import MarkdownReviewExporter
 from .server import ReviewServer
+from .sqlite_store import SQLiteReviewStore
 
 __all__ = [
     "GitReviewEngine",
@@ -18,4 +19,5 @@ __all__ = [
     "extract_line_snippet",
     "MarkdownReviewExporter",
     "ReviewServer",
+    "SQLiteReviewStore",
 ]

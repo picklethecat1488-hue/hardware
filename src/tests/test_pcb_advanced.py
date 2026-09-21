@@ -401,7 +401,7 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 29
+    assert len(wiring.footprints) == 31
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
@@ -410,6 +410,8 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert "J1" in footprint_names
     assert "J2" in footprint_names
     assert "J3" in footprint_names
+    assert "J13" in footprint_names
+    assert "C13" in footprint_names
     assert "U5" in footprint_names
     assert "Y1" in footprint_names
     assert "R1" in footprint_names
@@ -440,11 +442,11 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 29  # header + 28 carrier components (J4 is on flex tail)
+    assert len(bom_lines) == 31  # header + 30 carrier components (J4 is on flex tail)
     assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 29  # header + 28 carrier components
+    assert len(pos_lines) == 31  # header + 30 carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -1802,3 +1804,201 @@ def test_regression_pinmux_datasheet_verification() -> None:
     assert "L4" in content and "P1_22" in content and "PWR_EN_AUDIO" in content
     assert "L5" in content and "P1_21" in content and "PWR_EN_SENSORS" in content
     assert "M4" in content and "P1_23" in content and "PWR_EN_DEBUG" in content
+
+
+def test_regression_test_board_wiring_diagram_top_down_and_colored() -> None:
+    """Verify test board wiring diagram is 2D top-down and colored with distinct net layers."""
+    from model import DiagramStyle
+
+    provider = TestBoardProvider()
+    room_wiring = Room()
+    provider.diagram_wiring(room_wiring, ["test_board/wiring"], Mode.DEFAULT)
+
+    assert room_wiring.diagram_options is not None
+    assert room_wiring.diagram_options.view_from == "top"
+    assert room_wiring.diagram_options.style == DiagramStyle.COLOR
+
+    room_prod = Room()
+    provider.diagram_product(room_prod, ["test_board/product"], Mode.DEFAULT)
+    assert room_prod.diagram_options is not None
+    assert room_prod.diagram_options.view_from == "iso"
+    assert room_prod.diagram_options.style == DiagramStyle.HIDDEN
+
+
+def test_regression_enclosure_cad_feedback_and_assembly() -> None:
+    """Verify enclosure CAD feedback: rounded fillets, cutouts, locating lip, and product assembly."""
+    provider = TestBoardProvider()
+
+    # 1. Verify bottom enclosure geometry
+    bottom = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    assert bottom is not None and bottom.part is not None
+    b_part = bottom.part
+    bb = b_part.bounding_box()
+    expected_w = provider.settings.board_width + 2.0 * (
+        provider.settings.enclosure_clearance + provider.settings.enclosure_wall_thickness
+    )
+    expected_l = provider.settings.board_length + 2.0 * (
+        provider.settings.enclosure_clearance + provider.settings.enclosure_wall_thickness
+    )
+    expected_h = provider.settings.standoff_height + provider.settings.board_thickness + 10.0
+
+    assert abs((bb.max.X - bb.min.X) - expected_w) < 0.1
+    assert abs((bb.max.Y - bb.min.Y) - expected_l) < 0.1
+    assert abs((bb.max.Z - bb.min.Z) - expected_h) < 0.1
+    assert b_part.volume < (expected_w * expected_l * expected_h)
+
+    # 2. Verify enclosure lid geometry
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid is not None and lid.part is not None
+    l_part = lid.part
+    l_bb = l_part.bounding_box()
+    assert abs((l_bb.max.X - l_bb.min.X) - expected_w) < 0.1
+    assert abs((l_bb.max.Y - l_bb.min.Y) - expected_l) < 0.1
+    expected_lid_h = provider.settings.enclosure_wall_thickness + provider.settings.enclosure_lip_height
+    assert abs((l_bb.max.Z - l_bb.min.Z) - expected_lid_h) < 0.1
+
+    # 3. Verify view_product populates all 4 parts and seats carrier board on standoffs
+    room = Room()
+    provider.view_product(room, Mode.DEFAULT)
+    assert "carrier_board" in room
+    assert "flex_tail" in room
+    assert "enclosure_bottom" in room
+    assert "enclosure_lid" in room
+
+    carrier_geom = room["carrier_board"][0]
+    carrier_part = getattr(carrier_geom, "part", carrier_geom)
+    carrier_bb = carrier_part.bounding_box()
+    expected_carrier_bottom_z = (
+        -expected_h / 2.0 + provider.settings.enclosure_wall_thickness + provider.settings.standoff_height
+    )
+    assert abs(carrier_bb.min.Z - expected_carrier_bottom_z) < 0.05
+
+
+def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
+    """Verify BUG-065 (M.2 cutout in bottom enclosure) and BUG-066 (component silkscreens on carrier)."""
+    provider = TestBoardProvider()
+
+    # 1. BUG-065: Verify M.2 cutout settings and bottom enclosure build
+    assert provider.settings.enclosure_m2_cutout_width == 24.0
+    assert provider.settings.enclosure_m2_cutout_height == 5.0
+    bottom = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    assert bottom is not None and bottom.part is not None
+
+    # 2. BUG-066: Verify all component reference designators are present in silkscreen
+    silks = provider.silkscreen()
+    silk_texts = {t.text for t in silks}
+    expected_components = (
+        ["U1", "U2", "J1", "J2", "J3", "Q1", "U3", "U4", "SPK1", "Y1"]
+        + [f"R{i}" for i in range(1, 7)]
+        + [f"C{i}" for i in range(1, 13)]
+    )
+    for comp in expected_components:
+        assert comp in silk_texts, f"Component RefDes {comp} must be present in carrier silkscreen"
+
+    # 3. Verify zero DRC errors across carrier board with all silkscreen texts
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+    violations = checker.check_all(wiring=wiring)
+    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.errors]}"
+
+
+def test_regression_schematic_page_boundary_drc_and_layout(tmp_path: Path) -> None:
+    """Verify BUG-068 (page boundary DRC and Sheet 5 passives) and BUG-071 (Sheet 7 I2C pullups)."""
+    from provider.schematic_diagram import SchematicDiagram
+    from provider.pcb.drc import DRCRuleName
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+
+    # 1. Verify 0 schematic DRC violations across all 7 sheets
+    violations = checker.check_schematic(wiring)
+    page_boundary_errors = [v for v in violations.errors if v.rule_name == DRCRuleName.SCHEMATIC_PAGE_BOUNDARY_EXCEEDED]
+    assert len(page_boundary_errors) == 0, (
+        f"Page boundary violations found: {[v.description for v in page_boundary_errors]}"
+    )
+    assert len(violations.errors) == 0, f"Schematic DRC errors found: {[v.description for v in violations.errors]}"
+
+    # 2. Verify schematic multi-page PDF generation without clipping
+    diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
+    pdf_out = diag.render_pdf(tmp_path / "test_board_schematic.pdf")
+    assert pdf_out.is_file()
+    assert pdf_out.stat().st_size > 5000
+
+
+def test_regression_battery_connector_j13(tmp_path: Path) -> None:
+    """Verify BUG-070: JST-PH battery connector J13, C13 decoupling, and VBAT net."""
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+
+    # 1. Verify J13 and C13 are defined in wiring footprints
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+    assert "J13" in fp_map, "J13 battery connector footprint must be defined"
+    assert "C13" in fp_map, "C13 battery bypass capacitor footprint must be defined"
+    assert fp_map["J13"].package == "JST-PH-2P"
+
+    # 2. Verify VBAT and GND connectivity
+    vbat_net = next((n for n in wiring.nets if n.name == "VBAT"), None)
+    assert vbat_net is not None, "VBAT net must be defined"
+    vbat_pins = set(vbat_net.pins)
+    assert ("J13", "1") in vbat_pins
+    assert ("C13", "1") in vbat_pins
+    assert ("U3", "4") in vbat_pins
+
+    gnd_net = next((n for n in wiring.nets if n.name == "GND"), None)
+    assert gnd_net is not None, "GND net must be defined"
+    gnd_pins = set(gnd_net.pins)
+    assert ("J13", "2") in gnd_pins
+    assert ("C13", "2") in gnd_pins
+
+    # 3. Verify J13, C13, and polarity marks in carrier silkscreen
+    silks = provider.silkscreen()
+    silk_texts = {t.text for t in silks}
+    assert "J13" in silk_texts, "J13 silkscreen marking must be present"
+    assert "C13" in silk_texts, "C13 silkscreen marking must be present"
+    assert "+" in silk_texts and "-" in silk_texts
+
+    # 4. Verify 0 DRC violations across board and schematic
+    violations = checker.check_all(wiring=wiring)
+    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
+
+    schematic_violations = checker.check_schematic(wiring=wiring)
+    assert len(schematic_violations.errors) == 0, (
+        f"Schematic DRC errors found: {[v.description for v in schematic_violations.errors]}"
+    )
+
+
+def test_regression_downselection_results_application() -> None:
+    """Verify BUG-067: downselection results from downselection_report.md applied to test_board.md and PCB."""
+    tb_doc = Path("src/projects/test_board.md")
+    assert tb_doc.is_file(), "test_board.md must exist"
+    content = tb_doc.read_text(encoding="utf-8")
+
+    # 1. Verify all downselected active ICs and peripherals in test_board.md
+    assert "MCXN947VDF" in content, "MCU MCXN947VDF must be documented in BOM"
+    assert "W25N01GVZEIG" in content, "NAND W25N01GVZEIG must be documented in BOM"
+    assert "BQ24074RGTR" in content, "Charger BQ24074RGTR must be documented in BOM"
+    assert "MAX17048G+T10" in content, "Fuel gauge MAX17048 must be documented in BOM"
+    assert "LP5009RUKR" in content, "LED driver LP5009 must be documented in BOM"
+    assert "FT232RNQ-REEL" in content, "USB-UART FT232RNQ must be documented in BOM"
+    assert "CY8CMBR3116" in content, "Touch controller CY8CMBR3116 must be documented in BOM"
+    assert "MAX98357AETE+" in content, "Audio amp MAX98357A must be documented in BOM"
+    assert "TPS22918DBVR" in content, "Load switches TPS22918 must be documented in BOM"
+    assert "J13" in content and "JST-PH-2P" in content, "Battery connector J13 must be in BOM"
+
+    # 2. Verify all expansion headers documented
+    assert "J5" in content and "SWD" in content
+    assert "J7" in content and "I3C0" in content
+    assert "J8" in content and "I3C1" in content
+    assert "J6" in content and "I2C" in content
+    assert "J9" in content and "SPI" in content
+    assert "J10" in content and "UART" in content
+    assert "J14" in content and "GPIO" in content
+
+    # 3. Verify zero DRC violations on carrier board
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+    violations = checker.check_all(wiring=wiring)
+    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
