@@ -313,6 +313,24 @@ class TestBoardProvider(Provider):
             with Locations((-w / 2.0, swd_y, swd_z)):
                 Box(wall * 3.0, swd_w, swd_h, mode=BuildMode.SUBTRACT)
 
+            # Ventilation slots through left exterior wall between charger (U3) and amplifier (U4) (BUG-077)
+            vent_y_center = 15.5
+            if self.wiring_path.exists():
+                wiring = Wiring(str(self.wiring_path))
+                comp_map = {c.name: c for c in wiring.footprints}
+                if "U3" in comp_map and "U4" in comp_map:
+                    vent_y_center = (comp_map["U3"].position[1] + comp_map["U4"].position[1]) / 2.0
+
+            vent_w = self.settings.enclosure_vent_slot_width
+            vent_h = self.settings.enclosure_vent_slot_height
+            vent_spacing = self.settings.enclosure_vent_slot_spacing
+            vent_count = self.settings.enclosure_vent_count
+            vent_z = z_carrier + (self.settings.board_thickness / 2.0) + (vent_h / 2.0) - 0.5
+            vent_y_offsets = [(-((vent_count - 1) / 2.0) + idx) * vent_spacing for idx in range(vent_count)]
+            for dy in vent_y_offsets:
+                with Locations((-w / 2.0, vent_y_center + dy, vent_z)):
+                    Box(wall * 3.0, vent_w, vent_h, mode=BuildMode.SUBTRACT)
+
             # Flex tail passage exit slot at front rim (aligned with J2 at [0.0, 38.0, 0.8] and flex tail)
             slot_w = self.settings.flex_tail_width + 2.0
             z_cut_bot = z_carrier - 1.0

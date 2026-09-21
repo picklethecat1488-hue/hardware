@@ -127,3 +127,21 @@ def test_regression_bug_076_enclosure_snap_fit() -> None:
     assert not enclosure.part.is_inside((-groove_probe_x, 28.0, groove_z)), (
         "Enclosure bottom must have snap-fit groove on left cavity wall"
     )
+
+
+def test_regression_bug_077_ventilation_holes() -> None:
+    """Verify BUG-077: enclosure bottom has ventilation slots between charger (U3) and amplifier (U4)."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
+    z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
+    z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
+
+    # Probe point centered inside the left exterior wall (X = -w/2 + wall/2) between U3 (Y=10.0) and U4 (Y=21.0)
+    wall_x = (-w / 2.0) + (wall / 2.0)
+    assert not enclosure.part.is_inside((wall_x, 15.5, z_conn)), (
+        "Enclosure bottom must have ventilation cutout through left exterior wall between U3 and U4 at Y=15.5"
+    )

@@ -36,6 +36,10 @@ enclosure_snap_ridge_length: 8.0
 enclosure_snap_groove_depth: 0.5
 enclosure_snap_groove_height: 1.2
 enclosure_snap_groove_length: 10.0
+enclosure_vent_slot_width: 1.5
+enclosure_vent_slot_height: 5.0
+enclosure_vent_slot_spacing: 2.5
+enclosure_vent_count: 3
 
 # Factory assembly test limits and parameters
 test_tdr_rise_time_ps: 100.0

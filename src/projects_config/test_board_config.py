@@ -224,6 +224,26 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_snap_groove_length"])
 
     @property
+    def enclosure_vent_slot_width(self) -> float:
+        """Width of ventilation slot along Y in mm."""
+        return float(self._raw_data["enclosure_vent_slot_width"])
+
+    @property
+    def enclosure_vent_slot_height(self) -> float:
+        """Height of ventilation slot along Z in mm."""
+        return float(self._raw_data["enclosure_vent_slot_height"])
+
+    @property
+    def enclosure_vent_slot_spacing(self) -> float:
+        """Center-to-center pitch between ventilation slots in mm."""
+        return float(self._raw_data["enclosure_vent_slot_spacing"])
+
+    @property
+    def enclosure_vent_count(self) -> int:
+        """Number of ventilation slots between charger and amplifier."""
+        return int(self._raw_data["enclosure_vent_count"])
+
+    @property
     def test_tdr_rise_time_ps(self) -> float:
         """TDR step rise time in picoseconds for factory impedance testing."""
         return float(self._raw_data.get("test_tdr_rise_time_ps", 100.0))
