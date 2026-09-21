@@ -633,7 +633,12 @@ class Builder:
                         )
 
                 subassembly_param = subassembly if subassembly != provider.name else None
-                exporter = PCBExporter(target_cfg, wiring, subassembly=subassembly_param)
+                exporter = PCBExporter(
+                    target_cfg,
+                    wiring,
+                    subassembly=subassembly_param,
+                    design_rules=target_cfg.design_rules,
+                )
 
                 board_dir = Path(out_dir) / "board" / provider.name
                 schematics_dir = Path(out_dir) / "schematics" / provider.name
@@ -660,12 +665,12 @@ class Builder:
                 # Run KiCad DRC verification and generate report under build/rpt
                 from provider.pcb.kicad_cli import KiCadCLI
 
-                kicad_cli = KiCadCLI()
+                kicad_cli = KiCadCLI(design_rules=target_cfg.design_rules)
                 if kicad_cli.is_available:
                     rpt_dir = Path(out_dir) / "rpt"
                     rpt_dir.mkdir(parents=True, exist_ok=True)
                     rpt_file = rpt_dir / f"{subassembly}-drc.rpt"
-                    kicad_drc_report = kicad_cli.run_drc(kicad_pcb, rpt_file)
+                    kicad_drc_report = kicad_cli.run_drc(kicad_pcb, rpt_file, design_rules=target_cfg.design_rules)
                     if not kicad_drc_report.passed:
                         self.logger.print(
                             f"KiCad DRC Violations in {provider.name}/{subassembly}:\n{kicad_drc_report.summary()}",

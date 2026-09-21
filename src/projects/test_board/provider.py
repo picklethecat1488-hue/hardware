@@ -266,6 +266,21 @@ class TestBoardProvider(Provider):
             ):
                 Cylinder(radius=standoff_hole_r, height=standoff_hole_depth, mode=BuildMode.SUBTRACT)
 
+            # Foot recess indentations on bottom exterior face (BUG-060)
+            foot_r = self.settings.enclosure_foot_diameter / 2.0
+            foot_depth = self.settings.enclosure_foot_depth
+            foot_inset = self.settings.enclosure_foot_inset
+            foot_x = (w / 2.0) - foot_inset
+            foot_y = (length / 2.0) - foot_inset
+            foot_z = -h_shell / 2.0 + (foot_depth / 2.0)
+            with Locations(
+                (foot_x, foot_y, foot_z),
+                (-foot_x, foot_y, foot_z),
+                (-foot_x, -foot_y, foot_z),
+                (foot_x, -foot_y, foot_z),
+            ):
+                Cylinder(radius=foot_r, height=foot_depth, mode=BuildMode.SUBTRACT)
+
         return shell
 
     def enclosure_lid(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
