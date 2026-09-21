@@ -17,6 +17,7 @@ from typing import Optional, Any, Sequence, Callable
 from pydantic import validate_call
 from provider import ProviderManager, Section, Mode, SUBASSEMBLIES, Room, URDFShape
 import zipfile
+import shutil
 from shell import Logger
 from concurrent.futures import ThreadPoolExecutor
 import threading
@@ -549,55 +550,155 @@ class Builder:
                 if not matches:
                     continue
 
-            self.logger.print(f"Compiling PCBs: {provider.name}", symbol="🔌 ")
-            wiring = Wiring(Path(wiring_file))
+            from model.pcb import BoardType
 
-            # Run DRC and routing connectivity checks
-            drc_checker = PCBDesignRulesChecker(pcb_config)
-            drc_report = drc_checker.check_all(wiring=wiring)
-            if not drc_report.passed:
-                self.logger.print(f"PCB DRC Violations in {provider.name}:\n{drc_report.summary()}", symbol="⚠️")
-                if drc_report.error_count > 0:
-                    raise ValueError(
-                        f"PCB DRC check failed with {drc_report.error_count} error(s) in {provider.name}:\n"
-                        f"{drc_report.summary()}"
+            # Discover PCB targets: check manifest for targets configuring the PCB section
+            pcb_targets: list[str] = []
+            for target_name, target_cfg in self.manager.router.manifest.items():
+                if isinstance(target_cfg, dict) and (Section.PCB in target_cfg or "pcb" in target_cfg):
+                    pcb_targets.append(target_name)
+
+            if not pcb_targets:
+                pcb_targets.append(provider.name)
+
+            for target_name in pcb_targets:
+                subassembly = target_name.split("/")[-1]
+                if names:
+                    match_found = any(
+                        n in f"{provider.name}/{subassembly}"
+                        or f"{provider.name}/{subassembly}" in n
+                        or (subassembly in n and (":pcb" in n or Section.PCB in n))
+                        or n == f"{provider.name}:pcb"
+                        or n == provider.name
+                        for n in names
                     )
+                    if not match_found:
+                        continue
 
-            exporter = PCBExporter(pcb_config, wiring)
+                self.logger.print(f"Compiling PCBs: {provider.name}/{subassembly}", symbol="🔌 ")
+                wiring = Wiring(Path(wiring_file))
 
-            board_dir = Path(out_dir) / "board" / provider.name
-            schematics_dir = Path(out_dir) / "schematics" / provider.name
-            bom_dir = Path(out_dir) / "bom" / provider.name
-            step_file = Path(out_dir) / "step" / provider.name / f"{provider.name}_pcb.step"
+                sub_pcb_config = None
+                if subassembly in provider.part:
+                    part_func = provider.part[subassembly]
+                    part_res = part_func(subassembly, None, Mode.DEFAULT)
+                    if hasattr(part_res, "to_pcb_config"):
+                        sub_pcb_config = part_res.to_pcb_config()
+                    elif hasattr(part_res, "pcb_metadata"):
+                        sub_pcb_config = part_res.pcb_metadata
 
-            # 1. Export native KiCad targets (.kicad_pcb and .kicad_sch)
-            kicad_pcb = board_dir / f"{provider.name}.kicad_pcb"
-            kicad_sch = schematics_dir / f"{provider.name}.kicad_sch"
-            exporter.export_kicad_sch(kicad_sch)
+                target_cfg = sub_pcb_config or pcb_config
+                if sub_pcb_config and not target_cfg.stackup:
+                    target_cfg = target_cfg.model_copy(update={"stackup": pcb_config.stackup})
+                if sub_pcb_config and not target_cfg.capacitive_sensors and pcb_config.capacitive_sensors:
+                    target_cfg = target_cfg.model_copy(update={"capacitive_sensors": pcb_config.capacitive_sensors})
+                if sub_pcb_config and not target_cfg.copper_regions and pcb_config.copper_regions:
+                    target_cfg = target_cfg.model_copy(update={"copper_regions": pcb_config.copper_regions})
+                if sub_pcb_config and not target_cfg.net_classes and pcb_config.net_classes:
+                    target_cfg = target_cfg.model_copy(update={"net_classes": pcb_config.net_classes})
+                if (
+                    sub_pcb_config
+                    and not target_cfg.silkscreen_texts
+                    and pcb_config.silkscreen_texts
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
+                    target_cfg = target_cfg.model_copy(update={"silkscreen_texts": pcb_config.silkscreen_texts})
+                if (
+                    sub_pcb_config
+                    and not target_cfg.traces
+                    and pcb_config.traces
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
+                    target_cfg = target_cfg.model_copy(update={"traces": pcb_config.traces})
+                if (
+                    sub_pcb_config
+                    and not target_cfg.vias
+                    and pcb_config.vias
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
+                    target_cfg = target_cfg.model_copy(update={"vias": pcb_config.vias})
 
-            # 2. Export manufacturing board files via kicad-cli (gerbers + drill + .kicad_pcb)
-            exporter.export_board(board_dir, pcb_filename=f"{provider.name}.kicad_pcb")
+                # Run DRC and routing connectivity checks
+                drc_checker = PCBDesignRulesChecker(target_cfg)
+                drc_report = drc_checker.check_all(wiring=wiring)
+                if not drc_report.passed:
+                    self.logger.print(
+                        f"PCB DRC Violations in {provider.name}/{subassembly}:\n{drc_report.summary()}",
+                        symbol="⚠️",
+                    )
+                    if drc_report.error_count > 0:
+                        raise ValueError(
+                            f"PCB DRC check failed with {drc_report.error_count} error(s) in {provider.name}/{subassembly}:\n"
+                            f"{drc_report.summary()}"
+                        )
 
-            # 3. Export manufacturing BOM, CPL, Schematic vector PDF, and 3D STEP
-            bom_csv = bom_dir / "bom.csv"
-            pos_csv = bom_dir / "pos.csv"
-            schematic_pdf = schematics_dir / f"{provider.name}_schematic.pdf"
+                subassembly_param = subassembly if subassembly != provider.name else None
+                exporter = PCBExporter(target_cfg, wiring, subassembly=subassembly_param)
 
-            exporter.export_bom_csv(bom_csv)
-            exporter.export_pick_and_place_csv(pos_csv)
-            exporter.export_schematic_pdf(schematic_pdf)
-            exporter.export_step_solid(step_file)
+                board_dir = Path(out_dir) / "board" / provider.name
+                schematics_dir = Path(out_dir) / "schematics" / provider.name
+                bom_dir = Path(out_dir) / "bom" / provider.name
+                step_file = Path(out_dir) / "step" / provider.name / f"{subassembly}_pcb.step"
 
-            if pcb_config.capacitive_sensors:
-                cap_json = Path(out_dir) / "config" / provider.name / "capacitive_config.json"
-                exporter.export_capacitive_config_json(cap_json)
-                self.logger.print(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
+                # 1. Export native KiCad targets (.kicad_pcb and .kicad_sch)
+                kicad_pcb = board_dir / f"{subassembly}.kicad_pcb"
+                kicad_sch = schematics_dir / f"{subassembly}.kicad_sch"
+                exporter.export_kicad_sch(kicad_sch)
 
-            self.logger.print(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
-            self.logger.print(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
-            self.logger.print(f"Generated Board Files: {board_dir}", symbol="📦")
-            self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
-            self.logger.print(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
+                # 2. Export manufacturing board files via kicad-cli (gerbers + drill + .kicad_pcb)
+                exporter.export_board(board_dir, pcb_filename=f"{subassembly}.kicad_pcb")
+
+                if subassembly == "carrier_board":
+                    alias_pcb = board_dir / f"{provider.name}.kicad_pcb"
+                    if alias_pcb != kicad_pcb:
+                        shutil.copy2(kicad_pcb, alias_pcb)
+                        pro_src = kicad_pcb.with_suffix(".kicad_pro")
+                        pro_dst = alias_pcb.with_suffix(".kicad_pro")
+                        if pro_src.exists():
+                            shutil.copy2(pro_src, pro_dst)
+
+                # Run KiCad DRC verification and generate report under build/rpt
+                from provider.pcb.kicad_cli import KiCadCLI
+
+                kicad_cli = KiCadCLI()
+                if kicad_cli.is_available:
+                    rpt_dir = Path(out_dir) / "rpt"
+                    rpt_dir.mkdir(parents=True, exist_ok=True)
+                    rpt_file = rpt_dir / f"{subassembly}-drc.rpt"
+                    kicad_drc_report = kicad_cli.run_drc(kicad_pcb, rpt_file)
+                    if not kicad_drc_report.passed:
+                        self.logger.print(
+                            f"KiCad DRC Violations in {provider.name}/{subassembly}:\n{kicad_drc_report.summary()}",
+                            symbol="⚠️",
+                        )
+                        raise ValueError(
+                            f"KiCad DRC check failed with {kicad_drc_report.error_count} error(s) in {provider.name}/{subassembly}:\n"
+                            f"{kicad_drc_report.summary()}"
+                        )
+                    self.logger.print(f"Generated KiCad DRC Report: {rpt_file}", symbol="🔍")
+                    if subassembly == "carrier_board":
+                        shutil.copy2(rpt_file, rpt_dir / f"{provider.name}-drc.rpt")
+
+                # 3. Export manufacturing BOM, CPL, Schematic vector PDF, and 3D STEP
+                bom_csv = bom_dir / f"{subassembly}_bom.csv" if subassembly != provider.name else bom_dir / "bom.csv"
+                pos_csv = bom_dir / f"{subassembly}_pos.csv" if subassembly != provider.name else bom_dir / "pos.csv"
+                schematic_pdf = schematics_dir / f"{subassembly}_schematic.pdf"
+
+                exporter.export_bom_csv(bom_csv)
+                exporter.export_pick_and_place_csv(pos_csv)
+                exporter.export_schematic_pdf(schematic_pdf)
+                exporter.export_step_solid(step_file)
+
+                if target_cfg.capacitive_sensors:
+                    cap_json = Path(out_dir) / "config" / provider.name / "capacitive_config.json"
+                    exporter.export_capacitive_config_json(cap_json)
+                    self.logger.print(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
+
+                self.logger.print(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
+                self.logger.print(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
+                self.logger.print(f"Generated Board Files: {board_dir}", symbol="📦")
+                self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
+                self.logger.print(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
 
     def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""

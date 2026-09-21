@@ -2,7 +2,7 @@
   (version 20221018)
   (generator "hardware_pcb_engine")
   (general
-    (thickness {{ board.stackup.total_thickness_mm }})
+    (thickness {{ (board.stackup and board.stackup.total_thickness_mm) or (board.dimensions_mm and board.dimensions_mm[2]) or 1.6 }})
   )
   (paper "{{ board.sheet_size or 'A4' }}")
   (title_block
@@ -74,9 +74,9 @@
 {% endif %}
 {% for pin in fp.pins %}
 {% if pin.pad_type == "thru_hole" %}
-    (pad "{{ pin.name }}" thru_hole {{ pin.pad_shape }} (at {{ pin.x_mm }} {{ pin.y_mm }}) (size {{ pin.pad_size_x }} {{ pin.pad_size_y }}) (drill {{ pin.drill_dia_mm or 0.7 }}) (layers "*.Cu" "*.Mask") (net {{ pin.net_idx }} "{{ pin.net_name }}"))
+    (pad "{{ pin.name }}" thru_hole {{ pin.pad_shape }} (at {{ pin.x_mm }} {{ pin.y_mm }}{% if fp.rotation and fp.rotation[2] %} {{ fp.rotation[2] }}{% endif %}) (size {{ pin.pad_size_x }} {{ pin.pad_size_y }}) (drill {{ pin.drill_dia_mm or 0.7 }}) (layers "*.Cu" "*.Mask") (net {{ pin.net_idx }} "{{ pin.net_name }}"))
 {% else %}
-    (pad "{{ pin.name }}" smd {{ pin.pad_shape }} (at {{ pin.x_mm }} {{ pin.y_mm }}) (size {{ pin.pad_size_x }} {{ pin.pad_size_y }}) (layers "{{ fp.layer }}" "{{ fp.paste_layer }}" "{{ fp.mask_layer }}") (net {{ pin.net_idx }} "{{ pin.net_name }}"))
+    (pad "{{ pin.name }}" smd {{ pin.pad_shape }} (at {{ pin.x_mm }} {{ pin.y_mm }}{% if fp.rotation and fp.rotation[2] %} {{ fp.rotation[2] }}{% endif %}) (size {{ pin.pad_size_x }} {{ pin.pad_size_y }}) (layers "{{ fp.layer }}" "{{ fp.paste_layer }}" "{{ fp.mask_layer }}") (net {{ pin.net_idx }} "{{ pin.net_name }}"))
 {% endif %}
 {% endfor %}
   )
@@ -150,4 +150,30 @@
 {% for text in silkscreen_texts %}
   (gr_text "{{ text.text }}" (at {{ text.x_mm }} {{ text.y_mm }}{% if text.rotation %} {{ text.rotation }}{% endif %}) (layer "{{ text.layer }}") (effects (font (size {{ text.font_size }} {{ text.font_size }}) (thickness {{ text.thickness }})){% if text.mirror %} (justify mirror){% endif %}))
 {% endfor %}
+
+  (net_class "Default" "Default net class"
+    (clearance 0.127)
+    (trace_width 0.15)
+    (via_dia 0.45)
+    (via_drill 0.2)
+{% for net_info in nets %}
+    (add_net "{{ net_info.name }}")
+{% endfor %}
+  )
+{% for nc in board.net_classes %}
+  (net_class "{{ nc.name }}" "{{ nc.name }} net class"
+    (clearance {{ nc.clearance_mm }})
+    (trace_width {{ nc.trace_width_mm }})
+    (via_dia {{ nc.via_dia_mm }})
+    (via_drill {{ nc.via_drill_mm }})
+{% for dp in nc.diff_pairs %}
+    (add_net "{{ dp.pos_net }}")
+    (add_net "{{ dp.neg_net }}")
+{% endfor %}
+{% for sn in nc.single_nets %}
+    (add_net "{{ sn }}")
+{% endfor %}
+  )
+{% endfor %}
 )
+

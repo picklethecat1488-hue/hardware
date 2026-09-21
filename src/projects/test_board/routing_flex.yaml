@@ -1,238 +1,67 @@
 traces:
-- net: CAP_TX0
+- net: CAP_TX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 3.0
+  - 1.0
   - -22.75
   end_mm:
-  - 3.0
-  - -17.45
-- net: CAP_TX0
+  - 1.0
+  - -24.2
+- net: CAP_TX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 3.0
-  - -17.45
+  - 1.0
+  - -24.2
   end_mm:
-  - 2.9732
-  - -17.35
-- net: CAP_TX0
+  - -7.5
+  - -24.2
+- net: CAP_TX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 2.9732
-  - -17.35
+  - -7.5
+  - -24.2
   end_mm:
-  - 2.9
-  - -17.2768
-- net: CAP_TX0
+  - -7.5
+  - -19.5
+- net: CAP_TX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 2.9
-  - -17.2768
+  - -7.5
+  - -19.5
   end_mm:
-  - 2.8
-  - -17.25
-- net: CAP_TX0
+  - -7.0
+  - -19.0
+- net: CAP_TX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 2.8
-  - -17.25
+  - -7.0
+  - -19.0
   end_mm:
-  - -6.05
-  - -17.25
-- net: CAP_TX0
+  - -7.0
+  - 10.8
+- net: CAP_TX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - -6.05
-  - -17.25
+  - -7.0
+  - 10.8
   end_mm:
-  - -6.15
-  - -17.2232
-- net: CAP_TX0
+  - -6.8
+  - 11.0
+- net: CAP_TX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - -6.15
-  - -17.2232
-  end_mm:
-  - -6.2232
-  - -17.15
-- net: CAP_TX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.2232
-  - -17.15
-  end_mm:
-  - -6.25
-  - -17.05
-- net: CAP_TX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.25
-  - -17.05
-  end_mm:
-  - -6.25
-  - -12.1125
-- net: CAP_TX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.25
-  - -12.1125
-  end_mm:
-  - -6.2349
-  - -12.0563
-- net: CAP_TX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.2349
-  - -12.0563
-  end_mm:
-  - -6.1938
-  - -12.0151
-- net: CAP_TX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.1938
-  - -12.0151
-  end_mm:
-  - -6.1375
-  - -12.0
-- net: CAP_TX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.1375
-  - -12.0
+  - -6.8
+  - 11.0
   end_mm:
   - -6.0
-  - -12.0
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 5.0
-  - -22.75
-  end_mm:
-  - 5.0
-  - -17.45
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 5.0
-  - -17.45
-  end_mm:
-  - 5.0268
-  - -17.35
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 5.0268
-  - -17.35
-  end_mm:
-  - 5.1
-  - -17.2768
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 5.1
-  - -17.2768
-  end_mm:
-  - 5.2
-  - -17.25
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 5.2
-  - -17.25
-  end_mm:
-  - 6.05
-  - -17.25
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.05
-  - -17.25
-  end_mm:
-  - 6.15
-  - -17.2232
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.15
-  - -17.2232
-  end_mm:
-  - 6.2232
-  - -17.15
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.2232
-  - -17.15
-  end_mm:
-  - 6.25
-  - -17.05
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.25
-  - -17.05
-  end_mm:
-  - 6.25
-  - -12.1125
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.25
-  - -12.1125
-  end_mm:
-  - 6.2349
-  - -12.0563
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.2349
-  - -12.0563
-  end_mm:
-  - 6.1938
-  - -12.0151
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.1938
-  - -12.0151
-  end_mm:
-  - 6.1375
-  - -12.0
-- net: CAP_RX0
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.1375
-  - -12.0
-  end_mm:
-  - 6.0
-  - -12.0
+  - 11.0
 - net: CAP_TX1
   layer: F.Cu
   width_mm: 0.15
@@ -241,76 +70,40 @@ traces:
   - -22.75
   end_mm:
   - 2.0
-  - -17.7
+  - -22.0
 - net: CAP_TX1
   layer: F.Cu
   width_mm: 0.15
   start_mm:
   - 2.0
-  - -17.7
-  end_mm:
-  - 1.9732
-  - -17.6
-- net: CAP_TX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 1.9732
-  - -17.6
-  end_mm:
-  - 1.9
-  - -17.5268
-- net: CAP_TX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 1.9
-  - -17.5268
+  - -22.0
   end_mm:
   - 1.8
-  - -17.5
+  - -21.8
 - net: CAP_TX1
   layer: F.Cu
   width_mm: 0.15
   start_mm:
   - 1.8
-  - -17.5
+  - -21.8
   end_mm:
-  - -6.3
-  - -17.5
+  - -6.28
+  - -21.8
 - net: CAP_TX1
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - -6.3
-  - -17.5
-  end_mm:
-  - -6.4
-  - -17.4732
-- net: CAP_TX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.4
-  - -17.4732
-  end_mm:
-  - -6.4732
-  - -17.4
-- net: CAP_TX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.4732
-  - -17.4
+  - -6.28
+  - -21.8
   end_mm:
   - -6.5
-  - -17.3
+  - -21.58
 - net: CAP_TX1
   layer: F.Cu
   width_mm: 0.15
   start_mm:
   - -6.5
-  - -17.3
+  - -21.58
   end_mm:
   - -6.5
   - -0.7
@@ -320,24 +113,6 @@ traces:
   start_mm:
   - -6.5
   - -0.7
-  end_mm:
-  - -6.4732
-  - -0.6
-- net: CAP_TX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.4732
-  - -0.6
-  end_mm:
-  - -6.4
-  - -0.5268
-- net: CAP_TX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.4
-  - -0.5268
   end_mm:
   - -6.3
   - -0.5
@@ -350,6 +125,150 @@ traces:
   end_mm:
   - -6.0
   - -0.5
+- net: CAP_TX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 3.0
+  - -22.75
+  end_mm:
+  - 3.0
+  - -22.0
+- net: CAP_TX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 3.0
+  - -22.0
+  end_mm:
+  - 3.5
+  - -21.5
+- net: CAP_TX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 3.5
+  - -21.5
+  end_mm:
+  - 3.5
+  - -20.6
+- net: CAP_TX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 3.5
+  - -20.6
+  end_mm:
+  - 3.3
+  - -20.4
+- net: CAP_TX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 3.3
+  - -20.4
+  end_mm:
+  - -5.3
+  - -20.4
+- net: CAP_TX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - -5.3
+  - -20.4
+  end_mm:
+  - -5.5
+  - -20.2
+- net: CAP_TX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - -5.5
+  - -20.2
+  end_mm:
+  - -5.5
+  - -17.45
+- net: CAP_TX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - -5.5
+  - -17.45
+  end_mm:
+  - -6.14
+  - -16.81
+- net: CAP_TX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - -6.14
+  - -16.81
+  end_mm:
+  - -6.14
+  - -12.14
+- net: CAP_TX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - -6.14
+  - -12.14
+  end_mm:
+  - -6.0
+  - -12.0
+- net: CAP_RX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 5.0
+  - -22.75
+  end_mm:
+  - 5.0
+  - -22.0
+- net: CAP_RX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 5.0
+  - -22.0
+  end_mm:
+  - 5.5
+  - -21.5
+- net: CAP_RX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 5.5
+  - -21.5
+  end_mm:
+  - 5.5
+  - -17.45
+- net: CAP_RX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 5.5
+  - -17.45
+  end_mm:
+  - 6.14
+  - -16.81
+- net: CAP_RX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 6.14
+  - -16.81
+  end_mm:
+  - 6.14
+  - -12.14
+- net: CAP_RX0
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 6.14
+  - -12.14
+  end_mm:
+  - 6.0
+  - -12.0
 - net: CAP_RX1
   layer: F.Cu
   width_mm: 0.15
@@ -358,76 +277,22 @@ traces:
   - -22.75
   end_mm:
   - 6.0
-  - -17.7
+  - -22.0
 - net: CAP_RX1
   layer: F.Cu
   width_mm: 0.15
   start_mm:
   - 6.0
-  - -17.7
-  end_mm:
-  - 6.0268
-  - -17.6
-- net: CAP_RX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.0268
-  - -17.6
-  end_mm:
-  - 6.1
-  - -17.5268
-- net: CAP_RX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.1
-  - -17.5268
-  end_mm:
-  - 6.2
-  - -17.5
-- net: CAP_RX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.2
-  - -17.5
-  end_mm:
-  - 6.365
-  - -17.5
-- net: CAP_RX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.365
-  - -17.5
-  end_mm:
-  - 6.4325
-  - -17.4819
-- net: CAP_RX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.4325
-  - -17.4819
-  end_mm:
-  - 6.4819
-  - -17.4325
-- net: CAP_RX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.4819
-  - -17.4325
+  - -22.0
   end_mm:
   - 6.5
-  - -17.365
+  - -21.5
 - net: CAP_RX1
   layer: F.Cu
   width_mm: 0.15
   start_mm:
   - 6.5
-  - -17.365
+  - -21.5
   end_mm:
   - 6.5
   - -0.7
@@ -437,24 +302,6 @@ traces:
   start_mm:
   - 6.5
   - -0.7
-  end_mm:
-  - 6.4732
-  - -0.6
-- net: CAP_RX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.4732
-  - -0.6
-  end_mm:
-  - 6.4
-  - -0.5268
-- net: CAP_RX1
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 6.4
-  - -0.5268
   end_mm:
   - 6.3
   - -0.5
@@ -467,123 +314,6 @@ traces:
   end_mm:
   - 6.0
   - -0.5
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 1.0
-  - -22.75
-  end_mm:
-  - 1.0
-  - -17.95
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 1.0
-  - -17.95
-  end_mm:
-  - 0.9732
-  - -17.85
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 0.9732
-  - -17.85
-  end_mm:
-  - 0.9
-  - -17.7768
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 0.9
-  - -17.7768
-  end_mm:
-  - 0.8
-  - -17.75
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 0.8
-  - -17.75
-  end_mm:
-  - -6.55
-  - -17.75
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.55
-  - -17.75
-  end_mm:
-  - -6.65
-  - -17.7232
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.65
-  - -17.7232
-  end_mm:
-  - -6.7232
-  - -17.65
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.7232
-  - -17.65
-  end_mm:
-  - -6.75
-  - -17.55
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.75
-  - -17.55
-  end_mm:
-  - -6.75
-  - 10.8
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.75
-  - 10.8
-  end_mm:
-  - -6.7232
-  - 10.9
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.7232
-  - 10.9
-  end_mm:
-  - -6.65
-  - 10.9732
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.65
-  - 10.9732
-  end_mm:
-  - -6.55
-  - 11.0
-- net: CAP_TX2
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - -6.55
-  - 11.0
-  end_mm:
-  - -6.0
-  - 11.0
 - net: CAP_RX2
   layer: F.Cu
   width_mm: 0.15
@@ -592,39 +322,39 @@ traces:
   - -22.75
   end_mm:
   - 7.0
-  - 10.8
+  - -19.5
 - net: CAP_RX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
   - 7.0
-  - 10.8
+  - -19.5
   end_mm:
-  - 6.9732
-  - 10.9
+  - 6.82
+  - -19.32
 - net: CAP_RX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 6.9732
-  - 10.9
+  - 6.82
+  - -19.32
   end_mm:
-  - 6.9
-  - 10.9732
+  - 6.82
+  - 10.82
 - net: CAP_RX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 6.9
-  - 10.9732
+  - 6.82
+  - 10.82
   end_mm:
-  - 6.8
+  - 6.64
   - 11.0
 - net: CAP_RX2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 6.8
+  - 6.64
   - 11.0
   end_mm:
   - 6.0
@@ -637,148 +367,76 @@ traces:
   - -22.75
   end_mm:
   - 4.0
-  - -23.3
+  - -24.55
 - net: CAP_RX3
   layer: F.Cu
   width_mm: 0.15
   start_mm:
   - 4.0
-  - -23.3
+  - -24.55
   end_mm:
-  - 4.0268
-  - -23.4
+  - 8.5
+  - -24.55
 - net: CAP_RX3
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 4.0268
-  - -23.4
+  - 8.5
+  - -24.55
   end_mm:
-  - 4.1
-  - -23.4732
+  - 8.5
+  - -19.5
 - net: CAP_RX3
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 4.1
-  - -23.4732
+  - 8.5
+  - -19.5
   end_mm:
-  - 4.2
-  - -23.5
+  - 7.18
+  - -18.18
 - net: CAP_RX3
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 4.2
-  - -23.5
+  - 7.18
+  - -18.18
   end_mm:
-  - 7.05
-  - -23.5
+  - 7.18
+  - 17.0
 - net: CAP_RX3
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 7.05
-  - -23.5
+  - 7.18
+  - 17.0
   end_mm:
-  - 7.15
-  - -23.4732
-- net: CAP_RX3
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 7.15
-  - -23.4732
-  end_mm:
-  - 7.2232
-  - -23.4
-- net: CAP_RX3
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 7.2232
-  - -23.4
-  end_mm:
-  - 7.25
-  - -23.3
-- net: CAP_RX3
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 7.25
-  - -23.3
-  end_mm:
-  - 7.25
-  - 17.05
-- net: CAP_RX3
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 7.25
-  - 17.05
-  end_mm:
-  - 7.2232
+  - 7.03
   - 17.15
 - net: CAP_RX3
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 7.2232
+  - 7.03
   - 17.15
   end_mm:
-  - 7.15
-  - 17.2232
+  - 0.2
+  - 17.15
 - net: CAP_RX3
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 7.15
-  - 17.2232
-  end_mm:
-  - 7.05
-  - 17.25
-- net: CAP_RX3
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 7.05
-  - 17.25
-  end_mm:
-  - 0.1125
-  - 17.25
-- net: CAP_RX3
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 0.1125
-  - 17.25
-  end_mm:
-  - 0.0563
-  - 17.2651
-- net: CAP_RX3
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 0.0563
-  - 17.2651
-  end_mm:
-  - 0.0151
-  - 17.3063
-- net: CAP_RX3
-  layer: F.Cu
-  width_mm: 0.15
-  start_mm:
-  - 0.0151
-  - 17.3063
+  - 0.2
+  - 17.15
   end_mm:
   - 0.0
-  - 17.3625
+  - 17.35
 - net: CAP_RX3
   layer: F.Cu
   width_mm: 0.15
   start_mm:
   - 0.0
-  - 17.3625
+  - 17.35
   end_mm:
   - 0.0
   - 17.5

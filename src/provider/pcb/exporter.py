@@ -411,13 +411,22 @@ class PCBExporter:
                 if dx >= dy:
                     # Horizontal finger
                     y_mid = (min_y + max_y) / 2.0
+                    w = max(0.15, dy)
+                    # Semicircular end caps extend by w/2 beyond track endpoints.
+                    # Inset the free (unconnected) end by w/2 so copper does not violate gap_mm to opposing busbar.
+                    if net_idx == tx_net_idx:
+                        seg_x1 = min_x
+                        seg_x2 = max_x - w / 2.0
+                    else:
+                        seg_x1 = min_x + w / 2.0
+                        seg_x2 = max_x
                     segments_data.append(
                         {
-                            "x1": round(self.config.sheet_center_x_mm + min_x, 4),
+                            "x1": round(self.config.sheet_center_x_mm + seg_x1, 4),
                             "y1": round(self.config.sheet_center_y_mm + y_mid, 4),
-                            "x2": round(self.config.sheet_center_x_mm + max_x, 4),
+                            "x2": round(self.config.sheet_center_x_mm + seg_x2, 4),
                             "y2": round(self.config.sheet_center_y_mm + y_mid, 4),
-                            "width": round(max(0.15, dy), 4),
+                            "width": round(w, 4),
                             "layer": "F.Cu",
                             "net_idx": net_idx,
                         }
@@ -425,13 +434,14 @@ class PCBExporter:
                 else:
                     # Vertical busbar
                     x_mid = (min_x + max_x) / 2.0
+                    w = max(0.15, dx)
                     segments_data.append(
                         {
                             "x1": round(self.config.sheet_center_x_mm + x_mid, 4),
-                            "y1": round(self.config.sheet_center_y_mm + min_y, 4),
+                            "y1": round(self.config.sheet_center_y_mm + min_y + w / 2.0, 4),
                             "x2": round(self.config.sheet_center_x_mm + x_mid, 4),
-                            "y2": round(self.config.sheet_center_y_mm + max_y, 4),
-                            "width": round(max(0.15, dx), 4),
+                            "y2": round(self.config.sheet_center_y_mm + max_y - w / 2.0, 4),
+                            "width": round(w, 4),
                             "layer": "F.Cu",
                             "net_idx": net_idx,
                         }
@@ -448,19 +458,20 @@ class PCBExporter:
                 ]
                 active_net_idx = tx_net_idx if sensor.shape == "interdigital" else rx_net_idx
                 active_net_name = tx_net if sensor.shape == "interdigital" else rx_net
-                zones_data.append(
-                    {
-                        "net_idx": active_net_idx,
-                        "net_name": active_net_name,
-                        "layer": "F.Cu",
-                        "priority": 2,
-                        "clearance_mm": 0.20,
-                        "pts": pts,
-                    }
-                )
                 if sensor.shape == "interdigital":
                     _poly_to_segments(poly, active_net_idx)
                 else:
+                    # Emit solid touch pad as copper zone
+                    zones_data.append(
+                        {
+                            "net_idx": active_net_idx,
+                            "net_name": active_net_name,
+                            "layer": "F.Cu",
+                            "priority": 2,
+                            "clearance_mm": 0.20,
+                            "pts": pts,
+                        }
+                    )
                     # Fill self-cap touch pad with solid copper trace strips
                     pad_w, pad_l = sensor.area_mm
                     pad_cx, pad_cy = center
@@ -479,25 +490,8 @@ class PCBExporter:
                         )
                         y_c += 0.30
 
-            # RX comb fingers
+            # RX comb fingers (interdigital tracks)
             for poly in geom.rx_fingers:
-                pts = [
-                    {
-                        "x": round(self.config.sheet_center_x_mm + pt[0], 4),
-                        "y": round(self.config.sheet_center_y_mm + pt[1], 4),
-                    }
-                    for pt in poly
-                ]
-                zones_data.append(
-                    {
-                        "net_idx": rx_net_idx,
-                        "net_name": rx_net,
-                        "layer": "F.Cu",
-                        "priority": 2,
-                        "clearance_mm": 0.20,
-                        "pts": pts,
-                    }
-                )
                 _poly_to_segments(poly, rx_net_idx)
 
             # Back layer 45-degree cross-hatch ground fill
@@ -510,7 +504,7 @@ class PCBExporter:
                         "y2": round(self.config.sheet_center_y_mm + hl.end[1], 4),
                         "width": hl.width_mm,
                         "layer": "B.Cu",
-                        "net_idx": shield_net_idx,
+                        "net_idx": 0,
                     }
                 )
 
@@ -598,6 +592,42 @@ class PCBExporter:
 
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(rendered)
+
+        # Emit accompanying .kicad_pro project configuration so headless KiCad DRC applies matching design rules
+        pro_path = out_path.with_suffix(".kicad_pro")
+        pro_data = {
+            "board": {
+                "design_settings": {
+                    "rules": {
+                        "min_clearance": 0.12,
+                        "min_track_width": 0.10,
+                        "min_copper_edge_clearance": 0.15,
+                        "copper_edge_clearance": 0.15,
+                        "board_edge_clearance": 0.15,
+                        "min_hole_to_hole": 0.15,
+                        "min_hole_clearance": 0.20,
+                        "hole_clearance": 0.20,
+                        "min_through_hole_diameter": 0.16,
+                        "min_via_diameter": 0.35,
+                        "min_through_hole_annular_width": 0.08,
+                        "min_via_annular_ring": 0.08,
+                    }
+                }
+            },
+            "net_settings": {
+                "classes": [
+                    {
+                        "name": "Default",
+                        "clearance": 0.12,
+                        "track_width": 0.15,
+                        "via_diameter": 0.36,
+                        "via_drill": 0.16,
+                    }
+                ]
+            },
+        }
+        with open(pro_path, "w", encoding="utf-8") as f:
+            json.dump(pro_data, f, indent=2)
 
         # Automatically compute zone fill geometries and thermal reliefs so inner planes are never empty
         if getattr(self.config, "copper_regions", None):
@@ -954,7 +984,11 @@ class PCBExporter:
 
         cli = KiCadCLI()
         if cli.is_available:
-            copper_count = len(self.config.stackup.copper_layers)
+            copper_count = (
+                len(self.config.stackup.copper_layers)
+                if self.config.stackup and hasattr(self.config.stackup, "copper_layers")
+                else 2
+            )
             fab_layers = [
                 "F.Cu",
                 *[f"In{i}.Cu" for i in range(1, copper_count - 1)],
@@ -1024,7 +1058,11 @@ class PCBExporter:
     def build_solid(self) -> Compound:
         """Build and return solid 3D CAD geometry of the PCB substrate."""
         w, l, _ = self.config.dimensions_mm
-        thickness = self.config.stackup.total_thickness_mm
+        thickness = (
+            self.config.stackup.total_thickness_mm
+            if self.config.stackup and hasattr(self.config.stackup, "total_thickness_mm")
+            else getattr(self.config, "thickness_mm", 1.6)
+        )
 
         with BuildPart() as pcb_part:
             Box(w, l, thickness)
