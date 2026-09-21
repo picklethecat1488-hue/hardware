@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-21 18:15:28 UTC` |
-| **Total Issues** | `79` |
-| **Open Issues** | `0` |
-| **Resolved / Closed** | `79 (100%)` |
+| **Report Date** | `2026-09-21 18:43:17 UTC` |
+| **Total Issues** | `83` |
+| **Open Issues** | `3` |
+| **Resolved / Closed** | `80 (96%)` |
 
 ## Executive Summary
 
@@ -21,17 +21,17 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 1 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 4 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 73 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 77 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 1 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 60 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 63 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 10 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 0 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
-| **`INFRASTRUCTURE`** | 8 | Build tooling, compilers, test runners, headless tools. |
+| **`INFRASTRUCTURE`** | 9 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 1 | Web dashboards, CLI viewers, review interfaces. |
 
 ## Issue Checklist
@@ -115,6 +115,10 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-078](#bug-078): Code review highlight markers elide diff colors `[code_review]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-079](#bug-079): Move BUGS.md to repo root (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-080](#bug-080): Add LED cutout to test board enclosure `[test_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-081](#bug-081): This build.py command should have failed (`RESOLVED`)
+- [ ] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-083](#bug-083): I2C pullup resistors overlap (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-084](#bug-084): Update board files schematics  `[carrier_board]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -2029,5 +2033,97 @@ Add LED cutout and clear LED cover to the top of the enclosure. Copy the cat fou
 #### Resolution Notes
 
 Added 5.0mm LED cutout to enclosure lid at D1, created translucent push-fit led_cover part with 7.0mm flange and 4.8mm plug matching cat fountain dimensions, and registered in manifest.yaml.
+
+---
+
+### <a id="bug-081"></a> 🟢 `[BUG-081]` This build.py command should have failed
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `INFRASTRUCTURE`
+- **Created**: `2026-09-21 18:21:02 UTC`
+- **Resolved**: `2026-09-21 18:43:17 UTC`
+
+#### Description
+
+I ran build.py on commit 77ce2faa8d9023f3d76ace4a0ff96483c2a088e0 for the test board and it succeeded, but I saw multiple disconnected components, overlapping traces, and other issues.
+
+#### Reproduction Steps
+
+1. $ python src/build.py 'test_board/*'
+
+#### Behavior Comparison
+
+- **Expected**: $ python src/build.py 'test_board/*'
+pybullet build time: Oct 20 2025 08:05:00
+🛠️ Compiling parts: test_board/carrier_board, test_board/flex_tail, test_board/enclosure_bottom, test_board/enclosure_lid, test_board/led_cover 
+📄 Saved build/stl/test_board/carrier_board.stl 
+📄 Saved build/stl/test_board/flex_tail.stl 
+📄 Saved build/stl/test_board/enclosure_bottom.stl 
+📄 Saved build/stl/test_board/enclosure_lid.stl 
+📄 Saved build/stl/test_board/led_cover.stl 
+🛠️ Compiling diagrams: test_board/product, test_board/wiring 
+📄 Saved build/svg/test_board/test_board_diagram.svg 
+📄 Saved build/svg/test_board/test_board_wiring_diagram.svg 
+🤖 Compiling URDFs: test_board/product 
+📦 Done writing build/build.zip 
+✔ Done Building...
+(cq)
+- **Actual**: $ python src/build.py 'test_board/*'
+The build should have failed with multiple DRC violations from drc.py or kicad
+
+#### Resolution Notes
+
+Resolved target resolution in Builder.generate_pcbs using TargetParser.resolve so wildcard target patterns (e.g. test_board/*) resolve and execute PCB targets, enforcing DRC and KiCad verification failure
+
+---
+
+### <a id="bug-082"></a> 🔴 `[BUG-082]` Route test board
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-21 18:23:13 UTC`
+
+#### Description
+
+Route test_board correctly. Modify placements of all components and correct routing until there are no kicad or drc.py warnings or errors.
+
+#### Reproduction Steps
+
+1. $ python src/config.py 'test_board/*'
+
+---
+
+### <a id="bug-083"></a> 🔴 `[BUG-083]` I2C pullup resistors overlap
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-21 18:25:23 UTC`
+
+#### Description
+
+On sheet 7, the two I2C pullup resistors overlap. Fix this issue, then add a schematic DRC two ensure no two schematic symbols overlap.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790015168061.png](build/attachments/pasted_screenshot_1790015168061.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-084"></a> 🔴 `[BUG-084]` Update board files schematics 
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-21 18:26:11 UTC`
+
+#### Description
+
+Update the carrier board files and schematics that are generated by build.py to the new rev (2.0)
 
 ---

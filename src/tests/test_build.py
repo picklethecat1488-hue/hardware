@@ -527,3 +527,33 @@ def test_compiled_aabb_alignment(tmp_path):
 
             for m_max, e_max in zip(mesh_max, expected_max):
                 assert math.isclose(m_max, e_max, abs_tol=1e-4)
+
+
+def test_generate_pcbs_wildcard_resolution():
+    """Verify that wildcard target names (e.g. 'test_board/*') resolve and build PCB targets."""
+    from model import AppConfig
+    from shell import Logger
+    from provider import ProviderManager
+
+    config = AppConfig()
+    logger = Logger(enabled=False)
+    manager = ProviderManager(config, logger=logger)
+    builder = Builder(manager, logger=logger)
+
+    with (
+        patch("provider.pcb.PCBExporter.export_board") as mock_export,
+        patch("provider.pcb.PCBExporter.export_kicad_sch"),
+        patch("provider.pcb.PCBExporter.export_bom_csv"),
+        patch("provider.pcb.PCBExporter.export_pick_and_place_csv"),
+        patch("provider.pcb.PCBExporter.export_schematic_pdf"),
+        patch("provider.pcb.PCBExporter.export_step_solid"),
+        patch("provider.pcb.PCBExporter.export_capacitive_config_json"),
+        patch("provider.pcb.PCBDesignRulesChecker.check_all") as mock_drc,
+        patch("provider.pcb.kicad_cli.KiCadCLI.run_drc") as mock_kicad_drc,
+    ):
+        mock_drc.return_value = MagicMock(passed=True, error_count=0)
+        mock_kicad_drc.return_value = MagicMock(passed=True, error_count=0)
+
+        builder.generate_pcbs(out_dir="build", names=["test_board/*"])
+        # Wildcard target 'test_board/*' must resolve to carrier_board and flex_tail
+        assert mock_export.call_count == 2

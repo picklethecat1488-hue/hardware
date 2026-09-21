@@ -530,54 +530,36 @@ class Builder:
     def generate_pcbs(self, out_dir: str, names: list[str] | None = None, force_update: Optional[bool] = None):
         """Export PCB Gerber archives, supplier BOM/CPL, vector schematics, and 3D STEP models."""
         from provider.pcb import PCBExporter, PCBDesignRulesChecker
-        from model.pcb import PCBConfig
+        from model.pcb import PCBConfig, BoardType
         from model.wiring import Wiring
 
-        for provider in self.manager.router.providers:
-            wiring_file = getattr(provider, "wiring_path", None)
-            if not wiring_file or not Path(wiring_file).exists():
-                continue
+        if names:
+            target_lists = []
+            for name in names:
+                if self.target_parser.parse(name, Section.PCB) and self.target_parser.can_resolve(name, Section.PCB):
+                    target_lists.append(self.target_parser.resolve(name, Section.PCB))
+                elif ":" in name and self.target_parser.parse(name, Section.PCB):
+                    target_lists.append(self.target_parser.resolve(name, Section.PCB))
+        else:
+            target_lists = [self.manager.router.targets.supporting(Section.PCB).for_modes([Mode.DEFAULT])]
 
-            pcb_config = provider.pcb_config
-            if not pcb_config:
-                if names and any(provider.name in n and (Section.PCB in n or ":pcb" in n) for n in names):
-                    raise ValueError(f"Project '{provider.name}' does not configure a PCB manifest or PCBConfig.")
-                continue
+        if not target_lists:
+            return
 
-            if names:
-                matches = [
-                    n
-                    for n in names
-                    if provider.name in n
-                    and (Section.PCB in n or ":pcb" in n or self.target_parser.can_resolve(n, Section.PCB))
-                ]
-                if not matches:
+        for base_targets in target_lists:
+            for target_name in base_targets:
+                p_name, subassembly = TargetParser.split_target(target_name)
+                provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
+                if not provider:
                     continue
 
-            from model.pcb import BoardType
+                wiring_file = getattr(provider, "wiring_path", None)
+                if not wiring_file or not Path(wiring_file).exists():
+                    continue
 
-            # Discover PCB targets: check manifest for targets configuring the PCB section
-            pcb_targets: list[str] = []
-            for target_name, target_cfg in self.manager.router.manifest.items():
-                if isinstance(target_cfg, dict) and (Section.PCB in target_cfg or "pcb" in target_cfg):
-                    pcb_targets.append(target_name)
-
-            if not pcb_targets:
-                pcb_targets.append(provider.name)
-
-            for target_name in pcb_targets:
-                subassembly = target_name.split("/")[-1]
-                if names:
-                    match_found = any(
-                        n in f"{provider.name}/{subassembly}"
-                        or f"{provider.name}/{subassembly}" in n
-                        or (subassembly in n and (":pcb" in n or Section.PCB in n))
-                        or n == f"{provider.name}:pcb"
-                        or n == provider.name
-                        for n in names
-                    )
-                    if not match_found:
-                        continue
+                pcb_config = provider.pcb_config
+                if not pcb_config:
+                    raise ValueError(f"Project '{provider.name}' does not configure a PCB manifest or PCBConfig.")
 
                 self.logger.print(f"Compiling PCBs: {provider.name}/{subassembly}", symbol="🔌 ")
                 wiring = Wiring(Path(wiring_file))
