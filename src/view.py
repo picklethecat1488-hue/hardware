@@ -428,7 +428,8 @@ class Viewer:
                 self.logger.print(f"Exported H.264 MP4 video to {save_mp4}", symbol="✨")
             if not no_gui:
                 is_diagram = any(Section.DIAGRAM in str(t) for t in input_targets)
-                cam_mode = Camera.TOP if (is_diagram or view_from == "top") else Camera.RESET
+                top_cam = getattr(Camera, "TOP", Camera.RESET)
+                cam_mode = top_cam if (is_diagram or view_from == "top") else Camera.RESET
                 is_ortho = True if (is_diagram or view_from == "top") else None
                 show(
                     room.compound,
