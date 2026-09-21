@@ -401,7 +401,7 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 31
+    assert len(wiring.footprints) == 43
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
@@ -410,9 +410,21 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert "J1" in footprint_names
     assert "J2" in footprint_names
     assert "J3" in footprint_names
+    assert "J5" in footprint_names
+    assert "J6" in footprint_names
+    assert "J7" in footprint_names
+    assert "J8" in footprint_names
+    assert "J9" in footprint_names
+    assert "J10" in footprint_names
     assert "J13" in footprint_names
+    assert "J14" in footprint_names
     assert "C13" in footprint_names
     assert "U5" in footprint_names
+    assert "U6" in footprint_names
+    assert "U7" in footprint_names
+    assert "U8" in footprint_names
+    assert "U9" in footprint_names
+    assert "D1" in footprint_names
     assert "Y1" in footprint_names
     assert "R1" in footprint_names
     assert "R2" in footprint_names
@@ -442,11 +454,11 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 31  # header + 30 carrier components (J4 is on flex tail)
+    assert len(bom_lines) == 43  # header + 42 carrier components (J4 is on flex tail)
     assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 31  # header + 30 carrier components
+    assert len(pos_lines) == 43  # header + 42 carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -1996,9 +2008,21 @@ def test_regression_downselection_results_application() -> None:
     assert "J10" in content and "UART" in content
     assert "J14" in content and "GPIO" in content
 
-    # 3. Verify zero DRC violations on carrier board
+    # 3. Verify all downselected components are placed in wiring footprints
     provider = TestBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+    downselected_components = ["J5", "J6", "J7", "J8", "J9", "J10", "J14", "U8", "U6", "D1", "U7", "U9"]
+    for des in downselected_components:
+        assert des in fp_map, f"Footprint {des} must be present in wiring footprints"
+
+    # 4. Verify connector placements: right side of PCB (X >= 15.0) and SWD near U1
+    for conn in ["J6", "J7", "J8", "J9", "J10", "J14"]:
+        assert fp_map[conn].position[0] >= 15.0, f"Connector {conn} must be on right side of PCB (X >= 15.0)"
+    assert fp_map["J5"].position[0] < 0.0, "SWD header J5 must be placed towards left near U1"
+    assert math.hypot(fp_map["J5"].position[0], fp_map["J5"].position[1]) < 25.0, "J5 must be near U1"
+
+    # 5. Verify zero DRC violations on carrier board
     checker = PCBDesignRulesChecker(provider.pcb_config)
     violations = checker.check_all(wiring=wiring)
     assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"

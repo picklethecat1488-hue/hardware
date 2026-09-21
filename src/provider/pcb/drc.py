@@ -889,7 +889,11 @@ class PCBDesignRulesChecker:
 
         for fp in footprints or []:
             fx, fy = fp.position[0], fp.position[1]
-            fw, fl = (fp.dimensions[0], fp.dimensions[1]) if hasattr(fp, "dimensions") else (2.0, 2.0)
+            raw_w, raw_l = (fp.dimensions[0], fp.dimensions[1]) if hasattr(fp, "dimensions") else (2.0, 2.0)
+            rot_deg = fp.rotation[2] if hasattr(fp, "rotation") and len(fp.rotation) >= 3 else 0.0
+            rad = math.radians(rot_deg)
+            fw = abs(raw_w * math.cos(rad)) + abs(raw_l * math.sin(rad))
+            fl = abs(raw_w * math.sin(rad)) + abs(raw_l * math.cos(rad))
 
             if outline_polygon:
                 # Check center point and 4 corner points
