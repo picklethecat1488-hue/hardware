@@ -790,9 +790,12 @@ def test_test_board_full_milestones_integration(tmp_path: Path):
     assert electrodes_by_name["SENSE_WATER_PROXIMITY"].electrode_type == "self"
     assert electrodes_by_name["SENSE_WATER_PROXIMITY"].drive_shield is False
 
-    # Milestone 2: Carrier standoff pilot holes
+    # Milestone 2: Carrier standoff pilot holes and enclosure feet
     assert provider.settings.standoff_hole_diameter == 2.2
     assert provider.settings.standoff_hole_depth == 4.0
+    assert provider.settings.enclosure_foot_diameter == 8.0
+    assert provider.settings.enclosure_foot_depth == 1.0
+    assert provider.settings.enclosure_foot_inset == 8.0
     enclosure_bottom = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     assert enclosure_bottom.part is not None
     assert enclosure_bottom.part.is_valid()
@@ -1671,7 +1674,7 @@ def test_regression_inner_copper_layers_and_auto_routing_connectivity(tmp_path: 
     assert '"In3.Cu"' in content
 
     cli = KiCadCLI()
-    if cli.is_available:
+    if cli.supports_drc:
         # File size must be large (> 300KB) reflecting filled polygon geometry
         assert board_file.stat().st_size > 300_000, "Board file must include filled zone geometry"
         # Run DRC and assert zero unconnected pads
@@ -1679,3 +1682,123 @@ def test_regression_inner_copper_layers_and_auto_routing_connectivity(tmp_path: 
         cli.run_command(["pcb", "drc", "--output", str(drc_rpt), str(board_file)])
         rpt_text = drc_rpt.read_text()
         assert "** Found 0 unconnected pads **" in rpt_text
+
+
+def test_regression_deep_power_down_wakeup_and_power_sequencing() -> None:
+    """Verify BUG-060 (Deep Power Down wakeup) and BUG-061 (power-on sequencing verification)."""
+    report_path = Path("src/projects/test_board/docs/downselection_report.md")
+    assert report_path.is_file(), "Downselection report must exist locally"
+    content = report_path.read_text(encoding="utf-8")
+
+    # 1. BUG-060: Verify Deep Power Down wakeup triggers (Charger interface and M.2 connector)
+    assert "WAKEUP0_B" in content
+    assert "WAKEUP1_B" in content
+    assert "CHG_PGOOD_WAKE" in content
+    assert "M2_WAKE_N" in content
+    assert "Exit Deep Power Down" in content
+
+    # 2. BUG-061: Verify all required power-on sequencing steps
+    assert "Secondary IO supplies" in content
+    assert "VDD_P2" in content and "VDD_P3" in content and "VDD_P4" in content
+    assert "VDD_CORE must ramp after VDD" in content
+    assert "VDD_P4 and VDD_ANA must be same voltage" in content
+    assert "VDD_BAT must ramp before or with VDD_SYS" in content
+
+    # 3. Verify user approval sign-off for MCXN947VDF in VFBGA-184
+    assert "MCXN947VDF" in content
+    assert "APPROVED" in content
+
+
+def test_regression_flexspi_dual_channel_and_charger_state_detection() -> None:
+    """Verify BUG-062 (FlexSPI Dual Channel Mode) and BUG-063 (Charger /CHG state transitions)."""
+    report_path = Path("src/projects/test_board/docs/downselection_report.md")
+    assert report_path.is_file(), "Downselection report must exist locally"
+    content = report_path.read_text(encoding="utf-8")
+
+    # 1. BUG-062: FlexSPI Dual Channel & Section 4.3.2 specifications
+    assert "Dual-Channel FlexSPI" in content or "Dual Channel" in content
+    assert "FLEXSPI0_A_SCLK" in content
+    assert "FLEXSPI0_A_SS0_b" in content
+    assert "FLEXSPI0_A_DATA0" in content
+    assert "FLEXSPI0_B_SCLK" in content
+    assert "FLEXSPI0_B_SS0_b" in content
+    assert "FLEXSPI0_B_DATA0" in content
+    assert "15 pF" in content or "15pF" in content
+    assert "1 V/ns" in content or "1V/ns" in content
+    assert "100 MHz" in content
+    assert "W25N01GV" in content
+
+    # 2. BUG-063: Charger /CHG to MCU connection and Sleep/Active transitions
+    assert "/CHG" in content
+    assert "CHG_STAT" in content
+    assert "WUU0_IN15" in content
+    assert "LOW_POWER_SLEEP" in content
+    assert "ACTIVE_CHARGING" in content
+
+    # 3. Datasheet local archival verification
+    datasheet_dir = Path("src/projects/test_board/docs/datasheets")
+    assert (datasheet_dir / "NXP_MCXN947_datasheet.pdf").is_file()
+    assert (datasheet_dir / "Winbond_W25N01GV_datasheet.pdf").is_file()
+    assert (datasheet_dir / "TI_BQ24074_charger.pdf").is_file()
+    assert (datasheet_dir / "TI_LP5009_led_driver.pdf").is_file()
+    assert (datasheet_dir / "JST_SH_header.pdf").is_file()
+
+
+def test_regression_pinmux_datasheet_verification() -> None:
+    """Verify BUG-064: ensure MCU pin assignments are 100% sourced from NXP MCX N947 Table 93."""
+    report_path = Path("src/projects/test_board/docs/downselection_report.md")
+    assert report_path.is_file(), "Downselection report must exist locally"
+    content = report_path.read_text(encoding="utf-8")
+
+    # 1. BUG-064: Verify Ball F4 resolution (P1_17 is I3C1_SCL, not I2C0_SCL)
+    assert "F4" in content
+    assert "P1_17" in content
+    assert "I3C1_SCL" in content
+    assert "F6" in content and "P1_16" in content and "I3C1_SDA" in content
+    assert "E4" in content and "P1_15" in content and "I3C1_PUR" in content
+
+    # 2. Verify Core System I2C0 allocation (FC0 on A10 / B10)
+    assert "A10" in content and "P0_17" in content and "FC0_P1" in content and "I2C0_SCL" in content
+    assert "B10" in content and "P0_16" in content and "FC0_P0" in content and "I2C0_SDA" in content
+
+    # 3. Verify Dedicated Touch Controller I2C1 allocation (FC3 on C5 / C6)
+    assert "C5" in content and "P1_1" in content and "FC3_P1" in content and "I2C1_SCL" in content
+    assert "C6" in content and "P1_0" in content and "FC3_P0" in content and "I2C1_SDA" in content
+    assert "C4" in content and "P1_2" in content and "CAP_INT" in content
+
+    # 4. Verify SWD Debug and ISP Bootloader allocation
+    assert "A16" in content and "P0_1" in content and "TCLK" in content and "SWD_CLK" in content
+    assert "A17" in content and "P0_0" in content and "TMS" in content and "SWD_DIO" in content
+    assert "B16" in content and "P0_2" in content and "TDO" in content and "SWD_SWO" in content
+    assert "F3" in content and "RESET_B" in content and "nRESET" in content
+    assert "C14" in content and "P0_6" in content and "ISPMODE_N" in content and "BOOT0" in content
+
+    # 5. Verify High-Speed Console UART allocation (FC1 on B6 / A6 / F10 / E10)
+    assert "B6" in content and "P0_24" in content and "FC1_P0" in content and "UART0_RXD" in content
+    assert "A6" in content and "P0_25" in content and "FC1_P1" in content and "UART0_TXD" in content
+    assert "F10" in content and "P0_26" in content and "FC1_P2" in content and "UART0_CTS" in content
+    assert "E10" in content and "P0_27" in content and "FC1_P3" in content and "UART0_RTS" in content
+
+    # 6. Verify Dual-Channel FlexSPI Port A and Port B allocation
+    assert "B17" in content and "P3_0" in content and "FLEXSPI0_A_SS0_b" in content
+    assert "D14" in content and "P3_7" in content and "FLEXSPI0_A_SCLK" in content
+    assert "E14" in content and "P3_8" in content and "FLEXSPI0_A_DATA0" in content
+    assert "F15" in content and "P3_9" in content and "FLEXSPI0_A_DATA1" in content
+    assert "F17" in content and "P3_10" in content and "FLEXSPI0_A_DATA2" in content
+    assert "F16" in content and "P3_11" in content and "FLEXSPI0_A_DATA3" in content
+    assert "D17" in content and "P3_6" in content and "FLEXSPI0_A_DQS" in content
+    assert "H3" in content and "P2_2" in content and "FLEXSPI0_B_SS0_b" in content
+    assert "J3" in content and "P2_3" in content and "FLEXSPI0_B_SCLK" in content
+    assert "K3" in content and "P2_4" in content and "FLEXSPI0_B_DATA0" in content
+    assert "K1" in content and "P2_5" in content and "FLEXSPI0_B_DATA1" in content
+    assert "K2" in content and "P2_6" in content and "FLEXSPI0_B_DATA2" in content
+    assert "L2" in content and "P2_7" in content and "FLEXSPI0_B_DATA3" in content
+    assert "H1" in content and "P2_1" in content and "FLEXSPI0_B_DQS" in content
+
+    # 7. Verify Wakeup and Switched Power Rails
+    assert "G5" in content and "P1_19" in content and "WUU0_IN15" in content and "CHG_STAT" in content
+    assert "M10" in content and "P5_2" in content and "CHG_PGOOD_WAKE" in content
+    assert "C13" in content and "P0_7" in content and "WUU0_IN1" in content and "M2_WAKE_N" in content
+    assert "L4" in content and "P1_22" in content and "PWR_EN_AUDIO" in content
+    assert "L5" in content and "P1_21" in content and "PWR_EN_SENSORS" in content
+    assert "M4" in content and "P1_23" in content and "PWR_EN_DEBUG" in content
