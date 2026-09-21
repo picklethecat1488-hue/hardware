@@ -2062,109 +2062,144 @@ class PCBDesignRulesChecker:
                         passive_names.add(fp.name)
 
             main_fps = [fp for fp in sheet_fps if fp.name not in passive_names]
-            if not main_fps:
-                main_fps = sheet_fps
+        # Compute exact schematic symbol bounding boxes directly from SchematicDiagram
+        computed_symbol_boxes: Dict[int, List[Tuple[float, float, float, float, str]]] = {}
+        if self.config and getattr(self.config, "schematic_sheets", None):
+            try:
+                from provider.schematic_diagram import SchematicDiagram
 
-            layout = (
-                getattr(sheet, "layout", None)
-                or getattr(self.config, "schematic_layout", None)
-                or SchematicLayoutModel()
-            )
-            col_width = layout.col_width
-            col_gap = layout.col_gap
-            sheet_center_x = layout.sheet_center_x
-            sheet_center_y = layout.sheet_center_y
-            row_step_y = layout.row_step_y
-            def_sym_w = layout.default_symbol_width
-            def_sym_h = layout.default_symbol_height
+                diag = SchematicDiagram(wiring=wiring, pcb_config=self.config)
+                computed_symbol_boxes = diag.compute_symbol_bounding_boxes()
+            except Exception:
+                computed_symbol_boxes = {}
 
-            num_comps = len(main_fps)
-            if num_comps == 2 and layout.cols_per_row is None and not grid_positions:
-                col_gap = 55.0
-            elif num_comps == 3 and layout.cols_per_row is None and not grid_positions:
-                col_gap = 35.0
-            cols_per_row = layout.cols_per_row if layout.cols_per_row is not None else max(1, min(num_comps, 3))
-            num_rows = (num_comps + cols_per_row - 1) // cols_per_row
-            total_content_w = (cols_per_row * col_width) + ((cols_per_row - 1) * col_gap)
-            start_x = sheet_center_x - (total_content_w / 2.0)
-            top_row_y = sheet_center_y + ((num_rows - 1) * 27.5)
+        for sheet_idx, sheet in enumerate(self.config.schematic_sheets):
+            if (sheet_idx + 1) in computed_symbol_boxes:
+                boxes = computed_symbol_boxes[sheet_idx + 1]
+            else:
+                sheet_fps = [fp_map[c] for c in sheet.components if c in fp_map]
+                passive_names = set()
+                for fp in sheet_fps:
+                    if len(fp.pins) == 2:
+                        n1 = pin_to_net.get((fp.name, fp.pins[0].name), "").upper()
+                        n2 = pin_to_net.get((fp.name, fp.pins[1].name), "").upper()
+                        if (n1 in ("3V3", "VBUS", "GND") and n2) or (n2 in ("3V3", "VBUS", "GND") and n1):
+                            passive_names.add(fp.name)
 
-            grid_positions = getattr(layout, "grid_positions", {}) or {}
-            boxes: List[Tuple[float, float, float, float, str]] = []
-            main_box_map: Dict[str, Tuple[float, float, float, float]] = {}
-            for c_idx, fp in enumerate(main_fps):
-                if fp.name in grid_positions:
-                    r_idx, col = grid_positions[fp.name]
-                else:
-                    col = c_idx % cols_per_row
-                    r_idx = c_idx // cols_per_row
-                cx = start_x + (col * (col_width + col_gap)) + (col_width / 2.0)
-                cy = top_row_y - (r_idx * row_step_y)
-                cw = def_sym_w
-                num_pins = len(fp.pins)
-                ch = max(def_sym_h, (num_pins // 2) * 5.0 + 10.0)
-                boxes.append((cx, cy, cw, ch, fp.name))
-                main_box_map[fp.name] = (cx, cy, cw, ch)
+                main_fps = [fp for fp in sheet_fps if fp.name not in passive_names]
+                if not main_fps:
+                    main_fps = sheet_fps
 
-            # Include passives (decoupling caps, pull-ups, and shunts) in symbol overlap checks
-            decoupling_caps = []
-            vert_passives = []
-            for fp in sheet_fps:
-                if fp.name in passive_names:
-                    n1 = pin_to_net.get((fp.name, fp.pins[0].name), "").upper()
-                    n2 = pin_to_net.get((fp.name, fp.pins[1].name), "").upper()
-                    if (n1 in ("3V3", "VBUS", "VDD") and n2 == "GND") or (n2 in ("3V3", "VBUS", "VDD") and n1 == "GND"):
-                        decoupling_caps.append(fp)
+                layout = (
+                    getattr(sheet, "layout", None)
+                    or getattr(self.config, "schematic_layout", None)
+                    or SchematicLayoutModel()
+                )
+                col_width = layout.col_width
+                col_gap = layout.col_gap
+                sheet_center_x = layout.sheet_center_x
+                sheet_center_y = layout.sheet_center_y
+                row_step_y = layout.row_step_y
+                def_sym_w = layout.default_symbol_width
+                def_sym_h = layout.default_symbol_height
+
+                num_comps = len(main_fps)
+                grid_positions = getattr(layout, "grid_positions", {}) or {}
+                if num_comps == 2 and layout.cols_per_row is None and not grid_positions:
+                    col_gap = 55.0
+                elif num_comps == 3 and layout.cols_per_row is None and not grid_positions:
+                    col_gap = getattr(layout, "col_gap", 50.0) if getattr(layout, "col_gap", 15.0) != 15.0 else 50.0
+                cols_per_row = layout.cols_per_row if layout.cols_per_row is not None else max(1, min(num_comps, 3))
+                num_rows = (num_comps + cols_per_row - 1) // cols_per_row
+                total_content_w = (cols_per_row * col_width) + ((cols_per_row - 1) * col_gap)
+                start_x = sheet_center_x - (total_content_w / 2.0)
+                top_row_y = sheet_center_y + ((num_rows - 1) * 27.5)
+
+                boxes = []
+                main_box_map: Dict[str, Tuple[float, float, float, float]] = {}
+                for c_idx, fp in enumerate(main_fps):
+                    if fp.name in grid_positions:
+                        r_idx, col = grid_positions[fp.name]
                     else:
-                        vert_passives.append(fp)
+                        col = c_idx % cols_per_row
+                        r_idx = c_idx // cols_per_row
+                    cx = start_x + (col * (col_width + col_gap)) + (col_width / 2.0)
+                    cy = top_row_y - (r_idx * row_step_y)
+                    cw = def_sym_w
+                    num_pins = len(fp.pins)
+                    ch = max(def_sym_h, (num_pins // 2) * 5.0 + 10.0)
+                    boxes.append((cx, cy, cw, ch, fp.name))
+                    main_box_map[fp.name] = (cx, cy, cw, ch)
 
-            if decoupling_caps:
-                base_y = 35.0
-                total_w = (len(decoupling_caps) - 1) * 28.0
-                base_x = max(35.0, sheet_center_x - (total_w / 2.0))
-                for idx, cap in enumerate(decoupling_caps):
-                    boxes.append((base_x + idx * 28.0, base_y, 14.0, 24.0, cap.name))
-
-            comp_passive_count: Dict[Tuple[str, str], int] = {}
-            for p_fp in vert_passives:
-                n1 = pin_to_net.get((p_fp.name, p_fp.pins[0].name), "").upper()
-                n2 = pin_to_net.get((p_fp.name, p_fp.pins[1].name), "").upper()
-                is_pullup = n1 in ("3V3", "VBUS") or n2 in ("3V3", "VBUS")
-                sig_net = n2 if (n1 in ("3V3", "VBUS", "GND")) else n1
-                target_comp = next((c for (c, _), n in pin_to_net.items() if n == sig_net and c in main_box_map), None)
-                if target_comp:
-                    m_cx, m_cy, m_cw, _ = main_box_map[target_comp]
-                    other_comps = [
-                        c for (c, _), n in pin_to_net.items() if n == sig_net and c in main_box_map and c != target_comp
-                    ]
-                    if other_comps:
-                        side_key = (target_comp, "channel")
-                        local_idx = comp_passive_count.get(side_key, 0)
-                        comp_passive_count[side_key] = local_idx + 1
-                        o_cx, _, o_cw, _ = main_box_map[other_comps[0]]
-                        ch_left = min(m_cx + m_cw / 2.0, o_cx + o_cw / 2.0)
-                        px = ch_left + 10.0 + (local_idx % 2) * 9.0
-                        py = m_cy + (12.0 if is_pullup else -12.0)
-                    else:
-                        m_fp = next(f for f in main_fps if f.name == target_comp)
-                        p_obj = next((p for p in m_fp.pins if pin_to_net.get((target_comp, p.name)) == sig_net), None)
-                        sheet_sides = getattr(sheet, "pin_sides", {}) or {}
-                        comp_sides = sheet_sides.get(target_comp, {})
-                        p_side = comp_sides.get(p_obj.name, p_obj.side.value if p_obj else "left") if p_obj else "left"
-                        side_key = (target_comp, p_side)
-                        local_idx = comp_passive_count.get(side_key, 0)
-                        comp_passive_count[side_key] = local_idx + 1
-                        if p_side in ("right", "top"):
-                            px = m_cx + (m_cw / 2.0) + 12.0 + (local_idx * 12.0)
+                # Include passives (decoupling caps, pull-ups, and shunts) in symbol overlap checks
+                decoupling_caps = []
+                vert_passives = []
+                for fp in sheet_fps:
+                    if fp.name in passive_names:
+                        n1 = pin_to_net.get((fp.name, fp.pins[0].name), "").upper()
+                        n2 = pin_to_net.get((fp.name, fp.pins[1].name), "").upper()
+                        if (n1 in ("3V3", "VBUS", "VDD") and n2 == "GND") or (
+                            n2 in ("3V3", "VBUS", "VDD") and n1 == "GND"
+                        ):
+                            decoupling_caps.append(fp)
                         else:
-                            px = m_cx - (m_cw / 2.0) - 14.0 - (local_idx * 10.0)
+                            vert_passives.append(fp)
+
+                if decoupling_caps:
+                    base_y = 35.0
+                    total_w = (len(decoupling_caps) - 1) * 28.0
+                    base_x = max(35.0, sheet_center_x - (total_w / 2.0))
+                    for idx, cap in enumerate(decoupling_caps):
+                        boxes.append((base_x + idx * 28.0, base_y, 14.0, 24.0, cap.name))
+
+                comp_passive_count: Dict[Tuple[str, str], int] = {}
+                for p_fp in vert_passives:
+                    n1 = pin_to_net.get((p_fp.name, p_fp.pins[0].name), "").upper()
+                    n2 = pin_to_net.get((p_fp.name, p_fp.pins[1].name), "").upper()
+                    is_pullup = n1 in ("3V3", "VBUS") or n2 in ("3V3", "VBUS")
+                    sig_net = n2 if (n1 in ("3V3", "VBUS", "GND")) else n1
+                    target_comp = next(
+                        (c for (c, _), n in pin_to_net.items() if n == sig_net and c in main_box_map), None
+                    )
+                    if target_comp:
+                        m_cx, m_cy, m_cw, _ = main_box_map[target_comp]
+                        other_comps = [
+                            c
+                            for (c, _), n in pin_to_net.items()
+                            if n == sig_net and c in main_box_map and c != target_comp
+                        ]
+                        if other_comps:
+                            side_key = (target_comp, "channel")
+                            local_idx = comp_passive_count.get(side_key, 0)
+                            comp_passive_count[side_key] = local_idx + 1
+                            o_cx, _, o_cw, _ = main_box_map[other_comps[0]]
+                            ch_left = min(m_cx + m_cw / 2.0, o_cx + o_cw / 2.0)
+                            px = ch_left + 10.0 + (local_idx % 2) * 14.0
+                            py = m_cy + (12.0 if is_pullup else -12.0)
+                        else:
+                            m_fp = next(f for f in main_fps if f.name == target_comp)
+                            p_obj = next(
+                                (p for p in m_fp.pins if pin_to_net.get((target_comp, p.name)) == sig_net), None
+                            )
+                            sheet_sides = getattr(sheet, "pin_sides", {}) or {}
+                            comp_sides = sheet_sides.get(target_comp, {})
+                            p_side = (
+                                comp_sides.get(p_obj.name, p_obj.side.value if p_obj else "left") if p_obj else "left"
+                            )
+                            side_key = (target_comp, p_side)
+                            local_idx = comp_passive_count.get(side_key, 0)
+                            comp_passive_count[side_key] = local_idx + 1
+                            if p_side in ("right", "top"):
+                                px = m_cx + (m_cw / 2.0) + 12.0 + (local_idx * 12.0)
+                            else:
+                                px = m_cx - (m_cw / 2.0) - 14.0 - (local_idx * 10.0)
+                            py = m_cy + (12.0 if is_pullup else -12.0)
+                        boxes.append((px, py, 8.0, 18.0, p_fp.name))
+                    elif main_fps:
+                        m_cx, m_cy, m_cw, _ = main_box_map[main_fps[0].name]
+                        px = m_cx - (m_cw / 2.0) - 24.0
                         py = m_cy + (12.0 if is_pullup else -12.0)
-                    boxes.append((px, py, 8.0, 18.0, p_fp.name))
-                elif main_fps:
-                    m_cx, m_cy, m_cw, _ = main_box_map[main_fps[0].name]
-                    px = m_cx - (m_cw / 2.0) - 24.0
-                    py = m_cy + (12.0 if is_pullup else -12.0)
-                    boxes.append((px, py, 8.0, 18.0, p_fp.name))
+                        boxes.append((px, py, 8.0, 18.0, p_fp.name))
 
             for i, b1 in enumerate(boxes):
                 for b2 in boxes[i + 1 :]:

@@ -2026,3 +2026,51 @@ def test_regression_downselection_results_application() -> None:
     checker = PCBDesignRulesChecker(provider.pcb_config)
     violations = checker.check_all(wiring=wiring)
     assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
+
+
+def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path: Path) -> None:
+    """Verify BUG-083: Schematic symbol overlap DRC rule and Sheet 7 I2C pullup clearance."""
+    import matplotlib.figure
+    from matplotlib.backends.backend_pdf import PdfPages
+    from provider.schematic_diagram import SchematicDiagram
+    from provider.pcb.drc import DRCRuleName
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+
+    # 1. Verify 0 schematic symbol overlap DRC errors
+    violations = checker.check_schematic(wiring)
+    symbol_overlaps = [v for v in violations.errors if v.rule_name == DRCRuleName.SCHEMATIC_SYMBOL_OVERLAP]
+    assert len(symbol_overlaps) == 0, f"Schematic symbol overlaps detected: {[v.description for v in symbol_overlaps]}"
+
+    # 2. Verify rendered positions of Sheet 7 I2C pullup resistors R1 and R2
+    diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
+    plans = diag._build_sheet_plans()
+    sheet7 = [p for p in plans if p.sheet_idx == 7][0]
+
+    orig_add_axes = matplotlib.figure.Figure.add_axes
+    captured = []
+
+    def mock_add_axes(self, *args, **kwargs):
+        ax = orig_add_axes(self, *args, **kwargs)
+        captured.append(ax)
+        return ax
+
+    matplotlib.figure.Figure.add_axes = mock_add_axes
+    try:
+        with PdfPages(tmp_path / "sheet7.pdf") as pdf:
+            diag._render_pdf_schematic_sheet(pdf, "test_board", sheet7, 7, wiring.nets, 9, 9)
+    finally:
+        matplotlib.figure.Figure.add_axes = orig_add_axes
+
+    assert len(captured) > 0
+    ax = captured[0]
+    r1_texts = [t for t in ax.texts if t.get_text() == "R1"]
+    r2_texts = [t for t in ax.texts if t.get_text() == "R2"]
+    assert len(r1_texts) == 1, "R1 text must be rendered on Sheet 7"
+    assert len(r2_texts) == 1, "R2 text must be rendered on Sheet 7"
+    r1_pos = r1_texts[0].get_position()
+    r2_pos = r2_texts[0].get_position()
+    dx = abs(r1_pos[0] - r2_pos[0])
+    assert dx >= 12.0, f"R1 and R2 must have >= 12.0mm horizontal clearance to prevent overlap, got dx={dx:.1f}mm"
