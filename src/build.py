@@ -412,7 +412,11 @@ class Builder:
                     path_str = str(path_obj)
 
                     provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
-                    options = getattr(provider.settings, "diagram_options", None) if provider else None
+                    options = getattr(room, "diagram_options", None)
+                    if options is None and provider:
+                        options = getattr(provider.settings, "diagram_options", None)
+                    if options is not None:
+                        options = options.model_copy(deep=True)
 
                     current_hash = self._get_diagram_hash(room, options)
                     futures.append(

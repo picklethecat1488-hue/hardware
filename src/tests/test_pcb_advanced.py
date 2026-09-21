@@ -1802,3 +1802,22 @@ def test_regression_pinmux_datasheet_verification() -> None:
     assert "L4" in content and "P1_22" in content and "PWR_EN_AUDIO" in content
     assert "L5" in content and "P1_21" in content and "PWR_EN_SENSORS" in content
     assert "M4" in content and "P1_23" in content and "PWR_EN_DEBUG" in content
+
+
+def test_regression_test_board_wiring_diagram_top_down_and_colored() -> None:
+    """Verify test board wiring diagram is 2D top-down and colored with distinct net layers."""
+    from model import DiagramStyle
+
+    provider = TestBoardProvider()
+    room_wiring = Room()
+    provider.diagram_wiring(room_wiring, ["test_board/wiring"], Mode.DEFAULT)
+
+    assert room_wiring.diagram_options is not None
+    assert room_wiring.diagram_options.view_from == "top"
+    assert room_wiring.diagram_options.style == DiagramStyle.COLOR
+
+    room_prod = Room()
+    provider.diagram_product(room_prod, ["test_board/product"], Mode.DEFAULT)
+    assert room_prod.diagram_options is not None
+    assert room_prod.diagram_options.view_from == "iso"
+    assert room_prod.diagram_options.style == DiagramStyle.HIDDEN

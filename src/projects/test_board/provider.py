@@ -16,7 +16,7 @@ from build123d import (
     Mode as BuildMode,
     add,
 )
-from model import Wiring
+from model import Wiring, DiagramOptions, DiagramStyle
 from model.pcb import (
     BoardType,
     LayerType,
@@ -335,10 +335,21 @@ class TestBoardProvider(Provider):
 
     def diagram_product(self, room: Room, targets: Sequence[str], mode: Mode) -> None:
         """Populate product mechanical diagram elements."""
+        room.diagram_options = DiagramOptions(
+            line_weight=1,
+            view_from="iso",
+            style=DiagramStyle.HIDDEN,
+        )
         self.view_product(room, mode)
 
     def diagram_wiring(self, room: Room, targets: Sequence[str], mode: Mode) -> None:
         """Render top-down system architecture wiring diagram with clean interconnects."""
+        room.diagram_options = DiagramOptions(
+            line_weight=1,
+            view_from="top",
+            style=DiagramStyle.COLOR,
+            width=1000,
+        )
         system_wiring_path = self.wiring_path.parent / "system_wiring.yaml"
         wiring_file = system_wiring_path if system_wiring_path.exists() else self.wiring_path
         if wiring_file.exists():
