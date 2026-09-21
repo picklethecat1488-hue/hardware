@@ -1967,3 +1967,38 @@ def test_regression_battery_connector_j13(tmp_path: Path) -> None:
     assert len(schematic_violations.errors) == 0, (
         f"Schematic DRC errors found: {[v.description for v in schematic_violations.errors]}"
     )
+
+
+def test_regression_downselection_results_application() -> None:
+    """Verify BUG-067: downselection results from downselection_report.md applied to test_board.md and PCB."""
+    tb_doc = Path("src/projects/test_board.md")
+    assert tb_doc.is_file(), "test_board.md must exist"
+    content = tb_doc.read_text(encoding="utf-8")
+
+    # 1. Verify all downselected active ICs and peripherals in test_board.md
+    assert "MCXN947VDF" in content, "MCU MCXN947VDF must be documented in BOM"
+    assert "W25N01GVZEIG" in content, "NAND W25N01GVZEIG must be documented in BOM"
+    assert "BQ24074RGTR" in content, "Charger BQ24074RGTR must be documented in BOM"
+    assert "MAX17048G+T10" in content, "Fuel gauge MAX17048 must be documented in BOM"
+    assert "LP5009RUKR" in content, "LED driver LP5009 must be documented in BOM"
+    assert "FT232RNQ-REEL" in content, "USB-UART FT232RNQ must be documented in BOM"
+    assert "CY8CMBR3116" in content, "Touch controller CY8CMBR3116 must be documented in BOM"
+    assert "MAX98357AETE+" in content, "Audio amp MAX98357A must be documented in BOM"
+    assert "TPS22918DBVR" in content, "Load switches TPS22918 must be documented in BOM"
+    assert "J13" in content and "JST-PH-2P" in content, "Battery connector J13 must be in BOM"
+
+    # 2. Verify all expansion headers documented
+    assert "J5" in content and "SWD" in content
+    assert "J7" in content and "I3C0" in content
+    assert "J8" in content and "I3C1" in content
+    assert "J6" in content and "I2C" in content
+    assert "J9" in content and "SPI" in content
+    assert "J10" in content and "UART" in content
+    assert "J14" in content and "GPIO" in content
+
+    # 3. Verify zero DRC violations on carrier board
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+    violations = checker.check_all(wiring=wiring)
+    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
