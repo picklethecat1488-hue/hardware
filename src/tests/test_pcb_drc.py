@@ -804,3 +804,128 @@ def test_drc_violation_collection_helpers():
     assert report.error_count == 5
     assert report.warning_count == 1
     assert report.info_count == 1
+
+
+def test_kicad_drc_report_parser_synthetic():
+    """Verify KiCadCLI.parse_drc_text parses rules, severities, items, and error counts."""
+    from provider.pcb.kicad_cli import KiCadCLI, KiCadDRCSeverity
+
+    sample_report = """** Drc report for test_board.kicad_pcb **
+** Created on 2026-09-20T16:00:00 **
+** Report includes: Errors, Warnings **
+
+** Found 2 DRC violations **
+[clearance]: Clearance violation ( clearance 0.2000 mm; actual 0.1000 mm)
+    Local override; error
+    @(10.0 mm, 20.0 mm): Pad 1 [NET_A] of R1 on F.Cu
+    @(10.1 mm, 20.0 mm): Track [NET_B] on F.Cu, length 2.0 mm
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(15.0 mm, 25.0 mm): Segment of C1 on F.Silkscreen
+
+** Found 1 unconnected pads **
+[unconnected_items]: Missing connection between items
+    Rule: netlist; error
+    @(5.0 mm, 5.0 mm): Pad 2 [NET_C] of U1 on F.Cu
+
+** Found 0 Footprint errors **
+
+** End of Report **
+"""
+    report = KiCadCLI.parse_drc_text(sample_report)
+    assert report.board_name == "test_board.kicad_pcb"
+    assert report.violations_count == 2
+    assert report.unconnected_count == 1
+    assert report.footprint_errors_count == 0
+    assert len(report.violations) == 3
+    assert report.error_count == 2
+    assert report.warning_count == 1
+    assert not report.passed
+    assert "clearance" in report.summary()
+
+
+def test_trace_to_pad_clearance_drc_detection(base_pcb_config: PCBConfig):
+    """Verify DRC detects clearance violation and short circuit between trace and neighboring pad (BUG-043)."""
+    from unittest.mock import MagicMock
+    from model.wiring import FootprintModel, PinModel, NetModel
+
+    fp = FootprintModel(
+        name="U1",
+        package="SOIC-8",
+        position=(0.0, 0.0, 0.0),
+        dimensions=(4.0, 4.0, 1.0),
+        pins=[
+            PinModel(
+                name="1", position=(0.0, 0.0, 0.0), label="IN", side="left", pad_type="smd", pad_size_mm=(0.5, 0.5)
+            )
+        ],
+    )
+    net_a = NetModel(name="NET_A", color="blue", pins=[("U1", "1")])
+    net_b = NetModel(name="NET_B", color="red", pins=[])
+
+    wiring_mock = MagicMock()
+    wiring_mock.footprints = [fp]
+    wiring_mock.nets = [net_a, net_b]
+
+    # Trace on NET_B runs at distance 0.15mm from pad U1.1 (pad radius 0.25, trace half-width 0.10, required 0.45mm)
+    tr_violating = TraceSegmentModel(
+        net="NET_B",
+        layer="F.Cu",
+        width_mm=0.20,
+        start_mm=(0.15, -2.0),
+        end_mm=(0.15, 2.0),
+    )
+    base_pcb_config.traces = [tr_violating]
+    base_pcb_config.vias = []
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    report = checker.check_all(wiring=wiring_mock)
+    assert not report.passed
+    pad_violations = [v for v in report.violations if "U1.1" in v.net_or_zone]
+    assert len(pad_violations) > 0
+
+
+def test_via_connectivity_drc_detection(base_pcb_config: PCBConfig):
+    """Verify DRC detects floating vias outside board envelope and single-layer vias (BUG-044)."""
+    from unittest.mock import MagicMock
+    from model.wiring import NetModel
+
+    # Via 1: outside board envelope (dimensions: 60x40 -> half: 30x20)
+    via_off = ViaModel(
+        net="NET_OFF",
+        position_mm=(50.0, 50.0),
+        pad_diameter_mm=0.45,
+        drill_diameter_mm=0.20,
+        layer_start="F.Cu",
+        layer_end="B.Cu",
+    )
+    # Via 2: inside board envelope, but only connected on F.Cu, not on B.Cu
+    via_single = ViaModel(
+        net="NET_SINGLE",
+        position_mm=(5.0, 5.0),
+        pad_diameter_mm=0.45,
+        drill_diameter_mm=0.20,
+        layer_start="F.Cu",
+        layer_end="B.Cu",
+    )
+    tr_f = TraceSegmentModel(
+        net="NET_SINGLE",
+        layer="F.Cu",
+        width_mm=0.20,
+        start_mm=(0.0, 5.0),
+        end_mm=(5.0, 5.0),
+    )
+    base_pcb_config.vias = [via_off, via_single]
+    base_pcb_config.traces = [tr_f]
+
+    wiring_mock = MagicMock()
+    wiring_mock.footprints = []
+    wiring_mock.nets = [
+        NetModel(name="NET_OFF", pins=[], color="#ff0000"),
+        NetModel(name="NET_SINGLE", pins=[], color="#00ff00"),
+    ]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    violations = checker.check_via_connectivity(wiring_mock)
+    assert any(v.rule_name == "VIA_OUTSIDE_BOARD_BOUNDARY" for v in violations)
+    assert any(v.rule_name == "DISCONNECTED_VIA" for v in violations)

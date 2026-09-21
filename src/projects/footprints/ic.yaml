@@ -507,15 +507,27 @@ footprints:
     - 1.4
     pins:
     - name: A1
+      label: A1
       position:
-      - -5.0
-      - 5.0
+      - -5.2
+      - 5.2
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: A2
+      label: A2
       position:
-      - -4.2
-      - 5.0
+      - -4.4
+      - 5.2
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: A3
       label: A3
       position:
@@ -649,15 +661,27 @@ footprints:
       - 0.35
       - 0.35
     - name: B1
+      label: B1
       position:
-      - -5.0
-      - 4.2
+      - -5.2
+      - 4.4
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: B2
+      label: B2
       position:
-      - -4.2
-      - 4.2
+      - -4.4
+      - 4.4
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: B3
       label: B3
       position:
@@ -791,15 +815,27 @@ footprints:
       - 0.35
       - 0.35
     - name: C1
+      label: C1
       position:
-      - 3.0
-      - 5.0
-      side: right
+      - -5.2
+      - 3.6
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: C2
+      label: C2
       position:
-      - 3.8
-      - 5.0
-      side: right
+      - -4.4
+      - 3.6
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: C3
       label: C3
       position:
@@ -933,15 +969,27 @@ footprints:
       - 0.35
       - 0.35
     - name: D1
+      label: D1
       position:
-      - -3.0
-      - 0.0
-      side: right
+      - -5.2
+      - 2.8
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: D2
+      label: D2
       position:
-      - -3.0
-      - -1.0
-      side: right
+      - -4.4
+      - 2.8
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: D3
       label: D3
       position:
@@ -1229,15 +1277,27 @@ footprints:
       - 0.35
       - 0.35
     - name: F1
+      label: F1
       position:
-      - 4.0
-      - 0.0
-      side: right
+      - -5.2
+      - 1.2
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: F2
+      label: F2
       position:
-      - 4.0
-      - -1.0
-      side: right
+      - -4.4
+      - 1.2
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: F3
       label: F3
       position:
@@ -1371,20 +1431,38 @@ footprints:
       - 0.35
       - 0.35
     - name: G1
+      label: G1
       position:
-      - -2.0
-      - 3.0
+      - -5.2
+      - 0.4
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: G2
+      label: G2
       position:
-      - -2.0
-      - 2.2
+      - -4.4
+      - 0.4
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: G3
+      label: G3
       position:
-      - -2.0
-      - 1.4
+      - -3.6
+      - 0.4
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: G4
       label: G4
       position:
@@ -1573,9 +1651,10 @@ footprints:
       - 0.35
       - 0.35
     - name: H7
+      label: H7
       position:
-      - 0.0
-      - 0.0
+      - -0.4
+      - -0.4
       side: left
       pad_type: smd
       pad_shape: circle
@@ -1583,10 +1662,11 @@ footprints:
       - 0.35
       - 0.35
     - name: H8
+      label: H8
       position:
-      - 0.8
-      - 0.0
-      side: left
+      - 0.4
+      - -0.4
+      side: right
       pad_type: smd
       pad_shape: circle
       pad_size_mm:
@@ -1813,15 +1893,27 @@ footprints:
       - 0.35
       - 0.35
     - name: K1
+      label: K1
       position:
-      - -4.0
-      - 2.0
-      side: right
+      - -5.2
+      - -2.0
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: K2
+      label: K2
       position:
-      - -4.0
-      - 1.2
-      side: right
+      - -4.4
+      - -2.0
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: K3
       label: K3
       position:
@@ -2109,15 +2201,27 @@ footprints:
       - 0.35
       - 0.35
     - name: M1
+      label: M1
       position:
-      - -5.0
-      - 2.0
+      - -5.2
+      - -3.6
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: M2
+      label: M2
       position:
-      - -5.0
-      - 1.2
+      - -4.4
+      - -3.6
       side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: M3
       label: M3
       position:
@@ -2394,10 +2498,16 @@ footprints:
       - 0.35
       - 0.35
     - name: N14
+      label: N14
       position:
-      - 5.0
-      - -5.0
+      - 5.2
+      - -4.4
       side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
     - name: P1
       label: P1
       position:
@@ -2542,10 +2652,16 @@ footprints:
       - 0.35
       - 0.35
     - name: P14
+      label: P14
       position:
-      - 5.0
-      - -5.8
+      - 5.2
+      - -5.2
       side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.35
+      - 0.35
   M.2-KEY-M:
     dimensions:
     - 22.0
@@ -2795,179 +2911,180 @@ footprints:
       pad_size_mm:
       - 1.2
       - 1.6
+    - name: NC1
+      label: NC1
+      position:
+      - -2.0
+      - 0.0
+      side: left
+      pad_type: smd
+      pad_shape: rect
+      pad_size_mm:
+      - 0.35
+      - 1.2
+    - name: NC2
+      label: NC2
+      position:
+      - -1.0
+      - 0.0
+      side: left
+      pad_type: smd
+      pad_shape: rect
+      pad_size_mm:
+      - 0.35
+      - 1.2
+    - name: NC3
+      label: NC3
+      position:
+      - 0.0
+      - 0.0
+      side: left
+      pad_type: smd
+      pad_shape: rect
+      pad_size_mm:
+      - 0.35
+      - 1.2
+    - name: NC4
+      label: NC4
+      position:
+      - -6.0
+      - 1.6
+      side: left
+      pad_type: smd
+      pad_shape: rect
+      pad_size_mm:
+      - 0.35
+      - 0.6
+    - name: NC5
+      label: NC5
+      position:
+      - -5.0
+      - 1.6
+      side: left
+      pad_type: smd
+      pad_shape: rect
+      pad_size_mm:
+      - 0.35
+      - 0.6
+    - name: NC6
+      label: NC6
+      position:
+      - -4.0
+      - 1.6
+      side: left
+      pad_type: smd
+      pad_shape: rect
+      pad_size_mm:
+      - 0.35
+      - 0.6
     - name: NC7
       label: NC7
       position:
-      - -2.765
-      - 0.0
+      - -3.0
+      - 1.6
       side: left
       pad_type: smd
       pad_shape: rect
       pad_size_mm:
       - 0.35
-      - 1.2
+      - 0.6
     - name: NC8
       label: NC8
       position:
-      - -2.529
-      - 0.0
+      - -2.0
+      - 1.6
       side: left
       pad_type: smd
       pad_shape: rect
       pad_size_mm:
       - 0.35
-      - 1.2
+      - 0.6
     - name: NC9
       label: NC9
       position:
-      - -2.294
-      - 0.0
+      - -1.0
+      - 1.6
       side: left
       pad_type: smd
       pad_shape: rect
       pad_size_mm:
       - 0.35
-      - 1.2
+      - 0.6
     - name: NC10
       label: NC10
       position:
-      - -2.059
       - 0.0
+      - 1.6
       side: left
       pad_type: smd
       pad_shape: rect
       pad_size_mm:
       - 0.35
-      - 1.2
+      - 0.6
     - name: NC11
       label: NC11
       position:
-      - -1.824
-      - 0.0
-      side: left
+      - 1.0
+      - 1.6
+      side: right
       pad_type: smd
       pad_shape: rect
       pad_size_mm:
       - 0.35
-      - 1.2
+      - 0.6
     - name: NC12
       label: NC12
       position:
-      - -1.588
-      - 0.0
-      side: left
+      - 2.0
+      - 1.6
+      side: right
       pad_type: smd
       pad_shape: rect
       pad_size_mm:
       - 0.35
-      - 1.2
+      - 0.6
     - name: NC13
       label: NC13
       position:
-      - -1.353
-      - 0.0
-      side: left
+      - 3.0
+      - 1.6
+      side: right
       pad_type: smd
       pad_shape: rect
       pad_size_mm:
       - 0.35
-      - 1.2
+      - 0.6
     - name: NC14
       label: NC14
       position:
-      - -1.118
-      - 0.0
-      side: left
+      - 4.0
+      - 1.6
+      side: right
       pad_type: smd
       pad_shape: rect
       pad_size_mm:
       - 0.35
-      - 1.2
+      - 0.6
     - name: NC15
       label: NC15
       position:
-      - -0.882
-      - 0.0
-      side: left
+      - 5.0
+      - 1.6
+      side: right
       pad_type: smd
       pad_shape: rect
       pad_size_mm:
       - 0.35
-      - 1.2
+      - 0.6
     - name: NC16
       label: NC16
       position:
-      - -0.647
-      - 0.0
-      side: left
-      pad_type: smd
-      pad_shape: rect
-      pad_size_mm:
-      - 0.35
-      - 1.2
-    - name: NC17
-      label: NC17
-      position:
-      - -0.412
-      - 0.0
-      side: left
-      pad_type: smd
-      pad_shape: rect
-      pad_size_mm:
-      - 0.35
-      - 1.2
-    - name: NC18
-      label: NC18
-      position:
-      - -0.176
-      - 0.0
-      side: left
-      pad_type: smd
-      pad_shape: rect
-      pad_size_mm:
-      - 0.35
-      - 1.2
-    - name: NC19
-      label: NC19
-      position:
-      - 0.059
-      - 0.0
+      - 6.0
+      - 1.6
       side: right
       pad_type: smd
       pad_shape: rect
       pad_size_mm:
       - 0.35
-      - 1.2
-    - name: NC20
-      label: NC20
-      position:
-      - 0.294
-      - 0.0
-      side: right
-      pad_type: smd
-      pad_shape: rect
-      pad_size_mm:
-      - 0.35
-      - 1.2
-    - name: NC21
-      label: NC21
-      position:
-      - 0.529
-      - 0.0
-      side: right
-      pad_type: smd
-      pad_shape: rect
-      pad_size_mm:
-      - 0.35
-      - 1.2
-    - name: NC22
-      label: NC22
-      position:
-      - 0.765
-      - 0.0
-      side: right
-      pad_type: smd
-      pad_shape: rect
-      pad_size_mm:
-      - 0.35
-      - 1.2
+      - 0.6
+

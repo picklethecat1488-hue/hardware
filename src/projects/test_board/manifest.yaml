@@ -35,10 +35,6 @@ enclosure_lid:
   export: [stl, step]
   color: [0.15, 0.16, 0.20, 0.85]
 
-carrier_pcb:
-  pcb:
-    modes: [default]
-
 route:
   config:
     modes: [default]

@@ -17,19 +17,24 @@ def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None
     if cfg is None:
         raise ValueError("PCB configuration not found for test_board")
 
-    router = PCBAutoRouter(cfg, wiring)
-    auto_traces, auto_vias = router.route_all_nets()
-
-    # 1. Save carrier board routing to per-project YAML file
     project_dir = provider.wiring_path.parent
     routing_file = project_dir / "routing.yaml"
-    router.save_routing_yaml(routing_file, auto_traces, auto_vias)
+    auto_traces, auto_vias = [], []
+
+    if subassembly in (None, "carrier_board"):
+        router = PCBAutoRouter(cfg, wiring)
+        auto_traces, auto_vias = router.route_all_nets()
+        # 1. Save carrier board routing to per-project YAML file
+        router.save_routing_yaml(routing_file, auto_traces, auto_vias)
+    elif routing_file.exists():
+        auto_traces, auto_vias = PCBAutoRouter.load_routing_yaml(routing_file)
 
     # 2. Route flexible sensing tail and save to routing_flex.yaml
     flex_part = provider.part.get("flex_tail")
     flex_traces = []
     flex_vias = []
-    if flex_part:
+    routing_flex_file = project_dir / "routing_flex.yaml"
+    if flex_part and (subassembly == "flex_tail" or not routing_flex_file.exists()):
         from provider import Mode
 
         flex_res = flex_part("flex_tail", None, Mode.DEFAULT)
@@ -37,8 +42,9 @@ def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None
         if flex_cfg:
             flex_router = PCBAutoRouter(flex_cfg, wiring)
             flex_traces, flex_vias = flex_router.route_all_nets()
-            routing_flex_file = project_dir / "routing_flex.yaml"
             flex_router.save_routing_yaml(routing_flex_file, flex_traces, flex_vias)
+    elif routing_flex_file.exists():
+        flex_traces, flex_vias = PCBAutoRouter.load_routing_yaml(routing_flex_file)
 
     # 3. Persist path to root application .env so routes can be manually inspected or overridden
     if routing_file.is_relative_to(Path.cwd()):

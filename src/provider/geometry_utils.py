@@ -28,3 +28,22 @@ def point_in_polygon(x: float, y: float, polygon: Sequence[Tuple[float, float]])
                     inside = not inside
         p1x, p1y = p2x, p2y
     return inside
+
+
+def dist_point_to_segment(
+    p: Tuple[float, float],
+    a: Tuple[float, float],
+    b: Tuple[float, float],
+) -> float:
+    """Compute the shortest Euclidean distance from a 2D point p to line segment (a, b)."""
+    import math
+
+    dx = b[0] - a[0]
+    dy = b[1] - a[1]
+    seg_len_sq = dx * dx + dy * dy
+    if seg_len_sq < 1e-9:
+        return math.hypot(p[0] - a[0], p[1] - a[1])
+    t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / seg_len_sq))
+    proj_x = a[0] + t * dx
+    proj_y = a[1] + t * dy
+    return math.hypot(p[0] - proj_x, p[1] - proj_y)

@@ -9,6 +9,7 @@ import yaml
 
 from model.pcb import BoardType, PCBConfig, TraceSegmentModel, ViaModel, TestPointModel
 from model.wiring import Wiring
+from provider.geometry_utils import point_in_polygon, dist_point_to_segment
 
 
 def fillet_corner(
@@ -219,7 +220,7 @@ def straighten_junction_traces(
 
 @dataclass
 class Obstacle:
-    """Bounding box obstacle on a copper layer or across all layers."""
+    """Bounding box or circular obstacle on a copper layer or across all layers."""
 
     min_x: float
     min_y: float
@@ -227,6 +228,17 @@ class Obstacle:
     max_y: float
     layer: str = "ALL"
     net: Optional[str] = None
+    is_circle: bool = False
+    center: Optional[Tuple[float, float]] = None
+    radius: Optional[float] = None
+
+    def copper_dist(self, px: float, py: float) -> float:
+        """Compute minimum distance from point (px, py) to the physical copper of this obstacle."""
+        if self.is_circle and self.center is not None and self.radius is not None:
+            return max(0.0, math.hypot(px - self.center[0], py - self.center[1]) - self.radius)
+        edx = max(self.min_x - px, 0.0, px - self.max_x)
+        edy = max(self.min_y - py, 0.0, py - self.max_y)
+        return math.hypot(edx, edy)
 
 
 class AStarPCBRouter:
@@ -240,6 +252,10 @@ class AStarPCBRouter:
         obstacles: Optional[List[Obstacle]] = None,
         turn_penalty: float = 0.35,
         via_penalty: float = 2.50,
+        dense_regions: Optional[List[Tuple[float, float, float, float, str]]] = None,
+        connector_breakout_zones: Optional[List[Tuple[float, float, str]]] = None,
+        outline_polygon: Optional[List[Tuple[float, float]]] = None,
+        edge_clearance: float = 0.35,
     ) -> None:
         """Initialize the grid router with board boundaries and layer configuration."""
         self.min_x, self.min_y, self.max_x, self.max_y = board_bounds
@@ -250,6 +266,15 @@ class AStarPCBRouter:
         self.obstacles: List[Obstacle] = []
         self.turn_penalty = turn_penalty
         self.via_penalty = via_penalty
+        self.dense_regions = dense_regions or []
+        self.connector_breakout_zones = connector_breakout_zones or []
+        self.outline_polygon = outline_polygon
+        self.edge_clearance = edge_clearance
+        self.outline_segments: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
+        if outline_polygon and len(outline_polygon) >= 3:
+            n = len(outline_polygon)
+            for i in range(n):
+                self.outline_segments.append((outline_polygon[i], outline_polygon[(i + 1) % n]))
         self.routed_cells: Dict[Tuple[int, int, int], str] = {}
         self.blocked_cells: Dict[Tuple[int, int, str], Optional[str]] = {}
         if obstacles:
@@ -277,8 +302,17 @@ class AStarPCBRouter:
                 for gy in range(gy_min, gy_max + 1):
                     key = (gx, gy, lay)
                     existing = self.blocked_cells.get(key)
-                    if existing is None or obs.net is not None:
+                    if existing is None:
                         self.blocked_cells[key] = obs.net
+                    elif existing != obs.net:
+                        if (
+                            round((obs.min_x + obs.max_x) / (2.0 * self.grid_step)) == gx
+                            and round((obs.min_y + obs.max_y) / (2.0 * self.grid_step)) == gy
+                            and obs.net is not None
+                        ):
+                            self.blocked_cells[key] = obs.net
+                        else:
+                            self.blocked_cells[key] = "__CONFLICT__"
 
     def is_cell_blocked(
         self,
@@ -310,7 +344,7 @@ class AStarPCBRouter:
             # Unassigned obstacle (e.g. sensor envelope): allow connecting at start/end
             d_start = math.hypot(px - start_pt[0], py - start_pt[1])
             d_end = math.hypot(px - end_pt[0], py - end_pt[1])
-            if d_start < 0.30 or d_end < 0.30:
+            if d_start <= self.grid_step + 0.05 or d_end <= self.grid_step + 0.05:
                 return False
             return True
 
@@ -369,14 +403,48 @@ class AStarPCBRouter:
                 if not (self.min_x <= px <= self.max_x and self.min_y <= py <= self.max_y):
                     continue
 
+                if self.outline_polygon:
+                    if not point_in_polygon(px, py, self.outline_polygon):
+                        continue
+                    if self.outline_segments:
+                        dist_edge = min(dist_point_to_segment((px, py), s0, s1) for s0, s1 in self.outline_segments)
+                        if dist_edge < self.edge_clearance:
+                            if (
+                                math.hypot(px - start_pt[0], py - start_pt[1]) > 0.40
+                                and math.hypot(px - end_pt[0], py - end_pt[1]) > 0.40
+                            ):
+                                continue
+
                 if self.is_cell_blocked(px, py, l_idx, net_name, start_pt, end_pt):
                     continue
 
                 step_cost = self.grid_step
                 if last_dir is not None and (dx, dy) != last_dir:
                     step_cost += self.turn_penalty
-                if abs(dx) > 0 and (34.5 <= py <= 41.5 or -39.5 <= py <= -32.5):
-                    step_cost += 3.5
+                if abs(dx) > 0 and self.connector_breakout_zones:
+                    for cb_min_y, cb_max_y, cb_lay in self.connector_breakout_zones:
+                        if self.idx_to_layer[l_idx] == cb_lay and cb_min_y <= py <= cb_max_y:
+                            step_cost += 3.50
+                            break
+                if self.dense_regions:
+                    for dr_min_x, dr_min_y, dr_max_x, dr_max_y, dr_lay in self.dense_regions:
+                        if self.idx_to_layer[l_idx] == dr_lay:
+                            if dr_min_x <= px <= dr_max_x and dr_min_y <= py <= dr_max_y:
+                                step_cost += 1.50
+                                break
+                            margin = 1.20
+                            if abs(dy) > 0 and (
+                                (dr_min_x - margin <= px < dr_min_x and dr_min_y <= py <= dr_max_y)
+                                or (dr_max_x < px <= dr_max_x + margin and dr_min_y <= py <= dr_max_y)
+                            ):
+                                step_cost += 3.50
+                                break
+                            if abs(dx) > 0 and (
+                                (dr_min_y - margin <= py < dr_min_y and dr_min_x <= px <= dr_max_x)
+                                or (dr_max_y < py <= dr_max_y + margin and dr_min_x <= px <= dr_max_x)
+                            ):
+                                step_cost += 3.50
+                                break
 
                 tentative_g = curr_g + step_cost
                 next_state = (ngx, ngy, l_idx)
@@ -402,9 +470,7 @@ class AStarPCBRouter:
                         if obs.layer in ("ALL", self.idx_to_layer[l_idx], self.idx_to_layer[target_l_idx]):
                             if obs.net is not None and obs.net == net_name:
                                 continue
-                            if (obs.min_x - via_r <= px <= obs.max_x + via_r) and (
-                                obs.min_y - via_r <= py <= obs.max_y + via_r
-                            ):
+                            if obs.copper_dist(px, py) < (via_r + 0.12):
                                 blocked = True
                                 break
                     if blocked:
@@ -513,7 +579,7 @@ class AStarPCBRouter:
                 self.routed_cells[(gx_v, gy_v, l_i)] = net_name
 
         for tr in traces:
-            w_half = tr.width_mm / 2.0 + 0.12
+            w_half = max(tr.width_mm / 2.0 + 0.12, self.grid_step + 0.01)
             self.add_obstacle(
                 Obstacle(
                     min_x=min(tr.start_mm[0], tr.end_mm[0]) - w_half,
@@ -748,7 +814,10 @@ class PCBAutoRouter:
                 eff_w = pw * cos_r + pl * sin_r
                 eff_l = pw * sin_r + pl * cos_r
                 pin_lay = "ALL" if getattr(pin, "pad_type", "smd") == "thru_hole" else fp_layer
-                pad_margin = 0.05
+                pad_margin = 0.05 if max(eff_w, eff_l) <= 0.40 else 0.20
+                pin_net = pin_to_net.get((fp.name, pin.name)) or "__NO_NET__"
+                is_circle = getattr(pin, "pad_shape", "rect") == "circle"
+                copper_r = min(eff_w, eff_l) / 2.0 if is_circle else None
                 obstacles.append(
                     Obstacle(
                         min_x=px - eff_w / 2.0 - pad_margin,
@@ -756,7 +825,10 @@ class PCBAutoRouter:
                         max_x=px + eff_w / 2.0 + pad_margin,
                         max_y=py + eff_l / 2.0 + pad_margin,
                         layer=pin_lay,
-                        net=pin_to_net.get((fp.name, pin.name)),
+                        net=pin_net,
+                        is_circle=is_circle,
+                        center=(px, py) if is_circle else None,
+                        radius=copper_r,
                     )
                 )
 
@@ -771,6 +843,9 @@ class PCBAutoRouter:
                     max_y=my + r + 0.25,
                     layer="ALL",
                     net=getattr(mh, "net", None),
+                    is_circle=True,
+                    center=(mx, my),
+                    radius=r,
                 )
             )
 
@@ -786,6 +861,9 @@ class PCBAutoRouter:
                     max_y=ty + r + 0.22,
                     layer="ALL" if tp_drill > 0 else (tp.layer if hasattr(tp, "layer") else "F.Cu"),
                     net=tp.net,
+                    is_circle=True,
+                    center=(tx, ty),
+                    radius=r,
                 )
             )
 
@@ -798,18 +876,48 @@ class PCBAutoRouter:
                 continue
             scx, scy = getattr(sensor, "center_mm", (0.0, 0.0))
             sw, sl = getattr(sensor, "area_mm", (10.0, 10.0))
-            obstacles.append(
-                Obstacle(
-                    min_x=scx - sw / 2.0 - 0.20,
-                    min_y=scy - sl / 2.0 - 0.20,
-                    max_x=scx + sw / 2.0 + 0.20,
-                    max_y=scy + sl / 2.0 + 0.20,
-                    layer="ALL",
+            if getattr(sensor, "shape", None) == "interdigital":
+                if getattr(sensor, "tx_pin", None):
+                    obstacles.append(
+                        Obstacle(
+                            min_x=scx - sw / 2.0 - 0.20,
+                            min_y=scy - sl / 2.0 - 0.20,
+                            max_x=scx,
+                            max_y=scy + sl / 2.0 + 0.20,
+                            layer="ALL",
+                            net=sensor.tx_pin,
+                        )
+                    )
+                if getattr(sensor, "rx_pin", None):
+                    obstacles.append(
+                        Obstacle(
+                            min_x=scx,
+                            min_y=scy - sl / 2.0 - 0.20,
+                            max_x=scx + sw / 2.0 + 0.20,
+                            max_y=scy + sl / 2.0 + 0.20,
+                            layer="ALL",
+                            net=sensor.rx_pin,
+                        )
+                    )
+            else:
+                s_net = (
+                    getattr(sensor, "rx_pin", None)
+                    or getattr(sensor, "tx_pin", None)
+                    or getattr(sensor, "net_name", None)
                 )
-            )
+                obstacles.append(
+                    Obstacle(
+                        min_x=scx - sw / 2.0 - 0.20,
+                        min_y=scy - sl / 2.0 - 0.20,
+                        max_x=scx + sw / 2.0 + 0.20,
+                        max_y=scy + sl / 2.0 + 0.20,
+                        layer="ALL",
+                        net=s_net,
+                    )
+                )
 
         for tr in traces:
-            w_half = tr.width_mm / 2.0 + 0.12
+            w_half = max(tr.width_mm / 2.0 + 0.12, 0.21)
             obstacles.append(
                 Obstacle(
                     min_x=min(tr.start_mm[0], tr.end_mm[0]) - w_half,
@@ -821,13 +929,35 @@ class PCBAutoRouter:
                 )
             )
 
+        dense_regions: List[Tuple[float, float, float, float, str]] = []
+        for fp in board_fps:
+            if len(fp.pins) >= 40:
+                px0 = fp.position[0]
+                py0 = fp.position[1]
+                xs = [p.position[0] + px0 for p in fp.pins]
+                ys = [p.position[1] + py0 for p in fp.pins]
+                dense_regions.append((min(xs), min(ys), max(xs), max(ys), getattr(fp, "layer", "F.Cu")))
+
+        connector_breakout_zones: List[Tuple[float, float, str]] = []
+        for fp in board_fps:
+            if fp.name.startswith("J") and fp.pins:
+                fp_y = [p.position[1] + fp.position[1] for p in fp.pins]
+                min_y = min(fp_y) - 3.50
+                max_y = max(fp_y) + 3.50
+                if abs(min_y - board_bounds[1]) < 12.0 or abs(max_y - board_bounds[3]) < 12.0:
+                    connector_breakout_zones.append((min_y, max_y, getattr(fp, "layer", "F.Cu")))
+
         router = AStarPCBRouter(
             board_bounds=board_bounds,
-            grid_step=0.25,
+            grid_step=0.25 if is_flex else 0.20,
             layers=layers,
             obstacles=obstacles,
             turn_penalty=0.50,
-            via_penalty=8.00,
+            via_penalty=2.00 if not is_flex else 50.00,
+            dense_regions=dense_regions,
+            connector_breakout_zones=connector_breakout_zones,
+            outline_polygon=getattr(self.config, "outline_polygon", None),
+            edge_clearance=0.40 if is_flex else 0.35,
         )
 
         fp_by_name = {fp.name: fp for fp in board_fps}
@@ -856,7 +986,22 @@ class PCBAutoRouter:
         plane_nets = {cr.net for cr in getattr(self.config, "copper_regions", [])}
 
         if self.wiring and hasattr(self.wiring, "nets"):
-            for net in self.wiring.nets:
+
+            def _net_priority(n: Any) -> int:
+                if n.name in plane_nets:
+                    return 0
+                if n.name.startswith("PDM_"):
+                    return 1
+                if n.name in ("NRST", "BOOT0", "PWR_EN", "CAP_INT") or n.name.startswith(("OSC_", "I2C_", "RESET")):
+                    return 2
+                if n.name.startswith("SPK_") or n.name == "VREG":
+                    return 3
+                if n.name.startswith(("PCIE_", "MIPI_", "CAP_", "VBUS", "CC")):
+                    return 5
+                return 4
+
+            sorted_nets = sorted(self.wiring.nets, key=_net_priority)
+            for net in sorted_nets:
                 if net.name in skip_nets:
                     continue
 
@@ -897,6 +1042,14 @@ class PCBAutoRouter:
                     for px, py, lay in smd_endpoints:
                         # Try offsets around the pad for a stitching via
                         candidate_offsets = [
+                            (-0.40, 0.40),
+                            (0.40, 0.40),
+                            (-0.40, -0.40),
+                            (0.40, -0.40),
+                            (-0.40, 0.0),
+                            (0.40, 0.0),
+                            (0.0, -0.40),
+                            (0.0, 0.40),
                             (-0.25, -0.50),
                             (0.25, -0.50),
                             (-0.25, 0.50),
@@ -909,10 +1062,6 @@ class PCBAutoRouter:
                             (0.50, -0.25),
                             (-0.50, 0.25),
                             (0.50, 0.25),
-                            (0.40, 0.40),
-                            (-0.40, -0.40),
-                            (0.40, -0.40),
-                            (-0.40, 0.40),
                             (0.0, 0.50),
                             (0.0, -0.50),
                             (0.50, 0.0),
@@ -938,15 +1087,14 @@ class PCBAutoRouter:
                             if not (half_w - 1.0 > cand_x > -half_w + 1.0 and half_l - 1.0 > cand_y > -half_l + 1.0):
                                 continue
                             is_dense = math.hypot(dx, dy) < 0.65
-                            v_dia = 0.36 if is_dense else 0.45
-                            via_pad_r = v_dia / 2.0 + 0.15
+                            v_dia = 0.35 if is_dense else 0.45
+                            via_pad_r = v_dia / 2.0
+                            req_clearance = 0.12 if is_dense else 0.15
                             conflict = False
                             for obs in router.obstacles:
                                 if obs.net is not None and obs.net == net.name:
                                     continue
-                                edx = max(obs.min_x - cand_x, 0.0, cand_x - obs.max_x)
-                                edy = max(obs.min_y - cand_y, 0.0, cand_y - obs.max_y)
-                                if math.hypot(edx, edy) < via_pad_r:
+                                if obs.copper_dist(cand_x, cand_y) - via_pad_r < req_clearance:
                                     conflict = True
                                     break
                             if not conflict:
@@ -979,7 +1127,7 @@ class PCBAutoRouter:
                             traces.append(trace_seg)
 
                             # Register obstacle for the stitching via and trace
-                            v_r = v_dia / 2.0 + 0.15
+                            v_r = v_dia / 2.0 + 0.22
                             router.add_obstacle(
                                 Obstacle(
                                     min_x=best_vx - v_r,
@@ -990,7 +1138,7 @@ class PCBAutoRouter:
                                     net=net.name,
                                 )
                             )
-                            w_h = seg_w / 2.0 + 0.12
+                            w_h = max(seg_w / 2.0 + 0.12, router.grid_step + 0.01)
                             router.add_obstacle(
                                 Obstacle(
                                     min_x=min(px, best_vx) - w_h,
