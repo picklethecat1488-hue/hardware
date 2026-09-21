@@ -302,6 +302,13 @@ class TestBoardProvider(Provider):
             with Locations((0.0, length / 2.0, h_shell / 2.0)):
                 Box(slot_w, wall * 3.0, 6.0, mode=BuildMode.SUBTRACT)
 
+            # M.2 connector cutout through rear exterior wall (aligned with J1 at [0.0, -36.0, 0.8])
+            m2_w = self.settings.enclosure_m2_cutout_width
+            m2_h = self.settings.enclosure_m2_cutout_height
+            m2_z = -h_shell / 2.0 + wall + standoff_h + (m2_h / 2.0) - 0.5
+            with Locations((0.0, -length / 2.0, m2_z)):
+                Box(m2_w, wall * 3.0, m2_h, mode=BuildMode.SUBTRACT)
+
         return shell
 
     def enclosure_lid(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
@@ -561,6 +568,69 @@ class TestBoardProvider(Provider):
             # J2 FPC connector alignment markers
             with Locations((-10.0, 39.5), (10.0, 39.5)):
                 SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
+
+            # Component Reference Designators (BUG-066)
+            # Active ICs and Primary Modules
+            with Locations((0.0, 8.5)):
+                SilkscreenText("U1", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((18.0, -11.5)):
+                SilkscreenText("U2", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
+            with Locations((0.0, -32.5)):
+                SilkscreenText("J1", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((0.0, 35.5)):
+                SilkscreenText("J2", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((-17.5, 0.0)):
+                SilkscreenText("J3", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((-18.0, -12.5)):
+                SilkscreenText("Q1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
+            with Locations((-19.0, 12.5)):
+                SilkscreenText("U3", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-18.0, 24.5)):
+                SilkscreenText("U4", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-18.0, 38.0)):
+                SilkscreenText("SPK1", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((0.0, 17.0)):
+                SilkscreenText("Y1", layer="F.SilkS", font_size=0.8, thickness=0.12)
+
+            # Resistors
+            with Locations((14.5, -6.0)):
+                SilkscreenText("R1", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((14.5, -11.0)):
+                SilkscreenText("R2", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-14.5, 4.5)):
+                SilkscreenText("R3", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-14.5, -4.5)):
+                SilkscreenText("R4", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-5.5, 8.0)):
+                SilkscreenText("R5", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-11.5, -12.0)):
+                SilkscreenText("R6", layer="F.SilkS", font_size=0.7, thickness=0.10)
+
+            # Capacitors
+            with Locations((13.0, -17.5)):
+                SilkscreenText("C1", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-8.0, -6.5)):
+                SilkscreenText("C2", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
+            with Locations((-13.0, -5.5)):
+                SilkscreenText("C3", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((8.0, 10.5)):
+                SilkscreenText("C4", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-6.0, -11.5)):
+                SilkscreenText("C5", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-24.0, 12.5)):
+                SilkscreenText("C6", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-14.0, 12.5)):
+                SilkscreenText("C7", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-23.0, 23.5)):
+                SilkscreenText("C8", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-5.0, 16.5)):
+                SilkscreenText("C9", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((5.0, 16.5)):
+                SilkscreenText("C10", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-10.5, 10.5)):
+                SilkscreenText("C11", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((18.0, -7.5)):
+                SilkscreenText("C12", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
 
         return silk.texts
 

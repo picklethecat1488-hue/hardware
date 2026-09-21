@@ -1870,3 +1870,31 @@ def test_regression_enclosure_cad_feedback_and_assembly() -> None:
         -expected_h / 2.0 + provider.settings.enclosure_wall_thickness + provider.settings.standoff_height
     )
     assert abs(carrier_bb.min.Z - expected_carrier_bottom_z) < 0.05
+
+
+def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
+    """Verify BUG-065 (M.2 cutout in bottom enclosure) and BUG-066 (component silkscreens on carrier)."""
+    provider = TestBoardProvider()
+
+    # 1. BUG-065: Verify M.2 cutout settings and bottom enclosure build
+    assert provider.settings.enclosure_m2_cutout_width == 24.0
+    assert provider.settings.enclosure_m2_cutout_height == 5.0
+    bottom = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    assert bottom is not None and bottom.part is not None
+
+    # 2. BUG-066: Verify all component reference designators are present in silkscreen
+    silks = provider.silkscreen()
+    silk_texts = {t.text for t in silks}
+    expected_components = (
+        ["U1", "U2", "J1", "J2", "J3", "Q1", "U3", "U4", "SPK1", "Y1"]
+        + [f"R{i}" for i in range(1, 7)]
+        + [f"C{i}" for i in range(1, 13)]
+    )
+    for comp in expected_components:
+        assert comp in silk_texts, f"Component RefDes {comp} must be present in carrier silkscreen"
+
+    # 3. Verify zero DRC errors across carrier board with all silkscreen texts
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+    violations = checker.check_all(wiring=wiring)
+    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.errors]}"
