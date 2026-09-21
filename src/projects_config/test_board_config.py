@@ -174,6 +174,16 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_m2_cutout_height"])
 
     @property
+    def enclosure_gpio_cutout_width(self) -> float:
+        """Width of GPIO header cutout in enclosure lid in mm."""
+        return float(self._raw_data["enclosure_gpio_cutout_width"])
+
+    @property
+    def enclosure_gpio_cutout_length(self) -> float:
+        """Length of GPIO header cutout in enclosure lid in mm."""
+        return float(self._raw_data["enclosure_gpio_cutout_length"])
+
+    @property
     def test_tdr_rise_time_ps(self) -> float:
         """TDR step rise time in picoseconds for factory impedance testing."""
         return float(self._raw_data.get("test_tdr_rise_time_ps", 100.0))

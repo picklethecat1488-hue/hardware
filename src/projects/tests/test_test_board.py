@@ -34,3 +34,19 @@ def test_regression_bug_072_flex_tail_cutout_zero_intersection() -> None:
 
     assert inter_bottom.volume == 0.0, f"Flex tail intersects enclosure bottom: {inter_bottom.volume:.4f} mm^3"
     assert inter_lid.volume == 0.0, f"Flex tail intersects enclosure lid: {inter_lid.volume:.4f} mm^3"
+
+
+def test_regression_bug_073_gpio_cutout_and_key() -> None:
+    """Verify BUG-073: enclosure lid has GPIO cutout and key for J14."""
+    provider = TestBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+
+    wiring = Wiring(str(provider.wiring_path))
+    j14 = next(c for c in wiring.footprints if c.name == "J14")
+    gpio_x, gpio_y = j14.position[0], j14.position[1]
+
+    # GPIO cutout must pierce completely through the lid at J14 position
+    assert not lid.part.is_inside((gpio_x, gpio_y, wall / 2.0)), "Lid must have a cutout at J14 position"
+    assert not lid.part.is_inside((gpio_x, gpio_y + 10.0, wall / 2.0)), "Cutout must cover top GPIO pins"
+    assert not lid.part.is_inside((gpio_x, gpio_y - 10.0, wall / 2.0)), "Cutout must cover bottom GPIO pins"

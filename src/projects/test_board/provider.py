@@ -18,6 +18,7 @@ from build123d import (
     Axis,
     Mode as BuildMode,
     add,
+    Text,
 )
 from model import Wiring, DiagramOptions, DiagramStyle
 from model.pcb import (
@@ -358,6 +359,29 @@ class TestBoardProvider(Provider):
             # Flex ribbon passage slot at front edge
             with Locations((0.0, length / 2.0, 0.0)):
                 Box(slot_w, wall * 3.0, wall * 4.0, mode=BuildMode.SUBTRACT)
+
+            # GPIO breakout cutout through enclosure top (aligned with J14, BUG-073)
+            gpio_x, gpio_y = 24.5, -28.0
+            if self.wiring_path.exists():
+                wiring = Wiring(str(self.wiring_path))
+                j14_comp = next((c for c in wiring.footprints if c.name == "J14"), None)
+                if j14_comp:
+                    gpio_x, gpio_y = j14_comp.position[0], j14_comp.position[1]
+
+            gpio_w = self.settings.enclosure_gpio_cutout_width
+            gpio_l = self.settings.enclosure_gpio_cutout_length
+            with Locations((gpio_x, gpio_y, 0.0)):
+                Box(gpio_w, gpio_l, wall * 4.0, mode=BuildMode.SUBTRACT)
+
+            # GPIO key engraved on enclosure lid exterior surface
+            with BuildSketch(Plane.XY.offset(wall)) as s_key:
+                with Locations((gpio_x - 4.5, gpio_y)):
+                    Text("GPIO", font_size=2.5, rotation=90.0)
+                with Locations((gpio_x - 3.5, gpio_y + (gpio_l / 2.0) - 2.0)):
+                    Text("10", font_size=1.5, rotation=90.0)
+                with Locations((gpio_x - 3.5, gpio_y - (gpio_l / 2.0) + 2.0)):
+                    Text("1", font_size=1.5, rotation=90.0)
+            extrude(s_key.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
         return lid
 
