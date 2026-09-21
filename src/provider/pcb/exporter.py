@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import jinja2
 from build123d import Box, BuildPart, Compound, Part, Solid, export_step
-from model.pcb import BoardType, CapacitiveElectrodeModel, PCBConfig, StackupModel
+from model.pcb import BoardType, CapacitiveElectrodeModel, PCBConfig, PCBDesignRulesModel, StackupModel
 from model.wiring import Wiring, FootprintModel, NetModel
 from provider.pcb.capacitive import CapacitiveSensingGenerator
 from provider.pcb.silkscreen import find_empty_space_for_label
@@ -34,6 +34,7 @@ class PCBExporter:
         pcb_config: PCBConfig,
         wiring: Optional[Wiring] = None,
         subassembly: Optional[str] = None,
+        design_rules: Optional[PCBDesignRulesModel] = None,
     ):
         """Initialize the exporter with PCB stackup configuration and netlist."""
         self.config = pcb_config
@@ -46,6 +47,7 @@ class PCBExporter:
             or (self.config.name == "flex_tail")
             or (getattr(self.config, "board_type", None) == BoardType.FLEX)
         )
+        self.design_rules = design_rules or getattr(pcb_config, "design_rules", None) or PCBDesignRulesModel()
         self.jinja_env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(str(Path(__file__).parent.parent / "templates")),
             trim_blocks=True,
@@ -595,37 +597,7 @@ class PCBExporter:
 
         # Emit accompanying .kicad_pro project configuration so headless KiCad DRC applies matching design rules
         pro_path = out_path.with_suffix(".kicad_pro")
-        pro_data = {
-            "board": {
-                "design_settings": {
-                    "rules": {
-                        "min_clearance": 0.12,
-                        "min_track_width": 0.10,
-                        "min_copper_edge_clearance": 0.15,
-                        "copper_edge_clearance": 0.15,
-                        "board_edge_clearance": 0.15,
-                        "min_hole_to_hole": 0.15,
-                        "min_hole_clearance": 0.20,
-                        "hole_clearance": 0.20,
-                        "min_through_hole_diameter": 0.16,
-                        "min_via_diameter": 0.35,
-                        "min_through_hole_annular_width": 0.08,
-                        "min_via_annular_ring": 0.08,
-                    }
-                }
-            },
-            "net_settings": {
-                "classes": [
-                    {
-                        "name": "Default",
-                        "clearance": 0.12,
-                        "track_width": 0.15,
-                        "via_diameter": 0.36,
-                        "via_drill": 0.16,
-                    }
-                ]
-            },
-        }
+        pro_data = self.design_rules.to_kicad_pro_dict(net_classes=getattr(self.config, "net_classes", None))
         with open(pro_path, "w", encoding="utf-8") as f:
             json.dump(pro_data, f, indent=2)
 
@@ -633,7 +605,7 @@ class PCBExporter:
         if getattr(self.config, "copper_regions", None):
             from provider.pcb.kicad_cli import KiCadCLI
 
-            cli = KiCadCLI()
+            cli = KiCadCLI(design_rules=self.design_rules)
             if cli.is_available:
                 cli.refill_zones(out_path)
 
@@ -982,7 +954,7 @@ class PCBExporter:
         # 2. Invoke kicad-cli for manufacturing CAM files (Gerber RS-274X, drill, job)
         from provider.pcb.kicad_cli import KiCadCLI
 
-        cli = KiCadCLI()
+        cli = KiCadCLI(design_rules=self.design_rules)
         if cli.is_available:
             copper_count = (
                 len(self.config.stackup.copper_layers)

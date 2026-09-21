@@ -13,6 +13,7 @@ from model.pcb import (
     AssemblyTestModel,
     PCBMaterialModel,
     PCBMaterialsModel,
+    PCBDesignRulesModel,
     PCBConfig,
     SheetSize,
     SilkscreenTextModel,
@@ -363,3 +364,45 @@ footprints:
     assert len(j_hdr.pins) == 2
     assert j_hdr.pins[0].pad_type == "thru_hole"
     assert j_hdr.pins[0].drill_dia_mm == 1.00
+
+
+def test_pcb_design_rules_model_and_kicad_pro_generation():
+    """Verify PCBDesignRulesModel defaults, custom rules, and .kicad_pro dictionary serialization."""
+    default_rules = PCBDesignRulesModel()
+    assert default_rules.min_clearance_mm == 0.12
+    assert default_rules.min_track_width_mm == 0.10
+    assert default_rules.min_copper_edge_clearance_mm == 0.15
+
+    kicad_rules = default_rules.to_kicad_pro_rules()
+    assert kicad_rules["min_clearance"] == 0.12
+    assert kicad_rules["min_track_width"] == 0.10
+    assert kicad_rules["board_edge_clearance"] == 0.15
+
+    custom_rules = PCBDesignRulesModel(
+        min_clearance_mm=0.20,
+        min_track_width_mm=0.25,
+        min_copper_edge_clearance_mm=0.30,
+        min_via_diameter_mm=0.50,
+        default_track_width_mm=0.30,
+        default_via_diameter_mm=0.50,
+        default_via_drill_mm=0.25,
+    )
+    pro_dict = custom_rules.to_kicad_pro_dict(
+        net_classes=[
+            NetClassModel(
+                name="POWER",
+                clearance_mm=0.35,
+                trace_width_mm=0.50,
+                via_dia_mm=0.70,
+                via_drill_mm=0.35,
+            )
+        ]
+    )
+
+    assert pro_dict["board"]["design_settings"]["rules"]["min_clearance"] == 0.20
+    assert pro_dict["board"]["design_settings"]["rules"]["min_track_width"] == 0.25
+    assert len(pro_dict["net_settings"]["classes"]) == 2
+    assert pro_dict["net_settings"]["classes"][0]["name"] == "Default"
+    assert pro_dict["net_settings"]["classes"][0]["track_width"] == 0.30
+    assert pro_dict["net_settings"]["classes"][1]["name"] == "POWER"
+    assert pro_dict["net_settings"]["classes"][1]["clearance"] == 0.35

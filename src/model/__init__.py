@@ -44,6 +44,7 @@ from .pcb import (
     AssemblyTestModel,
     PCBMaterialModel,
     PCBMaterialsModel,
+    PCBDesignRulesModel,
     PCBConfig,
     SchematicLayoutModel,
     SchematicSheetModel,

@@ -129,6 +129,21 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["silkscreen_margin"])
 
     @property
+    def enclosure_foot_diameter(self) -> float:
+        """Diameter of rubber foot indentations on enclosure bottom in mm."""
+        return float(self._raw_data.get("enclosure_foot_diameter", 8.0))
+
+    @property
+    def enclosure_foot_depth(self) -> float:
+        """Depth of rubber foot indentations on enclosure bottom in mm."""
+        return float(self._raw_data.get("enclosure_foot_depth", 1.0))
+
+    @property
+    def enclosure_foot_inset(self) -> float:
+        """Inset distance of foot indentations from enclosure edge in mm."""
+        return float(self._raw_data.get("enclosure_foot_inset", 8.0))
+
+    @property
     def test_tdr_rise_time_ps(self) -> float:
         """TDR step rise time in picoseconds for factory impedance testing."""
         return float(self._raw_data.get("test_tdr_rise_time_ps", 100.0))

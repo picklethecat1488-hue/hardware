@@ -13,6 +13,7 @@ from model.pcb import (
     CapacitiveElectrodeModel,
     LayerType,
     PCBConfig,
+    PCBDesignRulesModel,
     SilkscreenTextModel,
     StackupLayerModel,
     StackupModel,
@@ -539,3 +540,48 @@ def test_provider_pcb_output_cad_archive(tmp_path: Path, mock_pcb_config: PCBCon
     assert "cpl" in outputs
     assert "schematic" in outputs
     assert "schematic_pdf" in outputs
+
+
+def test_export_kicad_pcb_with_design_rules(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
+    """Verify export_kicad_pcb generates matching .kicad_pro with custom design rules."""
+    custom_rules = PCBDesignRulesModel(
+        min_clearance_mm=0.22,
+        min_track_width_mm=0.18,
+        min_copper_edge_clearance_mm=0.25,
+        default_track_width_mm=0.25,
+        default_via_diameter_mm=0.45,
+        default_via_drill_mm=0.20,
+    )
+    exporter = PCBExporter(mock_pcb_config, mock_wiring, design_rules=custom_rules)
+    out_file = tmp_path / "test_rules.kicad_pcb"
+    exporter.export_kicad_pcb(out_file)
+
+    pro_file = out_file.with_suffix(".kicad_pro")
+    assert pro_file.is_file()
+    pro_data = json.loads(pro_file.read_text(encoding="utf-8"))
+    assert pro_data["board"]["design_settings"]["rules"]["min_clearance"] == 0.22
+    assert pro_data["board"]["design_settings"]["rules"]["min_track_width"] == 0.18
+    assert pro_data["board"]["design_settings"]["rules"]["board_edge_clearance"] == 0.25
+
+
+def test_kicad_cli_run_drc_syncs_design_rules(tmp_path: Path):
+    """Verify KiCadCLI.run_drc syncs custom design rules into .kicad_pro before running DRC."""
+    pcb_file = tmp_path / "board.kicad_pcb"
+    pcb_file.write_text("(kicad_pcb (version 20240108))\n", encoding="utf-8")
+    rpt_file = tmp_path / "board.rpt"
+
+    custom_rules = PCBDesignRulesModel(min_clearance_mm=0.30, min_track_width_mm=0.20)
+    cli = KiCadCLI(design_rules=custom_rules)
+
+    with patch.object(cli, "run_command") as mock_run:
+        mock_run.return_value = "dummy"
+        rpt_file.write_text(
+            "** Drc report for board **\n** Found 0 DRC violations **\n** Found 0 unconnected pads **\n** Found 0 Footprint errors **\n",
+            encoding="utf-8",
+        )
+        report = cli.run_drc(pcb_file, rpt_file)
+        assert report.passed
+        pro_file = pcb_file.with_suffix(".kicad_pro")
+        assert pro_file.is_file()
+        pro_data = json.loads(pro_file.read_text(encoding="utf-8"))
+        assert pro_data["board"]["design_settings"]["rules"]["min_clearance"] == 0.30

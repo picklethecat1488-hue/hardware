@@ -11,6 +11,8 @@ from model.pcb import BoardType, PCBConfig, TraceSegmentModel, ViaModel, TestPoi
 from model.wiring import Wiring
 from provider.geometry_utils import point_in_polygon, dist_point_to_segment
 
+CELL_CONFLICT_MARKER: str = "__CONFLICT__"
+
 
 def fillet_corner(
     p0: Tuple[float, float],
@@ -312,7 +314,7 @@ class AStarPCBRouter:
                         ):
                             self.blocked_cells[key] = obs.net
                         else:
-                            self.blocked_cells[key] = "__CONFLICT__"
+                            self.blocked_cells[key] = CELL_CONFLICT_MARKER
 
     def is_cell_blocked(
         self,
