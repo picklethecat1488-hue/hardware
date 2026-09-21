@@ -18,7 +18,8 @@ import webbrowser
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from provider.code_review.git_utils import GitReviewEngine, get_git_root
+from model.code_review import CommentModel, ReviewSeverity, ReviewStatus
+from provider.code_review.git_utils import GitReviewEngine, extract_line_snippet, get_git_root
 from provider.code_review.server import ReviewServer
 
 
@@ -63,6 +64,14 @@ def parse_arguments() -> argparse.Namespace:
         help="Persistent JSON file storing review comments and status.",
     )
     parser.add_argument(
+        "--db-file",
+        "--sqlite-file",
+        dest="db_file",
+        type=Path,
+        default=Path("build/code_review.sqlite"),
+        help="Persistent SQLite database file storing code review session and comments.",
+    )
+    parser.add_argument(
         "--fresh",
         action="store_true",
         help="Start a fresh review session, discarding previously concluded feedback.",
@@ -82,6 +91,51 @@ def parse_arguments() -> argparse.Namespace:
         "--export-only",
         action="store_true",
         help="Immediately export build/CR.md from existing review state without launching web server.",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List all active code review comments and file statuses in the terminal.",
+    )
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        help="When used with --list, only show unresolved comments.",
+    )
+    parser.add_argument(
+        "--add-comment",
+        type=str,
+        help="Quickly add a review comment with the specified body text.",
+    )
+    parser.add_argument(
+        "--file",
+        dest="comment_file",
+        type=str,
+        default="",
+        help="Target file path for quick-added comment.",
+    )
+    parser.add_argument(
+        "--line",
+        dest="comment_line",
+        type=int,
+        default=1,
+        help="Line number for quick-added comment.",
+    )
+    parser.add_argument(
+        "--severity",
+        choices=[s.value for s in ReviewSeverity],
+        default=ReviewSeverity.MUST_FIX.value,
+        help="Severity rating for quick-added comment.",
+    )
+    parser.add_argument(
+        "--resolve-comment",
+        type=str,
+        help="Mark a comment ID as resolved (e.g. --resolve-comment abc123).",
+    )
+    parser.add_argument(
+        "--verdict",
+        choices=[s.value for s in ReviewStatus],
+        help="Set overall review verdict from CLI.",
     )
     return parser.parse_args()
 
@@ -109,12 +163,13 @@ def launch_browser(url: str, target: str = "vscode") -> None:
 
 
 def main() -> None:
-    """Run code review server or perform direct markdown export."""
+    """Run code review server or perform direct CLI actions."""
     args = parse_arguments()
     repo_root = get_git_root()
 
     output_path = args.output if args.output.is_absolute() else (repo_root / args.output)
     state_path = args.state_file if args.state_file.is_absolute() else (repo_root / args.state_file)
+    db_path = args.db_file if args.db_file.is_absolute() else (repo_root / args.db_file)
 
     git_engine = GitReviewEngine(repo_root=repo_root)
     if not args.commits:
@@ -129,15 +184,94 @@ def main() -> None:
             print(f"Error resolving revisions: {err}", file=sys.stderr)
             sys.exit(1)
 
+    is_cli_only = bool(args.list or args.add_comment or args.resolve_comment or args.verdict or args.export_only)
+
     server = ReviewServer(
         host=args.host,
         port=args.port,
         repo_root=repo_root,
         markdown_output=output_path,
         state_file=state_path,
+        sqlite_file=db_path,
         revisions=revisions,
         fresh=args.fresh,
+        bind_and_activate=not is_cli_only,
     )
+
+    if args.add_comment:
+        if not args.comment_file:
+            print("Error: --file is required when adding a comment.", file=sys.stderr)
+            sys.exit(1)
+        import uuid
+        from datetime import datetime, timezone
+
+        snippet = extract_line_snippet(
+            file_path=args.comment_file,
+            start_line=args.comment_line,
+            end_line=args.comment_line,
+            commit=revisions[0] if revisions else "working",
+            repo_root=repo_root,
+        )
+        comment = CommentModel(
+            id=uuid.uuid4().hex[:12],
+            file_path=args.comment_file,
+            start_line=args.comment_line,
+            end_line=args.comment_line,
+            severity=ReviewSeverity(args.severity),
+            body=args.add_comment,
+            author="Reviewer",
+            code_snippet=snippet,
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+        server.session.comments.append(comment)
+        server.session.auto_update_status_on_comment()
+        server.save_and_sync()
+        print(f"Added comment [{comment.id}] on {comment.file_path}:{comment.start_line} [{comment.severity.value}]")
+        return
+
+    if args.resolve_comment:
+        target_c = None
+        for c in server.session.comments:
+            if c.id == args.resolve_comment:
+                c.resolved = True
+                target_c = c
+                break
+        if not target_c:
+            print(f"Comment '{args.resolve_comment}' not found.", file=sys.stderr)
+            sys.exit(1)
+        server.save_and_sync()
+        print(f"Resolved comment [{target_c.id}] on {target_c.file_path}:{target_c.start_line}")
+        return
+
+    if args.verdict:
+        server.session.verdict = ReviewStatus(args.verdict)
+        server.save_and_sync()
+        print(f"Updated review verdict to: {server.session.verdict.value}")
+        return
+
+    if args.list:
+        print("\n=== Code Review Session ===")
+        print(f"  Title:   {server.session.title}")
+        print(f"  Verdict: {server.session.verdict.value}")
+        counts = server.session.count_by_severity()
+        print(
+            f"  Findings: {len(server.session.comments)} total "
+            f"({counts.get('MUST_FIX', 0)} MUST_FIX, {counts.get('PROPOSAL', 0)} PROPOSAL, {counts.get('NIT', 0)} NIT)"
+        )
+        if not server.session.comments:
+            print("  No comments registered.")
+        else:
+            comments = [c for c in server.session.comments if not args.open or not c.resolved]
+            for c in comments:
+                chk = "[X]" if c.resolved else "[ ]"
+                summary_line = c.body.splitlines()[0] if c.body else ""
+                print(f"  {chk} [{c.id}] [{c.severity.value}] {c.file_path}:{c.start_line} -> {summary_line}")
+            total_open = sum(1 for c in server.session.comments if not c.resolved)
+            print(
+                f"\nShowing {len(comments)} comments ({total_open} unresolved, {len(server.session.comments)} total)."
+            )
+        print()
+        return
 
     if args.export_only:
         saved_md = server.save_and_sync()

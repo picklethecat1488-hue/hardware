@@ -30,6 +30,7 @@ from provider.code_review.git_utils import (
     get_git_root,
 )
 from provider.code_review.markdown_exporter import MarkdownReviewExporter
+from provider.code_review.sqlite_store import SQLiteReviewStore
 
 
 class ReviewRequestHandler(BaseHTTPRequestHandler):
@@ -314,6 +315,8 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
 class ReviewServer(ThreadingHTTPServer):
     """Multi-threaded HTTP review server with embedded state persistence."""
 
+    allow_reuse_address = True
+
     def __init__(
         self,
         host: str = "127.0.0.1",
@@ -321,8 +324,10 @@ class ReviewServer(ThreadingHTTPServer):
         repo_root: Optional[Path] = None,
         markdown_output: Optional[Path] = None,
         state_file: Optional[Path] = None,
+        sqlite_file: Optional[Path] = None,
         revisions: Optional[list[str]] = None,
         fresh: bool = False,
+        bind_and_activate: bool = True,
     ) -> None:
         """Initialize review HTTP server with config and persistent paths."""
         self.repo_root = repo_root or get_git_root()
@@ -331,16 +336,31 @@ class ReviewServer(ThreadingHTTPServer):
 
         self.markdown_output = markdown_output or (self.repo_root / "build" / "CR.md")
         self.state_file = state_file or (self.repo_root / "build" / "cr_feedback.json")
+        if sqlite_file is not None:
+            self.sqlite_file = sqlite_file
+        elif state_file is not None:
+            self.sqlite_file = state_file.with_suffix(".sqlite")
+        else:
+            self.sqlite_file = self.repo_root / "build" / "code_review.sqlite"
+        self.sqlite_store = SQLiteReviewStore(self.sqlite_file)
         self.is_serving = False
+        self.bind_and_activate = bind_and_activate
 
         resolved_revisions = self.git_engine.resolve_revisions(revisions) if revisions else None
 
-        # Load or initialize session: preserve feedback unless previously approved or requested fresh
+        # Load or initialize session: check SQLite first, fallback to JSON state file
         loaded_session = None
-        if not fresh and self.state_file.exists():
-            candidate = self.exporter.load_session_json(self.state_file)
-            if candidate is not None and candidate.verdict != ReviewStatus.APPROVED:
-                loaded_session = candidate
+        if not fresh:
+            if self.sqlite_file.exists():
+                candidate = self.sqlite_store.load_session()
+                if candidate is not None and candidate.verdict != ReviewStatus.APPROVED:
+                    loaded_session = candidate
+
+            if loaded_session is None and self.state_file.exists():
+                candidate = self.exporter.load_session_json(self.state_file)
+                if candidate is not None and candidate.verdict != ReviewStatus.APPROVED:
+                    loaded_session = candidate
+                    self.sqlite_store.save_session(candidate)
 
         if loaded_session is not None:
             self.session = loaded_session
@@ -354,20 +374,28 @@ class ReviewServer(ThreadingHTTPServer):
                 created_at=datetime.now(timezone.utc).isoformat(),
                 updated_at=datetime.now(timezone.utc).isoformat(),
             )
+            self.sqlite_store.save_session(self.session)
 
-        # Attempt port binding, fall back to next available port if requested port is taken
-        bound_port = port
-        while True:
-            try:
-                super().__init__((host, bound_port), ReviewRequestHandler)
-                break
-            except OSError as err:
-                if bound_port == 0 or bound_port > port + 50:
-                    raise err
-                bound_port += 1
-
-        self.actual_port = self.server_port
+        # Attempt port binding if bind_and_activate is enabled
         self.host = host
+        if bind_and_activate:
+            bound_port = port
+            while True:
+                try:
+                    super().__init__((host, bound_port), ReviewRequestHandler)
+                    break
+                except OSError as err:
+                    if bound_port == 0 or bound_port > port + 50:
+                        raise err
+                    bound_port += 1
+            self.actual_port = self.server_port
+        else:
+            self.actual_port = port
+
+    def server_close(self) -> None:
+        """Close socket if bound."""
+        if hasattr(self, "socket"):
+            super().server_close()
 
     def serve_forever(self, poll_interval: float = 0.5) -> None:
         """Handle requests until graceful shutdown is triggered."""
@@ -388,7 +416,9 @@ class ReviewServer(ThreadingHTTPServer):
         threading.Thread(target=_delayed_shutdown, daemon=True).start()
 
     def save_and_sync(self) -> Path:
-        """Persist session JSON and render updated Markdown report."""
+        """Persist session to SQLite, export JSON, and render updated Markdown report."""
+        self.session.updated_at = datetime.now(timezone.utc).isoformat()
+        self.sqlite_store.save_session(self.session)
         self.exporter.save_session_json(self.session, self.state_file)
         total_files = len(self.git_engine.get_changed_files("working"))
         return self.exporter.export_markdown(
