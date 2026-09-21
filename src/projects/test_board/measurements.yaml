@@ -30,6 +30,12 @@ enclosure_gpio_cutout_width: 5.0
 enclosure_gpio_cutout_length: 28.0
 enclosure_swd_cutout_width: 14.0
 enclosure_swd_cutout_height: 5.5
+enclosure_snap_ridge_depth: 0.4
+enclosure_snap_ridge_height: 1.0
+enclosure_snap_ridge_length: 8.0
+enclosure_snap_groove_depth: 0.5
+enclosure_snap_groove_height: 1.2
+enclosure_snap_groove_length: 10.0
 
 # Factory assembly test limits and parameters
 test_tdr_rise_time_ps: 100.0

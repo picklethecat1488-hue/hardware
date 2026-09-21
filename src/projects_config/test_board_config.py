@@ -194,6 +194,36 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_swd_cutout_height"])
 
     @property
+    def enclosure_snap_ridge_depth(self) -> float:
+        """Protrusion depth of snap-fit ridges on enclosure lid lip in mm."""
+        return float(self._raw_data["enclosure_snap_ridge_depth"])
+
+    @property
+    def enclosure_snap_ridge_height(self) -> float:
+        """Height of snap-fit ridges on enclosure lid lip in mm."""
+        return float(self._raw_data["enclosure_snap_ridge_height"])
+
+    @property
+    def enclosure_snap_ridge_length(self) -> float:
+        """Length of snap-fit ridges along enclosure rim in mm."""
+        return float(self._raw_data["enclosure_snap_ridge_length"])
+
+    @property
+    def enclosure_snap_groove_depth(self) -> float:
+        """Depth of matching snap-fit retaining grooves in enclosure bottom in mm."""
+        return float(self._raw_data["enclosure_snap_groove_depth"])
+
+    @property
+    def enclosure_snap_groove_height(self) -> float:
+        """Height of matching snap-fit retaining grooves in enclosure bottom in mm."""
+        return float(self._raw_data["enclosure_snap_groove_height"])
+
+    @property
+    def enclosure_snap_groove_length(self) -> float:
+        """Length of matching snap-fit retaining grooves in enclosure bottom in mm."""
+        return float(self._raw_data["enclosure_snap_groove_length"])
+
+    @property
     def test_tdr_rise_time_ps(self) -> float:
         """TDR step rise time in picoseconds for factory impedance testing."""
         return float(self._raw_data.get("test_tdr_rise_time_ps", 100.0))

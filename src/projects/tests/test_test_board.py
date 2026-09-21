@@ -87,3 +87,43 @@ def test_regression_bug_075_swd_cutout() -> None:
     assert not enclosure.part.is_inside((wall_x, -7.0, z_conn)), (
         "Enclosure bottom must have an SWD cutout through the left exterior wall at J5 position"
     )
+
+
+def test_regression_bug_076_enclosure_snap_fit() -> None:
+    """Verify BUG-076: enclosure lid snap fits to bottom shell without useless screw holes."""
+    provider = TestBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+
+    wall = provider.settings.enclosure_wall_thickness
+    lip_h = provider.settings.enclosure_lip_height
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
+    w_cavity = w - (2.0 * wall)
+    hole_x = (provider.settings.board_width / 2.0) - provider.settings.mounting_hole_inset
+    hole_y = (provider.settings.board_length / 2.0) - provider.settings.mounting_hole_inset
+
+    # 1. Lid must NOT have useless screw mounting holes (it should be solid at hole positions)
+    assert lid.part.is_inside((hole_x, hole_y, wall / 2.0)), "Lid must not have screw holes"
+    assert lid.part.is_inside((-hole_x, hole_y, wall / 2.0)), "Lid must not have screw holes"
+
+    # 2. Lid must have snap-fit ridges protruding from locating rim
+    lip_x = (w_cavity - 0.5) / 2.0
+    snap_ridge_probe_x = lip_x + 0.15
+    assert lid.part.is_inside((snap_ridge_probe_x, 28.0, -lip_h / 2.0)), (
+        "Lid must have snap-fit ridge on right locating lip"
+    )
+    assert lid.part.is_inside((-snap_ridge_probe_x, 28.0, -lip_h / 2.0)), (
+        "Lid must have snap-fit ridge on left locating lip"
+    )
+
+    # 3. Enclosure bottom must have matching snap-fit grooves recessed into cavity wall
+    groove_z = (h_shell / 2.0) - (lip_h / 2.0)
+    groove_probe_x = (w_cavity / 2.0) + 0.2
+    assert not enclosure.part.is_inside((groove_probe_x, 28.0, groove_z)), (
+        "Enclosure bottom must have snap-fit groove on right cavity wall"
+    )
+    assert not enclosure.part.is_inside((-groove_probe_x, 28.0, groove_z)), (
+        "Enclosure bottom must have snap-fit groove on left cavity wall"
+    )

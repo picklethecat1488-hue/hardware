@@ -357,6 +357,18 @@ class TestBoardProvider(Provider):
                         Text(label, font_size=1.6)
             extrude(s_periph_labels.sketch, amount=-0.3, mode=BuildMode.SUBTRACT)
 
+            # Matching snap-fit retaining grooves on inner cavity walls (BUG-076)
+            groove_depth = self.settings.enclosure_snap_groove_depth
+            groove_len = self.settings.enclosure_snap_groove_length
+            groove_h = self.settings.enclosure_snap_groove_height
+            snap_z_bottom = (h_shell / 2.0) - (self.settings.enclosure_lip_height / 2.0)
+            snap_y_positions = (-28.0, 28.0)
+            for sy in snap_y_positions:
+                with Locations(((w_cavity / 2.0) + (groove_depth / 2.0), sy, snap_z_bottom)):
+                    Box(groove_depth * 2.0, groove_len, groove_h, mode=BuildMode.SUBTRACT)
+                with Locations(((-w_cavity / 2.0) - (groove_depth / 2.0), sy, snap_z_bottom)):
+                    Box(groove_depth * 2.0, groove_len, groove_h, mode=BuildMode.SUBTRACT)
+
         return shell
 
     def enclosure_lid(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
@@ -374,9 +386,6 @@ class TestBoardProvider(Provider):
         r_inner = self.settings.corner_radius
         lip_h = self.settings.enclosure_lip_height
         slot_w = self.settings.flex_tail_width + 2.0
-        hole_dia = self.settings.mounting_hole_diameter
-        hole_x = (self.settings.board_width / 2.0) - self.settings.mounting_hole_inset
-        hole_y = (self.settings.board_length / 2.0) - self.settings.mounting_hole_inset
 
         with BuildPart() as lid:
             with BuildSketch() as s_lid:
@@ -389,14 +398,17 @@ class TestBoardProvider(Provider):
                 RectangleRounded(w_cavity - 3.5, l_cavity - 3.5, max(0.5, r_inner - 1.5), mode=BuildMode.SUBTRACT)
             extrude(s_lip.sketch, amount=-lip_h)
 
-            # Screw clearance holes matching standoff pilot holes
-            with Locations(
-                (hole_x, hole_y, 0.0),
-                (-hole_x, hole_y, 0.0),
-                (-hole_x, -hole_y, 0.0),
-                (hole_x, -hole_y, 0.0),
-            ):
-                Cylinder(radius=hole_dia / 2.0, height=wall * 4.0, mode=BuildMode.SUBTRACT)
+            # Snap-fit ridges on locating rim (BUG-076)
+            snap_depth = self.settings.enclosure_snap_ridge_depth
+            snap_len = self.settings.enclosure_snap_ridge_length
+            snap_h = self.settings.enclosure_snap_ridge_height
+            lip_x = (w_cavity - 0.5) / 2.0
+            snap_y_positions = (-28.0, 28.0)
+            for sy in snap_y_positions:
+                with Locations((lip_x + (snap_depth / 2.0), sy, -lip_h / 2.0)):
+                    Box(snap_depth, snap_len, snap_h)
+                with Locations((-lip_x - (snap_depth / 2.0), sy, -lip_h / 2.0)):
+                    Box(snap_depth, snap_len, snap_h)
 
             # Flex ribbon passage slot at front edge
             with Locations((0.0, length / 2.0, 0.0)):
@@ -458,7 +470,7 @@ class TestBoardProvider(Provider):
                 dz = j2_comp.position[2] - j_flex_comp.position[2]
                 tail_geom = tail.part.locate(Location((dx, dy, z_carrier + dz)))
 
-        z_lid = (h_shell / 2.0) + (wall / 2.0)
+        z_lid = h_shell / 2.0
         lid_geom = lid.part.locate(Location((0.0, 0.0, z_lid)))
 
         room.add("carrier_board", carrier_geom, color=(0.08, 0.40, 0.20), alpha=1.0)
