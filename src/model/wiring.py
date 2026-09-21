@@ -145,6 +145,10 @@ class FootprintModel(BaseModel):
         default=None,
         description="Optional display color for the component package in wiring diagrams",
     )
+    unconnected: bool = Field(
+        default=False,
+        description="Whether this component footprint is intentionally unconnected to the electrical netlist",
+    )
 
 
 class NetModel(BaseModel):
@@ -294,6 +298,7 @@ class Wiring:
                     layer=c.get("layer") or ("B.Cu" if position[2] < 0 else "F.Cu"),
                     truth_table=truth_table,
                     shape_ref=c.get("shape_ref"),
+                    unconnected=bool(c.get("unconnected", False)),
                 )
             )
         return components

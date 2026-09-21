@@ -1125,7 +1125,11 @@ class PCBDesignRulesChecker:
         connected_components = {comp_name for net in wiring.nets for comp_name, _ in net.pins}
         board_footprints = self.get_footprints_for_board(wiring)
         for fp in board_footprints:
-            if fp.name not in connected_components and getattr(fp, "pins", []):
+            if (
+                fp.name not in connected_components
+                and getattr(fp, "pins", [])
+                and not getattr(fp, "unconnected", False)
+            ):
                 violations.append(
                     DRCViolation(
                         rule_name="DANGLING_COMPONENT",

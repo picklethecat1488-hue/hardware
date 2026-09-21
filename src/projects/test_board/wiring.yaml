@@ -281,6 +281,7 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: FTSH-105-01-L-DV-K
     supplier_pn: SAMTEC-FTSH105-ND
+    unconnected: true
 
   # Peripheral Headers on Right Side of PCB (BUG-074)
   - name: J6
@@ -289,6 +290,7 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: SM04B-SRSS-TB
     supplier_pn: 455-1804-1-ND
+    unconnected: true
 
   - name: J7
     package: pin_header_1x4
@@ -296,6 +298,7 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: SM04B-SRSS-TB
     supplier_pn: 455-1804-1-ND
+    unconnected: true
 
   - name: J8
     package: pin_header_1x4
@@ -303,6 +306,7 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: SM04B-SRSS-TB
     supplier_pn: 455-1804-1-ND
+    unconnected: true
 
   - name: J9
     package: pin_header_1x6
@@ -310,6 +314,7 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: TSW-106-07-L-S
     supplier_pn: SAM1034-06-ND
+    unconnected: true
 
   - name: J10
     package: pin_header_1x6
@@ -317,6 +322,7 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: TSW-106-07-L-S
     supplier_pn: SAM1034-06-ND
+    unconnected: true
 
   # 10-Pin GPIO Breakout Header (Right side of PCB, accessible via top cutout for BUG-073)
   - name: J14
@@ -325,6 +331,7 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: TSW-110-07-L-S
     supplier_pn: SAM1034-10-ND
+    unconnected: true
 
   # Serial NAND Flash (FlexSPI Port A)
   - name: U8
@@ -333,6 +340,7 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: W25N01GVZEIG
     supplier_pn: W25N01GVZEIG-ND
+    unconnected: true
 
   # I2C RGB LED Driver & Status LED
   - name: U6
@@ -341,6 +349,7 @@ footprints:
     rotation: [0.0, 0.0, 0.0]
     mpn: LP5009PWR
     supplier_pn: 296-LP5009PWR-ND
+    unconnected: true
 
   - name: D1
     package: LED_RGB_4P
@@ -348,6 +357,7 @@ footprints:
     rotation: [0.0, 0.0, 0.0]
     mpn: CLV1A-FKB-CJ1M1F1BB7R3S3
     supplier_pn: CLV1A-FKB-ND
+    unconnected: true
 
   # Battery Fuel Gauge (near J13 battery connector)
   - name: U7
@@ -356,6 +366,7 @@ footprints:
     rotation: [0.0, 0.0, 0.0]
     mpn: MAX17048G+T10
     supplier_pn: MAX17048G+T10-ND
+    unconnected: true
 
   # USB-to-UART Bridge
   - name: U9
@@ -364,6 +375,8 @@ footprints:
     rotation: [0.0, 0.0, 0.0]
     mpn: FT232RNQ-REEL
     supplier_pn: 768-FT232RNQ-REEL-ND
+    unconnected: true
+
 
 nets:
   - name: GND
