@@ -3,7 +3,7 @@
 import math
 from enum import StrEnum
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field, model_validator
 
 # Default relative permittivity (epsilon_r) for standard FR-4 dielectric substrates
@@ -489,6 +489,98 @@ class NetClassModel(BaseModel):
     )
 
 
+class PCBDesignRulesModel(BaseModel):
+    """Design rules and manufacturing constraints for PCB routing, clearance, and DRC validation."""
+
+    min_clearance_mm: float = Field(
+        default=0.12, gt=0.0, description="Minimum copper-to-copper clearance in millimeters"
+    )
+    min_track_width_mm: float = Field(default=0.10, gt=0.0, description="Minimum copper trace width in millimeters")
+    min_copper_edge_clearance_mm: float = Field(
+        default=0.15, gt=0.0, description="Minimum clearance from copper features to board edge in millimeters"
+    )
+    min_hole_to_hole_mm: float = Field(
+        default=0.15, gt=0.0, description="Minimum distance between drill hole edges in millimeters"
+    )
+    min_hole_clearance_mm: float = Field(
+        default=0.20, gt=0.0, description="Minimum clearance from drill hole edge to copper in millimeters"
+    )
+    min_through_hole_diameter_mm: float = Field(
+        default=0.16, gt=0.0, description="Minimum finished drill diameter for through-holes in millimeters"
+    )
+    min_via_diameter_mm: float = Field(
+        default=0.35, gt=0.0, description="Minimum via outer pad diameter in millimeters"
+    )
+    min_through_hole_annular_width_mm: float = Field(
+        default=0.08, gt=0.0, description="Minimum through-hole annular ring copper width in millimeters"
+    )
+    min_via_annular_ring_mm: float = Field(
+        default=0.08, gt=0.0, description="Minimum via annular ring copper width in millimeters"
+    )
+    default_track_width_mm: float = Field(
+        default=0.15, gt=0.0, description="Default trace conductor width in millimeters"
+    )
+    default_via_diameter_mm: float = Field(
+        default=0.36, gt=0.0, description="Default via pad outer diameter in millimeters"
+    )
+    default_via_drill_mm: float = Field(
+        default=0.16, gt=0.0, description="Default via drill hole diameter in millimeters"
+    )
+
+    def to_kicad_pro_rules(self) -> Dict[str, float]:
+        """Convert design rules to KiCad .kicad_pro design_settings rules dictionary."""
+        return {
+            "min_clearance": self.min_clearance_mm,
+            "min_track_width": self.min_track_width_mm,
+            "min_copper_edge_clearance": self.min_copper_edge_clearance_mm,
+            "copper_edge_clearance": self.min_copper_edge_clearance_mm,
+            "board_edge_clearance": self.min_copper_edge_clearance_mm,
+            "min_hole_to_hole": self.min_hole_to_hole_mm,
+            "min_hole_clearance": self.min_hole_clearance_mm,
+            "hole_clearance": self.min_hole_clearance_mm,
+            "min_through_hole_diameter": self.min_through_hole_diameter_mm,
+            "min_via_diameter": self.min_via_diameter_mm,
+            "min_through_hole_annular_width": self.min_through_hole_annular_width_mm,
+            "min_via_annular_ring": self.min_via_annular_ring_mm,
+        }
+
+    def to_kicad_pro_dict(self, net_classes: Optional[List[NetClassModel]] = None) -> Dict[str, Any]:
+        """Convert design rules and net classes to a complete KiCad .kicad_pro dictionary."""
+        classes = []
+        if net_classes:
+            for nc in net_classes:
+                classes.append(
+                    {
+                        "name": nc.name,
+                        "clearance": nc.clearance_mm,
+                        "track_width": nc.trace_width_mm,
+                        "via_diameter": nc.via_dia_mm,
+                        "via_drill": nc.via_drill_mm,
+                    }
+                )
+        if not any(c["name"] == "Default" for c in classes):
+            classes.insert(
+                0,
+                {
+                    "name": "Default",
+                    "clearance": self.min_clearance_mm,
+                    "track_width": self.default_track_width_mm,
+                    "via_diameter": self.default_via_diameter_mm,
+                    "via_drill": self.default_via_drill_mm,
+                },
+            )
+        return {
+            "board": {
+                "design_settings": {
+                    "rules": self.to_kicad_pro_rules(),
+                }
+            },
+            "net_settings": {
+                "classes": classes,
+            },
+        }
+
+
 class BgaFanoutModel(BaseModel):
     """Configuration for Ball Grid Array (BGA) package breakout routing."""
 
@@ -784,6 +876,10 @@ class PCBConfig(BaseModel):
         default=None, description="2D polygon vertices defining non-rectangular or hull board outline"
     )
     test_points: List[TestPointModel] = Field(default_factory=list, description="Exposed test point probing pads")
+    design_rules: PCBDesignRulesModel = Field(
+        default_factory=PCBDesignRulesModel,
+        description="Manufacturing design rules and constraints for routing, clearance, and DRC checks",
+    )
 
     @property
     def sheet_dimensions_mm(self) -> Tuple[float, float]:

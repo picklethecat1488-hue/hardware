@@ -214,3 +214,141 @@ footprints:
         pad_type: smd
         pad_shape: roundrect
         pad_size_mm: [1.2, 0.9]
+
+  "LED_RGB_4P":
+    dimensions: [2.1, 2.1, 1.0]
+    pins:
+      - name: "1"
+        label: "A"
+        position: [-0.8, -0.8]
+        side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.7, 0.7]
+      - name: "2"
+        label: "R"
+        position: [0.8, -0.8]
+        side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.7, 0.7]
+      - name: "3"
+        label: "G"
+        position: [0.8, 0.8]
+        side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.7, 0.7]
+      - name: "4"
+        label: "B"
+        position: [-0.8, 0.8]
+        side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.7, 0.7]
+
+  "FPC-15P-0.5MM":
+    dimensions: [10.5, 4.0, 1.2]
+    pins:
+      - name: "1"
+        position: [-3.5, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "2"
+        position: [-3.0, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "3"
+        position: [-2.5, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "4"
+        position: [-2.0, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "5"
+        position: [-1.5, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "6"
+        position: [-1.0, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "7"
+        position: [-0.5, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "8"
+        position: [0.0, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "9"
+        position: [0.5, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "10"
+        position: [1.0, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "11"
+        position: [1.5, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "12"
+        position: [2.0, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "13"
+        position: [2.5, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "14"
+        position: [3.0, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "15"
+        position: [3.5, -1.2]
+        side: bottom
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.3, 1.2]
+      - name: "MP1"
+        position: [-4.8, 0.5]
+        side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [1.4, 2.0]
+      - name: "MP2"
+        position: [4.8, 0.5]
+        side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [1.4, 2.0]

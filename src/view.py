@@ -12,6 +12,7 @@ import time
 import pybullet as p
 from daemon import DaemonClient
 from model import AppConfig
+from model.pcb import BoardType
 from pathlib import Path
 from typing import Sequence, Optional, List, Any, cast, Iterable, Union
 from build123d import *  # type: ignore
@@ -206,9 +207,26 @@ class Viewer:
                 pcb_cfg = pcb_cfg.model_copy(update={"copper_regions": provider.pcb_config.copper_regions})
             if sub_pcb_config and not pcb_cfg.net_classes and provider.pcb_config.net_classes:
                 pcb_cfg = pcb_cfg.model_copy(update={"net_classes": provider.pcb_config.net_classes})
-            if sub_pcb_config and not pcb_cfg.traces and provider.pcb_config.traces:
+            if (
+                sub_pcb_config
+                and not pcb_cfg.silkscreen_texts
+                and provider.pcb_config.silkscreen_texts
+                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
+            ):
+                pcb_cfg = pcb_cfg.model_copy(update={"silkscreen_texts": provider.pcb_config.silkscreen_texts})
+            if (
+                sub_pcb_config
+                and not pcb_cfg.traces
+                and provider.pcb_config.traces
+                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
+            ):
                 pcb_cfg = pcb_cfg.model_copy(update={"traces": provider.pcb_config.traces})
-            if sub_pcb_config and not pcb_cfg.vias and provider.pcb_config.vias:
+            if (
+                sub_pcb_config
+                and not pcb_cfg.vias
+                and provider.pcb_config.vias
+                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
+            ):
                 pcb_cfg = pcb_cfg.model_copy(update={"vias": provider.pcb_config.vias})
 
             exporter = PCBExporter(pcb_cfg, wiring, subassembly=subassembly)
@@ -409,7 +427,17 @@ class Viewer:
                 )
                 self.logger.print(f"Exported H.264 MP4 video to {save_mp4}", symbol="✨")
             if not no_gui:
-                show(room.compound, names=["View"], collapse=Collapse.LEAVES, reset_camera=Camera.RESET)
+                is_diagram = any(Section.DIAGRAM in str(t) for t in input_targets)
+                top_cam = getattr(Camera, "TOP", Camera.RESET)
+                cam_mode = top_cam if (is_diagram or view_from == "top") else Camera.RESET
+                is_ortho = True if (is_diagram or view_from == "top") else None
+                show(
+                    room.compound,
+                    names=["View"],
+                    collapse=Collapse.LEAVES,
+                    reset_camera=cam_mode,
+                    ortho=is_ortho,
+                )
 
 
 def get_args():

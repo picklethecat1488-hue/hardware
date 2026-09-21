@@ -39,7 +39,9 @@ class BuildSilkscreen:
 
         active_pcb = BuildPcb.current()
         if active_pcb is not None:
-            active_pcb.silkscreen_texts.extend(self.texts)
+            for t in self.texts:
+                if t not in active_pcb.silkscreen_texts:
+                    active_pcb.silkscreen_texts.append(t)
 
     @classmethod
     def _get_context(cls) -> Optional["BuildSilkscreen"]:

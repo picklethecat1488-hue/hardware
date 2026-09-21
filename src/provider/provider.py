@@ -508,7 +508,18 @@ class Provider:
             else:
                 config.vias = list(p_vias)
 
-        # Fall back to shape metadata traces/vias if not present
+        # Silkscreen from provider context manager
+        if hasattr(self, "silkscreen") and callable(self.silkscreen):
+            p_silkscreen = self.silkscreen()
+            if p_silkscreen:
+                from provider.pcb.silkscreen import BuildSilkscreen
+
+                if isinstance(p_silkscreen, BuildSilkscreen):
+                    config.silkscreen_texts = list(p_silkscreen.texts)
+                else:
+                    config.silkscreen_texts = list(p_silkscreen)
+
+        # Fall back to shape metadata traces/vias/silkscreen if not present
         if config.shape_ref and config.shape_ref in self.part:
             part_builder = self.part[config.shape_ref]
             part_obj = part_builder(config.shape_ref, None, Mode.DEFAULT)
@@ -520,6 +531,8 @@ class Provider:
                     config.traces = pcb_meta.traces
                 if not config.vias and pcb_meta.vias:
                     config.vias = pcb_meta.vias
+                if not config.silkscreen_texts and pcb_meta.silkscreen_texts:
+                    config.silkscreen_texts = pcb_meta.silkscreen_texts
 
         return config
 

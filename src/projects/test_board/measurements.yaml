@@ -17,6 +17,9 @@ standoff_radius: 3.0
 standoff_hole_diameter: 2.2
 standoff_hole_depth: 4.0
 silkscreen_margin: 7.0
+enclosure_foot_diameter: 8.0
+enclosure_foot_depth: 1.0
+enclosure_foot_inset: 8.0
 
 # Factory assembly test limits and parameters
 test_tdr_rise_time_ps: 100.0

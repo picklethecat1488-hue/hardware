@@ -144,3 +144,197 @@ footprints:
         pad_size_mm: [1.8, 1.8]
         drill_dia_mm: 1.00
 
+  "pin_header_1x6":
+    dimensions: [15.24, 2.54, 8.5]
+    pins:
+      - name: "1"
+        position: [-6.35, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: roundrect
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "2"
+        position: [-3.81, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "3"
+        position: [-1.27, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "4"
+        position: [1.27, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "5"
+        position: [3.81, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "6"
+        position: [6.35, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+
+  "pin_header_1x10":
+    dimensions: [25.4, 2.54, 8.5]
+    pins:
+      - name: "1"
+        position: [-11.43, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: roundrect
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "2"
+        position: [-8.89, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "3"
+        position: [-6.35, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "4"
+        position: [-3.81, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "5"
+        position: [-1.27, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "6"
+        position: [1.27, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "7"
+        position: [3.81, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "8"
+        position: [6.35, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "9"
+        position: [8.89, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "10"
+        position: [11.43, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+
+  "pin_header_2x5_1.27mm":
+    dimensions: [6.35, 3.81, 5.0]
+    pins:
+      - name: "1"
+        position: [-2.54, -0.635]
+        side: left
+        pad_type: thru_hole
+        pad_shape: roundrect
+        pad_size_mm: [1.0, 1.0]
+        drill_dia_mm: 0.65
+      - name: "2"
+        position: [-2.54, 0.635]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.0, 1.0]
+        drill_dia_mm: 0.65
+      - name: "3"
+        position: [-1.27, -0.635]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.0, 1.0]
+        drill_dia_mm: 0.65
+      - name: "4"
+        position: [-1.27, 0.635]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.0, 1.0]
+        drill_dia_mm: 0.65
+      - name: "5"
+        position: [0.0, -0.635]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.0, 1.0]
+        drill_dia_mm: 0.65
+      - name: "6"
+        position: [0.0, 0.635]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.0, 1.0]
+        drill_dia_mm: 0.65
+      - name: "7"
+        position: [1.27, -0.635]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.0, 1.0]
+        drill_dia_mm: 0.65
+      - name: "8"
+        position: [1.27, 0.635]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.0, 1.0]
+        drill_dia_mm: 0.65
+      - name: "9"
+        position: [2.54, -0.635]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.0, 1.0]
+        drill_dia_mm: 0.65
+      - name: "10"
+        position: [2.54, 0.635]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.0, 1.0]
+        drill_dia_mm: 0.65
+

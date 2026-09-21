@@ -10,6 +10,7 @@ components:
     position: [-80.0, 0.0, 0.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [22.0, 50.0, 1.6]
+    color: cornflowerblue
     label:
       text: "M.2 Host PCIe"
       position: [-16.0, 0.0, 0.0]
@@ -36,6 +37,7 @@ components:
     position: [0.0, -80.0, 0.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [30.0, 18.0, 1.6]
+    color: darkorange
     label:
       text: "USB-C Source (5V)"
       position: [0.0, -14.0, 0.0]
@@ -59,6 +61,7 @@ components:
     position: [0.0, 0.0, 0.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [60.0, 90.0, 1.6]
+    color: forestgreen
     label:
       text: "Test Board Carrier PCB"
       position: [0.0, 0.0, 0.0]
@@ -129,6 +132,7 @@ components:
     position: [0.0, 85.0, 0.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [24.0, 54.0, 0.2]
+    color: goldenrod
     label:
       text: "Capacitive Flex Tail Sensor"
       position: [0.0, 32.0, 0.0]

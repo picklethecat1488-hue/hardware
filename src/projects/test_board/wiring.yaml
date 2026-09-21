@@ -58,7 +58,7 @@ footprints:
 
   - name: C1
     package: "0402"
-    position: [20.0, -15.0, 0.8]
+    position: [13.0, -15.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402KRX7R9BB104
     supplier_pn: 311-1438-1-ND
@@ -445,40 +445,12 @@ nets:
       - [U1, C2]
       - [J2, CLK_N]
 
-  - name: CAP_TX0
-    color: "#06b6d4"
+  - name: CAP_SHIELD
+    color: "#64748b"
     pins:
-      - [U2, CS0]
-      - [J2, CAP_TX0]
-      - [J4, CAP_TX0]
-
-  - name: CAP_RX0
-    color: "#0891b2"
-    pins:
-      - [U2, CS1]
-      - [J2, CAP_RX0]
-      - [J4, CAP_RX0]
-
-  - name: CAP_TX1
-    color: "#0284c7"
-    pins:
-      - [U2, CS2]
-      - [J2, CAP_TX1]
-      - [J4, CAP_TX1]
-
-  - name: CAP_RX1
-    color: "#0369a1"
-    pins:
-      - [U2, CS3]
-      - [J2, CAP_RX1]
-      - [J4, CAP_RX1]
-
-  - name: CAP_TX2
-    color: "#0ea5e9"
-    pins:
-      - [U2, CS4]
-      - [J2, CAP_TX2]
-      - [J4, CAP_TX2]
+      - [U2, SHIELD]
+      - [J2, CAP_SHIELD]
+      - [J4, CAP_SHIELD]
 
   - name: CAP_RX2
     color: "#38bdf8"
@@ -487,6 +459,20 @@ nets:
       - [J2, CAP_RX2]
       - [J4, CAP_RX2]
 
+  - name: CAP_RX1
+    color: "#0369a1"
+    pins:
+      - [U2, CS3]
+      - [J2, CAP_RX1]
+      - [J4, CAP_RX1]
+
+  - name: CAP_RX0
+    color: "#0891b2"
+    pins:
+      - [U2, CS1]
+      - [J2, CAP_RX0]
+      - [J4, CAP_RX0]
+
   - name: CAP_RX3
     color: "#67e8f9"
     pins:
@@ -494,12 +480,26 @@ nets:
       - [J2, CAP_RX3]
       - [J4, CAP_RX3]
 
-  - name: CAP_SHIELD
-    color: "#64748b"
+  - name: CAP_TX0
+    color: "#06b6d4"
     pins:
-      - [U2, SHIELD]
-      - [J2, CAP_SHIELD]
-      - [J4, CAP_SHIELD]
+      - [U2, CS0]
+      - [J2, CAP_TX0]
+      - [J4, CAP_TX0]
+
+  - name: CAP_TX1
+    color: "#0284c7"
+    pins:
+      - [U2, CS2]
+      - [J2, CAP_TX1]
+      - [J4, CAP_TX1]
+
+  - name: CAP_TX2
+    color: "#0ea5e9"
+    pins:
+      - [U2, CS4]
+      - [J2, CAP_TX2]
+      - [J4, CAP_TX2]
 
   - name: PDM_DAT
     color: "#9333ea"

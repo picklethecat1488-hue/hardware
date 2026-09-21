@@ -151,8 +151,13 @@ class TestBoardProvider(Provider):
                 if r not in pcb.copper_regions:
                     pcb.copper_regions.append(r)
 
-            pcb.traces.extend(self.traces())
-            pcb.vias.extend(self.vias())
+            with BuildSilkscreen() as silk:
+                silk.add(self.silkscreen())
+
+            with BuildTraces() as bt:
+                bt.add(self.traces())
+            with BuildVias() as bv:
+                bv.add(self.vias())
 
         return pcb
 
@@ -209,50 +214,12 @@ class TestBoardProvider(Provider):
                 from provider.pcb.router import PCBAutoRouter
 
                 f_traces, f_vias = PCBAutoRouter.load_routing_yaml(routing_flex_file)
-                tail.traces.extend(f_traces)
-                tail.vias.extend(f_vias)
+                with BuildTraces() as bt:
+                    bt.add(f_traces)
+                with BuildVias() as bv:
+                    bv.add(f_vias)
 
         return tail
-
-    def silkscreen(self) -> list[SilkscreenTextModel]:
-        """Define silkscreen text markings located relative to board geometry using CAD primitives."""
-        length_board = self.settings.board_length
-        margin = self.settings.silkscreen_margin
-        y_top = (length_board / 2.0) - margin
-        y_bottom = -(length_board / 2.0) + margin
-
-        with BuildSilkscreen() as silk:
-            # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
-            with Locations((0.0, 26.0)):
-                SilkscreenText("TEST BOARD CARRIER REV 1.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
-            with Locations((0.0, -28.0)):
-                SilkscreenText("LAYER 1-6 RIGID-FLEX", layer="F.SilkS", font_size=1.0, thickness=0.15)
-            with Locations((0.0, 0.0)):
-                SilkscreenText(
-                    "BOTTOM SHIELD / GROUND REF", layer="B.SilkS", font_size=1.0, thickness=0.15, mirror=True
-                )
-
-            # Global optical fiducials (crosshairs)
-            with Locations((-24.0, 38.0), (24.0, -38.0), (-24.0, -38.0)):
-                SilkscreenText("+", layer="F.SilkS", font_size=1.5, thickness=0.25)
-            with Locations((-24.0, 38.0), (24.0, -38.0), (-24.0, -38.0)):
-                SilkscreenText("+", layer="B.SilkS", font_size=1.5, thickness=0.25, mirror=True)
-
-            # Alignment markers for ICs and connectors
-            # U1 BGA pin-1 indicator
-            with Locations((-7.0, 7.0)):
-                SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            # U2 QFN pin-1 indicator
-            with Locations((15.0, -12.5)):
-                SilkscreenText("• Pin 1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
-            # J1 M.2 connector edge alignment markers
-            with Locations((-12.0, -38.0), (12.0, -38.0)):
-                SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
-            # J2 FPC connector alignment markers
-            with Locations((-10.0, 39.5), (10.0, 39.5)):
-                SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
-
-        return silk.texts
 
     def enclosure_bottom(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
         """Build the protective lower enclosure shell with mounting standoffs."""
@@ -298,6 +265,21 @@ class TestBoardProvider(Provider):
                 (hole_x, -hole_y, hole_z),
             ):
                 Cylinder(radius=standoff_hole_r, height=standoff_hole_depth, mode=BuildMode.SUBTRACT)
+
+            # Foot recess indentations on bottom exterior face (BUG-060)
+            foot_r = self.settings.enclosure_foot_diameter / 2.0
+            foot_depth = self.settings.enclosure_foot_depth
+            foot_inset = self.settings.enclosure_foot_inset
+            foot_x = (w / 2.0) - foot_inset
+            foot_y = (length / 2.0) - foot_inset
+            foot_z = -h_shell / 2.0 + (foot_depth / 2.0)
+            with Locations(
+                (foot_x, foot_y, foot_z),
+                (-foot_x, foot_y, foot_z),
+                (-foot_x, -foot_y, foot_z),
+                (foot_x, -foot_y, foot_z),
+            ):
+                Cylinder(radius=foot_r, height=foot_depth, mode=BuildMode.SUBTRACT)
 
         return shell
 
@@ -480,6 +462,41 @@ class TestBoardProvider(Provider):
     def vias(self) -> list[ViaModel]:
         """Return interlayer vias for the test board."""
         return self._routed_network[1]
+
+    def silkscreen(self) -> list[SilkscreenTextModel]:
+        """Return silkscreen markings for the test board carrier."""
+        with BuildSilkscreen() as silk:
+            # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
+            with Locations((0.0, 26.0)):
+                SilkscreenText("TEST BOARD CARRIER REV 1.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
+            with Locations((0.0, -28.0)):
+                SilkscreenText("LAYER 1-6 RIGID-FLEX", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((0.0, 0.0)):
+                SilkscreenText(
+                    "BOTTOM SHIELD / GROUND REF", layer="B.SilkS", font_size=1.0, thickness=0.15, mirror=True
+                )
+
+            # Global optical fiducials (crosshairs)
+            with Locations((-24.0, 38.0), (24.0, -38.0), (-24.0, -38.0)):
+                SilkscreenText("+", layer="F.SilkS", font_size=1.5, thickness=0.25)
+            with Locations((-24.0, 38.0), (24.0, -38.0), (-24.0, -38.0)):
+                SilkscreenText("+", layer="B.SilkS", font_size=1.5, thickness=0.25, mirror=True)
+
+            # Alignment markers for ICs and connectors
+            # U1 BGA pin-1 indicator
+            with Locations((-7.0, 7.0)):
+                SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            # U2 QFN pin-1 indicator
+            with Locations((15.0, -12.5)):
+                SilkscreenText("• Pin 1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
+            # J1 M.2 connector edge alignment markers
+            with Locations((-12.0, -38.0), (12.0, -38.0)):
+                SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            # J2 FPC connector alignment markers
+            with Locations((-10.0, 39.5), (10.0, 39.5)):
+                SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
+
+        return silk.texts
 
     @property
     def config(self) -> dict[str, Callable[[str, Optional[str]], Any]]:
