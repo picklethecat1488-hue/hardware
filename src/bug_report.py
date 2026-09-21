@@ -196,6 +196,9 @@ def main() -> None:
             print(f"Bug '{args.resolve}' not found in database.", file=sys.stderr)
             sys.exit(1)
         bug.status = BugStatus.RESOLVED
+        from datetime import datetime, timezone
+
+        bug.resolved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         if args.notes:
             bug.resolution_notes = args.notes
         server.save_and_sync()

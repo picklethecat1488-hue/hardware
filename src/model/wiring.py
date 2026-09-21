@@ -141,6 +141,10 @@ class FootprintModel(BaseModel):
         default=None,
         description="Optional subassembly or shape reference for this footprint (e.g. 'carrier_board', 'flex_tail')",
     )
+    color: Optional[str] = Field(
+        default=None,
+        description="Optional display color for the component package in wiring diagrams",
+    )
 
 
 class NetModel(BaseModel):
