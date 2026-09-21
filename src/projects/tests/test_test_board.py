@@ -1,5 +1,6 @@
 """Tests for test_board rigid-flex PCB and protective enclosure CAD geometry."""
 
+import pytest
 from build123d import Location
 from projects.test_board.provider import TestBoardProvider
 from model.wiring import Wiring
@@ -145,3 +146,28 @@ def test_regression_bug_077_ventilation_holes() -> None:
     assert not enclosure.part.is_inside((wall_x, 15.5, z_conn)), (
         "Enclosure bottom must have ventilation cutout through left exterior wall between U3 and U4 at Y=15.5"
     )
+
+
+def test_regression_bug_078_led_cutout_and_cover() -> None:
+    """Verify BUG-078: enclosure lid has LED cutout at D1 and clear LED cover part."""
+    provider = TestBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+
+    # Query D1 position from wiring
+    wiring = Wiring(str(provider.wiring_path))
+    d1 = next(c for c in wiring.footprints if c.name == "D1")
+    led_x, led_y = d1.position[0], d1.position[1]
+
+    # 1. Lid must have cutout at D1 LED position
+    assert not lid.part.is_inside((led_x, led_y, wall / 2.0)), "Lid must have an LED cutout at D1 position"
+
+    # 2. Provider must build led_cover part
+    assert "led_cover" in provider.part, "Provider must register 'led_cover' part target"
+    cover = provider.led_cover("led_cover", None, Mode.DEFAULT)
+    assert cover is not None
+    bbox = cover.part.bounding_box()
+    assert bbox.size.X == pytest.approx(7.0, abs=0.1)
+    assert bbox.size.Y == pytest.approx(7.0, abs=0.1)
+    assert bbox.size.Z == pytest.approx(4.0, abs=0.1)
+    assert "mount" in cover.part.joints, "LED cover must have 'mount' RigidJoint"

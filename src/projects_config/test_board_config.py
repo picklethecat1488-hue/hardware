@@ -244,6 +244,31 @@ class TestBoardConfig(BaseModel):
         return int(self._raw_data["enclosure_vent_count"])
 
     @property
+    def led_flange_thickness(self) -> float:
+        """Thickness of top flange on clear LED cover in mm."""
+        return float(self._raw_data["led_flange_thickness"])
+
+    @property
+    def led_flange_width(self) -> float:
+        """Width of top square flange on clear LED cover in mm."""
+        return float(self._raw_data["led_flange_width"])
+
+    @property
+    def led_hole_width(self) -> float:
+        """Width of square LED cutout hole through enclosure lid in mm."""
+        return float(self._raw_data["led_hole_width"])
+
+    @property
+    def led_plug_length(self) -> float:
+        """Downward insertion length of LED cover plug in mm."""
+        return float(self._raw_data["led_plug_length"])
+
+    @property
+    def led_plug_width(self) -> float:
+        """Width of square LED cover plug in mm."""
+        return float(self._raw_data["led_plug_width"])
+
+    @property
     def test_tdr_rise_time_ps(self) -> float:
         """TDR step rise time in picoseconds for factory impedance testing."""
         return float(self._raw_data.get("test_tdr_rise_time_ps", 100.0))

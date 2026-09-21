@@ -4,12 +4,14 @@ from pathlib import Path
 from typing import cast, Callable, Sequence, Any, Optional
 from functools import cached_property
 from build123d import (
+    Align,
     BuildPart,
     BuildSketch,
     Polygon,
     RectangleRounded,
     Plane,
     Location,
+    RigidJoint,
     extrude,
     Box,
     Cylinder,
@@ -455,7 +457,38 @@ class TestBoardProvider(Provider):
                     Text("1", font_size=1.5, rotation=90.0)
             extrude(s_key.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
+            # LED cutout through enclosure top (aligned with D1, BUG-078)
+            led_x, led_y = 17.0, 10.0
+            if self.wiring_path.exists():
+                wiring = Wiring(str(self.wiring_path))
+                d1_comp = next((c for c in wiring.footprints if c.name == "D1"), None)
+                if d1_comp:
+                    led_x, led_y = d1_comp.position[0], d1_comp.position[1]
+
+            led_hole_w = self.settings.led_hole_width
+            with Locations((led_x, led_y, 0.0)):
+                Box(led_hole_w, led_hole_w, wall * 4.0, mode=BuildMode.SUBTRACT)
+
+        RigidJoint("led_port", lid.part, Location((led_x, led_y, wall)))
+
         return lid
+
+    def led_cover(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
+        """Build a translucent push-fit cover/diffuser for the RGB status LED."""
+        flange_w = self.settings.led_flange_width
+        flange_t = self.settings.led_flange_thickness
+        plug_w = self.settings.led_plug_width
+        plug_l = self.settings.led_plug_length
+
+        with BuildPart() as cover:
+            Box(flange_w, flange_w, flange_t, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            fillet(cover.edges().filter_by(Axis.Z), radius=1.0)
+
+            Box(plug_w, plug_w, plug_l, align=(Align.CENTER, Align.CENTER, Align.MAX))
+
+        RigidJoint("mount", cover.part, Location((0, 0, 0)))
+
+        return cover
 
     def view_product(self, room: Room, mode: Mode) -> None:
         """Assemble complete rigid-flex PCB and protective housing for 3D inspection."""
@@ -463,6 +496,7 @@ class TestBoardProvider(Provider):
         tail = self.flex_tail("flex_tail", None, mode)
         enclosure = self.enclosure_bottom("enclosure_bottom", None, mode)
         lid = self.enclosure_lid("enclosure_lid", None, mode)
+        cover = self.led_cover("led_cover", None, mode)
 
         wall = self.settings.enclosure_wall_thickness
         standoff_h = self.settings.standoff_height
@@ -491,10 +525,20 @@ class TestBoardProvider(Provider):
         z_lid = h_shell / 2.0
         lid_geom = lid.part.locate(Location((0.0, 0.0, z_lid)))
 
+        led_x, led_y = 17.0, 10.0
+        if self.wiring_path.exists():
+            wiring = Wiring(self.wiring_path)
+            d1_comp = next((c for c in wiring.footprints if c.name == "D1"), None)
+            if d1_comp:
+                led_x, led_y = d1_comp.position[0], d1_comp.position[1]
+
+        cover_geom = cover.part.locate(Location((led_x, led_y, z_lid + wall)))
+
         room.add("carrier_board", carrier_geom, color=(0.08, 0.40, 0.20), alpha=1.0)
         room.add("flex_tail", tail_geom, color=(0.85, 0.65, 0.15), alpha=0.9)
         room.add("enclosure_bottom", enclosure.part, color=(0.15, 0.16, 0.20), alpha=0.4)
         room.add("enclosure_lid", lid_geom, color=(0.20, 0.22, 0.28), alpha=0.4)
+        room.add("led_cover", cover_geom, color=(0.90, 0.95, 1.0), alpha=0.6)
 
     def diagram_product(self, room: Room, targets: Sequence[str], mode: Mode) -> None:
         """Populate product mechanical diagram elements."""
@@ -528,6 +572,7 @@ class TestBoardProvider(Provider):
             "flex_tail": self.flex_tail,
             "enclosure_bottom": self.enclosure_bottom,
             "enclosure_lid": self.enclosure_lid,
+            "led_cover": self.led_cover,
         }
 
     @property

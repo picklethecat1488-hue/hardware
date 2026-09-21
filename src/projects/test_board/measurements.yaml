@@ -40,6 +40,11 @@ enclosure_vent_slot_width: 1.5
 enclosure_vent_slot_height: 5.0
 enclosure_vent_slot_spacing: 2.5
 enclosure_vent_count: 3
+led_flange_thickness: 1.0
+led_flange_width: 7.0
+led_hole_width: 5.0
+led_plug_length: 3.0
+led_plug_width: 4.8
 
 # Factory assembly test limits and parameters
 test_tdr_rise_time_ps: 100.0
