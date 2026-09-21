@@ -1197,8 +1197,6 @@ def test_code_review_cli_features(
 ) -> None:
     """Verify code_review.py CLI commands for comment addition, resolution, and listing."""
     db_file = tmp_path / "cli_test.sqlite"
-    state_file = tmp_path / "cli_test.json"
-    md_file = tmp_path / "cli_test.md"
 
     from code_review import main
 
@@ -1209,10 +1207,6 @@ def test_code_review_cli_features(
             "code_review.py",
             "--db-file",
             str(db_file),
-            "--state-file",
-            str(state_file),
-            "--output",
-            str(md_file),
             "--add-comment",
             "Check crystal routing",
             "--file",
@@ -1234,10 +1228,6 @@ def test_code_review_cli_features(
             "code_review.py",
             "--db-file",
             str(db_file),
-            "--state-file",
-            str(state_file),
-            "--output",
-            str(md_file),
             "--list",
         ],
     )
@@ -1260,10 +1250,6 @@ def test_code_review_cli_features(
             "code_review.py",
             "--db-file",
             str(db_file),
-            "--state-file",
-            str(state_file),
-            "--output",
-            str(md_file),
             "--resolve-comment",
             cid,
         ],
@@ -1279,10 +1265,6 @@ def test_code_review_cli_features(
             "code_review.py",
             "--db-file",
             str(db_file),
-            "--state-file",
-            str(state_file),
-            "--output",
-            str(md_file),
             "--list",
             "--open",
         ],

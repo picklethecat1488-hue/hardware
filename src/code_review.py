@@ -1,12 +1,12 @@
-"""Interactive Quake-styled Code Review Tool and Markdown Exporter.
+"""Interactive Quake-styled Code Review Tool and SQLite Review Store.
 
 Launches a local browser-based review workstation with a Quake retro console UI,
 allowing line-by-line diff inspection, inline review feedback, terminal CLI commands,
-and automated export to GitHub-flavored Markdown (build/CR.md).
+backed fully by an ACID SQLite database (build/code_review.sqlite).
 
 Usage:
     python src/code_review.py [commit1] [commit2] ...
-    python src/code_review.py --port 8765 --output build/CR.md
+    python src/code_review.py --port 8765
 """
 
 import argparse
@@ -30,7 +30,7 @@ def parse_arguments() -> argparse.Namespace:
         Parsed argument namespace.
     """
     parser = argparse.ArgumentParser(
-        description="GLQuake Code Review Terminal & Markdown Exporter",
+        description="GLQuake Code Review Terminal & SQLite Review Store",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -49,19 +49,6 @@ def parse_arguments() -> argparse.Namespace:
         type=str,
         default="127.0.0.1",
         help="Host interface address to bind.",
-    )
-    parser.add_argument(
-        "--output",
-        "-o",
-        type=Path,
-        default=Path("build/CR.md"),
-        help="Destination markdown file for review findings.",
-    )
-    parser.add_argument(
-        "--state-file",
-        type=Path,
-        default=Path("build/cr_feedback.json"),
-        help="Persistent JSON file storing review comments and status.",
     )
     parser.add_argument(
         "--db-file",
@@ -86,11 +73,6 @@ def parse_arguments() -> argparse.Namespace:
         "--no-browser",
         action="store_true",
         help="Disable automatic browser opening on server launch (alias for --browser none).",
-    )
-    parser.add_argument(
-        "--export-only",
-        action="store_true",
-        help="Immediately export build/CR.md from existing review state without launching web server.",
     )
     parser.add_argument(
         "--list",
@@ -167,9 +149,9 @@ def main() -> None:
     args = parse_arguments()
     repo_root = get_git_root()
 
-    output_path = args.output if args.output.is_absolute() else (repo_root / args.output)
-    state_path = args.state_file if args.state_file.is_absolute() else (repo_root / args.state_file)
     db_path = args.db_file if args.db_file.is_absolute() else (repo_root / args.db_file)
+    state_path = db_path.with_suffix(".json")
+    markdown_path = db_path.with_suffix(".md")
 
     git_engine = GitReviewEngine(repo_root=repo_root)
     if not args.commits:
@@ -184,13 +166,13 @@ def main() -> None:
             print(f"Error resolving revisions: {err}", file=sys.stderr)
             sys.exit(1)
 
-    is_cli_only = bool(args.list or args.add_comment or args.resolve_comment or args.verdict or args.export_only)
+    is_cli_only = bool(args.list or args.add_comment or args.resolve_comment or args.verdict)
 
     server = ReviewServer(
         host=args.host,
         port=args.port,
         repo_root=repo_root,
-        markdown_output=output_path,
+        markdown_output=markdown_path,
         state_file=state_path,
         sqlite_file=db_path,
         revisions=revisions,
@@ -273,12 +255,7 @@ def main() -> None:
         print()
         return
 
-    if args.export_only:
-        saved_md = server.save_and_sync()
-        print(f"Exported code review markdown report to: {saved_md}")
-        return
-
-    # Initial sync to ensure build/CR.md exists immediately
+    # Initial sync to ensure SQLite database is ready
     server.save_and_sync()
     url = server.get_url()
 
@@ -295,7 +272,7 @@ def main() -> None:
   GLQUAKE CODE REVIEW TERMINAL // HUD v1.09
 ======================================================================
   * Dashboard URL  : {url}
-  * Markdown Target: {output}
+  * Database       : {db_path}
   * Revisions      : {revs}
   * Target Browser : {browser}
   * Press [Ctrl+C] to conclude session and shut down server.
@@ -305,7 +282,7 @@ def main() -> None:
 ======================================================================
 """.format(
         url=url,
-        output=output_path,
+        db_path=db_path,
         revs=rev_desc,
         browser="VS Code (Integrated Simple Browser)" if args.browser == "vscode" else args.browser.upper(),
     )
@@ -325,11 +302,11 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\nConcluding code review session via interrupt...")
     finally:
-        final_md = server.save_and_sync()
+        server.save_and_sync()
         server.server_close()
         verdict_str = server.session.verdict.value if server.session else "IN_REVIEW"
         print(f"\n[REVIEW CONCLUDED] Overall Verdict: [{verdict_str}]")
-        print(f"Final review findings exported to: {final_md}")
+        print(f"Review session saved to SQLite database: {db_path}")
         print("Review server shut down. Terminal released.\n")
 
 
