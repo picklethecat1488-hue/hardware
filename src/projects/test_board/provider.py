@@ -581,6 +581,12 @@ class TestBoardProvider(Provider):
                 SilkscreenText("J2", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((-17.5, 0.0)):
                 SilkscreenText("J3", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((-23.0, 19.5)):
+                SilkscreenText("J13", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-24.0, 13.5)):
+                SilkscreenText("+", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-22.0, 13.5)):
+                SilkscreenText("-", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((-18.0, -12.5)):
                 SilkscreenText("Q1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
             with Locations((-19.0, 12.5)):
@@ -631,6 +637,8 @@ class TestBoardProvider(Provider):
                 SilkscreenText("C11", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((18.0, -7.5)):
                 SilkscreenText("C12", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
+            with Locations((-20.0, 15.5)):
+                SilkscreenText("C13", layer="F.SilkS", font_size=0.7, thickness=0.10)
 
         return silk.texts
 

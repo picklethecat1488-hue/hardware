@@ -109,6 +109,7 @@ graph TD
 | **`J9`** | **JST-SH 6-Pin Micro-Header** | Expansion SPI Bus Header | 1.0mm Pitch Side-Entry SMD | `SPI0` (`T6`, `T7`, `R8`, `R9`) | 4-wire SPI peripheral bus (SCK, MOSI, MISO, CS#). |
 | **`J10`** | **JST-SH 4-Pin Micro-Header** | Expansion UART Bus Header | 1.0mm Pitch Side-Entry SMD | `UART1` (`A4`, `B3`) | Dedicated asynchronous serial link for external radios or modules. |
 | **`J14`** | **JST-SH 10-Pin Micro-Header** | General-Purpose GPIO Breakout Header | 1.0mm Pitch Side-Entry SMD | `GPIO0`..`GPIO9` (Port 4 pins) | 10 dedicated digital IO lines supporting timer, PLU, and FlexIO. |
+| **`J13`** | **JST-PH 2-Pin Connector (`S2B-PH-K-S`)** | 1S Li-Ion / LiPo Battery Power Input Connector | 2.0mm Pitch Thru-Hole (`JST-PH-2P`) | `VBAT`, `GND` | Direct connection for 3.7V Li-Ion battery pack with polarized mating shroud. |
 
 ## Technical Integration Notes
 

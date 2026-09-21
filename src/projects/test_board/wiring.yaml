@@ -42,6 +42,21 @@ footprints:
     mpn: HIROSE-FH35C-30S
     supplier_pn: H1234-ND
 
+  # Battery Interface: 2-pin JST-PH 2.0mm pitch for 1S Li-Ion / LiPo cell (BUG-070)
+  - name: J13
+    package: JST-PH-2P
+    position: [-23.0, 16.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: S2B-PH-K-S
+    supplier_pn: 455-1165-ND
+
+  - name: C13
+    package: "0603"
+    position: [-20.0, 14.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CL10A106KP8NNNC
+    supplier_pn: 1276-1189-1-ND
+
   - name: R1
     package: "0402"
     position: [12.0, -6.0, 0.8]
@@ -295,6 +310,8 @@ nets:
       - [C4, "2"]
       - [C5, "2"]
       - [C12, "2"]
+      - [J13, "2"]
+      - [C13, "2"]
 
   - name: 3V3
     color: "#dc2626"
@@ -325,6 +342,13 @@ nets:
       - [U3, "1"]
       - [U3, "3"]
       - [C6, "1"]
+
+  - name: VBAT
+    color: "#f59e0b"
+    pins:
+      - [J13, "1"]
+      - [C13, "1"]
+      - [U3, "4"]
 
   - name: CC1
     color: "#0284c7"

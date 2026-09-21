@@ -401,7 +401,7 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 29
+    assert len(wiring.footprints) == 31
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
@@ -410,6 +410,8 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert "J1" in footprint_names
     assert "J2" in footprint_names
     assert "J3" in footprint_names
+    assert "J13" in footprint_names
+    assert "C13" in footprint_names
     assert "U5" in footprint_names
     assert "Y1" in footprint_names
     assert "R1" in footprint_names
@@ -440,11 +442,11 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 29  # header + 28 carrier components (J4 is on flex tail)
+    assert len(bom_lines) == 31  # header + 30 carrier components (J4 is on flex tail)
     assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 29  # header + 28 carrier components
+    assert len(pos_lines) == 31  # header + 30 carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -1922,3 +1924,46 @@ def test_regression_schematic_page_boundary_drc_and_layout(tmp_path: Path) -> No
     pdf_out = diag.render_pdf(tmp_path / "test_board_schematic.pdf")
     assert pdf_out.is_file()
     assert pdf_out.stat().st_size > 5000
+
+
+def test_regression_battery_connector_j13(tmp_path: Path) -> None:
+    """Verify BUG-070: JST-PH battery connector J13, C13 decoupling, and VBAT net."""
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+
+    # 1. Verify J13 and C13 are defined in wiring footprints
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+    assert "J13" in fp_map, "J13 battery connector footprint must be defined"
+    assert "C13" in fp_map, "C13 battery bypass capacitor footprint must be defined"
+    assert fp_map["J13"].package == "JST-PH-2P"
+
+    # 2. Verify VBAT and GND connectivity
+    vbat_net = next((n for n in wiring.nets if n.name == "VBAT"), None)
+    assert vbat_net is not None, "VBAT net must be defined"
+    vbat_pins = set(vbat_net.pins)
+    assert ("J13", "1") in vbat_pins
+    assert ("C13", "1") in vbat_pins
+    assert ("U3", "4") in vbat_pins
+
+    gnd_net = next((n for n in wiring.nets if n.name == "GND"), None)
+    assert gnd_net is not None, "GND net must be defined"
+    gnd_pins = set(gnd_net.pins)
+    assert ("J13", "2") in gnd_pins
+    assert ("C13", "2") in gnd_pins
+
+    # 3. Verify J13, C13, and polarity marks in carrier silkscreen
+    silks = provider.silkscreen()
+    silk_texts = {t.text for t in silks}
+    assert "J13" in silk_texts, "J13 silkscreen marking must be present"
+    assert "C13" in silk_texts, "C13 silkscreen marking must be present"
+    assert "+" in silk_texts and "-" in silk_texts
+
+    # 4. Verify 0 DRC violations across board and schematic
+    violations = checker.check_all(wiring=wiring)
+    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
+
+    schematic_violations = checker.check_schematic(wiring=wiring)
+    assert len(schematic_violations.errors) == 0, (
+        f"Schematic DRC errors found: {[v.description for v in schematic_violations.errors]}"
+    )

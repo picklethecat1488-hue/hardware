@@ -170,13 +170,15 @@ schematic_sheets:
       R3: ["1", "2"]
       R4: ["1", "2"]
 
-  - title: 3.3V LDO Voltage Regulation
-    description: Low-dropout linear voltage regulator converting VBUS to 3.3V system rail
-    components: [U3, C6, C7]
+  - title: 3.3V LDO Voltage Regulation & Battery Power
+    description: Low-dropout linear voltage regulator and 1S Li-Ion battery power input
+    components: [U3, C6, C7, J13, C13]
     pin_breakouts:
-      U3: ["1", "2", "3", "5"]
+      U3: ["1", "2", "3", "4", "5"]
       C6: ["1", "2"]
       C7: ["1", "2"]
+      J13: ["1", "2"]
+      C13: ["1", "2"]
 
   - title: Power Distribution & Load Switch
     description: Switched power rail MOSFET switch and primary system decoupling
