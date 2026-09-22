@@ -2111,3 +2111,34 @@ def test_regression_bug_082_carrier_board_routing_and_kicad_drc(tmp_path: Path):
             f"KiCad DRC failed with {kicad_report.error_count} error(s):\n{kicad_report.summary()}"
         )
         assert kicad_report.error_count == 0, f"KiCad DRC reported errors: {kicad_report.summary()}"
+
+
+def test_regression_bug_084_carrier_board_and_schematic_revision_2_0(tmp_path: Path):
+    """Verify BUG-084: carrier_board files, schematics, and silkscreen reflect Revision 2.0."""
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.exporter import PCBExporter
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_cfg = provider.pcb_config
+
+    # 1. Config revision must be 2.0
+    assert pcb_cfg.revision == "2.0", f"Expected revision '2.0', got '{pcb_cfg.revision}'"
+
+    # 2. Silkscreen text on carrier board must reflect REV 2.0
+    carrier_texts = [st.text for st in pcb_cfg.silkscreen_texts]
+    assert "TEST BOARD CARRIER REV 2.0" in carrier_texts, (
+        f"Silkscreen texts must contain 'TEST BOARD CARRIER REV 2.0', got: {carrier_texts}"
+    )
+
+    # 3. Export KiCad PCB and schematic and verify revision 2.0 in output files
+    exporter = PCBExporter(pcb_cfg, wiring, subassembly=None)
+    pcb_file = tmp_path / "carrier_board.kicad_pcb"
+    sch_file = tmp_path / "carrier_board.kicad_sch"
+    exporter.export_kicad_pcb(pcb_file)
+    exporter.export_kicad_sch(sch_file)
+
+    pcb_text = pcb_file.read_text(encoding="utf-8")
+    sch_text = sch_file.read_text(encoding="utf-8")
+    assert '(rev "2.0")' in pcb_text, 'KiCad PCB must specify (rev "2.0")'
+    assert '(rev "2.0")' in sch_text, 'KiCad schematic must specify (rev "2.0")'

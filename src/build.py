@@ -574,6 +574,8 @@ class Builder:
                         sub_pcb_config = part_res.pcb_metadata
 
                 target_cfg = sub_pcb_config or pcb_config
+                if sub_pcb_config and pcb_config.revision and getattr(target_cfg, "board_type", None) != BoardType.FLEX:
+                    target_cfg = target_cfg.model_copy(update={"revision": pcb_config.revision})
                 if sub_pcb_config and not target_cfg.stackup:
                     target_cfg = target_cfg.model_copy(update={"stackup": pcb_config.stackup})
                 if sub_pcb_config and not target_cfg.capacitive_sensors and pcb_config.capacitive_sensors:

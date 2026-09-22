@@ -125,7 +125,10 @@ class TestBoardProvider(Provider):
         hole_dia = self.settings.mounting_hole_diameter
         inset = self.settings.mounting_hole_inset
 
-        with BuildPcb(name="carrier_board", board_type=BoardType.RIGID, stackup=self.stackup()) as pcb:
+        pcb_rev = self.pcb_manifest.get("revision", "2.0") if self.pcb_manifest else "2.0"
+        with BuildPcb(
+            name="carrier_board", board_type=BoardType.RIGID, revision=pcb_rev, stackup=self.stackup()
+        ) as pcb:
             # Main board outline block
             b = Box(w, length, thickness)
             # Fillet corner vertical edges
@@ -687,7 +690,7 @@ class TestBoardProvider(Provider):
         with BuildSilkscreen() as silk:
             # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
             with Locations((0.0, 26.0)):
-                SilkscreenText("TEST BOARD CARRIER REV 1.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
+                SilkscreenText("TEST BOARD CARRIER REV 2.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
             with Locations((0.0, -28.0)):
                 SilkscreenText("LAYER 1-6 RIGID-FLEX", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((0.0, 0.0)):

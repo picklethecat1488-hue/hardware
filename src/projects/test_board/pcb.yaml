@@ -1,6 +1,6 @@
 name: TestBoard_Carrier
 board_type: rigid-flex
-revision: "1.0"
+revision: "2.0"
 shape_ref: carrier_board
 sheet_size: A4
 
