@@ -238,13 +238,19 @@ class SchematicDiagram:
         Returns:
             Dictionary mapping sheet_idx (1-indexed) to list of (cx, cy, width, height, name) bounding boxes.
         """
-        all_nets = self.wiring.nets
+        if not self.wiring or not getattr(self.wiring, "footprints", None):
+            return {}
+
+        sheet_plans = self._build_sheet_plans()
+        if not sheet_plans:
+            return {}
+
+        all_nets = getattr(self.wiring, "nets", []) or []
         pin_to_net: Dict[Tuple[str, str], str] = {}
         for net in all_nets:
             for pair in net.pins:
                 pin_to_net[pair] = net.name
 
-        sheet_plans = self._build_sheet_plans()
         sheet_boxes: Dict[int, List[Tuple[float, float, float, float, str]]] = {}
 
         for plan in sheet_plans:

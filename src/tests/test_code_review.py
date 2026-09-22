@@ -1297,3 +1297,23 @@ def test_regression_bug_078_code_review_highlight_markers_preserve_diff_colors()
     # 3. Highlight markers on the left column grid receive selection highlight
     assert "td.diff-marker" in content, "diff-marker styles must exist"
     assert ".unified-marker" in content, "unified-marker styles must exist"
+
+
+def test_code_review_ignores_bugs_md(tmp_path: Path) -> None:
+    """Verify that BUGS.md and BUGS.txt are excluded from code review diffs and files."""
+    from provider.code_review.git_utils import GitReviewEngine, is_file_ignored
+
+    assert is_file_ignored("BUGS.md")
+    assert is_file_ignored("./BUGS.md")
+    assert is_file_ignored("build/BUGS.md")
+    assert is_file_ignored("BUGS.txt")
+    assert not is_file_ignored("src/provider/drc.py")
+    assert not is_file_ignored("pyproject.toml")
+
+    repo_root = Path(__file__).parent.parent.parent
+    engine = GitReviewEngine(repo_root=repo_root)
+    assert engine.is_file_ignored("BUGS.md")
+
+    # Working tree changed files must never include BUGS.md
+    changed_files = engine.get_changed_files("working")
+    assert not any(f["path"] == "BUGS.md" or f["path"].endswith("/BUGS.md") for f in changed_files)
