@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-22 15:05:08 UTC` |
+| **Report Date** | `2026-09-22 15:09:49 UTC` |
 | **Total Issues** | `89` |
-| **Open Issues** | `2` |
-| **Resolved / Closed** | `87 (97%)` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `88 (98%)` |
 
 ## Executive Summary
 
@@ -124,7 +124,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-087](#bug-087): Add power test points (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-088](#bug-088): Schematic bugs review (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-089](#bug-089): Organize schematic pages by subsystem (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-090](#bug-090): Test board Enclosure feedback (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-090](#bug-090): Test board Enclosure feedback (`RESOLVED`)
 
 ## Detailed Issue Log
 
@@ -2276,12 +2276,13 @@ Reorganized carrier board schematic pages into 11 functional subsystem sheets co
 
 ---
 
-### <a id="bug-090"></a> 🔴 `[BUG-090]` Test board Enclosure feedback
+### <a id="bug-090"></a> 🟢 `[BUG-090]` Test board Enclosure feedback
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-22 03:06:00 UTC`
+- **Resolved**: `2026-09-22 15:09:49 UTC`
 
 #### Description
 
@@ -2294,5 +2295,9 @@ Reorganized carrier board schematic pages into 11 functional subsystem sheets co
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790046385642.png](build/attachments/pasted_screenshot_1790046385642.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Spaced SWD cutout (swd_y = -15.0mm, swd_w = 8.0mm) from USB-C cutout with >= 5.0mm solid wall barrier, applied 0.8mm corner fillets to all enclosure bottom side cutouts (USB, SWD, periph, M.2), and added battery retention mount cradle and J13 pass-through cutout to enclosure lid with dedicated regression test.
 
 ---

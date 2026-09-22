@@ -312,15 +312,19 @@ class TestBoardProvider(Provider):
 
             z_carrier = -h_shell / 2.0 + wall + standoff_h + (self.settings.board_thickness / 2.0)
 
+            cutout_r = self.settings.enclosure_cutout_fillet_radius
+
             # USB-C connector cutout through left exterior wall (aligned with J3 at [-25.0, 0.0, 0.8])
             usb_w = self.settings.enclosure_usb_cutout_width
             usb_h = self.settings.enclosure_usb_cutout_height
             usb_z = -h_shell / 2.0 + wall + standoff_h + (usb_h / 2.0) - 0.5
-            with Locations((-w / 2.0, 0.0, usb_z)):
-                Box(wall * 3.0, usb_w, usb_h, mode=BuildMode.SUBTRACT)
+            with BuildSketch(Plane.YZ.offset(-w / 2.0)) as s_usb:
+                with Locations((0.0, usb_z)):
+                    RectangleRounded(usb_w, usb_h, cutout_r)
+            extrude(s_usb.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
 
-            # SWD connector cutout through left exterior wall (aligned with J5 at [-21.0, -7.0, 0.8]) (BUG-075)
-            swd_y = -7.0
+            # SWD connector cutout through left exterior wall (aligned with J5) (BUG-075, BUG-090)
+            swd_y = -15.0
             if self.wiring_path.exists():
                 wiring = Wiring(str(self.wiring_path))
                 comp_map = {c.name: c for c in wiring.footprints}
@@ -329,8 +333,10 @@ class TestBoardProvider(Provider):
             swd_w = self.settings.enclosure_swd_cutout_width
             swd_h = self.settings.enclosure_swd_cutout_height
             swd_z = z_carrier + (self.settings.board_thickness / 2.0) + (swd_h / 2.0) - 0.5
-            with Locations((-w / 2.0, swd_y, swd_z)):
-                Box(wall * 3.0, swd_w, swd_h, mode=BuildMode.SUBTRACT)
+            with BuildSketch(Plane.YZ.offset(-w / 2.0)) as s_swd:
+                with Locations((swd_y, swd_z)):
+                    RectangleRounded(swd_w, swd_h, cutout_r)
+            extrude(s_swd.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
 
             # Ventilation slots through left exterior wall between charger (U3) and amplifier (U4) (BUG-077)
             vent_y_center = 15.5
@@ -346,9 +352,11 @@ class TestBoardProvider(Provider):
             vent_count = self.settings.enclosure_vent_count
             vent_z = z_carrier + (self.settings.board_thickness / 2.0) + (vent_h / 2.0) - 0.5
             vent_y_offsets = [(-((vent_count - 1) / 2.0) + idx) * vent_spacing for idx in range(vent_count)]
-            for dy in vent_y_offsets:
-                with Locations((-w / 2.0, vent_y_center + dy, vent_z)):
-                    Box(wall * 3.0, vent_w, vent_h, mode=BuildMode.SUBTRACT)
+            with BuildSketch(Plane.YZ.offset(-w / 2.0)) as s_vents:
+                for dy in vent_y_offsets:
+                    with Locations((vent_y_center + dy, vent_z)):
+                        RectangleRounded(vent_w, vent_h, min(cutout_r, (vent_w / 2.0) - 0.1))
+            extrude(s_vents.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
 
             # Flex tail passage exit slot at front rim (aligned with J2 at [0.0, 38.0, 0.8] and flex tail)
             slot_w = self.settings.flex_tail_width + 2.0
@@ -363,10 +371,12 @@ class TestBoardProvider(Provider):
             m2_w = self.settings.enclosure_m2_cutout_width
             m2_h = self.settings.enclosure_m2_cutout_height
             m2_z = -h_shell / 2.0 + wall + standoff_h + (m2_h / 2.0) - 0.5
-            with Locations((0.0, -length / 2.0, m2_z)):
-                Box(m2_w, wall * 3.0, m2_h, mode=BuildMode.SUBTRACT)
+            with BuildSketch(Plane.XZ.offset(-length / 2.0)) as s_m2:
+                with Locations((0.0, m2_z)):
+                    RectangleRounded(m2_w, m2_h, cutout_r)
+            extrude(s_m2.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
 
-            # Peripheral cutouts and bus identifiers through right exterior wall (BUG-074)
+            # Peripheral cutouts and bus identifiers through right exterior wall (BUG-074, BUG-090)
             periph_cutout_h = 5.0
             periph_z = z_carrier + (self.settings.board_thickness / 2.0) + (periph_cutout_h / 2.0) - 0.5
             periph_specs = [
@@ -383,9 +393,11 @@ class TestBoardProvider(Provider):
                     if des in comp_map:
                         periph_specs[idx] = (des, comp_map[des].position[1], cut_l, label)
 
-            for _, py, cut_l, _ in periph_specs:
-                with Locations((w / 2.0, py, periph_z)):
-                    Box(wall * 3.0, cut_l, periph_cutout_h, mode=BuildMode.SUBTRACT)
+            with BuildSketch(Plane.YZ.offset(w / 2.0)) as s_periph:
+                for _, py, cut_l, _ in periph_specs:
+                    with Locations((py, periph_z)):
+                        RectangleRounded(cut_l, periph_cutout_h, cutout_r)
+            extrude(s_periph.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
 
             # Bus identifier labels on exterior right wall
             with BuildSketch(Plane.YZ.offset(w / 2.0)) as s_periph_labels:
@@ -486,7 +498,38 @@ class TestBoardProvider(Provider):
             with Locations((led_x, led_y, 0.0)):
                 Box(led_hole_w, led_hole_w, wall * 4.0, mode=BuildMode.SUBTRACT)
 
+            # Battery retention cradle on top exterior of enclosure lid (BUG-090)
+            batt_w = self.settings.enclosure_battery_mount_width
+            batt_l = self.settings.enclosure_battery_mount_length
+            batt_rim_t = self.settings.enclosure_battery_mount_wall_thickness
+            batt_rim_h = self.settings.enclosure_battery_mount_wall_height
+            batt_x = self.settings.enclosure_battery_mount_x
+            batt_y = self.settings.enclosure_battery_mount_y
+            with BuildSketch(Plane.XY.offset(wall)) as s_batt:
+                with Locations((batt_x, batt_y)):
+                    RectangleRounded(batt_w + (2.0 * batt_rim_t), batt_l + (2.0 * batt_rim_t), 2.0)
+                    RectangleRounded(batt_w, batt_l, 1.0, mode=BuildMode.SUBTRACT)
+            extrude(s_batt.sketch, amount=batt_rim_h)
+
+            # Battery connector pass-through cutout through lid (aligned with J13, BUG-090)
+            j13_x, j13_y = -23.0, 16.0
+            if self.wiring_path.exists():
+                wiring = Wiring(str(self.wiring_path))
+                j13_comp = next((c for c in wiring.footprints if c.name == "J13"), None)
+                if j13_comp:
+                    j13_x, j13_y = j13_comp.position[0], j13_comp.position[1]
+
+            batt_cut_w = self.settings.enclosure_battery_cutout_width
+            batt_cut_l = self.settings.enclosure_battery_cutout_length
+            cutout_r = self.settings.enclosure_cutout_fillet_radius
+            with BuildSketch(Plane.XY.offset(wall + 1.0)) as s_batt_cut:
+                with Locations((j13_x, j13_y)):
+                    RectangleRounded(batt_cut_w, batt_cut_l, cutout_r)
+            extrude(s_batt_cut.sketch, amount=-(wall + 2.0), mode=BuildMode.SUBTRACT)
+
         RigidJoint("led_port", lid.part, Location((led_x, led_y, wall)))
+        RigidJoint("battery_mount", lid.part, Location((batt_x, batt_y, wall)))
+        RigidJoint("battery_port", lid.part, Location((j13_x, j13_y, wall)))
 
         return lid
 

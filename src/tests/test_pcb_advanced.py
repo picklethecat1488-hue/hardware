@@ -1870,7 +1870,11 @@ def test_regression_enclosure_cad_feedback_and_assembly() -> None:
     l_bb = l_part.bounding_box()
     assert abs((l_bb.max.X - l_bb.min.X) - expected_w) < 0.1
     assert abs((l_bb.max.Y - l_bb.min.Y) - expected_l) < 0.1
-    expected_lid_h = provider.settings.enclosure_wall_thickness + provider.settings.enclosure_lip_height
+    expected_lid_h = (
+        provider.settings.enclosure_wall_thickness
+        + provider.settings.enclosure_lip_height
+        + provider.settings.enclosure_battery_mount_wall_height
+    )
     assert abs((l_bb.max.Z - l_bb.min.Z) - expected_lid_h) < 0.1
 
     # 3. Verify view_product populates all 4 parts and seats carrier board on standoffs
@@ -1915,7 +1919,7 @@ def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
     wiring = Wiring(str(provider.wiring_path))
     checker = PCBDesignRulesChecker(provider.pcb_config)
     violations = checker.check_all(wiring=wiring)
-    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.errors]}"
+    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
 
 
 def test_regression_schematic_page_boundary_drc_and_layout(tmp_path: Path) -> None:
@@ -2457,3 +2461,65 @@ def test_regression_bug_089_schematic_subsystem_organization() -> None:
     checker = PCBDesignRulesChecker(cfg)
     violations = checker.check_schematic(wiring=wiring)
     assert len(violations.errors) == 0, f"DRC errors on subsystem sheets: {[e.description for e in violations.errors]}"
+
+
+def test_regression_bug_090_enclosure_cad_feedback() -> None:
+    """Verify BUG-090: SWD vs USB cutout separation, rounded side cutouts, and lid battery mount."""
+    provider = TestBoardProvider()
+    cfg = provider.pcb_config
+    assert cfg is not None
+    wiring = Wiring(str(provider.wiring_path))
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+
+    # 1. Verify SWD cutout is spaced apart from USB cutout with a solid wall barrier
+    usb_w = provider.settings.enclosure_usb_cutout_width
+    swd_w = provider.settings.enclosure_swd_cutout_width
+    swd_y = fp_map["J5"].position[1]
+    usb_min_y = -usb_w / 2.0
+    swd_max_y = swd_y + (swd_w / 2.0)
+    separation = usb_min_y - swd_max_y
+    assert separation >= 2.0, (
+        f"SWD cutout (max Y = {swd_max_y}) and USB cutout (min Y = {usb_min_y}) must have >= 2mm wall barrier, "
+        f"got {separation:.2f}mm"
+    )
+
+    # 2. Verify side enclosure cutouts on bottom shell build with rounded corners
+    assert provider.settings.enclosure_cutout_fillet_radius == 0.8
+    bottom = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    assert bottom is not None and bottom.part is not None
+    assert bottom.part.is_valid(), "Enclosure bottom must be a valid solid"
+
+    # Wall barrier between USB and SWD is solid material
+    w = provider.settings.board_width + 2.0 * (
+        provider.settings.enclosure_clearance + provider.settings.enclosure_wall_thickness
+    )
+    wall = provider.settings.enclosure_wall_thickness
+    probe_x = (-w / 2.0) + (wall / 2.0)
+    probe_y = (usb_min_y + swd_max_y) / 2.0
+    h_shell = provider.settings.standoff_height + provider.settings.board_thickness + 10.0
+    mid_z = -h_shell / 2.0 + wall + provider.settings.standoff_height + 2.0
+    assert bottom.part.is_inside((probe_x, probe_y, mid_z)), "Material between USB and SWD cutouts must be solid"
+
+    # 3. Verify enclosure lid contains battery mount cradle and pass-through cutout for J13
+    assert provider.settings.enclosure_battery_mount_width == 24.0
+    assert provider.settings.enclosure_battery_mount_length == 38.0
+    assert provider.settings.enclosure_battery_mount_wall_height == 3.5
+    assert provider.settings.enclosure_battery_cutout_width == 8.0
+    assert provider.settings.enclosure_battery_cutout_length == 6.0
+
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid is not None and lid.part is not None
+    assert lid.part.is_valid(), "Enclosure lid must be a valid solid"
+
+    # Check joints on lid
+    joint_names = {j.label for j in lid.part.joints.values()}
+    assert "battery_mount" in joint_names, "Enclosure lid must define battery_mount joint"
+    assert "battery_port" in joint_names, "Enclosure lid must define battery_port joint"
+    assert "led_port" in joint_names, "Enclosure lid must define led_port joint"
+
+    # Pass-through cutout at J13 is void (hollow) through lid
+    j13_pos = fp_map["J13"].position
+    cutout_probe_z = wall / 2.0
+    assert not lid.part.is_inside((j13_pos[0], j13_pos[1], cutout_probe_z)), (
+        "Lid must have open pass-through cutout at J13 battery connector"
+    )

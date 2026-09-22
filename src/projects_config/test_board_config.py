@@ -209,6 +209,51 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_swd_cutout_height"])
 
     @property
+    def enclosure_cutout_fillet_radius(self) -> float:
+        """Corner fillet radius for enclosure side cutouts in mm."""
+        return float(self._raw_data["enclosure_cutout_fillet_radius"])
+
+    @property
+    def enclosure_battery_mount_width(self) -> float:
+        """Width of battery retention mount cavity on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_mount_width"])
+
+    @property
+    def enclosure_battery_mount_length(self) -> float:
+        """Length of battery retention mount cavity on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_mount_length"])
+
+    @property
+    def enclosure_battery_mount_wall_height(self) -> float:
+        """Height of battery retention mount retaining walls in mm."""
+        return float(self._raw_data["enclosure_battery_mount_wall_height"])
+
+    @property
+    def enclosure_battery_mount_wall_thickness(self) -> float:
+        """Thickness of battery retention mount retaining walls in mm."""
+        return float(self._raw_data["enclosure_battery_mount_wall_thickness"])
+
+    @property
+    def enclosure_battery_mount_x(self) -> float:
+        """X coordinate offset of battery mount on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_mount_x"])
+
+    @property
+    def enclosure_battery_mount_y(self) -> float:
+        """Y coordinate offset of battery mount on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_mount_y"])
+
+    @property
+    def enclosure_battery_cutout_width(self) -> float:
+        """Width of battery connector pass-through cutout in enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_cutout_width"])
+
+    @property
+    def enclosure_battery_cutout_length(self) -> float:
+        """Length of battery connector pass-through cutout in enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_cutout_length"])
+
+    @property
     def enclosure_snap_ridge_depth(self) -> float:
         """Protrusion depth of snap-fit ridges on enclosure lid lip in mm."""
         return float(self._raw_data["enclosure_snap_ridge_depth"])
