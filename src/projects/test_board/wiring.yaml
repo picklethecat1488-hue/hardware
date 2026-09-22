@@ -286,7 +286,7 @@ footprints:
   # Peripheral Headers on Right Side of PCB (BUG-074)
   - name: J6
     package: pin_header_1x4
-    position: [24.5, 26.0, 0.8]
+    position: [24.5, 28.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
     mpn: SM04B-SRSS-TB
     supplier_pn: 455-1804-1-ND
@@ -294,7 +294,7 @@ footprints:
 
   - name: J7
     package: pin_header_1x4
-    position: [24.5, 16.0, 0.8]
+    position: [24.5, 18.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
     mpn: SM04B-SRSS-TB
     supplier_pn: 455-1804-1-ND
@@ -302,7 +302,7 @@ footprints:
 
   - name: J8
     package: pin_header_1x4
-    position: [24.5, 6.0, 0.8]
+    position: [24.5, 8.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
     mpn: SM04B-SRSS-TB
     supplier_pn: 455-1804-1-ND
@@ -310,7 +310,7 @@ footprints:
 
   - name: J9
     package: pin_header_1x6
-    position: [24.5, -6.0, 0.8]
+    position: [24.5, -5.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
     mpn: TSW-106-07-L-S
     supplier_pn: SAM1034-06-ND
@@ -318,7 +318,7 @@ footprints:
 
   - name: J10
     package: pin_header_1x6
-    position: [24.5, -17.0, 0.8]
+    position: [24.5, -20.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
     mpn: TSW-106-07-L-S
     supplier_pn: SAM1034-06-ND
@@ -327,7 +327,7 @@ footprints:
   # 10-Pin GPIO Breakout Header (Right side of PCB, accessible via top cutout for BUG-073)
   - name: J14
     package: pin_header_1x10
-    position: [24.5, -28.0, 0.8]
+    position: [19.0, -29.5, 0.8]
     rotation: [0.0, 0.0, 90.0]
     mpn: TSW-110-07-L-S
     supplier_pn: SAM1034-10-ND
@@ -336,7 +336,7 @@ footprints:
   # Serial NAND Flash (FlexSPI Port A)
   - name: U8
     package: WSON-8
-    position: [15.2, 0.0, 0.8]
+    position: [15.0, 4.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
     mpn: W25N01GVZEIG
     supplier_pn: W25N01GVZEIG-ND
@@ -371,7 +371,7 @@ footprints:
   # USB-to-UART Bridge
   - name: U9
     package: QFN-32
-    position: [-21.5, -22.0, 0.8]
+    position: [-20.0, -32.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: FT232RNQ-REEL
     supplier_pn: 768-FT232RNQ-REEL-ND

@@ -3211,7 +3211,7 @@ footprints:
         side: left
         pad_type: smd
         pad_shape: roundrect
-        pad_size_mm: [1.2, 1.5]
+        pad_size_mm: [0.7, 1.3]
 
   TSSOP-16:
     dimensions: [5.0, 4.4, 1.1]

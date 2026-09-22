@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-21 19:12:34 UTC` |
+| **Report Date** | `2026-09-22 00:42:11 UTC` |
 | **Total Issues** | `85` |
-| **Open Issues** | `4` |
-| **Resolved / Closed** | `81 (95%)` |
+| **Open Issues** | `3` |
+| **Resolved / Closed** | `82 (96%)` |
 
 ## Executive Summary
 
@@ -116,11 +116,11 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-079](#bug-079): Move BUGS.md to repo root (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-080](#bug-080): Add LED cutout to test board enclosure `[test_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-081](#bug-081): This build.py command should have failed (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-083](#bug-083): I2C pullup resistors overlap (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-084](#bug-084): Update board files schematics  `[carrier_board]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-085](#bug-085): Change mounting holes on enclosure bottom to mounting posts (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-086](#bug-086): New Bug Report (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-086](#bug-086): Capacitive sensing and control section is incorrect (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -2080,12 +2080,13 @@ Resolved target resolution in Builder.generate_pcbs using TargetParser.resolve s
 
 ---
 
-### <a id="bug-082"></a> 🔴 `[BUG-082]` Route test board
+### <a id="bug-082"></a> 🟢 `[BUG-082]` Route test board
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 18:23:13 UTC`
+- **Resolved**: `2026-09-22 00:42:11 UTC`
 
 #### Description
 
@@ -2094,6 +2095,10 @@ Route test_board correctly. Modify placements of all components and correct rout
 #### Reproduction Steps
 
 1. $ python src/config.py 'test_board/*'
+
+#### Resolution Notes
+
+Resolved test_board carrier routing and KiCad DRC clearance/bridge violations by adjusting component placements (J6-J10 vertical bus spacing, J14 GPIO header placed at (19.0, -29.5), U8 NAND moved to (15.0, 4.0), U9 USB-UART moved to (-20.0, -32.0), and corrected TDFN-8 Pad EP dimension in footprints/ic.yaml to 0.7x1.3mm).
 
 ---
 
@@ -2148,11 +2153,22 @@ Plastic material is difficult to thread screws into. Change the mounting holes o
 
 ---
 
-### <a id="bug-086"></a> 🔴 `[BUG-086]` New Bug Report
+### <a id="bug-086"></a> 🔴 `[BUG-086]` Capacitive sensing and control section is incorrect
 
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 19:12:34 UTC`
+
+#### Description
+
+The PCB schematic sheet for the capacitive sensor is incorrect:
+
+  - title: Capacitive Sensing & Control
+    description: CY8CMBR3116 CapSense controller, 4-channel liquid level flex tail, and I2C bus
+
+The carrier board flex tail is intended to be a generic capaacitive button array with support for mutual capacitive buttons and proximity sensors.
+
+Based on our online discussion, Azoteq IQS7211A / IQS7222 is the preferred capacitive touch IC. Update the schematic, board, and hardware documents for the downselected capacitive touch IC.
 
 ---

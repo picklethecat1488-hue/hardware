@@ -2074,3 +2074,40 @@ def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path
     r2_pos = r2_texts[0].get_position()
     dx = abs(r1_pos[0] - r2_pos[0])
     assert dx >= 12.0, f"R1 and R2 must have >= 12.0mm horizontal clearance to prevent overlap, got dx={dx:.1f}mm"
+
+
+def test_regression_bug_082_carrier_board_routing_and_kicad_drc(tmp_path: Path):
+    """Verify BUG-082: carrier_board routes cleanly with zero drc.py and zero KiCad DRC errors."""
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.pcb.exporter import PCBExporter
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_cfg = provider.pcb_config
+
+    # 1. Verify drc.py checks on carrier_board pass with 0 errors
+    drc = PCBDesignRulesChecker(pcb_cfg)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"drc.py checks failed: {report.summary()}"
+    assert report.error_count == 0, f"Expected 0 drc.py errors, got {report.error_count}"
+
+    # 2. Verify component clearances for downselected components
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+    assert fp_map["U8"].position[1] >= 2.0, "U8 NAND flash must be placed clear of I2C test points"
+    assert fp_map["U9"].position[1] <= -25.0, "U9 USB-UART must be placed clear of TP_GND"
+    assert fp_map["J14"].position[0] <= 21.0, "J14 GPIO header must be moved left of peripheral column to avoid MH4"
+
+    # 3. If KiCad CLI is available, verify export and run_drc returns 0 errors
+    kicad_cli = KiCadCLI(design_rules=pcb_cfg.design_rules)
+    if kicad_cli.is_available and kicad_cli.supports_drc:
+        exporter = PCBExporter(pcb_cfg, wiring, subassembly=None, design_rules=pcb_cfg.design_rules)
+        pcb_file = tmp_path / "carrier_board.kicad_pcb"
+        rpt_file = tmp_path / "carrier_board-drc.rpt"
+        exporter.export_kicad_pcb(pcb_file)
+        kicad_report = kicad_cli.run_drc(pcb_file, rpt_file, design_rules=pcb_cfg.design_rules)
+        assert kicad_report.passed, (
+            f"KiCad DRC failed with {kicad_report.error_count} error(s):\n{kicad_report.summary()}"
+        )
+        assert kicad_report.error_count == 0, f"KiCad DRC reported errors: {kicad_report.summary()}"
