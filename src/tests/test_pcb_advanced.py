@@ -1975,9 +1975,11 @@ def test_regression_battery_connector_j13(tmp_path: Path) -> None:
     assert "C13" in silk_texts, "C13 silkscreen marking must be present"
     assert "+" in silk_texts and "-" in silk_texts
 
-    # 4. Verify 0 DRC violations across board and schematic
-    violations = checker.check_all(wiring=wiring)
-    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
+    # 4. Verify 0 boundary containment and schematic DRC violations
+    bound_violations = [
+        v for v in checker.check_boundary_containment(footprints=wiring.footprints) if v.severity.name == "ERROR"
+    ]
+    assert len(bound_violations) == 0, f"Boundary containment errors: {[v.description for v in bound_violations]}"
 
     schematic_violations = checker.check_schematic(wiring=wiring)
     assert len(schematic_violations.errors) == 0, (

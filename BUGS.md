@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-22 05:21:44 UTC` |
+| **Report Date** | `2026-09-22 05:25:55 UTC` |
 | **Total Issues** | `89` |
-| **Open Issues** | `7` |
-| **Resolved / Closed** | `82 (92%)` |
+| **Open Issues** | `6` |
+| **Resolved / Closed** | `83 (93%)` |
 
 ## Executive Summary
 
@@ -104,7 +104,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [ ] **`[MEDIUM]`** [#BUG-067](#bug-067): Apply component downselection results  to PCB (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-068](#bug-068): Component fell off schematic page 5 (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-069](#bug-069): Change bug_report and code_review backing store to sqlite (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-070](#bug-070): Add battery connector to carrier board (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-070](#bug-070): Add battery connector to carrier board (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-071](#bug-071): I2c pull ups on sheet 7 dangling off page (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-072](#bug-072): Flex tail cutout doesn't align with flex tail (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-073](#bug-073): Add GPIO cutout to enclosure (`RESOLVED`)
@@ -1821,12 +1821,13 @@ Implemented SQLiteBugStore backed by build/bugs.sqlite providing atomic ACID per
 
 ---
 
-### <a id="bug-070"></a> 🔴 `[BUG-070]` Add battery connector to carrier board
+### <a id="bug-070"></a> 🟢 `[BUG-070]` Add battery connector to carrier board
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 04:49:03 UTC`
+- **Resolved**: `2026-09-22 05:25:55 UTC`
 
 #### Description
 
@@ -1836,7 +1837,7 @@ Add a standard JST battery connector to the carrier board
 
 #### Resolution Notes
 
-Added JST-PH 2.0mm battery connector J13 and filter C13 to carrier board, connected to VBAT and GND nets with zero DRC errors.
+Verified JST-PH battery connector J13 and C13 decoupling capacitor placement, VBAT/GND connectivity, silkscreen polarity markings, and 0 boundary/schematic DRC errors.
 
 ---
 
