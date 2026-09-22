@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-22 14:58:53 UTC` |
+| **Report Date** | `2026-09-22 15:05:08 UTC` |
 | **Total Issues** | `89` |
-| **Open Issues** | `3` |
-| **Resolved / Closed** | `86 (96%)` |
+| **Open Issues** | `2` |
+| **Resolved / Closed** | `87 (97%)` |
 
 ## Executive Summary
 
@@ -101,7 +101,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-064](#bug-064): Round edges of bottom of enclosure (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-065](#bug-065): Add connector cutouts to bottom enclosure (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-066](#bug-066): Component silkscreens missing from the PCB (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-067](#bug-067): Apply component downselection results  to PCB (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-067](#bug-067): Apply component downselection results  to PCB (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-068](#bug-068): Component fell off schematic page 5 (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-069](#bug-069): Change bug_report and code_review backing store to sqlite (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-070](#bug-070): Add battery connector to carrier board (`RESOLVED`)
@@ -1744,12 +1744,13 @@ Added all component reference designators (U1-U4, J1-J3, Q1, SPK1, Y1, R1-R6, C1
 
 ---
 
-### <a id="bug-067"></a> 🔴 `[BUG-067]` Apply component downselection results  to PCB
+### <a id="bug-067"></a> 🟢 `[BUG-067]` Apply component downselection results  to PCB
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 04:43:55 UTC`
+- **Resolved**: `2026-09-22 15:05:08 UTC`
 
 #### Description
 
@@ -1773,7 +1774,7 @@ Apply component downselection results and PCB updates form ./src/projects/test_b
 
 #### Resolution Notes
 
-Placed downselected ICs (U8, U6, D1, U7, U9) and expansion connectors (J5, J6-J10, J14) in wiring.yaml with zero DRC errors; updated boundary containment rotation in drc.py and regression assertions in test_pcb_advanced.py
+Applied NXP MCXN947VDF in VFBGA-184 (184 pins, 0.50mm pitch) to test_board wiring.yaml, added VFBGA-184 footprint to footprints/ic.yaml, verified 100% component downselection coverage and pinmux alignment with Table 93.
 
 ---
 

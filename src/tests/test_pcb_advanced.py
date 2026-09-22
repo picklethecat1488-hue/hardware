@@ -1607,10 +1607,10 @@ def test_regression_smd_no_connect_pads_included_on_pcb(tmp_path: Path) -> None:
     provider = TestBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
 
-    # 1. Verify U1 has all 196 balls defined
+    # 1. Verify U1 has all 184 balls defined
     u1 = next((fp for fp in wiring.footprints if fp.name == "U1"), None)
     assert u1 is not None
-    assert len(u1.pins) == 196, f"Expected 196 balls on U1 BGA-196, got {len(u1.pins)}"
+    assert len(u1.pins) == 184, f"Expected 184 balls on U1 VFBGA-184, got {len(u1.pins)}"
 
     # 2. Verify J3 (USB-C-16P) includes all pins and tabs (including SBU1, SBU2, SHIELD3, SHIELD4)
     j3 = next((fp for fp in wiring.footprints if fp.name == "J3"), None)
@@ -1632,8 +1632,8 @@ def test_regression_smd_no_connect_pads_included_on_pcb(tmp_path: Path) -> None:
     exporter.export_kicad_pcb(board_file)
     content = board_file.read_text()
 
-    # Must contain no-connect pads (e.g. U1 ball A3 and J3 pin SBU1)
-    assert '(pad "A3"' in content, "carrier_board.kicad_pcb must contain no-connect pad A3 on U1"
+    # Must contain no-connect pads (e.g. U1 ball A4 and J3 pin SBU1)
+    assert '(pad "A4"' in content, "carrier_board.kicad_pcb must contain no-connect pad A4 on U1"
     assert '(pad "SBU1"' in content, "carrier_board.kicad_pcb must contain no-connect pad SBU1 on J3"
 
 
@@ -2020,6 +2020,10 @@ def test_regression_downselection_results_application() -> None:
     provider = TestBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     fp_map = {fp.name: fp for fp in wiring.footprints}
+    u1 = fp_map["U1"]
+    assert u1.package == "VFBGA-184", f"Expected U1 package VFBGA-184, got {u1.package}"
+    assert u1.mpn == "MCXN947VDF", f"Expected U1 mpn MCXN947VDF, got {u1.mpn}"
+    assert len(u1.pins) == 184, f"Expected 184 pins on U1, got {len(u1.pins)}"
     downselected_components = ["J5", "J6", "J7", "J8", "J9", "J10", "J14", "U8", "U6", "D1", "U7", "U9"]
     for des in downselected_components:
         assert des in fp_map, f"Footprint {des} must be present in wiring footprints"
