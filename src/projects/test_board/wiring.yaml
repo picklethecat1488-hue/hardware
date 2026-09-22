@@ -290,7 +290,6 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: FTSH-105-01-L-DV-K
     supplier_pn: SAMTEC-FTSH105-ND
-    unconnected: true
 
   # Peripheral Headers on Right Side of PCB (BUG-074)
   - name: J6
@@ -299,7 +298,6 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: SM04B-SRSS-TB
     supplier_pn: 455-1804-1-ND
-    unconnected: true
 
   - name: J7
     package: pin_header_1x4
@@ -307,7 +305,6 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: SM04B-SRSS-TB
     supplier_pn: 455-1804-1-ND
-    unconnected: true
 
   - name: J8
     package: pin_header_1x4
@@ -315,7 +312,6 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: SM04B-SRSS-TB
     supplier_pn: 455-1804-1-ND
-    unconnected: true
 
   - name: J9
     package: pin_header_1x6
@@ -323,7 +319,6 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: TSW-106-07-L-S
     supplier_pn: SAM1034-06-ND
-    unconnected: true
 
   - name: J10
     package: pin_header_1x6
@@ -331,7 +326,6 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: TSW-106-07-L-S
     supplier_pn: SAM1034-06-ND
-    unconnected: true
 
   # 10-Pin GPIO Breakout Header (Right side of PCB, accessible via top cutout for BUG-073)
   - name: J14
@@ -340,7 +334,6 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: TSW-110-07-L-S
     supplier_pn: SAM1034-10-ND
-    unconnected: true
 
   # Serial NAND Flash (FlexSPI Port A)
   - name: U8
@@ -349,7 +342,6 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: W25N01GVZEIG
     supplier_pn: W25N01GVZEIG-ND
-    unconnected: true
 
   # I2C RGB LED Driver & Status LED
   - name: U6
@@ -358,7 +350,6 @@ footprints:
     rotation: [0.0, 0.0, 0.0]
     mpn: LP5009PWR
     supplier_pn: 296-LP5009PWR-ND
-    unconnected: true
 
   - name: D1
     package: LED_RGB_4P
@@ -366,7 +357,6 @@ footprints:
     rotation: [0.0, 0.0, 0.0]
     mpn: CLV1A-FKB-CJ1M1F1BB7R3S3
     supplier_pn: CLV1A-FKB-ND
-    unconnected: true
 
   # Battery Fuel Gauge (near J13 battery connector)
   - name: U7
@@ -375,7 +365,6 @@ footprints:
     rotation: [0.0, 0.0, 0.0]
     mpn: MAX17048G+T10
     supplier_pn: MAX17048G+T10-ND
-    unconnected: true
 
   # USB-to-UART Bridge
   - name: U9
@@ -384,7 +373,6 @@ footprints:
     rotation: [0.0, 0.0, 0.0]
     mpn: FT232RNQ-REEL
     supplier_pn: 768-FT232RNQ-REEL-ND
-    unconnected: true
 
 
 nets:
@@ -428,6 +416,37 @@ nets:
       - [U2, EP]
       - [J13, "2"]
       - [C13, "2"]
+      - [U8, "4"]
+      - [U8, EP]
+      - [U7, "1"]
+      - [U7, "4"]
+      - [U7, "6"]
+      - [U7, EP]
+      - [U6, "3"]
+      - [U6, "4"]
+      - [U6, "9"]
+      - [U6, "10"]
+      - [U6, "11"]
+      - [U6, "12"]
+      - [U6, "13"]
+      - [U6, "14"]
+      - [U6, "15"]
+      - [U9, "7"]
+      - [U9, "18"]
+      - [U9, "21"]
+      - [U9, "25"]
+      - [U9, "26"]
+      - [U9, "29"]
+      - [U9, EP]
+      - [J5, "3"]
+      - [J5, "5"]
+      - [J5, "7"]
+      - [J5, "8"]
+      - [J5, "9"]
+      - [J6, "2"]
+      - [J7, "2"]
+      - [J8, "2"]
+      - [J9, "2"]
 
   - name: 3V3
     color: "#dc2626"
@@ -450,6 +469,18 @@ nets:
       - [R5, "1"]
       - [C4, "1"]
       - [C5, "1"]
+      - [U8, "8"]
+      - [U7, "3"]
+      - [U6, "5"]
+      - [U6, "16"]
+      - [D1, "4"]
+      - [U9, "4"]
+      - [U9, "19"]
+      - [J5, "1"]
+      - [J6, "1"]
+      - [J7, "1"]
+      - [J8, "1"]
+      - [J9, "1"]
 
   - name: VBUS
     color: "#b91c1c"
@@ -459,6 +490,7 @@ nets:
       - [U3, "1"]
       - [U3, "3"]
       - [C6, "1"]
+      - [U9, "20"]
 
   - name: VBAT
     color: "#f59e0b"
@@ -466,6 +498,7 @@ nets:
       - [J13, "1"]
       - [C13, "1"]
       - [U3, "4"]
+      - [U7, "2"]
 
   - name: CC1
     color: "#0284c7"
@@ -531,12 +564,15 @@ nets:
       - [U1, M1]
       - [R5, "2"]
       - [C11, "1"]
+      - [U9, "23"]
+      - [J5, "10"]
 
   - name: BOOT0
     color: "#ca8a04"
     pins:
       - [U1, M2]
       - [R6, "1"]
+      - [U9, "22"]
 
   - name: PCIE_TX0_P
     color: "#2563eb"
@@ -683,3 +719,305 @@ nets:
     pins:
       - [U2, VREGA]
       - [C14, "1"]
+
+  - name: I2C0_SCL
+    color: "#22c55e"
+    pins:
+      - [U7, "7"]
+      - [U6, "1"]
+      - [U1, A10]
+
+  - name: I2C0_SDA
+    color: "#16a34a"
+    pins:
+      - [U7, "8"]
+      - [U6, "2"]
+      - [U1, B10]
+
+  - name: FUEL_ALRT
+    color: "#eab308"
+    pins:
+      - [U7, "5"]
+      - [U1, G5]
+
+  - name: LED_R
+    color: "#ef4444"
+    pins:
+      - [U6, "6"]
+      - [D1, "1"]
+
+  - name: LED_G
+    color: "#22c55e"
+    pins:
+      - [U6, "7"]
+      - [D1, "2"]
+
+  - name: LED_B
+    color: "#3b82f6"
+    pins:
+      - [U6, "8"]
+      - [D1, "3"]
+
+  - name: FLEX0_A_CS0_N
+    color: "#6366f1"
+    pins:
+      - [U8, "1"]
+      - [U1, B14]
+
+  - name: FLEX0_A_IO1
+    color: "#818cf8"
+    pins:
+      - [U8, "2"]
+      - [U1, F14]
+
+  - name: FLEX0_A_IO2
+    color: "#a5b4fc"
+    pins:
+      - [U8, "3"]
+      - [U1, F13]
+
+  - name: FLEX0_A_IO0
+    color: "#4f46e5"
+    pins:
+      - [U8, "5"]
+      - [U1, E14]
+
+  - name: FLEX0_A_SCK
+    color: "#4338ca"
+    pins:
+      - [U8, "6"]
+      - [U1, D14]
+
+  - name: FLEX0_A_IO3
+    color: "#c7d2fe"
+    pins:
+      - [U8, "7"]
+      - [U1, F12]
+
+  - name: SWD_DIO
+    color: "#14b8a6"
+    pins:
+      - [J5, "2"]
+      - [U1, A13]
+
+  - name: SWD_CLK
+    color: "#0d9488"
+    pins:
+      - [J5, "4"]
+      - [U1, A14]
+
+  - name: SWD_SWO
+    color: "#0f766e"
+    pins:
+      - [J5, "6"]
+      - [U1, B13]
+
+  - name: I2C2_SDA
+    color: "#10b981"
+    pins:
+      - [J6, "3"]
+      - [U1, A3]
+
+  - name: I2C2_SCL
+    color: "#059669"
+    pins:
+      - [J6, "4"]
+      - [U1, B3]
+
+  - name: I3C0_SDA
+    color: "#06b6d4"
+    pins:
+      - [J7, "3"]
+      - [U1, C8]
+
+  - name: I3C0_SCL
+    color: "#0891b2"
+    pins:
+      - [J7, "4"]
+      - [U1, A8]
+
+  - name: I3C1_SDA
+    color: "#0284c7"
+    pins:
+      - [J8, "3"]
+      - [U1, F6]
+
+  - name: I3C1_SCL
+    color: "#0369a1"
+    pins:
+      - [J8, "4"]
+      - [U1, F4]
+
+  - name: SPI0_SCK
+    color: "#f59e0b"
+    pins:
+      - [J9, "3"]
+      - [U1, L6]
+
+  - name: SPI0_MOSI
+    color: "#d97706"
+    pins:
+      - [J9, "4"]
+      - [U1, L7]
+
+  - name: SPI0_MISO
+    color: "#b45309"
+    pins:
+      - [J9, "5"]
+      - [U1, L8]
+
+  - name: SPI0_CS_N
+    color: "#92400e"
+    pins:
+      - [J9, "6"]
+      - [U1, L9]
+
+  - name: UART0_RXD
+    color: "#8b5cf6"
+    pins:
+      - [U9, "1"]
+      - [U1, B6]
+
+  - name: UART0_CTS
+    color: "#a78bfa"
+    pins:
+      - [U9, "3"]
+      - [U1, F10]
+
+  - name: UART0_TXD
+    color: "#7c3aed"
+    pins:
+      - [U9, "5"]
+      - [U1, A6]
+
+  - name: UART0_RTS
+    color: "#6d28d9"
+    pins:
+      - [U9, "11"]
+      - [U1, E10]
+
+  - name: USB_DP
+    color: "#ec4899"
+    pins:
+      - [U9, "15"]
+      - [J3, DP1]
+
+  - name: USB_DM
+    color: "#db2777"
+    pins:
+      - [U9, "16"]
+      - [J3, DN1]
+
+  - name: FTDI_3V3
+    color: "#f43f5e"
+    pins:
+      - [U9, "17"]
+      - [U9, "24"]
+
+  - name: DTR_N
+    color: "#64748b"
+    pins:
+      - [U9, "2"]
+      - [J10, "5"]
+
+  - name: RI_N
+    color: "#64748b"
+    pins:
+      - [U9, "6"]
+      - [J10, "6"]
+
+  - name: DSR_N
+    color: "#64748b"
+    pins:
+      - [U9, "9"]
+      - [J10, "1"]
+
+  - name: DCD_N
+    color: "#64748b"
+    pins:
+      - [U9, "10"]
+      - [J10, "2"]
+
+  - name: CBUS4
+    color: "#64748b"
+    pins:
+      - [U9, "12"]
+      - [J10, "3"]
+
+  - name: CBUS2
+    color: "#64748b"
+    pins:
+      - [U9, "13"]
+      - [J10, "4"]
+
+  - name: CBUS3
+    color: "#64748b"
+    pins:
+      - [U9, "14"]
+      - [J14, "10"]
+
+  - name: CBUS5
+    color: "#64748b"
+    pins:
+      - [U9, "30"]
+      - [J14, "8"]
+
+  - name: CBUS6
+    color: "#64748b"
+    pins:
+      - [U9, "31"]
+      - [J14, "9"]
+
+  - name: CBUS7
+    color: "#64748b"
+    pins:
+      - [U9, "32"]
+      - [J14, "7"]
+
+  - name: OSCI
+    color: "#64748b"
+    pins:
+      - [U9, "27"]
+      - [U9, "28"]
+
+  - name: NC_U9
+    color: "#64748b"
+    pins:
+      - [U9, "8"]
+      - [U1, L10]
+
+  - name: GPIO0
+    color: "#10b981"
+    pins:
+      - [J14, "1"]
+      - [U1, M6]
+
+  - name: GPIO1
+    color: "#10b981"
+    pins:
+      - [J14, "2"]
+      - [U1, M8]
+
+  - name: GPIO2
+    color: "#10b981"
+    pins:
+      - [J14, "3"]
+      - [U1, N7]
+
+  - name: GPIO3
+    color: "#10b981"
+    pins:
+      - [J14, "4"]
+      - [U1, N4]
+
+  - name: GPIO4
+    color: "#10b981"
+    pins:
+      - [J14, "5"]
+      - [U1, N8]
+
+  - name: GPIO5
+    color: "#10b981"
+    pins:
+      - [J14, "6"]
+      - [U1, N9]

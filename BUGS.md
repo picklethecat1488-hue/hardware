@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-22 07:35:55 UTC` |
+| **Report Date** | `2026-09-22 08:42:28 UTC` |
 | **Total Issues** | `89` |
-| **Open Issues** | `5` |
-| **Resolved / Closed** | `84 (94%)` |
+| **Open Issues** | `4` |
+| **Resolved / Closed** | `85 (95%)` |
 
 ## Executive Summary
 
@@ -122,7 +122,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-085](#bug-085): Change mounting holes on enclosure bottom to mounting posts (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-086](#bug-086): Capacitive sensing and control section is incorrect (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-087](#bug-087): Add power test points (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-088](#bug-088): Schematic bugs review (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-088](#bug-088): Schematic bugs review (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-089](#bug-089): Organize schematic pages by subsystem (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-090](#bug-090): Test board Enclosure feedback (`OPEN`)
 
@@ -2225,12 +2225,13 @@ Added power test points TP_VBAT at (-18.0, -26.0), TP_VBUS at (-14.0, -26.0), an
 
 ---
 
-### <a id="bug-088"></a> 🔴 `[BUG-088]` Schematic bugs review
+### <a id="bug-088"></a> 🟢 `[BUG-088]` Schematic bugs review
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-22 02:59:42 UTC`
+- **Resolved**: `2026-09-22 08:42:28 UTC`
 
 #### Description
 
@@ -2249,6 +2250,10 @@ Update DRC engine to catch issues identified above, and fix.
 | `screenshot` | [pasted_screenshot_1790046087008.png](build/attachments/pasted_screenshot_1790046087008.png) | Pasted screenshot |
 | `screenshot` | [pasted_screenshot_1790046134444.png](build/attachments/pasted_screenshot_1790046134444.png) | Pasted screenshot |
 | `screenshot` | [pasted_screenshot_1790046211771.png](build/attachments/pasted_screenshot_1790046211771.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Clamped symbol heights in SchematicDiagram to avoid page bottom overflow (cy >= 18.0) and dynamically scaled pin pitch; constrained decoupling capacitor cards to base_x <= 195.0 - card_w + 12.0 avoiding title block collisions (X: [200, 285]); added title block keepout, sheet header keepout, and global dangling component rules to DRC engine (SCHEMATIC_TITLE_BLOCK_COLLISION, SCHEMATIC_HEADER_COLLISION, SCHEMATIC_DANGLING_COMPONENT); connected all components past sheet 15 in test_board wiring.yaml to architecture nets; added test_regression_bug_088_schematic_defects_and_drc.
 
 ---
 

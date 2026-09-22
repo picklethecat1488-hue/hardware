@@ -1224,8 +1224,8 @@ def test_schematic_diagram_geometric_offsets_and_gnd_placement(tmp_path: Path) -
     left_pins.sort(key=_pin_sort_key)
     # VDD must be first (index 0)
     assert left_pins[0].name == "VDD"
-    # VSS (ground) must be at the bottom (after signals SDA, SCL, INT)
-    assert left_pins[-1].name == "VSS"
+    # Ground pins (VSS, EP) must be at the bottom (after signals SDA, SCL, INT)
+    assert left_pins[-1].name in ("VSS", "EP")
 
     # 2. Verify PDF generation executes with zero self-intersections
     pdf_path = tmp_path / "schematic_offsets_verified.pdf"
@@ -2335,3 +2335,58 @@ def test_regression_bug_087_power_test_points():
         v for v in checker.check_boundary_containment(footprints=wiring.footprints) if v.severity.name == "ERROR"
     ]
     assert len(bound_violations) == 0, f"Boundary containment errors: {[v.description for v in bound_violations]}"
+
+
+def test_regression_bug_088_schematic_defects_and_drc() -> None:
+    """Verify schematic defect remedies and DRC rule enforcement (BUG-088).
+
+    Guards against:
+    1. Symbol boundary overflow off page edge (e.g. U1 symbol height clamped to page margins).
+    2. Decoupling capacitor card overlap with top sheet header banner (Y in [184, 198]).
+    3. Decoupling capacitor card or symbol overlap with engineering title block (X in [200, 285], Y in [12, 46]).
+    4. Components in the netlist having no connected pins (dangling components past sheet 15).
+    5. DRC rules SCHEMATIC_TITLE_BLOCK_COLLISION, SCHEMATIC_HEADER_COLLISION, and SCHEMATIC_DANGLING_COMPONENT.
+    """
+    from model.wiring import Wiring
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.schematic_diagram import SchematicDiagram
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    cfg = provider.pcb_config
+
+    # 1. Verify live design passes all schematic DRC checks with 0 errors
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring=wiring)
+    assert len(violations.errors) == 0, f"Unexpected schematic DRC errors: {[e.description for e in violations.errors]}"
+
+    # 2. Verify all symbol bounding boxes are strictly within page limits and do not hit header or title block
+    diag = SchematicDiagram(wiring=wiring, pcb_config=cfg)
+    boxes = diag.compute_symbol_bounding_boxes()
+    for sheet_idx, b_list in boxes.items():
+        for b in b_list:
+            b_xmin = b[0] - b[2] / 2.0
+            b_xmax = b[0] + b[2] / 2.0
+            b_ymin = b[1] - b[3] / 2.0
+            b_ymax = b[1] + b[3] / 2.0
+
+            # No symbol may extend off bottom page boundary (cy >= 16.0)
+            assert b_ymin >= 16.0, f"Symbol {b[4]} on sheet {sheet_idx} falls off bottom margin: ymin={b_ymin:.1f}"
+            # No symbol may collide with top sheet header (Y in [184, 198] for X in [20, 280])
+            header_collision = b_ymax > 184.0 and b_ymin < 198.0 and b_xmax > 20.0 and b_xmin < 280.0
+            assert not header_collision, (
+                f"Symbol {b[4]} on sheet {sheet_idx} collides with header: bounds=({b_xmin:.1f}, {b_ymin:.1f}, {b_xmax:.1f}, {b_ymax:.1f})"
+            )
+            # No symbol may collide with title block (X in [200, 285] and Y in [12, 46])
+            tb_collision = b_xmax > 200.0 and b_xmin < 285.0 and b_ymin < 46.0 and b_ymax > 12.0
+            assert not tb_collision, (
+                f"Symbol {b[4]} on sheet {sheet_idx} collides with title block: bounds=({b_xmin:.1f}, {b_ymin:.1f}, {b_xmax:.1f}, {b_ymax:.1f})"
+            )
+
+    # 3. Verify all carrier footprints in wiring have at least one connected pin
+    footprints_map = {f.name: f for f in wiring.footprints if getattr(f, "shape_ref", None) != "flex_tail"}
+    pin_to_net = {(c, p): net.name for net in wiring.nets for c, p in net.pins}
+    for name, fp in footprints_map.items():
+        connected = [p for p in fp.pins if (name, p.name) in pin_to_net]
+        assert len(connected) > 0, f"Dangling component {name} has no connected pins in wiring.yaml"

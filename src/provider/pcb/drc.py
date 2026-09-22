@@ -149,6 +149,9 @@ class DRCRuleName(StrEnum):
     SCHEMATIC_PAGE_TRANSITION_MISSING = "SCHEMATIC_PAGE_TRANSITION_MISSING"
     SCHEMATIC_DANGLING_COMPONENT = "SCHEMATIC_DANGLING_COMPONENT"
     SCHEMATIC_PAGE_BOUNDARY_EXCEEDED = "SCHEMATIC_PAGE_BOUNDARY_EXCEEDED"
+    SCHEMATIC_TITLE_BLOCK_COLLISION = "SCHEMATIC_TITLE_BLOCK_COLLISION"
+    SCHEMATIC_HEADER_COLLISION = "SCHEMATIC_HEADER_COLLISION"
+    SCHEMATIC_UNCONNECTED_COMPONENT = "SCHEMATIC_UNCONNECTED_COMPONENT"
 
 
 @dataclass
@@ -2062,6 +2065,10 @@ class PCBDesignRulesChecker:
             boxes = computed_symbol_boxes.get(sheet_idx + 1, [])
             for i, b1 in enumerate(boxes):
                 for b2 in boxes[i + 1 :]:
+                    if "DECOUPLING_CARD" in (b1[4], b2[4]):
+                        other_name = b2[4] if b1[4] == "DECOUPLING_CARD" else b1[4]
+                        if other_name.upper().startswith("C"):
+                            continue
                     dx = abs(b1[0] - b2[0])
                     dy = abs(b1[1] - b2[1])
                     min_dx = (b1[2] + b2[2]) / 2.0
@@ -2094,5 +2101,40 @@ class PCBDesignRulesChecker:
                         ),
                         location=(b[0], b[1], 0.0),
                     )
+
+                # 3d. Title block and sheet header collision check (BUG-088)
+                # Bottom-right title block: X in [200.0, 285.0], Y in [12.0, 46.0]
+                if b_xmax > 200.0 and b_xmin < 285.0 and b_ymin < 46.0 and b_ymax > 12.0:
+                    violations.add_error(
+                        rule_name=DRCRuleName.SCHEMATIC_TITLE_BLOCK_COLLISION,
+                        net_or_zone=b[4],
+                        description=(
+                            f"Symbol/card '{b[4]}' on sheet {sheet_idx + 1} ('{sheet.title}') "
+                            f"overlaps schematic title block: bounds=({b_xmin:.1f}, {b_ymin:.1f}, {b_xmax:.1f}, {b_ymax:.1f})"
+                        ),
+                        location=(b[0], b[1], 0.0),
+                    )
+
+                # Top sheet header banner: X in [20.0, 280.0], Y in [184.0, 198.0]
+                if b_ymax > 184.0 and b_ymin < 198.0 and b_xmax > 20.0 and b_xmin < 280.0:
+                    violations.add_error(
+                        rule_name=DRCRuleName.SCHEMATIC_HEADER_COLLISION,
+                        net_or_zone=b[4],
+                        description=(
+                            f"Symbol/card '{b[4]}' on sheet {sheet_idx + 1} ('{sheet.title}') "
+                            f"overlaps schematic sheet header: bounds=({b_xmin:.1f}, {b_ymin:.1f}, {b_xmax:.1f}, {b_ymax:.1f})"
+                        ),
+                        location=(b[0], b[1], 0.0),
+                    )
+
+        # 4. Check that all components in the design have connected pins (BUG-088)
+        for fp_name, fp in footprints_map.items():
+            connected_pins = [p for p in fp.pins if (fp.name, p.name) in pin_to_net]
+            if not connected_pins:
+                violations.add_error(
+                    rule_name=DRCRuleName.SCHEMATIC_DANGLING_COMPONENT,
+                    net_or_zone=fp_name,
+                    description=f"Component '{fp_name}' has no pins connected to any nets in the netlist",
+                )
 
         return violations

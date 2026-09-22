@@ -584,6 +584,10 @@ class Builder:
                     target_cfg = target_cfg.model_copy(update={"copper_regions": pcb_config.copper_regions})
                 if sub_pcb_config and not target_cfg.net_classes and pcb_config.net_classes:
                     target_cfg = target_cfg.model_copy(update={"net_classes": pcb_config.net_classes})
+                if sub_pcb_config and not target_cfg.schematic_sheets and pcb_config.schematic_sheets:
+                    target_cfg = target_cfg.model_copy(update={"schematic_sheets": pcb_config.schematic_sheets})
+                if sub_pcb_config and not target_cfg.schematic_layout and pcb_config.schematic_layout:
+                    target_cfg = target_cfg.model_copy(update={"schematic_layout": pcb_config.schematic_layout})
                 if (
                     sub_pcb_config
                     and not target_cfg.silkscreen_texts

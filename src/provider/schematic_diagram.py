@@ -40,7 +40,7 @@ class _TOCPagePlan:
     net_rows: List[List[NetModel]] = field(default_factory=list)
 
 
-POWER_NET_NAMES = {"3V3", "5V", "1V8", "1V2", "VCC", "VDD", "VLOAD_SW", "VBUS"}
+POWER_NET_NAMES = {"3V3", "5V", "1V8", "1V2", "VCC", "VDD", "VLOAD_SW", "VBUS", "VBAT"}
 GROUND_NET_NAMES = {"GND", "GROUND", "VSS"}
 JUMPER_BRIDGE_RADIUS_MM = 1.2
 PIN_PITCH_MM = 5.0
@@ -411,6 +411,8 @@ class SchematicDiagram:
                 header_offset = 18.0 if getattr(fp, "mpn", None) else 15.0
                 max_pin_rows = max(len(left_pins), len(right_pins), 2)
                 ch = max(34.0, header_offset + (max_pin_rows - 1) * PIN_PITCH_MM + 6.0)
+                if row_top_y - ch < 18.0:
+                    ch = max(34.0, row_top_y - 18.0)
                 cy = row_top_y - ch
                 boxes.append((cx + cw / 2.0, cy + ch / 2.0, cw, ch, fp.name))
 
@@ -435,12 +437,22 @@ class SchematicDiagram:
                     )
 
             if decoupling_caps:
-                base_y = 35.0
+                n_caps = len(decoupling_caps)
                 pitch_x = 28.0
-                total_w = (len(decoupling_caps) - 1) * pitch_x
-                start_x = max(35.0, page_center_x - total_w / 2.0)
+                total_w = (n_caps - 1) * pitch_x
+                card_w = max(total_w + 32.0, 75.0)
+                max_card_x = 195.0 - card_w
+                target_base_x = max(35.0, page_center_x - total_w / 2.0)
+                cap_base_x = max(35.0, min(target_base_x, max_card_x + 12.0))
+                card_x = cap_base_x - 12.0
+                base_y = 66.0 if has_bottom_cards else 60.0
+                y_top = base_y + 16.0
+                y_bot = base_y - 12.0
+                card_y = y_bot - 12.0
+                card_h = (y_top - y_bot) + 26.0
+                boxes.append((card_x + card_w / 2.0, card_y + card_h / 2.0, card_w, card_h, "DECOUPLING_CARD"))
                 for idx, cap in enumerate(decoupling_caps):
-                    boxes.append((start_x + idx * pitch_x, base_y, 14.0, 24.0, cap.name))
+                    boxes.append((cap_base_x + idx * pitch_x, base_y, 14.0, 24.0, cap.name))
 
             h_segments = []
             trans_map = {}
@@ -535,7 +547,11 @@ class SchematicDiagram:
                         if target_pair:
                             p_x, p_y = sheet_pin_coords[target_pair]
                             y_base = p_y
-                            cand_x = p_x + 14.0 + idx * 16.0 if p_x >= 148.5 else max(22.0, p_x - 24.0 - idx * 16.0)
+                            side = pin_side_map.get(target_pair, "right" if p_x >= 148.5 else "left")
+                            if side == "right":
+                                cand_x = p_x + 14.0 + idx * 16.0
+                            else:
+                                cand_x = max(22.0, p_x - 24.0 - idx * 16.0)
                             x_pull = cand_x
                         else:
                             x_pull = page_center_x + idx * 14.0
@@ -1284,7 +1300,9 @@ class SchematicDiagram:
                         step = (safe_max - safe_min) / max(1, n_chan - 1) if n_chan > 1 else 0.0
                         cand_x = safe_min + chan_idx * step
 
-                    while any(abs(cand_x - ux) < 7.0 for ux in used_x_positions):
+                    for _ in range(10):
+                        if not any(abs(cand_x - ux) < 7.0 for ux in used_x_positions):
+                            break
                         if cand_x + 7.0 <= safe_max:
                             cand_x += 7.0
                         elif cand_x - 7.0 >= safe_min:
@@ -1295,7 +1313,9 @@ class SchematicDiagram:
                     # Left breakout stub: extend outward to the left well clear of GND symbols while staying on-page
                     min_page_x = 22.0
                     cand_x = max(min_page_x, x_start - 24.0 - idx * 16.0)
-                    while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
+                    for _ in range(10):
+                        if not any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
+                            break
                         if cand_x - 10.0 >= min_page_x:
                             cand_x -= 10.0
                         elif cand_x + 10.0 <= x_start - 6.0:
@@ -1314,7 +1334,9 @@ class SchematicDiagram:
                     # Right breakout stub: extend outward to the right while staying on-page
                     max_page_x = 275.0
                     cand_x = min(max_page_x, x_end + 14.0 + idx * 16.0)
-                    while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
+                    for _ in range(10):
+                        if not any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
+                            break
                         if cand_x + 10.0 <= max_page_x:
                             cand_x += 10.0
                         elif cand_x - 10.0 >= x_end + 6.0:
@@ -1354,17 +1376,21 @@ class SchematicDiagram:
                         cand_x = p_x + 14.0 + idx * 16.0
                         if cand_x > next_comp_left - 12.0:
                             cand_x = (p_x + next_comp_left) / 2.0
-                        while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
-                            if cand_x - 7.0 > p_x + 6.0:
-                                cand_x -= 7.0
-                            elif cand_x + 7.0 < next_comp_left - 8.0:
+                        for _ in range(10):
+                            if not any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
+                                break
+                            if cand_x + 7.0 < next_comp_left - 8.0:
                                 cand_x += 7.0
+                            elif cand_x - 7.0 > p_x + 6.0:
+                                cand_x -= 7.0
                             else:
                                 break
                     else:
                         min_page_x = 22.0
                         cand_x = max(min_page_x, p_x - 24.0 - idx * 16.0)
-                        while any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
+                        for _ in range(10):
+                            if not any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
+                                break
                             if cand_x - step >= min_page_x:
                                 cand_x -= step
                             elif cand_x + step <= p_x - 6.0:
@@ -2256,6 +2282,9 @@ class SchematicDiagram:
             header_offset = 18.0 if has_mpn else 15.0
             max_pin_rows = max(len(left_pins), len(right_pins), 2)
             ch = max(34.0, header_offset + (max_pin_rows - 1) * pin_pitch + 6.0)
+            if row_top_y - ch < 18.0:
+                ch = max(34.0, row_top_y - 18.0)
+                pin_pitch = max(2.5, (ch - header_offset - 6.0) / max(1, max_pin_rows - 1))
             cy = row_top_y - ch
             comp_boxes.append((cx, cy, cw, ch))
 
@@ -2989,12 +3018,16 @@ class SchematicDiagram:
         if decoupling_caps:
             n_caps = len(decoupling_caps)
             total_w = (n_caps - 1) * 28.0
+            card_w = max(total_w + 32.0, 75.0)
+            max_card_x = 195.0 - card_w
             if has_truth_table:
                 cap_base_x = 35.0
             elif cols_override == 2:
-                cap_base_x = col_x_positions[0]
+                cap_base_x = min(col_x_positions[0], max_card_x + 12.0)
             else:
-                cap_base_x = max(35.0, page_center_x - (total_w / 2.0))
+                target_base_x = max(35.0, page_center_x - (total_w / 2.0))
+                cap_base_x = min(target_base_x, max_card_x + 12.0)
+            cap_base_x = max(35.0, cap_base_x)
             self._draw_decoupling_cap_bank(
                 ax=ax,
                 caps=decoupling_caps,
