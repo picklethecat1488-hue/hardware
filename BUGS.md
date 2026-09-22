@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-22 05:25:55 UTC` |
+| **Report Date** | `2026-09-22 07:35:55 UTC` |
 | **Total Issues** | `89` |
-| **Open Issues** | `6` |
-| **Resolved / Closed** | `83 (93%)` |
+| **Open Issues** | `5` |
+| **Resolved / Closed** | `84 (94%)` |
 
 ## Executive Summary
 
@@ -121,7 +121,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-084](#bug-084): Update board files schematics  `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-085](#bug-085): Change mounting holes on enclosure bottom to mounting posts (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-086](#bug-086): Capacitive sensing and control section is incorrect (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-087](#bug-087): Add power test points (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-087](#bug-087): Add power test points (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-088](#bug-088): Schematic bugs review (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-089](#bug-089): Organize schematic pages by subsystem (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-090](#bug-090): Test board Enclosure feedback (`OPEN`)
@@ -2207,16 +2207,21 @@ Downselected U2 to Azoteq IQS7222A001QNR in QFN-20 with dual internal LDO decoup
 
 ---
 
-### <a id="bug-087"></a> 🔴 `[BUG-087]` Add power test points
+### <a id="bug-087"></a> 🟢 `[BUG-087]` Add power test points
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-22 02:54:00 UTC`
+- **Resolved**: `2026-09-22 07:35:55 UTC`
 
 #### Description
 
 Add power and ground test points for the following power nets to the board: VBAT, VBUS, 3V3
+
+#### Resolution Notes
+
+Added power test points TP_VBAT at (-18.0, -26.0), TP_VBUS at (-14.0, -26.0), and TP_3V3 at (-10.0, -26.0) with standard 4mm probe pitch; verified TP_GND at (-18.0, -22.0) and added regression test test_regression_bug_087_power_test_points.
 
 ---
 

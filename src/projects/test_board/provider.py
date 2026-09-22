@@ -651,6 +651,11 @@ class TestBoardProvider(Provider):
             # GND through-hole probe test point
             TestPoint("TP_GND", net="GND", at=(-18.0, -22.0))
 
+            # Power test points (BUG-087)
+            TestPoint("TP_VBAT", net="VBAT", at=(-18.0, -26.0))
+            TestPoint("TP_VBUS", net="VBUS", at=(-14.0, -26.0))
+            TestPoint("TP_3V3", net="3V3", at=(-10.0, -26.0))
+
             # PCIe Gen4 differential pair test points (spaced with 4mm pitch)
             TestPoint("TP_TX0_N", net="PCIE_TX0_N", at=(-14.0, -22.0))
             TestPoint("TP_TX0_P", net="PCIE_TX0_P", at=(-10.0, -22.0))

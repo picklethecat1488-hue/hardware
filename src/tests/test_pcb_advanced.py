@@ -2284,3 +2284,54 @@ def test_regression_bug_086_azoteq_capacitive_sensing() -> None:
         v for v in checker.check_boundary_containment(footprints=wiring.footprints) if v.severity.name == "ERROR"
     ]
     assert len(bound_violations) == 0, f"Boundary containment errors: {[v.description for v in bound_violations]}"
+
+
+def test_regression_bug_087_power_test_points():
+    """Verify BUG-087: carrier_board has power test points for VBAT, VBUS, 3V3, and GND."""
+    import math
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from model.wiring import Wiring
+
+    provider = TestBoardProvider()
+    cfg = provider.pcb_config
+    assert cfg is not None
+
+    tps = {tp.name: tp for tp in cfg.test_points}
+    for required in ("TP_VBAT", "TP_VBUS", "TP_3V3", "TP_GND"):
+        assert required in tps, f"Missing required test point: {required}"
+
+    assert tps["TP_VBAT"].net == "VBAT"
+    assert tps["TP_VBUS"].net == "VBUS"
+    assert tps["TP_3V3"].net == "3V3"
+    assert tps["TP_GND"].net == "GND"
+
+    assert tps["TP_VBAT"].position_mm == (-18.0, -26.0)
+    assert tps["TP_VBUS"].position_mm == (-14.0, -26.0)
+    assert tps["TP_3V3"].position_mm == (-10.0, -26.0)
+    assert tps["TP_GND"].position_mm == (-18.0, -22.0)
+
+    for tp_name in ("TP_VBAT", "TP_VBUS", "TP_3V3", "TP_GND"):
+        tp = tps[tp_name]
+        assert tp.drill_diameter_mm == 0.80
+        assert tp.pad_diameter_mm == 1.40
+        assert tp.plated is True
+
+    # 4mm pitch between consecutive power test points
+    def point_dist(name1: str, name2: str) -> float:
+        p1 = tps[name1].position_mm
+        p2 = tps[name2].position_mm
+        return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+
+    assert abs(point_dist("TP_VBAT", "TP_VBUS") - 4.0) < 1e-3
+    assert abs(point_dist("TP_VBUS", "TP_3V3") - 4.0) < 1e-3
+
+    # Schematic & boundary DRC check
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(cfg)
+    sch_violations = checker.check_schematic(wiring=wiring)
+    assert len(sch_violations.errors) == 0, f"Schematic DRC errors: {[v.description for v in sch_violations.errors]}"
+    bound_violations = [
+        v for v in checker.check_boundary_containment(footprints=wiring.footprints) if v.severity.name == "ERROR"
+    ]
+    assert len(bound_violations) == 0, f"Boundary containment errors: {[v.description for v in bound_violations]}"
