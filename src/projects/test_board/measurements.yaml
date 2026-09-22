@@ -14,8 +14,11 @@ mounting_hole_diameter: 3.2
 mounting_hole_inset: 4.5
 standoff_height: 5.0
 standoff_radius: 3.0
-standoff_hole_diameter: 2.2
-standoff_hole_depth: 4.0
+mounting_post_diameter: 2.8
+mounting_post_height: 2.6
+mounting_post_flare_diameter: 3.6
+mounting_post_flare_height: 1.0
+mounting_post_tip_diameter: 2.2
 silkscreen_margin: 7.0
 enclosure_foot_diameter: 8.0
 enclosure_foot_depth: 1.0

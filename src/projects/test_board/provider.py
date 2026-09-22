@@ -14,6 +14,7 @@ from build123d import (
     RigidJoint,
     extrude,
     Box,
+    Cone,
     Cylinder,
     fillet,
     Locations,
@@ -258,9 +259,10 @@ class TestBoardProvider(Provider):
                 RectangleRounded(w_cavity, l_cavity, r_inner)
             extrude(s_inner.sketch, amount=h_shell + 1.0, mode=BuildMode.SUBTRACT)
 
-            # Corner standoffs
+            # Corner standoffs with clip-on mounting posts for carrier PCB (BUG-085)
             hole_x = (self.settings.board_width / 2.0) - self.settings.mounting_hole_inset
             hole_y = (self.settings.board_length / 2.0) - self.settings.mounting_hole_inset
+            standoff_top_z = -h_shell / 2.0 + wall + standoff_h
             with Locations(
                 (hole_x, hole_y, -h_shell / 2.0 + wall + standoff_h / 2.0),
                 (-hole_x, hole_y, -h_shell / 2.0 + wall + standoff_h / 2.0),
@@ -269,17 +271,29 @@ class TestBoardProvider(Provider):
             ):
                 Cylinder(radius=standoff_r, height=standoff_h)
 
-            # Standoff screw mounting pilot holes
-            standoff_hole_r = self.settings.standoff_hole_diameter / 2.0
-            standoff_hole_depth = self.settings.standoff_hole_depth
-            hole_z = -h_shell / 2.0 + wall + standoff_h - (standoff_hole_depth / 2.0)
+            post_r = self.settings.mounting_post_diameter / 2.0
+            flare_r = self.settings.mounting_post_flare_diameter / 2.0
+            tip_r = self.settings.mounting_post_tip_diameter / 2.0
+            flare_h = self.settings.mounting_post_flare_height
+            shaft_h = self.settings.mounting_post_height - flare_h
+
+            # Cylindrical post shafts through PCB mounting holes
             with Locations(
-                (hole_x, hole_y, hole_z),
-                (-hole_x, hole_y, hole_z),
-                (-hole_x, -hole_y, hole_z),
-                (hole_x, -hole_y, hole_z),
+                (hole_x, hole_y, standoff_top_z + shaft_h / 2.0),
+                (-hole_x, hole_y, standoff_top_z + shaft_h / 2.0),
+                (-hole_x, -hole_y, standoff_top_z + shaft_h / 2.0),
+                (hole_x, -hole_y, standoff_top_z + shaft_h / 2.0),
             ):
-                Cylinder(radius=standoff_hole_r, height=standoff_hole_depth, mode=BuildMode.SUBTRACT)
+                Cylinder(radius=post_r, height=shaft_h)
+
+            # Flared retaining heads on top of mounting posts for secure clip-on fit
+            with Locations(
+                (hole_x, hole_y, standoff_top_z + shaft_h + flare_h / 2.0),
+                (-hole_x, hole_y, standoff_top_z + shaft_h + flare_h / 2.0),
+                (-hole_x, -hole_y, standoff_top_z + shaft_h + flare_h / 2.0),
+                (hole_x, -hole_y, standoff_top_z + shaft_h + flare_h / 2.0),
+            ):
+                Cone(bottom_radius=flare_r, top_radius=tip_r, height=flare_h)
 
             # Foot recess indentations on bottom exterior face (BUG-060)
             foot_r = self.settings.enclosure_foot_diameter / 2.0

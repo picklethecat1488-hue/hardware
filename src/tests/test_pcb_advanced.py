@@ -804,9 +804,12 @@ def test_test_board_full_milestones_integration(tmp_path: Path):
     assert electrodes_by_name["SENSE_WATER_PROXIMITY"].electrode_type == "self"
     assert electrodes_by_name["SENSE_WATER_PROXIMITY"].drive_shield is False
 
-    # Milestone 2: Carrier standoff pilot holes and enclosure feet
-    assert provider.settings.standoff_hole_diameter == 2.2
-    assert provider.settings.standoff_hole_depth == 4.0
+    # Milestone 2: Carrier clip-on mounting posts and enclosure feet (BUG-085)
+    assert provider.settings.mounting_post_diameter == 2.8
+    assert provider.settings.mounting_post_height == 2.6
+    assert provider.settings.mounting_post_flare_diameter == 3.6
+    assert provider.settings.mounting_post_flare_height == 1.0
+    assert provider.settings.mounting_post_tip_diameter == 2.2
     assert provider.settings.enclosure_foot_diameter == 8.0
     assert provider.settings.enclosure_foot_depth == 1.0
     assert provider.settings.enclosure_foot_inset == 8.0
@@ -2142,3 +2145,53 @@ def test_regression_bug_084_carrier_board_and_schematic_revision_2_0(tmp_path: P
     sch_text = sch_file.read_text(encoding="utf-8")
     assert '(rev "2.0")' in pcb_text, 'KiCad PCB must specify (rev "2.0")'
     assert '(rev "2.0")' in sch_text, 'KiCad schematic must specify (rev "2.0")'
+
+
+def test_regression_bug_085_clip_on_mounting_posts() -> None:
+    """Verify BUG-085: carrier mounting holes on enclosure bottom replaced with flared clip-on posts."""
+    from build123d import Location
+    from projects.test_board.provider import TestBoardProvider
+
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    carrier = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
+
+    # 1. Config properties must match measurements.yaml
+    assert provider.settings.mounting_post_diameter == 2.8
+    assert provider.settings.mounting_post_height == 2.6
+    assert provider.settings.mounting_post_flare_diameter == 3.6
+    assert provider.settings.mounting_post_flare_height == 1.0
+    assert provider.settings.mounting_post_tip_diameter == 2.2
+
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    standoff_top_z = -h_shell / 2.0 + wall + standoff_h
+    z_carrier = standoff_top_z + (provider.settings.board_thickness / 2.0)
+
+    hole_x = (provider.settings.board_width / 2.0) - provider.settings.mounting_hole_inset
+    hole_y = (provider.settings.board_length / 2.0) - provider.settings.mounting_hole_inset
+    shaft_h = provider.settings.mounting_post_height - provider.settings.mounting_post_flare_height
+
+    # 2. Pilot hole locations inside standoffs must be solid
+    standoff_mid_z = -h_shell / 2.0 + wall + (standoff_h / 2.0)
+    for sx in (hole_x, -hole_x):
+        for sy in (hole_y, -hole_y):
+            assert enclosure.part.is_inside((sx, sy, standoff_mid_z))
+
+    # 3. Post shaft must be solid
+    post_mid_z = standoff_top_z + (shaft_h / 2.0)
+    for sx in (hole_x, -hole_x):
+        for sy in (hole_y, -hole_y):
+            assert enclosure.part.is_inside((sx, sy, post_mid_z))
+
+    # 4. Flared retaining head must overhang hole radius (1.6 mm) at radius 1.7 mm
+    flare_probe_z = standoff_top_z + shaft_h + 0.1
+    for sx, sy in [(hole_x, hole_y), (-hole_x, hole_y), (-hole_x, -hole_y), (hole_x, -hole_y)]:
+        assert enclosure.part.is_inside((sx + 1.7, sy, flare_probe_z))
+        assert not enclosure.part.is_inside((sx + 2.0, sy, flare_probe_z))
+
+    # 5. Zero intersection between carrier board and enclosure bottom
+    carrier_geom = carrier.part.locate(Location((0.0, 0.0, z_carrier)))
+    inter = enclosure.part.intersect(carrier_geom)
+    assert inter.volume == pytest.approx(0.0, abs=1e-3)

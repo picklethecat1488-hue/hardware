@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-22 01:00:31 UTC` |
+| **Report Date** | `2026-09-22 01:30:56 UTC` |
 | **Total Issues** | `85` |
-| **Open Issues** | `2` |
-| **Resolved / Closed** | `83 (97%)` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `84 (98%)` |
 
 ## Executive Summary
 
@@ -119,7 +119,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-083](#bug-083): I2C pullup resistors overlap (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-084](#bug-084): Update board files schematics  `[carrier_board]` (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-085](#bug-085): Change mounting holes on enclosure bottom to mounting posts (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-085](#bug-085): Change mounting holes on enclosure bottom to mounting posts (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-086](#bug-086): Capacitive sensing and control section is incorrect (`OPEN`)
 
 ## Detailed Issue Log
@@ -2145,16 +2145,21 @@ Updated carrier board files, silkscreen, and schematics to Revision 2.0.
 
 ---
 
-### <a id="bug-085"></a> 🔴 `[BUG-085]` Change mounting holes on enclosure bottom to mounting posts
+### <a id="bug-085"></a> 🟢 `[BUG-085]` Change mounting holes on enclosure bottom to mounting posts
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Created**: `2026-09-21 18:53:03 UTC`
+- **Resolved**: `2026-09-22 01:30:56 UTC`
 
 #### Description
 
 Plastic material is difficult to thread screws into. Change the mounting holes on the enclosure bottom to mounting posts which are slightly flared on the top to provide a secure clip-on fit for the carrier PCB.
+
+#### Resolution Notes
+
+Replaced standoff screw mounting pilot holes with clip-on mounting posts featuring flared retaining heads for secure carrier PCB retention.
 
 ---
 

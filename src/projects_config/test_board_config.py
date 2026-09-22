@@ -114,14 +114,29 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["standoff_radius"])
 
     @property
-    def standoff_hole_diameter(self) -> float:
-        """Pilot drill hole diameter inside enclosure mounting standoffs in mm."""
-        return float(self._raw_data["standoff_hole_diameter"])
+    def mounting_post_diameter(self) -> float:
+        """Shaft diameter of clip-on mounting posts in mm."""
+        return float(self._raw_data["mounting_post_diameter"])
 
     @property
-    def standoff_hole_depth(self) -> float:
-        """Pilot drill hole depth inside enclosure mounting standoffs in mm."""
-        return float(self._raw_data["standoff_hole_depth"])
+    def mounting_post_height(self) -> float:
+        """Total height of clip-on mounting posts above standoff shoulder in mm."""
+        return float(self._raw_data["mounting_post_height"])
+
+    @property
+    def mounting_post_flare_diameter(self) -> float:
+        """Maximum diameter of flared retaining head on mounting posts in mm."""
+        return float(self._raw_data["mounting_post_flare_diameter"])
+
+    @property
+    def mounting_post_flare_height(self) -> float:
+        """Height of flared retaining head on mounting posts in mm."""
+        return float(self._raw_data["mounting_post_flare_height"])
+
+    @property
+    def mounting_post_tip_diameter(self) -> float:
+        """Lead-in tip diameter at top of mounting posts in mm."""
+        return float(self._raw_data["mounting_post_tip_diameter"])
 
     @property
     def silkscreen_margin(self) -> float:

@@ -171,3 +171,60 @@ def test_regression_bug_078_led_cutout_and_cover() -> None:
     assert bbox.size.Y == pytest.approx(7.0, abs=0.1)
     assert bbox.size.Z == pytest.approx(4.0, abs=0.1)
     assert "mount" in cover.part.joints, "LED cover must have 'mount' RigidJoint"
+
+
+def test_regression_bug_085_enclosure_clip_on_mounting_posts() -> None:
+    """Verify BUG-085: enclosure bottom replaces screw holes with flared clip-on mounting posts for carrier PCB."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    carrier = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
+
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    standoff_top_z = -h_shell / 2.0 + wall + standoff_h
+    z_carrier = standoff_top_z + (provider.settings.board_thickness / 2.0)
+
+    hole_x = (provider.settings.board_width / 2.0) - provider.settings.mounting_hole_inset
+    hole_y = (provider.settings.board_length / 2.0) - provider.settings.mounting_hole_inset
+
+    post_dia = provider.settings.mounting_post_diameter
+    post_h = provider.settings.mounting_post_height
+    flare_dia = provider.settings.mounting_post_flare_diameter
+    flare_h = provider.settings.mounting_post_flare_height
+    shaft_h = post_h - flare_h
+
+    # 1. Standoff body must be solid where screw pilot holes previously were drilled
+    standoff_mid_z = -h_shell / 2.0 + wall + (standoff_h / 2.0)
+    for sx in (hole_x, -hole_x):
+        for sy in (hole_y, -hole_y):
+            assert enclosure.part.is_inside((sx, sy, standoff_mid_z)), (
+                f"Standoff at ({sx}, {sy}) must be solid (no screw pilot holes)"
+            )
+
+    # 2. Mounting post shafts must extend above standoff shoulder
+    post_shaft_z = standoff_top_z + (shaft_h / 2.0)
+    for sx in (hole_x, -hole_x):
+        for sy in (hole_y, -hole_y):
+            assert enclosure.part.is_inside((sx, sy, post_shaft_z)), (
+                f"Mounting post shaft at ({sx}, {sy}) must be solid"
+            )
+
+    # 3. Mounting post tops must be flared to clip over PCB mounting hole
+    # Probe just above PCB surface at radius 1.7 mm (exceeding 3.2mm hole radius of 1.6mm)
+    flare_probe_z = standoff_top_z + shaft_h + 0.1
+    flare_probe_r = 1.7
+    for sx, sy in [(hole_x, hole_y), (-hole_x, hole_y), (-hole_x, -hole_y), (hole_x, -hole_y)]:
+        assert enclosure.part.is_inside((sx + flare_probe_r, sy, flare_probe_z)), (
+            f"Mounting post at ({sx}, {sy}) must have flared clip-on head extending past PCB hole radius"
+        )
+        assert not enclosure.part.is_inside((sx + 2.0, sy, flare_probe_z)), (
+            f"Mounting post at ({sx}, {sy}) must not exceed flare envelope"
+        )
+
+    # 4. Carrier board seated on standoffs must have zero intersection volume with enclosure bottom
+    carrier_geom = carrier.part.locate(Location((0.0, 0.0, z_carrier)))
+    inter = enclosure.part.intersect(carrier_geom)
+    assert inter.volume == pytest.approx(0.0, abs=1e-3), (
+        f"Carrier board intersects enclosure bottom: {inter.volume:.4f} mm^3"
+    )
