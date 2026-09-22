@@ -2390,3 +2390,66 @@ def test_regression_bug_088_schematic_defects_and_drc() -> None:
     for name, fp in footprints_map.items():
         connected = [p for p in fp.pins if (name, p.name) in pin_to_net]
         assert len(connected) > 0, f"Dangling component {name} has no connected pins in wiring.yaml"
+
+
+def test_regression_bug_089_schematic_subsystem_organization() -> None:
+    """Verify schematic sheets are organized topologically by subsystem with 100% component coverage (BUG-089).
+
+    Guards against:
+    1. Unorganized schematic sheets or falling back to arbitrary multi-page chunking.
+    2. Missing carrier board components from schematic sheets.
+    3. Missing functional subsystem domains: Power/Battery, Regulation, MCU, Storage, Telemetry, UI, Cap Touch, Audio, High-Speed, Expansion.
+    4. Schematic DRC violations across organized sheets.
+    """
+    from model.wiring import Wiring
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    cfg = provider.pcb_config
+
+    assert cfg.schematic_sheets is not None
+    assert len(cfg.schematic_sheets) >= 8
+
+    # 1. Verify subsystem sheets by title keywords
+    titles = [s.title for s in cfg.schematic_sheets]
+    expected_subsystems = [
+        "Battery",
+        "Regulation",
+        "Microcontroller",
+        "Storage",
+        "Telemetry",
+        "User Interface",
+        "Capacitive",
+        "Audio",
+        "Differential",
+        "Expansion",
+    ]
+    for sub in expected_subsystems:
+        assert any(sub.lower() in t.lower() for t in titles), f"Missing subsystem sheet matching '{sub}' in {titles}"
+
+    # 2. Verify 100% carrier board component coverage
+    carrier_comps = {f.name for f in wiring.footprints if getattr(f, "shape_ref", None) != "flex_tail"}
+    documented_comps = {c for s in cfg.schematic_sheets for c in s.components}
+    missing_comps = carrier_comps - documented_comps
+    assert len(missing_comps) == 0, f"Components missing from subsystem schematic sheets: {missing_comps}"
+
+    # 3. Verify specific subsystem allocations
+    sheet_by_title = {s.title: s for s in cfg.schematic_sheets}
+
+    storage_sheet = next(s for s in cfg.schematic_sheets if "storage" in s.title.lower())
+    assert "U8" in storage_sheet.components
+
+    telemetry_sheet = next(s for s in cfg.schematic_sheets if "telemetry" in s.title.lower())
+    assert "U9" in telemetry_sheet.components
+    assert "J5" in telemetry_sheet.components
+
+    ui_sheet = next(s for s in cfg.schematic_sheets if "user interface" in s.title.lower())
+    assert "U6" in ui_sheet.components
+    assert "D1" in ui_sheet.components
+
+    # 4. DRC check passes with 0 violations
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring=wiring)
+    assert len(violations.errors) == 0, f"DRC errors on subsystem sheets: {[e.description for e in violations.errors]}"

@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-22 08:42:28 UTC` |
+| **Report Date** | `2026-09-22 14:58:53 UTC` |
 | **Total Issues** | `89` |
-| **Open Issues** | `4` |
-| **Resolved / Closed** | `85 (95%)` |
+| **Open Issues** | `3` |
+| **Resolved / Closed** | `86 (96%)` |
 
 ## Executive Summary
 
@@ -123,7 +123,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-086](#bug-086): Capacitive sensing and control section is incorrect (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-087](#bug-087): Add power test points (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-088](#bug-088): Schematic bugs review (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-089](#bug-089): Organize schematic pages by subsystem (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-089](#bug-089): Organize schematic pages by subsystem (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-090](#bug-090): Test board Enclosure feedback (`OPEN`)
 
 ## Detailed Issue Log
@@ -2257,16 +2257,21 @@ Clamped symbol heights in SchematicDiagram to avoid page bottom overflow (cy >= 
 
 ---
 
-### <a id="bug-089"></a> 🔴 `[BUG-089]` Organize schematic pages by subsystem
+### <a id="bug-089"></a> 🟢 `[BUG-089]` Organize schematic pages by subsystem
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-22 03:04:02 UTC`
+- **Resolved**: `2026-09-22 14:58:53 UTC`
 
 #### Description
 
 Organize the schematic pages by subsystem: power and charging, audio, MCU, cap touch, ... in order to make it easier to review the sheet topologically
+
+#### Resolution Notes
+
+Reorganized carrier board schematic pages into 11 functional subsystem sheets covering all 43 components: USB-C & battery power, 3.3V regulation & distribution, MCU core/clock/reset, FlexSPI NAND flash storage, telemetry/UART bridge and SWD debug, LP5009 UI LED driver & RGB indicator, IQS7222A capacitive sensing flex interface, I2S digital audio amplifier & piezo speaker, high-speed PCIe/MIPI differential buses, serial peripheral expansion headers, and 10-pin GPIO breakout; verified 0 DRC violations and added test_regression_bug_089_schematic_subsystem_organization.
 
 ---
 
