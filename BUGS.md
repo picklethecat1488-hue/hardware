@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-22 01:30:56 UTC` |
-| **Total Issues** | `85` |
-| **Open Issues** | `1` |
-| **Resolved / Closed** | `84 (98%)` |
+| **Report Date** | `2026-09-22 05:21:44 UTC` |
+| **Total Issues** | `89` |
+| **Open Issues** | `7` |
+| **Resolved / Closed** | `82 (92%)` |
 
 ## Executive Summary
 
@@ -21,15 +21,15 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 1 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 4 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 79 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 83 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 1 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 64 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 11 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`PCB`** | 67 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 12 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 0 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 9 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 1 | Web dashboards, CLI viewers, review interfaces. |
@@ -101,10 +101,10 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-064](#bug-064): Round edges of bottom of enclosure (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-065](#bug-065): Add connector cutouts to bottom enclosure (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-066](#bug-066): Component silkscreens missing from the PCB (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-067](#bug-067): Apply component downselection results  to PCB (`RESOLVED`)
+- [ ] **`[MEDIUM]`** [#BUG-067](#bug-067): Apply component downselection results  to PCB (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-068](#bug-068): Component fell off schematic page 5 (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-069](#bug-069): Change bug_report and code_review backing store to sqlite (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-070](#bug-070): Add battery connector to carrier board (`RESOLVED`)
+- [ ] **`[MEDIUM]`** [#BUG-070](#bug-070): Add battery connector to carrier board (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-071](#bug-071): I2c pull ups on sheet 7 dangling off page (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-072](#bug-072): Flex tail cutout doesn't align with flex tail (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-073](#bug-073): Add GPIO cutout to enclosure (`RESOLVED`)
@@ -116,11 +116,15 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-079](#bug-079): Move BUGS.md to repo root (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-080](#bug-080): Add LED cutout to test board enclosure `[test_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-081](#bug-081): This build.py command should have failed (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`RESOLVED`)
+- [ ] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`OPEN`)
 - [x] **`[MEDIUM]`** [#BUG-083](#bug-083): I2C pullup resistors overlap (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-084](#bug-084): Update board files schematics  `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-085](#bug-085): Change mounting holes on enclosure bottom to mounting posts (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-086](#bug-086): Capacitive sensing and control section is incorrect (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-086](#bug-086): Capacitive sensing and control section is incorrect (`RESOLVED`)
+- [ ] **`[MEDIUM]`** [#BUG-087](#bug-087): Add power test points (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-088](#bug-088): Schematic bugs review (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-089](#bug-089): Organize schematic pages by subsystem (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-090](#bug-090): Test board Enclosure feedback (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -1740,15 +1744,16 @@ Added all component reference designators (U1-U4, J1-J3, Q1, SPK1, Y1, R1-R6, C1
 
 ---
 
-### <a id="bug-067"></a> 🟢 `[BUG-067]` Apply component downselection results  to PCB
+### <a id="bug-067"></a> 🔴 `[BUG-067]` Apply component downselection results  to PCB
 
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 04:43:55 UTC`
-- **Resolved**: `2026-09-21 16:13:25 UTC`
 
 #### Description
+
+Reopened! U1 is still STM32MP157-BGA196 and U2 is still CY8CMBR3116-LQI
 
 Apply component downselection results and PCB updates form ./src/projects/test_board/docs/downselection_report.md to the test_board schematic and PCB, then update ./src/projects/test_board.md
 
@@ -1759,6 +1764,12 @@ Apply component downselection results and PCB updates form ./src/projects/test_b
 
 - **Expected**: All new ICs and connectors placed on board
 - **Actual**: No new components from the downselection review are placed on board
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790045953631.png](build/attachments/pasted_screenshot_1790045953631.png) | Pasted screenshot |
 
 #### Resolution Notes
 
@@ -1810,15 +1821,16 @@ Implemented SQLiteBugStore backed by build/bugs.sqlite providing atomic ACID per
 
 ---
 
-### <a id="bug-070"></a> 🟢 `[BUG-070]` Add battery connector to carrier board
+### <a id="bug-070"></a> 🔴 `[BUG-070]` Add battery connector to carrier board
 
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 04:49:03 UTC`
-- **Resolved**: `2026-09-21 05:14:10 UTC`
 
 #### Description
+
+Reopened! This doesn't appear to have been done
 
 Add a standard JST battery connector to the carrier board
 
@@ -2080,21 +2092,27 @@ Resolved target resolution in Builder.generate_pcbs using TargetParser.resolve s
 
 ---
 
-### <a id="bug-082"></a> 🟢 `[BUG-082]` Route test board
+### <a id="bug-082"></a> 🔴 `[BUG-082]` Route test board
 
-- **Status**: `RESOLVED`
+- **Status**: `OPEN`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 18:23:13 UTC`
-- **Resolved**: `2026-09-22 00:42:11 UTC`
 
 #### Description
 
 Route test_board correctly. Modify placements of all components and correct routing until there are no kicad or drc.py warnings or errors.
 
+Reopened! the carrier board PCB still looks totally unrooted!
+
 #### Reproduction Steps
 
-1. $ python src/config.py 'test_board/*'
+1. $ python src/view.py test_board/carrier_board:pcb
+
+#### Behavior Comparison
+
+- **Expected**: All trace routing on board should be completed.
+- **Actual**: The board had several components without trace routing (see attached)
 
 #### Resolution Notes
 
@@ -2163,12 +2181,13 @@ Replaced standoff screw mounting pilot holes with clip-on mounting posts featuri
 
 ---
 
-### <a id="bug-086"></a> 🔴 `[BUG-086]` Capacitive sensing and control section is incorrect
+### <a id="bug-086"></a> 🟢 `[BUG-086]` Capacitive sensing and control section is incorrect
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 19:12:34 UTC`
+- **Resolved**: `2026-09-22 05:21:44 UTC`
 
 #### Description
 
@@ -2180,5 +2199,83 @@ The PCB schematic sheet for the capacitive sensor is incorrect:
 The carrier board flex tail is intended to be a generic capaacitive button array with support for mutual capacitive buttons and proximity sensors.
 
 Based on our online discussion, Azoteq IQS7211A / IQS7222 is the preferred capacitive touch IC. Update the schematic, board, and hardware documents for the downselected capacitive touch IC.
+
+#### Resolution Notes
+
+Downselected U2 to Azoteq IQS7222A001QNR in QFN-20 with dual internal LDO decoupling (C12 VREGD, C14 VREGA), updated Sheet 7 in pcb.yaml, updated downselection_report.md and test_board.md, and added dedicated regression test test_regression_bug_086_azoteq_capacitive_sensing.
+
+---
+
+### <a id="bug-087"></a> 🔴 `[BUG-087]` Add power test points
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-22 02:54:00 UTC`
+
+#### Description
+
+Add power and ground test points for the following power nets to the board: VBAT, VBUS, 3V3
+
+---
+
+### <a id="bug-088"></a> 🔴 `[BUG-088]` Schematic bugs review
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-22 02:59:42 UTC`
+
+#### Description
+
+Attached screenshots for all issues identified:
+- U1 falls off the edge of sheet 1
+- decoupling capacitors on sheet 5 overlaps schematic sheet header
+- decoupling capacitors on sheet 10 overlaps schematic sheet header
+- every component past sheet 15 (page 20) is unconnected to anything. components must all be connected to conform to the test board 2.0 system architecture
+Update DRC engine to catch issues identified above, and fix.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790045994113.png](build/attachments/pasted_screenshot_1790045994113.png) | Pasted screenshot |
+| `screenshot` | [pasted_screenshot_1790046087008.png](build/attachments/pasted_screenshot_1790046087008.png) | Pasted screenshot |
+| `screenshot` | [pasted_screenshot_1790046134444.png](build/attachments/pasted_screenshot_1790046134444.png) | Pasted screenshot |
+| `screenshot` | [pasted_screenshot_1790046211771.png](build/attachments/pasted_screenshot_1790046211771.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-089"></a> 🔴 `[BUG-089]` Organize schematic pages by subsystem
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-22 03:04:02 UTC`
+
+#### Description
+
+Organize the schematic pages by subsystem: power and charging, audio, MCU, cap touch, ... in order to make it easier to review the sheet topologically
+
+---
+
+### <a id="bug-090"></a> 🔴 `[BUG-090]` Test board Enclosure feedback
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `CAD`
+- **Created**: `2026-09-22 03:06:00 UTC`
+
+#### Description
+
+- The SWD connector cutout should be spaced further apart from the USB connector cutout. Right now, the cutouts overlap. 
+- The side enclosure cutouts on enclosure bottom should have rounded edges. 
+- The enclosure top should contain some sort of battery mount, either on the inside or outside, with a top cutout to allow the battery connector through
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790046385642.png](build/attachments/pasted_screenshot_1790046385642.png) | Pasted screenshot |
 
 ---

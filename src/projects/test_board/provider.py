@@ -657,9 +657,9 @@ class TestBoardProvider(Provider):
             TestPoint("TP_RX0_P", net="PCIE_RX0_P", at=(-6.0, -22.0))
             TestPoint("TP_RX0_N", net="PCIE_RX0_N", at=(-2.0, -22.0))
 
-            # I2C test points (spaced with 4mm pitch)
-            TestPoint("TP_SCL", net="I2C_SCL", at=(14.0, -4.0))
-            TestPoint("TP_SDA", net="I2C_SDA", at=(18.0, -4.0))
+            # I2C test points (spaced with 4mm pitch, aligned with U2 pin order)
+            TestPoint("TP_SDA", net="I2C_SDA", at=(14.0, -4.0))
+            TestPoint("TP_SCL", net="I2C_SCL", at=(18.0, -4.0))
 
             # MIPI display differential pair test points (spaced with 4mm pitch on left half of board)
             TestPoint("TP_D0_P", net="MIPI_DATA0_P", at=(-14.0, 22.0))

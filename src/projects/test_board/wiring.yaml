@@ -12,12 +12,12 @@ footprints:
     supplier_pn: 497-STM32MP157-ND
 
   - name: U2
-    package: QFN-24
+    package: QFN-20
     position: [18.0, -15.0, -0.8]
     layer: B.Cu
     rotation: [0.0, 0.0, 0.0]
-    mpn: CY8CMBR3116-LQI
-    supplier_pn: 428-CY8CMBR3116-ND
+    mpn: IQS7222A001QNR
+    supplier_pn: IQS7222A-QNR-ND
 
   - name: J1
     package: M.2-KEY-M
@@ -264,13 +264,22 @@ footprints:
     mpn: CC0402KRX7R9BB104
     supplier_pn: 311-1438-1-ND
 
-  # U2 CY8CMBR3116 Internal Regulator Bypass Capacitor
+  # U2 Azoteq IQS7222A Digital Regulator Bypass Capacitor (2.2 uF)
   - name: C12
     package: "0402"
-    position: [18.0, -10.0, -0.8]
+    position: [14.0, -14.0, -0.8]
     layer: B.Cu
     rotation: [0.0, 0.0, 0.0]
-    mpn: CC0402KRX5R6BB105
+    mpn: CC0402KRX5R6BB225
+    supplier_pn: 311-1440-1-ND
+
+  # U2 Azoteq IQS7222A Analog Regulator Bypass Capacitor (2.2 uF)
+  - name: C14
+    package: "0402"
+    position: [14.0, -16.0, -0.8]
+    layer: B.Cu
+    rotation: [0.0, 0.0, 0.0]
+    mpn: CC0402KRX5R6BB225
     supplier_pn: 311-1440-1-ND
 
   # Downselection Components (BUG-067)
@@ -415,6 +424,8 @@ nets:
       - [C4, "2"]
       - [C5, "2"]
       - [C12, "2"]
+      - [C14, "2"]
+      - [U2, EP]
       - [J13, "2"]
       - [C13, "2"]
 
@@ -423,6 +434,7 @@ nets:
     pins:
       - [U1, H8]
       - [U2, VDD]
+      - [U2, MCLR]
       - [J1, 3V3]
       - [J2, 3V3]
       - [R1, "1"]
@@ -497,7 +509,7 @@ nets:
     color: "#84cc16"
     pins:
       - [U1, D2]
-      - [U2, INT]
+      - [U2, RDY]
 
   - name: OSC_IN
     color: "#059669"
@@ -574,61 +586,61 @@ nets:
       - [U1, C2]
       - [J2, CLK_N]
 
-  - name: CAP_SHIELD
-    color: "#64748b"
+  - name: CAP_RX0
+    color: "#0891b2"
     pins:
-      - [U2, SHIELD]
-      - [J2, CAP_SHIELD]
-      - [J4, CAP_SHIELD]
-
-  - name: CAP_RX2
-    color: "#38bdf8"
-    pins:
-      - [U2, CS5]
-      - [J2, CAP_RX2]
-      - [J4, CAP_RX2]
+      - [U2, CR0]
+      - [J2, CAP_RX0]
+      - [J4, CAP_RX0]
 
   - name: CAP_RX1
     color: "#0369a1"
     pins:
-      - [U2, CS3]
+      - [U2, CR1]
       - [J2, CAP_RX1]
       - [J4, CAP_RX1]
 
-  - name: CAP_RX0
-    color: "#0891b2"
+  - name: CAP_RX2
+    color: "#38bdf8"
     pins:
-      - [U2, CS1]
-      - [J2, CAP_RX0]
-      - [J4, CAP_RX0]
+      - [U2, CR2]
+      - [J2, CAP_RX2]
+      - [J4, CAP_RX2]
 
   - name: CAP_RX3
     color: "#67e8f9"
     pins:
-      - [U2, CS6]
+      - [U2, CR3]
       - [J2, CAP_RX3]
       - [J4, CAP_RX3]
 
   - name: CAP_TX0
     color: "#06b6d4"
     pins:
-      - [U2, CS0]
+      - [U2, CR4]
       - [J2, CAP_TX0]
       - [J4, CAP_TX0]
 
   - name: CAP_TX1
     color: "#0284c7"
     pins:
-      - [U2, CS2]
+      - [U2, CR5]
       - [J2, CAP_TX1]
       - [J4, CAP_TX1]
 
   - name: CAP_TX2
     color: "#0ea5e9"
     pins:
-      - [U2, CS4]
+      - [U2, CR6]
       - [J2, CAP_TX2]
       - [J4, CAP_TX2]
+
+  - name: CAP_SHIELD
+    color: "#64748b"
+    pins:
+      - [U2, CR7]
+      - [J2, CAP_SHIELD]
+      - [J4, CAP_SHIELD]
 
   - name: PDM_DAT
     color: "#9333ea"
@@ -660,8 +672,14 @@ nets:
       - [U4, OUTN]
       - [U5, "2"]
 
-  - name: VREG
+  - name: VREGD
     color: "#0891b2"
     pins:
-      - [U2, VREG]
+      - [U2, VREGD]
       - [C12, "1"]
+
+  - name: VREGA
+    color: "#06b6d4"
+    pins:
+      - [U2, VREGA]
+      - [C14, "1"]

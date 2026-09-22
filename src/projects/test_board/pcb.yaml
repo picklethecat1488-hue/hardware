@@ -251,31 +251,36 @@ schematic_sheets:
       U1: [G1, G2, G3]
       C8: ["1", "2"]
 
-  - title: Capacitive Sensing & Control
-    description: CY8CMBR3116 CapSense controller, 4-channel liquid level flex tail, and I2C bus
+  - title: Capacitive Sensing & Control (Azoteq IQS7222A)
+    description: Azoteq IQS7222A ProxFusion controller, 4-channel liquid level flex tail, and I2C bus
     layout:
       col_gap: 50.0
-    components: [U1, U2, J2, R1, R2, C12]
+    components: [U1, U2, J2, R1, R2, C12, C14]
     pin_sides:
       U1:
         F1: right
         F2: right
         D2: right
       U2:
-        SDA: left
-        SCL: left
-        INT: left
         VDD: left
         VSS: left
-        CS0: right
-        CS1: right
-        CS2: right
-        CS3: right
-        CS4: right
-        CS5: right
-        CS6: right
-        SHIELD: right
-        VREG: right
+        EP: left
+        MCLR: left
+        SDA: left
+        SCL: left
+        RDY: left
+        CR0: right
+        CR1: right
+        CR2: right
+        CR3: right
+        CR4: right
+        CR5: right
+        CR6: right
+        CR7: right
+        CT8: right
+        OUTA: right
+        VREGD: right
+        VREGA: right
       J2:
         CAP_TX0: left
         CAP_RX0: left
@@ -287,11 +292,12 @@ schematic_sheets:
         CAP_SHIELD: left
     pin_breakouts:
       U1: [F1, F2, D2]
-      U2: [VDD, VSS, SDA, SCL, INT, CS0, CS1, CS2, CS3, CS4, CS5, CS6, SHIELD, VREG]
+      U2: [VDD, VSS, EP, MCLR, SDA, SCL, RDY, CR0, CR1, CR2, CR3, CR4, CR5, CR6, CR7, VREGD, VREGA]
       J2: [CAP_TX0, CAP_RX0, CAP_TX1, CAP_RX1, CAP_TX2, CAP_RX2, CAP_RX3, CAP_SHIELD]
       R1: ["1", "2"]
       R2: ["1", "2"]
       C12: ["1", "2"]
+      C14: ["1", "2"]
 
 assembly_test:
   test_fixture: flying_probe

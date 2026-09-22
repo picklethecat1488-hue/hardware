@@ -1,6 +1,6 @@
 # Test Board
 
-This project designs a modular hardware evaluation and sensor test board featuring a multi-layer rigid carrier PCB and a flexible tail PCB with mutual/self-capacitive proximity electrodes. The board is powered by the **NXP MCX N947** dual-core Arm Cortex-M33 microcontroller (`MCXN947VDF` in VFBGA-184), with high-speed dual-channel Octal/Quad FlexSPI storage (**Winbond W25N01GV** 1Gb SLC NAND), autonomous battery charging & power path management (**TI BQ24074**), precision fuel gauging (**ADI MAX17048**), constant-current logarithmic RGB LED indication (**TI LP5009**), high-speed USB-to-UART telemetry (**FTDI FT232RNQ**), 16-channel capacitive touch sensing (**Infineon CY8CMBR3116**), and digital Class-D audio amplification (**ADI MAX98357A**).
+This project designs a modular hardware evaluation and sensor test board featuring a multi-layer rigid carrier PCB and a flexible tail PCB with mutual/self-capacitive proximity electrodes. The board is powered by the **NXP MCX N947** dual-core Arm Cortex-M33 microcontroller (`MCXN947VDF` in VFBGA-184), with high-speed dual-channel Octal/Quad FlexSPI storage (**Winbond W25N01GV** 1Gb SLC NAND), autonomous battery charging & power path management (**TI BQ24074**), precision fuel gauging (**ADI MAX17048**), constant-current logarithmic RGB LED indication (**TI LP5009**), high-speed USB-to-UART telemetry (**FTDI FT232RNQ**), multi-channel capacitive touch and proximity sensing (**Azoteq IQS7222A001QNR / IQS7211A**), and digital Class-D audio amplification (**ADI MAX98357A**).
 
 The mechanical enclosure features an upper lid with an optical window for status LED viewing and a rigid lower housing capturing rubber anti-skid feet, with four M3 corner mounting fasteners providing mechanical rigidity.
 
@@ -61,7 +61,7 @@ graph TD
     MCU -->|PWR_EN_DEBUG (M4)| Q4["Debug Load Switch (TPS22918)"]
     
     Q2 -->|SW_3V3_AUDIO| AUDIO["MAX98357A Amp (U4) & SPK1"]
-    Q3 -->|SW_3V3_SENSORS| TOUCH["CY8CMBR3116 Touch (U2)"]
+    Q3 -->|SW_3V3_SENSORS| TOUCH["Azoteq IQS7222A Touch (U2)"]
     Q4 -->|SW_3V3_DEBUG| FTDI["FT232RNQ USB-UART (U9)"]
     
     %% Microcontroller Busses
@@ -98,7 +98,7 @@ graph TD
 | **`U7`** | **ADI / Maxim MAX17048G+T10** | 1-Cell Li+ ModelGauge Fuel Gauge IC | TDFN-8 ($2\times 2\text{ mm}$) | Core `I2C0` (`0x36`) | Ultra-low $3\,\mu\text{A}$ operating current, state of charge (SoC) estimation, alert interrupt. |
 | **`U6`** | **TI LP5009RUKR** | 9-Channel Constant-Current RGB LED Driver | WQFN-20 ($3\times 3\text{ mm}$) | Core `I2C0` (`0x14`) | Logarithmic dimming, auto-breathing animation engine, independent RGB color mixing. |
 | **`U9`** | **FTDI FT232RNQ-REEL** | High-Speed USB 2.0 to UART Serial Bridge | QFN-32 ($5\times 5\text{ mm}$) | `FC1` UART0 (`B6`, `A6`, `F10`, `E10`) | Up to 3 Mbaud data rate, internal EEPROM, USB bus powered with reset & boot control GPIOs. |
-| **`U2`** | **Infineon CY8CMBR3116** | 16-Channel CapSense Capacitive Touch Controller | QFN-24 ($4\times 4\text{ mm}$) | Touch `I2C1` (`0x37`), `CAP_INT` (`C4`)| SmartSense auto-tuning, proximity detection, LED buzzer output, water tolerance. |
+| **`U2`** | **Azoteq IQS7222A (`IQS7222A001QNR`) / IQS7211A** | ProxFusion Capacitive Touch & Proximity Controller | QFN-20 ($3\times 3\text{ mm}$, $0.4\text{ mm}$ pitch) | Touch `I2C1` (`0x44`), `CAP_INT` (`C4`)| Multi-channel ProxFusion engine driving 4 flex tail electrodes (3 mutual steps, 1 self-cap proximity) with dual internal LDOs (VREGD, VREGA). |
 | **`U4`** | **ADI / Maxim MAX98357AETE+** | 3.2W Class-D Mono Audio Amplifier | TQFN-16 ($3\times 3\text{ mm}$) | `PDM0` Audio (`B14`, `A14`) | Integrated digital PCM/I2S/PDM input stage, filterless Class-D, 92% efficiency into $4\,\Omega$. |
 | **`U5`** | **Piezo Sounder (PKM13EPYH4000)** | Surface-mount piezoelectric audio transducer | Custom Circular ($13\text{ mm}$ dia) | `PIEZO_PWM` (`D15`, `PWM0_X0`) | Resonant frequency 4.0 kHz, SPL $\ge 75\text{ dB}$, audible user feedback. |
 | **`Q2`–`Q4`**| **TI TPS22918DBVR** | 5.5V, 2A Ultra-Low On-Resistance Power Switches | SOT-23-6 ($2.9\times 1.6\text{ mm}$) | `PWR_EN_AUDIO` (`L4`), `SENSORS` (`L5`), `DEBUG` (`M4`) | $R_{\text{ON}} = 52\text{ m}\Omega$, controlled rise time, active-high enable with 100k pull-up. |
@@ -113,25 +113,19 @@ graph TD
 
 ## Technical Integration Notes
 
-1. **MCU Pinmux Verification & Sourcing (`BUG-064`)**:
-   * All 184 ball coordinates and functional mappings are derived from **Table 93 ("Pinmux", pages 101–132)** of the NXP MCX N947 datasheet (`MCXNP184M150F70.pdf`).
-   * **Ball `F4` Correction**: Ball `F4` is pin `P1_17` and supports `ALT10 - I3C1_SCL`. It is correctly assigned to the secondary I3C evaluation bus clock on `J8`.
-   * **Core System I2C (`I2C0`)**: Assigned to `A10` (`P0_17`, ALT2: `FC0_P1`, SCL) and `B10` (`P0_16`, ALT2: `FC0_P0`, SDA), featuring hardware `+I2C` glitch filters and `+I3C` pull-up capability.
-   * **Dedicated Touch I2C (`I2C1`)**: Assigned to `C5` (`P1_1`, ALT2: `FC3_P1`, SCL) and `C6` (`P1_0`, ALT2: `FC3_P0`, SDA), completely isolating the high-rate capacitive touch scan traffic from the primary system sensors.
-2. **Deep Power Down Wakeup (`BUG-060`)**:
-   * The system enters Deep Power Down ($< 2.5\,\mu\text{A}$) by gating internal power domains via the on-chip Smart Power Controller (SPC).
-   * **Charger Insertion Wakeup**: BQ24074 `/PGOOD` (pin 10) connects to MCX N947 ball `M10` (`P5_2`, `VBAT_WAKEUP_b` / `WAKEUP0_B`). When USB VBUS is inserted, `/PGOOD` transitions LOW, triggering an immediate hardware wakeup from Deep Power Down into Active Charging state.
-   * **Host Wakeup**: M.2 connector pin 50 (`PEWAKE#`) connects to ball `C13` (`P0_7`, `WUU0_IN1` / `WAKEUP1_B`), allowing host PCIe/NVMe systems to wake the evaluation unit via active-low signaling.
-3. **Charger State Transitions (`BUG-063`)**:
-   * BQ24074 `/CHG` (pin 11) connects via net `CHG_STAT` (with 100k pull-up to `SYS_3V3`) to MCX N947 ball `G5` (`P1_19`, Wake-Up Unit `WUU0_IN15`).
-   * The MCU firmware configures asynchronous dual-edge interrupts:
-     - **Falling edge** (`/CHG` LOW): Enters `ACTIVE_CHARGING` mode, pulsing the RGB LED in amber via autonomous hardware breathing.
-     - **Rising edge** (`/CHG` HIGH): Charge cycle complete; transitions the system into `LOW_POWER_SLEEP` ($< 15\,\mu\text{A}$), displaying solid green for 5 seconds before turning off LEDs.
-4. **Power-On Sequencing Compliance (`BUG-061`)**:
-   * **Rule 1 (Unified Plane)**: `VDD` (`H6`, `H8`, `G7`), `VDD_P2` (`K8`, `L7`), `VDD_P3` (`G11`, `H10`, `H12`), and `VDD_P4` (`N5`, `P4`) ramp together from the common 3.3V system rail.
-   * **Rule 2 (Core Supply Delay)**: `VDD_CORE` (`K10`, `L11`) is powered from the internal LDO/buck regulator and ramps monotonically after `VDD` reaches minimum operating threshold ($1.71\text{V}$).
-   * **Rule 3 (Port 4 & Analog Matching)**: `VDD_P4` and `VDD_ANA` are matched to the same potential ($\Delta V < 50\text{ mV}$) via star-routing with ferrite bead isolation.
-   * **Rule 4 (Battery Pre-bias)**: `VDD_BAT` is powered continuously from the battery cell, ensuring RTC state and tamper domains are established before/with main system rail ramp.
+1. **Host Microcontroller Architecture (`BUG-058`)**:
+   * Dual-core Arm Cortex-M33 (Core 0: 150 MHz primary application core with DSP/FPU and eIQ Neutron NPU; Core 1: 150 MHz real-time sensor fusion & DSP coprocessor).
+   * 2MB Dual-Bank Flash allows zero-downtime background firmware updates.
+   * 512KB SRAM with ECC protection.
+2. **Audio Subsystem Integration (`BUG-053`)**:
+   * Digital PDM microphone/audio stream is generated via Flexcomm 7 (`FC7_P0` = `G1` PDM_DAT, `FC7_P1` = `G2` PDM_CLK) and routed to the MAX98357A amplifier.
+   * The PKM13EPYH4000 piezo sounder connects directly to `SPK_P` and `SPK_N` differential outputs for high-volume audible signaling.
+3. **RGB Indication Subsystem (`BUG-054`)**:
+   * TI LP5009 drives a high-brightness RGB LED via constant-current sink outputs with logarithmic brightness curve adjustments and autonomous color fade loops, offloading the MCU.
+4. **Autonomous Battery Management (`BUG-055`, `BUG-056`, `BUG-063`)**:
+   * TI BQ24074 dynamically routes power from USB-C ($5\text{V}$) to system load while concurrently charging the 1S Li-Ion/LiPo battery at up to $1.5\text{ A}$.
+   * Dynamic Power Path Management (DPPM) automatically reduces battery charge current if system load increases, preventing brownouts.
+   * MAX17048 ModelGauge fuel gauge communicates over Core I2C0 (`0x36`) to report precise battery cell voltage, State of Charge (SoC), and time-to-empty without requiring sense resistor calibration.
 5. **High-Speed Dual-Channel FlexSPI Design (`BUG-062`)**:
    * **Channel A (Internal NAND)**: Connected to Winbond W25N01GV on Port 3 balls `B17` (SS0), `D14` (SCLK), `E14` (DATA0), `F15` (DATA1), `F17` (DATA2), `F16` (DATA3), and `D17` (DQS loopback).
    * **Channel B (Expansion)**: Routed to `J_FLEX` header on Port 2 balls `H3` (SS0), `J3` (SCLK), `K3` (DATA0), `K1` (DATA1), `K2` (DATA2), `L2` (DATA3), and `H1` (DQS).
@@ -139,7 +133,7 @@ graph TD
 6. **Switched Power Rails & Load Switch Gating (`BUG-060`)**:
    * Three dedicated TPS22918 load switches (`Q2`, `Q3`, `Q4`) isolate high-quiescent subsystems during sleep:
      - `PWR_EN_AUDIO` (`L4`): Controls power to MAX98357A amplifier ($I_Q = 2.4\text{ mA}$ active $\to 0.01\,\mu\text{A}$ off).
-     - `PWR_EN_SENSORS` (`L5`): Controls power to CY8CMBR3116 touch controller and external sensor headers.
+     - `PWR_EN_SENSORS` (`L5`): Controls power to Azoteq IQS7222A touch controller and external sensor headers.
      - `PWR_EN_DEBUG` (`M4`): Controls power to FT232RNQ bridge, eliminating parasitic leakage back-feeding into the MCU when USB is unpowered.
    * All load switch enable pins are equipped with 100k pull-ups to guarantee default-ON state during development and initial boot.
 
@@ -152,7 +146,7 @@ Operating on a single **18650 3.7V Li-ion cell (3000 mAh / 11.1 Wh)**, the syste
 | Subsystem State | Active Components | Current Draw (at 3.7V) | Power Draw | Daily Duty Cycle |
 | :--- | :--- | :--- | :--- | :--- |
 | **Active Mode** (Processing, NAND R/W, Audio, Telemetry) | MCU active @ 150MHz, NAND R/W active, MAX98357A audio driving speaker, FT232RNQ active, RGB LED on | **~65 mA** | 240 mW | **2.0%** (28.8 mins/day) |
-| **Low-Power Sleep** (Touch sensing active, MCU in Deep Sleep) | MCU Deep Sleep (SRAM retained, RTC running), CY8CMBR3116 in Low-Power Scan mode, Q2/Q4 off | **~45 µA** | 0.17 mW | **98.0%** (idle evaluation monitoring) |
+| **Low-Power Sleep** (Touch sensing active, MCU in Deep Sleep) | MCU Deep Sleep (SRAM retained, RTC running), IQS7222A in Low-Power ProxFusion scan mode, Q2/Q4 off | **~45 µA** | 0.17 mW | **98.0%** (idle evaluation monitoring) |
 | **Deep Power Down** (Storage / Shipping / Off) | MCU Deep Power Down ($2.5\,\mu\text{A}$), BQ24074 in battery standby ($1.5\,\mu\text{A}$), MAX17048 ($3\,\mu\text{A}$), All load switches off | **~7.0 µA** | 0.026 mW | **Storage mode** (exited via USB plug-in or M.2 wake) |
 
 ### Calculations

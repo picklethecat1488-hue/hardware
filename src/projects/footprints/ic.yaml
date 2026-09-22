@@ -85,6 +85,223 @@ footprints:
       pad_size_mm:
       - 1.5
       - 0.6
+  QFN-20:
+    dimensions:
+    - 3.0
+    - 3.0
+    - 0.6
+    pins:
+    - name: VDD
+      position:
+      - -1.45
+      - 0.8
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: VREGD
+      position:
+      - -1.45
+      - 0.4
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: VSS
+      position:
+      - -1.45
+      - 0.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: VREGA
+      position:
+      - -1.45
+      - -0.4
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: CR0
+      position:
+      - -1.45
+      - -0.8
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: CR1
+      position:
+      - -0.8
+      - -1.45
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: CR2
+      position:
+      - -0.4
+      - -1.45
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: CR3
+      position:
+      - 0.0
+      - -1.45
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: CR4
+      position:
+      - 0.4
+      - -1.45
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: CR5
+      position:
+      - 0.8
+      - -1.45
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: CR6
+      position:
+      - 1.45
+      - -0.8
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: CR7
+      position:
+      - 1.45
+      - -0.4
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: CT8
+      position:
+      - 1.45
+      - 0.0
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: OUTA
+      position:
+      - 1.45
+      - 0.4
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: NC1
+      position:
+      - 1.45
+      - 0.8
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: NC2
+      position:
+      - 0.8
+      - 1.45
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: RDY
+      position:
+      - 0.4
+      - 1.45
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: SCL
+      position:
+      - 0.0
+      - 1.45
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: SDA
+      position:
+      - -0.4
+      - 1.45
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: MCLR
+      position:
+      - -0.8
+      - 1.45
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: EP
+      position:
+      - 0.0
+      - 0.0
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.65
+      - 1.65
+
   QFN-24:
     dimensions:
     - 4.0

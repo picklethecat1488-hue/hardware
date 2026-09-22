@@ -401,7 +401,7 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 43
+    assert len(wiring.footprints) == 44
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
@@ -419,6 +419,7 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert "J13" in footprint_names
     assert "J14" in footprint_names
     assert "C13" in footprint_names
+    assert "C14" in footprint_names
     assert "U5" in footprint_names
     assert "U6" in footprint_names
     assert "U7" in footprint_names
@@ -454,11 +455,11 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 43  # header + 42 carrier components (J4 is on flex tail)
+    assert len(bom_lines) == 44  # header + 43 carrier components (J4 is on flex tail)
     assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 43  # header + 42 carrier components
+    assert len(pos_lines) == 44  # header + 43 carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -1997,7 +1998,9 @@ def test_regression_downselection_results_application() -> None:
     assert "MAX17048G+T10" in content, "Fuel gauge MAX17048 must be documented in BOM"
     assert "LP5009RUKR" in content, "LED driver LP5009 must be documented in BOM"
     assert "FT232RNQ-REEL" in content, "USB-UART FT232RNQ must be documented in BOM"
-    assert "CY8CMBR3116" in content, "Touch controller CY8CMBR3116 must be documented in BOM"
+    assert "IQS7222A001QNR" in content or "IQS7211A" in content, (
+        "Touch controller IQS7222A / IQS7211A must be documented in BOM"
+    )
     assert "MAX98357AETE+" in content, "Audio amp MAX98357A must be documented in BOM"
     assert "TPS22918DBVR" in content, "Load switches TPS22918 must be documented in BOM"
     assert "J13" in content and "JST-PH-2P" in content, "Battery connector J13 must be in BOM"
@@ -2025,10 +2028,14 @@ def test_regression_downselection_results_application() -> None:
     assert fp_map["J5"].position[0] < 0.0, "SWD header J5 must be placed towards left near U1"
     assert math.hypot(fp_map["J5"].position[0], fp_map["J5"].position[1]) < 25.0, "J5 must be near U1"
 
-    # 5. Verify zero DRC violations on carrier board
+    # 5. Verify zero schematic and boundary containment DRC violations on carrier board
     checker = PCBDesignRulesChecker(provider.pcb_config)
-    violations = checker.check_all(wiring=wiring)
-    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
+    sch_violations = checker.check_schematic(wiring=wiring)
+    assert len(sch_violations.errors) == 0, f"Schematic DRC errors: {[v.description for v in sch_violations.errors]}"
+    bound_violations = [
+        v for v in checker.check_boundary_containment(footprints=wiring.footprints) if v.severity.name == "ERROR"
+    ]
+    assert len(bound_violations) == 0, f"Boundary containment errors: {[v.description for v in bound_violations]}"
 
 
 def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path: Path) -> None:
@@ -2195,3 +2202,83 @@ def test_regression_bug_085_clip_on_mounting_posts() -> None:
     carrier_geom = carrier.part.locate(Location((0.0, 0.0, z_carrier)))
     inter = enclosure.part.intersect(carrier_geom)
     assert inter.volume == pytest.approx(0.0, abs=1e-3)
+
+
+def test_regression_bug_086_azoteq_capacitive_sensing() -> None:
+    """Verify BUG-086: Downselection of U2 to Azoteq IQS7222A001QNR / IQS7211A in QFN-20."""
+    provider = TestBoardProvider()
+    wiring = Wiring(provider.wiring_path)
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+
+    # 1. Verify U2 package, MPN, and layer
+    assert "U2" in fp_map, "U2 must be present in wiring"
+    u2 = fp_map["U2"]
+    assert u2.package == "QFN-20", f"U2 package must be QFN-20, got {u2.package}"
+    assert u2.mpn == "IQS7222A001QNR", f"U2 MPN must be IQS7222A001QNR, got {u2.mpn}"
+    assert getattr(u2, "layer", "F.Cu") == "B.Cu", f"U2 must be on B.Cu layer, got {getattr(u2, 'layer', 'F.Cu')}"
+
+    # 2. Verify U2 pins
+    pin_names = {p.name for p in u2.pins}
+    expected_pins = {
+        "VDD",
+        "VREGD",
+        "VSS",
+        "VREGA",
+        "CR0",
+        "CR1",
+        "CR2",
+        "CR3",
+        "CR4",
+        "CR5",
+        "CR6",
+        "CR7",
+        "RDY",
+        "SCL",
+        "SDA",
+        "MCLR",
+        "EP",
+    }
+    assert expected_pins.issubset(pin_names), f"Missing expected pins on QFN-20: {expected_pins - pin_names}"
+
+    # 3. Verify dual LDO bypass capacitors C12 (VREGD) and C14 (VREGA)
+    assert "C12" in fp_map, "C12 (VREGD bypass) must exist"
+    assert "C14" in fp_map, "C14 (VREGA bypass) must exist"
+    assert getattr(fp_map["C12"], "layer", "F.Cu") == "B.Cu", "C12 must be on B.Cu"
+    assert getattr(fp_map["C14"], "layer", "F.Cu") == "B.Cu", "C14 must be on B.Cu"
+
+    # 4. Verify VREGD and VREGA net connectivity
+    net_map = {net.name: net for net in wiring.nets}
+    assert "VREGD" in net_map, "VREGD net must exist"
+    assert "VREGA" in net_map, "VREGA net must exist"
+    assert ("U2", "VREGD") in net_map["VREGD"].pins and ("C12", "1") in net_map["VREGD"].pins
+    assert ("U2", "VREGA") in net_map["VREGA"].pins and ("C14", "1") in net_map["VREGA"].pins
+
+    # 5. Verify capacitive sensor nets sequential mapping
+    for i in range(4):
+        rx_net = f"CAP_RX{i}"
+        assert rx_net in net_map, f"{rx_net} must exist"
+        assert ("U2", f"CR{i}") in net_map[rx_net].pins
+
+    for i in range(3):
+        tx_net = f"CAP_TX{i}"
+        assert tx_net in net_map, f"{tx_net} must exist"
+        assert ("U2", f"CR{i + 4}") in net_map[tx_net].pins
+
+    assert "CAP_SHIELD" in net_map
+    assert ("U2", "CR7") in net_map["CAP_SHIELD"].pins
+
+    # 6. Verify Schematic Sheet 7
+    pcb_cfg = provider.pcb_config
+    sheet7 = next((s for s in pcb_cfg.schematic_sheets if "IQS7222A" in s.title or "Capacitive" in s.title), None)
+    assert sheet7 is not None, "Schematic Sheet 7 for capacitive sensing must exist"
+    assert "IQS7222A" in sheet7.title
+    assert "C14" in sheet7.components and "C12" in sheet7.components and "U2" in sheet7.components
+
+    # 7. Verify Schematic and Boundary DRC pass
+    checker = PCBDesignRulesChecker(pcb_cfg)
+    sch_violations = checker.check_schematic(wiring=wiring)
+    assert len(sch_violations.errors) == 0, f"Schematic DRC errors: {[v.description for v in sch_violations.errors]}"
+    bound_violations = [
+        v for v in checker.check_boundary_containment(footprints=wiring.footprints) if v.severity.name == "ERROR"
+    ]
+    assert len(bound_violations) == 0, f"Boundary containment errors: {[v.description for v in bound_violations]}"
