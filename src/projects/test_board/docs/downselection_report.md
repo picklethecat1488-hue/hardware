@@ -57,8 +57,8 @@ flowchart TD
     end
 
     subgraph Sensors["Touch & Audio Peripherals"]
-        CYPRESS["CY8CMBR3116 Touch IC (U2)"] -->|"I2C1 + CAP_INT"| MCU
-        FLEX_TAIL["Capacitive Flex Tail (J2/J4)"] -->|"4 Sensing Channels"| CYPRESS
+        AZOTEQ["Azoteq IQS7222A / IQS7211A Touch IC (U2)"] -->|"I2C1 + CAP_INT"| MCU
+        FLEX_TAIL["Capacitive Flex Tail (J2/J4)"] -->|"4 Sensing Channels"| AZOTEQ
         MCU -->|"PDM Clock / Data"| AUDIO_AMP["MAX98357A Mono Amp (U4)"]
         AUDIO_AMP -->|"Differential Drive"| SPK["Piezo Sounder (U5)"]
     end
@@ -79,7 +79,7 @@ flowchart TD
 
 | Ref Des | Component Name | Package | MPN | Functional Role in System | Datasheet & Reference Documentation |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`U2`** | Capacitive Touch Controller | QFN-24 (4x4mm, 0.5mm pitch) | `CY8CMBR3116-LQI` | CapSense Express controller driving 4 flex tail electrodes (3 mutual steps, 1 self-cap proximity). Interfaces via I2C1 and `CAP_INT` interrupt. | [Infineon CY8CMBR3116 Portal](https://www.infineon.com/cms/en/product/universal-serial-bus/usb-peripheral-controllers/capsense-controllers/cy8cmbr3116-lqi/) / [DigiKey CY8CMBR3116](https://www.digikey.com/en/products/result?keywords=CY8CMBR3116-LQI) |
+| **`U2`** | Capacitive Touch Controller | QFN-20 (3x3mm, 0.4mm pitch) | `IQS7222A001QNR` | ProxFusion controller driving 4 flex tail electrodes (3 mutual steps, 1 self-cap proximity) with dual internal LDOs (VREGD, VREGA). Interfaces via I2C and `CAP_INT` (`RDY`) interrupt. | [Azoteq IQS7222A Datasheet](datasheets/Azoteq_IQS7222A_datasheet.pdf) / [DigiKey IQS7222A](https://www.digikey.com/en/products/result?keywords=IQS7222A) |
 | **`U4`** | Mono Class D Audio Amplifier | TQFN-16 (3x3mm) | `MAX98357AETE+` | Converts digital PDM / I2S audio streams from the MCU to high-efficiency analog drive for the piezo sounder. | [Analog Devices MAX98357A Portal](https://www.analog.com/en/products/max98357a.html) / [Adafruit Datasheet Mirror](https://cdn-learn.adafruit.com/assets/assets/000/035/778/original/MAX98357A-MAX98357B.pdf) |
 | **`U5`** | Piezoelectric Sounder | 12mm Cylindrical SMD | `PKM13EPYH4000-B0` | High-frequency alert buzzer, alarm feedback, and audible notification emitter. | [Murata PKM13EPYH4000 Portal](https://www.murata.com/en-global/products/productdetail?partno=PKM13EPYH4000-B0) / [DigiKey PKM13EPYH4000](https://www.digikey.com/en/products/result?keywords=PKM13EPYH4000-B0) |
 | **`Q1`** | N-Channel MOSFET Load Switch | SOT-23 | `BSS138` | Low-side power-gating switch controlled by `PWR_EN` to cut quiescent current to expansion sensors during sleep. | [onsemi BSS138 Portal](https://www.onsemi.com/products/discrete-power-modules/mosfets/bss138) / [SparkFun Datasheet Mirror](https://www.sparkfun.com/datasheets/Components/General/BSS138.pdf) |
@@ -338,9 +338,9 @@ Requirement Checklist:
 | **`XTAL_IN`** | `F2` | `P1_31` | `ANALOG - EXTAL48M` | `MED` | Input | `Y1.3` (48MHz Crystal) | High-frequency crystal oscillator amplifier input |
 | **`I2C0_SCL`** | `A10` | `P0_17` | `ALT2 - FC0_P1` | `MED+I2C` | Open-Drain | `U6.SCL`, `U7.SCL` | Core system I2C clock (RGB driver & fuel gauge) |
 | **`I2C0_SDA`** | `B10` | `P0_16` | `ALT2 - FC0_P0` | `MED+I2C+I3C` | Open-Drain | `U6.SDA`, `U7.SDA` | Core system I2C data with 2.2k pull-up to SYS_3V3 |
-| **`I2C1_SCL`** | `C5` | `P1_1` | `ALT2 - FC3_P1` | `MED+I2C` | Open-Drain | `U2.SCL` (CY8CMBR3116) | Dedicated capacitive touch controller I2C clock |
-| **`I2C1_SDA`** | `C6` | `P1_0` | `ALT2 - FC3_P0` | `MED+I2C` | Open-Drain | `U2.SDA` (CY8CMBR3116) | Dedicated capacitive touch controller I2C data |
-| **`CAP_INT`** | `C4` | `P1_2` | `ALT0 - P1_2` | `MED` | Input | `U2.INT_B` (CY8CMBR3116) | Capacitive touch active-low proximity/press IRQ |
+| **`I2C1_SCL`** | `C5` | `P1_1` | `ALT2 - FC3_P1` | `MED+I2C` | Open-Drain | `U2.SCL` (IQS7222A) | Dedicated capacitive touch controller I2C clock |
+| **`I2C1_SDA`** | `C6` | `P1_0` | `ALT2 - FC3_P0` | `MED+I2C` | Open-Drain | `U2.SDA` (IQS7222A) | Dedicated capacitive touch controller I2C data |
+| **`CAP_INT`** | `C4` | `P1_2` | `ALT0 - P1_2` | `MED` | Input | `U2.RDY` (IQS7222A) | Capacitive touch active-low proximity/press IRQ |
 | **`UART0_RXD`** | `B6` | `P0_24` | `ALT2 - FC1_P0` | `MED` | Input | `U9.TXD` (FT232RNQ) | Debug console UART receive (up to 3 Mbaud) |
 | **`UART0_TXD`** | `A6` | `P0_25` | `ALT2 - FC1_P1` | `MED` | Output | `U9.RXD` (FT232RNQ) | Debug console UART transmit (up to 3 Mbaud) |
 | **`UART0_CTS`** | `F10` | `P0_26` | `ALT2 - FC1_P2` | `MED` | Input | `U9.RTS` (FT232RNQ) | Console UART Clear-to-Send hardware flow control |
@@ -431,9 +431,9 @@ All engineering decisions, electrical characteristics, pinmux multiplexing, and 
 | **`U6`** | `LP5009RUKR` | Texas Instruments | WQFN-20 ($3	imes 3	ext{ mm}$) | [TI_LP5009_led_driver.pdf](datasheets/TI_LP5009_led_driver.pdf) | 9-channel $I^2C$ constant-current RGB LED driver with logarithmic dimming, autonomous breathing animation engine, 400kHz fast-mode. |
 | **`U7`** | `MAX17048G+T10` | Analog Devices / Maxim | TDFN-8 ($2	imes 2	ext{ mm}$) | Archived locally in `test_board/docs/datasheets/` | ModelGauge fuel gauge IC, 1-cell Li-Ion/LiPo, ultra-low $3\,\mu	ext{A}$ operating current, $I^2C$ telemetry. |
 | **`U9`** | `FT232RNQ-REEL` | FTDI Chip | QFN-32 ($5	imes 5	ext{ mm}$) | Archived locally in `test_board/docs/datasheets/` | High-speed USB 2.0 to UART serial converter IC, internal EEPROM, 3 Mbaud data rate, USB VBUS powered. |
-| **`U2`** | `CY8CMBR3116` | Infineon / Cypress | QFN-24 ($4	imes 4	ext{ mm}$) | Archived locally in `test_board/docs/datasheets/` | CapSense 16-channel capacitive touch sensing controller with SmartSense auto-tuning, $I^2C$ host interface. |
-| **`U4`** | `MAX98357AETE+` | Analog Devices / Maxim | TQFN-16 ($3	imes 3	ext{ mm}$) | Archived locally in `test_board/docs/datasheets/` | 3.2W Class-D audio amplifier with integrated digital PCM/I2S/PDM input stage, 92% efficiency. |
-| **`J5`–`J14`** | `SM0*B-SRSS-TB` | JST (Japan Solderless Terminals)| JST-SH $1.0	ext{ mm}$ pitch | [JST_SH_header.pdf](datasheets/JST_SH_header.pdf) | Ultra-compact 1.0mm pitch surface-mount side-entry headers (3-pin to 10-pin) for SWD, I3C, I2C, SPI, UART, and GPIO breakout. |
+| **`U2`** | `IQS7222A001QNR` | Azoteq | QFN-20 ($3\times 3\text{ mm}$, $0.4\text{ mm}$ pitch) | [Azoteq_IQS7222A_datasheet.pdf](datasheets/Azoteq_IQS7222A_datasheet.pdf) | ProxFusion capacitive sensing controller with dual internal LDOs (VREGD, VREGA), I2C host interface, RDY IRQ. |
+| **`U4`** | `MAX98357AETE+` | Analog Devices / Maxim | TQFN-16 ($3\times 3\text{ mm}$) | Archived locally in `test_board/docs/datasheets/` | 3.2W Class-D audio amplifier with integrated digital PCM/I2S/PDM input stage, 92% efficiency. |
+| **`J5`–`J14`** | `SM0*B-SRSS-TB` | JST (Japan Solderless Terminals)| JST-SH $1.0\text{ mm}$ pitch | [JST_SH_header.pdf](datasheets/JST_SH_header.pdf) | Ultra-compact 1.0mm pitch surface-mount side-entry headers (3-pin to 10-pin) for SWD, I3C, I2C, SPI, UART, and GPIO breakout. |
 
 ---
 
@@ -457,7 +457,7 @@ The test board carrier has a compact form factor of $60.0\text{ mm} \times 90.0\
    - **`U_CHG` BQ24074 & `U_FUEL` MAX17048**: Located at $(-18.0, 8.0)$ near the USB power entry.
 5. **Right Edge $(X \in [15, 30])$**:
    - **`U_NAND` Winbond W25N01GV**: Placed at $(18.0, 0.0)$ right of the MCU for short, equal-length FlexSPI traces.
-   - **`U2` CY8CMBR3116 Touch Controller**: Placed on Bottom Layer (`B.Cu`) at $(18.0, -15.0)$ near flex tail return paths.
+   - **`U2` Azoteq IQS7222A Touch Controller**: Placed on Bottom Layer (`B.Cu`) at $(18.0, -15.0)$ near flex tail return paths.
    - **`J_I2C`, `J_I3C`, `J_SPI`, `J_UART` Peripheral Headers**: Arranged in an orderly vertical bus strip along the right perimeter $(X = 24.0, Y \in [-15, 20])$.
    - **`U_LED` Driver & RGB Status LED**: Located at $(22.0, 26.0)$ near the corner for maximum visibility through the top lid window.
 6. **Bottom Exterior Enclosure Shell (`BUG-060`)**:

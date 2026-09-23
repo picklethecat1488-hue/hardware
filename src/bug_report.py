@@ -1,15 +1,14 @@
-"""Interactive Bug Report Tool and Markdown Tracker CLI.
+"""Interactive Bug Report Tool and SQLite Workstation CLI.
 
 Launches a local browser-based bug reporting workstation, allowing issue triage,
-reproduction step logging, attachment uploads (screenshots, logs, CAD refs),
-and automated export to GitHub-flavored Markdown (build/BUGS.md).
+reproduction step logging, and attachment uploads (screenshots, logs, CAD refs),
+backed fully by an ACID SQLite database (build/bugs.sqlite).
 
 Usage:
     python src/bug_report.py
-    python src/bug_report.py --port 8766 --output build/BUGS.md
+    python src/bug_report.py --port 8766
     python src/bug_report.py --list
     python src/bug_report.py --add "Antenna on Q2" --severity HIGH --category PCB
-    python src/bug_report.py --export-only
 """
 
 import argparse
@@ -33,7 +32,7 @@ def parse_arguments() -> argparse.Namespace:
         Parsed argument namespace.
     """
     parser = argparse.ArgumentParser(
-        description="Hardware Bug Report Terminal & Markdown Tracker",
+        description="Hardware Bug Report Terminal & SQLite Workstation",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -49,19 +48,6 @@ def parse_arguments() -> argparse.Namespace:
         help="Host interface address to bind.",
     )
     parser.add_argument(
-        "--output",
-        "-o",
-        type=Path,
-        default=Path("build/BUGS.md"),
-        help="Destination markdown file for bug tracker registry.",
-    )
-    parser.add_argument(
-        "--state-file",
-        type=Path,
-        default=Path("build/bugs_state.json"),
-        help="Persistent JSON file storing bug database.",
-    )
-    parser.add_argument(
         "--db-file",
         "--sqlite-file",
         dest="db_file",
@@ -72,7 +58,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--fresh",
         action="store_true",
-        help="Start a fresh bug tracking session, ignoring previous JSON state.",
+        help="Start a fresh bug tracking session, ignoring previous database state.",
     )
     parser.add_argument(
         "--browser",
@@ -84,11 +70,6 @@ def parse_arguments() -> argparse.Namespace:
         "--no-browser",
         action="store_true",
         help="Disable automatic browser opening on server launch.",
-    )
-    parser.add_argument(
-        "--export-only",
-        action="store_true",
-        help="Immediately export build/BUGS.md from existing state without launching server.",
     )
     parser.add_argument(
         "--list",
@@ -166,16 +147,16 @@ def main() -> None:
     args = parse_arguments()
     repo_root = get_git_root()
 
-    output_path = args.output if args.output.is_absolute() else (repo_root / args.output)
-    state_path = args.state_file if args.state_file.is_absolute() else (repo_root / args.state_file)
     db_path = args.db_file if args.db_file.is_absolute() else (repo_root / args.db_file)
+    state_path = db_path.with_suffix(".json")
+    markdown_path = repo_root / "BUGS.md"
 
-    is_cli_only = bool(args.add or args.resolve or args.list or args.export_only)
+    is_cli_only = bool(args.add or args.resolve or args.list)
     server = BugReportServer(
         host=args.host,
         port=args.port,
         repo_root=repo_root,
-        markdown_output=output_path,
+        markdown_output=markdown_path,
         state_file=state_path,
         sqlite_file=db_path,
         fresh=args.fresh,
@@ -236,20 +217,14 @@ def main() -> None:
         print()
         return
 
-    if args.export_only:
-        saved_md = server.save_and_sync()
-        print(f"Exported bug tracker markdown report to: {saved_md}")
-        return
-
-    # Initial sync to ensure build/BUGS.md exists immediately
+    # Initial sync to ensure SQLite database is ready
     server.save_and_sync()
     url = server.get_url()
 
     print("=================================================================")
     print("  HARDWARE BUG REPORT TERMINAL & WORKSTATION")
     print(f"  Dashboard URL: {url}")
-    print(f"  Report File:   {output_path}")
-    print(f"  State File:    {state_path}")
+    print(f"  Database:      {db_path}")
     print("  Press Ctrl+C to terminate the bug reporting session.")
     print("=================================================================")
 
@@ -261,7 +236,6 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\nSaving bug database and shutting down server...")
         server.save_and_sync()
-        print(f"Markdown report synced to: {output_path}")
 
 
 if __name__ == "__main__":

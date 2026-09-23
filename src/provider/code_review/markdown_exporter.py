@@ -17,6 +17,7 @@ from model.code_review import (
     ReviewSessionModel,
     ReviewSeverity,
 )
+from provider.code_review.git_utils import is_file_ignored
 
 
 class MarkdownReviewExporter:
@@ -115,7 +116,11 @@ class MarkdownReviewExporter:
         for comment in session.comments:
             comments_by_file.setdefault(comment.file_path, []).append(comment)
 
-        all_file_paths = sorted(set(list(session.files.keys()) + list(comments_by_file.keys())))
+        all_file_paths = [
+            fp
+            for fp in sorted(set(list(session.files.keys()) + list(comments_by_file.keys())))
+            if not is_file_ignored(fp)
+        ]
 
         lines.extend(
             [

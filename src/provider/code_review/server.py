@@ -421,11 +421,18 @@ class ReviewServer(ThreadingHTTPServer):
         self.sqlite_store.save_session(self.session)
         self.exporter.save_session_json(self.session, self.state_file)
         total_files = len(self.git_engine.get_changed_files("working"))
-        return self.exporter.export_markdown(
+        res = self.exporter.export_markdown(
             self.session,
             self.markdown_output,
             total_repo_files=total_files,
         )
+        cr_md = self.repo_root / "build" / "CR.md"
+        if self.markdown_output.resolve() != cr_md.resolve():
+            try:
+                self.exporter.export_markdown(self.session, cr_md, total_repo_files=total_files)
+            except OSError:
+                pass
+        return res
 
     def get_url(self) -> str:
         """Return the browser URL for accessing the review dashboard."""

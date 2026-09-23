@@ -67,8 +67,29 @@ def get_git_root(cwd: Optional[Path] = None) -> Path:
     return Path(root_str)
 
 
+IGNORED_REVIEW_FILES: frozenset[str] = frozenset({"BUGS.md", "BUGS.txt"})
+
+
+def is_file_ignored(file_path: str) -> bool:
+    """Check if file should be hidden from code review inspection.
+
+    Args:
+        file_path: Relative or absolute file path or filename.
+
+    Returns:
+        True if file is in IGNORED_REVIEW_FILES or matches ignored filename.
+    """
+    p = Path(file_path)
+    return p.name in IGNORED_REVIEW_FILES or file_path in IGNORED_REVIEW_FILES
+
+
 class GitReviewEngine:
     """Git inspection engine providing revisions, diffs, and content."""
+
+    @staticmethod
+    def is_file_ignored(file_path: str) -> bool:
+        """Check if file should be hidden from code review inspection."""
+        return is_file_ignored(file_path)
 
     def __init__(self, repo_root: Optional[Path] = None) -> None:
         """Initialize GitReviewEngine with repository root.
@@ -204,7 +225,16 @@ class GitReviewEngine:
     def has_working_tree_changes(self) -> bool:
         """Check whether repository contains any uncommitted or untracked changes."""
         status_output = run_git_command(["status", "--porcelain"], cwd=self.repo_root).strip()
-        return bool(status_output)
+        if not status_output:
+            return False
+        for line in status_output.splitlines():
+            if len(line) >= 4:
+                file_path = line[3:].strip()
+                if " -> " in file_path:
+                    file_path = file_path.split(" -> ")[1].strip()
+                if not self.is_file_ignored(file_path):
+                    return True
+        return False
 
     def _get_working_tree_info(self) -> Optional[CommitInfoModel]:
         """Check if working tree has unstaged, staged, or untracked modifications."""
@@ -219,6 +249,9 @@ class GitReviewEngine:
         for line in diff_stat.splitlines():
             cols = line.split("\t")
             if len(cols) >= 3:
+                file_path = cols[2].strip()
+                if self.is_file_ignored(file_path):
+                    continue
                 file_count += 1
                 if cols[0].isdigit():
                     additions += int(cols[0])
@@ -226,16 +259,26 @@ class GitReviewEngine:
                     deletions += int(cols[1])
 
         # Include untracked files in count and additions
+        status_lines = []
         for line in status_output.splitlines():
-            if line.startswith("?? "):
+            if len(line) >= 4:
                 file_path = line[3:].strip()
-                file_count += 1
-                full_path = self.repo_root / file_path
-                if full_path.is_file():
-                    try:
-                        additions += len(full_path.read_text(encoding="utf-8", errors="replace").splitlines())
-                    except OSError:
-                        pass
+                if " -> " in file_path:
+                    file_path = file_path.split(" -> ")[1].strip()
+                if self.is_file_ignored(file_path):
+                    continue
+                status_lines.append(line)
+                if line.startswith("?? "):
+                    file_count += 1
+                    full_path = self.repo_root / file_path
+                    if full_path.is_file():
+                        try:
+                            additions += len(full_path.read_text(encoding="utf-8", errors="replace").splitlines())
+                        except OSError:
+                            pass
+
+        if file_count == 0 and not status_lines:
+            return None
 
         now = datetime.now(timezone.utc)
         return CommitInfoModel(
@@ -246,7 +289,7 @@ class GitReviewEngine:
             date=f"Now ({now.strftime('%Y-%m-%d')})",
             time=now.strftime("%H:%M:%S"),
             subject=f"Uncommitted Changes ({file_count} modified files)",
-            body=status_output,
+            body="\n".join(status_lines),
             additions=additions,
             deletions=deletions,
             files_count=file_count,
@@ -311,9 +354,12 @@ class GitReviewEngine:
                         break
                     parts = line.split(":", 2)
                     if len(parts) >= 3 and parts[1].isdigit():
+                        file_path = parts[0].strip()
+                        if self.is_file_ignored(file_path):
+                            continue
                         results.append(
                             {
-                                "file_path": parts[0],
+                                "file_path": file_path,
                                 "line_number": int(parts[1]),
                                 "line_content": parts[2].strip(),
                             }
@@ -328,9 +374,12 @@ class GitReviewEngine:
                         break
                     parts = line.split(":", 3)
                     if len(parts) >= 4 and parts[2].isdigit():
+                        file_path = parts[1].strip()
+                        if self.is_file_ignored(file_path):
+                            continue
                         results.append(
                             {
-                                "file_path": parts[1],
+                                "file_path": file_path,
                                 "line_number": int(parts[2]),
                                 "line_content": parts[3].strip(),
                             }
@@ -354,6 +403,9 @@ class GitReviewEngine:
         for line in output.splitlines():
             cols = line.split("\t")
             if len(cols) >= 3:
+                file_path = cols[2].strip()
+                if self.is_file_ignored(file_path):
+                    continue
                 file_count += 1
                 if cols[0].isdigit():
                     additions += int(cols[0])
@@ -385,6 +437,8 @@ class GitReviewEngine:
             cols = line.split("\t")
             if len(cols) >= 3:
                 path = cols[2].strip()
+                if self.is_file_ignored(path):
+                    continue
                 adds = int(cols[0]) if cols[0].isdigit() else 0
                 dels = int(cols[1]) if cols[1].isdigit() else 0
                 stats_map[path] = (adds, dels)
@@ -395,6 +449,8 @@ class GitReviewEngine:
             if len(parts) >= 2:
                 status_code = parts[0].strip()
                 file_path = parts[-1].strip()
+                if self.is_file_ignored(file_path):
+                    continue
                 adds, dels = stats_map.get(file_path, (0, 0))
                 files.append(
                     {
@@ -416,6 +472,8 @@ class GitReviewEngine:
             cols = line.split("\t")
             if len(cols) >= 3:
                 path = cols[2].strip()
+                if self.is_file_ignored(path):
+                    continue
                 adds = int(cols[0]) if cols[0].isdigit() else 0
                 dels = int(cols[1]) if cols[1].isdigit() else 0
                 stats_map[path] = (adds, dels)
@@ -428,6 +486,8 @@ class GitReviewEngine:
             file_path = line[3:].strip()
             if " -> " in file_path:
                 file_path = file_path.split(" -> ")[1].strip()
+            if self.is_file_ignored(file_path):
+                continue
             adds, dels = stats_map.get(file_path, (0, 0))
             if status_code == "??" and adds == 0 and dels == 0:
                 full_path = self.repo_root / file_path
@@ -470,6 +530,20 @@ class GitReviewEngine:
 
     def get_file_diff(self, commit: str, file_path: str) -> FileDiffModel:
         """Construct comprehensive diff model including hunks and side-by-side rows."""
+        if self.is_file_ignored(file_path):
+            return FileDiffModel(
+                file_path=file_path,
+                old_path=file_path,
+                new_path=file_path,
+                status="ignored",
+                additions=0,
+                deletions=0,
+                hunks=[],
+                side_by_side=[],
+                raw_diff="File excluded from code review.",
+                full_content="File excluded from code review.",
+            )
+
         old_content = self.get_file_content(commit, file_path, parent=True)
         new_content = self.get_file_content(commit, file_path, parent=False)
 

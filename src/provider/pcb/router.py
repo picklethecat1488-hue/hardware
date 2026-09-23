@@ -510,7 +510,8 @@ class AStarPCBRouter:
             raise RuntimeError(
                 f"A* router could not find collision-free path for net '{net_name}' "
                 f"from ({start_pt[0]:.2f}, {start_pt[1]:.2f}) [{start_layer}] "
-                f"to ({end_pt[0]:.2f}, {end_pt[1]:.2f}) [{end_layer}]"
+                f"to ({end_pt[0]:.2f}, {end_pt[1]:.2f}) [{end_layer}] "
+                f"(expansions={expansions}, queue_len={len(queue)})"
             )
 
         traces: List[TraceSegmentModel] = []
@@ -816,7 +817,7 @@ class PCBAutoRouter:
                 eff_w = pw * cos_r + pl * sin_r
                 eff_l = pw * sin_r + pl * cos_r
                 pin_lay = "ALL" if getattr(pin, "pad_type", "smd") == "thru_hole" else fp_layer
-                pad_margin = 0.05 if max(eff_w, eff_l) <= 0.40 else 0.20
+                pad_margin = 0.05 if (min(eff_w, eff_l) <= 0.30 or max(eff_w, eff_l) <= 0.40) else 0.20
                 pin_net = pin_to_net.get((fp.name, pin.name)) or "__NO_NET__"
                 is_circle = getattr(pin, "pad_shape", "rect") == "circle"
                 copper_r = min(eff_w, eff_l) / 2.0 if is_circle else None
@@ -933,7 +934,8 @@ class PCBAutoRouter:
 
         dense_regions: List[Tuple[float, float, float, float, str]] = []
         for fp in board_fps:
-            if len(fp.pins) >= 40:
+            pkg = getattr(fp, "package", "")
+            if len(fp.pins) >= 16 or any(pkg.startswith(p) for p in ("QFN", "BGA", "TQFN", "WQFN", "VFBGA")):
                 px0 = fp.position[0]
                 py0 = fp.position[1]
                 xs = [p.position[0] + px0 for p in fp.pins]

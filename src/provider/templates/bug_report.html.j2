@@ -617,6 +617,15 @@
     let currentFilter = 'open';
 
     function init() {
+      // Disambiguate duplicate IDs if any exist in in-memory state
+      const seenIds = new Set();
+      (db.bugs || []).forEach(b => {
+        if (seenIds.has(b.id)) {
+          b.id = generateNextBugId();
+        }
+        seenIds.add(b.id);
+      });
+
       const openBugs = db.bugs.filter(b => b.status !== "RESOLVED" && b.status !== "CLOSED");
       if (openBugs.length > 0) {
         activeBugId = openBugs[0].id;
@@ -776,8 +785,38 @@
       });
     }
 
-    function newBug() {
-      const newId = "BUG-" + String(db.bugs.length + 1).padStart(3, "0");
+    function generateNextBugId() {
+      let maxIdx = 0;
+      (db.bugs || []).forEach(b => {
+        if (b.id && b.id.startsWith("BUG-")) {
+          const num = parseInt(b.id.slice(4), 10);
+          if (!isNaN(num) && num > maxIdx) {
+            maxIdx = num;
+          }
+        }
+      });
+      let nextId = "BUG-" + String(maxIdx + 1).padStart(3, "0");
+      while (db.bugs && db.bugs.some(b => b.id === nextId)) {
+        maxIdx++;
+        nextId = "BUG-" + String(maxIdx + 1).padStart(3, "0");
+      }
+      return nextId;
+    }
+
+    async function newBug() {
+      let newId = generateNextBugId();
+      try {
+        const res = await fetch("/api/next_bug_id");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.next_id && !db.bugs.some(b => b.id === data.next_id)) {
+            newId = data.next_id;
+          }
+        }
+      } catch (e) {
+        // Fallback to locally calculated generateNextBugId
+      }
+
       const bug = {
         id: newId,
         title: "New Bug Report",

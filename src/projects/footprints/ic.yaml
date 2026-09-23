@@ -85,6 +85,223 @@ footprints:
       pad_size_mm:
       - 1.5
       - 0.6
+  QFN-20:
+    dimensions:
+    - 3.0
+    - 3.0
+    - 0.6
+    pins:
+    - name: VDD
+      position:
+      - -1.45
+      - 0.8
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: VREGD
+      position:
+      - -1.45
+      - 0.4
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: VSS
+      position:
+      - -1.45
+      - 0.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: VREGA
+      position:
+      - -1.45
+      - -0.4
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: CR0
+      position:
+      - -1.45
+      - -0.8
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: CR1
+      position:
+      - -0.8
+      - -1.45
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: CR2
+      position:
+      - -0.4
+      - -1.45
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: CR3
+      position:
+      - 0.0
+      - -1.45
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: CR4
+      position:
+      - 0.4
+      - -1.45
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: CR5
+      position:
+      - 0.8
+      - -1.45
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: CR6
+      position:
+      - 1.45
+      - -0.8
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: CR7
+      position:
+      - 1.45
+      - -0.4
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: CT8
+      position:
+      - 1.45
+      - 0.0
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: OUTA
+      position:
+      - 1.45
+      - 0.4
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: NC1
+      position:
+      - 1.45
+      - 0.8
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.65
+      - 0.22
+    - name: NC2
+      position:
+      - 0.8
+      - 1.45
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: RDY
+      position:
+      - 0.4
+      - 1.45
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: SCL
+      position:
+      - 0.0
+      - 1.45
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: SDA
+      position:
+      - -0.4
+      - 1.45
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: MCLR
+      position:
+      - -0.8
+      - 1.45
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.22
+      - 0.65
+    - name: EP
+      position:
+      - 0.0
+      - 0.0
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.65
+      - 1.65
+
   QFN-24:
     dimensions:
     - 4.0
@@ -3211,7 +3428,7 @@ footprints:
         side: left
         pad_type: smd
         pad_shape: roundrect
-        pad_size_mm: [1.2, 1.5]
+        pad_size_mm: [0.7, 1.3]
 
   TSSOP-16:
     dimensions: [5.0, 4.4, 1.1]
@@ -3620,3 +3837,2034 @@ footprints:
         pad_type: smd
         pad_shape: roundrect
         pad_size_mm: [3.2, 3.2]
+
+  VFBGA-184:
+    dimensions:
+    - 11.0
+    - 11.0
+    - 1.2
+    pins:
+    - name: A1
+      label: A1
+      position:
+      - -4.0
+      - 3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: A10
+      label: A10
+      position:
+      - 0.5
+      - 3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: A12
+      label: A12
+      position:
+      - 1.5
+      - 3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: A14
+      label: A14
+      position:
+      - 2.5
+      - 3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: A16
+      label: A16
+      position:
+      - 3.5
+      - 3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: A17
+      label: A17
+      position:
+      - 4.0
+      - 3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: A2
+      label: A2
+      position:
+      - -3.5
+      - 3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: A4
+      label: A4
+      position:
+      - -2.5
+      - 3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: A6
+      label: A6
+      position:
+      - -1.5
+      - 3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: A8
+      label: A8
+      position:
+      - -0.5
+      - 3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B1
+      label: B1
+      position:
+      - -4.0
+      - 3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B10
+      label: B10
+      position:
+      - 0.5
+      - 3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B11
+      label: B11
+      position:
+      - 1.0
+      - 3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B12
+      label: B12
+      position:
+      - 1.5
+      - 3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B14
+      label: B14
+      position:
+      - 2.5
+      - 3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B15
+      label: B15
+      position:
+      - 3.0
+      - 3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B16
+      label: B16
+      position:
+      - 3.5
+      - 3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B17
+      label: B17
+      position:
+      - 4.0
+      - 3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B2
+      label: B2
+      position:
+      - -3.5
+      - 3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B3
+      label: B3
+      position:
+      - -3.0
+      - 3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B4
+      label: B4
+      position:
+      - -2.5
+      - 3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B6
+      label: B6
+      position:
+      - -1.5
+      - 3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B7
+      label: B7
+      position:
+      - -1.0
+      - 3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: B8
+      label: B8
+      position:
+      - -0.5
+      - 3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C10
+      label: C10
+      position:
+      - 0.5
+      - 2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C12
+      label: C12
+      position:
+      - 1.5
+      - 2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C13
+      label: C13
+      position:
+      - 2.0
+      - 2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C14
+      label: C14
+      position:
+      - 2.5
+      - 2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C15
+      label: C15
+      position:
+      - 3.0
+      - 2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C3
+      label: C3
+      position:
+      - -3.0
+      - 2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C4
+      label: C4
+      position:
+      - -2.5
+      - 2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C5
+      label: C5
+      position:
+      - -2.0
+      - 2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C6
+      label: C6
+      position:
+      - -1.5
+      - 2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C8
+      label: C8
+      position:
+      - -0.5
+      - 2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: C9
+      label: C9
+      position:
+      - 0.0
+      - 2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D1
+      label: D1
+      position:
+      - -4.0
+      - 2.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D11
+      label: D11
+      position:
+      - 1.0
+      - 2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D12
+      label: D12
+      position:
+      - 1.5
+      - 2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D14
+      label: D14
+      position:
+      - 2.5
+      - 2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D15
+      label: D15
+      position:
+      - 3.0
+      - 2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D16
+      label: D16
+      position:
+      - 3.5
+      - 2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D17
+      label: D17
+      position:
+      - 4.0
+      - 2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D2
+      label: D2
+      position:
+      - -3.5
+      - 2.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D3
+      label: D3
+      position:
+      - -3.0
+      - 2.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D4
+      label: D4
+      position:
+      - -2.5
+      - 2.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D6
+      label: D6
+      position:
+      - -1.5
+      - 2.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D7
+      label: D7
+      position:
+      - -1.0
+      - 2.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: D9
+      label: D9
+      position:
+      - 0.0
+      - 2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: E10
+      label: E10
+      position:
+      - 0.5
+      - 1.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: E11
+      label: E11
+      position:
+      - 1.0
+      - 1.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: E13
+      label: E13
+      position:
+      - 2.0
+      - 1.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: E14
+      label: E14
+      position:
+      - 2.5
+      - 1.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: E4
+      label: E4
+      position:
+      - -2.5
+      - 1.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: E5
+      label: E5
+      position:
+      - -2.0
+      - 1.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: E7
+      label: E7
+      position:
+      - -1.0
+      - 1.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: E8
+      label: E8
+      position:
+      - -0.5
+      - 1.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F1
+      label: F1
+      position:
+      - -4.0
+      - 1.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F10
+      label: F10
+      position:
+      - 0.5
+      - 1.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F12
+      label: F12
+      position:
+      - 1.5
+      - 1.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F14
+      label: F14
+      position:
+      - 2.5
+      - 1.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F15
+      label: F15
+      position:
+      - 3.0
+      - 1.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F16
+      label: F16
+      position:
+      - 3.5
+      - 1.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F17
+      label: F17
+      position:
+      - 4.0
+      - 1.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F2
+      label: F2
+      position:
+      - -3.5
+      - 1.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F3
+      label: F3
+      position:
+      - -3.0
+      - 1.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F4
+      label: F4
+      position:
+      - -2.5
+      - 1.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F6
+      label: F6
+      position:
+      - -1.5
+      - 1.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: F8
+      label: F8
+      position:
+      - -0.5
+      - 1.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: G11
+      label: G11
+      position:
+      - 1.0
+      - 0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: G13
+      label: G13
+      position:
+      - 2.0
+      - 0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: G14
+      label: G14
+      position:
+      - 2.5
+      - 0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: G16
+      label: G16
+      position:
+      - 3.5
+      - 0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: G2
+      label: G2
+      position:
+      - -3.5
+      - 0.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: G4
+      label: G4
+      position:
+      - -2.5
+      - 0.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: G5
+      label: G5
+      position:
+      - -2.0
+      - 0.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: G7
+      label: G7
+      position:
+      - -1.0
+      - 0.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H1
+      label: H1
+      position:
+      - -4.0
+      - 0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H10
+      label: H10
+      position:
+      - 0.5
+      - 0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H12
+      label: H12
+      position:
+      - 1.5
+      - 0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H13
+      label: H13
+      position:
+      - 2.0
+      - 0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H15
+      label: H15
+      position:
+      - 3.0
+      - 0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H16
+      label: H16
+      position:
+      - 3.5
+      - 0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H17
+      label: H17
+      position:
+      - 4.0
+      - 0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H2
+      label: H2
+      position:
+      - -3.5
+      - 0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H3
+      label: H3
+      position:
+      - -3.0
+      - 0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H5
+      label: H5
+      position:
+      - -2.0
+      - 0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H6
+      label: H6
+      position:
+      - -1.5
+      - 0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H8
+      label: H8
+      position:
+      - -0.5
+      - 0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: H9
+      label: H9
+      position:
+      - 0.0
+      - 0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J1
+      label: J1
+      position:
+      - -4.0
+      - -0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J10
+      label: J10
+      position:
+      - 0.5
+      - -0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J11
+      label: J11
+      position:
+      - 1.0
+      - -0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J12
+      label: J12
+      position:
+      - 1.5
+      - -0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J13
+      label: J13
+      position:
+      - 2.0
+      - -0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J14
+      label: J14
+      position:
+      - 2.5
+      - -0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J15
+      label: J15
+      position:
+      - 3.0
+      - -0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J16
+      label: J16
+      position:
+      - 3.5
+      - -0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J17
+      label: J17
+      position:
+      - 4.0
+      - -0.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J2
+      label: J2
+      position:
+      - -3.5
+      - -0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J3
+      label: J3
+      position:
+      - -3.0
+      - -0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J4
+      label: J4
+      position:
+      - -2.5
+      - -0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J5
+      label: J5
+      position:
+      - -2.0
+      - -0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J6
+      label: J6
+      position:
+      - -1.5
+      - -0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J7
+      label: J7
+      position:
+      - -1.0
+      - -0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: J8
+      label: J8
+      position:
+      - -0.5
+      - -0.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K1
+      label: K1
+      position:
+      - -4.0
+      - -0.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K10
+      label: K10
+      position:
+      - 0.5
+      - -0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K12
+      label: K12
+      position:
+      - 1.5
+      - -0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K13
+      label: K13
+      position:
+      - 2.0
+      - -0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K15
+      label: K15
+      position:
+      - 3.0
+      - -0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K16
+      label: K16
+      position:
+      - 3.5
+      - -0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K17
+      label: K17
+      position:
+      - 4.0
+      - -0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K2
+      label: K2
+      position:
+      - -3.5
+      - -0.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K3
+      label: K3
+      position:
+      - -3.0
+      - -0.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K5
+      label: K5
+      position:
+      - -2.0
+      - -0.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K6
+      label: K6
+      position:
+      - -1.5
+      - -0.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K8
+      label: K8
+      position:
+      - -0.5
+      - -0.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: K9
+      label: K9
+      position:
+      - 0.0
+      - -0.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: L11
+      label: L11
+      position:
+      - 1.0
+      - -1.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: L13
+      label: L13
+      position:
+      - 2.0
+      - -1.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: L14
+      label: L14
+      position:
+      - 2.5
+      - -1.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: L16
+      label: L16
+      position:
+      - 3.5
+      - -1.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: L2
+      label: L2
+      position:
+      - -3.5
+      - -1.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: L4
+      label: L4
+      position:
+      - -2.5
+      - -1.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: L5
+      label: L5
+      position:
+      - -2.0
+      - -1.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: L7
+      label: L7
+      position:
+      - -1.0
+      - -1.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M1
+      label: M1
+      position:
+      - -4.0
+      - -1.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M10
+      label: M10
+      position:
+      - 0.5
+      - -1.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M12
+      label: M12
+      position:
+      - 1.5
+      - -1.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M14
+      label: M14
+      position:
+      - 2.5
+      - -1.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M15
+      label: M15
+      position:
+      - 3.0
+      - -1.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M16
+      label: M16
+      position:
+      - 3.5
+      - -1.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M17
+      label: M17
+      position:
+      - 4.0
+      - -1.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M2
+      label: M2
+      position:
+      - -3.5
+      - -1.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M3
+      label: M3
+      position:
+      - -3.0
+      - -1.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M4
+      label: M4
+      position:
+      - -2.5
+      - -1.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M6
+      label: M6
+      position:
+      - -1.5
+      - -1.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: M8
+      label: M8
+      position:
+      - -0.5
+      - -1.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: N10
+      label: N10
+      position:
+      - 0.5
+      - -2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: N11
+      label: N11
+      position:
+      - 1.0
+      - -2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: N13
+      label: N13
+      position:
+      - 2.0
+      - -2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: N14
+      label: N14
+      position:
+      - 2.5
+      - -2.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: N4
+      label: N4
+      position:
+      - -2.5
+      - -2.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: N5
+      label: N5
+      position:
+      - -2.0
+      - -2.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: N7
+      label: N7
+      position:
+      - -1.0
+      - -2.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: N8
+      label: N8
+      position:
+      - -0.5
+      - -2.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P1
+      label: P1
+      position:
+      - -4.0
+      - -2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P11
+      label: P11
+      position:
+      - 1.0
+      - -2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P12
+      label: P12
+      position:
+      - 1.5
+      - -2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P14
+      label: P14
+      position:
+      - 2.5
+      - -2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P15
+      label: P15
+      position:
+      - 3.0
+      - -2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P16
+      label: P16
+      position:
+      - 3.5
+      - -2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P17
+      label: P17
+      position:
+      - 4.0
+      - -2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P2
+      label: P2
+      position:
+      - -3.5
+      - -2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P3
+      label: P3
+      position:
+      - -3.0
+      - -2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P4
+      label: P4
+      position:
+      - -2.5
+      - -2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P6
+      label: P6
+      position:
+      - -1.5
+      - -2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P7
+      label: P7
+      position:
+      - -1.0
+      - -2.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: P9
+      label: P9
+      position:
+      - 0.0
+      - -2.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R10
+      label: R10
+      position:
+      - 0.5
+      - -3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R12
+      label: R12
+      position:
+      - 1.5
+      - -3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R13
+      label: R13
+      position:
+      - 2.0
+      - -3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R14
+      label: R14
+      position:
+      - 2.5
+      - -3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R15
+      label: R15
+      position:
+      - 3.0
+      - -3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R3
+      label: R3
+      position:
+      - -3.0
+      - -3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R4
+      label: R4
+      position:
+      - -2.5
+      - -3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R5
+      label: R5
+      position:
+      - -2.0
+      - -3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R6
+      label: R6
+      position:
+      - -1.5
+      - -3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R8
+      label: R8
+      position:
+      - -0.5
+      - -3.25
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: R9
+      label: R9
+      position:
+      - 0.0
+      - -3.25
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T1
+      label: T1
+      position:
+      - -4.0
+      - -3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T10
+      label: T10
+      position:
+      - 0.5
+      - -3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T11
+      label: T11
+      position:
+      - 1.0
+      - -3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T12
+      label: T12
+      position:
+      - 1.5
+      - -3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T14
+      label: T14
+      position:
+      - 2.5
+      - -3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T15
+      label: T15
+      position:
+      - 3.0
+      - -3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T16
+      label: T16
+      position:
+      - 3.5
+      - -3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T17
+      label: T17
+      position:
+      - 4.0
+      - -3.75
+      side: right
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T2
+      label: T2
+      position:
+      - -3.5
+      - -3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T3
+      label: T3
+      position:
+      - -3.0
+      - -3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T4
+      label: T4
+      position:
+      - -2.5
+      - -3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T6
+      label: T6
+      position:
+      - -1.5
+      - -3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T7
+      label: T7
+      position:
+      - -1.0
+      - -3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28
+    - name: T8
+      label: T8
+      position:
+      - -0.5
+      - -3.75
+      side: left
+      pad_type: smd
+      pad_shape: circle
+      pad_size_mm:
+      - 0.28
+      - 0.28

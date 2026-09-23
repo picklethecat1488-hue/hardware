@@ -35,6 +35,13 @@ enclosure_lid:
   export: [stl, step]
   color: [0.15, 0.16, 0.20, 0.85]
 
+led_cover:
+  part:
+    modes: [default, print]
+  material: utr8100
+  export: [stl, step]
+  color: [0.90, 0.95, 1.0, 0.6]
+
 route:
   config:
     modes: [default]

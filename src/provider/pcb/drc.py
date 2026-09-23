@@ -149,6 +149,9 @@ class DRCRuleName(StrEnum):
     SCHEMATIC_PAGE_TRANSITION_MISSING = "SCHEMATIC_PAGE_TRANSITION_MISSING"
     SCHEMATIC_DANGLING_COMPONENT = "SCHEMATIC_DANGLING_COMPONENT"
     SCHEMATIC_PAGE_BOUNDARY_EXCEEDED = "SCHEMATIC_PAGE_BOUNDARY_EXCEEDED"
+    SCHEMATIC_TITLE_BLOCK_COLLISION = "SCHEMATIC_TITLE_BLOCK_COLLISION"
+    SCHEMATIC_HEADER_COLLISION = "SCHEMATIC_HEADER_COLLISION"
+    SCHEMATIC_UNCONNECTED_COMPONENT = "SCHEMATIC_UNCONNECTED_COMPONENT"
 
 
 @dataclass
@@ -889,7 +892,11 @@ class PCBDesignRulesChecker:
 
         for fp in footprints or []:
             fx, fy = fp.position[0], fp.position[1]
-            fw, fl = (fp.dimensions[0], fp.dimensions[1]) if hasattr(fp, "dimensions") else (2.0, 2.0)
+            raw_w, raw_l = (fp.dimensions[0], fp.dimensions[1]) if hasattr(fp, "dimensions") else (2.0, 2.0)
+            rot_deg = fp.rotation[2] if hasattr(fp, "rotation") and len(fp.rotation) >= 3 else 0.0
+            rad = math.radians(rot_deg)
+            fw = abs(raw_w * math.cos(rad)) + abs(raw_l * math.sin(rad))
+            fl = abs(raw_w * math.sin(rad)) + abs(raw_l * math.cos(rad))
 
             if outline_polygon:
                 # Check center point and 4 corner points
@@ -1121,7 +1128,11 @@ class PCBDesignRulesChecker:
         connected_components = {comp_name for net in wiring.nets for comp_name, _ in net.pins}
         board_footprints = self.get_footprints_for_board(wiring)
         for fp in board_footprints:
-            if fp.name not in connected_components and getattr(fp, "pins", []):
+            if (
+                fp.name not in connected_components
+                and getattr(fp, "pins", [])
+                and not getattr(fp, "unconnected", False)
+            ):
                 violations.append(
                     DRCViolation(
                         rule_name="DANGLING_COMPONENT",
@@ -2037,129 +2048,27 @@ class PCBDesignRulesChecker:
                         ),
                     )
 
-            # 3b. Symbol overlap check
-            passive_names = set()
-            for fp in sheet_fps:
-                name_u = fp.name.upper()
-                pkg_u = fp.package.upper()
-                if (name_u.startswith("R") or "RES" in pkg_u) and len(fp.pins) == 2:
-                    n1 = pin_to_net.get((fp.name, fp.pins[0].name), "").upper()
-                    n2 = pin_to_net.get((fp.name, fp.pins[1].name), "").upper()
-                    if n1 in ("3V3", "VBUS", "GND") or n2 in ("3V3", "VBUS", "GND"):
-                        passive_names.add(fp.name)
-                elif (name_u.startswith("C") or "CAP" in pkg_u) and len(fp.pins) == 2:
-                    n1 = pin_to_net.get((fp.name, fp.pins[0].name), "").upper()
-                    n2 = pin_to_net.get((fp.name, fp.pins[1].name), "").upper()
-                    if (n1 in ("3V3", "VBUS", "GND") and n2) or (n2 in ("3V3", "VBUS", "GND") and n1):
-                        passive_names.add(fp.name)
+        # 3b. Symbol overlap and page boundary checks
+        computed_symbol_boxes: Dict[int, List[Tuple[float, float, float, float, str]]] = {}
+        if (
+            self.config
+            and getattr(self.config, "schematic_sheets", None)
+            and wiring
+            and getattr(wiring, "footprints", None)
+        ):
+            from provider.schematic_diagram import SchematicDiagram
 
-            main_fps = [fp for fp in sheet_fps if fp.name not in passive_names]
-            if not main_fps:
-                main_fps = sheet_fps
+            diag = SchematicDiagram(wiring=wiring, pcb_config=self.config)
+            computed_symbol_boxes = diag.compute_symbol_bounding_boxes()
 
-            layout = (
-                getattr(sheet, "layout", None)
-                or getattr(self.config, "schematic_layout", None)
-                or SchematicLayoutModel()
-            )
-            col_width = layout.col_width
-            col_gap = layout.col_gap
-            sheet_center_x = layout.sheet_center_x
-            sheet_center_y = layout.sheet_center_y
-            row_step_y = layout.row_step_y
-            def_sym_w = layout.default_symbol_width
-            def_sym_h = layout.default_symbol_height
-
-            num_comps = len(main_fps)
-            if num_comps == 2 and layout.cols_per_row is None and not grid_positions:
-                col_gap = 55.0
-            elif num_comps == 3 and layout.cols_per_row is None and not grid_positions:
-                col_gap = 35.0
-            cols_per_row = layout.cols_per_row if layout.cols_per_row is not None else max(1, min(num_comps, 3))
-            num_rows = (num_comps + cols_per_row - 1) // cols_per_row
-            total_content_w = (cols_per_row * col_width) + ((cols_per_row - 1) * col_gap)
-            start_x = sheet_center_x - (total_content_w / 2.0)
-            top_row_y = sheet_center_y + ((num_rows - 1) * 27.5)
-
-            grid_positions = getattr(layout, "grid_positions", {}) or {}
-            boxes: List[Tuple[float, float, float, float, str]] = []
-            main_box_map: Dict[str, Tuple[float, float, float, float]] = {}
-            for c_idx, fp in enumerate(main_fps):
-                if fp.name in grid_positions:
-                    r_idx, col = grid_positions[fp.name]
-                else:
-                    col = c_idx % cols_per_row
-                    r_idx = c_idx // cols_per_row
-                cx = start_x + (col * (col_width + col_gap)) + (col_width / 2.0)
-                cy = top_row_y - (r_idx * row_step_y)
-                cw = def_sym_w
-                num_pins = len(fp.pins)
-                ch = max(def_sym_h, (num_pins // 2) * 5.0 + 10.0)
-                boxes.append((cx, cy, cw, ch, fp.name))
-                main_box_map[fp.name] = (cx, cy, cw, ch)
-
-            # Include passives (decoupling caps, pull-ups, and shunts) in symbol overlap checks
-            decoupling_caps = []
-            vert_passives = []
-            for fp in sheet_fps:
-                if fp.name in passive_names:
-                    n1 = pin_to_net.get((fp.name, fp.pins[0].name), "").upper()
-                    n2 = pin_to_net.get((fp.name, fp.pins[1].name), "").upper()
-                    if (n1 in ("3V3", "VBUS", "VDD") and n2 == "GND") or (n2 in ("3V3", "VBUS", "VDD") and n1 == "GND"):
-                        decoupling_caps.append(fp)
-                    else:
-                        vert_passives.append(fp)
-
-            if decoupling_caps:
-                base_y = 35.0
-                total_w = (len(decoupling_caps) - 1) * 28.0
-                base_x = max(35.0, sheet_center_x - (total_w / 2.0))
-                for idx, cap in enumerate(decoupling_caps):
-                    boxes.append((base_x + idx * 28.0, base_y, 14.0, 24.0, cap.name))
-
-            comp_passive_count: Dict[Tuple[str, str], int] = {}
-            for p_fp in vert_passives:
-                n1 = pin_to_net.get((p_fp.name, p_fp.pins[0].name), "").upper()
-                n2 = pin_to_net.get((p_fp.name, p_fp.pins[1].name), "").upper()
-                is_pullup = n1 in ("3V3", "VBUS") or n2 in ("3V3", "VBUS")
-                sig_net = n2 if (n1 in ("3V3", "VBUS", "GND")) else n1
-                target_comp = next((c for (c, _), n in pin_to_net.items() if n == sig_net and c in main_box_map), None)
-                if target_comp:
-                    m_cx, m_cy, m_cw, _ = main_box_map[target_comp]
-                    other_comps = [
-                        c for (c, _), n in pin_to_net.items() if n == sig_net and c in main_box_map and c != target_comp
-                    ]
-                    if other_comps:
-                        side_key = (target_comp, "channel")
-                        local_idx = comp_passive_count.get(side_key, 0)
-                        comp_passive_count[side_key] = local_idx + 1
-                        o_cx, _, o_cw, _ = main_box_map[other_comps[0]]
-                        ch_left = min(m_cx + m_cw / 2.0, o_cx + o_cw / 2.0)
-                        px = ch_left + 10.0 + (local_idx % 2) * 9.0
-                        py = m_cy + (12.0 if is_pullup else -12.0)
-                    else:
-                        m_fp = next(f for f in main_fps if f.name == target_comp)
-                        p_obj = next((p for p in m_fp.pins if pin_to_net.get((target_comp, p.name)) == sig_net), None)
-                        sheet_sides = getattr(sheet, "pin_sides", {}) or {}
-                        comp_sides = sheet_sides.get(target_comp, {})
-                        p_side = comp_sides.get(p_obj.name, p_obj.side.value if p_obj else "left") if p_obj else "left"
-                        side_key = (target_comp, p_side)
-                        local_idx = comp_passive_count.get(side_key, 0)
-                        comp_passive_count[side_key] = local_idx + 1
-                        if p_side in ("right", "top"):
-                            px = m_cx + (m_cw / 2.0) + 12.0 + (local_idx * 12.0)
-                        else:
-                            px = m_cx - (m_cw / 2.0) - 14.0 - (local_idx * 10.0)
-                        py = m_cy + (12.0 if is_pullup else -12.0)
-                    boxes.append((px, py, 8.0, 18.0, p_fp.name))
-                elif main_fps:
-                    m_cx, m_cy, m_cw, _ = main_box_map[main_fps[0].name]
-                    px = m_cx - (m_cw / 2.0) - 24.0
-                    py = m_cy + (12.0 if is_pullup else -12.0)
-                    boxes.append((px, py, 8.0, 18.0, p_fp.name))
-
+        for sheet_idx, sheet in enumerate(self.config.schematic_sheets):
+            boxes = computed_symbol_boxes.get(sheet_idx + 1, [])
             for i, b1 in enumerate(boxes):
                 for b2 in boxes[i + 1 :]:
+                    if "DECOUPLING_CARD" in (b1[4], b2[4]):
+                        other_name = b2[4] if b1[4] == "DECOUPLING_CARD" else b1[4]
+                        if other_name.upper().startswith("C"):
+                            continue
                     dx = abs(b1[0] - b2[0])
                     dy = abs(b1[1] - b2[1])
                     min_dx = (b1[2] + b2[2]) / 2.0
@@ -2192,5 +2101,40 @@ class PCBDesignRulesChecker:
                         ),
                         location=(b[0], b[1], 0.0),
                     )
+
+                # 3d. Title block and sheet header collision check (BUG-088)
+                # Bottom-right title block: X in [200.0, 285.0], Y in [12.0, 46.0]
+                if b_xmax > 200.0 and b_xmin < 285.0 and b_ymin < 46.0 and b_ymax > 12.0:
+                    violations.add_error(
+                        rule_name=DRCRuleName.SCHEMATIC_TITLE_BLOCK_COLLISION,
+                        net_or_zone=b[4],
+                        description=(
+                            f"Symbol/card '{b[4]}' on sheet {sheet_idx + 1} ('{sheet.title}') "
+                            f"overlaps schematic title block: bounds=({b_xmin:.1f}, {b_ymin:.1f}, {b_xmax:.1f}, {b_ymax:.1f})"
+                        ),
+                        location=(b[0], b[1], 0.0),
+                    )
+
+                # Top sheet header banner: X in [20.0, 280.0], Y in [184.0, 198.0]
+                if b_ymax > 184.0 and b_ymin < 198.0 and b_xmax > 20.0 and b_xmin < 280.0:
+                    violations.add_error(
+                        rule_name=DRCRuleName.SCHEMATIC_HEADER_COLLISION,
+                        net_or_zone=b[4],
+                        description=(
+                            f"Symbol/card '{b[4]}' on sheet {sheet_idx + 1} ('{sheet.title}') "
+                            f"overlaps schematic sheet header: bounds=({b_xmin:.1f}, {b_ymin:.1f}, {b_xmax:.1f}, {b_ymax:.1f})"
+                        ),
+                        location=(b[0], b[1], 0.0),
+                    )
+
+        # 4. Check that all components in the design have connected pins (BUG-088)
+        for fp_name, fp in footprints_map.items():
+            connected_pins = [p for p in fp.pins if (fp.name, p.name) in pin_to_net]
+            if not connected_pins:
+                violations.add_error(
+                    rule_name=DRCRuleName.SCHEMATIC_DANGLING_COMPONENT,
+                    net_or_zone=fp_name,
+                    description=f"Component '{fp_name}' has no pins connected to any nets in the netlist",
+                )
 
         return violations

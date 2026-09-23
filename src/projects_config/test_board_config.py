@@ -114,14 +114,29 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["standoff_radius"])
 
     @property
-    def standoff_hole_diameter(self) -> float:
-        """Pilot drill hole diameter inside enclosure mounting standoffs in mm."""
-        return float(self._raw_data["standoff_hole_diameter"])
+    def mounting_post_diameter(self) -> float:
+        """Shaft diameter of clip-on mounting posts in mm."""
+        return float(self._raw_data["mounting_post_diameter"])
 
     @property
-    def standoff_hole_depth(self) -> float:
-        """Pilot drill hole depth inside enclosure mounting standoffs in mm."""
-        return float(self._raw_data["standoff_hole_depth"])
+    def mounting_post_height(self) -> float:
+        """Total height of clip-on mounting posts above standoff shoulder in mm."""
+        return float(self._raw_data["mounting_post_height"])
+
+    @property
+    def mounting_post_flare_diameter(self) -> float:
+        """Maximum diameter of flared retaining head on mounting posts in mm."""
+        return float(self._raw_data["mounting_post_flare_diameter"])
+
+    @property
+    def mounting_post_flare_height(self) -> float:
+        """Height of flared retaining head on mounting posts in mm."""
+        return float(self._raw_data["mounting_post_flare_height"])
+
+    @property
+    def mounting_post_tip_diameter(self) -> float:
+        """Lead-in tip diameter at top of mounting posts in mm."""
+        return float(self._raw_data["mounting_post_tip_diameter"])
 
     @property
     def silkscreen_margin(self) -> float:
@@ -172,6 +187,146 @@ class TestBoardConfig(BaseModel):
     def enclosure_m2_cutout_height(self) -> float:
         """Height of M.2 connector cutout on enclosure rear wall in mm."""
         return float(self._raw_data["enclosure_m2_cutout_height"])
+
+    @property
+    def enclosure_gpio_cutout_width(self) -> float:
+        """Width of GPIO header cutout in enclosure lid in mm."""
+        return float(self._raw_data["enclosure_gpio_cutout_width"])
+
+    @property
+    def enclosure_gpio_cutout_length(self) -> float:
+        """Length of GPIO header cutout in enclosure lid in mm."""
+        return float(self._raw_data["enclosure_gpio_cutout_length"])
+
+    @property
+    def enclosure_swd_cutout_width(self) -> float:
+        """Width of SWD connector cutout on enclosure side in mm."""
+        return float(self._raw_data["enclosure_swd_cutout_width"])
+
+    @property
+    def enclosure_swd_cutout_height(self) -> float:
+        """Height of SWD connector cutout on enclosure side in mm."""
+        return float(self._raw_data["enclosure_swd_cutout_height"])
+
+    @property
+    def enclosure_cutout_fillet_radius(self) -> float:
+        """Corner fillet radius for enclosure side cutouts in mm."""
+        return float(self._raw_data["enclosure_cutout_fillet_radius"])
+
+    @property
+    def enclosure_battery_mount_width(self) -> float:
+        """Width of battery retention mount cavity on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_mount_width"])
+
+    @property
+    def enclosure_battery_mount_length(self) -> float:
+        """Length of battery retention mount cavity on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_mount_length"])
+
+    @property
+    def enclosure_battery_mount_wall_height(self) -> float:
+        """Height of battery retention mount retaining walls in mm."""
+        return float(self._raw_data["enclosure_battery_mount_wall_height"])
+
+    @property
+    def enclosure_battery_mount_wall_thickness(self) -> float:
+        """Thickness of battery retention mount retaining walls in mm."""
+        return float(self._raw_data["enclosure_battery_mount_wall_thickness"])
+
+    @property
+    def enclosure_battery_mount_x(self) -> float:
+        """X coordinate offset of battery mount on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_mount_x"])
+
+    @property
+    def enclosure_battery_mount_y(self) -> float:
+        """Y coordinate offset of battery mount on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_mount_y"])
+
+    @property
+    def enclosure_battery_cutout_width(self) -> float:
+        """Width of battery connector pass-through cutout in enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_cutout_width"])
+
+    @property
+    def enclosure_battery_cutout_length(self) -> float:
+        """Length of battery connector pass-through cutout in enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_cutout_length"])
+
+    @property
+    def enclosure_snap_ridge_depth(self) -> float:
+        """Protrusion depth of snap-fit ridges on enclosure lid lip in mm."""
+        return float(self._raw_data["enclosure_snap_ridge_depth"])
+
+    @property
+    def enclosure_snap_ridge_height(self) -> float:
+        """Height of snap-fit ridges on enclosure lid lip in mm."""
+        return float(self._raw_data["enclosure_snap_ridge_height"])
+
+    @property
+    def enclosure_snap_ridge_length(self) -> float:
+        """Length of snap-fit ridges along enclosure rim in mm."""
+        return float(self._raw_data["enclosure_snap_ridge_length"])
+
+    @property
+    def enclosure_snap_groove_depth(self) -> float:
+        """Depth of matching snap-fit retaining grooves in enclosure bottom in mm."""
+        return float(self._raw_data["enclosure_snap_groove_depth"])
+
+    @property
+    def enclosure_snap_groove_height(self) -> float:
+        """Height of matching snap-fit retaining grooves in enclosure bottom in mm."""
+        return float(self._raw_data["enclosure_snap_groove_height"])
+
+    @property
+    def enclosure_snap_groove_length(self) -> float:
+        """Length of matching snap-fit retaining grooves in enclosure bottom in mm."""
+        return float(self._raw_data["enclosure_snap_groove_length"])
+
+    @property
+    def enclosure_vent_slot_width(self) -> float:
+        """Width of ventilation slot along Y in mm."""
+        return float(self._raw_data["enclosure_vent_slot_width"])
+
+    @property
+    def enclosure_vent_slot_height(self) -> float:
+        """Height of ventilation slot along Z in mm."""
+        return float(self._raw_data["enclosure_vent_slot_height"])
+
+    @property
+    def enclosure_vent_slot_spacing(self) -> float:
+        """Center-to-center pitch between ventilation slots in mm."""
+        return float(self._raw_data["enclosure_vent_slot_spacing"])
+
+    @property
+    def enclosure_vent_count(self) -> int:
+        """Number of ventilation slots between charger and amplifier."""
+        return int(self._raw_data["enclosure_vent_count"])
+
+    @property
+    def led_flange_thickness(self) -> float:
+        """Thickness of top flange on clear LED cover in mm."""
+        return float(self._raw_data["led_flange_thickness"])
+
+    @property
+    def led_flange_width(self) -> float:
+        """Width of top square flange on clear LED cover in mm."""
+        return float(self._raw_data["led_flange_width"])
+
+    @property
+    def led_hole_width(self) -> float:
+        """Width of square LED cutout hole through enclosure lid in mm."""
+        return float(self._raw_data["led_hole_width"])
+
+    @property
+    def led_plug_length(self) -> float:
+        """Downward insertion length of LED cover plug in mm."""
+        return float(self._raw_data["led_plug_length"])
+
+    @property
+    def led_plug_width(self) -> float:
+        """Width of square LED cover plug in mm."""
+        return float(self._raw_data["led_plug_width"])
 
     @property
     def test_tdr_rise_time_ps(self) -> float:

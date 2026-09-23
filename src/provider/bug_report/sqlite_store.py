@@ -312,3 +312,17 @@ class SQLiteBugStore:
         json_path.parent.mkdir(parents=True, exist_ok=True)
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(db.model_dump(mode="json"), f, indent=2)
+
+    def generate_next_bug_id(self) -> str:
+        """Query maximum bug ID directly from SQLite database and return next unique global ID."""
+        with self._get_connection() as conn:
+            rows = conn.execute("SELECT id FROM bugs WHERE id LIKE 'BUG-%'").fetchall()
+            max_idx = 0
+            for r in rows:
+                try:
+                    idx = int(r["id"][4:])
+                    if idx > max_idx:
+                        max_idx = idx
+                except ValueError:
+                    pass
+            return f"BUG-{max_idx + 1:03d}"

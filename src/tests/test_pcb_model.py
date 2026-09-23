@@ -258,7 +258,7 @@ def test_test_board_provider_cad_silkscreen():
     provider = TestBoardProvider()
     texts = provider.silkscreen()
     assert len(texts) >= 3
-    assert texts[0].text == "TEST BOARD CARRIER REV 1.0"
+    assert texts[0].text == "TEST BOARD CARRIER REV 2.0"
     assert texts[0].position == (0.0, 26.0)
     assert texts[0].layer == "F.SilkS"
 

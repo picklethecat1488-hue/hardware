@@ -401,7 +401,7 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 31
+    assert len(wiring.footprints) == 44
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
@@ -410,9 +410,22 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert "J1" in footprint_names
     assert "J2" in footprint_names
     assert "J3" in footprint_names
+    assert "J5" in footprint_names
+    assert "J6" in footprint_names
+    assert "J7" in footprint_names
+    assert "J8" in footprint_names
+    assert "J9" in footprint_names
+    assert "J10" in footprint_names
     assert "J13" in footprint_names
+    assert "J14" in footprint_names
     assert "C13" in footprint_names
+    assert "C14" in footprint_names
     assert "U5" in footprint_names
+    assert "U6" in footprint_names
+    assert "U7" in footprint_names
+    assert "U8" in footprint_names
+    assert "U9" in footprint_names
+    assert "D1" in footprint_names
     assert "Y1" in footprint_names
     assert "R1" in footprint_names
     assert "R2" in footprint_names
@@ -442,11 +455,11 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 31  # header + 30 carrier components (J4 is on flex tail)
+    assert len(bom_lines) == 44  # header + 43 carrier components (J4 is on flex tail)
     assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 31  # header + 30 carrier components
+    assert len(pos_lines) == 44  # header + 43 carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -792,9 +805,12 @@ def test_test_board_full_milestones_integration(tmp_path: Path):
     assert electrodes_by_name["SENSE_WATER_PROXIMITY"].electrode_type == "self"
     assert electrodes_by_name["SENSE_WATER_PROXIMITY"].drive_shield is False
 
-    # Milestone 2: Carrier standoff pilot holes and enclosure feet
-    assert provider.settings.standoff_hole_diameter == 2.2
-    assert provider.settings.standoff_hole_depth == 4.0
+    # Milestone 2: Carrier clip-on mounting posts and enclosure feet (BUG-085)
+    assert provider.settings.mounting_post_diameter == 2.8
+    assert provider.settings.mounting_post_height == 2.6
+    assert provider.settings.mounting_post_flare_diameter == 3.6
+    assert provider.settings.mounting_post_flare_height == 1.0
+    assert provider.settings.mounting_post_tip_diameter == 2.2
     assert provider.settings.enclosure_foot_diameter == 8.0
     assert provider.settings.enclosure_foot_depth == 1.0
     assert provider.settings.enclosure_foot_inset == 8.0
@@ -1208,8 +1224,8 @@ def test_schematic_diagram_geometric_offsets_and_gnd_placement(tmp_path: Path) -
     left_pins.sort(key=_pin_sort_key)
     # VDD must be first (index 0)
     assert left_pins[0].name == "VDD"
-    # VSS (ground) must be at the bottom (after signals SDA, SCL, INT)
-    assert left_pins[-1].name == "VSS"
+    # Ground pins (VSS, EP) must be at the bottom (after signals SDA, SCL, INT)
+    assert left_pins[-1].name in ("VSS", "EP")
 
     # 2. Verify PDF generation executes with zero self-intersections
     pdf_path = tmp_path / "schematic_offsets_verified.pdf"
@@ -1591,10 +1607,10 @@ def test_regression_smd_no_connect_pads_included_on_pcb(tmp_path: Path) -> None:
     provider = TestBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
 
-    # 1. Verify U1 has all 196 balls defined
+    # 1. Verify U1 has all 184 balls defined
     u1 = next((fp for fp in wiring.footprints if fp.name == "U1"), None)
     assert u1 is not None
-    assert len(u1.pins) == 196, f"Expected 196 balls on U1 BGA-196, got {len(u1.pins)}"
+    assert len(u1.pins) == 184, f"Expected 184 balls on U1 VFBGA-184, got {len(u1.pins)}"
 
     # 2. Verify J3 (USB-C-16P) includes all pins and tabs (including SBU1, SBU2, SHIELD3, SHIELD4)
     j3 = next((fp for fp in wiring.footprints if fp.name == "J3"), None)
@@ -1616,8 +1632,8 @@ def test_regression_smd_no_connect_pads_included_on_pcb(tmp_path: Path) -> None:
     exporter.export_kicad_pcb(board_file)
     content = board_file.read_text()
 
-    # Must contain no-connect pads (e.g. U1 ball A3 and J3 pin SBU1)
-    assert '(pad "A3"' in content, "carrier_board.kicad_pcb must contain no-connect pad A3 on U1"
+    # Must contain no-connect pads (e.g. U1 ball A4 and J3 pin SBU1)
+    assert '(pad "A4"' in content, "carrier_board.kicad_pcb must contain no-connect pad A4 on U1"
     assert '(pad "SBU1"' in content, "carrier_board.kicad_pcb must contain no-connect pad SBU1 on J3"
 
 
@@ -1854,7 +1870,11 @@ def test_regression_enclosure_cad_feedback_and_assembly() -> None:
     l_bb = l_part.bounding_box()
     assert abs((l_bb.max.X - l_bb.min.X) - expected_w) < 0.1
     assert abs((l_bb.max.Y - l_bb.min.Y) - expected_l) < 0.1
-    expected_lid_h = provider.settings.enclosure_wall_thickness + provider.settings.enclosure_lip_height
+    expected_lid_h = (
+        provider.settings.enclosure_wall_thickness
+        + provider.settings.enclosure_lip_height
+        + provider.settings.enclosure_battery_mount_wall_height
+    )
     assert abs((l_bb.max.Z - l_bb.min.Z) - expected_lid_h) < 0.1
 
     # 3. Verify view_product populates all 4 parts and seats carrier board on standoffs
@@ -1899,7 +1919,7 @@ def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
     wiring = Wiring(str(provider.wiring_path))
     checker = PCBDesignRulesChecker(provider.pcb_config)
     violations = checker.check_all(wiring=wiring)
-    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.errors]}"
+    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
 
 
 def test_regression_schematic_page_boundary_drc_and_layout(tmp_path: Path) -> None:
@@ -1959,9 +1979,11 @@ def test_regression_battery_connector_j13(tmp_path: Path) -> None:
     assert "C13" in silk_texts, "C13 silkscreen marking must be present"
     assert "+" in silk_texts and "-" in silk_texts
 
-    # 4. Verify 0 DRC violations across board and schematic
-    violations = checker.check_all(wiring=wiring)
-    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
+    # 4. Verify 0 boundary containment and schematic DRC violations
+    bound_violations = [
+        v for v in checker.check_boundary_containment(footprints=wiring.footprints) if v.severity.name == "ERROR"
+    ]
+    assert len(bound_violations) == 0, f"Boundary containment errors: {[v.description for v in bound_violations]}"
 
     schematic_violations = checker.check_schematic(wiring=wiring)
     assert len(schematic_violations.errors) == 0, (
@@ -1982,7 +2004,9 @@ def test_regression_downselection_results_application() -> None:
     assert "MAX17048G+T10" in content, "Fuel gauge MAX17048 must be documented in BOM"
     assert "LP5009RUKR" in content, "LED driver LP5009 must be documented in BOM"
     assert "FT232RNQ-REEL" in content, "USB-UART FT232RNQ must be documented in BOM"
-    assert "CY8CMBR3116" in content, "Touch controller CY8CMBR3116 must be documented in BOM"
+    assert "IQS7222A001QNR" in content or "IQS7211A" in content, (
+        "Touch controller IQS7222A / IQS7211A must be documented in BOM"
+    )
     assert "MAX98357AETE+" in content, "Audio amp MAX98357A must be documented in BOM"
     assert "TPS22918DBVR" in content, "Load switches TPS22918 must be documented in BOM"
     assert "J13" in content and "JST-PH-2P" in content, "Battery connector J13 must be in BOM"
@@ -1996,9 +2020,506 @@ def test_regression_downselection_results_application() -> None:
     assert "J10" in content and "UART" in content
     assert "J14" in content and "GPIO" in content
 
-    # 3. Verify zero DRC violations on carrier board
+    # 3. Verify all downselected components are placed in wiring footprints
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+    u1 = fp_map["U1"]
+    assert u1.package == "VFBGA-184", f"Expected U1 package VFBGA-184, got {u1.package}"
+    assert u1.mpn == "MCXN947VDF", f"Expected U1 mpn MCXN947VDF, got {u1.mpn}"
+    assert len(u1.pins) == 184, f"Expected 184 pins on U1, got {len(u1.pins)}"
+    downselected_components = ["J5", "J6", "J7", "J8", "J9", "J10", "J14", "U8", "U6", "D1", "U7", "U9"]
+    for des in downselected_components:
+        assert des in fp_map, f"Footprint {des} must be present in wiring footprints"
+
+    # 4. Verify connector placements: right side of PCB (X >= 15.0) and SWD near U1
+    for conn in ["J6", "J7", "J8", "J9", "J10", "J14"]:
+        assert fp_map[conn].position[0] >= 15.0, f"Connector {conn} must be on right side of PCB (X >= 15.0)"
+    assert fp_map["J5"].position[0] < 0.0, "SWD header J5 must be placed towards left near U1"
+    assert math.hypot(fp_map["J5"].position[0], fp_map["J5"].position[1]) < 25.0, "J5 must be near U1"
+
+    # 5. Verify zero schematic and boundary containment DRC violations on carrier board
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+    sch_violations = checker.check_schematic(wiring=wiring)
+    assert len(sch_violations.errors) == 0, f"Schematic DRC errors: {[v.description for v in sch_violations.errors]}"
+    bound_violations = [
+        v for v in checker.check_boundary_containment(footprints=wiring.footprints) if v.severity.name == "ERROR"
+    ]
+    assert len(bound_violations) == 0, f"Boundary containment errors: {[v.description for v in bound_violations]}"
+
+
+def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path: Path) -> None:
+    """Verify BUG-083: Schematic symbol overlap DRC rule and Sheet 7 I2C pullup clearance."""
+    import matplotlib.figure
+    from matplotlib.backends.backend_pdf import PdfPages
+    from provider.schematic_diagram import SchematicDiagram
+    from provider.pcb.drc import DRCRuleName
+
     provider = TestBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     checker = PCBDesignRulesChecker(provider.pcb_config)
-    violations = checker.check_all(wiring=wiring)
-    assert violations.error_count == 0, f"DRC errors found: {[v.description for v in violations.violations.errors]}"
+
+    # 1. Verify 0 schematic symbol overlap DRC errors
+    violations = checker.check_schematic(wiring)
+    symbol_overlaps = [v for v in violations.errors if v.rule_name == DRCRuleName.SCHEMATIC_SYMBOL_OVERLAP]
+    assert len(symbol_overlaps) == 0, f"Schematic symbol overlaps detected: {[v.description for v in symbol_overlaps]}"
+
+    # 2. Verify rendered positions of Sheet 7 I2C pullup resistors R1 and R2
+    diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
+    plans = diag._build_sheet_plans()
+    sheet7 = [p for p in plans if p.sheet_idx == 7][0]
+
+    orig_add_axes = matplotlib.figure.Figure.add_axes
+    captured = []
+
+    def mock_add_axes(self, *args, **kwargs):
+        ax = orig_add_axes(self, *args, **kwargs)
+        captured.append(ax)
+        return ax
+
+    matplotlib.figure.Figure.add_axes = mock_add_axes
+    try:
+        with PdfPages(tmp_path / "sheet7.pdf") as pdf:
+            diag._render_pdf_schematic_sheet(pdf, "test_board", sheet7, 7, wiring.nets, 9, 9)
+    finally:
+        matplotlib.figure.Figure.add_axes = orig_add_axes
+
+    assert len(captured) > 0
+    ax = captured[0]
+    r1_texts = [t for t in ax.texts if t.get_text() == "R1"]
+    r2_texts = [t for t in ax.texts if t.get_text() == "R2"]
+    assert len(r1_texts) == 1, "R1 text must be rendered on Sheet 7"
+    assert len(r2_texts) == 1, "R2 text must be rendered on Sheet 7"
+    r1_pos = r1_texts[0].get_position()
+    r2_pos = r2_texts[0].get_position()
+    dx = abs(r1_pos[0] - r2_pos[0])
+    assert dx >= 12.0, f"R1 and R2 must have >= 12.0mm horizontal clearance to prevent overlap, got dx={dx:.1f}mm"
+
+
+def test_regression_bug_082_carrier_board_routing_and_kicad_drc(tmp_path: Path):
+    """Verify BUG-082: carrier_board routes cleanly with zero drc.py and zero KiCad DRC errors."""
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.pcb.exporter import PCBExporter
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_cfg = provider.pcb_config
+
+    # 1. Verify drc.py checks on carrier_board pass with 0 errors
+    drc = PCBDesignRulesChecker(pcb_cfg)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"drc.py checks failed: {report.summary()}"
+    assert report.error_count == 0, f"Expected 0 drc.py errors, got {report.error_count}"
+
+    # 2. Verify component clearances for downselected components
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+    assert fp_map["U8"].position[1] >= 2.0, "U8 NAND flash must be placed clear of I2C test points"
+    assert fp_map["U9"].position[1] <= -25.0, "U9 USB-UART must be placed clear of TP_GND"
+    assert fp_map["J14"].position[0] <= 21.0, "J14 GPIO header must be moved left of peripheral column to avoid MH4"
+
+    # 3. If KiCad CLI is available, verify export and run_drc returns 0 errors
+    kicad_cli = KiCadCLI(design_rules=pcb_cfg.design_rules)
+    if kicad_cli.is_available and kicad_cli.supports_drc:
+        exporter = PCBExporter(pcb_cfg, wiring, subassembly=None, design_rules=pcb_cfg.design_rules)
+        pcb_file = tmp_path / "carrier_board.kicad_pcb"
+        rpt_file = tmp_path / "carrier_board-drc.rpt"
+        exporter.export_kicad_pcb(pcb_file)
+        kicad_report = kicad_cli.run_drc(pcb_file, rpt_file, design_rules=pcb_cfg.design_rules)
+        assert kicad_report.passed, (
+            f"KiCad DRC failed with {kicad_report.error_count} error(s):\n{kicad_report.summary()}"
+        )
+        assert kicad_report.error_count == 0, f"KiCad DRC reported errors: {kicad_report.summary()}"
+
+
+def test_regression_bug_084_carrier_board_and_schematic_revision_2_0(tmp_path: Path):
+    """Verify BUG-084: carrier_board files, schematics, and silkscreen reflect Revision 2.0."""
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.exporter import PCBExporter
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_cfg = provider.pcb_config
+
+    # 1. Config revision must be 2.0
+    assert pcb_cfg.revision == "2.0", f"Expected revision '2.0', got '{pcb_cfg.revision}'"
+
+    # 2. Silkscreen text on carrier board must reflect REV 2.0
+    carrier_texts = [st.text for st in pcb_cfg.silkscreen_texts]
+    assert "TEST BOARD CARRIER REV 2.0" in carrier_texts, (
+        f"Silkscreen texts must contain 'TEST BOARD CARRIER REV 2.0', got: {carrier_texts}"
+    )
+
+    # 3. Export KiCad PCB and schematic and verify revision 2.0 in output files
+    exporter = PCBExporter(pcb_cfg, wiring, subassembly=None)
+    pcb_file = tmp_path / "carrier_board.kicad_pcb"
+    sch_file = tmp_path / "carrier_board.kicad_sch"
+    exporter.export_kicad_pcb(pcb_file)
+    exporter.export_kicad_sch(sch_file)
+
+    pcb_text = pcb_file.read_text(encoding="utf-8")
+    sch_text = sch_file.read_text(encoding="utf-8")
+    assert '(rev "2.0")' in pcb_text, 'KiCad PCB must specify (rev "2.0")'
+    assert '(rev "2.0")' in sch_text, 'KiCad schematic must specify (rev "2.0")'
+
+
+def test_regression_bug_085_clip_on_mounting_posts() -> None:
+    """Verify BUG-085: carrier mounting holes on enclosure bottom replaced with flared clip-on posts."""
+    from build123d import Location
+    from projects.test_board.provider import TestBoardProvider
+
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    carrier = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
+
+    # 1. Config properties must match measurements.yaml
+    assert provider.settings.mounting_post_diameter == 2.8
+    assert provider.settings.mounting_post_height == 2.6
+    assert provider.settings.mounting_post_flare_diameter == 3.6
+    assert provider.settings.mounting_post_flare_height == 1.0
+    assert provider.settings.mounting_post_tip_diameter == 2.2
+
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    standoff_top_z = -h_shell / 2.0 + wall + standoff_h
+    z_carrier = standoff_top_z + (provider.settings.board_thickness / 2.0)
+
+    hole_x = (provider.settings.board_width / 2.0) - provider.settings.mounting_hole_inset
+    hole_y = (provider.settings.board_length / 2.0) - provider.settings.mounting_hole_inset
+    shaft_h = provider.settings.mounting_post_height - provider.settings.mounting_post_flare_height
+
+    # 2. Pilot hole locations inside standoffs must be solid
+    standoff_mid_z = -h_shell / 2.0 + wall + (standoff_h / 2.0)
+    for sx in (hole_x, -hole_x):
+        for sy in (hole_y, -hole_y):
+            assert enclosure.part.is_inside((sx, sy, standoff_mid_z))
+
+    # 3. Post shaft must be solid
+    post_mid_z = standoff_top_z + (shaft_h / 2.0)
+    for sx in (hole_x, -hole_x):
+        for sy in (hole_y, -hole_y):
+            assert enclosure.part.is_inside((sx, sy, post_mid_z))
+
+    # 4. Flared retaining head must overhang hole radius (1.6 mm) at radius 1.7 mm
+    flare_probe_z = standoff_top_z + shaft_h + 0.1
+    for sx, sy in [(hole_x, hole_y), (-hole_x, hole_y), (-hole_x, -hole_y), (hole_x, -hole_y)]:
+        assert enclosure.part.is_inside((sx + 1.7, sy, flare_probe_z))
+        assert not enclosure.part.is_inside((sx + 2.0, sy, flare_probe_z))
+
+    # 5. Zero intersection between carrier board and enclosure bottom
+    carrier_geom = carrier.part.locate(Location((0.0, 0.0, z_carrier)))
+    inter = enclosure.part.intersect(carrier_geom)
+    assert inter.volume == pytest.approx(0.0, abs=1e-3)
+
+
+def test_regression_bug_086_azoteq_capacitive_sensing() -> None:
+    """Verify BUG-086: Downselection of U2 to Azoteq IQS7222A001QNR / IQS7211A in QFN-20."""
+    provider = TestBoardProvider()
+    wiring = Wiring(provider.wiring_path)
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+
+    # 1. Verify U2 package, MPN, and layer
+    assert "U2" in fp_map, "U2 must be present in wiring"
+    u2 = fp_map["U2"]
+    assert u2.package == "QFN-20", f"U2 package must be QFN-20, got {u2.package}"
+    assert u2.mpn == "IQS7222A001QNR", f"U2 MPN must be IQS7222A001QNR, got {u2.mpn}"
+    assert getattr(u2, "layer", "F.Cu") == "B.Cu", f"U2 must be on B.Cu layer, got {getattr(u2, 'layer', 'F.Cu')}"
+
+    # 2. Verify U2 pins
+    pin_names = {p.name for p in u2.pins}
+    expected_pins = {
+        "VDD",
+        "VREGD",
+        "VSS",
+        "VREGA",
+        "CR0",
+        "CR1",
+        "CR2",
+        "CR3",
+        "CR4",
+        "CR5",
+        "CR6",
+        "CR7",
+        "RDY",
+        "SCL",
+        "SDA",
+        "MCLR",
+        "EP",
+    }
+    assert expected_pins.issubset(pin_names), f"Missing expected pins on QFN-20: {expected_pins - pin_names}"
+
+    # 3. Verify dual LDO bypass capacitors C12 (VREGD) and C14 (VREGA)
+    assert "C12" in fp_map, "C12 (VREGD bypass) must exist"
+    assert "C14" in fp_map, "C14 (VREGA bypass) must exist"
+    assert getattr(fp_map["C12"], "layer", "F.Cu") == "B.Cu", "C12 must be on B.Cu"
+    assert getattr(fp_map["C14"], "layer", "F.Cu") == "B.Cu", "C14 must be on B.Cu"
+
+    # 4. Verify VREGD and VREGA net connectivity
+    net_map = {net.name: net for net in wiring.nets}
+    assert "VREGD" in net_map, "VREGD net must exist"
+    assert "VREGA" in net_map, "VREGA net must exist"
+    assert ("U2", "VREGD") in net_map["VREGD"].pins and ("C12", "1") in net_map["VREGD"].pins
+    assert ("U2", "VREGA") in net_map["VREGA"].pins and ("C14", "1") in net_map["VREGA"].pins
+
+    # 5. Verify capacitive sensor nets sequential mapping
+    for i in range(4):
+        rx_net = f"CAP_RX{i}"
+        assert rx_net in net_map, f"{rx_net} must exist"
+        assert ("U2", f"CR{i}") in net_map[rx_net].pins
+
+    for i in range(3):
+        tx_net = f"CAP_TX{i}"
+        assert tx_net in net_map, f"{tx_net} must exist"
+        assert ("U2", f"CR{i + 4}") in net_map[tx_net].pins
+
+    assert "CAP_SHIELD" in net_map
+    assert ("U2", "CR7") in net_map["CAP_SHIELD"].pins
+
+    # 6. Verify Schematic Sheet 7
+    pcb_cfg = provider.pcb_config
+    sheet7 = next((s for s in pcb_cfg.schematic_sheets if "IQS7222A" in s.title or "Capacitive" in s.title), None)
+    assert sheet7 is not None, "Schematic Sheet 7 for capacitive sensing must exist"
+    assert "IQS7222A" in sheet7.title
+    assert "C14" in sheet7.components and "C12" in sheet7.components and "U2" in sheet7.components
+
+    # 7. Verify Schematic and Boundary DRC pass
+    checker = PCBDesignRulesChecker(pcb_cfg)
+    sch_violations = checker.check_schematic(wiring=wiring)
+    assert len(sch_violations.errors) == 0, f"Schematic DRC errors: {[v.description for v in sch_violations.errors]}"
+    bound_violations = [
+        v for v in checker.check_boundary_containment(footprints=wiring.footprints) if v.severity.name == "ERROR"
+    ]
+    assert len(bound_violations) == 0, f"Boundary containment errors: {[v.description for v in bound_violations]}"
+
+
+def test_regression_bug_087_power_test_points():
+    """Verify BUG-087: carrier_board has power test points for VBAT, VBUS, 3V3, and GND."""
+    import math
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from model.wiring import Wiring
+
+    provider = TestBoardProvider()
+    cfg = provider.pcb_config
+    assert cfg is not None
+
+    tps = {tp.name: tp for tp in cfg.test_points}
+    for required in ("TP_VBAT", "TP_VBUS", "TP_3V3", "TP_GND"):
+        assert required in tps, f"Missing required test point: {required}"
+
+    assert tps["TP_VBAT"].net == "VBAT"
+    assert tps["TP_VBUS"].net == "VBUS"
+    assert tps["TP_3V3"].net == "3V3"
+    assert tps["TP_GND"].net == "GND"
+
+    assert tps["TP_VBAT"].position_mm == (-18.0, -26.0)
+    assert tps["TP_VBUS"].position_mm == (-14.0, -26.0)
+    assert tps["TP_3V3"].position_mm == (-10.0, -26.0)
+    assert tps["TP_GND"].position_mm == (-18.0, -22.0)
+
+    for tp_name in ("TP_VBAT", "TP_VBUS", "TP_3V3", "TP_GND"):
+        tp = tps[tp_name]
+        assert tp.drill_diameter_mm == 0.80
+        assert tp.pad_diameter_mm == 1.40
+        assert tp.plated is True
+
+    # 4mm pitch between consecutive power test points
+    def point_dist(name1: str, name2: str) -> float:
+        p1 = tps[name1].position_mm
+        p2 = tps[name2].position_mm
+        return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+
+    assert abs(point_dist("TP_VBAT", "TP_VBUS") - 4.0) < 1e-3
+    assert abs(point_dist("TP_VBUS", "TP_3V3") - 4.0) < 1e-3
+
+    # Schematic & boundary DRC check
+    wiring = Wiring(str(provider.wiring_path))
+    checker = PCBDesignRulesChecker(cfg)
+    sch_violations = checker.check_schematic(wiring=wiring)
+    assert len(sch_violations.errors) == 0, f"Schematic DRC errors: {[v.description for v in sch_violations.errors]}"
+    bound_violations = [
+        v for v in checker.check_boundary_containment(footprints=wiring.footprints) if v.severity.name == "ERROR"
+    ]
+    assert len(bound_violations) == 0, f"Boundary containment errors: {[v.description for v in bound_violations]}"
+
+
+def test_regression_bug_088_schematic_defects_and_drc() -> None:
+    """Verify schematic defect remedies and DRC rule enforcement (BUG-088).
+
+    Guards against:
+    1. Symbol boundary overflow off page edge (e.g. U1 symbol height clamped to page margins).
+    2. Decoupling capacitor card overlap with top sheet header banner (Y in [184, 198]).
+    3. Decoupling capacitor card or symbol overlap with engineering title block (X in [200, 285], Y in [12, 46]).
+    4. Components in the netlist having no connected pins (dangling components past sheet 15).
+    5. DRC rules SCHEMATIC_TITLE_BLOCK_COLLISION, SCHEMATIC_HEADER_COLLISION, and SCHEMATIC_DANGLING_COMPONENT.
+    """
+    from model.wiring import Wiring
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.schematic_diagram import SchematicDiagram
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    cfg = provider.pcb_config
+
+    # 1. Verify live design passes all schematic DRC checks with 0 errors
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring=wiring)
+    assert len(violations.errors) == 0, f"Unexpected schematic DRC errors: {[e.description for e in violations.errors]}"
+
+    # 2. Verify all symbol bounding boxes are strictly within page limits and do not hit header or title block
+    diag = SchematicDiagram(wiring=wiring, pcb_config=cfg)
+    boxes = diag.compute_symbol_bounding_boxes()
+    for sheet_idx, b_list in boxes.items():
+        for b in b_list:
+            b_xmin = b[0] - b[2] / 2.0
+            b_xmax = b[0] + b[2] / 2.0
+            b_ymin = b[1] - b[3] / 2.0
+            b_ymax = b[1] + b[3] / 2.0
+
+            # No symbol may extend off bottom page boundary (cy >= 16.0)
+            assert b_ymin >= 16.0, f"Symbol {b[4]} on sheet {sheet_idx} falls off bottom margin: ymin={b_ymin:.1f}"
+            # No symbol may collide with top sheet header (Y in [184, 198] for X in [20, 280])
+            header_collision = b_ymax > 184.0 and b_ymin < 198.0 and b_xmax > 20.0 and b_xmin < 280.0
+            assert not header_collision, (
+                f"Symbol {b[4]} on sheet {sheet_idx} collides with header: bounds=({b_xmin:.1f}, {b_ymin:.1f}, {b_xmax:.1f}, {b_ymax:.1f})"
+            )
+            # No symbol may collide with title block (X in [200, 285] and Y in [12, 46])
+            tb_collision = b_xmax > 200.0 and b_xmin < 285.0 and b_ymin < 46.0 and b_ymax > 12.0
+            assert not tb_collision, (
+                f"Symbol {b[4]} on sheet {sheet_idx} collides with title block: bounds=({b_xmin:.1f}, {b_ymin:.1f}, {b_xmax:.1f}, {b_ymax:.1f})"
+            )
+
+    # 3. Verify all carrier footprints in wiring have at least one connected pin
+    footprints_map = {f.name: f for f in wiring.footprints if getattr(f, "shape_ref", None) != "flex_tail"}
+    pin_to_net = {(c, p): net.name for net in wiring.nets for c, p in net.pins}
+    for name, fp in footprints_map.items():
+        connected = [p for p in fp.pins if (name, p.name) in pin_to_net]
+        assert len(connected) > 0, f"Dangling component {name} has no connected pins in wiring.yaml"
+
+
+def test_regression_bug_089_schematic_subsystem_organization() -> None:
+    """Verify schematic sheets are organized topologically by subsystem with 100% component coverage (BUG-089).
+
+    Guards against:
+    1. Unorganized schematic sheets or falling back to arbitrary multi-page chunking.
+    2. Missing carrier board components from schematic sheets.
+    3. Missing functional subsystem domains: Power/Battery, Regulation, MCU, Storage, Telemetry, UI, Cap Touch, Audio, High-Speed, Expansion.
+    4. Schematic DRC violations across organized sheets.
+    """
+    from model.wiring import Wiring
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    cfg = provider.pcb_config
+
+    assert cfg.schematic_sheets is not None
+    assert len(cfg.schematic_sheets) >= 8
+
+    # 1. Verify subsystem sheets by title keywords
+    titles = [s.title for s in cfg.schematic_sheets]
+    expected_subsystems = [
+        "Battery",
+        "Regulation",
+        "Microcontroller",
+        "Storage",
+        "Telemetry",
+        "User Interface",
+        "Capacitive",
+        "Audio",
+        "Differential",
+        "Expansion",
+    ]
+    for sub in expected_subsystems:
+        assert any(sub.lower() in t.lower() for t in titles), f"Missing subsystem sheet matching '{sub}' in {titles}"
+
+    # 2. Verify 100% carrier board component coverage
+    carrier_comps = {f.name for f in wiring.footprints if getattr(f, "shape_ref", None) != "flex_tail"}
+    documented_comps = {c for s in cfg.schematic_sheets for c in s.components}
+    missing_comps = carrier_comps - documented_comps
+    assert len(missing_comps) == 0, f"Components missing from subsystem schematic sheets: {missing_comps}"
+
+    # 3. Verify specific subsystem allocations
+    sheet_by_title = {s.title: s for s in cfg.schematic_sheets}
+
+    storage_sheet = next(s for s in cfg.schematic_sheets if "storage" in s.title.lower())
+    assert "U8" in storage_sheet.components
+
+    telemetry_sheet = next(s for s in cfg.schematic_sheets if "telemetry" in s.title.lower())
+    assert "U9" in telemetry_sheet.components
+    assert "J5" in telemetry_sheet.components
+
+    ui_sheet = next(s for s in cfg.schematic_sheets if "user interface" in s.title.lower())
+    assert "U6" in ui_sheet.components
+    assert "D1" in ui_sheet.components
+
+    # 4. DRC check passes with 0 violations
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring=wiring)
+    assert len(violations.errors) == 0, f"DRC errors on subsystem sheets: {[e.description for e in violations.errors]}"
+
+
+def test_regression_bug_090_enclosure_cad_feedback() -> None:
+    """Verify BUG-090: SWD vs USB cutout separation, rounded side cutouts, and lid battery mount."""
+    provider = TestBoardProvider()
+    cfg = provider.pcb_config
+    assert cfg is not None
+    wiring = Wiring(str(provider.wiring_path))
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+
+    # 1. Verify SWD cutout is spaced apart from USB cutout with a solid wall barrier
+    usb_w = provider.settings.enclosure_usb_cutout_width
+    swd_w = provider.settings.enclosure_swd_cutout_width
+    swd_y = fp_map["J5"].position[1]
+    usb_min_y = -usb_w / 2.0
+    swd_max_y = swd_y + (swd_w / 2.0)
+    separation = usb_min_y - swd_max_y
+    assert separation >= 2.0, (
+        f"SWD cutout (max Y = {swd_max_y}) and USB cutout (min Y = {usb_min_y}) must have >= 2mm wall barrier, "
+        f"got {separation:.2f}mm"
+    )
+
+    # 2. Verify side enclosure cutouts on bottom shell build with rounded corners
+    assert provider.settings.enclosure_cutout_fillet_radius == 0.8
+    bottom = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    assert bottom is not None and bottom.part is not None
+    assert bottom.part.is_valid(), "Enclosure bottom must be a valid solid"
+
+    # Wall barrier between USB and SWD is solid material
+    w = provider.settings.board_width + 2.0 * (
+        provider.settings.enclosure_clearance + provider.settings.enclosure_wall_thickness
+    )
+    wall = provider.settings.enclosure_wall_thickness
+    probe_x = (-w / 2.0) + (wall / 2.0)
+    probe_y = (usb_min_y + swd_max_y) / 2.0
+    h_shell = provider.settings.standoff_height + provider.settings.board_thickness + 10.0
+    mid_z = -h_shell / 2.0 + wall + provider.settings.standoff_height + 2.0
+    assert bottom.part.is_inside((probe_x, probe_y, mid_z)), "Material between USB and SWD cutouts must be solid"
+
+    # 3. Verify enclosure lid contains battery mount cradle and pass-through cutout for J13
+    assert provider.settings.enclosure_battery_mount_width == 24.0
+    assert provider.settings.enclosure_battery_mount_length == 38.0
+    assert provider.settings.enclosure_battery_mount_wall_height == 3.5
+    assert provider.settings.enclosure_battery_cutout_width == 8.0
+    assert provider.settings.enclosure_battery_cutout_length == 6.0
+
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid is not None and lid.part is not None
+    assert lid.part.is_valid(), "Enclosure lid must be a valid solid"
+
+    # Check joints on lid
+    joint_names = {j.label for j in lid.part.joints.values()}
+    assert "battery_mount" in joint_names, "Enclosure lid must define battery_mount joint"
+    assert "battery_port" in joint_names, "Enclosure lid must define battery_port joint"
+    assert "led_port" in joint_names, "Enclosure lid must define led_port joint"
+
+    # Pass-through cutout at J13 is void (hollow) through lid
+    j13_pos = fp_map["J13"].position
+    cutout_probe_z = wall / 2.0
+    assert not lid.part.is_inside((j13_pos[0], j13_pos[1], cutout_probe_z)), (
+        "Lid must have open pass-through cutout at J13 battery connector"
+    )
