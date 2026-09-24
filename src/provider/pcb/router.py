@@ -476,7 +476,14 @@ class PCBAutoRouter:
             best_u_idx = 0
             for u_idx, u_pt in enumerate(unvisited):
                 for v_pt in visited:
+                    p_v = (round(v_pt[0], 2), round(v_pt[1], 2))
                     d = math.hypot(u_pt[0] - v_pt[0], u_pt[1] - v_pt[1]) + (0.0 if u_pt[2] == v_pt[2] else 3.0)
+                    if p_v in bga_pins and any(
+                        round(ep[0], 2) == p_v[0] and round(ep[1], 2) == p_v[1] for e in edges for ep in e
+                    ):
+                        d += 1000.0
+                    elif len(visited) > 1 and (p_v in bga_pins or p_v in dense_pins):
+                        d += 20.0
                     if d < best_d:
                         best_d = d
                         best_edge = (v_pt, u_pt)
@@ -681,8 +688,15 @@ class PCBAutoRouter:
                 py0 = fp.position[1]
                 xs = [p.position[0] + px0 for p in fp.pins]
                 ys = [p.position[1] + py0 for p in fp.pins]
+                margin = 0.35
                 dense_regions.append(
-                    (min(xs) - 1.50, min(ys) - 1.50, max(xs) + 1.50, max(ys) + 1.50, getattr(fp, "layer", "F.Cu"))
+                    (
+                        min(xs) - margin,
+                        min(ys) - margin,
+                        max(xs) + margin,
+                        max(ys) + margin,
+                        getattr(fp, "layer", "F.Cu"),
+                    )
                 )
 
         connector_breakout_zones: List[Tuple[float, float, str]] = []
@@ -1124,8 +1138,7 @@ class PCBAutoRouter:
                                         )
                                         traces.extend(c_tr)
                                         vias.extend(c_vi)
-                        except Exception as ripup_err:
-                            # If rip-up reroute fails, raise the original descriptive error
+                        except Exception:
                             raise initial_err
 
         traces = straighten_junction_traces(traces, fillet_radius=0.20)

@@ -193,7 +193,7 @@ class JaxPCBRouter:
                 gx_max = min(self.w_cells - 1, int(math.ceil((dr_max_x - self.min_x) / self.grid_step)))
                 gy_min = max(0, int(math.floor((dr_min_y - self.min_y) / self.grid_step)))
                 gy_max = min(self.h_cells - 1, int(math.ceil((dr_max_y - self.min_y) / self.grid_step)))
-                self.step_cost_np[gy_min : gy_max + 1, gx_min : gx_max + 1] = self.grid_step * 1.5
+                self.step_cost_np[gy_min : gy_max + 1, gx_min : gx_max + 1] = self.grid_step * 5.0
 
         self.obstacles: List[Obstacle] = []
         self.pin_cells: Set[Tuple[int, int, str]] = set()
