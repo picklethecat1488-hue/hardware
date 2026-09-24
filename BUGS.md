@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-24 03:12:01 UTC` |
+| **Report Date** | `2026-09-24 03:13:49 UTC` |
 | **Total Issues** | `96` |
-| **Open Issues** | `2` |
-| **Resolved / Closed** | `94 (97%)` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `95 (98%)` |
 
 ## Executive Summary
 
@@ -131,7 +131,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-094](#bug-094): Remove manual net priorities from PCB router (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-095](#bug-095): Make JAX router backend the default (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-096](#bug-096): Load switch should control audio and peripheral domains (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-097](#bug-097): Log routing violations to a file (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-097](#bug-097): Log routing violations to a file (`RESOLVED`)
 
 ## Detailed Issue Log
 
@@ -2468,12 +2468,13 @@ Wired audio amplifier U4, C8, and peripheral headers J6-J9 to switched domain VL
 
 ---
 
-### <a id="bug-097"></a> 🔴 `[BUG-097]` Log routing violations to a file
+### <a id="bug-097"></a> 🟢 `[BUG-097]` Log routing violations to a file
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 02:47:31 UTC`
+- **Resolved**: `2026-09-24 03:13:49 UTC`
 
 #### Description
 
@@ -2494,5 +2495,9 @@ Log PCB build errors (routing violations) to a log file that goes under the boar
 ▶   * [ERROR] DISCONNECTED_VIA on 'I2C_SCL' at (16.00, -15.50): Via on net 'I2C_SCL' at (16.00, -15.50) is not connected across multiple layers (only connects on layers: ['F.Cu']) 
 ▶   * [ERROR] DISCONNECTED_VIA on 'OSC_IN' at (-5.20, -2.00): Via on net 'OSC_IN' at (-5.20, -2.00) is not connected across multiple layers (only connects on layers: ['B.Cu']) 
 ❌ Tool build execution failed
+
+#### Resolution Notes
+
+Redirected PCB DRC routing violations to board/<provider>/<subassembly>_drc_violations.log and raised concise error with file path.
 
 ---

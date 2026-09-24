@@ -611,18 +611,21 @@ class Builder:
                     target_cfg = target_cfg.model_copy(update={"vias": pcb_config.vias})
 
                 # Run DRC and routing connectivity checks
+                board_dir = Path(out_dir) / "board" / provider.name
+                board_dir.mkdir(parents=True, exist_ok=True)
                 drc_checker = PCBDesignRulesChecker(target_cfg)
                 drc_report = drc_checker.check_all(wiring=wiring)
                 if not drc_report.passed:
-                    self.logger.print(
-                        f"PCB DRC Violations in {provider.name}/{subassembly}:\n{drc_report.summary()}",
-                        symbol="⚠️",
-                    )
+                    drc_log_file = board_dir / f"{subassembly}_drc_violations.log"
+                    drc_log_file.write_text(drc_report.summary())
                     if drc_report.error_count > 0:
                         raise ValueError(
-                            f"PCB DRC check failed with {drc_report.error_count} error(s) in {provider.name}/{subassembly}:\n"
-                            f"{drc_report.summary()}"
+                            f"Failed to build {provider.name}/{subassembly}:pcb. Project has DRC errors:  {drc_log_file}"
                         )
+                    self.logger.print(
+                        f"PCB DRC Warnings in {provider.name}/{subassembly}: {drc_log_file}",
+                        symbol="⚠️",
+                    )
 
                 subassembly_param = subassembly if subassembly != provider.name else None
                 exporter = PCBExporter(
@@ -664,13 +667,10 @@ class Builder:
                     rpt_file = rpt_dir / f"{subassembly}-drc.rpt"
                     kicad_drc_report = kicad_cli.run_drc(kicad_pcb, rpt_file, design_rules=target_cfg.design_rules)
                     if not kicad_drc_report.passed:
-                        self.logger.print(
-                            f"KiCad DRC Violations in {provider.name}/{subassembly}:\n{kicad_drc_report.summary()}",
-                            symbol="⚠️",
-                        )
+                        drc_log_file = board_dir / f"{subassembly}_drc_violations.log"
+                        drc_log_file.write_text(kicad_drc_report.summary())
                         raise ValueError(
-                            f"KiCad DRC check failed with {kicad_drc_report.error_count} error(s) in {provider.name}/{subassembly}:\n"
-                            f"{kicad_drc_report.summary()}"
+                            f"Failed to build {provider.name}/{subassembly}:pcb. Project has DRC errors:  {drc_log_file}"
                         )
                     self.logger.print(f"Generated KiCad DRC Report: {rpt_file}", symbol="🔍")
                     if subassembly == "carrier_board":
