@@ -292,6 +292,7 @@ schematic_sheets:
       grid_positions:
         U4: [0, 0]
         U5: [0, 1]
+        C8: [1, 0]
         U1: [1, 1]
     components: [U4, U5, U1, C8]
     pin_sides:
