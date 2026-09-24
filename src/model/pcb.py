@@ -719,6 +719,24 @@ class SilkscreenTextModel(BaseModel):
     mirror: bool = Field(default=False, description="Whether text is mirrored (default True for B.SilkS)")
 
 
+class SilkscreenGraphicModel(BaseModel):
+    """Declarative silkscreen vector graphic primitive (rect/frame, line, or polygon) placed on PCB copper outer layers."""
+
+    shape: str = Field(default="rect", description="Graphic shape type ('rect', 'line', 'polygon')")
+    layer: str = Field(default="F.SilkS", description="Target layer ('F.SilkS' for top, 'B.SilkS' for bottom)")
+    position: Tuple[float, float] = Field(
+        default=(0.0, 0.0), description="Coordinates (x, y) in mm on board relative to board center"
+    )
+    dimensions: Tuple[float, float] = Field(
+        default=(5.0, 5.0), description="Width and height (width, height) in mm for rect/frame"
+    )
+    thickness: float = Field(default=0.15, gt=0.0, description="Stroke line thickness in mm")
+    fill: bool = Field(default=False, description="Whether graphic is filled solid")
+    points: Optional[List[Tuple[float, float]]] = Field(
+        default=None, description="Optional relative or absolute vertex coordinates for polygon or line"
+    )
+
+
 class SchematicLayoutModel(BaseModel):
     """Layout grid and dimension parameters for schematic diagram sheets."""
 
@@ -840,6 +858,10 @@ class PCBConfig(BaseModel):
     silkscreen_texts: List[SilkscreenTextModel] = Field(
         default_factory=list,
         description="Top and bottom silkscreen text markings and annotations",
+    )
+    silkscreen_graphics: List[SilkscreenGraphicModel] = Field(
+        default_factory=list,
+        description="Top and bottom silkscreen vector graphic primitives (frames, lines, polygons)",
     )
     net_classes: List[NetClassModel] = Field(
         default_factory=list, description="High-speed and standard electrical net classes"

@@ -46,6 +46,8 @@ from .pcb import (
     PCBMaterialsModel,
     PCBDesignRulesModel,
     PCBConfig,
+    SilkscreenTextModel,
+    SilkscreenGraphicModel,
     SchematicLayoutModel,
     SchematicSheetModel,
 )

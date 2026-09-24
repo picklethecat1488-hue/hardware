@@ -2528,7 +2528,8 @@ def test_regression_bug_090_enclosure_cad_feedback() -> None:
 
 
 def test_regression_bug_092_carrier_board_top_logo() -> None:
-    """Verify BUG-092: Antigravity logo placed in empty space on carrier board top with zero DRC errors."""
+    """Verify BUG-092: Antigravity logo placed as a unique graphic image within a square frame (not text) on carrier board top with zero DRC errors."""
+    from pathlib import Path
     from projects.test_board.provider import TestBoardProvider
     from provider.pcb.drc import PCBDesignRulesChecker
 
@@ -2536,20 +2537,36 @@ def test_regression_bug_092_carrier_board_top_logo() -> None:
     silks = provider.silkscreen()
     silk_map = {t.text: t for t in silks}
 
-    # 1. Logo must be present on F.SilkS with unique, non-trivial branding insignia
-    assert "ANTIGRAVITY" in silk_map, "Carrier board must contain ANTIGRAVITY logo silkscreen text"
-    logo = silk_map["ANTIGRAVITY"]
-    assert logo.layer == "F.SilkS"
-    assert logo.position[1] > 28.0, f"Logo must be in top region (y > 28mm), got {logo.position}"
-    assert abs(logo.position[0]) < 5.0, f"Logo should be centered horizontally, got {logo.position}"
+    # 1. Logo must NOT be text (e.g. "ANTIGRAVITY", "[>", etc. must not be text strings)
+    assert "ANTIGRAVITY" not in silk_map, "Carrier board logo must not be text 'ANTIGRAVITY'"
+    assert "[>" not in silk_map, "Carrier board logo must not be text '[>'"
+    assert "<]" not in silk_map, "Carrier board logo must not be text '<]'"
+    assert "* * *" not in silk_map, "Carrier board logo must not be text '* * *'"
+    assert "QUANTUM DYNAMICS // 0x414759" not in silk_map, "Carrier board logo must not be text hex signature"
 
-    # Verify unique insignia elements
-    assert "[>" in silk_map, "Carrier board logo must contain stylized left wing [>"
-    assert "<]" in silk_map, "Carrier board logo must contain stylized right wing <]"
-    assert "* * *" in silk_map, "Carrier board logo must contain star cluster insignia"
-    assert "QUANTUM DYNAMICS // 0x414759" in silk_map, "Carrier board logo must contain unique hex signature"
+    # 2. Logo must be present as a unique vector graphic within a square frame on F.SilkS
+    graphics = provider.silkscreen_graphics()
+    assert len(graphics) > 0, "Carrier board must contain silkscreen graphic elements for the logo"
 
-    # 2. DRC check verifies zero silkscreen-to-pad overlap errors
+    rect_frames = [g for g in graphics if g.shape == "rect" and g.layer == "F.SilkS"]
+    assert len(rect_frames) >= 1, "Carrier board must contain a square frame rect on F.SilkS"
+    frame = rect_frames[0]
+    assert frame.position[1] > 28.0, f"Logo frame must be in top region (y > 28mm), got {frame.position}"
+    assert abs(frame.position[0]) < 5.0, f"Logo frame should be centered horizontally, got {frame.position}"
+    assert frame.dimensions[0] == frame.dimensions[1], f"Logo frame must be square, got {frame.dimensions}"
+
+    # Verify inner graphic emblem primitives (polygon and wing lines)
+    poly_emblems = [g for g in graphics if g.shape == "polygon" and g.layer == "F.SilkS"]
+    assert len(poly_emblems) >= 1, "Logo must contain inner geometric polygon emblem"
+    line_emblems = [g for g in graphics if g.shape == "line" and g.layer == "F.SilkS"]
+    assert len(line_emblems) >= 2, "Logo must contain inner graphic line elements"
+
+    # 3. Unique logo image asset must exist within a square frame
+    repo_root = Path(__file__).resolve().parents[2]
+    logo_asset = repo_root / "src" / "projects" / "test_board" / "docs" / "assets" / "carrier_board_logo.jpg"
+    assert logo_asset.exists(), f"Unique logo image asset must exist at {logo_asset}"
+
+    # 4. DRC check verifies zero silkscreen-to-pad overlap errors
     wiring = Wiring(provider.wiring_path)
     checker = PCBDesignRulesChecker(provider.pcb_config)
     violations = [

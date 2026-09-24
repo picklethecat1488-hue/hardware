@@ -14,6 +14,7 @@ from model.pcb import (
     MountingHoleModel,
     PCBConfig,
     SilkscreenTextModel,
+    SilkscreenGraphicModel,
     StackupModel,
     TestPointModel,
     TraceSegmentModel,
@@ -72,6 +73,7 @@ class BuildPcb(BuildPart):
 
         self.mounting_holes: List[MountingHoleModel] = []
         self.silkscreen_texts: List[SilkscreenTextModel] = []
+        self.silkscreen_graphics: List[SilkscreenGraphicModel] = []
         self.traces: List[TraceSegmentModel] = []
         self.vias: List[ViaModel] = []
         self.copper_regions: List[CopperRegionModel] = []
@@ -126,6 +128,7 @@ class BuildPcb(BuildPart):
             stackup=self.stackup_model,
             mounting_holes=list(self.mounting_holes),
             silkscreen_texts=list(self.silkscreen_texts),
+            silkscreen_graphics=list(self.silkscreen_graphics),
             traces=list(self.traces),
             vias=list(self.vias),
             copper_regions=list(self.copper_regions),

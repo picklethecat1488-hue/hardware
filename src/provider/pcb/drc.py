@@ -1786,6 +1786,74 @@ class PCBDesignRulesChecker:
                                 )
                             )
 
+        for sg in getattr(self.config, "silkscreen_graphics", []):
+            sx, sy = sg.position
+            for mh in holes:
+                dist = math.hypot(sx - mh.position_mm[0], sy - mh.position_mm[1])
+                min_dist = (mh.drill_diameter_mm / 2.0) + 0.30
+                if dist < min_dist:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="SILKSCREEN_PAD_OVERLAP",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"graphic_{sg.shape}",
+                            description=(
+                                f"Silkscreen graphic '{sg.shape}' at ({sx:.2f}, {sy:.2f}) overlaps drill hole '{mh.name}'"
+                            ),
+                            actual_value=dist,
+                            expected_range=(min_dist, 100.0),
+                            location=(sx, sy, 0.0),
+                        )
+                    )
+            for tp in self.config.test_points:
+                dist = math.hypot(sx - tp.position_mm[0], sy - tp.position_mm[1])
+                min_dist = (tp.pad_diameter_mm / 2.0) + 0.30
+                if dist < min_dist:
+                    violations.append(
+                        DRCViolation(
+                            rule_name="SILKSCREEN_PAD_OVERLAP",
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"graphic_{sg.shape}",
+                            description=(
+                                f"Silkscreen graphic '{sg.shape}' at ({sx:.2f}, {sy:.2f}) overlaps test point pad '{tp.name}'"
+                            ),
+                            actual_value=dist,
+                            expected_range=(min_dist, 100.0),
+                            location=(sx, sy, 0.0),
+                        )
+                    )
+            if wiring:
+                board_footprints = self.get_footprints_for_board(wiring)
+                for fp in board_footprints:
+                    fp_layer = getattr(fp, "layer", "F.Cu") or ("B.Cu" if fp.position[2] < 0 else "F.Cu")
+                    pad_silk_layer = "B.SilkS" if fp_layer == "B.Cu" else "F.SilkS"
+                    fx, fy = fp.position[0], fp.position[1]
+                    for p in getattr(fp, "pins", []):
+                        pad_type = getattr(p, "pad_type", "smd")
+                        if pad_type != "thru_hole" and sg.layer != pad_silk_layer:
+                            continue
+                        px = fx + p.position[0]
+                        py = fy + p.position[1]
+                        pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
+                        p_r = max(pad_size) / 2.0
+                        dist = math.hypot(sx - px, sy - py)
+                        min_dist = p_r + 0.30
+                        if dist < min_dist:
+                            violations.append(
+                                DRCViolation(
+                                    rule_name="SILKSCREEN_PAD_OVERLAP",
+                                    severity=DRCSeverity.ERROR,
+                                    net_or_zone=f"graphic_{sg.shape}",
+                                    description=(
+                                        f"Silkscreen graphic '{sg.shape}' at ({sx:.2f}, {sy:.2f}) overlaps pad '{p.name}' "
+                                        f"on component '{fp.name}' at ({px:.2f}, {py:.2f})"
+                                    ),
+                                    actual_value=dist,
+                                    expected_range=(min_dist, 100.0),
+                                    location=(sx, sy, 0.0),
+                                )
+                            )
+
         return violations
 
     def check_antennae(self, wiring: Any) -> List[DRCViolation]:

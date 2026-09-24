@@ -431,6 +431,11 @@ class Provider:
         if provider_texts:
             config.silkscreen_texts = list(provider_texts)
 
+        if hasattr(self, "silkscreen_graphics") and callable(self.silkscreen_graphics):
+            provider_graphics = self.silkscreen_graphics()
+            if provider_graphics:
+                config.silkscreen_graphics = list(provider_graphics)
+
         # 4. Copper regions from provider context manager
         p_regions = self.copper_regions()
         if p_regions:
@@ -518,6 +523,11 @@ class Provider:
                     config.silkscreen_texts = list(p_silkscreen.texts)
                 else:
                     config.silkscreen_texts = list(p_silkscreen)
+
+        if hasattr(self, "silkscreen_graphics") and callable(self.silkscreen_graphics):
+            p_graphics = self.silkscreen_graphics()
+            if p_graphics:
+                config.silkscreen_graphics = list(p_graphics)
 
         # Fall back to shape metadata traces/vias/silkscreen if not present
         if config.shape_ref and config.shape_ref in self.part:
