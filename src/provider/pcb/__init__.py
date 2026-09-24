@@ -22,6 +22,7 @@ from .routing import (
     BuildTestPoints,
     TestPoint,
 )
+from .jax_router import JaxPCBRouter
 
 __all__ = [
     "PCBDesignRulesChecker",
@@ -62,4 +63,5 @@ __all__ = [
     "BuildFlexPCB",
     "FlexType",
     "find_empty_space_for_label",
+    "JaxPCBRouter",
 ]
