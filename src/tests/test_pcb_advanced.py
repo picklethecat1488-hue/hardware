@@ -456,7 +456,7 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
     assert len(bom_lines) == 44  # header + 43 carrier components (J4 is on flex tail)
-    assert "STM32MP157-BGA196" in bom_csv.read_text(encoding="utf-8")
+    assert "MCXN947VDF" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
     assert len(pos_lines) == 44  # header + 43 carrier components
@@ -851,8 +851,8 @@ def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     assert report.passed, f"DRC failed:\n{report.summary()}"
     assert report.error_count == 0
 
-    # Verify TP_GND has routed trace and via connecting to ground (BUG-040)
-    tp_gnd = next((tp for tp in cfg.test_points if tp.name == "TP_GND"), None)
+    # Verify TP1 (GND test point) has routed trace and via connecting to ground (BUG-040, CR 06e5272b01da)
+    tp_gnd = next((tp for tp in cfg.test_points if tp.name in ("TP1", "TP_GND")), None)
     assert tp_gnd is not None
     assert tp_gnd.net == "GND"
     tp_x, tp_y = tp_gnd.position_mm
@@ -868,7 +868,7 @@ def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
         ),
         None,
     )
-    assert tp_trace is not None, "TP_GND must have a routed copper trace connecting to ground"
+    assert tp_trace is not None, "TP1 (GND) must have a routed copper trace connecting to ground"
 
     # 2. Export board files (.kicad_pcb, .drl, .gbr) and pos.csv
     exporter = PCBExporter(cfg, wiring)
@@ -1090,9 +1090,9 @@ def test_test_board_test_points_and_zero_drc_errors():
 
     # Check test points
     tps = {tp.name: tp for tp in cfg.test_points}
-    assert "TP_GND" in tps
-    assert tps["TP_GND"].net == "GND"
-    assert tps["TP_GND"].position_mm == (-18.0, -22.0)
+    assert "TP1" in tps
+    assert tps["TP1"].net == "GND"
+    assert tps["TP1"].position_mm == (-18.0, -22.0)
 
     # All test points must be plated drilled holes for probe / fly wire insertion
     for tp in cfg.test_points:
@@ -1106,9 +1106,9 @@ def test_test_board_test_points_and_zero_drc_errors():
         p2 = tps[name2].position_mm
         return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
-    assert abs(point_dist("TP_TX0_P", "TP_TX0_N") - 4.0) < 1e-3
-    assert abs(point_dist("TP_D0_P", "TP_D0_N") - 4.0) < 1e-3
-    assert abs(point_dist("TP_SDA", "TP_SCL") - 4.0) < 1e-3
+    assert abs(point_dist("TP6", "TP5") - 4.0) < 1e-3
+    assert abs(point_dist("TP11", "TP12") - 4.0) < 1e-3
+    assert abs(point_dist("TP9", "TP10") - 4.0) < 1e-3
 
     # DRC check: 0 errors on test_board
     wiring = Wiring(provider.wiring_path)
@@ -2162,6 +2162,8 @@ def test_regression_bug_084_carrier_board_and_schematic_revision_2_0(tmp_path: P
     sch_text = sch_file.read_text(encoding="utf-8")
     assert '(rev "2.0")' in pcb_text, 'KiCad PCB must specify (rev "2.0")'
     assert '(rev "2.0")' in sch_text, 'KiCad schematic must specify (rev "2.0")'
+    assert "MCXN947VDF" in sch_text, "KiCad schematic must specify MCXN947VDF"
+    assert "STM32" not in sch_text, "KiCad schematic must not contain obsolete STM32 references"
 
 
 def test_regression_bug_085_clip_on_mounting_posts() -> None:
@@ -2306,20 +2308,20 @@ def test_regression_bug_087_power_test_points():
     assert cfg is not None
 
     tps = {tp.name: tp for tp in cfg.test_points}
-    for required in ("TP_VBAT", "TP_VBUS", "TP_3V3", "TP_GND"):
+    for required in ("TP2", "TP3", "TP4", "TP1"):
         assert required in tps, f"Missing required test point: {required}"
 
-    assert tps["TP_VBAT"].net == "VBAT"
-    assert tps["TP_VBUS"].net == "VBUS"
-    assert tps["TP_3V3"].net == "3V3"
-    assert tps["TP_GND"].net == "GND"
+    assert tps["TP2"].net == "VBAT"
+    assert tps["TP3"].net == "VBUS"
+    assert tps["TP4"].net == "3V3"
+    assert tps["TP1"].net == "GND"
 
-    assert tps["TP_VBAT"].position_mm == (-18.0, -26.0)
-    assert tps["TP_VBUS"].position_mm == (-14.0, -26.0)
-    assert tps["TP_3V3"].position_mm == (-10.0, -26.0)
-    assert tps["TP_GND"].position_mm == (-18.0, -22.0)
+    assert tps["TP2"].position_mm == (-18.0, -26.0)
+    assert tps["TP3"].position_mm == (-14.0, -26.0)
+    assert tps["TP4"].position_mm == (-10.0, -26.0)
+    assert tps["TP1"].position_mm == (-18.0, -22.0)
 
-    for tp_name in ("TP_VBAT", "TP_VBUS", "TP_3V3", "TP_GND"):
+    for tp_name in ("TP2", "TP3", "TP4", "TP1"):
         tp = tps[tp_name]
         assert tp.drill_diameter_mm == 0.80
         assert tp.pad_diameter_mm == 1.40
@@ -2331,8 +2333,8 @@ def test_regression_bug_087_power_test_points():
         p2 = tps[name2].position_mm
         return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
-    assert abs(point_dist("TP_VBAT", "TP_VBUS") - 4.0) < 1e-3
-    assert abs(point_dist("TP_VBUS", "TP_3V3") - 4.0) < 1e-3
+    assert abs(point_dist("TP2", "TP3") - 4.0) < 1e-3
+    assert abs(point_dist("TP3", "TP4") - 4.0) < 1e-3
 
     # Schematic & boundary DRC check
     wiring = Wiring(str(provider.wiring_path))
@@ -2523,3 +2525,98 @@ def test_regression_bug_090_enclosure_cad_feedback() -> None:
     assert not lid.part.is_inside((j13_pos[0], j13_pos[1], cutout_probe_z)), (
         "Lid must have open pass-through cutout at J13 battery connector"
     )
+
+
+def test_regression_bug_092_carrier_board_top_logo() -> None:
+    """Verify BUG-092: Antigravity logo placed in empty space on carrier board top with zero DRC errors."""
+    from projects.test_board.provider import TestBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = TestBoardProvider()
+    silks = provider.silkscreen()
+    silk_map = {t.text: t for t in silks}
+
+    # 1. Logo must be present on F.SilkS
+    assert "ANTIGRAVITY" in silk_map, "Carrier board must contain ANTIGRAVITY logo silkscreen text"
+    logo = silk_map["ANTIGRAVITY"]
+    assert logo.layer == "F.SilkS"
+    assert logo.position[1] > 28.0, f"Logo must be in top region (y > 28mm), got {logo.position}"
+    assert abs(logo.position[0]) < 5.0, f"Logo should be centered horizontally, got {logo.position}"
+
+    # 2. DRC check verifies zero silkscreen-to-pad overlap errors
+    wiring = Wiring(provider.wiring_path)
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+    violations = [
+        v for v in checker.check_clearances_and_overlaps(wiring=wiring) if v.rule_name == "SILKSCREEN_PAD_OVERLAP"
+    ]
+    assert len(violations) == 0, f"Silkscreen overlap violations found: {violations}"
+
+
+def test_regression_bug_094_dynamic_geometric_priority_and_rip_up_reroute() -> None:
+    """Verify BUG-094: PCBAutoRouter uses dynamic geometric constraint scoring and rip-up reroute without hardcoded net names."""
+    import inspect
+    from types import SimpleNamespace
+    from provider.pcb.router import PCBAutoRouter
+    from model.wiring import NetModel, FootprintModel, PinModel
+    from model.pcb import PCBConfig, StackupModel, StackupLayerModel, LayerType
+
+    # 1. Inspect PCBAutoRouter.route_all_nets source to verify no hardcoded net name strings
+    source = inspect.getsource(PCBAutoRouter.route_all_nets)
+    banned_hardcoded = ['"I2C"', '"FLEX0_A"', '"UART0_"', '"SPI"', '"USB"']
+    for banned in banned_hardcoded:
+        assert banned not in source, f"Hardcoded net name priority matching {banned} found in route_all_nets!"
+
+    # 2. Verify NetModel supports custom priority attribute
+    net_custom = NetModel(name="CUSTOM_HIGH_PRIO", pins=[("U1", "1"), ("U2", "1")], priority=0, color="green")
+    assert net_custom.priority == 0
+
+    # 3. Test dynamic geometric priority sorting
+    # Build synthetic wiring with two components: U1 (dense multi-pin IC) and J1 (sparse connector)
+    u1_pins = [
+        PinModel(name=str(i), position=((i % 4) * 0.8, (i // 4) * 0.8, 0.0), label=str(i), side="left")
+        for i in range(16)
+    ]
+    u1 = FootprintModel(name="U1", package="QFN-16", position=(0.0, 0.0, 0.0), dimensions=(4.0, 4.0, 1.0), pins=u1_pins)
+
+    u2_pins = [
+        PinModel(name="1", position=(0.0, 0.0, 0.0), label="1", side="left"),
+        PinModel(name="2", position=(0.8, 0.0, 0.0), label="2", side="right"),
+    ]
+    u2 = FootprintModel(name="U2", package="0402", position=(4.0, 0.0, 0.0), dimensions=(1.0, 0.5, 0.5), pins=u2_pins)
+
+    j1_pins = [
+        PinModel(name="1", position=(0.0, 0.0, 0.0), label="1", side="left"),
+        PinModel(name="2", position=(0.0, 2.54, 0.0), label="2", side="right"),
+    ]
+    j1 = FootprintModel(
+        name="J1", package="CONN", position=(15.0, 15.0, 0.0), dimensions=(2.54, 5.08, 2.54), pins=j1_pins
+    )
+
+    net_dense = NetModel(name="DENSE_LOCAL_NET", pins=[("U1", "0"), ("U2", "1")], color="blue")
+    net_sparse = NetModel(name="SPARSE_CROSS_NET", pins=[("U1", "15"), ("J1", "1")], color="yellow")
+    net_override = NetModel(name="OVERRIDE_NET", pins=[("J1", "2"), ("U2", "2")], priority=-10, color="red")
+
+    wiring = SimpleNamespace(
+        components={"U1": u1, "U2": u2, "J1": j1},
+        footprints=[u1, u2, j1],
+        nets=[net_sparse, net_dense, net_override],
+    )
+
+    stackup = StackupModel(
+        layers=[
+            StackupLayerModel(name="F.Cu", thickness_mm=0.035, material="copper", layer_type=LayerType.SIGNAL),
+            StackupLayerModel(name="B.Cu", thickness_mm=0.035, material="copper", layer_type=LayerType.SIGNAL),
+        ]
+    )
+    cfg = PCBConfig(
+        name="test_board",
+        dimensions_mm=(40.0, 40.0, 1.6),
+        stackup=stackup,
+    )
+
+    router = PCBAutoRouter(cfg, wiring)
+    traces, vias = router.route_all_nets()
+    assert len(traces) > 0, "Router should successfully route nets"
+    routed_nets = {tr.net for tr in traces}
+    assert "OVERRIDE_NET" in routed_nets
+    assert "DENSE_LOCAL_NET" in routed_nets

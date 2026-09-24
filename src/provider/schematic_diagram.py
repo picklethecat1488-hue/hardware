@@ -1,5 +1,6 @@
 """Dedicated vector schematic diagram and multi-page PDF generator for electronic components and nets."""
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -499,6 +500,7 @@ class SchematicDiagram:
                         if xe - xs >= 18.0:
                             channel_map.setdefault((round(xs, 1), round(xe, 1)), []).append(fp)
 
+                comp_stub_counts: Dict[Tuple[str, str], int] = defaultdict(int)
                 p_pts = []
                 for idx, fp in enumerate(vertical_passives):
                     n1 = pin_to_net.get((fp.name, fp.pins[0].name), "")
@@ -532,7 +534,7 @@ class SchematicDiagram:
                         elif x_start < 100.0:
                             cand_x = max(22.0, x_start - 24.0 - idx * 16.0)
                         else:
-                            cand_x = min(275.0, x_end + 14.0 + idx * 16.0)
+                            cand_x = min(265.0, x_end + 14.0 + idx * 16.0)
                         x_pull = cand_x
                         y_base = matching_segs[0][2]
                     else:
@@ -548,10 +550,12 @@ class SchematicDiagram:
                             p_x, p_y = sheet_pin_coords[target_pair]
                             y_base = p_y
                             side = pin_side_map.get(target_pair, "right" if p_x >= 148.5 else "left")
+                            stub_idx = comp_stub_counts[(target_pair[0], side)]
+                            comp_stub_counts[(target_pair[0], side)] += 1
                             if side == "right":
-                                cand_x = p_x + 14.0 + idx * 16.0
+                                cand_x = min(265.0, p_x + 14.0 + stub_idx * 16.0)
                             else:
-                                cand_x = max(22.0, p_x - 24.0 - idx * 16.0)
+                                cand_x = max(22.0, p_x - 24.0 - stub_idx * 16.0)
                             x_pull = cand_x
                         else:
                             x_pull = page_center_x + idx * 14.0
@@ -1257,6 +1261,7 @@ class SchematicDiagram:
         if center_x - total_span / 2.0 < x_min_all + 6.0:
             center_x = (x_min_all + 6.0) + total_span / 2.0
 
+        comp_stub_counts: Dict[Tuple[str, str], int] = defaultdict(int)
         used_x_positions: List[float] = []
         for idx, fp in enumerate(pullups):
             n1 = pin_to_net.get((fp.name, fp.pins[0].name), "")
@@ -1332,7 +1337,7 @@ class SchematicDiagram:
                     h_wire_segments.append((cand_x, x_start, matching_segs[0][2], sig_net, "#2563eb"))
                 else:
                     # Right breakout stub: extend outward to the right while staying on-page
-                    max_page_x = 275.0
+                    max_page_x = 265.0
                     cand_x = min(max_page_x, x_end + 14.0 + idx * 16.0)
                     for _ in range(10):
                         if not any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
@@ -1368,18 +1373,20 @@ class SchematicDiagram:
                         side = "left"
 
                     step = 14.0
+                    stub_idx = comp_stub_counts[(target_pair[0], side)]
+                    comp_stub_counts[(target_pair[0], side)] += 1
                     if side == "right":
                         next_comp_left = min(
                             (c[0] for p, c in sheet_pin_coords.items() if c[0] > p_x + 10.0 and p[0] != target_pair[0]),
                             default=280.0,
                         )
-                        cand_x = p_x + 14.0 + idx * 16.0
+                        cand_x = min(265.0, p_x + 14.0 + stub_idx * 16.0)
                         if cand_x > next_comp_left - 12.0:
                             cand_x = (p_x + next_comp_left) / 2.0
                         for _ in range(10):
                             if not any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
                                 break
-                            if cand_x + 7.0 < next_comp_left - 8.0:
+                            if cand_x + 7.0 < min(268.0, next_comp_left - 8.0):
                                 cand_x += 7.0
                             elif cand_x - 7.0 > p_x + 6.0:
                                 cand_x -= 7.0
@@ -1387,7 +1394,7 @@ class SchematicDiagram:
                                 break
                     else:
                         min_page_x = 22.0
-                        cand_x = max(min_page_x, p_x - 24.0 - idx * 16.0)
+                        cand_x = max(min_page_x, p_x - 24.0 - stub_idx * 16.0)
                         for _ in range(10):
                             if not any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
                                 break

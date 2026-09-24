@@ -692,28 +692,28 @@ class TestBoardProvider(Provider):
         """Define drilled through-hole test points for GND, I2C, PCIe, and MIPI using BuildTestPoints."""
         with BuildTestPoints(default_layer="F.Cu", default_diameter_mm=1.40, default_drill_diameter_mm=0.80) as tp:
             # GND through-hole probe test point
-            TestPoint("TP_GND", net="GND", at=(-18.0, -22.0))
+            TestPoint("TP1", net="GND", at=(-18.0, -22.0))
 
             # Power test points (BUG-087)
-            TestPoint("TP_VBAT", net="VBAT", at=(-18.0, -26.0))
-            TestPoint("TP_VBUS", net="VBUS", at=(-14.0, -26.0))
-            TestPoint("TP_3V3", net="3V3", at=(-10.0, -26.0))
+            TestPoint("TP2", net="VBAT", at=(-18.0, -26.0))
+            TestPoint("TP3", net="VBUS", at=(-14.0, -26.0))
+            TestPoint("TP4", net="3V3", at=(-10.0, -26.0))
 
             # PCIe Gen4 differential pair test points (spaced with 4mm pitch)
-            TestPoint("TP_TX0_N", net="PCIE_TX0_N", at=(-14.0, -22.0))
-            TestPoint("TP_TX0_P", net="PCIE_TX0_P", at=(-10.0, -22.0))
-            TestPoint("TP_RX0_P", net="PCIE_RX0_P", at=(-6.0, -22.0))
-            TestPoint("TP_RX0_N", net="PCIE_RX0_N", at=(-2.0, -22.0))
+            TestPoint("TP5", net="PCIE_TX0_N", at=(-14.0, -22.0))
+            TestPoint("TP6", net="PCIE_TX0_P", at=(-10.0, -22.0))
+            TestPoint("TP7", net="PCIE_RX0_P", at=(-6.0, -22.0))
+            TestPoint("TP8", net="PCIE_RX0_N", at=(-2.0, -22.0))
 
-            # I2C test points (spaced with 4mm pitch, aligned with U2 pin order)
-            TestPoint("TP_SDA", net="I2C_SDA", at=(14.0, -4.0))
-            TestPoint("TP_SCL", net="I2C_SCL", at=(18.0, -4.0))
+            # I2C test points (through-hole, accessible from both sides, routed on B.Cu)
+            TestPoint("TP9", net="I2C_SDA", at=(14.0, -4.0), layer="B.Cu")
+            TestPoint("TP10", net="I2C_SCL", at=(18.0, -4.0), layer="B.Cu")
 
             # MIPI display differential pair test points (spaced with 4mm pitch on left half of board)
-            TestPoint("TP_D0_P", net="MIPI_DATA0_P", at=(-14.0, 22.0))
-            TestPoint("TP_D0_N", net="MIPI_DATA0_N", at=(-10.0, 22.0))
-            TestPoint("TP_CLK_P", net="MIPI_CLK_P", at=(-6.0, 22.0))
-            TestPoint("TP_CLK_N", net="MIPI_CLK_N", at=(-2.0, 22.0))
+            TestPoint("TP11", net="MIPI_DATA0_P", at=(-14.0, 22.0))
+            TestPoint("TP12", net="MIPI_DATA0_N", at=(-10.0, 22.0))
+            TestPoint("TP13", net="MIPI_CLK_P", at=(-6.0, 22.0))
+            TestPoint("TP14", net="MIPI_CLK_N", at=(-2.0, 22.0))
         return tp
 
     @cached_property
@@ -750,6 +750,10 @@ class TestBoardProvider(Provider):
     def silkscreen(self) -> list[SilkscreenTextModel]:
         """Return silkscreen markings for the test board carrier."""
         with BuildSilkscreen() as silk:
+            # Top logo in empty space between connector J2 and carrier title (BUG-092)
+            with Locations((0.0, 31.0)):
+                SilkscreenText("ANTIGRAVITY", layer="F.SilkS", font_size=1.6, thickness=0.25)
+
             # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
             with Locations((0.0, 26.0)):
                 SilkscreenText("TEST BOARD CARRIER REV 2.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
@@ -771,7 +775,7 @@ class TestBoardProvider(Provider):
             with Locations((-7.0, 7.0)):
                 SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.8, thickness=0.12)
             # U2 QFN pin-1 indicator
-            with Locations((15.0, -12.5)):
+            with Locations((15.0, -6.5)):
                 SilkscreenText("• Pin 1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
             # J1 M.2 connector edge alignment markers
             with Locations((-12.0, -38.0), (12.0, -38.0)):
@@ -812,7 +816,7 @@ class TestBoardProvider(Provider):
             # Resistors
             with Locations((14.5, -6.0)):
                 SilkscreenText("R1", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((14.5, -11.0)):
+            with Locations((10.0, -4.5)):
                 SilkscreenText("R2", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((-14.5, 4.5)):
                 SilkscreenText("R3", layer="F.SilkS", font_size=0.7, thickness=0.10)
@@ -846,7 +850,7 @@ class TestBoardProvider(Provider):
                 SilkscreenText("C10", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((-10.5, 10.5)):
                 SilkscreenText("C11", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((18.0, -7.5)):
+            with Locations((14.0, -6.5)):
                 SilkscreenText("C12", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
             with Locations((-20.0, 15.5)):
                 SilkscreenText("C13", layer="F.SilkS", font_size=0.7, thickness=0.10)

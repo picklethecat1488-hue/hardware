@@ -521,12 +521,12 @@
     /* Side-by-Side Table */
     .sbs-table {
       width: 100%;
+      min-width: max-content;
       border-collapse: collapse;
-      table-layout: fixed;
     }
-    .sbs-table col.col-lineno { width: 44px; }
-    .sbs-table col.col-marker { width: 22px; }
-    .sbs-table col.col-code { width: calc(50% - 66px); }
+    .sbs-table col.col-lineno { width: 44px; min-width: 44px; }
+    .sbs-table col.col-marker { width: 22px; min-width: 22px; }
+    .sbs-table col.col-code { width: 50%; min-width: 380px; }
     .sbs-table th {
       background: #170f09;
       color: var(--quake-text-muted);
@@ -543,8 +543,6 @@
       white-space: pre;
       word-break: normal;
       vertical-align: top;
-      max-width: 0;
-      overflow-x: auto;
     }
     .lineno {
       user-select: none;
@@ -599,6 +597,8 @@
     /* Unified View */
     .unified-wrap {
       padding: 10px 14px;
+      min-width: 100%;
+      width: max-content;
     }
     .unified-hunk-bar {
       background: #201309;
@@ -641,7 +641,6 @@
       white-space: pre;
       word-break: normal;
       padding-left: 8px;
-      overflow-x: auto;
     }
     .unified-row.add, .unified-row.insert { background: var(--bg-diff-add); color: #86efac; }
     .unified-row.del, .unified-row.delete { background: var(--bg-diff-del); color: #fca5a5; }

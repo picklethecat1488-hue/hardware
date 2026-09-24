@@ -161,6 +161,9 @@ class NetModel(BaseModel):
     path: List[Tuple[float, float, float]] = Field(
         default_factory=list, description="Explicit 3D intermediate routing points for the net wire path"
     )
+    priority: Optional[int] = Field(
+        default=None, description="Optional custom routing priority (lower integer routes earlier)"
+    )
 
 
 # Shared Footprint Library Cache
@@ -315,6 +318,7 @@ class Wiring:
                     pins=[(p[0], p[1]) for p in n["pins"]],
                     offset=tuple(n.get("offset", (0.0, 0.0))),
                     path=[tuple(p) for p in n.get("path", [])],
+                    priority=n.get("priority"),
                 )
             )
         return nets
