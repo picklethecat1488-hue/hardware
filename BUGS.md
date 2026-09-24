@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-24 03:09:37 UTC` |
+| **Report Date** | `2026-09-24 03:12:01 UTC` |
 | **Total Issues** | `96` |
-| **Open Issues** | `3` |
-| **Resolved / Closed** | `93 (96%)` |
+| **Open Issues** | `2` |
+| **Resolved / Closed** | `94 (97%)` |
 
 ## Executive Summary
 
@@ -130,7 +130,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-093](#bug-093): Update docs with architecture changes (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-094](#bug-094): Remove manual net priorities from PCB router (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-095](#bug-095): Make JAX router backend the default (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-096](#bug-096): Load switch should control audio and peripheral domains (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-096](#bug-096): Load switch should control audio and peripheral domains (`RESOLVED`)
 - [ ] **`[MEDIUM]`** [#BUG-097](#bug-097): Log routing violations to a file (`OPEN`)
 
 ## Detailed Issue Log
@@ -2450,16 +2450,21 @@ Made JaxPCBRouter the default backend, removed deprecated AStarPCBRouter, and ad
 
 ---
 
-### <a id="bug-096"></a> 🔴 `[BUG-096]` Load switch should control audio and peripheral domains
+### <a id="bug-096"></a> 🟢 `[BUG-096]` Load switch should control audio and peripheral domains
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 02:45:52 UTC`
+- **Resolved**: `2026-09-24 03:12:01 UTC`
 
 #### Description
 
 The load switch should control the audio and peripheral domains so that both those domains can be disabled when entering a power down state.
+
+#### Resolution Notes
+
+Wired audio amplifier U4, C8, and peripheral headers J6-J9 to switched domain VLOAD_SW and PWR_EN.
 
 ---
 

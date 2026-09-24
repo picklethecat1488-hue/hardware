@@ -2626,3 +2626,51 @@ def test_regression_bug_094_dynamic_geometric_priority_and_rip_up_reroute() -> N
     routed_nets = {tr.net for tr in traces}
     assert "OVERRIDE_NET" in routed_nets
     assert "DENSE_LOCAL_NET" in routed_nets
+
+
+def test_regression_bug_096_load_switch_controls_audio_and_peripherals() -> None:
+    """Verify BUG-096: Q1 load switch and PWR_EN control audio domain (U4, C8) and peripheral headers (J6-J9)."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. Verify VLOAD_SW connects Q1 drain, J1, audio amp U4 ground/gain, C8 cap ground, and peripheral headers J6-J9
+    vload_net = next((net for net in wiring.nets if net.name == "VLOAD_SW"), None)
+    assert vload_net is not None, "VLOAD_SW net must exist in wiring.yaml"
+    vload_pins = set(vload_net.pins)
+    expected_vload_pins = {
+        ("Q1", "D"),
+        ("J1", "VLOAD_SW"),
+        ("U4", "GND"),
+        ("U4", "GAIN"),
+        ("C8", "2"),
+        ("J6", "2"),
+        ("J7", "2"),
+        ("J8", "2"),
+        ("J9", "2"),
+    }
+    for pin in expected_vload_pins:
+        assert pin in vload_pins, f"Pin {pin} must be connected to switched ground rail VLOAD_SW"
+
+    # 2. Verify PWR_EN connects MCU D1, Q1 gate, and U4 SD_MODE (audio shutdown)
+    pwr_en_net = next((net for net in wiring.nets if net.name == "PWR_EN"), None)
+    assert pwr_en_net is not None, "PWR_EN net must exist in wiring.yaml"
+    pwr_en_pins = set(pwr_en_net.pins)
+    assert ("U1", "D1") in pwr_en_pins
+    assert ("Q1", "G") in pwr_en_pins
+    assert ("U4", "SD_MODE") in pwr_en_pins, "Audio amp U4 SD_MODE must be controlled by PWR_EN for shutdown"
+
+    # 3. Verify continuous GND net does NOT contain switched domain pins
+    gnd_net = next((net for net in wiring.nets if net.name == "GND"), None)
+    assert gnd_net is not None
+    gnd_pins = set(gnd_net.pins)
+    for pin in [("U4", "GND"), ("U4", "GAIN"), ("C8", "2"), ("J6", "2"), ("J7", "2"), ("J8", "2"), ("J9", "2")]:
+        assert pin not in gnd_pins, f"Pin {pin} must NOT be on continuous GND; must be on VLOAD_SW"
+
+    # 4. Verify continuous 3V3 net does NOT contain SD_MODE
+    v33_net = next((net for net in wiring.nets if net.name == "3V3"), None)
+    assert v33_net is not None
+    v33_pins = set(v33_net.pins)
+    assert ("U4", "SD_MODE") not in v33_pins, "U4 SD_MODE must NOT be permanently tied to 3V3"
