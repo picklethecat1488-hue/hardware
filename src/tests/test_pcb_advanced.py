@@ -2536,12 +2536,18 @@ def test_regression_bug_092_carrier_board_top_logo() -> None:
     silks = provider.silkscreen()
     silk_map = {t.text: t for t in silks}
 
-    # 1. Logo must be present on F.SilkS
+    # 1. Logo must be present on F.SilkS with unique, non-trivial branding insignia
     assert "ANTIGRAVITY" in silk_map, "Carrier board must contain ANTIGRAVITY logo silkscreen text"
     logo = silk_map["ANTIGRAVITY"]
     assert logo.layer == "F.SilkS"
     assert logo.position[1] > 28.0, f"Logo must be in top region (y > 28mm), got {logo.position}"
     assert abs(logo.position[0]) < 5.0, f"Logo should be centered horizontally, got {logo.position}"
+
+    # Verify unique insignia elements
+    assert "[>" in silk_map, "Carrier board logo must contain stylized left wing [>"
+    assert "<]" in silk_map, "Carrier board logo must contain stylized right wing <]"
+    assert "* * *" in silk_map, "Carrier board logo must contain star cluster insignia"
+    assert "QUANTUM DYNAMICS // 0x414759" in silk_map, "Carrier board logo must contain unique hex signature"
 
     # 2. DRC check verifies zero silkscreen-to-pad overlap errors
     wiring = Wiring(provider.wiring_path)

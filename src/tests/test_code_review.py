@@ -17,6 +17,7 @@ import pytest
 
 from model.code_review import (
     CommentModel,
+    CommitInfoModel,
     FileReviewStatus,
     FileStateModel,
     ReviewSessionModel,
@@ -1346,3 +1347,32 @@ def test_regression_bug_091_diff_view_horizontal_scrollbar_on_bottom() -> None:
     # 3. Tables and wrappers have min-width: max-content to prevent truncation while expanding container
     assert "min-width: max-content" in content.split(".sbs-table")[1].split("}")[0]
     assert "min-width: 100%" in content.split(".unified-wrap")[1].split("}")[0]
+
+
+def test_code_review_tracker_only_commit_handling(tmp_path: Path) -> None:
+    """Verify that commits modifying only BUGS.md report ignored_files and render clear UI notices."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    template_file = templates_dir / "code_review.html.j2"
+    assert template_file.exists()
+    content = template_file.read_text(encoding="utf-8")
+
+    # 1. UI template must contain TRACKER ONLY badge and informative notice
+    assert "TRACKER ONLY" in content
+    assert "Issue Tracker & Documentation Update Only" in content
+    assert "filtered" in content
+    assert "isTrackerOnly" in content
+
+    # 2. Verify commit model tracks ignored files on CommitInfoModel
+    c = CommitInfoModel(
+        commit_hash="abc1234",
+        short_hash="abc1234",
+        author="Tester",
+        date="2026-09-24T00:00:00Z",
+        subject="docs: update bug tracker",
+        files_count=0,
+        ignored_files_count=1,
+        ignored_files=["BUGS.md"],
+    )
+    assert c.files_count == 0
+    assert c.ignored_files_count == 1
+    assert "BUGS.md" in c.ignored_files

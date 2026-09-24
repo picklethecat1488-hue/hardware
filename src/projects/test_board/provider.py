@@ -750,9 +750,18 @@ class TestBoardProvider(Provider):
     def silkscreen(self) -> list[SilkscreenTextModel]:
         """Return silkscreen markings for the test board carrier."""
         with BuildSilkscreen() as silk:
-            # Top logo in empty space between connector J2 and carrier title (BUG-092)
+            # Top Antigravity brand logo emblem in empty space between J2 and carrier title (BUG-092)
+            # Procedural stylized insignia with orbital wings and unique hex signature (0x414759 = 'AGY')
+            with Locations((0.0, 33.0)):
+                SilkscreenText("* * *", layer="F.SilkS", font_size=1.0, thickness=0.18)
+            with Locations((-11.5, 31.0)):
+                SilkscreenText("[>", layer="F.SilkS", font_size=1.4, thickness=0.22)
             with Locations((0.0, 31.0)):
                 SilkscreenText("ANTIGRAVITY", layer="F.SilkS", font_size=1.6, thickness=0.25)
+            with Locations((11.5, 31.0)):
+                SilkscreenText("<]", layer="F.SilkS", font_size=1.4, thickness=0.22)
+            with Locations((0.0, 29.0)):
+                SilkscreenText("QUANTUM DYNAMICS // 0x414759", layer="F.SilkS", font_size=0.75, thickness=0.14)
 
             # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
             with Locations((0.0, 26.0)):
