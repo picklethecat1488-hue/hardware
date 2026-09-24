@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-23 03:48:26 UTC` |
-| **Total Issues** | `93` |
-| **Open Issues** | `1` |
-| **Resolved / Closed** | `92 (98%)` |
+| **Report Date** | `2026-09-24 03:09:37 UTC` |
+| **Total Issues** | `96` |
+| **Open Issues** | `3` |
+| **Resolved / Closed** | `93 (96%)` |
 
 ## Executive Summary
 
@@ -21,14 +21,14 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 1 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 4 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 87 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 90 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 1 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 69 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 72 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 12 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 0 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 10 | Build tooling, compilers, test runners, headless tools. |
@@ -129,6 +129,9 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-092](#bug-092): Add logo to carrier board top (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-093](#bug-093): Update docs with architecture changes (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-094](#bug-094): Remove manual net priorities from PCB router (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-095](#bug-095): Make JAX router backend the default (`RESOLVED`)
+- [ ] **`[MEDIUM]`** [#BUG-096](#bug-096): Load switch should control audio and peripheral domains (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-097](#bug-097): Log routing violations to a file (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -2426,5 +2429,65 @@ Replace A* router with two-stage dynamic geometric constraint scoring and rip up
 #### Resolution Notes
 
 Replaced manual net name matching in PCBAutoRouter with dynamic geometric priority scoring (pin density bottleneck, Manhattan distance, pad slack) and NetModel.priority override. Added two-stage rip-up and reroute for congested routing corridors.
+
+---
+
+### <a id="bug-095"></a> 🟢 `[BUG-095]` Make JAX router backend the default
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 02:44:12 UTC`
+- **Resolved**: `2026-09-24 03:09:37 UTC`
+
+#### Description
+
+Ensure the JAX router backend passes all regression tests, then make it the default router, and remove the deprecated astar backend.
+
+#### Resolution Notes
+
+Made JaxPCBRouter the default backend, removed deprecated AStarPCBRouter, and added QFN via keepout support.
+
+---
+
+### <a id="bug-096"></a> 🔴 `[BUG-096]` Load switch should control audio and peripheral domains
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 02:45:52 UTC`
+
+#### Description
+
+The load switch should control the audio and peripheral domains so that both those domains can be disabled when entering a power down state.
+
+---
+
+### <a id="bug-097"></a> 🔴 `[BUG-097]` Log routing violations to a file
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 02:47:31 UTC`
+
+#### Description
+
+Log PCB build errors (routing violations) to a log file that goes under the board/ subdirectory for the project. Outputting them to the console is very slow and makes it hard to tell what is going on with the overall build.
+
+#### Reproduction Steps
+
+1. $ python src/build.py "test_board:pcb"
+
+#### Behavior Comparison
+
+- **Expected**: ❌ Failed to build test_board/carrier_board:pcb. Project has DRC errors:  <THIS FILE> 
+❌ Tool build execution failed
+- **Actual**: ng trace stub / antenna detected on net 'CAP_RX0' on layer 'B.Cu' at (20.00, -14.00) with no pad, via, test point, or connected trace 
+▶   * [ERROR] ANTENNA_TRACE_DETECTED on 'CAP_TX0' at (20.00, -13.50): Dangling trace stub / antenna detected on net 'CAP_TX0' on layer 'B.Cu' at (20.00, -13.50) with no pad, via, test point, or connected trace 
+▶   * [ERROR] DISCONNECTED_VIA on 'I2C_SDA' at (-5.20, 1.20): Via on net 'I2C_SDA' at (-5.20, 1.20) is not connected across multiple layers (only connects on layers: ['B.Cu']) 
+▶   * [ERROR] DISCONNECTED_VIA on 'I2C_SDA' at (16.00, -14.50): Via on net 'I2C_SDA' at (16.00, -14.50) is not connected across multiple layers (only connects on layers: ['F.Cu']) 
+▶   * [ERROR] DISCONNECTED_VIA on 'I2C_SCL' at (16.00, -15.50): Via on net 'I2C_SCL' at (16.00, -15.50) is not connected across multiple layers (only connects on layers: ['F.Cu']) 
+▶   * [ERROR] DISCONNECTED_VIA on 'OSC_IN' at (-5.20, -2.00): Via on net 'OSC_IN' at (-5.20, -2.00) is not connected across multiple layers (only connects on layers: ['B.Cu']) 
+❌ Tool build execution failed
 
 ---
