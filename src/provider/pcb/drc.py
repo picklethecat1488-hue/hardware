@@ -2132,7 +2132,7 @@ class PCBDesignRulesChecker:
             connected_pins = [p for p in fp.pins if (fp.name, p.name) in pin_to_net]
             if not connected_pins:
                 violations.add_error(
-                    rule_name=DRCRuleName.SCHEMATIC_DANGLING_COMPONENT,
+                    rule_name=DRCRuleName.SCHEMATIC_UNCONNECTED_COMPONENT,
                     net_or_zone=fp_name,
                     description=f"Component '{fp_name}' has no pins connected to any nets in the netlist",
                 )
