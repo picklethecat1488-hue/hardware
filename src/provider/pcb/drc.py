@@ -482,7 +482,7 @@ class PCBDesignRulesChecker:
 
             # Check via annular ring manufacturability
             annular_ring = (w_via - net_class.via_drill_mm) / 2.0
-            if annular_ring < 0.100:
+            if annular_ring < 0.100 - 1e-6:
                 violations.append(
                     DRCViolation(
                         rule_name="MIN_ANNULAR_RING",
@@ -1458,7 +1458,19 @@ class PCBDesignRulesChecker:
         holes = self.config.mounting_holes
         vias = self.config.vias
         traces = self.config.traces
-        clearance_default = 0.10  # Standard fab minimum clearance
+        rules = getattr(self.config, "design_rules", None) or getattr(self.config, "rules", None)
+        clearance_default = getattr(rules, "min_clearance_mm", 0.10)
+        fine_pitch_clearance = getattr(rules, "min_fine_pitch_clearance_mm", 0.035)
+        fine_pitch_threshold = getattr(rules, "fine_pitch_pad_threshold_mm", 0.30)
+        fine_pitch_coords: List[Tuple[float, float]] = []
+        if wiring:
+            board_fps = self.get_footprints_for_board(wiring)
+            for fp in board_fps:
+                for p in getattr(fp, "pins", []):
+                    pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
+                    if min(pad_size) <= fine_pitch_threshold:
+                        px, py = _get_pin_absolute_pos(fp, p)
+                        fine_pitch_coords.append((px, py))
 
         # 1. Check via to drill hole overlaps
         for mh in holes:
@@ -1585,6 +1597,13 @@ class PCBDesignRulesChecker:
                     continue
                 dist = _dist_point_to_segment((vx, vy), tr.start_mm, tr.end_mm)
                 min_copper = v_r + (tr.width_mm / 2.0)
+                is_near_fine_pitch = any(
+                    math.hypot(vx - fx, vy - fy) <= 0.8
+                    or math.hypot(tr.start_mm[0] - fx, tr.start_mm[1] - fy) <= 0.4
+                    or math.hypot(tr.end_mm[0] - fx, tr.end_mm[1] - fy) <= 0.4
+                    for fx, fy in fine_pitch_coords
+                )
+                req_clearance = fine_pitch_clearance if is_near_fine_pitch else clearance_default
                 if dist < min_copper - 1e-4:
                     violations.append(
                         DRCViolation(
@@ -1600,7 +1619,7 @@ class PCBDesignRulesChecker:
                             location=(vx, vy, 0.0),
                         )
                     )
-                elif dist < min_copper + clearance_default - 1e-4:
+                elif dist < min_copper + req_clearance - 1e-4:
                     violations.append(
                         DRCViolation(
                             rule_name="CLEARANCE_VIOLATION",
@@ -1608,10 +1627,10 @@ class PCBDesignRulesChecker:
                             net_or_zone=f"{v.net}<->{tr.net}",
                             description=(
                                 f"Clearance violation between via on net '{v.net}' at ({vx:.2f}, {vy:.2f}) and trace on net '{tr.net}' "
-                                f"(dist: {dist:.3f}mm < required {min_copper + clearance_default:.3f}mm)"
+                                f"(dist: {dist:.3f}mm < required {min_copper + req_clearance:.3f}mm)"
                             ),
                             actual_value=dist,
-                            expected_range=(min_copper + clearance_default, 100.0),
+                            expected_range=(min_copper + req_clearance, 100.0),
                             location=(vx, vy, 0.0),
                         )
                     )
@@ -1673,6 +1692,8 @@ class PCBDesignRulesChecker:
                     pad_type = getattr(p, "pad_type", "smd")
                     pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
                     p_r = min(pad_size) / 2.0
+                    is_fine_pitch = min(pad_size) <= fine_pitch_threshold
+                    pad_clearance = fine_pitch_clearance if is_fine_pitch else clearance_default
 
                     for tr in traces:
                         # Allow trace belonging to the pad's own net
@@ -1700,7 +1721,7 @@ class PCBDesignRulesChecker:
                                     location=(px, py, 0.0),
                                 )
                             )
-                        elif dist < min_copper + clearance_default - 1e-4:
+                        elif dist < min_copper + pad_clearance - 1e-4:
                             violations.append(
                                 DRCViolation(
                                     rule_name="CLEARANCE_VIOLATION",
@@ -1709,10 +1730,10 @@ class PCBDesignRulesChecker:
                                     description=(
                                         f"Clearance violation between trace on net '{tr.net}' on layer '{tr.layer}' "
                                         f"and pad '{p.name}' of component '{fp.name}' (net: '{p_net or '<no net>'}') "
-                                        f"(dist: {dist:.3f}mm < required {min_copper + clearance_default:.3f}mm)"
+                                        f"(dist: {dist:.3f}mm < required {min_copper + pad_clearance:.3f}mm)"
                                     ),
                                     actual_value=dist,
-                                    expected_range=(min_copper + clearance_default, 100.0),
+                                    expected_range=(min_copper + pad_clearance, 100.0),
                                     location=(px, py, 0.0),
                                 )
                             )

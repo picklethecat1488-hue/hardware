@@ -269,11 +269,17 @@ class Obstacle:
     center: Optional[Tuple[float, float]] = None
     radius: Optional[float] = None
     is_pin: bool = False
+    copper_box: Optional[Tuple[float, float, float, float]] = None
 
     def copper_dist(self, px: float, py: float) -> float:
         """Compute minimum distance from point (px, py) to the physical copper of this obstacle."""
         if self.is_circle and self.center is not None and self.radius is not None:
             return max(0.0, math.hypot(px - self.center[0], py - self.center[1]) - self.radius)
+        if self.copper_box is not None:
+            c_min_x, c_min_y, c_max_x, c_max_y = self.copper_box
+            edx = max(c_min_x - px, 0.0, px - c_max_x)
+            edy = max(c_min_y - py, 0.0, py - c_max_y)
+            return math.hypot(edx, edy)
         edx = max(self.min_x - px, 0.0, px - self.max_x)
         edy = max(self.min_y - py, 0.0, py - self.max_y)
         return math.hypot(edx, edy)
@@ -298,31 +304,35 @@ class PCBAutoRouter:
 
     def get_net_trace_width(self, net_name: str) -> float:
         """Resolve trace width for a given net based on net classes and interfaces."""
+        rules = getattr(self.config, "design_rules", None) or getattr(self.config, "rules", None)
+        default_width = getattr(rules, "default_track_width_mm", 0.12) if rules else 0.12
         net_upper = net_name.upper()
 
-        # Check differential pairs in net classes
+        # Check net classes
         for nc in self.config.net_classes:
             for dp in nc.diff_pairs:
                 if net_name in (dp.pos_net, dp.neg_net):
                     return nc.trace_width_mm
+            if hasattr(nc, "single_nets") and nc.single_nets and net_name in nc.single_nets:
+                return nc.trace_width_mm
             if nc.name.upper() in net_upper:
                 return nc.trace_width_mm
 
         # Check standard interface patterns
         if "PCIE" in net_upper:
-            return 0.14
+            return default_width
         if "MIPI" in net_upper or "DISP" in net_upper:
-            return 0.12
+            return default_width
         if "RF" in net_upper or "CPWG" in net_upper:
             return 0.22
-        if any(pwr in net_upper for pwr in ("GND", "3V3", "5V", "VCC", "VDD", "VLOAD")):
-            return 0.30
+        if "VLOAD" in net_upper or "VBAT" in net_upper or "VBUS" in net_upper:
+            return default_width
         if "PDM" in net_upper or "SPK" in net_upper or "AUDIO" in net_upper or "I2S" in net_upper:
-            return 0.14
+            return default_width
         if "I2C" in net_upper:
-            return 0.14
+            return default_width
 
-        return 0.15
+        return default_width
 
     @classmethod
     def save_routing_yaml(
@@ -477,7 +487,9 @@ class PCBAutoRouter:
             for u_idx, u_pt in enumerate(unvisited):
                 for v_pt in visited:
                     p_v = (round(v_pt[0], 2), round(v_pt[1], 2))
-                    d = math.hypot(u_pt[0] - v_pt[0], u_pt[1] - v_pt[1]) + (0.0 if u_pt[2] == v_pt[2] else 3.0)
+                    d = math.hypot(u_pt[0] - v_pt[0], u_pt[1] - v_pt[1]) + (
+                        0.0 if u_pt[2] == v_pt[2] or u_pt[2] == "ALL" or v_pt[2] == "ALL" else 3.0
+                    )
                     if p_v in bga_pins and any(
                         round(ep[0], 2) == p_v[0] and round(ep[1], 2) == p_v[1] for e in edges for ep in e
                     ):
@@ -555,16 +567,24 @@ class PCBAutoRouter:
             cos_r, sin_r = abs(math.cos(rad)), abs(math.sin(rad))
 
             fp_layer = getattr(fp, "layer", "F.Cu")
+            rules = getattr(self.config, "design_rules", None)
+            fp_threshold = getattr(rules, "fine_pitch_pad_threshold_mm", 0.35) if rules else 0.35
             for pin in fp.pins:
                 px, py = self.get_pin_absolute_position(fp, pin)
                 pw, pl = getattr(pin, "pad_size_mm", (0.5, 0.5))
                 eff_w = pw * cos_r + pl * sin_r
                 eff_l = pw * sin_r + pl * cos_r
                 pin_lay = "ALL" if getattr(pin, "pad_type", "smd") == "thru_hole" else fp_layer
-                pad_margin = 0.05 if (min(eff_w, eff_l) <= 0.30 or max(eff_w, eff_l) <= 0.40) else 0.20
+                is_fine_pitch = min(eff_w, eff_l) <= fp_threshold or max(eff_w, eff_l) <= 0.40
+                is_thru_hole = getattr(pin, "pad_type", "smd") == "thru_hole"
+                min_fp_clr = getattr(rules, "min_fine_pitch_clearance_mm", 0.035) if rules else 0.035
+                pad_margin = (0.07 + min_fp_clr) if is_fine_pitch else (0.36 if is_thru_hole else 0.26)
                 pin_net = pin_to_net.get((fp.name, pin.name)) or "__NO_NET__"
                 is_circle = getattr(pin, "pad_shape", "rect") == "circle"
                 copper_r = min(eff_w, eff_l) / 2.0 if is_circle else None
+                copper_box = (
+                    None if is_circle else (px - eff_w / 2.0, py - eff_l / 2.0, px + eff_w / 2.0, py + eff_l / 2.0)
+                )
                 obstacles.append(
                     Obstacle(
                         min_x=px - eff_w / 2.0 - pad_margin,
@@ -577,6 +597,7 @@ class PCBAutoRouter:
                         center=(px, py) if is_circle else None,
                         radius=copper_r,
                         is_pin=True,
+                        copper_box=copper_box,
                     )
                 )
 
@@ -665,8 +686,13 @@ class PCBAutoRouter:
                     )
                 )
 
+        min_clearance = (
+            getattr(self.config.rules, "min_clearance_mm", 0.12)
+            if hasattr(self, "config") and hasattr(self.config, "rules")
+            else 0.12
+        )
         for tr in traces:
-            w_half = max(tr.width_mm / 2.0 + 0.12, 0.21)
+            w_half = tr.width_mm / 2.0 + min_clearance
             obstacles.append(
                 Obstacle(
                     min_x=min(tr.start_mm[0], tr.end_mm[0]) - w_half,
@@ -678,7 +704,7 @@ class PCBAutoRouter:
                 )
             )
 
-        dense_regions: List[Tuple[float, float, float, float, str]] = []
+        dense_regions: List[Tuple[float, float, float, float, str, bool]] = []
         for fp in board_fps:
             pkg = getattr(fp, "package", "")
             if len(fp.pins) >= 16 or any(
@@ -688,7 +714,8 @@ class PCBAutoRouter:
                 py0 = fp.position[1]
                 xs = [p.position[0] + px0 for p in fp.pins]
                 ys = [p.position[1] + py0 for p in fp.pins]
-                margin = 0.35
+                margin = 0.05
+                is_bga = pkg.startswith(("BGA", "VFBGA"))
                 dense_regions.append(
                     (
                         min(xs) - margin,
@@ -696,6 +723,7 @@ class PCBAutoRouter:
                         max(xs) + margin,
                         max(ys) + margin,
                         getattr(fp, "layer", "F.Cu"),
+                        is_bga,
                     )
                 )
 
@@ -711,30 +739,37 @@ class PCBAutoRouter:
         qfn_keepouts: List[Tuple[float, float, float, float]] = []
         for fp in board_fps:
             pkg = getattr(fp, "package", "")
-            if any(
-                pkg.startswith(p)
-                for p in ("QFN", "DFN", "TQFN", "WQFN", "TDFN", "WSON", "TSSOP", "MSOP", "SOIC", "SSOP")
-            ):
+            if any(pkg.startswith(p) for p in ("QFN", "DFN", "TQFN", "WQFN", "TDFN", "WSON")) and "FPC" not in pkg:
                 px0 = fp.position[0]
                 py0 = fp.position[1]
                 xs = [p.position[0] + px0 for p in fp.pins]
                 ys = [p.position[1] + py0 for p in fp.pins]
                 if xs and ys:
-                    qfn_keepouts.append((min(xs) - 1.00, min(ys) - 1.00, max(xs) + 1.00, max(ys) + 1.00))
+                    k_min_x = min(xs) + 0.15
+                    k_max_x = max(xs) - 0.15
+                    k_min_y = min(ys) + 0.15
+                    k_max_y = max(ys) - 0.15
+                    if k_min_x < k_max_x and k_min_y < k_max_y:
+                        qfn_keepouts.append((k_min_x, k_min_y, k_max_x, k_max_y))
 
         from provider.pcb.jax_router import JaxPCBRouter
+
+        rules = getattr(self.config, "design_rules", None)
+        base_via_penalty = getattr(rules, "via_penalty", 6.00) if rules else 6.00
+        resolved_via_penalty = 50.00 if is_flex else base_via_penalty
 
         router = JaxPCBRouter(
             board_bounds=board_bounds,
             grid_step=0.25,
             layers=layers,
             obstacles=obstacles,
-            via_penalty=2.00 if not is_flex else 50.00,
+            via_penalty=resolved_via_penalty,
             dense_regions=dense_regions,
             connector_breakout_zones=connector_breakout_zones,
             outline_polygon=getattr(self.config, "outline_polygon", None),
             edge_clearance=0.40 if is_flex else 0.35,
             qfn_keepouts=qfn_keepouts,
+            design_rules=rules,
         )
         self.router = router
 
@@ -841,13 +876,13 @@ class PCBAutoRouter:
                     if pin_match:
                         gx, gy = self.get_pin_absolute_position(fp, pin_match)
                         pad_type = getattr(pin_match, "pad_type", "smd")
-                        glay = "F.Cu" if pad_type == "thru_hole" else getattr(fp, "layer", "F.Cu")
+                        glay = "ALL" if pad_type == "thru_hole" else getattr(fp, "layer", "F.Cu")
                         endpoints.append((gx, gy, glay))
                         if pad_type != "thru_hole":
                             smd_endpoints.append((gx, gy, glay, fp, pin_match))
 
                 for tp in tp_by_net.get(net.name, []):
-                    tp_layer = getattr(tp, "layer", "F.Cu")
+                    tp_layer = "ALL" if getattr(tp, "drill_diameter_mm", 0) > 0 else getattr(tp, "layer", "F.Cu")
                     endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer))
                     if getattr(tp, "drill_diameter_mm", 0) <= 0 or net.name in plane_nets:
                         smd_endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer, None, None))
@@ -863,6 +898,8 @@ class PCBAutoRouter:
                 if net.name in plane_nets and not is_flex:
                     for smd_item in smd_endpoints:
                         px, py, lay = smd_item[0], smd_item[1], smd_item[2]
+                        if lay == "ALL":
+                            lay = "F.Cu"
                         fp = smd_item[3] if len(smd_item) > 3 else None
                         pin_match = smd_item[4] if len(smd_item) > 4 else None
 
@@ -873,51 +910,149 @@ class PCBAutoRouter:
                                 and getattr(pin_match, "size_mm", (0, 0))[1] >= 1.0
                             )
                         )
+                        pkg_name = getattr(fp, "package", "") if fp else ""
+                        is_qfn_pin = (
+                            fp is not None
+                            and any(pkg_name.startswith(p) for p in ("QFN", "DFN", "TQFN", "WQFN", "TDFN", "WSON"))
+                            and "TSSOP" not in pkg_name
+                            and "FPC" not in pkg_name
+                        )
+                        if is_qfn_pin and not is_exposed_pad:
+                            ep_pin = next(
+                                (
+                                    p
+                                    for p in getattr(fp, "pins", [])
+                                    if (
+                                        p.name in ("EP", "PAD", "EXP", "THERMAL", "33")
+                                        or (
+                                            getattr(p, "size_mm", (0, 0))[0] >= 1.0
+                                            and getattr(p, "size_mm", (0, 0))[1] >= 1.0
+                                        )
+                                    )
+                                    and pin_to_net.get((fp.name, p.name)) == net.name
+                                ),
+                                None,
+                            )
+                            if ep_pin is not None:
+                                ep_gx, ep_gy = self.get_pin_absolute_position(fp, ep_pin)
+                                is_orthogonal = abs(px - ep_gx) < 0.1 or abs(py - ep_gy) < 0.1
+                                if is_orthogonal:
+                                    seg_w = min(width_mm, 0.20)
+                                    trace_seg = TraceSegmentModel(
+                                        net=net.name,
+                                        layer=lay,
+                                        width_mm=seg_w,
+                                        start_mm=(px, py),
+                                        end_mm=(ep_gx, ep_gy),
+                                    )
+                                    traces.append(trace_seg)
+                                    w_h = max(seg_w / 2.0 + 0.12, 0.21)
+                                    router.add_obstacle(
+                                        Obstacle(
+                                            min_x=min(px, ep_gx) - w_h,
+                                            min_y=min(py, ep_gy) - w_h,
+                                            max_x=max(px, ep_gx) + w_h,
+                                            max_y=max(py, ep_gy) + w_h,
+                                            layer=lay,
+                                            net=net.name,
+                                        )
+                                    )
+                                    continue
+
                         in_qfn_keepout = any(
                             kx_min <= px <= kx_max and ky_min <= py <= ky_max
                             for kx_min, ky_min, kx_max, ky_max in getattr(router, "qfn_keepouts", [])
                         )
 
-                        candidate_offsets = (
-                            [(0.0, 0.0)] + CANDIDATE_VIA_OFFSETS if is_exposed_pad else list(CANDIDATE_VIA_OFFSETS)
-                        )
-                        if fp is not None and in_qfn_keepout and not is_exposed_pad:
+                        candidate_offsets = [(0.0, 0.0)] if is_exposed_pad else list(CANDIDATE_VIA_OFFSETS)
+                        if fp is not None and (in_qfn_keepout or is_qfn_pin) and not is_exposed_pad:
                             vx = px - fp.position[0]
                             vy = py - fp.position[1]
-                            v_norm = math.hypot(vx, vy)
-                            if v_norm > 0.01:
-                                vx, vy = vx / v_norm, vy / v_norm
-                                candidate_offsets = [
-                                    off
-                                    for off in candidate_offsets
-                                    if math.hypot(off[0], off[1]) > 0.01
-                                    and (off[0] * vx + off[1] * vy) / math.hypot(off[0], off[1]) >= 0.50
+                            if abs(vx) > abs(vy):
+                                dir_x = 1.0 if vx > 0 else -1.0
+                                same_edge_pins = [
+                                    self.get_pin_absolute_position(fp, p)
+                                    for p in fp.pins
+                                    if abs(self.get_pin_absolute_position(fp, p)[0] - px) < 0.1
                                 ]
-                                candidate_offsets.sort(
-                                    key=lambda off: (
-                                        -((off[0] * vx + off[1] * vy) / math.hypot(off[0], off[1])),
-                                        math.hypot(off[0], off[1]),
-                                    )
+                                has_pin_above = any(pt[1] > py + 0.1 for pt in same_edge_pins)
+                                has_pin_below = any(pt[1] < py - 0.1 for pt in same_edge_pins)
+                                is_corner_pin = (not has_pin_above and has_pin_below) or (
+                                    not has_pin_below and has_pin_above
                                 )
+                                if is_corner_pin:
+                                    corner_dir_y = 1.0 if not has_pin_above else -1.0
+                                    candidate_offsets = [
+                                        off
+                                        for off in candidate_offsets
+                                        if off[0] * dir_x >= 0.40 and off[1] * corner_dir_y >= 0.35
+                                    ]
+                                else:
+                                    candidate_offsets = [
+                                        off
+                                        for off in candidate_offsets
+                                        if off[0] * dir_x > 0.01
+                                        and (
+                                            (off[1] >= -0.05)
+                                            if not has_pin_above
+                                            else ((off[1] <= 0.05) if not has_pin_below else abs(off[1]) <= 0.05)
+                                        )
+                                    ]
+                            else:
+                                dir_y = 1.0 if vy > 0 else -1.0
+                                same_edge_pins = [
+                                    self.get_pin_absolute_position(fp, p)
+                                    for p in fp.pins
+                                    if abs(self.get_pin_absolute_position(fp, p)[1] - py) < 0.1
+                                ]
+                                has_pin_right = any(pt[0] > px + 0.1 for pt in same_edge_pins)
+                                has_pin_left = any(pt[0] < px - 0.1 for pt in same_edge_pins)
+                                is_corner_pin = (not has_pin_right and has_pin_left) or (
+                                    not has_pin_left and has_pin_right
+                                )
+                                if is_corner_pin:
+                                    corner_dir_x = -1.0 if not has_pin_left else 1.0
+                                    candidate_offsets = [
+                                        off
+                                        for off in candidate_offsets
+                                        if off[1] * dir_y >= 0.40 and off[0] * corner_dir_x >= 0.35
+                                    ]
+                                else:
+                                    candidate_offsets = [
+                                        off
+                                        for off in candidate_offsets
+                                        if off[1] * dir_y > 0.01
+                                        and (
+                                            (off[0] >= -0.05)
+                                            if not has_pin_right
+                                            else ((off[0] <= 0.05) if not has_pin_left else abs(off[0]) <= 0.05)
+                                        )
+                                    ]
+                            candidate_offsets.sort(key=lambda off: math.hypot(off[0], off[1]))
 
                         best_vx, best_vy = px, py
                         found_via_spot = False
                         best_offset = (0.0, 0.0)
+                        seen_cands = set()
                         for dx, dy in candidate_offsets:
-                            cand_x, cand_y = px + dx, py + dy
+                            cand_x = round((px + dx) / router.grid_step) * router.grid_step
+                            cand_y = round((py + dy) / router.grid_step) * router.grid_step
+                            if (cand_x, cand_y) in seen_cands:
+                                continue
+                            seen_cands.add((cand_x, cand_y))
                             if not (half_w - 1.0 > cand_x > -half_w + 1.0 and half_l - 1.0 > cand_y > -half_l + 1.0):
                                 continue
 
                             # Perimeter pins of fine-pitch packages must place stitching vias outside breakout keepouts
-                            if in_qfn_keepout and not is_exposed_pad:
-                                if any(
-                                    kx_min <= cand_x <= kx_max and ky_min <= cand_y <= ky_max
-                                    for kx_min, ky_min, kx_max, ky_max in getattr(router, "qfn_keepouts", [])
-                                ):
-                                    continue
+                            if not is_exposed_pad and any(
+                                kx_min <= cand_x <= kx_max and ky_min <= cand_y <= ky_max
+                                for kx_min, ky_min, kx_max, ky_max in getattr(router, "qfn_keepouts", [])
+                            ):
+                                continue
 
-                            is_dense = math.hypot(dx, dy) < 0.65 or in_qfn_keepout
-                            v_dia = 0.35 if is_dense else 0.45
+                            is_dense = math.hypot(dx, dy) < 0.65 or in_qfn_keepout or is_qfn_pin
+                            default_v_dia = getattr(rules, "default_via_diameter_mm", 0.36) if rules else 0.36
+                            v_dia = default_v_dia
                             via_pad_r = v_dia / 2.0
                             req_clearance = 0.12 if is_dense else 0.15
                             conflict = False
@@ -931,50 +1066,38 @@ class PCBAutoRouter:
                                 continue
 
                             # Check connecting trace clearance if fanout has non-zero length
-                            if math.hypot(dx, dy) > 0.01:
-                                seg_w = min(width_mm, 0.20) if is_dense else width_mm
+                            if math.hypot(cand_x - px, cand_y - py) > 0.01:
+                                seg_w = getattr(rules, "default_track_width_mm", 0.12) if rules else 0.12
                                 trace_half_w = seg_w / 2.0
                                 trace_conflict = False
-                                for obs in router.obstacles:
-                                    if obs.net is not None and obs.net == net.name:
-                                        continue
-                                    if obs.layer in (lay, "ALL"):
-                                        if obs.is_circle and obs.center:
-                                            d = dist_point_to_segment(obs.center, (px, py), (cand_x, cand_y))
-                                            if d - (obs.radius or 0.0) - trace_half_w < req_clearance:
+                                seg_len = math.hypot(cand_x - px, cand_y - py)
+                                num_samples = max(2, int(math.ceil(seg_len / 0.05)))
+                                for s in range(num_samples + 1):
+                                    t = s / num_samples
+                                    sx = px + t * (cand_x - px)
+                                    sy = py + t * (cand_y - py)
+                                    for obs in router.obstacles:
+                                        if obs.net is not None and obs.net == net.name:
+                                            continue
+                                        if obs.layer in (lay, "ALL"):
+                                            if obs.copper_dist(sx, sy) - trace_half_w < req_clearance:
                                                 trace_conflict = True
                                                 break
-                                        else:
-                                            m = req_clearance + trace_half_w
-                                            if (
-                                                min(px, cand_x) - m < obs.max_x
-                                                and max(px, cand_x) + m > obs.min_x
-                                                and min(py, cand_y) - m < obs.max_y
-                                                and max(py, cand_y) + m > obs.min_y
-                                            ):
-                                                obs_center = (
-                                                    (obs.min_x + obs.max_x) / 2.0,
-                                                    (obs.min_y + obs.max_y) / 2.0,
-                                                )
-                                                obs_hw = (obs.max_x - obs.min_x) / 2.0
-                                                obs_hl = (obs.max_y - obs.min_y) / 2.0
-                                                obs_r = max(obs_hw, obs_hl)
-                                                d = dist_point_to_segment(obs_center, (px, py), (cand_x, cand_y))
-                                                if d - obs_r - trace_half_w < req_clearance:
-                                                    trace_conflict = True
-                                                    break
+                                    if trace_conflict:
+                                        break
                                 if trace_conflict:
                                     continue
 
                             best_vx, best_vy = cand_x, cand_y
-                            best_offset = (dx, dy)
+                            best_offset = (cand_x - px, cand_y - py)
                             found_via_spot = True
                             break
 
                         if found_via_spot:
-                            is_dense = math.hypot(best_offset[0], best_offset[1]) < 0.65 or in_qfn_keepout
-                            v_dia = 0.36 if is_dense else 0.45
-                            v_drill = 0.16 if is_dense else 0.20
+                            default_v_dia = getattr(rules, "default_via_diameter_mm", 0.36) if rules else 0.36
+                            default_v_drill = getattr(rules, "default_via_drill_mm", 0.16) if rules else 0.16
+                            v_dia = default_v_dia
+                            v_drill = default_v_drill
                             stitching_via = ViaModel(
                                 net=net.name,
                                 position_mm=(best_vx, best_vy),
@@ -986,7 +1109,7 @@ class PCBAutoRouter:
                             vias.append(stitching_via)
 
                             if math.hypot(best_vx - px, best_vy - py) > 0.01:
-                                seg_w = min(width_mm, 0.20) if is_dense else width_mm
+                                seg_w = getattr(rules, "default_track_width_mm", 0.12) if rules else 0.12
                                 trace_seg = TraceSegmentModel(
                                     net=net.name,
                                     layer=lay,
@@ -995,7 +1118,7 @@ class PCBAutoRouter:
                                     end_mm=(best_vx, best_vy),
                                 )
                                 traces.append(trace_seg)
-                                w_h = max(seg_w / 2.0 + (0.12 if is_dense else 0.15), 0.21)
+                                w_h = seg_w / 2.0 + 0.17
                                 router.add_obstacle(
                                     Obstacle(
                                         min_x=min(px, best_vx) - w_h,
@@ -1004,11 +1127,35 @@ class PCBAutoRouter:
                                         max_y=max(py, best_vy) + w_h,
                                         layer=lay,
                                         net=net.name,
+                                        copper_box=(
+                                            min(px, best_vx) - seg_w / 2.0,
+                                            min(py, best_vy) - seg_w / 2.0,
+                                            max(px, best_vx) + seg_w / 2.0,
+                                            max(py, best_vy) + seg_w / 2.0,
+                                        ),
                                     )
                                 )
+                                gx_s = round((px - router.min_x) / router.grid_step)
+                                gy_s = round((py - router.min_y) / router.grid_step)
+                                gx_e = round((best_vx - router.min_x) / router.grid_step)
+                                gy_e = round((best_vy - router.min_y) / router.grid_step)
+                                l_idx = router.layer_to_idx.get(lay, 0)
+                                dist_cells = max(abs(gx_e - gx_s), abs(gy_e - gy_s), 1)
+                                for s in range(dist_cells + 1):
+                                    t = s / dist_cells
+                                    cgx = round(gx_s + t * (gx_e - gx_s))
+                                    cgy = round(gy_s + t * (gy_e - gy_s))
+                                    router.routed_cells[(cgx, cgy, l_idx)] = net.name
+                                    for dy in (-1, 0, 1):
+                                        ny = cgy + dy
+                                        if 0 <= ny < router.h_cells:
+                                            for dx in (-1, 0, 1):
+                                                nx = cgx + dx
+                                                if 0 <= nx < router.w_cells:
+                                                    router.via_mask_np[ny, nx] = True
 
                             # Register obstacle for the stitching via
-                            v_r = v_dia / 2.0 + (0.12 if is_dense else 0.15)
+                            v_r = max(v_dia / 2.0 + 0.20, 0.38)
                             router.add_obstacle(
                                 Obstacle(
                                     min_x=best_vx - v_r,
@@ -1022,6 +1169,22 @@ class PCBAutoRouter:
                                     radius=v_dia / 2.0,
                                 )
                             )
+                            gx_v = round((best_vx - router.min_x) / router.grid_step)
+                            gy_v = round((best_vy - router.min_y) / router.grid_step)
+                            for dy_v in (-1, 0, 1):
+                                ny_v = gy_v + dy_v
+                                if not (0 <= ny_v < router.h_cells):
+                                    continue
+                                for dx_v in (-1, 0, 1):
+                                    nx_v = gx_v + dx_v
+                                    if not (0 <= nx_v < router.w_cells):
+                                        continue
+                                    router.via_mask_np[ny_v, nx_v] = True
+                                    router.mask_np[:, ny_v, nx_v] = True
+                                    for l_i in range(len(router.layers)):
+                                        router.blocked_cells[(nx_v, ny_v, router.idx_to_layer[l_i])] = net.name
+                                        if dy_v == 0 and dx_v == 0:
+                                            router.routed_cells[(nx_v, ny_v, l_i)] = net.name
                     continue
 
                 # Signal nets: compute optimal Minimum Spanning Tree (MST) routing edges
@@ -1034,7 +1197,9 @@ class PCBAutoRouter:
                     end_pt = (end_node[0], end_node[1])
                     end_layer = end_node[2]
 
-                    if math.hypot(end_pt[0] - start_pt[0], end_pt[1] - start_pt[1]) < 1e-3 and start_layer == end_layer:
+                    if math.hypot(end_pt[0] - start_pt[0], end_pt[1] - start_pt[1]) < 1e-3 and (
+                        start_layer == end_layer or start_layer == "ALL" or end_layer == "ALL"
+                    ):
                         continue
 
                     try:
@@ -1079,6 +1244,8 @@ class PCBAutoRouter:
                         router.obstacles = [
                             obs for obs in router.obstacles if obs.is_pin or obs.net not in conflicting_nets
                         ]
+                        if hasattr(router, "routed_traces"):
+                            router.routed_traces = [tr for tr in router.routed_traces if tr.net not in conflicting_nets]
                         router.rebuild_spatial_index()
                         router.routed_cells = {
                             k: v for k, v in router.routed_cells.items() if v not in conflicting_nets

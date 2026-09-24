@@ -837,7 +837,7 @@ class TestBoardProvider(Provider):
                 SilkscreenText("U4", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((-18.0, 38.0)):
                 SilkscreenText("SPK1", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-4.0, 17.0)):
+            with Locations((-9.0, 3.5)):
                 SilkscreenText("Y1", layer="F.SilkS", font_size=0.8, thickness=0.12)
 
             # Resistors
@@ -845,9 +845,9 @@ class TestBoardProvider(Provider):
                 SilkscreenText("R1", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((10.0, -4.5)):
                 SilkscreenText("R2", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-14.5, 4.5)):
-                SilkscreenText("R3", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((-14.5, -4.5)):
+                SilkscreenText("R3", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-14.5, 4.5)):
                 SilkscreenText("R4", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((-5.5, 8.0)):
                 SilkscreenText("R5", layer="F.SilkS", font_size=0.7, thickness=0.10)

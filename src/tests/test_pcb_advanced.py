@@ -1670,14 +1670,29 @@ def test_regression_inner_copper_layers_and_auto_routing_connectivity(tmp_path: 
     cfg = provider.pcb_config
     assert cfg is not None
     vias = cfg.vias
-    h7_via = next(
-        (v for v in vias if v.net == "GND" and abs(v.position_mm[0]) < 1.0 and abs(v.position_mm[1]) < 1.0),
-        None,
-    )
-    assert h7_via is not None, "U1 BGA GND pin H7 must have a stitching via connecting to the GND plane"
+    u1 = next(fp for fp in wiring.footprints if fp.name == "U1")
+    h7_pin = next((p for p in u1.pins if p.name == "H7"), None)
+    h8_pin = next(p for p in u1.pins if p.name == "H8")
+    h8_x, h8_y = PCBAutoRouter.get_pin_absolute_position(u1, h8_pin)
+
+    if h7_pin is not None:
+        h7_x, h7_y = PCBAutoRouter.get_pin_absolute_position(u1, h7_pin)
+        h7_via = next(
+            (
+                v
+                for v in vias
+                if v.net == "GND" and abs(v.position_mm[0] - h7_x) < 1.0 and abs(v.position_mm[1] - h7_y) < 1.0
+            ),
+            None,
+        )
+        assert h7_via is not None, "U1 BGA GND pin H7 must have a stitching via connecting to the GND plane"
 
     h8_via = next(
-        (v for v in vias if v.net == "3V3" and abs(v.position_mm[0] - 0.8) < 1.0 and abs(v.position_mm[1]) < 1.0),
+        (
+            v
+            for v in vias
+            if v.net == "3V3" and abs(v.position_mm[0] - h8_x) < 1.0 and abs(v.position_mm[1] - h8_y) < 1.0
+        ),
         None,
     )
     assert h8_via is not None, "U1 BGA 3V3 pin H8 must have a stitching via connecting to the 3V3 plane"

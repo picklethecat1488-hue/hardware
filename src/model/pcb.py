@@ -495,6 +495,16 @@ class PCBDesignRulesModel(BaseModel):
     min_clearance_mm: float = Field(
         default=0.12, gt=0.0, description="Minimum copper-to-copper clearance in millimeters"
     )
+    min_fine_pitch_clearance_mm: float = Field(
+        default=0.035,
+        gt=0.0,
+        description="Minimum copper-to-copper clearance for fine-pitch BGA neckdown in millimeters",
+    )
+    fine_pitch_pad_threshold_mm: float = Field(
+        default=0.35,
+        gt=0.0,
+        description="Maximum pad dimension in mm to qualify as fine-pitch",
+    )
     min_track_width_mm: float = Field(default=0.10, gt=0.0, description="Minimum copper trace width in millimeters")
     min_copper_edge_clearance_mm: float = Field(
         default=0.15, gt=0.0, description="Minimum clearance from copper features to board edge in millimeters"
@@ -525,6 +535,12 @@ class PCBDesignRulesModel(BaseModel):
     )
     default_via_drill_mm: float = Field(
         default=0.16, gt=0.0, description="Default via drill hole diameter in millimeters"
+    )
+    via_penalty: float = Field(
+        default=2.00, gt=0.0, description="Cost penalty for layer transition via in automated routing"
+    )
+    pad_to_mask_clearance_mm: float = Field(
+        default=0.0, ge=0.0, description="Solder mask expansion clearance in millimeters"
     )
 
     def to_kicad_pro_rules(self) -> Dict[str, float]:

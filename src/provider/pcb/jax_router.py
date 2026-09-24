@@ -6,8 +6,9 @@ It maps PCB routing layers and obstacles to dense tensors, solving multi-layer
 point-to-point and batched routing paths on Apple Silicon MPS and NVIDIA CUDA GPUs.
 """
 
+from collections import defaultdict
 import math
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -25,7 +26,8 @@ def _wavefront_step_2layer(
     cost: jnp.ndarray,
     mask: jnp.ndarray,
     via_mask: jnp.ndarray,
-    step_cost: jnp.ndarray,
+    step_cost_v: jnp.ndarray,
+    step_cost_h: jnp.ndarray,
     via_penalty: float,
 ) -> jnp.ndarray:
     """Execute one single-step 4-neighborhood planar and via wavefront propagation for 2 layers.
@@ -34,16 +36,17 @@ def _wavefront_step_2layer(
         cost: 3D float32 tensor of current shortest path costs (2, H, W).
         mask: 3D boolean tensor of obstacles (2, H, W).
         via_mask: 2D boolean tensor of via keepouts (H, W).
-        step_cost: 2D float32 tensor of cell traversal step costs (H, W).
+        step_cost_v: 3D float32 tensor of vertical cell traversal step costs (2, H, W).
+        step_cost_h: 3D float32 tensor of horizontal cell traversal step costs (2, H, W).
         via_penalty: Layer transition penalty cost.
 
     Returns:
         Updated 3D float32 cost tensor.
     """
-    c_up = jnp.pad(cost[:, :-1, :], ((0, 0), (1, 0), (0, 0)), constant_values=INF_COST) + step_cost
-    c_down = jnp.pad(cost[:, 1:, :], ((0, 0), (0, 1), (0, 0)), constant_values=INF_COST) + step_cost
-    c_left = jnp.pad(cost[:, :, :-1], ((0, 0), (0, 0), (1, 0)), constant_values=INF_COST) + step_cost
-    c_right = jnp.pad(cost[:, :, 1:], ((0, 0), (0, 0), (0, 1)), constant_values=INF_COST) + step_cost
+    c_up = jnp.pad(cost[:, :-1, :], ((0, 0), (1, 0), (0, 0)), constant_values=INF_COST) + step_cost_v
+    c_down = jnp.pad(cost[:, 1:, :], ((0, 0), (0, 1), (0, 0)), constant_values=INF_COST) + step_cost_v
+    c_left = jnp.pad(cost[:, :, :-1], ((0, 0), (0, 0), (1, 0)), constant_values=INF_COST) + step_cost_h
+    c_right = jnp.pad(cost[:, :, 1:], ((0, 0), (0, 0), (0, 1)), constant_values=INF_COST) + step_cost_h
 
     # Layer swap using explicit concatenation (fully compatible with Apple Silicon MPS and CUDA)
     other = jnp.concatenate([cost[1:2], cost[0:1]], axis=0)
@@ -60,7 +63,8 @@ def _run_wavefront_chunk(
     cost: jnp.ndarray,
     mask: jnp.ndarray,
     via_mask: jnp.ndarray,
-    step_cost: jnp.ndarray,
+    step_cost_v: jnp.ndarray,
+    step_cost_h: jnp.ndarray,
     via_penalty: float,
     chunk_size: int,
 ) -> jnp.ndarray:
@@ -70,7 +74,8 @@ def _run_wavefront_chunk(
         cost: 3D float32 cost tensor.
         mask: 3D boolean obstacle mask.
         via_mask: 2D boolean via obstacle mask.
-        step_cost: 2D float32 tensor of cell traversal step costs.
+        step_cost_v: 3D float32 tensor of vertical traversal step costs (2, H, W).
+        step_cost_h: 3D float32 tensor of horizontal traversal step costs (2, H, W).
         via_penalty: Via penalty in cost units.
         chunk_size: Number of steps to iterate per JIT execution.
 
@@ -79,7 +84,7 @@ def _run_wavefront_chunk(
     """
 
     def body_fn(_idx: int, c: jnp.ndarray) -> jnp.ndarray:
-        return _wavefront_step_2layer(c, mask, via_mask, step_cost, via_penalty)
+        return _wavefront_step_2layer(c, mask, via_mask, step_cost_v, step_cost_h, via_penalty)
 
     return jax.lax.fori_loop(0, chunk_size, body_fn, cost)
 
@@ -89,7 +94,8 @@ def _wavefront_step_batch_2layer(
     costs: jnp.ndarray,
     masks: jnp.ndarray,
     via_mask: jnp.ndarray,
-    step_cost: jnp.ndarray,
+    step_cost_v: jnp.ndarray,
+    step_cost_h: jnp.ndarray,
     via_penalty: float,
     chunk_size: int,
 ) -> jnp.ndarray:
@@ -99,7 +105,8 @@ def _wavefront_step_batch_2layer(
         costs: 4D float32 tensor of shape (B, 2, H, W).
         masks: 4D boolean tensor of shape (B, 2, H, W).
         via_mask: 2D boolean tensor of via keepouts (H, W).
-        step_cost: 2D float32 tensor of cell traversal step costs (H, W).
+        step_cost_v: 3D float32 tensor of vertical cell traversal step costs (2, H, W).
+        step_cost_h: 3D float32 tensor of horizontal cell traversal step costs (2, H, W).
         via_penalty: Layer transition penalty cost.
         chunk_size: Number of iterations per chunk.
 
@@ -110,19 +117,19 @@ def _wavefront_step_batch_2layer(
     def body_fn(_idx: int, c: jnp.ndarray) -> jnp.ndarray:
         c_up = (
             jnp.pad(c[:, :, :-1, :], ((0, 0), (0, 0), (1, 0), (0, 0)), constant_values=INF_COST)
-            + step_cost[None, None, :, :]
+            + step_cost_v[None, :, :, :]
         )
         c_down = (
             jnp.pad(c[:, :, 1:, :], ((0, 0), (0, 0), (0, 1), (0, 0)), constant_values=INF_COST)
-            + step_cost[None, None, :, :]
+            + step_cost_v[None, :, :, :]
         )
         c_left = (
             jnp.pad(c[:, :, :, :-1], ((0, 0), (0, 0), (0, 0), (1, 0)), constant_values=INF_COST)
-            + step_cost[None, None, :, :]
+            + step_cost_h[None, :, :, :]
         )
         c_right = (
             jnp.pad(c[:, :, :, 1:], ((0, 0), (0, 0), (0, 0), (0, 1)), constant_values=INF_COST)
-            + step_cost[None, None, :, :]
+            + step_cost_h[None, :, :, :]
         )
         other = jnp.concatenate([c[:, 1:2], c[:, 0:1]], axis=1)
         can_via = (other < REACHABLE_THRESHOLD) & (~via_mask[None, None, :, :])
@@ -149,6 +156,7 @@ class JaxPCBRouter:
         outline_polygon: Optional[List[Tuple[float, float]]] = None,
         edge_clearance: float = 0.35,
         qfn_keepouts: Optional[List[Tuple[float, float, float, float]]] = None,
+        design_rules: Optional[Any] = None,
     ) -> None:
         """Initialize the JAX-accelerated PCB router.
 
@@ -163,6 +171,7 @@ class JaxPCBRouter:
             outline_polygon: Optional closed polygon defining the outer board contour.
             edge_clearance: Minimum clearance between routed traces and outer board edge.
             qfn_keepouts: Keepout zones beneath fine-pitch packages.
+            design_rules: Optional design rules configuration model.
         """
         self.min_x, self.min_y, self.max_x, self.max_y = board_bounds
         self.grid_step = grid_step
@@ -175,6 +184,7 @@ class JaxPCBRouter:
         self.outline_polygon = outline_polygon
         self.edge_clearance = edge_clearance
         self.qfn_keepouts = qfn_keepouts or []
+        self.design_rules = design_rules
 
         self.width_mm = self.max_x - self.min_x
         self.height_mm = self.max_y - self.min_y
@@ -186,19 +196,52 @@ class JaxPCBRouter:
         # Host NumPy obstacle mask synchronized with JAX device
         self.mask_np = np.zeros((self.num_layers, self.h_cells, self.w_cells), dtype=bool)
         self.via_mask_np = np.zeros((self.h_cells, self.w_cells), dtype=bool)
-        self.step_cost_np = np.full((self.h_cells, self.w_cells), self.grid_step, dtype=np.float32)
+        self.step_cost_v_np = np.full((self.num_layers, self.h_cells, self.w_cells), self.grid_step, dtype=np.float32)
+        self.step_cost_h_np = np.full((self.num_layers, self.h_cells, self.w_cells), self.grid_step, dtype=np.float32)
         if self.dense_regions:
-            for dr_min_x, dr_min_y, dr_max_x, dr_max_y, _ in self.dense_regions:
+            for dr in self.dense_regions:
+                dr_min_x, dr_min_y, dr_max_x, dr_max_y = dr[0], dr[1], dr[2], dr[3]
+                dr_layer = dr[4] if len(dr) > 4 else "F.Cu"
+                is_bga = dr[5] if len(dr) > 5 else False
                 gx_min = max(0, int(math.floor((dr_min_x - self.min_x) / self.grid_step)))
                 gx_max = min(self.w_cells - 1, int(math.ceil((dr_max_x - self.min_x) / self.grid_step)))
                 gy_min = max(0, int(math.floor((dr_min_y - self.min_y) / self.grid_step)))
                 gy_max = min(self.h_cells - 1, int(math.ceil((dr_max_y - self.min_y) / self.grid_step)))
-                self.step_cost_np[gy_min : gy_max + 1, gx_min : gx_max + 1] = self.grid_step * 5.0
+                dr_l_idx = self.layer_to_idx.get(dr_layer, 0)
+                if is_bga:
+                    self.step_cost_v_np[dr_l_idx, gy_min : gy_max + 1, gx_min : gx_max + 1] = self.grid_step * 500.0
+                    self.step_cost_h_np[dr_l_idx, gy_min : gy_max + 1, gx_min : gx_max + 1] = self.grid_step * 500.0
+                    opp_l_idx = 1 - dr_l_idx if self.num_layers == 2 else (dr_l_idx + 1) % self.num_layers
+                    self.step_cost_v_np[opp_l_idx, gy_min : gy_max + 1, gx_min : gx_max + 1] = self.grid_step * 1.5
+                    self.step_cost_h_np[opp_l_idx, gy_min : gy_max + 1, gx_min : gx_max + 1] = self.grid_step * 1.5
+                else:
+                    self.step_cost_v_np[:, gy_min : gy_max + 1, gx_min : gx_max + 1] = self.grid_step * 5.0
+                    self.step_cost_h_np[:, gy_min : gy_max + 1, gx_min : gx_max + 1] = self.grid_step * 5.0
+
+                # Orthogonal pin escape corridors (1.50mm outward):
+                # North & South breakout corridors enforce vertical escape by penalizing horizontal cutting
+                b_dist = 1.50
+                g_south_min = max(0, int(math.floor((dr_min_y - b_dist - self.min_y) / self.grid_step)))
+                self.step_cost_h_np[:, g_south_min : gy_min + 1, gx_min : gx_max + 1] = self.grid_step * 15.0
+
+                g_north_max = min(self.h_cells - 1, int(math.ceil((dr_max_y + b_dist - self.min_y) / self.grid_step)))
+                self.step_cost_h_np[:, gy_max : g_north_max + 1, gx_min : gx_max + 1] = self.grid_step * 15.0
+
+                # East & West breakout corridors enforce horizontal escape by penalizing vertical cutting
+                g_west_min = max(0, int(math.floor((dr_min_x - b_dist - self.min_x) / self.grid_step)))
+                self.step_cost_v_np[:, gy_min : gy_max + 1, g_west_min : gx_min + 1] = self.grid_step * 15.0
+
+                g_east_max = min(self.w_cells - 1, int(math.ceil((dr_max_x + b_dist - self.min_x) / self.grid_step)))
+                self.step_cost_v_np[:, gy_min : gy_max + 1, gx_max : g_east_max + 1] = self.grid_step * 15.0
 
         self.obstacles: List[Obstacle] = []
         self.pin_cells: Set[Tuple[int, int, str]] = set()
+        self.pin_centers: Dict[Tuple[int, int, str], Optional[str]] = {}
         self.routed_cells: Dict[Tuple[int, int, int], str] = {}
         self.blocked_cells: Dict[Tuple[int, int, str], Optional[str]] = {}
+        self.routed_traces: List[TraceSegmentModel] = []
+        self.pin_via_owners: Dict[Tuple[int, int], Set[str]] = defaultdict(set)
+        self.pad_via_cells: Set[Tuple[int, int]] = set()
 
         self._apply_boundary_and_keepouts()
 
@@ -299,6 +342,57 @@ class JaxPCBRouter:
             else []
         )
 
+        if obs.is_pin:
+            c_x = obs.center[0] if obs.center else (obs.min_x + obs.max_x) / 2.0
+            c_y = obs.center[1] if obs.center else (obs.min_y + obs.max_y) / 2.0
+            c_gx = int(round((c_x - self.min_x) / self.grid_step))
+            c_gy = int(round((c_y - self.min_y) / self.grid_step))
+
+            if obs.copper_box:
+                cb_x0, cb_y0, cb_x1, cb_y1 = obs.copper_box
+                pgx_min = max(0, int(math.floor((cb_x0 - self.min_x) / self.grid_step)))
+                pgx_max = min(self.w_cells - 1, int(math.ceil((cb_x1 - self.min_x) / self.grid_step)))
+                pgy_min = max(0, int(math.floor((cb_y0 - self.min_y) / self.grid_step)))
+                pgy_max = min(self.h_cells - 1, int(math.ceil((cb_y1 - self.min_y) / self.grid_step)))
+                for py_i in range(pgy_min, pgy_max + 1):
+                    for px_i in range(pgx_min, pgx_max + 1):
+                        self.pad_via_cells.add((px_i, py_i))
+            else:
+                self.pad_via_cells.add((c_gx, c_gy))
+
+            if obs.is_circle and (obs.radius or 0.14) <= 0.20:
+                for dy in (-1, 0, 1):
+                    ny = c_gy + dy
+                    if 0 <= ny < self.h_cells:
+                        for dx in (-1, 0, 1):
+                            nx = c_gx + dx
+                            if 0 <= nx < self.w_cells:
+                                if abs(dy) + abs(dx) <= 1:
+                                    self.via_mask_np[ny, nx] = True
+                                    if obs.net:
+                                        self.pin_via_owners[(nx, ny)].add(obs.net)
+            else:
+                if obs.copper_box:
+                    cb_min_x, cb_min_y, cb_max_x, cb_max_y = obs.copper_box
+                else:
+                    cb_min_x, cb_min_y = c_x - 0.15, c_y - 0.15
+                    cb_max_x, cb_max_y = c_x + 0.15, c_y + 0.15
+                v_clr = 0.20
+                vgx_min = max(0, int(math.floor((cb_min_x - v_clr - self.min_x) / self.grid_step)))
+                vgx_max = min(self.w_cells - 1, int(math.ceil((cb_max_x + v_clr - self.min_x) / self.grid_step)))
+                vgy_min = max(0, int(math.floor((cb_min_y - v_clr - self.min_y) / self.grid_step)))
+                vgy_max = min(self.h_cells - 1, int(math.ceil((cb_max_y + v_clr - self.min_y) / self.grid_step)))
+                self.via_mask_np[vgy_min : vgy_max + 1, vgx_min : vgx_max + 1] = True
+                if obs.net:
+                    for vy in range(vgy_min, vgy_max + 1):
+                        for vx in range(vgx_min, vgx_max + 1):
+                            self.pin_via_owners[(vx, vy)].add(obs.net)
+            if 0 <= c_gx < self.w_cells and 0 <= c_gy < self.h_cells:
+                for l_idx in target_layer_indices:
+                    p_key = (c_gx, c_gy, self.idx_to_layer[l_idx])
+                    self.pin_centers[p_key] = obs.net
+                    self.blocked_cells[p_key] = obs.net
+
         for l_idx in target_layer_indices:
             lay_name = self.idx_to_layer[l_idx]
             if obs.is_circle and obs.center and obs.radius:
@@ -312,15 +406,34 @@ class JaxPCBRouter:
                             key = (gx, gy, lay_name)
                             if obs.is_pin:
                                 self.pin_cells.add(key)
-                            self.blocked_cells[key] = obs.net
+                            if key not in self.pin_centers or self.pin_centers[key] == obs.net:
+                                self.blocked_cells[key] = obs.net
             else:
-                self.mask_np[l_idx, gy_min : gy_max + 1, gx_min : gx_max + 1] = True
                 for gy in range(gy_min, gy_max + 1):
+                    py = self.min_y + gy * self.grid_step
+                    if py < obs.min_y or py > obs.max_y:
+                        continue
                     for gx in range(gx_min, gx_max + 1):
+                        px = self.min_x + gx * self.grid_step
+                        if px < obs.min_x or px > obs.max_x:
+                            continue
+                        self.mask_np[l_idx, gy, gx] = True
                         key = (gx, gy, lay_name)
                         if obs.is_pin:
                             self.pin_cells.add(key)
-                        self.blocked_cells[key] = obs.net
+                        if key not in self.pin_centers or self.pin_centers[key] == obs.net:
+                            self.blocked_cells[key] = obs.net
+
+        if not obs.is_pin and obs.is_circle and obs.center:
+            c_gx = int(round((obs.center[0] - self.min_x) / self.grid_step))
+            c_gy = int(round((obs.center[1] - self.min_y) / self.grid_step))
+            for dy in (-1, 0, 1):
+                ny = c_gy + dy
+                if 0 <= ny < self.h_cells:
+                    for dx in (-1, 0, 1):
+                        nx = c_gx + dx
+                        if 0 <= nx < self.w_cells:
+                            self.via_mask_np[ny, nx] = True
 
     def rebuild_spatial_index(self) -> None:
         """Rebuild dense obstacle tensor and dictionary indices from current registered obstacles."""
@@ -328,11 +441,32 @@ class JaxPCBRouter:
         self.via_mask_np.fill(False)
         self.blocked_cells.clear()
         self.pin_cells.clear()
+        self.pin_centers.clear()
+        self.routed_cells.clear()
         self._apply_boundary_and_keepouts()
         all_obs = list(self.obstacles)
         self.obstacles.clear()
         for obs in all_obs:
             self.add_obstacle(obs)
+        for tr in self.routed_traces:
+            gx_s = round((tr.start_mm[0] - self.min_x) / self.grid_step)
+            gy_s = round((tr.start_mm[1] - self.min_y) / self.grid_step)
+            gx_e = round((tr.end_mm[0] - self.min_x) / self.grid_step)
+            gy_e = round((tr.end_mm[1] - self.min_y) / self.grid_step)
+            l_idx = self.layer_to_idx.get(tr.layer, 0)
+            dist_cells = max(abs(gx_e - gx_s), abs(gy_e - gy_s), 1)
+            for s in range(dist_cells + 1):
+                t = s / dist_cells
+                cgx = round(gx_s + t * (gx_e - gx_s))
+                cgy = round(gy_s + t * (gy_e - gy_s))
+                self.routed_cells[(cgx, cgy, l_idx)] = tr.net
+                for dy in (-1, 0, 1):
+                    ny = cgy + dy
+                    if 0 <= ny < self.h_cells:
+                        for dx in (-1, 0, 1):
+                            nx = cgx + dx
+                            if 0 <= nx < self.w_cells:
+                                self.via_mask_np[ny, nx] = True
 
     def route_net(
         self,
@@ -345,7 +479,7 @@ class JaxPCBRouter:
         chunk_size: int = 25,
         max_chunks: int = 48,
         junction_points: Optional[List[Tuple[float, float]]] = None,
-        fillet_radius: float = 0.20,
+        fillet_radius: float = 0.0,
     ) -> Tuple[List[TraceSegmentModel], List[ViaModel]]:
         """Solve optimal collision-free multi-layer path between start and end using GPU JAX wavefronts.
 
@@ -367,8 +501,21 @@ class JaxPCBRouter:
         Raises:
             RuntimeError: If target is completely unreachable or blocked by obstacles.
         """
-        l0, y0, x0 = self.world_to_grid(start_pt[0], start_pt[1], start_layer)
-        l1, y1, x1 = self.world_to_grid(end_pt[0], end_pt[1], end_layer)
+        if start_layer == "ALL":
+            start_layers = list(range(self.num_layers))
+            _, y0, x0 = self.world_to_grid(start_pt[0], start_pt[1], "F.Cu")
+            l0 = 0
+        else:
+            l0, y0, x0 = self.world_to_grid(start_pt[0], start_pt[1], start_layer)
+            start_layers = [l0]
+
+        if end_layer == "ALL":
+            end_layers = list(range(self.num_layers))
+            _, y1, x1 = self.world_to_grid(end_pt[0], end_pt[1], "F.Cu")
+            l1 = 0
+        else:
+            l1, y1, x1 = self.world_to_grid(end_pt[0], end_pt[1], end_layer)
+            end_layers = [l1]
 
         # Prepare active obstacle mask for this net
         active_mask = np.copy(self.mask_np)
@@ -377,26 +524,124 @@ class JaxPCBRouter:
                 l_idx = self.layer_to_idx.get(lay_name, 0)
                 active_mask[l_idx, gy, gx] = False
 
-        # Ensure start and target endpoints are open
-        active_mask[l0, max(0, y0 - 1) : y0 + 2, max(0, x0 - 1) : x0 + 2] = False
-        active_mask[l1, max(0, y1 - 1) : y1 + 2, max(0, x1 - 1) : x1 + 2] = False
+        # Ensure start and target endpoints are open on candidate layers
+        for sl in start_layers:
+            sl_name = self.idx_to_layer.get(sl, "F.Cu")
+            active_mask[sl, y0, x0] = False
+            for dy in (-1, 0, 1):
+                ny = y0 + dy
+                if not (0 <= ny < self.h_cells):
+                    continue
+                for dx in (-1, 0, 1):
+                    nx = x0 + dx
+                    if not (0 <= nx < self.w_cells) or (abs(dy) + abs(dx) != 1):
+                        continue
+                    blocked_net = self.blocked_cells.get((nx, ny, sl_name))
+                    foreign_copper = self.routed_cells.get((nx, ny, sl))
+                    if blocked_net in (None, net_name) and foreign_copper in (None, net_name):
+                        active_mask[sl, ny, nx] = False
+
+        for el in end_layers:
+            el_name = self.idx_to_layer.get(el, "F.Cu")
+            active_mask[el, y1, x1] = False
+            for dy in (-1, 0, 1):
+                ny = y1 + dy
+                if not (0 <= ny < self.h_cells):
+                    continue
+                for dx in (-1, 0, 1):
+                    nx = x1 + dx
+                    if not (0 <= nx < self.w_cells) or (abs(dy) + abs(dx) != 1):
+                        continue
+                    blocked_net = self.blocked_cells.get((nx, ny, el_name))
+                    foreign_copper = self.routed_cells.get((nx, ny, el))
+                    if blocked_net in (None, net_name) and foreign_copper in (None, net_name):
+                        active_mask[el, ny, nx] = False
+
+        if self.edge_clearance > 0.0:
+            c_cells_x = int(math.ceil(self.edge_clearance / self.grid_step))
+            c_cells_y = int(math.ceil(self.edge_clearance / self.grid_step))
+            active_mask[:, :c_cells_y, :] = True
+            active_mask[:, -c_cells_y:, :] = True
+            active_mask[:, :, :c_cells_x] = True
+            active_mask[:, :, -c_cells_x:] = True
+            for sl in start_layers:
+                active_mask[sl, y0, x0] = False
+            for el in end_layers:
+                active_mask[el, y1, x1] = False
+
+        active_via_mask = np.copy(self.via_mask_np)
+        for (vgx, vgy), owners in self.pin_via_owners.items():
+            if owners == {net_name} and (vgx, vgy) not in self.pad_via_cells:
+                active_via_mask[vgy, vgx] = False
 
         mask_jax = jnp.array(active_mask, dtype=bool)
-        via_mask_jax = jnp.array(self.via_mask_np, dtype=bool)
-        step_cost_jax = jnp.array(self.step_cost_np, dtype=jnp.float32)
+        via_mask_jax = jnp.array(active_via_mask, dtype=bool)
+        step_cost_v_jax = jnp.array(self.step_cost_v_np, dtype=jnp.float32)
+        step_cost_h_jax = jnp.array(self.step_cost_h_np, dtype=jnp.float32)
 
         cost = jnp.full((self.num_layers, self.h_cells, self.w_cells), INF_COST, dtype=jnp.float32)
-        cost = cost.at[l0, y0, x0].set(0.0)
+        for sl in start_layers:
+            cost = cost.at[sl, y0, x0].set(0.0)
 
         # Iteratively expand wavefront in JIT chunks on MPS/CUDA until target is reached
         target_cost = float(INF_COST)
+        best_l1 = end_layers[0]
         for _ in range(max_chunks):
-            cost = _run_wavefront_chunk(cost, mask_jax, via_mask_jax, step_cost_jax, self.via_penalty, chunk_size)
-            target_cost = float(cost[l1, y1, x1])
-            if target_cost < REACHABLE_THRESHOLD:
+            cost = _run_wavefront_chunk(
+                cost, mask_jax, via_mask_jax, step_cost_v_jax, step_cost_h_jax, self.via_penalty, chunk_size
+            )
+            cand_costs = [float(cost[el, y1, x1]) for el in end_layers]
+            min_cand = min(cand_costs)
+            if min_cand < REACHABLE_THRESHOLD:
+                best_l1 = end_layers[cand_costs.index(min_cand)]
+                target_cost = min_cand
                 break
 
         if target_cost >= REACHABLE_THRESHOLD:
+            cost_np = np.array(cost)
+            reached_mask = cost_np < REACHABLE_THRESHOLD
+            r_count = int(np.sum(reached_mask))
+            if r_count > 0:
+                l_arr, y_arr, x_arr = np.where(reached_mask)
+                x_min_mm = self.min_x + x_arr.min() * self.grid_step
+                x_max_mm = self.min_x + x_arr.max() * self.grid_step
+                y_min_mm = self.min_y + y_arr.min() * self.grid_step
+                y_max_mm = self.min_y + y_arr.max() * self.grid_step
+                print(
+                    f"DEBUG {net_name}: reached {r_count} cells, x in [{x_min_mm:.2f}, {x_max_mm:.2f}], y in [{y_min_mm:.2f}, {y_max_mm:.2f}], layers={np.unique(l_arr)}"
+                )
+                for l_idx in range(self.num_layers):
+                    l_reached = reached_mask[l_idx]
+                    if not np.any(l_reached):
+                        print(f"DEBUG {net_name}: layer {l_idx} ({self.idx_to_layer[l_idx]}) has 0 reached cells")
+                        continue
+                    border = np.zeros_like(l_reached)
+                    for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                        border |= np.roll(np.roll(l_reached, dy, axis=0), dx, axis=1)
+                    border &= ~l_reached
+                    border_ys, border_xs = np.where(border)
+                    blocking_nets = {}
+                    border_coords_by_net = {}
+                    for by, bx in zip(border_ys, border_xs):
+                        b_net = self.blocked_cells.get((bx, by, self.idx_to_layer[l_idx]))
+                        if b_net:
+                            blocking_nets[b_net] = blocking_nets.get(b_net, 0) + 1
+                            x_mm = self.min_x + bx * self.grid_step
+                            y_mm = self.min_y + by * self.grid_step
+                            border_coords_by_net.setdefault(b_net, []).append((round(x_mm, 2), round(y_mm, 2)))
+                    print(
+                        f"DEBUG {net_name}: layer {l_idx} ({self.idx_to_layer[l_idx]}) reached {np.sum(l_reached)} cells, border blocked by nets: {blocking_nets}"
+                    )
+                    for b_net, pts in border_coords_by_net.items():
+                        xs = [p[0] for p in pts]
+                        ys = [p[1] for p in pts]
+                        print(
+                            f"    {b_net}: {len(pts)} pts, x in [{min(xs):.2f}, {max(xs):.2f}], y in [{min(ys):.2f}, {max(ys):.2f}]"
+                        )
+            else:
+                print(
+                    f"DEBUG {net_name}: 0 cells reached from start ({start_pt[0]:.2f}, {start_pt[1]:.2f}) [grid: ({l0}, {y0}, {x0})] mask={bool(active_mask[l0, y0, x0])}"
+                )
             raise RuntimeError(
                 f"JAX router could not find collision-free path for net '{net_name}' "
                 f"from ({start_pt[0]:.2f}, {start_pt[1]:.2f}) [{start_layer}] "
@@ -406,11 +651,11 @@ class JaxPCBRouter:
 
         # Backtrack optimal shortest path along negative gradient on host NumPy array
         cost_np = np.array(cost)
-        curr = (l1, y1, x1)
+        curr = (best_l1, y1, x1)
         grid_path = [curr]
 
         dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        while curr != (l0, y0, x0):
+        while curr[0] not in start_layers or (curr[1], curr[2]) != (y0, x0):
             cl, cy, cx = curr
             best_cost = cost_np[cl, cy, cx]
             best_next = None
@@ -425,7 +670,7 @@ class JaxPCBRouter:
                         best_next = (cl, ny, nx)
 
             # 2. Check layer transition via (if not in via_mask)
-            if not self.via_mask_np[cy, cx]:
+            if not active_via_mask[cy, cx]:
                 other_l = 1 - cl if self.num_layers == 2 else (cl + 1) % self.num_layers
                 c_via_cand = cost_np[other_l, cy, cx]
                 if c_via_cand + self.via_penalty <= cost_np[cl, cy, cx] + 1e-4 and c_via_cand < best_cost:
@@ -448,8 +693,10 @@ class JaxPCBRouter:
         if len(raw_path) < 2:
             return [], []
 
-        raw_path[0] = (start_pt[0], start_pt[1], start_layer)
-        raw_path[-1] = (end_pt[0], end_pt[1], end_layer)
+        actual_start_layer = raw_path[0][2] if start_layer == "ALL" else start_layer
+        actual_end_layer = raw_path[-1][2] if end_layer == "ALL" else end_layer
+        raw_path[0] = (start_pt[0], start_pt[1], actual_start_layer)
+        raw_path[-1] = (end_pt[0], end_pt[1], actual_end_layer)
 
         traces: List[TraceSegmentModel] = []
         vias: List[ViaModel] = []
@@ -475,12 +722,16 @@ class JaxPCBRouter:
                     )
                 is_dense_via = False
                 if self.dense_regions:
-                    for dr_min_x, dr_min_y, dr_max_x, dr_max_y, _ in self.dense_regions:
+                    for dr in self.dense_regions:
+                        dr_min_x, dr_min_y, dr_max_x, dr_max_y = dr[0], dr[1], dr[2], dr[3]
                         if dr_min_x - 0.10 <= px <= dr_max_x + 0.10 and dr_min_y - 0.10 <= py <= dr_max_y + 0.10:
                             is_dense_via = True
                             break
-                v_pad = 0.36 if is_dense_via else 0.45
-                v_drill = 0.16 if is_dense_via else 0.20
+                rules = self.design_rules
+                default_v_pad = getattr(rules, "default_via_diameter_mm", 0.36) if rules else 0.36
+                default_v_drill = getattr(rules, "default_via_drill_mm", 0.16) if rules else 0.16
+                v_pad = default_v_pad
+                v_drill = default_v_drill
                 vias.append(
                     ViaModel(
                         net=net_name,
@@ -507,7 +758,7 @@ class JaxPCBRouter:
             )
 
         for v in vias:
-            v_r = v.pad_diameter_mm / 2.0 + 0.14
+            v_r = max(v.pad_diameter_mm / 2.0 + 0.20, 0.38)
             self.add_obstacle(
                 Obstacle(
                     min_x=v.position_mm[0] - v_r,
@@ -523,11 +774,23 @@ class JaxPCBRouter:
             )
             gx_v = round((v.position_mm[0] - self.min_x) / self.grid_step)
             gy_v = round((v.position_mm[1] - self.min_y) / self.grid_step)
-            for l_i in range(len(self.layers)):
-                self.routed_cells[(gx_v, gy_v, l_i)] = net_name
+            for dy in (-1, 0, 1):
+                ny_v = gy_v + dy
+                if not (0 <= ny_v < self.h_cells):
+                    continue
+                for dx in (-1, 0, 1):
+                    nx_v = gx_v + dx
+                    if not (0 <= nx_v < self.w_cells):
+                        continue
+                    self.via_mask_np[ny_v, nx_v] = True
+                    self.mask_np[:, ny_v, nx_v] = True
+                    for l_i in range(len(self.layers)):
+                        self.blocked_cells[(nx_v, ny_v, self.idx_to_layer[l_i])] = net_name
+                        if dy == 0 and dx == 0:
+                            self.routed_cells[(nx_v, ny_v, l_i)] = net_name
 
         for tr in traces:
-            w_half = max(tr.width_mm / 2.0 + 0.12, 0.21)
+            w_half = tr.width_mm / 2.0 + 0.17
             self.add_obstacle(
                 Obstacle(
                     min_x=min(tr.start_mm[0], tr.end_mm[0]) - w_half,
@@ -549,7 +812,15 @@ class JaxPCBRouter:
                 cgx = round(gx_s + t * (gx_e - gx_s))
                 cgy = round(gy_s + t * (gy_e - gy_s))
                 self.routed_cells[(cgx, cgy, l_idx)] = net_name
+                for dy in (-1, 0, 1):
+                    ny = cgy + dy
+                    if 0 <= ny < self.h_cells:
+                        for dx in (-1, 0, 1):
+                            nx = cgx + dx
+                            if 0 <= nx < self.w_cells:
+                                self.via_mask_np[ny, nx] = True
 
+        self.routed_traces.extend(traces)
         return traces, vias
 
     def route_batch(
@@ -578,23 +849,48 @@ class JaxPCBRouter:
         targets: List[Tuple[int, int, int]] = []
         starts: List[Tuple[int, int, int]] = []
 
-        for b_idx, (s_pt, s_lay, e_pt, e_lay, _net_name, _w) in enumerate(net_specs):
+        for b_idx, (s_pt, s_lay, e_pt, e_lay, b_net_name, _w) in enumerate(net_specs):
             l0, y0, x0 = self.world_to_grid(s_pt[0], s_pt[1], s_lay)
             l1, y1, x1 = self.world_to_grid(e_pt[0], e_pt[1], e_lay)
             costs_np[b_idx, l0, y0, x0] = 0.0
-            masks_np[b_idx, l0, max(0, y0 - 1) : y0 + 2, max(0, x0 - 1) : x0 + 2] = False
-            masks_np[b_idx, l1, max(0, y1 - 1) : y1 + 2, max(0, x1 - 1) : x1 + 2] = False
+            sl0_name = self.idx_to_layer.get(l0, "F.Cu")
+            for dy in (-1, 0, 1):
+                ny0 = y0 + dy
+                if 0 <= ny0 < self.h_cells:
+                    for dx in (-1, 0, 1):
+                        nx0 = x0 + dx
+                        if 0 <= nx0 < self.w_cells:
+                            foreign_pin = self.pin_centers.get((nx0, ny0, sl0_name))
+                            if (dy == 0 and dx == 0) or (
+                                self.routed_cells.get((nx0, ny0, l0)) in (None, b_net_name)
+                                and (foreign_pin is None or foreign_pin == b_net_name)
+                            ):
+                                masks_np[b_idx, l0, ny0, nx0] = False
+            sl1_name = self.idx_to_layer.get(l1, "F.Cu")
+            for dy in (-1, 0, 1):
+                ny1 = y1 + dy
+                if 0 <= ny1 < self.h_cells:
+                    for dx in (-1, 0, 1):
+                        nx1 = x1 + dx
+                        if 0 <= nx1 < self.w_cells:
+                            foreign_pin = self.pin_centers.get((nx1, ny1, sl1_name))
+                            if (dy == 0 and dx == 0) or (
+                                self.routed_cells.get((nx1, ny1, l1)) in (None, b_net_name)
+                                and (foreign_pin is None or foreign_pin == b_net_name)
+                            ):
+                                masks_np[b_idx, l1, ny1, nx1] = False
             starts.append((l0, y0, x0))
             targets.append((l1, y1, x1))
 
         costs_jax = jnp.array(costs_np)
         masks_jax = jnp.array(masks_np)
         via_mask_jax = jnp.array(self.via_mask_np, dtype=bool)
-        step_cost_jax = jnp.array(self.step_cost_np, dtype=jnp.float32)
+        step_cost_v_jax = jnp.array(self.step_cost_v_np, dtype=jnp.float32)
+        step_cost_h_jax = jnp.array(self.step_cost_h_np, dtype=jnp.float32)
 
         for _ in range(max_chunks):
             costs_jax = _wavefront_step_batch_2layer(
-                costs_jax, masks_jax, via_mask_jax, step_cost_jax, self.via_penalty, chunk_size
+                costs_jax, masks_jax, via_mask_jax, step_cost_v_jax, step_cost_h_jax, self.via_penalty, chunk_size
             )
             # Check if all reached
             reached_all = True
@@ -685,12 +981,15 @@ class JaxPCBRouter:
                 p0 = compressed_pts[i]
                 p1 = compressed_pts[i + 1]
                 if p0[2] != p1[2]:
+                    rules = self.design_rules
+                    default_v_pad = getattr(rules, "default_via_diameter_mm", 0.36) if rules else 0.36
+                    default_v_drill = getattr(rules, "default_via_drill_mm", 0.16) if rules else 0.16
                     net_vias.append(
                         ViaModel(
                             net=net_name,
                             position_mm=(p0[0], p0[1]),
-                            pad_diameter_mm=0.45,
-                            drill_diameter_mm=0.20,
+                            pad_diameter_mm=default_v_pad,
+                            drill_diameter_mm=default_v_drill,
                             layer_start=min(p0[2], p1[2]),
                             layer_end=max(p0[2], p1[2]),
                         )

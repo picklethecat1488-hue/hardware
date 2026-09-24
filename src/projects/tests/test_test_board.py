@@ -83,9 +83,18 @@ def test_regression_bug_075_swd_cutout() -> None:
     z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
     z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
 
-    # Probe point centered inside the left exterior wall (X = -w/2 + wall/2) at J5 SWD connector Y=-7.0
+    from model.wiring import Wiring
+
+    swd_y = -15.0
+    if provider.wiring_path.exists():
+        wiring = Wiring(str(provider.wiring_path))
+        comp_map = {c.name: c for c in wiring.footprints}
+        if "J5" in comp_map:
+            swd_y = comp_map["J5"].position[1]
+
+    # Probe point centered inside the left exterior wall (X = -w/2 + wall/2) at J5 SWD connector position
     wall_x = (-w / 2.0) + (wall / 2.0)
-    assert not enclosure.part.is_inside((wall_x, -7.0, z_conn)), (
+    assert not enclosure.part.is_inside((wall_x, swd_y, z_conn)), (
         "Enclosure bottom must have an SWD cutout through the left exterior wall at J5 position"
     )
 

@@ -97,7 +97,7 @@ footprints:
 
   - name: Q1
     package: SOT-23
-    position: [-18.0, -22.0, -0.8]
+    position: [-19.0, -22.0, -0.8]
     layer: B.Cu
     rotation: [0.0, 0.0, 0.0]
     dimensions: [2.9, 1.3, 1.1]
@@ -154,14 +154,14 @@ footprints:
 
   - name: R3
     package: "0402"
-    position: [-17.0, 4.5, 0.8]
+    position: [-17.0, -4.5, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: RC0402FR-075K1L
     supplier_pn: 311-5.1KLRCT-ND
 
   - name: R4
     package: "0402"
-    position: [-17.0, -4.5, 0.8]
+    position: [-17.0, 4.5, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: RC0402FR-075K1L
     supplier_pn: 311-5.1KLRCT-ND
@@ -212,21 +212,21 @@ footprints:
   # U1 High Speed Crystal Oscillator & Decoupling Passives
   - name: Y1
     package: XTAL-3225-4P
-    position: [-4.0, 14.0, 0.8]
+    position: [-9.0, 1.25, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: ECS-240-8-30B-CKM
     supplier_pn: XC2345-ND
 
   - name: C9
     package: "0402"
-    position: [-7.0, 14.0, 0.8]
+    position: [-12.0, 2.5, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402JRNPO9BN120
     supplier_pn: 311-1032-1-ND
 
   - name: C10
     package: "0402"
-    position: [-1.0, 14.0, 0.8]
+    position: [-12.0, 0.0, 0.8]
     rotation: [0.0, 0.0, 0.0]
     mpn: CC0402JRNPO9BN120
     supplier_pn: 311-1032-1-ND
@@ -271,7 +271,7 @@ footprints:
     package: "0402"
     position: [14.0, -8.0, -0.8]
     layer: B.Cu
-    rotation: [0.0, 0.0, 0.0]
+    rotation: [0.0, 0.0, 180.0]
     mpn: CC0402KRX5R6BB225
     supplier_pn: 311-1440-1-ND
 
@@ -280,7 +280,7 @@ footprints:
     package: "0402"
     position: [14.0, -10.0, -0.8]
     layer: B.Cu
-    rotation: [0.0, 0.0, 0.0]
+    rotation: [0.0, 0.0, 180.0]
     mpn: CC0402KRX5R6BB225
     supplier_pn: 311-1440-1-ND
 
@@ -318,7 +318,7 @@ footprints:
   - name: J9
     package: pin_header_1x6
     position: [24.5, -5.0, 0.8]
-    rotation: [0.0, 0.0, 90.0]
+    rotation: [0.0, 0.0, -90.0]
     mpn: TSW-106-07-L-S
     supplier_pn: SAM1034-06-ND
 
@@ -477,6 +477,7 @@ nets:
       - [J9, "1"]
 
   - name: VBUS
+    priority: 24
     color: "#b91c1c"
     pins:
       - [J3, VBUS]
@@ -487,6 +488,7 @@ nets:
       - [U9, "20"]
 
   - name: VBAT
+    priority: 24
     color: "#f59e0b"
     pins:
       - [J13, "1"]
@@ -495,18 +497,21 @@ nets:
       - [U7, "2"]
 
   - name: CC1
+    priority: 53
     color: "#0284c7"
     pins:
       - [J3, CC1]
       - [R3, "1"]
 
   - name: CC2
+    priority: 54
     color: "#0284c7"
     pins:
       - [J3, CC2]
       - [R4, "1"]
 
   - name: PWR_EN
+    priority: 24
     color: "#ea580c"
     pins:
       - [U1, D1]
@@ -514,6 +519,7 @@ nets:
       - [U4, SD_MODE]
 
   - name: VLOAD_SW
+    priority: 25
     color: "#f97316"
     pins:
       - [Q1, D]
@@ -526,8 +532,15 @@ nets:
       - [J8, "2"]
       - [J9, "2"]
 
+  - name: CAP_INT
+    priority: 18
+    color: "#84cc16"
+    pins:
+      - [U1, C4]
+      - [U2, RDY]
+
   - name: I2C_SCL
-    priority: 20
+    priority: 19
     color: "#22c55e"
     pins:
       - [U1, C5]
@@ -535,19 +548,12 @@ nets:
       - [R2, "2"]
 
   - name: I2C_SDA
-    priority: 19
+    priority: 20
     color: "#16a34a"
     pins:
       - [U1, C6]
       - [U2, SDA]
       - [R1, "2"]
-
-  - name: CAP_INT
-    priority: 21
-    color: "#84cc16"
-    pins:
-      - [U1, C4]
-      - [U2, RDY]
 
   - name: OSC_IN
     priority: 1
@@ -566,7 +572,7 @@ nets:
       - [C10, "1"]
 
   - name: NRST
-    priority: 37
+    priority: 21
     color: "#eab308"
     pins:
       - [U1, F3]
@@ -583,141 +589,141 @@ nets:
       - [U9, "22"]
 
   - name: PCIE_TX0_P
-    priority: 5
+    priority: 9
     color: "#2563eb"
     pins:
       - [U1, T2]
       - [J1, PETp0]
 
   - name: PCIE_TX0_N
-    priority: 6
+    priority: 10
     color: "#3b82f6"
     pins:
       - [U1, T1]
       - [J1, PETn0]
 
   - name: PCIE_RX0_P
-    priority: 7
+    priority: 11
     color: "#059669"
     pins:
       - [U1, T3]
       - [J1, PERp0]
 
   - name: PCIE_RX0_N
-    priority: 8
+    priority: 12
     color: "#10b981"
     pins:
       - [U1, T4]
       - [J1, PERn0]
 
   - name: MIPI_DATA0_P
-    priority: 41
+    priority: 5
     color: "#7c3aed"
     pins:
       - [U1, A2]
       - [J2, D0_P]
 
   - name: MIPI_DATA0_N
-    priority: 42
+    priority: 6
     color: "#8b5cf6"
     pins:
       - [U1, A4]
       - [J2, D0_N]
 
   - name: MIPI_CLK_P
-    priority: 43
+    priority: 7
     color: "#d97706"
     pins:
       - [U1, A12]
       - [J2, CLK_P]
 
   - name: MIPI_CLK_N
-    priority: 44
+    priority: 8
     color: "#f59e0b"
     pins:
       - [U1, A14]
       - [J2, CLK_N]
 
-  - name: CAP_RX0
-    priority: 45
-    color: "#0891b2"
-    pins:
-      - [U2, CR0]
-      - [J2, CAP_RX0]
-      - [J4, CAP_RX0]
-
-  - name: CAP_RX1
-    priority: 46
-    color: "#0369a1"
-    pins:
-      - [U2, CR1]
-      - [J2, CAP_RX1]
-      - [J4, CAP_RX1]
-
-  - name: CAP_RX2
-    priority: 47
-    color: "#38bdf8"
-    pins:
-      - [U2, CR2]
-      - [J2, CAP_RX2]
-      - [J4, CAP_RX2]
-
-  - name: CAP_RX3
-    priority: 48
-    color: "#67e8f9"
-    pins:
-      - [U2, CR3]
-      - [J2, CAP_RX3]
-      - [J4, CAP_RX3]
-
-  - name: CAP_TX0
-    priority: 49
-    color: "#06b6d4"
-    pins:
-      - [U2, CR4]
-      - [J2, CAP_TX0]
-      - [J4, CAP_TX0]
-
-  - name: CAP_TX1
-    priority: 50
-    color: "#0284c7"
-    pins:
-      - [U2, CR5]
-      - [J2, CAP_TX1]
-      - [J4, CAP_TX1]
-
-  - name: CAP_TX2
-    priority: 51
-    color: "#0ea5e9"
-    pins:
-      - [U2, CR6]
-      - [J2, CAP_TX2]
-      - [J4, CAP_TX2]
-
   - name: CAP_SHIELD
-    priority: 52
+    priority: 25
     color: "#64748b"
     pins:
       - [U2, CR7]
       - [J2, CAP_SHIELD]
       - [J4, CAP_SHIELD]
 
-  - name: PDM_DAT
-    priority: 38
-    color: "#9333ea"
+  - name: CAP_TX2
+    priority: 26
+    color: "#0ea5e9"
     pins:
-      - [U1, H1]
-      - [U4, DIN]
+      - [U2, CR6]
+      - [J2, CAP_TX2]
+      - [J4, CAP_TX2]
+
+  - name: CAP_TX1
+    priority: 27
+    color: "#0284c7"
+    pins:
+      - [U2, CR5]
+      - [J2, CAP_TX1]
+      - [J4, CAP_TX1]
+
+  - name: CAP_TX0
+    priority: 28
+    color: "#06b6d4"
+    pins:
+      - [U2, CR4]
+      - [J2, CAP_TX0]
+      - [J4, CAP_TX0]
+
+  - name: CAP_RX3
+    priority: 29
+    color: "#67e8f9"
+    pins:
+      - [U2, CR3]
+      - [J2, CAP_RX3]
+      - [J4, CAP_RX3]
+
+  - name: CAP_RX2
+    priority: 30
+    color: "#38bdf8"
+    pins:
+      - [U2, CR2]
+      - [J2, CAP_RX2]
+      - [J4, CAP_RX2]
+
+  - name: CAP_RX1
+    priority: 31
+    color: "#0369a1"
+    pins:
+      - [U2, CR1]
+      - [J2, CAP_RX1]
+      - [J4, CAP_RX1]
+
+  - name: CAP_RX0
+    priority: 32
+    color: "#0891b2"
+    pins:
+      - [U2, CR0]
+      - [J2, CAP_RX0]
+      - [J4, CAP_RX0]
 
   - name: PDM_CLK
-    priority: 39
+    priority: 13
     color: "#a855f7"
     pins:
       - [U1, G2]
       - [U4, BCLK]
 
+  - name: PDM_DAT
+    priority: 14
+    color: "#9333ea"
+    pins:
+      - [U1, H1]
+      - [U4, DIN]
+
   - name: PDM_LRCLK
-    priority: 40
+    priority: 15
     color: "#c084fc"
     pins:
       - [U1, J1]
@@ -795,73 +801,75 @@ nets:
       - [U8, "1"]
       - [U1, B17]
 
-  - name: FLEX0_A_IO3
+  - name: FLEX0_A_IO2
     priority: 10
+    color: "#a5b4fc"
+    pins:
+      - [U8, "3"]
+      - [U1, F17]
+
+  - name: FLEX0_A_IO3
+    priority: 11
     color: "#c7d2fe"
     pins:
       - [U8, "7"]
       - [U1, F16]
 
   - name: FLEX0_A_IO1
-    priority: 11
+    priority: 12
     color: "#818cf8"
     pins:
       - [U8, "2"]
       - [U1, F15]
 
   - name: FLEX0_A_IO0
-    priority: 12
+    priority: 13
     color: "#4f46e5"
     pins:
       - [U8, "5"]
       - [U1, E14]
 
   - name: FLEX0_A_SCK
-    priority: 13
+    priority: 14
     color: "#4338ca"
     pins:
       - [U8, "6"]
       - [U1, D14]
 
-  - name: FLEX0_A_IO2
-    priority: 14
-    color: "#a5b4fc"
-    pins:
-      - [U8, "3"]
-      - [U1, F17]
-
-  - name: SWD_DIO
-    priority: 53
-    color: "#14b8a6"
-    pins:
-      - [J5, "2"]
-      - [U1, A17]
-
-  - name: SWD_CLK
-    priority: 54
-    color: "#0d9488"
-    pins:
-      - [J5, "4"]
-      - [U1, A16]
-
   - name: SWD_SWO
-    priority: 55
+    priority: 8
     color: "#0f766e"
     pins:
       - [J5, "6"]
       - [U1, B16]
 
-  - name: I2C2_SDA
-    color: "#10b981"
+  - name: SWD_CLK
+    priority: 9
+    color: "#0d9488"
     pins:
-      - [J6, "3"]
-      - [U1, A1]
+      - [J5, "4"]
+      - [U1, A16]
+
+  - name: SWD_DIO
+    priority: 10
+    color: "#14b8a6"
+    pins:
+      - [J5, "2"]
+      - [U1, A17]
 
   - name: I2C2_SCL
+    priority: 7
     color: "#059669"
     pins:
       - [J6, "4"]
       - [U1, B1]
+
+  - name: I2C2_SDA
+    priority: 8
+    color: "#10b981"
+    pins:
+      - [J6, "3"]
+      - [U1, A1]
 
   - name: I3C1_SCL
     priority: 22
@@ -892,46 +900,32 @@ nets:
       - [U1, C8]
 
   - name: SPI0_CS_N
-    priority: 36
+    priority: 27
     color: "#92400e"
     pins:
       - [J9, "6"]
       - [U1, R9]
 
   - name: SPI0_MISO
-    priority: 35
+    priority: 28
     color: "#b45309"
     pins:
       - [J9, "5"]
       - [U1, R8]
 
   - name: SPI0_MOSI
-    priority: 34
+    priority: 29
     color: "#d97706"
     pins:
       - [J9, "4"]
       - [U1, T7]
 
   - name: SPI0_SCK
-    priority: 33
+    priority: 30
     color: "#f59e0b"
     pins:
       - [J9, "3"]
       - [U1, T6]
-
-  - name: UART0_TXD
-    priority: 3
-    color: "#7c3aed"
-    pins:
-      - [U9, "5"]
-      - [U1, A6]
-
-  - name: UART0_RXD
-    priority: 4
-    color: "#8b5cf6"
-    pins:
-      - [U9, "1"]
-      - [U1, B6]
 
   - name: UART0_CTS
     priority: 25
@@ -947,19 +941,36 @@ nets:
       - [U9, "11"]
       - [U1, E10]
 
+  - name: UART0_TXD
+    priority: 3
+    color: "#7c3aed"
+    pins:
+      - [U9, "5"]
+      - [U1, A6]
+
+  - name: UART0_RXD
+    priority: 4
+    color: "#8b5cf6"
+    pins:
+      - [U9, "1"]
+      - [U1, B6]
+
   - name: USB_DP
+    priority: 21
     color: "#ec4899"
     pins:
       - [U9, "15"]
       - [J3, DP1]
 
   - name: USB_DM
+    priority: 22
     color: "#db2777"
     pins:
       - [U9, "16"]
       - [J3, DN1]
 
   - name: FTDI_3V3
+    priority: 25
     color: "#f43f5e"
     pins:
       - [U9, "17"]
@@ -1031,44 +1042,44 @@ nets:
       - [U9, "27"]
       - [U9, "28"]
 
+  - name: GPIO0
+    priority: 33
+    color: "#10b981"
+    pins:
+      - [J14, "1"]
+      - [U1, M8]
+
+  - name: GPIO1
+    priority: 34
+    color: "#10b981"
+    pins:
+      - [J14, "2"]
+      - [U1, N8]
+
+  - name: GPIO2
+    priority: 35
+    color: "#10b981"
+    pins:
+      - [J14, "3"]
+      - [U1, N10]
+
   - name: GPIO5
-    priority: 32
+    priority: 36
     color: "#10b981"
     pins:
       - [J14, "6"]
       - [U1, T12]
 
   - name: GPIO4
-    priority: 31
+    priority: 37
     color: "#10b981"
     pins:
       - [J14, "5"]
       - [U1, T11]
 
   - name: GPIO3
-    priority: 30
+    priority: 38
     color: "#10b981"
     pins:
       - [J14, "4"]
       - [U1, T10]
-
-  - name: GPIO2
-    priority: 29
-    color: "#10b981"
-    pins:
-      - [J14, "3"]
-      - [U1, N10]
-
-  - name: GPIO1
-    priority: 28
-    color: "#10b981"
-    pins:
-      - [J14, "2"]
-      - [U1, N8]
-
-  - name: GPIO0
-    priority: 27
-    color: "#10b981"
-    pins:
-      - [J14, "1"]
-      - [U1, M8]
