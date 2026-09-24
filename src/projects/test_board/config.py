@@ -87,3 +87,10 @@ def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None
                 f"[test_board:route] Flex routed {len(flex_traces)} traces ({flex_len_mm:.2f} mm) and {len(flex_vias)} vias."
             )
         print(f"[test_board:route] Saved to {routing_file} and .env")
+
+
+if __name__ == "__main__":
+    from projects.test_board.provider import TestBoardProvider
+
+    provider_instance = TestBoardProvider()
+    config_route(provider_instance, "test_board:route", "carrier_board")
