@@ -647,7 +647,7 @@ class Builder:
 
                 if subassembly == "carrier_board":
                     alias_pcb = board_dir / f"{provider.name}.kicad_pcb"
-                    if alias_pcb != kicad_pcb:
+                    if alias_pcb != kicad_pcb and kicad_pcb.exists():
                         shutil.copy2(kicad_pcb, alias_pcb)
                         pro_src = kicad_pcb.with_suffix(".kicad_pro")
                         pro_dst = alias_pcb.with_suffix(".kicad_pro")
