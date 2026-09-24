@@ -1,6 +1,5 @@
 """PCB auto-router engine computing collision-free multi-layer routes for component netlists."""
 
-import heapq
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,8 +16,8 @@ CELL_CONFLICT_MARKER: str = "__CONFLICT__"
 
 def _generate_candidate_via_offsets() -> List[Tuple[float, float]]:
     """Generate radially sorted stitching via candidate offsets using NumPy."""
-    radii = [0.40, 0.50, 0.75, 1.0]
-    angles = np.linspace(0, 2 * np.pi, 8, endpoint=False)
+    radii = [0.40, 0.50, 0.60, 0.75, 1.0, 1.25, 1.50, 1.75, 2.0, 2.25, 2.50]
+    angles = np.linspace(0, 2 * np.pi, 16, endpoint=False)
     circ_pts = [(float(r * np.cos(a)), float(r * np.sin(a))) for r in radii for a in angles]
     knights = [
         (-0.25, -0.50),
@@ -270,448 +269,20 @@ class Obstacle:
     center: Optional[Tuple[float, float]] = None
     radius: Optional[float] = None
     is_pin: bool = False
+    copper_box: Optional[Tuple[float, float, float, float]] = None
 
     def copper_dist(self, px: float, py: float) -> float:
         """Compute minimum distance from point (px, py) to the physical copper of this obstacle."""
         if self.is_circle and self.center is not None and self.radius is not None:
             return max(0.0, math.hypot(px - self.center[0], py - self.center[1]) - self.radius)
+        if self.copper_box is not None:
+            c_min_x, c_min_y, c_max_x, c_max_y = self.copper_box
+            edx = max(c_min_x - px, 0.0, px - c_max_x)
+            edy = max(c_min_y - py, 0.0, py - c_max_y)
+            return math.hypot(edx, edy)
         edx = max(self.min_x - px, 0.0, px - self.max_x)
         edy = max(self.min_y - py, 0.0, py - self.max_y)
         return math.hypot(edx, edy)
-
-
-class AStarPCBRouter:
-    """Multi-layer and flexible PCB grid auto-router using obstacle-aware A* search."""
-
-    def __init__(
-        self,
-        board_bounds: Tuple[float, float, float, float],
-        grid_step: float = 0.25,
-        layers: Optional[List[str]] = None,
-        obstacles: Optional[List[Obstacle]] = None,
-        turn_penalty: float = 0.35,
-        via_penalty: float = 2.50,
-        dense_regions: Optional[List[Tuple[float, float, float, float, str]]] = None,
-        connector_breakout_zones: Optional[List[Tuple[float, float, str]]] = None,
-        outline_polygon: Optional[List[Tuple[float, float]]] = None,
-        edge_clearance: float = 0.35,
-        qfn_keepouts: Optional[List[Tuple[float, float, float, float]]] = None,
-    ) -> None:
-        """Initialize the grid router with board boundaries and layer configuration."""
-        self.min_x, self.min_y, self.max_x, self.max_y = board_bounds
-        self.grid_step = grid_step
-        self.layers = layers or ["F.Cu", "B.Cu"]
-        self.layer_to_idx = {lay: i for i, lay in enumerate(self.layers)}
-        self.idx_to_layer = {i: lay for i, lay in enumerate(self.layers)}
-        self.obstacles: List[Obstacle] = []
-        self.turn_penalty = turn_penalty
-        self.via_penalty = via_penalty
-        self.dense_regions = dense_regions or []
-        self.connector_breakout_zones = connector_breakout_zones or []
-        self.qfn_keepouts = qfn_keepouts or []
-        self.outline_polygon = outline_polygon
-        self.edge_clearance = edge_clearance
-        self.outline_segments: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
-        if outline_polygon and len(outline_polygon) >= 3:
-            n = len(outline_polygon)
-            for i in range(n):
-                self.outline_segments.append((outline_polygon[i], outline_polygon[(i + 1) % n]))
-        self.routed_cells: Dict[Tuple[int, int, int], str] = {}
-        self.blocked_cells: Dict[Tuple[int, int, str], Optional[str]] = {}
-        self.pin_cells: Set[Tuple[int, int, str]] = set()
-        if obstacles:
-            for obs in obstacles:
-                self.add_obstacle(obs)
-
-    def add_obstacle(self, obs: Obstacle) -> None:
-        """Register an obstacle in the routing domain and index into spatial grid."""
-        self.obstacles.append(obs)
-        gx_min = math.ceil(obs.min_x / self.grid_step)
-        gx_max = math.floor(obs.max_x / self.grid_step)
-        if gx_min > gx_max:
-            gx_mid = round((obs.min_x + obs.max_x) / (2.0 * self.grid_step))
-            gx_min, gx_max = gx_mid, gx_mid
-
-        gy_min = math.ceil(obs.min_y / self.grid_step)
-        gy_max = math.floor(obs.max_y / self.grid_step)
-        if gy_min > gy_max:
-            gy_mid = round((obs.min_y + obs.max_y) / (2.0 * self.grid_step))
-            gy_min, gy_max = gy_mid, gy_mid
-
-        layers = self.layers if obs.layer == "ALL" else [obs.layer]
-        for lay in layers:
-            for gx in range(gx_min, gx_max + 1):
-                for gy in range(gy_min, gy_max + 1):
-                    key = (gx, gy, lay)
-                    if obs.is_pin:
-                        self.pin_cells.add(key)
-                    existing = self.blocked_cells.get(key)
-                    if existing is None:
-                        self.blocked_cells[key] = obs.net
-                    elif existing != obs.net:
-                        if key in self.pin_cells and not obs.is_pin:
-                            continue
-                        if (
-                            round((obs.min_x + obs.max_x) / (2.0 * self.grid_step)) == gx
-                            and round((obs.min_y + obs.max_y) / (2.0 * self.grid_step)) == gy
-                            and obs.net is not None
-                        ):
-                            self.blocked_cells[key] = obs.net
-                        else:
-                            self.blocked_cells[key] = CELL_CONFLICT_MARKER
-
-    def rebuild_spatial_index(self) -> None:
-        """Rebuild spatial blocked_cells index from all registered obstacles."""
-        self.blocked_cells.clear()
-        self.pin_cells.clear()
-        all_obs = list(self.obstacles)
-        self.obstacles.clear()
-        for obs in all_obs:
-            self.add_obstacle(obs)
-
-    def is_cell_blocked(
-        self,
-        px: float,
-        py: float,
-        layer_idx: int,
-        net_name: str,
-        start_pt: Tuple[float, float],
-        end_pt: Tuple[float, float],
-    ) -> bool:
-        """Check if physical coordinate (px, py) on layer is blocked by obstacles or existing nets."""
-        # Terminal points are always routable for their own net
-        d_start = math.hypot(px - start_pt[0], py - start_pt[1])
-        d_end = math.hypot(px - end_pt[0], py - end_pt[1])
-        if d_start <= self.grid_step * 0.75 or d_end <= self.grid_step * 0.75:
-            return False
-
-        layer_name = self.idx_to_layer.get(layer_idx, "F.Cu")
-        gx = round(px / self.grid_step)
-        gy = round(py / self.grid_step)
-
-        if d_start <= 0.75 or d_end <= 0.75:
-            obs_net = self.blocked_cells.get((gx, gy, layer_name))
-            if obs_net == net_name:
-                return False
-
-        # 1. Check routed grid cells from other nets
-        cell_net = self.routed_cells.get((gx, gy, layer_idx))
-        if cell_net is not None and cell_net != net_name:
-            return True
-
-        # 2. Check spatial obstacle map (O(1) dictionary lookup)
-        key = (gx, gy, layer_name)
-        if key in self.blocked_cells:
-            obs_net = self.blocked_cells[key]
-            if obs_net == net_name:
-                return False
-            if obs_net is not None and obs_net != net_name:
-                return True
-            # Unassigned obstacle (e.g. sensor envelope): allow connecting at start/end
-            if d_start <= self.grid_step + 0.05 or d_end <= self.grid_step + 0.05:
-                return False
-            return True
-
-        return False
-
-    def route_net(
-        self,
-        start_pt: Tuple[float, float],
-        start_layer: str,
-        end_pt: Tuple[float, float],
-        end_layer: str,
-        net_name: str,
-        width_mm: float = 0.20,
-        fillet_radius: float = 0.20,
-        junction_points: Optional[Sequence[Tuple[float, float]]] = None,
-    ) -> Tuple[List[TraceSegmentModel], List[ViaModel]]:
-        """Find an obstacle-avoiding orthogonal path between start and end using A* search."""
-        l0 = self.layer_to_idx.get(start_layer, 0)
-        l1 = self.layer_to_idx.get(end_layer, 0)
-        gx0 = round(start_pt[0] / self.grid_step)
-        gy0 = round(start_pt[1] / self.grid_step)
-        gx1 = round(end_pt[0] / self.grid_step)
-        gy1 = round(end_pt[1] / self.grid_step)
-
-        queue: List[Tuple[float, float, int, int, int, Optional[Tuple[int, int]]]] = []
-        h0 = (abs(gx0 - gx1) + abs(gy0 - gy1)) * self.grid_step + abs(l0 - l1) * self.via_penalty
-        heapq.heappush(queue, (h0, 0.0, gx0, gy0, l0, None))
-
-        g_scores: Dict[Tuple[int, int, int], float] = {(gx0, gy0, l0): 0.0}
-        came_from: Dict[Tuple[int, int, int], Tuple[int, int, int]] = {}
-
-        found_state: Optional[Tuple[int, int, int]] = None
-
-        dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-        max_expansions = 250000
-        expansions = 0
-
-        while queue and expansions < max_expansions:
-            expansions += 1
-            f, curr_g, gx, gy, l_idx, last_dir = heapq.heappop(queue)
-            state = (gx, gy, l_idx)
-
-            if curr_g > g_scores.get(state, float("inf")):
-                continue
-
-            if gx == gx1 and gy == gy1 and l_idx == l1:
-                found_state = state
-                break
-
-            # 1. Planar moves on same layer
-            for dx, dy in dirs:
-                ngx, ngy = gx + dx, gy + dy
-                px = ngx * self.grid_step
-                py = ngy * self.grid_step
-
-                if not (self.min_x <= px <= self.max_x and self.min_y <= py <= self.max_y):
-                    continue
-
-                if self.outline_polygon:
-                    if not point_in_polygon(px, py, self.outline_polygon):
-                        continue
-                    if self.outline_segments:
-                        dist_edge = min(dist_point_to_segment((px, py), s0, s1) for s0, s1 in self.outline_segments)
-                        if dist_edge < self.edge_clearance:
-                            if (
-                                math.hypot(px - start_pt[0], py - start_pt[1]) > 0.40
-                                and math.hypot(px - end_pt[0], py - end_pt[1]) > 0.40
-                            ):
-                                continue
-
-                if self.is_cell_blocked(px, py, l_idx, net_name, start_pt, end_pt):
-                    continue
-
-                step_cost = self.grid_step
-                if last_dir is not None and (dx, dy) != last_dir:
-                    step_cost += self.turn_penalty
-                if abs(dx) > 0 and self.connector_breakout_zones:
-                    for cb_min_y, cb_max_y, cb_lay in self.connector_breakout_zones:
-                        if self.idx_to_layer[l_idx] == cb_lay and cb_min_y <= py <= cb_max_y:
-                            step_cost += 3.50
-                            break
-                if self.dense_regions:
-                    for dr_min_x, dr_min_y, dr_max_x, dr_max_y, dr_lay in self.dense_regions:
-                        if self.idx_to_layer[l_idx] == dr_lay:
-                            is_endpoint_region = (
-                                dr_min_x - 0.50 <= start_pt[0] <= dr_max_x + 0.50
-                                and dr_min_y - 0.50 <= start_pt[1] <= dr_max_y + 0.50
-                            ) or (
-                                dr_min_x - 0.50 <= end_pt[0] <= dr_max_x + 0.50
-                                and dr_min_y - 0.50 <= end_pt[1] <= dr_max_y + 0.50
-                            )
-                            if dr_min_x <= px <= dr_max_x and dr_min_y <= py <= dr_max_y:
-                                if is_endpoint_region:
-                                    curr_edge_dist = min(px - dr_min_x, dr_max_x - px, py - dr_min_y, dr_max_y - py)
-                                    step_cost += 3.50 * curr_edge_dist
-                                else:
-                                    step_cost += 12.00
-                                break
-                            margin = 1.00
-                            if abs(dy) > 0 and (
-                                (dr_min_x - margin <= px < dr_min_x and dr_min_y <= py <= dr_max_y)
-                                or (dr_max_x < px <= dr_max_x + margin and dr_min_y <= py <= dr_max_y)
-                            ):
-                                step_cost += 3.50
-                                break
-                            if abs(dx) > 0 and (
-                                (dr_min_y - margin <= py < dr_min_y and dr_min_x <= px <= dr_max_x)
-                                or (dr_max_y < py <= dr_max_y + margin and dr_min_x <= px <= dr_max_x)
-                            ):
-                                step_cost += 3.50
-                                break
-
-                if l_idx != l1:
-                    step_cost += 0.15
-
-                tentative_g = curr_g + step_cost
-                next_state = (ngx, ngy, l_idx)
-
-                if tentative_g < g_scores.get(next_state, float("inf")):
-                    g_scores[next_state] = tentative_g
-                    came_from[next_state] = state
-                    h = (abs(ngx - gx1) + abs(ngy - gy1)) * self.grid_step + (self.via_penalty if l_idx != l1 else 0.0)
-                    heapq.heappush(queue, (tentative_g + h, tentative_g, ngx, ngy, l_idx, (dx, dy)))
-
-            # 2. Layer transitions (Vias) - only if multi-layer
-            if len(self.layers) > 1:
-                for target_l_idx in range(len(self.layers)):
-                    if target_l_idx == l_idx:
-                        continue
-
-                    px = gx * self.grid_step
-                    py = gy * self.grid_step
-
-                    in_dense = False
-                    if self.dense_regions:
-                        for dr_min_x, dr_min_y, dr_max_x, dr_max_y, _ in self.dense_regions:
-                            if dr_min_x - 0.10 <= px <= dr_max_x + 0.10 and dr_min_y - 0.10 <= py <= dr_max_y + 0.10:
-                                in_dense = True
-                                break
-
-                    # Forbid placing vias in the escape fanout of perimeter packages (QFN/DFN)
-                    # to keep escape channels open for adjacent pins.
-                    if self.qfn_keepouts:
-                        in_qfn_keepout = False
-                        for qk_min_x, qk_min_y, qk_max_x, qk_max_y in self.qfn_keepouts:
-                            if qk_min_x <= px <= qk_max_x and qk_min_y <= py <= qk_max_y:
-                                in_qfn_keepout = True
-                                break
-                        if in_qfn_keepout:
-                            continue
-
-                    via_dia = 0.36 if in_dense else 0.45
-                    via_r = via_dia / 2.0
-                    blocked = False
-                    for obs in self.obstacles:
-                        if obs.layer in ("ALL", self.idx_to_layer[l_idx], self.idx_to_layer[target_l_idx]):
-                            if obs.net is not None and obs.net == net_name:
-                                continue
-                            if obs.copper_dist(px, py) < (via_r + 0.10):
-                                blocked = True
-                                break
-                    if blocked:
-                        continue
-
-                    if self.is_cell_blocked(px, py, l_idx, net_name, start_pt, end_pt) or self.is_cell_blocked(
-                        px, py, target_l_idx, net_name, start_pt, end_pt
-                    ):
-                        continue
-
-                    tentative_g = curr_g + self.via_penalty
-                    next_state = (gx, gy, target_l_idx)
-
-                    if tentative_g < g_scores.get(next_state, float("inf")):
-                        g_scores[next_state] = tentative_g
-                        came_from[next_state] = state
-                        h = (abs(gx - gx1) + abs(gy - gy1)) * self.grid_step + (
-                            self.via_penalty if target_l_idx != l1 else 0.0
-                        )
-                        heapq.heappush(queue, (tentative_g + h, tentative_g, gx, gy, target_l_idx, last_dir))
-
-        raw_path: List[Tuple[float, float, str]] = []
-        if found_state is not None:
-            curr = found_state
-            while curr in came_from:
-                gx, gy, l_idx = curr
-                raw_path.append((gx * self.grid_step, gy * self.grid_step, self.idx_to_layer[l_idx]))
-                curr = came_from[curr]
-            raw_path.append((gx0 * self.grid_step, gy0 * self.grid_step, self.idx_to_layer[l0]))
-            raw_path.reverse()
-            if raw_path:
-                raw_path[0] = (start_pt[0], start_pt[1], start_layer)
-                raw_path[-1] = (end_pt[0], end_pt[1], end_layer)
-        else:
-            raise RuntimeError(
-                f"A* router could not find collision-free path for net '{net_name}' "
-                f"from ({start_pt[0]:.2f}, {start_pt[1]:.2f}) [{start_layer}] "
-                f"to ({end_pt[0]:.2f}, {end_pt[1]:.2f}) [{end_layer}] "
-                f"(expansions={expansions}, queue_len={len(queue)})"
-            )
-
-        traces: List[TraceSegmentModel] = []
-        vias: List[ViaModel] = []
-
-        if len(raw_path) < 2:
-            return traces, vias
-
-        current_layer_pts: List[Tuple[float, float]] = [(raw_path[0][0], raw_path[0][1])]
-        current_layer = raw_path[0][2]
-
-        for i in range(1, len(raw_path)):
-            px, py, lay = raw_path[i]
-            if lay == current_layer:
-                current_layer_pts.append((px, py))
-            else:
-                if len(current_layer_pts) >= 2:
-                    traces.extend(
-                        polyline_to_trace_segments(
-                            current_layer_pts,
-                            width_mm,
-                            current_layer,
-                            net_name,
-                            fillet_radius=fillet_radius,
-                            junction_points=junction_points,
-                        )
-                    )
-                is_dense_via = False
-                if self.dense_regions:
-                    for dr_min_x, dr_min_y, dr_max_x, dr_max_y, _ in self.dense_regions:
-                        if dr_min_x - 0.10 <= px <= dr_max_x + 0.10 and dr_min_y - 0.10 <= py <= dr_max_y + 0.10:
-                            is_dense_via = True
-                            break
-                v_pad = 0.36 if is_dense_via else 0.45
-                v_drill = 0.16 if is_dense_via else 0.20
-                vias.append(
-                    ViaModel(
-                        net=net_name,
-                        position_mm=(px, py),
-                        pad_diameter_mm=v_pad,
-                        drill_diameter_mm=v_drill,
-                        layer_start="F.Cu",
-                        layer_end="B.Cu",
-                    )
-                )
-                current_layer = lay
-                current_layer_pts = [(px, py)]
-
-        if len(current_layer_pts) >= 2:
-            traces.extend(
-                polyline_to_trace_segments(
-                    current_layer_pts,
-                    width_mm,
-                    current_layer,
-                    net_name,
-                    fillet_radius=fillet_radius,
-                    junction_points=junction_points,
-                )
-            )
-
-        for v in vias:
-            v_r = v.pad_diameter_mm / 2.0 + 0.14
-            self.add_obstacle(
-                Obstacle(
-                    min_x=v.position_mm[0] - v_r,
-                    min_y=v.position_mm[1] - v_r,
-                    max_x=v.position_mm[0] + v_r,
-                    max_y=v.position_mm[1] + v_r,
-                    layer="ALL",
-                    net=net_name,
-                    is_circle=True,
-                    center=v.position_mm,
-                    radius=v.pad_diameter_mm / 2.0,
-                )
-            )
-            gx_v = round(v.position_mm[0] / self.grid_step)
-            gy_v = round(v.position_mm[1] / self.grid_step)
-            for l_i in range(len(self.layers)):
-                self.routed_cells[(gx_v, gy_v, l_i)] = net_name
-
-        for tr in traces:
-            w_half = max(tr.width_mm / 2.0 + 0.12, 0.21)
-            self.add_obstacle(
-                Obstacle(
-                    min_x=min(tr.start_mm[0], tr.end_mm[0]) - w_half,
-                    min_y=min(tr.start_mm[1], tr.end_mm[1]) - w_half,
-                    max_x=max(tr.start_mm[0], tr.end_mm[0]) + w_half,
-                    max_y=max(tr.start_mm[1], tr.end_mm[1]) + w_half,
-                    layer=tr.layer,
-                    net=net_name,
-                )
-            )
-            gx_s = round(tr.start_mm[0] / self.grid_step)
-            gy_s = round(tr.start_mm[1] / self.grid_step)
-            gx_e = round(tr.end_mm[0] / self.grid_step)
-            gy_e = round(tr.end_mm[1] / self.grid_step)
-            l_idx = self.layer_to_idx.get(tr.layer, 0)
-            dist_cells = max(abs(gx_e - gx_s), abs(gy_e - gy_s), 1)
-            for s in range(dist_cells + 1):
-                t = s / dist_cells
-                cgx = round(gx_s + t * (gx_e - gx_s))
-                cgy = round(gy_s + t * (gy_e - gy_s))
-                self.routed_cells[(cgx, cgy, l_idx)] = net_name
-
-        return traces, vias
 
 
 class PCBAutoRouter:
@@ -721,7 +292,7 @@ class PCBAutoRouter:
         self,
         pcb_config: Union[PCBConfig, Dict[str, Any]],
         wiring: Wiring,
-        backend: str = "astar",
+        backend: str = "jax",
     ) -> None:
         """Initialize router with board configuration and electrical netlist."""
         if isinstance(pcb_config, dict):
@@ -733,31 +304,35 @@ class PCBAutoRouter:
 
     def get_net_trace_width(self, net_name: str) -> float:
         """Resolve trace width for a given net based on net classes and interfaces."""
+        rules = getattr(self.config, "design_rules", None) or getattr(self.config, "rules", None)
+        default_width = getattr(rules, "default_track_width_mm", 0.12) if rules else 0.12
         net_upper = net_name.upper()
 
-        # Check differential pairs in net classes
+        # Check net classes
         for nc in self.config.net_classes:
             for dp in nc.diff_pairs:
                 if net_name in (dp.pos_net, dp.neg_net):
                     return nc.trace_width_mm
+            if hasattr(nc, "single_nets") and nc.single_nets and net_name in nc.single_nets:
+                return nc.trace_width_mm
             if nc.name.upper() in net_upper:
                 return nc.trace_width_mm
 
         # Check standard interface patterns
         if "PCIE" in net_upper:
-            return 0.14
+            return default_width
         if "MIPI" in net_upper or "DISP" in net_upper:
-            return 0.12
+            return default_width
         if "RF" in net_upper or "CPWG" in net_upper:
             return 0.22
-        if any(pwr in net_upper for pwr in ("GND", "3V3", "5V", "VCC", "VDD", "VLOAD")):
-            return 0.30
+        if "VLOAD" in net_upper or "VBAT" in net_upper or "VBUS" in net_upper:
+            return default_width
         if "PDM" in net_upper or "SPK" in net_upper or "AUDIO" in net_upper or "I2S" in net_upper:
-            return 0.14
+            return default_width
         if "I2C" in net_upper:
-            return 0.14
+            return default_width
 
-        return 0.15
+        return default_width
 
     @classmethod
     def save_routing_yaml(
@@ -869,6 +444,75 @@ class PCBAutoRouter:
             return (fp.position[0] + rx, fp.position[1] + ry)
         return (fp.position[0] + pin.position[0], fp.position[1] + pin.position[1])
 
+    @staticmethod
+    def _compute_net_edges(
+        endpoints: List[Tuple[float, float, str]],
+        bga_pins: Set[Tuple[float, float]],
+        dense_pins: Set[Tuple[float, float]],
+    ) -> List[Tuple[Tuple[float, float, str], Tuple[float, float, str]]]:
+        """Compute ordered directed routing segments for a net using Prim's Minimum Spanning Tree (MST).
+
+        Args:
+            endpoints: List of physical (x, y, layer) terminal coordinates.
+            bga_pins: Set of (x, y) coordinates belonging to BGA/VFBGA packages.
+            dense_pins: Set of (x, y) coordinates belonging to high-density packages.
+
+        Returns:
+            List of (start_node, end_node) directed edges to route.
+        """
+        if len(endpoints) < 2:
+            return []
+        if len(endpoints) == 2:
+            p0 = (round(endpoints[0][0], 2), round(endpoints[0][1], 2))
+            p1 = (round(endpoints[1][0], 2), round(endpoints[1][1], 2))
+            if (p1 in bga_pins and p0 not in bga_pins) or (p1 in dense_pins and p0 not in dense_pins):
+                return [(endpoints[1], endpoints[0])]
+            return [(endpoints[0], endpoints[1])]
+
+        dense_indices = [idx for idx, pt in enumerate(endpoints) if (round(pt[0], 2), round(pt[1], 2)) in bga_pins]
+        if not dense_indices:
+            dense_indices = [
+                idx for idx, pt in enumerate(endpoints) if (round(pt[0], 2), round(pt[1], 2)) in dense_pins
+            ]
+        start_idx = dense_indices[0] if dense_indices else 0
+
+        visited = [endpoints[start_idx]]
+        unvisited = [pt for idx, pt in enumerate(endpoints) if idx != start_idx]
+        edges: List[Tuple[Tuple[float, float, str], Tuple[float, float, str]]] = []
+
+        while unvisited:
+            best_edge = None
+            best_d = float("inf")
+            best_u_idx = 0
+            for u_idx, u_pt in enumerate(unvisited):
+                for v_pt in visited:
+                    p_v = (round(v_pt[0], 2), round(v_pt[1], 2))
+                    d = math.hypot(u_pt[0] - v_pt[0], u_pt[1] - v_pt[1]) + (
+                        0.0 if u_pt[2] == v_pt[2] or u_pt[2] == "ALL" or v_pt[2] == "ALL" else 3.0
+                    )
+                    if p_v in bga_pins and any(
+                        round(ep[0], 2) == p_v[0] and round(ep[1], 2) == p_v[1] for e in edges for ep in e
+                    ):
+                        d += 1000.0
+                    elif len(visited) > 1 and (p_v in bga_pins or p_v in dense_pins):
+                        d += 20.0
+                    if d < best_d:
+                        best_d = d
+                        best_edge = (v_pt, u_pt)
+                        best_u_idx = u_idx
+            if best_edge:
+                p_v = (round(best_edge[0][0], 2), round(best_edge[0][1], 2))
+                p_u = (round(best_edge[1][0], 2), round(best_edge[1][1], 2))
+                if (p_u in bga_pins and p_v not in bga_pins) or (p_u in dense_pins and p_v not in dense_pins):
+                    edges.append((best_edge[1], best_edge[0]))
+                elif len(edges) >= 1 and p_u not in bga_pins and p_u not in dense_pins:
+                    edges.append((best_edge[1], best_edge[0]))
+                else:
+                    edges.append(best_edge)
+            visited.append(unvisited.pop(best_u_idx))
+
+        return edges
+
     def route_all_nets(
         self,
         exclude_nets: Optional[Set[str]] = None,
@@ -923,16 +567,24 @@ class PCBAutoRouter:
             cos_r, sin_r = abs(math.cos(rad)), abs(math.sin(rad))
 
             fp_layer = getattr(fp, "layer", "F.Cu")
+            rules = getattr(self.config, "design_rules", None)
+            fp_threshold = getattr(rules, "fine_pitch_pad_threshold_mm", 0.35) if rules else 0.35
             for pin in fp.pins:
                 px, py = self.get_pin_absolute_position(fp, pin)
                 pw, pl = getattr(pin, "pad_size_mm", (0.5, 0.5))
                 eff_w = pw * cos_r + pl * sin_r
                 eff_l = pw * sin_r + pl * cos_r
                 pin_lay = "ALL" if getattr(pin, "pad_type", "smd") == "thru_hole" else fp_layer
-                pad_margin = 0.05 if (min(eff_w, eff_l) <= 0.30 or max(eff_w, eff_l) <= 0.40) else 0.20
+                is_fine_pitch = min(eff_w, eff_l) <= fp_threshold or max(eff_w, eff_l) <= 0.40
+                is_thru_hole = getattr(pin, "pad_type", "smd") == "thru_hole"
+                min_fp_clr = getattr(rules, "min_fine_pitch_clearance_mm", 0.035) if rules else 0.035
+                pad_margin = (0.07 + min_fp_clr) if is_fine_pitch else (0.36 if is_thru_hole else 0.26)
                 pin_net = pin_to_net.get((fp.name, pin.name)) or "__NO_NET__"
                 is_circle = getattr(pin, "pad_shape", "rect") == "circle"
                 copper_r = min(eff_w, eff_l) / 2.0 if is_circle else None
+                copper_box = (
+                    None if is_circle else (px - eff_w / 2.0, py - eff_l / 2.0, px + eff_w / 2.0, py + eff_l / 2.0)
+                )
                 obstacles.append(
                     Obstacle(
                         min_x=px - eff_w / 2.0 - pad_margin,
@@ -945,6 +597,7 @@ class PCBAutoRouter:
                         center=(px, py) if is_circle else None,
                         radius=copper_r,
                         is_pin=True,
+                        copper_box=copper_box,
                     )
                 )
 
@@ -1033,8 +686,13 @@ class PCBAutoRouter:
                     )
                 )
 
+        min_clearance = (
+            getattr(self.config.rules, "min_clearance_mm", 0.12)
+            if hasattr(self, "config") and hasattr(self.config, "rules")
+            else 0.12
+        )
         for tr in traces:
-            w_half = max(tr.width_mm / 2.0 + 0.12, 0.21)
+            w_half = tr.width_mm / 2.0 + min_clearance
             obstacles.append(
                 Obstacle(
                     min_x=min(tr.start_mm[0], tr.end_mm[0]) - w_half,
@@ -1046,7 +704,7 @@ class PCBAutoRouter:
                 )
             )
 
-        dense_regions: List[Tuple[float, float, float, float, str]] = []
+        dense_regions: List[Tuple[float, float, float, float, str, bool]] = []
         for fp in board_fps:
             pkg = getattr(fp, "package", "")
             if len(fp.pins) >= 16 or any(
@@ -1056,7 +714,18 @@ class PCBAutoRouter:
                 py0 = fp.position[1]
                 xs = [p.position[0] + px0 for p in fp.pins]
                 ys = [p.position[1] + py0 for p in fp.pins]
-                dense_regions.append((min(xs), min(ys), max(xs), max(ys), getattr(fp, "layer", "F.Cu")))
+                margin = 0.05
+                is_bga = pkg.startswith(("BGA", "VFBGA"))
+                dense_regions.append(
+                    (
+                        min(xs) - margin,
+                        min(ys) - margin,
+                        max(xs) + margin,
+                        max(ys) + margin,
+                        getattr(fp, "layer", "F.Cu"),
+                        is_bga,
+                    )
+                )
 
         connector_breakout_zones: List[Tuple[float, float, str]] = []
         for fp in board_fps:
@@ -1070,39 +739,39 @@ class PCBAutoRouter:
         qfn_keepouts: List[Tuple[float, float, float, float]] = []
         for fp in board_fps:
             pkg = getattr(fp, "package", "")
-            if any(pkg.startswith(p) for p in ("QFN", "DFN", "TQFN", "WQFN", "TDFN", "WSON")):
+            if any(pkg.startswith(p) for p in ("QFN", "DFN", "TQFN", "WQFN", "TDFN", "WSON")) and "FPC" not in pkg:
                 px0 = fp.position[0]
                 py0 = fp.position[1]
                 xs = [p.position[0] + px0 for p in fp.pins]
                 ys = [p.position[1] + py0 for p in fp.pins]
                 if xs and ys:
-                    qfn_keepouts.append((min(xs) - 1.50, min(ys) - 1.50, max(xs) + 1.50, max(ys) + 1.50))
+                    k_min_x = min(xs) + 0.15
+                    k_max_x = max(xs) - 0.15
+                    k_min_y = min(ys) + 0.15
+                    k_max_y = max(ys) - 0.15
+                    if k_min_x < k_max_x and k_min_y < k_max_y:
+                        qfn_keepouts.append((k_min_x, k_min_y, k_max_x, k_max_y))
 
-        if self.backend == "jax":
-            from provider.pcb.jax_router import JaxPCBRouter
+        from provider.pcb.jax_router import JaxPCBRouter
 
-            router = JaxPCBRouter(
-                board_bounds=board_bounds,
-                grid_step=0.25,
-                layers=layers,
-                obstacles=obstacles,
-                via_penalty=2.00 if not is_flex else 50.00,
-            )
-        else:
-            router = AStarPCBRouter(
-                board_bounds=board_bounds,
-                grid_step=0.25,
-                layers=layers,
-                obstacles=obstacles,
-                turn_penalty=0.50,
-                via_penalty=2.00 if not is_flex else 50.00,
-                dense_regions=dense_regions,
-                connector_breakout_zones=connector_breakout_zones,
-                outline_polygon=getattr(self.config, "outline_polygon", None),
-                edge_clearance=0.40 if is_flex else 0.35,
-                qfn_keepouts=qfn_keepouts,
-            )
-        self.astar = router
+        rules = getattr(self.config, "design_rules", None)
+        base_via_penalty = getattr(rules, "via_penalty", 6.00) if rules else 6.00
+        resolved_via_penalty = 50.00 if is_flex else base_via_penalty
+
+        router = JaxPCBRouter(
+            board_bounds=board_bounds,
+            grid_step=0.25,
+            layers=layers,
+            obstacles=obstacles,
+            via_penalty=resolved_via_penalty,
+            dense_regions=dense_regions,
+            connector_breakout_zones=connector_breakout_zones,
+            outline_polygon=getattr(self.config, "outline_polygon", None),
+            edge_clearance=0.40 if is_flex else 0.35,
+            qfn_keepouts=qfn_keepouts,
+            design_rules=rules,
+        )
+        self.router = router
 
         fp_by_name = {fp.name: fp for fp in board_fps}
         dense_pins: Set[Tuple[float, float]] = set()
@@ -1188,10 +857,11 @@ class PCBAutoRouter:
                 return (2, -float(max_density), float(manhattan_span), len(pts))
 
             sorted_nets = sorted(self.wiring.nets, key=_dynamic_geometric_priority)
-            for net in sorted_nets:
+            for net_idx, net in enumerate(sorted_nets):
                 if net.name in skip_nets:
                     continue
 
+                print(f"Routing net [{net_idx + 1}/{len(sorted_nets)}] '{net.name}' ...", flush=True)
                 width_mm = self.get_net_trace_width(net.name)
 
                 endpoints: List[Tuple[float, float, str]] = []
@@ -1206,16 +876,16 @@ class PCBAutoRouter:
                     if pin_match:
                         gx, gy = self.get_pin_absolute_position(fp, pin_match)
                         pad_type = getattr(pin_match, "pad_type", "smd")
-                        glay = "F.Cu" if pad_type == "thru_hole" else getattr(fp, "layer", "F.Cu")
+                        glay = "ALL" if pad_type == "thru_hole" else getattr(fp, "layer", "F.Cu")
                         endpoints.append((gx, gy, glay))
                         if pad_type != "thru_hole":
-                            smd_endpoints.append((gx, gy, glay))
+                            smd_endpoints.append((gx, gy, glay, fp, pin_match))
 
                 for tp in tp_by_net.get(net.name, []):
-                    tp_layer = getattr(tp, "layer", "F.Cu")
+                    tp_layer = "ALL" if getattr(tp, "drill_diameter_mm", 0) > 0 else getattr(tp, "layer", "F.Cu")
                     endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer))
                     if getattr(tp, "drill_diameter_mm", 0) <= 0 or net.name in plane_nets:
-                        smd_endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer))
+                        smd_endpoints.append((tp.position_mm[0], tp.position_mm[1], tp_layer, None, None))
 
                 if net.name in sensor_terminals:
                     st_pos = sensor_terminals[net.name]
@@ -1226,18 +896,163 @@ class PCBAutoRouter:
 
                 # Plane nets connect via local stitching vias directly to inner copper planes
                 if net.name in plane_nets and not is_flex:
-                    for px, py, lay in smd_endpoints:
-                        # Try offsets around the pad for a stitching via
-                        candidate_offsets = CANDIDATE_VIA_OFFSETS
+                    for smd_item in smd_endpoints:
+                        px, py, lay = smd_item[0], smd_item[1], smd_item[2]
+                        if lay == "ALL":
+                            lay = "F.Cu"
+                        fp = smd_item[3] if len(smd_item) > 3 else None
+                        pin_match = smd_item[4] if len(smd_item) > 4 else None
+
+                        is_exposed_pad = pin_match is not None and (
+                            pin_match.name in ("EP", "PAD", "EXP", "THERMAL", "33")
+                            or (
+                                getattr(pin_match, "size_mm", (0, 0))[0] >= 1.0
+                                and getattr(pin_match, "size_mm", (0, 0))[1] >= 1.0
+                            )
+                        )
+                        pkg_name = getattr(fp, "package", "") if fp else ""
+                        is_qfn_pin = (
+                            fp is not None
+                            and any(pkg_name.startswith(p) for p in ("QFN", "DFN", "TQFN", "WQFN", "TDFN", "WSON"))
+                            and "TSSOP" not in pkg_name
+                            and "FPC" not in pkg_name
+                        )
+                        if is_qfn_pin and not is_exposed_pad:
+                            ep_pin = next(
+                                (
+                                    p
+                                    for p in getattr(fp, "pins", [])
+                                    if (
+                                        p.name in ("EP", "PAD", "EXP", "THERMAL", "33")
+                                        or (
+                                            getattr(p, "size_mm", (0, 0))[0] >= 1.0
+                                            and getattr(p, "size_mm", (0, 0))[1] >= 1.0
+                                        )
+                                    )
+                                    and pin_to_net.get((fp.name, p.name)) == net.name
+                                ),
+                                None,
+                            )
+                            if ep_pin is not None:
+                                ep_gx, ep_gy = self.get_pin_absolute_position(fp, ep_pin)
+                                is_orthogonal = abs(px - ep_gx) < 0.1 or abs(py - ep_gy) < 0.1
+                                if is_orthogonal:
+                                    seg_w = min(width_mm, 0.20)
+                                    trace_seg = TraceSegmentModel(
+                                        net=net.name,
+                                        layer=lay,
+                                        width_mm=seg_w,
+                                        start_mm=(px, py),
+                                        end_mm=(ep_gx, ep_gy),
+                                    )
+                                    traces.append(trace_seg)
+                                    w_h = max(seg_w / 2.0 + 0.12, 0.21)
+                                    router.add_obstacle(
+                                        Obstacle(
+                                            min_x=min(px, ep_gx) - w_h,
+                                            min_y=min(py, ep_gy) - w_h,
+                                            max_x=max(px, ep_gx) + w_h,
+                                            max_y=max(py, ep_gy) + w_h,
+                                            layer=lay,
+                                            net=net.name,
+                                        )
+                                    )
+                                    continue
+
+                        in_qfn_keepout = any(
+                            kx_min <= px <= kx_max and ky_min <= py <= ky_max
+                            for kx_min, ky_min, kx_max, ky_max in getattr(router, "qfn_keepouts", [])
+                        )
+
+                        candidate_offsets = [(0.0, 0.0)] if is_exposed_pad else list(CANDIDATE_VIA_OFFSETS)
+                        if fp is not None and (in_qfn_keepout or is_qfn_pin) and not is_exposed_pad:
+                            vx = px - fp.position[0]
+                            vy = py - fp.position[1]
+                            if abs(vx) > abs(vy):
+                                dir_x = 1.0 if vx > 0 else -1.0
+                                same_edge_pins = [
+                                    self.get_pin_absolute_position(fp, p)
+                                    for p in fp.pins
+                                    if abs(self.get_pin_absolute_position(fp, p)[0] - px) < 0.1
+                                ]
+                                has_pin_above = any(pt[1] > py + 0.1 for pt in same_edge_pins)
+                                has_pin_below = any(pt[1] < py - 0.1 for pt in same_edge_pins)
+                                is_corner_pin = (not has_pin_above and has_pin_below) or (
+                                    not has_pin_below and has_pin_above
+                                )
+                                if is_corner_pin:
+                                    corner_dir_y = 1.0 if not has_pin_above else -1.0
+                                    candidate_offsets = [
+                                        off
+                                        for off in candidate_offsets
+                                        if off[0] * dir_x >= 0.40 and off[1] * corner_dir_y >= 0.35
+                                    ]
+                                else:
+                                    candidate_offsets = [
+                                        off
+                                        for off in candidate_offsets
+                                        if off[0] * dir_x > 0.01
+                                        and (
+                                            (off[1] >= -0.05)
+                                            if not has_pin_above
+                                            else ((off[1] <= 0.05) if not has_pin_below else abs(off[1]) <= 0.05)
+                                        )
+                                    ]
+                            else:
+                                dir_y = 1.0 if vy > 0 else -1.0
+                                same_edge_pins = [
+                                    self.get_pin_absolute_position(fp, p)
+                                    for p in fp.pins
+                                    if abs(self.get_pin_absolute_position(fp, p)[1] - py) < 0.1
+                                ]
+                                has_pin_right = any(pt[0] > px + 0.1 for pt in same_edge_pins)
+                                has_pin_left = any(pt[0] < px - 0.1 for pt in same_edge_pins)
+                                is_corner_pin = (not has_pin_right and has_pin_left) or (
+                                    not has_pin_left and has_pin_right
+                                )
+                                if is_corner_pin:
+                                    corner_dir_x = -1.0 if not has_pin_left else 1.0
+                                    candidate_offsets = [
+                                        off
+                                        for off in candidate_offsets
+                                        if off[1] * dir_y >= 0.40 and off[0] * corner_dir_x >= 0.35
+                                    ]
+                                else:
+                                    candidate_offsets = [
+                                        off
+                                        for off in candidate_offsets
+                                        if off[1] * dir_y > 0.01
+                                        and (
+                                            (off[0] >= -0.05)
+                                            if not has_pin_right
+                                            else ((off[0] <= 0.05) if not has_pin_left else abs(off[0]) <= 0.05)
+                                        )
+                                    ]
+                            candidate_offsets.sort(key=lambda off: math.hypot(off[0], off[1]))
+
                         best_vx, best_vy = px, py
                         found_via_spot = False
                         best_offset = (0.0, 0.0)
+                        seen_cands = set()
                         for dx, dy in candidate_offsets:
-                            cand_x, cand_y = px + dx, py + dy
+                            cand_x = round((px + dx) / router.grid_step) * router.grid_step
+                            cand_y = round((py + dy) / router.grid_step) * router.grid_step
+                            if (cand_x, cand_y) in seen_cands:
+                                continue
+                            seen_cands.add((cand_x, cand_y))
                             if not (half_w - 1.0 > cand_x > -half_w + 1.0 and half_l - 1.0 > cand_y > -half_l + 1.0):
                                 continue
-                            is_dense = math.hypot(dx, dy) < 0.65
-                            v_dia = 0.35 if is_dense else 0.45
+
+                            # Perimeter pins of fine-pitch packages must place stitching vias outside breakout keepouts
+                            if not is_exposed_pad and any(
+                                kx_min <= cand_x <= kx_max and ky_min <= cand_y <= ky_max
+                                for kx_min, ky_min, kx_max, ky_max in getattr(router, "qfn_keepouts", [])
+                            ):
+                                continue
+
+                            is_dense = math.hypot(dx, dy) < 0.65 or in_qfn_keepout or is_qfn_pin
+                            default_v_dia = getattr(rules, "default_via_diameter_mm", 0.36) if rules else 0.36
+                            v_dia = default_v_dia
                             via_pad_r = v_dia / 2.0
                             req_clearance = 0.12 if is_dense else 0.15
                             conflict = False
@@ -1247,16 +1062,42 @@ class PCBAutoRouter:
                                 if obs.copper_dist(cand_x, cand_y) - via_pad_r < req_clearance:
                                     conflict = True
                                     break
-                            if not conflict:
-                                best_vx, best_vy = cand_x, cand_y
-                                best_offset = (dx, dy)
-                                found_via_spot = True
-                                break
+                            if conflict:
+                                continue
+
+                            # Check connecting trace clearance if fanout has non-zero length
+                            if math.hypot(cand_x - px, cand_y - py) > 0.01:
+                                seg_w = getattr(rules, "default_track_width_mm", 0.12) if rules else 0.12
+                                trace_half_w = seg_w / 2.0
+                                trace_conflict = False
+                                seg_len = math.hypot(cand_x - px, cand_y - py)
+                                num_samples = max(2, int(math.ceil(seg_len / 0.05)))
+                                for s in range(num_samples + 1):
+                                    t = s / num_samples
+                                    sx = px + t * (cand_x - px)
+                                    sy = py + t * (cand_y - py)
+                                    for obs in router.obstacles:
+                                        if obs.net is not None and obs.net == net.name:
+                                            continue
+                                        if obs.layer in (lay, "ALL"):
+                                            if obs.copper_dist(sx, sy) - trace_half_w < req_clearance:
+                                                trace_conflict = True
+                                                break
+                                    if trace_conflict:
+                                        break
+                                if trace_conflict:
+                                    continue
+
+                            best_vx, best_vy = cand_x, cand_y
+                            best_offset = (cand_x - px, cand_y - py)
+                            found_via_spot = True
+                            break
 
                         if found_via_spot:
-                            is_dense = math.hypot(best_offset[0], best_offset[1]) < 0.65
-                            v_dia = 0.36 if is_dense else 0.45
-                            v_drill = 0.16 if is_dense else 0.20
+                            default_v_dia = getattr(rules, "default_via_diameter_mm", 0.36) if rules else 0.36
+                            default_v_drill = getattr(rules, "default_via_drill_mm", 0.16) if rules else 0.16
+                            v_dia = default_v_dia
+                            v_drill = default_v_drill
                             stitching_via = ViaModel(
                                 net=net.name,
                                 position_mm=(best_vx, best_vy),
@@ -1266,18 +1107,55 @@ class PCBAutoRouter:
                                 layer_end="B.Cu",
                             )
                             vias.append(stitching_via)
-                            seg_w = min(width_mm, 0.20) if is_dense else width_mm
-                            trace_seg = TraceSegmentModel(
-                                net=net.name,
-                                layer=lay,
-                                width_mm=seg_w,
-                                start_mm=(px, py),
-                                end_mm=(best_vx, best_vy),
-                            )
-                            traces.append(trace_seg)
 
-                            # Register obstacle for the stitching via and trace
-                            v_r = v_dia / 2.0 + 0.22
+                            if math.hypot(best_vx - px, best_vy - py) > 0.01:
+                                seg_w = getattr(rules, "default_track_width_mm", 0.12) if rules else 0.12
+                                trace_seg = TraceSegmentModel(
+                                    net=net.name,
+                                    layer=lay,
+                                    width_mm=seg_w,
+                                    start_mm=(px, py),
+                                    end_mm=(best_vx, best_vy),
+                                )
+                                traces.append(trace_seg)
+                                w_h = seg_w / 2.0 + 0.17
+                                router.add_obstacle(
+                                    Obstacle(
+                                        min_x=min(px, best_vx) - w_h,
+                                        min_y=min(py, best_vy) - w_h,
+                                        max_x=max(px, best_vx) + w_h,
+                                        max_y=max(py, best_vy) + w_h,
+                                        layer=lay,
+                                        net=net.name,
+                                        copper_box=(
+                                            min(px, best_vx) - seg_w / 2.0,
+                                            min(py, best_vy) - seg_w / 2.0,
+                                            max(px, best_vx) + seg_w / 2.0,
+                                            max(py, best_vy) + seg_w / 2.0,
+                                        ),
+                                    )
+                                )
+                                gx_s = round((px - router.min_x) / router.grid_step)
+                                gy_s = round((py - router.min_y) / router.grid_step)
+                                gx_e = round((best_vx - router.min_x) / router.grid_step)
+                                gy_e = round((best_vy - router.min_y) / router.grid_step)
+                                l_idx = router.layer_to_idx.get(lay, 0)
+                                dist_cells = max(abs(gx_e - gx_s), abs(gy_e - gy_s), 1)
+                                for s in range(dist_cells + 1):
+                                    t = s / dist_cells
+                                    cgx = round(gx_s + t * (gx_e - gx_s))
+                                    cgy = round(gy_s + t * (gy_e - gy_s))
+                                    router.routed_cells[(cgx, cgy, l_idx)] = net.name
+                                    for dy in (-1, 0, 1):
+                                        ny = cgy + dy
+                                        if 0 <= ny < router.h_cells:
+                                            for dx in (-1, 0, 1):
+                                                nx = cgx + dx
+                                                if 0 <= nx < router.w_cells:
+                                                    router.via_mask_np[ny, nx] = True
+
+                            # Register obstacle for the stitching via
+                            v_r = max(v_dia / 2.0 + 0.20, 0.38)
                             router.add_obstacle(
                                 Obstacle(
                                     min_x=best_vx - v_r,
@@ -1291,60 +1169,37 @@ class PCBAutoRouter:
                                     radius=v_dia / 2.0,
                                 )
                             )
-                            w_h = max(seg_w / 2.0 + 0.12, router.grid_step + 0.01)
-                            router.add_obstacle(
-                                Obstacle(
-                                    min_x=min(px, best_vx) - w_h,
-                                    min_y=min(py, best_vy) - w_h,
-                                    max_x=max(px, best_vx) + w_h,
-                                    max_y=max(py, best_vy) + w_h,
-                                    layer=lay,
-                                    net=net.name,
-                                )
-                            )
+                            gx_v = round((best_vx - router.min_x) / router.grid_step)
+                            gy_v = round((best_vy - router.min_y) / router.grid_step)
+                            for dy_v in (-1, 0, 1):
+                                ny_v = gy_v + dy_v
+                                if not (0 <= ny_v < router.h_cells):
+                                    continue
+                                for dx_v in (-1, 0, 1):
+                                    nx_v = gx_v + dx_v
+                                    if not (0 <= nx_v < router.w_cells):
+                                        continue
+                                    router.via_mask_np[ny_v, nx_v] = True
+                                    router.mask_np[:, ny_v, nx_v] = True
+                                    for l_i in range(len(router.layers)):
+                                        router.blocked_cells[(nx_v, ny_v, router.idx_to_layer[l_i])] = net.name
+                                        if dy_v == 0 and dx_v == 0:
+                                            router.routed_cells[(nx_v, ny_v, l_i)] = net.name
                     continue
 
-                # Signal nets: order endpoints spatially to avoid self-crossing and backtracking
-                # Always route outward from dense pins (BGA/QFN) to ensure clean perimeter escape
-                if len(endpoints) == 2:
-                    p0 = (round(endpoints[0][0], 2), round(endpoints[0][1], 2))
-                    p1 = (round(endpoints[1][0], 2), round(endpoints[1][1], 2))
-                    if (p1 in bga_pins and p0 not in bga_pins) or (p1 in dense_pins and p0 not in dense_pins):
-                        endpoints = [endpoints[1], endpoints[0]]
-                elif len(endpoints) > 2:
-                    dense_indices = [
-                        idx for idx, pt in enumerate(endpoints) if (round(pt[0], 2), round(pt[1], 2)) in bga_pins
-                    ]
-                    if not dense_indices:
-                        dense_indices = [
-                            idx for idx, pt in enumerate(endpoints) if (round(pt[0], 2), round(pt[1], 2)) in dense_pins
-                        ]
-                    start_idx = dense_indices[0] if dense_indices else 0
-                    unvisited = list(endpoints)
-                    ordered = [unvisited.pop(start_idx)]
-                    while unvisited:
-                        curr = ordered[-1]
-                        best_idx = 0
-                        best_d = float("inf")
-                        for idx, pt in enumerate(unvisited):
-                            d = math.hypot(pt[0] - curr[0], pt[1] - curr[1]) + (0.0 if pt[2] == curr[2] else 3.0)
-                            if len(unvisited) > 1 and (round(pt[0], 2), round(pt[1], 2)) in dense_pins:
-                                d += 15.0
-                            if d < best_d:
-                                best_d = d
-                                best_idx = idx
-                        ordered.append(unvisited.pop(best_idx))
-                    endpoints = ordered
-
+                # Signal nets: compute optimal Minimum Spanning Tree (MST) routing edges
+                net_edges = self._compute_net_edges(endpoints, bga_pins, dense_pins)
                 junction_pts = [(pt[0], pt[1]) for pt in endpoints] if len(endpoints) > 2 else []
 
-                for i in range(len(endpoints) - 1):
-                    start_pt = (endpoints[i][0], endpoints[i][1])
-                    start_layer = endpoints[i][2]
-                    end_pt = (endpoints[i + 1][0], endpoints[i + 1][1])
-                    end_layer = endpoints[i + 1][2]
+                for start_node, end_node in net_edges:
+                    start_pt = (start_node[0], start_node[1])
+                    start_layer = start_node[2]
+                    end_pt = (end_node[0], end_node[1])
+                    end_layer = end_node[2]
 
-                    if math.hypot(end_pt[0] - start_pt[0], end_pt[1] - start_pt[1]) < 1e-3 and start_layer == end_layer:
+                    if math.hypot(end_pt[0] - start_pt[0], end_pt[1] - start_pt[1]) < 1e-3 and (
+                        start_layer == end_layer or start_layer == "ALL" or end_layer == "ALL"
+                    ):
                         continue
 
                     try:
@@ -1369,8 +1224,8 @@ class PCBAutoRouter:
 
                         conflicting_nets = set()
                         for (cx_cell, cy_cell, _), cell_net in list(router.routed_cells.items()):
-                            rx = cx_cell * router.grid_step
-                            ry = cy_cell * router.grid_step
+                            rx = router.min_x + cx_cell * router.grid_step
+                            ry = router.min_y + cy_cell * router.grid_step
                             if min_x <= rx <= max_x and min_y <= ry <= max_y:
                                 if (
                                     cell_net != net.name
@@ -1389,6 +1244,8 @@ class PCBAutoRouter:
                         router.obstacles = [
                             obs for obs in router.obstacles if obs.is_pin or obs.net not in conflicting_nets
                         ]
+                        if hasattr(router, "routed_traces"):
+                            router.routed_traces = [tr for tr in router.routed_traces if tr.net not in conflicting_nets]
                         router.rebuild_spatial_index()
                         router.routed_cells = {
                             k: v for k, v in router.routed_cells.items() if v not in conflicting_nets
@@ -1433,60 +1290,22 @@ class PCBAutoRouter:
                                     st_pos = sensor_terminals[c_net.name]
                                     c_endpoints.append((st_pos[0], st_pos[1], "F.Cu"))
 
-                                if len(c_endpoints) == 2:
-                                    p0 = (round(c_endpoints[0][0], 2), round(c_endpoints[0][1], 2))
-                                    p1 = (round(c_endpoints[1][0], 2), round(c_endpoints[1][1], 2))
-                                    if (p1 in bga_pins and p0 not in bga_pins) or (
-                                        p1 in dense_pins and p0 not in dense_pins
-                                    ):
-                                        c_endpoints = [c_endpoints[1], c_endpoints[0]]
-                                elif len(c_endpoints) > 2:
-                                    dense_indices = [
-                                        idx
-                                        for idx, pt in enumerate(c_endpoints)
-                                        if (round(pt[0], 2), round(pt[1], 2)) in bga_pins
-                                    ]
-                                    if not dense_indices:
-                                        dense_indices = [
-                                            idx
-                                            for idx, pt in enumerate(c_endpoints)
-                                            if (round(pt[0], 2), round(pt[1], 2)) in dense_pins
-                                        ]
-                                    start_idx = dense_indices[0] if dense_indices else 0
-                                    unvisited = list(c_endpoints)
-                                    ordered = [unvisited.pop(start_idx)]
-                                    while unvisited:
-                                        curr = ordered[-1]
-                                        best_idx = 0
-                                        best_d = float("inf")
-                                        for idx, pt in enumerate(unvisited):
-                                            d = math.hypot(pt[0] - curr[0], pt[1] - curr[1]) + (
-                                                0.0 if pt[2] == curr[2] else 3.0
-                                            )
-                                            if len(unvisited) > 1 and (round(pt[0], 2), round(pt[1], 2)) in dense_pins:
-                                                d += 15.0
-                                            if d < best_d:
-                                                best_d = d
-                                                best_idx = idx
-                                        ordered.append(unvisited.pop(best_idx))
-                                    c_endpoints = ordered
-
-                                if len(c_endpoints) >= 2:
+                                c_edges = self._compute_net_edges(c_endpoints, bga_pins, dense_pins)
+                                if c_edges:
                                     c_junction = [(pt[0], pt[1]) for pt in c_endpoints] if len(c_endpoints) > 2 else []
-                                    for c_i in range(len(c_endpoints) - 1):
+                                    for c_start_node, c_end_node in c_edges:
                                         c_tr, c_vi = router.route_net(
-                                            start_pt=(c_endpoints[c_i][0], c_endpoints[c_i][1]),
-                                            start_layer=c_endpoints[c_i][2],
-                                            end_pt=(c_endpoints[c_i + 1][0], c_endpoints[c_i + 1][1]),
-                                            end_layer=c_endpoints[c_i + 1][2],
+                                            start_pt=(c_start_node[0], c_start_node[1]),
+                                            start_layer=c_start_node[2],
+                                            end_pt=(c_end_node[0], c_end_node[1]),
+                                            end_layer=c_end_node[2],
                                             net_name=c_net.name,
                                             width_mm=c_width,
                                             junction_points=c_junction,
                                         )
                                         traces.extend(c_tr)
                                         vias.extend(c_vi)
-                        except Exception as ripup_err:
-                            # If rip-up reroute fails, raise the original descriptive error
+                        except Exception:
                             raise initial_err
 
         traces = straighten_junction_traces(traces, fillet_radius=0.20)

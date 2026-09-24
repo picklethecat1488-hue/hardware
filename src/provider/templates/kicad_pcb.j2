@@ -50,7 +50,7 @@
 {% endfor %}
       (copper_finish "{{ board.stackup.finish }}")
     )
-    (pad_to_mask_clearance 0.05)
+    (pad_to_mask_clearance {{ (board.design_rules and board.design_rules.pad_to_mask_clearance_mm) if (board.design_rules and board.design_rules.pad_to_mask_clearance_mm is not none) else 0.0 }})
   )
   (net 0 "")
 {% for net_info in nets %}
@@ -150,12 +150,21 @@
 {% for text in silkscreen_texts %}
   (gr_text "{{ text.text }}" (at {{ text.x_mm }} {{ text.y_mm }}{% if text.rotation %} {{ text.rotation }}{% endif %}) (layer "{{ text.layer }}") (effects (font (size {{ text.font_size }} {{ text.font_size }}) (thickness {{ text.thickness }})){% if text.mirror %} (justify mirror){% endif %}))
 {% endfor %}
+{% for g in silkscreen_graphics %}
+{% if g.shape == "rect" %}
+  (gr_rect (start {{ g.x1 }} {{ g.y1 }}) (end {{ g.x2 }} {{ g.y2 }}) (stroke (width {{ g.thickness }}) (type default)) (fill {{ "solid" if g.fill else "none" }}) (layer "{{ g.layer }}"))
+{% elif g.shape == "line" %}
+  (gr_line (start {{ g.x1 }} {{ g.y1 }}) (end {{ g.x2 }} {{ g.y2 }}) (stroke (width {{ g.thickness }}) (type default)) (layer "{{ g.layer }}"))
+{% elif g.shape == "polygon" and g.points %}
+  (gr_poly (pts {% for pt in g.points %}(xy {{ pt[0] }} {{ pt[1] }}) {% endfor %}) (stroke (width {{ g.thickness }}) (type default)) (fill {{ "solid" if g.fill else "none" }}) (layer "{{ g.layer }}"))
+{% endif %}
+{% endfor %}
 
   (net_class "Default" "Default net class"
-    (clearance 0.127)
-    (trace_width 0.15)
-    (via_dia 0.45)
-    (via_drill 0.2)
+    (clearance {{ (board.design_rules and board.design_rules.min_clearance_mm) or 0.12 }})
+    (trace_width {{ (board.design_rules and board.design_rules.default_track_width_mm) or 0.12 }})
+    (via_dia {{ (board.design_rules and board.design_rules.default_via_diameter_mm) or 0.36 }})
+    (via_drill {{ (board.design_rules and board.design_rules.default_via_drill_mm) or 0.16 }})
 {% for net_info in nets %}
     (add_net "{{ net_info.name }}")
 {% endfor %}

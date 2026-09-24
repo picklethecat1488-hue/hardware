@@ -300,6 +300,38 @@ class PCBExporter:
                 }
             )
 
+        silkscreen_graphics_data = []
+        for sg in getattr(self.config, "silkscreen_graphics", []):
+            cx = round(self.config.sheet_center_x_mm + sg.position[0], 4)
+            cy = round(self.config.sheet_center_y_mm + sg.position[1], 4)
+            w, h = sg.dimensions
+            x1 = round(cx - w / 2.0, 4)
+            y1 = round(cy - h / 2.0, 4)
+            x2 = round(cx + w / 2.0, 4)
+            y2 = round(cy + h / 2.0, 4)
+            pts_data = []
+            if sg.points:
+                pts_data = [
+                    (
+                        round(self.config.sheet_center_x_mm + pt[0], 4),
+                        round(self.config.sheet_center_y_mm + pt[1], 4),
+                    )
+                    for pt in sg.points
+                ]
+            silkscreen_graphics_data.append(
+                {
+                    "shape": sg.shape,
+                    "layer": sg.layer,
+                    "x1": x1,
+                    "y1": y1,
+                    "x2": x2,
+                    "y2": y2,
+                    "thickness": sg.thickness,
+                    "fill": sg.fill,
+                    "points": pts_data,
+                }
+            )
+
         mounting_holes_data = []
         if not self.is_flex:
             for mh in self.config.mounting_holes:
@@ -575,6 +607,7 @@ class PCBExporter:
             nets=nets,
             footprints=footprints_data,
             silkscreen_texts=silkscreen_data,
+            silkscreen_graphics=silkscreen_graphics_data,
             mounting_holes=mounting_holes_data,
             test_points=test_points_data,
             segments=segments_data,

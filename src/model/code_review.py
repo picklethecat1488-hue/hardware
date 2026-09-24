@@ -110,6 +110,8 @@ class CommitInfoModel(BaseModel):
     additions: int = 0
     deletions: int = 0
     files_count: int = 0
+    ignored_files_count: int = 0
+    ignored_files: List[str] = Field(default_factory=list)
 
 
 class CommentModel(BaseModel):

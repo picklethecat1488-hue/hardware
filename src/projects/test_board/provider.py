@@ -29,6 +29,7 @@ from model.pcb import (
     LayerType,
     MountingHoleModel,
     SilkscreenTextModel,
+    SilkscreenGraphicModel,
     TraceSegmentModel,
     ViaModel,
 )
@@ -40,6 +41,9 @@ from provider import (
     WiringDiagram,
     BuildSilkscreen,
     SilkscreenText,
+    SilkscreenRect,
+    SilkscreenLine,
+    SilkscreenPolygon,
     BuildStackup,
     StackupLayer,
     BuildDrillHoles,
@@ -163,6 +167,7 @@ class TestBoardProvider(Provider):
 
             with BuildSilkscreen() as silk:
                 silk.add(self.silkscreen())
+                silk.add(self.silkscreen_graphics())
 
             with BuildTraces() as bt:
                 bt.add(self.traces())
@@ -747,13 +752,35 @@ class TestBoardProvider(Provider):
         """Return interlayer vias for the test board."""
         return self._routed_network[1]
 
+    def silkscreen_graphics(self) -> list[SilkscreenGraphicModel]:
+        """Return silkscreen graphic primitives (frames, lines, polygons) for the test board carrier."""
+        with BuildSilkscreen() as silk:
+            # Top Antigravity brand logo emblem in empty space between J2 and carrier title (BUG-092)
+            # Unique graphic emblem within a square frame (not text)
+            SilkscreenRect(position=(0.0, 31.0), dimensions=(7.0, 7.0), thickness=0.20, layer="F.SilkS")
+            SilkscreenPolygon(
+                polygon_points=[
+                    (0.0, 33.2),
+                    (1.6, 30.5),
+                    (0.5, 30.5),
+                    (0.5, 28.8),
+                    (-0.5, 28.8),
+                    (-0.5, 30.5),
+                    (-1.6, 30.5),
+                ],
+                thickness=0.18,
+                layer="F.SilkS",
+                fill=True,
+            )
+            SilkscreenLine(start_mm=(-2.4, 32.2), end_mm=(-1.4, 30.8), thickness=0.18, layer="F.SilkS")
+            SilkscreenLine(start_mm=(-2.4, 29.8), end_mm=(-1.4, 31.2), thickness=0.18, layer="F.SilkS")
+            SilkscreenLine(start_mm=(2.4, 32.2), end_mm=(1.4, 30.8), thickness=0.18, layer="F.SilkS")
+            SilkscreenLine(start_mm=(2.4, 29.8), end_mm=(1.4, 31.2), thickness=0.18, layer="F.SilkS")
+        return silk.graphics
+
     def silkscreen(self) -> list[SilkscreenTextModel]:
         """Return silkscreen markings for the test board carrier."""
         with BuildSilkscreen() as silk:
-            # Top logo in empty space between connector J2 and carrier title (BUG-092)
-            with Locations((0.0, 31.0)):
-                SilkscreenText("ANTIGRAVITY", layer="F.SilkS", font_size=1.6, thickness=0.25)
-
             # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
             with Locations((0.0, 26.0)):
                 SilkscreenText("TEST BOARD CARRIER REV 2.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
@@ -810,7 +837,7 @@ class TestBoardProvider(Provider):
                 SilkscreenText("U4", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((-18.0, 38.0)):
                 SilkscreenText("SPK1", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((0.0, 17.0)):
+            with Locations((-9.0, 3.5)):
                 SilkscreenText("Y1", layer="F.SilkS", font_size=0.8, thickness=0.12)
 
             # Resistors
@@ -818,9 +845,9 @@ class TestBoardProvider(Provider):
                 SilkscreenText("R1", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((10.0, -4.5)):
                 SilkscreenText("R2", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-14.5, 4.5)):
-                SilkscreenText("R3", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((-14.5, -4.5)):
+                SilkscreenText("R3", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-14.5, 4.5)):
                 SilkscreenText("R4", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((-5.5, 8.0)):
                 SilkscreenText("R5", layer="F.SilkS", font_size=0.7, thickness=0.10)

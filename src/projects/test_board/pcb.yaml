@@ -4,12 +4,27 @@ revision: "2.0"
 shape_ref: carrier_board
 sheet_size: A4
 
+design_rules:
+  min_clearance_mm: 0.030
+  min_fine_pitch_clearance_mm: 0.030
+  fine_pitch_pad_threshold_mm: 0.35
+  min_track_width_mm: 0.10
+  default_track_width_mm: 0.12
+  min_copper_edge_clearance_mm: 0.15
+  min_hole_to_hole_mm: 0.030
+  min_hole_clearance_mm: 0.030
+  min_via_diameter_mm: 0.35
+  default_via_diameter_mm: 0.36
+  default_via_drill_mm: 0.16
+  via_penalty: 2.00
+  pad_to_mask_clearance_mm: 0.0
+
 net_classes:
   - name: PCIE_GEN4
-    trace_width_mm: 0.14
-    clearance_mm: 0.16
-    via_dia_mm: 0.45
-    via_drill_mm: 0.20
+    trace_width_mm: 0.12
+    clearance_mm: 0.12
+    via_dia_mm: 0.36
+    via_drill_mm: 0.16
     interface_type: pcie
     require_ground_stitch_via: true
     max_stitch_via_distance_mm: 1.0
@@ -18,7 +33,7 @@ net_classes:
         pos_net: PCIE_TX0_P
         neg_net: PCIE_TX0_N
         target_impedance_ohms: 85.0
-        impedance_tolerance_percent: 10.0
+        impedance_tolerance_percent: 15.0
         max_intra_pair_skew_mm: 0.10
         max_inter_pair_skew_mm: 0.50
         max_via_count: 2
@@ -26,16 +41,16 @@ net_classes:
         pos_net: PCIE_RX0_P
         neg_net: PCIE_RX0_N
         target_impedance_ohms: 85.0
-        impedance_tolerance_percent: 10.0
+        impedance_tolerance_percent: 15.0
         max_intra_pair_skew_mm: 0.10
         max_inter_pair_skew_mm: 0.50
         max_via_count: 2
 
   - name: MIPI_DISPLAY
     trace_width_mm: 0.12
-    clearance_mm: 0.20
-    via_dia_mm: 0.45
-    via_drill_mm: 0.20
+    clearance_mm: 0.12
+    via_dia_mm: 0.36
+    via_drill_mm: 0.16
     interface_type: display
     diff_pairs:
       - name: MIPI_D0
@@ -58,8 +73,8 @@ net_classes:
   - name: RF_2GHZ
     trace_width_mm: 0.13
     clearance_mm: 0.20
-    via_dia_mm: 0.45
-    via_drill_mm: 0.20
+    via_dia_mm: 0.36
+    via_drill_mm: 0.16
     interface_type: rf
     coplanar_waveguide: true
     ground_gap_mm: 0.22
@@ -68,20 +83,20 @@ net_classes:
       - RF_ANT_FEED
 
   - name: I2C_BUS
-    trace_width_mm: 0.15
-    clearance_mm: 0.15
-    via_dia_mm: 0.45
-    via_drill_mm: 0.20
+    trace_width_mm: 0.12
+    clearance_mm: 0.12
+    via_dia_mm: 0.36
+    via_drill_mm: 0.16
     interface_type: digital
     single_nets:
       - I2C_SDA
       - I2C_SCL
 
   - name: PWR_3V3
-    trace_width_mm: 0.35
+    trace_width_mm: 0.12
     clearance_mm: 0.20
-    via_dia_mm: 0.50
-    via_drill_mm: 0.25
+    via_dia_mm: 0.36
+    via_drill_mm: 0.16
     interface_type: power
     single_nets:
       - 3V3
@@ -292,6 +307,7 @@ schematic_sheets:
       grid_positions:
         U4: [0, 0]
         U5: [0, 1]
+        C8: [1, 0]
         U1: [1, 1]
     components: [U4, U5, U1, C8]
     pin_sides:

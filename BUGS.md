@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-23 03:48:26 UTC` |
-| **Total Issues** | `93` |
-| **Open Issues** | `1` |
-| **Resolved / Closed** | `92 (98%)` |
+| **Report Date** | `2026-09-24 21:13:43 UTC` |
+| **Total Issues** | `105` |
+| **Open Issues** | `9` |
+| **Resolved / Closed** | `96 (91%)` |
 
 ## Executive Summary
 
@@ -21,14 +21,14 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 1 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 4 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 87 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 99 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 1 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 69 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 81 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 12 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 0 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 10 | Build tooling, compilers, test runners, headless tools. |
@@ -116,7 +116,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-079](#bug-079): Move BUGS.md to repo root (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-080](#bug-080): Add LED cutout to test board enclosure `[test_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-081](#bug-081): This build.py command should have failed (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-083](#bug-083): I2C pullup resistors overlap (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-084](#bug-084): Update board files schematics  `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-085](#bug-085): Change mounting holes on enclosure bottom to mounting posts (`RESOLVED`)
@@ -129,6 +129,18 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-092](#bug-092): Add logo to carrier board top (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-093](#bug-093): Update docs with architecture changes (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-094](#bug-094): Remove manual net priorities from PCB router (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-095](#bug-095): Make JAX router backend the default (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-096](#bug-096): Load switch should control audio and peripheral domains (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-097](#bug-097): Log routing violations to a file (`RESOLVED`)
+- [ ] **`[MEDIUM]`** [#BUG-098](#bug-098): Sheer 3 - C9, C10 overlap (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-099](#bug-099): Sheet 4- FLEXSPI wires should route around U8 (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-100](#bug-100): Sheet 6-SCL and SDA lines overlap (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-101](#bug-101): Sheet 7-U2 and J2- cap touch net routing is messy (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-102](#bug-102): Sheet 9- PCIE lanes are not cleanly routed (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-103](#bug-103): Sheet 10- Serial Bus Expansion Headers needs to be broken into 2 pages (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-104](#bug-104): Sheet11- GPIOs should route without off-sheet connectors (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-105](#bug-105): U4-Add AUDIO_EN GPIO connection to U1 (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-106](#bug-106): J6-J9: Remove VLOAD_SW connector (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -2098,12 +2110,13 @@ Resolved target resolution in Builder.generate_pcbs using TargetParser.resolve s
 
 ---
 
-### <a id="bug-082"></a> 🔴 `[BUG-082]` Route test board
+### <a id="bug-082"></a> 🟢 `[BUG-082]` Route test board
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-21 18:23:13 UTC`
+- **Resolved**: `2026-09-24 20:37:46 UTC`
 
 #### Description
 
@@ -2122,7 +2135,7 @@ Reopened! the carrier board PCB still looks totally unrooted!
 
 #### Resolution Notes
 
-Resolved test_board carrier routing and KiCad DRC clearance/bridge violations by adjusting component placements (J6-J10 vertical bus spacing, J14 GPIO header placed at (19.0, -29.5), U8 NAND moved to (15.0, 4.0), U9 USB-UART moved to (-20.0, -32.0), and corrected TDFN-8 Pad EP dimension in footprints/ic.yaml to 0.7x1.3mm).
+Carrier board auto-routed with zero drc.py and zero KiCad DRC violations.
 
 ---
 
@@ -2354,15 +2367,20 @@ Removed per-line max-width: 0 and overflow-x: auto styling from table cells and 
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-23 03:11:12 UTC`
-- **Resolved**: `2026-09-23 03:37:58 UTC`
+- **Resolved**: `2026-09-24 04:44:21 UTC`
 
 #### Description
 
 There is some empty space on top of the carrier board that we can add a logo to..?
 
+#### Behavior Comparison
+
+- **Expected**: Logo must be a totally unique image within a square frame, not text.
+- **Actual**: _Not specified_
+
 #### Resolution Notes
 
-Added ANTIGRAVITY silkscreen logo on F.SilkS at (0.0, 31.0) in the open area on top of the carrier board, validated with zero DRC silkscreen pad/hole overlap violations and dedicated regression test.
+Replaced text-based silkscreen markings with a totally unique vector image emblem within a square frame (not text) on carrier board top with 0 DRC violations, and generated accompanying 1:1 image asset.
 
 ---
 
@@ -2426,5 +2444,228 @@ Replace A* router with two-stage dynamic geometric constraint scoring and rip up
 #### Resolution Notes
 
 Replaced manual net name matching in PCBAutoRouter with dynamic geometric priority scoring (pin density bottleneck, Manhattan distance, pad slack) and NetModel.priority override. Added two-stage rip-up and reroute for congested routing corridors.
+
+---
+
+### <a id="bug-095"></a> 🟢 `[BUG-095]` Make JAX router backend the default
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 02:44:12 UTC`
+- **Resolved**: `2026-09-24 03:09:37 UTC`
+
+#### Description
+
+Ensure the JAX router backend passes all regression tests, then make it the default router, and remove the deprecated astar backend.
+
+#### Resolution Notes
+
+Made JaxPCBRouter the default backend, removed deprecated AStarPCBRouter, and added QFN via keepout support.
+
+---
+
+### <a id="bug-096"></a> 🟢 `[BUG-096]` Load switch should control audio and peripheral domains
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 02:45:52 UTC`
+- **Resolved**: `2026-09-24 03:12:01 UTC`
+
+#### Description
+
+The load switch should control the audio and peripheral domains so that both those domains can be disabled when entering a power down state.
+
+#### Resolution Notes
+
+Wired audio amplifier U4, C8, and peripheral headers J6-J9 to switched domain VLOAD_SW and PWR_EN.
+
+---
+
+### <a id="bug-097"></a> 🟢 `[BUG-097]` Log routing violations to a file
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 02:47:31 UTC`
+- **Resolved**: `2026-09-24 03:13:49 UTC`
+
+#### Description
+
+Log PCB build errors (routing violations) to a log file that goes under the board/ subdirectory for the project. Outputting them to the console is very slow and makes it hard to tell what is going on with the overall build.
+
+#### Reproduction Steps
+
+1. $ python src/build.py "test_board:pcb"
+
+#### Behavior Comparison
+
+- **Expected**: ❌ Failed to build test_board/carrier_board:pcb. Project has DRC errors:  <THIS FILE> 
+❌ Tool build execution failed
+- **Actual**: ng trace stub / antenna detected on net 'CAP_RX0' on layer 'B.Cu' at (20.00, -14.00) with no pad, via, test point, or connected trace 
+▶   * [ERROR] ANTENNA_TRACE_DETECTED on 'CAP_TX0' at (20.00, -13.50): Dangling trace stub / antenna detected on net 'CAP_TX0' on layer 'B.Cu' at (20.00, -13.50) with no pad, via, test point, or connected trace 
+▶   * [ERROR] DISCONNECTED_VIA on 'I2C_SDA' at (-5.20, 1.20): Via on net 'I2C_SDA' at (-5.20, 1.20) is not connected across multiple layers (only connects on layers: ['B.Cu']) 
+▶   * [ERROR] DISCONNECTED_VIA on 'I2C_SDA' at (16.00, -14.50): Via on net 'I2C_SDA' at (16.00, -14.50) is not connected across multiple layers (only connects on layers: ['F.Cu']) 
+▶   * [ERROR] DISCONNECTED_VIA on 'I2C_SCL' at (16.00, -15.50): Via on net 'I2C_SCL' at (16.00, -15.50) is not connected across multiple layers (only connects on layers: ['F.Cu']) 
+▶   * [ERROR] DISCONNECTED_VIA on 'OSC_IN' at (-5.20, -2.00): Via on net 'OSC_IN' at (-5.20, -2.00) is not connected across multiple layers (only connects on layers: ['B.Cu']) 
+❌ Tool build execution failed
+
+#### Resolution Notes
+
+Redirected PCB DRC routing violations to board/<provider>/<subassembly>_drc_violations.log and raised concise error with file path.
+
+---
+
+### <a id="bug-098"></a> 🔴 `[BUG-098]` Sheer 3 - C9, C10 overlap
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 20:52:26 UTC`
+
+#### Description
+
+C9
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790283157382.png](build/attachments/pasted_screenshot_1790283157382.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-099"></a> 🔴 `[BUG-099]` Sheet 4- FLEXSPI wires should route around U8
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 20:53:44 UTC`
+
+#### Description
+
+Sheet 4-FLEXSPI wires should route around U8 and connect to the pins without off-sheet symbols. Both pins are on the same sheet. The routing should not obstruct text labels. Please update the schematic router and learnings for future schematic drawings.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790283246209.png](build/attachments/pasted_screenshot_1790283246209.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-100"></a> 🔴 `[BUG-100]` Sheet 6-SCL and SDA lines overlap
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 20:55:50 UTC`
+
+#### Description
+
+SCL and SDA lines overlap on sheet 6. Update schematic router and learnings so that the SCL net crosses over SDA cleanly and follows a parallel path into 6
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790283360253.png](build/attachments/pasted_screenshot_1790283360253.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-101"></a> 🔴 `[BUG-101]` Sheet 7-U2 and J2- cap touch net routing is messy
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 20:57:12 UTC`
+
+#### Description
+
+The cap touch net routing is messed up looking. RX0 on the U2 side runs on top of TX0 starting at the connector symbol. RX0 should extend to the right of the connector symbol on U2, then overlap RX1's line midway through. The same feedback applies for TX2 and RX3 on the J2 side. Please update the schematic router and gemini learnings as appropriate so that this type of routing mistake doesn't happen anymore
+
+---
+
+### <a id="bug-102"></a> 🔴 `[BUG-102]` Sheet 9- PCIE lanes are not cleanly routed
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 21:01:11 UTC`
+
+#### Description
+
+PCIE_TX0_P has an unexpected bend that causes it to overlap PCIE_TX0_N. PCIE_TX0_P should route straight across to from J1 to U1 with no bend. Both MIPI_DATA0 differential lanes should route around U1 to J2, under U1, without using off sheet connectors. Please update the router and learnings so this type of mistake cannot happen in the future.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790283685004.png](build/attachments/pasted_screenshot_1790283685004.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-103"></a> 🔴 `[BUG-103]` Sheet 10- Serial Bus Expansion Headers needs to be broken into 2 pages
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 21:04:04 UTC`
+
+#### Description
+
+Components on this page are too densely packed. Please create a second expansion header page for J8-J10
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790283903996.png](build/attachments/pasted_screenshot_1790283903996.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-104"></a> 🔴 `[BUG-104]` Sheet11- GPIOs should route without off-sheet connectors
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 21:06:52 UTC`
+
+#### Description
+
+GPIO0, GPIO1, and GPIO5 should route cleanly around U1 into J14 without off-sheet connectors.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790284014503.png](build/attachments/pasted_screenshot_1790284014503.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-105"></a> 🔴 `[BUG-105]` U4-Add AUDIO_EN GPIO connection to U1
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 21:10:15 UTC`
+
+#### Description
+
+For U4, we can't use PWR_EN as the power gate as that is coming from the PCIE domain. We should add an AUDIO_EN GPIO and connect it to the amp.
+
+---
+
+### <a id="bug-106"></a> 🔴 `[BUG-106]` J6-J9: Remove VLOAD_SW connector
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-24 21:11:33 UTC`
+
+#### Description
+
+Remove VLOAD_SW routing from all sensor bus expansion headers. Replace with an INT GPIO for each expansion port. Replace 3V3 coming from the charger with a SENSOR_3V3 powered by a buck regulator that sources power from 3V3, and has a SENSOR_EN GPIO connected to U1.
 
 ---

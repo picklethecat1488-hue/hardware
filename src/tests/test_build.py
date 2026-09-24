@@ -557,3 +557,45 @@ def test_generate_pcbs_wildcard_resolution():
         builder.generate_pcbs(out_dir="build", names=["test_board/*"])
         # Wildcard target 'test_board/*' must resolve to carrier_board and flex_tail
         assert mock_export.call_count == 2
+
+
+def test_generate_pcbs_drc_errors_logged_to_file(tmp_path: Path) -> None:
+    """Verify BUG-097: PCB DRC routing violations are logged to a file under board/ subdirectory."""
+    from model import AppConfig
+    from shell import Logger
+    from provider import ProviderManager
+
+    config = AppConfig()
+    mock_logger = MagicMock(spec=Logger)
+    manager = ProviderManager(config, logger=mock_logger)
+    builder = Builder(manager, logger=mock_logger)
+
+    fake_violations_summary = (
+        "=== PCB Design Rules Check Report ===\n"
+        "* [ERROR] ANTENNA_TRACE_DETECTED on 'CAP_RX0' at (20.00, -14.00)\n"
+        "* [ERROR] DISCONNECTED_VIA on 'I2C_SDA' at (-5.20, 1.20)\n"
+    )
+
+    with (
+        patch("provider.pcb.PCBExporter.export_board"),
+        patch("provider.pcb.PCBExporter.export_kicad_sch"),
+        patch("provider.pcb.PCBDesignRulesChecker.check_all") as mock_drc,
+    ):
+        mock_drc.return_value = MagicMock(
+            passed=False,
+            error_count=2,
+            summary=MagicMock(return_value=fake_violations_summary),
+        )
+
+        out_dir = tmp_path / "build"
+        with pytest.raises(ValueError) as exc_info:
+            builder.generate_pcbs(out_dir=str(out_dir), names=["test_board/carrier_board"])
+
+        expected_log = out_dir / "board" / "test_board" / "carrier_board_drc_violations.log"
+        assert expected_log.exists(), f"DRC log file {expected_log} was not created"
+        log_content = expected_log.read_text()
+        assert fake_violations_summary == log_content
+
+        err_msg = str(exc_info.value)
+        assert f"Failed to build test_board/carrier_board:pcb. Project has DRC errors:  {expected_log}" in err_msg
+        assert fake_violations_summary not in err_msg

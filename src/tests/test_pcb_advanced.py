@@ -1670,14 +1670,29 @@ def test_regression_inner_copper_layers_and_auto_routing_connectivity(tmp_path: 
     cfg = provider.pcb_config
     assert cfg is not None
     vias = cfg.vias
-    h7_via = next(
-        (v for v in vias if v.net == "GND" and abs(v.position_mm[0]) < 1.0 and abs(v.position_mm[1]) < 1.0),
-        None,
-    )
-    assert h7_via is not None, "U1 BGA GND pin H7 must have a stitching via connecting to the GND plane"
+    u1 = next(fp for fp in wiring.footprints if fp.name == "U1")
+    h7_pin = next((p for p in u1.pins if p.name == "H7"), None)
+    h8_pin = next(p for p in u1.pins if p.name == "H8")
+    h8_x, h8_y = PCBAutoRouter.get_pin_absolute_position(u1, h8_pin)
+
+    if h7_pin is not None:
+        h7_x, h7_y = PCBAutoRouter.get_pin_absolute_position(u1, h7_pin)
+        h7_via = next(
+            (
+                v
+                for v in vias
+                if v.net == "GND" and abs(v.position_mm[0] - h7_x) < 1.0 and abs(v.position_mm[1] - h7_y) < 1.0
+            ),
+            None,
+        )
+        assert h7_via is not None, "U1 BGA GND pin H7 must have a stitching via connecting to the GND plane"
 
     h8_via = next(
-        (v for v in vias if v.net == "3V3" and abs(v.position_mm[0] - 0.8) < 1.0 and abs(v.position_mm[1]) < 1.0),
+        (
+            v
+            for v in vias
+            if v.net == "3V3" and abs(v.position_mm[0] - h8_x) < 1.0 and abs(v.position_mm[1] - h8_y) < 1.0
+        ),
         None,
     )
     assert h8_via is not None, "U1 BGA 3V3 pin H8 must have a stitching via connecting to the 3V3 plane"
@@ -2528,7 +2543,8 @@ def test_regression_bug_090_enclosure_cad_feedback() -> None:
 
 
 def test_regression_bug_092_carrier_board_top_logo() -> None:
-    """Verify BUG-092: Antigravity logo placed in empty space on carrier board top with zero DRC errors."""
+    """Verify BUG-092: Antigravity logo placed as a unique graphic image within a square frame (not text) on carrier board top with zero DRC errors."""
+    from pathlib import Path
     from projects.test_board.provider import TestBoardProvider
     from provider.pcb.drc import PCBDesignRulesChecker
 
@@ -2536,14 +2552,36 @@ def test_regression_bug_092_carrier_board_top_logo() -> None:
     silks = provider.silkscreen()
     silk_map = {t.text: t for t in silks}
 
-    # 1. Logo must be present on F.SilkS
-    assert "ANTIGRAVITY" in silk_map, "Carrier board must contain ANTIGRAVITY logo silkscreen text"
-    logo = silk_map["ANTIGRAVITY"]
-    assert logo.layer == "F.SilkS"
-    assert logo.position[1] > 28.0, f"Logo must be in top region (y > 28mm), got {logo.position}"
-    assert abs(logo.position[0]) < 5.0, f"Logo should be centered horizontally, got {logo.position}"
+    # 1. Logo must NOT be text (e.g. "ANTIGRAVITY", "[>", etc. must not be text strings)
+    assert "ANTIGRAVITY" not in silk_map, "Carrier board logo must not be text 'ANTIGRAVITY'"
+    assert "[>" not in silk_map, "Carrier board logo must not be text '[>'"
+    assert "<]" not in silk_map, "Carrier board logo must not be text '<]'"
+    assert "* * *" not in silk_map, "Carrier board logo must not be text '* * *'"
+    assert "QUANTUM DYNAMICS // 0x414759" not in silk_map, "Carrier board logo must not be text hex signature"
 
-    # 2. DRC check verifies zero silkscreen-to-pad overlap errors
+    # 2. Logo must be present as a unique vector graphic within a square frame on F.SilkS
+    graphics = provider.silkscreen_graphics()
+    assert len(graphics) > 0, "Carrier board must contain silkscreen graphic elements for the logo"
+
+    rect_frames = [g for g in graphics if g.shape == "rect" and g.layer == "F.SilkS"]
+    assert len(rect_frames) >= 1, "Carrier board must contain a square frame rect on F.SilkS"
+    frame = rect_frames[0]
+    assert frame.position[1] > 28.0, f"Logo frame must be in top region (y > 28mm), got {frame.position}"
+    assert abs(frame.position[0]) < 5.0, f"Logo frame should be centered horizontally, got {frame.position}"
+    assert frame.dimensions[0] == frame.dimensions[1], f"Logo frame must be square, got {frame.dimensions}"
+
+    # Verify inner graphic emblem primitives (polygon and wing lines)
+    poly_emblems = [g for g in graphics if g.shape == "polygon" and g.layer == "F.SilkS"]
+    assert len(poly_emblems) >= 1, "Logo must contain inner geometric polygon emblem"
+    line_emblems = [g for g in graphics if g.shape == "line" and g.layer == "F.SilkS"]
+    assert len(line_emblems) >= 2, "Logo must contain inner graphic line elements"
+
+    # 3. Unique logo image asset must exist within a square frame
+    repo_root = Path(__file__).resolve().parents[2]
+    logo_asset = repo_root / "src" / "projects" / "test_board" / "docs" / "assets" / "carrier_board_logo.jpg"
+    assert logo_asset.exists(), f"Unique logo image asset must exist at {logo_asset}"
+
+    # 4. DRC check verifies zero silkscreen-to-pad overlap errors
     wiring = Wiring(provider.wiring_path)
     checker = PCBDesignRulesChecker(provider.pcb_config)
     violations = [
@@ -2620,3 +2658,51 @@ def test_regression_bug_094_dynamic_geometric_priority_and_rip_up_reroute() -> N
     routed_nets = {tr.net for tr in traces}
     assert "OVERRIDE_NET" in routed_nets
     assert "DENSE_LOCAL_NET" in routed_nets
+
+
+def test_regression_bug_096_load_switch_controls_audio_and_peripherals() -> None:
+    """Verify BUG-096: Q1 load switch and PWR_EN control audio domain (U4, C8) and peripheral headers (J6-J9)."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. Verify VLOAD_SW connects Q1 drain, J1, audio amp U4 ground/gain, C8 cap ground, and peripheral headers J6-J9
+    vload_net = next((net for net in wiring.nets if net.name == "VLOAD_SW"), None)
+    assert vload_net is not None, "VLOAD_SW net must exist in wiring.yaml"
+    vload_pins = set(vload_net.pins)
+    expected_vload_pins = {
+        ("Q1", "D"),
+        ("J1", "VLOAD_SW"),
+        ("U4", "GND"),
+        ("U4", "GAIN"),
+        ("C8", "2"),
+        ("J6", "2"),
+        ("J7", "2"),
+        ("J8", "2"),
+        ("J9", "2"),
+    }
+    for pin in expected_vload_pins:
+        assert pin in vload_pins, f"Pin {pin} must be connected to switched ground rail VLOAD_SW"
+
+    # 2. Verify PWR_EN connects MCU D1, Q1 gate, and U4 SD_MODE (audio shutdown)
+    pwr_en_net = next((net for net in wiring.nets if net.name == "PWR_EN"), None)
+    assert pwr_en_net is not None, "PWR_EN net must exist in wiring.yaml"
+    pwr_en_pins = set(pwr_en_net.pins)
+    assert ("U1", "D1") in pwr_en_pins
+    assert ("Q1", "G") in pwr_en_pins
+    assert ("U4", "SD_MODE") in pwr_en_pins, "Audio amp U4 SD_MODE must be controlled by PWR_EN for shutdown"
+
+    # 3. Verify continuous GND net does NOT contain switched domain pins
+    gnd_net = next((net for net in wiring.nets if net.name == "GND"), None)
+    assert gnd_net is not None
+    gnd_pins = set(gnd_net.pins)
+    for pin in [("U4", "GND"), ("U4", "GAIN"), ("C8", "2"), ("J6", "2"), ("J7", "2"), ("J8", "2"), ("J9", "2")]:
+        assert pin not in gnd_pins, f"Pin {pin} must NOT be on continuous GND; must be on VLOAD_SW"
+
+    # 4. Verify continuous 3V3 net does NOT contain SD_MODE
+    v33_net = next((net for net in wiring.nets if net.name == "3V3"), None)
+    assert v33_net is not None
+    v33_pins = set(v33_net.pins)
+    assert ("U4", "SD_MODE") not in v33_pins, "U4 SD_MODE must NOT be permanently tied to 3V3"

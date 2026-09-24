@@ -1495,18 +1495,26 @@
         const commitFiles = state.commitFiles ? state.commitFiles[c.commit_hash] : null;
         const openedSet = state.openedFilesByCommit[c.commit_hash];
         const isReviewed = commitFiles && commitFiles.length > 0 && commitFiles.every(p => openedSet && openedSet.has(p));
+        const isTrackerOnly = c.files_count === 0 && c.ignored_files && c.ignored_files.length > 0;
+        const trackerBadge = isTrackerOnly
+          ? `<span class="quake-badge quake-badge-yellow" style="font-size: 0.65em; margin-left: 6px;" title="Only tracking files modified: ${c.ignored_files.join(', ')}">TRACKER ONLY</span>`
+          : "";
+        const statExtra = isTrackerOnly
+          ? `<span style="opacity: 0.55; font-size: 0.85em; margin-left: 4px;">(${c.ignored_files.join(', ')} filtered)</span>`
+          : "";
         li.className = "commit-item" + (c.commit_hash === state.selectedCommit ? " active" : "") + (isReviewed ? " reviewed" : "");
         li.onclick = () => selectCommit(c.commit_hash);
         const timeDisplay = c.time ? ` ${c.time}` : (c.date.includes('T') ? ` ${c.date.split('T')[1].slice(0, 8)}` : '');
         li.innerHTML = `
           <div class="commit-top">
             <span class="commit-hash">${c.short_hash}</span>
+            ${trackerBadge}
             <span class="commit-date">${c.date.slice(0, 10)}${timeDisplay}</span>
           </div>
           <div class="commit-subject" title="${c.subject}">${c.subject}</div>
           <div class="commit-bottom">
             <span>${c.author}</span>
-            <span><span class="stat-add">+${c.additions}</span> / <span class="stat-del">-${c.deletions}</span></span>
+            <span><span class="stat-add">+${c.additions}</span> / <span class="stat-del">-${c.deletions}</span>${statExtra}</span>
           </div>
         `;
         listEl.appendChild(li);
@@ -1528,10 +1536,24 @@
         if (state.files.length > 0) {
           selectFile(state.files[0].path);
         } else {
-          document.getElementById("diffContent").innerHTML = `
-            <div style="padding: 40px; text-align: center; color: var(--quake-text-dim);">
-              No files modified in revision ${commitHash}.
-            </div>`;
+          const currentCommit = (state.commits || []).find(c => c.commit_hash === commitHash);
+          if (currentCommit && currentCommit.ignored_files && currentCommit.ignored_files.length > 0) {
+            document.getElementById("diffContent").innerHTML = `
+              <div style="padding: 50px 20px; text-align: center; color: var(--quake-text-dim);">
+                <div style="font-size: 2.2em; margin-bottom: 15px;">📋</div>
+                <div style="color: var(--quake-gold); font-size: 1.15em; font-weight: bold; margin-bottom: 8px;">
+                  Issue Tracker & Documentation Update Only
+                </div>
+                <div style="font-size: 0.9em; max-width: 550px; margin: 0 auto; line-height: 1.6;">
+                  All changes in revision <code style="color: var(--quake-cyan);">${currentCommit.short_hash}</code> are to tracking files (<strong>${currentCommit.ignored_files.join(', ')}</strong>), which are hidden from code review.
+                </div>
+              </div>`;
+          } else {
+            document.getElementById("diffContent").innerHTML = `
+              <div style="padding: 40px; text-align: center; color: var(--quake-text-dim);">
+                No files modified in revision ${commitHash}.
+              </div>`;
+          }
         }
       } catch (e) {
         logCli("Error loading files: " + e.message, "red");
@@ -1540,6 +1562,17 @@
 
     function renderFilesList() {
       const listEl = document.getElementById("filesList");
+      const currentCommit = (state.commits || []).find(c => c.commit_hash === state.selectedCommit);
+      if (state.files.length === 0 && currentCommit && currentCommit.ignored_files && currentCommit.ignored_files.length > 0) {
+        document.getElementById("filesCountHeader").innerText = `Changed Files (0) — ${currentCommit.ignored_files.join(', ')} filtered`;
+        listEl.innerHTML = currentCommit.ignored_files.map(f => `
+          <li class="file-item" style="opacity: 0.6; cursor: default; padding: 8px 12px;">
+            <span class="quake-badge quake-badge-yellow">TRACKER</span>
+            <span style="font-style: italic; margin-left: 6px;">${f} (hidden from review)</span>
+          </li>
+        `).join("");
+        return;
+      }
       document.getElementById("filesCountHeader").innerText = `Changed Files (${state.files.length})`;
       listEl.innerHTML = "";
 

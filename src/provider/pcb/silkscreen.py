@@ -6,13 +6,13 @@ from typing import Iterator, List, Optional, Sequence, Tuple, Union
 
 from build123d import Location, LocationList, Text
 
-from model.pcb import SilkscreenTextModel
+from model.pcb import SilkscreenTextModel, SilkscreenGraphicModel
 
 _current_silkscreen: ContextVar[Optional["BuildSilkscreen"]] = ContextVar("_current_silkscreen", default=None)
 
 
 class BuildSilkscreen:
-    """Context manager for declarative PCB silkscreen text placement using CAD locating primitives."""
+    """Context manager for declarative PCB silkscreen text and graphic placement using CAD locating primitives."""
 
     def __init__(self, default_layer: str = "F.SilkS") -> None:
         """Initialize silkscreen builder context.
@@ -22,6 +22,7 @@ class BuildSilkscreen:
         """
         self.default_layer = default_layer
         self.texts: List[SilkscreenTextModel] = []
+        self.graphics: List[SilkscreenGraphicModel] = []
         self._token: Optional[Token] = None
 
     def __enter__(self) -> "BuildSilkscreen":
@@ -42,22 +43,38 @@ class BuildSilkscreen:
             for t in self.texts:
                 if t not in active_pcb.silkscreen_texts:
                     active_pcb.silkscreen_texts.append(t)
+            for g in self.graphics:
+                if hasattr(active_pcb, "silkscreen_graphics") and g not in active_pcb.silkscreen_graphics:
+                    active_pcb.silkscreen_graphics.append(g)
 
     @classmethod
     def _get_context(cls) -> Optional["BuildSilkscreen"]:
         """Retrieve active silkscreen builder context if present."""
         return _current_silkscreen.get()
 
-    def add(self, item: Union[SilkscreenTextModel, Sequence[SilkscreenTextModel]]) -> None:
-        """Add one or more silkscreen text models to the active context.
+    def add(
+        self,
+        item: Union[
+            SilkscreenTextModel,
+            SilkscreenGraphicModel,
+            Sequence[Union[SilkscreenTextModel, SilkscreenGraphicModel]],
+        ],
+    ) -> None:
+        """Add one or more silkscreen text or graphic models to the active context.
 
         Args:
-            item: Single SilkscreenTextModel or sequence of models to append.
+            item: Single model or sequence of models to append.
         """
         if isinstance(item, SilkscreenTextModel):
             self.texts.append(item)
+        elif isinstance(item, SilkscreenGraphicModel):
+            self.graphics.append(item)
         else:
-            self.texts.extend(item)
+            for it in item:
+                if isinstance(it, SilkscreenTextModel):
+                    self.texts.append(it)
+                elif isinstance(it, SilkscreenGraphicModel):
+                    self.graphics.append(it)
 
     def to_shapes(self) -> List[Text]:
         """Convert collected silkscreen texts to 2D build123d CAD Text shapes for 3D inspection.
@@ -161,6 +178,143 @@ class SilkscreenText:
     def __len__(self) -> int:
         """Return number of generated text instances."""
         return len(self.models)
+
+
+class SilkscreenRect:
+    """Silkscreen rectangle or square frame CAD primitive evaluating active Location contexts."""
+
+    def __init__(
+        self,
+        dimensions: Tuple[float, float] = (5.0, 5.0),
+        layer: Optional[str] = None,
+        thickness: float = 0.15,
+        fill: bool = False,
+        position: Optional[Tuple[float, float]] = None,
+    ) -> None:
+        """Create and place silkscreen rectangle or square frame."""
+        self.dimensions = dimensions
+        self.thickness = thickness
+        self.fill = fill
+        self.models: List[SilkscreenGraphicModel] = []
+
+        ctx = BuildSilkscreen._get_context()
+        target_layer = layer or (ctx.default_layer if ctx else "F.SilkS")
+
+        loc_ctx = LocationList._get_context()
+        active_locations: List[Location] = (
+            loc_ctx.local_locations if loc_ctx is not None and loc_ctx.local_locations else []
+        )
+
+        if active_locations:
+            for loc in active_locations:
+                x_offset = position[0] if position else 0.0
+                y_offset = position[1] if position else 0.0
+                pos_x = round(loc.position.X + x_offset, 4)
+                pos_y = round(loc.position.Y + y_offset, 4)
+                model = SilkscreenGraphicModel(
+                    shape="rect",
+                    layer=target_layer,
+                    position=(pos_x, pos_y),
+                    dimensions=dimensions,
+                    thickness=thickness,
+                    fill=fill,
+                )
+                self.models.append(model)
+                if ctx is not None:
+                    ctx.add(model)
+        else:
+            pos_x = round(position[0] if position else 0.0, 4)
+            pos_y = round(position[1] if position else 0.0, 4)
+            model = SilkscreenGraphicModel(
+                shape="rect",
+                layer=target_layer,
+                position=(pos_x, pos_y),
+                dimensions=dimensions,
+                thickness=thickness,
+                fill=fill,
+            )
+            self.models.append(model)
+            if ctx is not None:
+                ctx.add(model)
+
+    @property
+    def model(self) -> SilkscreenGraphicModel:
+        """Return the primary SilkscreenGraphicModel instance."""
+        return self.models[0]
+
+    def __iter__(self) -> Iterator[SilkscreenGraphicModel]:
+        """Iterate over generated graphic models."""
+        return iter(self.models)
+
+
+class SilkscreenLine:
+    """Silkscreen vector line segment CAD primitive."""
+
+    def __init__(
+        self,
+        start_mm: Tuple[float, float],
+        end_mm: Tuple[float, float],
+        layer: Optional[str] = None,
+        thickness: float = 0.15,
+    ) -> None:
+        """Create and place silkscreen line."""
+        self.start_mm = start_mm
+        self.end_mm = end_mm
+        self.thickness = thickness
+
+        ctx = BuildSilkscreen._get_context()
+        target_layer = layer or (ctx.default_layer if ctx else "F.SilkS")
+
+        p1 = (round(start_mm[0], 4), round(start_mm[1], 4))
+        p2 = (round(end_mm[0], 4), round(end_mm[1], 4))
+        center_x = round((p1[0] + p2[0]) / 2.0, 4)
+        center_y = round((p1[1] + p2[1]) / 2.0, 4)
+
+        self.model = SilkscreenGraphicModel(
+            shape="line",
+            layer=target_layer,
+            position=(center_x, center_y),
+            thickness=thickness,
+            points=[p1, p2],
+        )
+        if ctx is not None:
+            ctx.add(self.model)
+
+
+class SilkscreenPolygon:
+    """Silkscreen vector polygon CAD primitive."""
+
+    def __init__(
+        self,
+        polygon_points: Sequence[Tuple[float, float]],
+        layer: Optional[str] = None,
+        thickness: float = 0.15,
+        fill: bool = False,
+    ) -> None:
+        """Create and place silkscreen polygon."""
+        self.points = [(round(p[0], 4), round(p[1], 4)) for p in polygon_points]
+        self.thickness = thickness
+        self.fill = fill
+
+        ctx = BuildSilkscreen._get_context()
+        target_layer = layer or (ctx.default_layer if ctx else "F.SilkS")
+
+        xs = [p[0] for p in self.points]
+        ys = [p[1] for p in self.points]
+        center_x = round((min(xs) + max(xs)) / 2.0, 4)
+        center_y = round((min(ys) + max(ys)) / 2.0, 4)
+
+        self.model = SilkscreenGraphicModel(
+            shape="polygon",
+            layer=target_layer,
+            position=(center_x, center_y),
+            dimensions=(round(max(xs) - min(xs), 4), round(max(ys) - min(ys), 4)),
+            thickness=thickness,
+            fill=fill,
+            points=self.points,
+        )
+        if ctx is not None:
+            ctx.add(self.model)
 
 
 def find_empty_space_for_label(

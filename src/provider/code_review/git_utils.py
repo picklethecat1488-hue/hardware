@@ -200,7 +200,7 @@ class GitReviewEngine:
                 subject = parts[5].strip()
                 body = parts[6].strip() if len(parts) > 6 else ""
 
-                additions, deletions, file_count = self._get_commit_stat_summary(c_hash)
+                additions, deletions, file_count, ignored_files = self._get_commit_stat_summary(c_hash)
                 commits.append(
                     CommitInfoModel(
                         commit_hash=c_hash,
@@ -214,6 +214,8 @@ class GitReviewEngine:
                         additions=additions,
                         deletions=deletions,
                         files_count=file_count,
+                        ignored_files_count=len(ignored_files),
+                        ignored_files=ignored_files,
                     )
                 )
 
@@ -246,11 +248,14 @@ class GitReviewEngine:
         additions = 0
         deletions = 0
         file_count = 0
+        ignored_files: List[str] = []
         for line in diff_stat.splitlines():
             cols = line.split("\t")
             if len(cols) >= 3:
                 file_path = cols[2].strip()
                 if self.is_file_ignored(file_path):
+                    if Path(file_path).name not in ignored_files:
+                        ignored_files.append(Path(file_path).name)
                     continue
                 file_count += 1
                 if cols[0].isdigit():
@@ -266,6 +271,8 @@ class GitReviewEngine:
                 if " -> " in file_path:
                     file_path = file_path.split(" -> ")[1].strip()
                 if self.is_file_ignored(file_path):
+                    if Path(file_path).name not in ignored_files:
+                        ignored_files.append(Path(file_path).name)
                     continue
                 status_lines.append(line)
                 if line.startswith("?? "):
@@ -277,7 +284,7 @@ class GitReviewEngine:
                         except OSError:
                             pass
 
-        if file_count == 0 and not status_lines:
+        if file_count == 0 and not status_lines and not ignored_files:
             return None
 
         now = datetime.now(timezone.utc)
@@ -293,6 +300,8 @@ class GitReviewEngine:
             additions=additions,
             deletions=deletions,
             files_count=file_count,
+            ignored_files_count=len(ignored_files),
+            ignored_files=ignored_files,
         )
 
     def _get_single_commit_info(self, rev: str) -> Optional[CommitInfoModel]:
@@ -313,7 +322,7 @@ class GitReviewEngine:
             subject = parts[5].strip()
             body = parts[6].strip() if len(parts) > 6 else ""
 
-            additions, deletions, file_count = self._get_commit_stat_summary(c_hash)
+            additions, deletions, file_count, ignored_files = self._get_commit_stat_summary(c_hash)
             return CommitInfoModel(
                 commit_hash=c_hash,
                 short_hash=s_hash,
@@ -326,6 +335,8 @@ class GitReviewEngine:
                 additions=additions,
                 deletions=deletions,
                 files_count=file_count,
+                ignored_files_count=len(ignored_files),
+                ignored_files=ignored_files,
             )
         return None
 
@@ -389,29 +400,33 @@ class GitReviewEngine:
 
         return results
 
-    def _get_commit_stat_summary(self, commit_hash: str) -> Tuple[int, int, int]:
-        """Calculate additions, deletions, and file count for a commit."""
+    def _get_commit_stat_summary(self, commit_hash: str) -> Tuple[int, int, int, List[str]]:
+        """Calculate additions, deletions, file count, and ignored files list for a commit."""
         cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit_hash]
         try:
             output = run_git_command(cmd, cwd=self.repo_root)
         except RuntimeError:
-            return 0, 0, 0
+            return 0, 0, 0, []
 
         additions = 0
         deletions = 0
         file_count = 0
+        ignored_files: List[str] = []
         for line in output.splitlines():
             cols = line.split("\t")
             if len(cols) >= 3:
                 file_path = cols[2].strip()
                 if self.is_file_ignored(file_path):
+                    name = Path(file_path).name
+                    if name not in ignored_files:
+                        ignored_files.append(name)
                     continue
                 file_count += 1
                 if cols[0].isdigit():
                     additions += int(cols[0])
                 if cols[1].isdigit():
                     deletions += int(cols[1])
-        return additions, deletions, file_count
+        return additions, deletions, file_count, ignored_files
 
     def get_changed_files(self, commit: str) -> List[Dict[str, str]]:
         """List changed files with status and stats for a revision."""

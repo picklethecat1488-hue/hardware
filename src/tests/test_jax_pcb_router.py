@@ -146,3 +146,65 @@ def test_jax_pcb_router_device_acceleration():
     assert len(devices) > 0
     backend = jax.default_backend()
     assert backend in ("mps", "gpu", "cuda", "cpu")
+
+
+def test_jax_pcb_router_is_default_backend():
+    """Verify BUG-095: PCBAutoRouter defaults to JaxPCBRouter backend."""
+    from provider.pcb.router import PCBAutoRouter
+    from model.pcb import PCBConfig, StackupModel, StackupLayerModel, LayerType
+    from types import SimpleNamespace
+
+    stackup = StackupModel(
+        layers=[
+            StackupLayerModel(name="F.Cu", thickness_mm=0.035, material="copper", layer_type=LayerType.SIGNAL),
+            StackupLayerModel(name="B.Cu", thickness_mm=0.035, material="copper", layer_type=LayerType.SIGNAL),
+        ]
+    )
+    cfg = PCBConfig(
+        name="test_board",
+        dimensions_mm=(20.0, 20.0, 1.6),
+        stackup=stackup,
+    )
+    wiring = SimpleNamespace(footprints=[], nets=[])
+    auto_router = PCBAutoRouter(cfg, wiring)
+    assert auto_router.backend == "jax"
+    auto_router.route_all_nets()
+    assert isinstance(auto_router.router, JaxPCBRouter)
+
+
+def test_jax_pcb_router_qfn_via_keepout_allows_traces_forbids_vias():
+    """Verify QFN keepout zone forbids vias while allowing planar traces to route through."""
+    router = JaxPCBRouter(
+        board_bounds=(-20.0, -20.0, 20.0, 20.0),
+        grid_step=0.25,
+        layers=["F.Cu", "B.Cu"],
+        qfn_keepouts=[(-5.0, -5.0, 5.0, 5.0)],
+    )
+
+    # 1. Planar trace traversing directly through QFN keepout on F.Cu must succeed without vias
+    traces, vias = router.route_net(
+        start_pt=(-10.0, 0.0),
+        start_layer="F.Cu",
+        end_pt=(10.0, 0.0),
+        end_layer="F.Cu",
+        net_name="QFN_PLANAR_NET",
+        width_mm=0.20,
+    )
+    assert len(traces) == 1
+    assert len(vias) == 0
+
+    # 2. Net with start and end requiring vias must not place vias inside (-5.0, -5.0, 5.0, 5.0)
+    # Block F.Cu outside the QFN zone to force via transition to B.Cu
+    router.add_obstacle(Obstacle(min_x=-15.0, min_y=-10.0, max_x=-12.0, max_y=10.0, layer="F.Cu"))
+    traces_via, vias_via = router.route_net(
+        start_pt=(-18.0, 0.0),
+        start_layer="F.Cu",
+        end_pt=(15.0, 0.0),
+        end_layer="F.Cu",
+        net_name="QFN_VIA_NET",
+        width_mm=0.20,
+    )
+    for v in vias_via:
+        vx, vy = v.position_mm
+        is_inside_qfn = (-5.0 <= vx <= 5.0) and (-5.0 <= vy <= 5.0)
+        assert not is_inside_qfn, f"Via placed inside QFN keepout at ({vx}, {vy})!"
