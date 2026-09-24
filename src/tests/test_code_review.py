@@ -1317,3 +1317,32 @@ def test_code_review_ignores_bugs_md(tmp_path: Path) -> None:
     # Working tree changed files must never include BUGS.md
     changed_files = engine.get_changed_files("working")
     assert not any(f["path"] == "BUGS.md" or f["path"].endswith("/BUGS.md") for f in changed_files)
+
+
+def test_regression_bug_091_diff_view_horizontal_scrollbar_on_bottom() -> None:
+    """Verify BUG-091: diff view lines do not have per-line scrollbars; horizontal scrollbar is at the bottom."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    template_file = templates_dir / "code_review.html.j2"
+    assert template_file.exists()
+    content = template_file.read_text(encoding="utf-8")
+
+    # 1. No per-line overflow-x: auto on sbs-row td or unified-text
+    assert (
+        ".sbs-row td {\n      padding: 1px 6px;\n      white-space: pre;\n      word-break: normal;\n      vertical-align: top;\n      max-width: 0;\n      overflow-x: auto;\n    }"
+        not in content
+    )
+    assert "overflow-x: auto" not in content.split(".sbs-row td")[1].split("}")[0], (
+        ".sbs-row td must not have overflow-x: auto"
+    )
+    assert "overflow-x: auto" not in content.split(".unified-text")[1].split("}")[0], (
+        ".unified-text must not have overflow-x: auto"
+    )
+
+    # 2. Diff container has overflow: auto for bottom-level scrolling
+    assert ".diff-container {\n      flex: 1;\n      overflow: auto;" in content, (
+        ".diff-container must have overflow: auto so horizontal scrollbars reside at the bottom of the container"
+    )
+
+    # 3. Tables and wrappers have min-width: max-content to prevent truncation while expanding container
+    assert "min-width: max-content" in content.split(".sbs-table")[1].split("}")[0]
+    assert "min-width: 100%" in content.split(".unified-wrap")[1].split("}")[0]
