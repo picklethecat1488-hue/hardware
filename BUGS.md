@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-25 03:09:10 UTC` |
+| **Report Date** | `2026-09-25 15:18:24 UTC` |
 | **Total Issues** | `113` |
-| **Open Issues** | `8` |
-| **Resolved / Closed** | `105 (92%)` |
+| **Open Issues** | `0` |
+| **Resolved / Closed** | `113 (100%)` |
 
 ## Executive Summary
 
@@ -45,7 +45,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[HIGH]`** [#BUG-007](#bug-007): A* router net ordering deadlock walling in local MCU control pins `[test_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-008](#bug-008): Carrier PCB rectangular sharp corners around mounting holes `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-009](#bug-009): Split-view CSS text overflow clipping code review diff listings `[code_review]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-010](#bug-010): bug reporter should use the quake UI color scheme  (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-010](#bug-010): bug reporter should use the quake UI color scheme (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-011](#bug-011): Rename "Export BUGS.md" to "Save and Exit" `[bug_reporter]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-012](#bug-012): Add ability to paste screenshotsand documents into attachments and references section `[bug_reporter]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-013](#bug-013): J_USB missing pads, has overlapping drill holes (`RESOLVED`)
@@ -118,7 +118,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-081](#bug-081): This build.py command should have failed (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-082](#bug-082): Route test board (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-083](#bug-083): I2C pullup resistors overlap (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-084](#bug-084): Update board files schematics  `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-084](#bug-084): Update board files schematics `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-085](#bug-085): Change mounting holes on enclosure bottom to mounting posts (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-086](#bug-086): Capacitive sensing and control section is incorrect (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-087](#bug-087): Add power test points (`RESOLVED`)
@@ -141,14 +141,14 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-104](#bug-104): Sheet11- GPIOs should route without off-sheet connectors (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-105](#bug-105): U4-Add AUDIO_EN GPIO connection to U1 (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-106](#bug-106): J6-J9: Remove VLOAD_SW connector (`RESOLVED`)
-- [ ] **`[LOW]`** [#BUG-107](#bug-107): Simulate flying probes test: carrier board `[carrier_board]` (`OPEN`)
-- [ ] **`[LOW]`** [#BUG-108](#bug-108): Simulate flying probes test: flex tail (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-109](#bug-109): Resolve pytest warnings (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-110](#bug-110): Expansion header connectors should be JST-style (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-111](#bug-111): White square above J2 `[carrier_board]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-112](#bug-112): Update test board docs with recommended battery model `[carrier_board]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-113](#bug-113): Carrier board serial expansion cutouts overlap `[carrier_board]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-114](#bug-114): Bug report tool does not pickup changes to BUGS.md `[bug_report]` (`OPEN`)
+- [x] **`[LOW]`** [#BUG-107](#bug-107): Simulate flying probes test: carrier board `[carrier_board]` (`RESOLVED`)
+- [x] **`[LOW]`** [#BUG-108](#bug-108): Simulate flying probes test: flex tail (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-109](#bug-109): Resolve pytest warnings (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-110](#bug-110): Expansion header connectors should be JST-style (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-111](#bug-111): White square above J2 `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-112](#bug-112): Update test board docs with recommended battery model `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-113](#bug-113): Carrier board serial expansion cutouts overlap `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-114](#bug-114): Bug report tool does not pickup changes to BUGS.md `[bug_report]` (`RESOLVED`)
 
 ## Detailed Issue Log
 
@@ -449,7 +449,7 @@ Added max-width: 0; overflow-x: auto; to .sbs-row td in code_review.html.j2.
 
 ---
 
-### <a id="bug-010"></a> 🟢 `[BUG-010]` bug reporter should use the quake UI color scheme 
+### <a id="bug-010"></a> 🟢 `[BUG-010]` bug reporter should use the quake UI color scheme
 
 - **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
@@ -2171,7 +2171,7 @@ Fixed Sheet 7 I2C pullup resistor overlap by setting col_gap 50.0, spacing chann
 
 ---
 
-### <a id="bug-084"></a> 🟢 `[BUG-084]` Update board files schematics 
+### <a id="bug-084"></a> 🟢 `[BUG-084]` Update board files schematics
 
 - **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
@@ -2723,13 +2723,14 @@ Replaced VLOAD_SW on J6-J9 with dedicated interrupt lines (EXP_INT_*); powered e
 
 ---
 
-### <a id="bug-107"></a> 🔴 `[BUG-107]` Simulate flying probes test: carrier board
+### <a id="bug-107"></a> 🟢 `[BUG-107]` Simulate flying probes test: carrier board
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `LOW`
 - **Category**: `SIMULATION`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 00:29:09 UTC`
+- **Resolved**: `2026-09-25 15:18:11 UTC`
 
 #### Description
 
@@ -2739,14 +2740,19 @@ Simulate a flying probes test of the carrier board in pybullet. The flying probe
 
 1. $ bin/anvil simulate test_board/carrier_board:simulate -s 1000
 
+#### Resolution Notes
+
+Simulated flying probes test for carrier_board with obstacle clearance, electrical net test sequence, and Rerun telemetry/reports.
+
 ---
 
-### <a id="bug-108"></a> 🔴 `[BUG-108]` Simulate flying probes test: flex tail
+### <a id="bug-108"></a> 🟢 `[BUG-108]` Simulate flying probes test: flex tail
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `LOW`
 - **Category**: `SIMULATION`
 - **Created**: `2026-09-25 00:34:01 UTC`
+- **Resolved**: `2026-09-25 15:18:13 UTC`
 
 #### Description
 
@@ -2756,14 +2762,19 @@ Simulate a flying probes test of the flex tail in pybullet. The flying probes te
 
 1. $ python src/view.py test_board/flex_tail:pcb
 
+#### Resolution Notes
+
+Simulated flying probes test for flex_tail with obstacle clearance, electrical net test sequence, and Rerun telemetry/reports.
+
 ---
 
-### <a id="bug-109"></a> 🔴 `[BUG-109]` Resolve pytest warnings
+### <a id="bug-109"></a> 🟢 `[BUG-109]` Resolve pytest warnings
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Created**: `2026-09-25 01:05:13 UTC`
+- **Resolved**: `2026-09-25 15:18:15 UTC`
 
 #### Description
 
@@ -2779,28 +2790,38 @@ The command exited with code 0.
   warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
   @pytest.mark.geometry
 
+#### Resolution Notes
+
+Registered geometry mark in pyproject.toml and added warning filters for pyparsing to eliminate pytest warnings.
+
 ---
 
-### <a id="bug-110"></a> 🔴 `[BUG-110]` Expansion header connectors should be JST-style
+### <a id="bug-110"></a> 🟢 `[BUG-110]` Expansion header connectors should be JST-style
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-25 01:10:03 UTC`
+- **Resolved**: `2026-09-25 15:18:17 UTC`
 
 #### Description
 
 Expansion header connectors should be 6 pin JST-PH style connectors to make insertion easier. Right now, they are Dupont style connectors which will complicate insertion of test boards.
 
+#### Resolution Notes
+
+Updated expansion headers J9 and J10 to JST-PH-6P connectors with 2.0mm pitch in wiring.yaml and footprints.
+
 ---
 
-### <a id="bug-111"></a> 🔴 `[BUG-111]` White square above J2
+### <a id="bug-111"></a> 🟢 `[BUG-111]` White square above J2
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 01:14:00 UTC`
+- **Resolved**: `2026-09-25 15:18:18 UTC`
 
 #### Description
 
@@ -2812,29 +2833,39 @@ Pasted a screenshot. Is this supposed to be the logo? Seems like a silkscreen er
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790298848779.png](build/attachments/pasted_screenshot_1790298848779.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Exported unfilled silkscreen rectangles as 4 explicit gr_line strokes to avoid KiCad 8 / KiCode fill none lavender block rendering bug.
+
 ---
 
-### <a id="bug-112"></a> 🔴 `[BUG-112]` Update test board docs with recommended battery model
+### <a id="bug-112"></a> 🟢 `[BUG-112]` Update test board docs with recommended battery model
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `GENERAL`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 01:15:38 UTC`
+- **Resolved**: `2026-09-25 15:18:20 UTC`
 
 #### Description
 
 Update the test board docs with a recommmended battery model to be placed in the battery holder on the carrier board top.
 
+#### Resolution Notes
+
+Updated test board docs with recommended PKCELL LP352438 350mAh LiPo battery model and runtime estimates.
+
 ---
 
-### <a id="bug-113"></a> 🔴 `[BUG-113]` Carrier board serial expansion cutouts overlap
+### <a id="bug-113"></a> 🟢 `[BUG-113]` Carrier board serial expansion cutouts overlap
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-25 01:17:38 UTC`
+- **Resolved**: `2026-09-25 15:18:22 UTC`
 
 #### Description
 
@@ -2846,18 +2877,27 @@ See attached screenshot, carrier board serial expansion cutouts overlap with eac
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790299068920.png](build/attachments/pasted_screenshot_1790299068920.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Parameterized enclosure peripheral cutouts in measurements.yaml, adjusted J10 offset to eliminate overlap burrs and ensure solid separating walls.
+
 ---
 
-### <a id="bug-114"></a> 🔴 `[BUG-114]` Bug report tool does not pickup changes to BUGS.md
+### <a id="bug-114"></a> 🟢 `[BUG-114]` Bug report tool does not pickup changes to BUGS.md
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `bug_report`
 - **Created**: `2026-09-25 02:21:09 UTC`
+- **Resolved**: `2026-09-25 15:18:24 UTC`
 
 #### Description
 
 Bug report tool does not pickup changes to BUGS.md when updating it. The tool should use a R+M+W operation to sync BUGS.md, not just write the current SQLite database status to the file. We should also add file watch on BUGS.md to that changes to it can be picked up in the UI automatically
+
+#### Resolution Notes
+
+Implemented markdown parser, database merger, R+M+W sync, and file watcher on BUGS.md in bug report tool.
 
 ---
