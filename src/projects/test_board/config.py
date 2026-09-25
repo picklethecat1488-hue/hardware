@@ -21,7 +21,7 @@ def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None
     routing_file = project_dir / "routing.yaml"
     auto_traces, auto_vias = [], []
 
-    if subassembly in (None, "carrier_board"):
+    if subassembly == "carrier_board" or not routing_file.exists():
         router = PCBAutoRouter(cfg, wiring)
         auto_traces, auto_vias = router.route_all_nets()
         # 1. Save carrier board routing to per-project YAML file

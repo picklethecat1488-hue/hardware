@@ -41,7 +41,7 @@ class _TOCPagePlan:
     net_rows: List[List[NetModel]] = field(default_factory=list)
 
 
-POWER_NET_NAMES = {"3V3", "5V", "1V8", "1V2", "VCC", "VDD", "VLOAD_SW", "VBUS", "VBAT"}
+POWER_NET_NAMES = {"3V3", "5V", "1V8", "1V2", "VCC", "VDD", "VLOAD_SW", "VBUS", "VBAT", "SENSOR_3V3"}
 GROUND_NET_NAMES = {"GND", "GROUND", "VSS"}
 JUMPER_BRIDGE_RADIUS_MM = 1.2
 PIN_PITCH_MM = 5.0
@@ -369,13 +369,18 @@ class SchematicDiagram:
                     pin_side_map[(fp.name, p.name)] = "right"
 
             direct_wire_pairs = []
+            detour_wire_pairs = []
             wired_pins = set()
             for net in all_nets:
+                if net.name.upper() in POWER_NET_NAMES or net.name.upper() in GROUND_NET_NAMES:
+                    continue
                 present_pins = [pair for pair in net.pins if pair in pin_side_map]
                 if len(present_pins) >= 2:
                     for i, pair1 in enumerate(present_pins):
                         for pair2 in present_pins[i + 1 :]:
                             if pair1 in wired_pins or pair2 in wired_pins:
+                                continue
+                            if pair1[0] == pair2[0]:
                                 continue
                             c1, c2 = comp_col_map[pair1[0]], comp_col_map[pair2[0]]
                             s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
@@ -385,6 +390,10 @@ class SchematicDiagram:
                                 s1, s2 = s2, s1
                             if (c2 == c1 + 1) and s1 == "right" and s2 == "left":
                                 direct_wire_pairs.append((pair1, pair2, net))
+                                wired_pins.add(pair1)
+                                wired_pins.add(pair2)
+                            else:
+                                detour_wire_pairs.append((pair1, pair2, net))
                                 wired_pins.add(pair1)
                                 wired_pins.add(pair2)
 
@@ -1289,14 +1298,14 @@ class SchematicDiagram:
                         if o_segs:
                             o_xs = min(min(s[0], s[1]) for s in o_segs)
                             o_xe = max(max(s[0], s[1]) for s in o_segs)
-                            if abs(o_xs - x_start) < 2.0 and abs(o_xe - x_end) < 2.0:
+                            if max(x_start, o_xs) < min(x_end, o_xe) - 5.0:
                                 chan_fps.append(other_fp)
 
                     n_chan = max(1, len(chan_fps))
                     chan_idx = chan_fps.index(fp) if fp in chan_fps else (idx % n_chan)
-                    safe_min = x_start + 6.0
-                    safe_max = x_end - 10.0
-                    pitch = 14.0
+                    safe_min = x_start + 10.0
+                    safe_max = x_end - 12.0
+                    pitch = 20.0
                     total_span = (n_chan - 1) * pitch
                     if safe_max - safe_min >= total_span:
                         mid_x = (safe_min + safe_max) / 2.0
@@ -1305,13 +1314,13 @@ class SchematicDiagram:
                         step = (safe_max - safe_min) / max(1, n_chan - 1) if n_chan > 1 else 0.0
                         cand_x = safe_min + chan_idx * step
 
-                    for _ in range(10):
-                        if not any(abs(cand_x - ux) < 7.0 for ux in used_x_positions):
+                    for _ in range(15):
+                        if not any(abs(cand_x - ux) < 16.0 for ux in used_x_positions):
                             break
-                        if cand_x + 7.0 <= safe_max:
-                            cand_x += 7.0
-                        elif cand_x - 7.0 >= safe_min:
-                            cand_x -= 7.0
+                        if cand_x + 16.0 <= safe_max:
+                            cand_x += 16.0
+                        elif cand_x - 16.0 >= safe_min:
+                            cand_x -= 16.0
                         else:
                             break
                 elif x_start < 100.0:
@@ -1382,7 +1391,11 @@ class SchematicDiagram:
                         )
                         cand_x = min(265.0, p_x + 14.0 + stub_idx * 16.0)
                         if cand_x > next_comp_left - 12.0:
-                            cand_x = (p_x + next_comp_left) / 2.0
+                            avail_span = (next_comp_left - 10.0) - (p_x + 8.0)
+                            if avail_span > 18.0:
+                                cand_x = (p_x + 8.0) + (stub_idx + 1) * (avail_span / 3.0)
+                            else:
+                                cand_x = (p_x + next_comp_left) / 2.0 + (stub_idx - 0.5) * 12.0
                         for _ in range(10):
                             if not any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
                                 break
@@ -2226,16 +2239,21 @@ class SchematicDiagram:
             for p in right_p:
                 pin_side_map[(fp.name, p.name)] = "right"
 
-        # Discover direct wire pairs between facing pins of adjacent components
+        # Discover direct wire pairs between facing pins and detour wire pairs around components
         direct_wire_pairs: List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]] = []
+        detour_wire_pairs: List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]] = []
         wired_pins: set[Tuple[str, str]] = set()
 
         for net in all_nets:
+            if net.name.upper() in POWER_NET_NAMES or net.name.upper() in GROUND_NET_NAMES:
+                continue
             present_pins = [pair for pair in net.pins if pair in pin_side_map]
             if len(present_pins) >= 2:
                 for i, pair1 in enumerate(present_pins):
                     for pair2 in present_pins[i + 1 :]:
                         if pair1 in wired_pins or pair2 in wired_pins:
+                            continue
+                        if pair1[0] == pair2[0]:
                             continue
                         c1, c2 = comp_col_map[pair1[0]], comp_col_map[pair2[0]]
                         s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
@@ -2245,6 +2263,10 @@ class SchematicDiagram:
                             s1, s2 = s2, s1
                         if (c2 == c1 + 1) and s1 == "right" and s2 == "left":
                             direct_wire_pairs.append((pair1, pair2, net))
+                            wired_pins.add(pair1)
+                            wired_pins.add(pair2)
+                        else:
+                            detour_wire_pairs.append((pair1, pair2, net))
                             wired_pins.add(pair1)
                             wired_pins.add(pair2)
 
@@ -2690,7 +2712,20 @@ class SchematicDiagram:
                 for fp in pullup_resistors
             )
 
-            dogleg_idx = 0
+            # Sort doglegs to eliminate collinear overlaps (BUG-100)
+            # Step-down pairs: lower Y drops first at smaller X
+            # Step-up pairs: higher Y rises first at smaller X
+            def _dogleg_sort_key(item: Tuple[Tuple[str, str], Tuple[str, str], NetModel]) -> Tuple[int, float]:
+                y1 = sheet_pin_coords[item[0]][1]
+                y2 = sheet_pin_coords[item[1]][1]
+                if y1 > y2:  # step down
+                    return (0, min(y1, y2))
+                else:  # step up
+                    return (1, -max(y1, y2))
+
+            sorted_doglegs = sorted(dogleg_pairs, key=_dogleg_sort_key)
+            dogleg_order = {(p[0], p[1]): idx for idx, p in enumerate(sorted_doglegs)}
+
             for pair1, pair2, net in pairs:
                 p1 = sheet_pin_coords[pair1]
                 p2 = sheet_pin_coords[pair2]
@@ -2698,24 +2733,116 @@ class SchematicDiagram:
 
                 if abs(p1[1] - p2[1]) < 0.1:
                     # Straight horizontal wire
-                    h_segments.append((p1[0], p2[0], p1[1], net.name, col))
+                    h_segments.append((min(p1[0], p2[0]), max(p1[0], p2[0]), p1[1], net.name, col))
                     if not has_pullups_in_channel:
                         wire_labels.append(((p1[0] + p2[0]) / 2.0, p1[1] + 1.2, net.name))
                 else:
-                    # Staggered vertical corridor
+                    # Staggered vertical corridor strictly constrained to channel boundaries (BUG-101)
+                    d_idx = dogleg_order.get((pair1, pair2), 0)
                     if has_pullups_in_channel:
-                        x_v = (p2[0] - 14.0) + dogleg_idx * 2.0
+                        x_v = (p2[0] - 14.0) + d_idx * 2.0
                     else:
-                        mid_base = (p1[0] + p2[0]) / 2.0
-                        offset = (dogleg_idx - (num_doglegs - 1) / 2.0) * 8.0 if num_doglegs > 1 else 0.0
-                        x_v = mid_base + offset
-                    dogleg_idx += 1
+                        x_min_v = p1[0] + 10.0
+                        x_max_v = p2[0] - 10.0
+                        avail = max(4.0, x_max_v - x_min_v)
+                        step = min(8.0, max(3.5, avail / (num_doglegs + 1)))
+                        total_span = (num_doglegs - 1) * step
+                        mid_base = (x_min_v + x_max_v) / 2.0
+                        x_v = max(x_min_v, min(x_max_v, mid_base - total_span / 2.0 + d_idx * step))
 
-                    h_segments.append((p1[0], x_v, p1[1], net.name, col))
+                    h_segments.append((min(p1[0], x_v), max(p1[0], x_v), p1[1], net.name, col))
                     v_segments.append((x_v, p1[1], p2[1], net.name, col))
-                    h_segments.append((x_v, p2[0], p2[1], net.name, col))
+                    h_segments.append((min(x_v, p2[0]), max(x_v, p2[0]), p2[1], net.name, col))
                     if not has_pullups_in_channel:
-                        wire_labels.append((p1[0] + 6.0, p1[1] + 1.2, net.name))
+                        seg1_len = abs(x_v - p1[0])
+                        seg2_len = abs(p2[0] - x_v)
+                        if seg1_len >= 16.0:
+                            wire_labels.append(((p1[0] + x_v) / 2.0, p1[1] + 1.2, net.name))
+                        elif seg2_len >= 16.0:
+                            wire_labels.append(((x_v + p2[0]) / 2.0, p2[1] + 1.2, net.name))
+
+        # Route on-sheet detour wires around components (BUG-099, BUG-102, BUG-104)
+        comp_box_dict: Dict[str, Tuple[float, float, float, float]] = {
+            fp.name: comp_boxes[c_idx] for c_idx, fp in enumerate(main_fps)
+        }
+        detour_count_by_channel: Dict[Tuple[str, str], int] = {}
+
+        # Sort detour wires for concentric nesting to avoid avoidable wire crossings
+        def _detour_sort_key(item: Tuple[Tuple[str, str], Tuple[str, str], NetModel]) -> Tuple[int, float]:
+            pair1, pair2, _ = item
+            s1 = pin_side_map[pair1]
+            s2 = pin_side_map[pair2]
+            p1 = sheet_pin_coords[pair1]
+            p2 = sheet_pin_coords[pair2]
+            if s1 == "left" and s2 == "left":
+                # Lower pin on c1 takes inner concentric track (smaller d_idx)
+                return (0, p1[1])
+            elif s1 == "right" and s2 == "right":
+                # Lower pin on c2 takes inner concentric track (smaller d_idx)
+                return (1, p2[1])
+            else:
+                return (2, p1[1])
+
+        sorted_detour_pairs = sorted(detour_wire_pairs, key=_detour_sort_key)
+        for pair1, pair2, net in sorted_detour_pairs:
+            p1 = sheet_pin_coords[pair1]
+            p2 = sheet_pin_coords[pair2]
+            c1_name, c2_name = pair1[0], pair2[0]
+            s1 = pin_side_map[pair1]
+            s2 = pin_side_map[pair2]
+            col = net.color if hasattr(net, "color") and net.color else "#2563eb"
+
+            ch_key = (min(c1_name, c2_name), max(c1_name, c2_name))
+            d_idx = detour_count_by_channel.get(ch_key, 0)
+            detour_count_by_channel[ch_key] = d_idx + 1
+
+            b1 = comp_box_dict[c1_name]
+            b2 = comp_box_dict[c2_name]
+            min_y_bottom = min(b1[1], b2[1])
+            y_detour = min_y_bottom - 8.0 - d_idx * 3.5
+
+            if s1 == "right" and s2 == "right":
+                # Route from c1 right side, down under c2, up right of c2, into c2 right side (BUG-099, BUG-104)
+                x_drop = b2[0] - 6.0 - d_idx * 2.5
+                x_rise = max(b2[0] + b2[2] + 6.0 + d_idx * 2.5, p2[0] + 6.0 + d_idx * 2.5)
+
+                h_segments.append((min(p1[0], x_drop), max(p1[0], x_drop), p1[1], net.name, col))
+                v_segments.append((x_drop, p1[1], y_detour, net.name, col))
+                h_segments.append((min(x_drop, x_rise), max(x_drop, x_rise), y_detour, net.name, col))
+                v_segments.append((x_rise, y_detour, p2[1], net.name, col))
+                h_segments.append((min(p2[0], x_rise), max(p2[0], x_rise), p2[1], net.name, col))
+                wire_labels.append(((x_drop + x_rise) / 2.0, y_detour + 1.2, net.name))
+
+            elif s1 == "left" and s2 == "left":
+                # Route from c1 left side, down under c1, up between c1 and c2, into c2 left side (BUG-102, BUG-104)
+                x_drop = min(b1[0] - 6.0 - d_idx * 2.5, p1[0] - 6.0 - d_idx * 2.5)
+                x_rise = b1[0] + b1[2] + 6.0 + d_idx * 2.5
+
+                h_segments.append((min(x_drop, p1[0]), max(x_drop, p1[0]), p1[1], net.name, col))
+                v_segments.append((x_drop, p1[1], y_detour, net.name, col))
+                h_segments.append((min(x_drop, x_rise), max(x_drop, x_rise), y_detour, net.name, col))
+                v_segments.append((x_rise, y_detour, p2[1], net.name, col))
+                h_segments.append((min(x_rise, p2[0]), max(x_rise, p2[0]), p2[1], net.name, col))
+                wire_labels.append(((x_drop + x_rise) / 2.0, y_detour + 1.2, net.name))
+
+            elif s1 == "right" and s2 == "left":
+                # Facing pins on non-adjacent components: route directly through channel
+                x_mid = (p1[0] + p2[0]) / 2.0
+                h_segments.append((min(p1[0], x_mid), max(p1[0], x_mid), p1[1], net.name, col))
+                v_segments.append((x_mid, p1[1], p2[1], net.name, col))
+                h_segments.append((min(x_mid, p2[0]), max(x_mid, p2[0]), p2[1], net.name, col))
+                wire_labels.append(((p1[0] + p2[0]) / 2.0, p1[1] + 1.2, net.name))
+
+            else:
+                # s1 == "left" and s2 == "right"
+                x_drop = min(b1[0] - 6.0 - d_idx * 2.5, p1[0] - 6.0 - d_idx * 2.5)
+                x_rise = max(b2[0] + b2[2] + 6.0 + d_idx * 2.5, p2[0] + 6.0 + d_idx * 2.5)
+                h_segments.append((min(x_drop, p1[0]), max(x_drop, p1[0]), p1[1], net.name, col))
+                v_segments.append((x_drop, p1[1], y_detour, net.name, col))
+                h_segments.append((min(x_drop, x_rise), max(x_drop, x_rise), y_detour, net.name, col))
+                v_segments.append((x_rise, y_detour, p2[1], net.name, col))
+                h_segments.append((min(p2[0], x_rise), max(p2[0], x_rise), p2[1], net.name, col))
+                wire_labels.append(((x_drop + x_rise) / 2.0, y_detour + 1.2, net.name))
 
         # Render all horizontal wire segments
         for x_start, x_end, y, net_name, col in h_segments:

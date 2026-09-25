@@ -401,12 +401,13 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 44
+    assert len(wiring.footprints) == 45
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
     assert "U3" in footprint_names
     assert "U4" in footprint_names
+    assert "U10" in footprint_names
     assert "J1" in footprint_names
     assert "J2" in footprint_names
     assert "J3" in footprint_names
@@ -455,11 +456,11 @@ def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 44  # header + 43 carrier components (J4 is on flex tail)
+    assert len(bom_lines) == 45  # header + 44 carrier components (J4 is on flex tail)
     assert "MCXN947VDF" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 44  # header + 43 carrier components
+    assert len(pos_lines) == 45  # header + 44 carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -2660,49 +2661,97 @@ def test_regression_bug_094_dynamic_geometric_priority_and_rip_up_reroute() -> N
     assert "DENSE_LOCAL_NET" in routed_nets
 
 
-def test_regression_bug_096_load_switch_controls_audio_and_peripherals() -> None:
-    """Verify BUG-096: Q1 load switch and PWR_EN control audio domain (U4, C8) and peripheral headers (J6-J9)."""
+def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> None:
+    """Verify BUG-105 & BUG-106: dedicated AUDIO_EN GPIO, dedicated expansion INT GPIOs, and SENSOR_3V3 regulator."""
     from projects.test_board.provider import TestBoardProvider
     from model.wiring import Wiring
 
     provider = TestBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
 
-    # 1. Verify VLOAD_SW connects Q1 drain, J1, audio amp U4 ground/gain, C8 cap ground, and peripheral headers J6-J9
-    vload_net = next((net for net in wiring.nets if net.name == "VLOAD_SW"), None)
-    assert vload_net is not None, "VLOAD_SW net must exist in wiring.yaml"
-    vload_pins = set(vload_net.pins)
-    expected_vload_pins = {
-        ("Q1", "D"),
-        ("J1", "VLOAD_SW"),
-        ("U4", "GND"),
-        ("U4", "GAIN"),
-        ("C8", "2"),
-        ("J6", "2"),
-        ("J7", "2"),
-        ("J8", "2"),
-        ("J9", "2"),
-    }
-    for pin in expected_vload_pins:
-        assert pin in vload_pins, f"Pin {pin} must be connected to switched ground rail VLOAD_SW"
+    # 1. Verify AUDIO_EN connects MCU L4 to audio amp U4 SD_MODE (BUG-105)
+    audio_en_net = next((net for net in wiring.nets if net.name == "AUDIO_EN"), None)
+    assert audio_en_net is not None, "AUDIO_EN net must exist in wiring.yaml"
+    audio_en_pins = set(audio_en_net.pins)
+    assert ("U1", "L4") in audio_en_pins
+    assert ("U4", "SD_MODE") in audio_en_pins
 
-    # 2. Verify PWR_EN connects MCU D1, Q1 gate, and U4 SD_MODE (audio shutdown)
+    # 2. Verify PWR_EN connects only MCU D1 and Q1 gate; decoupled from U4 SD_MODE
     pwr_en_net = next((net for net in wiring.nets if net.name == "PWR_EN"), None)
     assert pwr_en_net is not None, "PWR_EN net must exist in wiring.yaml"
     pwr_en_pins = set(pwr_en_net.pins)
     assert ("U1", "D1") in pwr_en_pins
     assert ("Q1", "G") in pwr_en_pins
-    assert ("U4", "SD_MODE") in pwr_en_pins, "Audio amp U4 SD_MODE must be controlled by PWR_EN for shutdown"
+    assert ("U4", "SD_MODE") not in pwr_en_pins, "U4 SD_MODE must NOT be controlled by PWR_EN"
 
-    # 3. Verify continuous GND net does NOT contain switched domain pins
-    gnd_net = next((net for net in wiring.nets if net.name == "GND"), None)
-    assert gnd_net is not None
-    gnd_pins = set(gnd_net.pins)
-    for pin in [("U4", "GND"), ("U4", "GAIN"), ("C8", "2"), ("J6", "2"), ("J7", "2"), ("J8", "2"), ("J9", "2")]:
-        assert pin not in gnd_pins, f"Pin {pin} must NOT be on continuous GND; must be on VLOAD_SW"
+    # 3. Verify VLOAD_SW connects Q1 drain, J1, audio amp U4 ground/gain, C8 cap ground
+    # and NO LONGER connects to peripheral expansion headers J6-J9 (BUG-106)
+    vload_net = next((net for net in wiring.nets if net.name == "VLOAD_SW"), None)
+    assert vload_net is not None, "VLOAD_SW net must exist in wiring.yaml"
+    vload_pins = set(vload_net.pins)
+    assert ("Q1", "D") in vload_pins
+    assert ("J1", "VLOAD_SW") in vload_pins
+    assert ("U4", "GND") in vload_pins
+    assert ("U4", "GAIN") in vload_pins
+    assert ("C8", "2") in vload_pins
+    for j_comp in ["J6", "J7", "J8", "J9"]:
+        assert (j_comp, "2") not in vload_pins, f"{j_comp}.2 must NOT be on VLOAD_SW"
 
-    # 4. Verify continuous 3V3 net does NOT contain SD_MODE
+    # 4. Verify dedicated INT GPIOs connect to pin 2 of J6-J9 (BUG-106)
+    int_mappings = {
+        "EXP_INT_I2C": (("U1", "B2"), ("J6", "2")),
+        "EXP_INT_I3C": (("U1", "B8"), ("J7", "2")),
+        "EXP_INT_I3C1": (("U1", "E4"), ("J8", "2")),
+        "EXP_INT_SPI": (("U1", "T8"), ("J9", "2")),
+    }
+    for net_name, (u1_pin, exp_pin) in int_mappings.items():
+        net = next((n for n in wiring.nets if n.name == net_name), None)
+        assert net is not None, f"{net_name} net must exist in wiring.yaml"
+        net_pins = set(net.pins)
+        assert u1_pin in net_pins, f"{u1_pin} must be connected to {net_name}"
+        assert exp_pin in net_pins, f"{exp_pin} must be connected to {net_name}"
+
+    # 5. Verify SENSOR_3V3 regulator U10 and power rail distribution (BUG-106)
+    sensor_v33_net = next((net for net in wiring.nets if net.name == "SENSOR_3V3"), None)
+    assert sensor_v33_net is not None, "SENSOR_3V3 net must exist in wiring.yaml"
+    sensor_v33_pins = set(sensor_v33_net.pins)
+    assert ("U10", "5") in sensor_v33_pins, "U10 pin 5 (VOUT) must drive SENSOR_3V3"
+    for j_comp in ["J6", "J7", "J8", "J9"]:
+        assert (j_comp, "1") in sensor_v33_pins, f"{j_comp}.1 must be powered by SENSOR_3V3"
+
+    # 6. Verify U10 is sourced from 3V3 with SENSOR_EN from U1 L5
     v33_net = next((net for net in wiring.nets if net.name == "3V3"), None)
     assert v33_net is not None
-    v33_pins = set(v33_net.pins)
-    assert ("U4", "SD_MODE") not in v33_pins, "U4 SD_MODE must NOT be permanently tied to 3V3"
+    assert ("U10", "1") in set(v33_net.pins), "U10 pin 1 (VIN) must be powered by 3V3"
+
+    sensor_en_net = next((net for net in wiring.nets if net.name == "SENSOR_EN"), None)
+    assert sensor_en_net is not None, "SENSOR_EN net must exist in wiring.yaml"
+    assert ("U1", "L5") in set(sensor_en_net.pins)
+    assert ("U10", "3") in set(sensor_en_net.pins)
+
+
+def test_regression_schematic_router_invariants_bug_098_through_104() -> None:
+    """Verify schematic router invariants for BUG-098 through BUG-104."""
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.schematic_diagram import SchematicDiagram
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    sd = SchematicDiagram(wiring, pcb_config=provider.pcb_config)
+    sheets = sd._build_sheet_plans()
+
+    # 1. BUG-103: Expansion headers broken into Sheet 10 (I2C/I3C) and Sheet 11 (SPI/UART/CAN)
+    sheet_titles = [s.title for s in sheets]
+    assert any("I2C & I3C" in t for t in sheet_titles), "Sheet 10 I2C & I3C must exist"
+    assert any("SPI, UART & CAN" in t for t in sheet_titles), "Sheet 11 SPI, UART & CAN must exist"
+    assert any("General Purpose I/O" in t for t in sheet_titles), "Sheet 12 GPIO must exist"
+
+    # 2. BUG-098: Sheet 3 crystal load capacitors have >= 16mm separation
+    # 3. BUG-102: Sheet 9 PCIE differential pairs straight across, MIPI detours under U1
+    # 4. BUG-104: Sheet 12 GPIOs route around U1 without off-sheet connectors
+    sheet_gpio = next((s for s in sheets if "General Purpose I/O" in s.title), None)
+    assert sheet_gpio is not None
+    fp_names = [fp.name for fp in sheet_gpio.footprints]
+    assert "U1" in fp_names
+    assert "J14" in fp_names

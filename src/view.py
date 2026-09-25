@@ -209,6 +209,12 @@ class Viewer:
                 pcb_cfg = pcb_cfg.model_copy(update={"net_classes": provider.pcb_config.net_classes})
             if (
                 sub_pcb_config
+                and provider.pcb_config.design_rules
+                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
+            ):
+                pcb_cfg = pcb_cfg.model_copy(update={"design_rules": provider.pcb_config.design_rules})
+            if (
+                sub_pcb_config
                 and not pcb_cfg.silkscreen_texts
                 and provider.pcb_config.silkscreen_texts
                 and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX

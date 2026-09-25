@@ -376,6 +376,15 @@ footprints:
     mpn: FT232RNQ-REEL
     supplier_pn: 768-FT232RNQ-REEL-ND
 
+  # Sensor Bus 3.3V Step-Down Buck Regulator (TLV62568, SOT-23-5) (BUG-106)
+  - name: U10
+    package: SOT-23-5
+    position: [18.0, 24.0, 0.8]
+    rotation: [0.0, 0.0, 0.0]
+    mpn: TLV62568DBVR
+    supplier_pn: 296-TLV62568DBVR-ND
+
+
 
 nets:
   - name: GND
@@ -442,6 +451,7 @@ nets:
       - [J5, "7"]
       - [J5, "8"]
       - [J5, "9"]
+      - [U10, "2"]
 
   - name: 3V3
     color: "#dc2626"
@@ -471,10 +481,7 @@ nets:
       - [U9, "4"]
       - [U9, "19"]
       - [J5, "1"]
-      - [J6, "1"]
-      - [J7, "1"]
-      - [J8, "1"]
-      - [J9, "1"]
+      - [U10, "1"]
 
   - name: VBUS
     priority: 24
@@ -516,6 +523,12 @@ nets:
     pins:
       - [U1, D1]
       - [Q1, G]
+
+  - name: AUDIO_EN
+    priority: 16
+    color: "#ea580c"
+    pins:
+      - [U1, L4]
       - [U4, SD_MODE]
 
   - name: VLOAD_SW
@@ -527,9 +540,50 @@ nets:
       - [U4, GND]
       - [U4, GAIN]
       - [C8, "2"]
+
+  - name: SENSOR_EN
+    priority: 24
+    color: "#ea580c"
+    pins:
+      - [U1, L5]
+      - [U10, "3"]
+
+  - name: SENSOR_3V3
+    priority: 25
+    color: "#dc2626"
+    pins:
+      - [U10, "5"]
+      - [J6, "1"]
+      - [J7, "1"]
+      - [J8, "1"]
+      - [J9, "1"]
+
+  - name: EXP_INT_I2C
+    priority: 19
+    color: "#84cc16"
+    pins:
+      - [U1, B2]
       - [J6, "2"]
+
+  - name: EXP_INT_I3C
+    priority: 20
+    color: "#84cc16"
+    pins:
+      - [U1, B8]
       - [J7, "2"]
+
+  - name: EXP_INT_I3C1
+    priority: 21
+    color: "#84cc16"
+    pins:
+      - [U1, E4]
       - [J8, "2"]
+
+  - name: EXP_INT_SPI
+    priority: 22
+    color: "#84cc16"
+    pins:
+      - [U1, T8]
       - [J9, "2"]
 
   - name: CAP_INT

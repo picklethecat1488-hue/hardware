@@ -190,12 +190,20 @@ schematic_sheets:
       C7: ["1", "2"]
 
   - title: 3.3V Power Regulation & Distribution
-    description: Low-dropout linear voltage regulator, switched power rail MOSFET switch, and system decoupling
-    components: [U3, C6, Q1, J1, C1, C2, C3]
+    description: Low-dropout linear voltage regulator, switched power rail MOSFET switch, sensor buck regulator, and system decoupling
+    layout:
+      cols_per_row: 4
+      grid_positions:
+        U3: [0, 0]
+        Q1: [0, 1]
+        J1: [0, 2]
+        U10: [0, 3]
+    components: [U3, C6, Q1, J1, C1, C2, C3, U10]
     pin_breakouts:
       U3: ["1", "2", "3", "4", "5"]
       Q1: [G, S, D]
       J1: [GND, 3V3, VLOAD_SW]
+      U10: ["1", "2", "3", "5"]
       C1: ["1", "2"]
       C2: ["1", "2"]
       C3: ["1", "2"]
@@ -203,21 +211,23 @@ schematic_sheets:
 
   - title: Microcontroller Core, Clock & Reset
     description: Primary microcontroller core, 24MHz crystal oscillator, power bypass, reset and boot circuitry
+    layout:
+      col_gap: 65.0
     components: [U1, Y1, C9, C10, R5, C11, R6, C4, C5]
     pin_sides:
       U1:
-        J8: right
-        H8: right
+        J8: left
+        H8: left
         F2: right
         F1: right
         D1: left
         M1: left
         C14: left
       Y1:
-        "1": right
-        "3": right
-        "2": bottom
-        "4": bottom
+        "1": left
+        "3": left
+        "2": right
+        "4": right
     pin_breakouts:
       U1: [J8, H8, D1, F2, F1, F3, C14]
       Y1: ["1", "2", "3", "4"]
@@ -233,7 +243,7 @@ schematic_sheets:
     description: Winbond W25N01GV 1Gb SLC serial NAND flash on FlexSPI Port A
     components: [U1, U8]
     pin_breakouts:
-      U1: [B17, D14, E14, F15, F17, F16]
+      U1: [B17, F15, F17, D14, E14, F16]
       U8: ["1", "2", "3", "4", "5", "6", "7", "8"]
 
   - title: Telemetry & Debug Communications
@@ -255,7 +265,7 @@ schematic_sheets:
   - title: Capacitive Sensing & Control (Azoteq IQS7222A)
     description: Azoteq IQS7222A ProxFusion controller, 4-channel liquid level flex tail, and I2C bus
     layout:
-      col_gap: 50.0
+      col_gap: 65.0
     components: [U1, U2, J2, R1, R2, C12, C14]
     pin_sides:
       U1:
@@ -303,12 +313,11 @@ schematic_sheets:
   - title: Audio Subsystem
     description: MAX98357A I2S/PDM digital audio amplifier and piezo speaker
     layout:
-      cols_per_row: 2
+      cols_per_row: 3
       grid_positions:
-        U4: [0, 0]
-        U5: [0, 1]
-        C8: [1, 0]
-        U1: [1, 1]
+        U1: [0, 0]
+        U4: [0, 1]
+        U5: [0, 2]
     components: [U4, U5, U1, C8]
     pin_sides:
       U4:
@@ -323,7 +332,7 @@ schematic_sheets:
     pin_breakouts:
       U4: [GAIN, SD_MODE, GND, VDD, OUTP, OUTN, DIN, BCLK, LRCLK]
       U5: ["1", "2"]
-      U1: [H1, G2, J1]
+      U1: [H1, G2, J1, L4]
       C8: ["1", "2"]
 
   - title: High-Speed Differential Interfaces
@@ -331,26 +340,71 @@ schematic_sheets:
     components: [J1, U1, J2]
     pin_breakouts:
       J1: [PETp0, PETn0, PERp0, PERn0]
-      U1: [T1, T2, T3, T4, A2, A4, A12, A14]
+      U1: [T2, T1, T3, T4, A2, A4, A12, A14]
       J2: [D0_P, D0_N, CLK_P, CLK_N]
 
-  - title: Serial Bus Expansion Headers
-    description: I2C, I3C, SPI, and UART peripheral expansion headers
+  - title: Serial Bus Expansion Headers (I2C & I3C)
+    description: Primary I2C and I3C0 peripheral expansion headers
     layout:
-      cols_per_row: 4
-      row_step_y: 55.0
+      cols_per_row: 3
       grid_positions:
-        J6: [0, 0]
-        J7: [0, 1]
-        J8: [0, 2]
-        J9: [0, 3]
-        U1: [1, 0]
-        J10: [1, 1]
-    components: [U1, J6, J7, J8, J9, J10]
+        U1: [0, 0]
+        J6: [0, 1]
+        J7: [0, 2]
+    components: [U1, J6, J7]
+    pin_sides:
+      U1:
+        A1: right
+        B1: right
+        B2: right
+        A8: right
+        C8: right
+        B8: right
+      J6:
+        "2": left
+        "3": left
+        "4": left
+      J7:
+        "2": left
+        "3": left
+        "4": left
     pin_breakouts:
-      U1: [A1, B1, A8, C8, F4, F6, T6, T7, R8, R9]
+      U1: [A1, B1, B2, A8, C8, B8]
       J6: ["1", "2", "3", "4"]
       J7: ["1", "2", "3", "4"]
+
+  - title: Serial Bus Expansion Headers (SPI, UART & CAN)
+    description: Secondary I3C, SPI, and UART peripheral expansion headers
+    layout:
+      cols_per_row: 3
+      grid_positions:
+        U1: [0, 0]
+        J8: [0, 1]
+        J9: [1, 1]
+        J10: [0, 2]
+    components: [U1, J8, J9, J10]
+    pin_sides:
+      U1:
+        F4: right
+        F6: right
+        E4: right
+        T6: right
+        T7: right
+        R8: right
+        R9: right
+        T8: right
+      J8:
+        "2": left
+        "3": left
+        "4": left
+      J9:
+        "2": left
+        "3": left
+        "4": left
+        "5": left
+        "6": left
+    pin_breakouts:
+      U1: [F4, F6, E4, T6, T7, R8, R9, T8]
       J8: ["1", "2", "3", "4"]
       J9: ["1", "2", "3", "4", "5", "6"]
       J10: ["1", "2", "3", "4", "5", "6"]

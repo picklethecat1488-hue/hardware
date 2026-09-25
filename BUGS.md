@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-24 21:13:43 UTC` |
-| **Total Issues** | `105` |
-| **Open Issues** | `9` |
-| **Resolved / Closed** | `96 (91%)` |
+| **Report Date** | `2026-09-25 02:12:20 UTC` |
+| **Total Issues** | `112` |
+| **Open Issues** | `7` |
+| **Resolved / Closed** | `105 (93%)` |
 
 ## Executive Summary
 
@@ -21,16 +21,16 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 1 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 4 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 99 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
-| **`[LOW]`** | 1 | Minor aesthetic imperfections or documentation notes. |
+| **`[MEDIUM]`** | 104 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[LOW]`** | 3 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 81 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 12 | 3D geometry, step models, enclosures, mechanical assembly. |
-| **`SIMULATION`** | 0 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
+| **`PCB`** | 83 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 13 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`SIMULATION`** | 2 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 10 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 1 | Web dashboards, CLI viewers, review interfaces. |
 
@@ -132,15 +132,22 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-095](#bug-095): Make JAX router backend the default (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-096](#bug-096): Load switch should control audio and peripheral domains (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-097](#bug-097): Log routing violations to a file (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-098](#bug-098): Sheer 3 - C9, C10 overlap (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-099](#bug-099): Sheet 4- FLEXSPI wires should route around U8 (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-100](#bug-100): Sheet 6-SCL and SDA lines overlap (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-101](#bug-101): Sheet 7-U2 and J2- cap touch net routing is messy (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-102](#bug-102): Sheet 9- PCIE lanes are not cleanly routed (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-103](#bug-103): Sheet 10- Serial Bus Expansion Headers needs to be broken into 2 pages (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-104](#bug-104): Sheet11- GPIOs should route without off-sheet connectors (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-105](#bug-105): U4-Add AUDIO_EN GPIO connection to U1 (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-106](#bug-106): J6-J9: Remove VLOAD_SW connector (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-098](#bug-098): Sheer 3 - C9, C10 overlap (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-099](#bug-099): Sheet 4- FLEXSPI wires should route around U8 (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-100](#bug-100): Sheet 6-SCL and SDA lines overlap (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-101](#bug-101): Sheet 7-U2 and J2- cap touch net routing is messy (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-102](#bug-102): Sheet 9- PCIE lanes are not cleanly routed (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-103](#bug-103): Sheet 10- Serial Bus Expansion Headers needs to be broken into 2 pages (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-104](#bug-104): Sheet11- GPIOs should route without off-sheet connectors (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-105](#bug-105): U4-Add AUDIO_EN GPIO connection to U1 (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-106](#bug-106): J6-J9: Remove VLOAD_SW connector (`RESOLVED`)
+- [ ] **`[LOW]`** [#BUG-107](#bug-107): Simulate flying probes test: carrier board `[carrier_board]` (`OPEN`)
+- [ ] **`[LOW]`** [#BUG-108](#bug-108): Simulate flying probes test: flex tail (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-109](#bug-109): Resolve pytest warnings (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-110](#bug-110): Expansion header connectors should be JST-style (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-111](#bug-111): White square above J2 `[carrier_board]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-112](#bug-112): Update test board docs with recommended battery model `[carrier_board]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-113](#bug-113): Carrier board serial expansion cutouts overlap `[carrier_board]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -2517,12 +2524,13 @@ Redirected PCB DRC routing violations to board/<provider>/<subassembly>_drc_viol
 
 ---
 
-### <a id="bug-098"></a> 🔴 `[BUG-098]` Sheer 3 - C9, C10 overlap
+### <a id="bug-098"></a> 🟢 `[BUG-098]` Sheer 3 - C9, C10 overlap
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:52:26 UTC`
+- **Resolved**: `2026-09-25 02:11:34 UTC`
 
 #### Description
 
@@ -2534,14 +2542,19 @@ C9
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790283157382.png](build/attachments/pasted_screenshot_1790283157382.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Increased horizontal separation between crystal load capacitors C9 and C10 to 18mm on Sheet 3 to eliminate passive overlap.
+
 ---
 
-### <a id="bug-099"></a> 🔴 `[BUG-099]` Sheet 4- FLEXSPI wires should route around U8
+### <a id="bug-099"></a> 🟢 `[BUG-099]` Sheet 4- FLEXSPI wires should route around U8
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:53:44 UTC`
+- **Resolved**: `2026-09-25 02:11:39 UTC`
 
 #### Description
 
@@ -2553,14 +2566,19 @@ Sheet 4-FLEXSPI wires should route around U8 and connect to the pins without off
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790283246209.png](build/attachments/pasted_screenshot_1790283246209.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Added concentric detour routing under U8 for Sheet 4 FLEXSPI signals to eliminate off-sheet connectors.
+
 ---
 
-### <a id="bug-100"></a> 🔴 `[BUG-100]` Sheet 6-SCL and SDA lines overlap
+### <a id="bug-100"></a> 🟢 `[BUG-100]` Sheet 6-SCL and SDA lines overlap
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:55:50 UTC`
+- **Resolved**: `2026-09-25 02:11:43 UTC`
 
 #### Description
 
@@ -2572,27 +2590,37 @@ SCL and SDA lines overlap on sheet 6. Update schematic router and learnings so t
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790283360253.png](build/attachments/pasted_screenshot_1790283360253.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Staggered Sheet 6 SCL and SDA doglegs to eliminate collinear segment overlaps.
+
 ---
 
-### <a id="bug-101"></a> 🔴 `[BUG-101]` Sheet 7-U2 and J2- cap touch net routing is messy
+### <a id="bug-101"></a> 🟢 `[BUG-101]` Sheet 7-U2 and J2- cap touch net routing is messy
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:57:12 UTC`
+- **Resolved**: `2026-09-25 02:11:49 UTC`
 
 #### Description
 
 The cap touch net routing is messed up looking. RX0 on the U2 side runs on top of TX0 starting at the connector symbol. RX0 should extend to the right of the connector symbol on U2, then overlap RX1's line midway through. The same feedback applies for TX2 and RX3 on the J2 side. Please update the schematic router and gemini learnings as appropriate so that this type of routing mistake doesn't happen anymore
 
+#### Resolution Notes
+
+Cleaned up Sheet 7 capacitive touch routing on U2 and J2 with direct orthogonal corridors and neat spacing.
+
 ---
 
-### <a id="bug-102"></a> 🔴 `[BUG-102]` Sheet 9- PCIE lanes are not cleanly routed
+### <a id="bug-102"></a> 🟢 `[BUG-102]` Sheet 9- PCIE lanes are not cleanly routed
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:01:11 UTC`
+- **Resolved**: `2026-09-25 02:11:53 UTC`
 
 #### Description
 
@@ -2604,14 +2632,19 @@ PCIE_TX0_P has an unexpected bend that causes it to overlap PCIE_TX0_N. PCIE_TX0
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790283685004.png](build/attachments/pasted_screenshot_1790283685004.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Routed Sheet 9 PCIE differential pairs straight across and detoured MIPI signals under U1 cleanly.
+
 ---
 
-### <a id="bug-103"></a> 🔴 `[BUG-103]` Sheet 10- Serial Bus Expansion Headers needs to be broken into 2 pages
+### <a id="bug-103"></a> 🟢 `[BUG-103]` Sheet 10- Serial Bus Expansion Headers needs to be broken into 2 pages
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:04:04 UTC`
+- **Resolved**: `2026-09-25 02:11:58 UTC`
 
 #### Description
 
@@ -2623,14 +2656,19 @@ Components on this page are too densely packed. Please create a second expansion
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790283903996.png](build/attachments/pasted_screenshot_1790283903996.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Split dense Serial Bus Expansion Headers into Sheet 10 (I2C & I3C) and Sheet 11 (SPI, UART & CAN), updating all downstream sheets and TOC.
+
 ---
 
-### <a id="bug-104"></a> 🔴 `[BUG-104]` Sheet11- GPIOs should route without off-sheet connectors
+### <a id="bug-104"></a> 🟢 `[BUG-104]` Sheet11- GPIOs should route without off-sheet connectors
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:06:52 UTC`
+- **Resolved**: `2026-09-25 02:12:03 UTC`
 
 #### Description
 
@@ -2642,30 +2680,169 @@ GPIO0, GPIO1, and GPIO5 should route cleanly around U1 into J14 without off-shee
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790284014503.png](build/attachments/pasted_screenshot_1790284014503.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Routed Sheet 12 GPIO signals directly on-sheet without off-sheet connectors using concentric detours under U1 into J14.
+
 ---
 
-### <a id="bug-105"></a> 🔴 `[BUG-105]` U4-Add AUDIO_EN GPIO connection to U1
+### <a id="bug-105"></a> 🟢 `[BUG-105]` U4-Add AUDIO_EN GPIO connection to U1
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:10:15 UTC`
+- **Resolved**: `2026-09-25 02:12:15 UTC`
 
 #### Description
 
 For U4, we can't use PWR_EN as the power gate as that is coming from the PCIE domain. We should add an AUDIO_EN GPIO and connect it to the amp.
 
+#### Resolution Notes
+
+Routed dedicated AUDIO_EN GPIO from U1.L4 to U4.SD_MODE, decoupling audio shutdown from PWR_EN.
+
 ---
 
-### <a id="bug-106"></a> 🔴 `[BUG-106]` J6-J9: Remove VLOAD_SW connector
+### <a id="bug-106"></a> 🟢 `[BUG-106]` J6-J9: Remove VLOAD_SW connector
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:11:33 UTC`
+- **Resolved**: `2026-09-25 02:12:20 UTC`
 
 #### Description
 
 Remove VLOAD_SW routing from all sensor bus expansion headers. Replace with an INT GPIO for each expansion port. Replace 3V3 coming from the charger with a SENSOR_3V3 powered by a buck regulator that sources power from 3V3, and has a SENSOR_EN GPIO connected to U1.
+
+#### Resolution Notes
+
+Replaced VLOAD_SW on J6-J9 with dedicated interrupt lines (EXP_INT_*); powered expansion headers from dedicated SENSOR_3V3 regulator U10 with SENSOR_EN from U1.L5.
+
+---
+
+### <a id="bug-107"></a> 🔴 `[BUG-107]` Simulate flying probes test: carrier board
+
+- **Status**: `OPEN`
+- **Severity**: `LOW`
+- **Category**: `SIMULATION`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-25 00:29:09 UTC`
+
+#### Description
+
+Simulate a flying probes test of the carrier board in pybullet. The flying probes test should attempt to replicate a physical tester and board by populating obstacles for the tester to interact with in pybullet to validate electrical connectivity in rerun. Rerun should include a test report that gives pass/fail status of each test point as well as a report of electrical characteristics. Example command to run given in the repro steps
+
+#### Reproduction Steps
+
+1. $ bin/anvil simulate test_board/carrier_board:simulate -s 1000
+
+---
+
+### <a id="bug-108"></a> 🔴 `[BUG-108]` Simulate flying probes test: flex tail
+
+- **Status**: `OPEN`
+- **Severity**: `LOW`
+- **Category**: `SIMULATION`
+- **Created**: `2026-09-25 00:34:01 UTC`
+
+#### Description
+
+Simulate a flying probes test of the flex tail in pybullet. The flying probes test should attempt to replicate a physical tester and board by populating obstacles for the tester to interact with in pybullet to validate electrical connectivity in rerun. Rerun should include a test report that gives pass/fail status of each test point as well as a report of electrical characteristics. Example command to run given in the repro steps
+
+#### Reproduction Steps
+
+1. $ python src/view.py test_board/flex_tail:pcb
+
+---
+
+### <a id="bug-109"></a> 🔴 `[BUG-109]` Resolve pytest warnings
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `GENERAL`
+- **Created**: `2026-09-25 01:05:13 UTC`
+
+#### Description
+
+The command exited with code 0.
+  Output:
+  pybullet build time: Oct 20 2025 08:05:00
+  ........................................................................ [ 83%]
+  ..............                                                           [100%]
+  ============================== warnings summary ===============================
+  src/tests/test_pcb_advanced.py:1017
+  /Users/daparker/gh/hardware/src/tests/test_pcb_advanced.py:1017: PytestUnknownMarkWarning:
+  Unknown pytest.mark.geometry - is this a typo?  You can register custom marks to avoid this
+  warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+  @pytest.mark.geometry
+
+---
+
+### <a id="bug-110"></a> 🔴 `[BUG-110]` Expansion header connectors should be JST-style
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 01:10:03 UTC`
+
+#### Description
+
+Expansion header connectors should be 6 pin JST-PH style connectors to make insertion easier. Right now, they are Dupont style connectors which will complicate insertion of test boards.
+
+---
+
+### <a id="bug-111"></a> 🔴 `[BUG-111]` White square above J2
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-25 01:14:00 UTC`
+
+#### Description
+
+Pasted a screenshot. Is this supposed to be the logo? Seems like a silkscreen error too me
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790298848779.png](build/attachments/pasted_screenshot_1790298848779.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-112"></a> 🔴 `[BUG-112]` Update test board docs with recommended battery model
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `GENERAL`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-25 01:15:38 UTC`
+
+#### Description
+
+Update the test board docs with a recommmended battery model to be placed in the battery holder on the carrier board top.
+
+---
+
+### <a id="bug-113"></a> 🔴 `[BUG-113]` Carrier board serial expansion cutouts overlap
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `CAD`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-25 01:17:38 UTC`
+
+#### Description
+
+See attached screenshot, carrier board serial expansion cutouts overlap with each other causing the model to have burrs
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790299068920.png](build/attachments/pasted_screenshot_1790299068920.png) | Pasted screenshot |
 
 ---
