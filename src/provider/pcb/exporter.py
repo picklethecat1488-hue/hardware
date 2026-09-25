@@ -188,12 +188,24 @@ class PCBExporter:
             dim_h = fp.dimensions[1] if fp.dimensions else 4.0
             w_half = round(dim_w / 2.0 + 0.4, 4)
             h_half = round(dim_h / 2.0 + 0.4, 4)
+            rot_deg = fp.rotation[2] if hasattr(fp, "rotation") and len(fp.rotation) >= 3 else 0.0
+            rad = math.radians(rot_deg) if abs(rot_deg) > 1e-4 else 0.0
+            cos_r, sin_r = (math.cos(rad), math.sin(rad)) if rad else (1.0, 0.0)
+
+            pad_max_x = w_half
+            pad_max_y = h_half
             if hasattr(fp, "pins") and fp.pins:
-                pad_max_x = max(abs(p.position[0]) + getattr(p, "pad_size_mm", (0.35, 1.2))[0] / 2.0 for p in fp.pins)
-                pad_max_y = max(abs(p.position[1]) + getattr(p, "pad_size_mm", (0.35, 1.2))[1] / 2.0 for p in fp.pins)
-                w_half = max(w_half, round(pad_max_x + 0.35, 4))
-                h_half = max(h_half, round(pad_max_y + 0.35, 4))
-            val_y = round(h_half + 1.2, 4)
+                pad_xs = []
+                pad_ys = []
+                for p in fp.pins:
+                    rx = p.position[0] * cos_r - p.position[1] * sin_r
+                    ry = p.position[0] * sin_r + p.position[1] * cos_r
+                    p_s = getattr(p, "pad_size_mm", (0.35, 1.2))
+                    pad_xs.append(abs(rx) + max(p_s) / 2.0)
+                    pad_ys.append(abs(ry) + max(p_s) / 2.0)
+                pad_max_x = max(pad_max_x, max(pad_xs))
+                pad_max_y = max(pad_max_y, max(pad_ys))
+            val_y = round(pad_max_y + 1.2, 4)
 
             is_round = (
                 getattr(fp, "shape", None) == "circle"
@@ -203,7 +215,18 @@ class PCBExporter:
             )
             radius = round((fp.dimensions[0] / 2.0) if fp.dimensions else 6.0, 4)
 
-            # Find empty space for component reference label
+            # Edge-aware direction preference to keep designators within board boundaries
+            pref_dir = "north"
+            if fp.position[0] > (w_board / 2.0 - 15.0):
+                pref_dir = "west"
+            elif fp.position[0] < (-w_board / 2.0 + 15.0):
+                pref_dir = "east"
+            elif fp.position[1] < (-l_board / 2.0 + 12.0):
+                pref_dir = "south"
+            elif fp.position[1] > (l_board / 2.0 - 12.0):
+                pref_dir = "north"
+
+            # Find empty space for component reference label clear of all pins and courtyards
             ref_w = len(fp.name) * 0.7 + 0.4
             ref_h = 1.0 + 0.4
             ref_off_x, ref_off_y = find_empty_space_for_label(
@@ -215,14 +238,18 @@ class PCBExporter:
                 bounding_boxes=placed_component_label_boxes,
                 board_bounds=board_bounds,
                 clearance=0.30,
-                preferred_direction="north",
-                step_multiplier=1.2,
+                preferred_direction=pref_dir,
+                step_multiplier=1.0,
+                min_dist_x=pad_max_x + 0.35,
+                min_dist_y=pad_max_y + 0.35,
             )
             cand_ref_x = fp.position[0] + ref_off_x
             cand_ref_y = fp.position[1] + ref_off_y
             if self.is_flex or getattr(fp, "shape_ref", None) == "flex_tail":
                 cand_ref_x = fp.position[0]
                 cand_ref_y = fp.position[1]
+                ref_off_x = 0.0
+                ref_off_y = 0.0
             placed_component_label_boxes.append(
                 (
                     cand_ref_x - ref_w / 2.0,
@@ -231,6 +258,15 @@ class PCBExporter:
                     cand_ref_y + ref_h / 2.0,
                 )
             )
+
+            # Un-rotate world offset into footprint local coordinate frame for KiCad
+            if abs(rot_deg) > 1e-4:
+                inv_rad = math.radians(-rot_deg)
+                local_ref_x = ref_off_x * math.cos(inv_rad) - ref_off_y * math.sin(inv_rad)
+                local_ref_y = ref_off_x * math.sin(inv_rad) + ref_off_y * math.cos(inv_rad)
+            else:
+                local_ref_x = ref_off_x
+                local_ref_y = ref_off_y
 
             tick_w = round(min(1.0, max(0.2, w_half * 0.4)), 4)
             tick_h = round(min(1.0, max(0.2, h_half * 0.4)), 4)
@@ -268,8 +304,8 @@ class PCBExporter:
                     "fab_layer": fab_layer,
                     "paste_layer": paste_layer,
                     "mask_layer": mask_layer,
-                    "ref_x": round(ref_off_x, 4),
-                    "ref_y": round(ref_off_y, 4),
+                    "ref_x": round(local_ref_x, 4),
+                    "ref_y": round(local_ref_y, 4),
                     "val_y": val_y,
                     "is_round": is_round,
                     "radius": radius,
@@ -285,8 +321,11 @@ class PCBExporter:
             else []
         )
 
+        fp_names = {fp.name for fp in fps_to_process}
         silkscreen_data = []
         for st in self.config.silkscreen_texts:
+            if st.text in fp_names:
+                continue
             silkscreen_data.append(
                 {
                     "text": st.text,

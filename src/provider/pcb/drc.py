@@ -1511,8 +1511,7 @@ class PCBDesignRulesChecker:
                         continue
 
                     for p in getattr(fp, "pins", []):
-                        px = fx + p.position[0]
-                        py = fy + p.position[1]
+                        px, py = _get_pin_absolute_pos(fp, p)
                         dist = math.hypot(mh_x - px, mh_y - py)
                         min_dist = mh_r + 0.30
                         if dist < min_dist:
@@ -1785,8 +1784,7 @@ class PCBDesignRulesChecker:
                         pad_type = getattr(p, "pad_type", "smd")
                         if pad_type != "thru_hole" and st.layer != pad_silk_layer:
                             continue
-                        px = fx + p.position[0]
-                        py = fy + p.position[1]
+                        px, py = _get_pin_absolute_pos(fp, p)
                         pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
                         p_r = max(pad_size) / 2.0
                         dist = math.hypot(sx - px, sy - py)
@@ -1853,8 +1851,7 @@ class PCBDesignRulesChecker:
                         pad_type = getattr(p, "pad_type", "smd")
                         if pad_type != "thru_hole" and sg.layer != pad_silk_layer:
                             continue
-                        px = fx + p.position[0]
-                        py = fy + p.position[1]
+                        px, py = _get_pin_absolute_pos(fp, p)
                         pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
                         p_r = max(pad_size) / 2.0
                         dist = math.hypot(sx - px, sy - py)

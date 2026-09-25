@@ -243,6 +243,21 @@ class Bullet:
             else:
                 raise FileNotFoundError(f"Required OBJ file not found for simulation: {real_obj_path}")
 
+        # Copy any project textures (top/bottom PCB textures or link textures)
+        texture_sources = [
+            os.path.join("src", "projects", self.proj_name, "textures"),
+            os.path.join(self.build_dir, self.proj_name, "textures"),
+            os.path.join(self.build_dir, "attachments"),
+        ]
+        for src_dir in texture_sources:
+            if os.path.exists(src_dir):
+                for fname in os.listdir(src_dir):
+                    if fname.lower().endswith((".png", ".jpg", ".jpeg")):
+                        src_file = os.path.join(src_dir, fname)
+                        dst_file = os.path.join(proj_dir, fname)
+                        if not os.path.exists(dst_file):
+                            shutil.copy(src_file, dst_file)
+
     def _init_simulation_objects(
         self,
         physics_client: int,
@@ -419,6 +434,65 @@ class Bullet:
                         rr.Asset3D(path=temp_obj_path, albedo_factor=rgba_255),
                         static=True,
                     )
+
+                # Check and apply top and bottom textures (BUG-125)
+                top_tex = os.path.join(proj_dir, f"{label}_top.png")
+                if not os.path.exists(top_tex):
+                    top_tex = os.path.join(proj_dir, f"{label}.png")
+                bottom_tex = os.path.join(proj_dir, f"{label}_bottom.png")
+
+                # Apply to PyBullet visual shape if texture exists
+                if os.path.exists(top_tex) and is_real and label in label_to_link_idx:
+                    link_idx = label_to_link_idx[label]
+                    tex_id = p.loadTexture(top_tex, physicsClientId=physics_client)
+                    if tex_id >= 0:
+                        p.changeVisualShape(body_id, link_idx, textureUniqueId=tex_id, physicsClientId=physics_client)
+
+                # Log textured planes in Rerun if available
+                if hasattr(geom, "part") and geom.part is not None:
+                    try:
+                        from PIL import Image
+
+                        bb = geom.part.bounding_box()
+                        min_x, max_x = float(bb.min.X), float(bb.max.X)
+                        min_y, max_y = float(bb.min.Y), float(bb.max.Y)
+                        min_z, max_z = float(bb.min.Z), float(bb.max.Z)
+
+                        if os.path.exists(top_tex):
+                            top_img = np.array(Image.open(top_tex).convert("RGBA"))
+                            z_top = max_z + 0.05
+                            top_mesh = rr.Mesh3D(
+                                vertex_positions=[
+                                    [min_x, min_y, z_top],
+                                    [max_x, min_y, z_top],
+                                    [max_x, max_y, z_top],
+                                    [min_x, max_y, z_top],
+                                ],
+                                triangle_indices=[[0, 1, 2], [0, 2, 3]],
+                                vertex_normals=[[0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1]],
+                                vertex_texcoords=[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+                                albedo_texture=top_img,
+                            )
+                            rr.log(f"world/{label}/texture_top", top_mesh, static=True)
+
+                        if os.path.exists(bottom_tex):
+                            bot_img = np.array(Image.open(bottom_tex).convert("RGBA"))
+                            z_bot = min_z - 0.05
+                            bot_mesh = rr.Mesh3D(
+                                vertex_positions=[
+                                    [min_x, min_y, z_bot],
+                                    [max_x, min_y, z_bot],
+                                    [max_x, max_y, z_bot],
+                                    [min_x, max_y, z_bot],
+                                ],
+                                triangle_indices=[[0, 2, 1], [0, 3, 2]],
+                                vertex_normals=[[0, 0, -1], [0, 0, -1], [0, 0, -1], [0, 0, -1]],
+                                vertex_texcoords=[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+                                albedo_texture=bot_img,
+                            )
+                            rr.log(f"world/{label}/texture_bottom", bot_mesh, static=True)
+                    except Exception:
+                        pass
 
         return label_to_link_idx
 

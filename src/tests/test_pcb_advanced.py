@@ -2083,7 +2083,7 @@ def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path
     # 2. Verify rendered positions of Sheet 7 I2C pullup resistors R1 and R2
     diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
     plans = diag._build_sheet_plans()
-    sheet7 = [p for p in plans if p.sheet_idx == 7][0]
+    pullup_sheet = next(p for p in plans if any(fp.name == "R1" for fp in p.footprints))
 
     orig_add_axes = matplotlib.figure.Figure.add_axes
     captured = []
@@ -2095,8 +2095,10 @@ def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path
 
     matplotlib.figure.Figure.add_axes = mock_add_axes
     try:
-        with PdfPages(tmp_path / "sheet7.pdf") as pdf:
-            diag._render_pdf_schematic_sheet(pdf, "test_board", sheet7, 7, wiring.nets, 9, 9)
+        with PdfPages(tmp_path / "sheet_pullup.pdf") as pdf:
+            diag._render_pdf_schematic_sheet(
+                pdf, "test_board", pullup_sheet, pullup_sheet.sheet_idx, wiring.nets, len(plans), len(plans)
+            )
     finally:
         matplotlib.figure.Figure.add_axes = orig_add_axes
 
@@ -2104,8 +2106,8 @@ def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path
     ax = captured[0]
     r1_texts = [t for t in ax.texts if t.get_text() == "R1"]
     r2_texts = [t for t in ax.texts if t.get_text() == "R2"]
-    assert len(r1_texts) == 1, "R1 text must be rendered on Sheet 7"
-    assert len(r2_texts) == 1, "R2 text must be rendered on Sheet 7"
+    assert len(r1_texts) == 1, f"R1 text must be rendered on Sheet {pullup_sheet.sheet_idx}"
+    assert len(r2_texts) == 1, f"R2 text must be rendered on Sheet {pullup_sheet.sheet_idx}"
     r1_pos = r1_texts[0].get_position()
     r2_pos = r2_texts[0].get_position()
     dx = abs(r1_pos[0] - r2_pos[0])
@@ -2711,23 +2713,23 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
         assert u1_pin in net_pins, f"{u1_pin} must be connected to {net_name}"
         assert exp_pin in net_pins, f"{exp_pin} must be connected to {net_name}"
 
-    # 5. Verify SENSOR_3V3 regulator U10 and power rail distribution (BUG-106)
-    sensor_v33_net = next((net for net in wiring.nets if net.name == "SENSOR_3V3"), None)
-    assert sensor_v33_net is not None, "SENSOR_3V3 net must exist in wiring.yaml"
-    sensor_v33_pins = set(sensor_v33_net.pins)
-    assert ("U10", "5") in sensor_v33_pins, "U10 pin 5 (VOUT) must drive SENSOR_3V3"
+    # 5. Verify PERIPH_3V3 regulator U10 and power rail distribution (BUG-106, BUG-115)
+    periph_v33_net = next((net for net in wiring.nets if net.name == "PERIPH_3V3"), None)
+    assert periph_v33_net is not None, "PERIPH_3V3 net must exist in wiring.yaml"
+    periph_v33_pins = set(periph_v33_net.pins)
+    assert ("U10", "5") in periph_v33_pins, "U10 pin 5 (VOUT) must drive PERIPH_3V3"
     for j_comp in ["J6", "J7", "J8", "J9"]:
-        assert (j_comp, "1") in sensor_v33_pins, f"{j_comp}.1 must be powered by SENSOR_3V3"
+        assert (j_comp, "1") in periph_v33_pins, f"{j_comp}.1 must be powered by PERIPH_3V3"
 
-    # 6. Verify U10 is sourced from 3V3 with SENSOR_EN from U1 L5
+    # 6. Verify U10 is sourced from 3V3 with PERIPH_EN from U1 L5
     v33_net = next((net for net in wiring.nets if net.name == "3V3"), None)
     assert v33_net is not None
     assert ("U10", "1") in set(v33_net.pins), "U10 pin 1 (VIN) must be powered by 3V3"
 
-    sensor_en_net = next((net for net in wiring.nets if net.name == "SENSOR_EN"), None)
-    assert sensor_en_net is not None, "SENSOR_EN net must exist in wiring.yaml"
-    assert ("U1", "L5") in set(sensor_en_net.pins)
-    assert ("U10", "3") in set(sensor_en_net.pins)
+    periph_en_net = next((net for net in wiring.nets if net.name == "PERIPH_EN"), None)
+    assert periph_en_net is not None, "PERIPH_EN net must exist in wiring.yaml"
+    assert ("U1", "L5") in set(periph_en_net.pins)
+    assert ("U10", "3") in set(periph_en_net.pins)
 
 
 def test_regression_schematic_router_invariants_bug_098_through_104() -> None:
@@ -2741,10 +2743,10 @@ def test_regression_schematic_router_invariants_bug_098_through_104() -> None:
     sd = SchematicDiagram(wiring, pcb_config=provider.pcb_config)
     sheets = sd._build_sheet_plans()
 
-    # 1. BUG-103: Expansion headers broken into Sheet 10 (I2C/I3C) and Sheet 11 (SPI/UART/CAN)
+    # 1. BUG-103 & BUG-122: Expansion headers broken into dedicated sheets (J6, J7, J8, J9, J10)
     sheet_titles = [s.title for s in sheets]
-    assert any("I2C & I3C" in t for t in sheet_titles), "Sheet 10 I2C & I3C must exist"
-    assert any("SPI, UART & CAN" in t for t in sheet_titles), "Sheet 11 SPI, UART & CAN must exist"
+    assert any("I2C" in t for t in sheet_titles), "I2C expansion sheet must exist"
+    assert any("SPI" in t for t in sheet_titles), "SPI expansion sheet must exist"
     assert any("General Purpose I/O" in t for t in sheet_titles), "Sheet 12 GPIO must exist"
 
     # 2. BUG-098: Sheet 3 crystal load capacitors have >= 16mm separation
@@ -2755,3 +2757,132 @@ def test_regression_schematic_router_invariants_bug_098_through_104() -> None:
     fp_names = [fp.name for fp in sheet_gpio.footprints]
     assert "U1" in fp_names
     assert "J14" in fp_names
+
+
+def test_regression_bugs_115_through_127() -> None:
+    """Verify regression invariants for BUG-115 through BUG-127."""
+    from pathlib import Path
+    import yaml
+    from projects.test_board.provider import TestBoardProvider
+    from model.wiring import Wiring
+    from provider.schematic_diagram import SchematicDiagram
+    from provider.pcb.drc import _get_pin_absolute_pos
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_cfg = provider.pcb_config
+
+    # BUG-115: Dedicated Peripheral Power Regulation & Gating sheet and PERIPH nets
+    sheet_pwr = next((s for s in pcb_cfg.schematic_sheets if "Peripheral Power" in s.title), None)
+    assert sheet_pwr is not None, "BUG-115: Peripheral Power sheet must exist"
+    assert "U10" in sheet_pwr.components, "BUG-115: U10 must be on Peripheral Power sheet"
+    assert any(n.name == "PERIPH_EN" for n in wiring.nets), "BUG-115: PERIPH_EN net must exist"
+    assert any(n.name == "PERIPH_3V3" for n in wiring.nets), "BUG-115: PERIPH_3V3 net must exist"
+
+    # BUG-116 & BUG-117: SWD SWO removed, NRST pruned, J5 5-pin breakout
+    sheet_debug = next((s for s in pcb_cfg.schematic_sheets if "Telemetry & Debug" in s.title), None)
+    assert sheet_debug is not None
+    assert sheet_debug.pin_breakouts.get("J5") == ["1", "2", "3", "4", "5"], "BUG-117: J5 must breakout only 5 pins"
+    assert not any(n.name == "SWD_SWO" for n in wiring.nets), "BUG-117: SWD_SWO net must be removed"
+    nrst_net = next(n for n in wiring.nets if n.name == "NRST")
+    nrst_comps = [p[0] for p in nrst_net.pins]
+    assert "U9" not in nrst_comps, "BUG-117: NRST must not connect to U9"
+    assert "J5" not in nrst_comps, "BUG-117: NRST must not connect to J5"
+
+    # BUG-118: U6 pins 6, 7, 8 on right side and pin 15 on left side
+    sheet_ui = next((s for s in pcb_cfg.schematic_sheets if "User Interface" in s.title), None)
+    assert sheet_ui is not None
+    u6_sides = sheet_ui.pin_sides.get("U6", {})
+    assert u6_sides.get("6") == "right" and u6_sides.get("7") == "right" and u6_sides.get("8") == "right"
+    assert u6_sides.get("15") == "left", "BUG-118: U6 pin 15 (GND) must be on left side"
+
+    # BUG-119: J2 pin breakout order matches U2 on Cap Touch sheet
+    sheet_cap = next((s for s in pcb_cfg.schematic_sheets if "Capacitive Sensing" in s.title), None)
+    assert sheet_cap is not None
+    expected_j2_order = ["CAP_RX0", "CAP_RX1", "CAP_RX2", "CAP_RX3", "CAP_TX0", "CAP_TX1", "CAP_TX2", "CAP_SHIELD"]
+    assert sheet_cap.pin_breakouts.get("J2") == expected_j2_order, "BUG-119: J2 order must match U2"
+
+    # BUG-120: C8 moved to 3.3V Power Regulation & Distribution sheet
+    sheet_pwr33 = next((s for s in pcb_cfg.schematic_sheets if "3.3V Power Regulation" in s.title), None)
+    assert sheet_pwr33 is not None
+    assert "C8" in sheet_pwr33.components, "BUG-120: C8 must be in 3.3V Power Regulation sheet"
+    sheet_audio = next((s for s in pcb_cfg.schematic_sheets if "Audio Subsystem" in s.title), None)
+    assert sheet_audio is not None
+    assert "C8" not in sheet_audio.components, "BUG-120: C8 must not be in Audio Subsystem sheet"
+
+    # BUG-121: MIPI CLK differential pins on right side of J2
+    sheet_mipi = next((s for s in pcb_cfg.schematic_sheets if "High-Speed Differential" in s.title), None)
+    assert sheet_mipi is not None
+    j2_mipi_sides = sheet_mipi.pin_sides.get("J2", {})
+    assert j2_mipi_sides.get("CLK_P") == "right" and j2_mipi_sides.get("CLK_N") == "right"
+
+    # BUG-122: J6, J7, J8 connector style is JST-PH-6P; separate sheet pages exist for each connector
+    for j_name in ["J6", "J7", "J8"]:
+        fp = next(f for f in wiring.footprints if f.name == j_name)
+        assert (fp.label and fp.label.text == "JST-PH-6P") or fp.package == "JST-PH-6P", (
+            f"BUG-122: {j_name} must have connector style JST-PH-6P"
+        )
+        assert fp.mpn == "B6B-PH-K-S", f"BUG-122: {j_name} must have JST-PH MPN B6B-PH-K-S"
+
+    expansion_sheets = [s for s in pcb_cfg.schematic_sheets if "Expansion Interface" in s.title]
+    assert len(expansion_sheets) == 5, f"BUG-122: Must have 5 dedicated expansion sheets, got {len(expansion_sheets)}"
+    for s in expansion_sheets:
+        assert "JST-PH-6P" in s.description, f"BUG-122: Sheet '{s.title}' must document JST-PH-6P connector"
+
+    # BUG-123: GPIO sheet pin sides (M8/N8 left, N10..T12 right)
+    sheet_gpio = next(s for s in pcb_cfg.schematic_sheets if "General Purpose I/O" in s.title)
+    u1_gpio_sides = sheet_gpio.pin_sides.get("U1", {})
+    assert u1_gpio_sides.get("M8") == "left" and u1_gpio_sides.get("N8") == "left"
+    assert u1_gpio_sides.get("N10") == "right" and u1_gpio_sides.get("T10") == "right"
+
+    # BUG-124: manifest.yaml exports obj for carrier_board and flex_tail
+    manifest_path = Path("src/projects/test_board/manifest.yaml")
+    with open(manifest_path, "r") as f:
+        manifest_data = yaml.safe_load(f)
+    for part in manifest_data.get("parts", []):
+        if part.get("name") in ["carrier_board", "flex_tail"]:
+            assert "obj" in part.get("export", []), f"BUG-124: {part['name']} must export obj"
+
+    # BUG-125: textures exist
+    tex_dir = Path("src/projects/test_board/textures")
+    assert (tex_dir / "carrier_board_top.png").exists(), "BUG-125: carrier_board_top.png must exist"
+    assert (tex_dir / "carrier_board_bottom.png").exists(), "BUG-125: carrier_board_bottom.png must exist"
+
+    # BUG-126: _get_pin_absolute_pos handles rotation
+    from types import SimpleNamespace
+
+    mock_fp = SimpleNamespace(position=[10.0, 20.0, 0.0], rotation=[0.0, 0.0, 90.0])
+    mock_pin = SimpleNamespace(position=[2.0, 0.0])
+    pos = _get_pin_absolute_pos(mock_fp, mock_pin)
+    assert abs(pos[0] - 10.0) < 1e-4 and abs(pos[1] - (20.0 - 2.0)) < 1e-4
+
+    # BUG-127: Exporter does not emit duplicate silkscreen designator texts (gr_text) on PCB
+    import tempfile
+    from provider.pcb.exporter import PCBExporter
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        exporter = PCBExporter(pcb_cfg, wiring=wiring)
+        out_pcb = exporter.export_kicad_pcb(Path(tmpdir) / "board.kicad_pcb")
+        kicad_text = out_pcb.read_text()
+        duplicates = [fp.name for fp in wiring.footprints if f'(gr_text "{fp.name}"' in kicad_text]
+        assert len(duplicates) == 0, f"BUG-127: Found duplicate silkscreen designators: {duplicates}"
+
+    # CR Item 4d403f3fec09 & 6235032c3438: Flying probe simulator in provider library and test steps from YAML
+    from provider.simulation.flying_probe import load_test_steps_from_yaml, render_markdown_test_report
+
+    test_steps_path = Path("src/projects/test_board/pcb_test_steps.yaml")
+    assert test_steps_path.exists(), "pcb_test_steps.yaml must exist"
+    carrier_steps = load_test_steps_from_yaml(test_steps_path, "carrier_board")
+    assert len(carrier_steps) >= 5, f"carrier_board must declare test steps, found {len(carrier_steps)}"
+    flex_steps = load_test_steps_from_yaml(test_steps_path, "flex_tail")
+    assert len(flex_steps) >= 4, f"flex_tail must declare test steps, found {len(flex_steps)}"
+
+    report_md = render_markdown_test_report("carrier_board", carrier_steps, len(carrier_steps), len(carrier_steps))
+    assert "Flying Probes Automated Acceptance Test Report" in report_md
+
+    # CR Item b31545d3edd5: Obstacles in PCBConfig schema
+    assert hasattr(pcb_cfg, "obstacles"), "PCBConfig must declare obstacles"
+    assert len(pcb_cfg.obstacles) > 0, "pcb.yaml must declare component/fixture obstacles"
+
+    # CR Item 70dba9941823: Peripheral cutouts read dynamically from footprints
+    assert hasattr(provider, "enclosure_bottom"), "TestBoardProvider must have enclosure_bottom"

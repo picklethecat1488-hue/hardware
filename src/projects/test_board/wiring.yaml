@@ -293,27 +293,33 @@ footprints:
     mpn: FTSH-105-01-L-DV-K
     supplier_pn: SAMTEC-FTSH105-ND
 
-  # Peripheral Headers on Right Side of PCB (BUG-074)
+  # Peripheral Headers on Right Side of PCB (BUG-074, BUG-122)
   - name: J6
     package: pin_header_1x4
+    label:
+      text: JST-PH-6P
     position: [24.5, 28.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
-    mpn: SM04B-SRSS-TB
-    supplier_pn: 455-1804-1-ND
+    mpn: B6B-PH-K-S
+    supplier_pn: 455-1708-ND
 
   - name: J7
     package: pin_header_1x4
+    label:
+      text: JST-PH-6P
     position: [24.5, 18.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
-    mpn: SM04B-SRSS-TB
-    supplier_pn: 455-1804-1-ND
+    mpn: B6B-PH-K-S
+    supplier_pn: 455-1708-ND
 
   - name: J8
     package: pin_header_1x4
+    label:
+      text: JST-PH-6P
     position: [24.5, 8.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
-    mpn: SM04B-SRSS-TB
-    supplier_pn: 455-1804-1-ND
+    mpn: B6B-PH-K-S
+    supplier_pn: 455-1708-ND
 
   - name: J9
     package: JST-PH-6P
@@ -541,14 +547,14 @@ nets:
       - [U4, GAIN]
       - [C8, "2"]
 
-  - name: SENSOR_EN
+  - name: PERIPH_EN
     priority: 24
     color: "#ea580c"
     pins:
       - [U1, L5]
       - [U10, "3"]
 
-  - name: SENSOR_3V3
+  - name: PERIPH_3V3
     priority: 25
     color: "#dc2626"
     pins:
@@ -632,8 +638,6 @@ nets:
       - [U1, F3]
       - [R5, "2"]
       - [C11, "1"]
-      - [U9, "23"]
-      - [J5, "10"]
 
   - name: BOOT0
     color: "#ca8a04"
@@ -890,12 +894,6 @@ nets:
       - [U8, "6"]
       - [U1, D14]
 
-  - name: SWD_SWO
-    priority: 8
-    color: "#0f766e"
-    pins:
-      - [J5, "6"]
-      - [U1, B16]
 
   - name: SWD_CLK
     priority: 9

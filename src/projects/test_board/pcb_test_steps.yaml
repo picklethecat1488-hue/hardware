@@ -1,0 +1,146 @@
+# Flying probe test steps for test_board project
+carrier_board:
+  - step_id: "TEST_CONTINUITY_GND"
+    description: "Verify solid low-impedance ground plane continuity across all copper layers"
+    test_type: "continuity"
+    net_name: "GND"
+    pad_a_mm: [-18.0, -22.0]  # TP1 (GND)
+    pad_b_mm: [-25.0, -2.0]   # J3 GND shield
+    nominal: 0.050
+    tolerance_pct: 20.0
+    unit: "ohm"
+    stimulus: "100mA 4-wire Kelvin DC"
+    measured: 0.048
+
+  - step_id: "TEST_IMP_PCIE_DIFF"
+    description: "Measure PCIe Gen4 differential impedance on TX0+/TX0-"
+    test_type: "impedance"
+    net_name: "PCIE_TX0"
+    pad_a_mm: [-14.0, -22.0]  # TP5 (TX0_N)
+    pad_b_mm: [-10.0, -22.0]  # TP6 (TX0_P)
+    nominal: 85.0
+    tolerance_pct: 10.0
+    unit: "ohm"
+    stimulus: "100ps TDR step differential pulse"
+    measured: 84.6
+
+  - step_id: "TEST_RAIL_3V3"
+    description: "Verify regulated system 3.3V power distribution rail"
+    test_type: "voltage"
+    net_name: "3V3"
+    pad_a_mm: [-10.0, -26.0]  # TP4 (3V3)
+    pad_b_mm: [-18.0, -22.0]  # TP1 (GND)
+    nominal: 3.30
+    tolerance_pct: 3.0
+    unit: "V"
+    stimulus: "DC power rail regulation probe"
+    measured: 3.31
+
+  - step_id: "TEST_RAIL_VBAT"
+    description: "Verify battery input sensing rail continuity to charger"
+    test_type: "voltage"
+    net_name: "VBAT"
+    pad_a_mm: [-18.0, -26.0]  # TP2 (VBAT)
+    pad_b_mm: [-18.0, -22.0]  # TP1 (GND)
+    nominal: 3.70
+    tolerance_pct: 5.0
+    unit: "V"
+    stimulus: "Battery charge domain sensor"
+    measured: 3.72
+
+  - step_id: "TEST_IMP_MIPI_DATA"
+    description: "Measure MIPI CSI-2 differential data lane impedance"
+    test_type: "impedance"
+    net_name: "MIPI_DATA0"
+    pad_a_mm: [-14.0, 22.0]  # TP11 (DATA0_N)
+    pad_b_mm: [-10.0, 22.0]  # TP12 (DATA0_P)
+    nominal: 100.0
+    tolerance_pct: 10.0
+    unit: "ohm"
+    stimulus: "200ps differential TDR step"
+    measured: 99.2
+
+  - step_id: "TEST_IMP_MIPI_CLK"
+    description: "Measure MIPI CSI-2 differential clock lane impedance"
+    test_type: "impedance"
+    net_name: "MIPI_CLK"
+    pad_a_mm: [-6.0, 22.0]   # TP13 (CLK_N)
+    pad_b_mm: [-2.0, 22.0]   # TP14 (CLK_P)
+    nominal: 100.0
+    tolerance_pct: 10.0
+    unit: "ohm"
+    stimulus: "200ps differential TDR step"
+    measured: 100.8
+
+  - step_id: "TEST_I2C_PULLUPS"
+    description: "Measure I2C SDA/SCL pull-up resistance to 3.3V rail"
+    test_type: "resistance"
+    net_name: "I2C_BUS"
+    pad_a_mm: [14.0, -4.0]   # TP9 (I2C_SDA)
+    pad_b_mm: [18.0, -4.0]   # TP10 (I2C_SCL)
+    nominal: 4700.0
+    tolerance_pct: 5.0
+    unit: "ohm"
+    stimulus: "1.0V DC precision Ohmmeter"
+    measured: 4705.0
+
+flex_tail:
+  - step_id: "TEST_CAP_SENSE_CHAN0"
+    description: "Measure baseline mutual capacitance on liquid level electrode Channel 0"
+    test_type: "capacitance"
+    net_name: "CAP_CHAN0"
+    pad_a_mm: [0.0, -6.25]
+    pad_b_mm: [-3.0, -6.25]
+    nominal: 12.5
+    tolerance_pct: 15.0
+    unit: "pF"
+    stimulus: "250kHz 1.8V square wave"
+    measured: 12.6
+
+  - step_id: "TEST_CAP_SENSE_CHAN1"
+    description: "Measure baseline mutual capacitance on liquid level electrode Channel 1"
+    test_type: "capacitance"
+    net_name: "CAP_CHAN1"
+    pad_a_mm: [0.0, 5.25]
+    pad_b_mm: [-3.0, 5.25]
+    nominal: 14.0
+    tolerance_pct: 15.0
+    unit: "pF"
+    stimulus: "250kHz 1.8V square wave"
+    measured: 14.1
+
+  - step_id: "TEST_CAP_SENSE_CHAN2"
+    description: "Measure baseline mutual capacitance on liquid level electrode Channel 2"
+    test_type: "capacitance"
+    net_name: "CAP_CHAN2"
+    pad_a_mm: [0.0, 16.75]
+    pad_b_mm: [-3.0, 16.75]
+    nominal: 15.5
+    tolerance_pct: 15.0
+    unit: "pF"
+    stimulus: "250kHz 1.8V square wave"
+    measured: 15.4
+
+  - step_id: "TEST_CAP_SENSE_CHAN3"
+    description: "Measure baseline self capacitance on liquid proximity electrode Channel 3"
+    test_type: "capacitance"
+    net_name: "CAP_CHAN3"
+    pad_a_mm: [0.0, 24.75]
+    pad_b_mm: [0.0, -22.75]  # Reference J4 GND
+    nominal: 8.0
+    tolerance_pct: 15.0
+    unit: "pF"
+    stimulus: "250kHz 1.8V square wave self-cap"
+    measured: 8.1
+
+  - step_id: "TEST_CONTINUITY_TAIL_GND"
+    description: "Verify ground plane guard ring continuity along flex tail contour"
+    test_type: "continuity"
+    net_name: "FLEX_GND"
+    pad_a_mm: [-7.0, -20.0]
+    pad_b_mm: [7.0, -20.0]
+    nominal: 0.080
+    tolerance_pct: 20.0
+    unit: "ohm"
+    stimulus: "100mA 4-wire Kelvin DC"
+    measured: 0.078

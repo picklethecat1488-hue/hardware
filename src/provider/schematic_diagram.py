@@ -2628,10 +2628,11 @@ class SchematicDiagram:
                         color="#0369a1",
                         zorder=3,
                     )
+                    pkg_label = fp.label.text if fp.label and fp.label.text and fp.label.text != fp.name else fp.package
                     ax.text(
                         cx + cw / 2.0,
                         cy + ch - 11.5,
-                        str(fp.package),
+                        str(pkg_label),
                         ha="center",
                         va="center",
                         fontsize=5.5,
@@ -2865,24 +2866,56 @@ class SchematicDiagram:
                 wire_labels.append(((x_drop + x_rise) / 2.0, y_detour + 1.2, net.name))
 
             elif s1 == "left" and s2 == "left":
-                # Route from c1 left side, down under c1, up between c1 and c2, into c2 left side (BUG-102, BUG-104)
-                x_drop = min(b1[0] - 6.0 - d_idx * 2.5, p1[0] - 6.0 - d_idx * 2.5)
-                x_rise = b1[0] + b1[2] + 6.0 + d_idx * 2.5
+                # Check if pin on c1 is in the upper half -> route over the top (BUG-123)
+                if p1[1] >= (b1[1] + b1[3] / 2.0):
+                    x_drop = min(b1[0] - 6.0 - d_idx * 2.5, p1[0] - 6.0 - d_idx * 2.5)
+                    y_over = max(b1[1] + b1[3], b2[1] + b2[3]) + 8.0 + d_idx * 3.5
+                    x_rise = b1[0] + b1[2] + 6.0 + d_idx * 2.5
+                    h_segments.append((min(x_drop, p1[0]), max(x_drop, p1[0]), p1[1], net.name, col))
+                    v_segments.append((x_drop, p1[1], y_over, net.name, col))
+                    h_segments.append((min(x_drop, x_rise), max(x_drop, x_rise), y_over, net.name, col))
+                    v_segments.append((x_rise, y_over, p2[1], net.name, col))
+                    h_segments.append((min(x_rise, p2[0]), max(x_rise, p2[0]), p2[1], net.name, col))
+                    wire_labels.append(((x_drop + x_rise) / 2.0, y_over + 1.2, net.name))
+                else:
+                    # Route from c1 left side, down under c1, up between c1 and c2, into c2 left side (BUG-102, BUG-104)
+                    x_drop = min(b1[0] - 6.0 - d_idx * 2.5, p1[0] - 6.0 - d_idx * 2.5)
+                    x_rise = b1[0] + b1[2] + 6.0 + d_idx * 2.5
 
-                h_segments.append((min(x_drop, p1[0]), max(x_drop, p1[0]), p1[1], net.name, col))
-                v_segments.append((x_drop, p1[1], y_detour, net.name, col))
-                h_segments.append((min(x_drop, x_rise), max(x_drop, x_rise), y_detour, net.name, col))
-                v_segments.append((x_rise, y_detour, p2[1], net.name, col))
-                h_segments.append((min(x_rise, p2[0]), max(x_rise, p2[0]), p2[1], net.name, col))
-                wire_labels.append(((x_drop + x_rise) / 2.0, y_detour + 1.2, net.name))
+                    h_segments.append((min(x_drop, p1[0]), max(x_drop, p1[0]), p1[1], net.name, col))
+                    v_segments.append((x_drop, p1[1], y_detour, net.name, col))
+                    h_segments.append((min(x_drop, x_rise), max(x_drop, x_rise), y_detour, net.name, col))
+                    v_segments.append((x_rise, y_detour, p2[1], net.name, col))
+                    h_segments.append((min(x_rise, p2[0]), max(x_rise, p2[0]), p2[1], net.name, col))
+                    wire_labels.append(((x_drop + x_rise) / 2.0, y_detour + 1.2, net.name))
 
             elif s1 == "right" and s2 == "left":
-                # Facing pins on non-adjacent components: route directly through channel
-                x_mid = (p1[0] + p2[0]) / 2.0
-                h_segments.append((min(p1[0], x_mid), max(p1[0], x_mid), p1[1], net.name, col))
-                v_segments.append((x_mid, p1[1], p2[1], net.name, col))
-                h_segments.append((min(x_mid, p2[0]), max(x_mid, p2[0]), p2[1], net.name, col))
-                wire_labels.append(((p1[0] + p2[0]) / 2.0, p1[1] + 1.2, net.name))
+                # Check for intervening components between c1 and c2 (e.g. U9 between U1 and J5 - BUG-116)
+                intervening = [
+                    b
+                    for c, b in comp_box_dict.items()
+                    if c not in (c1_name, c2_name)
+                    and not (b[0] + b[2] <= min(p1[0], p2[0]) or b[0] >= max(p1[0], p2[0]))
+                ]
+                if intervening:
+                    # Route over top of intervening component(s)
+                    max_y_top = max(b[1] + b[3] for b in [b1, b2] + intervening)
+                    y_over = max_y_top + 16.0 + d_idx * 3.5
+                    x_rise = b1[0] + b1[2] + 6.0 + d_idx * 2.5
+                    x_drop = b2[0] - 6.0 - d_idx * 2.5
+                    h_segments.append((min(p1[0], x_rise), max(p1[0], x_rise), p1[1], net.name, col))
+                    v_segments.append((x_rise, p1[1], y_over, net.name, col))
+                    h_segments.append((min(x_rise, x_drop), max(x_rise, x_drop), y_over, net.name, col))
+                    v_segments.append((x_drop, y_over, p2[1], net.name, col))
+                    h_segments.append((min(x_drop, p2[0]), max(x_drop, p2[0]), p2[1], net.name, col))
+                    wire_labels.append(((x_rise + x_drop) / 2.0, y_over + 1.2, net.name))
+                else:
+                    # Facing pins on non-adjacent components: route directly through channel
+                    x_mid = (p1[0] + p2[0]) / 2.0
+                    h_segments.append((min(p1[0], x_mid), max(p1[0], x_mid), p1[1], net.name, col))
+                    v_segments.append((x_mid, p1[1], p2[1], net.name, col))
+                    h_segments.append((min(x_mid, p2[0]), max(x_mid, p2[0]), p2[1], net.name, col))
+                    wire_labels.append(((p1[0] + p2[0]) / 2.0, p1[1] + 1.2, net.name))
 
             else:
                 # s1 == "left" and s2 == "right"

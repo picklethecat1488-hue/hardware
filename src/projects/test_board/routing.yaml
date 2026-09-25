@@ -6380,114 +6380,6 @@ traces:
   end_mm:
   - -17.5
   - 4.5
-- net: SWD_SWO
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - 3.5
-  - 3.25
-  end_mm:
-  - 3.5
-  - 2.75
-- net: SWD_SWO
-  layer: B.Cu
-  width_mm: 0.12
-  start_mm:
-  - 3.5
-  - 2.75
-  end_mm:
-  - 5.0
-  - 2.75
-- net: SWD_SWO
-  layer: B.Cu
-  width_mm: 0.12
-  start_mm:
-  - 5.0
-  - 2.75
-  end_mm:
-  - 5.0
-  - 1.25
-- net: SWD_SWO
-  layer: B.Cu
-  width_mm: 0.12
-  start_mm:
-  - 5.0
-  - 1.25
-  end_mm:
-  - 6.5
-  - 1.25
-- net: SWD_SWO
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - 6.5
-  - 1.25
-  end_mm:
-  - 6.5
-  - -4.25
-- net: SWD_SWO
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - 6.5
-  - -4.25
-  end_mm:
-  - 6.0
-  - -4.25
-- net: SWD_SWO
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - 6.0
-  - -4.25
-  end_mm:
-  - 6.0
-  - -4.5
-- net: SWD_SWO
-  layer: B.Cu
-  width_mm: 0.12
-  start_mm:
-  - 6.0
-  - -4.5
-  end_mm:
-  - 4.5
-  - -4.5
-- net: SWD_SWO
-  layer: B.Cu
-  width_mm: 0.12
-  start_mm:
-  - 4.5
-  - -4.5
-  end_mm:
-  - 4.5
-  - -5.75
-- net: SWD_SWO
-  layer: B.Cu
-  width_mm: 0.12
-  start_mm:
-  - 4.5
-  - -5.75
-  end_mm:
-  - -16.5
-  - -5.75
-- net: SWD_SWO
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -16.5
-  - -5.75
-  end_mm:
-  - -16.5
-  - -15.0
-- net: SWD_SWO
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -16.5
-  - -15.0
-  end_mm:
-  - -17.365
-  - -15.0
 - net: SWD_CLK
   layer: F.Cu
   width_mm: 0.12
@@ -7847,150 +7739,6 @@ traces:
   end_mm:
   - -7.5
   - 8.0
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -17.365
-  - -17.54
-  end_mm:
-  - -17.25
-  - -17.25
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -17.25
-  - -17.25
-  end_mm:
-  - -17.25
-  - -17.0
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -17.25
-  - -17.0
-  end_mm:
-  - -16.5
-  - -17.0
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -16.5
-  - -17.0
-  end_mm:
-  - -16.5
-  - -15.25
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -16.5
-  - -15.25
-  end_mm:
-  - -16.25
-  - -15.25
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -16.25
-  - -15.25
-  end_mm:
-  - -16.25
-  - -6.25
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -16.25
-  - -6.25
-  end_mm:
-  - -16.0
-  - -6.25
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -16.0
-  - -6.25
-  end_mm:
-  - -16.0
-  - -5.75
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -16.0
-  - -5.75
-  end_mm:
-  - -14.5
-  - -5.75
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -14.5
-  - -5.75
-  end_mm:
-  - -14.5
-  - 6.75
-- net: NRST
-  layer: B.Cu
-  width_mm: 0.12
-  start_mm:
-  - -14.5
-  - 6.75
-  end_mm:
-  - -11.0
-  - 6.75
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -11.0
-  - 6.75
-  end_mm:
-  - -11.0
-  - 8.0
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -17.55
-  - -30.75
-  end_mm:
-  - -15.75
-  - -30.75
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -15.75
-  - -30.75
-  end_mm:
-  - -15.75
-  - -17.5
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -15.75
-  - -17.5
-  end_mm:
-  - -17.0
-  - -17.5
-- net: NRST
-  layer: F.Cu
-  width_mm: 0.12
-  start_mm:
-  - -17.0
-  - -17.5
-  end_mm:
-  - -17.365
-  - -17.54
 - net: USB_DP
   layer: F.Cu
   width_mm: 0.12
@@ -13940,7 +13688,7 @@ traces:
   end_mm:
   - -19.5
   - 20.25
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -13949,7 +13697,7 @@ traces:
   end_mm:
   - -2.0
   - -2.0
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -13958,7 +13706,7 @@ traces:
   end_mm:
   - -2.25
   - -2.0
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -13967,7 +13715,7 @@ traces:
   end_mm:
   - -2.25
   - -2.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -13976,7 +13724,7 @@ traces:
   end_mm:
   - -4.25
   - -2.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -13985,7 +13733,7 @@ traces:
   end_mm:
   - -4.25
   - -2.75
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -13994,7 +13742,7 @@ traces:
   end_mm:
   - -6.0
   - -2.75
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14003,7 +13751,7 @@ traces:
   end_mm:
   - -9.25
   - -2.75
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14012,7 +13760,7 @@ traces:
   end_mm:
   - -9.25
   - -1.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14021,7 +13769,7 @@ traces:
   end_mm:
   - -12.0
   - -1.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14030,7 +13778,7 @@ traces:
   end_mm:
   - -14.25
   - -1.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14039,7 +13787,7 @@ traces:
   end_mm:
   - -14.25
   - -1.0
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14048,7 +13796,7 @@ traces:
   end_mm:
   - -14.5
   - -1.0
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14057,7 +13805,7 @@ traces:
   end_mm:
   - -14.5
   - 0.0
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14066,7 +13814,7 @@ traces:
   end_mm:
   - -17.25
   - 0.0
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14075,7 +13823,7 @@ traces:
   end_mm:
   - -17.25
   - -0.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14084,7 +13832,7 @@ traces:
   end_mm:
   - -18.75
   - -0.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14093,7 +13841,7 @@ traces:
   end_mm:
   - -18.75
   - 3.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14102,7 +13850,7 @@ traces:
   end_mm:
   - -17.25
   - 3.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14111,7 +13859,7 @@ traces:
   end_mm:
   - -17.25
   - 3.25
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14120,7 +13868,7 @@ traces:
   end_mm:
   - -9.5
   - 3.25
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14129,7 +13877,7 @@ traces:
   end_mm:
   - -9.5
   - 4.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14138,7 +13886,7 @@ traces:
   end_mm:
   - -5.0
   - 4.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14147,7 +13895,7 @@ traces:
   end_mm:
   - -5.0
   - 4.25
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14156,7 +13904,7 @@ traces:
   end_mm:
   - 3.25
   - 4.25
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -14165,7 +13913,7 @@ traces:
   end_mm:
   - 3.25
   - 4.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14174,7 +13922,7 @@ traces:
   end_mm:
   - 3.25
   - 3.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14183,7 +13931,7 @@ traces:
   end_mm:
   - 3.75
   - 3.5
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14192,7 +13940,7 @@ traces:
   end_mm:
   - 3.75
   - 4.0
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14201,7 +13949,7 @@ traces:
   end_mm:
   - 6.0
   - 4.0
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14210,7 +13958,7 @@ traces:
   end_mm:
   - 6.0
   - 9.0
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14219,7 +13967,7 @@ traces:
   end_mm:
   - 8.75
   - 9.0
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14228,7 +13976,7 @@ traces:
   end_mm:
   - 8.75
   - 19.25
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14237,7 +13985,7 @@ traces:
   end_mm:
   - 9.75
   - 19.25
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14246,7 +13994,7 @@ traces:
   end_mm:
   - 9.75
   - 20.25
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14255,7 +14003,7 @@ traces:
   end_mm:
   - 19.0
   - 20.25
-- net: SENSOR_EN
+- net: PERIPH_EN
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14624,7 +14372,7 @@ traces:
   end_mm:
   - 24.5
   - 29.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14633,7 +14381,7 @@ traces:
   end_mm:
   - 18.0
   - 25.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14642,7 +14390,7 @@ traces:
   end_mm:
   - 18.0
   - 25.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14651,7 +14399,7 @@ traces:
   end_mm:
   - 18.25
   - 25.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14660,7 +14408,7 @@ traces:
   end_mm:
   - 18.25
   - 26.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14669,7 +14417,7 @@ traces:
   end_mm:
   - 18.75
   - 26.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14678,7 +14426,7 @@ traces:
   end_mm:
   - 18.75
   - 26.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14687,7 +14435,7 @@ traces:
   end_mm:
   - 23.0
   - 26.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14696,7 +14444,7 @@ traces:
   end_mm:
   - 23.0
   - 27.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14705,7 +14453,7 @@ traces:
   end_mm:
   - 23.25
   - 27.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14714,7 +14462,7 @@ traces:
   end_mm:
   - 23.25
   - 29.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14723,7 +14471,7 @@ traces:
   end_mm:
   - 23.5
   - 29.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14732,7 +14480,7 @@ traces:
   end_mm:
   - 23.5
   - 30.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14741,7 +14489,7 @@ traces:
   end_mm:
   - 23.75
   - 30.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14750,7 +14498,7 @@ traces:
   end_mm:
   - 23.75
   - 30.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14759,7 +14507,7 @@ traces:
   end_mm:
   - 24.25
   - 30.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14768,7 +14516,7 @@ traces:
   end_mm:
   - 24.25
   - 30.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14777,7 +14525,7 @@ traces:
   end_mm:
   - 24.5
   - 30.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14786,7 +14534,7 @@ traces:
   end_mm:
   - 24.5
   - 31.75
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14795,7 +14543,7 @@ traces:
   end_mm:
   - 24.5
   - 30.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14804,7 +14552,7 @@ traces:
   end_mm:
   - 24.75
   - 30.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14813,7 +14561,7 @@ traces:
   end_mm:
   - 24.75
   - 30.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14822,7 +14570,7 @@ traces:
   end_mm:
   - 25.25
   - 30.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14831,7 +14579,7 @@ traces:
   end_mm:
   - 25.25
   - 30.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14840,7 +14588,7 @@ traces:
   end_mm:
   - 25.5
   - 30.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14849,7 +14597,7 @@ traces:
   end_mm:
   - 25.5
   - 29.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14858,7 +14606,7 @@ traces:
   end_mm:
   - 25.75
   - 29.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14867,7 +14615,7 @@ traces:
   end_mm:
   - 25.75
   - 21.75
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14876,7 +14624,7 @@ traces:
   end_mm:
   - 24.5
   - 21.75
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14885,7 +14633,7 @@ traces:
   end_mm:
   - 24.5
   - 20.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14894,7 +14642,7 @@ traces:
   end_mm:
   - 24.75
   - 20.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14903,7 +14651,7 @@ traces:
   end_mm:
   - 24.75
   - 20.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14912,7 +14660,7 @@ traces:
   end_mm:
   - 25.25
   - 20.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14921,7 +14669,7 @@ traces:
   end_mm:
   - 25.25
   - 20.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14930,7 +14678,7 @@ traces:
   end_mm:
   - 25.5
   - 20.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14939,7 +14687,7 @@ traces:
   end_mm:
   - 25.5
   - 19.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14948,7 +14696,7 @@ traces:
   end_mm:
   - 25.75
   - 19.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14957,7 +14705,7 @@ traces:
   end_mm:
   - 25.75
   - 11.75
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14966,7 +14714,7 @@ traces:
   end_mm:
   - 24.5
   - 11.75
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14975,7 +14723,7 @@ traces:
   end_mm:
   - 24.5
   - 10.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14984,7 +14732,7 @@ traces:
   end_mm:
   - 24.75
   - 10.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -14993,7 +14741,7 @@ traces:
   end_mm:
   - 24.75
   - 10.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -15002,7 +14750,7 @@ traces:
   end_mm:
   - 25.25
   - 10.25
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -15011,7 +14759,7 @@ traces:
   end_mm:
   - 25.25
   - 10.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -15020,7 +14768,7 @@ traces:
   end_mm:
   - 25.5
   - 10.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -15029,7 +14777,7 @@ traces:
   end_mm:
   - 25.5
   - 9.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -15038,7 +14786,7 @@ traces:
   end_mm:
   - 25.75
   - 9.5
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -15047,7 +14795,7 @@ traces:
   end_mm:
   - 25.75
   - 9.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -15056,7 +14804,7 @@ traces:
   end_mm:
   - 27.0
   - 9.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -15191,7 +14939,7 @@ traces:
   end_mm:
   - 24.5
   - -8.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -15200,7 +14948,7 @@ traces:
   end_mm:
   - 27.5
   - -9.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: F.Cu
   width_mm: 0.12
   start_mm:
@@ -15209,7 +14957,7 @@ traces:
   end_mm:
   - 27.5
   - -10.0
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   layer: B.Cu
   width_mm: 0.12
   start_mm:
@@ -17266,38 +17014,6 @@ vias:
   drill_diameter_mm: 0.16
   layer_start: F.Cu
   layer_end: B.Cu
-- net: SWD_SWO
-  position_mm:
-  - 3.5
-  - 2.75
-  pad_diameter_mm: 0.36
-  drill_diameter_mm: 0.16
-  layer_start: F.Cu
-  layer_end: B.Cu
-- net: SWD_SWO
-  position_mm:
-  - 6.5
-  - 1.25
-  pad_diameter_mm: 0.36
-  drill_diameter_mm: 0.16
-  layer_start: F.Cu
-  layer_end: B.Cu
-- net: SWD_SWO
-  position_mm:
-  - 6.0
-  - -4.5
-  pad_diameter_mm: 0.36
-  drill_diameter_mm: 0.16
-  layer_start: F.Cu
-  layer_end: B.Cu
-- net: SWD_SWO
-  position_mm:
-  - -16.5
-  - -5.75
-  pad_diameter_mm: 0.36
-  drill_diameter_mm: 0.16
-  layer_start: F.Cu
-  layer_end: B.Cu
 - net: SWD_CLK
   position_mm:
   - 5.25
@@ -17582,22 +17298,6 @@ vias:
   position_mm:
   - -7.0
   - 2.5
-  pad_diameter_mm: 0.36
-  drill_diameter_mm: 0.16
-  layer_start: F.Cu
-  layer_end: B.Cu
-- net: NRST
-  position_mm:
-  - -14.5
-  - 6.75
-  pad_diameter_mm: 0.36
-  drill_diameter_mm: 0.16
-  layer_start: F.Cu
-  layer_end: B.Cu
-- net: NRST
-  position_mm:
-  - -11.0
-  - 6.75
   pad_diameter_mm: 0.36
   drill_diameter_mm: 0.16
   layer_start: F.Cu
@@ -18674,7 +18374,7 @@ vias:
   drill_diameter_mm: 0.16
   layer_start: F.Cu
   layer_end: B.Cu
-- net: SENSOR_EN
+- net: PERIPH_EN
   position_mm:
   - -6.0
   - -2.75
@@ -18682,7 +18382,7 @@ vias:
   drill_diameter_mm: 0.16
   layer_start: F.Cu
   layer_end: B.Cu
-- net: SENSOR_EN
+- net: PERIPH_EN
   position_mm:
   - -9.25
   - -2.75
@@ -18690,7 +18390,7 @@ vias:
   drill_diameter_mm: 0.16
   layer_start: F.Cu
   layer_end: B.Cu
-- net: SENSOR_EN
+- net: PERIPH_EN
   position_mm:
   - -12.0
   - -1.5
@@ -18698,7 +18398,7 @@ vias:
   drill_diameter_mm: 0.16
   layer_start: F.Cu
   layer_end: B.Cu
-- net: SENSOR_EN
+- net: PERIPH_EN
   position_mm:
   - -17.25
   - 0.0
@@ -18706,7 +18406,7 @@ vias:
   drill_diameter_mm: 0.16
   layer_start: F.Cu
   layer_end: B.Cu
-- net: SENSOR_EN
+- net: PERIPH_EN
   position_mm:
   - -18.75
   - 3.5
@@ -18714,7 +18414,7 @@ vias:
   drill_diameter_mm: 0.16
   layer_start: F.Cu
   layer_end: B.Cu
-- net: SENSOR_EN
+- net: PERIPH_EN
   position_mm:
   - 3.25
   - 4.5
@@ -18778,7 +18478,7 @@ vias:
   drill_diameter_mm: 0.16
   layer_start: F.Cu
   layer_end: B.Cu
-- net: SENSOR_3V3
+- net: PERIPH_3V3
   position_mm:
   - 27.5
   - -10.0

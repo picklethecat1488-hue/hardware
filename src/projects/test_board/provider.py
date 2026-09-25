@@ -175,6 +175,29 @@ class TestBoardProvider(Provider):
             with BuildVias() as bv:
                 bv.add(self.vias())
 
+            # Component obstacles declared in PCB schema for CAD inspection and simulation
+            if self.pcb_manifest and mode != Mode.PRINT:
+                for obs in self.pcb_manifest.get("obstacles", []):
+                    obs_shape = obs.get("shape") if isinstance(obs, dict) else getattr(obs, "shape", "")
+                    obs_name = obs.get("name", "") if isinstance(obs, dict) else getattr(obs, "name", "")
+                    if (
+                        obs_shape == "box"
+                        and not obs_name.startswith("clamp_rail")
+                        and obs_name not in ("flex_vacuum_plate", "J4")
+                    ):
+                        pos = (
+                            obs.get("position_mm", [0, 0, 0])
+                            if isinstance(obs, dict)
+                            else getattr(obs, "position_mm", [0, 0, 0])
+                        )
+                        dim = (
+                            obs.get("dimensions_mm", [1, 1, 1])
+                            if isinstance(obs, dict)
+                            else getattr(obs, "dimensions_mm", [1, 1, 1])
+                        )
+                        with Locations((pos[0], pos[1], pos[2])):
+                            Box(dim[0], dim[1], dim[2], mode=BuildMode.ADD)
+
         return pcb
 
     def flex_tail(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildFlexPCB:
@@ -387,19 +410,17 @@ class TestBoardProvider(Provider):
             periph_z = z_carrier + (self.settings.board_thickness / 2.0) + (periph_cutout_h / 2.0) - 0.5
             l_4p = self.settings.enclosure_periph_4p_cutout_length
             l_6p = self.settings.enclosure_periph_6p_cutout_length
-            periph_specs = [
-                ("J6", 28.0, l_4p, "I2C"),
-                ("J7", 18.0, l_4p, "I3C0"),
-                ("J8", 8.0, l_4p, "I3C1"),
-                ("J9", -5.0, l_6p, "SPI"),
-                ("J10", -21.0, l_6p, "UART"),
-            ]
+            bus_labels = {"J6": "I2C", "J7": "I3C0", "J8": "I3C1", "J9": "SPI", "J10": "UART"}
+            periph_specs = []
             if self.wiring_path.exists():
                 wiring = Wiring(str(self.wiring_path))
                 comp_map = {c.name: c for c in wiring.footprints}
-                for idx, (des, def_y, cut_l, label) in enumerate(periph_specs):
+                for des in ("J6", "J7", "J8", "J9", "J10"):
                     if des in comp_map:
-                        periph_specs[idx] = (des, comp_map[des].position[1], cut_l, label)
+                        c = comp_map[des]
+                        is_6p = "6P" in getattr(c, "package", "") or len(getattr(c, "pins", [])) == 6
+                        cut_l = l_6p if is_6p else l_4p
+                        periph_specs.append((des, c.position[1], cut_l, bus_labels.get(des, des)))
 
             with BuildSketch(Plane.YZ.offset(w / 2.0)) as s_periph:
                 for _, py, cut_l, _ in periph_specs:
@@ -832,6 +853,12 @@ class TestBoardProvider(Provider):
             with Locations((-10.0, 39.5), (10.0, 39.5)):
                 SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
 
+            # Battery polarity markings
+            with Locations((-24.0, 13.5)):
+                SilkscreenText("+", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-22.0, 13.5)):
+                SilkscreenText("-", layer="F.SilkS", font_size=0.8, thickness=0.12)
+
             # Component Reference Designators (BUG-066)
             # Active ICs and Primary Modules
             with Locations((0.0, 8.5)):
@@ -846,11 +873,7 @@ class TestBoardProvider(Provider):
                 SilkscreenText("J3", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((-23.0, 19.5)):
                 SilkscreenText("J13", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-24.0, 13.5)):
-                SilkscreenText("+", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-22.0, 13.5)):
-                SilkscreenText("-", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-18.0, -12.5)):
+            with Locations((-21.5, -22.0)):
                 SilkscreenText("Q1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
             with Locations((-19.0, 12.5)):
                 SilkscreenText("U3", layer="F.SilkS", font_size=0.8, thickness=0.12)

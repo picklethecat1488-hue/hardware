@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-25 15:18:24 UTC` |
-| **Total Issues** | `113` |
-| **Open Issues** | `0` |
-| **Resolved / Closed** | `113 (100%)` |
+| **Report Date** | `2026-09-25 21:44:33 UTC` |
+| **Total Issues** | `127` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `126 (99%)` |
 
 ## Executive Summary
 
@@ -20,18 +20,18 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 | Severity | Count | Meaning |
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 1 | System crashes, build failures, blockages, or electrical shorts. |
-| **`[HIGH]`** | 4 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 105 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[HIGH]`** | 6 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
+| **`[MEDIUM]`** | 117 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 3 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 83 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 94 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 13 | 3D geometry, step models, enclosures, mechanical assembly. |
-| **`SIMULATION`** | 2 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
-| **`INFRASTRUCTURE`** | 11 | Build tooling, compilers, test runners, headless tools. |
+| **`SIMULATION`** | 4 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
+| **`INFRASTRUCTURE`** | 12 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 1 | Web dashboards, CLI viewers, review interfaces. |
 
 ## Issue Checklist
@@ -149,6 +149,20 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-112](#bug-112): Update test board docs with recommended battery model `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-113](#bug-113): Carrier board serial expansion cutouts overlap `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-114](#bug-114): Bug report tool does not pickup changes to BUGS.md `[bug_report]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-115](#bug-115): Move U10, U10 decoupling caps to new sheet page (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-116](#bug-116): SWD should not route thru U9 (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-117](#bug-117): Remove SWO and NRST (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-118](#bug-118): GND has routing conflict with LED_R on U6 sheet (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-119](#bug-119): Cap signals has multiple overlaps (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-120](#bug-120): Move C8 to power regulation and distribution section. (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-121](#bug-121): Move MIPI CLK pins on J2 (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-122](#bug-122): J6, J7, J8 should be JST-PH-6P connectors (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-123](#bug-123): Sheet 12- GPIO wires overlap (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-124](#bug-124): Couldn't run carrier board flying probe test (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-125](#bug-125): Add top and bottom textures to PCB objects (`RESOLVED`)
+- [x] **`[HIGH]`** [#BUG-126](#bug-126): Components designators are overlapping pads and holes (`RESOLVED`)
+- [x] **`[HIGH]`** [#BUG-127](#bug-127): Some components have duplicate designators (`RESOLVED`)
+- [ ] **`[MEDIUM]`** [#BUG-128](#bug-128): Newly created folders do not show up in the Changed Files section `[code_review]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -2899,5 +2913,383 @@ Bug report tool does not pickup changes to BUGS.md when updating it. The tool sh
 #### Resolution Notes
 
 Implemented markdown parser, database merger, R+M+W sync, and file watcher on BUGS.md in bug report tool.
+
+---
+
+### <a id="bug-115"></a> 🟢 `[BUG-115]` Move U10, U10 decoupling caps to new sheet page
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 17:50:20 UTC`
+- **Resolved**: `2026-09-25 21:44:04 UTC`
+
+#### Description
+
+U10 decoupling caps overlap J1. Move U10 and related components to a new sheet page. Rename SENSOR_EN and SENSOR_3V3 to PERIPH_EN and PERIPH_3V3
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790358624572.png](build/attachments/pasted_screenshot_1790358624572.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Moved U10 to dedicated Peripheral Power sheet; renamed SENSOR_EN/3V3 to PERIPH_EN/3V3.
+
+---
+
+### <a id="bug-116"></a> 🟢 `[BUG-116]` SWD should not route thru U9
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 17:52:29 UTC`
+- **Resolved**: `2026-09-25 21:44:07 UTC`
+
+#### Description
+
+SWDIO and SWCLK should route over top U9 from U1 to J5, right now they are routing straight thru U9 making the schematic harder to read. 3Both power nets symbols (VBUS and 3V#) should be placed above U9 and J5 so that they can dogleg into U0
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790358758039.png](build/attachments/pasted_screenshot_1790358758039.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Enhanced detour routing over U9 and placed power net symbols vertically above U9 and J5.
+
+---
+
+### <a id="bug-117"></a> 🟢 `[BUG-117]` Remove SWO and NRST
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 17:55:30 UTC`
+- **Resolved**: `2026-09-25 21:44:09 UTC`
+
+#### Description
+
+Remove SWO routing from U1 and J5. We do not need to support SWO. Remove NRST routing from U9 to J5.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790358938072.png](build/attachments/pasted_screenshot_1790358938072.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Pruned SWD_SWO net and pruned NRST routing from U9:23 and J5:10.
+
+---
+
+### <a id="bug-118"></a> 🟢 `[BUG-118]` GND has routing conflict with LED_R on U6 sheet
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 17:57:20 UTC`
+- **Resolved**: `2026-09-25 21:44:11 UTC`
+
+#### Description
+
+On sheet 6, LED_R has a routing conflict with GND. LED_R should route over GND and dogleg into D1
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790359052357.png](build/attachments/pasted_screenshot_1790359052357.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Configured U6 pin sides with outputs 6-8 on right and GND on left, eliminating routing conflict with LED_R.
+
+---
+
+### <a id="bug-119"></a> 🟢 `[BUG-119]` Cap signals has multiple overlaps
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 17:58:48 UTC`
+- **Resolved**: `2026-09-25 21:44:14 UTC`
+
+#### Description
+
+On sheet 7, CAP_RX2, CAP_TX2, and CAP_TX3 all overlap each other. Is there a a bulk routing PCB symbol we can use to bridge U2 cap signals to J2? Otherwise, I think these symbols need to be moved to the other side of J2 so they can route over and around that component to resolve the overlaps.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790359136802.png](build/attachments/pasted_screenshot_1790359136802.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Aligned J2 pin breakout order with U2 on Capacitive Sensing sheet.
+
+---
+
+### <a id="bug-120"></a> 🟢 `[BUG-120]` Move C8 to power regulation and distribution section.
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 18:01:12 UTC`
+- **Resolved**: `2026-09-25 21:44:16 UTC`
+
+#### Description
+
+C8 has overlaps with audio routing on sheet 8. Move it to the power regulation and distribution section, and note what it is for.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790359293290.png](build/attachments/pasted_screenshot_1790359293290.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Moved C8 from Audio Subsystem to 3.3V Power Regulation sheet in pcb.yaml.
+
+---
+
+### <a id="bug-121"></a> 🟢 `[BUG-121]` Move MIPI CLK pins on J2
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 19:35:13 UTC`
+- **Resolved**: `2026-09-25 21:44:19 UTC`
+
+#### Description
+
+Move MIPI_CLK differential pins on J2 to the right side, so the route cleanly under J2 and do not overlap the MIPI data pins
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790364991115.png](build/attachments/pasted_screenshot_1790364991115.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Moved MIPI CLK differential pins to right side of J2.
+
+---
+
+### <a id="bug-122"></a> 🟢 `[BUG-122]` J6, J7, J8 should be JST-PH-6P connectors
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 19:37:35 UTC`
+- **Resolved**: `2026-09-25 21:44:21 UTC`
+
+#### Description
+
+Update connector style on J6-J8 to JST-PH-6P. Create separate sheet pages for each expansion connector so that the wires do not overlap.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790365115426.png](build/attachments/pasted_screenshot_1790365115426.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Configured JST-PH-6P connector style on J6-J8 and created 5 dedicated expansion sheets in pcb.yaml.
+
+---
+
+### <a id="bug-123"></a> 🟢 `[BUG-123]` Sheet 12- GPIO wires overlap
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 19:39:13 UTC`
+- **Resolved**: `2026-09-25 21:44:23 UTC`
+
+#### Description
+
+Fix the GPIO wire routing on sheet 12 so that GPIO0 and GPIO1 route over the top of U1 into J14 and avoid intersecting other GPIO wires. Align GPIO2..GPIO4 on U1 with GPIO2..GPIO4 on J14 horizontally so that that bank of GPIOs route straight across without doglegging.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790365165371.png](build/attachments/pasted_screenshot_1790365165371.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Configured GPIO pin sides on Sheet 16 and routed upper pins over U1 into header pins 1-2.
+
+---
+
+### <a id="bug-124"></a> 🟢 `[BUG-124]` Couldn't run carrier board flying probe test
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `SIMULATION`
+- **Created**: `2026-09-25 19:50:48 UTC`
+- **Resolved**: `2026-09-25 21:44:26 UTC`
+
+#### Description
+
+Pasted trace back below.
+
+#### Execution / Console Logs
+
+```text
+$ python src/view.py   test_board/carrier_board:view/simulate             
+pybullet build time: Oct 20 2025 08:05:00
+🛠️ Compiling parts: test_board/carrier_board, test_board/flex_tail, test_board/enclosure_bottom, test_board/enclosure_lid, test_board/led_cover 
+🤖 Compiling URDFs: test_board/carrier_board, test_board/flex_tail, test_board/product 
+🤖 Running Simulation (Ctrl-C to exit)... 
+▶ Tool view failed with error: Required OBJ file not found for simulation: build/test_board/test_board_carrier_board_carrier_board.obj 
+▶ Traceback (most recent call last): 
+▶   File "/Users/daparker/gh/hardware/src/daemon.py", line 403, in run 
+▶     main_func() 
+▶     ~~~~~~~~~^^ 
+▶   File "/Users/daparker/gh/hardware/src/view.py", line 556, in main 
+▶     viewer.show_view( 
+▶     ~~~~~~~~~~~~~~~~^ 
+▶         cast(Sequence[str], args.targets), 
+▶         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+▶     ...<12 lines>... 
+▶         stage_window_size=args.stage_window_size, 
+▶         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+▶     ) 
+▶     ^ 
+▶   File "/Users/daparker/miniforge3/envs/cq/lib/python3.13/site-packages/pydantic/_internal/_validate_call.py", line 40, in wrapper_function 
+▶     return wrapper(*args, **kwargs) 
+▶   File "/Users/daparker/miniforge3/envs/cq/lib/python3.13/site-packages/pydantic/_internal/_validate_call.py", line 137, in __call__ 
+▶     res = self.__pydantic_validator__.validate_python(pydantic_core.ArgsKwargs(args, kwargs)) 
+▶   File "/Users/daparker/gh/hardware/src/view.py", line 396, in show_view 
+▶     room.simulate( 
+▶     ~~~~~~~~~~~~~^ 
+▶         provider_hooks=provider.get_simulate_hooks(sim_target or "default"), 
+▶         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+▶     ...<15 lines>... 
+▶         stage_window_size=stage_window_size, 
+▶         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+▶     ) 
+▶     ^ 
+▶   File "/Users/daparker/gh/hardware/src/provider/room.py", line 1097, in simulate 
+▶     bullet_sim.run() 
+▶     ~~~~~~~~~~~~~~^^ 
+▶   File "/Users/daparker/gh/hardware/src/provider/bullet.py", line 505, in run 
+▶     self._copy_project_assets(build_proj_dir, proj_dir) 
+▶     ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+▶   File "/Users/daparker/gh/hardware/src/provider/bullet.py", line 231, in _copy_project_assets 
+▶     raise FileNotFoundError(f"Required OBJ file not found for simulation: {real_obj_path}") 
+▶ FileNotFoundError: Required OBJ file not found for simulation: build/test_board/test_board_carrier_board_carrier_board.obj 
+❌ Tool view execution failed 
+✔ Done Visualizing...
+(cq)
+```
+
+#### Resolution Notes
+
+Added obj export to carrier_board and flex_tail in manifest.yaml for flying probe tests.
+
+---
+
+### <a id="bug-125"></a> 🟢 `[BUG-125]` Add top and bottom textures to PCB objects
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `SIMULATION`
+- **Created**: `2026-09-25 19:51:08 UTC`
+- **Resolved**: `2026-09-25 21:44:28 UTC`
+
+#### Description
+
+When we load the PCB objects in rerun, is it possible to texture them with the PCB top and bottom sides so that probe points can be visually identified? Example carrier board textures are attached
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [carrier_board_bottom.png](build/attachments/carrier_board_bottom.png) | Uploaded screenshot carrier_board_bottom.png |
+| `screenshot` | [carrier_board_top.png](build/attachments/carrier_board_top.png) | Uploaded screenshot carrier_board_top.png |
+
+#### Resolution Notes
+
+Added top and bottom PCB textures to test_board/textures/ and bound them in PyBullet and Rerun.
+
+---
+
+### <a id="bug-126"></a> 🟢 `[BUG-126]` Components designators are overlapping pads and holes
+
+- **Status**: `RESOLVED`
+- **Severity**: `HIGH`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 19:56:17 UTC`
+- **Resolved**: `2026-09-25 21:44:30 UTC`
+
+#### Description
+
+Multiple component designators are overlapping pads or mounting holes. Circled them on this diagram. I propose that we create an algorithm which can intelligently place component designators on the board without overlapping any bar copper regions or holes, and add a DRC to validate this!
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790366404771.png](build/attachments/pasted_screenshot_1790366404771.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Updated DRC engine to rotate footprint pins via _get_pin_absolute_pos and inverted footprint rotation on silkscreen labels.
+
+---
+
+### <a id="bug-127"></a> 🟢 `[BUG-127]` Some components have duplicate designators
+
+- **Status**: `RESOLVED`
+- **Severity**: `HIGH`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 19:59:39 UTC`
+- **Resolved**: `2026-09-25 21:44:32 UTC`
+
+#### Description
+
+Some component designators on the PCB are duplicated. Each component should have only a single designator. We need to implement a fix for this one ASAP. There are duplicate designators on the top and bottom (included a screenshot only of the bottom)
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790366854184.png](build/attachments/pasted_screenshot_1790366854184.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Deduplicated silkscreen text export in exporter.py when matching component footprint reference designators.
+
+---
+
+### <a id="bug-128"></a> 🔴 `[BUG-128]` Newly created folders do not show up in the Changed Files section
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `INFRASTRUCTURE`
+- **Component**: `code_review`
+- **Created**: `2026-09-25 21:42:13 UTC`
+
+#### Description
+
+In the Changed Files UI section, newly added files under newly added subfolders do not display. Attached screenshot
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790372559666.png](build/attachments/pasted_screenshot_1790372559666.png) | Pasted screenshot |
 
 ---
