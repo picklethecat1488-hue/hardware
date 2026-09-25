@@ -57,6 +57,9 @@ led_flange_width: 7.0
 led_hole_width: 5.0
 led_plug_length: 3.0
 led_plug_width: 4.8
+enclosure_periph_4p_cutout_length: 7.5
+enclosure_periph_6p_cutout_length: 14.5
+enclosure_periph_cutout_height: 5.0
 
 # Factory assembly test limits and parameters
 test_tdr_rise_time_ps: 100.0

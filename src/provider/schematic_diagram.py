@@ -3,8 +3,9 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import fnmatch
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import matplotlib
 
@@ -41,7 +42,57 @@ class _TOCPagePlan:
     net_rows: List[List[NetModel]] = field(default_factory=list)
 
 
-POWER_NET_NAMES = {"3V3", "5V", "1V8", "1V2", "VCC", "VDD", "VLOAD_SW", "VBUS", "VBAT", "SENSOR_3V3"}
+POWER_NET_PATTERNS = (
+    "*3V3*",
+    "*5V*",
+    "*1V8*",
+    "*1V2*",
+    "*VCC*",
+    "*VDD*",
+    "*VLOAD*",
+    "*VBUS*",
+    "*VBAT*",
+    "*SENSOR_3V3*",
+    "*PWR*",
+    "*POWER*",
+)
+
+
+class PowerNetMatcher:
+    """Matches net names against standard power rail wildcard glob patterns."""
+
+    def __init__(self, patterns: Sequence[str] = POWER_NET_PATTERNS) -> None:
+        """Initialize matcher with glob patterns.
+
+        Args:
+            patterns: Sequence of glob pattern strings to match against.
+        """
+        self.patterns = tuple(patterns)
+
+    def __contains__(self, item: object) -> bool:
+        """Return True if the net name matches any power net glob pattern.
+
+        Args:
+            item: Net name or string to test.
+        """
+        if not isinstance(item, str):
+            return False
+        name_u = item.upper()
+        return any(fnmatch.fnmatch(name_u, pat) for pat in self.patterns)
+
+    def is_power_net(self, name: str) -> bool:
+        """Check if a net name matches power rail patterns.
+
+        Args:
+            name: Net name string.
+
+        Returns:
+            True if matching power rail pattern.
+        """
+        return name in self
+
+
+POWER_NET_NAMES = PowerNetMatcher()
 GROUND_NET_NAMES = {"GND", "GROUND", "VSS"}
 JUMPER_BRIDGE_RADIUS_MM = 1.2
 PIN_PITCH_MM = 5.0

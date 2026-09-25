@@ -106,10 +106,11 @@ graph TD
 | **`J5`** | **JST-SH 10-Pin Micro-Header** | SWD Hardware Debug & Flash Programming Header | 1.0mm Pitch Side-Entry SMD | `SWD_CLK` (`A16`), `DIO` (`A17`), `SWO` (`B16`), `nRESET` (`F3`), `BOOT0` (`C14`) | Compact debug interface for J-Link, MCU-Link, or CMSIS-DAP probes. |
 | **`J7`, `J8`**| **JST-SH 5-Pin Micro-Headers** | Primary (`I3C0`) and Secondary (`I3C1`) I3C Headers | 1.0mm Pitch Side-Entry SMD | `I3C0` (`A8`, `C8`, `B8`), `I3C1` (`F4`, `F6`, `E4`) | High-speed MIPI I3C evaluation interface operating up to 12.5 Mbps. |
 | **`J6`** | **JST-SH 4-Pin Micro-Header** | Expansion I2C Bus Header | 1.0mm Pitch Side-Entry SMD | `I2C2` (`B1`, `A1`) | External sensor expansion I2C with 3.3V and GND. |
-| **`J9`** | **JST-SH 6-Pin Micro-Header** | Expansion SPI Bus Header | 1.0mm Pitch Side-Entry SMD | `SPI0` (`T6`, `T7`, `R8`, `R9`) | 4-wire SPI peripheral bus (SCK, MOSI, MISO, CS#). |
-| **`J10`** | **JST-SH 4-Pin Micro-Header** | Expansion UART Bus Header | 1.0mm Pitch Side-Entry SMD | `UART1` (`A4`, `B3`) | Dedicated asynchronous serial link for external radios or modules. |
+| **`J9`** | **JST-PH 6-Pin Header (`B6B-PH-K-S`)** | Expansion SPI Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-6P`) | `SPI0` (`T6`, `T7`, `R8`, `R9`) | 4-wire SPI peripheral bus (SCK, MOSI, MISO, CS#) with 3.3V and interrupt. |
+| **`J10`** | **JST-PH 6-Pin Header (`B6B-PH-K-S`)** | Expansion UART / CAN Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-6P`) | `UART1` (`A4`, `B3`) | Dedicated asynchronous serial link for external radios or modules with power and handshaking. |
 | **`J14`** | **JST-SH 10-Pin Micro-Header** | General-Purpose GPIO Breakout Header | 1.0mm Pitch Side-Entry SMD | `GPIO0`..`GPIO9` (Port 4 pins) | 10 dedicated digital IO lines supporting timer, PLU, and FlexIO. |
 | **`J13`** | **JST-PH 2-Pin Connector (`S2B-PH-K-S`)** | 1S Li-Ion / LiPo Battery Power Input Connector | 2.0mm Pitch Thru-Hole (`JST-PH-2P`) | `VBAT`, `GND` | Direct connection for 3.7V Li-Ion battery pack with polarized mating shroud. |
+| **`BAT1`** | **PKCELL LP352438 (Recommended Battery)** | 1S 3.7V 350mAh LiPo Rechargeable Pouch Cell | $3.5\times 24\times 38\text{ mm}$ Pouch | `VBAT`, `GND` via J13 | Integrated PCM protection circuit module; pre-terminated with polarized JST-PH 2-pin connector; fits top lid cradle. |
 | **`TP1`** | **Test Point (GND)** | Ground probe through-hole test point | 1.4mm Pad / 0.8mm Drill | `GND` | Located at `(-18.0, -22.0)`. |
 | **`TP2`..`TP4`** | **Test Points (Power)** | Power rail through-hole test points | 1.4mm Pad / 0.8mm Drill | `VBAT`, `VBUS`, `3V3` | 4mm pitch at `(-18.0, -26.0)`, `(-14.0, -26.0)`, `(-10.0, -26.0)`. |
 | **`TP5`..`TP8`** | **Test Points (PCIe)** | PCIe Gen4 Tx/Rx differential pair test points | 1.4mm Pad / 0.8mm Drill | `PCIE_TX0_N/P`, `RX0_P/N` | 4mm pitch at `(-14.0, -22.0)`, `(-10.0, -22.0)`, `(-6.0, -22.0)`, `(-2.0, -22.0)`. |
@@ -127,10 +128,11 @@ graph TD
    * The PKM13EPYH4000 piezo sounder connects directly to `SPK_P` and `SPK_N` differential outputs for high-volume audible signaling.
 3. **RGB Indication Subsystem (`BUG-054`)**:
    * TI LP5009 drives a high-brightness RGB LED via constant-current sink outputs with logarithmic brightness curve adjustments and autonomous color fade loops, offloading the MCU.
-4. **Autonomous Battery Management (`BUG-055`, `BUG-056`, `BUG-063`, `BUG-070`)**:
+4. **Autonomous Battery Management & Recommended Battery Model (`BUG-054`, `BUG-070`, `BUG-112`)**:
    * TI BQ24074 dynamically routes power from USB-C ($5\text{V}$) to system load while concurrently charging the 1S Li-Ion/LiPo battery at up to $1.5\text{ A}$.
    * Dynamic Power Path Management (DPPM) automatically reduces battery charge current if system load increases, preventing brownouts.
    * MAX17048 ModelGauge fuel gauge communicates over Core I2C0 (`0x36`) to report precise battery cell voltage, State of Charge (SoC), and time-to-empty without requiring sense resistor calibration.
+   * **Recommended Battery Model**: **PKCELL LP352438** (1S 3.7V 350 mAh / 1.30 Wh LiPo pouch cell, nominal dimensions $3.5\times 24.0\times 38.0\text{ mm}$). Designed specifically to nest flush inside the enclosure lid's retention cradle ($24.0\times 38.0\times 3.5\text{ mm}$ cavity) with flying leads connecting through the lid cutout to J13. Includes integrated Protection Circuit Module (PCM) guarding against overcharge ($>4.28\text{ V}$), over-discharge ($<3.0\text{ V}$), and overcurrent ($>2.0\text{ A}$).
 5. **High-Speed Dual-Channel FlexSPI Design (`BUG-062`)**:
    * **Channel A (Internal NAND)**: Connected to Winbond W25N01GV on Port 3 balls `B17` (SS0), `K17` (SCK), `J17` (IO0), `D17` (IO1), `F17` (IO2), and `M17` (IO3).
    * **Channel B (Expansion)**: Routed to `J_FLEX` header on Port 2 balls `H3` (SS0), `J3` (SCLK), `K3` (DATA0), `K1` (DATA1), `K2` (DATA2), `L2` (DATA3), and `H1` (DQS).
@@ -141,15 +143,16 @@ graph TD
      - `PWR_EN_SENSORS` (`L5`): Controls power to Azoteq IQS7222A touch controller and external sensor headers.
      - `PWR_EN_DEBUG` (`M4`): Controls power to FT232RNQ bridge, eliminating parasitic leakage back-feeding into the MCU when USB is unpowered.
    * All load switch enable pins are equipped with 100k pull-ups to guarantee default-ON state during development and initial boot.
-7. **Mechanical Enclosure & Assembly Features (`BUG-085`, `BUG-090`, `BUG-092`)**:
+7. **Mechanical Enclosure & Assembly Features (`BUG-085`, `BUG-090`, `BUG-092`, `BUG-110`, `BUG-113`)**:
    * Lower enclosure features integral mounting posts with flared retention snap-heads replacing loose screws.
    * Upper enclosure lid incorporates an internal battery retention cradle ($24\times 38\times 3.5\text{ mm}$) and pass-through cutout for J13.
-   * Side cutouts (USB-C, SWD, expansion, M.2) are radiused with 0.8mm corner fillets to avoid stress concentrations, with $\ge 5\text{ mm}$ solid wall isolation between USB and SWD.
+   * Side cutouts (USB-C, SWD, expansion, M.2) are radiused with 0.8mm corner fillets to avoid stress concentrations, with separate non-overlapping cutouts and solid wall separation between all expansion ports.
+   * Expansion headers J9 and J10 use polarized 6-pin JST-PH connectors (`B6B-PH-K-S`) for easy insertion and keyed polarization.
    * Carrier board top layer features the prominent Antigravity logo in silkscreen.
 
 ## Battery Life Estimation
 
-Operating on a single **18650 3.7V Li-ion cell (3000 mAh / 11.1 Wh)**, the system implements aggressive power gating across three distinct operating tiers:
+Operating on the recommended **PKCELL LP352438 3.7V LiPo pouch cell (350 mAh / 1.30 Wh)** fitted inside the lid cradle, the system implements aggressive power gating across three distinct operating tiers (an external 18650 3000 mAh cell may also be connected via J13 for extended multi-month deployments):
 
 ### Power Consumption Breakdown
 
@@ -162,7 +165,9 @@ Operating on a single **18650 3.7V Li-ion cell (3000 mAh / 11.1 Wh)**, the syste
 ### Calculations
 * **Average Daily Operating Current**:
   $$I_{\text{avg}} = (I_{\text{active}} \times 0.02) + (I_{\text{sleep}} \times 0.98) = (65\text{ mA} \times 0.02) + (0.045\text{ mA} \times 0.98) = 1.30\text{ mA} + 0.044\text{ mA} = 1.344\text{ mA}$$
-* **Estimated Runtime (Continuous Monitoring)**:
+* **Estimated Runtime with Recommended PKCELL LP352438 (350 mAh)**:
+  $$\text{Runtime} = \frac{350\text{ mAh}}{1.344\text{ mA}} \approx 260\text{ hours} \approx \mathbf{10.9\text{ days}}$$
+* **Shelf Life in Deep Power Down with PKCELL LP352438 (350 mAh)**:
+  $$\text{Shelf Life} = \frac{350\text{ mAh}}{0.007\text{ mA}} \approx 50000\text{ hours} \approx \mathbf{5.7\text{ years (limited by self-discharge)}}$$
+* **Extended Deployment with External 18650 Cell (3000 mAh)**:
   $$\text{Runtime} = \frac{3000\text{ mAh}}{1.344\text{ mA}} \approx 2232\text{ hours} \approx \mathbf{93\text{ days}}$$
-* **Shelf Life in Deep Power Down**:
-  $$\text{Shelf Life} = \frac{3000\text{ mAh}}{0.007\text{ mA}} \approx 428571\text{ hours} \approx \mathbf{48\text{ years (limited by self-discharge)}}$$

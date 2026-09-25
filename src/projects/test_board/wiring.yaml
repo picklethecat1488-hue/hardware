@@ -316,18 +316,18 @@ footprints:
     supplier_pn: 455-1804-1-ND
 
   - name: J9
-    package: pin_header_1x6
+    package: JST-PH-6P
     position: [24.5, -5.0, 0.8]
     rotation: [0.0, 0.0, -90.0]
-    mpn: TSW-106-07-L-S
-    supplier_pn: SAM1034-06-ND
+    mpn: B6B-PH-K-S
+    supplier_pn: 455-1708-ND
 
   - name: J10
-    package: pin_header_1x6
-    position: [24.5, -20.0, 0.8]
+    package: JST-PH-6P
+    position: [24.5, -21.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
-    mpn: TSW-106-07-L-S
-    supplier_pn: SAM1034-06-ND
+    mpn: B6B-PH-K-S
+    supplier_pn: 455-1708-ND
 
   # 10-Pin GPIO Breakout Header (Right side of PCB, accessible via top cutout for BUG-073)
   - name: J14

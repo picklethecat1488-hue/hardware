@@ -214,6 +214,21 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_cutout_fillet_radius"])
 
     @property
+    def enclosure_periph_4p_cutout_length(self) -> float:
+        """Length of 4-pin peripheral connector cutout along Y in mm."""
+        return float(self._raw_data["enclosure_periph_4p_cutout_length"])
+
+    @property
+    def enclosure_periph_6p_cutout_length(self) -> float:
+        """Length of 6-pin serial expansion connector cutout along Y in mm."""
+        return float(self._raw_data["enclosure_periph_6p_cutout_length"])
+
+    @property
+    def enclosure_periph_cutout_height(self) -> float:
+        """Height of peripheral connector cutout along Z in mm."""
+        return float(self._raw_data["enclosure_periph_cutout_height"])
+
+    @property
     def enclosure_battery_mount_width(self) -> float:
         """Width of battery retention mount cavity on enclosure lid in mm."""
         return float(self._raw_data["enclosure_battery_mount_width"])

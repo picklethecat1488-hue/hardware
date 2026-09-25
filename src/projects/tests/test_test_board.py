@@ -64,11 +64,65 @@ def test_regression_bug_074_peripheral_cutouts_and_identifiers() -> None:
     z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
     z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
 
-    # Probe points centered inside the right exterior wall (X = w/2 - wall/2) at each peripheral connector Y
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
     wall_x = (w / 2.0) - (wall / 2.0)
-    for y, bus in [(26.0, "I2C"), (16.0, "I3C0"), (6.0, "I3C1"), (-6.0, "SPI"), (-17.0, "UART")]:
+    for des, bus in [("J6", "I2C"), ("J7", "I3C0"), ("J8", "I3C1"), ("J9", "SPI"), ("J10", "UART")]:
+        y = comp_map[des].position[1]
         assert not enclosure.part.is_inside((wall_x, y, z_conn)), (
             f"Enclosure bottom must have cutout for {bus} at Y={y}"
+        )
+
+
+def test_regression_bug_110_expansion_headers_jst_ph() -> None:
+    """Verify BUG-110: expansion header connectors J9 and J10 are 6-pin JST-PH style connectors."""
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    assert comp_map["J9"].package == "JST-PH-6P", f"J9 package should be JST-PH-6P, got {comp_map['J9'].package}"
+    assert comp_map["J10"].package == "JST-PH-6P", f"J10 package should be JST-PH-6P, got {comp_map['J10'].package}"
+    assert "B6B-PH-K-S" in comp_map["J9"].mpn or "PH" in comp_map["J9"].mpn
+    assert "B6B-PH-K-S" in comp_map["J10"].mpn or "PH" in comp_map["J10"].mpn
+
+
+def test_regression_bug_113_carrier_board_serial_cutouts_do_not_overlap() -> None:
+    """Verify BUG-113: peripheral and serial expansion cutouts do not overlap, leaving solid walls."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
+    z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
+    z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
+    wall_x = (w / 2.0) - (wall / 2.0)
+
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    connectors = ["J6", "J7", "J8", "J9", "J10"]
+    y_coords = [comp_map[c].position[1] for c in connectors]
+    lengths = [
+        provider.settings.enclosure_periph_4p_cutout_length,
+        provider.settings.enclosure_periph_4p_cutout_length,
+        provider.settings.enclosure_periph_4p_cutout_length,
+        provider.settings.enclosure_periph_6p_cutout_length,
+        provider.settings.enclosure_periph_6p_cutout_length,
+    ]
+
+    for i in range(len(y_coords) - 1):
+        y_bottom_prev = y_coords[i] - (lengths[i] / 2.0)
+        y_top_curr = y_coords[i + 1] + (lengths[i + 1] / 2.0)
+        # Assert non-overlapping with at least 1.0mm solid separation wall
+        wall_separation = y_bottom_prev - y_top_curr
+        assert wall_separation >= 1.0, (
+            f"Cutout {connectors[i]} and {connectors[i + 1]} overlap or have insufficient wall: {wall_separation:.2f}mm"
+        )
+        mid_wall_y = (y_bottom_prev + y_top_curr) / 2.0
+        assert enclosure.part.is_inside((wall_x, mid_wall_y, z_conn)), (
+            f"Solid wall must exist between {connectors[i]} and {connectors[i + 1]} at Y={mid_wall_y}"
         )
 
 
@@ -237,3 +291,72 @@ def test_regression_bug_085_enclosure_clip_on_mounting_posts() -> None:
     assert inter.volume == pytest.approx(0.0, abs=1e-3), (
         f"Carrier board intersects enclosure bottom: {inter.volume:.4f} mm^3"
     )
+
+
+def test_regression_bug_107_carrier_board_flying_probes_simulation() -> None:
+    """Verify BUG-107: simulate flying probes test for carrier board with obstacles and electrical validation."""
+    import pybullet as p
+    from provider import Simulate
+
+    provider = TestBoardProvider()
+    hooks = provider.get_simulate_hooks("carrier_board")
+    assert Simulate.SETUP in hooks, "Carrier board must have Simulate.SETUP hook"
+    assert Simulate.STEP in hooks, "Carrier board must have Simulate.STEP hook"
+
+    client = p.connect(p.DIRECT)
+    try:
+        hooks[Simulate.SETUP](0, client, "carrier_board", {})
+        # Step through test sequences
+        num_steps = 1000
+        for step_idx in range(num_steps):
+            hooks[Simulate.STEP](0, client, step_idx, "carrier_board")
+
+        # Verify all carrier board steps passed electrical validation
+        assert hasattr(provider, "flying_probe_steps"), "Provider must expose flying_probe_steps"
+        for step in provider.flying_probe_steps:
+            assert step.passed, f"Carrier board step {step.step_id} ({step.description}) failed electrical validation"
+
+        # Verify test report generation
+        report_md = provider.generate_test_report()
+        assert "Flying Probes Automated Acceptance Test Report" in report_md
+        assert "TEST_CONTINUITY_GND" in report_md
+        assert "TEST_IMP_PCIE_DIFF" in report_md
+        assert "PASS" in report_md
+        assert "100.0%" in report_md
+    finally:
+        p.disconnect(client)
+
+
+def test_regression_bug_108_flex_tail_flying_probes_simulation() -> None:
+    """Verify BUG-108: simulate flying probes test for flex tail validating capacitive sensing channels."""
+    import pybullet as p
+    from provider import Simulate
+
+    provider = TestBoardProvider()
+    hooks = provider.get_simulate_hooks("flex_tail")
+    assert Simulate.SETUP in hooks, "Flex tail must have Simulate.SETUP hook"
+    assert Simulate.STEP in hooks, "Flex tail must have Simulate.STEP hook"
+
+    client = p.connect(p.DIRECT)
+    try:
+        hooks[Simulate.SETUP](0, client, "flex_tail", {})
+        # Step through test sequences
+        num_steps = 1000
+        for step_idx in range(num_steps):
+            hooks[Simulate.STEP](0, client, step_idx, "flex_tail")
+
+        # Verify all flex tail capacitive sensing steps passed electrical validation
+        assert hasattr(provider, "flying_probe_steps"), "Provider must expose flying_probe_steps"
+        for step in provider.flying_probe_steps:
+            assert step.passed, f"Flex tail step {step.step_id} ({step.description}) failed electrical validation"
+
+        # Verify test report generation
+        report_md = provider.generate_test_report()
+        assert "TEST_CAP_SENSE_CHAN0" in report_md
+        assert "TEST_CAP_SENSE_CHAN1" in report_md
+        assert "TEST_CAP_SENSE_CHAN2" in report_md
+        assert "TEST_CAP_SENSE_CHAN3" in report_md
+        assert "PASS" in report_md
+        assert "100.0%" in report_md
+    finally:
+        p.disconnect(client)

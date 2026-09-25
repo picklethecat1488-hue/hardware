@@ -38,6 +38,7 @@ from provider import (
     discover_provider,
     Room,
     Mode,
+    Simulate,
     WiringDiagram,
     BuildSilkscreen,
     SilkscreenText,
@@ -381,15 +382,17 @@ class TestBoardProvider(Provider):
                     RectangleRounded(m2_w, m2_h, cutout_r)
             extrude(s_m2.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
 
-            # Peripheral cutouts and bus identifiers through right exterior wall (BUG-074, BUG-090)
-            periph_cutout_h = 5.0
+            # Peripheral cutouts and bus identifiers through right exterior wall (BUG-074, BUG-090, BUG-110, BUG-113)
+            periph_cutout_h = self.settings.enclosure_periph_cutout_height
             periph_z = z_carrier + (self.settings.board_thickness / 2.0) + (periph_cutout_h / 2.0) - 0.5
+            l_4p = self.settings.enclosure_periph_4p_cutout_length
+            l_6p = self.settings.enclosure_periph_6p_cutout_length
             periph_specs = [
-                ("J6", 26.0, 10.5, "I2C"),
-                ("J7", 16.0, 10.5, "I3C0"),
-                ("J8", 6.0, 10.5, "I3C1"),
-                ("J9", -6.0, 15.5, "SPI"),
-                ("J10", -17.0, 15.5, "UART"),
+                ("J6", 28.0, l_4p, "I2C"),
+                ("J7", 18.0, l_4p, "I3C0"),
+                ("J8", 8.0, l_4p, "I3C1"),
+                ("J9", -5.0, l_6p, "SPI"),
+                ("J10", -21.0, l_6p, "UART"),
             ]
             if self.wiring_path.exists():
                 wiring = Wiring(str(self.wiring_path))
@@ -640,11 +643,29 @@ class TestBoardProvider(Provider):
             "led_cover": self.led_cover,
         }
 
+    def view_carrier_board(self, room: Room, mode: Mode) -> None:
+        """Assemble rigid carrier PCB with component obstacles and test points for inspection and simulation."""
+        carrier = self.carrier_board("carrier_board", None, mode)
+        room.add("carrier_board", carrier.part, color=(0.08, 0.40, 0.20), alpha=1.0)
+
+    def view_flex_tail(self, room: Room, mode: Mode) -> None:
+        """Assemble flex tail PCB with sensor pads and test points for inspection and simulation."""
+        tail = self.flex_tail("flex_tail", None, mode)
+        room.add("flex_tail", tail.part, color=(0.85, 0.65, 0.15), alpha=0.9)
+
+    def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
+        """Return flying probe simulation and electrical verification hooks."""
+        from .simulate_hooks import get_simulate_hooks_impl as impl
+
+        return impl(self, sim_name)
+
     @property
     def view(self) -> dict[str, Callable[[Room, Mode], None]]:
         """Map view targets to room population functions."""
         return {
             "product": self.view_product,
+            "carrier_board": self.view_carrier_board,
+            "flex_tail": self.view_flex_tail,
         }
 
     @property

@@ -8,9 +8,11 @@ action checklists, and embedded references.
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 from typing import Dict, List, Optional
 
 from model.bug_report import (
+    BugAttachmentModel,
     BugCategory,
     BugDatabaseModel,
     BugReportModel,
@@ -274,3 +276,271 @@ class MarkdownBugExporter:
             return BugDatabaseModel.model_validate(data)
         except Exception:
             return None
+
+    def parse_markdown(self, markdown_path: Path) -> Optional[BugDatabaseModel]:
+        """Parse an existing BUGS.md file into a BugDatabaseModel.
+
+        Args:
+            markdown_path: Path to BUGS.md file.
+
+        Returns:
+            BugDatabaseModel if file exists and was parsed, else None.
+        """
+        if not markdown_path.exists():
+            return None
+        try:
+            content = markdown_path.read_text(encoding="utf-8")
+            return self.parse_markdown_text(content)
+        except Exception:
+            return None
+
+    def parse_markdown_text(self, content: str) -> BugDatabaseModel:
+        """Parse raw BUGS.md text content into a BugDatabaseModel.
+
+        Args:
+            content: Raw Markdown string.
+
+        Returns:
+            BugDatabaseModel populated with parsed issues.
+        """
+        title_match = re.search(r"^#\s+Bug Report Tracker:\s*(.*?)$", content, re.MULTILINE)
+        title = title_match.group(1).strip() if title_match else "Hardware Bug Tracker"
+
+        # Check list items for quick-action statuses: - [x] or - [ ]
+        checklist_status: Dict[str, BugStatus] = {}
+        for line in content.splitlines():
+            chk_m = re.match(r"^-\s+\[([ xX])\]\s+.*?\b(BUG-\d+)\b", line)
+            if chk_m:
+                is_checked = chk_m.group(1).lower() == "x"
+                chk_id = chk_m.group(2)
+                checklist_status[chk_id] = BugStatus.RESOLVED if is_checked else BugStatus.OPEN
+
+        db = BugDatabaseModel(title=title)
+
+        # Split into bug sections by ### headers
+        sections = re.split(r"\n(?=###\s+)", content)
+        for sec in sections:
+            sec_clean = sec.strip()
+            if not sec_clean.startswith("###"):
+                continue
+
+            header_match = re.search(
+                r'###\s+(?:<a id=".*?></a>\s*)?(?:[^\n\[]*?)?`\[(BUG-\d+)\]`\s*(.*?)$', sec_clean, re.MULTILINE
+            )
+            if not header_match:
+                continue
+
+            bug_id = header_match.group(1).strip()
+            bug_title = header_match.group(2).strip()
+
+            # Parse metadata lines
+            status_val = BugStatus.OPEN
+            m_status = re.search(r"-\s+\*\*Status\*\*:\s*`?([A-Za-z_]+)`?", sec_clean)
+            if m_status:
+                try:
+                    status_val = BugStatus(m_status.group(1).strip().upper())
+                except ValueError:
+                    status_val = BugStatus.OPEN
+            elif bug_id in checklist_status:
+                status_val = checklist_status[bug_id]
+
+            # If checklist explicitly checked [x], prefer RESOLVED unless CLOSED
+            if checklist_status.get(bug_id) == BugStatus.RESOLVED and status_val == BugStatus.OPEN:
+                status_val = BugStatus.RESOLVED
+
+            severity_val = BugSeverity.MEDIUM
+            m_sev = re.search(r"-\s+\*\*Severity\*\*:\s*`?([A-Za-z_]+)`?", sec_clean)
+            if m_sev:
+                try:
+                    severity_val = BugSeverity(m_sev.group(1).strip().upper())
+                except ValueError:
+                    severity_val = BugSeverity.MEDIUM
+
+            category_val = BugCategory.GENERAL
+            m_cat = re.search(r"-\s+\*\*Category\*\*:\s*`?([A-Za-z_]+)`?", sec_clean)
+            if m_cat:
+                try:
+                    category_val = BugCategory(m_cat.group(1).strip().upper())
+                except ValueError:
+                    category_val = BugCategory.GENERAL
+
+            component_val = ""
+            m_comp = re.search(r"-\s+\*\*Component\*\*:\s*`?([^\n`*]+)`?", sec_clean)
+            if m_comp:
+                component_val = m_comp.group(1).strip()
+
+            created_val = ""
+            m_created = re.search(r"-\s+\*\*Created\*\*:\s*`?([^\n`*]+)`?", sec_clean)
+            if m_created:
+                created_val = m_created.group(1).strip()
+
+            resolved_val = None
+            m_resolved = re.search(r"-\s+\*\*Resolved\*\*:\s*`?([^\n`*]+)`?", sec_clean)
+            if m_resolved:
+                resolved_val = m_resolved.group(1).strip()
+
+            # Parse subsections: ####
+            subsections = re.split(r"\n(?=####\s+)", sec_clean)
+            desc = ""
+            steps: List[str] = []
+            expected = ""
+            actual = ""
+            logs = ""
+            res_notes = ""
+            attachments: List[BugAttachmentModel] = []
+
+            for sub in subsections:
+                sub_clean = sub.strip()
+                if not sub_clean.startswith("####"):
+                    continue
+
+                sub_lines = sub_clean.splitlines()
+                sub_title = sub_lines[0].replace("####", "").strip().lower()
+                sub_body = "\n".join(sub_lines[1:]).strip()
+                # Remove trailing divider --- if present
+                if sub_body.endswith("---"):
+                    sub_body = sub_body[:-3].strip()
+
+                match sub_title:
+                    case "description":
+                        desc = sub_body
+                    case "reproduction steps":
+                        for step_line in sub_body.splitlines():
+                            step_m = re.match(r"^\d+\.\s*(.*?)$", step_line.strip())
+                            if step_m:
+                                steps.append(step_m.group(1).strip())
+                            elif step_line.strip().startswith("-"):
+                                steps.append(step_line.strip().lstrip("-").strip())
+                    case "expected behavior":
+                        expected = sub_body
+                    case "actual behavior":
+                        actual = sub_body
+                    case "execution / console logs":
+                        cleaned_logs = sub_body
+                        if cleaned_logs.startswith("```"):
+                            first_nl = cleaned_logs.find("\n")
+                            if first_nl != -1:
+                                cleaned_logs = cleaned_logs[first_nl + 1 :]
+                        if cleaned_logs.endswith("```"):
+                            cleaned_logs = cleaned_logs[:-3]
+                        logs = cleaned_logs.strip()
+                    case "resolution notes":
+                        res_notes = sub_body
+                    case "attachments & references":
+                        for att_line in sub_body.splitlines():
+                            att_m = re.match(
+                                r"^\|\s*`?(.*?)`?\s*\|\s*\[(.*?)\]\((.*?)\)\s*\|\s*(.*?)\s*\|$", att_line.strip()
+                            )
+                            if att_m:
+                                ftype = att_m.group(1).strip()
+                                fname = att_m.group(2).strip()
+                                fpath = att_m.group(3).strip()
+                                fdesc = att_m.group(4).strip()
+                                if fdesc in ("_None_", "None"):
+                                    fdesc = ""
+                                attachments.append(
+                                    BugAttachmentModel(
+                                        id=f"att-{len(attachments) + 1}",
+                                        filename=fname,
+                                        file_type=ftype,
+                                        file_path=fpath,
+                                        description=fdesc,
+                                    )
+                                )
+
+            bug = BugReportModel(
+                id=bug_id,
+                title=bug_title,
+                status=status_val,
+                severity=severity_val,
+                category=category_val,
+                component=component_val,
+                created_at=created_val or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+                resolved_at=resolved_val,
+                description=desc,
+                reproduction_steps=steps,
+                expected_behavior=expected,
+                actual_behavior=actual,
+                logs=logs,
+                attachments=attachments,
+                resolution_notes=res_notes,
+            )
+            db.add_or_update(bug)
+
+        return db
+
+    def merge_databases(self, base_db: BugDatabaseModel, md_db: BugDatabaseModel) -> BugDatabaseModel:
+        """Merge markdown database changes into base database using Read-Modify-Write rules.
+
+        Args:
+            base_db: Current base database model (e.g. from SQLite).
+            md_db: Database model parsed from BUGS.md.
+
+        Returns:
+            Updated base_db with all merged changes.
+        """
+        existing_map = {b.id: b for b in base_db.bugs}
+
+        for md_bug in md_db.bugs:
+            if md_bug.id not in existing_map:
+                # Newly added bug in BUGS.md
+                base_db.bugs.append(md_bug)
+                existing_map[md_bug.id] = md_bug
+            else:
+                existing = existing_map[md_bug.id]
+                # Status update
+                if md_bug.status != existing.status:
+                    existing.status = md_bug.status
+                    if md_bug.status in (BugStatus.RESOLVED, BugStatus.CLOSED):
+                        if not existing.resolved_at:
+                            existing.resolved_at = md_bug.resolved_at or datetime.now(timezone.utc).strftime(
+                                "%Y-%m-%d %H:%M:%S UTC"
+                            )
+                    else:
+                        existing.resolved_at = None
+
+                # Non-empty title / severity / category / component updates
+                if md_bug.title and md_bug.title != existing.title:
+                    existing.title = md_bug.title
+                if md_bug.severity != existing.severity:
+                    existing.severity = md_bug.severity
+                if md_bug.category != existing.category:
+                    existing.category = md_bug.category
+                if md_bug.component and md_bug.component != existing.component:
+                    existing.component = md_bug.component
+
+                # Description & notes
+                if md_bug.description.strip() and md_bug.description.strip() != existing.description.strip():
+                    existing.description = md_bug.description
+                if (
+                    md_bug.resolution_notes.strip()
+                    and md_bug.resolution_notes.strip() != existing.resolution_notes.strip()
+                ):
+                    existing.resolution_notes = md_bug.resolution_notes
+
+                # Reproduction steps
+                if md_bug.reproduction_steps and md_bug.reproduction_steps != existing.reproduction_steps:
+                    existing.reproduction_steps = md_bug.reproduction_steps
+
+                # Behaviors & logs
+                if (
+                    md_bug.expected_behavior.strip()
+                    and md_bug.expected_behavior.strip() != existing.expected_behavior.strip()
+                ):
+                    existing.expected_behavior = md_bug.expected_behavior
+                if (
+                    md_bug.actual_behavior.strip()
+                    and md_bug.actual_behavior.strip() != existing.actual_behavior.strip()
+                ):
+                    existing.actual_behavior = md_bug.actual_behavior
+                if md_bug.logs.strip() and md_bug.logs.strip() != existing.logs.strip():
+                    existing.logs = md_bug.logs
+
+                # Attachments: merge unique by file_path
+                existing_paths = {a.file_path for a in existing.attachments}
+                for att in md_bug.attachments:
+                    if att.file_path not in existing_paths:
+                        existing.attachments.append(att)
+                        existing_paths.add(att.file_path)
+
+        return base_db
