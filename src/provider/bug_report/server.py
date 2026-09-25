@@ -38,8 +38,19 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         """Suppress default HTTP server logging to preserve clean console output."""
         return
 
+    def _check_markdown_file_watch(self) -> None:
+        """Check if BUGS.md was modified externally and reload database."""
+        if self.server.markdown_output.exists():
+            try:
+                curr_mtime = self.server.markdown_output.stat().st_mtime
+                if curr_mtime > self.server.markdown_mtime + 0.001:
+                    self.server.sync_with_markdown()
+            except OSError:
+                pass
+
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboard and data query endpoints."""
+        self._check_markdown_file_watch()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -362,10 +373,37 @@ class BugReportServer(ThreadingHTTPServer):
 
         self.sqlite_store = SQLiteBugStore(self.sqlite_file)
         self.exporter = MarkdownBugExporter(repo_root=self.repo_root)
+        self.markdown_mtime = self.markdown_output.stat().st_mtime if self.markdown_output.exists() else 0.0
         self.database = self._initialize_database()
+        self._watcher_stop = threading.Event()
 
         if bind_and_activate:
+            self._start_file_watcher()
             super().__init__((host, port), BugReportRequestHandler)
+
+    def _start_file_watcher(self) -> None:
+        """Start background polling thread to watch BUGS.md for external changes."""
+
+        def watch_loop() -> None:
+            import time
+
+            while not self._watcher_stop.is_set():
+                time.sleep(1.0)
+                if self.markdown_output.exists():
+                    try:
+                        curr_mtime = self.markdown_output.stat().st_mtime
+                        if curr_mtime > self.markdown_mtime + 0.001:
+                            self.sync_with_markdown()
+                    except OSError:
+                        pass
+
+        t = threading.Thread(target=watch_loop, daemon=True)
+        t.start()
+
+    def server_close(self) -> None:
+        """Stop background file watcher and close server."""
+        self._watcher_stop.set()
+        super().server_close()
 
     def _ensure_unique_bug_ids(self, db: BugDatabaseModel) -> None:
         """Ensure all bug IDs in database are unique, disambiguating any duplicates."""
@@ -376,33 +414,49 @@ class BugReportServer(ThreadingHTTPServer):
             seen.add(bug.id)
 
     def _initialize_database(self) -> BugDatabaseModel:
-        """Load existing database state from SQLite, fallback to JSON state, or initialize fresh database."""
+        """Load existing database state from SQLite/JSON and perform R+M+W sync with BUGS.md."""
+        db = None
         if not self.fresh:
             if self.sqlite_file.exists():
                 db = self.sqlite_store.load_database()
-                if db and db.bugs:
-                    self._ensure_unique_bug_ids(db)
-                    return db
+            elif self.state_file.exists():
+                db = self.exporter.load_state_json(self.state_file)
 
-            if self.state_file.exists():
-                loaded = self.exporter.load_state_json(self.state_file)
-                if loaded:
-                    self._ensure_unique_bug_ids(loaded)
-                    self.sqlite_store.save_database(loaded)
-                    return loaded
+        if db is None:
+            db = BugDatabaseModel(
+                title="Hardware Bug Tracker",
+                summary="Hardware engineering defects, PCB layout issues, and reproduction tracking.",
+            )
 
-        db = BugDatabaseModel(
-            title="Hardware Bug Tracker",
-            summary="Hardware engineering defects, PCB layout issues, and reproduction tracking.",
-        )
+        if not self.fresh and self.markdown_output.exists():
+            md_db = self.exporter.parse_markdown(self.markdown_output)
+            if md_db and md_db.bugs:
+                db = self.exporter.merge_databases(db, md_db)
+            self.markdown_mtime = self.markdown_output.stat().st_mtime
+
+        self._ensure_unique_bug_ids(db)
+        if not self.fresh:
+            self.sqlite_store.save_database(db)
         return db
 
+    def sync_with_markdown(self) -> Path:
+        """Perform Read-Modify-Write (R+M+W) sync with BUGS.md and persist to stores."""
+        if self.markdown_output.exists():
+            md_db = self.exporter.parse_markdown(self.markdown_output)
+            if md_db and md_db.bugs:
+                self.database = self.exporter.merge_databases(self.database, md_db)
+                self._ensure_unique_bug_ids(self.database)
+        return self.save_and_sync()
+
     def save_and_sync(self) -> Path:
-        """Persist bug database to SQLite backing store, JSON state file, and export to Markdown."""
+        """Persist bug database to SQLite, JSON, and Markdown."""
         self.database.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         self.sqlite_store.save_database(self.database)
         self.exporter.export_state_json(self.database, self.state_file)
-        return self.exporter.export_markdown(self.database, self.markdown_output)
+        out = self.exporter.export_markdown(self.database, self.markdown_output)
+        if self.markdown_output.exists():
+            self.markdown_mtime = self.markdown_output.stat().st_mtime
+        return out
 
     def get_url(self) -> str:
         """Return reachable HTTP URL for browser."""
