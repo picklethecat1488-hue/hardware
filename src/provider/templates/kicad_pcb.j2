@@ -151,8 +151,13 @@
   (gr_text "{{ text.text }}" (at {{ text.x_mm }} {{ text.y_mm }}{% if text.rotation %} {{ text.rotation }}{% endif %}) (layer "{{ text.layer }}") (effects (font (size {{ text.font_size }} {{ text.font_size }}) (thickness {{ text.thickness }})){% if text.mirror %} (justify mirror){% endif %}))
 {% endfor %}
 {% for g in silkscreen_graphics %}
-{% if g.shape == "rect" %}
-  (gr_rect (start {{ g.x1 }} {{ g.y1 }}) (end {{ g.x2 }} {{ g.y2 }}) (stroke (width {{ g.thickness }}) (type default)) (fill {{ "solid" if g.fill else "none" }}) (layer "{{ g.layer }}"))
+{% if g.shape == "rect" and not g.fill %}
+  (gr_line (start {{ g.x1 }} {{ g.y1 }}) (end {{ g.x2 }} {{ g.y1 }}) (stroke (width {{ g.thickness }}) (type default)) (layer "{{ g.layer }}"))
+  (gr_line (start {{ g.x2 }} {{ g.y1 }}) (end {{ g.x2 }} {{ g.y2 }}) (stroke (width {{ g.thickness }}) (type default)) (layer "{{ g.layer }}"))
+  (gr_line (start {{ g.x2 }} {{ g.y2 }}) (end {{ g.x1 }} {{ g.y2 }}) (stroke (width {{ g.thickness }}) (type default)) (layer "{{ g.layer }}"))
+  (gr_line (start {{ g.x1 }} {{ g.y2 }}) (end {{ g.x1 }} {{ g.y1 }}) (stroke (width {{ g.thickness }}) (type default)) (layer "{{ g.layer }}"))
+{% elif g.shape == "rect" and g.fill %}
+  (gr_rect (start {{ g.x1 }} {{ g.y1 }}) (end {{ g.x2 }} {{ g.y2 }}) (stroke (width {{ g.thickness }}) (type default)) (fill solid) (layer "{{ g.layer }}"))
 {% elif g.shape == "line" %}
   (gr_line (start {{ g.x1 }} {{ g.y1 }}) (end {{ g.x2 }} {{ g.y2 }}) (stroke (width {{ g.thickness }}) (type default)) (layer "{{ g.layer }}"))
 {% elif g.shape == "polygon" and g.points %}
