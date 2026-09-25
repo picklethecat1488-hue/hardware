@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-25 02:12:20 UTC` |
-| **Total Issues** | `112` |
-| **Open Issues** | `7` |
-| **Resolved / Closed** | `105 (93%)` |
+| **Report Date** | `2026-09-25 03:09:10 UTC` |
+| **Total Issues** | `113` |
+| **Open Issues** | `8` |
+| **Resolved / Closed** | `105 (92%)` |
 
 ## Executive Summary
 
@@ -21,7 +21,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 1 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 4 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 104 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[MEDIUM]`** | 105 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 3 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
@@ -31,7 +31,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 | **`PCB`** | 83 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 13 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 2 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
-| **`INFRASTRUCTURE`** | 10 | Build tooling, compilers, test runners, headless tools. |
+| **`INFRASTRUCTURE`** | 11 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 1 | Web dashboards, CLI viewers, review interfaces. |
 
 ## Issue Checklist
@@ -148,6 +148,7 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [ ] **`[MEDIUM]`** [#BUG-111](#bug-111): White square above J2 `[carrier_board]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-112](#bug-112): Update test board docs with recommended battery model `[carrier_board]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-113](#bug-113): Carrier board serial expansion cutouts overlap `[carrier_board]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-114](#bug-114): Bug report tool does not pickup changes to BUGS.md `[bug_report]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -2530,7 +2531,7 @@ Redirected PCB DRC routing violations to board/<provider>/<subassembly>_drc_viol
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:52:26 UTC`
-- **Resolved**: `2026-09-25 02:11:34 UTC`
+- **Resolved**: `2026-09-25 03:08:55 UTC`
 
 #### Description
 
@@ -2554,7 +2555,7 @@ Increased horizontal separation between crystal load capacitors C9 and C10 to 18
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:53:44 UTC`
-- **Resolved**: `2026-09-25 02:11:39 UTC`
+- **Resolved**: `2026-09-25 03:08:57 UTC`
 
 #### Description
 
@@ -2578,7 +2579,7 @@ Added concentric detour routing under U8 for Sheet 4 FLEXSPI signals to eliminat
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:55:50 UTC`
-- **Resolved**: `2026-09-25 02:11:43 UTC`
+- **Resolved**: `2026-09-25 03:08:59 UTC`
 
 #### Description
 
@@ -2602,7 +2603,7 @@ Staggered Sheet 6 SCL and SDA doglegs to eliminate collinear segment overlaps.
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 20:57:12 UTC`
-- **Resolved**: `2026-09-25 02:11:49 UTC`
+- **Resolved**: `2026-09-25 03:09:00 UTC`
 
 #### Description
 
@@ -2620,7 +2621,7 @@ Cleaned up Sheet 7 capacitive touch routing on U2 and J2 with direct orthogonal 
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:01:11 UTC`
-- **Resolved**: `2026-09-25 02:11:53 UTC`
+- **Resolved**: `2026-09-25 03:09:02 UTC`
 
 #### Description
 
@@ -2644,7 +2645,7 @@ Routed Sheet 9 PCIE differential pairs straight across and detoured MIPI signals
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:04:04 UTC`
-- **Resolved**: `2026-09-25 02:11:58 UTC`
+- **Resolved**: `2026-09-25 03:09:04 UTC`
 
 #### Description
 
@@ -2668,7 +2669,7 @@ Split dense Serial Bus Expansion Headers into Sheet 10 (I2C & I3C) and Sheet 11 
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:06:52 UTC`
-- **Resolved**: `2026-09-25 02:12:03 UTC`
+- **Resolved**: `2026-09-25 03:09:07 UTC`
 
 #### Description
 
@@ -2692,7 +2693,7 @@ Routed Sheet 12 GPIO signals directly on-sheet without off-sheet connectors usin
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:10:15 UTC`
-- **Resolved**: `2026-09-25 02:12:15 UTC`
+- **Resolved**: `2026-09-25 03:09:08 UTC`
 
 #### Description
 
@@ -2710,7 +2711,7 @@ Routed dedicated AUDIO_EN GPIO from U1.L4 to U4.SD_MODE, decoupling audio shutdo
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Created**: `2026-09-24 21:11:33 UTC`
-- **Resolved**: `2026-09-25 02:12:20 UTC`
+- **Resolved**: `2026-09-25 03:09:10 UTC`
 
 #### Description
 
@@ -2844,5 +2845,19 @@ See attached screenshot, carrier board serial expansion cutouts overlap with eac
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790299068920.png](build/attachments/pasted_screenshot_1790299068920.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-114"></a> 🔴 `[BUG-114]` Bug report tool does not pickup changes to BUGS.md
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `INFRASTRUCTURE`
+- **Component**: `bug_report`
+- **Created**: `2026-09-25 02:21:09 UTC`
+
+#### Description
+
+Bug report tool does not pickup changes to BUGS.md when updating it. The tool should use a R+M+W operation to sync BUGS.md, not just write the current SQLite database status to the file. We should also add file watch on BUGS.md to that changes to it can be picked up in the UI automatically
 
 ---
