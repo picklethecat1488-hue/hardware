@@ -17,6 +17,7 @@ from typing import Optional, Any, Sequence, Callable
 from pydantic import validate_call
 from provider import ProviderManager, Section, Mode, SUBASSEMBLIES, Room, URDFShape
 import zipfile
+import shutil
 from shell import Logger
 from concurrent.futures import ThreadPoolExecutor
 import threading
@@ -344,7 +345,9 @@ class Builder:
             target_lists = []
             for name in names:
                 # Only resolve targets that are intended for the PART action
-                if self.target_parser.parse(name, Section.PART):
+                if self.target_parser.parse(name, Section.PART) and self.target_parser.can_resolve(name, Section.PART):
+                    target_lists.append(self.target_parser.resolve(name, Section.PART))
+                elif ":" in name and self.target_parser.parse(name, Section.PART):
                     target_lists.append(self.target_parser.resolve(name, Section.PART))
         else:
             target_lists = [self.manager.router.targets.supporting(Section.PART).for_modes([Mode.PRINT])]
@@ -380,7 +383,11 @@ class Builder:
             target_lists = []
             for name in names:
                 # Only resolve targets that are intended for the DIAGRAM action
-                if self.target_parser.parse(name, Section.DIAGRAM):
+                if self.target_parser.parse(name, Section.DIAGRAM) and self.target_parser.can_resolve(
+                    name, Section.DIAGRAM
+                ):
+                    target_lists.append(self.target_parser.resolve(name, Section.DIAGRAM))
+                elif ":" in name and self.target_parser.parse(name, Section.DIAGRAM):
                     target_lists.append(self.target_parser.resolve(name, Section.DIAGRAM))
         else:
             target_lists = [self.manager.router.targets.supporting(Section.DIAGRAM).for_modes([Mode.DEFAULT])]
@@ -405,7 +412,11 @@ class Builder:
                     path_str = str(path_obj)
 
                     provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
-                    options = getattr(provider.settings, "diagram_options", None) if provider else None
+                    options = getattr(room, "diagram_options", None)
+                    if options is None and provider:
+                        options = getattr(provider.settings, "diagram_options", None)
+                    if options is not None:
+                        options = options.model_copy(deep=True)
 
                     current_hash = self._get_diagram_hash(room, options)
                     futures.append(
@@ -431,7 +442,9 @@ class Builder:
         if names:
             target_lists = []
             for name in names:
-                if self.target_parser.parse(name, Section.VIEW):
+                if self.target_parser.parse(name, Section.VIEW) and self.target_parser.can_resolve(name, Section.VIEW):
+                    target_lists.append(self.target_parser.resolve(name, Section.VIEW))
+                elif ":" in name and self.target_parser.parse(name, Section.VIEW):
                     target_lists.append(self.target_parser.resolve(name, Section.VIEW))
         else:
             target_lists = [self.manager.router.targets.supporting(Section.VIEW).for_modes([Mode.SIMULATE])]
@@ -513,6 +526,193 @@ class Builder:
         for fut in futures:
             fut.result()
 
+    @validate_call(config={"arbitrary_types_allowed": True})
+    def generate_pcbs(self, out_dir: str, names: list[str] | None = None, force_update: Optional[bool] = None):
+        """Export PCB Gerber archives, supplier BOM/CPL, vector schematics, and 3D STEP models."""
+        from provider.pcb import PCBExporter, PCBDesignRulesChecker
+        from model.pcb import PCBConfig, BoardType
+        from model.wiring import Wiring
+
+        if names:
+            target_lists = []
+            for name in names:
+                if self.target_parser.parse(name, Section.PCB) and self.target_parser.can_resolve(name, Section.PCB):
+                    target_lists.append(self.target_parser.resolve(name, Section.PCB))
+                elif ":" in name and self.target_parser.parse(name, Section.PCB):
+                    target_lists.append(self.target_parser.resolve(name, Section.PCB))
+        else:
+            target_lists = [self.manager.router.targets.supporting(Section.PCB).for_modes([Mode.DEFAULT])]
+
+        if not target_lists:
+            return
+
+        for base_targets in target_lists:
+            for target_name in base_targets:
+                p_name, subassembly = TargetParser.split_target(target_name)
+                provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
+                if not provider:
+                    continue
+
+                wiring_file = getattr(provider, "wiring_path", None)
+                if not wiring_file or not Path(wiring_file).exists():
+                    continue
+
+                pcb_config = provider.pcb_config
+                if not pcb_config:
+                    raise ValueError(f"Project '{provider.name}' does not configure a PCB manifest or PCBConfig.")
+
+                self.logger.print(f"Compiling PCBs: {provider.name}/{subassembly}", symbol="🔌 ")
+                wiring = Wiring(Path(wiring_file))
+
+                sub_pcb_config = None
+                if subassembly in provider.part:
+                    part_func = provider.part[subassembly]
+                    part_res = part_func(subassembly, None, Mode.DEFAULT)
+                    if hasattr(part_res, "to_pcb_config"):
+                        sub_pcb_config = part_res.to_pcb_config()
+                    elif hasattr(part_res, "pcb_metadata"):
+                        sub_pcb_config = part_res.pcb_metadata
+
+                target_cfg = sub_pcb_config or pcb_config
+                if sub_pcb_config and pcb_config.revision and getattr(target_cfg, "board_type", None) != BoardType.FLEX:
+                    target_cfg = target_cfg.model_copy(update={"revision": pcb_config.revision})
+                if sub_pcb_config and not target_cfg.stackup:
+                    target_cfg = target_cfg.model_copy(update={"stackup": pcb_config.stackup})
+                if (
+                    sub_pcb_config
+                    and pcb_config.design_rules
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
+                    target_cfg = target_cfg.model_copy(update={"design_rules": pcb_config.design_rules})
+                if sub_pcb_config and not target_cfg.capacitive_sensors and pcb_config.capacitive_sensors:
+                    target_cfg = target_cfg.model_copy(update={"capacitive_sensors": pcb_config.capacitive_sensors})
+                if sub_pcb_config and not target_cfg.copper_regions and pcb_config.copper_regions:
+                    target_cfg = target_cfg.model_copy(update={"copper_regions": pcb_config.copper_regions})
+                if sub_pcb_config and not target_cfg.net_classes and pcb_config.net_classes:
+                    target_cfg = target_cfg.model_copy(update={"net_classes": pcb_config.net_classes})
+                if (
+                    sub_pcb_config
+                    and not target_cfg.schematic_sheets
+                    and pcb_config.schematic_sheets
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
+                    target_cfg = target_cfg.model_copy(update={"schematic_sheets": pcb_config.schematic_sheets})
+                if (
+                    sub_pcb_config
+                    and not target_cfg.schematic_layout
+                    and pcb_config.schematic_layout
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
+                    target_cfg = target_cfg.model_copy(update={"schematic_layout": pcb_config.schematic_layout})
+                if (
+                    sub_pcb_config
+                    and not target_cfg.silkscreen_texts
+                    and pcb_config.silkscreen_texts
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
+                    target_cfg = target_cfg.model_copy(update={"silkscreen_texts": pcb_config.silkscreen_texts})
+                if (
+                    sub_pcb_config
+                    and not target_cfg.traces
+                    and pcb_config.traces
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
+                    target_cfg = target_cfg.model_copy(update={"traces": pcb_config.traces})
+                if (
+                    sub_pcb_config
+                    and not target_cfg.vias
+                    and pcb_config.vias
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
+                    target_cfg = target_cfg.model_copy(update={"vias": pcb_config.vias})
+
+                # Run DRC and routing connectivity checks
+                board_dir = Path(out_dir) / "board" / provider.name
+                board_dir.mkdir(parents=True, exist_ok=True)
+                drc_checker = PCBDesignRulesChecker(target_cfg)
+                drc_report = drc_checker.check_all(wiring=wiring)
+                if not drc_report.passed:
+                    drc_log_file = board_dir / f"{subassembly}_drc_violations.log"
+                    drc_log_file.write_text(drc_report.summary())
+                    if drc_report.error_count > 0:
+                        raise ValueError(
+                            f"Failed to build {provider.name}/{subassembly}:pcb. Project has DRC errors:  {drc_log_file}"
+                        )
+                    self.logger.print(
+                        f"PCB DRC Warnings in {provider.name}/{subassembly}: {drc_log_file}",
+                        symbol="⚠️",
+                    )
+
+                subassembly_param = subassembly if subassembly != provider.name else None
+                exporter = PCBExporter(
+                    target_cfg,
+                    wiring,
+                    subassembly=subassembly_param,
+                    design_rules=target_cfg.design_rules,
+                )
+
+                board_dir = Path(out_dir) / "board" / provider.name
+                schematics_dir = Path(out_dir) / "schematics" / provider.name
+                bom_dir = Path(out_dir) / "bom" / provider.name
+                step_file = Path(out_dir) / "step" / provider.name / f"{subassembly}_pcb.step"
+
+                # 1. Export native KiCad targets (.kicad_pcb and .kicad_sch)
+                kicad_pcb = board_dir / f"{subassembly}.kicad_pcb"
+                kicad_sch = schematics_dir / f"{subassembly}.kicad_sch"
+                exporter.export_kicad_sch(kicad_sch)
+
+                # 2. Export manufacturing board files via kicad-cli (gerbers + drill + .kicad_pcb)
+                exporter.export_board(board_dir, pcb_filename=f"{subassembly}.kicad_pcb")
+
+                if subassembly == "carrier_board":
+                    alias_pcb = board_dir / f"{provider.name}.kicad_pcb"
+                    if alias_pcb != kicad_pcb and kicad_pcb.exists():
+                        shutil.copy2(kicad_pcb, alias_pcb)
+                        pro_src = kicad_pcb.with_suffix(".kicad_pro")
+                        pro_dst = alias_pcb.with_suffix(".kicad_pro")
+                        if pro_src.exists():
+                            shutil.copy2(pro_src, pro_dst)
+
+                # Run KiCad DRC verification and generate report under build/rpt
+                from provider.pcb.kicad_cli import KiCadCLI
+
+                kicad_cli = KiCadCLI(design_rules=target_cfg.design_rules)
+                if kicad_cli.is_available:
+                    rpt_dir = Path(out_dir) / "rpt"
+                    rpt_dir.mkdir(parents=True, exist_ok=True)
+                    rpt_file = rpt_dir / f"{subassembly}-drc.rpt"
+                    kicad_drc_report = kicad_cli.run_drc(kicad_pcb, rpt_file, design_rules=target_cfg.design_rules)
+                    if not kicad_drc_report.passed:
+                        drc_log_file = board_dir / f"{subassembly}_drc_violations.log"
+                        drc_log_file.write_text(kicad_drc_report.summary())
+                        raise ValueError(
+                            f"Failed to build {provider.name}/{subassembly}:pcb. Project has DRC errors:  {drc_log_file}"
+                        )
+                    self.logger.print(f"Generated KiCad DRC Report: {rpt_file}", symbol="🔍")
+                    if subassembly == "carrier_board":
+                        shutil.copy2(rpt_file, rpt_dir / f"{provider.name}-drc.rpt")
+
+                # 3. Export manufacturing BOM, CPL, Schematic vector PDF, and 3D STEP
+                bom_csv = bom_dir / f"{subassembly}_bom.csv" if subassembly != provider.name else bom_dir / "bom.csv"
+                pos_csv = bom_dir / f"{subassembly}_pos.csv" if subassembly != provider.name else bom_dir / "pos.csv"
+                schematic_pdf = schematics_dir / f"{subassembly}_schematic.pdf"
+
+                exporter.export_bom_csv(bom_csv)
+                exporter.export_pick_and_place_csv(pos_csv)
+                exporter.export_schematic_pdf(schematic_pdf)
+                exporter.export_step_solid(step_file)
+
+                if target_cfg.capacitive_sensors:
+                    cap_json = Path(out_dir) / "config" / provider.name / "capacitive_config.json"
+                    exporter.export_capacitive_config_json(cap_json)
+                    self.logger.print(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
+
+                self.logger.print(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
+                self.logger.print(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
+                self.logger.print(f"Generated Board Files: {board_dir}", symbol="📦")
+                self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
+                self.logger.print(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
+
     def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
 
@@ -551,9 +751,21 @@ class Builder:
         if not self.manager.router.providers:
             raise ValueError("No projects discovered. Nothing to build.")
 
+        if names:
+            all_supported_sections = [Section.PART, Section.DIAGRAM, Section.VIEW, Section.PCB]
+            for name in names:
+                if not any(self.target_parser.can_resolve(name, s) for s in all_supported_sections):
+                    target_action = Section.PART
+                    if ":" in name:
+                        action_str = name.split(":", 1)[1].split("/")[0]
+                        if action_str in [s.value for s in Section]:
+                            target_action = Section(action_str)
+                    self.target_parser.resolve(name, target_action)
+
         self.generate_parts(out_dir=out_dir, names=names)
         self.generate_diagram(out_dir=out_dir, names=names)
         self.generate_urdfs(out_dir=out_dir, names=names)
+        self.generate_pcbs(out_dir=out_dir, names=names)
 
         # Compress the build
         zip_path = Path(out_dir) / zip_name

@@ -4,10 +4,11 @@ import math
 import yaml
 from enum import StrEnum
 from pathlib import Path
-from typing import Tuple, List, Optional, Callable, Any
+from typing import Tuple, List, Optional, Callable, Any, Dict
 from functools import cached_property
-from pydantic import BaseModel, Field, validate_call
+from pydantic import BaseModel, Field, validate_call, field_validator
 from build123d import Vector, Location
+from model.pcb import BgaFanoutModel
 
 # Footprint Layout Registry
 PIN_LAYOUT_REGISTRY = {}
@@ -56,6 +57,10 @@ class PinModel(BaseModel):
     label: str = Field(description="Display label text for the pin")
     side: PinSide = Field(description="Placement side for the pin label (left, right, top, bottom)")
     slot: Optional[int] = Field(default=None, description="Optional slot index for DIP spacing")
+    pad_type: str = Field(default="smd", description="Pad type: smd or thru_hole")
+    pad_shape: str = Field(default="circle", description="Pad shape: circle, rect, oval, roundrect")
+    pad_size_mm: Tuple[float, float] = Field(default=(0.5, 0.5), description="Pad dimensions (width, height)")
+    drill_dia_mm: Optional[float] = Field(default=None, description="Drill hole diameter in mm for thru_hole pads")
 
 
 class LabelModel(BaseModel):
@@ -64,6 +69,44 @@ class LabelModel(BaseModel):
     text: str = Field(description="The display text for the label")
     position: Tuple[float, float, float] = Field(description="3D position offset relative to component center")
     align: Tuple[str, str] = Field(description="Horizontal and vertical text alignment (e.g. ['center', 'max'])")
+
+
+class TruthTableState(StrEnum):
+    """Classification of discrete component network truth table states."""
+
+    TRUE = "TRUE"
+    FALSE = "FALSE"
+    INVALID = "INVALID"
+
+
+class TruthTableRowModel(BaseModel):
+    """Row in a component truth table capturing inputs, outputs, state, and functional mode."""
+
+    inputs: Dict[str, str] = Field(description="Input pin or signal logic levels (e.g. {'PWR_EN': 'HIGH'})")
+    outputs: Dict[str, str] = Field(description="Output pin or signal logic levels (e.g. {'VLOAD_SW': 'LOW (0V)'})")
+    state: TruthTableState = Field(description="State classification: TRUE, FALSE, or INVALID")
+    description: str = Field(description="Functional operational mode or circuit note")
+
+    @field_validator("state", mode="before")
+    @classmethod
+    def parse_state(cls, v: Any) -> TruthTableState:
+        """Coerce strings to TruthTableState enum values."""
+        if isinstance(v, TruthTableState):
+            return v
+        if isinstance(v, str):
+            v_upper = v.strip().upper()
+            if v_upper in TruthTableState.__members__:
+                return TruthTableState[v_upper]
+        return v
+
+
+class TruthTableModel(BaseModel):
+    """Truth table representing true, false, and invalid states for discrete component networks."""
+
+    title: str = Field(default="Truth Table", description="Table title or circuit functional name")
+    input_headers: List[str] = Field(default_factory=list, description="Column headers for input signals")
+    output_headers: List[str] = Field(default_factory=list, description="Column headers for output signals")
+    rows: List[TruthTableRowModel] = Field(default_factory=list, description="Truth table rows")
 
 
 class FootprintModel(BaseModel):
@@ -85,8 +128,27 @@ class FootprintModel(BaseModel):
         default=None, description="Optional x/y spacing for mounting holes"
     )
     slots_per_side: Optional[int] = Field(default=None, description="Optional total number of DIP slots per side")
-    label: LabelModel = Field(description="Label settings for the footprint")
+    label: Optional[LabelModel] = Field(default=None, description="Label settings for the footprint")
     pins: List[PinModel] = Field(default_factory=list, description="List of pins on the footprint")
+    mpn: Optional[str] = Field(default=None, description="Manufacturer part number for BOM generation")
+    supplier_pn: Optional[str] = Field(default=None, description="Supplier part number (e.g. LCSC, DigiKey)")
+    bga_fanout: Optional[BgaFanoutModel] = Field(default=None, description="Optional BGA fanout configuration")
+    layer: str = Field(default="F.Cu", description="PCB copper placement layer ('F.Cu' for top, 'B.Cu' for bottom)")
+    truth_table: Optional[TruthTableModel] = Field(
+        default=None, description="Optional truth table capturing true, false, and invalid states for discrete networks"
+    )
+    shape_ref: Optional[str] = Field(
+        default=None,
+        description="Optional subassembly or shape reference for this footprint (e.g. 'carrier_board', 'flex_tail')",
+    )
+    color: Optional[str] = Field(
+        default=None,
+        description="Optional display color for the component package in wiring diagrams",
+    )
+    unconnected: bool = Field(
+        default=False,
+        description="Whether this component footprint is intentionally unconnected to the electrical netlist",
+    )
 
 
 class NetModel(BaseModel):
@@ -99,6 +161,35 @@ class NetModel(BaseModel):
     path: List[Tuple[float, float, float]] = Field(
         default_factory=list, description="Explicit 3D intermediate routing points for the net wire path"
     )
+    priority: Optional[int] = Field(
+        default=None, description="Optional custom routing priority (lower integer routes earlier)"
+    )
+
+
+# Shared Footprint Library Cache
+_SHARED_FOOTPRINTS_CACHE: Optional[Dict[str, Dict[str, Any]]] = None
+
+
+def load_shared_footprints(search_dir: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
+    """Load standard footprint definitions from shared yaml libraries (smd.yaml, thru_hole.yaml, ic.yaml)."""
+    global _SHARED_FOOTPRINTS_CACHE
+    if _SHARED_FOOTPRINTS_CACHE is not None and search_dir is None:
+        return _SHARED_FOOTPRINTS_CACHE
+
+    footprints: Dict[str, Dict[str, Any]] = {}
+    base = search_dir or Path(__file__).parent.parent / "projects" / "footprints"
+    if base.exists() and base.is_dir():
+        for yml in sorted(base.glob("*.yaml")):
+            with open(yml, "r") as f:
+                data = yaml.safe_load(f)
+            if data and isinstance(data, dict):
+                fps = data.get("footprints", {})
+                if isinstance(fps, dict):
+                    footprints.update(fps)
+
+    if search_dir is None:
+        _SHARED_FOOTPRINTS_CACHE = footprints
+    return footprints
 
 
 class Wiring:
@@ -110,13 +201,29 @@ class Wiring:
         self.yaml_path = yaml_path
         self.parent_part = parent_part
         with open(yaml_path, "r") as f:
-            self.config = yaml.safe_load(f)
+            self.config = yaml.safe_load(f) or {}
+
+        # Resolve any explicit imports in wiring YAML
+        self.shared_footprints = dict(load_shared_footprints())
+        imports = self.config.get("imports", [])
+        for imp in imports:
+            imp_path = (self.yaml_path.parent / imp).resolve()
+            if not imp_path.exists():
+                imp_path = (self.yaml_path.parent.parent / imp).resolve()
+            if imp_path.exists():
+                with open(imp_path, "r") as f:
+                    imp_data = yaml.safe_load(f)
+                if imp_data and isinstance(imp_data, dict):
+                    fps = imp_data.get("footprints", {})
+                    if isinstance(fps, dict):
+                        self.shared_footprints.update(fps)
 
     @cached_property
     def footprints(self) -> List[FootprintModel]:
         """Load and compute all component footprints with resolved positions and pin layouts."""
         components = []
-        for c in self.config.get("components", []):
+        raw_items = self.config.get("components") or self.config.get("footprints") or []
+        for c in raw_items:
             position = c.get("position", [0.0, 0.0, 0.0])
             rotation = c.get("rotation", [0.0, 0.0, 0.0])
 
@@ -128,11 +235,27 @@ class Wiring:
                 loc = joint_loc * Location(tuple(offset))
                 position = [loc.position.X, loc.position.Y, loc.position.Z]
 
-            pins = [PinModel(**p) for p in c.get("pins", [])]
-            w, l, thickness = c["dimensions"]
+            pkg_str = c.get("package", "")
+            shared_tmpl = self.shared_footprints.get(pkg_str, {})
+
+            # Default dimensions from shared footprint template if not specified on component
+            dims = c.get("dimensions") or shared_tmpl.get("dimensions", [5.0, 5.0, 1.0])
+            w, l, thickness = dims
+
+            pins = []
+            raw_pins = c.get("pins")
+            if raw_pins is None and "pins" in shared_tmpl:
+                raw_pins = shared_tmpl["pins"]
+
+            for p in raw_pins or []:
+                p_dict = dict(p)
+                if "label" not in p_dict:
+                    p_dict["label"] = p_dict["name"]
+                if "position" in p_dict and len(p_dict["position"]) == 2:
+                    p_dict["position"] = (p_dict["position"][0], p_dict["position"][1], 0.0)
+                pins.append(PinModel(**p_dict))
 
             # Parse package and namespace from the YAML value
-            pkg_str = c["package"]
             if ":" in pkg_str:
                 ns, pkg = pkg_str.split(":", 1)
                 layout_func = PIN_LAYOUT_REGISTRY.get(f"{ns}:{pkg}")
@@ -150,7 +273,15 @@ class Wiring:
             if layout_func is not None:
                 layout_func(pins, w, l, c.get("slots_per_side"))
 
-            label = LabelModel(**c["label"])
+            label_data = c.get("label")
+            label = (
+                LabelModel(**label_data)
+                if label_data
+                else LabelModel(text=c["name"], position=(0.0, 0.0, 0.0), align=("center", "center"))
+            )
+
+            tt_data = c.get("truth_table")
+            truth_table = TruthTableModel(**tt_data) if tt_data else None
 
             components.append(
                 FootprintModel(
@@ -159,11 +290,18 @@ class Wiring:
                     namespace=ns,
                     position=tuple(position),
                     rotation=tuple(rotation),
-                    dimensions=tuple(c["dimensions"]),
+                    dimensions=tuple(dims),
                     mounting_holes=tuple(c["mounting_holes"]) if c.get("mounting_holes") is not None else None,
                     slots_per_side=c.get("slots_per_side"),
                     label=label,
                     pins=pins,
+                    mpn=c.get("mpn"),
+                    supplier_pn=c.get("supplier_pn"),
+                    bga_fanout=c.get("bga_fanout"),
+                    layer=c.get("layer") or ("B.Cu" if position[2] < 0 else "F.Cu"),
+                    truth_table=truth_table,
+                    shape_ref=c.get("shape_ref"),
+                    unconnected=bool(c.get("unconnected", False)),
                 )
             )
         return components
@@ -180,6 +318,7 @@ class Wiring:
                     pins=[(p[0], p[1]) for p in n["pins"]],
                     offset=tuple(n.get("offset", (0.0, 0.0))),
                     path=[tuple(p) for p in n.get("path", [])],
+                    priority=n.get("priority"),
                 )
             )
         return nets

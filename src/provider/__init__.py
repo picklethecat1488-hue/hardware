@@ -124,4 +124,27 @@ from .provider_manager import ProviderManager
 from .utils import load_manifest, discover_provider
 from .wiring_diagram import WiringDiagram
 from .blender import BlenderRenderer, CameraViewport, RenderConfig
+from .pcb.silkscreen import (
+    BuildSilkscreen,
+    SilkscreenText,
+    SilkscreenRect,
+    SilkscreenLine,
+    SilkscreenPolygon,
+)
+from .pcb.stackup import BuildStackup, StackupLayer
+from .pcb.drill_holes import BuildDrillHoles, MountingHole, DrillHole
+from .pcb.board import BuildPcb, BuildFlexPCB
+from model.pcb import FlexType
+from .pcb.routing import (
+    BuildTraces,
+    Trace,
+    BuildVias,
+    Via,
+    BuildCopperRegions,
+    CopperRegion,
+    CopperZone,
+    BuildTestPoints,
+    TestPoint,
+)
+from .pcb.drc import PCBDesignRulesChecker, DRCReport, DRCViolation, DRCSeverity, DRCViolationCollection
 from model.wiring import Wiring

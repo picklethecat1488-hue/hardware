@@ -5,7 +5,7 @@ import heapq
 from typing import Dict, List, Optional, Any
 from pydantic import validate_call
 from build123d import *  # type: ignore
-from model.wiring import Wiring, FootprintModel, NetModel, PinSide
+from model.wiring import Wiring, FootprintModel, NetModel, PinModel, PinSide
 from model.text_args import TextArgs
 from .room import Room
 
@@ -211,7 +211,10 @@ class WiringDiagram:
         path.append(start_pt)
         path.reverse()
 
-        if path:
+        if len(path) == 1:
+            if (end_pt - start_pt).length > 1e-5:
+                path.append(end_pt)
+        elif len(path) > 1:
             path[0] = start_pt
             path[-1] = end_pt
 
@@ -227,10 +230,13 @@ class WiringDiagram:
 
             if (dir1 - dir2).length > 1e-5:
                 simplified.append(curr)
-        simplified.append(path[-1])
+        if len(path) > 1 and (path[-1] - simplified[-1]).length > 1e-5:
+            simplified.append(path[-1])
 
         if len(simplified) < 2:
-            return [start_pt, end_pt]
+            if (end_pt - start_pt).length > 1e-5:
+                return [start_pt, end_pt]
+            return []
         return simplified
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -245,13 +251,15 @@ class WiringDiagram:
                 return Align.MAX
             return Align.CENTER
 
-        def get_pin_side(pin_pos: tuple[float, float, float]) -> PinSide:
-            """Determine the side of a pin based on its physical offset from component center."""
-            if pin_pos[0] < -1e-3:
+        def get_pin_side(pin: PinModel) -> PinSide:
+            """Determine the side of a pin based on its explicit side or physical offset."""
+            if hasattr(pin, "side") and pin.side:
+                return pin.side
+            if pin.position[0] < -1e-3:
                 return PinSide.LEFT
-            elif pin_pos[0] > 1e-3:
+            elif pin.position[0] > 1e-3:
                 return PinSide.RIGHT
-            elif pin_pos[1] > 1e-3:
+            elif pin.position[1] > 1e-3:
                 return PinSide.TOP
             else:
                 return PinSide.BOTTOM
@@ -260,6 +268,63 @@ class WiringDiagram:
         for fp in components:
             cx, cy = fp.position[0], fp.position[1]
             w, l, thickness = fp.dimensions
+            fp_color = getattr(fp, "color", None) or "grey"
+
+            # Check if any pins need automatic perimeter edge distribution
+            auto_distribute = any(
+                p.position == (0.0, 0.0, 0.0) or math.hypot(p.position[0], p.position[1]) < 1e-3 for p in fp.pins
+            )
+
+            local_offsets: Dict[str, Tuple[float, float]] = {}
+            if auto_distribute:
+                # Group pins by side
+                pins_by_side: Dict[PinSide, List[PinModel]] = {
+                    PinSide.LEFT: [],
+                    PinSide.RIGHT: [],
+                    PinSide.TOP: [],
+                    PinSide.BOTTOM: [],
+                }
+                for pin in fp.pins:
+                    side = get_pin_side(pin)
+                    pins_by_side[side].append(pin)
+
+                for side, side_pins in pins_by_side.items():
+                    n_pins = len(side_pins)
+                    if n_pins == 0:
+                        continue
+                    match side:
+                        case PinSide.LEFT:
+                            edge_x = -w / 2.0
+                            margin = min(6.0, l * 0.15)
+                            y_start = l / 2.0 - margin
+                            y_end = -l / 2.0 + margin
+                            for idx, p in enumerate(side_pins):
+                                y_val = 0.0 if n_pins == 1 else y_start - idx * (y_start - y_end) / (n_pins - 1)
+                                local_offsets[p.name] = (edge_x, y_val)
+                        case PinSide.RIGHT:
+                            edge_x = w / 2.0
+                            margin = min(6.0, l * 0.15)
+                            y_start = l / 2.0 - margin
+                            y_end = -l / 2.0 + margin
+                            for idx, p in enumerate(side_pins):
+                                y_val = 0.0 if n_pins == 1 else y_start - idx * (y_start - y_end) / (n_pins - 1)
+                                local_offsets[p.name] = (edge_x, y_val)
+                        case PinSide.TOP:
+                            edge_y = l / 2.0
+                            margin = min(6.0, w * 0.15)
+                            x_start = -w / 2.0 + margin
+                            x_end = w / 2.0 - margin
+                            for idx, p in enumerate(side_pins):
+                                x_val = 0.0 if n_pins == 1 else x_start + idx * (x_end - x_start) / (n_pins - 1)
+                                local_offsets[p.name] = (x_val, edge_y)
+                        case PinSide.BOTTOM:
+                            edge_y = -l / 2.0
+                            margin = min(6.0, w * 0.15)
+                            x_start = -w / 2.0 + margin
+                            x_end = w / 2.0 - margin
+                            for idx, p in enumerate(side_pins):
+                                x_val = 0.0 if n_pins == 1 else x_start + idx * (x_end - x_start) / (n_pins - 1)
+                                local_offsets[p.name] = (x_val, edge_y)
 
             # Build footprint sketch
             with BuildSketch() as f_sketch:
@@ -268,7 +333,7 @@ class WiringDiagram:
                 if fillet_r > 0.1:
                     fillet(f_sketch.vertices(), radius=fillet_r)
 
-            room.add(f"{fp.name}_footprint", f_sketch.sketch.moved(Location((cx, cy))), color="grey", line_weight=2.0)
+            room.add(f"{fp.name}_footprint", f_sketch.sketch.moved(Location((cx, cy))), color=fp_color, line_weight=2.0)
 
             # Add component label centered inside the footprint
             room.add_label(
@@ -281,15 +346,20 @@ class WiringDiagram:
             # Add pins
             pin_positions[fp.name] = {}
             for pin in fp.pins:
-                gx, gy = cx + pin.position[0], cy + pin.position[1]
+                if pin.name in local_offsets:
+                    lx, ly = local_offsets[pin.name]
+                else:
+                    lx, ly = pin.position[0], pin.position[1]
+
+                gx, gy = cx + lx, cy + ly
                 pin_positions[fp.name][pin.name] = Vector(gx, gy, 0.0)
 
                 with BuildSketch() as pad:
                     Circle(radius=PAD_RADIUS)
-                room.add(f"{fp.name}_pad_{pin.name}", pad.sketch.moved(Location((gx, gy))), color="grey")
+                room.add(f"{fp.name}_pad_{pin.name}", pad.sketch.moved(Location((gx, gy))), color=fp_color)
 
                 lbl_offset = LABEL_OFFSET
-                match get_pin_side(pin.position):
+                match get_pin_side(pin):
                     case PinSide.LEFT:
                         lbl_pos = Vector(gx - lbl_offset, gy, 0.0)
                         align = (Align.MAX, Align.CENTER)
@@ -353,7 +423,8 @@ class WiringDiagram:
 
             # Add pin label obstacles (owner=pin position)
             for pin in fp.pins:
-                gx, gy = cx + pin.position[0], cy + pin.position[1]
+                pin_pos = pin_positions[fp.name][pin.name]
+                gx, gy = pin_pos.X, pin_pos.Y
                 # Add pin pad obstacle (owner=pin position) so wires avoid other pins (aligned to grid step)
                 obstacles.append(
                     Obstacle(
@@ -361,7 +432,7 @@ class WiringDiagram:
                         gy - PAD_CLEARANCE,
                         gx + PAD_CLEARANCE,
                         gy + PAD_CLEARANCE,
-                        Vector(gx, gy, 0.0),
+                        pin_pos,
                     )
                 )
                 lbl_offset = LABEL_OFFSET
@@ -370,7 +441,7 @@ class WiringDiagram:
                 text_width = len(pin.label) * TEXT_FONT_SIZE * TEXT_WIDTH_FACTOR
                 text_height = TEXT_HEIGHT
 
-                match get_pin_side(pin.position):
+                match get_pin_side(pin):
                     case PinSide.LEFT:
                         lox1 = gx - lbl_offset - text_width
                         lox2 = gx - 0.5
@@ -437,8 +508,8 @@ class WiringDiagram:
                 fp_b = next(f for f in components if f.name == component_b)
                 pin_b_obj = next(p for p in fp_b.pins if p.name == pin_b)
 
-                start_side = get_pin_side(pin_a_obj.position)
-                end_side = get_pin_side(pin_b_obj.position)
+                start_side = get_pin_side(pin_a_obj)
+                end_side = get_pin_side(pin_b_obj)
 
                 # Route between current active pin and next pin using A* router
                 segment_path = self._find_wire_path(pt_a, pt_b, obstacles, routed_cells, bounds)
@@ -455,9 +526,10 @@ class WiringDiagram:
                         for gy in range(y_start, y_end + 1):
                             routed_cells.add((gx, gy))
 
-                # Append the segment path directly to sub_paths
-                sub_paths.append(segment_path)
-                segments_info.append((segment_path, start_side, end_side))
+                # Append the segment path directly to sub_paths if valid
+                if len(segment_path) >= 2:
+                    sub_paths.append(segment_path)
+                    segments_info.append((segment_path, start_side, end_side))
 
                 # Move the active routing pin forward only if the target is not surface mount
                 if not self.wiring.is_surface_mount(component_b):
@@ -566,17 +638,19 @@ class WiringDiagram:
                     if not dedup_pts or (pt - dedup_pts[-1]).length > 1e-5:
                         dedup_pts.append(pt)
 
-                wire_name = name_i if sub_idx == 0 else f"{name_i}_{sub_idx}"
-                processed_paths.append((wire_name, color_i, dedup_pts))
+                if len(dedup_pts) >= 2:
+                    wire_name = name_i if sub_idx == 0 else f"{name_i}_{sub_idx}"
+                    processed_paths.append((wire_name, color_i, dedup_pts))
 
         # 3. Add all processed polylines/wires to the room
         for name, color, pts in processed_paths:
+            if len(pts) < 2:
+                continue
             wire_geom = smart_fillet(pts, WIRE_FILLET_RADIUS)
             room.add(f"wire_{name}", wire_geom, color=color)
 
             # Add connection dots at the start and end of the wire segment
-            if len(pts) >= 2:
-                with BuildSketch() as dot_sketch:
-                    Circle(radius=WIRE_DOT_RADIUS)
-                room.add(f"wire_dot_start_{name}", dot_sketch.sketch.moved(Location(pts[0])), color=color)
-                room.add(f"wire_dot_end_{name}", dot_sketch.sketch.moved(Location(pts[-1])), color=color)
+            with BuildSketch() as dot_sketch:
+                Circle(radius=WIRE_DOT_RADIUS)
+            room.add(f"wire_dot_start_{name}", dot_sketch.sketch.moved(Location(pts[0])), color=color)
+            room.add(f"wire_dot_end_{name}", dot_sketch.sketch.moved(Location(pts[-1])), color=color)

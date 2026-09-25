@@ -1,0 +1,470 @@
+name: TestBoard_Carrier
+board_type: rigid-flex
+revision: "2.0"
+shape_ref: carrier_board
+sheet_size: A4
+
+design_rules:
+  min_clearance_mm: 0.030
+  min_fine_pitch_clearance_mm: 0.030
+  fine_pitch_pad_threshold_mm: 0.35
+  min_track_width_mm: 0.10
+  default_track_width_mm: 0.12
+  min_copper_edge_clearance_mm: 0.15
+  min_hole_to_hole_mm: 0.030
+  min_hole_clearance_mm: 0.030
+  min_via_diameter_mm: 0.35
+  default_via_diameter_mm: 0.36
+  default_via_drill_mm: 0.16
+  via_penalty: 2.00
+  pad_to_mask_clearance_mm: 0.0
+
+net_classes:
+  - name: PCIE_GEN4
+    trace_width_mm: 0.12
+    clearance_mm: 0.12
+    via_dia_mm: 0.36
+    via_drill_mm: 0.16
+    interface_type: pcie
+    require_ground_stitch_via: true
+    max_stitch_via_distance_mm: 1.0
+    diff_pairs:
+      - name: PCIE_L0_TX
+        pos_net: PCIE_TX0_P
+        neg_net: PCIE_TX0_N
+        target_impedance_ohms: 85.0
+        impedance_tolerance_percent: 15.0
+        max_intra_pair_skew_mm: 0.10
+        max_inter_pair_skew_mm: 0.50
+        max_via_count: 2
+      - name: PCIE_L0_RX
+        pos_net: PCIE_RX0_P
+        neg_net: PCIE_RX0_N
+        target_impedance_ohms: 85.0
+        impedance_tolerance_percent: 15.0
+        max_intra_pair_skew_mm: 0.10
+        max_inter_pair_skew_mm: 0.50
+        max_via_count: 2
+
+  - name: MIPI_DISPLAY
+    trace_width_mm: 0.12
+    clearance_mm: 0.12
+    via_dia_mm: 0.36
+    via_drill_mm: 0.16
+    interface_type: display
+    diff_pairs:
+      - name: MIPI_D0
+        pos_net: MIPI_DATA0_P
+        neg_net: MIPI_DATA0_N
+        target_impedance_ohms: 100.0
+        impedance_tolerance_percent: 10.0
+        max_intra_pair_skew_mm: 0.15
+        max_inter_pair_skew_mm: 0.75
+        max_via_count: 2
+      - name: MIPI_CLK
+        pos_net: MIPI_CLK_P
+        neg_net: MIPI_CLK_N
+        target_impedance_ohms: 100.0
+        impedance_tolerance_percent: 10.0
+        max_intra_pair_skew_mm: 0.15
+        max_inter_pair_skew_mm: 0.75
+        max_via_count: 2
+
+  - name: RF_2GHZ
+    trace_width_mm: 0.13
+    clearance_mm: 0.20
+    via_dia_mm: 0.36
+    via_drill_mm: 0.16
+    interface_type: rf
+    coplanar_waveguide: true
+    ground_gap_mm: 0.22
+    keepout_clearance_mm: 1.5
+    single_nets:
+      - RF_ANT_FEED
+
+  - name: I2C_BUS
+    trace_width_mm: 0.12
+    clearance_mm: 0.12
+    via_dia_mm: 0.36
+    via_drill_mm: 0.16
+    interface_type: digital
+    single_nets:
+      - I2C_SDA
+      - I2C_SCL
+
+  - name: PWR_3V3
+    trace_width_mm: 0.12
+    clearance_mm: 0.20
+    via_dia_mm: 0.36
+    via_drill_mm: 0.16
+    interface_type: power
+    single_nets:
+      - 3V3
+
+flex_zones:
+  - name: flex_tail_ribbon
+    start_x_mm: 30.0
+    length_mm: 54.0
+    substrate_thickness_mm: 0.050
+    coverlay_thickness_mm: 0.025
+    min_bend_radius_mm: 3.0
+    shape_ref: flex_tail
+
+capacitive_sensors:
+  - name: SENSE_WATER_LEVEL_LOW
+    channel_id: 0
+    electrode_type: mutual
+    shape: interdigital
+    area_mm: [12.0, 10.0]
+    pitch_mm: 1.2
+    gap_mm: 0.3
+    center_mm: [0.0, -12.0]
+    drive_shield: false
+    hatch_ground_pour: true
+    hatch_line_width_mm: 0.15
+    hatch_pitch_mm: 0.50
+    tx_pin: CAP_TX0
+    rx_pin: CAP_RX0
+    threshold_raw: 2200
+    shape_ref: flex_tail
+
+  - name: SENSE_WATER_LEVEL_MID
+    channel_id: 1
+    electrode_type: mutual
+    shape: interdigital
+    area_mm: [12.0, 10.0]
+    pitch_mm: 1.2
+    gap_mm: 0.3
+    center_mm: [0.0, -0.5]
+    drive_shield: false
+    hatch_ground_pour: true
+    hatch_line_width_mm: 0.15
+    hatch_pitch_mm: 0.50
+    tx_pin: CAP_TX1
+    rx_pin: CAP_RX1
+    threshold_raw: 2500
+    shape_ref: flex_tail
+
+  - name: SENSE_WATER_LEVEL_HIGH
+    channel_id: 2
+    electrode_type: mutual
+    shape: interdigital
+    area_mm: [12.0, 10.0]
+    pitch_mm: 1.2
+    gap_mm: 0.3
+    center_mm: [0.0, 11.0]
+    drive_shield: false
+    hatch_ground_pour: true
+    hatch_line_width_mm: 0.15
+    hatch_pitch_mm: 0.50
+    tx_pin: CAP_TX2
+    rx_pin: CAP_RX2
+    threshold_raw: 2800
+    shape_ref: flex_tail
+
+  - name: SENSE_WATER_PROXIMITY
+    channel_id: 3
+    electrode_type: self
+    shape: pad
+    area_mm: [10.0, 6.0]
+    center_mm: [0.0, 20.5]
+    drive_shield: false
+    hatch_ground_pour: true
+    hatch_line_width_mm: 0.15
+    hatch_pitch_mm: 0.50
+    rx_pin: CAP_RX3
+    threshold_raw: 1500
+    shape_ref: flex_tail
+
+schematic_sheets:
+  - title: USB-C Power & Battery Interface
+    description: USB-C connector, CC pull-down termination, Li-Ion battery connector, and MAX17048 fuel gauge
+    components: [J3, R3, R4, J13, C13, U7, C7]
+    pin_breakouts:
+      J3: [VBUS, VBUS2, GND, GND2, CC1, CC2, SHIELD1, SHIELD2]
+      J13: ["1", "2"]
+      C13: ["1", "2"]
+      U7: ["1", "2", "3", "4", "5", "7", "8"]
+      R3: ["1", "2"]
+      R4: ["1", "2"]
+      C7: ["1", "2"]
+
+  - title: 3.3V Power Regulation & Distribution
+    description: Low-dropout linear voltage regulator, switched power rail MOSFET switch, sensor buck regulator, and system decoupling
+    layout:
+      cols_per_row: 4
+      grid_positions:
+        U3: [0, 0]
+        Q1: [0, 1]
+        J1: [0, 2]
+        U10: [0, 3]
+    components: [U3, C6, Q1, J1, C1, C2, C3, U10]
+    pin_breakouts:
+      U3: ["1", "2", "3", "4", "5"]
+      Q1: [G, S, D]
+      J1: [GND, 3V3, VLOAD_SW]
+      U10: ["1", "2", "3", "5"]
+      C1: ["1", "2"]
+      C2: ["1", "2"]
+      C3: ["1", "2"]
+      C6: ["1", "2"]
+
+  - title: Microcontroller Core, Clock & Reset
+    description: Primary microcontroller core, 24MHz crystal oscillator, power bypass, reset and boot circuitry
+    layout:
+      col_gap: 65.0
+    components: [U1, Y1, C9, C10, R5, C11, R6, C4, C5]
+    pin_sides:
+      U1:
+        J8: left
+        H8: left
+        F2: right
+        F1: right
+        D1: left
+        M1: left
+        C14: left
+      Y1:
+        "1": left
+        "3": left
+        "2": right
+        "4": right
+    pin_breakouts:
+      U1: [J8, H8, D1, F2, F1, F3, C14]
+      Y1: ["1", "2", "3", "4"]
+      C9: ["1", "2"]
+      C10: ["1", "2"]
+      R5: ["1", "2"]
+      C11: ["1", "2"]
+      R6: ["1", "2"]
+      C4: ["1", "2"]
+      C5: ["1", "2"]
+
+  - title: External Serial NAND Storage Subsystem
+    description: Winbond W25N01GV 1Gb SLC serial NAND flash on FlexSPI Port A
+    components: [U1, U8]
+    pin_breakouts:
+      U1: [B17, F15, F17, D14, E14, F16]
+      U8: ["1", "2", "3", "4", "5", "6", "7", "8"]
+
+  - title: Telemetry & Debug Communications
+    description: FTDI FT232RNQ high-speed USB-to-UART serial bridge and ARM 10-pin SWD debug micro-header
+    components: [U1, U9, J5]
+    pin_breakouts:
+      U1: [A6, B6, E10, F10, A17, A16, B16]
+      U9: ["1", "3", "4", "5", "7", "11", "15", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "29"]
+      J5: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+
+  - title: User Interface & Status Indication
+    description: TI LP5009 9-channel I2C constant-current LED driver and high-brightness RGB status indicator
+    components: [U1, U6, D1]
+    pin_breakouts:
+      U1: [A10, B10]
+      U6: ["1", "2", "3", "4", "5", "6", "7", "8", "15", "16"]
+      D1: ["1", "2", "3", "4"]
+
+  - title: Capacitive Sensing & Control (Azoteq IQS7222A)
+    description: Azoteq IQS7222A ProxFusion controller, 4-channel liquid level flex tail, and I2C bus
+    layout:
+      col_gap: 65.0
+    components: [U1, U2, J2, R1, R2, C12, C14]
+    pin_sides:
+      U1:
+        C5: right
+        C6: right
+        C4: right
+      U2:
+        VDD: left
+        VSS: left
+        EP: left
+        MCLR: left
+        SDA: left
+        SCL: left
+        RDY: left
+        CR0: right
+        CR1: right
+        CR2: right
+        CR3: right
+        CR4: right
+        CR5: right
+        CR6: right
+        CR7: right
+        CT8: right
+        OUTA: right
+        VREGD: right
+        VREGA: right
+      J2:
+        CAP_TX0: left
+        CAP_RX0: left
+        CAP_TX1: left
+        CAP_RX1: left
+        CAP_TX2: left
+        CAP_RX2: left
+        CAP_RX3: left
+        CAP_SHIELD: left
+    pin_breakouts:
+      U1: [C5, C6, C4]
+      U2: [VDD, VSS, EP, MCLR, SDA, SCL, RDY, CR0, CR1, CR2, CR3, CR4, CR5, CR6, CR7, VREGD, VREGA]
+      J2: [CAP_TX0, CAP_RX0, CAP_TX1, CAP_RX1, CAP_TX2, CAP_RX2, CAP_RX3, CAP_SHIELD]
+      R1: ["1", "2"]
+      R2: ["1", "2"]
+      C12: ["1", "2"]
+      C14: ["1", "2"]
+
+  - title: Audio Subsystem
+    description: MAX98357A I2S/PDM digital audio amplifier and piezo speaker
+    layout:
+      cols_per_row: 3
+      grid_positions:
+        U1: [0, 0]
+        U4: [0, 1]
+        U5: [0, 2]
+    components: [U4, U5, U1, C8]
+    pin_sides:
+      U4:
+        OUTP: right
+        OUTN: right
+        DIN: right
+        BCLK: right
+        LRCLK: right
+      U5:
+        "1": left
+        "2": left
+    pin_breakouts:
+      U4: [GAIN, SD_MODE, GND, VDD, OUTP, OUTN, DIN, BCLK, LRCLK]
+      U5: ["1", "2"]
+      U1: [H1, G2, J1, L4]
+      C8: ["1", "2"]
+
+  - title: High-Speed Differential Interfaces
+    description: PCIe Gen4 x1 differential link and MIPI D-PHY display interface
+    components: [J1, U1, J2]
+    pin_breakouts:
+      J1: [PETp0, PETn0, PERp0, PERn0]
+      U1: [T2, T1, T3, T4, A2, A4, A12, A14]
+      J2: [D0_P, D0_N, CLK_P, CLK_N]
+
+  - title: Serial Bus Expansion Headers (I2C & I3C)
+    description: Primary I2C and I3C0 peripheral expansion headers
+    layout:
+      cols_per_row: 3
+      grid_positions:
+        U1: [0, 0]
+        J6: [0, 1]
+        J7: [0, 2]
+    components: [U1, J6, J7]
+    pin_sides:
+      U1:
+        A1: right
+        B1: right
+        B2: right
+        A8: right
+        C8: right
+        B8: right
+      J6:
+        "2": left
+        "3": left
+        "4": left
+      J7:
+        "2": left
+        "3": left
+        "4": left
+    pin_breakouts:
+      U1: [A1, B1, B2, A8, C8, B8]
+      J6: ["1", "2", "3", "4"]
+      J7: ["1", "2", "3", "4"]
+
+  - title: Serial Bus Expansion Headers (SPI, UART & CAN)
+    description: Secondary I3C, SPI, and UART peripheral expansion headers
+    layout:
+      cols_per_row: 3
+      grid_positions:
+        U1: [0, 0]
+        J8: [0, 1]
+        J9: [1, 1]
+        J10: [0, 2]
+    components: [U1, J8, J9, J10]
+    pin_sides:
+      U1:
+        F4: right
+        F6: right
+        E4: right
+        T6: right
+        T7: right
+        R8: right
+        R9: right
+        T8: right
+      J8:
+        "2": left
+        "3": left
+        "4": left
+      J9:
+        "2": left
+        "3": left
+        "4": left
+        "5": left
+        "6": left
+    pin_breakouts:
+      U1: [F4, F6, E4, T6, T7, R8, R9, T8]
+      J8: ["1", "2", "3", "4"]
+      J9: ["1", "2", "3", "4", "5", "6"]
+      J10: ["1", "2", "3", "4", "5", "6"]
+
+  - title: General Purpose I/O Expansion Header
+    description: 10-pin multipurpose microcontroller GPIO expansion header
+    components: [U1, J14]
+    pin_breakouts:
+      U1: [M8, N8, N10, T10, T11, T12]
+      J14: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+
+assembly_test:
+  test_fixture: flying_probe
+  pass_criteria: all_steps_within_tolerance
+  instructions:
+    - step_id: TEST_CONTINUITY_GND
+      description: Verify solid low-impedance ground plane continuity across all copper layers
+      test_type: continuity
+      net_or_points: [GND, IN1_GND, IN3_PWR]
+      expected_nominal: 0.05
+      tolerance_pct: 20.0
+      unit: ohm
+    - step_id: TEST_IMP_PCIE_DIFF
+      description: Measure PCIe Gen4 differential impedance on TX0+/TX0-
+      test_type: impedance
+      net_or_points: [PCIE_TX0_P, PCIE_TX0_N]
+      expected_nominal: 85.0
+      tolerance_pct: 10.0
+      unit: ohm
+      stimulus: 100ps TDR step
+    - step_id: TEST_CAP_SENSE_CHAN0
+      description: Measure baseline mutual capacitance on liquid level electrode Channel 0
+      test_type: capacitance
+      net_or_points: [CAP_TX0, CAP_RX0]
+      expected_nominal: 12.5
+      tolerance_pct: 15.0
+      unit: pF
+      stimulus: 250kHz 1.8V square
+    - step_id: TEST_CAP_SENSE_CHAN1
+      description: Measure baseline mutual capacitance on liquid level electrode Channel 1
+      test_type: capacitance
+      net_or_points: [CAP_TX1, CAP_RX1]
+      expected_nominal: 14.0
+      tolerance_pct: 15.0
+      unit: pF
+      stimulus: 250kHz 1.8V square
+    - step_id: TEST_CAP_SENSE_CHAN2
+      description: Measure baseline mutual capacitance on liquid level electrode Channel 2
+      test_type: capacitance
+      net_or_points: [CAP_TX2, CAP_RX2]
+      expected_nominal: 15.5
+      tolerance_pct: 15.0
+      unit: pF
+      stimulus: 250kHz 1.8V square
+    - step_id: TEST_CAP_SENSE_CHAN3
+      description: Measure baseline self capacitance on liquid proximity electrode Channel 3
+      test_type: capacitance
+      net_or_points: [CAP_RX3]
+      expected_nominal: 8.0
+      tolerance_pct: 15.0
+      unit: pF
+      stimulus: 250kHz 1.8V square
+
