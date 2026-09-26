@@ -539,7 +539,7 @@ class TestViewer:
         assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
         assert kwargs.get("proj_name") == "mock"
         assert kwargs.get("sim_target") == "mock/target"
-        assert kwargs.get("steps") == 2000
+        assert kwargs.get("steps") is None
 
         # Verify Builder compiles parts and URDFs prior to simulating
         mock_builder_class.assert_called_once_with(viewer.manager, viewer.logger)
@@ -577,7 +577,7 @@ class TestViewer:
         assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
         assert kwargs.get("proj_name") == "mock"
         assert kwargs.get("sim_target") == "mock/target"
-        assert kwargs.get("steps") == 2000
+        assert kwargs.get("steps") is None
         mock_builder_class.assert_not_called()
 
     @patch("view.show")
@@ -616,7 +616,7 @@ class TestViewer:
         assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
         assert kwargs.get("proj_name") == "mock"
         assert kwargs.get("sim_target") == "mock/target"
-        assert kwargs.get("steps") == 2000
+        assert kwargs.get("steps") is None
         assert kwargs.get("build_dir") == "custom_build"
 
     def test_show_simulation_empty_room(self, viewer):

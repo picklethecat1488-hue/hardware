@@ -275,6 +275,56 @@ class KiCadCLI:
 
         return out_svg
 
+    def render_board_image(
+        self,
+        kicad_pcb_path: str | Path,
+        output_png: str | Path,
+        side: str = "top",
+        width: int = 1600,
+        height: int = 900,
+        transparent: bool = True,
+    ) -> Path:
+        """Render photorealistic 3D board view to PNG image using kicad-cli.
+
+        Args:
+            kicad_pcb_path: Path to .kicad_pcb file.
+            output_png: Destination path for rendered PNG image.
+            side: View side ('top' or 'bottom').
+            width: Output image width in pixels.
+            height: Output image height in pixels.
+            transparent: Whether to render with transparent background.
+
+        Returns:
+            Path to rendered output PNG image.
+        """
+        pcb_file = Path(kicad_pcb_path).resolve()
+        out_png = Path(output_png).resolve()
+        out_png.parent.mkdir(parents=True, exist_ok=True)
+
+        if not pcb_file.is_file():
+            raise FileNotFoundError(f"KiCad PCB file not found: {pcb_file}")
+
+        args = [
+            "pcb",
+            "render",
+            "--side",
+            side,
+            "--width",
+            str(width),
+            "--height",
+            str(height),
+            "--quality",
+            "basic",
+            "-o",
+            str(out_png),
+            str(pcb_file),
+        ]
+        if transparent:
+            args.extend(["--background", "transparent"])
+        self.run_command(args)
+
+        return out_png
+
     def export_all_board_files(
         self,
         kicad_pcb_path: str | Path,

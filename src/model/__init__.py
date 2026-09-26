@@ -51,3 +51,4 @@ from .pcb import (
     SchematicLayoutModel,
     SchematicSheetModel,
 )
+from .simulation import FlyingProbeReportModel, FlyingProbeStepReportModel

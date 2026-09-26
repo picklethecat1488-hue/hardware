@@ -340,3 +340,18 @@ class Wiring:
                 if func is not None:
                     return getattr(func, "surface_mount", False)
         return False
+
+    def filter_by_footprints(self, footprints: List[Any]) -> "Wiring":
+        """Return a shallow copy of this Wiring instance with a filtered footprint list."""
+        filtered = Wiring.__new__(Wiring)
+        filtered.yaml_path = self.yaml_path
+        filtered.parent_part = self.parent_part
+        filtered.config = self.config
+        filtered.shared_footprints = self.shared_footprints
+        if footprints and isinstance(footprints[0], str):
+            target_names = set(footprints)
+            filtered.__dict__["footprints"] = [fp for fp in self.footprints if fp.name in target_names]
+        else:
+            filtered.__dict__["footprints"] = list(footprints)
+        filtered.__dict__["nets"] = self.nets
+        return filtered

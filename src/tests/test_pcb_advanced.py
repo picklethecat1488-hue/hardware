@@ -1866,8 +1866,10 @@ def test_regression_enclosure_cad_feedback_and_assembly() -> None:
     assert bottom is not None and bottom.part is not None
     b_part = bottom.part
     bb = b_part.bounding_box()
-    expected_w = provider.settings.board_width + 2.0 * (
-        provider.settings.enclosure_clearance + provider.settings.enclosure_wall_thickness
+    expected_w = (
+        provider.settings.board_width
+        + 2.0 * (provider.settings.enclosure_clearance + provider.settings.enclosure_wall_thickness)
+        + provider.settings.enclosure_expansion_mount_protrusion
     )
     expected_l = provider.settings.board_length + 2.0 * (
         provider.settings.enclosure_clearance + provider.settings.enclosure_wall_thickness
@@ -1884,7 +1886,10 @@ def test_regression_enclosure_cad_feedback_and_assembly() -> None:
     assert lid is not None and lid.part is not None
     l_part = lid.part
     l_bb = l_part.bounding_box()
-    assert abs((l_bb.max.X - l_bb.min.X) - expected_w) < 0.1
+    expected_base_w = provider.settings.board_width + 2.0 * (
+        provider.settings.enclosure_clearance + provider.settings.enclosure_wall_thickness
+    )
+    assert abs((l_bb.max.X - l_bb.min.X) - expected_base_w) < 0.1
     assert abs((l_bb.max.Y - l_bb.min.Y) - expected_l) < 0.1
     expected_lid_h = (
         provider.settings.enclosure_wall_thickness
@@ -2786,8 +2791,9 @@ def test_regression_bugs_115_through_127() -> None:
     assert not any(n.name == "SWD_SWO" for n in wiring.nets), "BUG-117: SWD_SWO net must be removed"
     nrst_net = next(n for n in wiring.nets if n.name == "NRST")
     nrst_comps = [p[0] for p in nrst_net.pins]
-    assert "U9" not in nrst_comps, "BUG-117: NRST must not connect to U9"
     assert "J5" not in nrst_comps, "BUG-117: NRST must not connect to J5"
+    # Under BUG-129, NRST connects to U9 pin 23 (CBUS0) for FTDI reboot into ISP mode
+    assert "U9" in nrst_comps, "BUG-129: NRST must connect to U9 for FTDI ISP reboot"
 
     # BUG-118: U6 pins 6, 7, 8 on right side and pin 15 on left side
     sheet_ui = next((s for s in pcb_cfg.schematic_sheets if "User Interface" in s.title), None)
@@ -2843,10 +2849,13 @@ def test_regression_bugs_115_through_127() -> None:
         if part.get("name") in ["carrier_board", "flex_tail"]:
             assert "obj" in part.get("export", []), f"BUG-124: {part['name']} must export obj"
 
-    # BUG-125: textures exist
-    tex_dir = Path("src/projects/test_board/textures")
-    assert (tex_dir / "carrier_board_top.png").exists(), "BUG-125: carrier_board_top.png must exist"
-    assert (tex_dir / "carrier_board_bottom.png").exists(), "BUG-125: carrier_board_bottom.png must exist"
+    # BUG-125 & CR 9140e9d18d0e: textures exist in build output, not committed in project textures/
+    assert not Path("src/projects/test_board/textures").exists(), "Textures subfolder must not exist in project source"
+    tex_dir = Path("build/board/test_board/textures")
+    assert (tex_dir / "carrier_board_top.png").exists(), "BUG-125: carrier_board_top.png must exist in build textures"
+    assert (tex_dir / "carrier_board_bottom.png").exists(), (
+        "BUG-125: carrier_board_bottom.png must exist in build textures"
+    )
 
     # BUG-126: _get_pin_absolute_pos handles rotation
     from types import SimpleNamespace
@@ -2856,7 +2865,7 @@ def test_regression_bugs_115_through_127() -> None:
     pos = _get_pin_absolute_pos(mock_fp, mock_pin)
     assert abs(pos[0] - 10.0) < 1e-4 and abs(pos[1] - (20.0 - 2.0)) < 1e-4
 
-    # BUG-127: Exporter does not emit duplicate silkscreen designator texts (gr_text) on PCB
+    # BUG-127: Exporter emits single visible silkscreen designator (gr_text) and hides duplicate footprint references
     import tempfile
     from provider.pcb.exporter import PCBExporter
 
@@ -2864,8 +2873,15 @@ def test_regression_bugs_115_through_127() -> None:
         exporter = PCBExporter(pcb_cfg, wiring=wiring)
         out_pcb = exporter.export_kicad_pcb(Path(tmpdir) / "board.kicad_pcb")
         kicad_text = out_pcb.read_text()
-        duplicates = [fp.name for fp in wiring.footprints if f'(gr_text "{fp.name}"' in kicad_text]
-        assert len(duplicates) == 0, f"BUG-127: Found duplicate silkscreen designators: {duplicates}"
+        for fp in exporter.get_footprints_for_board():
+            assert kicad_text.count(f'(gr_text "{fp.name}"') == 1, (
+                f"BUG-127: Footprint {fp.name} must have exactly one gr_text silkscreen designator"
+            )
+            ref_present = (
+                f'(property "Reference" "{fp.name}"' in kicad_text or f'(fp_text reference "{fp.name}"' in kicad_text
+            )
+            assert ref_present, f"Reference for {fp.name} must be present in footprint"
+        assert "(hide yes)" in kicad_text or "hide" in kicad_text
 
     # CR Item 4d403f3fec09 & 6235032c3438: Flying probe simulator in provider library and test steps from YAML
     from provider.simulation.flying_probe import load_test_steps_from_yaml, render_markdown_test_report
@@ -2880,9 +2896,41 @@ def test_regression_bugs_115_through_127() -> None:
     report_md = render_markdown_test_report("carrier_board", carrier_steps, len(carrier_steps), len(carrier_steps))
     assert "Flying Probes Automated Acceptance Test Report" in report_md
 
-    # CR Item b31545d3edd5: Obstacles in PCBConfig schema
+    # CR Item b31545d3edd5 & 015e911c546e: Obstacles in PCBConfig schema and clamp rails removed from pcb.yaml
     assert hasattr(pcb_cfg, "obstacles"), "PCBConfig must declare obstacles"
-    assert len(pcb_cfg.obstacles) > 0, "pcb.yaml must declare component/fixture obstacles"
+    assert len(pcb_cfg.obstacles) > 0, "pcb.yaml must declare component obstacles"
+    assert not any("clamp_rail" in obs.name for obs in pcb_cfg.obstacles), (
+        "CR 015e911c546e: clamp rails must be moved from pcb.yaml to flying_probe fixture"
+    )
+
+    # CR Item f6df7fdff257: Invalid declared_obstacles raises ValueError
+    from provider.simulation.flying_probe import create_flying_probe_hooks
+    from types import SimpleNamespace
+    import pytest
+
+    from provider import Simulate
+
+    mock_invalid_prov = SimpleNamespace(pcb_config=SimpleNamespace(obstacles=[]))
+    hooks = create_flying_probe_hooks(mock_invalid_prov, "carrier_board")
+    with pytest.raises(ValueError, match="Invalid declared_obstacles"):
+        hooks[Simulate.SETUP](0, 0, "carrier_board", None)
+
+    # CR Item 8989ed0e5701 & ea77502a34b8: FlyingProbeReportModel & Jinja template
+    from model.simulation import FlyingProbeReportModel, FlyingProbeStepReportModel
+
+    assert FlyingProbeReportModel is not None and FlyingProbeStepReportModel is not None
+
+    # CR Item 438578d59c68: KiCadCLI render_board_image
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    cli = KiCadCLI()
+    assert hasattr(cli, "render_board_image"), "KiCadCLI must have render_board_image method"
+
+    # BUG-130: J8 sheet has aligned pin breakouts without wire overlaps
+    sheet_j8 = next(s for s in pcb_cfg.schematic_sheets if "J8" in s.title)
+    assert sheet_j8.pin_breakouts.get("U1") == ["E4", "F6", "F4"], (
+        "BUG-130: U1 breakouts on J8 sheet must align with connector pins [2, 3, 4] to prevent overlaps"
+    )
 
     # CR Item 70dba9941823: Peripheral cutouts read dynamically from footprints
     assert hasattr(provider, "enclosure_bottom"), "TestBoardProvider must have enclosure_bottom"

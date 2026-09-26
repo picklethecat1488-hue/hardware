@@ -360,3 +360,110 @@ def test_regression_bug_108_flex_tail_flying_probes_simulation() -> None:
         assert "100.0%" in report_md
     finally:
         p.disconnect(client)
+
+
+def test_regression_bug_131_schematic_collinear_wire_overlaps() -> None:
+    """Verify BUG-131: schematic wire segments have zero collinear overlaps across all sheets."""
+    import yaml
+    from model.pcb import PCBConfig
+    from provider.pcb.drc import PCBDesignRulesChecker, DRCRuleName
+    from provider.schematic_diagram import SchematicDiagram
+
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
+    with open(pcb_yaml_path) as f:
+        cfg = PCBConfig(**yaml.safe_load(f))
+
+    diag = SchematicDiagram(wiring=wiring, pcb_config=cfg)
+    segs = diag.compute_sheet_wire_segments()
+    for s_idx, (h_segs, v_segs) in segs.items():
+        for i, s1 in enumerate(h_segs):
+            for s2 in h_segs[i + 1 :]:
+                if abs(s1[2] - s2[2]) < 0.1:
+                    overlap = min(s1[1], s2[1]) - max(s1[0], s2[0])
+                    assert overlap <= 0.5, (
+                        f"Sheet {s_idx} horizontal wire overlap: {s1[3]} and {s2[3]} at y={s1[2]} (overlap={overlap:.2f}mm)"
+                    )
+        for i, s1 in enumerate(v_segs):
+            for s2 in v_segs[i + 1 :]:
+                if abs(s1[0] - s2[0]) < 0.1:
+                    overlap = min(s1[2], s2[2]) - max(s1[1], s2[1])
+                    assert overlap <= 0.5, (
+                        f"Sheet {s_idx} vertical wire overlap: {s1[3]} and {s2[3]} at x={s1[0]} (overlap={overlap:.2f}mm)"
+                    )
+
+    drc = PCBDesignRulesChecker(config=cfg)
+    violations = drc.check_schematic(wiring)
+    wire_violations = [v for v in violations if v.rule_name == DRCRuleName.SCHEMATIC_WIRE_COLLINEAR_OVERLAP]
+    assert len(wire_violations) == 0, f"Schematic DRC found wire overlaps: {wire_violations}"
+
+
+def test_regression_bug_132_expansion_carrier_mount_and_endpoints() -> None:
+    """Verify BUG-132: enclosure bottom has expansion carrier mounting collar and connector endpoints."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
+    mount_protrusion = provider.settings.enclosure_expansion_mount_protrusion
+
+    # 1. Verify mounting collar geometry extends outward past the right wall
+    probe_x = (w / 2.0) + (mount_protrusion / 2.0)
+    assert enclosure.part.is_inside((probe_x, 1.75, 2.30 + 4.0)), "Expansion mount collar top wall must exist"
+    assert enclosure.part.is_inside((probe_x, 1.75, 2.30 - 4.0)), "Expansion mount collar bottom wall must exist"
+
+    # 2. Verify connector endpoints and expansion mount RigidJoints exist
+    joints = enclosure.part.joints
+    assert "expansion_carrier_mount" in joints, "Must have expansion_carrier_mount joint"
+    assert "expansion_mount" in joints, "Must have expansion_mount joint"
+    assert "connector_endpoint" in joints, "Must have connector_endpoint joint"
+    for des in ("j6_mount", "j7_mount", "j8_mount", "j9_mount", "j10_mount"):
+        assert des in joints, f"Must have joint {des}"
+
+    # 3. Verify joint positions are at the tip of the expansion mount protrusion
+    tip_x = (w / 2.0) + mount_protrusion
+    for j_name in ("expansion_carrier_mount", "expansion_mount", "connector_endpoint"):
+        loc = joints[j_name].location
+        assert abs(loc.position.X - tip_x) < 0.1, f"Joint {j_name} must be at X={tip_x}, got {loc.position.X}"
+
+
+def test_regression_bug_133_flex_tail_schematic_isolated() -> None:
+    """Verify BUG-133: flex tail schematic contains only J4 on 1 sheet."""
+    from pathlib import Path
+    from model.wiring import Wiring
+
+    provider = TestBoardProvider()
+    wiring = Wiring(Path(provider.wiring_path))
+    flex_wiring = wiring.filter_by_footprints(["J4"])
+    assert len(flex_wiring.footprints) == 1
+    assert flex_wiring.footprints[0].name == "J4"
+
+    # Verify generated flex_tail schematic has only J4
+    sch_path = Path("build/schematics/test_board/flex_tail.kicad_sch")
+    if sch_path.exists():
+        sch_text = sch_path.read_text()
+        assert "J4" in sch_text
+        for other_comp in ("U1", "U2", "U3", "J1", "J6", "J7", "J8", "J9", "J10"):
+            assert f'"{other_comp}"' not in sch_text
+
+
+def test_regression_bug_134_carrier_board_components_match_schematic() -> None:
+    """Verify BUG-134: carrier board PCB components J6, J7, J8 are JST-PH-6P matching schematic."""
+    from pathlib import Path
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = TestBoardProvider()
+    wiring = Wiring(Path(provider.wiring_path))
+    footprints = {fp.name: fp for fp in wiring.footprints}
+    for j_name in ("J6", "J7", "J8"):
+        assert j_name in footprints, f"Footprint {j_name} must exist in wiring"
+        fp = footprints[j_name]
+        assert fp.package == "JST-PH-6P", f"{j_name} must use JST-PH-6P package"
+        assert fp.mpn == "B6B-PH-K-S", f"{j_name} must use B6B-PH-K-S MPN"
+
+    # Verify carrier board DRC passes with 0 errors
+    cfg = provider.pcb_config
+    checker = PCBDesignRulesChecker(cfg)
+    report = checker.check_all(wiring=wiring)
+    assert report.passed, f"DRC must pass with 0 errors, got: {report.error_count}"

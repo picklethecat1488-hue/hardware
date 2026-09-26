@@ -1,0 +1,29 @@
+# Flying Probes Automated Acceptance Test Report: {{ target_title }}
+
+> Automated physical and electrical flying probe verification report simulated via PyBullet and Rerun.
+
+## Test Execution Summary
+
+| Metric | Details |
+| :--- | :--- |
+| **Test Fixture** | High-Precision Dual-Head Flying Probe Tester (FP-600) |
+| **Target Unit** | `{{ target_name }}` |
+| **Timestamp** | `{{ timestamp }}` |
+| **Overall Verdict** | {{ status_badge }} |
+| **Tested Steps** | `{{ passed_count }} / {{ total_count }}` |
+| **Yield** | {{ "%.1f"|format(yield_pct) }}% |
+| **Simulation Progress** | `Step {{ current_step_idx }} / {{ total_sim_steps }}` |
+
+## Detailed Step Results
+
+| Step ID | Description | Net | Nominal | Measured | Tolerance | Stimulus | Verdict |
+| :--- | :--- | :--- | :---: | :---: | :---: | :--- | :---: |
+{% for s in steps %}
+| `{{ s.step_id }}` | {{ s.description }} | `{{ s.net_name }}` | {{ s.nominal_str }} | {{ s.measured_str }} | {{ s.tolerance_str }} | {{ s.stimulus }} | {{ s.verdict_str }} |
+{% endfor %}
+
+## Electrical Specifications & Compliance Criteria
+- **Continuity**: Contact resistance strictly $\le R_{\text{nom}} \times (1 + \text{tol}\%)$. Zero opens.
+- **Differential Impedance**: PCIe $85\,\Omega \pm 10\%$, MIPI $100\,\Omega \pm 10\%$. Reflection $\le -20\,\text{dB}$.
+- **Capacitance**: Liquid sensing pads $12.5 - 15.5\,\text{pF} \pm 15\%$, Proximity $8.0\,\text{pF} \pm 15\%$.
+- **Probe Clearance**: Minimum vertical flight height $\ge 15.0\,\text{mm}$ above all board component obstacles.

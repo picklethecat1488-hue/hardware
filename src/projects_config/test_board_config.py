@@ -229,6 +229,26 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_periph_cutout_height"])
 
     @property
+    def enclosure_expansion_mount_protrusion(self) -> float:
+        """Protrusion of expansion carrier mount collar past outer right wall in mm."""
+        return float(self._raw_data["enclosure_expansion_mount_protrusion"])
+
+    @property
+    def enclosure_expansion_mount_wall_thickness(self) -> float:
+        """Wall thickness of expansion carrier mount collar in mm."""
+        return float(self._raw_data["enclosure_expansion_mount_wall_thickness"])
+
+    @property
+    def enclosure_expansion_mount_clearance(self) -> float:
+        """Clearance padding around peripheral cutouts for expansion mount in mm."""
+        return float(self._raw_data["enclosure_expansion_mount_clearance"])
+
+    @property
+    def enclosure_expansion_mount_snap_ridge(self) -> float:
+        """Protrusion of snap-fit retention ridge on expansion carrier mount in mm."""
+        return float(self._raw_data["enclosure_expansion_mount_snap_ridge"])
+
+    @property
     def enclosure_battery_mount_width(self) -> float:
         """Width of battery retention mount cavity on enclosure lid in mm."""
         return float(self._raw_data["enclosure_battery_mount_width"])

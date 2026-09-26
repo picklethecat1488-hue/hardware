@@ -5,16 +5,6 @@ shape_ref: carrier_board
 sheet_size: A4
 
 obstacles:
-  - name: clamp_rail_right
-    shape: box
-    dimensions_mm: [4.0, 92.0, 8.0]
-    position_mm: [32.0, 0.0, 4.0]
-    description: "Fixture clamping rail along right board edge"
-  - name: clamp_rail_left
-    shape: box
-    dimensions_mm: [4.0, 92.0, 8.0]
-    position_mm: [-32.0, 0.0, 4.0]
-    description: "Fixture clamping rail along left board edge"
   - name: U1
     shape: box
     dimensions_mm: [12.0, 12.0, 2.0]
@@ -327,9 +317,17 @@ schematic_sheets:
   - title: Telemetry & Debug Communications
     description: FTDI FT232RNQ high-speed USB-to-UART serial bridge and ARM 10-pin SWD debug micro-header
     components: [U1, U9, J5]
+    pin_sides:
+      U1:
+        A6: right
+        B6: right
+        E10: right
+        F10: right
+        A17: right
+        A16: right
     pin_breakouts:
-      U1: [A6, B6, E10, F10, A17, A16]
-      U9: ["1", "3", "4", "5", "7", "11", "15", "16", "17", "18", "19", "20", "21", "22", "25", "26", "29"]
+      U1: [B6, F10, A6, E10, A17, A16]
+      U9: ["1", "3", "4", "5", "7", "11", "15", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "29"]
       J5: ["1", "2", "3", "4", "5"]
 
   - title: User Interface & Status Indication
@@ -428,6 +426,15 @@ schematic_sheets:
     description: PCIe Gen4 x1 differential link and MIPI D-PHY display interface
     components: [J1, U1, J2]
     pin_sides:
+      U1:
+        T2: left
+        T1: left
+        T3: left
+        T4: left
+        A2: right
+        A4: right
+        A12: right
+        A14: right
       J2:
         CLK_P: right
         CLK_N: right
@@ -452,7 +459,7 @@ schematic_sheets:
         "5": left
         "6": left
     pin_breakouts:
-      U1: [A1, B1, B2]
+      U1: [B2, A1, B1]
       J6: ["1", "2", "3", "4", "5", "6"]
 
   - title: I3C Primary Controller Expansion Interface (J7)
@@ -460,9 +467,9 @@ schematic_sheets:
     components: [U1, J7]
     pin_sides:
       U1:
+        B8: right
         A8: right
         C8: right
-        B8: right
       J7:
         "1": left
         "2": left
@@ -471,7 +478,7 @@ schematic_sheets:
         "5": left
         "6": left
     pin_breakouts:
-      U1: [A8, C8, B8]
+      U1: [B8, A8, C8]
       J7: ["1", "2", "3", "4", "5", "6"]
 
   - title: I3C Secondary Controller Expansion Interface (J8)
@@ -479,9 +486,9 @@ schematic_sheets:
     components: [U1, J8]
     pin_sides:
       U1:
-        F4: right
-        F6: right
         E4: right
+        F6: right
+        F4: right
       J8:
         "1": left
         "2": left
@@ -490,7 +497,7 @@ schematic_sheets:
         "5": left
         "6": left
     pin_breakouts:
-      U1: [F4, F6, E4]
+      U1: [E4, F6, F4]
       J8: ["1", "2", "3", "4", "5", "6"]
 
   - title: SPI Master Expansion Interface (J9)
@@ -498,11 +505,11 @@ schematic_sheets:
     components: [U1, J9]
     pin_sides:
       U1:
+        T8: right
         T6: right
         T7: right
         R8: right
         R9: right
-        T8: right
       J9:
         "1": left
         "2": left
@@ -511,7 +518,7 @@ schematic_sheets:
         "5": left
         "6": left
     pin_breakouts:
-      U1: [T6, T7, R8, R9, T8]
+      U1: [T8, T6, T7, R8, R9]
       J9: ["1", "2", "3", "4", "5", "6"]
 
   - title: UART & Control Expansion Interface (J10)
@@ -519,12 +526,12 @@ schematic_sheets:
     components: [U9, J10]
     pin_sides:
       U9:
-        "2": right
-        "6": right
         "9": right
         "10": right
         "12": right
         "13": right
+        "2": right
+        "6": right
       J10:
         "1": left
         "2": left
@@ -533,7 +540,7 @@ schematic_sheets:
         "5": left
         "6": left
     pin_breakouts:
-      U9: ["2", "6", "9", "10", "12", "13"]
+      U9: ["9", "10", "12", "13", "2", "6"]
       J10: ["1", "2", "3", "4", "5", "6"]
 
   - title: General Purpose I/O Expansion Header

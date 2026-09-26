@@ -418,7 +418,7 @@ class TestBoardProvider(Provider):
                 for des in ("J6", "J7", "J8", "J9", "J10"):
                     if des in comp_map:
                         c = comp_map[des]
-                        is_6p = "6P" in getattr(c, "package", "") or len(getattr(c, "pins", [])) == 6
+                        is_6p = des in ("J9", "J10")
                         cut_l = l_6p if is_6p else l_4p
                         periph_specs.append((des, c.position[1], cut_l, bus_labels.get(des, des)))
 
@@ -435,6 +435,36 @@ class TestBoardProvider(Provider):
                         Text(label, font_size=1.6)
             extrude(s_periph_labels.sketch, amount=-0.3, mode=BuildMode.SUBTRACT)
 
+            # Expansion carrier mounting collar with snap-fit retention ridge (BUG-132)
+            mount_protrusion = self.settings.enclosure_expansion_mount_protrusion
+            mount_wall = self.settings.enclosure_expansion_mount_wall_thickness
+            mount_clr = self.settings.enclosure_expansion_mount_clearance
+            mount_ridge = self.settings.enclosure_expansion_mount_snap_ridge
+
+            if periph_specs:
+                min_py = min(py - cut_l / 2.0 for _, py, cut_l, _ in periph_specs)
+                max_py = max(py + cut_l / 2.0 for _, py, cut_l, _ in periph_specs)
+                mount_mid_y = (min_py + max_py) / 2.0
+                inner_l = (max_py - min_py) + 2.0 * mount_clr
+                outer_l = inner_l + 2.0 * mount_wall
+                inner_h = periph_cutout_h + 2.0 * mount_clr
+                outer_h = inner_h + 2.0 * mount_wall
+
+                with BuildSketch(Plane.YZ.offset(w / 2.0)) as s_mount:
+                    with Locations((mount_mid_y, periph_z)):
+                        RectangleRounded(outer_l, outer_h, cutout_r + mount_wall)
+                        RectangleRounded(inner_l, inner_h, cutout_r, mode=BuildMode.SUBTRACT)
+                extrude(s_mount.sketch, amount=mount_protrusion)
+
+                # Outer snap-fit retention ridge (bead) on top and bottom faces of collar
+                ridge_h = mount_ridge
+                ridge_w = 1.0
+                ridge_x = (w / 2.0) + mount_protrusion - (ridge_w / 2.0) - 0.2
+                with Locations((ridge_x, mount_mid_y, periph_z + (outer_h / 2.0) + (ridge_h / 2.0))):
+                    Box(ridge_w, outer_l - 2.0 * cutout_r, ridge_h)
+                with Locations((ridge_x, mount_mid_y, periph_z - (outer_h / 2.0) - (ridge_h / 2.0))):
+                    Box(ridge_w, outer_l - 2.0 * cutout_r, ridge_h)
+
             # Matching snap-fit retaining grooves on inner cavity walls (BUG-076)
             groove_depth = self.settings.enclosure_snap_groove_depth
             groove_len = self.settings.enclosure_snap_groove_length
@@ -446,6 +476,16 @@ class TestBoardProvider(Provider):
                     Box(groove_depth * 2.0, groove_len, groove_h, mode=BuildMode.SUBTRACT)
                 with Locations(((-w_cavity / 2.0) - (groove_depth / 2.0), sy, snap_z_bottom)):
                     Box(groove_depth * 2.0, groove_len, groove_h, mode=BuildMode.SUBTRACT)
+
+        # Joint endpoints for expansion carrier mounting and peripheral connectors (BUG-132)
+        if periph_specs:
+            mount_x_tip = (w / 2.0) + mount_protrusion
+            RigidJoint("expansion_carrier_mount", shell.part, Location((mount_x_tip, mount_mid_y, periph_z)))
+            RigidJoint("expansion_mount", shell.part, Location((mount_x_tip, mount_mid_y, periph_z)))
+            RigidJoint("connector_endpoint", shell.part, Location((mount_x_tip, mount_mid_y, periph_z)))
+            for des, py, _, _ in periph_specs:
+                RigidJoint(f"{des.lower()}_mount", shell.part, Location((mount_x_tip, py, periph_z)))
+                RigidJoint(f"{des}_mount", shell.part, Location((mount_x_tip, py, periph_z)))
 
         return shell
 
@@ -883,6 +923,32 @@ class TestBoardProvider(Provider):
                 SilkscreenText("SPK1", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((-9.0, 3.5)):
                 SilkscreenText("Y1", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((14.0, 18.0)):
+                SilkscreenText("U6", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-16.0, 19.0)):
+                SilkscreenText("U7", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((15.0, 7.5)):
+                SilkscreenText("U8", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-20.0, -37.5)):
+                SilkscreenText("U9", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((18.0, 26.5)):
+                SilkscreenText("U10", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((19.5, 10.0)):
+                SilkscreenText("D1", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-18.0, -18.5)):
+                SilkscreenText("J5", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((20.5, 31.0)):
+                SilkscreenText("J6", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((20.5, 19.0)):
+                SilkscreenText("J7", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((20.5, 7.0)):
+                SilkscreenText("J8", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((20.5, -5.0)):
+                SilkscreenText("J9", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((20.5, -21.0)):
+                SilkscreenText("J10", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((16.0, -28.0)):
+                SilkscreenText("J14", layer="F.SilkS", font_size=0.8, thickness=0.12)
 
             # Resistors
             with Locations((14.5, -6.0)):
@@ -925,6 +991,8 @@ class TestBoardProvider(Provider):
                 SilkscreenText("C12", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
             with Locations((-20.0, 15.5)):
                 SilkscreenText("C13", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((14.0, -12.0)):
+                SilkscreenText("C14", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
 
         return silk.texts
 

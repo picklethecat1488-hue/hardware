@@ -728,6 +728,34 @@ def test_untracked_files_diff_and_working_tree_handling(tmp_path: Path) -> None:
             temp_untracked.unlink()
 
 
+def test_regression_bug_128_untracked_folder_files(tmp_path: Path) -> None:
+    """Verify that newly created untracked subfolders show their contained files in changed files (BUG-128)."""
+    repo_root = get_git_root()
+    engine = GitReviewEngine(repo_root=repo_root)
+
+    temp_folder = repo_root / "temp_untracked_folder_bug128"
+    try:
+        temp_folder.mkdir(parents=True, exist_ok=True)
+        sample_file = temp_folder / "nested_sample.txt"
+        sample_file.write_text("hello\nworld\n", encoding="utf-8")
+
+        working_files = engine.get_changed_files("working")
+        file_paths = [f["path"] for f in working_files]
+        expected_path = "temp_untracked_folder_bug128/nested_sample.txt"
+        assert expected_path in file_paths
+        assert "temp_untracked_folder_bug128/" not in file_paths
+
+        # Check diff
+        diff = engine.get_file_diff("working", expected_path)
+        assert diff.additions == 2
+        assert "+hello" in diff.raw_diff
+    finally:
+        if (temp_folder / "nested_sample.txt").exists():
+            (temp_folder / "nested_sample.txt").unlink()
+        if temp_folder.exists():
+            temp_folder.rmdir()
+
+
 def test_code_review_comment_editing_and_custom_snippet(tmp_path: Path) -> None:
     """Verify that comments can be edited via API and custom code snippets/commits are preserved."""
     repo_root = get_git_root()

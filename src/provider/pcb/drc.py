@@ -152,6 +152,7 @@ class DRCRuleName(StrEnum):
     SCHEMATIC_TITLE_BLOCK_COLLISION = "SCHEMATIC_TITLE_BLOCK_COLLISION"
     SCHEMATIC_HEADER_COLLISION = "SCHEMATIC_HEADER_COLLISION"
     SCHEMATIC_UNCONNECTED_COMPONENT = "SCHEMATIC_UNCONNECTED_COMPONENT"
+    SCHEMATIC_WIRE_COLLINEAR_OVERLAP = "SCHEMATIC_WIRE_COLLINEAR_OVERLAP"
 
 
 @dataclass
@@ -2134,8 +2135,11 @@ class PCBDesignRulesChecker:
                         ),
                     )
 
-        # 3b. Symbol overlap and page boundary checks
+        # 3b. Symbol overlap, page boundary, and collinear wire overlap checks
         computed_symbol_boxes: Dict[int, List[Tuple[float, float, float, float, str]]] = {}
+        computed_wire_segments: Dict[
+            int, Tuple[List[Tuple[float, float, float, str]], List[Tuple[float, float, float, str]]]
+        ] = {}
         if (
             self.config
             and getattr(self.config, "schematic_sheets", None)
@@ -2146,6 +2150,7 @@ class PCBDesignRulesChecker:
 
             diag = SchematicDiagram(wiring=wiring, pcb_config=self.config)
             computed_symbol_boxes = diag.compute_symbol_bounding_boxes()
+            computed_wire_segments = diag.compute_sheet_wire_segments()
 
         for sheet_idx, sheet in enumerate(self.config.schematic_sheets):
             boxes = computed_symbol_boxes.get(sheet_idx + 1, [])
@@ -2212,6 +2217,39 @@ class PCBDesignRulesChecker:
                         ),
                         location=(b[0], b[1], 0.0),
                     )
+
+            # 3e. Collinear wire segment overlap check (BUG-131)
+            h_segs, v_segs = computed_wire_segments.get(sheet_idx + 1, ([], []))
+            for i, s1 in enumerate(h_segs):
+                for s2 in h_segs[i + 1 :]:
+                    if abs(s1[2] - s2[2]) < 0.1:
+                        overlap = min(s1[1], s2[1]) - max(s1[0], s2[0])
+                        if overlap > 0.5:
+                            violations.add_error(
+                                rule_name=DRCRuleName.SCHEMATIC_WIRE_COLLINEAR_OVERLAP,
+                                net_or_zone=f"{s1[3]} & {s2[3]}",
+                                description=(
+                                    f"Schematic horizontal wire overlap on sheet {sheet_idx + 1} ('{sheet.title}'): "
+                                    f"Wire '{s1[3]}' overlaps with '{s2[3]}' at y={s1[2]:.1f}mm "
+                                    f"(overlap={overlap:.1f}mm > 0.5mm)"
+                                ),
+                                location=(max(s1[0], s2[0]), s1[2], 0.0),
+                            )
+            for i, s1 in enumerate(v_segs):
+                for s2 in v_segs[i + 1 :]:
+                    if abs(s1[0] - s2[0]) < 0.1:
+                        overlap = min(s1[2], s2[2]) - max(s1[1], s2[1])
+                        if overlap > 0.5:
+                            violations.add_error(
+                                rule_name=DRCRuleName.SCHEMATIC_WIRE_COLLINEAR_OVERLAP,
+                                net_or_zone=f"{s1[3]} & {s2[3]}",
+                                description=(
+                                    f"Schematic vertical wire overlap on sheet {sheet_idx + 1} ('{sheet.title}'): "
+                                    f"Wire '{s1[3]}' overlaps with '{s2[3]}' at x={s1[0]:.1f}mm "
+                                    f"(overlap={overlap:.1f}mm > 0.5mm)"
+                                ),
+                                location=(s1[0], max(s1[1], s2[1]), 0.0),
+                            )
 
         # 4. Check that all components in the design have connected pins (BUG-088)
         for fp_name, fp in footprints_map.items():

@@ -144,9 +144,9 @@ class Bullet:
         provider_hooks: dict[Simulate, Callable[..., Any]],
         proj_name: str,
         sim_target: str,
-        steps: int,
-        manager: Any,
-        logger: Any,
+        steps: Optional[int] = None,
+        manager: Any = None,
+        logger: Any = None,
         build_dir: str = "build",
         save_rrd: Optional[str] = None,
         save_mp4: Optional[str] = None,
@@ -164,7 +164,7 @@ class Bullet:
         self.provider_hooks = provider_hooks
         self.proj_name = proj_name
         self.sim_target = sim_target
-        self.steps = steps
+        self.steps = steps if steps is not None else 20000
         self.manager = manager
         self.logger = logger
         self.build_dir = build_dir
@@ -436,10 +436,19 @@ class Bullet:
                     )
 
                 # Check and apply top and bottom textures (BUG-125)
-                top_tex = os.path.join(proj_dir, f"{label}_top.png")
+                alt_tex_dir = os.path.join(self.build_dir, "board", self.proj_name, "textures")
+                top_tex = os.path.join(alt_tex_dir, f"{label}_top.png")
+                bottom_tex = os.path.join(alt_tex_dir, f"{label}_bottom.png")
                 if not os.path.exists(top_tex):
-                    top_tex = os.path.join(proj_dir, f"{label}.png")
-                bottom_tex = os.path.join(proj_dir, f"{label}_bottom.png")
+                    top_tex = os.path.join(proj_dir, f"{label}_top.png")
+                if not os.path.exists(bottom_tex):
+                    bottom_tex = os.path.join(proj_dir, f"{label}_bottom.png")
+
+                kicad_board = os.path.join(self.build_dir, "board", self.proj_name, f"{label}.kicad_pcb")
+                if os.path.exists(kicad_board) and (not os.path.exists(top_tex) or not os.path.exists(bottom_tex)):
+                    raise ValueError(
+                        f"PCB texture not found for '{label}': expected '{top_tex}' and '{bottom_tex}'. Run build first."
+                    )
 
                 # Apply to PyBullet visual shape if texture exists
                 if os.path.exists(top_tex) and is_real and label in label_to_link_idx:

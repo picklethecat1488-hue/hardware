@@ -14,7 +14,9 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import numpy as np
 import pybullet as p
 import yaml
+from jinja2 import Environment, FileSystemLoader
 
+from model.simulation import FlyingProbeReportModel, FlyingProbeStepReportModel
 from provider import Simulate, rerun_is_enabled
 from provider.bullet import _is_real_physics_client
 
@@ -107,55 +109,42 @@ def render_markdown_test_report(
     status_badge = "🟢 `PASS`" if all_passed else ("🟡 `IN_PROGRESS`" if passed_count < total_count else "🔴 `FAIL`")
     yield_pct = (passed_count / total_count * 100.0) if total_count > 0 else 100.0
 
-    lines = [
-        f"# Flying Probes Automated Acceptance Test Report: {target_name.replace('_', ' ').title()}",
-        "",
-        "> Automated physical and electrical flying probe verification report simulated via PyBullet and Rerun.",
-        "",
-        "## Test Execution Summary",
-        "",
-        "| Metric | Details |",
-        "| :--- | :--- |",
-        f"| **Test Fixture** | High-Precision Dual-Head Flying Probe Tester (FP-600) |",
-        f"| **Target Unit** | `{target_name}` |",
-        f"| **Timestamp** | `{now_str}` |",
-        f"| **Overall Verdict** | {status_badge} |",
-        f"| **Tested Steps** | `{passed_count} / {total_count}` |",
-        f"| **Yield** | `{yield_pct:.1f}%` |",
-        f"| **Simulation Progress** | `Step {current_step_idx} / {total_sim_steps}` |",
-        "",
-        "## Detailed Step Results",
-        "",
-        "| Step ID | Description | Net | Nominal | Measured | Tolerance | Stimulus | Verdict |",
-        "| :--- | :--- | :--- | :---: | :---: | :---: | :--- | :---: |",
-    ]
-
+    report_steps: List[FlyingProbeStepReportModel] = []
     for s in steps:
         verdict_str = "🟢 **PASS**" if s.passed else ("🟡 *TESTING*" if current_step_idx > 0 else "⚪ *PENDING*")
         nom_str = f"{s.nominal:.3f} {s.unit}" if s.nominal < 1.0 else f"{s.nominal:.1f} {s.unit}"
         meas_str = f"{s.measured:.3f} {s.unit}" if s.nominal < 1.0 else f"{s.measured:.1f} {s.unit}"
         tol_str = f"±{s.tolerance_pct:.1f}%"
-        lines.append(
-            f"| `{s.step_id}` | {s.description} | `{s.net_name}` | {nom_str} | {meas_str} | {tol_str} | {s.stimulus} | {verdict_str} |"
+        report_steps.append(
+            FlyingProbeStepReportModel(
+                step_id=s.step_id,
+                description=s.description,
+                net_name=s.net_name,
+                nominal_str=nom_str,
+                measured_str=meas_str,
+                tolerance_str=tol_str,
+                stimulus=s.stimulus,
+                verdict_str=verdict_str,
+            )
         )
 
-    lines.append("")
-    lines.append("## Electrical Specifications & Compliance Criteria")
-    lines.append(
-        "- **Continuity**: Contact resistance strictly $\\le R_{\\text{nom}} \\times (1 + \\text{tol}\\%)$. Zero opens."
+    model = FlyingProbeReportModel(
+        target_name=target_name,
+        target_title=target_name.replace("_", " ").title(),
+        timestamp=now_str,
+        status_badge=status_badge,
+        passed_count=passed_count,
+        total_count=total_count,
+        yield_pct=yield_pct,
+        current_step_idx=current_step_idx,
+        total_sim_steps=total_sim_steps,
+        steps=report_steps,
     )
-    lines.append(
-        "- **Differential Impedance**: PCIe $85\\,\\Omega \\pm 10\\%$, MIPI $100\\,\\Omega \\pm 10\\%$. Reflection $\\le -20\\,\\text{dB}$."
-    )
-    lines.append(
-        "- **Capacitance**: Liquid sensing pads $12.5 - 15.5\\,\\text{pF} \\pm 15\\%$, Proximity $8.0\\,\\text{pF} \\pm 15\\%$."
-    )
-    lines.append(
-        "- **Probe Clearance**: Minimum vertical flight height $\\ge 15.0\\,\\text{mm}$ above all board component obstacles."
-    )
-    lines.append("")
 
-    return "\n".join(lines)
+    templates_dir = Path(__file__).resolve().parent.parent / "templates"
+    env = Environment(loader=FileSystemLoader(str(templates_dir)), trim_blocks=True, lstrip_blocks=True)
+    template = env.get_template("flying_probe_report.md.j2")
+    return template.render(**model.model_dump())
 
 
 def create_flying_probe_hooks(
@@ -188,6 +177,14 @@ def create_flying_probe_hooks(
     if test_steps_path and Path(test_steps_path).exists():
         test_steps = load_test_steps_from_yaml(test_steps_path, target_label)
 
+    if provider is not None:
+        setattr(provider, "flying_probe_steps", test_steps)
+        setattr(
+            provider,
+            "generate_test_report",
+            lambda: render_markdown_test_report(target_label, test_steps, 1000, 1000),
+        )
+
     sim_state = {
         "client": None,
         "probe_a_id": -1,
@@ -209,28 +206,32 @@ def create_flying_probe_hooks(
 
         obstacle_ids = []
 
-        # 1. Check if obstacles are defined in PCBConfig schema metadata
+        # 1. Validate declared obstacles from PCBConfig schema metadata
         pcb_cfg = getattr(provider, "pcb_config", None)
-        declared_obstacles = getattr(pcb_cfg, "obstacles", []) if pcb_cfg else []
+        declared_obstacles = getattr(pcb_cfg, "obstacles", None) if pcb_cfg else None
 
-        if declared_obstacles:
-            # Populate obstacles dynamically declared in the PCB schema
-            for obs in declared_obstacles:
-                # Filter obstacles relevant to this subassembly/board
-                if is_flex and obs.name not in ("J4", "flex_vacuum_plate"):
-                    continue
-                if not is_flex and obs.name in ("J4", "flex_vacuum_plate"):
-                    continue
+        if (
+            declared_obstacles is None
+            or not isinstance(declared_obstacles, (list, tuple))
+            or len(declared_obstacles) == 0
+        ):
+            raise ValueError(
+                f"Invalid declared_obstacles in PCBConfig: expected non-empty sequence of PCBObstacleModel, "
+                f"got {type(declared_obstacles).__name__ if declared_obstacles is not None else 'None'}"
+            )
 
-                half_ext = [d * 1e-3 / 2.0 for d in obs.dimensions_mm]
-                pos = [coord * 1e-3 for coord in obs.position_mm]
-                col_box = p.createCollisionShape(p.GEOM_BOX, halfExtents=half_ext, physicsClientId=client)
-                b_id = p.createMultiBody(
-                    baseMass=0, baseCollisionShapeIndex=col_box, basePosition=pos, physicsClientId=client
+        for obs in declared_obstacles:
+            if not hasattr(obs, "dimensions_mm") or not hasattr(obs, "position_mm"):
+                raise ValueError(
+                    f"declared_obstacle '{getattr(obs, 'name', 'unnamed')}' must contain dimensions_mm and position_mm"
                 )
-                obstacle_ids.append(b_id)
-        else:
-            # Fallback default physical fixture and component obstacles
+            if len(obs.dimensions_mm) != 3 or any(d <= 0 for d in obs.dimensions_mm):
+                raise ValueError(f"declared_obstacle '{obs.name}' has invalid dimensions_mm: {obs.dimensions_mm}")
+            if len(obs.position_mm) != 3:
+                raise ValueError(f"declared_obstacle '{obs.name}' has invalid position_mm: {obs.position_mm}")
+
+        if _is_real_physics_client(client):
+            # 2. Setup test fixture clamp rails / vacuum mounting plate (FP-600 fixture mechanics)
             if not is_flex:
                 clamp_col = p.createCollisionShape(
                     p.GEOM_BOX, halfExtents=[0.002, 0.046, 0.004], physicsClientId=client
@@ -248,23 +249,6 @@ def create_flying_probe_hooks(
                     physicsClientId=client,
                 )
                 obstacle_ids.extend([c1, c2])
-
-                component_obstacles = [
-                    ([0.006, 0.006, 0.0010], [0.0, 0.0, 0.0018]),
-                    ([0.012, 0.005, 0.0025], [0.0, -0.036, 0.0033]),
-                    ([0.009, 0.0025, 0.0010], [0.0, 0.038, 0.0018]),
-                    ([0.0045, 0.0045, 0.0020], [-0.025, 0.0, 0.0028]),
-                    ([0.0030, 0.0060, 0.0030], [-0.021, -0.007, 0.0038]),
-                    ([0.0030, 0.0040, 0.0035], [-0.023, 0.016, 0.0043]),
-                    ([0.0030, 0.0075, 0.0035], [0.0245, -0.005, 0.0043]),
-                    ([0.0030, 0.0075, 0.0035], [0.0245, -0.021, 0.0043]),
-                ]
-                for half_ext, pos in component_obstacles:
-                    col_box = p.createCollisionShape(p.GEOM_BOX, halfExtents=half_ext, physicsClientId=client)
-                    b_id = p.createMultiBody(
-                        baseMass=0, baseCollisionShapeIndex=col_box, basePosition=pos, physicsClientId=client
-                    )
-                    obstacle_ids.append(b_id)
             else:
                 plate_col = p.createCollisionShape(
                     p.GEOM_BOX, halfExtents=[0.015, 0.030, 0.002], physicsClientId=client
@@ -277,36 +261,42 @@ def create_flying_probe_hooks(
                 )
                 obstacle_ids.append(p_id)
 
-                j4_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.009, 0.0025, 0.0012], physicsClientId=client)
-                j4_id = p.createMultiBody(
-                    baseMass=0,
-                    baseCollisionShapeIndex=j4_col,
-                    basePosition=[0.0, -0.02275, 0.0012],
-                    physicsClientId=client,
+            for obs in declared_obstacles:
+                # Filter obstacles relevant to this subassembly/board
+                if is_flex and obs.name not in ("J4", "flex_vacuum_plate"):
+                    continue
+                if not is_flex and obs.name in ("J4", "flex_vacuum_plate"):
+                    continue
+
+                half_ext = [d * 1e-3 / 2.0 for d in obs.dimensions_mm]
+                pos = [coord * 1e-3 for coord in obs.position_mm]
+                col_box = p.createCollisionShape(p.GEOM_BOX, halfExtents=half_ext, physicsClientId=client)
+                b_id = p.createMultiBody(
+                    baseMass=0, baseCollisionShapeIndex=col_box, basePosition=pos, physicsClientId=client
                 )
-                obstacle_ids.append(j4_id)
+                obstacle_ids.append(b_id)
+
+            # 3. Create high-speed kinematic Probe A and Probe B needle bodies
+            needle_col_a = p.createCollisionShape(p.GEOM_SPHERE, radius=0.0006, physicsClientId=client)
+            needle_col_b = p.createCollisionShape(p.GEOM_SPHERE, radius=0.0006, physicsClientId=client)
+
+            init_pad_a = test_steps[0].pad_a_mm if test_steps else (0.0, 0.0)
+            init_pad_b = test_steps[0].pad_b_mm if test_steps else (0.0, 0.0)
+
+            init_pos_a = [init_pad_a[0] * 1e-3, init_pad_a[1] * 1e-3, z_flight]
+            init_pos_b = [init_pad_b[0] * 1e-3, init_pad_b[1] * 1e-3, z_flight]
+
+            probe_a_id = p.createMultiBody(
+                baseMass=0.05, baseCollisionShapeIndex=needle_col_a, basePosition=init_pos_a, physicsClientId=client
+            )
+            probe_b_id = p.createMultiBody(
+                baseMass=0.05, baseCollisionShapeIndex=needle_col_b, basePosition=init_pos_b, physicsClientId=client
+            )
+
+            sim_state["probe_a_id"] = probe_a_id
+            sim_state["probe_b_id"] = probe_b_id
 
         sim_state["obstacle_ids"] = obstacle_ids
-
-        # 2. Create high-speed kinematic Probe A and Probe B needle bodies
-        needle_col_a = p.createCollisionShape(p.GEOM_SPHERE, radius=0.0006, physicsClientId=client)
-        needle_col_b = p.createCollisionShape(p.GEOM_SPHERE, radius=0.0006, physicsClientId=client)
-
-        init_pad_a = test_steps[0].pad_a_mm if test_steps else (0.0, 0.0)
-        init_pad_b = test_steps[0].pad_b_mm if test_steps else (0.0, 0.0)
-
-        init_pos_a = [init_pad_a[0] * 1e-3, init_pad_a[1] * 1e-3, z_flight]
-        init_pos_b = [init_pad_b[0] * 1e-3, init_pad_b[1] * 1e-3, z_flight]
-
-        probe_a_id = p.createMultiBody(
-            baseMass=0.05, baseCollisionShapeIndex=needle_col_a, basePosition=init_pos_a, physicsClientId=client
-        )
-        probe_b_id = p.createMultiBody(
-            baseMass=0.05, baseCollisionShapeIndex=needle_col_b, basePosition=init_pos_b, physicsClientId=client
-        )
-
-        sim_state["probe_a_id"] = probe_a_id
-        sim_state["probe_b_id"] = probe_b_id
 
     def step_simulation(body_id: int, client: int, step_idx: int, name: str) -> Optional[str]:
         sim_state["current_step_idx"] = step_idx
@@ -419,30 +409,31 @@ def create_flying_probe_hooks(
             )
 
             # Measurement metrics
-            rr.log("telemetry/contact_force_n", rr.Scalar(contact_force))
+            rr.log("telemetry/contact_force_n", rr.Scalars(contact_force))
             if contact_active:
                 rr.log(
                     f"telemetry/measurement_{active_spec.test_type}",
-                    rr.Scalar(active_spec.measured),
+                    rr.Scalars(active_spec.measured),
                 )
                 rr.log(
                     f"telemetry/nominal_{active_spec.test_type}",
-                    rr.Scalar(active_spec.nominal),
+                    rr.Scalars(active_spec.nominal),
                 )
 
             # Periodic Markdown status report
-            if step_idx % 25 == 0 or step_idx == 999:
-                report_md = render_markdown_test_report(target_label, test_steps, step_idx, 1000)
+            if step_idx % 25 == 0 or step_idx == (steps_per_test * num_tests - 1):
+                report_md = render_markdown_test_report(target_label, test_steps, step_idx, steps_per_test * num_tests)
                 sim_state["last_report"] = report_md
                 rr.log("reports/flying_probes", rr.TextDocument(report_md, media_type="text/markdown"))
 
-        # Save final report to build directory on final simulation step
-        if step_idx >= 999 or step_idx == (steps_per_test * num_tests - 1):
-            report_md = render_markdown_test_report(target_label, test_steps, step_idx, 1000)
+        # Save final report to build directory on final simulation step and terminate
+        if step_idx >= (steps_per_test * num_tests - 1):
+            report_md = render_markdown_test_report(target_label, test_steps, step_idx, steps_per_test * num_tests)
             sim_state["last_report"] = report_md
             out_rpt = Path(f"build/test_board/{target_label}_flying_probe_report.md")
             out_rpt.parent.mkdir(parents=True, exist_ok=True)
             out_rpt.write_text(report_md, encoding="utf-8")
+            return f"All {num_tests} flying probe test points completed successfully"
 
         return None
 

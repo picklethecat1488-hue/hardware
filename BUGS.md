@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-25 21:44:33 UTC` |
-| **Total Issues** | `127` |
-| **Open Issues** | `1` |
-| **Resolved / Closed** | `126 (99%)` |
+| **Report Date** | `2026-09-26 03:23:18 UTC` |
+| **Total Issues** | `142` |
+| **Open Issues** | `8` |
+| **Resolved / Closed** | `134 (94%)` |
 
 ## Executive Summary
 
@@ -21,18 +21,18 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 1 | System crashes, build failures, blockages, or electrical shorts. |
 | **`[HIGH]`** | 6 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 117 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
-| **`[LOW]`** | 3 | Minor aesthetic imperfections or documentation notes. |
+| **`[MEDIUM]`** | 131 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[LOW]`** | 4 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 94 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 13 | 3D geometry, step models, enclosures, mechanical assembly. |
-| **`SIMULATION`** | 4 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
-| **`INFRASTRUCTURE`** | 12 | Build tooling, compilers, test runners, headless tools. |
-| **`UI`** | 1 | Web dashboards, CLI viewers, review interfaces. |
+| **`PCB`** | 101 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 17 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`SIMULATION`** | 5 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
+| **`INFRASTRUCTURE`** | 13 | Build tooling, compilers, test runners, headless tools. |
+| **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
 
 ## Issue Checklist
 
@@ -162,7 +162,22 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-125](#bug-125): Add top and bottom textures to PCB objects (`RESOLVED`)
 - [x] **`[HIGH]`** [#BUG-126](#bug-126): Components designators are overlapping pads and holes (`RESOLVED`)
 - [x] **`[HIGH]`** [#BUG-127](#bug-127): Some components have duplicate designators (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-128](#bug-128): Newly created folders do not show up in the Changed Files section `[code_review]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-128](#bug-128): Newly created folders do not show up in the Changed Files section `[code_review]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-129](#bug-129): Support reboot into ISP mode from the FTDI `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-130](#bug-130): J8 has wire overlaps (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-131](#bug-131): Resolve all schematic wire overlaps (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-132](#bug-132): Create expansion carrier mount `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-133](#bug-133): Flex tail schematic looks wrong `[flex_tail]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-134](#bug-134): Carrier board PCB components don't match schematic `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-135](#bug-135): Flying probe simulate still fails `[carrier_board]` (`RESOLVED`)
+- [ ] **`[MEDIUM]`** [#BUG-136](#bug-136): The horizontal scrollbar is really long for some reason. `[code_review]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-137](#bug-137): Support binary files diff UI `[code_review]` (`OPEN`)
+- [ ] **`[LOW]`** [#BUG-138](#bug-138): Refactor schematic_diagram.py (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-139](#bug-139): Add battery cover `[carrier_board]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-140](#bug-140): Extend enclosure bottom under flex tail `[carrier_board]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-141](#bug-141): It does not look like the flex tail will fit in the connector. `[carrier_board]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-142](#bug-142): No cutout for PCIE connector `[enclosure_bottom]` (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-143](#bug-143): Peripheral cutouts should all be the same size `[enclosure_bottom]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -3274,13 +3289,14 @@ Deduplicated silkscreen text export in exporter.py when matching component footp
 
 ---
 
-### <a id="bug-128"></a> 🔴 `[BUG-128]` Newly created folders do not show up in the Changed Files section
+### <a id="bug-128"></a> 🟢 `[BUG-128]` Newly created folders do not show up in the Changed Files section
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `code_review`
 - **Created**: `2026-09-25 21:42:13 UTC`
+- **Resolved**: `2026-09-26 03:22:55 UTC`
 
 #### Description
 
@@ -3291,5 +3307,380 @@ In the Changed Files UI section, newly added files under newly added subfolders 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790372559666.png](build/attachments/pasted_screenshot_1790372559666.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Added --untracked-files=all flag to git status command in git_utils.py so all untracked files in newly created folders are returned and visible in the Changed Files section.
+
+---
+
+### <a id="bug-129"></a> 🟢 `[BUG-129]` Support reboot into ISP mode from the FTDI
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-25 22:15:53 UTC`
+- **Resolved**: `2026-09-26 03:22:59 UTC`
+
+#### Description
+
+Can we connect NRST to the FTDI so that BOOT0 after gets asserted we can toggle NRST to get into ISP mode without power cycling the board manually ?
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [image.png](build/attachments/image.png) | Uploaded screenshot image.png |
+
+#### Resolution Notes
+
+Connected FTDI CBUS0 (U9 pin 23) to MCU NRST net in wiring.yaml and added schematic breakout on Sheet 6 of pcb.yaml.
+
+---
+
+### <a id="bug-130"></a> 🟢 `[BUG-130]` J8 has wire overlaps
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 22:25:07 UTC`
+- **Resolved**: `2026-09-25 22:39:57 UTC`
+
+#### Description
+
+On J8 all I3C wires overlap with each other. Can we reverse the order of wires on J8 and move U1 down slightly so that the I3C data and interrupt lines route cleanly straight across to U1 without doglegging?
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790375160222.png](build/attachments/pasted_screenshot_1790375160222.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Aligned U1 pin breakout sequence on the J8 secondary I3C expansion interface sheet so signals map directly to connector pins (E4->pin 2, F6->pin 3, F4->pin 4), eliminating wire crossing doglegging. Updated SchematicDiagram channel router to draw direct collinear wires for straight horizontal connections and offset vertical jogs across distinct channel lanes to eliminate wire overlaps.
+
+---
+
+### <a id="bug-131"></a> 🟢 `[BUG-131]` Resolve all schematic wire overlaps
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-25 22:29:58 UTC`
+- **Resolved**: `2026-09-26 03:23:03 UTC`
+
+#### Description
+
+Resolve all schematic wire overlaps and add collinearity check to the schematic DRC engine so that overlaps cause build errors.
+
+#### Resolution Notes
+
+Added SCHEMATIC_WIRE_COLLINEAR_OVERLAP check to schematic DRC engine and updated schematic router to prevent overlapping wire segments.
+
+---
+
+### <a id="bug-132"></a> 🟢 `[BUG-132]` Create expansion carrier mount
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `CAD`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-25 22:32:22 UTC`
+- **Resolved**: `2026-09-26 03:23:07 UTC`
+
+#### Description
+
+Create an expansion carrier mounting system, and implement a connector endpoint for the enclosure bottom. The purpose is so that when we add expansion boards to the test board carrier, they have something to securely mount onto. These could be similar to the snap fit system used for the cat fountain components (lid, bowl and bottom), just a ring that runs around the connector cutouts.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790375665424.png](build/attachments/pasted_screenshot_1790375665424.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Added expansion carrier mounting collar with snap-fit retention ridge to enclosure_bottom, along with expansion_carrier_mount and connector_endpoint RigidJoints.
+
+---
+
+### <a id="bug-133"></a> 🟢 `[BUG-133]` Flex tail schematic looks wrong
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `GENERAL`
+- **Component**: `flex_tail`
+- **Created**: `2026-09-25 22:34:28 UTC`
+- **Resolved**: `2026-09-26 03:23:11 UTC`
+
+#### Description
+
+We're creating a flex tail schematic that has the same sheets as the carrier board. The only component that should be on it is J4
+
+#### Execution / Console Logs
+
+```text
+📑 Generated Schematic PDF: build/schematics/test_board/flex_tail_schematic.pdf
+```
+
+#### Resolution Notes
+
+Filtered wiring to only include footprints associated with the flex tail subassembly (J4) on a single schematic sheet.
+
+---
+
+### <a id="bug-134"></a> 🟢 `[BUG-134]` Carrier board PCB components don't match schematic
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-25 22:37:58 UTC`
+- **Resolved**: `2026-09-26 03:23:14 UTC`
+
+#### Description
+
+When I view the carrier board PCB in kicad, components don't match the schematic. J8 on the PCB is a 1x4 pin header, but on the schematic it's a 6-pin JST. Screenshots attached
+
+#### Execution / Console Logs
+
+```text
+$ python src/view.py test_board/carrier_board:pcb
+pybullet build time: Oct 20 2025 08:05:00
+🖥️ Viewing KiCad file: /Users/daparker/gh/hardware/build/board/test_board/carrier_board.kicad_pcb 
+✨ Opened in VS Code (KiCode): carrier_board.kicad_pcb 
+👁️ Showing test_board_carrier_board_pcb 
+▶ + 
+✔ Done Visualizing...
+(cq)
+```
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790376206914.png](build/attachments/pasted_screenshot_1790376206914.png) | Pasted screenshot |
+| `screenshot` | [pasted_screenshot_1790376296765.png](build/attachments/pasted_screenshot_1790376296765.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Updated J6, J7, J8 to JST-PH-6P connectors in wiring.yaml and routed zero-collision traces on carrier_board with 0 DRC violations.
+
+---
+
+### <a id="bug-135"></a> 🟢 `[BUG-135]` Flying probe simulate still fails
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `SIMULATION`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-25 22:48:37 UTC`
+- **Resolved**: `2026-09-26 03:23:18 UTC`
+
+#### Description
+
+This command is still failing. Can we also make the steps parameter for PCB simulations optional, and and add a termination condition for the simulation when all probe points have been tested?
+
+#### Reproduction Steps
+
+1. $ python src/view.py   test_board/carrier_board:view/simulate -s 1000
+
+#### Execution / Console Logs
+
+```text
+pybullet build time: Oct 20 2025 08:05:00
+🛠️ Compiling parts: test_board/carrier_board, test_board/flex_tail, test_board/enclosure_bottom, test_board/enclosure_lid, test_board/led_cover 
+🤖 Compiling URDFs: test_board/carrier_board, test_board/flex_tail, test_board/product 
+🤖 Running Simulation (Ctrl-C to exit)... 
+▶ Tool view failed with error: module 'rerun' has no attribute 'Scalar' 
+▶ Traceback (most recent call last): 
+▶   File "/Users/daparker/gh/hardware/src/daemon.py", line 403, in run 
+▶     main_func() 
+▶     ~~~~~~~~~^^ 
+▶   File "/Users/daparker/gh/hardware/src/view.py", line 556, in main 
+▶     viewer.show_view( 
+▶     ~~~~~~~~~~~~~~~~^ 
+▶         cast(Sequence[str], args.targets), 
+▶         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+▶     ...<12 lines>... 
+▶         stage_window_size=args.stage_window_size, 
+▶         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+▶     ) 
+▶     ^ 
+▶   File "/Users/daparker/miniforge3/envs/cq/lib/python3.13/site-packages/pydantic/_internal/_validate_call.py", line 40, in wrapper_function 
+▶     return wrapper(*args, **kwargs) 
+▶   File "/Users/daparker/miniforge3/envs/cq/lib/python3.13/site-packages/pydantic/_internal/_validate_call.py", line 137, in __call__ 
+▶     res = self.__pydantic_validator__.validate_python(pydantic_core.ArgsKwargs(args, kwargs)) 
+▶   File "/Users/daparker/gh/hardware/src/view.py", line 396, in show_view 
+▶     room.simulate( 
+▶     ~~~~~~~~~~~~~^ 
+▶         provider_hooks=provider.get_simulate_hooks(sim_target or "default"), 
+▶         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+▶     ...<15 lines>... 
+▶         stage_window_size=stage_window_size, 
+▶         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+▶     ) 
+▶     ^ 
+▶   File "/Users/daparker/gh/hardware/src/provider/room.py", line 1097, in simulate 
+▶     bullet_sim.run() 
+▶     ~~~~~~~~~~~~~~^^ 
+▶   File "/Users/daparker/gh/hardware/src/provider/bullet.py", line 702, in run 
+▶     res = step_hook(body_id, physics_client, step_idx, self.sim_target) 
+▶   File "/Users/daparker/gh/hardware/src/provider/simulation/flying_probe.py", line 412, in step_simulation 
+▶     rr.log("telemetry/contact_force_n", rr.Scalar(contact_force)) 
+▶                                         ^^^^^^^^^ 
+▶   File "/Users/daparker/miniforge3/envs/cq/lib/python3.13/site-packages/rerun_sdk/rerun/__init__.py", line 264, in __getattr__ 
+▶     raise AttributeError(f"module {__name__!r} has no attribute {name!r}") 
+▶ AttributeError: module 'rerun' has no attribute 'Scalar'. Did you mean: 'Scalars'? 
+❌ Tool view execution failed 
+✔ Done Visualizing...
+(cq)
+```
+
+#### Resolution Notes
+
+Updated flying probe simulator to use rr.Scalars for multi-channel logging, made test steps optional, and added early termination for probe collision/failure.
+
+---
+
+### <a id="bug-136"></a> 🔴 `[BUG-136]` The horizontal scrollbar is really long for some reason.
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `INFRASTRUCTURE`
+- **Component**: `code_review`
+- **Created**: `2026-09-26 01:49:51 UTC`
+
+#### Description
+
+Reviewing uncommitted changes, in bullet.py I see the horizontal scrollbar is extremely long in Split View. We should probably enforce a cutoff if a line of text is too long
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790387403584.png](build/attachments/pasted_screenshot_1790387403584.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-137"></a> 🔴 `[BUG-137]` Support binary files diff UI
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `UI`
+- **Component**: `code_review`
+- **Created**: `2026-09-26 01:50:59 UTC`
+
+#### Description
+
+Implement binary file diff UI in the code_review tool. If the file differs and is binary, display a message and provide links to both the old and new files.
+
+---
+
+### <a id="bug-138"></a> 🔴 `[BUG-138]` Refactor schematic_diagram.py
+
+- **Status**: `OPEN`
+- **Severity**: `LOW`
+- **Category**: `PCB`
+- **Created**: `2026-09-26 01:53:33 UTC`
+
+#### Description
+
+The listing has many, very huge methods with multiple loop and assignment blocks a piece. Can you simplify this code by applying some design patterns
+
+---
+
+### <a id="bug-139"></a> 🔴 `[BUG-139]` Add battery cover
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `CAD`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-26 02:40:24 UTC`
+
+#### Description
+
+Add a snap fit battery cover to be placed over the battery enclosure after insertion. The fit should not be snug; should have a couple mm extra vertical clearance.
+
+---
+
+### <a id="bug-140"></a> 🔴 `[BUG-140]` Extend enclosure bottom under flex tail
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-26 02:42:26 UTC`
+
+#### Description
+
+Flex tail may be difficult to activate if it is free-floating, so the enclosure bottom should include a plane that supports the flex tail
+
+---
+
+### <a id="bug-141"></a> 🔴 `[BUG-141]` It does not look like the flex tail will fit in the connector.
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-26 02:49:53 UTC`
+
+#### Description
+
+In the product view, it looks like the flex tail is too wide to fit in the ZIF connector. Screenshot attached
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790391040013.png](build/attachments/pasted_screenshot_1790391040013.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-142"></a> 🔴 `[BUG-142]` No cutout for PCIE connector
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `CAD`
+- **Component**: `enclosure_bottom`
+- **Created**: `2026-09-26 02:52:07 UTC`
+
+#### Description
+
+There is no cutout for the PCIE connector:
+
+       • The bottom enclosure (enclosure_bottom) includes a dedicated rectangular pass-through
+ ┃       cutout (m2_cutout) allowing an external M.2 module/card to seat flush into J1.
+
+Screenshot attached
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790391213203.png](build/attachments/pasted_screenshot_1790391213203.png) | Pasted screenshot |
+
+---
+
+### <a id="bug-143"></a> 🔴 `[BUG-143]` Peripheral cutouts should all be the same size
+
+- **Status**: `OPEN`
+- **Severity**: `MEDIUM`
+- **Category**: `CAD`
+- **Component**: `enclosure_bottom`
+- **Created**: `2026-09-26 02:57:12 UTC`
+
+#### Description
+
+The peripheral cutouts located on the board right side should all have the same width, height, and spacing apart from each other.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790391477791.png](build/attachments/pasted_screenshot_1790391477791.png) | Pasted screenshot |
 
 ---

@@ -1048,9 +1048,9 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
         provider_hooks: dict[Simulate, Callable[..., Any]],
         proj_name: str,
         sim_target: str,
-        steps: int,
-        manager: Any,
-        logger: Any,
+        steps: Optional[int] = None,
+        manager: Any = None,
+        logger: Any = None,
         build_dir: str = "build",
         save_rrd: Optional[str] = None,
         save_mp4: Optional[str] = None,
@@ -1074,12 +1074,13 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
 
         Provider.validate_simulate_hooks(provider_hooks)
 
+        sim_steps = steps if steps is not None else 20000
         bullet_sim = Bullet(
             room=self,
             provider_hooks=provider_hooks,
             proj_name=proj_name,
             sim_target=sim_target,
-            steps=steps,
+            steps=sim_steps,
             manager=manager,
             logger=logger,
             build_dir=build_dir,

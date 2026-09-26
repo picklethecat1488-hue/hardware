@@ -60,6 +60,10 @@ led_plug_width: 4.8
 enclosure_periph_4p_cutout_length: 7.5
 enclosure_periph_6p_cutout_length: 14.5
 enclosure_periph_cutout_height: 5.0
+enclosure_expansion_mount_protrusion: 2.5
+enclosure_expansion_mount_wall_thickness: 1.2
+enclosure_expansion_mount_clearance: 1.2
+enclosure_expansion_mount_snap_ridge: 0.4
 
 # Factory assembly test limits and parameters
 test_tdr_rise_time_ps: 100.0

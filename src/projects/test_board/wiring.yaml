@@ -293,30 +293,24 @@ footprints:
     mpn: FTSH-105-01-L-DV-K
     supplier_pn: SAMTEC-FTSH105-ND
 
-  # Peripheral Headers on Right Side of PCB (BUG-074, BUG-122)
+  # Peripheral Headers on Right Side of PCB (BUG-074, BUG-122, BUG-134)
   - name: J6
-    package: pin_header_1x4
-    label:
-      text: JST-PH-6P
-    position: [24.5, 28.0, 0.8]
+    package: JST-PH-6P
+    position: [24.5, 31.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
     mpn: B6B-PH-K-S
     supplier_pn: 455-1708-ND
 
   - name: J7
-    package: pin_header_1x4
-    label:
-      text: JST-PH-6P
-    position: [24.5, 18.0, 0.8]
+    package: JST-PH-6P
+    position: [24.5, 19.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
     mpn: B6B-PH-K-S
     supplier_pn: 455-1708-ND
 
   - name: J8
-    package: pin_header_1x4
-    label:
-      text: JST-PH-6P
-    position: [24.5, 8.0, 0.8]
+    package: JST-PH-6P
+    position: [24.5, 7.0, 0.8]
     rotation: [0.0, 0.0, 90.0]
     mpn: B6B-PH-K-S
     supplier_pn: 455-1708-ND
@@ -638,6 +632,7 @@ nets:
       - [U1, F3]
       - [R5, "2"]
       - [C11, "1"]
+      - [U9, "23"]
 
   - name: BOOT0
     color: "#ca8a04"

@@ -279,7 +279,7 @@ class Viewer:
         input_targets: Sequence[str],
         build_dir: str = "build",
         no_build: bool = False,
-        sim_steps: int = 2000,
+        sim_steps: Optional[int] = None,
         save_rrd: Optional[str] = None,
         save_mp4: Optional[str] = None,
         view_from: str = "iso",
@@ -461,7 +461,7 @@ def get_args():
         "-s",
         "--sim-steps",
         type=int,
-        default=20000,
+        default=None,
         required=False,
         help="Maximum number of steps to take before stopping the simulation.",
     )

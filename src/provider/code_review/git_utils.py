@@ -226,7 +226,7 @@ class GitReviewEngine:
 
     def has_working_tree_changes(self) -> bool:
         """Check whether repository contains any uncommitted or untracked changes."""
-        status_output = run_git_command(["status", "--porcelain"], cwd=self.repo_root).strip()
+        status_output = run_git_command(["status", "--porcelain", "--untracked-files=all"], cwd=self.repo_root).strip()
         if not status_output:
             return False
         for line in status_output.splitlines():
@@ -240,7 +240,7 @@ class GitReviewEngine:
 
     def _get_working_tree_info(self) -> Optional[CommitInfoModel]:
         """Check if working tree has unstaged, staged, or untracked modifications."""
-        status_output = run_git_command(["status", "--porcelain"], cwd=self.repo_root).strip()
+        status_output = run_git_command(["status", "--porcelain", "--untracked-files=all"], cwd=self.repo_root).strip()
         if not status_output:
             return None
 
@@ -479,7 +479,7 @@ class GitReviewEngine:
 
     def _get_working_tree_files(self) -> List[Dict[str, str]]:
         """List modified and untracked files in local working directory."""
-        status_out = run_git_command(["status", "--porcelain"], cwd=self.repo_root)
+        status_out = run_git_command(["status", "--porcelain", "--untracked-files=all"], cwd=self.repo_root)
         numstat_out = run_git_command(["diff", "HEAD", "--numstat"], cwd=self.repo_root)
 
         stats_map: Dict[str, Tuple[int, int]] = {}

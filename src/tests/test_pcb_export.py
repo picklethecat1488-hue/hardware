@@ -68,6 +68,7 @@ def mock_wiring() -> MagicMock:
     wiring = MagicMock()
     wiring.footprints = [fp1, fp2]
     wiring.nets = [net_vdd, net_gnd]
+    wiring.filter_by_footprints = MagicMock(side_effect=lambda fps: wiring)
     return wiring
 
 
