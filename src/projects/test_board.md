@@ -115,7 +115,7 @@ graph TD
 | **`TP2`..`TP4`** | **Test Points (Power)** | Power rail through-hole test points | 1.4mm Pad / 0.8mm Drill | `VBAT`, `VBUS`, `3V3` | 4mm pitch at `(-18.0, -26.0)`, `(-14.0, -26.0)`, `(-10.0, -26.0)`. |
 | **`TP5`..`TP8`** | **Test Points (PCIe)** | PCIe Gen4 Tx/Rx differential pair test points | 1.4mm Pad / 0.8mm Drill | `PCIE_TX0_N/P`, `RX0_P/N` | 4mm pitch at `(-14.0, -22.0)`, `(-10.0, -22.0)`, `(-6.0, -22.0)`, `(-2.0, -22.0)`. |
 | **`TP9`..`TP10`**| **Test Points (I2C)** | Capacitive touch I2C bus test points | 1.4mm Pad / 0.8mm Drill | `I2C_SDA`, `I2C_SCL` | 4mm pitch at `(14.0, -4.0)`, `(18.0, -4.0)` on bottom layer B.Cu. |
-| **`TP11`..`TP14`**| **Test Points (MIPI)** | MIPI display differential pair test points | 1.4mm Pad / 0.8mm Drill | `MIPI_DATA0_P/N`, `CLK_P/N` | 4mm pitch at `(-14.0, 22.0)`, `(-10.0, 22.0)`, `(-6.0, 22.0)`, `(-2.0, 22.0)`. |
+| **`TP11`..`TP14`**| **Test Points (Reserved)** | Unpopulated reserve test points (formerly MIPI D-PHY, removed in BUG-146) | 1.4mm Pad / 0.8mm Drill | Unconnected / Reserved | 4mm pitch at `(-14.0, 22.0)`, `(-10.0, 22.0)`, `(-6.0, 22.0)`, `(-2.0, 22.0)`. |
 
 ## Technical Integration Notes
 

@@ -673,11 +673,12 @@ class GitReviewEngine:
                 )
             )
 
+        diff_lines = raw_diff.splitlines()
         is_binary = (
             "\x00" in old_content[:8000]
             or "\x00" in new_content[:8000]
-            or "Binary files " in raw_diff
-            or "GIT binary patch" in raw_diff
+            or any(line.startswith("Binary files ") and "differ" in line for line in diff_lines)
+            or any(line.startswith("GIT binary patch") for line in diff_lines)
         )
         if is_binary:
             return FileDiffModel(

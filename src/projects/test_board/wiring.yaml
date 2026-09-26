@@ -669,33 +669,6 @@ nets:
       - [U1, T4]
       - [J1, PERn0]
 
-  - name: MIPI_DATA0_P
-    priority: 5
-    color: "#7c3aed"
-    pins:
-      - [U1, A2]
-      - [J2, D0_P]
-
-  - name: MIPI_DATA0_N
-    priority: 6
-    color: "#8b5cf6"
-    pins:
-      - [U1, A4]
-      - [J2, D0_N]
-
-  - name: MIPI_CLK_P
-    priority: 7
-    color: "#d97706"
-    pins:
-      - [U1, A12]
-      - [J2, CLK_P]
-
-  - name: MIPI_CLK_N
-    priority: 8
-    color: "#f59e0b"
-    pins:
-      - [U1, A14]
-      - [J2, CLK_N]
 
   - name: CAP_SHIELD
     priority: 25

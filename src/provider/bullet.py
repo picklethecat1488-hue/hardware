@@ -412,23 +412,52 @@ class Bullet:
 
         # Apply exact RGBA colors (including alpha transparency) from the room to PyBullet visual shapes
         if is_real:
+            from target_parser import TargetParser
+
             for name, (geom, rgba) in self.room.items():
                 u_geom = cast(URDFShape, geom)
-                label = getattr(u_geom, "urdf_label", None)
+                label = getattr(u_geom, "urdf_label", None) or getattr(geom, "label", None)
+                if not label:
+                    base_name = name.split("/")[-1].split("_")[-1] if "_" in name else name
+                    if base_name in label_to_link_idx:
+                        label = base_name
+                    elif self.sim_target:
+                        target_base = TargetParser.get_base_target(self.sim_target)
+                        if target_base in label_to_link_idx:
+                            label = target_base
                 if label and label in label_to_link_idx:
                     link_idx = label_to_link_idx[label]
                     p.changeVisualShape(body_id, link_idx, rgbaColor=rgba, physicsClientId=physics_client)
 
         urdf_dir = os.path.dirname(urdf_path) if urdf_path else proj_dir
         link_to_obj = self._parse_urdf_meshes(urdf_dir)
-        for geom, rgba in self.room.values():
+        from target_parser import TargetParser
+
+        for name, (geom, rgba) in self.room.items():
             u_geom = cast(URDFShape, geom)
-            label = getattr(u_geom, "urdf_label", None)
+            label = getattr(u_geom, "urdf_label", None) or getattr(geom, "label", None)
+            if not label:
+                base_name = name.split("/")[-1].split("_")[-1] if "_" in name else name
+                if base_name in link_to_obj or f"{base_name}.obj" in (
+                    os.listdir(proj_dir) if os.path.exists(proj_dir) else []
+                ):
+                    label = base_name
+                elif self.sim_target:
+                    target_base = TargetParser.get_base_target(self.sim_target)
+                    if target_base in link_to_obj or f"{target_base}.obj" in (
+                        os.listdir(proj_dir) if os.path.exists(proj_dir) else []
+                    ):
+                        label = target_base
             if label:
                 obj_filename = link_to_obj.get(label, getattr(u_geom, "urdf_obj_filename", f"{label}.obj"))
                 temp_obj_path = os.path.join(proj_dir, obj_filename)
                 if os.path.exists(temp_obj_path):
                     rgba_255 = [int(round(c * 255.0)) for c in rgba]
+                    rr.log(
+                        f"world/{label}",
+                        rr.Transform3D(scale=0.001),
+                        static=True,
+                    )
                     rr.log(
                         f"world/{label}",
                         rr.Asset3D(path=temp_obj_path, albedo_factor=rgba_255),

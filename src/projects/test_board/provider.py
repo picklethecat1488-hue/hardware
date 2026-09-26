@@ -8,11 +8,13 @@ from build123d import (
     BuildPart,
     BuildSketch,
     Polygon,
+    Rectangle,
     RectangleRounded,
     Plane,
     Location,
     RigidJoint,
     extrude,
+    offset,
     Box,
     Cone,
     Cylinder,
@@ -198,6 +200,11 @@ class TestBoardProvider(Provider):
                         with Locations((pos[0], pos[1], pos[2])):
                             Box(dim[0], dim[1], dim[2], mode=BuildMode.ADD)
 
+        if hasattr(pcb, "part") and pcb.part is not None:
+            pcb.part.label = "carrier_board"
+            pcb.part.urdf_label = "carrier_board"
+        pcb.label = "carrier_board"
+        pcb.urdf_label = "carrier_board"
         return pcb
 
     def flex_tail(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildFlexPCB:
@@ -239,14 +246,24 @@ class TestBoardProvider(Provider):
                     )
                 with Locations((-7.5, -21.0)):
                     SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.5, thickness=0.08)
-                with Locations((0.0, -6.25)):
-                    SilkscreenText("CH0: LOW", layer="F.SilkS", font_size=0.7, thickness=0.10)
-                with Locations((0.0, 5.25)):
-                    SilkscreenText("CH1: MID", layer="F.SilkS", font_size=0.7, thickness=0.10)
-                with Locations((0.0, 16.75)):
-                    SilkscreenText("CH2: HIGH", layer="F.SilkS", font_size=0.7, thickness=0.10)
-                with Locations((0.0, 24.75)):
-                    SilkscreenText("CH3: PROX", layer="F.SilkS", font_size=0.7, thickness=0.10)
+
+                # 5-Button Slider Region (BUG-147)
+                with Locations((0.0, -3.0)):
+                    SilkscreenRect((11.0, 26.0), layer="F.SilkS", thickness=0.15)
+                    SilkscreenText("SLIDER", layer="F.SilkS", font_size=0.9, thickness=0.12)
+                for idx, dy in enumerate([-10.0, -5.0, 0.0, 5.0, 10.0], start=1):
+                    with Locations((0.0, -3.0 + dy)):
+                        SilkscreenText(f"S{idx}", layer="F.SilkS", font_size=0.55, thickness=0.08)
+
+                # Action Button Region (distal end left) (BUG-147)
+                with Locations((-3.5, 18.0)):
+                    SilkscreenRect((4.8, 8.0), layer="F.SilkS", thickness=0.15)
+                    SilkscreenText("ACTION", layer="F.SilkS", font_size=0.6, thickness=0.09)
+
+                # Proximity Sensor Region (distal end right) (BUG-147)
+                with Locations((3.5, 18.0)):
+                    SilkscreenRect((4.8, 8.0), layer="F.SilkS", thickness=0.15)
+                    SilkscreenText("PROX", layer="F.SilkS", font_size=0.6, thickness=0.09)
 
             routing_flex_file = self.wiring_path.parent / "routing_flex.yaml"
             if routing_flex_file.exists():
@@ -258,6 +275,11 @@ class TestBoardProvider(Provider):
                 with BuildVias() as bv:
                     bv.add(f_vias)
 
+        if hasattr(tail, "part") and tail.part is not None:
+            tail.part.label = "flex_tail"
+            tail.part.urdf_label = "flex_tail"
+        tail.label = "flex_tail"
+        tail.urdf_label = "flex_tail"
         return tail
 
     def enclosure_bottom(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
@@ -387,16 +409,7 @@ class TestBoardProvider(Provider):
                         RectangleRounded(vent_w, vent_h, min(cutout_r, (vent_w / 2.0) - 0.1))
             extrude(s_vents.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
 
-            # Flex tail passage exit slot at front rim (aligned with J2 at [0.0, 38.0, 0.8] and flex tail)
-            slot_w = self.settings.flex_tail_width + 2.0
-            z_cut_bot = z_carrier - 1.0
-            z_cut_top = (h_shell / 2.0) + 0.5
-            slot_h = z_cut_top - z_cut_bot
-            slot_z = (z_cut_top + z_cut_bot) / 2.0
-            with Locations((0.0, length / 2.0, slot_z)):
-                Box(slot_w, wall * 3.0, slot_h, mode=BuildMode.SUBTRACT)
-
-            # Flex tail support shelf extending from front exterior wall underneath flex tail (BUG-140)
+            # Flex tail support shelf extending from front exterior wall underneath flex tail (BUG-140, BUG-148)
             shelf_l = self.settings.enclosure_flex_support_length
             shelf_w = self.settings.enclosure_flex_support_width
             shelf_t = wall
@@ -407,20 +420,56 @@ class TestBoardProvider(Provider):
                 if "J2" in comp_map and "J4" in comp_map:
                     tail_dz = comp_map["J2"].position[2] - comp_map["J4"].position[2]
             shelf_top_z = z_carrier + tail_dz - 0.05
-            shelf_y = (length / 2.0) + (shelf_l / 2.0)
+            shelf_y_start = (length / 2.0) - wall
+            shelf_total_l = shelf_l + wall
+            shelf_y_center = shelf_y_start + (shelf_total_l / 2.0)
             with BuildSketch(Plane.XY.offset(shelf_top_z - shelf_t)) as s_shelf:
-                with Locations((0.0, shelf_y)):
-                    RectangleRounded(shelf_w, shelf_l, cutout_r * 2.0)
+                with Locations((0.0, shelf_y_center)):
+                    RectangleRounded(shelf_w, shelf_total_l, cutout_r * 2.0)
             extrude(s_shelf.sketch, amount=shelf_t)
 
-            # M.2 connector cutout through rear exterior wall (aligned with J1 at [0.0, -36.0, 0.8])
+            # Flex tail passage exit slot at front rim (aligned with J2 at [0.0, 38.0, 0.8] and flex tail)
+            slot_w = self.settings.flex_tail_width + 2.0
+            z_cut_bot = shelf_top_z
+            z_cut_top = (h_shell / 2.0) + 0.5
+            slot_h = z_cut_top - z_cut_bot
+            slot_z = (z_cut_top + z_cut_bot) / 2.0
+            with Locations((0.0, length / 2.0, slot_z)):
+                Box(slot_w, wall * 3.0, slot_h, mode=BuildMode.SUBTRACT)
+
+            # Flex ribbon support label (BUG-150)
+            with BuildSketch(Plane.XY.offset(shelf_top_z)) as s_flex_lbl:
+                with Locations((0.0, (length / 2.0) + (shelf_l / 2.0))):
+                    Text("FLEX TAIL", font_size=1.5)
+            extrude(s_flex_lbl.sketch, amount=-0.3, mode=BuildMode.SUBTRACT)
+
+            # Charger terminal graphical label (lightning bolt) (BUG-150)
+            bolt_pts = [(0.0, 1.8), (-1.2, 0.2), (-0.3, 0.2), (-0.8, -1.8), (1.2, -0.2), (0.3, -0.2)]
+            with BuildSketch(Plane.YZ.offset(-w / 2.0)) as s_bolt:
+                with Locations((0.0, usb_z + (usb_h / 2.0) + 2.2)):
+                    Polygon(*bolt_pts)
+            extrude(s_bolt.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
+
+            # SWD cutout label (BUG-150)
+            with BuildSketch(Plane.YZ.offset(-w / 2.0)) as s_swd_lbl:
+                with Locations((swd_y, swd_z + (swd_h / 2.0) + 1.8)):
+                    Text("SWD", font_size=1.6)
+            extrude(s_swd_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
+
+            # M.2 connector cutout through rear exterior wall (aligned with J1 at [0.0, -36.0, 0.8]) (BUG-144)
             m2_w = self.settings.enclosure_m2_cutout_width
             m2_h = self.settings.enclosure_m2_cutout_height
             m2_z = -h_shell / 2.0 + wall + standoff_h + (m2_h / 2.0) - 0.5
-            with BuildSketch(Plane.XZ.offset(-length / 2.0)) as s_m2:
+            with BuildSketch(Plane.XZ.offset(length / 2.0)) as s_m2:
                 with Locations((0.0, m2_z)):
                     RectangleRounded(m2_w, m2_h, cutout_r)
             extrude(s_m2.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
+
+            # M.2 PCIe cutout label (BUG-150)
+            with BuildSketch(Plane.XZ.offset(length / 2.0)) as s_m2_lbl:
+                with Locations((0.0, m2_z + (m2_h / 2.0) + 2.0)):
+                    Text("M.2 PCIE", font_size=1.6)
+            extrude(s_m2_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
             # M.2 connector floor pass-through cutout (aligned with J1) (BUG-142)
             m2_x, m2_y = 0.0, -36.0
@@ -595,20 +644,13 @@ class TestBoardProvider(Provider):
             with Locations((led_x, led_y, 0.0)):
                 Box(led_hole_w, led_hole_w, wall * 4.0, mode=BuildMode.SUBTRACT)
 
-            # Battery retention cradle on top exterior of enclosure lid (BUG-090)
+            # Battery retention cradle on top exterior of enclosure lid, extended over J13 cutout (BUG-090, BUG-145)
             batt_w = self.settings.enclosure_battery_mount_width
             batt_l = self.settings.enclosure_battery_mount_length
             batt_rim_t = self.settings.enclosure_battery_mount_wall_thickness
             batt_rim_h = self.settings.enclosure_battery_mount_wall_height
             batt_x = self.settings.enclosure_battery_mount_x
             batt_y = self.settings.enclosure_battery_mount_y
-            with BuildSketch(Plane.XY.offset(wall)) as s_batt:
-                with Locations((batt_x, batt_y)):
-                    RectangleRounded(batt_w + (2.0 * batt_rim_t), batt_l + (2.0 * batt_rim_t), 2.0)
-                    RectangleRounded(batt_w, batt_l, 1.0, mode=BuildMode.SUBTRACT)
-            extrude(s_batt.sketch, amount=batt_rim_h)
-
-            # Battery connector pass-through cutout through lid (aligned with J13, BUG-090)
             j13_x, j13_y = -23.0, 16.0
             if self.wiring_path.exists():
                 wiring = Wiring(str(self.wiring_path))
@@ -619,10 +661,38 @@ class TestBoardProvider(Provider):
             batt_cut_w = self.settings.enclosure_battery_cutout_width
             batt_cut_l = self.settings.enclosure_battery_cutout_length
             cutout_r = self.settings.enclosure_cutout_fillet_radius
+            bridge_x = (batt_x - batt_w / 2.0 + j13_x) / 2.0
+            bridge_y = (batt_y + batt_l / 2.0 + j13_y) / 2.0
+            bridge_w = abs(batt_x - batt_w / 2.0 - j13_x) + 4.0
+            bridge_l = abs(batt_y + batt_l / 2.0 - j13_y) + 4.0
+
+            with BuildSketch() as s_c_in:
+                with Locations((batt_x, batt_y)):
+                    Rectangle(batt_w, batt_l)
+                with Locations((j13_x, j13_y)):
+                    Rectangle(batt_cut_w + 3.0, batt_cut_l + 3.0)
+                with Locations((bridge_x, bridge_y)):
+                    Rectangle(bridge_w, bridge_l)
+
+            with BuildSketch() as s_c_out:
+                offset(s_c_in.sketch, amount=batt_rim_t)
+
+            with BuildSketch(Plane.XY.offset(wall)) as s_batt:
+                add(s_c_out.sketch)
+                add(s_c_in.sketch, mode=BuildMode.SUBTRACT)
+            extrude(s_batt.sketch, amount=batt_rim_h)
+
+            # Battery connector pass-through cutout through lid (now fully enclosed inside cradle) (BUG-090, BUG-145)
             with BuildSketch(Plane.XY.offset(wall + 1.0)) as s_batt_cut:
                 with Locations((j13_x, j13_y)):
                     RectangleRounded(batt_cut_w, batt_cut_l, cutout_r)
             extrude(s_batt_cut.sketch, amount=-(wall + 2.0), mode=BuildMode.SUBTRACT)
+
+            # Battery label (BUG-150)
+            with BuildSketch(Plane.XY.offset(wall)) as s_batt_lbl:
+                with Locations((batt_x, batt_y - (batt_l / 2.0) - 3.0)):
+                    Text("BATTERY", font_size=1.6)
+            extrude(s_batt_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
         RigidJoint("led_port", lid.part, Location((led_x, led_y, wall)))
         RigidJoint("battery_mount", lid.part, Location((batt_x, batt_y, wall)))
@@ -648,42 +718,53 @@ class TestBoardProvider(Provider):
         return cover
 
     def battery_cover(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
-        """Build snap-fit battery cover placed over the enclosure lid battery cradle (BUG-139)."""
+        """Build snap-fit battery cover placed over the enclosure lid battery cradle (BUG-139, BUG-145)."""
         batt_w = self.settings.enclosure_battery_mount_width
         batt_l = self.settings.enclosure_battery_mount_length
         cradle_t = self.settings.enclosure_battery_mount_wall_thickness
         cradle_h = self.settings.enclosure_battery_mount_wall_height
+        batt_x = self.settings.enclosure_battery_mount_x
+        batt_y = self.settings.enclosure_battery_mount_y
+        j13_x, j13_y = -23.0, 16.0
+        if self.wiring_path.exists():
+            wiring = Wiring(str(self.wiring_path))
+            j13_comp = next((c for c in wiring.footprints if c.name == "J13"), None)
+            if j13_comp:
+                j13_x, j13_y = j13_comp.position[0], j13_comp.position[1]
+        batt_cut_w = self.settings.enclosure_battery_cutout_width
+        batt_cut_l = self.settings.enclosure_battery_cutout_length
+
         clr = self.settings.enclosure_battery_cover_clearance
         extra_h = self.settings.enclosure_battery_cover_vertical_clearance
         cover_t = self.settings.enclosure_battery_cover_wall_thickness
 
-        # Inner cavity dimensions to fit over cradle outer rim with clearance
-        inner_w = batt_w + 2.0 * (cradle_t + clr)
-        inner_l = batt_l + 2.0 * (cradle_t + clr)
         inner_h = cradle_h + extra_h
-
-        # Outer dimensions
-        outer_w = inner_w + 2.0 * cover_t
-        outer_l = inner_l + 2.0 * cover_t
         total_h = inner_h + cover_t
+
+        bridge_x = (batt_x - batt_w / 2.0 + j13_x) / 2.0
+        bridge_y = (batt_y + batt_l / 2.0 + j13_y) / 2.0
+        bridge_w = abs(batt_x - batt_w / 2.0 - j13_x) + 4.0
+        bridge_l = abs(batt_y + batt_l / 2.0 - j13_y) + 4.0
+
+        with BuildSketch() as s_c_in:
+            with Locations((batt_x, batt_y)):
+                Rectangle(batt_w, batt_l)
+            with Locations((j13_x, j13_y)):
+                Rectangle(batt_cut_w + 3.0, batt_cut_l + 3.0)
+            with Locations((bridge_x, bridge_y)):
+                Rectangle(bridge_w, bridge_l)
+
+        with BuildSketch() as s_c_out:
+            offset(s_c_in.sketch, amount=cradle_t)
 
         with BuildPart() as cover:
             with BuildSketch() as s_outer:
-                RectangleRounded(outer_w, outer_l, 2.5)
+                add(offset(s_c_out.sketch, amount=clr + cover_t))
             extrude(s_outer.sketch, amount=total_h)
 
             with BuildSketch(Plane.XY.offset(-0.01)) as s_inner:
-                RectangleRounded(inner_w, inner_l, 1.5)
+                add(offset(s_c_out.sketch, amount=clr))
             extrude(s_inner.sketch, amount=inner_h + 0.01, mode=BuildMode.SUBTRACT)
-
-            # Snap-fit retention tabs on interior rim
-            snap_depth = self.settings.enclosure_snap_ridge_depth
-            snap_len = 8.0
-            with Locations((0.0, 0.0, cover_t + 1.0)):
-                with Locations((-inner_w / 2.0 + snap_depth / 2.0, 0.0)):
-                    Box(snap_depth, snap_len, 0.8, mode=BuildMode.ADD)
-                with Locations((inner_w / 2.0 - snap_depth / 2.0, 0.0)):
-                    Box(snap_depth, snap_len, 0.8, mode=BuildMode.ADD)
 
         RigidJoint("mount", cover.part, Location((0, 0, 0)))
 
@@ -734,9 +815,7 @@ class TestBoardProvider(Provider):
 
         cover_geom = cover.part.locate(Location((led_x, led_y, z_lid + wall)))
 
-        batt_x = self.settings.enclosure_battery_mount_x
-        batt_y = self.settings.enclosure_battery_mount_y
-        batt_cov_geom = batt_cov.part.locate(Location((batt_x, batt_y, z_lid + wall + 0.5)))
+        batt_cov_geom = batt_cov.part.locate(Location((0.0, 0.0, z_lid + wall + 0.5)))
 
         room.add("carrier_board", carrier_geom, color=(0.08, 0.40, 0.20), alpha=1.0)
         room.add("flex_tail", tail_geom, color=(0.85, 0.65, 0.15), alpha=0.9)
@@ -879,11 +958,11 @@ class TestBoardProvider(Provider):
             TestPoint("TP9", net="I2C_SDA", at=(14.0, -4.0), layer="B.Cu")
             TestPoint("TP10", net="I2C_SCL", at=(18.0, -4.0), layer="B.Cu")
 
-            # MIPI display differential pair test points (spaced with 4mm pitch on left half of board)
-            TestPoint("TP11", net="MIPI_DATA0_P", at=(-14.0, 22.0))
-            TestPoint("TP12", net="MIPI_DATA0_N", at=(-10.0, 22.0))
-            TestPoint("TP13", net="MIPI_CLK_P", at=(-6.0, 22.0))
-            TestPoint("TP14", net="MIPI_CLK_N", at=(-2.0, 22.0))
+            # Reserved test points (spaced with 4mm pitch on left half of board) (BUG-146)
+            TestPoint("TP11", net="RESERVED", at=(-14.0, 22.0))
+            TestPoint("TP12", net="RESERVED", at=(-10.0, 22.0))
+            TestPoint("TP13", net="RESERVED", at=(-6.0, 22.0))
+            TestPoint("TP14", net="RESERVED", at=(-2.0, 22.0))
         return tp
 
     @cached_property

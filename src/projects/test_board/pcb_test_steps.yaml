@@ -48,29 +48,6 @@ carrier_board:
     stimulus: "Battery charge domain sensor"
     measured: 3.72
 
-  - step_id: "TEST_IMP_MIPI_DATA"
-    description: "Measure MIPI CSI-2 differential data lane impedance"
-    test_type: "impedance"
-    net_name: "MIPI_DATA0"
-    pad_a_mm: [-14.0, 22.0]  # TP11 (DATA0_N)
-    pad_b_mm: [-10.0, 22.0]  # TP12 (DATA0_P)
-    nominal: 100.0
-    tolerance_pct: 10.0
-    unit: "ohm"
-    stimulus: "200ps differential TDR step"
-    measured: 99.2
-
-  - step_id: "TEST_IMP_MIPI_CLK"
-    description: "Measure MIPI CSI-2 differential clock lane impedance"
-    test_type: "impedance"
-    net_name: "MIPI_CLK"
-    pad_a_mm: [-6.0, 22.0]   # TP13 (CLK_N)
-    pad_b_mm: [-2.0, 22.0]   # TP14 (CLK_P)
-    nominal: 100.0
-    tolerance_pct: 10.0
-    unit: "ohm"
-    stimulus: "200ps differential TDR step"
-    measured: 100.8
 
   - step_id: "TEST_I2C_PULLUPS"
     description: "Measure I2C SDA/SCL pull-up resistance to 3.3V rail"

@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-26 13:08:50 UTC` |
-| **Total Issues** | `142` |
+| **Report Date** | `2026-09-26 20:21:28 UTC` |
+| **Total Issues** | `152` |
 | **Open Issues** | `0` |
-| **Resolved / Closed** | `142 (100%)` |
+| **Resolved / Closed** | `152 (100%)` |
 
 ## Executive Summary
 
@@ -19,19 +19,19 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 
 | Severity | Count | Meaning |
 | :--- | :---: | :--- |
-| **`[CRITICAL]`** | 1 | System crashes, build failures, blockages, or electrical shorts. |
-| **`[HIGH]`** | 6 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 131 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[CRITICAL]`** | 3 | System crashes, build failures, blockages, or electrical shorts. |
+| **`[HIGH]`** | 8 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
+| **`[MEDIUM]`** | 137 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
 | **`[LOW]`** | 4 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 101 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 17 | 3D geometry, step models, enclosures, mechanical assembly. |
-| **`SIMULATION`** | 5 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
-| **`INFRASTRUCTURE`** | 13 | Build tooling, compilers, test runners, headless tools. |
+| **`PCB`** | 103 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 22 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`SIMULATION`** | 7 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
+| **`INFRASTRUCTURE`** | 14 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
 
 ## Issue Checklist
@@ -178,6 +178,16 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-141](#bug-141): It does not look like the flex tail will fit in the connector. `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-142](#bug-142): No cutout for PCIE connector `[enclosure_bottom]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-143](#bug-143): Peripheral cutouts should all be the same size `[enclosure_bottom]` (`RESOLVED`)
+- [x] **`[CRITICAL]`** [#BUG-144](#bug-144): Cutout region for J1 is missing from the design `[enclosure_bottom]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-145](#bug-145): Extend battery holder over the battery connector cutout `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-146](#bug-146): Remove MIPI camera routing `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-147](#bug-147): Change flex ribbon design `[carrier_board]` (`RESOLVED`)
+- [x] **`[CRITICAL]`** [#BUG-148](#bug-148): Flex ribbon support does not connect with main enclosure button `[enclosure_bottom]` (`RESOLVED`)
+- [x] **`[HIGH]`** [#BUG-149](#bug-149): Mutual intersection test `[enclosure_bottom, enclosure_top]` (`RESOLVED`)
+- [x] **`[HIGH]`** [#BUG-150](#bug-150): Component cutouts missing labels `[enclosure_bottom]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-151](#bug-151): Git_utils.py shows as binary `[bug_report]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-152](#bug-152): Textured PCB ain't visible (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-153](#bug-153): Bad formatting in flying probes report (`RESOLVED`)
 
 ## Detailed Issue Log
 
@@ -3722,5 +3732,266 @@ The peripheral cutouts located on the board right side should all have the same 
 #### Resolution Notes
 
 Equalized peripheral connector cutouts in enclosure_bottom right wall to uniform length 10.0mm and height 5.0mm parameterized via enclosure_periph_cutout_length and enclosure_periph_cutout_height.
+
+---
+
+### <a id="bug-144"></a> 🟢 `[BUG-144]` Cutout region for J1 is missing from the design
+
+- **Status**: `RESOLVED`
+- **Severity**: `CRITICAL`
+- **Category**: `CAD`
+- **Component**: `enclosure_bottom`
+- **Created**: `2026-09-26 17:37:29 UTC`
+- **Resolved**: `2026-09-26 20:21:10 UTC`
+
+#### Description
+
+-The cutout region for J1 is missing from the design. See the circled gray region, and the insertion diagram showing the expected cutout region for insertion
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790445012556.png](build/attachments/pasted_screenshot_1790445012556.png) | Pasted screenshot |
+| `screenshot` | [pasted_screenshot_1790445149239.png](build/attachments/pasted_screenshot_1790445149239.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Aligned rear wall cutout for J1 using Plane.XZ.offset(length / 2.0) at (0, -length/2, 0) with 10x5mm dimensions penetrating the rear wall.
+
+---
+
+### <a id="bug-145"></a> 🟢 `[BUG-145]` Extend battery holder over the battery connector cutout
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `CAD`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-26 17:37:44 UTC`
+- **Resolved**: `2026-09-26 20:21:12 UTC`
+
+#### Description
+
+In the current design, the battery wire will be visible from the top of the board. There is no need for this, extend the battery mount and cover so that it is not visible when the cover is installed.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790444379020.png](build/attachments/pasted_screenshot_1790444379020.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Extended battery holder over J13 cutout in provider.py with world coordinate alignment and 0.4mm clearance; verified 0 mutual intersection.
+
+---
+
+### <a id="bug-146"></a> 🟢 `[BUG-146]` Remove MIPI camera routing
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-26 17:54:58 UTC`
+- **Resolved**: `2026-09-26 20:21:14 UTC`
+
+#### Description
+
+Remove the MIPI camera routing from the board. We will use I3C if a camera expansion is planned.
+
+#### Resolution Notes
+
+Removed MIPI camera differential pairs and nets from wiring.yaml, pcb.yaml, routing.yaml, and marked TP11-TP14 as RESERVED.
+
+---
+
+### <a id="bug-147"></a> 🟢 `[BUG-147]` Change flex ribbon design
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-26 17:57:02 UTC`
+- **Resolved**: `2026-09-26 20:21:16 UTC`
+
+#### Description
+
+This project is a generic test board meant for firmware bringup and component evaluations. Change the flex ribbon design so that it has a 5 button slider, action button, and proximity sensor. Diagram attached. The slider, action button, and proximity regions should be labeled and outlined with silkscreen
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790445678469.png](build/attachments/pasted_screenshot_1790445678469.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Updated flex ribbon design with 5-button slider (S1-S5), ACTION button, PROX sensor, silkscreen borders/labels, and synchronized routing_flex.yaml.
+
+---
+
+### <a id="bug-148"></a> 🟢 `[BUG-148]` Flex ribbon support does not connect with main enclosure button
+
+- **Status**: `RESOLVED`
+- **Severity**: `CRITICAL`
+- **Category**: `CAD`
+- **Component**: `enclosure_bottom`
+- **Created**: `2026-09-26 18:01:36 UTC`
+- **Resolved**: `2026-09-26 20:21:18 UTC`
+
+#### Description
+
+The nearly added flex ribbon support does not connect with the enclosure bottom.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790445761429.png](build/attachments/pasted_screenshot_1790445761429.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Adjusted shelf_y_start to (length / 2.0) - wall, unifying flex ribbon shelf with main enclosure button as a single solid.
+
+---
+
+### <a id="bug-149"></a> 🟢 `[BUG-149]` Mutual intersection test
+
+- **Status**: `RESOLVED`
+- **Severity**: `HIGH`
+- **Category**: `CAD`
+- **Component**: `enclosure_bottom, enclosure_top`
+- **Created**: `2026-09-26 18:03:50 UTC`
+- **Resolved**: `2026-09-26 20:21:20 UTC`
+
+#### Description
+
+Write an integration test to ensure all components in the test_board will not mutually intersect, and there are adequate clearances and tolerances for 3D printing and component assembly.
+
+#### Resolution Notes
+
+Added test_regression_bug_149_mutual_intersection_test decorated with @pytest.mark.slow asserting zero intersection volume.
+
+---
+
+### <a id="bug-150"></a> 🟢 `[BUG-150]` Component cutouts missing labels
+
+- **Status**: `RESOLVED`
+- **Severity**: `HIGH`
+- **Category**: `CAD`
+- **Component**: `enclosure_bottom`
+- **Created**: `2026-09-26 18:05:45 UTC`
+- **Resolved**: `2026-09-26 20:21:22 UTC`
+
+#### Description
+
+Can we label the charger terminal, flex ribbon, M.2 PCIe, SWD and battery cutouts. Can we please use a graphical label for the charger terminal.
+
+#### Resolution Notes
+
+Added embossed/engraved labels for USB-C, SWD, M.2 PCIE, FLEX TAIL, and BATTERY on enclosure cutouts.
+
+---
+
+### <a id="bug-151"></a> 🟢 `[BUG-151]` Git_utils.py shows as binary
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `INFRASTRUCTURE`
+- **Component**: `bug_report`
+- **Created**: `2026-09-26 18:09:09 UTC`
+- **Resolved**: `2026-09-26 20:21:24 UTC`
+
+#### Description
+
+When I try to diff git_utils.py, the diff tool complaints that it is binary
+
+#### Behavior Comparison
+
+- **Expected**: _Not specified_
+- **Actual**: This is a text file. So text diffing should work
+
+#### Execution / Console Logs
+
+```text
+src/provider/code_review/git_utils.py
+This file differs and is binary. Direct line-by-line diff is unavailable.
+```
+
+#### Resolution Notes
+
+Updated git_utils.py to detect git binary diff lines and prevent git_utils.py from showing as binary.
+
+---
+
+### <a id="bug-152"></a> 🟢 `[BUG-152]` Textured PCB ain't visible
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `SIMULATION`
+- **Created**: `2026-09-26 18:15:08 UTC`
+- **Resolved**: `2026-09-26 20:21:26 UTC`
+
+#### Description
+
+When I run the flying probes test, the textured PCB ain't visible in the world, only the probes are. Screenshot attached
+
+#### Reproduction Steps
+
+1. $ python src/view.py   test_board/carrier_board:view/simulate
+
+#### Execution / Console Logs
+
+```text
+pybullet build time: Oct 20 2025 08:05:00
+🛠️ Compiling parts: test_board/carrier_board, test_board/flex_tail, test_board/enclosure_bottom, test_board/enclosure_lid, test_board/led_cover, test_board/battery_cover 
+📄 Saved build/stl/test_board/carrier_board.stl 
+📄 Saved build/stl/test_board/enclosure_bottom.stl 
+📄 Saved build/obj/test_board/carrier_board.obj 
+📄 Saved build/stl/test_board/battery_cover.stl 
+🤖 Compiling URDFs: test_board/carrier_board, test_board/flex_tail, test_board/battery_cover, test_board/product 
+📄 Saved build/urdf/test_board/carrier_board.urdf 
+🤖 Running Simulation (Ctrl-C to exit)... 
+🛑 Simulation terminated: All 7 flying probe test points completed successfully 
+✔ Done Visualizing...
+(cq)
+```
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790446532263.png](build/attachments/pasted_screenshot_1790446532263.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Scaled Rerun PCB transform by 0.001 to match PyBullet meters and resolved textured mesh label mapping.
+
+---
+
+### <a id="bug-153"></a> 🟢 `[BUG-153]` Bad formatting in flying probes report
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `SIMULATION`
+- **Created**: `2026-09-26 18:15:57 UTC`
+- **Resolved**: `2026-09-26 20:21:28 UTC`
+
+#### Description
+
+When I view the flying probes test report, the following symbols are corrupted:
+
+Continuity: Contact resistance strictly $\le R_{\text{nom}} \times (1 + \text{tol}%)$. Zero opens.
+Differential Impedance: PCIe $85,\Omega \pm 10%$, MIPI $100,\Omega \pm 10%$. Reflection $\le -20,\text{dB}$.
+Capacitance: Liquid sensing pads $12.5 - 15.5,\text{pF} \pm 15%$, Proximity $8.0,\text{pF} \pm 15%$.
+Probe Clearance: Minimum vertical flight height $\ge 15.0,\text{mm}$ above all board component obstacles.
+
+#### Reproduction Steps
+
+1. $ python src/view.py   test_board/carrier_board:view/simulate
+
+#### Resolution Notes
+
+Cleaned up flying_probe_report.md.j2 replacing corrupted LaTeX escapes with standard Unicode characters and purged MIPI references.
 
 ---

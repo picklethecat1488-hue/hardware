@@ -1146,6 +1146,8 @@ class PCBDesignRulesChecker:
 
         # Check disconnected test points (airwires on test points)
         for tp in self.config.test_points:
+            if not tp.net or tp.net.upper() in ("NC", "NONE", "RESERVED", "UNCONNECTED"):
+                continue
             tp_x, tp_y = tp.position_mm
             tp_r = tp.pad_diameter_mm / 2.0
             connected = False
@@ -1936,13 +1938,15 @@ class PCBDesignRulesChecker:
             scx, scy = getattr(s, "center_mm", (0.0, 0.0))
             sw, sl = getattr(s, "area_mm", (10.0, 10.0))
             s_layer = getattr(s, "layer", "F.Cu")
-            term_r = 1.0
+            term_r = max(sl / 2.0, 1.0)
             if s.shape == "interdigital":
                 if s.tx_pin:
                     pin_targets.setdefault(s.tx_pin, []).append((scx - sw / 2.0, scy, s_layer, term_r))
                 if s.rx_pin:
                     pin_targets.setdefault(s.rx_pin, []).append((scx + sw / 2.0, scy, s_layer, term_r))
             else:
+                if s.tx_pin:
+                    pin_targets.setdefault(s.tx_pin, []).append((scx - sw / 2.0, scy, s_layer, term_r))
                 if s.rx_pin:
                     pin_targets.setdefault(s.rx_pin, []).append((scx, scy - sl / 2.0, s_layer, term_r))
 

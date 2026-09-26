@@ -98,30 +98,6 @@ net_classes:
         max_inter_pair_skew_mm: 0.50
         max_via_count: 2
 
-  - name: MIPI_DISPLAY
-    trace_width_mm: 0.12
-    clearance_mm: 0.12
-    via_dia_mm: 0.36
-    via_drill_mm: 0.16
-    interface_type: display
-    diff_pairs:
-      - name: MIPI_D0
-        pos_net: MIPI_DATA0_P
-        neg_net: MIPI_DATA0_N
-        target_impedance_ohms: 100.0
-        impedance_tolerance_percent: 10.0
-        max_intra_pair_skew_mm: 0.15
-        max_inter_pair_skew_mm: 0.75
-        max_via_count: 2
-      - name: MIPI_CLK
-        pos_net: MIPI_CLK_P
-        neg_net: MIPI_CLK_N
-        target_impedance_ohms: 100.0
-        impedance_tolerance_percent: 10.0
-        max_intra_pair_skew_mm: 0.15
-        max_inter_pair_skew_mm: 0.75
-        max_via_count: 2
-
   - name: RF_2GHZ
     trace_width_mm: 0.13
     clearance_mm: 0.20
@@ -163,14 +139,14 @@ flex_zones:
     shape_ref: flex_tail
 
 capacitive_sensors:
-  - name: SENSE_WATER_LEVEL_LOW
+  - name: SLIDER_SEGMENT_1
     channel_id: 0
     electrode_type: mutual
     shape: interdigital
-    area_mm: [12.0, 10.0]
+    area_mm: [10.0, 4.5]
     pitch_mm: 1.2
     gap_mm: 0.3
-    center_mm: [0.0, -12.0]
+    center_mm: [0.0, -13.0]
     drive_shield: false
     hatch_ground_pour: true
     hatch_line_width_mm: 0.15
@@ -180,14 +156,31 @@ capacitive_sensors:
     threshold_raw: 2200
     shape_ref: flex_tail
 
-  - name: SENSE_WATER_LEVEL_MID
+  - name: SLIDER_SEGMENT_2
     channel_id: 1
     electrode_type: mutual
     shape: interdigital
-    area_mm: [12.0, 10.0]
+    area_mm: [10.0, 4.5]
     pitch_mm: 1.2
     gap_mm: 0.3
-    center_mm: [0.0, -0.5]
+    center_mm: [0.0, -8.0]
+    drive_shield: false
+    hatch_ground_pour: true
+    hatch_line_width_mm: 0.15
+    hatch_pitch_mm: 0.50
+    tx_pin: CAP_TX0
+    rx_pin: CAP_RX1
+    threshold_raw: 2200
+    shape_ref: flex_tail
+
+  - name: SLIDER_SEGMENT_3
+    channel_id: 2
+    electrode_type: mutual
+    shape: interdigital
+    area_mm: [10.0, 4.5]
+    pitch_mm: 1.2
+    gap_mm: 0.3
+    center_mm: [0.0, -3.0]
     drive_shield: false
     hatch_ground_pour: true
     hatch_line_width_mm: 0.15
@@ -197,14 +190,31 @@ capacitive_sensors:
     threshold_raw: 2500
     shape_ref: flex_tail
 
-  - name: SENSE_WATER_LEVEL_HIGH
-    channel_id: 2
+  - name: SLIDER_SEGMENT_4
+    channel_id: 3
     electrode_type: mutual
     shape: interdigital
-    area_mm: [12.0, 10.0]
+    area_mm: [10.0, 4.5]
     pitch_mm: 1.2
     gap_mm: 0.3
-    center_mm: [0.0, 11.0]
+    center_mm: [0.0, 2.0]
+    drive_shield: false
+    hatch_ground_pour: true
+    hatch_line_width_mm: 0.15
+    hatch_pitch_mm: 0.50
+    tx_pin: CAP_TX1
+    rx_pin: CAP_RX2
+    threshold_raw: 2500
+    shape_ref: flex_tail
+
+  - name: SLIDER_SEGMENT_5
+    channel_id: 4
+    electrode_type: mutual
+    shape: interdigital
+    area_mm: [10.0, 4.5]
+    pitch_mm: 1.2
+    gap_mm: 0.3
+    center_mm: [0.0, 7.0]
     drive_shield: false
     hatch_ground_pour: true
     hatch_line_width_mm: 0.15
@@ -214,12 +224,27 @@ capacitive_sensors:
     threshold_raw: 2800
     shape_ref: flex_tail
 
-  - name: SENSE_WATER_PROXIMITY
-    channel_id: 3
+  - name: ACTION_BUTTON
+    channel_id: 5
+    electrode_type: mutual
+    shape: pad
+    area_mm: [4.5, 7.0]
+    center_mm: [-3.5, 18.0]
+    drive_shield: false
+    hatch_ground_pour: true
+    hatch_line_width_mm: 0.15
+    hatch_pitch_mm: 0.50
+    tx_pin: CAP_TX2
+    rx_pin: CAP_RX0
+    threshold_raw: 2000
+    shape_ref: flex_tail
+
+  - name: PROXIMITY_SENSOR
+    channel_id: 6
     electrode_type: self
     shape: pad
-    area_mm: [10.0, 6.0]
-    center_mm: [0.0, 20.5]
+    area_mm: [4.5, 7.0]
+    center_mm: [3.5, 18.0]
     drive_shield: false
     hatch_ground_pour: true
     hatch_line_width_mm: 0.15
@@ -351,7 +376,7 @@ schematic_sheets:
       D1: ["1", "2", "3", "4"]
 
   - title: Capacitive Sensing & Control (Azoteq IQS7222A)
-    description: Azoteq IQS7222A ProxFusion controller, 4-channel liquid level flex tail, and I2C bus
+    description: Azoteq IQS7222A ProxFusion controller, 5-button slider, action button, and proximity sensing flex tail, and I2C bus
     layout:
       col_gap: 65.0
     components: [U1, U2, J2, R1, R2, C12, C14]
@@ -423,25 +448,17 @@ schematic_sheets:
       U1: [H1, G2, J1, L4]
 
   - title: High-Speed Differential Interfaces
-    description: PCIe Gen4 x1 differential link and MIPI D-PHY display interface
-    components: [J1, U1, J2]
+    description: PCIe Gen4 x1 differential link
+    components: [J1, U1]
     pin_sides:
       U1:
         T2: left
         T1: left
         T3: left
         T4: left
-        A2: right
-        A4: right
-        A12: right
-        A14: right
-      J2:
-        CLK_P: right
-        CLK_N: right
     pin_breakouts:
       J1: [PETp0, PETn0, PERp0, PERn0]
-      U1: [T2, T1, T3, T4, A2, A4, A12, A14]
-      J2: [D0_P, D0_N, CLK_P, CLK_N]
+      U1: [T2, T1, T3, T4]
 
   - title: I2C Peripheral Expansion Interface (J6)
     description: Primary I2C peripheral expansion connector (JST-PH-6P)

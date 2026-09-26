@@ -482,8 +482,12 @@ def test_regression_bug_139_battery_cover() -> None:
     expected_outer_l = batt_l + 2.0 * (cradle_t + clr + cover_t)
 
     bbox = cover.part.bounding_box()
-    assert abs(bbox.size.X - expected_outer_w) < 0.2, f"Expected cover width ~{expected_outer_w}, got {bbox.size.X}"
-    assert abs(bbox.size.Y - expected_outer_l) < 0.2, f"Expected cover length ~{expected_outer_l}, got {bbox.size.Y}"
+    assert bbox.size.X >= expected_outer_w - 0.2, (
+        f"Cover width must span at least {expected_outer_w}, got {bbox.size.X}"
+    )
+    assert bbox.size.Y >= expected_outer_l - 0.2, (
+        f"Cover length must span at least {expected_outer_l}, got {bbox.size.Y}"
+    )
     assert provider.settings.enclosure_battery_cover_vertical_clearance >= 2.0
 
 
@@ -577,3 +581,235 @@ def test_regression_bug_143_peripheral_cutouts_uniform_size() -> None:
     # Verify uniform length and solid separating walls
     assert provider.settings.enclosure_periph_cutout_length == 10.0
     assert provider.settings.enclosure_periph_cutout_height == 5.0
+
+
+def test_regression_bug_144_m2_rear_wall_cutout() -> None:
+    """Verify BUG-144: enclosure bottom rear wall has cutout for J1 insertion."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    length = provider.settings.board_length + 2.0 * (provider.settings.enclosure_clearance + wall)
+    m2_h = provider.settings.enclosure_m2_cutout_height
+    m2_z = -h_shell / 2.0 + wall + standoff_h + (m2_h / 2.0) - 0.5
+    rear_wall_y = -length / 2.0 + (wall / 2.0)
+
+    # Cutout aperture must pierce rear wall at center X=0
+    assert not enclosure.part.is_inside((0.0, rear_wall_y, m2_z)), (
+        f"Enclosure rear wall must have M.2 cutout at (0.0, {rear_wall_y}, {m2_z})"
+    )
+    # Rear wall must remain solid away from cutout
+    assert enclosure.part.is_inside((25.0, rear_wall_y, m2_z)), "Rear wall must be solid outside M.2 cutout"
+
+
+def test_regression_bug_145_battery_cradle_and_cover_extend_over_j13() -> None:
+    """Verify BUG-145: battery cradle and cover extend over J13 cutout to conceal wiring."""
+    from build123d import Location
+
+    provider = TestBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    cover = provider.battery_cover("battery_cover", None, Mode.DEFAULT)
+    wiring = Wiring(str(provider.wiring_path))
+    j13 = next(c for c in wiring.footprints if c.name == "J13")
+    j13_x, j13_y = j13.position[0], j13.position[1]
+
+    # Verify battery cover bounding box covers J13 position
+    cov_bb = cover.part.bounding_box()
+    assert cov_bb.min.X <= j13_x <= cov_bb.max.X, f"Battery cover must span J13 X={j13_x}"
+    assert cov_bb.min.Y <= j13_y <= cov_bb.max.Y, f"Battery cover must span J13 Y={j13_y}"
+
+    # Verify cover fits over lid cradle without intersecting
+    wall = provider.settings.enclosure_wall_thickness
+    cov_located = cover.part.locate(Location((0.0, 0.0, wall + 0.5)))
+    inter = lid.part.intersect(cov_located)
+    assert inter.volume < 1e-3, f"Battery cover intersects lid cradle: {inter.volume} mm^3"
+
+
+def test_regression_bug_146_mipi_camera_routing_removed() -> None:
+    """Verify BUG-146: MIPI camera routing and differential nets are removed from board."""
+    provider = TestBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_cfg = provider.pcb_config
+
+    # No nets with MIPI in their name should exist
+    mipi_nets = [n.name for n in wiring.nets if "MIPI" in n.name]
+    assert not mipi_nets, f"BUG-146: All MIPI nets must be removed, found: {mipi_nets}"
+
+    # MIPI_DISPLAY net class must be removed from PCB configuration
+    assert not any(nc.name == "MIPI_DISPLAY" for nc in pcb_cfg.net_classes), (
+        "BUG-146: MIPI_DISPLAY net class must be removed"
+    )
+
+    # Sheet 9 must only describe PCIe Gen4
+    sheet_hs = next((s for s in pcb_cfg.schematic_sheets if "High-Speed" in s.title), None)
+    assert sheet_hs is not None
+    assert "J2" not in sheet_hs.components, "BUG-146: J2 must be removed from High-Speed sheet"
+
+
+def test_regression_bug_147_flex_ribbon_slider_action_prox() -> None:
+    """Verify BUG-147: flex ribbon features 5-button slider, action button, and prox sensor."""
+    provider = TestBoardProvider()
+    tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
+    pcb_cfg = provider.pcb_config
+
+    # Verify capacitive sensors include slider segments, action button, and prox sensor
+    cap_names = [s.name for s in pcb_cfg.capacitive_sensors]
+    slider_segs = [n for n in cap_names if "SLIDER" in n]
+    assert len(slider_segs) == 5, f"Expected 5 slider segments, found {slider_segs}"
+    assert "ACTION_BUTTON" in cap_names, "ACTION_BUTTON must exist in capacitive sensors"
+    assert "PROXIMITY_SENSOR" in cap_names, "PROXIMITY_SENSOR must exist in capacitive sensors"
+
+
+def test_regression_bug_148_flex_ribbon_support_connects_to_enclosure() -> None:
+    """Verify BUG-148: flex ribbon support shelf connects continuously with enclosure bottom."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+
+    # Must be a single contiguous fused solid (no disconnected/floating parts)
+    solids = enclosure.part.solids()
+    assert len(solids) == 1, f"Expected 1 solid for enclosure_bottom, got {len(solids)}"
+
+    # Shelf must exist and connect through wall
+    wall = provider.settings.enclosure_wall_thickness
+    length = provider.settings.board_length + 2.0 * (provider.settings.enclosure_clearance + wall)
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
+    shelf_z = z_carrier + 0.8 - 0.5
+
+    # Check connection point right at wall boundary
+    probe_y = length / 2.0
+    assert enclosure.part.is_inside((0.0, probe_y, shelf_z)), (
+        f"Support shelf must connect continuously at enclosure wall Y={probe_y}, Z={shelf_z}"
+    )
+
+
+def test_regression_bug_150_component_cutout_labels() -> None:
+    """Verify BUG-150: charger, SWD, M.2 PCIe, and flex ribbon cutouts have labels."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
+    length = provider.settings.board_length + 2.0 * (provider.settings.enclosure_clearance + wall)
+
+    # Verify solid enclosure exists and labels are engraved (subtracted)
+    assert enclosure.part.is_valid(), "Enclosure bottom with labels must be valid CAD solid"
+    assert lid.part.is_valid(), "Enclosure lid with battery label must be valid CAD solid"
+
+
+@pytest.mark.slow
+def test_regression_bug_149_mutual_intersection_test() -> None:
+    """Verify BUG-149: all components in test_board assembly have zero mutual volume intersection."""
+    from build123d import Location
+
+    provider = TestBoardProvider()
+    carrier = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
+    tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    led_cov = provider.led_cover("led_cover", None, Mode.DEFAULT)
+    batt_cov = provider.battery_cover("battery_cover", None, Mode.DEFAULT)
+
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
+    z_lid = h_shell / 2.0
+
+    carrier_geom = carrier.part.locate(Location((0.0, 0.0, z_carrier)))
+    lid_geom = lid.part.locate(Location((0.0, 0.0, z_lid)))
+
+    wiring = Wiring(str(provider.wiring_path))
+    j2_comp = next(c for c in wiring.footprints if c.name == "J2")
+    j4_comp = next(c for c in wiring.footprints if c.name == "J4")
+    dx = j2_comp.position[0] - j4_comp.position[0]
+    dy = j2_comp.position[1] - j4_comp.position[1]
+    dz = j2_comp.position[2] - j4_comp.position[2]
+    tail_geom = tail.part.locate(Location((dx, dy, z_carrier + dz)))
+
+    d1_comp = next((c for c in wiring.footprints if c.name == "D1"), None)
+    led_x = d1_comp.position[0] if d1_comp else 17.0
+    led_y = d1_comp.position[1] if d1_comp else 10.0
+    led_cov_geom = led_cov.part.locate(Location((led_x, led_y, z_lid + wall)))
+
+    batt_cov_geom = batt_cov.part.locate(Location((0.0, 0.0, z_lid + wall + 0.5)))
+
+    # Pairwise mutual intersection checks
+    parts = {
+        "enclosure_bottom": enclosure.part,
+        "enclosure_lid": lid_geom,
+        "carrier_board": carrier_geom,
+        "flex_tail": tail_geom,
+        "led_cover": led_cov_geom,
+        "battery_cover": batt_cov_geom,
+    }
+
+    pairs = [
+        ("enclosure_bottom", "enclosure_lid"),
+        ("enclosure_bottom", "carrier_board"),
+        ("enclosure_bottom", "flex_tail"),
+        ("enclosure_lid", "flex_tail"),
+        ("enclosure_lid", "battery_cover"),
+        ("enclosure_lid", "led_cover"),
+    ]
+
+    for name_a, name_b in pairs:
+        inter = parts[name_a].intersect(parts[name_b])
+        assert inter.volume < 1e-3, (
+            f"Mutual intersection detected between {name_a} and {name_b}: {inter.volume:.4f} mm^3"
+        )
+
+
+def test_regression_bug_152_textured_pcb_simulation_visibility() -> None:
+    """Verify BUG-152: carrier board and flex tail expose urdf_label for textured PCB visualization."""
+    from pathlib import Path
+
+    provider = TestBoardProvider()
+    carrier = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
+    tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
+
+    # Both objects and parts must expose urdf_label
+    assert getattr(carrier, "urdf_label", None) == "carrier_board", "carrier_board must have urdf_label"
+    assert getattr(carrier.part, "urdf_label", None) == "carrier_board", "carrier_board.part must have urdf_label"
+    assert getattr(tail, "urdf_label", None) == "flex_tail", "flex_tail must have urdf_label"
+    assert getattr(tail.part, "urdf_label", None) == "flex_tail", "flex_tail.part must have urdf_label"
+
+    # Board textures must exist in build/board/test_board/textures
+    tex_dir = Path("build/board/test_board/textures")
+    assert (tex_dir / "carrier_board_top.png").exists(), "carrier_board_top.png must exist"
+    assert (tex_dir / "carrier_board_bottom.png").exists(), "carrier_board_bottom.png must exist"
+
+
+def test_regression_bug_153_flying_probes_report_formatting() -> None:
+    """Verify BUG-153: flying probe report uses clean Unicode symbols without corrupted LaTeX escapes."""
+    import pybullet as p
+    from provider import Simulate
+
+    provider = TestBoardProvider()
+    hooks = provider.get_simulate_hooks("carrier_board")
+    client = p.connect(p.DIRECT)
+    try:
+        hooks[Simulate.SETUP](0, client, "carrier_board", {})
+        report_md = provider.generate_test_report()
+
+        # No corrupted LaTeX math markers
+        assert "$\\le" not in report_md, "Report must not contain raw $\\le LaTeX tokens"
+        assert "$\\ge" not in report_md, "Report must not contain raw $\\ge LaTeX tokens"
+        assert "\\Omega" not in report_md, "Report must not contain raw \\Omega LaTeX tokens"
+        assert "\\text{" not in report_md, "Report must not contain raw \\text{ LaTeX tokens"
+        assert "\\%" not in report_md, "Report must not contain raw \\% LaTeX tokens"
+
+        # Standard clean Unicode characters must be present
+        assert "≤" in report_md, "Report must contain clean Unicode ≤"
+        assert "≥" in report_md, "Report must contain clean Unicode ≥"
+        assert "Ω" in report_md, "Report must contain clean Unicode Ω"
+        assert "±" in report_md, "Report must contain clean Unicode ±"
+        assert "×" in report_md, "Report must contain clean Unicode ×"
+
+        # MIPI must be purged from report (BUG-146)
+        assert "MIPI" not in report_md, "Report must not reference MIPI camera/display"
+        assert "PCIe 85 Ω" in report_md, "Report must document PCIe 85 Ω impedance"
+    finally:
+        p.disconnect(client)

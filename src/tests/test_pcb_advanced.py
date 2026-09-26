@@ -337,7 +337,7 @@ def test_test_board_provider_cad_and_assembly():
     assert provider.pcb_config.name == "TestBoard_Carrier"
     assert provider.pcb_config.board_type == "rigid-flex"
     assert len(provider.pcb_config.stackup.layers) == 11
-    assert len(provider.pcb_config.capacitive_sensors) == 4
+    assert len(provider.pcb_config.capacitive_sensors) == 7  # BUG-147: 5 slider + 1 action + 1 prox
 
     # Check assembly test instructions from manifest/pcb.yaml
     assert provider.pcb_config.assembly_test is not None
@@ -786,25 +786,23 @@ def test_test_board_full_milestones_integration(tmp_path: Path):
         assert abs(abs(mh.position_mm[0]) - 25.5) < 1e-4
         assert abs(abs(mh.position_mm[1]) - 40.5) < 1e-4
 
-    # Milestone 4: 3 mutual cap + 1 self cap sensors
-    assert len(cfg.capacitive_sensors) == 4
+    # Milestone 4: 5-segment slider + 1 action button + 1 proximity sensor (BUG-147)
+    assert len(cfg.capacitive_sensors) == 7
     electrodes_by_name = {e.name: e for e in cfg.capacitive_sensors}
-    assert "SENSE_WATER_LEVEL_LOW" in electrodes_by_name
-    assert electrodes_by_name["SENSE_WATER_LEVEL_LOW"].channel_id == 0
-    assert electrodes_by_name["SENSE_WATER_LEVEL_LOW"].electrode_type == "mutual"
+    for seg_idx in range(1, 6):
+        seg_name = f"SLIDER_SEGMENT_{seg_idx}"
+        assert seg_name in electrodes_by_name
+        assert electrodes_by_name[seg_name].channel_id == seg_idx - 1
+        assert electrodes_by_name[seg_name].electrode_type == "mutual"
 
-    assert "SENSE_WATER_LEVEL_MID" in electrodes_by_name
-    assert electrodes_by_name["SENSE_WATER_LEVEL_MID"].channel_id == 1
-    assert electrodes_by_name["SENSE_WATER_LEVEL_MID"].electrode_type == "mutual"
+    assert "ACTION_BUTTON" in electrodes_by_name
+    assert electrodes_by_name["ACTION_BUTTON"].channel_id == 5
+    assert electrodes_by_name["ACTION_BUTTON"].electrode_type == "mutual"
 
-    assert "SENSE_WATER_LEVEL_HIGH" in electrodes_by_name
-    assert electrodes_by_name["SENSE_WATER_LEVEL_HIGH"].channel_id == 2
-    assert electrodes_by_name["SENSE_WATER_LEVEL_HIGH"].electrode_type == "mutual"
-
-    assert "SENSE_WATER_PROXIMITY" in electrodes_by_name
-    assert electrodes_by_name["SENSE_WATER_PROXIMITY"].channel_id == 3
-    assert electrodes_by_name["SENSE_WATER_PROXIMITY"].electrode_type == "self"
-    assert electrodes_by_name["SENSE_WATER_PROXIMITY"].drive_shield is False
+    assert "PROXIMITY_SENSOR" in electrodes_by_name
+    assert electrodes_by_name["PROXIMITY_SENSOR"].channel_id == 6
+    assert electrodes_by_name["PROXIMITY_SENSOR"].electrode_type == "self"
+    assert electrodes_by_name["PROXIMITY_SENSOR"].drive_shield is False
 
     # Milestone 2: Carrier clip-on mounting posts and enclosure feet (BUG-085)
     assert provider.settings.mounting_post_diameter == 2.8
@@ -829,10 +827,10 @@ def test_test_board_full_milestones_integration(tmp_path: Path):
     json_path = exporter.export_capacitive_config_json(tmp_path / "test_cap.json")
     assert json_path.exists()
     cap_data = json.loads(json_path.read_text(encoding="utf-8"))
-    assert cap_data["channel_count"] == 4
-    assert len(cap_data["channels"]) == 4
-    assert cap_data["channels"][3]["electrode_type"] == "self"
-    assert cap_data["channels"][3]["drive_shield"] is False
+    assert cap_data["channel_count"] == 7
+    assert len(cap_data["channels"]) == 7
+    assert cap_data["channels"][6]["electrode_type"] == "self"
+    assert cap_data["channels"][6]["drive_shield"] is False
 
 
 def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
@@ -2817,11 +2815,11 @@ def test_regression_bugs_115_through_127() -> None:
     assert sheet_audio is not None
     assert "C8" not in sheet_audio.components, "BUG-120: C8 must not be in Audio Subsystem sheet"
 
-    # BUG-121: MIPI CLK differential pins on right side of J2
+    # BUG-121 & BUG-146: J2 removed from High-Speed Differential sheet; all MIPI nets removed
     sheet_mipi = next((s for s in pcb_cfg.schematic_sheets if "High-Speed Differential" in s.title), None)
     assert sheet_mipi is not None
-    j2_mipi_sides = sheet_mipi.pin_sides.get("J2", {})
-    assert j2_mipi_sides.get("CLK_P") == "right" and j2_mipi_sides.get("CLK_N") == "right"
+    assert "J2" not in sheet_mipi.components, "BUG-146: J2 must be removed from High-Speed Differential sheet"
+    assert not any("MIPI" in n.name for n in wiring.nets), "BUG-146: All MIPI nets must be removed"
 
     # BUG-122: J6, J7, J8 connector style is JST-PH-6P; separate sheet pages exist for each connector
     for j_name in ["J6", "J7", "J8"]:
