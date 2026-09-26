@@ -20,6 +20,8 @@ from model.code_review import (
     FileDiffModel,
 )
 
+MAX_DIFF_LINE_LENGTH: int = 1000
+
 
 def extract_time_str(date_str: str) -> str:
     """Extract HH:MM:SS from ISO or git timestamp string."""
@@ -47,7 +49,14 @@ def run_git_command(args: List[str], cwd: Optional[Path] = None) -> str:
         RuntimeError: If git command fails with non-zero exit code.
     """
     cmd = ["git"] + args
-    result = subprocess.run(cmd, cwd=str(cwd) if cwd else None, capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd else None,
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    )
     if result.returncode != 0:
         err_msg = result.stderr.strip() or f"Git command failed with code {result.returncode}"
         raise RuntimeError(f"Error running {' '.join(cmd)}: {err_msg}")
@@ -543,6 +552,40 @@ class GitReviewEngine:
         except RuntimeError:
             return ""
 
+    def get_file_bytes(self, commit: str, file_path: str, parent: bool = False) -> bytes:
+        """Retrieve raw byte content of a file at a commit or parent."""
+        if commit == "working":
+            if parent:
+                try:
+                    res = subprocess.run(
+                        ["git", "show", f"HEAD:{file_path}"],
+                        cwd=self.repo_root,
+                        capture_output=True,
+                        check=True,
+                    )
+                    return res.stdout
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    return b""
+            full_path = self.repo_root / file_path
+            if full_path.exists() and full_path.is_file():
+                try:
+                    return full_path.read_bytes()
+                except OSError:
+                    return b""
+            return b""
+
+        rev_spec = f"{commit}^:{file_path}" if parent else f"{commit}:{file_path}"
+        try:
+            res = subprocess.run(
+                ["git", "show", rev_spec],
+                cwd=self.repo_root,
+                capture_output=True,
+                check=True,
+            )
+            return res.stdout
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return b""
+
     def get_file_diff(self, commit: str, file_path: str) -> FileDiffModel:
         """Construct comprehensive diff model including hunks and side-by-side rows."""
         if self.is_file_ignored(file_path):
@@ -557,6 +600,53 @@ class GitReviewEngine:
                 side_by_side=[],
                 raw_diff="File excluded from code review.",
                 full_content="File excluded from code review.",
+            )
+
+        binary_exts = {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".webp",
+            ".ico",
+            ".bmp",
+            ".tiff",
+            ".pdf",
+            ".stl",
+            ".step",
+            ".stp",
+            ".obj",
+            ".glb",
+            ".gltf",
+            ".zip",
+            ".tar",
+            ".gz",
+            ".bz2",
+            ".7z",
+            ".bin",
+            ".dat",
+            ".sqlite",
+            ".db",
+            ".so",
+            ".dylib",
+            ".dll",
+            ".exe",
+            ".pyc",
+            ".woff",
+            ".woff2",
+            ".ttf",
+            ".eot",
+            ".mp4",
+            ".mov",
+            ".rrd",
+        }
+        suffix = Path(file_path).suffix.lower()
+        if suffix in binary_exts:
+            return FileDiffModel(
+                file_path=file_path,
+                is_binary=True,
+                raw_diff="Binary file differs",
+                full_content="Binary file preview unavailable.",
             )
 
         old_content = self.get_file_content(commit, file_path, parent=True)
@@ -583,7 +673,12 @@ class GitReviewEngine:
                 )
             )
 
-        is_binary = "\x00" in old_content[:8000] or "\x00" in new_content[:8000]
+        is_binary = (
+            "\x00" in old_content[:8000]
+            or "\x00" in new_content[:8000]
+            or "Binary files " in raw_diff
+            or "GIT binary patch" in raw_diff
+        )
         if is_binary:
             return FileDiffModel(
                 file_path=file_path,
@@ -647,25 +742,33 @@ class GitReviewEngine:
                 continue
 
             if raw_line.startswith("+"):
+                content = raw_line[1:]
+                if len(content) > MAX_DIFF_LINE_LENGTH:
+                    content = content[:MAX_DIFF_LINE_LENGTH] + "…"
                 current_hunk.lines.append(
                     DiffLine(
                         type=DiffLineType.ADD,
                         new_line_no=new_cur,
-                        content=raw_line[1:],
+                        content=content,
                     )
                 )
                 new_cur += 1
             elif raw_line.startswith("-"):
+                content = raw_line[1:]
+                if len(content) > MAX_DIFF_LINE_LENGTH:
+                    content = content[:MAX_DIFF_LINE_LENGTH] + "…"
                 current_hunk.lines.append(
                     DiffLine(
                         type=DiffLineType.DELETE,
                         old_line_no=old_cur,
-                        content=raw_line[1:],
+                        content=content,
                     )
                 )
                 old_cur += 1
             elif raw_line.startswith(" ") or raw_line == "":
                 content = raw_line[1:] if raw_line.startswith(" ") else ""
+                if len(content) > MAX_DIFF_LINE_LENGTH:
+                    content = content[:MAX_DIFF_LINE_LENGTH] + "…"
                 current_hunk.lines.append(
                     DiffLine(
                         type=DiffLineType.CONTEXT,
@@ -687,6 +790,11 @@ class GitReviewEngine:
         matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
         rows: List[DiffSideBySideRow] = []
 
+        def _trim(s: str) -> str:
+            if len(s) > MAX_DIFF_LINE_LENGTH:
+                return s[:MAX_DIFF_LINE_LENGTH] + "…"
+            return s
+
         for tag, i1, i2, j1, j2 in matcher.get_opcodes():
             match tag:
                 case "equal":
@@ -694,9 +802,9 @@ class GitReviewEngine:
                         rows.append(
                             DiffSideBySideRow(
                                 old_no=i1 + offset + 1,
-                                old_text=old_lines[i1 + offset],
+                                old_text=_trim(old_lines[i1 + offset]),
                                 new_no=j1 + offset + 1,
-                                new_text=new_lines[j1 + offset],
+                                new_text=_trim(new_lines[j1 + offset]),
                                 row_type="equal",
                             )
                         )
@@ -705,7 +813,7 @@ class GitReviewEngine:
                         rows.append(
                             DiffSideBySideRow(
                                 old_no=idx + 1,
-                                old_text=old_lines[idx],
+                                old_text=_trim(old_lines[idx]),
                                 new_no=None,
                                 new_text="",
                                 row_type="delete",
@@ -718,7 +826,7 @@ class GitReviewEngine:
                                 old_no=None,
                                 old_text="",
                                 new_no=idx + 1,
-                                new_text=new_lines[idx],
+                                new_text=_trim(new_lines[idx]),
                                 row_type="insert",
                             )
                         )
@@ -730,9 +838,9 @@ class GitReviewEngine:
                         rows.append(
                             DiffSideBySideRow(
                                 old_no=old_idx + 1 if old_idx is not None else None,
-                                old_text=old_lines[old_idx] if old_idx is not None else "",
+                                old_text=_trim(old_lines[old_idx]) if old_idx is not None else "",
                                 new_no=new_idx + 1 if new_idx is not None else None,
-                                new_text=new_lines[new_idx] if new_idx is not None else "",
+                                new_text=_trim(new_lines[new_idx]) if new_idx is not None else "",
                                 row_type="replace",
                             )
                         )

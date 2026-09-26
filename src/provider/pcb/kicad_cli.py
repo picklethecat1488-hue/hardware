@@ -167,6 +167,11 @@ class KiCadCLI:
         """Return True if kicad-cli supports the 'pcb drc' subcommand (KiCad 8+)."""
         return self.is_available and self.major_version >= 8
 
+    @property
+    def supports_render(self) -> bool:
+        """Return True if kicad-cli supports the 'pcb render' subcommand (KiCad 8+)."""
+        return self.is_available and self.major_version >= 8
+
     def run_command(self, args: List[str]) -> str:
         """Execute a kicad-cli command locally."""
         if not self._local_bin:
@@ -303,6 +308,9 @@ class KiCadCLI:
 
         if not pcb_file.is_file():
             raise FileNotFoundError(f"KiCad PCB file not found: {pcb_file}")
+
+        if not self.supports_render:
+            return out_png
 
         args = [
             "pcb",

@@ -46,6 +46,15 @@ led_cover:
   export: [stl, step]
   color: [0.90, 0.95, 1.0, 0.6]
 
+battery_cover:
+  part:
+    modes: [default, print]
+  view:
+    modes: [default]
+  material: petg
+  export: [stl, step]
+  color: [0.20, 0.22, 0.28, 1.0]
+
 route:
   config:
     modes: [default]

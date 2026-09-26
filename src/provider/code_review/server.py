@@ -7,6 +7,7 @@ and automated Markdown persistence.
 
 from datetime import datetime, timezone
 import json
+import mimetypes
 from pathlib import Path
 import threading
 import time
@@ -77,6 +78,26 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
                 commit = query.get("commit", ["working"])[0]
                 results = self.server.git_engine.search_code(q, commit=commit)
                 self._send_json({"query": q, "commit": commit, "results": results})
+            case "/api/raw":
+                commit = query.get("commit", ["working"])[0]
+                file_path = query.get("file", [""])[0]
+                side = query.get("side", ["new"])[0]
+                if not file_path:
+                    self._send_json({"error": "Missing file parameter"}, status=400)
+                    return
+                parent = side == "old"
+                raw_bytes = self.server.git_engine.get_file_bytes(commit, file_path, parent=parent)
+                mime_type, _ = mimetypes.guess_type(file_path)
+                if not mime_type:
+                    mime_type = "application/octet-stream"
+                self.send_response(200)
+                self.send_header("Content-Type", mime_type)
+                self.send_header("Content-Length", str(len(raw_bytes)))
+                filename = Path(file_path).name
+                self.send_header("Content-Disposition", f'inline; filename="{filename}"')
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(raw_bytes)
             case _:
                 self.send_error(404, "Endpoint not found")
 

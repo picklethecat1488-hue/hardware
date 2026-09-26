@@ -104,13 +104,7 @@ def test_regression_bug_113_carrier_board_serial_cutouts_do_not_overlap() -> Non
 
     connectors = ["J6", "J7", "J8", "J9", "J10"]
     y_coords = [comp_map[c].position[1] for c in connectors]
-    lengths = [
-        provider.settings.enclosure_periph_4p_cutout_length,
-        provider.settings.enclosure_periph_4p_cutout_length,
-        provider.settings.enclosure_periph_4p_cutout_length,
-        provider.settings.enclosure_periph_6p_cutout_length,
-        provider.settings.enclosure_periph_6p_cutout_length,
-    ]
+    lengths = [provider.settings.enclosure_periph_cutout_length] * len(connectors)
 
     for i in range(len(y_coords) - 1):
         y_bottom_prev = y_coords[i] - (lengths[i] / 2.0)
@@ -467,3 +461,119 @@ def test_regression_bug_134_carrier_board_components_match_schematic() -> None:
     checker = PCBDesignRulesChecker(cfg)
     report = checker.check_all(wiring=wiring)
     assert report.passed, f"DRC must pass with 0 errors, got: {report.error_count}"
+
+
+def test_regression_bug_139_battery_cover() -> None:
+    """Verify BUG-139: battery cover fits over enclosure lid battery cradle with clearance."""
+    provider = TestBoardProvider()
+    cover = provider.battery_cover("battery_cover", None, Mode.DEFAULT)
+    cover_print = provider.battery_cover("battery_cover", None, Mode.PRINT)
+    assert cover.part.volume > 0.0, "Battery cover volume must be positive"
+    assert cover_print.part.volume > 0.0, "Battery cover print mode volume must be positive"
+    assert "mount" in cover.part.joints, "Battery cover must define mount joint"
+
+    # Verify battery cover dimensions account for cradle wall thickness + clearances
+    batt_w = provider.settings.enclosure_battery_mount_width
+    batt_l = provider.settings.enclosure_battery_mount_length
+    cradle_t = provider.settings.enclosure_battery_mount_wall_thickness
+    clr = provider.settings.enclosure_battery_cover_clearance
+    cover_t = provider.settings.enclosure_battery_cover_wall_thickness
+    expected_outer_w = batt_w + 2.0 * (cradle_t + clr + cover_t)
+    expected_outer_l = batt_l + 2.0 * (cradle_t + clr + cover_t)
+
+    bbox = cover.part.bounding_box()
+    assert abs(bbox.size.X - expected_outer_w) < 0.2, f"Expected cover width ~{expected_outer_w}, got {bbox.size.X}"
+    assert abs(bbox.size.Y - expected_outer_l) < 0.2, f"Expected cover length ~{expected_outer_l}, got {bbox.size.Y}"
+    assert provider.settings.enclosure_battery_cover_vertical_clearance >= 2.0
+
+
+def test_regression_bug_140_flex_tail_support() -> None:
+    """Verify BUG-140: enclosure bottom extends a support shelf under the flex tail."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
+
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    length = provider.settings.board_length + 2.0 * (provider.settings.enclosure_clearance + wall)
+    z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
+
+    wiring = Wiring(str(provider.wiring_path))
+    j2 = next(c for c in wiring.footprints if c.name == "J2")
+    j4 = next(c for c in wiring.footprints if c.name == "J4")
+    dz = j2.position[2] - j4.position[2]
+    dy = j2.position[1] - j4.position[1]
+    dx = j2.position[0] - j4.position[0]
+
+    tail_geom = tail.part.locate(Location((dx, dy, z_carrier + dz)))
+    inter = enclosure.part.intersect(tail_geom)
+    assert inter.volume == 0.0, f"Flex tail intersects enclosure support: {inter.volume}"
+
+    # Verify shelf exists under the forward portion of the flex tail
+    sup_l = provider.settings.enclosure_flex_support_length
+    shelf_probe_y = (length / 2.0) + (sup_l / 2.0)
+    shelf_z = z_carrier + dz - 0.5
+    assert enclosure.part.is_inside((0.0, shelf_probe_y, shelf_z)), (
+        f"Enclosure support shelf must exist at Y={shelf_probe_y}, Z={shelf_z}"
+    )
+
+
+def test_regression_bug_141_flex_tail_tab_fit() -> None:
+    """Verify BUG-141: ZIF connector J2 on carrier board is wider than flex tail tab so flex tail fits."""
+    provider = TestBoardProvider()
+    tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
+    bbox = tail.part.bounding_box()
+    assert bbox.size.X <= 24.0, f"Flex tail width exceeded: {bbox.size.X}"
+
+    assert provider.pcb_manifest is not None, "PCB manifest must be loaded"
+    j2_obs = next(obs for obs in provider.pcb_manifest["obstacles"] if obs["name"] == "J2")
+    j2_width = j2_obs["dimensions_mm"][0]
+    assert j2_width > bbox.size.X, f"Connector width ({j2_width}mm) must exceed flex tail width ({bbox.size.X}mm)"
+
+
+def test_regression_bug_142_m2_floor_cutout() -> None:
+    """Verify BUG-142: enclosure bottom floor has pass-through cutout under PCIE connector J1."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    floor_z = -h_shell / 2.0 + (wall / 2.0)
+
+    wiring = Wiring(str(provider.wiring_path))
+    j1 = next(c for c in wiring.footprints if c.name == "J1")
+    j1_x, j1_y = j1.position[0], j1.position[1]
+
+    # Floor must have a cutout under J1 connector
+    assert not enclosure.part.is_inside((j1_x, j1_y, floor_z)), (
+        f"Enclosure bottom floor must have cutout under J1 at ({j1_x}, {j1_y})"
+    )
+    # Floor must remain solid away from J1 cutout
+    assert enclosure.part.is_inside((20.0, j1_y, floor_z)), "Enclosure floor must be solid away from cutout"
+
+
+def test_regression_bug_143_peripheral_cutouts_uniform_size() -> None:
+    """Verify BUG-143: all peripheral cutouts in enclosure bottom have uniform length and spacing."""
+    provider = TestBoardProvider()
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
+    z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
+    z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
+    wall_x = (w / 2.0) - (wall / 2.0)
+
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+    periph_connectors = ["J6", "J7", "J8", "J9", "J10"]
+
+    # Verify each connector position is cleared by a cutout
+    for des in periph_connectors:
+        y = comp_map[des].position[1]
+        assert not enclosure.part.is_inside((wall_x, y, z_conn)), f"Cutout missing for connector {des} at Y={y}"
+
+    # Verify uniform length and solid separating walls
+    assert provider.settings.enclosure_periph_cutout_length == 10.0
+    assert provider.settings.enclosure_periph_cutout_height == 5.0

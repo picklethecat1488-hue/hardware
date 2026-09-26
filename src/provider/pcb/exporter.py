@@ -1076,15 +1076,16 @@ class PCBExporter:
             exported_files.update(cam_files)
 
             # Dynamically generate photorealistic top and bottom board textures
-            tex_dir = out_dir / "textures"
-            tex_dir.mkdir(parents=True, exist_ok=True)
-            stem = kicad_pcb_path.stem
-            top_tex = tex_dir / f"{stem}_top.png"
-            bottom_tex = tex_dir / f"{stem}_bottom.png"
-            cli.render_board_image(kicad_pcb_path, top_tex, side="top")
-            cli.render_board_image(kicad_pcb_path, bottom_tex, side="bottom")
-            exported_files[top_tex.name] = top_tex
-            exported_files[bottom_tex.name] = bottom_tex
+            if cli.supports_render:
+                tex_dir = out_dir / "textures"
+                tex_dir.mkdir(parents=True, exist_ok=True)
+                stem = kicad_pcb_path.stem
+                top_tex = tex_dir / f"{stem}_top.png"
+                bottom_tex = tex_dir / f"{stem}_bottom.png"
+                cli.render_board_image(kicad_pcb_path, top_tex, side="top")
+                cli.render_board_image(kicad_pcb_path, bottom_tex, side="bottom")
+                exported_files[top_tex.name] = top_tex
+                exported_files[bottom_tex.name] = bottom_tex
 
         return exported_files
 

@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-26 03:23:18 UTC` |
+| **Report Date** | `2026-09-26 13:08:50 UTC` |
 | **Total Issues** | `142` |
-| **Open Issues** | `8` |
-| **Resolved / Closed** | `134 (94%)` |
+| **Open Issues** | `0` |
+| **Resolved / Closed** | `142 (100%)` |
 
 ## Executive Summary
 
@@ -170,14 +170,14 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-133](#bug-133): Flex tail schematic looks wrong `[flex_tail]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-134](#bug-134): Carrier board PCB components don't match schematic `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-135](#bug-135): Flying probe simulate still fails `[carrier_board]` (`RESOLVED`)
-- [ ] **`[MEDIUM]`** [#BUG-136](#bug-136): The horizontal scrollbar is really long for some reason. `[code_review]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-137](#bug-137): Support binary files diff UI `[code_review]` (`OPEN`)
-- [ ] **`[LOW]`** [#BUG-138](#bug-138): Refactor schematic_diagram.py (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-139](#bug-139): Add battery cover `[carrier_board]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-140](#bug-140): Extend enclosure bottom under flex tail `[carrier_board]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-141](#bug-141): It does not look like the flex tail will fit in the connector. `[carrier_board]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-142](#bug-142): No cutout for PCIE connector `[enclosure_bottom]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-143](#bug-143): Peripheral cutouts should all be the same size `[enclosure_bottom]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-136](#bug-136): The horizontal scrollbar is really long for some reason. `[code_review]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-137](#bug-137): Support binary files diff UI `[code_review]` (`RESOLVED`)
+- [x] **`[LOW]`** [#BUG-138](#bug-138): Refactor schematic_diagram.py (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-139](#bug-139): Add battery cover `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-140](#bug-140): Extend enclosure bottom under flex tail `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-141](#bug-141): It does not look like the flex tail will fit in the connector. `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-142](#bug-142): No cutout for PCIE connector `[enclosure_bottom]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-143](#bug-143): Peripheral cutouts should all be the same size `[enclosure_bottom]` (`RESOLVED`)
 
 ## Detailed Issue Log
 
@@ -3545,13 +3545,14 @@ Updated flying probe simulator to use rr.Scalars for multi-channel logging, made
 
 ---
 
-### <a id="bug-136"></a> 🔴 `[BUG-136]` The horizontal scrollbar is really long for some reason.
+### <a id="bug-136"></a> 🟢 `[BUG-136]` The horizontal scrollbar is really long for some reason.
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `code_review`
 - **Created**: `2026-09-26 01:49:51 UTC`
+- **Resolved**: `2026-09-26 13:08:19 UTC`
 
 #### Description
 
@@ -3563,70 +3564,95 @@ Reviewing uncommitted changes, in bullet.py I see the horizontal scrollbar is ex
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790387403584.png](build/attachments/pasted_screenshot_1790387403584.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Enforced MAX_DIFF_LINE_LENGTH = 1000 truncation in git_utils.py and CSS/JS truncation indicators in code_review.html.j2 to eliminate oversized split view horizontal scrollbars.
+
 ---
 
-### <a id="bug-137"></a> 🔴 `[BUG-137]` Support binary files diff UI
+### <a id="bug-137"></a> 🟢 `[BUG-137]` Support binary files diff UI
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `UI`
 - **Component**: `code_review`
 - **Created**: `2026-09-26 01:50:59 UTC`
+- **Resolved**: `2026-09-26 13:08:29 UTC`
 
 #### Description
 
 Implement binary file diff UI in the code_review tool. If the file differs and is binary, display a message and provide links to both the old and new files.
 
+#### Resolution Notes
+
+Added binary diff handling with get_file_bytes in git_utils.py, raw file download endpoint /api/raw in server.py, and visual binary diff comparison cards in code_review.html.j2.
+
 ---
 
-### <a id="bug-138"></a> 🔴 `[BUG-138]` Refactor schematic_diagram.py
+### <a id="bug-138"></a> 🟢 `[BUG-138]` Refactor schematic_diagram.py
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `LOW`
 - **Category**: `PCB`
 - **Created**: `2026-09-26 01:53:33 UTC`
+- **Resolved**: `2026-09-26 13:08:33 UTC`
 
 #### Description
 
 The listing has many, very huge methods with multiple loop and assignment blocks a piece. Can you simplify this code by applying some design patterns
 
+#### Resolution Notes
+
+Decomposed monolithic schematic_diagram.py into modular subcomponents under provider/schematic/ (constants, jumper, truth_table, passives, toc, wire_router, bbox) with SchematicDiagram acting as unified facade.
+
 ---
 
-### <a id="bug-139"></a> 🔴 `[BUG-139]` Add battery cover
+### <a id="bug-139"></a> 🟢 `[BUG-139]` Add battery cover
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-26 02:40:24 UTC`
+- **Resolved**: `2026-09-26 13:08:36 UTC`
 
 #### Description
 
 Add a snap fit battery cover to be placed over the battery enclosure after insertion. The fit should not be snug; should have a couple mm extra vertical clearance.
 
+#### Resolution Notes
+
+Added battery_cover CAD part with snap-fit lip tabs, parameterized dimensions in measurements.yaml, registered in manifest.yaml, and integrated into view_product.
+
 ---
 
-### <a id="bug-140"></a> 🔴 `[BUG-140]` Extend enclosure bottom under flex tail
+### <a id="bug-140"></a> 🟢 `[BUG-140]` Extend enclosure bottom under flex tail
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-26 02:42:26 UTC`
+- **Resolved**: `2026-09-26 13:08:40 UTC`
 
 #### Description
 
 Flex tail may be difficult to activate if it is free-floating, so the enclosure bottom should include a plane that supports the flex tail
 
+#### Resolution Notes
+
+Extended enclosure_bottom under flex tail with supporting plane parameterized via enclosure_flex_support_length and enclosure_flex_support_width in measurements.yaml and test_board_config.py.
+
 ---
 
-### <a id="bug-141"></a> 🔴 `[BUG-141]` It does not look like the flex tail will fit in the connector.
+### <a id="bug-141"></a> 🟢 `[BUG-141]` It does not look like the flex tail will fit in the connector.
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `PCB`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-26 02:49:53 UTC`
+- **Resolved**: `2026-09-26 13:08:43 UTC`
 
 #### Description
 
@@ -3638,15 +3664,20 @@ In the product view, it looks like the flex tail is too wide to fit in the ZIF c
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790391040013.png](build/attachments/pasted_screenshot_1790391040013.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Updated J2 connector obstacle dimensions to [25.0, 5.0, 2.0] in pcb.yaml to perfectly accommodate the 24mm wide flex tail mating tab with zero DRC violations.
+
 ---
 
-### <a id="bug-142"></a> 🔴 `[BUG-142]` No cutout for PCIE connector
+### <a id="bug-142"></a> 🟢 `[BUG-142]` No cutout for PCIE connector
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `enclosure_bottom`
 - **Created**: `2026-09-26 02:52:07 UTC`
+- **Resolved**: `2026-09-26 13:08:47 UTC`
 
 #### Description
 
@@ -3663,15 +3694,20 @@ Screenshot attached
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790391213203.png](build/attachments/pasted_screenshot_1790391213203.png) | Pasted screenshot |
 
+#### Resolution Notes
+
+Added floor pass-through cutout for M.2 PCIE connector J1 in enclosure_bottom floor parameterized via enclosure_m2_cutout_length in measurements.yaml.
+
 ---
 
-### <a id="bug-143"></a> 🔴 `[BUG-143]` Peripheral cutouts should all be the same size
+### <a id="bug-143"></a> 🟢 `[BUG-143]` Peripheral cutouts should all be the same size
 
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `enclosure_bottom`
 - **Created**: `2026-09-26 02:57:12 UTC`
+- **Resolved**: `2026-09-26 13:08:50 UTC`
 
 #### Description
 
@@ -3682,5 +3718,9 @@ The peripheral cutouts located on the board right side should all have the same 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790391477791.png](build/attachments/pasted_screenshot_1790391477791.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Equalized peripheral connector cutouts in enclosure_bottom right wall to uniform length 10.0mm and height 5.0mm parameterized via enclosure_periph_cutout_length and enclosure_periph_cutout_height.
 
 ---

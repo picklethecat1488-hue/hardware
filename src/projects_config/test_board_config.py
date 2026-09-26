@@ -64,6 +64,11 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["flex_tail_width"])
 
     @property
+    def flex_tail_tab_width(self) -> float:
+        """Width of the flex tail insertion tab fitting into the ZIF connector in mm."""
+        return float(self._raw_data["flex_tail_tab_width"])
+
+    @property
     def flex_tail_length(self) -> float:
         """Length of the flex tail extension in mm."""
         return float(self._raw_data["flex_tail_length"])
@@ -76,7 +81,7 @@ class TestBoardConfig(BaseModel):
     @property
     def flex_tail_corner_radius(self) -> float:
         """Fillet corner radius of flex tail contour in mm."""
-        return float(self._raw_data.get("flex_tail_corner_radius", 1.0))
+        return float(self._raw_data["flex_tail_corner_radius"])
 
     @property
     def flex_bend_radius(self) -> float:
@@ -189,6 +194,11 @@ class TestBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_m2_cutout_height"])
 
     @property
+    def enclosure_m2_cutout_length(self) -> float:
+        """Length of M.2 connector floor pass-through cutout along Y in mm."""
+        return float(self._raw_data["enclosure_m2_cutout_length"])
+
+    @property
     def enclosure_gpio_cutout_width(self) -> float:
         """Width of GPIO header cutout in enclosure lid in mm."""
         return float(self._raw_data["enclosure_gpio_cutout_width"])
@@ -212,6 +222,11 @@ class TestBoardConfig(BaseModel):
     def enclosure_cutout_fillet_radius(self) -> float:
         """Corner fillet radius for enclosure side cutouts in mm."""
         return float(self._raw_data["enclosure_cutout_fillet_radius"])
+
+    @property
+    def enclosure_periph_cutout_length(self) -> float:
+        """Standardized length of peripheral connector cutouts along Y in mm."""
+        return float(self._raw_data["enclosure_periph_cutout_length"])
 
     @property
     def enclosure_periph_4p_cutout_length(self) -> float:
@@ -287,6 +302,31 @@ class TestBoardConfig(BaseModel):
     def enclosure_battery_cutout_length(self) -> float:
         """Length of battery connector pass-through cutout in enclosure lid in mm."""
         return float(self._raw_data["enclosure_battery_cutout_length"])
+
+    @property
+    def enclosure_battery_cover_clearance(self) -> float:
+        """Clearance between battery cover and cradle exterior walls in mm."""
+        return float(self._raw_data["enclosure_battery_cover_clearance"])
+
+    @property
+    def enclosure_battery_cover_vertical_clearance(self) -> float:
+        """Extra vertical clearance for battery cover in mm."""
+        return float(self._raw_data["enclosure_battery_cover_vertical_clearance"])
+
+    @property
+    def enclosure_battery_cover_wall_thickness(self) -> float:
+        """Wall thickness of snap-fit battery cover in mm."""
+        return float(self._raw_data["enclosure_battery_cover_wall_thickness"])
+
+    @property
+    def enclosure_flex_support_length(self) -> float:
+        """Length of support plane extending under flex tail from front wall in mm."""
+        return float(self._raw_data["enclosure_flex_support_length"])
+
+    @property
+    def enclosure_flex_support_width(self) -> float:
+        """Width of support plane extending under flex tail in mm."""
+        return float(self._raw_data["enclosure_flex_support_width"])
 
     @property
     def enclosure_snap_ridge_depth(self) -> float:
@@ -366,14 +406,14 @@ class TestBoardConfig(BaseModel):
     @property
     def test_tdr_rise_time_ps(self) -> float:
         """TDR step rise time in picoseconds for factory impedance testing."""
-        return float(self._raw_data.get("test_tdr_rise_time_ps", 100.0))
+        return float(self._raw_data["test_tdr_rise_time_ps"])
 
     @property
     def test_cap_stimulus_freq_khz(self) -> float:
         """Stimulus frequency in kHz for factory capacitive touch testing."""
-        return float(self._raw_data.get("test_cap_stimulus_freq_khz", 250.0))
+        return float(self._raw_data["test_cap_stimulus_freq_khz"])
 
     @property
     def test_pcie_diff_target_ohm(self) -> float:
         """Target differential impedance in ohms for PCIe lines."""
-        return float(self._raw_data.get("test_pcie_diff_target_ohm", 85.0))
+        return float(self._raw_data["test_pcie_diff_target_ohm"])

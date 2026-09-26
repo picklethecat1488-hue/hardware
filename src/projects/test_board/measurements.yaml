@@ -4,6 +4,7 @@ board_length: 90.0
 corner_radius: 6.0
 board_thickness: 1.6
 flex_tail_width: 24.0
+flex_tail_tab_width: 17.0
 flex_tail_length: 54.0
 flex_tail_thickness: 0.20
 flex_tail_corner_radius: 1.0
@@ -29,6 +30,7 @@ enclosure_usb_cutout_height: 6.5
 enclosure_lip_height: 2.0
 enclosure_m2_cutout_width: 24.0
 enclosure_m2_cutout_height: 5.0
+enclosure_m2_cutout_length: 10.0
 enclosure_gpio_cutout_width: 5.0
 enclosure_gpio_cutout_length: 28.0
 enclosure_swd_cutout_width: 8.0
@@ -42,6 +44,9 @@ enclosure_battery_mount_x: -5.0
 enclosure_battery_mount_y: -8.0
 enclosure_battery_cutout_width: 8.0
 enclosure_battery_cutout_length: 6.0
+enclosure_battery_cover_clearance: 0.4
+enclosure_battery_cover_vertical_clearance: 2.0
+enclosure_battery_cover_wall_thickness: 1.5
 enclosure_snap_ridge_depth: 0.4
 enclosure_snap_ridge_height: 1.0
 enclosure_snap_ridge_length: 8.0
@@ -52,11 +57,14 @@ enclosure_vent_slot_width: 1.5
 enclosure_vent_slot_height: 5.0
 enclosure_vent_slot_spacing: 2.5
 enclosure_vent_count: 3
+enclosure_flex_support_length: 38.0
+enclosure_flex_support_width: 19.0
 led_flange_thickness: 1.0
 led_flange_width: 7.0
 led_hole_width: 5.0
 led_plug_length: 3.0
 led_plug_width: 4.8
+enclosure_periph_cutout_length: 10.0
 enclosure_periph_4p_cutout_length: 7.5
 enclosure_periph_6p_cutout_length: 14.5
 enclosure_periph_cutout_height: 5.0

@@ -237,7 +237,7 @@ class TestBoardProvider(Provider):
                     SilkscreenText(
                         "FLEX TAIL SENSOR REV 1.0", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True
                     )
-                with Locations((-8.0, -21.0)):
+                with Locations((-7.5, -21.0)):
                     SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.5, thickness=0.08)
                 with Locations((0.0, -6.25)):
                     SilkscreenText("CH0: LOW", layer="F.SilkS", font_size=0.7, thickness=0.10)
@@ -396,6 +396,23 @@ class TestBoardProvider(Provider):
             with Locations((0.0, length / 2.0, slot_z)):
                 Box(slot_w, wall * 3.0, slot_h, mode=BuildMode.SUBTRACT)
 
+            # Flex tail support shelf extending from front exterior wall underneath flex tail (BUG-140)
+            shelf_l = self.settings.enclosure_flex_support_length
+            shelf_w = self.settings.enclosure_flex_support_width
+            shelf_t = wall
+            tail_dz = 0.8
+            if self.wiring_path.exists():
+                wiring = Wiring(str(self.wiring_path))
+                comp_map = {c.name: c for c in wiring.footprints}
+                if "J2" in comp_map and "J4" in comp_map:
+                    tail_dz = comp_map["J2"].position[2] - comp_map["J4"].position[2]
+            shelf_top_z = z_carrier + tail_dz - 0.05
+            shelf_y = (length / 2.0) + (shelf_l / 2.0)
+            with BuildSketch(Plane.XY.offset(shelf_top_z - shelf_t)) as s_shelf:
+                with Locations((0.0, shelf_y)):
+                    RectangleRounded(shelf_w, shelf_l, cutout_r * 2.0)
+            extrude(s_shelf.sketch, amount=shelf_t)
+
             # M.2 connector cutout through rear exterior wall (aligned with J1 at [0.0, -36.0, 0.8])
             m2_w = self.settings.enclosure_m2_cutout_width
             m2_h = self.settings.enclosure_m2_cutout_height
@@ -405,11 +422,24 @@ class TestBoardProvider(Provider):
                     RectangleRounded(m2_w, m2_h, cutout_r)
             extrude(s_m2.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
 
-            # Peripheral cutouts and bus identifiers through right exterior wall (BUG-074, BUG-090, BUG-110, BUG-113)
+            # M.2 connector floor pass-through cutout (aligned with J1) (BUG-142)
+            m2_x, m2_y = 0.0, -36.0
+            if self.wiring_path.exists():
+                wiring = Wiring(str(self.wiring_path))
+                comp_map = {c.name: c for c in wiring.footprints}
+                if "J1" in comp_map:
+                    m2_x, m2_y = comp_map["J1"].position[0], comp_map["J1"].position[1]
+            m2_l = self.settings.enclosure_m2_cutout_length
+            with BuildSketch(Plane.XY.offset(-h_shell / 2.0)) as s_m2_floor:
+                with Locations((m2_x, m2_y)):
+                    RectangleRounded(m2_w, m2_l, cutout_r)
+            extrude(s_m2_floor.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
+
+            # Peripheral cutouts and bus identifiers through right exterior wall (BUG-074, BUG-090, BUG-110, BUG-113, BUG-143)
+            # All cutouts have the exact same width, height, and equal spacing apart from each other
             periph_cutout_h = self.settings.enclosure_periph_cutout_height
+            periph_cutout_l = self.settings.enclosure_periph_cutout_length
             periph_z = z_carrier + (self.settings.board_thickness / 2.0) + (periph_cutout_h / 2.0) - 0.5
-            l_4p = self.settings.enclosure_periph_4p_cutout_length
-            l_6p = self.settings.enclosure_periph_6p_cutout_length
             bus_labels = {"J6": "I2C", "J7": "I3C0", "J8": "I3C1", "J9": "SPI", "J10": "UART"}
             periph_specs = []
             if self.wiring_path.exists():
@@ -418,9 +448,7 @@ class TestBoardProvider(Provider):
                 for des in ("J6", "J7", "J8", "J9", "J10"):
                     if des in comp_map:
                         c = comp_map[des]
-                        is_6p = des in ("J9", "J10")
-                        cut_l = l_6p if is_6p else l_4p
-                        periph_specs.append((des, c.position[1], cut_l, bus_labels.get(des, des)))
+                        periph_specs.append((des, c.position[1], periph_cutout_l, bus_labels.get(des, des)))
 
             with BuildSketch(Plane.YZ.offset(w / 2.0)) as s_periph:
                 for _, py, cut_l, _ in periph_specs:
@@ -619,6 +647,48 @@ class TestBoardProvider(Provider):
 
         return cover
 
+    def battery_cover(self, target: str, subassembly: Optional[str], mode: Mode) -> BuildPart:
+        """Build snap-fit battery cover placed over the enclosure lid battery cradle (BUG-139)."""
+        batt_w = self.settings.enclosure_battery_mount_width
+        batt_l = self.settings.enclosure_battery_mount_length
+        cradle_t = self.settings.enclosure_battery_mount_wall_thickness
+        cradle_h = self.settings.enclosure_battery_mount_wall_height
+        clr = self.settings.enclosure_battery_cover_clearance
+        extra_h = self.settings.enclosure_battery_cover_vertical_clearance
+        cover_t = self.settings.enclosure_battery_cover_wall_thickness
+
+        # Inner cavity dimensions to fit over cradle outer rim with clearance
+        inner_w = batt_w + 2.0 * (cradle_t + clr)
+        inner_l = batt_l + 2.0 * (cradle_t + clr)
+        inner_h = cradle_h + extra_h
+
+        # Outer dimensions
+        outer_w = inner_w + 2.0 * cover_t
+        outer_l = inner_l + 2.0 * cover_t
+        total_h = inner_h + cover_t
+
+        with BuildPart() as cover:
+            with BuildSketch() as s_outer:
+                RectangleRounded(outer_w, outer_l, 2.5)
+            extrude(s_outer.sketch, amount=total_h)
+
+            with BuildSketch(Plane.XY.offset(-0.01)) as s_inner:
+                RectangleRounded(inner_w, inner_l, 1.5)
+            extrude(s_inner.sketch, amount=inner_h + 0.01, mode=BuildMode.SUBTRACT)
+
+            # Snap-fit retention tabs on interior rim
+            snap_depth = self.settings.enclosure_snap_ridge_depth
+            snap_len = 8.0
+            with Locations((0.0, 0.0, cover_t + 1.0)):
+                with Locations((-inner_w / 2.0 + snap_depth / 2.0, 0.0)):
+                    Box(snap_depth, snap_len, 0.8, mode=BuildMode.ADD)
+                with Locations((inner_w / 2.0 - snap_depth / 2.0, 0.0)):
+                    Box(snap_depth, snap_len, 0.8, mode=BuildMode.ADD)
+
+        RigidJoint("mount", cover.part, Location((0, 0, 0)))
+
+        return cover
+
     def view_product(self, room: Room, mode: Mode) -> None:
         """Assemble complete rigid-flex PCB and protective housing for 3D inspection."""
         carrier = self.carrier_board("carrier_board", None, mode)
@@ -626,6 +696,7 @@ class TestBoardProvider(Provider):
         enclosure = self.enclosure_bottom("enclosure_bottom", None, mode)
         lid = self.enclosure_lid("enclosure_lid", None, mode)
         cover = self.led_cover("led_cover", None, mode)
+        batt_cov = self.battery_cover("battery_cover", None, mode)
 
         wall = self.settings.enclosure_wall_thickness
         standoff_h = self.settings.standoff_height
@@ -663,11 +734,16 @@ class TestBoardProvider(Provider):
 
         cover_geom = cover.part.locate(Location((led_x, led_y, z_lid + wall)))
 
+        batt_x = self.settings.enclosure_battery_mount_x
+        batt_y = self.settings.enclosure_battery_mount_y
+        batt_cov_geom = batt_cov.part.locate(Location((batt_x, batt_y, z_lid + wall + 0.5)))
+
         room.add("carrier_board", carrier_geom, color=(0.08, 0.40, 0.20), alpha=1.0)
         room.add("flex_tail", tail_geom, color=(0.85, 0.65, 0.15), alpha=0.9)
         room.add("enclosure_bottom", enclosure.part, color=(0.15, 0.16, 0.20), alpha=0.4)
         room.add("enclosure_lid", lid_geom, color=(0.20, 0.22, 0.28), alpha=0.4)
         room.add("led_cover", cover_geom, color=(0.90, 0.95, 1.0), alpha=0.6)
+        room.add("battery_cover", batt_cov_geom, color=(0.20, 0.22, 0.28), alpha=0.9)
 
     def diagram_product(self, room: Room, targets: Sequence[str], mode: Mode) -> None:
         """Populate product mechanical diagram elements."""
@@ -702,6 +778,7 @@ class TestBoardProvider(Provider):
             "enclosure_bottom": self.enclosure_bottom,
             "enclosure_lid": self.enclosure_lid,
             "led_cover": self.led_cover,
+            "battery_cover": self.battery_cover,
         }
 
     def view_carrier_board(self, room: Room, mode: Mode) -> None:
@@ -713,6 +790,11 @@ class TestBoardProvider(Provider):
         """Assemble flex tail PCB with sensor pads and test points for inspection and simulation."""
         tail = self.flex_tail("flex_tail", None, mode)
         room.add("flex_tail", tail.part, color=(0.85, 0.65, 0.15), alpha=0.9)
+
+    def view_battery_cover(self, room: Room, mode: Mode) -> None:
+        """Render standalone snap-fit battery cover."""
+        cover = self.battery_cover("battery_cover", None, mode)
+        room.add("battery_cover", cover.part, color=(0.20, 0.22, 0.28), alpha=0.9)
 
     def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
         """Return flying probe simulation and electrical verification hooks."""
@@ -727,6 +809,7 @@ class TestBoardProvider(Provider):
             "product": self.view_product,
             "carrier_board": self.view_carrier_board,
             "flex_tail": self.view_flex_tail,
+            "battery_cover": self.view_battery_cover,
         }
 
     @property
