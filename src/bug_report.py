@@ -156,7 +156,7 @@ def main() -> None:
     elif args.db_file != Path("build/bugs.sqlite"):
         markdown_path = db_path.parent / "BUGS.md"
     else:
-        markdown_path = repo_root / "feedback" / "BUGS.md"
+        markdown_path = repo_root / "build" / "BUGS.md"
 
     is_cli_only = bool(args.add or args.resolve or args.list)
     server = BugReportServer(

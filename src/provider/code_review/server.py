@@ -366,6 +366,7 @@ class ReviewServer(ThreadingHTTPServer):
         port: int = 8765,
         repo_root: Optional[Path] = None,
         markdown_output: Optional[Path] = None,
+        feedback_dir: Optional[Path] = None,
         state_file: Optional[Path] = None,
         sqlite_file: Optional[Path] = None,
         revisions: Optional[list[str]] = None,
@@ -377,8 +378,13 @@ class ReviewServer(ThreadingHTTPServer):
         self.git_engine = GitReviewEngine(repo_root=self.repo_root)
         self.exporter = MarkdownReviewExporter(repo_root=self.repo_root)
 
-        self.markdown_output = markdown_output or (self.repo_root / "feedback" / "CR.md")
-        self.feedback_dir = self.markdown_output.parent
+        self.markdown_output = markdown_output or (self.repo_root / "build" / "CR.md")
+        if feedback_dir is not None:
+            self.feedback_dir = feedback_dir
+        elif markdown_output is not None and markdown_output.parent.name != "build":
+            self.feedback_dir = markdown_output.parent
+        else:
+            self.feedback_dir = self.repo_root / "feedback"
         self.state_file = state_file or (self.repo_root / "build" / "cr_feedback.json")
         if sqlite_file is not None:
             self.sqlite_file = sqlite_file

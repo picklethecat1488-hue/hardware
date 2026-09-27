@@ -586,3 +586,44 @@ def test_kicad_cli_run_drc_syncs_design_rules(tmp_path: Path):
         assert pro_file.is_file()
         pro_data = json.loads(pro_file.read_text(encoding="utf-8"))
         assert pro_data["board"]["design_settings"]["rules"]["min_clearance"] == 0.30
+
+
+def test_export_kicad_pcb_silkscreen_parity_and_mirroring(
+    tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring
+):
+    """Verify BUG-165/BUG-167: F.SilkS text and test point labels apply parity correction.
+
+    In CAD right-handed space vs KiCad left-handed space, text on F.SilkS must have
+    mirror: True and rotation transformed to prevent horizontally mirrored text in 3D physics rendering.
+    """
+    mock_pcb_config.silkscreen_texts = [
+        SilkscreenTextModel(
+            text="TEST BOARD CARRIER REV 2.0",
+            layer="F.SilkS",
+            position=(10.0, 15.0),
+            font_size=1.5,
+            thickness=0.2,
+            rotation=0.0,
+        )
+    ]
+    from model.pcb import TestPointModel
+
+    mock_pcb_config.test_points = [
+        TestPointModel(
+            name="TP1",
+            net="VDD_3V3",
+            position_mm=(5.0, 10.0),
+            layer="F.Cu",
+            pad_diameter_mm=1.0,
+        )
+    ]
+    exporter = PCBExporter(mock_pcb_config, mock_wiring)
+    out_file = tmp_path / "board_silkscreen.kicad_pcb"
+    exporter.export_kicad_pcb(out_file)
+
+    assert out_file.is_file()
+    content = out_file.read_text(encoding="utf-8")
+    assert "TEST BOARD CARRIER REV 2.0" in content
+    # Assert mirror attribute is emitted in justify for F.SilkS gr_text and test point reference
+    assert "(justify mirror)" in content
+    assert 'fp_text reference "TP1"' in content

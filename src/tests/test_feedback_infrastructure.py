@@ -321,6 +321,7 @@ def test_code_review_no_feedback_leaves_no_markdown_files(tmp_path: Path) -> Non
     assert "Finding on commit 1" in content
 
     # 3. ReviewServer save_and_sync with empty comments inside feedback_dir does not create CR.md
+    from provider.code_review.git_utils import get_git_root
     from provider.code_review.server import ReviewServer
 
     db_file = tmp_path / "test_store.sqlite"
@@ -328,7 +329,7 @@ def test_code_review_no_feedback_leaves_no_markdown_files(tmp_path: Path) -> Non
     server = ReviewServer(
         host="127.0.0.1",
         port=0,
-        repo_root=tmp_path,
+        repo_root=get_git_root(),
         markdown_output=feedback_dir / "CR.md",
         state_file=state_file,
         sqlite_file=db_file,
@@ -337,3 +338,54 @@ def test_code_review_no_feedback_leaves_no_markdown_files(tmp_path: Path) -> Non
     server.save_and_sync()
     assert not (feedback_dir / "CR.md").exists()
     assert not (feedback_dir / f"CR_{server.session.commit_hash}.md").exists()
+
+
+def test_baseline_reports_default_to_build_and_preserve_feedback_granularity(tmp_path: Path) -> None:
+    """Verify BUG-166: baseline BUGS.md and CR.md default to build/ and are excluded from feedback/.
+
+    Only granular BUG_<id>.md and CR_<commit>.md files are stored in feedback/.
+    """
+    from provider.bug_report.server import BugReportServer
+    from provider.code_review.server import ReviewServer
+
+    mock_repo = tmp_path / "repo"
+    mock_repo.mkdir()
+    (mock_repo / "build").mkdir()
+    (mock_repo / "feedback").mkdir()
+
+    # Verify ReviewServer defaults to build/CR.md and feedback/
+    cr_server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=mock_repo,
+        bind_and_activate=False,
+    )
+    assert cr_server.markdown_output == mock_repo / "build" / "CR.md"
+    assert cr_server.feedback_dir == mock_repo / "feedback"
+
+    # Verify BugReportServer defaults to build/BUGS.md and feedback/
+    bug_server = BugReportServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=mock_repo,
+        bind_and_activate=False,
+    )
+    assert bug_server.markdown_output == mock_repo / "build" / "BUGS.md"
+    assert bug_server.feedback_dir == mock_repo / "feedback"
+
+    # Add a bug and sync
+    test_bug = BugReportModel(
+        id="BUG-999",
+        uuid=str(uuid.uuid4()),
+        title="Test Granular Report BUG-166",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.INFRASTRUCTURE,
+    )
+    bug_server.database.bugs.append(test_bug)
+    bug_server.save_and_sync()
+
+    # Main BUGS.md is written to build/, individual bug is written to feedback/
+    assert (mock_repo / "build" / "BUGS.md").is_file()
+    assert (mock_repo / "feedback" / "BUG_999.md").is_file()
+    assert not (mock_repo / "feedback" / "BUGS.md").exists()

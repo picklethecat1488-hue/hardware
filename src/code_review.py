@@ -158,7 +158,7 @@ def main() -> None:
     elif args.db_file != Path("build/code_review.sqlite"):
         markdown_path = db_path.parent / "CR.md"
     else:
-        markdown_path = repo_root / "feedback" / "CR.md"
+        markdown_path = repo_root / "build" / "CR.md"
 
     git_engine = GitReviewEngine(repo_root=repo_root)
     if not args.commits:

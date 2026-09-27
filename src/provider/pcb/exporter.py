@@ -326,6 +326,7 @@ class PCBExporter:
         existing_silk_names = {st.text for st in self.config.silkscreen_texts}
         silkscreen_data = []
         for st in self.config.silkscreen_texts:
+            is_front = st.layer != "B.SilkS"
             silkscreen_data.append(
                 {
                     "text": st.text,
@@ -334,8 +335,8 @@ class PCBExporter:
                     "y_mm": round(self.config.sheet_center_y_mm + st.position[1], 4),
                     "font_size": st.font_size,
                     "thickness": st.thickness,
-                    "rotation": st.rotation,
-                    "mirror": st.mirror or (st.layer == "B.SilkS"),
+                    "rotation": (st.rotation + 180.0) % 360.0 if is_front else st.rotation,
+                    "mirror": not st.mirror if is_front else (st.mirror or False),
                 }
             )
 
@@ -343,6 +344,7 @@ class PCBExporter:
         for fp_data in footprints_data:
             fp_name = fp_data["name"]
             if fp_name not in existing_silk_names and "cand_ref_x" in fp_data:
+                is_front = fp_data["silk_layer"] != "B.SilkS"
                 silkscreen_data.append(
                     {
                         "text": fp_name,
@@ -351,8 +353,8 @@ class PCBExporter:
                         "y_mm": round(self.config.sheet_center_y_mm + fp_data["cand_ref_y"], 4),
                         "font_size": 0.8,
                         "thickness": 0.12,
-                        "rotation": 0.0,
-                        "mirror": fp_data["silk_layer"] == "B.SilkS",
+                        "rotation": 180.0 if is_front else 0.0,
+                        "mirror": is_front,
                     }
                 )
 
@@ -637,8 +639,9 @@ class PCBExporter:
                         "dia_mm": round(tp.pad_diameter_mm, 4),
                         "drill_mm": round(tp.drill_diameter_mm, 4),
                         "label_x": round(lbl_off_x, 4),
-                        "label_y": round(lbl_off_y, 4),
-                        "label_angle": 90,
+                        "label_y": round(-lbl_off_y if tp.layer != "B.Cu" else lbl_off_y, 4),
+                        "label_angle": 270 if tp.layer != "B.Cu" else 90,
+                        "mirror": tp.layer != "B.Cu",
                         "layer": tp.layer,
                         "silk_layer": silk_layer,
                         "mask_layer": mask_layer,

@@ -492,14 +492,7 @@ class MarkdownReviewExporter:
         commit_comments = [
             c
             for c in session.comments
-            if (
-                c.commit
-                and (
-                    c.commit == safe_sha
-                    or safe_sha.startswith(c.commit)
-                    or c.commit.startswith(safe_sha)
-                )
-            )
+            if (c.commit and (c.commit == safe_sha or safe_sha.startswith(c.commit) or c.commit.startswith(safe_sha)))
             or (
                 not c.commit
                 and session.commit_hash

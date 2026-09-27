@@ -357,6 +357,7 @@ class BugReportServer(ThreadingHTTPServer):
         port: int = 8766,
         repo_root: Optional[Path] = None,
         markdown_output: Optional[Path] = None,
+        feedback_dir: Optional[Path] = None,
         state_file: Optional[Path] = None,
         sqlite_file: Optional[Path] = None,
         attachments_dir: Optional[Path] = None,
@@ -367,8 +368,13 @@ class BugReportServer(ThreadingHTTPServer):
         self.host = host
         self.port = port
         self.repo_root = repo_root or Path.cwd()
-        self.markdown_output = markdown_output or (self.repo_root / "feedback" / "BUGS.md")
-        self.feedback_dir = self.markdown_output.parent
+        self.markdown_output = markdown_output or (self.repo_root / "build" / "BUGS.md")
+        if feedback_dir is not None:
+            self.feedback_dir = feedback_dir
+        elif markdown_output is not None and markdown_output.parent.name != "build":
+            self.feedback_dir = markdown_output.parent
+        else:
+            self.feedback_dir = self.repo_root / "feedback"
         self.state_file = state_file or (self.repo_root / "build" / "bugs_state.json")
         self.sqlite_file = sqlite_file or (self.repo_root / "build" / "bugs.sqlite")
         self.attachments_dir = attachments_dir or (self.repo_root / "build" / "attachments")
@@ -432,14 +438,14 @@ class BugReportServer(ThreadingHTTPServer):
                 summary="Hardware engineering defects, PCB layout issues, and reproduction tracking.",
             )
 
-        if not self.fresh and self.feedback_dir.exists():
-            self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, db, self.sqlite_store)
-
         if not self.fresh and self.markdown_output.exists():
             md_db = self.exporter.parse_markdown(self.markdown_output)
             if md_db and md_db.bugs:
                 db = self.exporter.merge_databases(db, md_db)
             self.markdown_mtime = self.markdown_output.stat().st_mtime
+
+        if not self.fresh and self.feedback_dir.exists():
+            self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, db, self.sqlite_store)
 
         self._ensure_unique_bug_ids(db)
         if not self.fresh:
@@ -459,11 +465,11 @@ class BugReportServer(ThreadingHTTPServer):
 
     def sync_with_feedback_dir(self) -> Dict[str, Any]:
         """Scan feedback/ directory, detect file renames, merge into SQLite, and update markdown."""
-        stats = self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
         if self.markdown_output.exists():
             md_db = self.exporter.parse_markdown(self.markdown_output)
             if md_db and md_db.bugs:
                 self.database = self.exporter.merge_databases(self.database, md_db)
+        stats = self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
         self.save_and_sync()
         return stats
 
@@ -472,7 +478,12 @@ class BugReportServer(ThreadingHTTPServer):
         self.database.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         self.sqlite_store.save_database(self.database)
         self.exporter.export_state_json(self.database, self.state_file)
-        out = self.exporter.export_markdown(self.database, self.markdown_output, store=self.sqlite_store)
+        out = self.exporter.export_markdown(
+            self.database,
+            self.markdown_output,
+            store=self.sqlite_store,
+            feedback_dir=self.feedback_dir,
+        )
         if self.markdown_output.exists():
             self.markdown_mtime = self.markdown_output.stat().st_mtime
         return out

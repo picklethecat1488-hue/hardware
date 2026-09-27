@@ -38,6 +38,7 @@ class MarkdownBugExporter:
         database: BugDatabaseModel,
         output_path: Path,
         store: Optional[Any] = None,
+        feedback_dir: Optional[Path] = None,
     ) -> Path:
         """Generate and save BUGS.md markdown document and individual BUG_<id>.md files.
 
@@ -45,6 +46,7 @@ class MarkdownBugExporter:
             database: Active bug database model.
             output_path: Destination path for BUGS.md file.
             store: Optional SQLiteBugStore to synchronize duplicate ID updates.
+            feedback_dir: Optional destination directory for individual BUG_<id>.md files.
 
         Returns:
             Resolved Path where markdown was saved.
@@ -68,8 +70,11 @@ class MarkdownBugExporter:
         md_text = self.render_markdown(database)
         output_path.write_text(md_text, encoding="utf-8")
 
-        # Export individual BUG_<id>.md files into feedback/
-        self.export_all_individual_bugs(database, output_path.parent)
+        # Export individual BUG_<id>.md files into feedback/ (or custom feedback_dir)
+        target_feedback_dir = feedback_dir or (
+            output_path.parent if output_path.parent.name != "build" else (self.repo_root / "feedback")
+        )
+        self.export_all_individual_bugs(database, target_feedback_dir)
 
         return output_path
 
