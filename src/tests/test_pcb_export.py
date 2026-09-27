@@ -606,7 +606,7 @@ def test_export_kicad_pcb_silkscreen_parity_and_mirroring(
             rotation=0.0,
         )
     ]
-    from model.pcb import TestPointModel
+    from model.pcb import TestPointModel, MountingHoleModel
 
     mock_pcb_config.test_points = [
         TestPointModel(
@@ -615,6 +615,16 @@ def test_export_kicad_pcb_silkscreen_parity_and_mirroring(
             position_mm=(5.0, 10.0),
             layer="F.Cu",
             pad_diameter_mm=1.0,
+        )
+    ]
+    mock_pcb_config.mounting_holes = [
+        MountingHoleModel(
+            name="MH1",
+            position_mm=(20.0, 30.0),
+            drill_diameter_mm=3.2,
+            pad_diameter_mm=4.5,
+            plated=True,
+            net="GND",
         )
     ]
     exporter = PCBExporter(mock_pcb_config, mock_wiring)
@@ -627,3 +637,6 @@ def test_export_kicad_pcb_silkscreen_parity_and_mirroring(
     # Assert mirror attribute is emitted in justify for F.SilkS gr_text and test point reference
     assert "(justify mirror)" in content
     assert 'fp_text reference "TP1"' in content
+    assert 'gr_text "MH1"' in content
+    assert '(footprint "MountingHole:MountingHole_3.2mm_Pad"' in content
+    assert 'fp_text reference "MH1" (at 0 0) (layer "F.SilkS") hide' in content

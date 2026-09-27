@@ -358,6 +358,23 @@ class PCBExporter:
                     }
                 )
 
+        if not self.is_flex:
+            for mh in getattr(self.config, "mounting_holes", []):
+                if mh.name not in existing_silk_names:
+                    y_off = mh.drill_diameter_mm if mh.name in ["MH3", "MH4"] else -mh.drill_diameter_mm
+                    silkscreen_data.append(
+                        {
+                            "text": mh.name,
+                            "layer": "F.SilkS",
+                            "x_mm": round(self.config.sheet_center_x_mm + mh.position_mm[0], 4),
+                            "y_mm": round(self.config.sheet_center_y_mm + mh.position_mm[1] + y_off, 4),
+                            "font_size": 0.8,
+                            "thickness": 0.12,
+                            "rotation": 180.0,
+                            "mirror": True,
+                        }
+                    )
+
         silkscreen_graphics_data = []
         for sg in getattr(self.config, "silkscreen_graphics", []):
             cx = round(self.config.sheet_center_x_mm + sg.position[0], 4)
