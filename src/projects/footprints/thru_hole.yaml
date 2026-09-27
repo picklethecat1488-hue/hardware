@@ -356,4 +356,51 @@ footprints:
         pad_size_mm: [1.6, 1.6]
         drill_dia_mm: 0.80
 
+  "JST-PH-6P":
+    dimensions: [14.0, 5.0, 6.5]
+    pins:
+      - name: "1"
+        position: [-5.0, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: roundrect
+        pad_size_mm: [1.6, 1.6]
+        drill_dia_mm: 0.80
+      - name: "2"
+        position: [-3.0, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.6, 1.6]
+        drill_dia_mm: 0.80
+      - name: "3"
+        position: [-1.0, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.6, 1.6]
+        drill_dia_mm: 0.80
+      - name: "4"
+        position: [1.0, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.6, 1.6]
+        drill_dia_mm: 0.80
+      - name: "5"
+        position: [3.0, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.6, 1.6]
+        drill_dia_mm: 0.80
+      - name: "6"
+        position: [5.0, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.6, 1.6]
+        drill_dia_mm: 0.80
+
+
 

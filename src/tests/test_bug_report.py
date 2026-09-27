@@ -395,3 +395,65 @@ def test_regression_bug_079_no_duplicate_bug_ids_and_generator():
     ]
     # Length is 3, but max is 78. Next ID MUST be BUG-079, NOT BUG-004
     assert db.generate_bug_id() == "BUG-079"
+
+
+def test_regression_bug_114_rmw_markdown_sync_and_file_watch(tmp_path: Path) -> None:
+    """Verify BUG-114: bug report tool uses R+M+W to sync BUGS.md changes into SQLite and database."""
+    sqlite_file = tmp_path / "bugs.sqlite"
+    state_file = tmp_path / "bugs_state.json"
+    md_file = tmp_path / "BUGS.md"
+
+    server = BugReportServer(
+        repo_root=tmp_path,
+        sqlite_file=sqlite_file,
+        state_file=state_file,
+        markdown_output=md_file,
+        bind_and_activate=False,
+    )
+
+    # 1. Add initial bug and save
+    b1 = BugReportModel(
+        id="BUG-001",
+        title="Initial defect",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.MEDIUM,
+        category=BugCategory.PCB,
+        description="Original description",
+    )
+    server.database.add_or_update(b1)
+    server.save_and_sync()
+
+    assert md_file.exists()
+    content = md_file.read_text(encoding="utf-8")
+    assert "- [ ]" in content
+
+    # 2. Simulate external user editing BUGS.md:
+    # Check off BUG-001 as resolved, add resolution notes, and add a new BUG-002
+    updated_content = content.replace("- [ ]", "- [x]")
+    updated_content = updated_content.replace(
+        "- **Status**: `OPEN`", "- **Status**: `RESOLVED`\n- **Resolved**: `2026-09-25 02:00:00 UTC`"
+    )
+    updated_content += (
+        '\n\n### <a id="bug-002"></a> 🔴 `[BUG-002]` New issue added via markdown\n\n'
+        "- **Status**: `OPEN`\n- **Severity**: `HIGH`\n- **Category**: `CAD`\n\n"
+        "#### Description\n\nAdded directly to BUGS.md\n\n---\n"
+    )
+    md_file.write_text(updated_content, encoding="utf-8")
+
+    # 3. Perform R+M+W sync
+    server.sync_with_markdown()
+
+    # 4. Verify in-memory database and SQLite store picked up external BUGS.md changes
+    b1_updated = server.database.get_bug("BUG-001")
+    assert b1_updated is not None
+    assert b1_updated.status == BugStatus.RESOLVED
+
+    b2_added = server.database.get_bug("BUG-002")
+    assert b2_added is not None
+    assert b2_added.title == "New issue added via markdown"
+    assert b2_added.severity == BugSeverity.HIGH
+
+    # Verify SQLite was updated
+    sqlite_db = server.sqlite_store.load_database()
+    assert sqlite_db.get_bug("BUG-001").status == BugStatus.RESOLVED
+    assert sqlite_db.get_bug("BUG-002") is not None

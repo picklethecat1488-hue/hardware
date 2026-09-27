@@ -482,10 +482,23 @@
       <div class="metric-pill">RESOLVED: <span id="m-resolved" class="metric-highlight" style="color:var(--quake-green);">0</span></div>
     </div>
     <div class="header-actions">
+      <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
       <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
       <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
     </div>
   </header>
+
+  <!-- Feedback Sync Progress Modal -->
+  <div id="feedback-loading-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:99999; align-items:center; justify-content:center;">
+    <div class="quake-card" style="padding:24px 32px; max-width:480px; width:90%; text-align:center; border:2px solid var(--quake-gold);">
+      <h3 style="color:var(--quake-gold); margin-bottom:12px; font-size:16px;">🔄 MERGING AGENT FEEDBACK</h3>
+      <p id="loading-status-text" style="color:var(--quake-text-light); font-size:13px; margin-bottom:16px;">Merging stored agent feedback from feedback/ directory into SQLite database...</p>
+      <div style="background:#120c08; border:1px solid #5a381e; border-radius:4px; height:12px; overflow:hidden; margin-bottom:12px;">
+        <div id="loading-progress-bar" style="background:var(--quake-gold); width:30%; height:100%; transition:width 0.3s ease;"></div>
+      </div>
+      <div id="loading-step-text" style="color:var(--quake-text-muted); font-size:11px;">Scanning feedback/ directory for BUG_*.md files...</div>
+    </div>
+  </div>
 
   <!-- Main Container -->
   <div class="main-container">
@@ -558,7 +571,7 @@
         </div>
         <div class="col">
           <label>Reproduction Steps (one per line)</label>
-          <textarea id="bug-steps" placeholder="1. python src/view.py test_board/carrier_board:pcb&#10;2. Inspect net NRST&#10;3. Observe collision"></textarea>
+          <textarea id="bug-steps" placeholder="1. python src/view.py carrier_board:pcb&#10;2. Inspect net NRST&#10;3. Observe collision"></textarea>
         </div>
         <div class="row">
           <div class="col">
@@ -1073,6 +1086,32 @@
         renderAttachments(bug.attachments);
         saveActiveBug();
         showToast("Attached " + att.filename);
+      }
+    }
+
+    async function syncFeedback() {
+      const modal = document.getElementById("feedback-loading-modal");
+      if (modal) modal.style.display = "flex";
+      try {
+        const res = await fetch("/api/sync_feedback", { method: "POST" });
+        const data = await res.json();
+        if (data.status === "ok") {
+          const stats = data.stats || {};
+          showToast(`Feedback synced: ${stats.imported || 0} imported, ${stats.renamed || 0} renamed, ${stats.total || 0} total bugs.`);
+          const dbRes = await fetch("/api/database");
+          if (dbRes.ok) {
+            db = await dbRes.json();
+            updateMetrics();
+            renderBugList();
+            loadActiveBug();
+          }
+        } else {
+          showToast("Sync failed: " + (data.message || "Unknown error"));
+        }
+      } catch (err) {
+        showToast("Error syncing feedback: " + err.message);
+      } finally {
+        if (modal) modal.style.display = "none";
       }
     }
 

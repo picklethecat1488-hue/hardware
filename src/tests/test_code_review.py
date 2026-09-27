@@ -728,6 +728,34 @@ def test_untracked_files_diff_and_working_tree_handling(tmp_path: Path) -> None:
             temp_untracked.unlink()
 
 
+def test_regression_bug_128_untracked_folder_files(tmp_path: Path) -> None:
+    """Verify that newly created untracked subfolders show their contained files in changed files (BUG-128)."""
+    repo_root = get_git_root()
+    engine = GitReviewEngine(repo_root=repo_root)
+
+    temp_folder = repo_root / "temp_untracked_folder_bug128"
+    try:
+        temp_folder.mkdir(parents=True, exist_ok=True)
+        sample_file = temp_folder / "nested_sample.txt"
+        sample_file.write_text("hello\nworld\n", encoding="utf-8")
+
+        working_files = engine.get_changed_files("working")
+        file_paths = [f["path"] for f in working_files]
+        expected_path = "temp_untracked_folder_bug128/nested_sample.txt"
+        assert expected_path in file_paths
+        assert "temp_untracked_folder_bug128/" not in file_paths
+
+        # Check diff
+        diff = engine.get_file_diff("working", expected_path)
+        assert diff.additions == 2
+        assert "+hello" in diff.raw_diff
+    finally:
+        if (temp_folder / "nested_sample.txt").exists():
+            (temp_folder / "nested_sample.txt").unlink()
+        if temp_folder.exists():
+            temp_folder.rmdir()
+
+
 def test_code_review_comment_editing_and_custom_snippet(tmp_path: Path) -> None:
     """Verify that comments can be edited via API and custom code snippets/commits are preserved."""
     repo_root = get_git_root()
@@ -1376,3 +1404,101 @@ def test_code_review_tracker_only_commit_handling(tmp_path: Path) -> None:
     assert c.files_count == 0
     assert c.ignored_files_count == 1
     assert "BUGS.md" in c.ignored_files
+
+
+def test_diff_line_length_truncation_bug_136(tmp_path: Path) -> None:
+    """Verify that extremely long diff lines are truncated to MAX_DIFF_LINE_LENGTH (BUG-136)."""
+    repo_dir = tmp_path / "long_line_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    test_file = repo_dir / "long.py"
+    test_file.write_text("initial = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "long.py"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Write a very long line (e.g. 2500 characters)
+    long_line = "x = '" + ("A" * 2500) + "'\n"
+    test_file.write_text(long_line, encoding="utf-8")
+
+    engine = GitReviewEngine(repo_root=repo_dir)
+    diff_model = engine.get_file_diff("working", "long.py")
+
+    assert not diff_model.is_binary
+    assert len(diff_model.hunks) > 0
+    # Hunk lines must be capped
+    for hunk in diff_model.hunks:
+        for line in hunk.lines:
+            assert len(line.content) <= 1005
+            if "A" * 100 in line.content:
+                assert line.content.endswith("…")
+
+    # Side by side rows must also be capped
+    assert len(diff_model.side_by_side) > 0
+    for row in diff_model.side_by_side:
+        if row.new_text and "A" * 100 in row.new_text:
+            assert len(row.new_text) <= 1005
+            assert row.new_text.endswith("…")
+
+
+def test_binary_diff_and_raw_endpoint_bug_137(tmp_path: Path) -> None:
+    """Verify binary file diff detection and raw binary download/view endpoint (BUG-137)."""
+    repo_dir = tmp_path / "binary_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 1: Initial image
+    img_file = repo_dir / "logo.png"
+    fake_png_old = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDRold_version"
+    img_file.write_bytes(fake_png_old)
+    subprocess.run(["git", "add", "logo.png"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add old logo"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 2: Modified image
+    fake_png_new = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDRnew_version"
+    img_file.write_bytes(fake_png_new)
+
+    engine = GitReviewEngine(repo_root=repo_dir)
+    diff_model = engine.get_file_diff("working", "logo.png")
+
+    assert diff_model.is_binary is True
+
+    # Test get_file_bytes
+    old_bytes = engine.get_file_bytes("working", "logo.png", parent=True)
+    new_bytes = engine.get_file_bytes("working", "logo.png", parent=False)
+    assert old_bytes == fake_png_old
+    assert new_bytes == fake_png_new
+
+    # Test server endpoint /api/raw
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        revisions=["working"],
+        repo_root=repo_dir,
+    )
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    time.sleep(0.1)
+    try:
+        base_url = server.get_url()
+        url_old = f"{base_url}/api/raw?commit=working&file=logo.png&side=old"
+        req_old = urllib.request.Request(url_old)
+        with urllib.request.urlopen(req_old) as resp_old:
+            assert resp_old.status == 200
+            assert resp_old.headers.get("Content-Type") == "image/png"
+            assert resp_old.read() == fake_png_old
+
+        url_new = f"{base_url}/api/raw?commit=working&file=logo.png&side=new"
+        req_new = urllib.request.Request(url_new)
+        with urllib.request.urlopen(req_new) as resp_new:
+            assert resp_new.status == 200
+            assert resp_new.headers.get("Content-Type") == "image/png"
+            assert resp_new.read() == fake_png_new
+    finally:
+        server.trigger_shutdown()

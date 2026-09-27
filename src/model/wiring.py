@@ -67,8 +67,12 @@ class LabelModel(BaseModel):
     """Data model representing textual label arguments and alignment."""
 
     text: str = Field(description="The display text for the label")
-    position: Tuple[float, float, float] = Field(description="3D position offset relative to component center")
-    align: Tuple[str, str] = Field(description="Horizontal and vertical text alignment (e.g. ['center', 'max'])")
+    position: Tuple[float, float, float] = Field(
+        default=(0.0, 0.0, 0.0), description="3D position offset relative to component center"
+    )
+    align: Tuple[str, str] = Field(
+        default=("center", "center"), description="Horizontal and vertical text alignment (e.g. ['center', 'max'])"
+    )
 
 
 class TruthTableState(StrEnum):
@@ -274,11 +278,12 @@ class Wiring:
                 layout_func(pins, w, l, c.get("slots_per_side"))
 
             label_data = c.get("label")
-            label = (
-                LabelModel(**label_data)
-                if label_data
-                else LabelModel(text=c["name"], position=(0.0, 0.0, 0.0), align=("center", "center"))
-            )
+            if isinstance(label_data, str):
+                label = LabelModel(text=label_data)
+            elif isinstance(label_data, dict):
+                label = LabelModel(**label_data)
+            else:
+                label = LabelModel(text=c["name"], position=(0.0, 0.0, 0.0), align=("center", "center"))
 
             tt_data = c.get("truth_table")
             truth_table = TruthTableModel(**tt_data) if tt_data else None
@@ -335,3 +340,18 @@ class Wiring:
                 if func is not None:
                     return getattr(func, "surface_mount", False)
         return False
+
+    def filter_by_footprints(self, footprints: List[Any]) -> "Wiring":
+        """Return a shallow copy of this Wiring instance with a filtered footprint list."""
+        filtered = Wiring.__new__(Wiring)
+        filtered.yaml_path = self.yaml_path
+        filtered.parent_part = self.parent_part
+        filtered.config = self.config
+        filtered.shared_footprints = self.shared_footprints
+        if footprints and isinstance(footprints[0], str):
+            target_names = set(footprints)
+            filtered.__dict__["footprints"] = [fp for fp in self.footprints if fp.name in target_names]
+        else:
+            filtered.__dict__["footprints"] = list(footprints)
+        filtered.__dict__["nets"] = self.nets
+        return filtered

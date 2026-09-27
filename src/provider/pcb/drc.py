@@ -81,6 +81,38 @@ def _dist_segment_to_segment(
     )
 
 
+def _dist_segment_to_polygon(
+    p0: Tuple[float, float],
+    p1: Tuple[float, float],
+    poly: List[Tuple[float, float]],
+) -> float:
+    """Compute shortest Euclidean distance from segment (p0, p1) to polygon poly."""
+    n = len(poly)
+    if n == 0:
+        return float("inf")
+    # Check if either endpoint is inside the polygon
+    for px, py in (p0, p1):
+        inside = False
+        for i in range(n):
+            q1x, q1y = poly[i]
+            q2x, q2y = poly[(i + 1) % n]
+            if ((q1y > py) != (q2y > py)) and (px < (q2x - q1x) * (py - q1y) / (q2y - q1y + 1e-12) + q1x):
+                inside = not inside
+        if inside:
+            return 0.0
+
+    min_dist = float("inf")
+    for i in range(n):
+        q0 = poly[i]
+        q1_pt = poly[(i + 1) % n]
+        d = _dist_segment_to_segment(p0, p1, q0, q1_pt)
+        if d < min_dist:
+            min_dist = d
+            if min_dist == 0.0:
+                break
+    return min_dist
+
+
 def _get_pin_absolute_pos(fp: Any, pin: Any) -> Tuple[float, float]:
     """Compute absolute (x, y) coordinates for a footprint pin taking rotation into account."""
     rot_deg = fp.rotation[2] if hasattr(fp, "rotation") and len(fp.rotation) >= 3 else 0.0
@@ -152,6 +184,7 @@ class DRCRuleName(StrEnum):
     SCHEMATIC_TITLE_BLOCK_COLLISION = "SCHEMATIC_TITLE_BLOCK_COLLISION"
     SCHEMATIC_HEADER_COLLISION = "SCHEMATIC_HEADER_COLLISION"
     SCHEMATIC_UNCONNECTED_COMPONENT = "SCHEMATIC_UNCONNECTED_COMPONENT"
+    SCHEMATIC_WIRE_COLLINEAR_OVERLAP = "SCHEMATIC_WIRE_COLLINEAR_OVERLAP"
 
 
 @dataclass
@@ -1145,6 +1178,8 @@ class PCBDesignRulesChecker:
 
         # Check disconnected test points (airwires on test points)
         for tp in self.config.test_points:
+            if not tp.net or tp.net.upper() in ("NC", "NONE", "RESERVED", "UNCONNECTED"):
+                continue
             tp_x, tp_y = tp.position_mm
             tp_r = tp.pad_diameter_mm / 2.0
             connected = False
@@ -1511,8 +1546,7 @@ class PCBDesignRulesChecker:
                         continue
 
                     for p in getattr(fp, "pins", []):
-                        px = fx + p.position[0]
-                        py = fy + p.position[1]
+                        px, py = _get_pin_absolute_pos(fp, p)
                         dist = math.hypot(mh_x - px, mh_y - py)
                         min_dist = mh_r + 0.30
                         if dist < min_dist:
@@ -1785,8 +1819,7 @@ class PCBDesignRulesChecker:
                         pad_type = getattr(p, "pad_type", "smd")
                         if pad_type != "thru_hole" and st.layer != pad_silk_layer:
                             continue
-                        px = fx + p.position[0]
-                        py = fy + p.position[1]
+                        px, py = _get_pin_absolute_pos(fp, p)
                         pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
                         p_r = max(pad_size) / 2.0
                         dist = math.hypot(sx - px, sy - py)
@@ -1853,8 +1886,7 @@ class PCBDesignRulesChecker:
                         pad_type = getattr(p, "pad_type", "smd")
                         if pad_type != "thru_hole" and sg.layer != pad_silk_layer:
                             continue
-                        px = fx + p.position[0]
-                        py = fy + p.position[1]
+                        px, py = _get_pin_absolute_pos(fp, p)
                         pad_size = getattr(p, "pad_size_mm", (0.5, 0.5))
                         p_r = max(pad_size) / 2.0
                         dist = math.hypot(sx - px, sy - py)
@@ -1874,6 +1906,83 @@ class PCBDesignRulesChecker:
                                     location=(sx, sy, 0.0),
                                 )
                             )
+
+        # 8. Check trace-to-capacitive-sensor copper collisions and clearance violations
+        target_shape = getattr(self.config, "shape_ref", None)
+        sensors = [
+            s
+            for s in getattr(self.config, "capacitive_sensors", [])
+            if (target_shape and getattr(s, "shape_ref", None) == target_shape)
+            or (self.is_flex and getattr(s, "shape_ref", None) in (None, "flex_tail"))
+            or (not self.is_flex and getattr(s, "shape_ref", None) not in ("flex_tail",))
+        ]
+        for s in sensors:
+            s_layer = getattr(s, "layer", "F.Cu")
+            s_center = getattr(s, "center_mm", (0.0, 0.0))
+            from provider.pcb.capacitive import CapacitiveSensingGenerator
+
+            s_geom = CapacitiveSensingGenerator(s, center=s_center).generate()
+            sensor_copper: List[Tuple[str, List[Tuple[float, float]]]] = []
+            if s.tx_pin:
+                for poly in s_geom.tx_fingers:
+                    sensor_copper.append((s.tx_pin, poly))
+            if s.rx_pin:
+                for poly in s_geom.rx_fingers:
+                    sensor_copper.append((s.rx_pin, poly))
+            if getattr(s, "drive_shield", False) and s_geom.guard_ring:
+                sensor_copper.append((getattr(s, "shield_net", "GND"), s_geom.guard_ring))
+
+            for s_net, poly in sensor_copper:
+                poly_min_x = min(pt[0] for pt in poly)
+                poly_max_x = max(pt[0] for pt in poly)
+                poly_min_y = min(pt[1] for pt in poly)
+                poly_max_y = max(pt[1] for pt in poly)
+
+                for tr in traces:
+                    if tr.layer != s_layer or tr.net == s_net:
+                        continue
+                    margin = (tr.width_mm / 2.0) + clearance_default
+                    if (
+                        poly_min_x - margin > max(tr.start_mm[0], tr.end_mm[0])
+                        or poly_max_x + margin < min(tr.start_mm[0], tr.end_mm[0])
+                        or poly_min_y - margin > max(tr.start_mm[1], tr.end_mm[1])
+                        or poly_max_y + margin < min(tr.start_mm[1], tr.end_mm[1])
+                    ):
+                        continue
+
+                    dist = _dist_segment_to_polygon(tr.start_mm, tr.end_mm, poly)
+                    copper_thresh = tr.width_mm / 2.0
+                    if dist < copper_thresh - 1e-4:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="TRACE_SHORT_CIRCUIT",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=f"{s.name}.{s_net}<->{tr.net}",
+                                description=(
+                                    f"Trace on net '{tr.net}' on layer '{tr.layer}' collides with capacitive sensor "
+                                    f"'{s.name}' on net '{s_net}' (dist: {dist:.3f}mm < copper threshold {copper_thresh:.3f}mm)"
+                                ),
+                                actual_value=dist,
+                                expected_range=(copper_thresh, 100.0),
+                                location=(tr.start_mm[0], tr.start_mm[1], 0.0),
+                            )
+                        )
+                    elif dist < copper_thresh + clearance_default - 1e-4:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="CLEARANCE_VIOLATION",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=f"{s.name}.{s_net}<->{tr.net}",
+                                description=(
+                                    f"Clearance violation between trace on net '{tr.net}' on layer '{tr.layer}' "
+                                    f"and capacitive sensor '{s.name}' on net '{s_net}' "
+                                    f"(dist: {dist:.3f}mm < required {copper_thresh + clearance_default:.3f}mm)"
+                                ),
+                                actual_value=dist,
+                                expected_range=(copper_thresh + clearance_default, 100.0),
+                                location=(tr.start_mm[0], tr.start_mm[1], 0.0),
+                            )
+                        )
 
         return violations
 
@@ -1938,13 +2047,21 @@ class PCBDesignRulesChecker:
             scx, scy = getattr(s, "center_mm", (0.0, 0.0))
             sw, sl = getattr(s, "area_mm", (10.0, 10.0))
             s_layer = getattr(s, "layer", "F.Cu")
-            term_r = 1.0
+            term_r = max(sl / 2.0, 1.0)
             if s.shape == "interdigital":
                 if s.tx_pin:
                     pin_targets.setdefault(s.tx_pin, []).append((scx - sw / 2.0, scy, s_layer, term_r))
                 if s.rx_pin:
                     pin_targets.setdefault(s.rx_pin, []).append((scx + sw / 2.0, scy, s_layer, term_r))
+            elif s.shape in ("loop", "perimeter_loop"):
+                loop_r = max(sw, sl, 1.0)
+                if s.tx_pin:
+                    pin_targets.setdefault(s.tx_pin, []).append((scx, scy, s_layer, loop_r))
+                if s.rx_pin:
+                    pin_targets.setdefault(s.rx_pin, []).append((scx, scy, s_layer, loop_r))
             else:
+                if s.tx_pin:
+                    pin_targets.setdefault(s.tx_pin, []).append((scx - sw / 2.0, scy, s_layer, term_r))
                 if s.rx_pin:
                     pin_targets.setdefault(s.rx_pin, []).append((scx, scy - sl / 2.0, s_layer, term_r))
 
@@ -2137,8 +2254,11 @@ class PCBDesignRulesChecker:
                         ),
                     )
 
-        # 3b. Symbol overlap and page boundary checks
+        # 3b. Symbol overlap, page boundary, and collinear wire overlap checks
         computed_symbol_boxes: Dict[int, List[Tuple[float, float, float, float, str]]] = {}
+        computed_wire_segments: Dict[
+            int, Tuple[List[Tuple[float, float, float, str]], List[Tuple[float, float, float, str]]]
+        ] = {}
         if (
             self.config
             and getattr(self.config, "schematic_sheets", None)
@@ -2149,6 +2269,7 @@ class PCBDesignRulesChecker:
 
             diag = SchematicDiagram(wiring=wiring, pcb_config=self.config)
             computed_symbol_boxes = diag.compute_symbol_bounding_boxes()
+            computed_wire_segments = diag.compute_sheet_wire_segments()
 
         for sheet_idx, sheet in enumerate(self.config.schematic_sheets):
             boxes = computed_symbol_boxes.get(sheet_idx + 1, [])
@@ -2215,6 +2336,39 @@ class PCBDesignRulesChecker:
                         ),
                         location=(b[0], b[1], 0.0),
                     )
+
+            # 3e. Collinear wire segment overlap check (BUG-131)
+            h_segs, v_segs = computed_wire_segments.get(sheet_idx + 1, ([], []))
+            for i, s1 in enumerate(h_segs):
+                for s2 in h_segs[i + 1 :]:
+                    if abs(s1[2] - s2[2]) < 0.1:
+                        overlap = min(s1[1], s2[1]) - max(s1[0], s2[0])
+                        if overlap > 0.5:
+                            violations.add_error(
+                                rule_name=DRCRuleName.SCHEMATIC_WIRE_COLLINEAR_OVERLAP,
+                                net_or_zone=f"{s1[3]} & {s2[3]}",
+                                description=(
+                                    f"Schematic horizontal wire overlap on sheet {sheet_idx + 1} ('{sheet.title}'): "
+                                    f"Wire '{s1[3]}' overlaps with '{s2[3]}' at y={s1[2]:.1f}mm "
+                                    f"(overlap={overlap:.1f}mm > 0.5mm)"
+                                ),
+                                location=(max(s1[0], s2[0]), s1[2], 0.0),
+                            )
+            for i, s1 in enumerate(v_segs):
+                for s2 in v_segs[i + 1 :]:
+                    if abs(s1[0] - s2[0]) < 0.1:
+                        overlap = min(s1[2], s2[2]) - max(s1[1], s2[1])
+                        if overlap > 0.5:
+                            violations.add_error(
+                                rule_name=DRCRuleName.SCHEMATIC_WIRE_COLLINEAR_OVERLAP,
+                                net_or_zone=f"{s1[3]} & {s2[3]}",
+                                description=(
+                                    f"Schematic vertical wire overlap on sheet {sheet_idx + 1} ('{sheet.title}'): "
+                                    f"Wire '{s1[3]}' overlaps with '{s2[3]}' at x={s1[0]:.1f}mm "
+                                    f"(overlap={overlap:.1f}mm > 0.5mm)"
+                                ),
+                                location=(s1[0], max(s1[1], s2[1]), 0.0),
+                            )
 
         # 4. Check that all components in the design have connected pins (BUG-088)
         for fp_name, fp in footprints_map.items():

@@ -582,12 +582,12 @@ def test_find_empty_space_for_silkscreen_label():
     assert cand_y + 0.5 <= board_bounds[3]
 
 
-def test_test_board_carrier_and_flex_tail_zero_drc_errors_and_warnings():
-    """Verify test_board carrier and flex tail subassembly both pass DRC with 0 errors and 0 warnings."""
-    from projects.test_board.provider import TestBoardProvider
+def test_carrier_board_carrier_and_flex_tail_zero_drc_errors_and_warnings():
+    """Verify carrier_board carrier and flex tail subassembly both pass DRC with 0 errors and 0 warnings."""
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(provider.wiring_path)
 
     # 1. Carrier PCB check
@@ -810,7 +810,7 @@ def test_kicad_drc_report_parser_synthetic():
     """Verify KiCadCLI.parse_drc_text parses rules, severities, items, and error counts."""
     from provider.pcb.kicad_cli import KiCadCLI, KiCadDRCSeverity
 
-    sample_report = """** Drc report for test_board.kicad_pcb **
+    sample_report = """** Drc report for carrier_board.kicad_pcb **
 ** Created on 2026-09-20T16:00:00 **
 ** Report includes: Errors, Warnings **
 
@@ -833,7 +833,7 @@ def test_kicad_drc_report_parser_synthetic():
 ** End of Report **
 """
     report = KiCadCLI.parse_drc_text(sample_report)
-    assert report.board_name == "test_board.kicad_pcb"
+    assert report.board_name == "carrier_board.kicad_pcb"
     assert report.violations_count == 2
     assert report.unconnected_count == 1
     assert report.footprint_errors_count == 0

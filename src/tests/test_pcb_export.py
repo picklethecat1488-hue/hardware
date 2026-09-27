@@ -68,6 +68,7 @@ def mock_wiring() -> MagicMock:
     wiring = MagicMock()
     wiring.footprints = [fp1, fp2]
     wiring.nets = [net_vdd, net_gnd]
+    wiring.filter_by_footprints = MagicMock(side_effect=lambda fps: wiring)
     return wiring
 
 
@@ -520,7 +521,7 @@ def test_provider_pcb_output_cad_archive(tmp_path: Path, mock_pcb_config: PCBCon
 
     monkeypatch.chdir(tmp_path)
     mock_prov = MagicMock()
-    mock_prov.name = "test_board"
+    mock_prov.name = "carrier_board"
     mock_prov.targets = ("pcb_unit",)
     mock_prov.manifest = {"pcb_unit": {Section.PCB: {"modes": [Mode.DEFAULT]}}}
     mock_prov.pcb = {}
