@@ -149,7 +149,14 @@ def main() -> None:
 
     db_path = args.db_file if args.db_file.is_absolute() else (repo_root / args.db_file)
     state_path = db_path.with_suffix(".json")
-    markdown_path = repo_root / "BUGS.md"
+    if getattr(args, "markdown_output", None) is not None:
+        markdown_path = (
+            args.markdown_output if args.markdown_output.is_absolute() else (repo_root / args.markdown_output)
+        )
+    elif args.db_file != Path("build/bugs.sqlite"):
+        markdown_path = db_path.parent / "BUGS.md"
+    else:
+        markdown_path = repo_root / "feedback" / "BUGS.md"
 
     is_cli_only = bool(args.add or args.resolve or args.list)
     server = BugReportServer(

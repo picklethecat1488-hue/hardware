@@ -1169,6 +1169,9 @@
     </div>
 
     <div class="header-actions">
+      <button id="btnSyncFeedback" class="quake-btn quake-btn-default" onclick="syncFeedback()" title="Synchronize review feedback with feedback/ directory and merge commit feedback">
+        🔄 Sync Feedback
+      </button>
       <button id="btnVerdictApprove" class="quake-btn quake-btn-green" onclick="setVerdict('APPROVED')" title="Conclude review with Approval (LGTM), export build/CR.md, and release terminal">
         ✓ Approve
       </button>
@@ -1312,6 +1315,13 @@
       <button class="quake-btn quake-btn-gold" onclick="window.close()" style="padding: 8px 24px; font-size: 13px;">
         CLOSE TAB
       </button>
+    </div>
+  </div>
+
+  <div id="feedbackLoadingModal" class="quake-modal-backdrop" style="display:none; justify-content:center; align-items:center; z-index:9999;">
+    <div class="quake-card" style="padding: 24px 32px; text-align: center; border-color: var(--quake-gold); box-shadow: 0 0 20px rgba(255, 184, 0, 0.4); max-width: 450px;">
+      <div style="font-size: 14px; font-weight: bold; color: var(--quake-gold); margin-bottom: 8px;">// SYNCHRONIZING FEEDBACK //</div>
+      <div style="font-size: 12px; color: var(--quake-text-muted); line-height: 1.5;">Scanning feedback/ directory and merging commit reviews...</div>
     </div>
   </div>
 
@@ -2853,6 +2863,35 @@
         }
       } catch (e) {
         logCli("Export failed: " + e.message, "red");
+      }
+    }
+
+    async function syncFeedback() {
+      const modal = document.getElementById("feedbackLoadingModal");
+      if (modal) modal.style.display = "flex";
+      logCli("Synchronizing review feedback with feedback/ directory...", "cyan");
+      try {
+        const res = await fetch("/api/sync_feedback", { method: "POST" });
+        const data = await res.json();
+        if (data.status === "ok") {
+          const stats = data.stats || {};
+          const msg = `Feedback synced: ${stats.merged || 0} commit reviews merged.`;
+          logCli(msg, "green");
+          showToast(msg);
+          await loadSession();
+          renderFilesList();
+          if (state.selectedFile) {
+            renderDiff();
+          }
+        } else {
+          logCli("Sync failed: " + (data.message || "Unknown error"), "red");
+          showToast("Sync failed");
+        }
+      } catch (err) {
+        logCli("Error syncing feedback: " + err.message, "red");
+        showToast("Error syncing feedback");
+      } finally {
+        if (modal) modal.style.display = "none";
       }
     }
 

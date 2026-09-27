@@ -110,6 +110,9 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             case "/api/export":
                 out_path = self.server.save_and_sync()
                 self._send_json({"status": "exported", "path": str(out_path)})
+            case "/api/sync_feedback":
+                stats = self.server.sync_with_feedback_dir()
+                self._send_json({"status": "ok", "stats": stats})
             case "/api/exit":
                 out_path = self.server.save_and_sync()
                 self._send_json({"status": "saved_and_exited", "path": str(out_path)})
@@ -364,7 +367,8 @@ class BugReportServer(ThreadingHTTPServer):
         self.host = host
         self.port = port
         self.repo_root = repo_root or Path.cwd()
-        self.markdown_output = markdown_output or (self.repo_root / "BUGS.md")
+        self.markdown_output = markdown_output or (self.repo_root / "feedback" / "BUGS.md")
+        self.feedback_dir = self.markdown_output.parent
         self.state_file = state_file or (self.repo_root / "build" / "bugs_state.json")
         self.sqlite_file = sqlite_file or (self.repo_root / "build" / "bugs.sqlite")
         self.attachments_dir = attachments_dir or (self.repo_root / "build" / "attachments")
@@ -414,7 +418,7 @@ class BugReportServer(ThreadingHTTPServer):
             seen.add(bug.id)
 
     def _initialize_database(self) -> BugDatabaseModel:
-        """Load existing database state from SQLite/JSON and perform R+M+W sync with BUGS.md."""
+        """Load existing database state from SQLite/JSON and perform R+M+W sync with feedback/ and BUGS.md."""
         db = None
         if not self.fresh:
             if self.sqlite_file.exists():
@@ -428,6 +432,9 @@ class BugReportServer(ThreadingHTTPServer):
                 summary="Hardware engineering defects, PCB layout issues, and reproduction tracking.",
             )
 
+        if not self.fresh and self.feedback_dir.exists():
+            self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, db, self.sqlite_store)
+
         if not self.fresh and self.markdown_output.exists():
             md_db = self.exporter.parse_markdown(self.markdown_output)
             if md_db and md_db.bugs:
@@ -440,7 +447,9 @@ class BugReportServer(ThreadingHTTPServer):
         return db
 
     def sync_with_markdown(self) -> Path:
-        """Perform Read-Modify-Write (R+M+W) sync with BUGS.md and persist to stores."""
+        """Perform Read-Modify-Write (R+M+W) sync with feedback/ and BUGS.md and persist to stores."""
+        if self.feedback_dir.exists():
+            self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
         if self.markdown_output.exists():
             md_db = self.exporter.parse_markdown(self.markdown_output)
             if md_db and md_db.bugs:
@@ -448,12 +457,22 @@ class BugReportServer(ThreadingHTTPServer):
                 self._ensure_unique_bug_ids(self.database)
         return self.save_and_sync()
 
+    def sync_with_feedback_dir(self) -> Dict[str, Any]:
+        """Scan feedback/ directory, detect file renames, merge into SQLite, and update markdown."""
+        stats = self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
+        if self.markdown_output.exists():
+            md_db = self.exporter.parse_markdown(self.markdown_output)
+            if md_db and md_db.bugs:
+                self.database = self.exporter.merge_databases(self.database, md_db)
+        self.save_and_sync()
+        return stats
+
     def save_and_sync(self) -> Path:
-        """Persist bug database to SQLite, JSON, and Markdown."""
+        """Persist bug database to SQLite, JSON, BUGS.md, and individual BUG_<id>.md files."""
         self.database.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         self.sqlite_store.save_database(self.database)
         self.exporter.export_state_json(self.database, self.state_file)
-        out = self.exporter.export_markdown(self.database, self.markdown_output)
+        out = self.exporter.export_markdown(self.database, self.markdown_output, store=self.sqlite_store)
         if self.markdown_output.exists():
             self.markdown_mtime = self.markdown_output.stat().st_mtime
         return out

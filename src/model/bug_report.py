@@ -6,6 +6,7 @@ attachments (logs, screenshots, references), and bug collection management.
 
 from enum import StrEnum
 from typing import Dict, List, Optional
+import uuid as uuid_pkg
 from pydantic import BaseModel, Field
 
 
@@ -54,6 +55,7 @@ class BugReportModel(BaseModel):
     """Complete specification of an engineering bug report."""
 
     id: str
+    uuid: str = Field(default_factory=lambda: str(uuid_pkg.uuid4()))
     title: str
     status: BugStatus = BugStatus.OPEN
     severity: BugSeverity = BugSeverity.MEDIUM
@@ -86,10 +88,17 @@ class BugDatabaseModel(BaseModel):
                 return b
         return None
 
+    def get_bug_by_uuid(self, bug_uuid: str) -> Optional[BugReportModel]:
+        """Find a bug by its unique UUID."""
+        for b in self.bugs:
+            if b.uuid == bug_uuid:
+                return b
+        return None
+
     def add_or_update(self, bug: BugReportModel) -> None:
-        """Add a new bug or update an existing bug matching the ID."""
+        """Add a new bug or update an existing bug matching UUID or ID."""
         for idx, existing in enumerate(self.bugs):
-            if existing.id == bug.id:
+            if existing.uuid == bug.uuid or existing.id == bug.id:
                 self.bugs[idx] = bug
                 return
         self.bugs.append(bug)
