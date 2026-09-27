@@ -231,52 +231,7 @@ def create_flying_probe_hooks(
                 raise ValueError(f"declared_obstacle '{obs.name}' has invalid position_mm: {obs.position_mm}")
 
         if _is_real_physics_client(client):
-            # 2. Setup test fixture clamp rails / vacuum mounting plate (FP-600 fixture mechanics)
-            if not is_flex:
-                clamp_col = p.createCollisionShape(
-                    p.GEOM_BOX, halfExtents=[0.002, 0.046, 0.004], physicsClientId=client
-                )
-                c1 = p.createMultiBody(
-                    baseMass=0,
-                    baseCollisionShapeIndex=clamp_col,
-                    basePosition=[0.032, 0.0, 0.004],
-                    physicsClientId=client,
-                )
-                c2 = p.createMultiBody(
-                    baseMass=0,
-                    baseCollisionShapeIndex=clamp_col,
-                    basePosition=[-0.032, 0.0, 0.004],
-                    physicsClientId=client,
-                )
-                obstacle_ids.extend([c1, c2])
-            else:
-                plate_col = p.createCollisionShape(
-                    p.GEOM_BOX, halfExtents=[0.015, 0.030, 0.002], physicsClientId=client
-                )
-                p_id = p.createMultiBody(
-                    baseMass=0,
-                    baseCollisionShapeIndex=plate_col,
-                    basePosition=[0.0, 0.0, -0.002],
-                    physicsClientId=client,
-                )
-                obstacle_ids.append(p_id)
-
-            for obs in declared_obstacles:
-                # Filter obstacles relevant to this subassembly/board
-                if is_flex and obs.name not in ("J4", "flex_vacuum_plate"):
-                    continue
-                if not is_flex and obs.name in ("J4", "flex_vacuum_plate"):
-                    continue
-
-                half_ext = [d * 1e-3 / 2.0 for d in obs.dimensions_mm]
-                pos = [coord * 1e-3 for coord in obs.position_mm]
-                col_box = p.createCollisionShape(p.GEOM_BOX, halfExtents=half_ext, physicsClientId=client)
-                b_id = p.createMultiBody(
-                    baseMass=0, baseCollisionShapeIndex=col_box, basePosition=pos, physicsClientId=client
-                )
-                obstacle_ids.append(b_id)
-
-            # 3. Create high-speed kinematic Probe A and Probe B needle bodies
+            # High-speed kinematic Probe A and Probe B needle bodies (BUG-152: obstacles removed from board view)
             needle_col_a = p.createCollisionShape(p.GEOM_SPHERE, radius=0.0006, physicsClientId=client)
             needle_col_b = p.createCollisionShape(p.GEOM_SPHERE, radius=0.0006, physicsClientId=client)
 
@@ -430,7 +385,8 @@ def create_flying_probe_hooks(
         if step_idx >= (steps_per_test * num_tests - 1):
             report_md = render_markdown_test_report(target_label, test_steps, step_idx, steps_per_test * num_tests)
             sim_state["last_report"] = report_md
-            out_rpt = Path(f"build/test_board/{target_label}_flying_probe_report.md")
+            proj_folder = getattr(provider, "name", "carrier_board")
+            out_rpt = Path(f"build/{proj_folder}/{target_label}_flying_probe_report.md")
             out_rpt.parent.mkdir(parents=True, exist_ok=True)
             out_rpt.write_text(report_md, encoding="utf-8")
             return f"All {num_tests} flying probe test points completed successfully"

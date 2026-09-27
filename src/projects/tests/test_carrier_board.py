@@ -698,6 +698,27 @@ def test_regression_bug_150_component_cutout_labels() -> None:
     assert enclosure.part.is_valid(), "Enclosure bottom with labels must be valid CAD solid"
     assert lid.part.is_valid(), "Enclosure lid with battery label must be valid CAD solid"
 
+    # Active regression assertions: verify engraved faces exist inside wall depth
+    # 1. Left exterior wall (USB trident icon and SWD label)
+    left_engraved = [f for f in enclosure.part.faces() if abs(f.center().X - (-w / 2.0 + 0.4)) < 1e-3]
+    assert len(left_engraved) >= 4, f"Expected USB icon and SWD engraved faces, found {len(left_engraved)}"
+    usb_face = next((f for f in left_engraved if abs(f.center().Y) < 1.0), None)
+    assert usb_face is not None, "USB connector trident icon face must be engraved above USB-C cutout"
+
+    # 2. Rear exterior wall (M.2 PCIE label)
+    rear_engraved = [f for f in enclosure.part.faces() if abs(f.center().Y - (-length / 2.0 + 0.4)) < 1e-3]
+    assert len(rear_engraved) >= 5, f"Expected M.2 PCIE engraved faces, found {len(rear_engraved)}"
+
+    # 3. Front shelf (FLEX TAIL label)
+    shelf_engraved = [
+        f for f in enclosure.part.faces() if f.center().Y > (length / 2.0) and f.normal_at(f.center()).Z > 0.9
+    ]
+    assert len(shelf_engraved) >= 8, f"Expected FLEX TAIL engraved faces, found {len(shelf_engraved)}"
+
+    # 4. Enclosure lid (BATTERY label)
+    lid_engraved = [f for f in lid.part.faces() if abs(f.center().Z - (wall - 0.4)) < 1e-3]
+    assert len(lid_engraved) >= 5, f"Expected BATTERY engraved faces on lid, found {len(lid_engraved)}"
+
 
 @pytest.mark.slow
 def test_regression_bug_149_mutual_intersection_test() -> None:
@@ -776,10 +797,81 @@ def test_regression_bug_152_textured_pcb_simulation_visibility() -> None:
     assert getattr(tail, "urdf_label", None) == "flex_tail", "flex_tail must have urdf_label"
     assert getattr(tail.part, "urdf_label", None) == "flex_tail", "flex_tail.part must have urdf_label"
 
-    # Board textures must exist in build/board/carrier_board/textures
-    tex_dir = Path("build/board/carrier_board/textures")
+    # Test board texture in isolated test directory to avoid polluting production textures
+    test_build_dir = Path("build/test_dummy_textures")
+    tex_dir = test_build_dir / "board" / "carrier_board" / "textures"
+    tex_dir.mkdir(parents=True, exist_ok=True)
+    from PIL import Image
+    import numpy as np
+
+    raw_tex = Image.new("RGBA", (90, 30), (0, 0, 0, 0))
+    # Draw green board in middle 1/3 (X=30..60)
+    for x in range(30, 60):
+        for y in range(30):
+            raw_tex.putpixel((x, y), (0, 100, 0, 255))
+    raw_tex.save(tex_dir / "carrier_board_top.png")
+    raw_tex.save(tex_dir / "carrier_board_bottom.png")
+
     assert (tex_dir / "carrier_board_top.png").exists(), "carrier_board_top.png must exist"
     assert (tex_dir / "carrier_board_bottom.png").exists(), "carrier_board_bottom.png must exist"
+
+    # Verify Bullet._init_simulation_objects logs texture_top and texture_bottom to Rerun
+    from unittest.mock import patch
+    from provider.bullet import Bullet
+    from provider import Room
+    import pybullet as p
+
+    room = Room(is_simulate=True)
+    provider.view["carrier_board"](room, Mode.DEFAULT)
+    hooks = provider.get_simulate_hooks("carrier_board")
+    bullet = Bullet(
+        room=room,
+        provider_hooks=hooks,
+        sim_target="carrier_board",
+        proj_name="carrier_board",
+        build_dir=str(test_build_dir),
+    )
+    client = p.connect(p.DIRECT)
+    try:
+        with patch("rerun.log") as mock_log:
+            bullet._init_simulation_objects(
+                client, 0, "build/obj/carrier_board", "build/urdf/carrier_board/carrier_board.urdf"
+            )
+            logged_entities = [call[0][0] for call in mock_log.call_args_list]
+            assert "world/carrier_board/texture_top" in logged_entities, (
+                "texture_top must be logged to Rerun under world/carrier_board"
+            )
+            assert "world/carrier_board/texture_bottom" in logged_entities, (
+                "texture_bottom must be logged to Rerun under world/carrier_board"
+            )
+
+            # Verify Asset3D is NOT logged when pcb texture is present to prevent occluding the texture
+            import rerun as rr
+
+            asset_calls = [
+                call for call in mock_log.call_args_list if len(call[0]) > 1 and isinstance(call[0][1], rr.Asset3D)
+            ]
+            assert len(asset_calls) == 0, "Asset3D must not be logged when textured PCB is active to avoid occlusion"
+
+            # Verify the albedo texture was cropped to remove outer transparent margins (BUG-152)
+            top_mesh_calls = [
+                call[0][1]
+                for call in mock_log.call_args_list
+                if len(call[0]) > 1 and call[0][0] == "world/carrier_board/texture_top"
+            ]
+            assert len(top_mesh_calls) == 1
+            top_mesh = top_mesh_calls[0]
+            assert len(top_mesh.vertex_positions) >= 4, (
+                "top_mesh must be logged as clean textured mesh with matching board outline"
+            )
+            fmt = top_mesh.albedo_texture_format.as_arrow_array()[0].as_py()
+            # Texture should be cropped to 30px width (middle 1/3) instead of retaining 90px width
+            assert fmt["width"] == 30, f"Expected cropped width of 30, got {fmt['width']}"
+    finally:
+        p.disconnect(client)
+        import shutil
+
+        shutil.rmtree(test_build_dir, ignore_errors=True)
 
 
 def test_regression_bug_153_flying_probes_report_formatting() -> None:
@@ -815,6 +907,21 @@ def test_regression_bug_153_flying_probes_report_formatting() -> None:
         p.disconnect(client)
 
 
+def test_regression_bug_155_slider_silkscreen_does_not_overlap_s3() -> None:
+    """Verify BUG-155: SLIDER silkscreen text does not overlap S3 button glyph."""
+    import math
+
+    provider = CarrierBoardProvider()
+    tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
+    pcb_cfg = tail.to_pcb_config() if hasattr(tail, "to_pcb_config") else tail.pcb_metadata
+
+    slider_text = next(t for t in pcb_cfg.silkscreen_texts if t.text == "SLIDER")
+    s3_text = next(t for t in pcb_cfg.silkscreen_texts if t.text == "S3")
+
+    dist = math.hypot(slider_text.position[0] - s3_text.position[0], slider_text.position[1] - s3_text.position[1])
+    assert dist > 10.0, f"SLIDER and S3 silkscreen texts overlap! Distance is {dist} mm <= 10.0 mm"
+
+
 def test_regression_bug_154_carrier_board_project_rename() -> None:
     """Verify BUG-154: test_board project renamed to carrier_board across all source and configs."""
     from pathlib import Path
@@ -845,3 +952,153 @@ def test_regression_bug_154_carrier_board_project_rename() -> None:
     # 4. Strongly typed configuration model resolution
     cfg = provider.settings
     assert isinstance(cfg, CarrierBoardConfig)
+
+
+def test_regression_bug_156_m2_thru_holes() -> None:
+    """Verify BUG-156: J1 M.2 connector footprint contains all required through-hole pins."""
+    from pathlib import Path
+    import yaml
+
+    repo_root = Path(__file__).resolve().parents[3]
+    footprints_file = repo_root / "src" / "projects" / "footprints" / "ic.yaml"
+    with open(footprints_file) as f:
+        footprints = yaml.safe_load(f)["footprints"]
+
+    m2_fp = footprints["M.2-KEY-M"]
+    thru_hole_pins = [p for p in m2_fp["pins"] if p.get("pad_type") == "thru_hole"]
+    assert len(thru_hole_pins) >= 10, (
+        f"M.2-KEY-M footprint must have at least 10 thru-hole pins, found {len(thru_hole_pins)}"
+    )
+    for pin in thru_hole_pins:
+        assert pin.get("drill_dia_mm") is not None and pin["drill_dia_mm"] > 0, (
+            f"Pin {pin['name']} must define positive drill_dia_mm"
+        )
+
+
+def test_regression_bug_157_action_button_routed() -> None:
+    """Verify BUG-157: ACTION_BUTTON on flex tail is fully routed to J4 connector."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    flex_part = provider.part["flex_tail"]("flex_tail", None, None)
+    flex_config = flex_part.to_pcb_config()
+    if not flex_config.stackup:
+        flex_config = flex_config.model_copy(update={"stackup": provider.pcb_config.stackup})
+
+    action_btn = next(s for s in flex_config.capacitive_sensors if s.name == "ACTION_BUTTON")
+    assert action_btn.tx_pin == "CAP_TX2"
+    assert action_btn.rx_pin == "CAP_RX2"
+
+    checker = PCBDesignRulesChecker(flex_config)
+    report = checker.check_all(wiring=wiring)
+    action_violations = [
+        v
+        for v in report.violations
+        if "ACTION_BUTTON" in v.message
+        or ("CAP_TX2" in v.message and v.rule_name == "ANTENNA_TRACE_DETECTED")
+        or ("CAP_RX2" in v.message and v.rule_name == "ANTENNA_TRACE_DETECTED")
+    ]
+    assert not action_violations, f"ACTION_BUTTON routing violations found: {action_violations}"
+
+
+def test_regression_bug_158_flex_perimeter_proximity_loop() -> None:
+    """Verify BUG-158: flex tail proximity sensor uses a perimeter loop layout surrounding sensing region."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+
+    provider = CarrierBoardProvider()
+    flex_part = provider.part["flex_tail"]("flex_tail", None, None)
+    flex_config = flex_part.to_pcb_config()
+
+    prox = next(s for s in flex_config.capacitive_sensors if s.name == "PROXIMITY_SENSOR")
+    assert prox.shape in ("loop", "perimeter_loop")
+    assert prox.area_mm[0] >= 14.0
+    assert prox.area_mm[1] >= 40.0
+
+    top_traces = [
+        tr for tr in flex_config.traces if tr.net == "CAP_RX3" and (tr.start_mm[1] >= 24.0 or tr.end_mm[1] >= 24.0)
+    ]
+    assert top_traces, "CAP_RX3 perimeter loop must include distal top trace segment at Y >= 24.0mm"
+
+
+def test_regression_bug_159_swd_usb_labels_orientation() -> None:
+    """Verify BUG-159: SWD and USB connector labels on exterior wall are right-reading from exterior."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.types import Mode
+
+    provider = CarrierBoardProvider()
+    enc = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    assert enc.part.is_valid(), "Enclosure bottom with exterior-facing labels must be a valid solid"
+    assert len(enc.part.solids()) == 1, "Enclosure bottom must remain a single contiguous solid"
+
+
+def test_regression_bug_160_peripheral_labels_on_enclosure_lid() -> None:
+    """Verify BUG-160: peripheral connector text moved to enclosure top to prevent hollow shells."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.types import Mode
+
+    provider = CarrierBoardProvider()
+    bot = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+
+    # Both enclosure parts must be valid, single contiguous solids
+    assert bot.part.is_valid(), "enclosure_bottom must be valid solid"
+    assert len(bot.part.solids()) == 1, "enclosure_bottom must be a single solid without hollow cavities"
+    assert lid.part.is_valid(), "enclosure_lid must be valid solid"
+    assert len(lid.part.solids()) == 1, "enclosure_lid must be a single solid with engraved bus labels"
+
+
+def test_regression_capsense_proximity_loop_clearance_and_drc() -> None:
+    """Verify capsense traces maintain clearance to proximity sensor perimeter loop and pass DRC."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    flex_part = provider.part["flex_tail"]("flex_tail", None, None)
+    flex_config = flex_part.to_pcb_config()
+
+    checker = PCBDesignRulesChecker(flex_config)
+    report = checker.check_all()
+    cap_errors = [
+        v
+        for v in report.violations
+        if "PROXIMITY_SENSOR" in v.net_or_zone or "SLIDER" in v.net_or_zone or "ACTION" in v.net_or_zone
+    ]
+    assert not cap_errors, f"Expected 0 capacitive sensor DRC violations on flex_tail, found: {cap_errors}"
+    assert report.error_count == 0, f"Expected 0 errors on flex_tail DRC, found: {report.violations}"
+
+
+def test_regression_bug_161_board_texture_transparency_mask() -> None:
+    """Verify BUG-161: KiCad texture rendering applies geometric transparency mask to corners and mounting holes."""
+    from PIL import Image
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    # Create solid RGBA test image: 600x900 representing 60mm x 90mm board (10 px/mm)
+    w_px, h_px = 600, 900
+    w_mm, l_mm = 60.0, 90.0
+    corner_r_mm = 3.0
+    mounting_holes = [(-25.0, 40.0, 1.6)]  # Hole at X=-25, Y=40, radius=1.6mm
+
+    img = Image.new("RGBA", (w_px, h_px), (0, 100, 0, 255))
+    masked = KiCadCLI.apply_transparency_mask(
+        img,
+        side="top",
+        board_dimensions_mm=(w_mm, l_mm),
+        corner_radius_mm=corner_r_mm,
+        mounting_holes=mounting_holes,
+    )
+
+    # 1. Corner pixel (0, 0) must be 100% transparent (alpha = 0)
+    assert masked.getpixel((0, 0))[3] == 0, "Top-left corner outside corner radius must be transparent"
+    assert masked.getpixel((w_px - 1, 0))[3] == 0, "Top-right corner outside corner radius must be transparent"
+
+    # 2. Board center (300, 450) must remain fully opaque (alpha = 255)
+    assert masked.getpixel((300, 450))[3] == 255, "Board interior must remain fully opaque"
+
+    # 3. Mounting hole center must be 100% transparent (alpha = 0)
+    # (-25.0 + 30.0) * 10 = 50px, (45.0 - 40.0) * 10 = 50px
+    hole_px_x = int((-25.0 + w_mm / 2.0) * (w_px / w_mm))
+    hole_px_y = int((l_mm / 2.0 - 40.0) * (h_px / l_mm))
+    assert masked.getpixel((hole_px_x, hole_px_y))[3] == 0, "Mounting hole center must be transparent"

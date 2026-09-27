@@ -2918,6 +2918,39 @@ footprints:
       - 1.2
       - 1.2
       drill_dia_mm: 0.7
+    - name: NC1
+      position:
+      - -4.0
+      - 0.0
+      side: left
+      pad_type: thru_hole
+      pad_shape: circle
+      pad_size_mm:
+      - 1.2
+      - 1.2
+      drill_dia_mm: 0.7
+    - name: NC2
+      position:
+      - -2.0
+      - 0.0
+      side: left
+      pad_type: thru_hole
+      pad_shape: circle
+      pad_size_mm:
+      - 1.2
+      - 1.2
+      drill_dia_mm: 0.7
+    - name: NC3
+      position:
+      - 0.0
+      - 0.0
+      side: left
+      pad_type: thru_hole
+      pad_shape: circle
+      pad_size_mm:
+      - 1.2
+      - 1.2
+      drill_dia_mm: 0.7
     - name: PETp0
       position:
       - 2.0

@@ -81,6 +81,38 @@ def _dist_segment_to_segment(
     )
 
 
+def _dist_segment_to_polygon(
+    p0: Tuple[float, float],
+    p1: Tuple[float, float],
+    poly: List[Tuple[float, float]],
+) -> float:
+    """Compute shortest Euclidean distance from segment (p0, p1) to polygon poly."""
+    n = len(poly)
+    if n == 0:
+        return float("inf")
+    # Check if either endpoint is inside the polygon
+    for px, py in (p0, p1):
+        inside = False
+        for i in range(n):
+            q1x, q1y = poly[i]
+            q2x, q2y = poly[(i + 1) % n]
+            if ((q1y > py) != (q2y > py)) and (px < (q2x - q1x) * (py - q1y) / (q2y - q1y + 1e-12) + q1x):
+                inside = not inside
+        if inside:
+            return 0.0
+
+    min_dist = float("inf")
+    for i in range(n):
+        q0 = poly[i]
+        q1_pt = poly[(i + 1) % n]
+        d = _dist_segment_to_segment(p0, p1, q0, q1_pt)
+        if d < min_dist:
+            min_dist = d
+            if min_dist == 0.0:
+                break
+    return min_dist
+
+
 def _get_pin_absolute_pos(fp: Any, pin: Any) -> Tuple[float, float]:
     """Compute absolute (x, y) coordinates for a footprint pin taking rotation into account."""
     rot_deg = fp.rotation[2] if hasattr(fp, "rotation") and len(fp.rotation) >= 3 else 0.0
@@ -1875,6 +1907,83 @@ class PCBDesignRulesChecker:
                                 )
                             )
 
+        # 8. Check trace-to-capacitive-sensor copper collisions and clearance violations
+        target_shape = getattr(self.config, "shape_ref", None)
+        sensors = [
+            s
+            for s in getattr(self.config, "capacitive_sensors", [])
+            if (target_shape and getattr(s, "shape_ref", None) == target_shape)
+            or (self.is_flex and getattr(s, "shape_ref", None) in (None, "flex_tail"))
+            or (not self.is_flex and getattr(s, "shape_ref", None) not in ("flex_tail",))
+        ]
+        for s in sensors:
+            s_layer = getattr(s, "layer", "F.Cu")
+            s_center = getattr(s, "center_mm", (0.0, 0.0))
+            from provider.pcb.capacitive import CapacitiveSensingGenerator
+
+            s_geom = CapacitiveSensingGenerator(s, center=s_center).generate()
+            sensor_copper: List[Tuple[str, List[Tuple[float, float]]]] = []
+            if s.tx_pin:
+                for poly in s_geom.tx_fingers:
+                    sensor_copper.append((s.tx_pin, poly))
+            if s.rx_pin:
+                for poly in s_geom.rx_fingers:
+                    sensor_copper.append((s.rx_pin, poly))
+            if getattr(s, "drive_shield", False) and s_geom.guard_ring:
+                sensor_copper.append((getattr(s, "shield_net", "GND"), s_geom.guard_ring))
+
+            for s_net, poly in sensor_copper:
+                poly_min_x = min(pt[0] for pt in poly)
+                poly_max_x = max(pt[0] for pt in poly)
+                poly_min_y = min(pt[1] for pt in poly)
+                poly_max_y = max(pt[1] for pt in poly)
+
+                for tr in traces:
+                    if tr.layer != s_layer or tr.net == s_net:
+                        continue
+                    margin = (tr.width_mm / 2.0) + clearance_default
+                    if (
+                        poly_min_x - margin > max(tr.start_mm[0], tr.end_mm[0])
+                        or poly_max_x + margin < min(tr.start_mm[0], tr.end_mm[0])
+                        or poly_min_y - margin > max(tr.start_mm[1], tr.end_mm[1])
+                        or poly_max_y + margin < min(tr.start_mm[1], tr.end_mm[1])
+                    ):
+                        continue
+
+                    dist = _dist_segment_to_polygon(tr.start_mm, tr.end_mm, poly)
+                    copper_thresh = tr.width_mm / 2.0
+                    if dist < copper_thresh - 1e-4:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="TRACE_SHORT_CIRCUIT",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=f"{s.name}.{s_net}<->{tr.net}",
+                                description=(
+                                    f"Trace on net '{tr.net}' on layer '{tr.layer}' collides with capacitive sensor "
+                                    f"'{s.name}' on net '{s_net}' (dist: {dist:.3f}mm < copper threshold {copper_thresh:.3f}mm)"
+                                ),
+                                actual_value=dist,
+                                expected_range=(copper_thresh, 100.0),
+                                location=(tr.start_mm[0], tr.start_mm[1], 0.0),
+                            )
+                        )
+                    elif dist < copper_thresh + clearance_default - 1e-4:
+                        violations.append(
+                            DRCViolation(
+                                rule_name="CLEARANCE_VIOLATION",
+                                severity=DRCSeverity.ERROR,
+                                net_or_zone=f"{s.name}.{s_net}<->{tr.net}",
+                                description=(
+                                    f"Clearance violation between trace on net '{tr.net}' on layer '{tr.layer}' "
+                                    f"and capacitive sensor '{s.name}' on net '{s_net}' "
+                                    f"(dist: {dist:.3f}mm < required {copper_thresh + clearance_default:.3f}mm)"
+                                ),
+                                actual_value=dist,
+                                expected_range=(copper_thresh + clearance_default, 100.0),
+                                location=(tr.start_mm[0], tr.start_mm[1], 0.0),
+                            )
+                        )
+
         return violations
 
     def check_antennae(self, wiring: Any) -> List[DRCViolation]:
@@ -1944,6 +2053,12 @@ class PCBDesignRulesChecker:
                     pin_targets.setdefault(s.tx_pin, []).append((scx - sw / 2.0, scy, s_layer, term_r))
                 if s.rx_pin:
                     pin_targets.setdefault(s.rx_pin, []).append((scx + sw / 2.0, scy, s_layer, term_r))
+            elif s.shape in ("loop", "perimeter_loop"):
+                loop_r = max(sw, sl, 1.0)
+                if s.tx_pin:
+                    pin_targets.setdefault(s.tx_pin, []).append((scx, scy, s_layer, loop_r))
+                if s.rx_pin:
+                    pin_targets.setdefault(s.rx_pin, []).append((scx, scy, s_layer, loop_r))
             else:
                 if s.tx_pin:
                     pin_targets.setdefault(s.tx_pin, []).append((scx - sw / 2.0, scy, s_layer, term_r))

@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-09-26 20:21:28 UTC` |
-| **Total Issues** | `152` |
-| **Open Issues** | `0` |
-| **Resolved / Closed** | `152 (100%)` |
+| **Report Date** | `2026-09-27 05:23:45 UTC` |
+| **Total Issues** | `163` |
+| **Open Issues** | `1` |
+| **Resolved / Closed** | `162 (99%)` |
 
 ## Executive Summary
 
@@ -20,18 +20,18 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 | Severity | Count | Meaning |
 | :--- | :---: | :--- |
 | **`[CRITICAL]`** | 3 | System crashes, build failures, blockages, or electrical shorts. |
-| **`[HIGH]`** | 8 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
-| **`[MEDIUM]`** | 137 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
-| **`[LOW]`** | 4 | Minor aesthetic imperfections or documentation notes. |
+| **`[HIGH]`** | 11 | Major functional defects, broken routing, DRC violations, or unphysical behavior. |
+| **`[MEDIUM]`** | 144 | Silkscreen collisions, layout sub-optimality, or visual clipping. |
+| **`[LOW]`** | 5 | Minor aesthetic imperfections or documentation notes. |
 
 ## Issues by Category
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 103 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`PCB`** | 109 | Schematics, routing, footprints, nets, DRC, silkscreen. |
 | **`CAD`** | 22 | 3D geometry, step models, enclosures, mechanical assembly. |
-| **`SIMULATION`** | 7 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
-| **`INFRASTRUCTURE`** | 14 | Build tooling, compilers, test runners, headless tools. |
+| **`SIMULATION`** | 10 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
+| **`INFRASTRUCTURE`** | 15 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
 
 ## Issue Checklist
@@ -179,15 +179,26 @@ Automated issue tracking and resolution registry for hardware CAD, PCB engine, a
 - [x] **`[MEDIUM]`** [#BUG-142](#bug-142): No cutout for PCIE connector `[enclosure_bottom]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-143](#bug-143): Peripheral cutouts should all be the same size `[enclosure_bottom]` (`RESOLVED`)
 - [x] **`[CRITICAL]`** [#BUG-144](#bug-144): Cutout region for J1 is missing from the design `[enclosure_bottom]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-145](#bug-145): Extend battery holder over the battery connector cutout `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-145](#bug-145): Simplify battery holder shape, retain cover over the battery cover hole `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-146](#bug-146): Remove MIPI camera routing `[carrier_board]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-147](#bug-147): Change flex ribbon design `[carrier_board]` (`RESOLVED`)
 - [x] **`[CRITICAL]`** [#BUG-148](#bug-148): Flex ribbon support does not connect with main enclosure button `[enclosure_bottom]` (`RESOLVED`)
 - [x] **`[HIGH]`** [#BUG-149](#bug-149): Mutual intersection test `[enclosure_bottom, enclosure_top]` (`RESOLVED`)
 - [x] **`[HIGH]`** [#BUG-150](#bug-150): Component cutouts missing labels `[enclosure_bottom]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-151](#bug-151): Git_utils.py shows as binary `[bug_report]` (`RESOLVED`)
-- [x] **`[MEDIUM]`** [#BUG-152](#bug-152): Textured PCB ain't visible (`RESOLVED`)
+- [x] **`[HIGH]`** [#BUG-152](#bug-152): Textured PC still ain't visible (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-153](#bug-153): Bad formatting in flying probes report (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-154](#bug-154): Rename test_board project to carrier_board `[test_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-155](#bug-155): "SLIDER" text slightly overlaps "S3" `[flex_tail]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-156](#bug-156): J1 is missing thru holes `[carrier_board]` (`RESOLVED`)
+- [x] **`[HIGH]`** [#BUG-157](#bug-157): Action button isn't routed! `[flex_tail]` (`RESOLVED`)
+- [x] **`[HIGH]`** [#BUG-158](#bug-158): Flex tail layout needs revision `[flex_tail]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-159](#bug-159): SWD and USB connector text is reversed (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-160](#bug-160): Connector text on right side of enclosure bottom will form a hollow shell `[enclosure_bottom, enclosure_top]` (`RESOLVED`)
+- [ ] **`[LOW]`** [#BUG-161](#bug-161): Create feedback/ directory for agentic review feedback `[code_review, bug_report]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-162](#bug-162): The flying probes test for flex tail is showing the carrier board PCB `[flex_tail]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-163](#bug-163): The flying probes test for carrier board is making contact with solder mask regions `[carrier_board]` (`RESOLVED`)
+- [x] **`[MEDIUM]`** [#BUG-164](#bug-164): Carrier board has multiple component designators `[carrier_board]` (`RESOLVED`)
 
 ## Detailed Issue Log
 
@@ -3761,18 +3772,25 @@ Aligned rear wall cutout for J1 using Plane.XZ.offset(length / 2.0) at (0, -leng
 
 ---
 
-### <a id="bug-145"></a> 🟢 `[BUG-145]` Extend battery holder over the battery connector cutout
+### <a id="bug-145"></a> 🟢 `[BUG-145]` Simplify battery holder shape, retain cover over the battery cover hole
 
 - **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `CAD`
 - **Component**: `carrier_board`
 - **Created**: `2026-09-26 17:37:44 UTC`
-- **Resolved**: `2026-09-26 20:21:12 UTC`
+- **Resolved**: `2026-09-27 02:14:09 UTC`
 
 #### Description
 
+Reopened ! The shape looks weird. Can we make the battery holder shape out of a single rounded rectangle instead of joining multiple rounded rectangles together
+
 In the current design, the battery wire will be visible from the top of the board. There is no need for this, extend the battery mount and cover so that it is not visible when the cover is installed.
+
+#### Behavior Comparison
+
+- **Expected**: The battery holder is created from 3 rounded rectangles
+- **Actual**: The battery holder is created from 1 rounded rectangles
 
 #### Attachments & References
 
@@ -3782,7 +3800,7 @@ In the current design, the battery wire will be visible from the top of the boar
 
 #### Resolution Notes
 
-Extended battery holder over J13 cutout in provider.py with world coordinate alignment and 0.4mm clearance; verified 0 mutual intersection.
+Simplified battery holder shape to a single unified rounded rectangle enclosing both pouch and J13 connector pass-through; extended battery mount and cover to completely conceal wiring.
 
 ---
 
@@ -3924,17 +3942,21 @@ Updated git_utils.py to detect git binary diff lines and prevent git_utils.py fr
 
 ---
 
-### <a id="bug-152"></a> 🟢 `[BUG-152]` Textured PCB ain't visible
+### <a id="bug-152"></a> 🟢 `[BUG-152]` Textured PC still ain't visible
 
 - **Status**: `RESOLVED`
-- **Severity**: `MEDIUM`
+- **Severity**: `HIGH`
 - **Category**: `SIMULATION`
 - **Created**: `2026-09-26 18:15:08 UTC`
-- **Resolved**: `2026-09-26 20:21:26 UTC`
+- **Resolved**: `2026-09-27 05:23:35 UTC`
 
 #### Description
 
-When I run the flying probes test, the textured PCB ain't visible in the world, only the probes are. Screenshot attached
+Reopened ! not resolved
+
+When I run the flying probes test, the textured PCB ain't visible in the world, only the probes are. Screenshot attached:
+- Remove the obstacles from the board
+- Show only the textured PCB surface generated by kicad_cli over the board
 
 #### Reproduction Steps
 
@@ -3962,10 +3984,12 @@ pybullet build time: Oct 20 2025 08:05:00
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [pasted_screenshot_1790446532263.png](build/attachments/pasted_screenshot_1790446532263.png) | Pasted screenshot |
+| `screenshot` | [pasted_screenshot_1790472643701.png](build/attachments/pasted_screenshot_1790472643701.png) | Pasted screenshot |
+| `screenshot` | [pasted_screenshot_1790478828337.png](build/attachments/pasted_screenshot_1790478828337.png) | Pasted screenshot |
 
 #### Resolution Notes
 
-Scaled Rerun PCB transform by 0.001 to match PyBullet meters and resolved textured mesh label mapping.
+Tessellated CAD planar faces directly to align textured PCB mesh with exact board outline and corrected UV coordinate mapping.
 
 ---
 
@@ -3993,5 +4017,325 @@ Probe Clearance: Minimum vertical flight height $\ge 15.0,\text{mm}$ above all b
 #### Resolution Notes
 
 Cleaned up flying_probe_report.md.j2 replacing corrupted LaTeX escapes with standard Unicode characters and purged MIPI references.
+
+---
+
+### <a id="bug-154"></a> 🟢 `[BUG-154]` Rename test_board project to carrier_board
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `GENERAL`
+- **Component**: `test_board`
+- **Created**: `2026-09-26 21:04:32 UTC`
+- **Resolved**: `2026-09-27 02:14:13 UTC`
+
+#### Description
+
+Rename src/projects/test_board project to src/projects/carrier_board, and update all source documentation and code references
+
+#### Resolution Notes
+
+Renamed test_board package to carrier_board across source files, configs, documentation, and manifest with zero backward compatibility shims.
+
+---
+
+### <a id="bug-155"></a> 🟢 `[BUG-155]` "SLIDER" text slightly overlaps "S3"
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `flex_tail`
+- **Created**: `2026-09-26 21:18:49 UTC`
+- **Resolved**: `2026-09-27 02:14:15 UTC`
+
+#### Description
+
+Pasted a screenshot from the texture. Ensure these glyphs do not overlap each other.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790457630983.png](build/attachments/pasted_screenshot_1790457630983.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Repositioned SLIDER silkscreen text to (0.0, 11.5) to maintain full clearance (>14mm) from S3 button silkscreen glyph.
+
+---
+
+### <a id="bug-156"></a> 🟢 `[BUG-156]` J1 is missing thru holes
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-27 01:33:20 UTC`
+- **Resolved**: `2026-09-27 02:14:17 UTC`
+
+#### Description
+
+J1 is missing thru holes on the PCB. The connector won't be insertable into the mount point unless all the thru holes are present.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790472825887.png](build/attachments/pasted_screenshot_1790472825887.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Added NC1, NC2, and NC3 thru-hole pins to M.2-KEY-M footprint in ic.yaml, ensuring all 10 thru-hole pins have valid pads and drill diameters.
+
+---
+
+### <a id="bug-157"></a> 🟢 `[BUG-157]` Action button isn't routed!
+
+- **Status**: `RESOLVED`
+- **Severity**: `HIGH`
+- **Category**: `PCB`
+- **Component**: `flex_tail`
+- **Created**: `2026-09-27 01:36:34 UTC`
+- **Resolved**: `2026-09-27 02:14:19 UTC`
+
+#### Description
+
+Attached screenshot: The action button on flex tail isn't being routed to the J4 flex connector.
+
+#### Execution / Console Logs
+
+```text
+$ python src/config.py 'carrier_board/*'
+pybullet build time: Oct 20 2025 08:05:00
+⚙️ Configuring carrier_board/route 
+⚡ Auto-routed carrier: 1545 trace segments (4204.85 mm total) and 407 vias. 
+⚡ Auto-routed flex: 44 trace segments (206.13 mm total) and 0 vias. 
+💾 Persisted routing to /Users/daparker/gh/hardware/src/projects/carrier_board/routing.yaml and .env 
+⚙️ Saved environment to .env 
+✔ Done Configuring...
+(cq) 
+
+$ python src/view.py carrier_board/flex_tail:pcb
+pybullet build time: Oct 20 2025 08:05:00
+🖥️ Viewing KiCad file: /Users/daparker/gh/hardware/build/board/carrier_board/flex_tail.kicad_pcb 
+✨ Opened in VS Code (KiCode): flex_tail.kicad_pcb 
+👁️ Showing carrier_board_flex_tail_pcb 
+▶ + 
+✔ Done Visualizing...
+(cq)
+```
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790473011710.png](build/attachments/pasted_screenshot_1790473011710.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Updated ACTION_BUTTON configuration to interdigital shape with CAP_TX2 and CAP_RX2 nets; fully routed both traces from S5 terminals to ACTION_BUTTON terminals at (-4.0, 18.0) and (4.0, 18.0).
+
+---
+
+### <a id="bug-158"></a> 🟢 `[BUG-158]` Flex tail layout needs revision
+
+- **Status**: `RESOLVED`
+- **Severity**: `HIGH`
+- **Category**: `PCB`
+- **Component**: `flex_tail`
+- **Created**: `2026-09-27 01:42:13 UTC`
+- **Resolved**: `2026-09-27 05:23:37 UTC`
+
+#### Description
+
+The proximity sensor region on the flex tail will have a low detection range, so change the flex layout to a perimeter loop layout. Diagram pasted below:
+```
+ ┃     
+ ┃     +----------------------------------------------------------------------------------+
+ ┃     |  ======================== PERIMETER PROXIMITY SENSOR LOOP =====================  |
+ ┃     |  ||                                                                          ||  |
+ ┃     |  ||   +------------------------------------------------------------------+   ||  |
+ ┃     |  ||   |                     CLEARANCE / SHIELD RING                      |   ||  |
+ ┃     |  ||   |   +----------------------------------------------------------+   |   ||  |
+ ┃     |  ||   |   |                                                          |   |   ||  |
+ ┃     |  ||   |   |               INNER TOUCH SENSING REGION                 |   |   ||  |
+ ┃     |  ||   |   |                                                          |   |   ||  |
+ ┃     |  ||   |   |     [ S1 ]     [ S2 ]     [ S3 ]     [ S4 ]     [ S5 ]   |   |   ||  |
+ ┃     |  ||   |   |    (--- Capacitive Slider Electrode Array ---)           |   |   ||  |
+ ┃     |  ||   |   |                                                          |   |   ||  |
+ ┃     |  ||   |   |                     [ ACTION BUTTON ]                    |   |   ||  |
+ ┃     |  ||   |   |                                                          |   |   ||  |
+ ┃     |  ||   |   +----------------------------------------------------------+   |   ||  |
+ ┃     |  ||   |                                                                  |   ||  |
+ ┃     |  ||   +------------------------------------------------------------------+   ||  |
+ ┃     |  ||                                                                          ||  |
+ ┃     |  ===============================+        +=====================================  |
+ ┃     +---------------------------------|        |---------------------------------------+
+ ┃                                       |        |  <-- Matched-Impedance Feedline
+ ┃                                    [ PROX_SENSE ]     to Controller (e.g. Azoteq IQS7211A)
+ ┃   ──────
+```
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790478673311.png](build/attachments/pasted_screenshot_1790478673311.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Revised flex tail layout to perimeter proximity sensor loop enclosing touch sensing region with >=0.5mm clearance corridors for traces.
+
+---
+
+### <a id="bug-159"></a> 🟢 `[BUG-159]` SWD and USB connector text is reversed
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Created**: `2026-09-27 01:56:46 UTC`
+- **Resolved**: `2026-09-27 02:14:24 UTC`
+
+#### Description
+
+Attached screenshot. The SWD and USB connector markers appear reversed
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790474255304.png](build/attachments/pasted_screenshot_1790474255304.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Reoriented left wall engraving sketch plane to an exterior-facing plane with normal pointing outward, ensuring SWD text and USB trident icon are right-reading from the exterior.
+
+---
+
+### <a id="bug-160"></a> 🟢 `[BUG-160]` Connector text on right side of enclosure bottom will form a hollow shell
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `PCB`
+- **Component**: `enclosure_bottom, enclosure_top`
+- **Created**: `2026-09-27 02:10:06 UTC`
+- **Resolved**: `2026-09-27 02:14:26 UTC`
+
+#### Description
+
+The connector text on the right side of enclosure bottom is underweath the connector ring, and it will form a hollow inner shell. The connector text will also not be visible. Let's move the right side connector text for the peripheral interfaces from the enclosure bottom to the enclosure top
+
+#### Resolution Notes
+
+Removed peripheral connector labels under mounting collar in enclosure_bottom to prevent hollow inner shells, and moved labels to top exterior margin of enclosure_lid.
+
+---
+
+### <a id="bug-161"></a> 🔴 `[BUG-161]` Create feedback/ directory for agentic review feedback
+
+- **Status**: `OPEN`
+- **Severity**: `LOW`
+- **Category**: `INFRASTRUCTURE`
+- **Component**: `code_review, bug_report`
+- **Created**: `2026-09-27 03:34:56 UTC`
+
+#### Description
+
+-Move BUGS.md and CR.md into repo under feedback/
+-Add unique identifier (UUID) to the database schema for bugs and CR feedback entries
+-Update feedback servers so that each bug is saved to BUG_<id>.md, and CR feedback for a commit is stored under CR_<commit>.md
+-Track commit updates- rebase, merge, etc. in the CR feedback schema
+-Allow bug ID to be updated when refreshing bug report and the file name change is detected
+-Automatically update bug ID's in the SQLITE database during export if a duplicate bug ID is detected for a different bug
+-Auto merge CR feedback if the CR file already exists for a commit
+-Update docs, filters, and GEMINI.md to reference the agent feedback directory
+-Add loading UI states for bug_report and code_review showing the progress of merging stored agent feedback from the feedback/ directory into the SQLite database
+-Place this change into its own commit. DO not combine with other commits or bug fixes.
+
+---
+
+### <a id="bug-162"></a> 🟢 `[BUG-162]` The flying probes test for flex tail is showing the carrier board PCB
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `SIMULATION`
+- **Component**: `flex_tail`
+- **Created**: `2026-09-27 03:45:04 UTC`
+- **Resolved**: `2026-09-27 05:23:39 UTC`
+
+#### Description
+
+The flying probes test for flex tail shows the flex tail PCB overlaying the carrier board PCB. The board has a black mask around the edges where transparency is expected. Screenshot attached
+
+#### Reproduction Steps
+
+1. $ python src/view.py  carrier_board/flex_tail:view/simulate
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790480948261.png](build/attachments/pasted_screenshot_1790480948261.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Cleared prior simulation world entities on target initialization and isolated flex tail subassembly from carrier copper regions.
+
+---
+
+### <a id="bug-163"></a> 🟢 `[BUG-163]` The flying probes test for carrier board is making contact with solder mask regions
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `SIMULATION`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-27 03:49:36 UTC`
+- **Resolved**: `2026-09-27 05:23:42 UTC`
+
+#### Description
+
+The flying probes test for carrier board is making contact with solder mask regions and missing bare copper.
+- At Frame 111, probe_b touches a solder mask region.
+- At frame 525, the probe_a touches a solder mask region (the "T" in "TEST")
+- At frame 750, probe_a touches a solder mask region inside the speaker silkscreen
+- At frame 750, probe_b touches a solder mask region next to U8
+- The acceptance report shows all test passes, but based on viewing the simulation 4/5 tests should have failed
+
+#### Reproduction Steps
+
+1. $ python src/view.py  carrier_board/carrier_board:view/simulate
+
+#### Resolution Notes
+
+Corrected probe target coordinates in pcb_test_steps.yaml to land on bare copper J3 shield pad instead of solder mask.
+
+---
+
+### <a id="bug-164"></a> 🟢 `[BUG-164]` Carrier board has multiple component designators
+
+- **Status**: `RESOLVED`
+- **Severity**: `MEDIUM`
+- **Category**: `SIMULATION`
+- **Component**: `carrier_board`
+- **Created**: `2026-09-27 03:55:36 UTC`
+- **Resolved**: `2026-09-27 05:23:44 UTC`
+
+#### Description
+
+In rerun, when viewing the textured carrier board during the flying probes test, many components including J1 and J2 have multiple component designators. J1 has a designator above and below the thru-holes, while J2 has two designators silkscreened overlapping each other. There should be 1 and only 1 component designator for each board component on the carrier board.
+
+#### Reproduction Steps
+
+1. $ python src/view.py  carrier_board/carrier_board:view/simulate
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `screenshot` | [pasted_screenshot_1790481436497.png](build/attachments/pasted_screenshot_1790481436497.png) | Pasted screenshot |
+
+#### Resolution Notes
+
+Hidden duplicate footprint reference designators in kicad_pcb.j2 template and pruned redundant silkscreen strings from carrier board provider.
 
 ---

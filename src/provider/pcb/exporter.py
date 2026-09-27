@@ -374,6 +374,9 @@ class PCBExporter:
                     )
                     for pt in sg.points
                 ]
+                if sg.shape == "line" and len(pts_data) >= 2:
+                    x1, y1 = pts_data[0]
+                    x2, y2 = pts_data[1]
             silkscreen_graphics_data.append(
                 {
                     "shape": sg.shape,
@@ -1082,8 +1085,28 @@ class PCBExporter:
                 stem = kicad_pcb_path.stem
                 top_tex = tex_dir / f"{stem}_top.png"
                 bottom_tex = tex_dir / f"{stem}_bottom.png"
-                cli.render_board_image(kicad_pcb_path, top_tex, side="top")
-                cli.render_board_image(kicad_pcb_path, bottom_tex, side="bottom")
+                w_mm, l_mm, _ = self.config.dimensions_mm
+                c_rad = getattr(self.config, "corner_radius_mm", 0.0)
+                m_holes = [
+                    (mh.position_mm[0], mh.position_mm[1], mh.drill_diameter_mm / 2.0)
+                    for mh in getattr(self.config, "mounting_holes", [])
+                ]
+                cli.render_board_image(
+                    kicad_pcb_path,
+                    top_tex,
+                    side="top",
+                    corner_radius_mm=c_rad,
+                    board_dimensions_mm=(w_mm, l_mm),
+                    mounting_holes=m_holes,
+                )
+                cli.render_board_image(
+                    kicad_pcb_path,
+                    bottom_tex,
+                    side="bottom",
+                    corner_radius_mm=c_rad,
+                    board_dimensions_mm=(w_mm, l_mm),
+                    mounting_holes=m_holes,
+                )
                 exported_files[top_tex.name] = top_tex
                 exported_files[bottom_tex.name] = bottom_tex
 

@@ -1,11 +1,11 @@
-# Flying probe test steps for test_board project
+# Flying probe test steps for carrier_board project
 carrier_board:
   - step_id: "TEST_CONTINUITY_GND"
     description: "Verify solid low-impedance ground plane continuity across all copper layers"
     test_type: "continuity"
     net_name: "GND"
     pad_a_mm: [-18.0, -22.0]  # TP1 (GND)
-    pad_b_mm: [-25.0, -2.0]   # J3 GND shield
+    pad_b_mm: [-25.0, -4.2]   # J3 GND shield
     nominal: 0.050
     tolerance_pct: 20.0
     unit: "ohm"

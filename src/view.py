@@ -84,8 +84,11 @@ class Viewer:
         """Collect items from a VIEW room."""
         items = []
         results = self.manager.router.run(targets)
+        subs = set(targets.subassemblies) if getattr(targets, "subassemblies", None) else set()
         for room_name, room in results:
             for item_name, (geom, rgba) in room.items():
+                if subs and not any(sub in item_name or item_name in sub for sub in subs):
+                    continue
                 items.append((geom, f"{room_name}_{item_name}", rgba[:3], rgba[3]))
         return items
 
@@ -203,7 +206,12 @@ class Viewer:
                 pcb_cfg = sub_pcb_config.model_copy(update={"stackup": provider.pcb_config.stackup})
             if sub_pcb_config and not pcb_cfg.capacitive_sensors and provider.pcb_config.capacitive_sensors:
                 pcb_cfg = pcb_cfg.model_copy(update={"capacitive_sensors": provider.pcb_config.capacitive_sensors})
-            if sub_pcb_config and not pcb_cfg.copper_regions and provider.pcb_config.copper_regions:
+            if (
+                sub_pcb_config
+                and not pcb_cfg.copper_regions
+                and provider.pcb_config.copper_regions
+                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
+            ):
                 pcb_cfg = pcb_cfg.model_copy(update={"copper_regions": provider.pcb_config.copper_regions})
             if sub_pcb_config and not pcb_cfg.net_classes and provider.pcb_config.net_classes:
                 pcb_cfg = pcb_cfg.model_copy(update={"net_classes": provider.pcb_config.net_classes})

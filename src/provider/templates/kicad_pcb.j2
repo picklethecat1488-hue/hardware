@@ -60,7 +60,7 @@
 {% for fp in footprints %}
   (footprint "{{ fp.package }}" (layer "{{ fp.layer }}")
     (at {{ fp.x_mm }} {{ fp.y_mm }}{% if fp.rotation and fp.rotation[2] %} {{ fp.rotation[2] }}{% endif %})
-    (fp_text reference "{{ fp.name }}" (at {{ fp.ref_x|default(0) }} {{ fp.ref_y }}) (layer "{{ fp.silk_layer }}") (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
+    (fp_text reference "{{ fp.name }}" (at {{ fp.ref_x|default(0) }} {{ fp.ref_y }}) (layer "{{ fp.silk_layer }}") hide (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
     (fp_text value "{{ fp.value }}" (at 0 {{ fp.val_y }}) (layer "{{ fp.fab_layer }}") hide (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
 {% if fp.is_round %}
     (fp_circle (center 0 0) (end {{ fp.radius }} 0) (stroke (width 0.15) (type default)) (fill none) (layer "{{ fp.silk_layer }}"))

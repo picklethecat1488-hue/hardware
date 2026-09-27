@@ -16,6 +16,7 @@ from build123d import (
     extrude,
     offset,
     Box,
+    Circle,
     Cone,
     Cylinder,
     fillet,
@@ -68,13 +69,13 @@ from projects_config import CarrierBoardConfig
 
 @discover_provider
 class CarrierBoardProvider(Provider):
-    """Provider for 6-layer rigid-flex test board and enclosure geometry."""
+    """Provider for 6-layer rigid-flex carrier board and enclosure geometry."""
 
     __test__ = False
 
     @cached_property
     def default_config(self) -> CarrierBoardConfig:
-        """Return the default configuration for the test board project."""
+        """Return the default configuration for the carrier board project."""
         measurements_file = str(Path(__file__).parent / "measurements.yaml")
         return CarrierBoardConfig(measurements_path=measurements_file)
 
@@ -177,29 +178,6 @@ class CarrierBoardProvider(Provider):
             with BuildVias() as bv:
                 bv.add(self.vias())
 
-            # Component obstacles declared in PCB schema for CAD inspection and simulation
-            if self.pcb_manifest and mode != Mode.PRINT:
-                for obs in self.pcb_manifest.get("obstacles", []):
-                    obs_shape = obs.get("shape") if isinstance(obs, dict) else getattr(obs, "shape", "")
-                    obs_name = obs.get("name", "") if isinstance(obs, dict) else getattr(obs, "name", "")
-                    if (
-                        obs_shape == "box"
-                        and not obs_name.startswith("clamp_rail")
-                        and obs_name not in ("flex_vacuum_plate", "J4")
-                    ):
-                        pos = (
-                            obs.get("position_mm", [0, 0, 0])
-                            if isinstance(obs, dict)
-                            else getattr(obs, "position_mm", [0, 0, 0])
-                        )
-                        dim = (
-                            obs.get("dimensions_mm", [1, 1, 1])
-                            if isinstance(obs, dict)
-                            else getattr(obs, "dimensions_mm", [1, 1, 1])
-                        )
-                        with Locations((pos[0], pos[1], pos[2])):
-                            Box(dim[0], dim[1], dim[2], mode=BuildMode.ADD)
-
         if hasattr(pcb, "part") and pcb.part is not None:
             pcb.part.label = "carrier_board"
             pcb.part.urdf_label = "carrier_board"
@@ -247,23 +225,28 @@ class CarrierBoardProvider(Provider):
                 with Locations((-7.5, -21.0)):
                     SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.5, thickness=0.08)
 
-                # 5-Button Slider Region (BUG-147)
-                with Locations((0.0, -3.0)):
-                    SilkscreenRect((11.0, 26.0), layer="F.SilkS", thickness=0.15)
-                    SilkscreenText("SLIDER", layer="F.SilkS", font_size=0.9, thickness=0.12)
+                # Inner Touch Sensing Region Outline (enclosing slider and action button without intersecting traces)
+                SilkscreenLine((-6.85, -15.5), (-6.85, 21.8), layer="F.SilkS", thickness=0.15)
+                SilkscreenLine((6.85, -15.5), (6.85, 21.8), layer="F.SilkS", thickness=0.15)
+                SilkscreenLine((-6.85, 21.8), (6.85, 21.8), layer="F.SilkS", thickness=0.15)
+
+                # 5-Button Slider Region Labels (BUG-147, BUG-155)
+                with Locations((0.0, 11.5)):
+                    SilkscreenText("SLIDER", layer="F.SilkS", font_size=0.8, thickness=0.12)
                 for idx, dy in enumerate([-10.0, -5.0, 0.0, 5.0, 10.0], start=1):
                     with Locations((0.0, -3.0 + dy)):
                         SilkscreenText(f"S{idx}", layer="F.SilkS", font_size=0.55, thickness=0.08)
 
-                # Action Button Region (distal end left) (BUG-147)
-                with Locations((-3.5, 18.0)):
-                    SilkscreenRect((4.8, 8.0), layer="F.SilkS", thickness=0.15)
+                # Action Button Region Label (centered) (BUG-147, BUG-157, BUG-158)
+                with Locations((0.0, 18.0)):
                     SilkscreenText("ACTION", layer="F.SilkS", font_size=0.6, thickness=0.09)
 
-                # Proximity Sensor Region (distal end right) (BUG-147)
-                with Locations((3.5, 18.0)):
-                    SilkscreenRect((4.8, 8.0), layer="F.SilkS", thickness=0.15)
-                    SilkscreenText("PROX", layer="F.SilkS", font_size=0.6, thickness=0.09)
+                # Perimeter Proximity Sensor Loop Outline & Annotation (BUG-158, open at bottom)
+                SilkscreenLine((-7.35, -16.5), (-7.35, 24.8), layer="F.SilkS", thickness=0.15)
+                SilkscreenLine((7.35, -16.5), (7.35, 24.8), layer="F.SilkS", thickness=0.15)
+                SilkscreenLine((-7.35, 24.8), (7.35, 24.8), layer="F.SilkS", thickness=0.15)
+                with Locations((0.0, 23.2)):
+                    SilkscreenText("PROX LOOP", layer="F.SilkS", font_size=0.6, thickness=0.09)
 
             routing_flex_file = self.wiring_path.parent / "routing_flex.yaml"
             if routing_flex_file.exists():
@@ -443,16 +426,33 @@ class CarrierBoardProvider(Provider):
                     Text("FLEX TAIL", font_size=1.5)
             extrude(s_flex_lbl.sketch, amount=-0.3, mode=BuildMode.SUBTRACT)
 
-            # Charger terminal graphical label (lightning bolt) (BUG-150)
-            bolt_pts = [(0.0, 1.8), (-1.2, 0.2), (-0.3, 0.2), (-0.8, -1.8), (1.2, -0.2), (0.3, -0.2)]
-            with BuildSketch(Plane.YZ.offset(-w / 2.0)) as s_bolt:
-                with Locations((0.0, usb_z + (usb_h / 2.0) + 2.2)):
-                    Polygon(*bolt_pts)
-            extrude(s_bolt.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
+            # USB connector graphical label (USB trident icon) (BUG-150, BUG-159)
+            plane_left = Plane(origin=(-w / 2.0, 0.0, 0.0), x_dir=(0, -1, 0), z_dir=(-1, 0, 0))
+            usb_icon_z = (usb_z + (usb_h / 2.0) + (h_shell / 2.0)) / 2.0 + 0.05
+            with BuildSketch(plane_left) as s_usb_icon:
+                with Locations((0.0, usb_icon_z)):
+                    Rectangle(0.35, 1.4)
+                    with Locations((0.0, -0.8)):
+                        Circle(0.3)
+                    with Locations((0.0, 0.7)):
+                        Polygon((-0.55, 0.0), (0.55, 0.0), (0.0, 0.65))
+                    with Locations((-0.32, -0.15)):
+                        Rectangle(0.4, 0.25)
+                    with Locations((-0.52, 0.15)):
+                        Rectangle(0.25, 0.45)
+                    with Locations((-0.52, 0.45)):
+                        Circle(0.25)
+                    with Locations((0.32, 0.05)):
+                        Rectangle(0.4, 0.25)
+                    with Locations((0.52, 0.25)):
+                        Rectangle(0.25, 0.4)
+                    with Locations((0.52, 0.52)):
+                        Rectangle(0.42, 0.42)
+            extrude(s_usb_icon.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
-            # SWD cutout label (BUG-150)
-            with BuildSketch(Plane.YZ.offset(-w / 2.0)) as s_swd_lbl:
-                with Locations((swd_y, swd_z + (swd_h / 2.0) + 1.8)):
+            # SWD cutout label (BUG-150, BUG-159)
+            with BuildSketch(plane_left) as s_swd_lbl:
+                with Locations((-swd_y, swd_z + (swd_h / 2.0) + 1.8)):
                     Text("SWD", font_size=1.6)
             extrude(s_swd_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
@@ -504,13 +504,6 @@ class CarrierBoardProvider(Provider):
                     with Locations((py, periph_z)):
                         RectangleRounded(cut_l, periph_cutout_h, cutout_r)
             extrude(s_periph.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
-
-            # Bus identifier labels on exterior right wall
-            with BuildSketch(Plane.YZ.offset(w / 2.0)) as s_periph_labels:
-                for _, py, _, label in periph_specs:
-                    with Locations((py, periph_z + (periph_cutout_h / 2.0) + 1.2)):
-                        Text(label, font_size=1.6)
-            extrude(s_periph_labels.sketch, amount=-0.3, mode=BuildMode.SUBTRACT)
 
             # Expansion carrier mounting collar with snap-fit retention ridge (BUG-132)
             mount_protrusion = self.settings.enclosure_expansion_mount_protrusion
@@ -632,6 +625,24 @@ class CarrierBoardProvider(Provider):
                     Text("1", font_size=1.5, rotation=90.0)
             extrude(s_key.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
+            # Peripheral bus identifier labels engraved on enclosure lid exterior right margin (BUG-160)
+            bus_labels = {"J6": "I3C", "J7": "I2C", "J8": "SPI", "J9": "UART", "J10": "GPIO"}
+            periph_lid_specs = []
+            if self.wiring_path.exists():
+                wiring = Wiring(str(self.wiring_path))
+                comp_map = {c.name: c for c in wiring.footprints}
+                for des in ("J6", "J7", "J8", "J9", "J10"):
+                    if des in comp_map:
+                        c = comp_map[des]
+                        periph_lid_specs.append((c.position[1], bus_labels.get(des, des)))
+
+            if periph_lid_specs:
+                with BuildSketch(Plane.XY.offset(wall)) as s_periph_lbl:
+                    for py, label in periph_lid_specs:
+                        with Locations(((w / 2.0) - 4.5, py)):
+                            Text(label, font_size=1.6)
+                extrude(s_periph_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
+
             # LED cutout through enclosure top (aligned with D1, BUG-078)
             led_x, led_y = 17.0, 10.0
             if self.wiring_path.exists():
@@ -661,18 +672,21 @@ class CarrierBoardProvider(Provider):
             batt_cut_w = self.settings.enclosure_battery_cutout_width
             batt_cut_l = self.settings.enclosure_battery_cutout_length
             cutout_r = self.settings.enclosure_cutout_fillet_radius
-            bridge_x = (batt_x - batt_w / 2.0 + j13_x) / 2.0
-            bridge_y = (batt_y + batt_l / 2.0 + j13_y) / 2.0
-            bridge_w = abs(batt_x - batt_w / 2.0 - j13_x) + 4.0
-            bridge_l = abs(batt_y + batt_l / 2.0 - j13_y) + 4.0
+
+            # Unified single rounded rectangle bounding envelope enclosing battery pouch and J13 connector (BUG-145)
+            min_x = min(batt_x - (batt_w / 2.0), j13_x - (batt_cut_w / 2.0) - batt_rim_t)
+            max_x = max(batt_x + (batt_w / 2.0), j13_x + (batt_cut_w / 2.0) + batt_rim_t)
+            min_y = min(batt_y - (batt_l / 2.0), j13_y - (batt_cut_l / 2.0) - batt_rim_t)
+            max_y = max(batt_y + (batt_l / 2.0), j13_y + (batt_cut_l / 2.0) + batt_rim_t)
+
+            cradle_w = max_x - min_x
+            cradle_l = max_y - min_y
+            cradle_cx = (min_x + max_x) / 2.0
+            cradle_cy = (min_y + max_y) / 2.0
 
             with BuildSketch() as s_c_in:
-                with Locations((batt_x, batt_y)):
-                    Rectangle(batt_w, batt_l)
-                with Locations((j13_x, j13_y)):
-                    Rectangle(batt_cut_w + 3.0, batt_cut_l + 3.0)
-                with Locations((bridge_x, bridge_y)):
-                    Rectangle(bridge_w, bridge_l)
+                with Locations((cradle_cx, cradle_cy)):
+                    RectangleRounded(cradle_w, cradle_l, cutout_r)
 
             with BuildSketch() as s_c_out:
                 offset(s_c_in.sketch, amount=batt_rim_t)
@@ -690,7 +704,7 @@ class CarrierBoardProvider(Provider):
 
             # Battery label (BUG-150)
             with BuildSketch(Plane.XY.offset(wall)) as s_batt_lbl:
-                with Locations((batt_x, batt_y - (batt_l / 2.0) - 3.0)):
+                with Locations((cradle_cx, min_y - 3.0)):
                     Text("BATTERY", font_size=1.6)
             extrude(s_batt_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
@@ -733,6 +747,7 @@ class CarrierBoardProvider(Provider):
                 j13_x, j13_y = j13_comp.position[0], j13_comp.position[1]
         batt_cut_w = self.settings.enclosure_battery_cutout_width
         batt_cut_l = self.settings.enclosure_battery_cutout_length
+        cutout_r = self.settings.enclosure_cutout_fillet_radius
 
         clr = self.settings.enclosure_battery_cover_clearance
         extra_h = self.settings.enclosure_battery_cover_vertical_clearance
@@ -741,18 +756,19 @@ class CarrierBoardProvider(Provider):
         inner_h = cradle_h + extra_h
         total_h = inner_h + cover_t
 
-        bridge_x = (batt_x - batt_w / 2.0 + j13_x) / 2.0
-        bridge_y = (batt_y + batt_l / 2.0 + j13_y) / 2.0
-        bridge_w = abs(batt_x - batt_w / 2.0 - j13_x) + 4.0
-        bridge_l = abs(batt_y + batt_l / 2.0 - j13_y) + 4.0
+        min_x = min(batt_x - (batt_w / 2.0), j13_x - (batt_cut_w / 2.0) - cradle_t)
+        max_x = max(batt_x + (batt_w / 2.0), j13_x + (batt_cut_w / 2.0) + cradle_t)
+        min_y = min(batt_y - (batt_l / 2.0), j13_y - (batt_cut_l / 2.0) - cradle_t)
+        max_y = max(batt_y + (batt_l / 2.0), j13_y + (batt_cut_l / 2.0) + cradle_t)
+
+        cradle_w = max_x - min_x
+        cradle_l = max_y - min_y
+        cradle_cx = (min_x + max_x) / 2.0
+        cradle_cy = (min_y + max_y) / 2.0
 
         with BuildSketch() as s_c_in:
-            with Locations((batt_x, batt_y)):
-                Rectangle(batt_w, batt_l)
-            with Locations((j13_x, j13_y)):
-                Rectangle(batt_cut_w + 3.0, batt_cut_l + 3.0)
-            with Locations((bridge_x, bridge_y)):
-                Rectangle(bridge_w, bridge_l)
+            with Locations((cradle_cx, cradle_cy)):
+                RectangleRounded(cradle_w, cradle_l, cutout_r)
 
         with BuildSketch() as s_c_out:
             offset(s_c_in.sketch, amount=cradle_t)
@@ -1060,102 +1076,6 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText("+", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((-22.0, 13.5)):
                 SilkscreenText("-", layer="F.SilkS", font_size=0.8, thickness=0.12)
-
-            # Component Reference Designators (BUG-066)
-            # Active ICs and Primary Modules
-            with Locations((0.0, 8.5)):
-                SilkscreenText("U1", layer="F.SilkS", font_size=1.0, thickness=0.15)
-            with Locations((18.0, -11.5)):
-                SilkscreenText("U2", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
-            with Locations((0.0, -32.5)):
-                SilkscreenText("J1", layer="F.SilkS", font_size=1.0, thickness=0.15)
-            with Locations((0.0, 35.5)):
-                SilkscreenText("J2", layer="F.SilkS", font_size=1.0, thickness=0.15)
-            with Locations((-17.5, 0.0)):
-                SilkscreenText("J3", layer="F.SilkS", font_size=1.0, thickness=0.15)
-            with Locations((-23.0, 19.5)):
-                SilkscreenText("J13", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-21.5, -22.0)):
-                SilkscreenText("Q1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
-            with Locations((-19.0, 12.5)):
-                SilkscreenText("U3", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-18.0, 24.5)):
-                SilkscreenText("U4", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-18.0, 38.0)):
-                SilkscreenText("SPK1", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-9.0, 3.5)):
-                SilkscreenText("Y1", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((14.0, 18.0)):
-                SilkscreenText("U6", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-16.0, 19.0)):
-                SilkscreenText("U7", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((15.0, 7.5)):
-                SilkscreenText("U8", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-20.0, -37.5)):
-                SilkscreenText("U9", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((18.0, 26.5)):
-                SilkscreenText("U10", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((19.5, 10.0)):
-                SilkscreenText("D1", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-18.0, -18.5)):
-                SilkscreenText("J5", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, 31.0)):
-                SilkscreenText("J6", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, 19.0)):
-                SilkscreenText("J7", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, 7.0)):
-                SilkscreenText("J8", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, -5.0)):
-                SilkscreenText("J9", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, -21.0)):
-                SilkscreenText("J10", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((16.0, -28.0)):
-                SilkscreenText("J14", layer="F.SilkS", font_size=0.8, thickness=0.12)
-
-            # Resistors
-            with Locations((14.5, -6.0)):
-                SilkscreenText("R1", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((10.0, -4.5)):
-                SilkscreenText("R2", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-14.5, -4.5)):
-                SilkscreenText("R3", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-14.5, 4.5)):
-                SilkscreenText("R4", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-5.5, 8.0)):
-                SilkscreenText("R5", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-11.5, -12.0)):
-                SilkscreenText("R6", layer="F.SilkS", font_size=0.7, thickness=0.10)
-
-            # Capacitors
-            with Locations((13.0, -17.5)):
-                SilkscreenText("C1", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-8.0, -6.5)):
-                SilkscreenText("C2", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
-            with Locations((-13.0, -5.5)):
-                SilkscreenText("C3", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((8.0, 10.5)):
-                SilkscreenText("C4", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-6.0, -11.5)):
-                SilkscreenText("C5", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-24.0, 12.5)):
-                SilkscreenText("C6", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-14.0, 12.5)):
-                SilkscreenText("C7", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-23.0, 23.5)):
-                SilkscreenText("C8", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-5.0, 16.5)):
-                SilkscreenText("C9", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((5.0, 16.5)):
-                SilkscreenText("C10", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((-10.5, 10.5)):
-                SilkscreenText("C11", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((14.0, -6.5)):
-                SilkscreenText("C12", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
-            with Locations((-20.0, 15.5)):
-                SilkscreenText("C13", layer="F.SilkS", font_size=0.7, thickness=0.10)
-            with Locations((14.0, -12.0)):
-                SilkscreenText("C14", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
-
         return silk.texts
 
     @property

@@ -32,16 +32,21 @@ class CapacitiveSensingGenerator:
     def __init__(self, config: CapacitiveElectrodeModel, center: Tuple[float, float] = (0.0, 0.0)):
         """Initialize generator with electrode model and placement coordinates."""
         self.config = config
-        self.cx, self.cy = center
+        if center == (0.0, 0.0) and getattr(config, "center_mm", None):
+            self.cx, self.cy = config.center_mm
+        else:
+            self.cx, self.cy = center
 
     def generate(self) -> CapacitiveGeometry:
         """Generate all copper geometric primitives for the capacitive sensor."""
         geom = CapacitiveGeometry(name=self.config.name)
         w, l = self.config.area_mm
 
-        # 1. Generate Interdigital Comb Electrodes
+        # 1. Generate Interdigital Comb Electrodes or Perimeter Loop
         if self.config.shape == "interdigital":
             geom.tx_fingers, geom.rx_fingers = self._generate_interdigital_combs(w, l)
+        elif self.config.shape in ("loop", "perimeter_loop"):
+            geom.rx_fingers = self._generate_perimeter_loop(w, l)
         else:
             # Solid touch pad rectangular bounds
             half_w = w / 2.0
@@ -123,6 +128,32 @@ class CapacitiveSensingGenerator:
                 rx_combs.append(finger)
 
         return tx_combs, rx_combs
+
+    def _generate_perimeter_loop(
+        self, width_mm: float, length_mm: float, trace_w: float = 0.30
+    ) -> List[List[Tuple[float, float]]]:
+        """Generate perimeter loop rectangular trace segments enclosing the touch sensing area."""
+        half_w = width_mm / 2.0
+        half_l = length_mm / 2.0
+        top = [
+            (self.cx - half_w, self.cy + half_l - trace_w / 2.0),
+            (self.cx + half_w, self.cy + half_l - trace_w / 2.0),
+            (self.cx + half_w, self.cy + half_l + trace_w / 2.0),
+            (self.cx - half_w, self.cy + half_l + trace_w / 2.0),
+        ]
+        left = [
+            (self.cx - half_w - trace_w / 2.0, self.cy - half_l),
+            (self.cx - half_w + trace_w / 2.0, self.cy - half_l),
+            (self.cx - half_w + trace_w / 2.0, self.cy + half_l),
+            (self.cx - half_w - trace_w / 2.0, self.cy + half_l),
+        ]
+        right = [
+            (self.cx + half_w - trace_w / 2.0, self.cy - half_l),
+            (self.cx + half_w + trace_w / 2.0, self.cy - half_l),
+            (self.cx + half_w + trace_w / 2.0, self.cy + half_l),
+            (self.cx + half_w - trace_w / 2.0, self.cy + half_l),
+        ]
+        return [top, left, right]
 
     def _generate_guard_ring(
         self, width_mm: float, length_mm: float, offset_mm: float = 0.8
