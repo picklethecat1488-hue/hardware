@@ -591,11 +591,7 @@ def test_kicad_cli_run_drc_syncs_design_rules(tmp_path: Path):
 def test_export_kicad_pcb_silkscreen_parity_and_mirroring(
     tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring
 ):
-    """Verify BUG-165/BUG-167: F.SilkS text and test point labels apply parity correction.
-
-    In CAD right-handed space vs KiCad left-handed space, text on F.SilkS must have
-    mirror: True and rotation transformed to prevent horizontally mirrored text in 3D physics rendering.
-    """
+    """Verify silkscreen text and test point labels are right-reading on F.SilkS without justify mirror."""
     mock_pcb_config.silkscreen_texts = [
         SilkscreenTextModel(
             text="TEST BOARD CARRIER REV 2.0",
@@ -604,7 +600,15 @@ def test_export_kicad_pcb_silkscreen_parity_and_mirroring(
             font_size=1.5,
             thickness=0.2,
             rotation=0.0,
-        )
+        ),
+        SilkscreenTextModel(
+            text="BOTTOM SHIELD / GROUND REF",
+            layer="B.SilkS",
+            position=(10.0, 15.0),
+            font_size=1.0,
+            thickness=0.15,
+            mirror=True,
+        ),
     ]
     from model.pcb import TestPointModel, MountingHoleModel
 
@@ -634,9 +638,19 @@ def test_export_kicad_pcb_silkscreen_parity_and_mirroring(
     assert out_file.is_file()
     content = out_file.read_text(encoding="utf-8")
     assert "TEST BOARD CARRIER REV 2.0" in content
-    # Assert mirror attribute is emitted in justify for F.SilkS gr_text and test point reference
+    # Assert F.SilkS text is right-reading (rotation 0) and does NOT have justify mirror
+    assert '(gr_text "TEST BOARD CARRIER REV 2.0"' in content
+    assert (
+        'gr_text "TEST BOARD CARRIER REV 2.0"\n    (at' in content
+        or 'gr_text "TEST BOARD CARRIER REV 2.0"\n\t\t(at' in content
+        or 'gr_text "TEST BOARD CARRIER REV 2.0" (at' in content
+    )
+    # Assert B.SilkS text DOES have justify mirror
+    assert "BOTTOM SHIELD / GROUND REF" in content
     assert "(justify mirror)" in content
+    # Assert TP1 footprint reference on F.SilkS has angle 90 and no justify mirror
     assert 'fp_text reference "TP1"' in content
-    assert 'gr_text "MH1"' in content
+    # Assert MH1 is emitted as footprint reference without hide
     assert '(footprint "MountingHole:MountingHole_3.2mm_Pad"' in content
-    assert 'fp_text reference "MH1" (at 0 0) (layer "F.SilkS") hide' in content
+    assert 'fp_text reference "MH1"' in content
+    assert 'fp_text reference "MH1" (at 0 0) (layer "F.SilkS") hide' not in content

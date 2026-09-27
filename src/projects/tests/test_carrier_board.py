@@ -1102,3 +1102,86 @@ def test_regression_bug_161_board_texture_transparency_mask() -> None:
     hole_px_x = int((-25.0 + w_mm / 2.0) * (w_px / w_mm))
     hole_px_y = int((l_mm / 2.0 - 40.0) * (h_px / l_mm))
     assert masked.getpixel((hole_px_x, hole_px_y))[3] == 0, "Mounting hole center must be transparent"
+
+
+def test_regression_pcb_texture_uv_parity_and_orientation() -> None:
+    """Verify that PCB texture UV mapping in Rerun Mesh3D maintains correct parity and upright orientation."""
+    from pathlib import Path
+    from unittest.mock import patch
+    import pybullet as p
+    from PIL import Image
+    from provider import Room, Mode
+    from provider.bullet import Bullet
+
+    test_build_dir = Path("build/test_dummy_uv_textures")
+    tex_dir = test_build_dir / "board" / "carrier_board" / "textures"
+    tex_dir.mkdir(parents=True, exist_ok=True)
+
+    raw_tex = Image.new("RGBA", (60, 90), (0, 100, 0, 255))
+    raw_tex.save(tex_dir / "carrier_board_top.png")
+    raw_tex.save(tex_dir / "carrier_board_bottom.png")
+
+    provider = CarrierBoardProvider()
+    room = Room(is_simulate=True)
+    provider.view["carrier_board"](room, Mode.DEFAULT)
+    hooks = provider.get_simulate_hooks("carrier_board")
+    bullet = Bullet(
+        room=room,
+        provider_hooks=hooks,
+        sim_target="carrier_board",
+        proj_name="carrier_board",
+        build_dir=str(test_build_dir),
+    )
+    client = p.connect(p.DIRECT)
+    try:
+        with patch("rerun.log") as mock_log:
+            bullet._init_simulation_objects(
+                client, 0, "build/obj/carrier_board", "build/urdf/carrier_board/carrier_board.urdf"
+            )
+            top_mesh = next(
+                call[0][1]
+                for call in mock_log.call_args_list
+                if len(call[0]) > 1 and call[0][0] == "world/carrier_board/texture_top"
+            )
+            bot_mesh = next(
+                call[0][1]
+                for call in mock_log.call_args_list
+                if len(call[0]) > 1 and call[0][0] == "world/carrier_board/texture_bottom"
+            )
+
+            # Check top mesh UV mapping:
+            # V=0 must correspond to CAD max_y (+Y, top of board)
+            # V=1 must correspond to CAD min_y (-Y, bottom of board)
+            v_pos = top_mesh.vertex_positions.as_arrow_array().to_pylist()
+            v_uv = top_mesh.vertex_texcoords.as_arrow_array().to_pylist()
+
+            for pos, uv in zip(v_pos, v_uv):
+                if pos[1] > 40.0:  # Top of board in CAD (+Y)
+                    assert uv[1] <= 0.10, f"Top CAD vertex at Y={pos[1]} must have V near 0 (got V={uv[1]})"
+                elif pos[1] < -40.0:  # Bottom of board in CAD (-Y)
+                    assert uv[1] >= 0.90, f"Bottom CAD vertex at Y={pos[1]} must have V near 1 (got V={uv[1]})"
+                if pos[0] > 25.0:  # Right of board in CAD (+X)
+                    assert uv[0] >= 0.90, f"Right CAD vertex at X={pos[0]} must have U near 1 (got U={uv[0]})"
+                elif pos[0] < -25.0:  # Left of board in CAD (-X)
+                    assert uv[0] <= 0.10, f"Left CAD vertex at X={pos[0]} must have U near 0 (got U={uv[0]})"
+
+            # Check bottom mesh UV mapping:
+            b_pos = bot_mesh.vertex_positions.as_arrow_array().to_pylist()
+            b_uv = bot_mesh.vertex_texcoords.as_arrow_array().to_pylist()
+
+            for pos, uv in zip(b_pos, b_uv):
+                if pos[1] > 40.0:
+                    assert uv[1] <= 0.10, f"Top CAD bottom vertex at Y={pos[1]} must have V near 0 (got V={uv[1]})"
+                elif pos[1] < -40.0:
+                    assert uv[1] >= 0.90, f"Bottom CAD bottom vertex at Y={pos[1]} must have V near 1 (got V={uv[1]})"
+                if pos[0] > 25.0:
+                    # In bottom view, CAD +X is on the viewer's left -> U near 0
+                    assert uv[0] <= 0.10, f"Right CAD bottom vertex at X={pos[0]} must have U near 0 (got U={uv[0]})"
+                elif pos[0] < -25.0:
+                    # In bottom view, CAD -X is on the viewer's right -> U near 1
+                    assert uv[0] >= 0.90, f"Left CAD bottom vertex at X={pos[0]} must have U near 1 (got U={uv[0]})"
+    finally:
+        p.disconnect(client)
+        import shutil
+
+        shutil.rmtree(test_build_dir, ignore_errors=True)

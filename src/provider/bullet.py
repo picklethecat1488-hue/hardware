@@ -552,7 +552,7 @@ class Bullet:
                             v_texcoords = [
                                 [
                                     float(np.clip((v.X - min_x) / dx_span, 0.0, 1.0)),
-                                    float(np.clip((v.Y - min_y) / dy_span, 0.0, 1.0)),
+                                    float(np.clip((max_y - v.Y) / dy_span, 0.0, 1.0)),
                                 ]
                                 for v in top_verts
                             ]
@@ -565,7 +565,7 @@ class Bullet:
                             ]
                             t_indices = [[0, 1, 2], [0, 2, 3]]
                             v_normals = [[0.0, 0.0, 1.0] for _ in range(4)]
-                            v_texcoords = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+                            v_texcoords = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]]
 
                         top_mesh = rr.Mesh3D(
                             vertex_positions=v_positions,
@@ -603,7 +603,7 @@ class Bullet:
                             b_texcoords = [
                                 [
                                     float(np.clip((max_x - v.X) / dx_span, 0.0, 1.0)),
-                                    float(np.clip((v.Y - min_y) / dy_span, 0.0, 1.0)),
+                                    float(np.clip((max_y - v.Y) / dy_span, 0.0, 1.0)),
                                 ]
                                 for v in bot_verts
                             ]
@@ -616,7 +616,7 @@ class Bullet:
                             ]
                             b_indices = [[0, 1, 2], [0, 2, 3]]
                             b_normals = [[0.0, 0.0, -1.0] for _ in range(4)]
-                            b_texcoords = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+                            b_texcoords = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]]
 
                         bot_mesh = rr.Mesh3D(
                             vertex_positions=b_positions,
