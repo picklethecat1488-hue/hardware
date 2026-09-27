@@ -1,4 +1,4 @@
-"""Configuration and automated routing action for test_board."""
+"""Configuration and automated routing action for carrier_board."""
 
 import math
 from pathlib import Path
@@ -8,14 +8,14 @@ from provider.pcb.router import PCBAutoRouter
 
 
 def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None:
-    """Execute automated PCB routing across all test board nets, persist to YAML and .env, and report metrics."""
+    """Execute automated PCB routing across all carrier board nets, persist to YAML and .env, and report metrics."""
     if not provider.wiring_path.exists():
         raise FileNotFoundError(f"Wiring specification not found at {provider.wiring_path}")
 
     wiring = Wiring(str(provider.wiring_path))
     cfg = provider.get_pcb_config_without_routes()
     if cfg is None:
-        raise ValueError("PCB configuration not found for test_board")
+        raise ValueError("PCB configuration not found for carrier_board")
 
     project_dir = provider.wiring_path.parent
     routing_file = project_dir / "routing.yaml"
@@ -52,13 +52,13 @@ def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None
     else:
         rel_path = routing_file
 
-    env_entry = f"APP_TEST_BOARD__ROUTING_PATH={rel_path}\n"
+    env_entry = f"APP_CARRIER_BOARD__ROUTING_PATH={rel_path}\n"
     root_env = Path(".env")
     if root_env.exists():
         existing_lines = [
             line
             for line in root_env.read_text().splitlines(keepends=True)
-            if not line.startswith("APP_TEST_BOARD__ROUTING_PATH=")
+            if not line.startswith("APP_CARRIER_BOARD__ROUTING_PATH=")
         ]
         existing_lines.append(env_entry)
         root_env.write_text("".join(existing_lines))
@@ -80,17 +80,17 @@ def config_route(provider: Any, target: str, subassembly: Optional[str]) -> None
         provider.logger.print(f"Persisted routing to {routing_file} and .env", symbol="💾 ")
     else:
         print(
-            f"[test_board:route] Carrier routed {len(auto_traces)} traces ({total_len_mm:.2f} mm) and {len(auto_vias)} vias."
+            f"[carrier_board:route] Carrier routed {len(auto_traces)} traces ({total_len_mm:.2f} mm) and {len(auto_vias)} vias."
         )
         if flex_traces:
             print(
-                f"[test_board:route] Flex routed {len(flex_traces)} traces ({flex_len_mm:.2f} mm) and {len(flex_vias)} vias."
+                f"[carrier_board:route] Flex routed {len(flex_traces)} traces ({flex_len_mm:.2f} mm) and {len(flex_vias)} vias."
             )
-        print(f"[test_board:route] Saved to {routing_file} and .env")
+        print(f"[carrier_board:route] Saved to {routing_file} and .env")
 
 
 if __name__ == "__main__":
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
 
-    provider_instance = TestBoardProvider()
-    config_route(provider_instance, "test_board:route", "carrier_board")
+    provider_instance = CarrierBoardProvider()
+    config_route(provider_instance, "carrier_board:route", "carrier_board")

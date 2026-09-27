@@ -161,7 +161,7 @@ def test_jax_pcb_router_is_default_backend():
         ]
     )
     cfg = PCBConfig(
-        name="test_board",
+        name="carrier_board",
         dimensions_mm=(20.0, 20.0, 1.6),
         stackup=stackup,
     )

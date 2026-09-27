@@ -1,47 +1,47 @@
-# Test Board
+# Carrier Board
 
 This project designs a modular hardware evaluation and sensor test board featuring a multi-layer rigid carrier PCB and a flexible tail PCB with mutual/self-capacitive proximity electrodes. The board is powered by the **NXP MCX N947** dual-core Arm Cortex-M33 microcontroller (`MCXN947VDF` in VFBGA-184), with high-speed dual-channel Octal/Quad FlexSPI storage (**Winbond W25N01GV** 1Gb SLC NAND), autonomous battery charging & power path management (**TI BQ24074**), precision fuel gauging (**ADI MAX17048**), constant-current logarithmic RGB LED indication (**TI LP5009**), high-speed USB-to-UART telemetry (**FTDI FT232RNQ**), multi-channel capacitive touch and proximity sensing (**Azoteq IQS7222A001QNR / IQS7211A**), and digital Class-D audio amplification (**ADI MAX98357A**).
 
 The mechanical enclosure features an upper lid with an optical window for status LED viewing, an integrated battery retention mount cradle and pass-through cutout for battery connector J13, and a rigid lower housing featuring snap-in flared mounting posts, anti-skid rubber feet, separated SWD and USB-C cutouts with >=5mm solid wall barrier, 0.8mm corner fillets on all side cutouts, and peripheral access ports for I2C, I3C, and SPI. The carrier board reflects Revision 2.0 with the Antigravity silkscreen logo, component alignment markers, and optical fiducials.
 
-![Test Board Carrier](carrier_board_schematic.svg)
+![Carrier Board](carrier_board_schematic.svg)
 
-*Test board carrier top-level schematic and subassembly overview.*
+*Carrier board top-level schematic and subassembly overview.*
 
 ## Build Files
 
 After running `build.py`, you should see these files in your build output organized by subdirectories under the build folder:
 
-- **build/svg/test_board/carrier_board_schematic.svg** - Complete carrier PCB schematic diagram with multi-sheet hierarchy.
-- **build/svg/test_board/flex_tail_schematic.svg** - Flexible tail PCB schematic showing capacitive sensor electrodes and connector pinout.
-- **build/svg/test_board/test_board_wiring_diagram.svg** - Top-down system wiring diagram illustrating inter-module power and bus connectivity.
-- **build/pcb/test_board/carrier_board.kicad_pcb** - 6-layer impedance-matched rigid carrier board layout (Rev 2.0).
-- **build/pcb/test_board/flex_tail.kicad_pcb** - 2-layer polyimide flexible tail PCB layout.
-- **build/gerber/test_board/carrier_board/** - RS-274X Gerber manufacturing files, Excellon drill files, and IPC-D-356 netlists.
-- **build/gerber/test_board/flex_tail/** - Gerber and NC drill manufacturing files for flexible PCB fabrication.
-- **build/stl/test_board/carrier_enclosure.stl** - 3D printable protective enclosure shell for the carrier assembly.
-- **build/urdf/test_board/product.urdf** - Full kinematic and simulation URDF model.
+- **build/svg/carrier_board/carrier_board_schematic.svg** - Complete carrier PCB schematic diagram with multi-sheet hierarchy.
+- **build/svg/carrier_board/flex_tail_schematic.svg** - Flexible tail PCB schematic showing capacitive sensor electrodes and connector pinout.
+- **build/svg/carrier_board/carrier_board_wiring_diagram.svg** - Top-down system wiring diagram illustrating inter-module power and bus connectivity.
+- **build/pcb/carrier_board/carrier_board.kicad_pcb** - 6-layer impedance-matched rigid carrier board layout (Rev 2.0).
+- **build/pcb/carrier_board/flex_tail.kicad_pcb** - 2-layer polyimide flexible tail PCB layout.
+- **build/gerber/carrier_board/carrier_board/** - RS-274X Gerber manufacturing files, Excellon drill files, and IPC-D-356 netlists.
+- **build/gerber/carrier_board/flex_tail/** - Gerber and NC drill manufacturing files for flexible PCB fabrication.
+- **build/stl/carrier_board/carrier_enclosure.stl** - 3D printable protective enclosure shell for the carrier assembly.
+- **build/urdf/carrier_board/product.urdf** - Full kinematic and simulation URDF model.
 
 ## Visualization & Simulation
 
-To view the complete test board mechanical assembly in the 3D CAD viewer:
+To view the complete carrier board mechanical assembly in the 3D CAD viewer:
 ```bash
-python src/view.py test_board/product
+python src/view.py carrier_board/product
 ```
 
 To visualize the routed carrier PCB with copper zones, silkscreen, and components:
 ```bash
-python src/view.py test_board/carrier_board:pcb
+python src/view.py carrier_board/carrier_board:pcb
 ```
 
 To visualize the routed flexible tail with capacitive sensor pads:
 ```bash
-python src/view.py test_board/flex_tail:pcb
+python src/view.py carrier_board/flex_tail:pcb
 ```
 
 To view the top-down 2D wiring layout:
 ```bash
-python src/view.py test_board/carrier_board:diagram
+python src/view.py carrier_board/carrier_board:diagram
 ```
 
 ## System Block Diagram

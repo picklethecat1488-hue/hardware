@@ -267,10 +267,10 @@ pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -
 - **Interactive Viewer CLI (`view.py`)**:
   ```bash
   # View PCB target (opens KiCode tab in VS Code and renders 3D substrate in ocp_vscode):
-  python src/view.py test_board:pcb
+  python src/view.py carrier_board:pcb
 
   # View a direct board or schematic file:
-  python src/view.py build/board/test_board/test_board.kicad_pcb
+  python src/view.py build/board/carrier_board/carrier_board.kicad_pcb
   ```
 - **In-Browser Gerber Viewers**: Drag the `build/board/<project>/` folder into open-source [tracespace.io/view](https://tracespace.io/view/) or online fab viewers (JLCPCB, PCBWay).
 - **Vector Schematics**: Open `build/schematics/<project>/<project>_schematic.svg` in any browser or SVG editor.

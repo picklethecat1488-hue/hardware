@@ -1,4 +1,4 @@
-"""Test board configuration and parameterized measurements."""
+"""Carrier board configuration and parameterized measurements."""
 
 from typing import Any, Optional, Union, cast
 from functools import cached_property
@@ -6,8 +6,8 @@ from pydantic import BaseModel, Field
 from model import load_measurements, DiagramOptions, DiagramStyle
 
 
-class TestBoardConfig(BaseModel):
-    """Configuration settings and parameterized dimensions for the test board rigid-flex assembly."""
+class CarrierBoardConfig(BaseModel):
+    """Configuration settings and parameterized dimensions for the carrier board rigid-flex assembly."""
 
     measurements_path: Optional[str] = Field(
         default=None,

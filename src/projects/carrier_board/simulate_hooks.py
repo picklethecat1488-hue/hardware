@@ -1,4 +1,4 @@
-"""Flying probes physics simulation and electrical validation hooks for test_board.
+"""Flying probes physics simulation and electrical validation hooks for carrier_board.
 
 Replicates a physical high-precision multi-axis flying probe tester in PyBullet.
 Loads test steps from pcb_test_steps.yaml, populates obstacles declared in PCB schema,
@@ -18,10 +18,10 @@ from provider.simulation.flying_probe import (
 
 
 def get_simulate_hooks_impl(self: Any, sim_name: str) -> Dict[Simulate, Callable[..., Any]]:
-    """Return flying probe simulation and electrical verification hooks for test_board.
+    """Return flying probe simulation and electrical verification hooks for carrier_board.
 
     Args:
-        self: TestBoardProvider instance.
+        self: CarrierBoardProvider instance.
         sim_name: Target name passed to simulator (e.g. carrier_board or flex_tail).
 
     Returns:

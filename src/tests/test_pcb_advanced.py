@@ -1,4 +1,4 @@
-"""Unit tests for advanced PCB features: CPWG impedance, RF/Display DRC, CAD boundary containment, Eye diagram, and TestBoard."""
+"""Unit tests for advanced PCB features: CPWG impedance, RF/Display DRC, CAD boundary containment, Eye diagram, and CarrierBoard."""
 
 import json
 import math
@@ -22,7 +22,7 @@ from provider.pcb.kicad_cli import KiCadCLI
 from provider.pcb.eye_diagram import EyeDiagramSimulator, EyeDiagramConfig, generate_prbs9
 from provider.pcb.rerun_logger import log_drc_report, log_eye_diagram
 from provider import Room, Mode
-from projects.test_board.provider import TestBoardProvider
+from projects.carrier_board.provider import CarrierBoardProvider
 
 
 @pytest.fixture
@@ -302,9 +302,9 @@ def test_rerun_logger_drc_and_eye(advanced_pcb_stackup: StackupModel):
     log_eye_diagram(eye_res)
 
 
-def test_test_board_provider_cad_and_assembly():
-    """Verify TestBoardProvider builds valid 3D shapes, loads measurements, and populates Room."""
-    provider = TestBoardProvider()
+def test_carrier_board_provider_cad_and_assembly():
+    """Verify CarrierBoardProvider builds valid 3D shapes, loads measurements, and populates Room."""
+    provider = CarrierBoardProvider()
     assert provider.settings.board_width == 60.0
     assert provider.settings.board_length == 90.0
 
@@ -334,7 +334,7 @@ def test_test_board_provider_cad_and_assembly():
 
     # Check PCB config loading
     assert provider.pcb_config is not None
-    assert provider.pcb_config.name == "TestBoard_Carrier"
+    assert provider.pcb_config.name == "CarrierBoard"
     assert provider.pcb_config.board_type == "rigid-flex"
     assert len(provider.pcb_config.stackup.layers) == 11
     assert len(provider.pcb_config.capacitive_sensors) == 7  # BUG-147: 5 slider + 1 action + 1 prox
@@ -395,9 +395,9 @@ def test_schematic_diagram_dynamic_scaling(tmp_path: Path):
     assert svg_height >= 700
 
 
-def test_test_board_wiring_and_diagram_generation(tmp_path: Path):
-    """Verify that TestBoard wiring YAML parses footprints and nets, generates diagrams, and exports BOM/CPL."""
-    provider = TestBoardProvider()
+def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
+    """Verify that CarrierBoard wiring YAML parses footprints and nets, generates diagrams, and exports BOM/CPL."""
+    provider = CarrierBoardProvider()
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
@@ -768,9 +768,9 @@ def test_pcb_exporter_mounting_holes(tmp_path: Path, advanced_pcb_stackup: Stack
     assert '(pad "1" np_thru_hole circle (at 0 0) (size 2.5 2.5) (drill 2.5)' in pcb_text
 
 
-def test_test_board_full_milestones_integration(tmp_path: Path):
-    """Verify TestBoardProvider integrates mounting holes, 3 mutual + 1 self cap sensors, and carrier standoffs."""
-    provider = TestBoardProvider()
+def test_carrier_board_full_milestones_integration(tmp_path: Path):
+    """Verify CarrierBoardProvider integrates mounting holes, 3 mutual + 1 self cap sensors, and carrier standoffs."""
+    provider = CarrierBoardProvider()
     cfg = provider.pcb_config
     assert cfg is not None
 
@@ -833,13 +833,13 @@ def test_test_board_full_milestones_integration(tmp_path: Path):
     assert cap_data["channels"][6]["drive_shield"] is False
 
 
-def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
-    """Verify test_board manufacturing exports (.kicad_pcb, .drl, *.gbr) and pos.csv pad alignment."""
+def test_carrier_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
+    """Verify carrier_board manufacturing exports (.kicad_pcb, .drl, *.gbr) and pos.csv pad alignment."""
     import csv
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from provider.pcb.drc import PCBDesignRulesChecker
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     cfg = provider.pcb_config
     assert cfg is not None
     wiring = Wiring(provider.wiring_path)
@@ -872,14 +872,14 @@ def test_test_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     # 2. Export board files (.kicad_pcb, .drl, .gbr) and pos.csv
     exporter = PCBExporter(cfg, wiring)
     board_dir = tmp_path / "board"
-    exporter.export_board(board_dir, pcb_filename="test_board.kicad_pcb")
+    exporter.export_board(board_dir, pcb_filename="carrier_board.kicad_pcb")
 
     pos_file = tmp_path / "pos.csv"
     exporter.export_pick_and_place_csv(pos_file)
 
     # 3. Verify .kicad_pcb and .drl exist
-    kicad_pcb = board_dir / "test_board.kicad_pcb"
-    drill_file = board_dir / "test_board.drl"
+    kicad_pcb = board_dir / "carrier_board.kicad_pcb"
+    drill_file = board_dir / "carrier_board.drl"
     assert kicad_pcb.exists()
 
     pcb_text = kicad_pcb.read_text(encoding="utf-8")
@@ -1077,13 +1077,13 @@ def test_schematic_decoupling_cap_bank_and_pullup_resistors():
     plt.close(fig)
 
 
-def test_test_board_test_points_and_zero_drc_errors():
-    """Verify test_board has drilled test points with 4mm pitch, TP_GND, and 0 DRC violations."""
-    from projects.test_board.provider import TestBoardProvider
+def test_carrier_board_test_points_and_zero_drc_errors():
+    """Verify carrier_board has drilled test points with 4mm pitch, TP_GND, and 0 DRC violations."""
+    from projects.carrier_board.provider import CarrierBoardProvider
     from provider.pcb.drc import PCBDesignRulesChecker
     import math
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     cfg = provider.pcb_config
     assert cfg is not None
 
@@ -1109,7 +1109,7 @@ def test_test_board_test_points_and_zero_drc_errors():
     assert abs(point_dist("TP11", "TP12") - 4.0) < 1e-3
     assert abs(point_dist("TP9", "TP10") - 4.0) < 1e-3
 
-    # DRC check: 0 errors on test_board
+    # DRC check: 0 errors on carrier_board
     wiring = Wiring(provider.wiring_path)
     drc = PCBDesignRulesChecker(cfg)
     report = drc.check_all(wiring=wiring)
@@ -1126,8 +1126,8 @@ def test_schematic_discrete_component_truth_table(tmp_path: Path):
     from model.wiring import TruthTableModel, TruthTableRowModel, TruthTableState, LabelModel
     from provider.schematic_diagram import SchematicDiagram
 
-    # 1. Verify parsing of declarative truth table in test_board/wiring.yaml
-    provider = TestBoardProvider()
+    # 1. Verify parsing of declarative truth table in carrier_board/wiring.yaml
+    provider = CarrierBoardProvider()
     wiring = Wiring(provider.wiring_path)
     q1 = next(fp for fp in wiring.footprints if fp.name == "Q1")
     assert q1.truth_table is not None
@@ -1174,9 +1174,9 @@ def test_schematic_discrete_component_truth_table(tmp_path: Path):
     auto_states = {r.state for r in auto_tt.rows}
     assert auto_states == {TruthTableState.FALSE, TruthTableState.TRUE, TruthTableState.INVALID}
 
-    # 3. Verify schematic PDF rendering of test_board wiring produces valid multi-page document with truth table
+    # 3. Verify schematic PDF rendering of carrier_board wiring produces valid multi-page document with truth table
     diag = SchematicDiagram(wiring)
-    out_pdf = tmp_path / "test_board_schematic.pdf"
+    out_pdf = tmp_path / "carrier_board_schematic.pdf"
     res = diag.render_pdf(out_pdf)
     assert res.exists()
     assert res.stat().st_size > 0
@@ -1190,10 +1190,10 @@ def test_schematic_diagram_geometric_offsets_and_gnd_placement(tmp_path: Path) -
     2. IC pin ordering: Power pins placed at top, Ground pins at bottom.
     3. Ground symbol downward placement: GND symbols hang DOWN under components/traces rather than horizontal overlap.
     """
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from provider.schematic_diagram import SchematicDiagram, GROUND_NET_NAMES, POWER_NET_NAMES
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     diag = SchematicDiagram(wiring, pcb_config=provider.pcb_config)
 
@@ -1235,11 +1235,11 @@ def test_schematic_diagram_geometric_offsets_and_gnd_placement(tmp_path: Path) -
 
 def test_regression_j_usb_edge_facing_and_drc_exemption() -> None:
     """Verify J3 USB-C connector faces outward to board edge and is exempt from internal DRC margin."""
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
     from provider.pcb.drc import PCBDesignRulesChecker
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     j3 = next(fp for fp in wiring.footprints if fp.name == "J3")
 
@@ -1257,12 +1257,12 @@ def test_regression_j_usb_edge_facing_and_drc_exemption() -> None:
 
 def test_regression_piezo_speaker_circular_silkscreen_and_placement() -> None:
     """Verify U5 piezo speaker has circular footprint and is positioned near MH2."""
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
     import math
     import yaml
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     u5 = next(fp for fp in wiring.footprints if fp.name == "U5")
 
@@ -1302,12 +1302,12 @@ def test_regression_collinear_vector_simplification() -> None:
 
 def test_regression_subassembly_footprint_isolation() -> None:
     """Verify PCBAutoRouter and PCBExporter cleanly isolate carrier and flex subassemblies."""
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
     from provider.pcb.router import PCBAutoRouter
     from provider import Mode
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
 
     # Carrier board router
@@ -1334,12 +1334,12 @@ def test_regression_subassembly_footprint_isolation() -> None:
 
 def test_regression_flex_tail_front_routing_and_silkscreen(tmp_path: Path) -> None:
     """Verify flex tail has routed traces on F.Cu, silkscreen on B.SilkS, and valid spacing (BUG-038)."""
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
     from provider.pcb.exporter import PCBExporter
     from provider import Mode
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     flex_part = provider.part.get("flex_tail")
     assert flex_part is not None
@@ -1369,19 +1369,19 @@ def test_regression_flex_tail_front_routing_and_silkscreen(tmp_path: Path) -> No
     assert ch3_bottom > ch2_top, f"CH3 bottom ({ch3_bottom}) must be strictly above CH2 top ({ch2_top})"
 
 
-def test_schematic_drc_test_board_passes() -> None:
-    """Verify that test_board schematic satisfies all schematic DRC rules with zero errors."""
-    from projects.test_board.provider import TestBoardProvider
+def test_schematic_drc_carrier_board_passes() -> None:
+    """Verify that carrier_board schematic satisfies all schematic DRC rules with zero errors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
     from provider.pcb.drc import PCBDesignRulesChecker
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     checker = PCBDesignRulesChecker(provider.pcb_config)
 
     violations = checker.check_schematic(wiring)
     errors = [v for v in violations if v.severity == "error"]
-    assert len(errors) == 0, f"Expected 0 schematic DRC errors on test_board, got: {errors}"
+    assert len(errors) == 0, f"Expected 0 schematic DRC errors on carrier_board, got: {errors}"
 
 
 def test_schematic_drc_detects_dangling_component(advanced_pcb_stackup: StackupModel) -> None:
@@ -1599,11 +1599,11 @@ def test_schematic_drc_detects_missing_page_transition(advanced_pcb_stackup: Sta
 
 def test_regression_smd_no_connect_pads_included_on_pcb(tmp_path: Path) -> None:
     """Verify that SMD components (U1 BGA-196, J3 USB-C, J2/J4 FPC-30) place no-connect pads on the board (BUG-043)."""
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
     from provider.pcb.exporter import PCBExporter
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
 
     # 1. Verify U1 has all 184 balls defined
@@ -1639,14 +1639,14 @@ def test_regression_smd_no_connect_pads_included_on_pcb(tmp_path: Path) -> None:
 def test_regression_inner_copper_layers_and_auto_routing_connectivity(tmp_path: Path) -> None:
     """Verify inner copper layer refill, pin rotation math, and BGA dogbone stitching connectivity."""
     import math
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
     from provider.pcb.router import PCBAutoRouter
     from provider.pcb.drc import _get_pin_absolute_pos
     from provider.pcb.exporter import PCBExporter
     from provider.pcb.kicad_cli import KiCadCLI
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
 
     # 1. Verify KiCad screen-space pin rotation math for rotated footprints (J3 at 270 deg)
@@ -1718,7 +1718,7 @@ def test_regression_inner_copper_layers_and_auto_routing_connectivity(tmp_path: 
 
 def test_regression_deep_power_down_wakeup_and_power_sequencing() -> None:
     """Verify BUG-060 (Deep Power Down wakeup) and BUG-061 (power-on sequencing verification)."""
-    report_path = Path("src/projects/test_board/docs/downselection_report.md")
+    report_path = Path("src/projects/carrier_board/docs/downselection_report.md")
     assert report_path.is_file(), "Downselection report must exist locally"
     content = report_path.read_text(encoding="utf-8")
 
@@ -1743,7 +1743,7 @@ def test_regression_deep_power_down_wakeup_and_power_sequencing() -> None:
 
 def test_regression_flexspi_dual_channel_and_charger_state_detection() -> None:
     """Verify BUG-062 (FlexSPI Dual Channel Mode) and BUG-063 (Charger /CHG state transitions)."""
-    report_path = Path("src/projects/test_board/docs/downselection_report.md")
+    report_path = Path("src/projects/carrier_board/docs/downselection_report.md")
     assert report_path.is_file(), "Downselection report must exist locally"
     content = report_path.read_text(encoding="utf-8")
 
@@ -1768,7 +1768,7 @@ def test_regression_flexspi_dual_channel_and_charger_state_detection() -> None:
     assert "ACTIVE_CHARGING" in content
 
     # 3. Datasheet local archival verification
-    datasheet_dir = Path("src/projects/test_board/docs/datasheets")
+    datasheet_dir = Path("src/projects/carrier_board/docs/datasheets")
     assert (datasheet_dir / "NXP_MCXN947_datasheet.pdf").is_file()
     assert (datasheet_dir / "Winbond_W25N01GV_datasheet.pdf").is_file()
     assert (datasheet_dir / "TI_BQ24074_charger.pdf").is_file()
@@ -1778,7 +1778,7 @@ def test_regression_flexspi_dual_channel_and_charger_state_detection() -> None:
 
 def test_regression_pinmux_datasheet_verification() -> None:
     """Verify BUG-064: ensure MCU pin assignments are 100% sourced from NXP MCX N947 Table 93."""
-    report_path = Path("src/projects/test_board/docs/downselection_report.md")
+    report_path = Path("src/projects/carrier_board/docs/downselection_report.md")
     assert report_path.is_file(), "Downselection report must exist locally"
     content = report_path.read_text(encoding="utf-8")
 
@@ -1836,20 +1836,20 @@ def test_regression_pinmux_datasheet_verification() -> None:
     assert "M4" in content and "P1_23" in content and "PWR_EN_DEBUG" in content
 
 
-def test_regression_test_board_wiring_diagram_top_down_and_colored() -> None:
-    """Verify test board wiring diagram is 2D top-down and colored with distinct net layers."""
+def test_regression_carrier_board_wiring_diagram_top_down_and_colored() -> None:
+    """Verify carrier board wiring diagram is 2D top-down and colored with distinct net layers."""
     from model import DiagramStyle
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     room_wiring = Room()
-    provider.diagram_wiring(room_wiring, ["test_board/wiring"], Mode.DEFAULT)
+    provider.diagram_wiring(room_wiring, ["carrier_board/wiring"], Mode.DEFAULT)
 
     assert room_wiring.diagram_options is not None
     assert room_wiring.diagram_options.view_from == "top"
     assert room_wiring.diagram_options.style == DiagramStyle.COLOR
 
     room_prod = Room()
-    provider.diagram_product(room_prod, ["test_board/product"], Mode.DEFAULT)
+    provider.diagram_product(room_prod, ["carrier_board/product"], Mode.DEFAULT)
     assert room_prod.diagram_options is not None
     assert room_prod.diagram_options.view_from == "iso"
     assert room_prod.diagram_options.style == DiagramStyle.HIDDEN
@@ -1857,7 +1857,7 @@ def test_regression_test_board_wiring_diagram_top_down_and_colored() -> None:
 
 def test_regression_enclosure_cad_feedback_and_assembly() -> None:
     """Verify enclosure CAD feedback: rounded fillets, cutouts, locating lip, and product assembly."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
 
     # 1. Verify bottom enclosure geometry
     bottom = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
@@ -1916,7 +1916,7 @@ def test_regression_enclosure_cad_feedback_and_assembly() -> None:
 
 def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
     """Verify BUG-065 (M.2 cutout in bottom enclosure) and BUG-066 (component silkscreens on carrier)."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
 
     # 1. BUG-065: Verify M.2 cutout settings and bottom enclosure build
     assert provider.settings.enclosure_m2_cutout_width == 24.0
@@ -1947,7 +1947,7 @@ def test_regression_schematic_page_boundary_drc_and_layout(tmp_path: Path) -> No
     from provider.schematic_diagram import SchematicDiagram
     from provider.pcb.drc import DRCRuleName
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     checker = PCBDesignRulesChecker(provider.pcb_config)
 
@@ -1961,14 +1961,14 @@ def test_regression_schematic_page_boundary_drc_and_layout(tmp_path: Path) -> No
 
     # 2. Verify schematic multi-page PDF generation without clipping
     diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
-    pdf_out = diag.render_pdf(tmp_path / "test_board_schematic.pdf")
+    pdf_out = diag.render_pdf(tmp_path / "carrier_board_schematic.pdf")
     assert pdf_out.is_file()
     assert pdf_out.stat().st_size > 5000
 
 
 def test_regression_battery_connector_j13(tmp_path: Path) -> None:
     """Verify BUG-070: JST-PH battery connector J13, C13 decoupling, and VBAT net."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     checker = PCBDesignRulesChecker(provider.pcb_config)
 
@@ -2012,12 +2012,12 @@ def test_regression_battery_connector_j13(tmp_path: Path) -> None:
 
 
 def test_regression_downselection_results_application() -> None:
-    """Verify BUG-067: downselection results from downselection_report.md applied to test_board.md and PCB."""
-    tb_doc = Path("src/projects/test_board.md")
-    assert tb_doc.is_file(), "test_board.md must exist"
+    """Verify BUG-067: downselection results from downselection_report.md applied to carrier_board.md and PCB."""
+    tb_doc = Path("src/projects/carrier_board.md")
+    assert tb_doc.is_file(), "carrier_board.md must exist"
     content = tb_doc.read_text(encoding="utf-8")
 
-    # 1. Verify all downselected active ICs and peripherals in test_board.md
+    # 1. Verify all downselected active ICs and peripherals in carrier_board.md
     assert "MCXN947VDF" in content, "MCU MCXN947VDF must be documented in BOM"
     assert "W25N01GVZEIG" in content, "NAND W25N01GVZEIG must be documented in BOM"
     assert "BQ24074RGTR" in content, "Charger BQ24074RGTR must be documented in BOM"
@@ -2041,7 +2041,7 @@ def test_regression_downselection_results_application() -> None:
     assert "J14" in content and "GPIO" in content
 
     # 3. Verify all downselected components are placed in wiring footprints
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     fp_map = {fp.name: fp for fp in wiring.footprints}
     u1 = fp_map["U1"]
@@ -2075,7 +2075,7 @@ def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path
     from provider.schematic_diagram import SchematicDiagram
     from provider.pcb.drc import DRCRuleName
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     checker = PCBDesignRulesChecker(provider.pcb_config)
 
@@ -2101,7 +2101,7 @@ def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path
     try:
         with PdfPages(tmp_path / "sheet_pullup.pdf") as pdf:
             diag._render_pdf_schematic_sheet(
-                pdf, "test_board", pullup_sheet, pullup_sheet.sheet_idx, wiring.nets, len(plans), len(plans)
+                pdf, "carrier_board", pullup_sheet, pullup_sheet.sheet_idx, wiring.nets, len(plans), len(plans)
             )
     finally:
         matplotlib.figure.Figure.add_axes = orig_add_axes
@@ -2120,12 +2120,12 @@ def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path
 
 def test_regression_bug_082_carrier_board_routing_and_kicad_drc(tmp_path: Path):
     """Verify BUG-082: carrier_board routes cleanly with zero drc.py and zero KiCad DRC errors."""
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from provider.pcb.drc import PCBDesignRulesChecker
     from provider.pcb.exporter import PCBExporter
     from provider.pcb.kicad_cli import KiCadCLI
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     pcb_cfg = provider.pcb_config
 
@@ -2157,10 +2157,10 @@ def test_regression_bug_082_carrier_board_routing_and_kicad_drc(tmp_path: Path):
 
 def test_regression_bug_084_carrier_board_and_schematic_revision_2_0(tmp_path: Path):
     """Verify BUG-084: carrier_board files, schematics, and silkscreen reflect Revision 2.0."""
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from provider.pcb.exporter import PCBExporter
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     pcb_cfg = provider.pcb_config
 
@@ -2191,9 +2191,9 @@ def test_regression_bug_084_carrier_board_and_schematic_revision_2_0(tmp_path: P
 def test_regression_bug_085_clip_on_mounting_posts() -> None:
     """Verify BUG-085: carrier mounting holes on enclosure bottom replaced with flared clip-on posts."""
     from build123d import Location
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     carrier = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
 
@@ -2240,7 +2240,7 @@ def test_regression_bug_085_clip_on_mounting_posts() -> None:
 
 def test_regression_bug_086_azoteq_capacitive_sensing() -> None:
     """Verify BUG-086: Downselection of U2 to Azoteq IQS7222A001QNR / IQS7211A in QFN-20."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(provider.wiring_path)
     fp_map = {fp.name: fp for fp in wiring.footprints}
 
@@ -2321,11 +2321,11 @@ def test_regression_bug_086_azoteq_capacitive_sensing() -> None:
 def test_regression_bug_087_power_test_points():
     """Verify BUG-087: carrier_board has power test points for VBAT, VBUS, 3V3, and GND."""
     import math
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from provider.pcb.drc import PCBDesignRulesChecker
     from model.wiring import Wiring
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     cfg = provider.pcb_config
     assert cfg is not None
 
@@ -2380,11 +2380,11 @@ def test_regression_bug_088_schematic_defects_and_drc() -> None:
     5. DRC rules SCHEMATIC_TITLE_BLOCK_COLLISION, SCHEMATIC_HEADER_COLLISION, and SCHEMATIC_DANGLING_COMPONENT.
     """
     from model.wiring import Wiring
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from provider.pcb.drc import PCBDesignRulesChecker
     from provider.schematic_diagram import SchematicDiagram
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     cfg = provider.pcb_config
 
@@ -2434,10 +2434,10 @@ def test_regression_bug_089_schematic_subsystem_organization() -> None:
     4. Schematic DRC violations across organized sheets.
     """
     from model.wiring import Wiring
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from provider.pcb.drc import PCBDesignRulesChecker
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     cfg = provider.pcb_config
 
@@ -2489,7 +2489,7 @@ def test_regression_bug_089_schematic_subsystem_organization() -> None:
 
 def test_regression_bug_090_enclosure_cad_feedback() -> None:
     """Verify BUG-090: SWD vs USB cutout separation, rounded side cutouts, and lid battery mount."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     cfg = provider.pcb_config
     assert cfg is not None
     wiring = Wiring(str(provider.wiring_path))
@@ -2552,10 +2552,10 @@ def test_regression_bug_090_enclosure_cad_feedback() -> None:
 def test_regression_bug_092_carrier_board_top_logo() -> None:
     """Verify BUG-092: Antigravity logo placed as a unique graphic image within a square frame (not text) on carrier board top with zero DRC errors."""
     from pathlib import Path
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from provider.pcb.drc import PCBDesignRulesChecker
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     silks = provider.silkscreen()
     silk_map = {t.text: t for t in silks}
 
@@ -2585,7 +2585,7 @@ def test_regression_bug_092_carrier_board_top_logo() -> None:
 
     # 3. Unique logo image asset must exist within a square frame
     repo_root = Path(__file__).resolve().parents[2]
-    logo_asset = repo_root / "src" / "projects" / "test_board" / "docs" / "assets" / "carrier_board_logo.jpg"
+    logo_asset = repo_root / "src" / "projects" / "carrier_board" / "docs" / "assets" / "carrier_board_logo.jpg"
     assert logo_asset.exists(), f"Unique logo image asset must exist at {logo_asset}"
 
     # 4. DRC check verifies zero silkscreen-to-pad overlap errors
@@ -2654,7 +2654,7 @@ def test_regression_bug_094_dynamic_geometric_priority_and_rip_up_reroute() -> N
         ]
     )
     cfg = PCBConfig(
-        name="test_board",
+        name="carrier_board",
         dimensions_mm=(40.0, 40.0, 1.6),
         stackup=stackup,
     )
@@ -2669,10 +2669,10 @@ def test_regression_bug_094_dynamic_geometric_priority_and_rip_up_reroute() -> N
 
 def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> None:
     """Verify BUG-105 & BUG-106: dedicated AUDIO_EN GPIO, dedicated expansion INT GPIOs, and SENSOR_3V3 regulator."""
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
 
     # 1. Verify AUDIO_EN connects MCU L4 to audio amp U4 SD_MODE (BUG-105)
@@ -2738,11 +2738,11 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
 
 def test_regression_schematic_router_invariants_bug_098_through_104() -> None:
     """Verify schematic router invariants for BUG-098 through BUG-104."""
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
     from provider.schematic_diagram import SchematicDiagram
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     sd = SchematicDiagram(wiring, pcb_config=provider.pcb_config)
     sheets = sd._build_sheet_plans()
@@ -2767,12 +2767,12 @@ def test_regression_bugs_115_through_127() -> None:
     """Verify regression invariants for BUG-115 through BUG-127."""
     from pathlib import Path
     import yaml
-    from projects.test_board.provider import TestBoardProvider
+    from projects.carrier_board.provider import CarrierBoardProvider
     from model.wiring import Wiring
     from provider.schematic_diagram import SchematicDiagram
     from provider.pcb.drc import _get_pin_absolute_pos
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     pcb_cfg = provider.pcb_config
 
@@ -2841,7 +2841,7 @@ def test_regression_bugs_115_through_127() -> None:
     assert u1_gpio_sides.get("N10") == "right" and u1_gpio_sides.get("T10") == "right"
 
     # BUG-124: manifest.yaml exports obj for carrier_board and flex_tail
-    manifest_path = Path("src/projects/test_board/manifest.yaml")
+    manifest_path = Path("src/projects/carrier_board/manifest.yaml")
     with open(manifest_path, "r") as f:
         manifest_data = yaml.safe_load(f)
     for part in manifest_data.get("parts", []):
@@ -2849,8 +2849,10 @@ def test_regression_bugs_115_through_127() -> None:
             assert "obj" in part.get("export", []), f"BUG-124: {part['name']} must export obj"
 
     # BUG-125 & CR 9140e9d18d0e: textures exist in build output, not committed in project textures/
-    assert not Path("src/projects/test_board/textures").exists(), "Textures subfolder must not exist in project source"
-    tex_dir = Path("build/board/test_board/textures")
+    assert not Path("src/projects/carrier_board/textures").exists(), (
+        "Textures subfolder must not exist in project source"
+    )
+    tex_dir = Path("build/board/carrier_board/textures")
     from provider.pcb.kicad_cli import KiCadCLI
 
     if tex_dir.parent.exists() and KiCadCLI().supports_render:
@@ -2890,7 +2892,7 @@ def test_regression_bugs_115_through_127() -> None:
     # CR Item 4d403f3fec09 & 6235032c3438: Flying probe simulator in provider library and test steps from YAML
     from provider.simulation.flying_probe import load_test_steps_from_yaml, render_markdown_test_report
 
-    test_steps_path = Path("src/projects/test_board/pcb_test_steps.yaml")
+    test_steps_path = Path("src/projects/carrier_board/pcb_test_steps.yaml")
     assert test_steps_path.exists(), "pcb_test_steps.yaml must exist"
     carrier_steps = load_test_steps_from_yaml(test_steps_path, "carrier_board")
     assert len(carrier_steps) >= 5, f"carrier_board must declare test steps, found {len(carrier_steps)}"
@@ -2937,4 +2939,4 @@ def test_regression_bugs_115_through_127() -> None:
     )
 
     # CR Item 70dba9941823: Peripheral cutouts read dynamically from footprints
-    assert hasattr(provider, "enclosure_bottom"), "TestBoardProvider must have enclosure_bottom"
+    assert hasattr(provider, "enclosure_bottom"), "CarrierBoardProvider must have enclosure_bottom"

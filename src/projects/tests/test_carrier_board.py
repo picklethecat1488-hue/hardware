@@ -1,15 +1,15 @@
-"""Tests for test_board rigid-flex PCB and protective enclosure CAD geometry."""
+"""Tests for carrier_board rigid-flex PCB and protective enclosure CAD geometry."""
 
 import pytest
 from build123d import Location
-from projects.test_board.provider import TestBoardProvider
+from projects.carrier_board.provider import CarrierBoardProvider
 from model.wiring import Wiring
 from provider import Mode
 
 
 def test_regression_bug_072_flex_tail_cutout_zero_intersection() -> None:
     """Verify BUG-072: flex tail has zero intersection volume with enclosure bottom and lid."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
@@ -39,7 +39,7 @@ def test_regression_bug_072_flex_tail_cutout_zero_intersection() -> None:
 
 def test_regression_bug_073_gpio_cutout_and_key() -> None:
     """Verify BUG-073: enclosure lid has GPIO cutout and key for J14."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
 
@@ -55,7 +55,7 @@ def test_regression_bug_073_gpio_cutout_and_key() -> None:
 
 def test_regression_bug_074_peripheral_cutouts_and_identifiers() -> None:
     """Verify BUG-074: enclosure bottom has peripheral cutouts for I2C, I3C, and SPI with identifiers."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
     standoff_h = provider.settings.standoff_height
@@ -77,7 +77,7 @@ def test_regression_bug_074_peripheral_cutouts_and_identifiers() -> None:
 
 def test_regression_bug_110_expansion_headers_jst_ph() -> None:
     """Verify BUG-110: expansion header connectors J9 and J10 are 6-pin JST-PH style connectors."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     comp_map = {c.name: c for c in wiring.footprints}
 
@@ -89,7 +89,7 @@ def test_regression_bug_110_expansion_headers_jst_ph() -> None:
 
 def test_regression_bug_113_carrier_board_serial_cutouts_do_not_overlap() -> None:
     """Verify BUG-113: peripheral and serial expansion cutouts do not overlap, leaving solid walls."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
     standoff_h = provider.settings.standoff_height
@@ -122,7 +122,7 @@ def test_regression_bug_113_carrier_board_serial_cutouts_do_not_overlap() -> Non
 
 def test_regression_bug_075_swd_cutout() -> None:
     """Verify BUG-075: enclosure bottom has SWD cutout through the left exterior wall."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
     standoff_h = provider.settings.standoff_height
@@ -149,7 +149,7 @@ def test_regression_bug_075_swd_cutout() -> None:
 
 def test_regression_bug_076_enclosure_snap_fit() -> None:
     """Verify BUG-076: enclosure lid snap fits to bottom shell without useless screw holes."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
 
@@ -189,7 +189,7 @@ def test_regression_bug_076_enclosure_snap_fit() -> None:
 
 def test_regression_bug_077_ventilation_holes() -> None:
     """Verify BUG-077: enclosure bottom has ventilation slots between charger (U3) and amplifier (U4)."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
     standoff_h = provider.settings.standoff_height
@@ -207,7 +207,7 @@ def test_regression_bug_077_ventilation_holes() -> None:
 
 def test_regression_bug_078_led_cutout_and_cover() -> None:
     """Verify BUG-078: enclosure lid has LED cutout at D1 and clear LED cover part."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
 
@@ -232,7 +232,7 @@ def test_regression_bug_078_led_cutout_and_cover() -> None:
 
 def test_regression_bug_085_enclosure_clip_on_mounting_posts() -> None:
     """Verify BUG-085: enclosure bottom replaces screw holes with flared clip-on mounting posts for carrier PCB."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     carrier = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
 
@@ -292,7 +292,7 @@ def test_regression_bug_107_carrier_board_flying_probes_simulation() -> None:
     import pybullet as p
     from provider import Simulate
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     hooks = provider.get_simulate_hooks("carrier_board")
     assert Simulate.SETUP in hooks, "Carrier board must have Simulate.SETUP hook"
     assert Simulate.STEP in hooks, "Carrier board must have Simulate.STEP hook"
@@ -326,7 +326,7 @@ def test_regression_bug_108_flex_tail_flying_probes_simulation() -> None:
     import pybullet as p
     from provider import Simulate
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     hooks = provider.get_simulate_hooks("flex_tail")
     assert Simulate.SETUP in hooks, "Flex tail must have Simulate.SETUP hook"
     assert Simulate.STEP in hooks, "Flex tail must have Simulate.STEP hook"
@@ -363,7 +363,7 @@ def test_regression_bug_131_schematic_collinear_wire_overlaps() -> None:
     from provider.pcb.drc import PCBDesignRulesChecker, DRCRuleName
     from provider.schematic_diagram import SchematicDiagram
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
     with open(pcb_yaml_path) as f:
@@ -395,7 +395,7 @@ def test_regression_bug_131_schematic_collinear_wire_overlaps() -> None:
 
 def test_regression_bug_132_expansion_carrier_mount_and_endpoints() -> None:
     """Verify BUG-132: enclosure bottom has expansion carrier mounting collar and connector endpoints."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
     w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
@@ -426,14 +426,14 @@ def test_regression_bug_133_flex_tail_schematic_isolated() -> None:
     from pathlib import Path
     from model.wiring import Wiring
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(Path(provider.wiring_path))
     flex_wiring = wiring.filter_by_footprints(["J4"])
     assert len(flex_wiring.footprints) == 1
     assert flex_wiring.footprints[0].name == "J4"
 
     # Verify generated flex_tail schematic has only J4
-    sch_path = Path("build/schematics/test_board/flex_tail.kicad_sch")
+    sch_path = Path("build/schematics/carrier_board/flex_tail.kicad_sch")
     if sch_path.exists():
         sch_text = sch_path.read_text()
         assert "J4" in sch_text
@@ -447,7 +447,7 @@ def test_regression_bug_134_carrier_board_components_match_schematic() -> None:
     from model.wiring import Wiring
     from provider.pcb.drc import PCBDesignRulesChecker
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(Path(provider.wiring_path))
     footprints = {fp.name: fp for fp in wiring.footprints}
     for j_name in ("J6", "J7", "J8"):
@@ -465,7 +465,7 @@ def test_regression_bug_134_carrier_board_components_match_schematic() -> None:
 
 def test_regression_bug_139_battery_cover() -> None:
     """Verify BUG-139: battery cover fits over enclosure lid battery cradle with clearance."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     cover = provider.battery_cover("battery_cover", None, Mode.DEFAULT)
     cover_print = provider.battery_cover("battery_cover", None, Mode.PRINT)
     assert cover.part.volume > 0.0, "Battery cover volume must be positive"
@@ -493,7 +493,7 @@ def test_regression_bug_139_battery_cover() -> None:
 
 def test_regression_bug_140_flex_tail_support() -> None:
     """Verify BUG-140: enclosure bottom extends a support shelf under the flex tail."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
 
@@ -525,7 +525,7 @@ def test_regression_bug_140_flex_tail_support() -> None:
 
 def test_regression_bug_141_flex_tail_tab_fit() -> None:
     """Verify BUG-141: ZIF connector J2 on carrier board is wider than flex tail tab so flex tail fits."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
     bbox = tail.part.bounding_box()
     assert bbox.size.X <= 24.0, f"Flex tail width exceeded: {bbox.size.X}"
@@ -538,7 +538,7 @@ def test_regression_bug_141_flex_tail_tab_fit() -> None:
 
 def test_regression_bug_142_m2_floor_cutout() -> None:
     """Verify BUG-142: enclosure bottom floor has pass-through cutout under PCIE connector J1."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
     standoff_h = provider.settings.standoff_height
@@ -559,7 +559,7 @@ def test_regression_bug_142_m2_floor_cutout() -> None:
 
 def test_regression_bug_143_peripheral_cutouts_uniform_size() -> None:
     """Verify BUG-143: all peripheral cutouts in enclosure bottom have uniform length and spacing."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
     standoff_h = provider.settings.standoff_height
@@ -585,7 +585,7 @@ def test_regression_bug_143_peripheral_cutouts_uniform_size() -> None:
 
 def test_regression_bug_144_m2_rear_wall_cutout() -> None:
     """Verify BUG-144: enclosure bottom rear wall has cutout for J1 insertion."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
     standoff_h = provider.settings.standoff_height
@@ -607,7 +607,7 @@ def test_regression_bug_145_battery_cradle_and_cover_extend_over_j13() -> None:
     """Verify BUG-145: battery cradle and cover extend over J13 cutout to conceal wiring."""
     from build123d import Location
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
     cover = provider.battery_cover("battery_cover", None, Mode.DEFAULT)
     wiring = Wiring(str(provider.wiring_path))
@@ -628,7 +628,7 @@ def test_regression_bug_145_battery_cradle_and_cover_extend_over_j13() -> None:
 
 def test_regression_bug_146_mipi_camera_routing_removed() -> None:
     """Verify BUG-146: MIPI camera routing and differential nets are removed from board."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     pcb_cfg = provider.pcb_config
 
@@ -649,7 +649,7 @@ def test_regression_bug_146_mipi_camera_routing_removed() -> None:
 
 def test_regression_bug_147_flex_ribbon_slider_action_prox() -> None:
     """Verify BUG-147: flex ribbon features 5-button slider, action button, and prox sensor."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
     pcb_cfg = provider.pcb_config
 
@@ -663,7 +663,7 @@ def test_regression_bug_147_flex_ribbon_slider_action_prox() -> None:
 
 def test_regression_bug_148_flex_ribbon_support_connects_to_enclosure() -> None:
     """Verify BUG-148: flex ribbon support shelf connects continuously with enclosure bottom."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
 
     # Must be a single contiguous fused solid (no disconnected/floating parts)
@@ -687,7 +687,7 @@ def test_regression_bug_148_flex_ribbon_support_connects_to_enclosure() -> None:
 
 def test_regression_bug_150_component_cutout_labels() -> None:
     """Verify BUG-150: charger, SWD, M.2 PCIe, and flex ribbon cutouts have labels."""
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
@@ -701,10 +701,10 @@ def test_regression_bug_150_component_cutout_labels() -> None:
 
 @pytest.mark.slow
 def test_regression_bug_149_mutual_intersection_test() -> None:
-    """Verify BUG-149: all components in test_board assembly have zero mutual volume intersection."""
+    """Verify BUG-149: all components in carrier_board assembly have zero mutual volume intersection."""
     from build123d import Location
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     carrier = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
     tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
@@ -766,7 +766,7 @@ def test_regression_bug_152_textured_pcb_simulation_visibility() -> None:
     """Verify BUG-152: carrier board and flex tail expose urdf_label for textured PCB visualization."""
     from pathlib import Path
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     carrier = provider.carrier_board("carrier_board", None, Mode.DEFAULT)
     tail = provider.flex_tail("flex_tail", None, Mode.DEFAULT)
 
@@ -776,8 +776,8 @@ def test_regression_bug_152_textured_pcb_simulation_visibility() -> None:
     assert getattr(tail, "urdf_label", None) == "flex_tail", "flex_tail must have urdf_label"
     assert getattr(tail.part, "urdf_label", None) == "flex_tail", "flex_tail.part must have urdf_label"
 
-    # Board textures must exist in build/board/test_board/textures
-    tex_dir = Path("build/board/test_board/textures")
+    # Board textures must exist in build/board/carrier_board/textures
+    tex_dir = Path("build/board/carrier_board/textures")
     assert (tex_dir / "carrier_board_top.png").exists(), "carrier_board_top.png must exist"
     assert (tex_dir / "carrier_board_bottom.png").exists(), "carrier_board_bottom.png must exist"
 
@@ -787,7 +787,7 @@ def test_regression_bug_153_flying_probes_report_formatting() -> None:
     import pybullet as p
     from provider import Simulate
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     hooks = provider.get_simulate_hooks("carrier_board")
     client = p.connect(p.DIRECT)
     try:
@@ -813,3 +813,35 @@ def test_regression_bug_153_flying_probes_report_formatting() -> None:
         assert "PCIe 85 Ω" in report_md, "Report must document PCIe 85 Ω impedance"
     finally:
         p.disconnect(client)
+
+
+def test_regression_bug_154_carrier_board_project_rename() -> None:
+    """Verify BUG-154: test_board project renamed to carrier_board across all source and configs."""
+    from pathlib import Path
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from projects_config.carrier_board_config import CarrierBoardConfig
+
+    # 1. Canonical provider class and name
+    provider = CarrierBoardProvider()
+    assert provider.name == "carrier_board"
+    assert provider.pcb_config.name == "CarrierBoard"
+
+    # 2. Canonical project file structure exists
+    repo_root = Path(__file__).resolve().parents[3]
+    carrier_dir = repo_root / "src" / "projects" / "carrier_board"
+    assert carrier_dir.is_dir(), "carrier_board project directory must exist"
+    assert (carrier_dir / "manifest.yaml").is_file()
+    assert (carrier_dir / "pcb.yaml").is_file()
+    assert (carrier_dir / "wiring.yaml").is_file()
+    assert (carrier_dir / "measurements.yaml").is_file()
+    assert (repo_root / "src" / "projects" / "carrier_board.md").is_file()
+    assert (repo_root / "src" / "projects_config" / "carrier_board_config.py").is_file()
+
+    # 3. Old test_board paths must NOT exist (no lingering shims or directories)
+    assert not (repo_root / "src" / "projects" / "test_board").exists()
+    assert not (repo_root / "src" / "projects" / "test_board.md").exists()
+    assert not (repo_root / "src" / "projects_config" / "test_board_config.py").exists()
+
+    # 4. Strongly typed configuration model resolution
+    cfg = provider.settings
+    assert isinstance(cfg, CarrierBoardConfig)

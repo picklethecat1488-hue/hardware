@@ -63,25 +63,25 @@ from provider import (
     BuildFlexPCB,
     FlexType,
 )
-from projects_config import TestBoardConfig
+from projects_config import CarrierBoardConfig
 
 
 @discover_provider
-class TestBoardProvider(Provider):
+class CarrierBoardProvider(Provider):
     """Provider for 6-layer rigid-flex test board and enclosure geometry."""
 
     __test__ = False
 
     @cached_property
-    def default_config(self) -> TestBoardConfig:
+    def default_config(self) -> CarrierBoardConfig:
         """Return the default configuration for the test board project."""
         measurements_file = str(Path(__file__).parent / "measurements.yaml")
-        return TestBoardConfig(measurements_path=measurements_file)
+        return CarrierBoardConfig(measurements_path=measurements_file)
 
     @property
-    def settings(self) -> TestBoardConfig:
+    def settings(self) -> CarrierBoardConfig:
         """Return typed configuration settings."""
-        return cast(TestBoardConfig, super().settings)
+        return cast(CarrierBoardConfig, super().settings)
 
     def stackup(self) -> BuildStackup:
         """Define 6-layer rigid-flex physical stackup using BuildStackup context manager."""
@@ -1161,7 +1161,7 @@ class TestBoardProvider(Provider):
     @property
     def config(self) -> dict[str, Callable[[str, Optional[str]], Any]]:
         """Map Modes to configuration handler methods."""
-        from projects.test_board.config import config_route
+        from projects.carrier_board.config import config_route
 
         def _handler(target: str, subassembly: Optional[str]) -> Any:
             if "route" in target:
