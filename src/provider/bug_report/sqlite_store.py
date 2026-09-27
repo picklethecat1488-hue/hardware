@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import sqlite3
 from typing import Any, Dict, List, Optional
+import uuid as uuid_pkg
 
 from model.bug_report import (
     BugAttachmentModel,
@@ -52,6 +53,7 @@ class SQLiteBugStore:
 
                 CREATE TABLE IF NOT EXISTS bugs (
                     id TEXT PRIMARY KEY,
+                    uuid TEXT,
                     title TEXT NOT NULL,
                     status TEXT NOT NULL,
                     severity TEXT NOT NULL,
@@ -77,7 +79,7 @@ class SQLiteBugStore:
                     size_bytes INTEGER NOT NULL DEFAULT 0,
                     description TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL DEFAULT '',
-                    FOREIGN KEY (bug_id) REFERENCES bugs(id) ON DELETE CASCADE
+                    FOREIGN KEY (bug_id) REFERENCES bugs(id) ON DELETE CASCADE ON UPDATE CASCADE
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_attachments_bug_id ON attachments(bug_id);
@@ -85,6 +87,18 @@ class SQLiteBugStore:
                 CREATE INDEX IF NOT EXISTS idx_bugs_severity ON bugs(severity);
                 """
             )
+            # Ensure uuid column exists on preexisting databases
+            cursor = conn.execute("PRAGMA table_info(bugs)")
+            cols = [row["name"] for row in cursor.fetchall()]
+            if "uuid" not in cols:
+                conn.execute("ALTER TABLE bugs ADD COLUMN uuid TEXT")
+
+            # Backfill any missing UUIDs
+            null_uuid_rows = conn.execute("SELECT id FROM bugs WHERE uuid IS NULL OR uuid = ''").fetchall()
+            for r in null_uuid_rows:
+                conn.execute("UPDATE bugs SET uuid = ? WHERE id = ?", (str(uuid_pkg.uuid4()), r["id"]))
+
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_bugs_uuid ON bugs(uuid)")
 
     def load_database(self) -> BugDatabaseModel:
         """Load full bug database model from SQLite.
@@ -120,7 +134,7 @@ class SQLiteBugStore:
 
             # Load bugs
             bug_rows = conn.execute(
-                "SELECT id, title, status, severity, category, component, description, "
+                "SELECT id, uuid, title, status, severity, category, component, description, "
                 "reproduction_steps, expected_behavior, actual_behavior, logs, created_at, "
                 "updated_at, resolved_at, resolution_notes FROM bugs"
             ).fetchall()
@@ -144,8 +158,10 @@ class SQLiteBugStore:
                 except (json.JSONDecodeError, TypeError):
                     steps = []
 
+                b_uuid = row["uuid"] if ("uuid" in row.keys() and row["uuid"]) else str(uuid_pkg.uuid4())
                 bug = BugReportModel(
                     id=row["id"],
+                    uuid=b_uuid,
                     title=row["title"],
                     status=BugStatus(row["status"]),
                     severity=BugSeverity(row["severity"]),
@@ -213,14 +229,16 @@ class SQLiteBugStore:
     def _upsert_bug_in_conn(self, conn: sqlite3.Connection, bug: BugReportModel) -> None:
         """Upsert a single bug in an active database connection."""
         steps_json = json.dumps(bug.reproduction_steps)
+        b_uuid = bug.uuid or str(uuid_pkg.uuid4())
         conn.execute(
             """
             INSERT INTO bugs (
-                id, title, status, severity, category, component, description,
+                id, uuid, title, status, severity, category, component, description,
                 reproduction_steps, expected_behavior, actual_behavior, logs,
                 created_at, updated_at, resolved_at, resolution_notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
+                uuid=COALESCE(excluded.uuid, bugs.uuid),
                 title=excluded.title,
                 status=excluded.status,
                 severity=excluded.severity,
@@ -238,6 +256,7 @@ class SQLiteBugStore:
             """,
             (
                 bug.id,
+                b_uuid,
                 bug.title,
                 bug.status.value,
                 bug.severity.value,
@@ -263,6 +282,14 @@ class SQLiteBugStore:
                 INSERT INTO attachments (
                     id, bug_id, filename, file_type, file_path, size_bytes, description, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    bug_id=excluded.bug_id,
+                    filename=excluded.filename,
+                    file_type=excluded.file_type,
+                    file_path=excluded.file_path,
+                    size_bytes=excluded.size_bytes,
+                    description=excluded.description,
+                    created_at=excluded.created_at
                 """,
                 (
                     att.id,
@@ -326,3 +353,118 @@ class SQLiteBugStore:
                 except ValueError:
                     pass
             return f"BUG-{max_idx + 1:03d}"
+
+    def get_bug_by_uuid(self, bug_uuid: str) -> Optional[BugReportModel]:
+        """Find a bug in SQLite by its unique UUID."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT id, uuid, title, status, severity, category, component, description, "
+                "reproduction_steps, expected_behavior, actual_behavior, logs, created_at, "
+                "updated_at, resolved_at, resolution_notes FROM bugs WHERE uuid = ?",
+                (bug_uuid,),
+            ).fetchone()
+            if not row:
+                return None
+            att_rows = conn.execute(
+                "SELECT id, filename, file_type, file_path, size_bytes, description, created_at "
+                "FROM attachments WHERE bug_id = ? ORDER BY created_at ASC",
+                (row["id"],),
+            ).fetchall()
+            attachments = [
+                BugAttachmentModel(
+                    id=ar["id"],
+                    filename=ar["filename"],
+                    file_type=ar["file_type"],
+                    file_path=ar["file_path"],
+                    size_bytes=ar["size_bytes"],
+                    description=ar["description"],
+                    created_at=ar["created_at"],
+                )
+                for ar in att_rows
+            ]
+            steps_raw = row["reproduction_steps"]
+            try:
+                steps = json.loads(steps_raw) if steps_raw else []
+            except (json.JSONDecodeError, TypeError):
+                steps = []
+            return BugReportModel(
+                id=row["id"],
+                uuid=row["uuid"] or bug_uuid,
+                title=row["title"],
+                status=BugStatus(row["status"]),
+                severity=BugSeverity(row["severity"]),
+                category=BugCategory(row["category"]),
+                component=row["component"] or "",
+                description=row["description"] or "",
+                reproduction_steps=steps,
+                expected_behavior=row["expected_behavior"] or "",
+                actual_behavior=row["actual_behavior"] or "",
+                logs=row["logs"] or "",
+                attachments=attachments,
+                created_at=row["created_at"] or "",
+                updated_at=row["updated_at"] or "",
+                resolved_at=row["resolved_at"],
+                resolution_notes=row["resolution_notes"] or "",
+            )
+
+    def update_bug_id(self, bug_uuid: str, new_id: str) -> None:
+        """Update bug ID for an existing bug matching its unique UUID.
+
+        Args:
+            bug_uuid: Unique identifier of the bug.
+            new_id: New bug ID to assign (e.g. BUG-199).
+        """
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT id FROM bugs WHERE uuid = ?", (bug_uuid,)).fetchone()
+            if not row:
+                return
+            old_id = row["id"]
+            if old_id == new_id:
+                return
+            conn.execute("PRAGMA foreign_keys = OFF")
+            conn.execute("UPDATE bugs SET id = ? WHERE uuid = ?", (new_id, bug_uuid))
+            conn.execute("UPDATE attachments SET bug_id = ? WHERE bug_id = ?", (new_id, old_id))
+            conn.execute("PRAGMA foreign_keys = ON")
+
+    def resolve_duplicate_ids(self) -> Dict[str, str]:
+        """Detect and automatically update duplicate bug IDs for different bugs in SQLite.
+
+        Returns:
+            Dictionary mapping bug UUID to new renumbered bug ID.
+        """
+        with self._get_connection() as conn:
+            dups = conn.execute("SELECT id, COUNT(*) as cnt FROM bugs GROUP BY id HAVING cnt > 1").fetchall()
+            if not dups:
+                return {}
+
+            max_idx = 0
+            all_ids = conn.execute("SELECT id FROM bugs").fetchall()
+            for r in all_ids:
+                b_id = r["id"]
+                if b_id.startswith("BUG-"):
+                    try:
+                        val = int(b_id[4:])
+                        if val > max_idx:
+                            max_idx = val
+                    except ValueError:
+                        pass
+
+            reassigned: Dict[str, str] = {}
+            for dup in dups:
+                dup_id = dup["id"]
+                rows = conn.execute(
+                    "SELECT uuid, id, created_at FROM bugs WHERE id = ? ORDER BY created_at ASC",
+                    (dup_id,),
+                ).fetchall()
+                # Retain the first entry, reassign subsequent duplicates
+                for row in rows[1:]:
+                    max_idx += 1
+                    new_id = f"BUG-{max_idx:03d}"
+                    b_uuid = row["uuid"]
+                    conn.execute("PRAGMA foreign_keys = OFF")
+                    conn.execute("UPDATE bugs SET id = ? WHERE uuid = ?", (new_id, b_uuid))
+                    conn.execute("UPDATE attachments SET bug_id = ? WHERE bug_id = ?", (new_id, dup_id))
+                    conn.execute("PRAGMA foreign_keys = ON")
+                    reassigned[b_uuid] = new_id
+
+            return reassigned

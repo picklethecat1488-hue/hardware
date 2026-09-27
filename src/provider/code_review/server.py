@@ -127,6 +127,11 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
                 self._handle_update_verdict(data)
             case "/api/export":
                 self._handle_export()
+            case "/api/sync_feedback":
+                res = self.server.sync_feedback()
+                self._send_json(res)
+            case "/api/commit_update":
+                self._handle_commit_update(data)
             case "/api/commit_reviewed":
                 query = urllib.parse.parse_qs(parsed.query)
                 commit = query.get("commit", [""])[0] or (data.get("commit", "") if isinstance(data, dict) else "")
@@ -228,6 +233,7 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
                 repo_root=self.server.repo_root,
             )
 
+        commit = data.get("commit", self.server.session.commit_hash or "working")
         comment = CommentModel(
             id=uuid.uuid4().hex[:12],
             file_path=file_path,
@@ -238,6 +244,7 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
             author=author,
             code_snippet=snippet,
             created_at=datetime.now(timezone.utc).isoformat(),
+            commit=commit,
         )
 
         self.server.session.comments.append(comment)
@@ -323,6 +330,21 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
         out_path = self.server.save_and_sync()
         self._send_json({"status": "ok", "path": str(out_path)})
 
+    def _handle_commit_update(self, data: dict) -> None:
+        """Handle commit update event (rebase, merge, amend, etc.)."""
+        orig_commit = data.get("original_commit", "")
+        curr_commit = data.get("current_commit", "")
+        action = data.get("action", "update")
+        notes = data.get("notes", "")
+        update = self.server.session.record_commit_update(
+            original_commit=orig_commit,
+            current_commit=curr_commit,
+            action=action,
+            notes=notes,
+        )
+        self.server.save_and_sync()
+        self._send_json({"status": "ok", "update": update.model_dump(mode="json")})
+
     def _send_json(self, payload: dict | list, status: int = 200) -> None:
         """Serialize and send JSON response."""
         content = json.dumps(payload).encode("utf-8")
@@ -355,7 +377,8 @@ class ReviewServer(ThreadingHTTPServer):
         self.git_engine = GitReviewEngine(repo_root=self.repo_root)
         self.exporter = MarkdownReviewExporter(repo_root=self.repo_root)
 
-        self.markdown_output = markdown_output or (self.repo_root / "build" / "CR.md")
+        self.markdown_output = markdown_output or (self.repo_root / "feedback" / "CR.md")
+        self.feedback_dir = self.markdown_output.parent
         self.state_file = state_file or (self.repo_root / "build" / "cr_feedback.json")
         if sqlite_file is not None:
             self.sqlite_file = sqlite_file
@@ -397,6 +420,21 @@ class ReviewServer(ThreadingHTTPServer):
             )
             self.sqlite_store.save_session(self.session)
 
+        # Ensure commit hash is set
+        head_commit = self.git_engine.get_head_commit()
+        if not self.session.commit_hash:
+            self.session.commit_hash = head_commit
+
+        # Requirement 7: Auto merge CR feedback if CR file already exists for commit
+        if self.session.commit_hash and self.feedback_dir.exists():
+            cr_commit_path = self.feedback_dir / f"CR_{self.session.commit_hash}.md"
+            if cr_commit_path.exists():
+                self.session = self.exporter.merge_commit_feedback(self.session, cr_commit_path)
+        elif loaded_session is not None and self.feedback_dir.exists():
+            cr_main_path = self.feedback_dir / "CR.md"
+            if cr_main_path.exists():
+                self.session = self.exporter.merge_commit_feedback(self.session, cr_main_path)
+
         # Attempt port binding if bind_and_activate is enabled
         self.host = host
         if bind_and_activate:
@@ -436,23 +474,62 @@ class ReviewServer(ThreadingHTTPServer):
 
         threading.Thread(target=_delayed_shutdown, daemon=True).start()
 
+    def sync_feedback(self) -> dict:
+        """Scan feedback/ directory for CR_*.md files and merge feedback into SQLite."""
+        merged_count = 0
+        if self.feedback_dir.exists():
+            for cr_file in sorted(self.feedback_dir.glob("CR_*.md")):
+                self.session = self.exporter.merge_commit_feedback(self.session, cr_file)
+                merged_count += 1
+            if (self.feedback_dir / "CR.md").exists():
+                self.session = self.exporter.merge_commit_feedback(self.session, self.feedback_dir / "CR.md")
+        self.save_and_sync()
+        return {"status": "ok", "merged_files": merged_count, "total_comments": len(self.session.comments)}
+
     def save_and_sync(self) -> Path:
         """Persist session to SQLite, export JSON, and render updated Markdown report."""
         self.session.updated_at = datetime.now(timezone.utc).isoformat()
         self.sqlite_store.save_session(self.session)
         self.exporter.save_session_json(self.session, self.state_file)
         total_files = len(self.git_engine.get_changed_files("working"))
-        res = self.exporter.export_markdown(
-            self.session,
-            self.markdown_output,
-            total_repo_files=total_files,
-        )
-        cr_md = self.repo_root / "build" / "CR.md"
-        if self.markdown_output.resolve() != cr_md.resolve():
+
+        is_feedback_dir = self.markdown_output.resolve().parent.name == "feedback"
+        if self.session.comments or not is_feedback_dir:
+            res = self.exporter.export_markdown(
+                self.session,
+                self.markdown_output,
+                total_repo_files=total_files,
+            )
+        else:
+            if self.markdown_output.exists():
+                try:
+                    self.markdown_output.unlink()
+                except OSError:
+                    pass
+            res = self.markdown_output
+
+        # Export commit-specific CR_<commit>.md ONLY if there are comments for this commit
+        commit_sha = self.session.commit_hash or self.git_engine.get_head_commit()
+        if commit_sha:
             try:
-                self.exporter.export_markdown(self.session, cr_md, total_repo_files=total_files)
+                self.exporter.export_commit_markdown(
+                    self.session, commit_sha, self.feedback_dir, total_repo_files=total_files
+                )
             except OSError:
                 pass
+
+        cr_md = self.repo_root / "build" / "CR.md"
+        if cr_md.parent.exists() and self.markdown_output.resolve() != cr_md.resolve():
+            if self.session.comments:
+                try:
+                    self.exporter.export_markdown(self.session, cr_md, total_repo_files=total_files)
+                except OSError:
+                    pass
+            elif cr_md.exists():
+                try:
+                    cr_md.unlink()
+                except OSError:
+                    pass
         return res
 
     def get_url(self) -> str:

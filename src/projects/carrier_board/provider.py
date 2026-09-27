@@ -1076,6 +1076,101 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText("+", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((-22.0, 13.5)):
                 SilkscreenText("-", layer="F.SilkS", font_size=0.8, thickness=0.12)
+
+            # Component Reference Designators (BUG-066)
+            # Active ICs and Primary Modules
+            with Locations((0.0, 8.5)):
+                SilkscreenText("U1", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((18.0, -11.5)):
+                SilkscreenText("U2", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
+            with Locations((0.0, -32.5)):
+                SilkscreenText("J1", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((0.0, 35.5)):
+                SilkscreenText("J2", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((-17.5, 0.0)):
+                SilkscreenText("J3", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((-23.0, 19.5)):
+                SilkscreenText("J13", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-21.5, -22.0)):
+                SilkscreenText("Q1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
+            with Locations((-19.0, 12.5)):
+                SilkscreenText("U3", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-18.0, 24.5)):
+                SilkscreenText("U4", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-18.0, 38.0)):
+                SilkscreenText("SPK1", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-9.0, 3.5)):
+                SilkscreenText("Y1", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((14.0, 18.0)):
+                SilkscreenText("U6", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-16.0, 19.0)):
+                SilkscreenText("U7", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((15.0, 7.5)):
+                SilkscreenText("U8", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-20.0, -37.5)):
+                SilkscreenText("U9", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((18.0, 26.5)):
+                SilkscreenText("U10", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((19.5, 10.0)):
+                SilkscreenText("D1", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-18.0, -18.5)):
+                SilkscreenText("J5", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((20.5, 31.0)):
+                SilkscreenText("J6", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((20.5, 19.0)):
+                SilkscreenText("J7", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((20.5, 7.0)):
+                SilkscreenText("J8", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((20.5, -5.0)):
+                SilkscreenText("J9", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((20.5, -21.0)):
+                SilkscreenText("J10", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((16.0, -28.0)):
+                SilkscreenText("J14", layer="F.SilkS", font_size=0.8, thickness=0.12)
+
+            # Resistors
+            with Locations((14.5, -6.0)):
+                SilkscreenText("R1", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((10.0, -4.5)):
+                SilkscreenText("R2", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-14.5, -4.5)):
+                SilkscreenText("R3", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-14.5, 4.5)):
+                SilkscreenText("R4", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-5.5, 8.0)):
+                SilkscreenText("R5", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-11.5, -12.0)):
+                SilkscreenText("R6", layer="F.SilkS", font_size=0.7, thickness=0.10)
+
+            # Capacitors
+            with Locations((13.0, -17.5)):
+                SilkscreenText("C1", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-8.0, -6.5)):
+                SilkscreenText("C2", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
+            with Locations((-13.0, -5.5)):
+                SilkscreenText("C3", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((8.0, 10.5)):
+                SilkscreenText("C4", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-6.0, -11.5)):
+                SilkscreenText("C5", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-24.0, 12.5)):
+                SilkscreenText("C6", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-14.0, 12.5)):
+                SilkscreenText("C7", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-23.0, 23.5)):
+                SilkscreenText("C8", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-5.0, 16.5)):
+                SilkscreenText("C9", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((5.0, 16.5)):
+                SilkscreenText("C10", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((-10.5, 10.5)):
+                SilkscreenText("C11", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((14.0, -6.5)):
+                SilkscreenText("C12", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
+            with Locations((-20.0, 15.5)):
+                SilkscreenText("C13", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((14.0, -12.0)):
+                SilkscreenText("C14", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
         return silk.texts
 
     @property

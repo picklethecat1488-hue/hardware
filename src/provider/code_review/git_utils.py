@@ -76,7 +76,7 @@ def get_git_root(cwd: Optional[Path] = None) -> Path:
     return Path(root_str)
 
 
-IGNORED_REVIEW_FILES: frozenset[str] = frozenset({"BUGS.md", "BUGS.txt"})
+IGNORED_REVIEW_FILES: frozenset[str] = frozenset({"BUGS.md", "BUGS.txt", "CR.md"})
 
 
 def is_file_ignored(file_path: str) -> bool:
@@ -86,10 +86,17 @@ def is_file_ignored(file_path: str) -> bool:
         file_path: Relative or absolute file path or filename.
 
     Returns:
-        True if file is in IGNORED_REVIEW_FILES or matches ignored filename.
+        True if file is in IGNORED_REVIEW_FILES, in feedback/ directory, or matches ignored patterns.
     """
-    p = Path(file_path)
-    return p.name in IGNORED_REVIEW_FILES or file_path in IGNORED_REVIEW_FILES
+    clean = file_path.replace("\\", "/").strip().lstrip("./")
+    p = Path(clean)
+    if "feedback" in p.parts:
+        return True
+    if p.name in IGNORED_REVIEW_FILES or clean in IGNORED_REVIEW_FILES:
+        return True
+    if p.name.startswith("BUG_") or p.name.startswith("CR_"):
+        return True
+    return False
 
 
 class GitReviewEngine:
@@ -107,6 +114,17 @@ class GitReviewEngine:
             repo_root: Root path of git repository.
         """
         self.repo_root = repo_root or get_git_root()
+
+    def get_head_commit(self) -> str:
+        """Retrieve the commit hash of HEAD in the repository.
+
+        Returns:
+            Full commit hash string, or empty string if repository has no commits or fails.
+        """
+        try:
+            return run_git_command(["rev-parse", "HEAD"], cwd=self.repo_root).strip()
+        except RuntimeError:
+            return ""
 
     def resolve_revisions(self, rev_args: Optional[Sequence[str]] = None) -> List[str]:
         """Resolve revision arguments (hashes, references, or ranges like A..B) into concrete revision identifiers.
