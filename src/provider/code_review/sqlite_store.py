@@ -86,7 +86,6 @@ class SQLiteReviewStore:
 
                 CREATE INDEX IF NOT EXISTS idx_comments_file_path ON comments(file_path);
                 CREATE INDEX IF NOT EXISTS idx_comments_severity ON comments(severity);
-                CREATE INDEX IF NOT EXISTS idx_comments_commit ON comments(commit_hash);
                 CREATE INDEX IF NOT EXISTS idx_files_status ON files(status);
                 CREATE INDEX IF NOT EXISTS idx_commit_updates_session ON commit_updates(session_uuid);
                 """
@@ -105,6 +104,7 @@ class SQLiteReviewStore:
                 conn.execute("UPDATE comments SET uuid = ? WHERE id = ?", (str(uuid_pkg.uuid4()), r["id"]))
 
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_comments_uuid ON comments(uuid)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_comments_commit ON comments(commit_hash)")
 
     def load_session(self) -> Optional[ReviewSessionModel]:
         """Load full review session model from SQLite.

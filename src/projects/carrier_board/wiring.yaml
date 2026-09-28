@@ -104,19 +104,31 @@ footprints:
     mpn: BSS138
     supplier_pn: BSS138CT-ND
     pins:
-      - name: G
+      - number: "1"
+        name: "1"
+        pin_name: "G"
+        label: "G"
+        signal_name: "PWR_EN"
         position: [-0.95, -1.0]
         side: left
         pad_type: smd
         pad_shape: roundrect
         pad_size_mm: [0.6, 1.0]
-      - name: S
+      - number: "2"
+        name: "2"
+        pin_name: "S"
+        label: "S"
+        signal_name: "GND"
         position: [0.95, -1.0]
         side: bottom
         pad_type: smd
         pad_shape: roundrect
         pad_size_mm: [0.6, 1.0]
-      - name: D
+      - number: "3"
+        name: "3"
+        pin_name: "D"
+        label: "D"
+        signal_name: "VLOAD_SW"
         position: [0.0, 1.0]
         side: right
         pad_type: smd
@@ -316,18 +328,90 @@ footprints:
     supplier_pn: 455-1708-ND
 
   - name: J9
-    package: JST-PH-6P
-    position: [24.5, -5.0, 0.8]
-    rotation: [0.0, 0.0, -90.0]
-    mpn: B6B-PH-K-S
-    supplier_pn: 455-1708-ND
+    package: JST-PH-7P
+    position: [24.5, -6.0, 0.8]
+    rotation: [0.0, 0.0, 90.0]
+    mpn: B7B-PH-K-S
+    supplier_pn: 455-1709-ND
+    pins:
+      - number: "1"
+        name: "1"
+        pin_name: "SPI0_CS_N"
+        label: "SPI0_CS_N"
+        signal_name: "SPI0_CS_N"
+      - number: "2"
+        name: "2"
+        pin_name: "SPI0_MISO"
+        label: "SPI0_MISO"
+        signal_name: "SPI0_MISO"
+      - number: "3"
+        name: "3"
+        pin_name: "SPI0_MOSI"
+        label: "SPI0_MOSI"
+        signal_name: "SPI0_MOSI"
+      - number: "4"
+        name: "4"
+        pin_name: "SPI0_SCK"
+        label: "SPI0_SCK"
+        signal_name: "SPI0_SCK"
+      - number: "5"
+        name: "5"
+        pin_name: "EXP_INT_SPI"
+        label: "EXP_INT_SPI"
+        signal_name: "EXP_INT_SPI"
+      - number: "6"
+        name: "6"
+        pin_name: "PERIPH_3V3"
+        label: "PERIPH_3V3"
+        signal_name: "PERIPH_3V3"
+      - number: "7"
+        name: "7"
+        pin_name: "GND"
+        label: "GND"
+        signal_name: "GND"
 
   - name: J10
-    package: JST-PH-6P
-    position: [24.5, -21.0, 0.8]
-    rotation: [0.0, 0.0, 90.0]
-    mpn: B6B-PH-K-S
-    supplier_pn: 455-1708-ND
+    package: JST-PH-7P
+    position: [24.5, -22.0, 0.8]
+    rotation: [0.0, 0.0, -90.0]
+    mpn: B7B-PH-K-S
+    supplier_pn: 455-1709-ND
+    pins:
+      - number: "1"
+        name: "1"
+        pin_name: "GND"
+        label: "GND"
+        signal_name: "GND"
+      - number: "2"
+        name: "2"
+        pin_name: "PERIPH_3V3"
+        label: "PERIPH_3V3"
+        signal_name: "PERIPH_3V3"
+      - number: "3"
+        name: "3"
+        pin_name: "DTR_N"
+        label: "DTR_N"
+        signal_name: "DTR_N"
+      - number: "4"
+        name: "4"
+        pin_name: "CBUS2"
+        label: "CBUS2"
+        signal_name: "CBUS2"
+      - number: "5"
+        name: "5"
+        pin_name: "CBUS4"
+        label: "CBUS4"
+        signal_name: "CBUS4"
+      - number: "6"
+        name: "6"
+        pin_name: "DCD_N"
+        label: "DCD_N"
+        signal_name: "DCD_N"
+      - number: "7"
+        name: "7"
+        pin_name: "DSR_N"
+        label: "DSR_N"
+        signal_name: "DSR_N"
 
   # 10-Pin GPIO Breakout Header (Right side of PCB, accessible via top cutout for BUG-073)
   - name: J14
@@ -336,6 +420,57 @@ footprints:
     rotation: [0.0, 0.0, 90.0]
     mpn: TSW-110-07-L-S
     supplier_pn: SAM1034-10-ND
+    pins:
+      - number: "1"
+        name: "1"
+        pin_name: "GPIO0"
+        label: "GPIO0"
+        signal_name: "GPIO0"
+      - number: "2"
+        name: "2"
+        pin_name: "GPIO1"
+        label: "GPIO1"
+        signal_name: "GPIO1"
+      - number: "3"
+        name: "3"
+        pin_name: "GPIO2"
+        label: "GPIO2"
+        signal_name: "GPIO2"
+      - number: "4"
+        name: "4"
+        pin_name: "GPIO3"
+        label: "GPIO3"
+        signal_name: "GPIO3"
+      - number: "5"
+        name: "5"
+        pin_name: "3V3"
+        label: "3V3"
+        signal_name: "3V3"
+      - number: "6"
+        name: "6"
+        pin_name: "GND"
+        label: "GND"
+        signal_name: "GND"
+      - number: "7"
+        name: "7"
+        pin_name: "CBUS7"
+        label: "CBUS7"
+        signal_name: "CBUS7"
+      - number: "8"
+        name: "8"
+        pin_name: "CBUS5"
+        label: "CBUS5"
+        signal_name: "CBUS5"
+      - number: "9"
+        name: "9"
+        pin_name: "CBUS6"
+        label: "CBUS6"
+        signal_name: "CBUS6"
+      - number: "10"
+        name: "10"
+        pin_name: "CBUS3"
+        label: "CBUS3"
+        signal_name: "CBUS3"
 
   # Serial NAND Flash (FlexSPI Port A)
   - name: U8
@@ -399,7 +534,7 @@ nets:
       - [C1, "2"]
       - [C2, "2"]
       - [C3, "2"]
-      - [Q1, S]
+      - [Q1, "2", "S"]
       - [J3, GND]
       - [J3, GND2]
       - [J3, SHIELD1]
@@ -451,7 +586,19 @@ nets:
       - [J5, "7"]
       - [J5, "8"]
       - [J5, "9"]
-      - [U10, "2"]
+      - [U10, "2", "GND"]
+      - [U4, GND, GND]
+      - [U4, GAIN, GAIN]
+      - [C8, "2"]
+      - [J6, "5"]
+      - [J6, "6"]
+      - [J7, "5"]
+      - [J7, "6"]
+      - [J8, "5"]
+      - [J8, "6"]
+      - [J9, "7", "GND"]
+      - [J10, "1", "GND"]
+      - [J14, "6", "GND"]
 
   - name: 3V3
     color: "#dc2626"
@@ -468,7 +615,7 @@ nets:
       - [C3, "1"]
       - [U3, "5"]
       - [C7, "1"]
-      - [U4, VDD]
+      - [U4, VDD, VDD]
       - [C8, "1"]
       - [R5, "1"]
       - [C4, "1"]
@@ -481,7 +628,8 @@ nets:
       - [U9, "4"]
       - [U9, "19"]
       - [J5, "1"]
-      - [U10, "1"]
+      - [U10, "1", "VIN"]
+      - [J14, "5", "3V3"]
 
   - name: VBUS
     priority: 24
@@ -522,41 +670,39 @@ nets:
     color: "#ea580c"
     pins:
       - [U1, D1]
-      - [Q1, G]
+      - [Q1, "1", "G"]
 
   - name: AUDIO_EN
     priority: 16
     color: "#ea580c"
     pins:
       - [U1, L4]
-      - [U4, SD_MODE]
+      - [U4, SD_MODE, SD_MODE]
 
   - name: VLOAD_SW
     priority: 25
     color: "#f97316"
     pins:
-      - [Q1, D]
+      - [Q1, "3", "D"]
       - [J1, VLOAD_SW]
-      - [U4, GND]
-      - [U4, GAIN]
-      - [C8, "2"]
 
   - name: PERIPH_EN
     priority: 24
     color: "#ea580c"
     pins:
       - [U1, L5]
-      - [U10, "3"]
+      - [U10, "3", "EN"]
 
   - name: PERIPH_3V3
     priority: 25
     color: "#dc2626"
     pins:
-      - [U10, "5"]
+      - [U10, "5", "VOUT"]
       - [J6, "1"]
       - [J7, "1"]
       - [J8, "1"]
-      - [J9, "1"]
+      - [J9, "6", "PERIPH_3V3"]
+      - [J10, "2", "PERIPH_3V3"]
 
   - name: EXP_INT_I2C
     priority: 19
@@ -584,7 +730,7 @@ nets:
     color: "#84cc16"
     pins:
       - [U1, T8]
-      - [J9, "2"]
+      - [J9, "5", "EXP_INT_SPI"]
 
   - name: CAP_INT
     priority: 18
@@ -923,28 +1069,28 @@ nets:
     priority: 27
     color: "#92400e"
     pins:
-      - [J9, "6"]
+      - [J9, "1", "SPI0_CS_N"]
       - [U1, R9]
 
   - name: SPI0_MISO
     priority: 28
     color: "#b45309"
     pins:
-      - [J9, "5"]
+      - [J9, "2", "SPI0_MISO"]
       - [U1, R8]
 
   - name: SPI0_MOSI
     priority: 29
     color: "#d97706"
     pins:
-      - [J9, "4"]
+      - [J9, "3", "SPI0_MOSI"]
       - [U1, T7]
 
   - name: SPI0_SCK
     priority: 30
     color: "#f59e0b"
     pins:
-      - [J9, "3"]
+      - [J9, "4", "SPI0_SCK"]
       - [U1, T6]
 
   - name: UART0_CTS
@@ -1000,61 +1146,55 @@ nets:
     color: "#64748b"
     pins:
       - [U9, "2"]
-      - [J10, "5"]
-
-  - name: RI_N
-    color: "#64748b"
-    pins:
-      - [U9, "6"]
-      - [J10, "6"]
+      - [J10, "3", "DTR_N"]
 
   - name: DSR_N
     color: "#64748b"
     pins:
       - [U9, "9"]
-      - [J10, "1"]
+      - [J10, "7", "DSR_N"]
 
   - name: DCD_N
     color: "#64748b"
     pins:
       - [U9, "10"]
-      - [J10, "2"]
+      - [J10, "6", "DCD_N"]
 
   - name: CBUS4
     color: "#64748b"
     pins:
       - [U9, "12"]
-      - [J10, "3"]
+      - [J10, "5", "CBUS4"]
 
   - name: CBUS2
     color: "#64748b"
     pins:
       - [U9, "13"]
-      - [J10, "4"]
+      - [J10, "4", "CBUS2"]
 
   - name: CBUS3
     color: "#64748b"
     pins:
       - [U9, "14"]
-      - [J14, "10"]
+      - [J14, "10", "CBUS3"]
 
   - name: CBUS5
     color: "#64748b"
     pins:
       - [U9, "30"]
-      - [J14, "8"]
+      - [J14, "8", "CBUS5"]
 
   - name: CBUS6
     color: "#64748b"
     pins:
       - [U9, "31"]
-      - [J14, "9"]
+      - [J14, "9", "CBUS6"]
 
   - name: CBUS7
     color: "#64748b"
     pins:
       - [U9, "32"]
-      - [J14, "7"]
+      - [J14, "7", "CBUS7"]
 
   - name: OSCI
     color: "#64748b"
@@ -1066,40 +1206,27 @@ nets:
     priority: 33
     color: "#10b981"
     pins:
-      - [J14, "1"]
+      - [J14, "1", "GPIO0"]
       - [U1, M8]
 
   - name: GPIO1
     priority: 34
     color: "#10b981"
     pins:
-      - [J14, "2"]
+      - [J14, "2", "GPIO1"]
       - [U1, N8]
 
   - name: GPIO2
     priority: 35
     color: "#10b981"
     pins:
-      - [J14, "3"]
+      - [J14, "3", "GPIO2"]
       - [U1, N10]
-
-  - name: GPIO5
-    priority: 36
-    color: "#10b981"
-    pins:
-      - [J14, "6"]
-      - [U1, T12]
-
-  - name: GPIO4
-    priority: 37
-    color: "#10b981"
-    pins:
-      - [J14, "5"]
-      - [U1, T11]
 
   - name: GPIO3
     priority: 38
     color: "#10b981"
     pins:
-      - [J14, "4"]
+      - [J14, "4", "GPIO3"]
       - [U1, T10]
+

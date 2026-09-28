@@ -16,7 +16,7 @@ from model.pcb import (
     TestPointModel as PcbTestPointModel,
     SilkscreenTextModel,
 )
-from provider.pcb.drc import PCBDesignRulesChecker, DRCSeverity, DRCReport
+from provider.pcb.drc import PCBDesignRulesChecker, DRCSeverity, DRCReport, DRCRuleName
 
 
 @pytest.fixture
@@ -929,3 +929,148 @@ def test_via_connectivity_drc_detection(base_pcb_config: PCBConfig):
     violations = checker.check_via_connectivity(wiring_mock)
     assert any(v.rule_name == "VIA_OUTSIDE_BOARD_BOUNDARY" for v in violations)
     assert any(v.rule_name == "DISCONNECTED_VIA" for v in violations)
+
+
+def test_drc_pin_name_mismatch(base_pcb_config: PCBConfig) -> None:
+    """Verify DRC flags PIN_NAME_MISMATCH when wiring net declares mismatched pin name."""
+    from unittest.mock import MagicMock
+    from model.wiring import FootprintModel, PinModel, NetModel, LabelModel, PinSide
+
+    fp = FootprintModel(
+        name="U1",
+        package="SOIC-8",
+        position=(0.0, 0.0, 0.8),
+        rotation=(0.0, 0.0, 0.0),
+        dimensions=(5.0, 5.0, 1.5),
+        label=LabelModel(text="U1"),
+        pins=[
+            PinModel(name="1", number="1", pin_name="GND", label="GND", side=PinSide.LEFT),
+            PinModel(name="2", number="2", pin_name="VCC", label="VCC", side=PinSide.RIGHT),
+        ],
+    )
+    wiring_mock = MagicMock()
+    wiring_mock.footprints = [fp]
+    # Net declares pin 1 as "VCC" instead of "GND"
+    wiring_mock.nets = [
+        NetModel(
+            name="TEST_NET",
+            pins=[("U1", "1"), ("U2", "1")],
+            pin_names={("U1", "1"): "VCC"},
+            color="#ff0000",
+        ),
+    ]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    violations = checker.check_netlist_connectivity(wiring_mock)
+    mismatches = [v for v in violations if v.rule_name == DRCRuleName.PIN_NAME_MISMATCH]
+    assert len(mismatches) == 1
+    assert "Pin name mismatch on 'U1' pin '1'" in mismatches[0].description
+
+
+def test_drc_signal_name_mismatch(base_pcb_config: PCBConfig) -> None:
+    """Verify DRC flags SIGNAL_NAME_MISMATCH when net connected to pin conflicts with expected signal."""
+    from unittest.mock import MagicMock
+    from model.wiring import FootprintModel, PinModel, NetModel, LabelModel, PinSide
+
+    fp = FootprintModel(
+        name="J1",
+        package="JST-PH-2P",
+        position=(0.0, 0.0, 0.8),
+        rotation=(0.0, 0.0, 0.0),
+        dimensions=(5.0, 5.0, 1.5),
+        label=LabelModel(text="J1"),
+        pins=[
+            PinModel(name="1", number="1", pin_name="GND", label="GND", signal_name="GND", side=PinSide.LEFT),
+            PinModel(name="2", number="2", pin_name="3V3", label="3V3", signal_name="3V3", side=PinSide.RIGHT),
+        ],
+    )
+    wiring_mock = MagicMock()
+    wiring_mock.footprints = [fp]
+    # Connecting wrong net "SPI_CLK" to pin 1 which expects "GND"
+    wiring_mock.nets = [
+        NetModel(
+            name="SPI_CLK",
+            pins=[("J1", "1"), ("U1", "4")],
+            color="#ff0000",
+        ),
+        NetModel(
+            name="3V3",
+            pins=[("J1", "2"), ("U1", "8")],
+            color="#00ff00",
+        ),
+    ]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    violations = checker.check_netlist_connectivity(wiring_mock)
+    signal_mismatches = [v for v in violations if v.rule_name == DRCRuleName.SIGNAL_NAME_MISMATCH]
+    assert len(signal_mismatches) == 1
+    assert "Signal name mismatch on 'J1' pin '1'" in signal_mismatches[0].description
+    assert "expects signal 'GND'" in signal_mismatches[0].description
+
+
+def test_drc_signal_name_disconnected(base_pcb_config: PCBConfig) -> None:
+    """Verify DRC flags SIGNAL_NAME_MISMATCH when footprint pin with signal_name is not connected to any net."""
+    from unittest.mock import MagicMock
+    from model.wiring import FootprintModel, PinModel, NetModel, LabelModel, PinSide
+
+    fp = FootprintModel(
+        name="J1",
+        package="JST-PH-2P",
+        position=(0.0, 0.0, 0.8),
+        rotation=(0.0, 0.0, 0.0),
+        dimensions=(5.0, 5.0, 1.5),
+        label=LabelModel(text="J1"),
+        pins=[
+            PinModel(name="1", number="1", pin_name="GND", label="GND", signal_name="GND", side=PinSide.LEFT),
+            PinModel(name="2", number="2", pin_name="3V3", label="3V3", signal_name="3V3", side=PinSide.RIGHT),
+        ],
+    )
+    wiring_mock = MagicMock()
+    wiring_mock.footprints = [fp]
+    # Only pin 2 is connected to 3V3, pin 1 is unconnected
+    wiring_mock.nets = [
+        NetModel(
+            name="3V3",
+            pins=[("J1", "2"), ("U1", "8")],
+            color="#00ff00",
+        ),
+    ]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    violations = checker.check_netlist_connectivity(wiring_mock)
+    disconn = [v for v in violations if v.rule_name == DRCRuleName.SIGNAL_NAME_MISMATCH]
+    assert len(disconn) == 1
+    assert "expects signal 'GND', but is not connected to any net" in disconn[0].description
+
+
+def test_drc_short_circuit_alias_pins(base_pcb_config: PCBConfig) -> None:
+    """Verify DRC flags SHORT_CIRCUIT_DETECTED when conflicting nets connect to the same pin via aliases."""
+    from unittest.mock import MagicMock
+    from model.wiring import FootprintModel, PinModel, NetModel, LabelModel, PinSide
+
+    fp = FootprintModel(
+        name="Q1",
+        package="SOT-23",
+        position=(0.0, 0.0, 0.8),
+        rotation=(0.0, 0.0, 0.0),
+        dimensions=(3.0, 1.5, 1.0),
+        label=LabelModel(text="Q1"),
+        pins=[
+            PinModel(name="1", number="1", pin_name="G", label="G", side=PinSide.LEFT),
+            PinModel(name="2", number="2", pin_name="S", label="S", side=PinSide.BOTTOM),
+            PinModel(name="3", number="3", pin_name="D", label="D", side=PinSide.RIGHT),
+        ],
+    )
+    wiring_mock = MagicMock()
+    wiring_mock.footprints = [fp]
+    # Net 1 references pin by number "2", Net 2 references pin by pin_name "S"
+    wiring_mock.nets = [
+        NetModel(name="GND", pins=[("Q1", "2"), ("U1", "1")], color="#000000"),
+        NetModel(name="VCC", pins=[("Q1", "S"), ("U1", "2")], color="#ff0000"),
+    ]
+
+    checker = PCBDesignRulesChecker(base_pcb_config)
+    violations = checker.check_netlist_connectivity(wiring_mock)
+    shorts = [v for v in violations if v.rule_name == DRCRuleName.SHORT_CIRCUIT_DETECTED]
+    assert len(shorts) == 1
+    assert "connected to conflicting nets: GND, VCC" in shorts[0].description

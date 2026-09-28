@@ -1502,3 +1502,61 @@ def test_binary_diff_and_raw_endpoint_bug_137(tmp_path: Path) -> None:
             assert resp_new.read() == fake_png_new
     finally:
         server.trigger_shutdown()
+
+
+def test_regression_bug_175_sqlite_store_missing_commit_hash_migration(tmp_path: Path) -> None:
+    """Verify BUG-175: SQLiteReviewStore correctly migrates databases missing commit_hash without throwing OperationalError."""
+    import sqlite3
+    from provider.code_review.sqlite_store import SQLiteReviewStore
+
+    db_path = tmp_path / "legacy_review.sqlite"
+    # Pre-create legacy database with comments table lacking commit_hash and uuid
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        """
+        CREATE TABLE metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        """
+    )
+    conn.execute("INSERT INTO metadata (key, value) VALUES ('title', 'Code Review');")
+    conn.execute(
+        """
+        CREATE TABLE comments (
+            id TEXT PRIMARY KEY,
+            file_path TEXT NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            severity TEXT NOT NULL,
+            body TEXT NOT NULL,
+            author TEXT NOT NULL DEFAULT 'Reviewer',
+            code_snippet TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT '',
+            resolved INTEGER NOT NULL DEFAULT 0
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO comments (id, file_path, start_line, end_line, severity, body) "
+        "VALUES ('c1', 'src/test.py', 10, 15, 'MUST_FIX', 'Fix legacy comment');"
+    )
+    conn.commit()
+    conn.close()
+
+    # Initializing SQLiteReviewStore on legacy database must succeed and migrate schema
+    store = SQLiteReviewStore(db_path)
+    session = store.load_session()
+    assert session is not None
+    assert len(session.comments) == 1
+    assert session.comments[0].id == "c1"
+
+    # Verify column and index exist
+    with sqlite3.connect(str(db_path)) as verify_conn:
+        cursor = verify_conn.execute("PRAGMA table_info(comments)")
+        cols = [row[1] for row in cursor.fetchall()]
+        assert "commit_hash" in cols
+        assert "uuid" in cols
+        idx_cursor = verify_conn.execute("PRAGMA index_list(comments)")
+        indices = [row[1] for row in idx_cursor.fetchall()]
+        assert "idx_comments_commit" in indices

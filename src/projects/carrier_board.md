@@ -106,9 +106,9 @@ graph TD
 | **`J5`** | **JST-SH 10-Pin Micro-Header** | SWD Hardware Debug & Flash Programming Header | 1.0mm Pitch Side-Entry SMD | `SWD_CLK` (`A16`), `DIO` (`A17`), `SWO` (`B16`), `nRESET` (`F3`), `BOOT0` (`C14`) | Compact debug interface for J-Link, MCU-Link, or CMSIS-DAP probes. |
 | **`J7`, `J8`**| **JST-SH 5-Pin Micro-Headers** | Primary (`I3C0`) and Secondary (`I3C1`) I3C Headers | 1.0mm Pitch Side-Entry SMD | `I3C0` (`A8`, `C8`, `B8`), `I3C1` (`F4`, `F6`, `E4`) | High-speed MIPI I3C evaluation interface operating up to 12.5 Mbps. |
 | **`J6`** | **JST-SH 4-Pin Micro-Header** | Expansion I2C Bus Header | 1.0mm Pitch Side-Entry SMD | `I2C2` (`B1`, `A1`) | External sensor expansion I2C with 3.3V and GND. |
-| **`J9`** | **JST-PH 6-Pin Header (`B6B-PH-K-S`)** | Expansion SPI Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-6P`) | `SPI0` (`T6`, `T7`, `R8`, `R9`) | 4-wire SPI peripheral bus (SCK, MOSI, MISO, CS#) with 3.3V and interrupt. |
-| **`J10`** | **JST-PH 6-Pin Header (`B6B-PH-K-S`)** | Expansion UART / CAN Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-6P`) | `UART1` (`A4`, `B3`) | Dedicated asynchronous serial link for external radios or modules with power and handshaking. |
-| **`J14`** | **JST-SH 10-Pin Micro-Header** | General-Purpose GPIO Breakout Header | 1.0mm Pitch Side-Entry SMD | `GPIO0`..`GPIO9` (Port 4 pins) | 10 dedicated digital IO lines supporting timer, PLU, and FlexIO. |
+| **`J9`** | **JST-PH 7-Pin Header (`B7B-PH-K-S`)** | Expansion SPI Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-7P`) | `SPI0` (`T6`, `T7`, `R8`, `R9`) | 4-wire SPI peripheral bus (SCK, MOSI, MISO, CS#) with 3.3V, interrupt, and dedicated GND. |
+| **`J10`** | **JST-PH 7-Pin Header (`B7B-PH-K-S`)** | Expansion UART / Control Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-7P`) | FTDI auxiliary signals (`DSR_N`, `DCD_N`, `CBUS4`, `CBUS2`, `DTR_N`), `PERIPH_3V3`, `GND` | Dedicated asynchronous serial control link with 3.3V peripheral power and dedicated GND. |
+| **`J14`** | **10-Pin GPIO & Modem Breakout Header** | General-Purpose GPIO & FTDI Breakout Header | 2.54mm Pitch Thru-Hole (`pin_header_1x10`) | `GPIO0`..`GPIO3`, `3V3`, `GND`, `CBUS3/5/6/7` | 4 digital GPIOs, 4 FTDI CBUS control pins, 3.3V power, and dedicated GND. |
 | **`J13`** | **JST-PH 2-Pin Connector (`S2B-PH-K-S`)** | 1S Li-Ion / LiPo Battery Power Input Connector | 2.0mm Pitch Thru-Hole (`JST-PH-2P`) | `VBAT`, `GND` | Direct connection for 3.7V Li-Ion battery pack with polarized mating shroud. |
 | **`BAT1`** | **PKCELL LP352438 (Recommended Battery)** | 1S 3.7V 350mAh LiPo Rechargeable Pouch Cell | $3.5\times 24\times 38\text{ mm}$ Pouch | `VBAT`, `GND` via J13 | Integrated PCM protection circuit module; pre-terminated with polarized JST-PH 2-pin connector; fits top lid cradle. |
 | **`TP1`** | **Test Point (GND)** | Ground probe through-hole test point | 1.4mm Pad / 0.8mm Drill | `GND` | Located at `(-18.0, -22.0)`. |
@@ -159,15 +159,16 @@ Operating on the recommended **PKCELL LP352438 3.7V LiPo pouch cell (350 mAh / 1
 | Subsystem State | Active Components | Current Draw (at 3.7V) | Power Draw | Daily Duty Cycle |
 | :--- | :--- | :--- | :--- | :--- |
 | **Active Mode** (Processing, NAND R/W, Audio, Telemetry) | MCU active @ 150MHz, NAND R/W active, MAX98357A audio driving speaker, FT232RNQ active, RGB LED on | **~65 mA** | 240 mW | **2.0%** (28.8 mins/day) |
-| **Low-Power Sleep** (Touch sensing active, MCU in Deep Sleep) | MCU Deep Sleep (SRAM retained, RTC running), IQS7222A in Low-Power ProxFusion scan mode, Q2/Q4 off | **~45 µA** | 0.17 mW | **98.0%** (idle evaluation monitoring) |
+| **Sleep Mode** (Active Processing, Audio Disabled, Touch Low-Power) | MCU active @ 150MHz, NAND/FT232RNQ active, audio amplifier disabled (Q2 off), IQS7222A in low-power ProxFusion mode | **~35 mA** | 130 mW | **3.0%** (43.2 mins/day) |
+| **Standby Mode** (Deep Sleep, Touch & Sensor Monitoring, PERIPH_3V3 Enabled) | MCU Deep Sleep (SRAM retained, RTC running), IQS7222A in Low-Power ProxFusion scan mode, PERIPH_3V3 buck regulator enabled with external peripherals in low-power idle (~150 µA), Q2/Q4 off | **~220 µA** | 0.81 mW | **95.0%** (idle evaluation monitoring) |
 | **Deep Power Down** (Storage / Shipping / Off) | MCU Deep Power Down ($2.5\,\mu\text{A}$), BQ24074 in battery standby ($1.5\,\mu\text{A}$), MAX17048 ($3\,\mu\text{A}$), All load switches off | **~7.0 µA** | 0.026 mW | **Storage mode** (exited via USB plug-in or M.2 wake) |
 
 ### Calculations
 * **Average Daily Operating Current**:
-  $$I_{\text{avg}} = (I_{\text{active}} \times 0.02) + (I_{\text{sleep}} \times 0.98) = (65\text{ mA} \times 0.02) + (0.045\text{ mA} \times 0.98) = 1.30\text{ mA} + 0.044\text{ mA} = 1.344\text{ mA}$$
+  $$I_{\text{avg}} = (I_{\text{active}} \times 0.02) + (I_{\text{sleep}} \times 0.03) + (I_{\text{standby}} \times 0.95) = (65\text{ mA} \times 0.02) + (35\text{ mA} \times 0.03) + (0.22\text{ mA} \times 0.95) = 1.30\text{ mA} + 1.05\text{ mA} + 0.209\text{ mA} = 2.559\text{ mA}$$
 * **Estimated Runtime with Recommended PKCELL LP352438 (350 mAh)**:
-  $$\text{Runtime} = \frac{350\text{ mAh}}{1.344\text{ mA}} \approx 260\text{ hours} \approx \mathbf{10.9\text{ days}}$$
+  $$\text{Runtime} = \frac{350\text{ mAh}}{2.559\text{ mA}} \approx 137\text{ hours} \approx \mathbf{5.7\text{ days}}$$
 * **Shelf Life in Deep Power Down with PKCELL LP352438 (350 mAh)**:
   $$\text{Shelf Life} = \frac{350\text{ mAh}}{0.007\text{ mA}} \approx 50000\text{ hours} \approx \mathbf{5.7\text{ years (limited by self-discharge)}}$$
 * **Extended Deployment with External 18650 Cell (3000 mAh)**:
-  $$\text{Runtime} = \frac{3000\text{ mAh}}{1.344\text{ mA}} \approx 2232\text{ hours} \approx \mathbf{93\text{ days}}$$
+  $$\text{Runtime} = \frac{3000\text{ mAh}}{2.559\text{ mA}} \approx 1172\text{ hours} \approx \mathbf{48.8\text{ days}}$$

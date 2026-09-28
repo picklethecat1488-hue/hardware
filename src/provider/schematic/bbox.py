@@ -13,6 +13,7 @@ from provider.schematic.constants import (
     STUB_POWER_MM,
     STUB_SIGNAL_MM,
     _SchematicSheetPlan,
+    partition_component_pins,
 )
 from provider.schematic.passives import SchematicPassiveClassifier
 
@@ -131,19 +132,17 @@ class SchematicBoundingBoxCalculator:
                     col_y_positions.append(top_row_y - (r_idx * layout.row_step_y))
 
             sheet_pin_sides = getattr(sheet_model, "pin_sides", {}) or {}
+            sheet_pin_breakouts = getattr(sheet_model, "pin_breakouts", {}) or {}
             pin_side_map: Dict[Tuple[str, str], str] = {}
             for fp in main_fps:
                 comp_side_overrides = sheet_pin_sides.get(fp.name, {})
-                left_p, right_p = [], []
-                for p in fp.pins:
-                    side_val = comp_side_overrides.get(p.name, p.side.value if hasattr(p, "side") else "left")
-                    if side_val in ("right", "top"):
-                        right_p.append(p)
-                    else:
-                        left_p.append(p)
-                if not left_p and not right_p:
-                    left_p = fp.pins[: len(fp.pins) // 2]
-                    right_p = fp.pins[len(fp.pins) // 2 :]
+                has_breakout = bool(sheet_pin_breakouts.get(fp.name))
+                left_p, right_p = partition_component_pins(
+                    fp=fp,
+                    comp_side_overrides=comp_side_overrides,
+                    pin_to_net=pin_to_net,
+                    has_breakout=has_breakout,
+                )
                 for p in left_p:
                     pin_side_map[(fp.name, p.name)] = "left"
                 for p in right_p:
@@ -183,21 +182,13 @@ class SchematicBoundingBoxCalculator:
                 cx = col_x_positions[c_idx]
                 row_top_y = col_y_positions[c_idx]
                 comp_side_overrides = sheet_pin_sides.get(fp.name, {})
-                left_pins = [
-                    p
-                    for p in fp.pins
-                    if comp_side_overrides.get(p.name, p.side.value if hasattr(p, "side") else "left")
-                    in ("left", "bottom")
-                ]
-                right_pins = [
-                    p
-                    for p in fp.pins
-                    if comp_side_overrides.get(p.name, p.side.value if hasattr(p, "side") else "right")
-                    in ("right", "top")
-                ]
-                if not left_pins and not right_pins:
-                    left_pins = fp.pins[: len(fp.pins) // 2]
-                    right_pins = fp.pins[len(fp.pins) // 2 :]
+                has_breakout = bool(sheet_pin_breakouts.get(fp.name))
+                left_pins, right_pins = partition_component_pins(
+                    fp=fp,
+                    comp_side_overrides=comp_side_overrides,
+                    pin_to_net=pin_to_net,
+                    has_breakout=has_breakout,
+                )
 
                 header_offset = 18.0 if getattr(fp, "mpn", None) else 15.0
                 max_pin_rows = max(len(left_pins), len(right_pins), 2)

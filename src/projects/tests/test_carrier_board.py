@@ -76,15 +76,15 @@ def test_regression_bug_074_peripheral_cutouts_and_identifiers() -> None:
 
 
 def test_regression_bug_110_expansion_headers_jst_ph() -> None:
-    """Verify BUG-110: expansion header connectors J9 and J10 are 6-pin JST-PH style connectors."""
+    """Verify BUG-110 & BUG-174: expansion header connectors J9 and J10 are 7-pin JST-PH style connectors with GND."""
     provider = CarrierBoardProvider()
     wiring = Wiring(str(provider.wiring_path))
     comp_map = {c.name: c for c in wiring.footprints}
 
-    assert comp_map["J9"].package == "JST-PH-6P", f"J9 package should be JST-PH-6P, got {comp_map['J9'].package}"
-    assert comp_map["J10"].package == "JST-PH-6P", f"J10 package should be JST-PH-6P, got {comp_map['J10'].package}"
-    assert "B6B-PH-K-S" in comp_map["J9"].mpn or "PH" in comp_map["J9"].mpn
-    assert "B6B-PH-K-S" in comp_map["J10"].mpn or "PH" in comp_map["J10"].mpn
+    assert comp_map["J9"].package == "JST-PH-7P", f"J9 package should be JST-PH-7P, got {comp_map['J9'].package}"
+    assert comp_map["J10"].package == "JST-PH-7P", f"J10 package should be JST-PH-7P, got {comp_map['J10'].package}"
+    assert "B7B-PH-K-S" in comp_map["J9"].mpn or "PH" in comp_map["J9"].mpn
+    assert "B7B-PH-K-S" in comp_map["J10"].mpn or "PH" in comp_map["J10"].mpn
 
 
 def test_regression_bug_113_carrier_board_serial_cutouts_do_not_overlap() -> None:
@@ -307,8 +307,15 @@ def test_regression_bug_107_carrier_board_flying_probes_simulation() -> None:
 
         # Verify all carrier board steps passed electrical validation
         assert hasattr(provider, "flying_probe_steps"), "Provider must expose flying_probe_steps"
-        for step in provider.flying_probe_steps:
-            assert step.passed, f"Carrier board step {step.step_id} ({step.description}) failed electrical validation"
+        # Verify signal lines isolation: all signal lines must not be shorted to power or ground
+        assert hasattr(provider, "flying_probe_signal_isolation"), "Provider must expose flying_probe_signal_isolation"
+        iso_results = provider.flying_probe_signal_isolation
+        assert iso_results["all_passed"] is True, (
+            f"Signal lines shorted to power/ground: {iso_results['shorted_signals']}"
+        )
+        assert len(iso_results["signal_lines"]) > 0, "Must have audited signal lines"
+        assert len(iso_results["power_ground_nets"]) > 0, "Must have audited power/ground nets"
+        assert len(iso_results["shorted_signals"]) == 0, f"Detected signal shorts: {iso_results['shorted_signals']}"
 
         # Verify test report generation
         report_md = provider.generate_test_report()
@@ -317,6 +324,7 @@ def test_regression_bug_107_carrier_board_flying_probes_simulation() -> None:
         assert "TEST_IMP_PCIE_DIFF" in report_md
         assert "PASS" in report_md
         assert "100.0%" in report_md
+        assert "Signal Line Isolation Audit" in report_md
     finally:
         p.disconnect(client)
 
@@ -1185,3 +1193,115 @@ def test_regression_pcb_texture_uv_parity_and_orientation() -> None:
         import shutil
 
         shutil.rmtree(test_build_dir, ignore_errors=True)
+
+
+def test_regression_bug_173_174_schematic_netlist_disconnects_and_missing_gnd() -> None:
+    """Verify BUG-173 & BUG-174: J9/J10 serial expansion connectors have complete netlist connectivity and GND."""
+    from pathlib import Path
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker, DRCRuleName
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(Path(provider.wiring_path))
+    footprints = {fp.name: fp for fp in wiring.footprints}
+
+    # Verify J9 and J10 exist and have 7 pins with pin_name, signal_name, and number
+    assert "J9" in footprints and "J10" in footprints
+    j9 = footprints["J9"]
+    j10 = footprints["J10"]
+    assert len(j9.pins) == 7
+    assert len(j10.pins) == 7
+
+    for p in j9.pins:
+        assert p.number is not None, f"J9 pin {p.name} must have number"
+        assert p.pin_name is not None, f"J9 pin {p.name} must have pin_name"
+        assert p.signal_name is not None, f"J9 pin {p.name} must have signal_name"
+
+    for p in j10.pins:
+        assert p.number is not None, f"J10 pin {p.name} must have number"
+        assert p.pin_name is not None, f"J10 pin {p.name} must have pin_name"
+        assert p.signal_name is not None, f"J10 pin {p.name} must have signal_name"
+
+    # Verify J9 pin 7 and J10 pin 1 are GND (BUG-174)
+    gnd_net = next(n for n in wiring.nets if n.name == "GND")
+    assert ("J9", "7") in gnd_net.pins or ("J9", "7", "GND") in gnd_net.pins
+    assert ("J10", "1") in gnd_net.pins or ("J10", "1", "GND") in gnd_net.pins
+
+    # Verify Q1 pins have number, pin_name, and signal_name
+    q1 = footprints["Q1"]
+    for p in q1.pins:
+        assert p.number is not None and p.pin_name is not None and p.signal_name is not None
+
+    # Verify DRC check_netlist_connectivity passes with 0 PIN_NAME_MISMATCH or SIGNAL_NAME_MISMATCH
+    cfg = provider.pcb_config
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_netlist_connectivity(wiring)
+    mismatches = [
+        v
+        for v in violations
+        if v.rule_name
+        in (DRCRuleName.PIN_NAME_MISMATCH, DRCRuleName.SIGNAL_NAME_MISMATCH, DRCRuleName.SHORT_CIRCUIT_DETECTED)
+    ]
+    assert len(mismatches) == 0, f"Netlist connectivity violations: {mismatches}"
+
+    # Verify flying probe signal isolation against power and ground
+    from provider.simulation.flying_probe import verify_signal_lines_isolation
+
+    isolation_result = verify_signal_lines_isolation(provider, wiring=wiring)
+    assert isolation_result["all_passed"] is True, f"Shorted signals: {isolation_result['shorted_signals']}"
+    assert len(isolation_result["signal_lines"]) > 0, "Must audit signal lines"
+    assert len(isolation_result["power_ground_nets"]) > 0, "Must audit power and ground nets"
+
+
+def test_regression_flying_probes_initial_isolation_verdict_pending() -> None:
+    """Verify flying probe isolation tests show PENDING initially, not PASS before physical probing."""
+    import pybullet as p
+    from provider import Simulate
+
+    provider = CarrierBoardProvider()
+    hooks = provider.get_simulate_hooks("carrier_board")
+    client = p.connect(p.DIRECT)
+    try:
+        hooks[Simulate.SETUP](0, client, "carrier_board", {})
+
+        # Initial test report before running simulation steps
+        initial_report = provider.generate_test_report()
+        assert "Overall Verdict** | ⚪ `PENDING`" in initial_report, (
+            "Initial test report must display ⚪ `PENDING` overall verdict"
+        )
+        assert "Tested Steps** | `0 /" in initial_report, "Initial test report must show 0 tested steps completed"
+        assert "Yield** | 0.0%" in initial_report, "Initial yield must be 0.0%"
+
+        # Detailed step results and Signal Line Isolation Audit must report PENDING, not PASS
+        assert "TEST_ISO_" in initial_report
+        assert "⚪ *PENDING*" in initial_report
+        # No isolation test should report PASS before pad contact and dwell
+        for line in initial_report.splitlines():
+            if "TEST_ISO_" in line:
+                assert "⚪ *PENDING*" in line, f"Isolation step must be PENDING initially: {line}"
+                assert "🟢 **PASS**" not in line, f"Isolation step cannot be PASS initially: {line}"
+                assert "> 100 MΩ" not in line, f"Isolation step cannot show measured resistance initially: {line}"
+
+        # Execute flying probe simulation to completion
+        for step_idx in range(1000):
+            hooks[Simulate.STEP](0, client, step_idx, "carrier_board")
+
+        # Verify isolation steps use standard 'resistance' test_type across all tests
+        assert hasattr(provider, "flying_probe_steps")
+        iso_steps = [s for s in provider.flying_probe_steps if s.step_id.startswith("TEST_ISO_")]
+        assert len(iso_steps) > 0, "Must have generated isolation steps"
+        for s in iso_steps:
+            assert s.test_type == "resistance", (
+                f"Isolation step {s.step_id} must have test_type 'resistance', got {s.test_type}"
+            )
+
+        # Final test report after simulation steps
+        final_report = provider.generate_test_report()
+        assert "Overall Verdict** | 🟢 `PASS`" in final_report, (
+            "Completed test report must display 🟢 `PASS` overall verdict"
+        )
+        assert "100.0%" in final_report, "Completed yield must be 100.0%"
+        assert "> 100 MΩ" in final_report, "Completed report must display measured isolation resistance"
+        assert "⚪ *PENDING*" not in final_report, "Completed report must not have pending steps"
+    finally:
+        p.disconnect(client)

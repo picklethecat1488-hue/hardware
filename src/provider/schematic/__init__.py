@@ -14,6 +14,7 @@ from provider.schematic.constants import (
     PowerNetMatcher,
     _SchematicSheetPlan,
     _TOCPagePlan,
+    partition_component_pins,
 )
 from provider.schematic.jumper import draw_vertical_wire_with_jumpers
 from provider.schematic.passives import SchematicPassiveClassifier, SchematicPassiveDrawer
@@ -41,4 +42,5 @@ __all__ = [
     "_SchematicSheetPlan",
     "_TOCPagePlan",
     "draw_vertical_wire_with_jumpers",
+    "partition_component_pins",
 ]
