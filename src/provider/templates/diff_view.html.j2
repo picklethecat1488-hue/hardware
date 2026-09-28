@@ -728,6 +728,12 @@
           <button id="btnOpenCR" class="quake-btn quake-btn-gold quake-btn-icon" onclick="onOpenInCodeReview()" title="Review selected commit(s) in Code Review">
             <span>🔍 <span id="selectedCount">0</span></span>
           </button>
+          <button id="btnCreatePR" class="quake-btn quake-btn-purple quake-btn-sm" onclick="onCreatePR()" title="Create Pull Request for selected commit(s)">
+            <span>🚀 Create PR</span>
+          </button>
+          <button id="btnUnlinkPR" class="quake-btn quake-btn-default quake-btn-sm" onclick="onUnlinkPR()" title="Unlink Pull Request from selected commit(s)">
+            <span>✕ Unlink PR</span>
+          </button>
           <button class="quake-btn quake-btn-default quake-btn-icon" onclick="togglePane('smartlog')" title="Collapse Smartlog Pane (Shortcut: [)">◀</button>
         </div>
       </div>
@@ -1889,6 +1895,61 @@
         window.open(prUrl, "_blank");
       }
     }
+
+    async function onCreatePR() {
+      if (!state.selectedCommits || state.selectedCommits.length === 0) {
+        alert("Please select one or more commits using the checkboxes to create a PR.");
+        return;
+      }
+
+      showToast(`Creating PR for ${state.selectedCommits.length} commit(s)...`);
+      try {
+        const resp = await fetch("/api/pr/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commits: state.selectedCommits })
+        });
+        const res = await resp.json();
+        if (res.status === "ok") {
+          showToast(`✓ Created ${res.created.length} PR(s) successfully!`);
+          setTimeout(() => location.reload(), 600);
+        } else {
+          alert(`Error creating PR: ${res.error}`);
+        }
+      } catch (err) {
+        alert(`Error communicating with server: ${err}`);
+      }
+    }
+
+    async function onUnlinkPR() {
+      if (!state.selectedCommits || state.selectedCommits.length === 0) {
+        alert("Please select one or more commits using the checkboxes to unlink PR.");
+        return;
+      }
+
+      if (!confirm(`Are you sure you want to unlink PRs from ${state.selectedCommits.length} selected commit(s)?`)) {
+        return;
+      }
+
+      showToast(`Unlinking PR from ${state.selectedCommits.length} commit(s)...`);
+      try {
+        const resp = await fetch("/api/pr/unlink", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commits: state.selectedCommits })
+        });
+        const res = await resp.json();
+        if (res.status === "ok") {
+          showToast(`✓ Unlinked ${res.unlinked.length} PR(s) successfully!`);
+          setTimeout(() => location.reload(), 600);
+        } else {
+          alert(`Error unlinking PR: ${res.error}`);
+        }
+      } catch (err) {
+        alert(`Error communicating with server: ${err}`);
+      }
+    }
+
 
 
 

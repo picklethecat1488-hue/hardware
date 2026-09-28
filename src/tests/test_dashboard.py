@@ -1003,3 +1003,126 @@ def test_regression_bug_192_pr_highlight_on_commit_element(tmp_path: Path) -> No
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_193_create_and_unlink_pr_buttons_and_ancestors(tmp_path: Path) -> None:
+    """Verify BUG-193: Create PR and Unlink PR buttons, ancestor preservation, and validation."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 1. Verify UI template contains buttons and client handlers
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert 'id="btnCreatePR"' in tpl_text
+    assert 'id="btnUnlinkPR"' in tpl_text
+    assert "onCreatePR" in tpl_text
+    assert "onUnlinkPR" in tpl_text
+    assert "/api/pr/create" in tpl_text
+    assert "/api/pr/unlink" in tpl_text
+
+    # 2. Test multi-commit PR creation preserving ancestor information
+    # Pass commits in reverse order (descendant first) to verify topological sorting
+    prs = engine.create_prs_for_commits([shas[2], shas[1]])
+    assert len(prs) == 2
+    pr1, pr2 = prs[0], prs[1]
+    assert pr1["commit"] == shas[1]
+    assert pr2["commit"] == shas[2]
+    # Ancestor's base branch is repository branch
+    curr_branch = engine.get_current_branch() or "main"
+    assert pr1["base_branch"] == curr_branch
+    # Descendant's base branch is ancestor's PR branch, preserving hierarchy
+    assert pr2["base_branch"] == pr1["branch"]
+    assert pr1["pr_number"] < pr2["pr_number"]
+
+    # 3. Test validation: cannot create PR for commit that already has an associated PR
+    with pytest.raises(ValueError, match="already has an associated PR"):
+        engine.create_prs_for_commits([shas[1]])
+
+    # 4. Test unlinking PRs
+    unlinked = engine.unlink_prs_for_commits([shas[1], shas[2]])
+    assert len(unlinked) == 2
+    assert any(u["commit"] == shas[1] for u in unlinked)
+    assert any(u["commit"] == shas[2] for u in unlinked)
+
+    # 5. Test validation: unlinking commit without PR raises ValueError
+    with pytest.raises(ValueError, match="does not have an associated PR to unlink"):
+        engine.unlink_prs_for_commits([shas[1]])
+
+    # 6. Test DashboardServer REST endpoints /api/pr/create and /api/pr/unlink
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+
+        # Empty commits payload validation
+        req = urllib.request.Request(
+            f"{base_url}/api/pr/create",
+            data=json.dumps({"commits": []}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req)
+        assert exc_info.value.code == 400
+
+        # Successful PR creation via API
+        req = urllib.request.Request(
+            f"{base_url}/api/pr/create",
+            data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["status"] == "ok"
+            assert len(res["created"]) == 1
+            assert res["created"][0]["commit"] == shas[1]
+
+        # Duplicate PR creation returns 400
+        req = urllib.request.Request(
+            f"{base_url}/api/pr/create",
+            data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req)
+        assert exc_info.value.code == 400
+
+        # Successful PR unlink via API
+        req = urllib.request.Request(
+            f"{base_url}/api/pr/unlink",
+            data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["status"] == "ok"
+            assert len(res["unlinked"]) == 1
+            assert res["unlinked"][0]["commit"] == shas[1]
+
+        # Unlink again returns 400
+        req = urllib.request.Request(
+            f"{base_url}/api/pr/unlink",
+            data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req)
+        assert exc_info.value.code == 400
+
+    finally:
+        server.shutdown()
+        server.server_close()

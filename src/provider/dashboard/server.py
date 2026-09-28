@@ -270,6 +270,26 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     self._send_json(res)
                 except (RuntimeError, ValueError) as e:
                     self._send_json({"error": str(e)}, status=400)
+            case "/api/pr/create":
+                commits = data.get("commits", [])
+                if not commits:
+                    self._send_json({"error": "No commits provided for PR creation"}, status=400)
+                    return
+                try:
+                    res = self.server.git_engine.create_prs_for_commits(commits)
+                    self._send_json({"status": "ok", "created": res})
+                except (ValueError, RuntimeError) as e:
+                    self._send_json({"error": str(e)}, status=400)
+            case "/api/pr/unlink":
+                commits = data.get("commits", [])
+                if not commits:
+                    self._send_json({"error": "No commits provided to unlink PR"}, status=400)
+                    return
+                try:
+                    res = self.server.git_engine.unlink_prs_for_commits(commits)
+                    self._send_json({"status": "ok", "unlinked": res})
+                except (ValueError, RuntimeError) as e:
+                    self._send_json({"error": str(e)}, status=400)
             case "/api/open_code_review":
                 commits = data.get("commits", [])
                 rev_str = ",".join(commits)
