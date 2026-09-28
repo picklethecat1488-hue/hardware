@@ -538,7 +538,8 @@ class GitEngine:
         sqlite_path = self.repo_root / "build" / "bugs.sqlite"
         if sqlite_path.exists():
             try:
-                with sqlite3.connect(str(sqlite_path)) as conn:
+                conn = sqlite3.connect(str(sqlite_path))
+                try:
                     cur = conn.cursor()
                     for bid in bug_ids:
                         norm_id = bid.replace("_", "-").upper()
@@ -552,6 +553,8 @@ class GitEngine:
                                 "status": str(row[2]),
                                 "severity": str(row[3]),
                             }
+                finally:
+                    conn.close()
             except Exception:
                 pass
 

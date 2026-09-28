@@ -671,6 +671,12 @@ class MarkdownBugExporter:
         clean_id = bug.id.removeprefix("BUG-").removeprefix("BUG_")
         target_file = feedback_dir / f"BUG_{clean_id}.md"
         content = self.render_bug_markdown(bug)
+        if target_file.exists():
+            try:
+                if target_file.read_text(encoding="utf-8") == content:
+                    return target_file
+            except OSError:
+                pass
         target_file.write_text(content, encoding="utf-8")
         return target_file
 
@@ -913,15 +919,14 @@ class MarkdownBugExporter:
                         store.update_bug_id(existing_by_uuid.uuid, expected_id_from_fn)
                     renamed += 1
                 database.add_or_update(md_bug)
-                if store and hasattr(store, "save_bug"):
-                    store.save_bug(md_bug)
                 merged += 1
             else:
                 if expected_id_from_fn:
                     md_bug.id = expected_id_from_fn
                 database.add_or_update(md_bug)
-                if store and hasattr(store, "save_bug"):
-                    store.save_bug(md_bug)
                 merged += 1
+
+        if store and hasattr(store, "save_database") and (merged > 0 or renamed > 0):
+            store.save_database(database)
 
         return {"merged": merged, "renamed": renamed, "scanned": scanned}

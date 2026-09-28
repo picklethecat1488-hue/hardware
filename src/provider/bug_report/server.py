@@ -143,8 +143,10 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(encoded)
+        self.close_connection = True
 
     def _handle_serve_attachment(self, path: str) -> None:
         """Serve uploaded file attachments from attachments directory."""
@@ -176,8 +178,10 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(content)))
+        self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(content)
+        self.close_connection = True
 
     def _handle_save_bug(self, data: Dict[str, Any]) -> None:
         """Create or update a bug report and persist to storage."""
@@ -341,14 +345,17 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(encoded)
+        self.close_connection = True
 
 
 class BugReportServer(ThreadingHTTPServer):
     """Local Threading HTTP web server hosting the interactive bug report dashboard."""
 
     allow_reuse_address = True
+    daemon_threads = True
 
     def __init__(
         self,
@@ -380,6 +387,9 @@ class BugReportServer(ThreadingHTTPServer):
         self.fresh = fresh
         self.bind_and_activate = bind_and_activate
 
+        self._lock = threading.RLock()
+        self._is_internal_saving = False
+
         self.sqlite_store = SQLiteBugStore(self.sqlite_file)
         self.exporter = MarkdownBugExporter(repo_root=self.repo_root)
         self.markdown_mtime = self.markdown_output.stat().st_mtime if self.markdown_output.exists() else 0.0
@@ -391,6 +401,12 @@ class BugReportServer(ThreadingHTTPServer):
         if bind_and_activate:
             self._start_file_watcher()
             super().__init__((host, port), BugReportRequestHandler)
+
+    def get_request(self) -> Any:
+        """Accept incoming connection and set a socket timeout to prevent lingering sockets."""
+        sock, addr = super().get_request()
+        sock.settimeout(10.0)
+        return sock, addr
 
     def _get_feedback_dir_mtime(self) -> float:
         """Compute maximum mtime across feedback_dir and all markdown files within it."""
@@ -411,23 +427,26 @@ class BugReportServer(ThreadingHTTPServer):
 
     def check_file_watch(self) -> bool:
         """Check if feedback_dir or markdown_output was modified externally and reload state."""
-        changed = False
-        if self.markdown_output.exists():
-            try:
-                curr_mtime = self.markdown_output.stat().st_mtime
-                if curr_mtime > self.markdown_mtime + 0.001:
-                    changed = True
-            except OSError:
-                pass
+        with self._lock:
+            if self._is_internal_saving:
+                return False
+            changed = False
+            if self.markdown_output.exists():
+                try:
+                    curr_mtime = self.markdown_output.stat().st_mtime
+                    if curr_mtime > self.markdown_mtime + 0.001:
+                        changed = True
+                except OSError:
+                    pass
 
-        curr_fb_mtime = self._get_feedback_dir_mtime()
-        if curr_fb_mtime > self.feedback_mtime + 0.001:
-            changed = True
+            curr_fb_mtime = self._get_feedback_dir_mtime()
+            if curr_fb_mtime > self.feedback_mtime + 0.001:
+                changed = True
 
-        if changed:
-            self.sync_with_feedback_dir()
-            return True
-        return False
+            if changed:
+                self.sync_with_feedback_dir()
+                return True
+            return False
 
     def _start_file_watcher(self) -> None:
         """Start background polling thread to watch feedback_dir and BUGS.md for external changes."""
@@ -489,41 +508,48 @@ class BugReportServer(ThreadingHTTPServer):
 
     def sync_with_markdown(self) -> Path:
         """Perform Read-Modify-Write (R+M+W) sync with feedback/ and BUGS.md and persist to stores."""
-        if self.feedback_dir.exists():
-            self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
-        if self.markdown_output.exists():
-            md_db = self.exporter.parse_markdown(self.markdown_output)
-            if md_db and md_db.bugs:
-                self.database = self.exporter.merge_databases(self.database, md_db)
-                self._ensure_unique_bug_ids(self.database)
-        return self.save_and_sync()
+        with self._lock:
+            if self.feedback_dir.exists():
+                self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
+            if self.markdown_output.exists():
+                md_db = self.exporter.parse_markdown(self.markdown_output)
+                if md_db and md_db.bugs:
+                    self.database = self.exporter.merge_databases(self.database, md_db)
+                    self._ensure_unique_bug_ids(self.database)
+            return self.save_and_sync()
 
     def sync_with_feedback_dir(self) -> Dict[str, Any]:
         """Scan feedback/ directory, detect file renames, merge into SQLite, and update markdown."""
-        if self.markdown_output.exists():
-            md_db = self.exporter.parse_markdown(self.markdown_output)
-            if md_db and md_db.bugs:
-                self.database = self.exporter.merge_databases(self.database, md_db)
-        stats = self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
-        self.save_and_sync()
-        return stats
+        with self._lock:
+            if self.markdown_output.exists():
+                md_db = self.exporter.parse_markdown(self.markdown_output)
+                if md_db and md_db.bugs:
+                    self.database = self.exporter.merge_databases(self.database, md_db)
+            stats = self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
+            self.save_and_sync()
+            return stats
 
     def save_and_sync(self) -> Path:
         """Persist bug database to SQLite, JSON, BUGS.md, and individual BUG_<id>.md files."""
-        self.database.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        self.sqlite_store.save_database(self.database)
-        self.exporter.export_state_json(self.database, self.state_file)
-        out = self.exporter.export_markdown(
-            self.database,
-            self.markdown_output,
-            store=self.sqlite_store,
-            feedback_dir=self.feedback_dir,
-        )
-        if self.markdown_output.exists():
-            self.markdown_mtime = self.markdown_output.stat().st_mtime
-        self.feedback_mtime = self._get_feedback_dir_mtime()
-        self.db_version += 1
-        return out
+        with self._lock:
+            self._is_internal_saving = True
+            try:
+                self.database.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+                self.sqlite_store.save_database(self.database)
+                self.exporter.export_state_json(self.database, self.state_file)
+                out = self.exporter.export_markdown(
+                    self.database,
+                    self.markdown_output,
+                    store=self.sqlite_store,
+                    feedback_dir=self.feedback_dir,
+                )
+                if self.markdown_output.exists():
+                    self.markdown_mtime = self.markdown_output.stat().st_mtime
+                self.feedback_mtime = self._get_feedback_dir_mtime()
+                self.db_version += 1
+                return out
+            finally:
+                self._is_internal_saving = False
 
     def get_url(self) -> str:
         """Return reachable HTTP URL for browser."""

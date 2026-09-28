@@ -590,3 +590,88 @@ def test_regression_bug_172_vertical_text_panel_and_cli_expansion() -> None:
     assert "expanded-vertical" in br_template
     assert "toggleExpandPanel" in br_template
     assert "resize: vertical" in br_template
+
+
+def test_regression_bug_181_no_file_descriptor_leak_in_sqlite_and_server(tmp_path: Path) -> None:
+    """Verify BUG-181: SQLite stores, markdown exporter, and server do not leak file descriptors."""
+    import os
+    import time
+
+    db_file = tmp_path / "bugs.sqlite"
+    feedback_dir = tmp_path / "feedback"
+    feedback_dir.mkdir()
+    md_file = tmp_path / "BUGS.md"
+    state_file = tmp_path / "bugs_state.json"
+
+    def get_open_fd_count() -> int:
+        fd_dir = Path("/dev/fd") if Path("/dev/fd").exists() else Path("/proc/self/fd")
+        if fd_dir.exists():
+            try:
+                return len(os.listdir(str(fd_dir)))
+            except OSError:
+                return 0
+        return 0
+
+    # 1. Test SQLiteBugStore connection closure across repeated operations
+    store = SQLiteBugStore(db_file)
+    initial_db = BugDatabaseModel(
+        title="FD Leak Test Tracker",
+        summary="Testing FD leak resistance",
+        bugs=[
+            BugReportModel(
+                id=f"BUG-{i:03d}",
+                title=f"Bug {i}",
+                status=BugStatus.OPEN,
+                severity=BugSeverity.MEDIUM,
+                category=BugCategory.INFRASTRUCTURE,
+                description=f"Description for bug {i}",
+            )
+            for i in range(1, 20)
+        ],
+    )
+    store.save_database(initial_db)
+
+    baseline_fds = get_open_fd_count()
+    if baseline_fds > 0:
+        for _ in range(50):
+            loaded = store.load_database()
+            store.save_database(loaded)
+        after_sqlite_fds = get_open_fd_count()
+        assert after_sqlite_fds <= baseline_fds, (
+            f"SQLiteBugStore leaked file descriptors: baseline={baseline_fds}, after={after_sqlite_fds}"
+        )
+
+    # 2. Test MarkdownBugExporter does not re-write identical bug files
+    exporter = MarkdownBugExporter(repo_root=tmp_path)
+    test_bug = initial_db.bugs[0]
+    out_file = exporter.export_individual_bug(test_bug, feedback_dir)
+    assert out_file.exists()
+    initial_mtime = out_file.stat().st_mtime_ns
+
+    time.sleep(0.01)
+    out_file_2 = exporter.export_individual_bug(test_bug, feedback_dir)
+    assert out_file_2 == out_file
+    second_mtime = out_file_2.stat().st_mtime_ns
+    assert second_mtime == initial_mtime, "export_individual_bug must not rewrite identical file contents"
+
+    # 3. Test BugReportServer save_and_sync and check_file_watch do not leak FDs
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=8766,
+        repo_root=tmp_path,
+        markdown_output=md_file,
+        feedback_dir=feedback_dir,
+        state_file=state_file,
+        sqlite_file=db_file,
+        bind_and_activate=False,
+    )
+
+    baseline_server_fds = get_open_fd_count()
+    if baseline_server_fds > 0:
+        for _ in range(20):
+            server.save_and_sync()
+            server.check_file_watch()
+        after_server_fds = get_open_fd_count()
+        assert after_server_fds <= baseline_server_fds + 1, (
+            f"BugReportServer leaked file descriptors: baseline={baseline_server_fds}, after={after_server_fds}"
+        )

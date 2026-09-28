@@ -300,12 +300,23 @@ class DiffViewRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(encoded)
+        self.close_connection = True
 
 
 class DiffViewServer(ThreadingHTTPServer):
     """Multi-threaded HTTP server powering the Quake Diff Viewer and Smartlog workstation."""
+
+    allow_reuse_address = True
+    daemon_threads = True
+
+    def get_request(self) -> Any:
+        """Accept incoming connection and set socket timeout to prevent lingering sockets."""
+        sock, addr = super().get_request()
+        sock.settimeout(10.0)
+        return sock, addr
 
     def __init__(
         self,
