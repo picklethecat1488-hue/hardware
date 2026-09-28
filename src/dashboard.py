@@ -370,7 +370,7 @@ def main() -> None:
     # Direct CLI git sync
     if args.sync:
         print(f"\n[Quake VCS] Syncing repository {repo_root.name} from remote...")
-        res = engine.fetch_or_pull()
+        res = engine.sync_repo()
         print(f"Status : {res.get('status')}")
         print(f"Message: {res.get('message')}\n")
         return

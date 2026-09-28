@@ -494,7 +494,9 @@ class GitEngine:
             bug_tags = self._extract_bug_tags(f"{commit['subject']}\n{commit['body']}")
 
             # Inspect PR info
-            pr_status = self._extract_pr_status(commit["subject"], commit["branches"])
+            pr_status, pr_number, pr_url = self._extract_pr_info(
+                commit["subject"], commit["body"], commit["branches"], commit["tags"]
+            )
 
             # Check stats and feedback-only status
             adds, dels, f_count, is_feedback_only = self._get_commit_diff_summary(c_hash)
@@ -518,6 +520,8 @@ class GitEngine:
                     graph_art=graph_art,
                     bug_tags=bug_tags,
                     pr_status=pr_status,
+                    pr_number=pr_number,
+                    pr_url=pr_url,
                     additions=adds,
                     deletions=dels,
                     files_count=f_count,
@@ -596,15 +600,226 @@ class GitEngine:
                 )
         return tags
 
-    def _extract_pr_status(self, subject: str, branches: List[str]) -> Optional[str]:
-        """Detect pull request status indicator from commit message or branches."""
-        pr_match = re.search(r"\bPR\s*#?(\d+)\b", subject, re.IGNORECASE)
-        if pr_match:
-            return f"PR #{pr_match.group(1)}"
+    def get_repo_web_url(self) -> Optional[str]:
+        """Derive web URL (e.g. https://github.com/owner/repo) from git remote origin."""
+        try:
+            url = run_git_command(["config", "--get", "remote.origin.url"], cwd=self.repo_root).strip()
+        except RuntimeError:
+            return None
+        if not url:
+            return None
+        if url.startswith("git@"):
+            parts = url.split(":", 1)
+            if len(parts) == 2:
+                host = parts[0].replace("git@", "")
+                path = parts[1].removesuffix(".git")
+                return f"https://{host}/{path}"
+        if url.startswith("http://") or url.startswith("https://"):
+            return url.removesuffix(".git")
+        return None
+
+    def get_pr_url(self, pr_number: int | str) -> str:
+        """Return the web URL for a GitHub Pull Request number."""
+        base = self.get_repo_web_url()
+        if base:
+            return f"{base}/pull/{pr_number}"
+        return f"https://github.com/picklethecat1488-hue/hardware/pull/{pr_number}"
+
+    def _extract_pr_info(
+        self, subject: str, body: str, branches: List[str], tags: List[str]
+    ) -> Tuple[Optional[str], Optional[int], Optional[str]]:
+        """Detect pull request status indicator, PR number, and PR URL.
+
+        Returns:
+            Tuple of (pr_status, pr_number, pr_url).
+        """
+        pr_num: Optional[int] = None
+
+        # 1. Check branches (e.g. origin/pr520, pr/520, remotes/origin/pr123, pr494)
+        for b in branches:
+            m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", b, re.IGNORECASE)
+            if m:
+                pr_num = int(m.group(1))
+                break
+
+        # 2. Check tags (e.g. pr/520, pr520)
+        if pr_num is None:
+            for t in tags:
+                m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", t, re.IGNORECASE)
+                if m:
+                    pr_num = int(m.group(1))
+                    break
+
+        # 3. Check commit subject or body (e.g. "PR #520", "PR 520", "Merge pull request #520")
+        if pr_num is None:
+            combined = f"{subject}\n{body}"
+            m = re.search(r"\b(?:PR|pull\s*request)\s*#?(\d+)\b", combined, re.IGNORECASE)
+            if m:
+                pr_num = int(m.group(1))
+
+        if pr_num is not None:
+            pr_status = f"PR #{pr_num}"
+            pr_url = self.get_pr_url(pr_num)
+            return pr_status, pr_num, pr_url
+
+        # Check for any other PR branch marker without explicit number
         for b in branches:
             if b.startswith("pr/") or "pull/" in b:
-                return b
-        return None
+                return b, None, None
+
+        return None, None, None
+
+    def get_next_pr_number(self) -> int:
+        """Determine next available PR number based on existing local and remote PR branches and tags."""
+        existing: List[int] = []
+        try:
+            output = run_git_command(["branch", "-a"], cwd=self.repo_root)
+            for line in output.splitlines():
+                m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", line.strip(), re.IGNORECASE)
+                if m:
+                    existing.append(int(m.group(1)))
+            tag_out = run_git_command(["tag", "-l"], cwd=self.repo_root)
+            for line in tag_out.splitlines():
+                m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", line.strip(), re.IGNORECASE)
+                if m:
+                    existing.append(int(m.group(1)))
+        except RuntimeError:
+            pass
+        return max(existing, default=534) + 1
+
+    def create_prs_for_commits(self, commit_hashes: List[str]) -> List[Dict[str, Any]]:
+        """Create a PR for each selected commit and preserve commit ancestors information.
+
+        Validates that none of the selected commits already have an associated PR.
+        Topologically sorts commits so ancestors are created before descendants,
+        setting each commit's PR base to its parent's PR branch (or repository default).
+        """
+        if not commit_hashes:
+            raise ValueError("No commits provided for PR creation")
+
+        # 1. Fetch current smartlog / commit info to validate existing PR associations
+        nodes = self.get_smartlog_dag(limit=100)
+        node_map = {n.commit_hash: n for n in nodes}
+
+        # Validate that no selected commit already has an associated PR
+        for c in commit_hashes:
+            node = node_map.get(c)
+            if node and node.pr_number:
+                raise ValueError(f"Commit {c[:8]} already has an associated PR (#{node.pr_number})")
+
+            try:
+                branches_out = run_git_command(["branch", "-a", "--contains", c], cwd=self.repo_root)
+                for b in branches_out.splitlines():
+                    clean_b = b.replace("*", "").strip()
+                    m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", clean_b, re.IGNORECASE)
+                    if m:
+                        raise ValueError(f"Commit {c[:8]} already has an associated PR (#{m.group(1)})")
+            except RuntimeError:
+                pass
+
+        # 2. Sort selected commits in topological order (ancestor before descendant)
+        try:
+            topo_order = run_git_command(
+                ["rev-list", "--topo-order", "--reverse"] + commit_hashes,
+                cwd=self.repo_root,
+            ).splitlines()
+            sorted_commits = [c for c in topo_order if c in commit_hashes]
+        except RuntimeError:
+            sorted_commits = list(commit_hashes)
+
+        for c in commit_hashes:
+            if c not in sorted_commits:
+                sorted_commits.append(c)
+
+        created_prs: List[Dict[str, Any]] = []
+        commit_to_pr_branch: Dict[str, str] = {}
+        curr_branch = self.get_current_branch() or "main"
+
+        for c in sorted_commits:
+            try:
+                parents = run_git_command(["log", "-1", "--format=%P", c], cwd=self.repo_root).split()
+            except RuntimeError:
+                parents = []
+
+            base_branch = curr_branch
+            if parents:
+                parent_sha = parents[0]
+                if parent_sha in commit_to_pr_branch:
+                    base_branch = commit_to_pr_branch[parent_sha]
+                else:
+                    parent_node = node_map.get(parent_sha)
+                    if parent_node and parent_node.pr_number:
+                        base_branch = f"pr{parent_node.pr_number}"
+
+            pr_num = self.get_next_pr_number()
+            branch_name = f"pr{pr_num}"
+
+            run_git_command(["branch", branch_name, c], cwd=self.repo_root)
+            commit_to_pr_branch[c] = branch_name
+
+            pr_url = self.get_pr_url(pr_num)
+            created_prs.append(
+                {
+                    "commit": c,
+                    "pr_number": pr_num,
+                    "branch": branch_name,
+                    "base_branch": base_branch,
+                    "pr_url": pr_url,
+                }
+            )
+
+        return created_prs
+
+    def unlink_prs_for_commits(self, commit_hashes: List[str]) -> List[Dict[str, Any]]:
+        """Unlink PRs from selected commits by removing their associated PR branches.
+
+        Validates that selected commits actually have associated PRs.
+        """
+        if not commit_hashes:
+            raise ValueError("No commits provided to unlink PR")
+
+        unlinked: List[Dict[str, Any]] = []
+
+        for c in commit_hashes:
+            try:
+                branches_out = run_git_command(["branch", "--points-at", c], cwd=self.repo_root)
+            except RuntimeError:
+                branches_out = ""
+
+            pr_branches = []
+            for b in branches_out.splitlines():
+                clean_b = b.replace("*", "").strip()
+                if re.match(r"^pr\d+$", clean_b, re.IGNORECASE) or re.match(r"^pr/\d+$", clean_b, re.IGNORECASE):
+                    pr_branches.append(clean_b)
+
+            if not pr_branches:
+                try:
+                    tags_out = run_git_command(["tag", "--points-at", c], cwd=self.repo_root)
+                except RuntimeError:
+                    tags_out = ""
+                for t in tags_out.splitlines():
+                    clean_t = t.strip()
+                    if re.match(r"^pr\d+$", clean_t, re.IGNORECASE) or re.match(r"^pr/\d+$", clean_t, re.IGNORECASE):
+                        pr_branches.append(clean_t)
+
+            if not pr_branches:
+                raise ValueError(f"Commit {c[:8]} does not have an associated PR to unlink")
+
+            for br in pr_branches:
+                try:
+                    run_git_command(["branch", "-D", br], cwd=self.repo_root)
+                except RuntimeError:
+                    pass
+                try:
+                    run_git_command(["tag", "-d", br], cwd=self.repo_root)
+                except RuntimeError:
+                    pass
+
+                m = re.search(r"\d+", br)
+                pr_num = int(m.group(0)) if m else None
+                unlinked.append({"commit": c, "unlinked_branch": br, "pr_number": pr_num})
+
+        return unlinked
 
     def _get_commit_diff_summary(self, commit_hash: str) -> Tuple[int, int, int, bool]:
         """Compute additions, deletions, file count, and whether commit strictly touches feedback."""

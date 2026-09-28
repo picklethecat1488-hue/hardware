@@ -162,7 +162,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
         match path:
             case "/api/sync":
-                res = self.server.git_engine.fetch_or_pull()
+                res = self.server.git_engine.sync_repo()
                 self._send_json(res)
             case "/api/checkout_branch":
                 branch = data.get("branch", "").strip()

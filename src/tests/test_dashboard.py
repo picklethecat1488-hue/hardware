@@ -24,7 +24,7 @@ from model.vcs import (
     WorkingTreeFileModel,
 )
 from provider.dashboard.server import DashboardServer
-from provider.vcs.git_engine import GitEngine, get_git_root
+from provider.vcs.git_engine import GitEngine, get_git_root, run_git_command
 
 
 def create_isolated_git_repo(path: Path) -> Tuple[Path, list[str]]:
@@ -915,6 +915,45 @@ def test_regression_bug_188_initial_sqlite_sync_loading_modal(tmp_path: Path) ->
             html = resp.read().decode("utf-8")
             assert "display: none;" in html
 
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_190_pr_branch_tag_clickable_link(tmp_path: Path) -> None:
+    """Verify BUG-190: PR branch tags like origin/pr520 are clickable links that open the PR in GitHub."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 1. Create a branch matching PR tag pattern (e.g. pr520 or origin/pr520)
+    run_git_command(["branch", "pr520", shas[1]], cwd=repo_dir)
+
+    # 2. Verify template has onBranchBadgeClick and pr-tag-link
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert "onBranchBadgeClick" in tpl_text
+    assert "pr-tag-link" in tpl_text
+    assert "picklethecat1488-hue/hardware/pull/" in tpl_text
+
+    # 3. Serve via DashboardServer and assert HTML contains clickable branch tag
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}/") as resp:
+            assert resp.status == 200
+            html = resp.read().decode("utf-8")
+            assert "pr520" in html
+            assert "onBranchBadgeClick(event, 'pr520'" in html
+            assert "pr-tag-link" in html
     finally:
         server.shutdown()
         server.server_close()

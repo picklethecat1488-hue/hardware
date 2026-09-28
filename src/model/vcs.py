@@ -133,6 +133,8 @@ class CommitNodeModel(BaseModel):
     graph_art: str = ""  # ASCII / Unicode tree column prefix (e.g. '@', '| o', '| /')
     bug_tags: List[CommitBugTagModel] = Field(default_factory=list)
     pr_status: Optional[str] = None
+    pr_number: Optional[int] = None
+    pr_url: Optional[str] = None
     additions: int = 0
     deletions: int = 0
     files_count: int = 0

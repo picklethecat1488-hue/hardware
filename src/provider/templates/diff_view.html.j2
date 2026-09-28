@@ -366,6 +366,59 @@
       border-color: var(--quake-green);
       color: var(--quake-green);
     }
+    .smartlog-node.has-pr {
+      border-left: 3px solid #a855f7 !important;
+      background: linear-gradient(90deg, rgba(168, 85, 247, 0.1) 0%, #160e07 40%);
+    }
+    .pr-highlight-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1px 6px;
+      background: rgba(168, 85, 247, 0.22);
+      border: 1px solid #a855f7;
+      border-radius: 3px;
+      color: #e9d5ff;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: 0 0 6px rgba(168, 85, 247, 0.3);
+    }
+    .pr-highlight-badge:hover {
+      background: rgba(168, 85, 247, 0.4);
+      border-color: #d8b4fe;
+      color: #ffffff;
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.7);
+      transform: translateY(-1px);
+    }
+    .node-badge-branch.pr-tag-link,
+    .node-badge-pr.pr-tag-link {
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .node-badge-branch.pr-tag-link:hover,
+    .node-badge-pr.pr-tag-link:hover {
+      border-color: #d8b4fe;
+      color: #ffffff;
+      background: rgba(168, 85, 247, 0.35);
+      text-decoration: underline;
+      box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+    }
+    .quake-btn-purple {
+      background: rgba(168, 85, 247, 0.2);
+      border-color: #a855f7;
+      color: #e9d5ff;
+    }
+    .quake-btn-purple:hover {
+      background: rgba(168, 85, 247, 0.4);
+      border-color: #c084fc;
+      color: #ffffff;
+      box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+    }
+
 
     .node-actions-row {
       display: flex;
@@ -723,13 +776,28 @@
             <!-- Tags Row (Branches, Tags, PR, Bugs) -->
             <div class="node-tags-row">
               {% for br in node.branches %}
-                <span class="node-badge node-badge-branch">⎇ {{ br }}</span>
+                <span class="node-badge node-badge-branch {% if 'pr' in br.lower() %}pr-tag-link{% endif %}"
+                      onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
+                      title="{% if 'pr' in br.lower() %}Open PR in GitHub{% else %}Branch {{ br }}{% endif %}">
+                  ⎇ {{ br }}
+                </span>
               {% endfor %}
               {% for tag in node.tags %}
-                <span class="node-badge node-badge-tag">🏷 {{ tag }}</span>
+                <span class="node-badge node-badge-tag {% if 'pr' in tag.lower() %}pr-tag-link{% endif %}"
+                      onclick="onBranchBadgeClick(event, '{{ tag }}', '{{ node.pr_url or '' }}')"
+                      title="{% if 'pr' in tag.lower() %}Open PR in GitHub{% else %}Tag {{ tag }}{% endif %}">
+                  🏷 {{ tag }}
+                </span>
               {% endfor %}
               {% if node.pr_status %}
-                <span class="node-badge node-badge-pr">PR: {{ node.pr_status }}</span>
+                <a href="{{ node.pr_url or ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ (node.pr_number or '')) }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="node-badge node-badge-pr pr-tag-link"
+                   onclick="event.stopPropagation();"
+                   title="Open PR on GitHub">
+                  ⎇ {{ node.pr_status }}
+                </a>
               {% endif %}
               {% for bug in node.bug_tags %}
                 <span class="node-badge node-badge-bug {% if bug.status == 'RESOLVED' %}resolved{% endif %}"
@@ -1801,6 +1869,18 @@
         showToast("Combine error: " + err);
       }
     }
+
+    function onBranchBadgeClick(e, branchName, prUrl) {
+      e.stopPropagation();
+      const match = branchName.match(/(?:pr|pull)[/-]?(\d+)/i) || branchName.match(/(\d+)/);
+      if (match) {
+        window.open(`https://github.com/picklethecat1488-hue/hardware/pull/${match[1]}`, "_blank");
+      } else if (prUrl) {
+        window.open(prUrl, "_blank");
+      }
+    }
+
+
 
     // Keyboard shortcuts for pane toggling
     document.addEventListener("keydown", (e) => {
