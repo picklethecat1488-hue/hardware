@@ -90,6 +90,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case "/api/working":
                 files = self.server.git_engine.get_working_tree_files()
                 self._send_json([f.model_dump(mode="json") for f in files])
+            case "/api/head_commit_message":
+                self._send_json({"message": self.server.git_engine.get_head_commit_message()})
             case "/api/conflicts":
                 conflicts = self.server.git_engine.get_merge_conflicts()
                 self._send_json([c.model_dump(mode="json") for c in conflicts])
@@ -202,23 +204,40 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     self._send_json({"error": str(e)}, status=400)
             case "/api/discard":
                 file_path = data.get("file", "").strip()
-                if not file_path:
+                files = data.get("files", [])
+                if not file_path and not files:
                     self._send_json({"error": "Missing file parameter"}, status=400)
                     return
+                targets = [f.strip() for f in files if f.strip()] if files else [file_path]
                 try:
-                    self.server.git_engine.discard_file(file_path)
-                    self._send_json({"status": "ok", "discarded": file_path})
+                    self.server.git_engine.discard_files(targets)
+                    self._send_json({"status": "ok", "discarded": targets})
                 except RuntimeError as e:
                     self._send_json({"error": str(e)}, status=400)
             case "/api/commit":
                 message = data.get("message", "").strip()
+                files = data.get("files")
+                amend = bool(data.get("amend", False))
                 if not message:
                     self._send_json({"error": "Commit message cannot be empty"}, status=400)
                     return
                 try:
-                    sha = self.server.git_engine.commit_staged(message)
+                    sha = self.server.git_engine.commit_files(message=message, file_paths=files, amend=amend)
                     self._send_json({"status": "ok", "commit_hash": sha})
-                except RuntimeError as e:
+                except (RuntimeError, ValueError) as e:
+                    self._send_json({"error": str(e)}, status=400)
+            case "/api/amend":
+                message = data.get("message", "").strip()
+                files = data.get("files")
+                if not message:
+                    message = self.server.git_engine.get_head_commit_message()
+                if not message:
+                    self._send_json({"error": "No commit message provided and no HEAD commit to amend"}, status=400)
+                    return
+                try:
+                    sha = self.server.git_engine.commit_files(message=message, file_paths=files, amend=True)
+                    self._send_json({"status": "ok", "commit_hash": sha})
+                except (RuntimeError, ValueError) as e:
                     self._send_json({"error": str(e)}, status=400)
             case "/api/split":
                 commit_hash = data.get("commit", "HEAD").strip()

@@ -465,6 +465,87 @@
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* Quake Modal Dialog */
+    .quake-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .quake-modal {
+      background: var(--quake-panel);
+      border: 2px solid var(--quake-border-light);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9), inset 1px 1px 0 var(--quake-border-light);
+      border-radius: 4px;
+      width: 620px;
+      max-width: 90vw;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .quake-modal-header {
+      background: var(--quake-header-bg);
+      border-bottom: 2px solid var(--quake-border-mid);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--quake-gold);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .quake-modal-body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .quake-modal-footer {
+      background: #140d07;
+      border-top: 1px solid var(--quake-border-mid);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .modal-files-list {
+      max-height: 180px;
+      overflow-y: auto;
+      border: 1px solid var(--quake-border-mid);
+      background: #100a05;
+      border-radius: 3px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 4px;
+    }
+    .modal-file-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px;
+      border-radius: 2px;
+      background: #180f08;
+      font-size: 11px;
+      gap: 8px;
+    }
+    .modal-file-row:hover {
+      background: #24160c;
+    }
   </style>
 </head>
 <body>
@@ -484,6 +565,14 @@
       <button id="btnSync" class="quake-btn quake-btn-default" onclick="onSyncClicked()">
         <span id="syncSpinner" style="display:none;">⏳</span>
         <span>🔄 Sync</span>
+      </button>
+
+      <!-- Commit & Amend Buttons -->
+      <button id="btnCommitModal" class="quake-btn quake-btn-gold" onclick="openCommitModal(false)" title="Commit selected working tree changes">
+        <span>+ Commit</span>
+      </button>
+      <button id="btnAmendModal" class="quake-btn quake-btn-default" onclick="openCommitModal(true)" title="Amend HEAD commit">
+        <span>⎇ Amend</span>
       </button>
 
       <!-- Branch Selector -->
@@ -610,11 +699,22 @@
 
       <!-- Working Tree Commit Area (Only visible when active commit is 'working') -->
       <div id="workingTreeCommitArea" class="commit-box" style="margin:8px; display:none;">
-        <div style="font-size:10px;font-weight:700;color:var(--quake-copper);text-transform:uppercase;">Commit Staged Changes</div>
-        <textarea id="commitMessageInput" class="commit-input" placeholder="feat/fix: commit description..."></textarea>
-        <button class="quake-btn quake-btn-gold quake-btn-sm" onclick="onCommitStagedClicked()" style="justify-content:center;">
-          <span>✓ Commit Staged</span>
-        </button>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;font-weight:700;color:var(--quake-copper);text-transform:uppercase;">Working Tree Actions</span>
+          <div style="display:flex;gap:4px;">
+            <button class="quake-btn quake-btn-gold quake-btn-sm" onclick="openCommitModal(false)">+ Commit</button>
+            <button class="quake-btn quake-btn-default quake-btn-sm" onclick="openCommitModal(true)">⎇ Amend</button>
+          </div>
+        </div>
+        <textarea id="commitMessageInput" class="commit-input" placeholder="feat/fix: quick commit description..."></textarea>
+        <div style="display:flex;gap:6px;justify-content:space-between;">
+          <button class="quake-btn quake-btn-red quake-btn-sm" onclick="discardSelectedWorkingFiles()" title="Discard selected uncommitted files">
+            <span>🗑 Discard</span>
+          </button>
+          <button class="quake-btn quake-btn-gold quake-btn-sm" onclick="onCommitStagedClicked()" style="justify-content:center;">
+            <span>✓ Quick Commit Staged</span>
+          </button>
+        </div>
       </div>
 
       <div class="column-scroll" id="filesContainer">
@@ -653,6 +753,46 @@
     </section>
 
   </main>
+
+  <!-- COMMIT / AMEND MODAL (BUG-185) -->
+  <div id="commitModalOverlay" class="quake-modal-overlay" onclick="if(event.target===this) closeCommitModal()">
+    <div class="quake-modal">
+      <div class="quake-modal-header">
+        <span id="commitModalTitle">Commit Changes</span>
+        <button class="quake-btn quake-btn-default quake-btn-icon" onclick="closeCommitModal()" title="Close">✕</button>
+      </div>
+      <div class="quake-modal-body">
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:11px;font-weight:700;color:var(--quake-copper);text-transform:uppercase;">Select files to commit/amend:</span>
+            <label style="font-size:10px;color:var(--quake-text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="modalSelectAll" onchange="toggleModalSelectAll(this.checked)" checked>
+              <span>Select All</span>
+            </label>
+          </div>
+          <div class="modal-files-list" id="modalFilesList">
+            <!-- Populated dynamically with checkboxes, status badges, paths, and discard buttons -->
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--quake-copper);text-transform:uppercase;display:block;margin-bottom:6px;">Commit Message:</label>
+          <textarea id="modalCommitMessage" class="commit-input" style="min-height:90px;" placeholder="feat/fix: commit description..."></textarea>
+        </div>
+      </div>
+      <div class="quake-modal-footer">
+        <button class="quake-btn quake-btn-red quake-btn-sm" onclick="discardSelectedFromModal()" title="Discard changes in selected files">
+          <span>🗑 Discard Selected</span>
+        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="quake-btn quake-btn-default" onclick="closeCommitModal()">Cancel</button>
+          <button id="btnSubmitModalCommit" class="quake-btn quake-btn-gold" onclick="submitCommitModal()">
+            <span>✓ Commit</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div id="quakeToast"></div>
 
@@ -759,12 +899,14 @@
             <div class="group-items">
               ${conflicts.map(c => `
                 <div class="file-item ${state.activeFile === c.path ? 'active' : ''}" onclick="selectFile('${c.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${c.path}" onclick="event.stopPropagation()">
                   <span class="file-status-badge status-conflict">UU</span>
                   <span class="file-path" title="${c.path}">${c.path} (${c.conflict_markers_count} markers)</span>
                   <div class="file-actions">
                     <button class="quake-btn quake-btn-default quake-btn-icon" onclick="event.stopPropagation(); resolveConflict('${c.path}', 'ours')" title="Accept Ours">👈</button>
                     <button class="quake-btn quake-btn-default quake-btn-icon" onclick="event.stopPropagation(); resolveConflict('${c.path}', 'theirs')" title="Accept Theirs">👉</button>
                     <button class="quake-btn quake-btn-gold quake-btn-icon" onclick="event.stopPropagation(); resolveConflict('${c.path}', 'mark_resolved')" title="Mark Resolved">✓</button>
+                    <button class="quake-btn quake-btn-red quake-btn-icon" onclick="event.stopPropagation(); discardFile('${c.path}')" title="Discard conflict file">🗑</button>
                   </div>
                 </div>
               `).join("")}
@@ -781,10 +923,12 @@
             <div class="group-items">
               ${staged.map(f => `
                 <div class="file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${f.path}" onclick="event.stopPropagation()" checked>
                   <span class="file-status-badge status-a">${f.status}</span>
                   <span class="file-path" title="${f.path}">${f.path}</span>
                   <div class="file-actions">
                     <button class="quake-btn quake-btn-default quake-btn-icon" onclick="event.stopPropagation(); unstageFile('${f.path}')" title="Unstage file">➖</button>
+                    <button class="quake-btn quake-btn-red quake-btn-icon" onclick="event.stopPropagation(); discardFile('${f.path}')" title="Discard staged changes">🗑</button>
                   </div>
                 </div>
               `).join("")}
@@ -801,6 +945,7 @@
             <div class="group-items">
               ${unstaged.map(f => `
                 <div class="file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${f.path}" onclick="event.stopPropagation()" checked>
                   <span class="file-status-badge status-m">${f.status}</span>
                   <span class="file-path" title="${f.path}">${f.path}</span>
                   <div class="file-actions">
@@ -822,6 +967,7 @@
             <div class="group-items">
               ${untracked.map(f => `
                 <div class="file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${f.path}" onclick="event.stopPropagation()">
                   <span class="file-status-badge status-untracked">??</span>
                   <span class="file-path" title="${f.path}">${f.path}</span>
                   <div class="file-actions">
@@ -846,10 +992,12 @@
             <div class="group-items" style="${state.feedbackCollapsed ? 'display:none;' : ''}">
               ${feedback.map(f => `
                 <div class="file-item agent-feedback ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${f.path}" onclick="event.stopPropagation()">
                   <span class="file-status-badge" style="color:var(--quake-text-muted);">${f.status}</span>
                   <span class="file-path" title="${f.path}">${f.path}</span>
                   <div class="file-actions">
                     <button class="quake-btn quake-btn-default quake-btn-icon" onclick="event.stopPropagation(); stageFile('${f.path}')" title="Stage feedback file">➕</button>
+                    <button class="quake-btn quake-btn-red quake-btn-icon" onclick="event.stopPropagation(); discardFile('${f.path}')" title="Discard feedback file">🗑</button>
                   </div>
                 </div>
               `).join("")}
@@ -1073,6 +1221,190 @@
         }
       } catch (err) {
         showToast("Failed to commit: " + err);
+      }
+    }
+
+    // Modal Commit & Amend Implementation (BUG-185)
+    async function openCommitModal(isAmend = false) {
+      state.isAmendMode = isAmend;
+      const modal = document.getElementById("commitModalOverlay");
+      const title = document.getElementById("commitModalTitle");
+      const submitBtn = document.getElementById("btnSubmitModalCommit");
+      const msgInput = document.getElementById("modalCommitMessage");
+
+      title.textContent = isAmend ? "Amend Last Commit (HEAD)" : "Commit Changes";
+      submitBtn.innerHTML = isAmend ? "<span>✓ Amend Commit</span>" : "<span>✓ Commit</span>";
+
+      if (isAmend) {
+        try {
+          const resp = await fetch("/api/head_commit_message");
+          const data = await resp.json();
+          msgInput.value = data.message || "";
+        } catch (e) {
+          msgInput.value = "";
+        }
+      } else {
+        const quickInput = document.getElementById("commitMessageInput");
+        msgInput.value = quickInput ? quickInput.value.trim() : "";
+      }
+
+      await refreshModalFilesList();
+      modal.style.display = "flex";
+    }
+
+    function closeCommitModal() {
+      document.getElementById("commitModalOverlay").style.display = "none";
+    }
+
+    async function refreshModalFilesList() {
+      const listEl = document.getElementById("modalFilesList");
+      listEl.innerHTML = `<div style="text-align:center;padding:10px;color:var(--quake-text-muted);">Loading changed files...</div>`;
+
+      try {
+        const resp = await fetch("/api/working");
+        const workingFiles = await resp.json();
+        state.workingFiles = workingFiles;
+
+        if (workingFiles.length === 0) {
+          listEl.innerHTML = `<div style="text-align:center;padding:12px;color:var(--quake-text-dim);">No uncommitted changes in working tree.</div>`;
+          return;
+        }
+
+        const mainChecked = Array.from(document.querySelectorAll(".working-file-cb:checked")).map(cb => cb.value);
+
+        listEl.innerHTML = workingFiles.map(f => {
+          const isChecked = mainChecked.length > 0 ? mainChecked.includes(f.path) : (f.is_staged || !f.is_untracked);
+          const badgeClass = f.is_staged ? 'status-a' : (f.is_untracked ? 'status-untracked' : 'status-m');
+          return `
+            <div class="modal-file-row">
+              <label style="display:flex;align-items:center;gap:6px;flex:1;overflow:hidden;cursor:pointer;">
+                <input type="checkbox" class="modal-file-cb" value="${f.path}" ${isChecked ? 'checked' : ''} onchange="updateModalSelectAllState()">
+                <span class="file-status-badge ${badgeClass}">${f.status}</span>
+                <span class="file-path" title="${f.path}">${f.path}</span>
+              </label>
+              <button class="quake-btn quake-btn-red quake-btn-icon" onclick="discardFromModal('${f.path}')" title="Discard this file">🗑</button>
+            </div>
+          `;
+        }).join("");
+
+        updateModalSelectAllState();
+      } catch (err) {
+        listEl.innerHTML = `<div style="color:var(--quake-red);padding:10px;">Failed to load files: ${err}</div>`;
+      }
+    }
+
+    function toggleModalSelectAll(checked) {
+      document.querySelectorAll(".modal-file-cb").forEach(cb => cb.checked = checked);
+    }
+
+    function updateModalSelectAllState() {
+      const all = document.querySelectorAll(".modal-file-cb");
+      const checked = document.querySelectorAll(".modal-file-cb:checked");
+      const master = document.getElementById("modalSelectAll");
+      if (master) master.checked = all.length > 0 && all.length === checked.length;
+    }
+
+    function getSelectedModalFiles() {
+      return Array.from(document.querySelectorAll(".modal-file-cb:checked")).map(cb => cb.value);
+    }
+
+    async function discardFromModal(path) {
+      if (!confirm(`Discard all changes in ${path}?`)) return;
+      try {
+        const resp = await fetch("/api/discard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: path })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Error: " + res.error);
+        else {
+          showToast("Discarded " + path);
+          await refreshModalFilesList();
+          await loadFilesForActiveCommit();
+        }
+      } catch (err) {
+        showToast("Failed to discard: " + err);
+      }
+    }
+
+    async function discardSelectedFromModal() {
+      const selected = getSelectedModalFiles();
+      if (selected.length === 0) {
+        alert("Please select files to discard.");
+        return;
+      }
+      if (!confirm(`Discard all changes in ${selected.length} selected file(s)? This cannot be undone.`)) return;
+      try {
+        const resp = await fetch("/api/discard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ files: selected })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Error: " + res.error);
+        else {
+          showToast(`Discarded ${selected.length} files`);
+          await refreshModalFilesList();
+          await loadFilesForActiveCommit();
+        }
+      } catch (err) {
+        showToast("Failed to discard: " + err);
+      }
+    }
+
+    async function discardSelectedWorkingFiles() {
+      const selected = Array.from(document.querySelectorAll(".working-file-cb:checked")).map(cb => cb.value);
+      if (selected.length === 0) {
+        alert("Please select at least one file using the checkboxes to discard.");
+        return;
+      }
+      if (!confirm(`Discard changes in ${selected.length} selected file(s)?`)) return;
+      try {
+        const resp = await fetch("/api/discard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ files: selected })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Error: " + res.error);
+        else {
+          showToast(`Discarded ${selected.length} files`);
+          await loadFilesForActiveCommit();
+        }
+      } catch (err) {
+        showToast("Failed to discard: " + err);
+      }
+    }
+
+    async function submitCommitModal() {
+      const msg = document.getElementById("modalCommitMessage").value.trim();
+      if (!msg) {
+        alert("Please enter a commit message.");
+        return;
+      }
+      const selectedFiles = getSelectedModalFiles();
+      if (!state.isAmendMode && selectedFiles.length === 0) {
+        alert("Please select at least one file to commit.");
+        return;
+      }
+
+      const endpoint = state.isAmendMode ? "/api/amend" : "/api/commit";
+      try {
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msg, files: selectedFiles })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Commit failed: " + res.error);
+        else {
+          showToast((state.isAmendMode ? "Amended " : "Committed ") + res.commit_hash.slice(0, 7));
+          closeCommitModal();
+          setTimeout(() => location.reload(), 500);
+        }
+      } catch (err) {
+        showToast("Commit failed: " + err);
       }
     }
 

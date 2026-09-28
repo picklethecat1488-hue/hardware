@@ -548,3 +548,136 @@ def test_regression_bug_178_unified_dashboard_and_no_standalone_tools(tmp_path: 
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_185_commit_amend_and_discard_files(tmp_path: Path) -> None:
+    """Verify BUG-185: commit modal UI, amend button, file selection, and multi-file discard."""
+    # 1. Verify template elements
+    template_path = Path(__file__).parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    assert template_path.exists()
+    html_content = template_path.read_text(encoding="utf-8")
+    assert 'id="btnCommitModal"' in html_content
+    assert 'id="btnAmendModal"' in html_content
+    assert 'id="commitModalOverlay"' in html_content
+    assert 'id="modalFilesList"' in html_content
+    assert 'id="modalCommitMessage"' in html_content
+    assert "working-file-cb" in html_content
+    assert "discardFromModal" in html_content
+    assert "discardSelectedFromModal" in html_content
+
+    # 2. Verify GitEngine commit_files, amend, and discard operations
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # Make changes to file1.txt, file2.py, and create an untracked file
+    f1 = repo_dir / "file1.txt"
+    f1.write_text("updated file1\n", encoding="utf-8")
+    f2 = repo_dir / "file2.py"
+    f2.write_text("# updated file2\n", encoding="utf-8")
+    f_untracked = repo_dir / "untracked_sample.txt"
+    f_untracked.write_text("untracked\n", encoding="utf-8")
+
+    # Selective commit: only commit file1.txt
+    new_sha = engine.commit_files("Selective commit for file1", file_paths=["file1.txt"], amend=False)
+    assert new_sha != shas[2]
+    assert engine.get_head_commit_message() == "Selective commit for file1"
+
+    # Verify file2.py and untracked_sample.txt are still in working tree
+    working_files = engine.get_working_tree_files()
+    working_paths = [f.path for f in working_files]
+    assert "file2.py" in working_paths
+    assert "untracked_sample.txt" in working_paths
+    assert "file1.txt" not in working_paths
+
+    # Amend commit with file2.py
+    amended_sha = engine.commit_files("Amended commit with file2 (BUG-185)", file_paths=["file2.py"], amend=True)
+    assert engine.get_head_commit_message() == "Amended commit with file2 (BUG-185)"
+
+    # Verify file2.py is now committed and untracked_sample.txt is still untracked
+    working_files = engine.get_working_tree_files()
+    working_paths = [f.path for f in working_files]
+    assert "file2.py" not in working_paths
+    assert "untracked_sample.txt" in working_paths
+
+    # Discard untracked file
+    engine.discard_file("untracked_sample.txt")
+    assert not f_untracked.exists()
+
+    # 3. Test HTTP Server endpoints: /api/head_commit_message, /api/commit with files, /api/amend, /api/discard
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    base_url = server.get_url()
+
+    try:
+        # Check GET /api/head_commit_message
+        with urllib.request.urlopen(f"{base_url}/api/head_commit_message") as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["message"] == "Amended commit with file2 (BUG-185)"
+
+        # Create two untracked files
+        t1 = repo_dir / "target1.txt"
+        t1.write_text("target 1\n", encoding="utf-8")
+        t2 = repo_dir / "target2.txt"
+        t2.write_text("target 2\n", encoding="utf-8")
+
+        # Selective commit via API
+        req_commit = urllib.request.Request(
+            f"{base_url}/api/commit",
+            data=json.dumps({"message": "Add target1 via API", "files": ["target1.txt"]}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_commit) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["status"] == "ok"
+            assert "commit_hash" in res
+
+        # Target2 should still be untracked
+        assert t2.exists()
+        working = engine.get_working_tree_files()
+        assert any(w.path == "target2.txt" for w in working)
+
+        # Amend via API
+        req_amend = urllib.request.Request(
+            f"{base_url}/api/amend",
+            data=json.dumps({"message": "Add target1 and target2 via API", "files": ["target2.txt"]}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_amend) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["status"] == "ok"
+            assert engine.get_head_commit_message() == "Add target1 and target2 via API"
+
+        # Discard multiple files via API
+        t3 = repo_dir / "target3.txt"
+        t3.write_text("to discard\n", encoding="utf-8")
+        f1.write_text("modified to discard\n", encoding="utf-8")
+
+        req_discard = urllib.request.Request(
+            f"{base_url}/api/discard",
+            data=json.dumps({"files": ["target3.txt", "file1.txt"]}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_discard) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["status"] == "ok"
+            assert "target3.txt" in res["discarded"]
+            assert "file1.txt" in res["discarded"]
+
+        assert not t3.exists()
+        assert f1.read_text(encoding="utf-8") == "updated file1\n"
+
+    finally:
+        server.shutdown()
+        server.server_close()

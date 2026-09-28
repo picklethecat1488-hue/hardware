@@ -1309,21 +1309,72 @@ class GitEngine:
         """Remove file changes from git index while preserving working tree changes."""
         run_git_command(["reset", "HEAD", "--", file_path], cwd=self.repo_root)
 
+    def get_head_commit_message(self) -> str:
+        """Retrieve full commit message (subject and body) of HEAD commit.
+
+        Returns:
+            Commit message string, or empty string if no HEAD commit.
+        """
+        try:
+            return run_git_command(["log", "-1", "--format=%B"], cwd=self.repo_root).strip()
+        except RuntimeError:
+            return ""
+
     def discard_file(self, file_path: str) -> None:
-        """Discard working tree changes or remove untracked file."""
+        """Discard working tree changes or remove untracked/added file.
+
+        Handles untracked files, staged additions, deletions, and tracked modifications.
+
+        Args:
+            file_path: Relative repository path of file to discard.
+        """
         full_path = self.repo_root / file_path
         status_out = run_git_command(["status", "--porcelain", "--", file_path], cwd=self.repo_root).strip()
 
+        if not status_out:
+            return
+
+        # Untracked file
         if status_out.startswith("??"):
             if full_path.is_file():
                 full_path.unlink()
             elif full_path.is_dir():
                 shutil.rmtree(full_path)
-        else:
+            return
+
+        # Staged new file (A)
+        if status_out.startswith("A"):
             try:
-                run_git_command(["checkout", "HEAD", "--", file_path], cwd=self.repo_root)
+                run_git_command(["reset", "HEAD", "--", file_path], cwd=self.repo_root)
             except RuntimeError:
+                pass
+            if full_path.is_file():
+                full_path.unlink()
+            elif full_path.is_dir():
+                shutil.rmtree(full_path)
+            return
+
+        # Tracked modification or deletion
+        try:
+            run_git_command(["reset", "HEAD", "--", file_path], cwd=self.repo_root)
+        except RuntimeError:
+            pass
+        try:
+            run_git_command(["checkout", "HEAD", "--", file_path], cwd=self.repo_root)
+        except RuntimeError:
+            try:
                 run_git_command(["checkout", "--", file_path], cwd=self.repo_root)
+            except RuntimeError:
+                pass
+
+    def discard_files(self, file_paths: List[str]) -> None:
+        """Discard uncommitted changes across multiple files.
+
+        Args:
+            file_paths: List of relative repository paths to discard.
+        """
+        for fp in file_paths:
+            self.discard_file(fp)
 
     def commit_staged(self, message: str) -> str:
         """Commit currently staged changes with specified message.
@@ -1334,7 +1385,43 @@ class GitEngine:
         Returns:
             New commit hash string.
         """
-        run_git_command(["commit", "-m", message], cwd=self.repo_root)
+        return self.commit_files(message=message)
+
+    def commit_files(
+        self,
+        message: str,
+        file_paths: Optional[List[str]] = None,
+        amend: bool = False,
+    ) -> str:
+        """Commit selected files (or currently staged files) with message, optionally amending HEAD.
+
+        Args:
+            message: Commit message string.
+            file_paths: Specific files to commit. If provided, stages only these files.
+            amend: If True, amends HEAD commit.
+
+        Returns:
+            New commit hash string.
+        """
+        if not message.strip():
+            raise ValueError("Commit message cannot be empty.")
+
+        if file_paths is not None:
+            if not file_paths and not amend:
+                raise ValueError("No files selected to commit.")
+            # Reset index to HEAD so only explicitly selected files are staged
+            try:
+                run_git_command(["reset"], cwd=self.repo_root)
+            except RuntimeError:
+                pass
+            for fp in file_paths:
+                run_git_command(["add", "--", fp], cwd=self.repo_root)
+
+        cmd = ["commit"]
+        if amend:
+            cmd.append("--amend")
+        cmd.extend(["-m", message])
+        run_git_command(cmd, cwd=self.repo_root)
         return self.get_head_commit()
 
     # Commit manipulation: split and combine
