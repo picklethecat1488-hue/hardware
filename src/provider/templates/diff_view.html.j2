@@ -755,7 +755,7 @@
 
         <!-- Render Commit Nodes -->
         {% for node in session.smartlog_nodes %}
-          <div class="smartlog-node {% if node.is_head %}head-node{% endif %} {% if session.active_commit == node.commit_hash %}active{% endif %}"
+          <div class="smartlog-node {% if node.is_head %}head-node{% endif %} {% if node.pr_number %}has-pr{% endif %} {% if session.active_commit == node.commit_hash %}active{% endif %}"
                id="node-{{ node.short_hash }}"
                onclick="selectCommit('{{ node.commit_hash }}')">
             <div class="node-header-row">
@@ -767,6 +767,16 @@
                        {% if node.commit_hash in session.selected_commits %}checked{% endif %}/>
                 <span class="node-graph-art">{{ node.graph_art or node.graph_symbol }}</span>
                 <span class="node-sha">{{ node.short_hash }}</span>
+                {% if node.pr_number %}
+                  <a href="{{ node.pr_url or ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ node.pr_number) }}"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     class="pr-highlight-badge"
+                     onclick="event.stopPropagation();"
+                     title="Pull Request #{{ node.pr_number }} (Click to open in GitHub)">
+                    <span class="pr-icon">⎇</span> PR #{{ node.pr_number }}
+                  </a>
+                {% endif %}
               </div>
               <span class="node-author-date">{{ node.relative_date or node.date }}</span>
             </div>

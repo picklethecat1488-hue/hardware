@@ -957,3 +957,49 @@ def test_regression_bug_190_pr_branch_tag_clickable_link(tmp_path: Path) -> None
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_192_pr_highlight_on_commit_element(tmp_path: Path) -> None:
+    """Verify BUG-192: Commit element has distinct PR highlight area with PR number text and color."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 1. Create PR branch to associate PR with commit
+    run_git_command(["branch", "pr520", shas[1]], cwd=repo_dir)
+
+    # Verify GitEngine detects pr_number and pr_url on the CommitNodeModel
+    nodes = engine.get_smartlog_dag(limit=10)
+    pr_node = next(n for n in nodes if n.commit_hash == shas[1])
+    assert pr_node.pr_number == 520
+    assert pr_node.pr_status == "PR #520"
+    assert "pull/520" in (pr_node.pr_url or "")
+
+    # 2. Verify template has .pr-highlight-badge, .smartlog-node.has-pr styling
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert ".pr-highlight-badge" in tpl_text
+    assert ".smartlog-node.has-pr" in tpl_text
+    assert "#a855f7" in tpl_text  # Distinct PR purple highlight color
+
+    # 3. Serve via DashboardServer and assert HTML contains PR highlight badge and has-pr class
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}/") as resp:
+            assert resp.status == 200
+            html = resp.read().decode("utf-8")
+            assert "pr-highlight-badge" in html
+            assert "PR #520" in html
+            assert "has-pr" in html
+    finally:
+        server.shutdown()
+        server.server_close()
