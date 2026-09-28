@@ -142,6 +142,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._send_json({"id": self.server.bug_server.database.generate_bug_id()})
             case "/api/version":
                 self._send_json({"version": self.server.bug_server.database.updated_at})
+            case "/api/sync_status":
+                self._send_json({"initial_sync_done": self.server.initial_sync_done})
             case _:
                 self.send_error(404, "Endpoint not found")
 
@@ -297,7 +299,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case "/api/export":
                 out_path = self.server.review_server.save_and_sync()
                 self._send_json({"status": "ok", "path": str(out_path)})
-            case "/api/sync_feedback":
+            case "/api/sync_feedback" | "/api/initial_sync":
                 res = self.server.sync_feedback()
                 self._send_json(res)
             case "/api/commit_reviewed":
@@ -668,6 +670,7 @@ class DashboardServer(ThreadingHTTPServer):
         self.port = port
         self.active_branch = initial_branch or self.git_engine.get_current_branch()
         self.active_commit = initial_commit or "working"
+        self.initial_sync_done: bool = False
 
         md_review = markdown_review_path
         if md_review is None and sqlite_review_file and sqlite_review_file.parent.name != "build":
@@ -762,13 +765,15 @@ class DashboardServer(ThreadingHTTPServer):
             working_files=working_files,
             conflicts=conflicts,
             agent_feedback_files=agent_feedback,
+            initial_sync_done=self.initial_sync_done,
         )
 
     def sync_feedback(self) -> Dict[str, Any]:
         """Synchronize review and bug report feedback from workspace feedback/ directory."""
         review_res = self.review_server.sync_feedback()
         bug_res = self.bug_server.sync_with_feedback_dir()
-        return {"status": "ok", "review": review_res, "bugs": bug_res}
+        self.initial_sync_done = True
+        return {"status": "ok", "initial_sync_done": True, "review": review_res, "bugs": bug_res}
 
     def server_close(self) -> None:
         """Close server sockets and cleanup sub-servers."""

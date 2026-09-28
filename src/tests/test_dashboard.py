@@ -839,3 +839,82 @@ def test_regression_bug_187_collapsible_file_and_commit_panes(tmp_path: Path) ->
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_188_initial_sqlite_sync_loading_modal(tmp_path: Path) -> None:
+    """Verify BUG-188: initial SQLite sync loading screen and feedback synchronization."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+
+    # 1. Verify template contains loading modal elements and functions
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    assert 'id="syncModalOverlay"' in tpl_text
+    assert 'id="syncProgressBar"' in tpl_text
+    assert 'id="syncProgressPercent"' in tpl_text
+    assert 'id="syncStatusText"' in tpl_text
+    assert 'id="btnSyncFeedback"' in tpl_text
+    assert "performInitialSync" in tpl_text
+    assert "INITIAL_SYNC_DONE" in tpl_text
+
+    # 2. Start server without prior sync
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        assert not server.initial_sync_done
+
+        # 3. GET / serves modal visible (display: flex) on initial load
+        with urllib.request.urlopen(f"{base_url}/") as resp:
+            assert resp.status == 200
+            html = resp.read().decode("utf-8")
+            assert 'id="syncModalOverlay"' in html
+            assert "SYNCHRONIZING FEEDBACK DATABASES" in html
+            assert "display: flex;" in html
+
+        # 4. Check /api/sync_status returns false initially
+        with urllib.request.urlopen(f"{base_url}/api/sync_status") as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data.get("initial_sync_done") is False
+
+        # 5. Trigger /api/sync_feedback POST
+        req = urllib.request.Request(
+            f"{base_url}/api/sync_feedback",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["status"] == "ok"
+            assert res["initial_sync_done"] is True
+            assert "review" in res
+            assert "bugs" in res
+
+        # 6. Verify server state is now synced
+        assert server.initial_sync_done is True
+
+        with urllib.request.urlopen(f"{base_url}/api/sync_status") as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data.get("initial_sync_done") is True
+
+        # 7. GET / now serves modal hidden (display: none)
+        with urllib.request.urlopen(f"{base_url}/") as resp:
+            assert resp.status == 200
+            html = resp.read().decode("utf-8")
+            assert "display: none;" in html
+
+    finally:
+        server.shutdown()
+        server.server_close()

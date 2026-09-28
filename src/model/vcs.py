@@ -178,4 +178,5 @@ class DiffViewSessionModel(BaseModel):
     smartlog_nodes: List[CommitNodeModel] = Field(default_factory=list)
     working_files: List[WorkingTreeFileModel] = Field(default_factory=list)
     conflicts: List[MergeConflictFileModel] = Field(default_factory=list)
+    initial_sync_done: bool = False
     metadata: Dict[str, Any] = Field(default_factory=dict)
