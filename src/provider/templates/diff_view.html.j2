@@ -186,8 +186,7 @@
     /* Main Layout */
     .app-workspace {
       flex: 1;
-      display: grid;
-      grid-template-columns: 330px 270px 1fr;
+      display: flex;
       gap: 10px;
       padding: 10px;
       overflow: hidden;
@@ -199,6 +198,52 @@
       flex-direction: column;
       overflow: hidden;
       height: 100%;
+    }
+    .pane-smartlog {
+      width: 330px;
+      min-width: 0;
+      flex-shrink: 0;
+      transition: width 0.2s ease, opacity 0.2s ease;
+      overflow: hidden;
+    }
+    .pane-smartlog.collapsed {
+      width: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      opacity: 0;
+      pointer-events: none;
+      margin-right: -10px !important;
+    }
+    .pane-smartlog .column-header,
+    .pane-smartlog .column-scroll,
+    .pane-smartlog > div {
+      min-width: 330px;
+    }
+
+    .pane-files {
+      width: 270px;
+      min-width: 0;
+      flex-shrink: 0;
+      transition: width 0.2s ease, opacity 0.2s ease;
+      overflow: hidden;
+    }
+    .pane-files.collapsed {
+      width: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      opacity: 0;
+      pointer-events: none;
+      margin-right: -10px !important;
+    }
+    .pane-files .column-header,
+    .pane-files .column-scroll,
+    .pane-files > div {
+      min-width: 270px;
+    }
+
+    .pane-diff {
+      flex: 1;
+      min-width: 0;
     }
     .column-header {
       background: var(--quake-header-bg);
@@ -579,6 +624,16 @@
         <span>⎇ Amend</span>
       </button>
 
+      <!-- Pane Toggle Controls -->
+      <div style="display:flex;align-items:center;gap:4px;border-left:1px solid var(--quake-border-mid);border-right:1px solid var(--quake-border-mid);padding:0 6px;">
+        <button id="btnToggleSmartlog" class="quake-btn quake-btn-default quake-btn-active" onclick="togglePane('smartlog')" title="Toggle Smartlog Pane (Shortcut: [)">
+          <span>⎇ Smartlog</span>
+        </button>
+        <button id="btnToggleFiles" class="quake-btn quake-btn-default quake-btn-active" onclick="togglePane('files')" title="Toggle Files Pane (Shortcut: ])">
+          <span>📄 Files</span>
+        </button>
+      </div>
+
       <!-- Branch Selector -->
       <div style="display:flex;align-items:center;gap:6px;">
         <span style="font-size:10px;color:var(--quake-text-dim);">BRANCH:</span>
@@ -610,13 +665,14 @@
   <main class="app-workspace">
 
     <!-- LEFT COLUMN: SMARTLOG ANCESTOR TREE DAG -->
-    <section class="quake-card column-panel">
+    <section id="paneSmartlog" class="quake-card column-panel pane-smartlog">
       <div class="column-header">
         <span>Smartlog Tree (sl)</span>
-        <div style="display:flex;gap:4px;">
+        <div style="display:flex;gap:4px;align-items:center;">
           <button id="btnOpenCR" class="quake-btn quake-btn-gold quake-btn-icon" onclick="onOpenInCodeReview()" title="Review selected commit(s) in Code Review">
             <span>🔍 <span id="selectedCount">0</span></span>
           </button>
+          <button class="quake-btn quake-btn-default quake-btn-icon" onclick="togglePane('smartlog')" title="Collapse Smartlog Pane (Shortcut: [)">◀</button>
         </div>
       </div>
 
@@ -695,10 +751,13 @@
     </section>
 
     <!-- MIDDLE COLUMN: CHANGED FILES & WORKING TREE OPERATIONS -->
-    <section class="quake-card column-panel">
+    <section id="paneFiles" class="quake-card column-panel pane-files">
       <div class="column-header">
-        <span id="filesHeaderTitle">Changed Files</span>
-        <span id="filesCountBadge" style="color:var(--quake-text-muted);">0 files</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span id="filesHeaderTitle">Changed Files</span>
+          <span id="filesCountBadge" style="color:var(--quake-text-muted);">0 files</span>
+        </div>
+        <button class="quake-btn quake-btn-default quake-btn-icon" onclick="togglePane('files')" title="Collapse Files Pane (Shortcut: ])">◀</button>
       </div>
 
       <!-- Working Tree Commit Area (Only visible when active commit is 'working') -->
@@ -727,7 +786,7 @@
     </section>
 
     <!-- RIGHT COLUMN: DIFF WORKSTATION -->
-    <section class="quake-card column-panel">
+    <section class="quake-card column-panel pane-diff">
       <!-- Toolbar -->
       <div class="diff-toolbar">
         <div class="diff-file-title" id="diffFileTitle">
@@ -814,8 +873,28 @@
       conflicts: [],
       currentDiff: null,
       selectedCommits: {{ session.selected_commits | tojson }},
-      feedbackCollapsed: false
+      feedbackCollapsed: false,
+      panes: {
+        smartlog: true,
+        files: true
+      }
     };
+
+    function togglePane(pane) {
+      if (pane === "smartlog" || pane === "commits") {
+        state.panes.smartlog = !state.panes.smartlog;
+        const el = document.getElementById("paneSmartlog");
+        if (el) el.classList.toggle("collapsed", !state.panes.smartlog);
+        const btn = document.getElementById("btnToggleSmartlog");
+        if (btn) btn.classList.toggle("quake-btn-active", state.panes.smartlog);
+      } else if (pane === "files") {
+        state.panes.files = !state.panes.files;
+        const el = document.getElementById("paneFiles");
+        if (el) el.classList.toggle("collapsed", !state.panes.files);
+        const btn = document.getElementById("btnToggleFiles");
+        if (btn) btn.classList.toggle("quake-btn-active", state.panes.files);
+      }
+    }
 
     function showToast(message, duration = 3000) {
       const toast = document.getElementById("quakeToast");
@@ -1653,6 +1732,16 @@
         showToast("Combine error: " + err);
       }
     }
+
+    // Keyboard shortcuts for pane toggling
+    document.addEventListener("keydown", (e) => {
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+      if (e.key === "[") {
+        togglePane("smartlog");
+      } else if (e.key === "]") {
+        togglePane("files");
+      }
+    });
 
     // Initialize on load
     window.addEventListener("DOMContentLoaded", () => {

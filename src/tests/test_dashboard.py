@@ -794,3 +794,48 @@ def test_regression_bug_194_lfs_tracked_files_grouping_and_styling(tmp_path: Pat
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_187_collapsible_file_and_commit_panes(tmp_path: Path) -> None:
+    """Verify BUG-187: file and commit panes can be collapsed in VCS UI like code_review."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+
+    # 1. Verify template contains collapse rules, buttons, and shortcuts
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    assert ".pane-smartlog" in tpl_text
+    assert ".pane-smartlog.collapsed" in tpl_text
+    assert ".pane-files" in tpl_text
+    assert ".pane-files.collapsed" in tpl_text
+    assert 'id="btnToggleSmartlog"' in tpl_text
+    assert 'id="btnToggleFiles"' in tpl_text
+    assert "togglePane('smartlog')" in tpl_text
+    assert "togglePane('files')" in tpl_text
+    assert 'e.key === "["' in tpl_text
+    assert 'e.key === "]"' in tpl_text
+
+    # 2. Verify DashboardServer serves HTML with collapsible panes
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}/") as resp:
+            assert resp.status == 200
+            html = resp.read().decode("utf-8")
+            assert 'id="paneSmartlog"' in html
+            assert 'id="paneFiles"' in html
+            assert 'id="btnToggleSmartlog"' in html
+            assert 'id="btnToggleFiles"' in html
+            assert "togglePane" in html
+    finally:
+        server.shutdown()
+        server.server_close()
