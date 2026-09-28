@@ -15,7 +15,7 @@ import urllib.request
 
 import pytest
 
-from diff_view import parse_arguments, print_cli_smartlog
+from dashboard import main, parse_arguments, print_cli_smartlog
 from model.vcs import (
     BranchInfoModel,
     CommitNodeModel,
@@ -23,7 +23,7 @@ from model.vcs import (
     FileDiffModel,
     WorkingTreeFileModel,
 )
-from provider.diff_view.server import DiffViewServer
+from provider.dashboard.server import DashboardServer
 from provider.vcs.git_engine import GitEngine, get_git_root
 
 
@@ -68,7 +68,7 @@ def create_isolated_git_repo(path: Path) -> Tuple[Path, list[str]]:
 def test_diff_view_server_initialization_and_session(tmp_path: Path) -> None:
     """Verify DiffViewServer initializes and constructs session data model."""
     repo_dir, shas = create_isolated_git_repo(tmp_path)
-    server = DiffViewServer(
+    server = DashboardServer(
         host="127.0.0.1",
         port=0,
         repo_root=repo_dir,
@@ -88,7 +88,7 @@ def test_diff_view_server_initialization_and_session(tmp_path: Path) -> None:
 def test_diff_view_http_get_endpoints(tmp_path: Path) -> None:
     """Verify HTTP GET endpoints: UI dashboard, /api/session, /api/commits, /api/branches, /api/diff, /api/raw."""
     repo_dir, shas = create_isolated_git_repo(tmp_path)
-    server = DiffViewServer(
+    server = DashboardServer(
         host="127.0.0.1",
         port=0,
         repo_root=repo_dir,
@@ -157,7 +157,7 @@ def test_diff_view_http_get_endpoints(tmp_path: Path) -> None:
 def test_working_tree_staging_unstaging_and_discarding(tmp_path: Path) -> None:
     """Verify POST endpoints for staging, unstaging, discarding, and committing files."""
     repo_dir, _ = create_isolated_git_repo(tmp_path)
-    server = DiffViewServer(
+    server = DashboardServer(
         host="127.0.0.1",
         port=0,
         repo_root=repo_dir,
@@ -247,7 +247,7 @@ def test_working_tree_staging_unstaging_and_discarding(tmp_path: Path) -> None:
 def test_commit_split_and_combine(tmp_path: Path) -> None:
     """Verify POST /api/split and /api/combine commit manipulation endpoints."""
     repo_dir, shas = create_isolated_git_repo(tmp_path)
-    server = DiffViewServer(
+    server = DashboardServer(
         host="127.0.0.1",
         port=0,
         repo_root=repo_dir,
@@ -349,7 +349,7 @@ def test_merge_conflict_detection_and_resolution(tmp_path: Path) -> None:
     assert len(conflicts) >= 1
     assert any(c.path == "file1.txt" for c in conflicts)
 
-    server = DiffViewServer(
+    server = DashboardServer(
         host="127.0.0.1",
         port=0,
         repo_root=repo_dir,
@@ -391,7 +391,7 @@ def test_merge_conflict_detection_and_resolution(tmp_path: Path) -> None:
 def test_cross_tool_endpoints_code_review_and_bug_viewer(tmp_path: Path) -> None:
     """Verify POST /api/open_code_review and /api/open_bug format target URLs."""
     repo_dir, shas = create_isolated_git_repo(tmp_path)
-    server = DiffViewServer(
+    server = DashboardServer(
         host="127.0.0.1",
         port=0,
         repo_root=repo_dir,
@@ -414,6 +414,7 @@ def test_cross_tool_endpoints_code_review_and_bug_viewer(tmp_path: Path) -> None
         with urllib.request.urlopen(req) as resp:
             res = json.loads(resp.read().decode("utf-8"))
             assert res["status"] == "ok"
+            assert "/review" in res["url"]
             assert f"revisions={shas[1]},{shas[2]}" in res["url"]
 
         # 2. Bug Viewer navigation for existing bug
@@ -426,7 +427,7 @@ def test_cross_tool_endpoints_code_review_and_bug_viewer(tmp_path: Path) -> None
         with urllib.request.urlopen(req) as resp:
             res = json.loads(resp.read().decode("utf-8"))
             assert res["status"] == "ok"
-            assert "8766/#BUG-171" in res["url"]
+            assert "/bugs#BUG-171" in res["url"]
 
         # 3. Bug Viewer creation prefilling commit
         req = urllib.request.Request(
@@ -438,7 +439,19 @@ def test_cross_tool_endpoints_code_review_and_bug_viewer(tmp_path: Path) -> None
         with urllib.request.urlopen(req) as resp:
             res = json.loads(resp.read().decode("utf-8"))
             assert res["status"] == "ok"
+            assert "/bugs" in res["url"]
             assert f"commit={shas[2]}" in res["url"]
+
+        # 4. Direct GET /review and /bugs UI serving
+        with urllib.request.urlopen(f"{base_url}/review") as resp:
+            assert resp.status == 200
+            html = resp.read().decode("utf-8")
+            assert "Code Review" in html or "quake" in html.lower()
+
+        with urllib.request.urlopen(f"{base_url}/bugs") as resp:
+            assert resp.status == 200
+            html = resp.read().decode("utf-8")
+            assert "BUG REPORT" in html or "quake" in html.lower()
 
     finally:
         server.shutdown()
@@ -456,3 +469,82 @@ def test_cli_smartlog_printer(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert "WORKING TREE" in captured
     assert "Initial commit" in captured
     assert "Modify file1" in captured
+
+
+def test_regression_bug_178_unified_dashboard_and_no_standalone_tools(tmp_path: Path) -> None:
+    """Verify BUG-178: standalone bug_report/code_review tools are removed and integrated into dashboard.py."""
+    repo_root = get_git_root()
+
+    # 1. Standalone scripts MUST NOT exist
+    assert not (repo_root / "src" / "bug_report.py").exists()
+    assert not (repo_root / "src" / "code_review.py").exists()
+    assert not (repo_root / "src" / "diff_view.py").exists()
+
+    # 2. Unified dashboard script MUST exist
+    dashboard_script = repo_root / "src" / "dashboard.py"
+    assert dashboard_script.exists()
+
+    # 3. Test unified server on ephemeral port
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    base_url = server.get_url()
+
+    try:
+        # Check diff view UI
+        with urllib.request.urlopen(f"{base_url}/") as resp:
+            assert resp.status == 200
+            assert "text/html" in resp.headers.get("Content-Type", "")
+
+        # Check code review UI
+        with urllib.request.urlopen(f"{base_url}/review") as resp:
+            assert resp.status == 200
+            assert "text/html" in resp.headers.get("Content-Type", "")
+
+        # Check bug report UI
+        with urllib.request.urlopen(f"{base_url}/bugs") as resp:
+            assert resp.status == 200
+            assert "text/html" in resp.headers.get("Content-Type", "")
+
+        # Check POST /api/verdict concluding does NOT shut down the server
+        req = urllib.request.Request(
+            f"{base_url}/api/verdict",
+            data=json.dumps({"verdict": "APPROVED"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["status"] == "ok"
+            assert res["terminating"] is False
+
+        # Server is still alive and accepting requests
+        with urllib.request.urlopen(f"{base_url}/api/commits") as resp:
+            assert resp.status == 200
+
+        # Check POST /api/exit does NOT shut down the server
+        req_exit = urllib.request.Request(
+            f"{base_url}/api/exit",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_exit) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["status"] == "saved_and_exited"
+
+        # Server is still alive
+        with urllib.request.urlopen(f"{base_url}/") as resp:
+            assert resp.status == 200
+
+    finally:
+        server.shutdown()
+        server.server_close()

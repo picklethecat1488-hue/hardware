@@ -5,9 +5,7 @@
  - **src/build.py** - Orchestrates the generation and export of 3D-printable geometry.
  - **src/config.py** - Automated utility for part placement and geometry optimization.
  - **src/view.py** - Interactive CAD visualization tool for inspection and debugging.
- - **src/code_review.py** - Interactive Quake-themed code review tool and Markdown report generator.
- - **src/bug_report.py** - Interactive bug reporting terminal, web workstation, and Markdown tracker.
- - **src/diff_view.py** - Interactive Quake-themed diff viewer, Smartlog DAG tree, and VCS workstation.
+ - **src/dashboard.py** - Unified Quake-themed workstation integrating VCS Diff Viewer, Smartlog DAG tree, Code Review, and Bug Tracker.
  - **src/model/** - Core application data models and configuration schemas.
  - **src/provider/** - Framework for geometry generation and build orchestration.
  - **src/projects/** - Specific geometry provider implementations.
@@ -305,89 +303,47 @@ python build.py
 
 Before submitting or approving pull requests, you can audit commits and staged changes using the interactive Quake-styled code review tool:
 
-```bash
-# Review uncommitted working tree changes (staged and unstaged)
-python src/code_review.py
+## Interactive VCS Dashboard, Code Review & Bug Tracker Workstation
 
-# Review specific commits or revision ranges
-python src/code_review.py HEAD~1 HEAD
-python src/code_review.py 542007d
-
-# Launch on custom port or output path
-python src/code_review.py --port 8765 --output feedback/CR.md
-
-# Directly export Markdown report from existing review state without launching the server
-python src/code_review.py --export-only
-```
-
-### Review Features & Workflow
-- **Retro Console UI**: 3-column layout displaying the revision stream, changed files list, and side-by-side or unified syntax-highlighted diffs.
-- **Line Selection & Inline Feedback**: Click or shift-click diff line numbers to select line ranges and submit structured review findings tagged as `[MUST FIX]`, `[PROPOSAL]`, or `[NIT]`.
-- **Integrated Quake CLI**: Bottom terminal console supporting commands such as `goto <path> [line]`, `must_fix <msg>`, `proposal <msg>`, `nit <msg>`, `reviewed`, `approve`, and `reject`.
-- **Automated Termination & Markdown Export**: Submitting a final verdict (`approve` / `lgtm` or `reject` / `changes`) automatically compiles and exports the full review audit log to `feedback/CR.md` and commit-specific reviews to `feedback/CR_<commit>.md`, and gracefully shuts down the local server, returning control to your terminal.
-- **VS Code Integration**: By default, opens inside VS Code via Simple Browser (`--browser vscode`) with task bindings in `.vscode/tasks.json`.
-
-## Interactive Bug Tracker & Issue Management
-
-You can log, triage, track, and resolve bugs using the interactive Quake-styled bug tracking workstation:
+Inspect commits, branches, working tree states, ancestors, code review findings, and bug reports using the unified Quake-styled engineering dashboard:
 
 ```bash
-# Launch interactive bug reporting web workstation
-python src/bug_report.py
-
-# List active / open bugs directly in the terminal
-python src/bug_report.py --list
-python src/bug_report.py --list --open
-
-# Quickly register an issue from the CLI
-python src/bug_report.py --add "Antenna on Q1" --severity HIGH --category PCB --component carrier_board
-
-# Resolve a bug with notes
-python src/bug_report.py --resolve BUG-014 --notes "Added bug filtering and status toggles"
-
-# Launch on custom port or output path
-python src/bug_report.py --port 8766 --output feedback/BUGS.md
-
-# Directly export Markdown report from existing state without launching the server
-python src/bug_report.py --export-only
-```
-
-### Bug Tracker Features & Workflow
-- **Retro Quake Workstation UI**: Styled with the GLQuake console aesthetic, featuring CRT scanlines, beveled stone plaque panels, and interactive Quake 3D embossed controls.
-- **Bug Status Filtering**: Filter issues by status (`OPEN`, `ALL`, `RESOLVED`), with resolved bugs hidden by default so developers focus immediately on active blockers.
-- **Clipboard & File Attachments**: Drag and drop or paste (⌘V / Ctrl+V) screenshots, images, logs, PDFs, and code references directly into issue reports with live previews.
-- **Git LFS Storage & Public Attachments Policy**: Bug report attachments (`build/attachments/` and `feedback/attachments/`) are automatically tracked and stored in **GitHub LFS**. All uploaded attachments are considered **non-confidential** and public to the repository. Never attach sensitive credentials, secret tokens, private keys, or confidential proprietary data.
-- **Automated Markdown Synchronization**: Changes made in the workstation or CLI automatically persist to `build/bugs.sqlite` and sync seamlessly to GitHub-flavored Markdown in `feedback/BUGS.md` and granular issue files `feedback/BUG_<id>.md`.
-- **Graceful Termination**: Clicking "Save and Exit" saves the active bug, syncs `feedback/BUGS.md` and `feedback/BUG_<id>.md`, and gracefully shuts down the server, releasing terminal control.
-
-## Interactive Quake Diff Viewer & Smartlog (sl)
-
-Inspect commits, branches, working tree states, and ancestors using the interactive Quake-styled diff viewer and Smartlog DAG workstation:
-
-```bash
-# Launch interactive diff viewer web workstation
-python src/diff_view.py
+# Launch interactive dashboard web workstation (Diff View at /, Code Review at /review, Bugs at /bugs)
+python src/dashboard.py
 
 # Print the smartlog ancestor tree (sl) and working tree status directly to the terminal
-python src/diff_view.py --list
+python src/dashboard.py --list
 
 # Inspect a specific branch or jump to a commit
-python src/diff_view.py --branch main
-python src/diff_view.py --goto 75d5f92
+python src/dashboard.py --branch main
+python src/dashboard.py --goto 75d5f92
 
 # Download latest changes from remote repository
-python src/diff_view.py --sync
+python src/dashboard.py --sync
 
 # Launch on custom port
-python src/diff_view.py --port 8767
+python src/dashboard.py --port 8767
+
+# Bug tracking via CLI
+python src/dashboard.py --bugs
+python src/dashboard.py --bugs --open
+python src/dashboard.py --add-bug "Antenna on Q1" --severity HIGH --category PCB --component carrier_board
+python src/dashboard.py --resolve-bug BUG-014 --notes "Fixed trace routing"
+
+# Code review via CLI
+python src/dashboard.py --reviews
+python src/dashboard.py --reviews --open
+python src/dashboard.py --add-comment "Check crystal routing" --file src/dashboard.py --line 10 --severity MUST_FIX
+python src/dashboard.py --resolve-comment abc123
+python src/dashboard.py --verdict APPROVED
 ```
 
-### Diff Viewer & Smartlog Features & Workflow
-- **Quake Retro Console UI**: CRT scanlines, stone bevel plaques, embossed buttons, and HUD bar with quick links to Code Review (`8765`) and Bug Tracker (`8766`).
+### Dashboard Features & Workflow
+- **Unified Quake Retro Console UI**: CRT scanlines, stone bevel plaques, embossed buttons, and instant top navigation between VCS Diff Viewer (`/`), Code Review (`/review`), and Bug Tracker (`/bugs`) on a single port (`8767`).
 - **Smartlog DAG Ancestor Tree (`sl`)**: Visualizes topological git commit ancestry with graph columns (`@` for HEAD, `o` for commits, `|`), branch labels, and PR status tags.
-- **Agent Feedback Customization**:
-  - Multi-commit selection (`[ ]`) with one-click **"Review Selected"** opening directly in Code Review (`python src/code_review.py`).
-  - Commit bug badges (`[BUG-XXX: STATUS]`) with one-click navigation to Bug Viewer (`python src/bug_report.py`).
+- **Agent Feedback Integration**:
+  - Multi-commit selection (`[ ]`) with one-click **"Review Selected"** opening directly in Code Review.
+  - Commit bug badges (`[BUG-XXX: STATUS]`) with one-click navigation to Bug Tracker.
   - **"+ Bug"** button to create a new bug report with the commit hash prefilled.
   - Agent feedback files (`feedback/` directory and review state files) are greyed-out and displayed in their own collapsible group (`opacity: 0.6`).
 - **Working Tree Operations**:
@@ -398,7 +354,8 @@ python src/diff_view.py --port 8767
   - **Split Commit**: Resets `HEAD~1` so its changes return to the working tree for selective restaging and granular committing.
   - **Combine Commits**: Squashes two or more selected contiguous commits into a single commit with a custom commit message.
 - **Merge Conflict Resolution**: Detects conflicted files (`UU`, `AA`, etc.), displays conflict marker counts, and offers instant resolution buttons: **Ours**, **Theirs**, or **Mark Resolved**.
-- **Shared Diff Engine & Modularity**: Core Git interaction, diff hunk parsing, side-by-side comparison, and syntax highlighting are shared seamlessly between `diff_view`, `code_review`, and `bug_report` via `GitEngine` and `diff_component.html.j2`.
+- **Interactive Code Review (`/review`)**: 3-column layout displaying the revision stream, changed files list, side-by-side or unified syntax-highlighted diffs, inline line-range comments (`[MUST FIX]`, `[PROPOSAL]`, `[NIT]`), and bottom Quake terminal. Concluding review with **Approve** or **Request Changes** persists findings to SQLite (`build/code_review.sqlite`), Markdown (`feedback/CR.md`), and returns cleanly to Dashboard.
+- **Interactive Bug Tracker (`/bugs`)**: Issue triage, reproduction steps, drag-and-drop or clipboard screenshot uploads (tracked automatically in **Git LFS** under public non-confidential attachments policy), status filtering (`OPEN`, `ALL`, `RESOLVED`), and "Save and Exit" returning seamlessly to the VCS Dashboard.
 
 ## Debugging
 

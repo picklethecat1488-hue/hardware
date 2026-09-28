@@ -507,6 +507,7 @@
       <div class="metric-pill">RESOLVED: <span id="m-resolved" class="metric-highlight" style="color:var(--quake-green);">0</span></div>
     </div>
     <div class="header-actions">
+      <a href="/" class="quake-btn quake-btn-default" style="text-decoration:none;display:inline-flex;align-items:center;" title="Return to VCS Dashboard">← Dashboard</a>
       <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
       <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
       <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
@@ -940,22 +941,15 @@
 
       try {
         await saveActiveBug();
-        const res = await fetch("/api/exit", { method: "POST" });
-        const data = await res.json();
-        showToast("Session saved to BUGS.md. Server exited.");
+        await fetch("/api/exit", { method: "POST" });
+        showToast("Bug state saved. Returning to Dashboard...");
       } catch (err) {
-        showToast("Saved state. Shutting down...");
+        showToast("Saved state. Returning to Dashboard...");
       }
 
       setTimeout(() => {
-        window.close();
-        document.body.innerHTML = `
-          <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;color:#ffb800;font-family:var(--font-mono);font-size:16px;text-align:center;">
-            <span style="font-size:24px;">⚡ BUGS.MD SAVED & SYNCED</span>
-            <span style="color:#dedede;font-size:13px;">The Bug Report server has shut down. You can safely close this window.</span>
-          </div>
-        `;
-      }, 700);
+        window.location.href = "/";
+      }, 500);
     }
 
     function removeAttachment(idx) {

@@ -504,11 +504,11 @@
       </button>
 
       <!-- Inter-Tool Links -->
-      <button class="quake-btn quake-btn-default" onclick="onOpenInCodeReview()" title="Open Code Review Tool">
-        <span>🔍 Code Review (8765)</span>
+      <button class="quake-btn quake-btn-default" onclick="onOpenInCodeReview()" title="Open Code Review">
+        <span>🔍 Code Review</span>
       </button>
       <button class="quake-btn quake-btn-default" onclick="openBugTracker()" title="Open Bug Report Tool">
-        <span>🐞 Bug Tracker (8766)</span>
+        <span>🐞 Bug Tracker</span>
       </button>
     </div>
   </header>
@@ -1176,7 +1176,7 @@
         window.open(res.url, "_blank");
       } catch (err) {
         const revStr = commits.join(",");
-        window.open(`http://127.0.0.1:8765/?revisions=${encodeURIComponent(revStr)}`, "_blank");
+        window.open(`/review?revisions=${encodeURIComponent(revStr)}`, "_blank");
       }
     }
 
@@ -1190,7 +1190,7 @@
         const res = await resp.json();
         window.open(res.url, "_blank");
       } catch (err) {
-        window.open(`http://127.0.0.1:8766/#BUG-${bugId}`, "_blank");
+        window.open(`/bugs#BUG-${bugId}`, "_blank");
       }
     }
 
@@ -1204,7 +1204,7 @@
         const res = await resp.json();
         window.open(res.url, "_blank");
       } catch (err) {
-        window.open("http://127.0.0.1:8766/", "_blank");
+        window.open("/bugs", "_blank");
       }
     }
 
@@ -1218,7 +1218,7 @@
         const res = await resp.json();
         window.open(res.url, "_blank");
       } catch (err) {
-        window.open(`http://127.0.0.1:8766/#new?commit=${encodeURIComponent(commitHash)}`, "_blank");
+        window.open(`/bugs#new?commit=${encodeURIComponent(commitHash)}`, "_blank");
       }
     }
 

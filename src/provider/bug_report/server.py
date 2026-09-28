@@ -467,7 +467,8 @@ class BugReportServer(ThreadingHTTPServer):
     def server_close(self) -> None:
         """Stop background file watcher and close server."""
         self._watcher_stop.set()
-        super().server_close()
+        if hasattr(self, "socket"):
+            super().server_close()
 
     def _ensure_unique_bug_ids(self, db: BugDatabaseModel) -> None:
         """Ensure all bug IDs in database are unique, disambiguating any duplicates."""

@@ -340,27 +340,18 @@ def test_server_sqlite_integration(tmp_path: Path) -> None:
 
 
 def test_regression_bug_076_feedback_tools_sqlite_only():
-    """Verify BUG-076: remove references to markdown and state files from bug_report.py and code_review.py."""
+    """Verify BUG-076: remove references to markdown and state files from dashboard.py."""
     import subprocess
     import sys
 
-    # Check bug_report.py --help
-    res_bug = subprocess.run(
-        [sys.executable, "src/bug_report.py", "--help"], capture_output=True, text=True, check=True
-    )
-    assert "--output" not in res_bug.stdout, "bug_report.py should not have --output flag"
-    assert "--state-file" not in res_bug.stdout, "bug_report.py should not have --state-file flag"
-    assert "BUGS.md" not in res_bug.stdout, "bug_report.py should not reference BUGS.md"
-    assert "bugs_state.json" not in res_bug.stdout, "bug_report.py should not reference bugs_state.json"
-
-    # Check code_review.py --help
-    res_cr = subprocess.run(
-        [sys.executable, "src/code_review.py", "--help"], capture_output=True, text=True, check=True
-    )
-    assert "--output" not in res_cr.stdout, "code_review.py should not have --output flag"
-    assert "--state-file" not in res_cr.stdout, "code_review.py should not have --state-file flag"
-    assert "CR.md" not in res_cr.stdout, "code_review.py should not reference CR.md"
-    assert "cr_feedback.json" not in res_cr.stdout, "code_review.py should not reference cr_feedback.json"
+    # Check dashboard.py --help
+    res = subprocess.run([sys.executable, "src/dashboard.py", "--help"], capture_output=True, text=True, check=True)
+    assert "--output" not in res.stdout, "dashboard.py should not have --output flag"
+    assert "--state-file" not in res.stdout, "dashboard.py should not have --state-file flag"
+    assert "BUGS.md" not in res.stdout, "dashboard.py should not reference BUGS.md"
+    assert "bugs_state.json" not in res.stdout, "dashboard.py should not reference bugs_state.json"
+    assert "CR.md" not in res.stdout, "dashboard.py should not reference CR.md"
+    assert "cr_feedback.json" not in res.stdout, "dashboard.py should not reference cr_feedback.json"
 
 
 def test_regression_bug_079_no_duplicate_bug_ids_and_generator():

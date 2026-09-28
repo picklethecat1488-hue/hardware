@@ -32,7 +32,7 @@ from provider.vcs.git_engine import (
 from provider.code_review.markdown_exporter import MarkdownReviewExporter
 from provider.code_review.server import ReviewServer
 from provider.code_review.sqlite_store import SQLiteReviewStore
-from code_review import launch_browser, parse_arguments
+from dashboard import launch_browser, parse_arguments
 
 
 def create_isolated_git_repo(path: Path) -> tuple[Path, list[str]]:
@@ -580,16 +580,16 @@ def test_launch_browser_and_webpage_title(tmp_path: Path) -> None:
             assert f"<title>Code Review: {repo_root.name}</title>" in html
 
         # Test CLI arguments default to VS Code
-        with patch("sys.argv", ["code_review.py"]):
+        with patch("sys.argv", ["dashboard.py"]):
             args = parse_arguments()
             assert args.browser == "vscode"
             assert not args.no_browser
 
-        with patch("sys.argv", ["code_review.py", "--no-browser"]):
+        with patch("sys.argv", ["dashboard.py", "--no-browser"]):
             args_no = parse_arguments()
             assert args_no.no_browser
 
-        with patch("sys.argv", ["code_review.py", "--browser", "system"]):
+        with patch("sys.argv", ["dashboard.py", "--browser", "system"]):
             args_sys = parse_arguments()
             assert args_sys.browser == "system"
 
@@ -1224,22 +1224,22 @@ def test_review_server_sqlite_integration(tmp_path: Path) -> None:
 def test_code_review_cli_features(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:
-    """Verify code_review.py CLI commands for comment addition, resolution, and listing."""
+    """Verify dashboard.py CLI commands for comment addition, resolution, and listing."""
     db_file = tmp_path / "cli_test.sqlite"
 
-    from code_review import main
+    from dashboard import main
 
     # 1. Quick add comment
     monkeypatch.setattr(
         "sys.argv",
         [
-            "code_review.py",
+            "dashboard.py",
             "--db-file",
             str(db_file),
             "--add-comment",
             "Check crystal routing",
             "--file",
-            "src/code_review.py",
+            "src/dashboard.py",
             "--line",
             "10",
             "--severity",
@@ -1254,7 +1254,7 @@ def test_code_review_cli_features(
     monkeypatch.setattr(
         "sys.argv",
         [
-            "code_review.py",
+            "dashboard.py",
             "--db-file",
             str(db_file),
             "--list",
@@ -1276,7 +1276,7 @@ def test_code_review_cli_features(
     monkeypatch.setattr(
         "sys.argv",
         [
-            "code_review.py",
+            "dashboard.py",
             "--db-file",
             str(db_file),
             "--resolve-comment",
@@ -1291,7 +1291,7 @@ def test_code_review_cli_features(
     monkeypatch.setattr(
         "sys.argv",
         [
-            "code_review.py",
+            "dashboard.py",
             "--db-file",
             str(db_file),
             "--list",

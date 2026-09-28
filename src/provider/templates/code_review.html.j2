@@ -1182,13 +1182,14 @@
     </div>
 
     <div class="header-actions">
+      <a href="/" class="quake-btn quake-btn-default" style="text-decoration:none;display:inline-flex;align-items:center;" title="Return to VCS Dashboard">← Dashboard</a>
       <button id="btnSyncFeedback" class="quake-btn quake-btn-default" onclick="syncFeedback()" title="Synchronize review feedback with feedback/ directory and merge commit feedback">
         🔄 Sync Feedback
       </button>
-      <button id="btnVerdictApprove" class="quake-btn quake-btn-green" onclick="setVerdict('APPROVED')" title="Conclude review with Approval (LGTM), export build/CR.md, and release terminal">
+      <button id="btnVerdictApprove" class="quake-btn quake-btn-green" onclick="setVerdict('APPROVED')" title="Conclude review with Approval (LGTM), export build/CR.md, and return to Dashboard">
         ✓ Approve
       </button>
-      <button id="btnVerdictChanges" class="quake-btn quake-btn-red" onclick="setVerdict('CHANGES_REQUESTED')" title="Conclude review with Changes Requested, export build/CR.md, and release terminal">
+      <button id="btnVerdictChanges" class="quake-btn quake-btn-red" onclick="setVerdict('CHANGES_REQUESTED')" title="Conclude review with Changes Requested, export build/CR.md, and return to Dashboard">
         ✗ Request Changes
       </button>
     </div>
@@ -1328,9 +1329,9 @@
         ✓ Local review server shut down<br>
         ✓ Terminal session released to shell
       </div>
-      <button class="quake-btn quake-btn-gold" onclick="window.close()" style="padding: 8px 24px; font-size: 13px;">
-        CLOSE TAB
-      </button>
+      <a href="/" class="quake-btn quake-btn-gold" style="padding: 8px 24px; font-size: 13px; text-decoration: none; display: inline-block;">
+        ← RETURN TO DASHBOARD
+      </a>
     </div>
   </div>
 
@@ -2855,7 +2856,7 @@
         const res = await fetch("/api/verdict", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ verdict: verdict })
+          body: JSON.stringify({ verdict: verdict, terminate: false })
         });
         const data = await res.json();
         if (data.status === "ok") {
@@ -2864,8 +2865,11 @@
             state.session = data.session;
             updateSessionUI();
           }
-          if (data.terminating) {
-            handleSessionTermination(verdict, data.exported_to);
+          if (verdict === "APPROVED" || verdict === "CHANGES_REQUESTED") {
+            showToast(`Review verdict: [${verdict}]. Returning to Dashboard...`);
+            setTimeout(() => {
+              window.location.href = "/";
+            }, 800);
           } else {
             showToast(`Review verdict: ${verdict}`);
           }
