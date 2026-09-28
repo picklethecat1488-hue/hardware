@@ -729,3 +729,68 @@ def test_regression_bug_186_lfs_tracking_for_attachments(tmp_path: Path) -> None
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_194_lfs_tracked_files_grouping_and_styling(tmp_path: Path) -> None:
+    """Verify BUG-194: Separate group for LFS tracked files in changed files column with unique color."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_dir)
+
+    # 1. Verify template HTML contains LFS styling, group headers, and badges
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert ".status-lfs" in tpl_text
+    assert ".lfs-file-item" in tpl_text
+    assert "📦 LFS Tracked Files" in tpl_text
+    assert 'class="file-status-badge status-lfs">LFS</span>' in tpl_text
+
+    # 2. Create LFS tracked file under attachments/ and a regular file
+    att_dir = repo_dir / "attachments"
+    att_dir.mkdir(parents=True, exist_ok=True)
+    lfs_file = att_dir / "diagram.png"
+    lfs_file.write_bytes(b"\x89PNG\r\n\x1a\ntestdiagram")
+
+    reg_file = repo_dir / "main.py"
+    reg_file.write_text("print('hello')\n", encoding="utf-8")
+
+    # Ensure .gitattributes has LFS pattern
+    ga = repo_dir / ".gitattributes"
+    ga.write_text("attachments/* filter=lfs diff=lfs merge=lfs -text\n", encoding="utf-8")
+
+    # 3. Check get_working_tree_files identifies is_lfs
+    working = engine.get_working_tree_files()
+    lfs_items = [w for w in working if w.is_lfs]
+    reg_items = [w for w in working if not w.is_lfs and not w.is_feedback]
+    assert any(w.path == "attachments/diagram.png" for w in lfs_items)
+    assert any(w.path == "main.py" for w in reg_items)
+
+    # 4. Check get_changed_files identifies is_lfs
+    changed = engine.get_changed_files("working", include_feedback=False)
+    lfs_changed = [c for c in changed if c.get("is_lfs")]
+    reg_changed = [c for c in changed if not c.get("is_lfs")]
+    assert any(c["path"] == "attachments/diagram.png" for c in lfs_changed)
+    assert any(c["path"] == "main.py" for c in reg_changed)
+
+    # 5. Check API endpoint /api/working returns is_lfs: true
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}/api/working") as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            lfs_api = [f for f in data if f.get("is_lfs")]
+            reg_api = [f for f in data if not f.get("is_lfs") and not f.get("is_feedback")]
+            assert any(f["path"] == "attachments/diagram.png" for f in lfs_api)
+            assert any(f["path"] == "main.py" for f in reg_api)
+    finally:
+        server.shutdown()
+        server.server_close()

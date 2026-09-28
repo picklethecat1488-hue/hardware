@@ -150,6 +150,7 @@ class WorkingTreeFileModel(BaseModel):
     is_untracked: bool = False
     is_conflicted: bool = False
     is_feedback: bool = False
+    is_lfs: bool = False
     additions: int = 0
     deletions: int = 0
 

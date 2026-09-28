@@ -377,6 +377,10 @@
     .status-d { color: var(--quake-red); }
     .status-untracked { color: var(--quake-purple); }
     .status-conflict { color: #f87171; background: rgba(239, 68, 68, 0.25); border: 1px solid var(--quake-red); }
+    .status-lfs { color: #00e5ff; background: rgba(0, 229, 255, 0.15); border: 1px solid #00e5ff; font-weight: 700; }
+    .lfs-file-item { border-left: 2px solid #00e5ff !important; background: rgba(0, 229, 255, 0.04); }
+    .lfs-file-item .file-path { color: #38bdf8 !important; }
+    .lfs-file-item:hover { background: rgba(0, 229, 255, 0.12) !important; }
 
     .file-actions {
       display: flex;
@@ -883,11 +887,12 @@
     // Render Working Tree Files (Staged, Unstaged, Untracked, Conflicts, Feedback)
     function renderWorkingTreeFiles(container) {
       let html = "";
-      const staged = state.workingFiles.filter(f => f.is_staged && !f.is_feedback);
-      const unstaged = state.workingFiles.filter(f => !f.is_staged && !f.is_untracked && !f.is_conflicted && !f.is_feedback);
-      const untracked = state.workingFiles.filter(f => f.is_untracked && !f.is_feedback);
-      const feedback = state.workingFiles.filter(f => f.is_feedback);
       const conflicts = state.conflicts;
+      const lfs = state.workingFiles.filter(f => f.is_lfs && !f.is_feedback);
+      const staged = state.workingFiles.filter(f => f.is_staged && !f.is_feedback && !f.is_lfs);
+      const unstaged = state.workingFiles.filter(f => !f.is_staged && !f.is_untracked && !f.is_conflicted && !f.is_feedback && !f.is_lfs);
+      const untracked = state.workingFiles.filter(f => f.is_untracked && !f.is_feedback && !f.is_lfs);
+      const feedback = state.workingFiles.filter(f => f.is_feedback);
 
       document.getElementById("filesCountBadge").textContent = `${state.workingFiles.length} changes`;
 
@@ -915,7 +920,33 @@
         `;
       }
 
-      // 2. Staged
+      // 2. LFS Tracked Files
+      if (lfs.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header" style="color:#00e5ff;">📦 LFS Tracked Files (${lfs.length})</div>
+            <div class="group-items">
+              ${lfs.map(f => `
+                <div class="file-item lfs-file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${f.path}" onclick="event.stopPropagation()" ${f.is_staged || !f.is_untracked ? 'checked' : ''}>
+                  <span class="file-status-badge status-lfs">LFS</span>
+                  <span class="file-status-badge ${f.is_staged ? 'status-a' : (f.is_untracked ? 'status-untracked' : 'status-m')}">${f.status}</span>
+                  <span class="file-path" title="${f.path}">${f.path}</span>
+                  <div class="file-actions">
+                    ${f.is_staged ?
+                      `<button class="quake-btn quake-btn-default quake-btn-icon" onclick="event.stopPropagation(); unstageFile('${f.path}')" title="Unstage LFS file">➖</button>` :
+                      `<button class="quake-btn quake-btn-gold quake-btn-icon" onclick="event.stopPropagation(); stageFile('${f.path}')" title="Stage LFS file">➕</button>`
+                    }
+                    <button class="quake-btn quake-btn-red quake-btn-icon" onclick="event.stopPropagation(); discardFile('${f.path}')" title="Discard LFS file">🗑</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      // 3. Staged
       if (staged.length > 0) {
         html += `
           <div class="group-section">
@@ -1014,7 +1045,7 @@
 
       // Auto-select first file if none selected
       if (!state.activeFile) {
-        const first = conflicts[0]?.path || staged[0]?.path || unstaged[0]?.path || untracked[0]?.path || feedback[0]?.path;
+        const first = conflicts[0]?.path || lfs[0]?.path || staged[0]?.path || unstaged[0]?.path || untracked[0]?.path || feedback[0]?.path;
         if (first) selectFile(first);
       }
     }
@@ -1022,10 +1053,30 @@
     // Render Commit Files (Regular vs Feedback)
     function renderCommitFiles(container) {
       let html = "";
-      const regular = state.files.filter(f => !f.is_feedback);
+      const lfs = state.files.filter(f => f.is_lfs && !f.is_feedback);
+      const regular = state.files.filter(f => !f.is_feedback && !f.is_lfs);
       const feedback = state.files.filter(f => f.is_feedback);
 
       document.getElementById("filesCountBadge").textContent = `${state.files.length} files`;
+
+      // LFS Tracked Files
+      if (lfs.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header" style="color:#00e5ff;">📦 LFS Tracked Files (${lfs.length})</div>
+            <div class="group-items">
+              ${lfs.map(f => `
+                <div class="file-item lfs-file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <span class="file-status-badge status-lfs">LFS</span>
+                  <span class="file-status-badge ${f.status === 'A' ? 'status-a' : (f.status === 'D' ? 'status-d' : 'status-m')}">${f.status}</span>
+                  <span class="file-path" title="${f.path}">${f.path}</span>
+                  <span style="font-size:10px;color:var(--quake-text-dim);">+${f.additions || 0} -${f.deletions || 0}</span>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
 
       // Regular Changed Files
       if (regular.length > 0) {
@@ -1074,7 +1125,7 @@
 
       // Auto select first file
       if (!state.activeFile) {
-        const first = regular[0]?.path || feedback[0]?.path;
+        const first = lfs[0]?.path || regular[0]?.path || feedback[0]?.path;
         if (first) selectFile(first);
       }
     }
@@ -1273,12 +1324,14 @@
         const mainChecked = Array.from(document.querySelectorAll(".working-file-cb:checked")).map(cb => cb.value);
 
         listEl.innerHTML = workingFiles.map(f => {
+          const isLfs = f.is_lfs || f.path.startsWith('attachments/');
           const isChecked = mainChecked.length > 0 ? mainChecked.includes(f.path) : (f.is_staged || !f.is_untracked);
           const badgeClass = f.is_staged ? 'status-a' : (f.is_untracked ? 'status-untracked' : 'status-m');
           return `
-            <div class="modal-file-row">
+            <div class="modal-file-row ${isLfs ? 'lfs-file-item' : ''}">
               <label style="display:flex;align-items:center;gap:6px;flex:1;overflow:hidden;cursor:pointer;">
                 <input type="checkbox" class="modal-file-cb" value="${f.path}" ${isChecked ? 'checked' : ''} onchange="updateModalSelectAllState()">
+                ${isLfs ? '<span class="file-status-badge status-lfs">LFS</span>' : ''}
                 <span class="file-status-badge ${badgeClass}">${f.status}</span>
                 <span class="file-path" title="${f.path}">${f.path}</span>
               </label>

@@ -14,7 +14,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from model.vcs import (
     BranchInfoModel,
@@ -649,6 +649,25 @@ class GitEngine:
                     return True
         return False
 
+    def check_lfs_paths(self, file_paths: List[str]) -> Set[str]:
+        """Return set of file paths that are tracked by Git LFS."""
+        lfs_set: Set[str] = set()
+        if not file_paths:
+            return lfs_set
+        try:
+            attr_out = run_git_command(["check-attr", "filter", "--"] + file_paths, cwd=self.repo_root)
+            for line in attr_out.splitlines():
+                if ": filter: lfs" in line:
+                    p = line.split(": filter: lfs")[0].strip()
+                    lfs_set.add(p)
+        except RuntimeError:
+            pass
+        for fp in file_paths:
+            clean = fp.replace("\\", "/").strip().lstrip("./")
+            if clean.startswith("attachments/"):
+                lfs_set.add(fp)
+        return lfs_set
+
     def get_working_tree_files(self) -> List[WorkingTreeFileModel]:
         """List all modified, staged, untracked, and conflicted files in working directory."""
         status_out = run_git_command(["status", "--porcelain=v1", "--untracked-files=all"], cwd=self.repo_root)
@@ -708,10 +727,17 @@ class GitEngine:
                     is_untracked=is_untracked,
                     is_conflicted=is_conflicted,
                     is_feedback=is_feedback,
+                    is_lfs=False,
                     additions=adds,
                     deletions=dels,
                 )
             )
+
+        lfs_set = self.check_lfs_paths([f.path for f in files])
+        for f in files:
+            clean = f.path.replace("\\", "/").strip().lstrip("./")
+            if f.path in lfs_set or clean in lfs_set or clean.startswith("attachments/"):
+                f.is_lfs = True
 
         return files
 
@@ -941,8 +967,13 @@ class GitEngine:
                         "additions": str(adds),
                         "deletions": str(dels),
                         "is_feedback": is_feedback,
+                        "is_lfs": False,
                     }
                 )
+        lfs_set = self.check_lfs_paths([f["path"] for f in files])
+        for f in files:
+            clean = f["path"].replace("\\", "/").strip().lstrip("./")
+            f["is_lfs"] = f["path"] in lfs_set or clean in lfs_set or clean.startswith("attachments/")
         return files
 
     def _get_working_tree_files_simple(self, include_feedback: bool = False) -> List[Dict[str, Any]]:
@@ -988,8 +1019,13 @@ class GitEngine:
                     "additions": str(adds),
                     "deletions": str(dels),
                     "is_feedback": is_feedback,
+                    "is_lfs": False,
                 }
             )
+        lfs_set = self.check_lfs_paths([f["path"] for f in files])
+        for f in files:
+            clean = f["path"].replace("\\", "/").strip().lstrip("./")
+            f["is_lfs"] = f["path"] in lfs_set or clean in lfs_set or clean.startswith("attachments/")
         return files
 
     def get_file_content(self, commit: str, file_path: str, parent: bool = False) -> str:
