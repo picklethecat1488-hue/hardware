@@ -1117,15 +1117,15 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText("D1", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((-18.0, -18.5)):
                 SilkscreenText("J5", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, 33.0)):
+            with Locations((20.5, 32.0)):
                 SilkscreenText("J6", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, 17.5)):
+            with Locations((20.5, 17.0)):
                 SilkscreenText("J7", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((20.5, 2.0)):
                 SilkscreenText("J8", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, -14.5)):
+            with Locations((20.5, -14.0)):
                 SilkscreenText("J9", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, -32.0)):
+            with Locations((20.5, -31.0)):
                 SilkscreenText("J10", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((16.0, -28.0)):
                 SilkscreenText("J14", layer="F.SilkS", font_size=0.8, thickness=0.12)

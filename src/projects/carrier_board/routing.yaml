@@ -9427,16 +9427,16 @@ traces:
   - -30.54
   end_mm:
   - 22.25
-  - -32.0
+  - -31.0
   width_mm: 0.12
   layer: B.Cu
   net: CBUS2
 - start_mm:
   - 22.25
-  - -32.0
+  - -31.0
   end_mm:
   - 24.5
-  - -32.0
+  - -31.0
   width_mm: 0.12
   layer: B.Cu
   net: CBUS2
@@ -9571,7 +9571,7 @@ traces:
   - -22.9
   end_mm:
   - 23.4
-  - -28.0
+  - -27.0
   width_mm: 0.12
   layer: B.Cu
   net: DCD_N
@@ -9742,16 +9742,16 @@ traces:
   - -40.75
   end_mm:
   - 20.25
-  - -26.0
+  - -25.0
   width_mm: 0.12
   layer: F.Cu
   net: DSR_N
 - start_mm:
   - 20.25
-  - -26.0
+  - -25.0
   end_mm:
   - 24.5
-  - -26.0
+  - -25.0
   width_mm: 0.12
   layer: F.Cu
   net: DSR_N
@@ -12127,16 +12127,16 @@ traces:
   - -1.0
   end_mm:
   - 23.0
-  - -10.5
+  - -10.0
   width_mm: 0.12
   layer: F.Cu
   net: SPI0_MISO
 - start_mm:
   - 23.0
-  - -10.5
+  - -10.0
   end_mm:
   - 24.5
-  - -10.5
+  - -10.0
   width_mm: 0.12
   layer: F.Cu
   net: SPI0_MISO
@@ -12154,7 +12154,7 @@ traces:
   - -3.5
   end_mm:
   - 22.5
-  - -12.5
+  - -12.0
   width_mm: 0.12
   layer: B.Cu
   net: SPI0_MOSI
@@ -12163,16 +12163,16 @@ traces:
   - -5.25
   end_mm:
   - 22.0
-  - -14.5
+  - -14.0
   width_mm: 0.12
   layer: B.Cu
   net: SPI0_SCK
 - start_mm:
   - 22.0
-  - -14.5
+  - -14.0
   end_mm:
   - 24.5
-  - -14.5
+  - -14.0
   width_mm: 0.12
   layer: B.Cu
   net: SPI0_SCK
@@ -12181,16 +12181,16 @@ traces:
   - -9.5
   end_mm:
   - 21.5
-  - -16.5
+  - -16.0
   width_mm: 0.12
   layer: B.Cu
   net: EXP_INT_SPI
 - start_mm:
   - 21.5
-  - -16.5
+  - -16.0
   end_mm:
   - 24.5
-  - -16.5
+  - -16.0
   width_mm: 0.12
   layer: B.Cu
   net: EXP_INT_SPI
@@ -12241,10 +12241,10 @@ traces:
   net: CAP_RX1
 - start_mm:
   - 23.4
-  - -28.0
+  - -27.0
   end_mm:
   - 24.5
-  - -28.0
+  - -27.0
   width_mm: 0.12
   layer: B.Cu
   net: DCD_N
@@ -12253,16 +12253,16 @@ traces:
   - -33.0
   end_mm:
   - 22.75
-  - -30.0
+  - -29.0
   width_mm: 0.12
   layer: F.Cu
   net: CBUS4
 - start_mm:
   - 22.75
-  - -30.0
+  - -29.0
   end_mm:
   - 24.5
-  - -30.0
+  - -29.0
   width_mm: 0.12
   layer: F.Cu
   net: CBUS4
@@ -12295,10 +12295,10 @@ traces:
   net: DTR_N
 - start_mm:
   - 25.5
-  - -34.0
+  - -33.0
   end_mm:
   - 24.5
-  - -34.0
+  - -33.0
   width_mm: 0.12
   layer: F.Cu
   net: DTR_N
@@ -12370,16 +12370,16 @@ traces:
   - 24.5
   end_mm:
   - 22.0
-  - 36.0
+  - 35.0
   width_mm: 0.12
   layer: F.Cu
   net: EXP_INT_I2C
 - start_mm:
   - 22.0
-  - 36.0
+  - 35.0
   end_mm:
   - 24.5
-  - 36.0
+  - 35.0
   width_mm: 0.12
   layer: F.Cu
   net: EXP_INT_I2C
@@ -12397,16 +12397,16 @@ traces:
   - 23.5
   end_mm:
   - 23.0
-  - 34.0
+  - 33.0
   width_mm: 0.12
   layer: F.Cu
   net: I2C2_SDA
 - start_mm:
   - 23.0
-  - 34.0
+  - 33.0
   end_mm:
   - 24.5
-  - 34.0
+  - 33.0
   width_mm: 0.12
   layer: F.Cu
   net: I2C2_SDA
@@ -12433,16 +12433,16 @@ traces:
   - 23.0
   end_mm:
   - 23.5
-  - 32.0
+  - 31.0
   width_mm: 0.12
   layer: F.Cu
   net: I2C2_SCL
 - start_mm:
   - 23.5
-  - 32.0
+  - 31.0
   end_mm:
   - 24.5
-  - 32.0
+  - 31.0
   width_mm: 0.12
   layer: F.Cu
   net: I2C2_SCL
@@ -12451,16 +12451,16 @@ traces:
   - 10.0
   end_mm:
   - 23.25
-  - 16.5
+  - 16.0
   width_mm: 0.12
   layer: B.Cu
   net: I3C0_SCL
 - start_mm:
   - 23.25
-  - 16.5
+  - 16.0
   end_mm:
   - 24.5
-  - 16.5
+  - 16.0
   width_mm: 0.12
   layer: B.Cu
   net: I3C0_SCL
@@ -12478,16 +12478,16 @@ traces:
   - 18.25
   end_mm:
   - 22.75
-  - 18.5
+  - 18.0
   width_mm: 0.12
   layer: F.Cu
   net: I3C0_SDA
 - start_mm:
   - 22.75
-  - 18.5
+  - 18.0
   end_mm:
   - 24.5
-  - 18.5
+  - 18.0
   width_mm: 0.12
   layer: F.Cu
   net: I3C0_SDA
@@ -12505,16 +12505,16 @@ traces:
   - 10.5
   end_mm:
   - 22.25
-  - 20.5
+  - 20.0
   width_mm: 0.12
   layer: F.Cu
   net: EXP_INT_I3C
 - start_mm:
   - 22.25
-  - 20.5
+  - 20.0
   end_mm:
   - 24.5
-  - 20.5
+  - 20.0
   width_mm: 0.12
   layer: F.Cu
   net: EXP_INT_I3C
@@ -12604,49 +12604,49 @@ traces:
   - 26.25
   end_mm:
   - 21.5
-  - 38.0
+  - 37.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 21.5
-  - 38.0
+  - 37.0
   end_mm:
   - 24.5
-  - 38.0
+  - 37.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 24.5
-  - 38.0
+  - 37.0
   end_mm:
   - 25.75
-  - 38.0
+  - 37.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 25.75
-  - 38.0
+  - 37.0
   end_mm:
   - 25.75
-  - 22.5
+  - 22.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 25.75
-  - 22.5
+  - 22.0
   end_mm:
   - 24.5
-  - 22.5
+  - 22.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 25.75
-  - 22.5
+  - 22.0
   end_mm:
   - 25.75
   - 7.0
@@ -12685,34 +12685,34 @@ traces:
   - 6.0
   end_mm:
   - 27.5
-  - -18.5
+  - -18.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 27.5
-  - -18.5
+  - -18.0
   end_mm:
   - 24.5
-  - -18.5
+  - -18.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 27.5
-  - -18.5
+  - -18.0
   end_mm:
   - 27.5
-  - -36.0
+  - -35.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 27.5
-  - -36.0
+  - -35.0
   end_mm:
   - 24.5
-  - -36.0
+  - -35.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
@@ -12727,7 +12727,7 @@ traces:
   net: CAP_RX1
 - start_mm:
   - 9.75
-  - 37.0
+  - 36.95
   end_mm:
   - 9.75
   - 33.5
@@ -12736,7 +12736,7 @@ traces:
   net: CAP_RX1
 - start_mm:
   - 9.75
-  - 37.0
+  - 36.95
   end_mm:
   - 9.75
   - 33.5
@@ -12847,16 +12847,16 @@ traces:
   - 25.5
   end_mm:
   - 22.5
-  - 37.0
+  - 36.95
   width_mm: 0.12
   layer: B.Cu
   net: CAP_RX1
 - start_mm:
   - 22.5
-  - 37.0
+  - 36.95
   end_mm:
   - 9.75
-  - 37.0
+  - 36.95
   width_mm: 0.12
   layer: B.Cu
   net: CAP_RX1
@@ -12883,25 +12883,25 @@ traces:
   - 0.0
   end_mm:
   - 23.5
-  - -8.5
+  - -8.0
   width_mm: 0.12
   layer: F.Cu
   net: SPI0_CS_N
 - start_mm:
   - 23.5
-  - -8.5
+  - -8.0
   end_mm:
   - 24.5
-  - -8.5
+  - -8.0
   width_mm: 0.12
   layer: F.Cu
   net: SPI0_CS_N
 - start_mm:
   - 22.5
-  - -12.5
+  - -12.0
   end_mm:
   - 24.5
-  - -12.5
+  - -12.0
   width_mm: 0.12
   layer: B.Cu
   net: SPI0_MOSI
@@ -12928,7 +12928,7 @@ traces:
   - -23.5
   end_mm:
   - 25.5
-  - -34.0
+  - -33.0
   width_mm: 0.12
   layer: F.Cu
   net: DTR_N
@@ -15967,7 +15967,7 @@ vias:
   net: EXP_INT_I3C
 - position_mm:
   - 9.75
-  - 37.0
+  - 36.95
   drill_diameter_mm: 0.16
   pad_diameter_mm: 0.36
   layer_start: F.Cu

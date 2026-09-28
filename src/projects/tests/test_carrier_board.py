@@ -1363,3 +1363,61 @@ def test_regression_bug_177_enclosure_bottom_cutouts_and_lid_markers() -> None:
     lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
     assert lid.part is not None
     assert lid.part.volume > 0.0
+
+
+def test_regression_bug_179_right_side_ports_clear_mounting_holes() -> None:
+    """Verify BUG-179: right side peripheral ports J6 and J10 clear mounting holes MH1 and MH4."""
+    import math
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from model.wiring import Wiring
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    # Connector lengths along Y: J6-J8 = 14mm, J9-J10 = 16mm
+    # Positions: J6 @ Y=32, J10 @ Y=-31
+    j6_y = comp_map["J6"].position[1]
+    j10_y = comp_map["J10"].position[1]
+    assert j6_y <= 32.0, f"J6 center Y must be <= 32.0 to clear MH1, got {j6_y}"
+    assert j10_y >= -31.0, f"J10 center Y must be >= -31.0 to clear MH4, got {j10_y}"
+
+    # Verify J6 top edge does not overlap MH1
+    j6_top = j6_y + 14.0 / 2.0
+    assert j6_top <= 39.0, f"J6 top body edge must be <= 39.0mm, got {j6_top}"
+
+    # Verify J10 bottom edge does not overlap MH4
+    j10_bottom = j10_y - 16.0 / 2.0
+    assert j10_bottom >= -39.0, f"J10 bottom body edge must be >= -39.0mm, got {j10_bottom}"
+
+    # Check pad-to-pad distance between J6 pin 1 (y = j6_y + 5.0) and MH1 (25.5, 40.5)
+    # J6 pin 1 is at (24.5, 37.0)
+    mh1_x, mh1_y = 25.5, 40.5
+    j6_p1_x, j6_p1_y = 24.5, j6_y + 5.0
+    dist_mh1 = math.hypot(mh1_x - j6_p1_x, mh1_y - j6_p1_y)
+    # MH1 pad radius (2.25) + J6 pad radius (0.8) = 3.05mm
+    assert dist_mh1 > 3.05, f"J6 pin 1 shorts with MH1: distance {dist_mh1:.3f}mm <= 3.05mm"
+
+    # Check pad-to-pad distance between J10 pin 7 (y = j10_y - 6.0) and MH4 (25.5, -40.5)
+    # J10 pin 7 is at (24.5, -37.0)
+    mh4_x, mh4_y = 25.5, -40.5
+    j10_p7_x, j10_p7_y = 24.5, j10_y - 6.0
+    dist_mh4 = math.hypot(mh4_x - j10_p7_x, mh4_y - j10_p7_y)
+    assert dist_mh4 > 3.05, f"J10 pin 7 shorts with MH4: distance {dist_mh4:.3f}mm <= 3.05mm"
+
+    # Verify uniform >= 1.0mm body gaps across all peripheral headers
+    connectors = [("J6", 14.0), ("J7", 14.0), ("J8", 14.0), ("J9", 16.0), ("J10", 16.0)]
+    for i in range(len(connectors) - 1):
+        c_top, len_top = connectors[i]
+        c_bot, len_bot = connectors[i + 1]
+        y_top = comp_map[c_top].position[1]
+        y_bot = comp_map[c_bot].position[1]
+        body_gap = (y_top - len_top / 2.0) - (y_bot + len_bot / 2.0)
+        assert body_gap >= 1.0, f"Body gap between {c_top} and {c_bot} must be >= 1.0mm, got {body_gap:.2f}mm"
+
+    # Verify DRC clean
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0, f"Expected 0 DRC errors, got {report.error_count}"
