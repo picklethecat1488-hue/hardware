@@ -3,6 +3,8 @@
 *.ipynb diff=ipynb
 
 # Git LFS tracking for bug report attachments and assets
+attachments/* filter=lfs diff=lfs merge=lfs -text
+attachments/** filter=lfs diff=lfs merge=lfs -text
 build/attachments/* filter=lfs diff=lfs merge=lfs -text
 build/attachments/** filter=lfs diff=lfs merge=lfs -text
 feedback/attachments/* filter=lfs diff=lfs merge=lfs -text

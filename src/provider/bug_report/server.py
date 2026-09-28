@@ -45,7 +45,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
 
-        if path.startswith("/attachments/"):
+        if path.startswith("/attachments/") or path.startswith("/build/attachments/"):
             self._handle_serve_attachment(path)
             return
 
@@ -150,11 +150,20 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_serve_attachment(self, path: str) -> None:
         """Serve uploaded file attachments from attachments directory."""
-        rel_name = path[len("/attachments/") :]
+        if path.startswith("/build/attachments/"):
+            rel_name = path[len("/build/attachments/") :]
+        elif path.startswith("/attachments/"):
+            rel_name = path[len("/attachments/") :]
+        else:
+            rel_name = path.lstrip("/")
         file_path = self.server.attachments_dir / rel_name
         if not file_path.exists() or not file_path.is_file():
-            self.send_error(404, f"Attachment '{rel_name}' not found")
-            return
+            fallback = self.server.repo_root / "build" / "attachments" / rel_name
+            if fallback.exists() and fallback.is_file():
+                file_path = fallback
+            else:
+                self.send_error(404, f"Attachment '{rel_name}' not found")
+                return
 
         content = file_path.read_bytes()
         suffix = file_path.suffix.lower()
@@ -383,7 +392,7 @@ class BugReportServer(ThreadingHTTPServer):
             self.feedback_dir = self.repo_root / "feedback"
         self.state_file = state_file or (self.repo_root / "build" / "bugs_state.json")
         self.sqlite_file = sqlite_file or (self.repo_root / "build" / "bugs.sqlite")
-        self.attachments_dir = attachments_dir or (self.repo_root / "build" / "attachments")
+        self.attachments_dir = attachments_dir or (self.repo_root / "attachments")
         self.fresh = fresh
         self.bind_and_activate = bind_and_activate
 

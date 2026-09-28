@@ -456,6 +456,7 @@ def test_regression_bug_169_git_lfs_tracking_and_policy() -> None:
     gitattributes_file = repo_root / ".gitattributes"
     assert gitattributes_file.exists(), ".gitattributes must exist"
     ga_content = gitattributes_file.read_text(encoding="utf-8")
+    assert "attachments/* filter=lfs diff=lfs merge=lfs -text" in ga_content
     assert "build/attachments/* filter=lfs diff=lfs merge=lfs -text" in ga_content
     assert "feedback/attachments/* filter=lfs diff=lfs merge=lfs -text" in ga_content
 
@@ -666,3 +667,18 @@ def test_regression_bug_181_no_file_descriptor_leak_in_sqlite_and_server(tmp_pat
         assert after_server_fds <= baseline_server_fds + 1, (
             f"BugReportServer leaked file descriptors: baseline={baseline_server_fds}, after={after_server_fds}"
         )
+
+
+def test_regression_bug_186_bug_report_server_attachments_dir(tmp_path: Path) -> None:
+    """Verify BUG-186: BugReportServer defaults attachments directory to attachments/."""
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=8766,
+        repo_root=tmp_path,
+        markdown_output=tmp_path / "BUGS.md",
+        feedback_dir=tmp_path / "feedback",
+        state_file=tmp_path / "bugs_state.json",
+        sqlite_file=tmp_path / "bugs.sqlite",
+        bind_and_activate=False,
+    )
+    assert server.attachments_dir == tmp_path / "attachments"

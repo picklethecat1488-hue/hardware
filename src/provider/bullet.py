@@ -248,6 +248,7 @@ class Bullet:
             os.path.join(self.build_dir, "board", self.proj_name, "textures"),
             os.path.join("src", "projects", self.proj_name, "textures"),
             os.path.join(self.build_dir, self.proj_name, "textures"),
+            os.path.join("attachments"),
             os.path.join(self.build_dir, "attachments"),
         ]
         for src_dir in texture_sources:

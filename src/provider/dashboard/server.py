@@ -586,7 +586,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         b64_content = data.get("content_base64", "")
         text_content = data.get("content_text", "")
 
-        att_dir = self.server.repo_root / "build" / "attachments"
+        att_dir = self.server.repo_root / "attachments"
         att_dir.mkdir(parents=True, exist_ok=True)
         dest_path = att_dir / filename
 

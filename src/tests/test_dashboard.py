@@ -681,3 +681,51 @@ def test_regression_bug_185_commit_amend_and_discard_files(tmp_path: Path) -> No
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_186_lfs_tracking_for_attachments(tmp_path: Path) -> None:
+    """Verify BUG-186: Automatically track attachments in Git LFS when committing/amending."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_dir)
+
+    # 1. Check .gitattributes at root has attachments/*
+    root_repo = Path(__file__).resolve().parent.parent.parent
+    root_ga = (root_repo / ".gitattributes").read_text(encoding="utf-8")
+    assert "attachments/* filter=lfs diff=lfs merge=lfs -text" in root_ga
+    assert "attachments/** filter=lfs diff=lfs merge=lfs -text" in root_ga
+
+    # 2. In isolated repo, add an attachment under attachments/
+    att_dir = repo_dir / "attachments"
+    att_dir.mkdir(parents=True, exist_ok=True)
+    sample_img = att_dir / "test_screenshot.png"
+    sample_img.write_bytes(b"\x89PNG\r\n\x1a\nfakeimagebytes")
+
+    # 3. Commit the attachment using commit_files
+    commit_sha = engine.commit_files(message="Add attachment", file_paths=["attachments/test_screenshot.png"])
+    assert commit_sha
+
+    # 4. Verify .gitattributes was automatically updated and committed
+    ga_file = repo_dir / ".gitattributes"
+    assert ga_file.exists()
+    ga_text = ga_file.read_text(encoding="utf-8")
+    assert "attachments/* filter=lfs diff=lfs merge=lfs -text" in ga_text
+
+    # 5. Verify /attachments/ serving via DashboardServer
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}/attachments/test_screenshot.png") as resp:
+            assert resp.status == 200
+            assert resp.read() == b"\x89PNG\r\n\x1a\nfakeimagebytes"
+    finally:
+        server.shutdown()
+        server.server_close()
