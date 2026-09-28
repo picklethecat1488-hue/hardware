@@ -499,6 +499,12 @@ def create_flying_probe_hooks(
     total_sim_steps = steps_per_test * num_tests
     isolation_map = {check.signal_net: check.passed for check in isolation_checks}
 
+    test_categories = []
+    for s in test_steps:
+        cat = "resistance" if (s.test_type == "isolation" or s.step_id.startswith("TEST_ISO_")) else s.test_type
+        if cat not in test_categories:
+            test_categories.append(cat)
+
     sim_state = {
         "client": None,
         "probe_a_id": -1,
@@ -509,6 +515,7 @@ def create_flying_probe_hooks(
         "current_step_idx": 0,
         "total_sim_steps": total_sim_steps,
         "steps_per_test": steps_per_test,
+        "test_categories": test_categories,
         "last_report": "",
         "target_label": target_label,
     }
@@ -639,7 +646,11 @@ def create_flying_probe_hooks(
             # Validate electrical measurement
             if active_spec.test_type == "isolation" or active_spec.step_id.startswith("TEST_ISO_"):
                 is_isolated = sim_state["isolation_map"].get(active_spec.net_name, True)
-                active_spec.measured = 1000.0 if is_isolated else 0.0
+                if is_isolated:
+                    net_hash = sum(ord(c) for c in active_spec.net_name)
+                    active_spec.measured = 500.0 + float(net_hash % 1000)
+                else:
+                    active_spec.measured = 0.0
                 if active_spec.measured >= active_spec.nominal:
                     active_spec.passed = True
             else:
@@ -704,18 +715,20 @@ def create_flying_probe_hooks(
 
             # Measurement metrics
             rr.log("telemetry/contact_force_n", rr.Scalars(contact_force))
-            if contact_active:
-                meas_type = (
-                    "resistance" if active_spec.test_type in ("isolation", "resistance") else active_spec.test_type
-                )
-                rr.log(
-                    f"telemetry/measurement_{meas_type}",
-                    rr.Scalars(active_spec.measured),
-                )
-                rr.log(
-                    f"telemetry/nominal_{meas_type}",
-                    rr.Scalars(active_spec.nominal),
-                )
+            cur_cat = (
+                "resistance"
+                if (active_spec.test_type == "isolation" or active_spec.step_id.startswith("TEST_ISO_"))
+                else active_spec.test_type
+            )
+            for cat in sim_state["test_categories"]:
+                if cat == cur_cat:
+                    nom_val = active_spec.nominal
+                    meas_val = active_spec.measured if contact_active else 0.0
+                else:
+                    nom_val = 0.0
+                    meas_val = 0.0
+                rr.log(f"telemetry/nominal_{cat}", rr.Scalars(nom_val))
+                rr.log(f"telemetry/measurement_{cat}", rr.Scalars(meas_val))
 
             # Periodic Markdown status report
             if step_idx % 25 == 0 or step_idx == (steps_per_test * num_tests - 1):
