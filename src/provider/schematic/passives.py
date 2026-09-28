@@ -536,7 +536,7 @@ class SchematicPassiveDrawer:
             if is_pullup:
                 y_zz_bot = pullup_max_y + 8.0
                 y_zz_top = y_zz_bot + 9.0
-                y_top_rail = y_zz_top + 6.0
+                y_top_rail = max(y_zz_top + 6.0, 176.0)
 
                 draw_vertical_wire_with_jumpers(
                     ax,

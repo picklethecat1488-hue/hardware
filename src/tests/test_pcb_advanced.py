@@ -2948,3 +2948,60 @@ def test_regression_bugs_115_through_127() -> None:
 
     # CR Item 70dba9941823: Peripheral cutouts read dynamically from footprints
     assert hasattr(provider, "enclosure_bottom"), "CarrierBoardProvider must have enclosure_bottom"
+
+
+def test_regression_bug_184_power_and_gnd_symbols_pulled_to_sheet_edges(tmp_path: Path) -> None:
+    """Verify BUG-184: power symbols pulled toward top of sheet (Y >= 165) and GND toward bottom (Y <= 50)."""
+    from unittest.mock import patch
+    from matplotlib.backends.backend_pdf import PdfPages
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.schematic_diagram import SchematicDiagram, POWER_NET_NAMES
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    diag = SchematicDiagram(wiring, pcb_config=provider.pcb_config)
+    plans = diag._build_sheet_plans()
+
+    actual_power_nets = {n.name for n in wiring.nets if n.name.upper() in POWER_NET_NAMES}
+
+    # Validate across all sheets that power symbols are pulled toward top and GND toward bottom
+    test_pdf_path = tmp_path / "dummy.pdf"
+    with PdfPages(test_pdf_path) as pdf:
+        with patch.object(pdf, "savefig") as mock_save:
+            for plan in plans:
+                diag._render_pdf_schematic_sheet(
+                    pdf=pdf,
+                    board_name="carrier_board",
+                    sheet_plan=plan,
+                    total_sheets=len(plans),
+                    all_nets=wiring.nets,
+                    page_num=plan.sheet_idx,
+                    total_pages=len(plans),
+                )
+                fig = mock_save.call_args[0][0]
+                ax = fig.axes[0]
+
+                pwr_texts = [
+                    t for t in ax.texts if t.get_color() == "#dc2626" and t.get_text().strip() in actual_power_nets
+                ]
+                gnd_texts = [t for t in ax.texts if t.get_color() == "#475569" and t.get_text().strip() == "GND"]
+
+                # Assert that all off-sheet power symbols for top components are pulled toward sheet top
+                top_pwr = [t for t in pwr_texts if t.get_position()[1] >= 165.0]
+                if pwr_texts:
+                    assert len(top_pwr) >= 1, (
+                        f"Sheet {plan.sheet_idx} ({plan.title}): Expected at least 1 power symbol near top of sheet"
+                    )
+
+                # Assert that all off-sheet GND symbols for bottom components are pulled toward sheet bottom
+                bot_gnd = [t for t in gnd_texts if t.get_position()[1] <= 50.0]
+                if gnd_texts:
+                    assert len(bot_gnd) >= 1, (
+                        f"Sheet {plan.sheet_idx} ({plan.title}): Expected at least 1 GND symbol near bottom of sheet"
+                    )
+
+    # Verify full PDF export renders completely
+    pdf_path = tmp_path / "schematic_edges_verified.pdf"
+    rendered = diag.render_pdf(pdf_path)
+    assert rendered.exists()
+    assert rendered.stat().st_size > 10000

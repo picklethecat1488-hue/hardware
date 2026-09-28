@@ -1232,7 +1232,8 @@ class SchematicDiagram:
         # Draw power/ground symbols and net labels for all UNWIRED pins
         handled_pins: set[Tuple[str, str]] = set()
 
-        # Group multiple GND pins on the same component & side to avoid overlapping GND symbols
+        # BUG-184: Pull power symbols toward top of sheet and GND symbols toward bottom of sheet
+        # Group GND pins on each component & side to avoid overlapping GND symbols
         for fp in main_fps:
             for side_val in ("left", "right"):
                 comp_gnd_pins = [
@@ -1243,17 +1244,31 @@ class SchematicDiagram:
                     and pin_side_map.get(p) == side_val
                     and pin_to_net.get(p, "").upper() in GROUND_NET_NAMES
                 ]
-                if len(comp_gnd_pins) >= 2:
+                if comp_gnd_pins:
                     px_gnd = sheet_pin_coords[comp_gnd_pins[0]][0]
                     py_vals = [sheet_pin_coords[p][1] for p in comp_gnd_pins]
                     py_min = min(py_vals)
                     py_max = max(py_vals)
-                    y_drop = py_min - 4.0
-                    # Draw vertical trunk connecting all ground pins on this side
+
+                    # Determine bottom target Y for GND: pull down toward bottom of sheet
+                    base_bottom_y = 48.0 if px_gnd >= 195.0 else 22.0
+                    obs_below = [
+                        b[1] + b[3]
+                        for b in comp_boxes
+                        if b[1] + b[3] < py_min - 2.0 and (b[0] - 3.0 <= px_gnd <= b[0] + b[2] + 3.0)
+                    ]
+                    target_gnd_y = max(obs_below) + 4.0 if obs_below else base_bottom_y
+                    y_drop = min(py_min - 4.0, target_gnd_y)
+
+                    # Draw vertical trunk connecting all ground pins on this side down to y_drop
                     ax.plot([px_gnd, px_gnd], [py_max, y_drop], color="#475569", linewidth=1.2, zorder=2)
                     for p in comp_gnd_pins:
-                        ax.plot(px_gnd, sheet_pin_coords[p][1], marker="o", markersize=2.0, color="#475569", zorder=3)
+                        if len(comp_gnd_pins) >= 2:
+                            ax.plot(
+                                px_gnd, sheet_pin_coords[p][1], marker="o", markersize=2.0, color="#475569", zorder=3
+                            )
                         handled_pins.add(p)
+
                     # Single 3-bar GND symbol at bottom of trunk
                     ax.plot([px_gnd - 2.8, px_gnd + 2.8], [y_drop, y_drop], color="#475569", linewidth=1.4, zorder=2)
                     ax.plot(
@@ -1282,26 +1297,59 @@ class SchematicDiagram:
                         zorder=3,
                     )
 
-                # Group multiple pins sharing the same POWER net on the same component & side (e.g. U3 VIN & EN)
+                # Group multiple pins sharing the same POWER net on the same component & side
                 power_pin_map: Dict[str, List[Tuple[str, str]]] = {}
                 for p in sheet_pin_coords:
                     if p[0] == fp.name and p not in wired_pins and pin_side_map.get(p) == side_val:
                         n = pin_to_net.get(p, "")
                         if n.upper() in POWER_NET_NAMES:
                             power_pin_map.setdefault(n, []).append(p)
-                for pwr_net, comp_pwr_pins in power_pin_map.items():
-                    if len(comp_pwr_pins) >= 2:
-                        px_pwr = sheet_pin_coords[comp_pwr_pins[0]][0]
+
+                for pwr_idx, (pwr_net, comp_pwr_pins) in enumerate(power_pin_map.items()):
+                    if comp_pwr_pins:
+                        base_px = sheet_pin_coords[comp_pwr_pins[0]][0]
                         py_vals = [sheet_pin_coords[p][1] for p in comp_pwr_pins]
                         py_min = min(py_vals)
                         py_max = max(py_vals)
-                        y_arrow = py_max + 4.0
+
+                        # Offset distinct power nets on same side to avoid overlapping vertical trunks
+                        if side_val == "left":
+                            px_pwr = base_px - pwr_idx * 4.0
+                        else:
+                            px_pwr = base_px + pwr_idx * 4.0
+
+                        if pwr_idx > 0:
+                            for p in comp_pwr_pins:
+                                ax.plot(
+                                    [base_px, px_pwr],
+                                    [sheet_pin_coords[p][1], sheet_pin_coords[p][1]],
+                                    color="#dc2626",
+                                    linewidth=1.2,
+                                    zorder=2,
+                                )
+
+                        base_top_y = 176.0 - pwr_idx * 3.5
+                        obs_above = [
+                            b[1]
+                            for b in comp_boxes
+                            if b[1] > py_max + 2.0 and (b[0] - 3.0 <= px_pwr <= b[0] + b[2] + 3.0)
+                        ]
+                        target_pwr_y = min(obs_above) - 6.0 if obs_above else base_top_y
+                        y_arrow = max(py_max + 4.0, target_pwr_y)
+
                         ax.plot([px_pwr, px_pwr], [py_min, y_arrow], color="#dc2626", linewidth=1.2, zorder=2)
                         for p in comp_pwr_pins:
-                            ax.plot(
-                                px_pwr, sheet_pin_coords[p][1], marker="o", markersize=2.0, color="#dc2626", zorder=3
-                            )
+                            if len(comp_pwr_pins) >= 2:
+                                ax.plot(
+                                    px_pwr,
+                                    sheet_pin_coords[p][1],
+                                    marker="o",
+                                    markersize=2.0,
+                                    color="#dc2626",
+                                    zorder=3,
+                                )
                             handled_pins.add(p)
+
                         ax.plot(
                             [px_pwr - 2.5, px_pwr, px_pwr + 2.5],
                             [y_arrow - 1.5, y_arrow + 1.0, y_arrow - 1.5],
@@ -1331,52 +1379,18 @@ class SchematicDiagram:
             side = pin_side_map.get(pair, "left")
             net_upper = net_name.upper()
 
-            has_pin_above = any(
-                p2 != pair
-                and p2[0] == pair[0]
-                and pin_side_map.get(p2) == side
-                and abs(sheet_pin_coords[p2][0] - px) < 4.0
-                and sheet_pin_coords[p2][1] > py
-                and sheet_pin_coords[p2][1] - py < 8.0
-                for p2 in sheet_pin_coords
-            )
-            has_pin_below = any(
-                p2 != pair
-                and p2[0] == pair[0]
-                and pin_side_map.get(p2) == side
-                and abs(sheet_pin_coords[p2][0] - px) < 4.0
-                and sheet_pin_coords[p2][1] < py
-                and py - sheet_pin_coords[p2][1] < 8.0
-                for p2 in sheet_pin_coords
-            )
-            has_wire_above = any(
-                0.1 < seg[2] - py < 10.0 and min(seg[0], seg[1]) - 1.0 <= px <= max(seg[0], seg[1]) + 1.0
-                for seg in h_segments
-            )
-            has_wire_below = any(
-                0.1 < py - seg[2] < 10.0 and min(seg[0], seg[1]) - 1.0 <= px <= max(seg[0], seg[1]) + 1.0
-                for seg in h_segments
-            )
-
-            # GND symbol
+            # GND symbol (fallback)
             if net_upper in GROUND_NET_NAMES:
-                # Always prefer standard vertical 3-bar hanging DOWN under components and traces
-                y_drop = py - 3.0
-                if has_pin_below or has_wire_below:
-                    # Drop down below the component and any nearby wires in the channel
-                    comp_box = next(
-                        (b for b in comp_boxes if abs(b[0] - px) < 15.0 or (b[0] <= px <= b[0] + b[2])), None
-                    )
-                    comp_bottom = comp_box[1] if comp_box else py - 10.0
-                    channel_wires = [
-                        seg[2] for seg in h_segments if min(seg[0], seg[1]) - 2.0 <= px <= max(seg[0], seg[1]) + 2.0
-                    ]
-                    min_wire_y = min(channel_wires) if channel_wires else py
-                    y_drop = min(comp_bottom - 2.0, min_wire_y - 3.0, py - 4.0)
+                base_bottom_y = 48.0 if px >= 195.0 else 22.0
+                obs_below = [
+                    b[1] + b[3]
+                    for b in comp_boxes
+                    if b[1] + b[3] < py - 2.0 and (b[0] - 3.0 <= px <= b[0] + b[2] + 3.0)
+                ]
+                target_gnd_y = max(obs_below) + 4.0 if obs_below else base_bottom_y
+                y_drop = min(py - 4.0, target_gnd_y)
 
-                # Vertical connection lead down to ground bar
                 ax.plot([px, px], [py, y_drop], color="#475569", linewidth=1.2, zorder=2)
-                # Standard vertical 3-bar hanging DOWN
                 ax.plot([px - 2.8, px + 2.8], [y_drop, y_drop], color="#475569", linewidth=1.4, zorder=2)
                 ax.plot([px - 1.8, px + 1.8], [y_drop - 1.2, y_drop - 1.2], color="#475569", linewidth=1.2, zorder=2)
                 ax.plot([px - 0.8, px + 0.8], [y_drop - 2.4, y_drop - 2.4], color="#475569", linewidth=1.0, zorder=2)
@@ -1392,71 +1406,31 @@ class SchematicDiagram:
                     zorder=3,
                 )
 
-            # Power symbol
+            # Power symbol (fallback)
             elif net_upper in POWER_NET_NAMES:
-                if not has_pin_above and not has_wire_above:
-                    # Standard upward arrow
-                    ax.plot([px, px], [py, py + 3.0], color="#dc2626", linewidth=1.2, zorder=2)
-                    ax.plot(
-                        [px - 2.5, px, px + 2.5],
-                        [py + 2.0, py + 4.5, py + 2.0],
-                        color="#dc2626",
-                        linewidth=1.2,
-                        zorder=2,
-                    )
-                    ax.text(
-                        px,
-                        py + 5.5,
-                        net_name,
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.8,
-                        fontweight="bold",
-                        color="#dc2626",
-                        zorder=3,
-                    )
-                else:
-                    # Horizontal power arrow pointing outward away from component
-                    if side == "left":
-                        ax.plot([px, px - 2.5], [py, py], color="#dc2626", linewidth=1.2, zorder=2)
-                        ax.plot(
-                            [px - 0.5, px - 3.0, px - 0.5],
-                            [py + 2.2, py, py - 2.2],
-                            color="#dc2626",
-                            linewidth=1.2,
-                            zorder=2,
-                        )
-                        ax.text(
-                            px - 4.5,
-                            py,
-                            net_name,
-                            ha="right",
-                            va="center",
-                            fontsize=5.8,
-                            fontweight="bold",
-                            color="#dc2626",
-                            zorder=3,
-                        )
-                    else:
-                        ax.plot([px, px + 2.5], [py, py], color="#dc2626", linewidth=1.2, zorder=2)
-                        ax.plot(
-                            [px + 0.5, px + 3.0, px + 0.5],
-                            [py + 2.2, py, py - 2.2],
-                            color="#dc2626",
-                            linewidth=1.2,
-                            zorder=2,
-                        )
-                        ax.text(
-                            px + 4.5,
-                            py,
-                            net_name,
-                            ha="left",
-                            va="center",
-                            fontsize=5.8,
-                            fontweight="bold",
-                            color="#dc2626",
-                            zorder=3,
-                        )
+                obs_above = [b[1] for b in comp_boxes if b[1] > py + 2.0 and (b[0] - 3.0 <= px <= b[0] + b[2] + 3.0)]
+                target_pwr_y = min(obs_above) - 6.0 if obs_above else 176.0
+                y_arrow = max(py + 4.0, target_pwr_y)
+
+                ax.plot([px, px], [py, y_arrow], color="#dc2626", linewidth=1.2, zorder=2)
+                ax.plot(
+                    [px - 2.5, px, px + 2.5],
+                    [y_arrow - 1.5, y_arrow + 1.0, y_arrow - 1.5],
+                    color="#dc2626",
+                    linewidth=1.2,
+                    zorder=2,
+                )
+                ax.text(
+                    px,
+                    y_arrow + 2.2,
+                    net_name,
+                    ha="center",
+                    va="bottom",
+                    fontsize=5.8,
+                    fontweight="bold",
+                    color="#dc2626",
+                    zorder=3,
+                )
 
             # Signal net flag / label
             else:
