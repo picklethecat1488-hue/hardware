@@ -2385,6 +2385,7 @@ class PCBDesignRulesChecker:
             diag = SchematicDiagram(wiring=wiring, pcb_config=self.config)
             computed_symbol_boxes = diag.compute_symbol_bounding_boxes()
             computed_wire_segments = diag.compute_sheet_wire_segments()
+            computed_text_boxes = diag.compute_text_bounding_boxes()
 
         for sheet_idx, sheet in enumerate(self.config.schematic_sheets):
             boxes = computed_symbol_boxes.get(sheet_idx + 1, [])
@@ -2484,6 +2485,42 @@ class PCBDesignRulesChecker:
                                 ),
                                 location=(s1[0], max(s1[1], s2[1]), 0.0),
                             )
+
+            # 3f. Text collision check (BUG-206)
+            text_boxes = computed_text_boxes.get(sheet_idx + 1, [])
+            for i, t1 in enumerate(text_boxes):
+                for t2 in text_boxes[i + 1 :]:
+                    t1_owner = t1[5].split(":")[0].split(".")[0]
+                    t2_owner = t2[5].split(":")[0].split(".")[0]
+                    if t1_owner == t2_owner:
+                        continue
+
+                    overlap_x = min(t1[2], t2[2]) - max(t1[0], t2[0])
+                    overlap_y = min(t1[3], t2[3]) - max(t1[1], t2[1])
+                    if overlap_x > 0.5 and overlap_y > 0.5:
+                        violations.add_error(
+                            rule_name=DRCRuleName.SCHEMATIC_TEXT_COLLISION,
+                            net_or_zone=f"{t1[4]} & {t2[4]}",
+                            description=(
+                                f"Schematic text collision on sheet {sheet_idx + 1} ('{sheet.title}'): "
+                                f"Text '{t1[4]}' on {t1[5]} overlaps with '{t2[4]}' on {t2[5]} "
+                                f"(overlap_x={overlap_x:.1f}mm, overlap_y={overlap_y:.1f}mm)"
+                            ),
+                            location=(max(t1[0], t2[0]), max(t1[1], t2[1]), 0.0),
+                        )
+
+            # 3g. Text page boundary check (BUG-206)
+            for t in text_boxes:
+                if t[0] < 12.0 or t[2] > 282.0 or t[1] < 12.0 or t[3] > 195.0:
+                    violations.add_error(
+                        rule_name=DRCRuleName.SCHEMATIC_PAGE_BOUNDARY_EXCEEDED,
+                        net_or_zone=t[4],
+                        description=(
+                            f"Text '{t[4]}' on schematic sheet {sheet_idx + 1} ('{sheet.title}') "
+                            f"exceeds page printable boundaries: bounds=({t[0]:.1f}, {t[1]:.1f}, {t[2]:.1f}, {t[3]:.1f})"
+                        ),
+                        location=(t[0], t[1], 0.0),
+                    )
 
         # 4. Check that all components in the design have connected pins (BUG-088)
         for fp_name, fp in footprints_map.items():

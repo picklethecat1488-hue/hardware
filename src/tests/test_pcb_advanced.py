@@ -3005,3 +3005,63 @@ def test_regression_bug_184_power_and_gnd_symbols_pulled_to_sheet_edges(tmp_path
     rendered = diag.render_pdf(pdf_path)
     assert rendered.exists()
     assert rendered.stat().st_size > 10000
+
+
+def test_regression_bug_206_off_sheet_schematic_feedback(tmp_path: Path) -> None:
+    """Verify BUG-206: Off-sheet schematic feedback resolutions.
+
+    Guards against:
+    1. Off-sheet GND and power traces intersecting truth tables, component cards, or title blocks.
+    2. Giant discrete component symbols (C8, Q1, R7-R12) exceeding standard discrete sizing (C6).
+    3. Stage antennas on Sheet 8 pull-up resistor power connections extending past the top rail.
+    4. Overcrowded Sheet 17 symbol and text overlaps (split into 4 focused sub-sheets).
+    5. Jumper and LED pin text collisions (pins 1 and 2 placed on same side).
+    6. Schematic text exceeding printable sheet boundaries (e.g. LED_AUD_K, LED_PERIPH_K).
+    7. DRC rule SCHEMATIC_TEXT_COLLISION flagging text overlaps.
+    """
+    from model.wiring import Wiring
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import DRCRuleName, PCBDesignRulesChecker
+    from provider.schematic_diagram import SchematicDiagram
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    cfg = provider.pcb_config
+
+    # 1. Verify Status and Overrides has been split into 4 distinct sub-sheets
+    status_sheets = [s for s in cfg.schematic_sheets if "Status and Overrides" in s.title]
+    assert len(status_sheets) == 4, f"Expected 4 Status and Overrides sub-sheets, found {len(status_sheets)}"
+
+    sheet_17 = status_sheets[0]
+    sheet_18 = status_sheets[1]
+    sheet_19 = status_sheets[2]
+    sheet_20 = status_sheets[3]
+
+    assert set(sheet_17.components) == {"SW1", "JP1", "JP2"}
+    assert set(sheet_18.components) == {"JP3", "JP4"}
+    assert set(sheet_19.components) == {"D2", "D3", "D4", "R7", "R8", "R9"}
+    assert set(sheet_20.components) == {"D5", "D6", "D7", "R10", "R11", "R12"}
+
+    # 2. Verify all LED and Jumper pins are on the left side to prevent label collisions
+    for sheet in [sheet_17, sheet_18, sheet_19, sheet_20]:
+        for comp_name, sides in sheet.pin_sides.items():
+            if comp_name.startswith("JP") or comp_name.startswith("D"):
+                assert sides.get("1") == "left" and sides.get("2") == "left", (
+                    f"Component {comp_name} pins must be on 'left', got {sides}"
+                )
+
+    # 3. Verify schematic passes all DRC checks with 0 errors
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring=wiring)
+    text_collisions = [v for v in violations.errors if v.rule_name == DRCRuleName.SCHEMATIC_TEXT_COLLISION]
+    boundary_errors = [v for v in violations.errors if v.rule_name == DRCRuleName.SCHEMATIC_PAGE_BOUNDARY_EXCEEDED]
+    assert len(text_collisions) == 0, f"Unexpected text collisions: {[e.description for e in text_collisions]}"
+    assert len(boundary_errors) == 0, f"Unexpected boundary errors: {[e.description for e in boundary_errors]}"
+    assert len(violations.errors) == 0, f"Schematic DRC errors: {[e.description for e in violations.errors]}"
+
+    # 4. Verify PDF export renders without error
+    diag = SchematicDiagram(wiring=wiring, pcb_config=cfg)
+    pdf_out = tmp_path / "bug_206_test.pdf"
+    rendered = diag.render_pdf(pdf_out)
+    assert rendered.exists()
+    assert rendered.stat().st_size > 10000

@@ -1046,12 +1046,11 @@ schematic_sheets:
     - '8'
     - '9'
     - '10'
-- title: Status and Overrides
-  description: Hardware overrides, isolation jumpers, reset button, and power/status LEDs
+- title: Status and Overrides - MCU Reset & Bootloader
+  description: Manual reset pushbutton and FTDI hardware programming jumpers
   layout:
-    cols_per_row: 6
-    top_row_y: 182.0
-    row_step_y: 50.0
+    cols_per_row: 3
+    top_row_y: 152.0
     grid_positions:
       SW1:
       - 0
@@ -1062,66 +1061,126 @@ schematic_sheets:
       JP2:
       - 0
       - 2
-      JP3:
-      - 0
-      - 3
-      JP4:
-      - 0
-      - 4
-      D2:
-      - 1
-      - 0
-      D3:
-      - 1
-      - 1
-      D4:
-      - 1
-      - 2
-      D5:
-      - 1
-      - 3
-      D6:
-      - 1
-      - 4
-      D7:
-      - 1
-      - 5
-      R7:
-      - 2
-      - 0
-      R8:
-      - 2
-      - 1
-      R9:
-      - 2
-      - 2
-      R10:
-      - 2
-      - 3
-      R11:
-      - 2
-      - 4
-      R12:
-      - 2
-      - 5
   components:
   - SW1
   - JP1
   - JP2
+  pin_sides:
+    SW1:
+      '1': left
+      '2': left
+    JP1:
+      '1': left
+      '2': left
+    JP2:
+      '1': left
+      '2': left
+- title: Status and Overrides - Power Isolation & Boot Mode
+  description: Boot configuration and USB charger isolation jumpers
+  layout:
+    cols_per_row: 2
+    top_row_y: 152.0
+    grid_positions:
+      JP3:
+      - 0
+      - 0
+      JP4:
+      - 0
+      - 1
+  components:
   - JP3
   - JP4
+  pin_sides:
+    JP3:
+      '1': left
+      '2': left
+    JP4:
+      '1': left
+      '2': left
+- title: Status and Overrides - Primary Power LEDs
+  description: Visual rail power indicators and current limiters for VBAT, VBUS, and 3V3
+  layout:
+    cols_per_row: 3
+    top_row_y: 168.0
+    row_step_y: 54.0
+    grid_positions:
+      D2:
+      - 0
+      - 0
+      D3:
+      - 0
+      - 1
+      D4:
+      - 0
+      - 2
+      R7:
+      - 1
+      - 0
+      R8:
+      - 1
+      - 1
+      R9:
+      - 1
+      - 2
+  components:
   - D2
   - D3
   - D4
-  - D5
-  - D6
-  - D7
   - R7
   - R8
   - R9
+  pin_sides:
+    D2:
+      '1': left
+      '2': left
+    D3:
+      '1': left
+      '2': left
+    D4:
+      '1': left
+      '2': left
+- title: Status and Overrides - Peripheral & MCU LEDs
+  description: Subsystem activity indicators and current limiters for Audio, Peripherals, and MCU
+  layout:
+    cols_per_row: 3
+    top_row_y: 168.0
+    row_step_y: 54.0
+    grid_positions:
+      D5:
+      - 0
+      - 0
+      D6:
+      - 0
+      - 1
+      D7:
+      - 0
+      - 2
+      R10:
+      - 1
+      - 0
+      R11:
+      - 1
+      - 1
+      R12:
+      - 1
+      - 2
+  components:
+  - D5
+  - D6
+  - D7
   - R10
   - R11
   - R12
+  pin_sides:
+    D5:
+      '1': left
+      '2': left
+    D6:
+      '1': left
+      '2': left
+    D7:
+      '1': left
+      '2': left
 assembly_test:
   test_fixture: flying_probe
   pass_criteria: all_steps_within_tolerance

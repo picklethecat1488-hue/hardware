@@ -1490,11 +1490,12 @@ def test_regression_bug_183_carrier_board_hardening() -> None:
         assert -15.0 <= pos[0] <= 15.0, f"Component {name} at X={pos[0]} not in designated corridor"
 
     # Verify Status and Overrides schematic sheet exists in PCB configuration
-    status_sheet = next((s for s in provider.pcb_config.schematic_sheets if "Status and Overrides" in s.title), None)
-    assert status_sheet is not None, "Schematic sheet 'Status and Overrides' must exist"
-    assert "SW1" in status_sheet.components
-    assert "JP1" in status_sheet.components
-    assert "D2" in status_sheet.components
+    status_sheets = [s for s in provider.pcb_config.schematic_sheets if "Status and Overrides" in s.title]
+    assert len(status_sheets) >= 1, "Schematic sheets for 'Status and Overrides' must exist"
+    all_status_comps = [c for s in status_sheets for c in s.components]
+    assert "SW1" in all_status_comps
+    assert "JP1" in all_status_comps
+    assert "D2" in all_status_comps
 
     # Verify PCB DRC checker passes
     drc = PCBDesignRulesChecker(provider.pcb_config)

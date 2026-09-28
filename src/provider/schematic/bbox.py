@@ -364,3 +364,261 @@ class SchematicBoundingBoxCalculator:
             sheet_boxes[plan.sheet_idx] = boxes
 
         return sheet_boxes
+
+    @classmethod
+    def compute_text_bounding_boxes(
+        cls,
+        wiring: Optional[Wiring],
+        config: Optional[PCBConfig],
+        sheet_plans: List[_SchematicSheetPlan],
+    ) -> Dict[int, List[Tuple[float, float, float, float, str, str]]]:
+        """Compute exact text bounding boxes (xmin, ymin, xmax, ymax, text, entity_key) for all rendered text.
+
+        Args:
+            wiring: Wiring model or None.
+            config: PCB configuration or None.
+            sheet_plans: Planned schematic sheets.
+
+        Returns:
+            Dictionary mapping sheet_idx (1-indexed) to list of (xmin, ymin, xmax, ymax, text, entity_key).
+        """
+        if not wiring or not getattr(wiring, "footprints", None) or not sheet_plans:
+            return {}
+
+        all_nets = getattr(wiring, "nets", []) or []
+        pin_to_net: Dict[Tuple[str, str], str] = {}
+        for net in all_nets:
+            for pair in net.pins:
+                pin_to_net[pair] = net.name
+
+        sheet_text_boxes: Dict[int, List[Tuple[float, float, float, float, str, str]]] = {}
+
+        for plan in sheet_plans:
+            sheet_fps = plan.footprints
+            text_boxes: List[Tuple[float, float, float, float, str, str]] = []
+
+            sheet_model = (
+                config.schematic_sheets[plan.sheet_idx - 1]
+                if (config and config.schematic_sheets and (0 <= (plan.sheet_idx - 1) < len(config.schematic_sheets)))
+                else None
+            )
+            layout = (
+                getattr(sheet_model, "layout", None)
+                or getattr(config, "schematic_layout", None)
+                or SchematicLayoutModel()
+            )
+            grid_positions = getattr(layout, "grid_positions", {}) or {}
+
+            decoupling_caps, pullup_resistors, shunt_caps, main_fps = SchematicPassiveClassifier.classify_passives(
+                sheet_fps, pin_to_net, grid_positions=grid_positions
+            )
+
+            num_comps = len(main_fps)
+            has_bottom_cards = bool(decoupling_caps) or any(
+                getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q") for fp in sheet_fps
+            )
+
+            page_center_x = layout.sheet_center_x
+            if getattr(layout, "top_row_y", None) is not None:
+                top_row_y = layout.top_row_y
+            elif has_bottom_cards:
+                top_row_y = 158.0
+            else:
+                top_row_y = 138.0
+
+            cols_override = getattr(layout, "cols_per_row", None)
+
+            if cols_override is not None:
+                cols_per_row = cols_override
+                col_w = 210.0 / max(1, cols_per_row)
+                cw = min(38.0, col_w * 0.55)
+                gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
+                start_x = 45.0
+                col_x_positions = []
+                col_y_positions = []
+                comp_col_map = {}
+                for i, fp in enumerate(main_fps):
+                    if fp.name in grid_positions:
+                        r_idx, c_idx_col = grid_positions[fp.name]
+                    else:
+                        r_idx = i // cols_per_row
+                        c_idx_col = i % cols_per_row
+                    comp_col_map[fp.name] = c_idx_col
+                    col_x_positions.append(start_x + c_idx_col * (cw + gap))
+                    col_y_positions.append(top_row_y - (r_idx * layout.row_step_y))
+            elif num_comps == 1:
+                cw = 38.0
+                col_x_positions = [page_center_x - cw / 2.0]
+                col_y_positions = [top_row_y]
+                comp_col_map = {main_fps[0].name: 0}
+            elif num_comps == 2:
+                cw = 38.0
+                gap = 55.0
+                total_w = 2 * cw + gap
+                start_x = page_center_x - total_w / 2.0
+                col_x_positions = [start_x, start_x + cw + gap]
+                col_y_positions = [top_row_y, top_row_y]
+                comp_col_map = {main_fps[0].name: 0, main_fps[1].name: 1}
+            elif num_comps == 3:
+                cw = 36.0
+                gap = getattr(layout, "col_gap", 50.0) if getattr(layout, "col_gap", 15.0) != 15.0 else 50.0
+                total_w = 3 * cw + 2 * gap
+                start_x = max(40.0, page_center_x - total_w / 2.0)
+                col_x_positions = [start_x, start_x + cw + gap, start_x + 2 * (cw + gap)]
+                col_y_positions = [top_row_y, top_row_y, top_row_y]
+                comp_col_map = {fp.name: idx for idx, fp in enumerate(main_fps)}
+            else:
+                cols_per_row = (num_comps + 1) // 2
+                col_w = 210.0 / max(1, cols_per_row)
+                cw = min(36.0, col_w * 0.55)
+                col_x_positions = []
+                col_y_positions = []
+                comp_col_map = {}
+                for i, fp in enumerate(main_fps):
+                    r_idx = i // cols_per_row
+                    c_idx_col = i % cols_per_row
+                    comp_col_map[fp.name] = c_idx_col
+                    col_x_positions.append(45.0 + c_idx_col * col_w + (col_w - cw) / 2.0)
+                    col_y_positions.append(top_row_y - (r_idx * layout.row_step_y))
+
+            sheet_pin_sides = getattr(sheet_model, "pin_sides", {}) or {}
+            sheet_pin_breakouts = getattr(sheet_model, "pin_breakouts", {}) or {}
+            pin_side_map: Dict[Tuple[str, str], str] = {}
+            for fp in main_fps:
+                comp_side_overrides = sheet_pin_sides.get(fp.name, {})
+                has_breakout = bool(sheet_pin_breakouts.get(fp.name))
+                left_p, right_p = partition_component_pins(
+                    fp=fp,
+                    comp_side_overrides=comp_side_overrides,
+                    pin_to_net=pin_to_net,
+                    has_breakout=has_breakout,
+                )
+                for p in left_p:
+                    pin_side_map[(fp.name, p.name)] = "left"
+                for p in right_p:
+                    pin_side_map[(fp.name, p.name)] = "right"
+
+            wired_pins = set()
+            for net in all_nets:
+                if net.name.upper() in POWER_NET_NAMES or net.name.upper() in GROUND_NET_NAMES:
+                    continue
+                present_pins = [pair for pair in net.pins if pair in pin_side_map]
+                if len(present_pins) >= 2:
+                    for i, pair1 in enumerate(present_pins):
+                        for pair2 in present_pins[i + 1 :]:
+                            if pair1 in wired_pins or pair2 in wired_pins:
+                                continue
+                            if pair1[0] == pair2[0]:
+                                continue
+                            c1, c2 = comp_col_map[pair1[0]], comp_col_map[pair2[0]]
+                            s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
+                            if c1 > c2:
+                                pair1, pair2 = pair2, pair1
+                                c1, c2 = c2, c1
+                                s1, s2 = s2, s1
+                            if (c2 == c1 + 1) and s1 == "right" and s2 == "left":
+                                wired_pins.add(pair1)
+                                wired_pins.add(pair2)
+                            else:
+                                wired_pins.add(pair1)
+                                wired_pins.add(pair2)
+
+            for c_idx, fp in enumerate(main_fps):
+                cx = col_x_positions[c_idx]
+                row_top_y = col_y_positions[c_idx]
+                comp_side_overrides = sheet_pin_sides.get(fp.name, {})
+                has_breakout = bool(sheet_pin_breakouts.get(fp.name))
+                left_pins, right_pins = partition_component_pins(
+                    fp=fp,
+                    comp_side_overrides=comp_side_overrides,
+                    pin_to_net=pin_to_net,
+                    has_breakout=has_breakout,
+                )
+
+                header_offset = 18.0 if getattr(fp, "mpn", None) else 15.0
+                max_pin_rows = max(len(left_pins), len(right_pins), 2)
+                ch = max(34.0, header_offset + (max_pin_rows - 1) * PIN_PITCH_MM + 6.0)
+                if row_top_y - ch < 18.0:
+                    ch = max(34.0, row_top_y - 18.0)
+                cy = row_top_y - ch
+
+                # Component Header Text Box
+                text_boxes.append((cx + 1.0, cy + ch - 12.0, cx + cw - 1.0, cy + ch, fp.name, fp.name))
+
+                # Left pins
+                for p_idx, p in enumerate(left_pins):
+                    pair = (fp.name, p.name)
+                    sig_name = pin_to_net.get(pair, "")
+                    net_u = sig_name.upper()
+                    stub = (
+                        STUB_POWER_MM
+                        if net_u in POWER_NET_NAMES
+                        else (STUB_GROUND_MM if net_u in GROUND_NET_NAMES else STUB_SIGNAL_MM)
+                    )
+                    px = cx - stub
+                    py = cy + ch - header_offset - p_idx * PIN_PITCH_MM
+
+                    pin_display = sig_name if sig_name else (p.label if p.label and p.label != p.name else p.name)
+                    text_boxes.append(
+                        (
+                            cx + 1.0,
+                            py - 1.5,
+                            cx + 1.0 + len(pin_display) * 1.5,
+                            py + 1.5,
+                            pin_display,
+                            f"{fp.name}.{p.name}:in",
+                        )
+                    )
+                    if pair not in wired_pins and sig_name:
+                        if net_u not in GROUND_NET_NAMES and net_u not in POWER_NET_NAMES:
+                            text_boxes.append(
+                                (
+                                    px - 1.5 - len(sig_name) * 1.8,
+                                    py - 1.5,
+                                    px - 1.5,
+                                    py + 1.5,
+                                    sig_name,
+                                    f"{fp.name}.{p.name}:sig",
+                                )
+                            )
+
+                # Right pins
+                for p_idx, p in enumerate(right_pins):
+                    pair = (fp.name, p.name)
+                    sig_name = pin_to_net.get(pair, "")
+                    net_u = sig_name.upper()
+                    stub = (
+                        STUB_POWER_MM
+                        if net_u in POWER_NET_NAMES
+                        else (STUB_GROUND_MM if net_u in GROUND_NET_NAMES else STUB_SIGNAL_MM)
+                    )
+                    px = cx + cw + stub
+                    py = cy + ch - header_offset - p_idx * PIN_PITCH_MM
+
+                    pin_display = sig_name if sig_name else (p.label if p.label and p.label != p.name else p.name)
+                    text_boxes.append(
+                        (
+                            cx + cw - 1.0 - len(pin_display) * 1.5,
+                            py - 1.5,
+                            cx + cw - 1.0,
+                            py + 1.5,
+                            pin_display,
+                            f"{fp.name}.{p.name}:in",
+                        )
+                    )
+                    if pair not in wired_pins and sig_name:
+                        if net_u not in GROUND_NET_NAMES and net_u not in POWER_NET_NAMES:
+                            text_boxes.append(
+                                (
+                                    px + 1.5,
+                                    py - 1.5,
+                                    px + 1.5 + len(sig_name) * 1.8,
+                                    py + 1.5,
+                                    sig_name,
+                                    f"{fp.name}.{p.name}:sig",
+                                )
+                            )
+
+            sheet_text_boxes[plan.sheet_idx] = text_boxes
+
+        return sheet_text_boxes
