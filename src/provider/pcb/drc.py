@@ -156,6 +156,8 @@ class DRCRuleName(StrEnum):
     TEST_POINT_OUTSIDE_BOARD_BOUNDARY = "TEST_POINT_OUTSIDE_BOARD_BOUNDARY"
     SINGLE_PIN_NET = "SINGLE_PIN_NET"
     SHORT_CIRCUIT_DETECTED = "SHORT_CIRCUIT_DETECTED"
+    PIN_NAME_MISMATCH = "PIN_NAME_MISMATCH"
+    SIGNAL_NAME_MISMATCH = "SIGNAL_NAME_MISMATCH"
     UNROUTED_NET_AIRWIRE = "UNROUTED_NET_AIRWIRE"
     DANGLING_COMPONENT = "DANGLING_COMPONENT"
     DISCONNECTED_TEST_POINT_AIRWIRE = "DISCONNECTED_TEST_POINT_AIRWIRE"
@@ -1076,6 +1078,7 @@ class PCBDesignRulesChecker:
         if not wiring or not hasattr(wiring, "nets"):
             return violations
 
+        footprints_map = {fp.name: fp for fp in getattr(wiring, "footprints", [])}
         pin_to_nets: Dict[Tuple[str, str], List[str]] = {}
 
         for net in wiring.nets:
@@ -1092,9 +1095,21 @@ class PCBDesignRulesChecker:
                     )
                 )
 
-            # Record pin usage for short circuit check
-            for comp_name, pin_name in net.pins:
-                key = (comp_name, pin_name)
+            # Record pin usage for short circuit check (resolving to canonical pin ID when footprint is available)
+            for comp_name, pin_spec in net.pins:
+                canonical_pin = pin_spec
+                if comp_name in footprints_map:
+                    fp = footprints_map[comp_name]
+                    for p in fp.pins:
+                        if (
+                            p.name == pin_spec
+                            or getattr(p, "number", None) == pin_spec
+                            or getattr(p, "pin_name", None) == pin_spec
+                            or p.label == pin_spec
+                        ):
+                            canonical_pin = getattr(p, "number", None) or getattr(p, "pin_name", None) or p.name
+                            break
+                key = (comp_name, canonical_pin)
                 if key not in pin_to_nets:
                     pin_to_nets[key] = []
                 pin_to_nets[key].append(net.name)
@@ -1105,7 +1120,7 @@ class PCBDesignRulesChecker:
             if len(unique_nets) > 1:
                 violations.append(
                     DRCViolation(
-                        rule_name="SHORT_CIRCUIT_DETECTED",
+                        rule_name=DRCRuleName.SHORT_CIRCUIT_DETECTED,
                         severity=DRCSeverity.ERROR,
                         net_or_zone=f"{comp_name}.{pin_name}",
                         description=(
@@ -1114,6 +1129,106 @@ class PCBDesignRulesChecker:
                         ),
                     )
                 )
+
+        # 3. Pin name and number verification against footprint definition
+        for net in wiring.nets:
+            pin_names = getattr(net, "pin_names", {}) or {}
+            for (comp_name, pin_spec), declared_name in pin_names.items():
+                if comp_name not in footprints_map:
+                    continue
+                fp = footprints_map[comp_name]
+                # Match pin by name, number, pin_name, or label
+                matched_pin = None
+                for p in fp.pins:
+                    if (
+                        p.name == pin_spec
+                        or getattr(p, "number", None) == pin_spec
+                        or getattr(p, "pin_name", None) == pin_spec
+                        or p.label == pin_spec
+                    ):
+                        matched_pin = p
+                        break
+                if matched_pin is None:
+                    violations.append(
+                        DRCViolation(
+                            rule_name=DRCRuleName.PIN_NAME_MISMATCH,
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"{comp_name}.{pin_spec}",
+                            description=(
+                                f"Pin '{pin_spec}' declared as '{declared_name}' on net '{net.name}' "
+                                f"does not exist on footprint '{comp_name}' ({fp.package})"
+                            ),
+                            location=(fp.position[0], fp.position[1], 0.0),
+                        )
+                    )
+                    continue
+
+                # Collect all valid names defined on the footprint pin
+                valid_names = {
+                    matched_pin.name.upper(),
+                    matched_pin.label.upper(),
+                }
+                if getattr(matched_pin, "pin_name", None):
+                    valid_names.add(matched_pin.pin_name.upper())
+                if getattr(matched_pin, "number", None):
+                    valid_names.add(matched_pin.number.upper())
+
+                if declared_name.upper() not in valid_names:
+                    fp_expected = getattr(matched_pin, "pin_name", None) or (
+                        matched_pin.label if matched_pin.label != matched_pin.name else matched_pin.name
+                    )
+                    violations.append(
+                        DRCViolation(
+                            rule_name=DRCRuleName.PIN_NAME_MISMATCH,
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"{comp_name}.{pin_spec}",
+                            description=(
+                                f"Pin name mismatch on '{comp_name}' pin '{pin_spec}': net '{net.name}' declares "
+                                f"'{declared_name}', but footprint '{comp_name}' ({fp.package}) pin '{pin_spec}' "
+                                f"is named '{fp_expected}'"
+                            ),
+                            location=(fp.position[0], fp.position[1], 0.0),
+                        )
+                    )
+
+        # 4. Signal name verification against footprint pin definitions
+        for fp in getattr(wiring, "footprints", []):
+            for p in getattr(fp, "pins", []):
+                expected_signal = getattr(p, "signal_name", None)
+                if not expected_signal:
+                    continue
+                canonical_pin = getattr(p, "number", None) or getattr(p, "pin_name", None) or p.name
+                connected_nets = set(pin_to_nets.get((fp.name, canonical_pin), []))
+                pin_display = getattr(p, "number", None) or getattr(p, "pin_name", None) or p.name
+
+                if not connected_nets:
+                    violations.append(
+                        DRCViolation(
+                            rule_name=DRCRuleName.SIGNAL_NAME_MISMATCH,
+                            severity=DRCSeverity.ERROR,
+                            net_or_zone=f"{fp.name}.{pin_display}",
+                            description=(
+                                f"Pin '{pin_display}' ({getattr(p, 'pin_name', None) or p.name}) on footprint '{fp.name}' "
+                                f"expects signal '{expected_signal}', but is not connected to any net"
+                            ),
+                            location=(fp.position[0], fp.position[1], 0.0),
+                        )
+                    )
+                else:
+                    for net_name in sorted(connected_nets):
+                        if net_name.upper() != expected_signal.upper():
+                            violations.append(
+                                DRCViolation(
+                                    rule_name=DRCRuleName.SIGNAL_NAME_MISMATCH,
+                                    severity=DRCSeverity.ERROR,
+                                    net_or_zone=f"{fp.name}.{pin_display}",
+                                    description=(
+                                        f"Signal name mismatch on '{fp.name}' pin '{pin_display}': "
+                                        f"connected to net '{net_name}', but footprint expects signal '{expected_signal}'"
+                                    ),
+                                    location=(fp.position[0], fp.position[1], 0.0),
+                                )
+                            )
 
         return violations
 

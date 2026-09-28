@@ -51,6 +51,11 @@ class PinModel(BaseModel):
     """Data model representing a connection pin on a footprint."""
 
     name: str = Field(description="Name of the pin (e.g. GND, GP2)")
+    number: Optional[str] = Field(default=None, description="Physical pin number on the package")
+    pin_name: Optional[str] = Field(default=None, description="Functional pin name or signal designation")
+    signal_name: Optional[str] = Field(
+        default=None, description="Expected electrical signal name connected to this pin"
+    )
     position: Tuple[float, float, float] = Field(
         default=(0.0, 0.0, 0.0), description="3D offset relative to component center (x, y, z)"
     )
@@ -161,6 +166,10 @@ class NetModel(BaseModel):
     name: str = Field(description="Name of the signal net (e.g. gnd, vcc_logic)")
     color: str = Field(description="Display color for the net wire path (e.g. black, red)")
     pins: List[Tuple[str, str]] = Field(description="List of connected pins as (component_name, pin_name) pairs")
+    pin_names: Dict[Tuple[str, str], str] = Field(
+        default_factory=dict,
+        description="Optional mapping of (component_name, pin_number) to declared pin functional name",
+    )
     offset: Tuple[float, float] = Field(default=(0.0, 0.0), description="2D offset for drawing parallel wire paths")
     path: List[Tuple[float, float, float]] = Field(
         default_factory=list, description="Explicit 3D intermediate routing points for the net wire path"
@@ -247,14 +256,53 @@ class Wiring:
             w, l, thickness = dims
 
             pins = []
-            raw_pins = c.get("pins")
-            if raw_pins is None and "pins" in shared_tmpl:
+            comp_pins = c.get("pins")
+            if comp_pins is not None and "pins" in shared_tmpl:
+                # Merge per-component pin overrides with shared template
+                tmpl_pins = shared_tmpl["pins"]
+                overrides = {}
+                for p in comp_pins:
+                    if "number" in p:
+                        overrides[str(p["number"])] = p
+                    if "name" in p:
+                        overrides[str(p["name"])] = p
+                    if "label" in p:
+                        overrides[str(p["label"])] = p
+                raw_pins = []
+                for tp in tmpl_pins:
+                    merged = dict(tp)
+                    p_key_name = str(tp.get("name", ""))
+                    p_key_num = str(tp.get("number", ""))
+                    p_override = overrides.get(p_key_num) or overrides.get(p_key_name)
+                    if p_override:
+                        merged.update(p_override)
+                    raw_pins.append(merged)
+            elif comp_pins is not None:
+                raw_pins = comp_pins
+            elif "pins" in shared_tmpl:
                 raw_pins = shared_tmpl["pins"]
+            else:
+                raw_pins = []
 
-            for p in raw_pins or []:
+            for p in raw_pins:
                 p_dict = dict(p)
+                if "name" in p_dict:
+                    p_dict["name"] = str(p_dict["name"])
+                if "number" in p_dict:
+                    p_dict["number"] = str(p_dict["number"])
+                elif "name" in p_dict and (
+                    p_dict["name"].isdigit()
+                    or (len(p_dict["name"]) <= 4 and p_dict["name"][0].isalpha() and p_dict["name"][1:].isdigit())
+                ):
+                    p_dict["number"] = p_dict["name"]
+                if "pin_name" in p_dict:
+                    p_dict["pin_name"] = str(p_dict["pin_name"])
+                elif "label" in p_dict and p_dict.get("label") != p_dict.get("name"):
+                    p_dict["pin_name"] = str(p_dict["label"])
+                if "signal_name" in p_dict:
+                    p_dict["signal_name"] = str(p_dict["signal_name"])
                 if "label" not in p_dict:
-                    p_dict["label"] = p_dict["name"]
+                    p_dict["label"] = p_dict.get("pin_name") or p_dict["name"]
                 if "position" in p_dict and len(p_dict["position"]) == 2:
                     p_dict["position"] = (p_dict["position"][0], p_dict["position"][1], 0.0)
                 pins.append(PinModel(**p_dict))
@@ -316,13 +364,47 @@ class Wiring:
         """Load and return structured network connections."""
         nets = []
         for n in self.config.get("nets", []):
+            pins = []
+            pin_names: Dict[Tuple[str, str], str] = {}
+            for p in n.get("pins", []):
+                if isinstance(p, (list, tuple)):
+                    if len(p) == 2:
+                        comp = str(p[0]).strip()
+                        pin_spec = str(p[1]).strip()
+                        if ":" in pin_spec:
+                            pin_num, pin_func = pin_spec.split(":", 1)
+                            pin_num_str = pin_num.strip()
+                            pins.append((comp, pin_num_str))
+                            pin_names[(comp, pin_num_str)] = pin_func.strip()
+                        elif "/" in pin_spec:
+                            pin_num, pin_func = pin_spec.split("/", 1)
+                            pin_num_str = pin_num.strip()
+                            pins.append((comp, pin_num_str))
+                            pin_names[(comp, pin_num_str)] = pin_func.strip()
+                        else:
+                            pins.append((comp, pin_spec))
+                    elif len(p) >= 3:
+                        comp = str(p[0]).strip()
+                        pin_num_str = str(p[1]).strip()
+                        pin_func_str = str(p[2]).strip()
+                        pins.append((comp, pin_num_str))
+                        pin_names[(comp, pin_num_str)] = pin_func_str
+                elif isinstance(p, dict):
+                    comp = str(p.get("component") or p.get("comp")).strip()
+                    pin_num_str = str(p.get("pin") or p.get("number")).strip()
+                    pin_func = p.get("name") or p.get("pin_name") or p.get("label")
+                    pins.append((comp, pin_num_str))
+                    if pin_func:
+                        pin_names[(comp, pin_num_str)] = str(pin_func).strip()
+
             nets.append(
                 NetModel(
                     name=n["name"],
                     color=n["color"],
-                    pins=[(p[0], p[1]) for p in n["pins"]],
+                    pins=pins,
+                    pin_names=pin_names,
                     offset=tuple(n.get("offset", (0.0, 0.0))),
-                    path=[tuple(p) for p in n.get("path", [])],
+                    path=[tuple(pt) for pt in n.get("path", [])],
                     priority=n.get("priority"),
                 )
             )

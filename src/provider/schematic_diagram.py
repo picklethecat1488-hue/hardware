@@ -33,6 +33,7 @@ from provider.schematic import (
     _SchematicSheetPlan,
     _TOCPagePlan,
     draw_vertical_wire_with_jumpers,
+    partition_component_pins,
 )
 
 
@@ -728,21 +729,13 @@ class SchematicDiagram:
         pin_side_map: Dict[Tuple[str, str], str] = {}
         for fp in main_fps:
             comp_side_overrides = sheet_pin_sides.get(fp.name, {})
-            left_p = []
-            right_p = []
-            for p in fp.pins:
-                if p.name in comp_side_overrides:
-                    if comp_side_overrides[p.name] == "right":
-                        right_p.append(p)
-                    else:
-                        left_p.append(p)
-                elif p.side.value in ("right", "top"):
-                    right_p.append(p)
-                elif p.side.value in ("left", "bottom"):
-                    left_p.append(p)
-            if not left_p and not right_p:
-                left_p = fp.pins[: len(fp.pins) // 2]
-                right_p = fp.pins[len(fp.pins) // 2 :]
+            has_breakout = bool(sheet_model and sheet_model.pin_breakouts and fp.name in sheet_model.pin_breakouts)
+            left_p, right_p = partition_component_pins(
+                fp=fp,
+                comp_side_overrides=comp_side_overrides,
+                pin_to_net=pin_to_net,
+                has_breakout=has_breakout,
+            )
             for p in left_p:
                 pin_side_map[(fp.name, p.name)] = "left"
             for p in right_p:
@@ -787,33 +780,13 @@ class SchematicDiagram:
             row_top_y = col_y_positions[c_idx]
 
             comp_side_overrides = sheet_pin_sides.get(fp.name, {})
-            left_pins = []
-            right_pins = []
-            for p in fp.pins:
-                if p.name in comp_side_overrides:
-                    if comp_side_overrides[p.name] == "right":
-                        right_pins.append(p)
-                    else:
-                        left_pins.append(p)
-                elif p.side.value in ("right", "top"):
-                    right_pins.append(p)
-                elif p.side.value in ("left", "bottom"):
-                    left_pins.append(p)
-            if not left_pins and not right_pins:
-                left_pins = fp.pins[: len(fp.pins) // 2]
-                right_pins = fp.pins[len(fp.pins) // 2 :]
-
-            # Sort pins on IC sides so Power pins are placed at the top and Ground pins at the bottom
-            def _pin_sort_key(p: PinModel) -> int:
-                net = pin_to_net.get((fp.name, p.name), "").upper()
-                if net in POWER_NET_NAMES:
-                    return 0
-                if net in GROUND_NET_NAMES:
-                    return 2
-                return 1
-
-            left_pins.sort(key=_pin_sort_key)
-            right_pins.sort(key=_pin_sort_key)
+            has_breakout = bool(sheet_model and sheet_model.pin_breakouts and fp.name in sheet_model.pin_breakouts)
+            left_pins, right_pins = partition_component_pins(
+                fp=fp,
+                comp_side_overrides=comp_side_overrides,
+                pin_to_net=pin_to_net,
+                has_breakout=has_breakout,
+            )
 
             mpn = getattr(fp, "mpn", None)
             has_mpn = bool(mpn)

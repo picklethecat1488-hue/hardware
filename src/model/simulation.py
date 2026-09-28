@@ -17,6 +17,16 @@ class FlyingProbeStepReportModel(BaseModel):
     verdict_str: str = Field(description="Rendered markdown verdict badge")
 
 
+class FlyingProbeIsolationCheckModel(BaseModel):
+    """Result of signal line isolation check against power and ground networks."""
+
+    signal_net: str = Field(description="Signal net name")
+    isolated_against: List[str] = Field(default_factory=list, description="Power and ground nets audited")
+    passed: bool = Field(default=True, description="Whether signal is fully isolated from all power/ground")
+    isolation_resistance_str: str = Field(default="> 100 MΩ", description="Measured isolation resistance")
+    verdict_str: str = Field(default="🟢 **PASS**", description="Markdown verdict badge")
+
+
 class FlyingProbeReportModel(BaseModel):
     """Top-level report model passed to Jinja2 template for flying probe acceptance testing."""
 
@@ -30,3 +40,9 @@ class FlyingProbeReportModel(BaseModel):
     current_step_idx: int = Field(description="Current completed test step index")
     total_sim_steps: int = Field(description="Total simulation time steps executed")
     steps: List[FlyingProbeStepReportModel] = Field(default_factory=list, description="Step results")
+    signal_isolation_checks: List[FlyingProbeIsolationCheckModel] = Field(
+        default_factory=list, description="Signal line power/ground isolation verification results"
+    )
+    all_signals_isolated: bool = Field(
+        default=True, description="Whether all signal lines are verified non-shorted to power or ground"
+    )

@@ -27,3 +27,14 @@
 - **Differential Impedance**: PCIe 85 Ω ± 10%. Reflection ≤ -20 dB.
 - **Capacitance**: Liquid sensing pads 12.5 - 15.5 pF ± 15%, Proximity 8.0 pF ± 15%.
 - **Probe Clearance**: Minimum vertical flight height ≥ 15.0 mm above all board component obstacles.
+{% if signal_isolation_checks %}
+
+## Signal Line Isolation Audit (Power & Ground Network Isolation)
+
+| Signal Net | Monitored Power & Ground Nets | Isolation Resistance | Verdict |
+| :--- | :--- | :---: | :---: |
+{% for iso in signal_isolation_checks %}
+| `{{ iso.signal_net }}` | `{{ iso.isolated_against | join(", ") }}` | {{ iso.isolation_resistance_str }} | {{ iso.verdict_str }} |
+{% endfor %}
+{% endif %}
+

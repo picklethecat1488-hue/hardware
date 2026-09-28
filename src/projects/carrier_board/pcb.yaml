@@ -74,22 +74,22 @@ obstacles:
   shape: box
   dimensions_mm:
   - 6.0
-  - 15.0
+  - 17.0
   - 7.0
   position_mm:
   - 24.5
-  - -5.0
+  - -6.0
   - 4.3
   description: Expansion header on right edge
 - name: J10
   shape: box
   dimensions_mm:
   - 6.0
-  - 15.0
+  - 17.0
   - 7.0
   position_mm:
   - 24.5
-  - -21.0
+  - -22.0
   - 4.3
   description: Expansion header on right edge
 - name: flex_vacuum_plate
@@ -438,18 +438,18 @@ schematic_sheets:
     U1:
       L5: right
     U10:
+      '3': left
       '1': left
       '2': left
-      '3': left
       '4': right
       '5': right
   pin_breakouts:
     U1:
     - L5
     U10:
+    - '3'
     - '1'
     - '2'
-    - '3'
     - '4'
     - '5'
 - title: Microcontroller Core, Clock & Reset
@@ -521,23 +521,40 @@ schematic_sheets:
   components:
   - U1
   - U8
+  pin_sides:
+    U1:
+      B17: right
+      D14: right
+      E14: right
+      F15: right
+      F17: right
+      F16: right
+    U8:
+      '1': left
+      '6': left
+      '5': left
+      '2': left
+      '3': left
+      '7': left
+      '8': right
+      '4': right
   pin_breakouts:
     U1:
     - B17
-    - F15
-    - F17
     - D14
     - E14
+    - F15
+    - F17
     - F16
     U8:
     - '1'
+    - '6'
+    - '5'
     - '2'
     - '3'
-    - '4'
-    - '5'
-    - '6'
     - '7'
     - '8'
+    - '4'
 - title: Telemetry & Debug Communications
   description: FTDI FT232RNQ high-speed USB-to-UART serial bridge and ARM 10-pin SWD
     debug micro-header
@@ -547,30 +564,52 @@ schematic_sheets:
   - J5
   pin_sides:
     U1:
-      A6: right
       B6: right
-      E10: right
+      A6: right
       F10: right
+      E10: right
       A17: right
       A16: right
+    U9:
+      '1': left
+      '5': left
+      '3': left
+      '11': left
+      '4': right
+      '15': right
+      '16': right
+      '18': right
+      '19': right
+      '20': right
+      '21': right
+      '22': right
+      '23': right
+      '25': right
+      '26': right
+      '29': right
+      '7': right
+    J5:
+      '1': left
+      '2': left
+      '3': left
+      '4': left
+      '5': left
   pin_breakouts:
     U1:
     - B6
-    - F10
     - A6
+    - F10
     - E10
     - A17
     - A16
     U9:
     - '1'
-    - '3'
-    - '4'
     - '5'
-    - '7'
+    - '3'
     - '11'
+    - '4'
     - '15'
     - '16'
-    - '17'
     - '18'
     - '19'
     - '20'
@@ -580,6 +619,7 @@ schematic_sheets:
     - '25'
     - '26'
     - '29'
+    - '7'
     J5:
     - '1'
     - '2'
@@ -594,17 +634,25 @@ schematic_sheets:
   - U6
   - D1
   pin_sides:
+    U1:
+      A10: right
+      B10: right
     U6:
+      '1': left
+      '2': left
+      '5': left
+      '3': left
+      '4': left
+      '15': left
+      '6': right
+      '7': right
+      '8': right
+      '16': right
+    D1:
       '1': left
       '2': left
       '3': left
       '4': left
-      '5': left
-      '6': right
-      '7': right
-      '8': right
-      '15': left
-      '16': right
   pin_breakouts:
     U1:
     - A10
@@ -612,13 +660,13 @@ schematic_sheets:
     U6:
     - '1'
     - '2'
+    - '5'
     - '3'
     - '4'
-    - '5'
+    - '15'
     - '6'
     - '7'
     - '8'
-    - '15'
     - '16'
     D1:
     - '1'
@@ -644,13 +692,13 @@ schematic_sheets:
       C6: right
       C4: right
     U2:
+      SCL: left
+      SDA: left
+      RDY: left
       VDD: left
+      MCLR: left
       VSS: left
       EP: left
-      MCLR: left
-      SDA: left
-      SCL: left
-      RDY: left
       CR0: right
       CR1: right
       CR2: right
@@ -678,13 +726,13 @@ schematic_sheets:
     - C6
     - C4
     U2:
+    - SCL
+    - SDA
+    - RDY
     - VDD
+    - MCLR
     - VSS
     - EP
-    - MCLR
-    - SDA
-    - SCL
-    - RDY
     - CR0
     - CR1
     - CR2
@@ -735,34 +783,43 @@ schematic_sheets:
   - U5
   - U1
   pin_sides:
+    U1:
+      G2: right
+      H1: right
+      J1: right
+      L4: right
     U4:
+      BCLK: left
+      DIN: left
+      LRCLK: left
+      SD_MODE: left
+      VDD: left
+      GND: left
+      GAIN: left
       OUTP: right
       OUTN: right
-      DIN: right
-      BCLK: right
-      LRCLK: right
     U5:
       '1': left
       '2': left
   pin_breakouts:
+    U1:
+    - G2
+    - H1
+    - J1
+    - L4
     U4:
-    - GAIN
+    - BCLK
+    - DIN
+    - LRCLK
     - SD_MODE
-    - GND
     - VDD
+    - GND
+    - GAIN
     - OUTP
     - OUTN
-    - DIN
-    - BCLK
-    - LRCLK
     U5:
     - '1'
     - '2'
-    U1:
-    - H1
-    - G2
-    - J1
-    - L4
 - title: High-Speed Differential Interfaces
   description: PCIe Gen4 x1 differential link
   components:
@@ -873,17 +930,17 @@ schematic_sheets:
     - '5'
     - '6'
 - title: SPI Master Expansion Interface (J9)
-  description: High-speed SPI peripheral expansion connector (JST-PH-6P)
+  description: High-speed SPI peripheral expansion connector (JST-PH-7P)
   components:
   - U1
   - J9
   pin_sides:
     U1:
-      T8: right
-      T6: right
-      T7: right
-      R8: right
       R9: right
+      R8: right
+      T7: right
+      T6: right
+      T8: right
     J9:
       '1': left
       '2': left
@@ -891,13 +948,14 @@ schematic_sheets:
       '4': left
       '5': left
       '6': left
+      '7': left
   pin_breakouts:
     U1:
-    - T8
-    - T6
-    - T7
-    - R8
     - R9
+    - R8
+    - T7
+    - T6
+    - T8
     J9:
     - '1'
     - '2'
@@ -905,41 +963,42 @@ schematic_sheets:
     - '4'
     - '5'
     - '6'
+    - '7'
 - title: UART & Control Expansion Interface (J10)
-  description: FTDI auxiliary UART and modem control expansion connector (JST-PH-6P)
+  description: FTDI auxiliary UART and modem control expansion connector (JST-PH-7P)
   components:
   - U9
   - J10
   pin_sides:
     U9:
-      '9': right
-      '10': right
-      '12': right
-      '13': right
       '2': right
-      '6': right
+      '13': right
+      '12': right
+      '10': right
+      '9': right
     J10:
-      '1': left
-      '2': left
+      '1': right
+      '2': right
       '3': left
       '4': left
       '5': left
       '6': left
+      '7': left
   pin_breakouts:
     U9:
-    - '9'
-    - '10'
-    - '12'
+    - '2'
     - '13'
-    - '2'
-    - '6'
+    - '12'
+    - '10'
+    - '9'
     J10:
-    - '1'
     - '2'
+    - '1'
     - '3'
     - '4'
     - '5'
     - '6'
+    - '7'
 - title: General Purpose I/O Expansion Header
   description: 10-pin multipurpose microcontroller GPIO expansion header
   components:
@@ -951,8 +1010,6 @@ schematic_sheets:
       N8: left
       N10: right
       T10: right
-      T11: right
-      T12: right
     J14:
       '1': left
       '2': left
@@ -970,8 +1027,6 @@ schematic_sheets:
     - N8
     - N10
     - T10
-    - T11
-    - T12
     J14:
     - '1'
     - '2'

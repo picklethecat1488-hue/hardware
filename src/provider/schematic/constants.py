@@ -2,9 +2,9 @@
 
 from dataclasses import dataclass, field
 import fnmatch
-from typing import List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
-from model.wiring import FootprintModel, NetModel
+from model.wiring import FootprintModel, NetModel, PinModel
 
 
 @dataclass
@@ -89,3 +89,42 @@ PIN_NUMBER_OFFSET_MM = 2.5
 STUB_SIGNAL_MM = 5.0
 STUB_POWER_MM = 10.0
 STUB_GROUND_MM = 18.0
+
+
+def partition_component_pins(
+    fp: FootprintModel,
+    comp_side_overrides: Dict[str, str],
+    pin_to_net: Dict[Tuple[str, str], str],
+    has_breakout: bool = False,
+) -> Tuple[List[PinModel], List[PinModel]]:
+    """Partition component pins into left and right sides.
+
+    If has_breakout is False, pins are sorted so power pins are at top and ground at bottom.
+    If has_breakout is True, pins strictly maintain the declared breakout order.
+    """
+    left_pins = []
+    right_pins = []
+    for p in fp.pins:
+        side_val = comp_side_overrides.get(p.name, p.side.value if hasattr(p, "side") else "left")
+        if side_val in ("right", "top"):
+            right_pins.append(p)
+        else:
+            left_pins.append(p)
+    if not left_pins and not right_pins:
+        left_pins = fp.pins[: len(fp.pins) // 2]
+        right_pins = fp.pins[len(fp.pins) // 2 :]
+
+    if not has_breakout:
+
+        def _pin_sort_key(p: PinModel) -> int:
+            net = pin_to_net.get((fp.name, p.name), "").upper()
+            if net in POWER_NET_NAMES:
+                return 0
+            if net in GROUND_NET_NAMES:
+                return 2
+            return 1
+
+        left_pins.sort(key=_pin_sort_key)
+        right_pins.sort(key=_pin_sort_key)
+
+    return left_pins, right_pins

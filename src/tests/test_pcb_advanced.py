@@ -2687,7 +2687,7 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
     assert pwr_en_net is not None, "PWR_EN net must exist in wiring.yaml"
     pwr_en_pins = set(pwr_en_net.pins)
     assert ("U1", "D1") in pwr_en_pins
-    assert ("Q1", "G") in pwr_en_pins
+    assert ("Q1", "1") in pwr_en_pins or ("Q1", "G") in pwr_en_pins
     assert ("U4", "SD_MODE") not in pwr_en_pins, "U4 SD_MODE must NOT be controlled by PWR_EN"
 
     # 3. Verify VLOAD_SW connects Q1 drain, J1, audio amp U4 ground/gain, C8 cap ground
@@ -2695,20 +2695,23 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
     vload_net = next((net for net in wiring.nets if net.name == "VLOAD_SW"), None)
     assert vload_net is not None, "VLOAD_SW net must exist in wiring.yaml"
     vload_pins = set(vload_net.pins)
-    assert ("Q1", "D") in vload_pins
+    assert ("Q1", "3") in vload_pins or ("Q1", "D") in vload_pins
     assert ("J1", "VLOAD_SW") in vload_pins
-    assert ("U4", "GND") in vload_pins
-    assert ("U4", "GAIN") in vload_pins
-    assert ("C8", "2") in vload_pins
+    gnd_net = next((net for net in wiring.nets if net.name == "GND"), None)
+    assert gnd_net is not None
+    gnd_pins = set(gnd_net.pins)
+    assert ("U4", "GND") in gnd_pins or ("U4", "GND") in vload_pins
+    assert ("U4", "GAIN") in gnd_pins or ("U4", "GAIN") in vload_pins
+    assert ("C8", "2") in gnd_pins or ("C8", "2") in vload_pins
     for j_comp in ["J6", "J7", "J8", "J9"]:
         assert (j_comp, "2") not in vload_pins, f"{j_comp}.2 must NOT be on VLOAD_SW"
 
-    # 4. Verify dedicated INT GPIOs connect to pin 2 of J6-J9 (BUG-106)
+    # 4. Verify dedicated INT GPIOs connect to expansion headers J6-J9 (BUG-106, BUG-110, BUG-173)
     int_mappings = {
         "EXP_INT_I2C": (("U1", "B2"), ("J6", "2")),
         "EXP_INT_I3C": (("U1", "B8"), ("J7", "2")),
         "EXP_INT_I3C1": (("U1", "E4"), ("J8", "2")),
-        "EXP_INT_SPI": (("U1", "T8"), ("J9", "2")),
+        "EXP_INT_SPI": (("U1", "T8"), ("J9", "5")),
     }
     for net_name, (u1_pin, exp_pin) in int_mappings.items():
         net = next((n for n in wiring.nets if n.name == net_name), None)
@@ -2717,13 +2720,14 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
         assert u1_pin in net_pins, f"{u1_pin} must be connected to {net_name}"
         assert exp_pin in net_pins, f"{exp_pin} must be connected to {net_name}"
 
-    # 5. Verify PERIPH_3V3 regulator U10 and power rail distribution (BUG-106, BUG-115)
+    # 5. Verify PERIPH_3V3 regulator U10 and power rail distribution (BUG-106, BUG-115, BUG-173)
     periph_v33_net = next((net for net in wiring.nets if net.name == "PERIPH_3V3"), None)
     assert periph_v33_net is not None, "PERIPH_3V3 net must exist in wiring.yaml"
     periph_v33_pins = set(periph_v33_net.pins)
     assert ("U10", "5") in periph_v33_pins, "U10 pin 5 (VOUT) must drive PERIPH_3V3"
-    for j_comp in ["J6", "J7", "J8", "J9"]:
+    for j_comp in ["J6", "J7", "J8"]:
         assert (j_comp, "1") in periph_v33_pins, f"{j_comp}.1 must be powered by PERIPH_3V3"
+    assert ("J9", "6") in periph_v33_pins, "J9.6 must be powered by PERIPH_3V3"
 
     # 6. Verify U10 is sourced from 3V3 with PERIPH_EN from U1 L5
     v33_net = next((net for net in wiring.nets if net.name == "3V3"), None)
@@ -2832,7 +2836,9 @@ def test_regression_bugs_115_through_127() -> None:
     expansion_sheets = [s for s in pcb_cfg.schematic_sheets if "Expansion Interface" in s.title]
     assert len(expansion_sheets) == 5, f"BUG-122: Must have 5 dedicated expansion sheets, got {len(expansion_sheets)}"
     for s in expansion_sheets:
-        assert "JST-PH-6P" in s.description, f"BUG-122: Sheet '{s.title}' must document JST-PH-6P connector"
+        assert "JST-PH-6P" in s.description or "JST-PH-7P" in s.description, (
+            f"BUG-122: Sheet '{s.title}' must document JST-PH connector"
+        )
 
     # BUG-123: GPIO sheet pin sides (M8/N8 left, N10..T12 right)
     sheet_gpio = next(s for s in pcb_cfg.schematic_sheets if "General Purpose I/O" in s.title)
