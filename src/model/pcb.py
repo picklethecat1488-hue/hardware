@@ -542,6 +542,10 @@ class PCBDesignRulesModel(BaseModel):
     pad_to_mask_clearance_mm: float = Field(
         default=0.0, ge=0.0, description="Solder mask expansion clearance in millimeters"
     )
+    rule_severities: Dict[str, str] = Field(
+        default_factory=dict,
+        description="KiCad DRC rule severity overrides (e.g. {'track_dangling': 'ignore', 'text_height': 'ignore'})",
+    )
 
     def to_kicad_pro_rules(self) -> Dict[str, float]:
         """Convert design rules to KiCad .kicad_pro design_settings rules dictionary."""
@@ -585,11 +589,15 @@ class PCBDesignRulesModel(BaseModel):
                     "via_drill": self.default_via_drill_mm,
                 },
             )
+        design_settings: Dict[str, Any] = {
+            "rules": self.to_kicad_pro_rules(),
+        }
+        if self.rule_severities:
+            design_settings["rule_severities"] = dict(self.rule_severities)
+
         return {
             "board": {
-                "design_settings": {
-                    "rules": self.to_kicad_pro_rules(),
-                }
+                "design_settings": design_settings,
             },
             "net_settings": {
                 "classes": classes,

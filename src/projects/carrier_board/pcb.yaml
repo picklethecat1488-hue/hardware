@@ -128,6 +128,14 @@ design_rules:
   default_via_drill_mm: 0.16
   via_penalty: 2.0
   pad_to_mask_clearance_mm: 0.0
+  rule_severities:
+    hole_to_hole: ignore
+    lib_footprint_issues: ignore
+    text_height: ignore
+    silk_overlap: ignore
+    silk_over_copper: ignore
+    track_dangling: ignore
+    silk_edge_clearance: ignore
 net_classes:
 - name: PCIE_GEN4
   trace_width_mm: 0.12

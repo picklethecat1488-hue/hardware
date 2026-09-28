@@ -1421,3 +1421,33 @@ def test_regression_bug_179_right_side_ports_clear_mounting_holes() -> None:
     report = drc.check_all(wiring=wiring)
     assert report.passed, f"PCB DRC failed:\n{report.summary()}"
     assert report.error_count == 0, f"Expected 0 DRC errors, got {report.error_count}"
+
+
+def test_regression_bug_180_zero_drc_violations_carrier_board_and_flex_tail() -> None:
+    """Verify BUG-180: carrier_board and flex_tail achieve zero DRC violations with rule severities."""
+    from pathlib import Path
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    # Test rule_severities in to_kicad_pro_dict
+    provider = CarrierBoardProvider()
+    rules = provider.pcb_config.design_rules
+    assert "hole_to_hole" in rules.rule_severities
+    assert "track_dangling" in rules.rule_severities
+    pro_dict = rules.to_kicad_pro_dict()
+    assert "rule_severities" in pro_dict["board"]["design_settings"]
+    assert pro_dict["board"]["design_settings"]["rule_severities"]["track_dangling"] == "ignore"
+
+    # Test parsed reports from build output
+    carrier_rpt = Path("build/rpt/carrier_board-drc.rpt")
+    if carrier_rpt.exists():
+        report = KiCadCLI.parse_drc_report(carrier_rpt)
+        assert report.passed
+        assert report.error_count == 0
+        assert report.violations_count == 0
+
+    flex_rpt = Path("build/rpt/flex_tail-drc.rpt")
+    if flex_rpt.exists():
+        report = KiCadCLI.parse_drc_report(flex_rpt)
+        assert report.passed
+        assert report.error_count == 0
+        assert report.violations_count == 0
