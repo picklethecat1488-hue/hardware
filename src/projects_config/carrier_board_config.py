@@ -209,6 +209,36 @@ class CarrierBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_gpio_cutout_length"])
 
     @property
+    def enclosure_gpio_pin_pitch(self) -> float:
+        """Pin pitch for GPIO pin header in mm."""
+        return float(self._raw_data["enclosure_gpio_pin_pitch"])
+
+    @property
+    def enclosure_gpio_label_margin(self) -> float:
+        """Margin between GPIO cutout edge and pin labels in mm."""
+        return float(self._raw_data["enclosure_gpio_label_margin"])
+
+    @property
+    def enclosure_gpio_header_label_margin(self) -> float:
+        """Margin between GPIO cutout edge and main header title in mm."""
+        return float(self._raw_data["enclosure_gpio_header_label_margin"])
+
+    @property
+    def enclosure_gpio_label_font_size(self) -> float:
+        """Font size for engraved pin key labels on enclosure lid."""
+        return float(self._raw_data["enclosure_gpio_label_font_size"])
+
+    @property
+    def enclosure_gpio_header_font_size(self) -> float:
+        """Font size for engraved GPIO title header on enclosure lid."""
+        return float(self._raw_data["enclosure_gpio_header_font_size"])
+
+    @property
+    def enclosure_gpio_label_depth(self) -> float:
+        """Engraving depth for GPIO labels on exterior enclosure lid in mm."""
+        return float(self._raw_data["enclosure_gpio_label_depth"])
+
+    @property
     def enclosure_swd_cutout_width(self) -> float:
         """Width of SWD connector cutout on enclosure side in mm."""
         return float(self._raw_data["enclosure_swd_cutout_width"])

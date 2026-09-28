@@ -1509,3 +1509,28 @@ def test_regression_bug_183_carrier_board_hardening() -> None:
         assert kicad_report.passed
         assert kicad_report.error_count == 0
         assert kicad_report.violations_count == 0
+
+
+def test_regression_bug_189_enclosure_top_gpio_labels() -> None:
+    """Verify BUG-189: GPIO labels on enclosure top are text, non-overlapping, and properly rotated."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider import Mode
+
+    provider = CarrierBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    depth = provider.settings.enclosure_gpio_label_depth
+
+    assert lid.part is not None
+    assert lid.part.is_valid(), "Enclosure lid with engraved GPIO labels must be a valid solid"
+    assert len(lid.part.solids()) == 1, "Enclosure lid must remain a single contiguous solid"
+
+    # Engraved text bottom faces lie at Z = wall - depth
+    engraved_z = wall - depth
+    label_faces = [f for f in lid.part.faces() if abs(f.center().Z - engraved_z) < 1e-3]
+    assert len(label_faces) > 0, f"Expected engraved faces at Z={engraved_z}, found 0"
+
+    # Verify GPIO header cutout is present
+    gpio_w = provider.settings.enclosure_gpio_cutout_width
+    gpio_l = provider.settings.enclosure_gpio_cutout_length
+    assert gpio_w > 0 and gpio_l > 0

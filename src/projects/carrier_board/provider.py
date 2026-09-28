@@ -615,17 +615,29 @@ class CarrierBoardProvider(Provider):
             with Locations((gpio_x, gpio_y, 0.0)):
                 Box(gpio_w, gpio_l, wall * 4.0, mode=BuildMode.SUBTRACT)
 
-            # GPIO key engraved on enclosure lid exterior surface (BUG-073, BUG-177)
+            # GPIO key engraved on enclosure lid exterior surface (BUG-073, BUG-177, BUG-189)
+            pitch = self.settings.enclosure_gpio_pin_pitch
+            lbl_margin = self.settings.enclosure_gpio_label_margin
+            hdr_margin = self.settings.enclosure_gpio_header_label_margin
+            font_sz = self.settings.enclosure_gpio_label_font_size
+            hdr_sz = self.settings.enclosure_gpio_header_font_size
+            depth = self.settings.enclosure_gpio_label_depth
+
+            pin_1_y = gpio_y - (4.5 * pitch)
+            pin_3v3_y = gpio_y - (0.5 * pitch)
+            pin_gnd_y = gpio_y + (0.5 * pitch)
+            label_x = gpio_x - (gpio_w / 2.0) - lbl_margin
+            hdr_x = gpio_x - (gpio_w / 2.0) - hdr_margin
             with BuildSketch(Plane.XY.offset(wall)) as s_key:
-                with Locations((gpio_x - 4.5, gpio_y - 2.0)):
-                    Text("GPIO", font_size=2.2, rotation=90.0)
-                with Locations((gpio_x - 3.5, gpio_y + (gpio_l / 2.0) - 2.0)):
-                    Text("⏚", font_size=2.0, rotation=90.0)
-                with Locations((gpio_x - 3.5, gpio_y + (gpio_l / 2.0) - 5.0)):
-                    Text("⚡", font_size=2.0, rotation=90.0)
-                with Locations((gpio_x - 3.5, gpio_y - 3.5)):
-                    Text("1..8", font_size=1.6, rotation=90.0)
-            extrude(s_key.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
+                with Locations((hdr_x, gpio_y)):
+                    Text("GPIO", font_size=hdr_sz, rotation=90.0)
+                with Locations((label_x, pin_gnd_y)):
+                    Text("GND", font_size=font_sz, rotation=0.0)
+                with Locations((label_x, pin_3v3_y)):
+                    Text("3V3", font_size=font_sz, rotation=0.0)
+                with Locations((label_x + 0.6, pin_1_y)):
+                    Text("1", font_size=font_sz, rotation=0.0)
+            extrude(s_key.sketch, amount=-depth, mode=BuildMode.SUBTRACT)
 
             # Peripheral bus identifier labels engraved on enclosure lid exterior right margin (BUG-160, BUG-177)
             bus_labels = {"J6": "I2C", "J7": "I3C0", "J8": "I3C1", "J9": "SPI", "J10": "UART"}
