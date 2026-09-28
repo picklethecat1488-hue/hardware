@@ -7,6 +7,7 @@
  - **src/view.py** - Interactive CAD visualization tool for inspection and debugging.
  - **src/code_review.py** - Interactive Quake-themed code review tool and Markdown report generator.
  - **src/bug_report.py** - Interactive bug reporting terminal, web workstation, and Markdown tracker.
+ - **src/diff_view.py** - Interactive Quake-themed diff viewer, Smartlog DAG tree, and VCS workstation.
  - **src/model/** - Core application data models and configuration schemas.
  - **src/provider/** - Framework for geometry generation and build orchestration.
  - **src/projects/** - Specific geometry provider implementations.
@@ -358,6 +359,46 @@ python src/bug_report.py --export-only
 - **Git LFS Storage & Public Attachments Policy**: Bug report attachments (`build/attachments/` and `feedback/attachments/`) are automatically tracked and stored in **GitHub LFS**. All uploaded attachments are considered **non-confidential** and public to the repository. Never attach sensitive credentials, secret tokens, private keys, or confidential proprietary data.
 - **Automated Markdown Synchronization**: Changes made in the workstation or CLI automatically persist to `build/bugs.sqlite` and sync seamlessly to GitHub-flavored Markdown in `feedback/BUGS.md` and granular issue files `feedback/BUG_<id>.md`.
 - **Graceful Termination**: Clicking "Save and Exit" saves the active bug, syncs `feedback/BUGS.md` and `feedback/BUG_<id>.md`, and gracefully shuts down the server, releasing terminal control.
+
+## Interactive Quake Diff Viewer & Smartlog (sl)
+
+Inspect commits, branches, working tree states, and ancestors using the interactive Quake-styled diff viewer and Smartlog DAG workstation:
+
+```bash
+# Launch interactive diff viewer web workstation
+python src/diff_view.py
+
+# Print the smartlog ancestor tree (sl) and working tree status directly to the terminal
+python src/diff_view.py --list
+
+# Inspect a specific branch or jump to a commit
+python src/diff_view.py --branch main
+python src/diff_view.py --goto 75d5f92
+
+# Download latest changes from remote repository
+python src/diff_view.py --sync
+
+# Launch on custom port
+python src/diff_view.py --port 8767
+```
+
+### Diff Viewer & Smartlog Features & Workflow
+- **Quake Retro Console UI**: CRT scanlines, stone bevel plaques, embossed buttons, and HUD bar with quick links to Code Review (`8765`) and Bug Tracker (`8766`).
+- **Smartlog DAG Ancestor Tree (`sl`)**: Visualizes topological git commit ancestry with graph columns (`@` for HEAD, `o` for commits, `|`), branch labels, and PR status tags.
+- **Agent Feedback Customization**:
+  - Multi-commit selection (`[ ]`) with one-click **"Review Selected"** opening directly in Code Review (`python src/code_review.py`).
+  - Commit bug badges (`[BUG-XXX: STATUS]`) with one-click navigation to Bug Viewer (`python src/bug_report.py`).
+  - **"+ Bug"** button to create a new bug report with the commit hash prefilled.
+  - Agent feedback files (`feedback/` directory and review state files) are greyed-out and displayed in their own collapsible group (`opacity: 0.6`).
+- **Working Tree Operations**:
+  - Live categorization into **Staged Changes**, **Unstaged Changes**, **Untracked Files**, and **Merge Conflicts**.
+  - One-click file actions: **Stage** (`git add`), **Unstage** (`git reset HEAD`), **Discard** (`git checkout` / delete untracked).
+  - Dedicated commit box with message input and **"Commit Staged"** button.
+- **Commit Manipulation**:
+  - **Split Commit**: Resets `HEAD~1` so its changes return to the working tree for selective restaging and granular committing.
+  - **Combine Commits**: Squashes two or more selected contiguous commits into a single commit with a custom commit message.
+- **Merge Conflict Resolution**: Detects conflicted files (`UU`, `AA`, etc.), displays conflict marker counts, and offers instant resolution buttons: **Ours**, **Theirs**, or **Mark Resolved**.
+- **Shared Diff Engine & Modularity**: Core Git interaction, diff hunk parsing, side-by-side comparison, and syntax highlighting are shared seamlessly between `diff_view`, `code_review`, and `bug_report` via `GitEngine` and `diff_component.html.j2`.
 
 ## Debugging
 

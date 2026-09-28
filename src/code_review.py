@@ -19,7 +19,7 @@ import webbrowser
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from model.code_review import CommentModel, ReviewSeverity, ReviewStatus
-from provider.code_review.git_utils import GitReviewEngine, extract_line_snippet, get_git_root
+from provider.vcs.git_engine import GitEngine, extract_line_snippet, get_git_root
 from provider.code_review.server import ReviewServer
 
 
@@ -160,7 +160,7 @@ def main() -> None:
     else:
         markdown_path = repo_root / "build" / "CR.md"
 
-    git_engine = GitReviewEngine(repo_root=repo_root)
+    git_engine = GitEngine(repo_root=repo_root)
     if not args.commits:
         if git_engine.has_working_tree_changes():
             revisions = ["working"]

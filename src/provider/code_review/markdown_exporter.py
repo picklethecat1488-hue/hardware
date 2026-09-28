@@ -18,7 +18,7 @@ from model.code_review import (
     ReviewSessionModel,
     ReviewSeverity,
 )
-from provider.code_review.git_utils import is_file_ignored
+from provider.vcs.git_engine import is_file_ignored
 
 
 class MarkdownReviewExporter:

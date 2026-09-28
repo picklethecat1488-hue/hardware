@@ -24,8 +24,8 @@ from model.code_review import (
     ReviewSeverity,
     ReviewStatus,
 )
-from provider.code_review.git_utils import (
-    GitReviewEngine,
+from provider.vcs.git_engine import (
+    GitEngine,
     extract_line_snippet,
     get_git_root,
 )
@@ -63,12 +63,12 @@ def create_isolated_git_repo(path: Path) -> tuple[Path, list[str]]:
 
 
 def test_git_review_engine_basics() -> None:
-    """Verify GitReviewEngine correctly discovers repository and queries commits."""
+    """Verify GitEngine correctly discovers repository and queries commits."""
     root = get_git_root()
     assert root.exists()
     assert (root / "pyproject.toml").exists()
 
-    engine = GitReviewEngine(repo_root=root)
+    engine = GitEngine(repo_root=root)
     commits = engine.get_commits(limit=5)
     assert len(commits) > 0
     assert commits[0].commit_hash != ""
@@ -76,9 +76,9 @@ def test_git_review_engine_basics() -> None:
 
 
 def test_git_review_engine_diff_and_snippets() -> None:
-    """Verify GitReviewEngine parses diff hunks and extracts source snippets."""
+    """Verify GitEngine parses diff hunks and extracts source snippets."""
     root = get_git_root()
-    engine = GitReviewEngine(repo_root=root)
+    engine = GitEngine(repo_root=root)
 
     # Check diff for pyproject.toml
     diff_model = engine.get_file_diff("HEAD", "pyproject.toml")
@@ -702,7 +702,7 @@ def test_diff_navigation_and_next_prev_change_cli(tmp_path: Path) -> None:
 def test_untracked_files_diff_and_working_tree_handling(tmp_path: Path) -> None:
     """Verify that untracked and uncommitted files are properly diffed with additions."""
     repo_root = get_git_root()
-    engine = GitReviewEngine(repo_root=repo_root)
+    engine = GitEngine(repo_root=repo_root)
 
     # Create a temporary untracked file in the repo
     temp_untracked = repo_root / "test_untracked_sample.txt"
@@ -731,7 +731,7 @@ def test_untracked_files_diff_and_working_tree_handling(tmp_path: Path) -> None:
 def test_regression_bug_128_untracked_folder_files(tmp_path: Path) -> None:
     """Verify that newly created untracked subfolders show their contained files in changed files (BUG-128)."""
     repo_root = get_git_root()
-    engine = GitReviewEngine(repo_root=repo_root)
+    engine = GitEngine(repo_root=repo_root)
 
     temp_folder = repo_root / "temp_untracked_folder_bug128"
     try:
@@ -886,9 +886,9 @@ def test_code_review_ui_cli_focus_and_edit_button(tmp_path: Path) -> None:
 
 
 def test_git_review_engine_resolve_revisions_range_syntax(tmp_path: Path) -> None:
-    """Verify GitReviewEngine resolves A..B commit ranges, individual hashes, and raises on invalid ranges."""
+    """Verify GitEngine resolves A..B commit ranges, individual hashes, and raises on invalid ranges."""
     repo_root, _ = create_isolated_git_repo(tmp_path)
-    engine = GitReviewEngine(repo_root=repo_root)
+    engine = GitEngine(repo_root=repo_root)
 
     # 1. Resolving HEAD~2..HEAD should return exactly 2 commit hashes
     revs = engine.resolve_revisions(["HEAD~2..HEAD"])
@@ -963,7 +963,7 @@ def test_code_review_html_unified_diff_delete_styling(tmp_path: Path) -> None:
 def test_code_review_commit_time_ascending_and_code_search(tmp_path: Path) -> None:
     """Verify commits include formatted time HH:MM:SS, are in ascending order, and search API returns matches."""
     repo_root, shas = create_isolated_git_repo(tmp_path)
-    engine = GitReviewEngine(repo_root=repo_root)
+    engine = GitEngine(repo_root=repo_root)
 
     # 1. Verify commits have time formatted as HH:MM:SS
     commits = engine.get_commits(rev_args=["HEAD~2..HEAD"])
@@ -1330,7 +1330,7 @@ def test_regression_bug_078_code_review_highlight_markers_preserve_diff_colors()
 
 def test_code_review_ignores_bugs_md(tmp_path: Path) -> None:
     """Verify that BUGS.md and BUGS.txt are excluded from code review diffs and files."""
-    from provider.code_review.git_utils import GitReviewEngine, is_file_ignored
+    from provider.vcs.git_engine import GitEngine, is_file_ignored
 
     assert is_file_ignored("BUGS.md")
     assert is_file_ignored("./BUGS.md")
@@ -1340,7 +1340,7 @@ def test_code_review_ignores_bugs_md(tmp_path: Path) -> None:
     assert not is_file_ignored("pyproject.toml")
 
     repo_root = Path(__file__).parent.parent.parent
-    engine = GitReviewEngine(repo_root=repo_root)
+    engine = GitEngine(repo_root=repo_root)
     assert engine.is_file_ignored("BUGS.md")
 
     # Working tree changed files must never include BUGS.md
@@ -1424,7 +1424,7 @@ def test_diff_line_length_truncation_bug_136(tmp_path: Path) -> None:
     long_line = "x = '" + ("A" * 2500) + "'\n"
     test_file.write_text(long_line, encoding="utf-8")
 
-    engine = GitReviewEngine(repo_root=repo_dir)
+    engine = GitEngine(repo_root=repo_dir)
     diff_model = engine.get_file_diff("working", "long.py")
 
     assert not diff_model.is_binary
@@ -1464,7 +1464,7 @@ def test_binary_diff_and_raw_endpoint_bug_137(tmp_path: Path) -> None:
     fake_png_new = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDRnew_version"
     img_file.write_bytes(fake_png_new)
 
-    engine = GitReviewEngine(repo_root=repo_dir)
+    engine = GitEngine(repo_root=repo_dir)
     diff_model = engine.get_file_diff("working", "logo.png")
 
     assert diff_model.is_binary is True

@@ -25,8 +25,8 @@ from model.code_review import (
     ReviewSeverity,
     ReviewStatus,
 )
-from provider.code_review.git_utils import (
-    GitReviewEngine,
+from provider.vcs.git_engine import (
+    GitEngine,
     extract_line_snippet,
     get_git_root,
 )
@@ -375,7 +375,7 @@ class ReviewServer(ThreadingHTTPServer):
     ) -> None:
         """Initialize review HTTP server with config and persistent paths."""
         self.repo_root = repo_root or get_git_root()
-        self.git_engine = GitReviewEngine(repo_root=self.repo_root)
+        self.git_engine = GitEngine(repo_root=self.repo_root)
         self.exporter = MarkdownReviewExporter(repo_root=self.repo_root)
 
         self.markdown_output = markdown_output or (self.repo_root / "build" / "CR.md")

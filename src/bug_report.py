@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from model.bug_report import BugCategory, BugReportModel, BugSeverity, BugStatus
 from provider.bug_report.server import BugReportServer
-from provider.code_review.git_utils import get_git_root
+from provider.vcs.git_engine import get_git_root
 
 
 def parse_arguments() -> argparse.Namespace:
