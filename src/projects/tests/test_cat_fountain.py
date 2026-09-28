@@ -861,11 +861,14 @@ class TestCatFountainProvider:
         hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
         assert provider.settings.drive_hub_recess_radius > hub_r
 
-        # 3. Verify that the motor clip U-cutout is larger than or equal to the motor collar diameter.
-        # The BetaFPV 1102 motor collar diameter is 10.0mm.
-        # This ensures the clip wraps around the collar to support the motor body.
-        motor_collar_diameter = 10.0
-        assert provider.settings.motor_clip_cutout_width >= motor_collar_diameter
+        # 3. Verify that the motor mount bolt circle radius matches the BetaFPV 1102 pattern (3-1.4M on Dia 6.6mm)
+        # and that the motor pocket radius provides sufficient clearance for the 15.2mm diameter motor body.
+        assert provider.settings.motor_mount_bolt_circle_radius == 3.3
+        assert provider.settings.motor_mount_hole_radius >= 0.7
+        assert (
+            provider.settings.motor_pocket_radius >= provider.settings.motor_radius + provider.settings.motor_clearance
+        )
+        assert provider.settings.motor_pocket_radius >= 8.1
 
     def test_bottom_cover_drain_and_notch_unobstructed(self, provider):
         """Verify that the bottom cover's central drain hole and edge notch are not filled by the snap ring."""
@@ -1503,3 +1506,77 @@ class TestCatFountainProvider:
         # South bridge/cradle wall (Y = tube_y - tube_r - 1.0) must be solid to support and locate the cover
         south_y = tube_y - tube_r - 1.0
         assert solid.is_inside((0.0, south_y, z_mid)), f"Pump cover South cradle wall is broken at Y = {south_y}!"
+
+    def test_compute_flow_metrics_upper_reservoir_retention(self, provider):
+        """Verify that fluid particles filling the reservoir up to the lid shelf are counted in pool_volume.
+
+        Regression test: Prevents metric collapse where an artificial 15mm cutoff dropped pool_volume
+        when the bowl reservoir was filled near the lid.
+        """
+        import numpy as np
+        from projects.cat_fountain.simulate_hooks import compute_flow_metrics
+
+        bowl_h = provider.settings.bowl_height * 0.001
+        step_d = provider.settings.lid_step_depth * 0.001
+        lid_mount_z = bowl_h - step_d
+
+        # 500 particles in upper reservoir at z = lid_mount_z - 0.005 (e.g. 97mm in a 102mm lid mount)
+        pts = np.zeros((500, 3))
+        pts[:, 0] = 0.035
+        pts[:, 1] = 0.0
+        pts[:, 2] = lid_mount_z - 0.005
+
+        provider.water_sim = type("MockSim", (), {"last_positions": pts, "last_velocities": None})()
+        metrics = compute_flow_metrics(provider)
+
+        assert metrics["pool_volume"] == 500, (
+            f"Upper reservoir particles were artificially excluded from pool_volume: got {metrics['pool_volume']}"
+        )
+
+    def test_regression_bug_168_motor_base_mounting_and_pocket_clearance(self, provider):
+        """Verify motor pocket clearance in bowl and secure triangular mounting holes in motor clip.
+
+        Regression test for BUG-168:
+        1. Ensures the motor pocket in the bowl has sufficient clearance for the 15.2mm diameter motor body.
+        2. Ensures the motor clip features 3x M1.4 mounting screw holes on a 6.6mm BCD, anti-rotation base recess,
+           and wire relief channel rather than a loose U-cutout that allowed the motor to spin.
+        """
+        # 1. Verify bowl motor pocket clearance
+        bowl = provider.build_bowl("bowl")
+        floor_z = provider.settings.floor_z
+        # Point at 7.8mm radius (inside the 8.1mm pocket, but outside the old 7.0mm cut) must be hollow
+        test_z = floor_z - 12.0
+        assert not bowl.part.is_inside((7.8, 0.0, test_z)), (
+            "Motor pocket at radius 7.8mm is solid: motor diameter 15.2mm (radius 7.6mm) will rub or not fit!"
+        )
+
+        # 2. Verify motor clip mounting and anti-rotation features
+        clip = provider.build_motor_clip("motor_clip")
+        assert clip.part.volume > 0.0
+        assert clip.part.is_valid()
+
+        clip_h = provider.settings.motor_clip_thickness
+        r_bcd = provider.settings.motor_mount_bolt_circle_radius
+        assert r_bcd == 3.3, f"Expected BCD radius 3.3mm for BetaFPV 1102, got {r_bcd}"
+
+        # 3 screw holes at 90°, 210°, 330° must be open (not solid)
+        for angle in [90.0, 210.0, 330.0]:
+            rad = math.radians(angle)
+            hx = r_bcd * math.cos(rad)
+            hy = r_bcd * math.sin(rad)
+            assert not clip.part.is_inside((hx, hy, clip_h * 0.5)), (
+                f"Mount screw hole at ({hx:.2f}, {hy:.2f}) is blocked!"
+            )
+
+        # Center shaft / bearing clearance hole must be open
+        assert not clip.part.is_inside((0.0, 0.0, clip_h * 0.5)), "Central shaft clearance hole is blocked!"
+
+        # Solid plate area outside shaft hole supporting motor base
+        assert clip.part.is_inside((3.5, 0.0, clip_h * 0.5)), (
+            "Motor clip is hollowed out around motor base: expected solid plastic to mount and secure motor!"
+        )
+
+        # Wire relief channel extending South along -Y
+        assert not clip.part.is_inside((0.0, -10.0, clip_h - 0.2)), (
+            "Wire relief channel at Y = -10.0 is blocked: 3-wire motor cable would be pinched!"
+        )

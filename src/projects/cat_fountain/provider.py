@@ -254,15 +254,20 @@ class CatFountainProvider(Provider):
                 motor_pocket_z = -(self.settings.pump_well_wall + recess_d)
                 motor_pocket_h = boss_h - (self.settings.pump_well_wall + recess_d) + 5.0
                 with Locations((0, 0, motor_pocket_z)):
-                    # Motor body pocket (radius 7.0mm for 13.8mm diameter, breaking through bottom)
+                    # Motor body pocket with clearance for 15.2mm diameter motor, breaking through bottom
                     Cylinder(
-                        radius=7.0,
+                        radius=self.settings.motor_pocket_radius,
                         height=motor_pocket_h,
                         align=(Align.CENTER, Align.CENTER, Align.MAX),
                         mode=Mode.SUBTRACT,
                     )
-                    # Motor front face alignment boss pocket (radius 2.75mm, height 1.6mm)
-                    Cylinder(radius=2.75, height=1.6, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                    # Motor front face alignment boss pocket
+                    Cylinder(
+                        radius=self.settings.motor_collar_clearance_radius,
+                        height=self.settings.motor_collar_clearance_height,
+                        align=(Align.CENTER, Align.CENTER, Align.MAX),
+                        mode=Mode.SUBTRACT,
+                    )
 
                 # 3. Horizontal slide-in slot for the motor retaining clip (Z = 23.5 to 25.5 mm, open to Y < 0)
                 clip_slot_w = self.settings.motor_clip_width + 0.4
@@ -1395,33 +1400,65 @@ class CatFountainProvider(Provider):
     def build_motor_clip(
         self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
     ) -> BuildPart:
-        """Build the slide-in motor retaining clip (fork) to secure the motor in place."""
+        """Build the slide-in motor retaining clip with mounting screw holes and anti-rotation recess."""
         clip_w = self.settings.motor_clip_width
         clip_l = self.settings.motor_clip_length
         clip_h = self.settings.motor_clip_thickness
-        fork_w = self.settings.motor_clip_cutout_width
+        r_bcd = self.settings.motor_mount_bolt_circle_radius
+        hole_r = self.settings.motor_mount_hole_radius
+        shaft_r = self.settings.motor_shaft_clearance_radius
+        recess_d = self.settings.motor_base_recess_depth
+        lobe_r = self.settings.motor_base_lobe_radius
+        wire_w = self.settings.motor_wire_relief_width
+        wire_d = self.settings.motor_wire_relief_depth
+
+        angles_deg = [90.0, 210.0, 330.0]
+        mount_pts = [(r_bcd * math.cos(math.radians(a)), r_bcd * math.sin(math.radians(a))) for a in angles_deg]
 
         with BuildPart() as clip:
             # Main flat slide plate extending South from the center (0, 0)
-            # Extends from Y = -clip_l to Y = 5.0 (so U-cutout centered at Y=0 is 5mm from front)
+            # Extends from Y = -clip_l to Y = 5.0
             with Locations((0, -clip_l, 0)):
                 Box(clip_w, clip_l + 5.0, clip_h, align=(Align.CENTER, Align.MIN, Align.MIN))
 
-            # Subtract U-cutout centered at (0, 0) of diameter fork_w (radius fork_w / 2.0)
+            # Add a pull handle at the back (South end, Y = -clip_l)
+            with Locations((0, -clip_l, 0)):
+                Box(clip_w + 4.0, 3.0, clip_h + 3.0, align=(Align.CENTER, Align.MAX, Align.MIN))
+
+            # Central shaft and bearing clearance through-hole
             Cylinder(
-                radius=fork_w / 2.0,
+                radius=shaft_r,
                 height=clip_h + 10.0,
                 align=(Align.CENTER, Align.CENTER, Align.CENTER),
                 mode=Mode.SUBTRACT,
             )
 
-            # Subtract the leading guide slot from Y = 0 to Y = 10.0 to break through the front (Y > 0)
-            with Locations((0, 0, 0)):
-                Box(fork_w, 20.0, clip_h + 10.0, align=(Align.CENTER, Align.MIN, Align.CENTER), mode=Mode.SUBTRACT)
+            # 3x M1.4 mounting screw through-holes on Phi 6.6mm BCD
+            with Locations(*mount_pts):
+                Cylinder(
+                    radius=hole_r,
+                    height=clip_h + 10.0,
+                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                    mode=Mode.SUBTRACT,
+                )
 
-            # Add a pull handle at the back (South end, Y = -clip_l)
-            with Locations((0, -clip_l, 0)):
-                Box(clip_w + 4.0, 3.0, clip_h + 3.0, align=(Align.CENTER, Align.MAX, Align.MIN))
+            # Triangular anti-rotation recess for motor base (on top surface Z = clip_h)
+            with Locations((0, 0, clip_h)):
+                with BuildSketch(mode=Mode.PRIVATE) as base_sketch:
+                    with Locations(*mount_pts):
+                        Circle(radius=lobe_r)
+                    make_hull()
+                extrude(base_sketch.sketch, amount=-recess_d, mode=Mode.SUBTRACT)
+
+            # Wire relief channel extending South along -Y
+            with Locations((0, -1.5, clip_h)):
+                Box(
+                    wire_w,
+                    clip_l + 5.0,
+                    wire_d + 3.5,
+                    align=(Align.CENTER, Align.MAX, Align.MAX),
+                    mode=Mode.SUBTRACT,
+                )
 
             URDFMetadata(
                 label=target,
