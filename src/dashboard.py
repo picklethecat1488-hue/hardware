@@ -208,23 +208,22 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def launch_browser(url: str, target: str = "vscode") -> None:
-    """Open the review or diff workstation dashboard in the specified browser environment."""
-    match target:
-        case "vscode":
-            try:
-                import subprocess
+    """Open the review or diff workstation dashboard in the specified browser environment.
 
-                subprocess.run(
-                    ["code", "--open-url", url],
-                    check=False,
-                    capture_output=True,
-                )
-            except Exception:
-                webbrowser.open(url)
+    Args:
+        url: The web URL of the workstation dashboard.
+        target: Target browser environment ('vscode', 'system', 'none').
+    """
+    match target:
+        case "none":
+            return
+        case "vscode":
+            # In VS Code, the integrated terminal intercepts localhost links with
+            # workbench.externalUriOpeners configured for simpleBrowser.open.
+            # We avoid spawning the system browser or the 'code' binary.
+            return
         case "system":
             webbrowser.open(url)
-        case "none":
-            pass
         case _:
             webbrowser.open(url)
 

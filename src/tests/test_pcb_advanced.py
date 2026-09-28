@@ -401,7 +401,7 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 45
+    assert len(wiring.footprints) == 62
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
@@ -456,11 +456,11 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 45  # header + 44 carrier components (J4 is on flex tail)
+    assert len(bom_lines) == 62  # header + 61 carrier components (J4 is on flex tail)
     assert "MCXN947VDF" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 45  # header + 44 carrier components
+    assert len(pos_lines) == 62  # header + 61 carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -2794,9 +2794,11 @@ def test_regression_bugs_115_through_127() -> None:
     assert not any(n.name == "SWD_SWO" for n in wiring.nets), "BUG-117: SWD_SWO net must be removed"
     nrst_net = next(n for n in wiring.nets if n.name == "NRST")
     nrst_comps = [p[0] for p in nrst_net.pins]
-    assert "J5" not in nrst_comps, "BUG-117: NRST must not connect to J5"
-    # Under BUG-129, NRST connects to U9 pin 23 (CBUS0) for FTDI reboot into ISP mode
-    assert "U9" in nrst_comps, "BUG-129: NRST must connect to U9 for FTDI ISP reboot"
+    # Under BUG-129 & BUG-183, NRST connects to JP1 isolation jumper, and FTDI_NRST connects U9 to JP1
+    assert "JP1" in nrst_comps, "BUG-183: NRST must connect to JP1 isolation jumper"
+    ftdi_nrst_net = next(n for n in wiring.nets if n.name == "FTDI_NRST")
+    ftdi_nrst_comps = [p[0] for p in ftdi_nrst_net.pins]
+    assert "U9" in ftdi_nrst_comps and "JP1" in ftdi_nrst_comps, "BUG-183: FTDI_NRST must connect U9 to JP1"
 
     # BUG-118: U6 pins 6, 7, 8 on right side and pin 15 on left side
     sheet_ui = next((s for s in pcb_cfg.schematic_sheets if "User Interface" in s.title), None)

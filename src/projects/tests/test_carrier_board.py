@@ -1451,3 +1451,61 @@ def test_regression_bug_180_zero_drc_violations_carrier_board_and_flex_tail() ->
         assert report.passed
         assert report.error_count == 0
         assert report.violations_count == 0
+
+
+def test_regression_bug_183_carrier_board_hardening() -> None:
+    """Verify BUG-183: carrier board design hardening with jumpers, LEDs, switch, and Status sheet."""
+    from pathlib import Path
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    # Verify SW1 reset button exists and is placed
+    assert "SW1" in comp_map, "SW1 reset button must exist in wiring"
+    assert comp_map["SW1"].package == "SW_PUSH_SMD"
+
+    # Verify isolation and override jumpers JP1..JP4
+    for jp in ("JP1", "JP2", "JP3", "JP4"):
+        assert jp in comp_map, f"Jumper {jp} must exist in wiring"
+        assert comp_map[jp].package == "pin_header_1x2"
+
+    # Verify power good / enable LEDs D2..D7 and resistors R7..R12
+    for d_idx in range(2, 8):
+        d_name = f"D{d_idx}"
+        r_name = f"R{d_idx + 5}"
+        assert d_name in comp_map, f"Status LED {d_name} must exist in wiring"
+        assert r_name in comp_map, f"Ballast resistor {r_name} must exist in wiring"
+        assert comp_map[d_name].package == "0603"
+        assert comp_map[r_name].package == "0402"
+
+    # Verify new components are placed in open space south of U1 and north of J1
+    for name in ["SW1", "JP1", "JP2", "JP3", "JP4", "D2", "D3", "D4", "D5", "D6", "D7"]:
+        pos = comp_map[name].position
+        assert -36.0 <= pos[1] <= -16.0, (
+            f"Component {name} at Y={pos[1]} not in designated space south of U1 and north of J1"
+        )
+        assert -15.0 <= pos[0] <= 15.0, f"Component {name} at X={pos[0]} not in designated corridor"
+
+    # Verify Status and Overrides schematic sheet exists in PCB configuration
+    status_sheet = next((s for s in provider.pcb_config.schematic_sheets if "Status and Overrides" in s.title), None)
+    assert status_sheet is not None, "Schematic sheet 'Status and Overrides' must exist"
+    assert "SW1" in status_sheet.components
+    assert "JP1" in status_sheet.components
+    assert "D2" in status_sheet.components
+
+    # Verify PCB DRC checker passes
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0
+
+    # Verify KiCad DRC report clean if generated
+    carrier_rpt = Path("build/rpt/carrier_board-drc.rpt")
+    if carrier_rpt.exists():
+        kicad_report = KiCadCLI.parse_drc_report(carrier_rpt)
+        assert kicad_report.passed
+        assert kicad_report.error_count == 0
+        assert kicad_report.violations_count == 0

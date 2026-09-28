@@ -772,6 +772,7 @@ class SchematicLayoutModel(BaseModel):
     default_symbol_width: float = Field(default=45.0, description="Default symbol width in mm for DRC overlap checks")
     default_symbol_height: float = Field(default=35.0, description="Default symbol height in mm for DRC overlap checks")
     cols_per_row: Optional[int] = Field(default=None, description="Optional forced columns per row for schematic sheet")
+    top_row_y: Optional[float] = Field(default=None, description="Optional override for top row Y in mm")
     grid_positions: dict[str, List[int]] = Field(
         default_factory=dict, description="Component -> [row, col] grid position override"
     )

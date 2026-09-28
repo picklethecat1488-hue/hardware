@@ -44,9 +44,11 @@ class SchematicPassiveClassifier:
         if not (is_rail_1 or is_rail_2):
             return False
         sig_net = n2 if is_rail_1 else n1
-        # The signal line must connect to another footprint on this sheet
+        # The signal line must connect to another footprint on this sheet (excluding indicator LEDs)
         for other in all_fps:
             if other.name == fp.name:
+                continue
+            if other.name.upper().startswith("D") or "LED" in other.package.upper():
                 continue
             for p in other.pins:
                 if pin_to_net.get((other.name, p.name)) == sig_net:
@@ -93,20 +95,31 @@ class SchematicPassiveClassifier:
 
     @classmethod
     def classify_passives(
-        cls, sheet_fps: List[FootprintModel], pin_to_net: Dict[Tuple[str, str], str]
+        cls,
+        sheet_fps: List[FootprintModel],
+        pin_to_net: Dict[Tuple[str, str], str],
+        grid_positions: Optional[Dict[str, List[int]]] = None,
     ) -> Tuple[List[FootprintModel], List[FootprintModel], List[FootprintModel], List[FootprintModel]]:
         """Classify footprints on a sheet into decoupling caps, pullups, shunt caps, and main ICs.
 
         Args:
             sheet_fps: Footprints on the current sheet.
             pin_to_net: Net mapping.
+            grid_positions: Optional explicit layout grid positions dict.
 
         Returns:
             Tuple of (decoupling_caps, pullup_resistors, shunt_caps, main_fps).
         """
-        decoupling_caps = [fp for fp in sheet_fps if cls.is_decoupling_cap(fp, pin_to_net)]
-        pullup_resistors = [fp for fp in sheet_fps if cls.is_pull_resistor(fp, pin_to_net, sheet_fps)]
-        shunt_caps = [fp for fp in sheet_fps if cls.is_shunt_cap(fp, pin_to_net, sheet_fps)]
+        grid_names = set(grid_positions.keys()) if grid_positions else set()
+        decoupling_caps = [
+            fp for fp in sheet_fps if fp.name not in grid_names and cls.is_decoupling_cap(fp, pin_to_net)
+        ]
+        pullup_resistors = [
+            fp for fp in sheet_fps if fp.name not in grid_names and cls.is_pull_resistor(fp, pin_to_net, sheet_fps)
+        ]
+        shunt_caps = [
+            fp for fp in sheet_fps if fp.name not in grid_names and cls.is_shunt_cap(fp, pin_to_net, sheet_fps)
+        ]
         passive_names = {fp.name for fp in decoupling_caps + pullup_resistors + shunt_caps}
         if passive_names and (len(passive_names) < len(sheet_fps)):
             main_fps = [fp for fp in sheet_fps if fp.name not in passive_names]

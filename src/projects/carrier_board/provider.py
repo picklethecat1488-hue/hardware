@@ -1038,6 +1038,10 @@ class CarrierBoardProvider(Provider):
             SilkscreenLine(start_mm=(-2.4, 29.8), end_mm=(-1.4, 31.2), thickness=0.18, layer="F.SilkS")
             SilkscreenLine(start_mm=(2.4, 32.2), end_mm=(1.4, 30.8), thickness=0.18, layer="F.SilkS")
             SilkscreenLine(start_mm=(2.4, 29.8), end_mm=(1.4, 31.2), thickness=0.18, layer="F.SilkS")
+
+            # BUG-183: Silkscreen grouping frames for Status and Overrides
+            SilkscreenRect(position=(12.2, -23.0), dimensions=(7.8, 17.5), thickness=0.15, layer="F.SilkS")
+            SilkscreenRect(position=(4.8, -25.0), dimensions=(6.8, 13.5), thickness=0.15, layer="F.SilkS")
         return silk.graphics
 
     def silkscreen(self) -> list[SilkscreenTextModel]:
@@ -1052,6 +1056,36 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText(
                     "BOTTOM SHIELD / GROUND REF", layer="B.SilkS", font_size=1.0, thickness=0.15, mirror=True
                 )
+
+            # BUG-183: Silkscreen labels for Status and Overrides
+            with Locations((11.25, -14.6)):
+                SilkscreenText("OVERRIDES", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((4.8, -17.2)):
+                SilkscreenText("STATUS", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            # Jumper and switch labels
+            with Locations((11.25, -16.0)):
+                SilkscreenText("RESET", layer="F.SilkS", font_size=0.6, thickness=0.09)
+            with Locations((11.25, -23.0)):
+                SilkscreenText("NRST", layer="F.SilkS", font_size=0.6, thickness=0.09, rotation=90.0)
+            with Locations((11.25, -28.5)):
+                SilkscreenText("BOOT0", layer="F.SilkS", font_size=0.6, thickness=0.09, rotation=90.0)
+            with Locations((14.8, -23.0)):
+                SilkscreenText("ISP", layer="F.SilkS", font_size=0.6, thickness=0.09)
+            with Locations((14.8, -28.5)):
+                SilkscreenText("VBUS", layer="F.SilkS", font_size=0.6, thickness=0.09)
+            # Status LED labels
+            with Locations((1.8, -20.0)):
+                SilkscreenText("MCU", layer="F.SilkS", font_size=0.6, thickness=0.09)
+            with Locations((1.8, -22.0)):
+                SilkscreenText("PERIPH", layer="F.SilkS", font_size=0.6, thickness=0.09)
+            with Locations((1.8, -24.0)):
+                SilkscreenText("AUD", layer="F.SilkS", font_size=0.6, thickness=0.09)
+            with Locations((1.8, -26.0)):
+                SilkscreenText("3V3", layer="F.SilkS", font_size=0.6, thickness=0.09)
+            with Locations((1.8, -28.0)):
+                SilkscreenText("VBUS", layer="F.SilkS", font_size=0.6, thickness=0.09)
+            with Locations((1.8, -30.0)):
+                SilkscreenText("VBAT", layer="F.SilkS", font_size=0.6, thickness=0.09)
 
             # Global optical fiducials (crosshairs)
             with Locations((-24.0, 38.0), (21.0, -42.0), (-24.0, -38.0)):
@@ -1127,7 +1161,7 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText("J9", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((20.5, -31.0)):
                 SilkscreenText("J10", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((16.0, -28.0)):
+            with Locations((19.0, -14.5)):
                 SilkscreenText("J14", layer="F.SilkS", font_size=0.8, thickness=0.12)
 
             # Resistors
@@ -1145,7 +1179,7 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText("R6", layer="F.SilkS", font_size=0.7, thickness=0.10)
 
             # Capacitors
-            with Locations((13.0, -17.5)):
+            with Locations((13.0, -13.5)):
                 SilkscreenText("C1", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((-8.0, -6.5)):
                 SilkscreenText("C2", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)

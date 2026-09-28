@@ -618,20 +618,6 @@ class SchematicDiagram:
 
         sheet_fps = sheet_plan.footprints
 
-        (
-            decoupling_caps,
-            pullup_resistors,
-            shunt_caps,
-            main_fps,
-        ) = SchematicPassiveClassifier.classify_passives(sheet_fps, pin_to_net)
-
-        num_comps = len(main_fps)
-        pin_pitch = PIN_PITCH_MM
-
-        has_bottom_cards = bool(decoupling_caps) or any(
-            getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q") for fp in sheet_fps
-        )
-
         sheet_model = (
             self.config.schematic_sheets[sheet_plan.sheet_idx - 1]
             if (
@@ -646,10 +632,29 @@ class SchematicDiagram:
             or getattr(self.config, "schematic_layout", None)
             or SchematicLayoutModel()
         )
+        grid_positions = getattr(layout, "grid_positions", {}) or {}
+
+        (
+            decoupling_caps,
+            pullup_resistors,
+            shunt_caps,
+            main_fps,
+        ) = SchematicPassiveClassifier.classify_passives(sheet_fps, pin_to_net, grid_positions=grid_positions)
+
+        num_comps = len(main_fps)
+        pin_pitch = PIN_PITCH_MM
+
+        has_bottom_cards = bool(decoupling_caps) or any(
+            getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q") for fp in sheet_fps
+        )
+
         page_center_x = layout.sheet_center_x
         page_center_y = layout.sheet_center_y
 
-        if has_bottom_cards:
+        if getattr(layout, "top_row_y", None) is not None:
+            top_row_y = layout.top_row_y
+            bottom_cards_y = 60.0
+        elif has_bottom_cards:
             top_row_y = 158.0
             bottom_cards_y = 66.0
         elif pullup_resistors:
@@ -660,7 +665,6 @@ class SchematicDiagram:
             bottom_cards_y = 60.0
 
         cols_override = getattr(layout, "cols_per_row", None)
-        grid_positions = getattr(layout, "grid_positions", {}) or {}
 
         if cols_override is not None:
             cols_per_row = cols_override

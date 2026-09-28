@@ -758,6 +758,210 @@ footprints:
   - 0.0
   mpn: TLV62568DBVR
   supplier_pn: 296-TLV62568DBVR-ND
+- name: SW1
+  package: SW_PUSH_SMD
+  position:
+  - 11.25
+  - -18.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: PTS645SL43SMTR92LFS
+  supplier_pn: CKN9012CT-ND
+- name: JP1
+  package: pin_header_1x2
+  position:
+  - 9.5
+  - -23.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 90.0
+  mpn: TSW-102-07-L-S
+  supplier_pn: SAM1026-02-ND
+- name: JP2
+  package: pin_header_1x2
+  position:
+  - 9.5
+  - -28.5
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 90.0
+  mpn: TSW-102-07-L-S
+  supplier_pn: SAM1026-02-ND
+- name: JP3
+  package: pin_header_1x2
+  position:
+  - 13.0
+  - -23.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 90.0
+  mpn: TSW-102-07-L-S
+  supplier_pn: SAM1026-02-ND
+- name: JP4
+  package: pin_header_1x2
+  position:
+  - 13.0
+  - -28.5
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 90.0
+  mpn: TSW-102-07-L-S
+  supplier_pn: SAM1026-02-ND
+- name: D2
+  package: '0603'
+  position:
+  - 4.0
+  - -30.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: LTST-C190GKT
+  supplier_pn: 160-1447-1-ND
+- name: D3
+  package: '0603'
+  position:
+  - 4.0
+  - -28.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: LTST-C190GKT
+  supplier_pn: 160-1447-1-ND
+- name: D4
+  package: '0603'
+  position:
+  - 4.0
+  - -26.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: LTST-C190GKT
+  supplier_pn: 160-1447-1-ND
+- name: D5
+  package: '0603'
+  position:
+  - 4.0
+  - -24.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: LTST-C190GKT
+  supplier_pn: 160-1447-1-ND
+- name: D6
+  package: '0603'
+  position:
+  - 4.0
+  - -22.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: LTST-C190GKT
+  supplier_pn: 160-1447-1-ND
+- name: D7
+  package: '0603'
+  position:
+  - 4.0
+  - -20.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: LTST-C190GKT
+  supplier_pn: 160-1447-1-ND
+- name: R7
+  package: '0402'
+  position:
+  - 6.5
+  - -30.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: RC0402FR-071KL
+  supplier_pn: 311-1.00KLRCT-ND
+- name: R8
+  package: '0402'
+  position:
+  - 6.5
+  - -28.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: RC0402FR-071KL
+  supplier_pn: 311-1.00KLRCT-ND
+- name: R9
+  package: '0402'
+  position:
+  - 6.5
+  - -26.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: RC0402FR-071KL
+  supplier_pn: 311-1.00KLRCT-ND
+- name: R10
+  package: '0402'
+  position:
+  - 6.5
+  - -24.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: RC0402FR-071KL
+  supplier_pn: 311-1.00KLRCT-ND
+- name: R11
+  package: '0402'
+  position:
+  - 6.5
+  - -22.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: RC0402FR-071KL
+  supplier_pn: 311-1.00KLRCT-ND
+- name: R12
+  package: '0402'
+  position:
+  - 6.5
+  - -20.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: RC0402FR-071KL
+  supplier_pn: 311-1.00KLRCT-ND
 nets:
 - name: GND
   color: '#475569'
@@ -917,6 +1121,20 @@ nets:
   - - J14
     - '6'
     - GND
+  - - SW1
+    - '2'
+  - - R7
+    - '2'
+  - - R8
+    - '2'
+  - - R9
+    - '2'
+  - - R10
+    - '2'
+  - - R11
+    - '2'
+  - - R12
+    - '2'
 - name: 3V3
   color: '#dc2626'
   pins:
@@ -977,6 +1195,10 @@ nets:
   - - J14
     - '5'
     - 3V3
+  - - JP3
+    - '1'
+  - - D4
+    - '1'
 - name: VBUS
   priority: 24
   color: '#b91c1c'
@@ -985,14 +1207,24 @@ nets:
     - VBUS
   - - J3
     - VBUS2
+  - - U9
+    - '20'
+  - - JP4
+    - '1'
+  - - D3
+    - '1'
+- name: VBUS_CHG
+  priority: 24
+  color: '#b91c1c'
+  pins:
   - - U3
     - '1'
   - - U3
     - '3'
   - - C6
     - '1'
-  - - U9
-    - '20'
+  - - JP4
+    - '2'
 - name: VBAT
   priority: 24
   color: '#f59e0b'
@@ -1005,6 +1237,8 @@ nets:
     - '4'
   - - U7
     - '2'
+  - - D2
+    - '1'
 - name: CC1
   priority: 53
   color: '#0284c7'
@@ -1030,6 +1264,8 @@ nets:
   - - Q1
     - '1'
     - G
+  - - D7
+    - '1'
 - name: AUDIO_EN
   priority: 16
   color: '#ea580c'
@@ -1039,6 +1275,8 @@ nets:
   - - U4
     - SD_MODE
     - SD_MODE
+  - - D5
+    - '1'
 - name: VLOAD_SW
   priority: 25
   color: '#f97316'
@@ -1076,6 +1314,8 @@ nets:
   - - J10
     - '2'
     - PERIPH_3V3
+  - - D6
+    - '1'
 - name: EXP_INT_I2C
   priority: 19
   color: '#84cc16'
@@ -1167,8 +1407,18 @@ nets:
     - '2'
   - - C11
     - '1'
+  - - JP1
+    - '2'
+  - - SW1
+    - '1'
+- name: FTDI_NRST
+  priority: 21
+  color: '#eab308'
+  pins:
   - - U9
     - '23'
+  - - JP1
+    - '1'
 - name: BOOT0
   color: '#ca8a04'
   pins:
@@ -1176,8 +1426,59 @@ nets:
     - C14
   - - R6
     - '1'
+  - - JP2
+    - '2'
+  - - JP3
+    - '2'
+- name: FTDI_BOOT0
+  color: '#ca8a04'
+  pins:
   - - U9
     - '22'
+  - - JP2
+    - '1'
+- name: LED_VBAT_K
+  color: '#f59e0b'
+  pins:
+  - - D2
+    - '2'
+  - - R7
+    - '1'
+- name: LED_VBUS_K
+  color: '#b91c1c'
+  pins:
+  - - D3
+    - '2'
+  - - R8
+    - '1'
+- name: LED_3V3_K
+  color: '#dc2626'
+  pins:
+  - - D4
+    - '2'
+  - - R9
+    - '1'
+- name: LED_AUD_K
+  color: '#ea580c'
+  pins:
+  - - D5
+    - '2'
+  - - R10
+    - '1'
+- name: LED_PERIPH_K
+  color: '#dc2626'
+  pins:
+  - - D6
+    - '2'
+  - - R11
+    - '1'
+- name: LED_MCU_K
+  color: '#ea580c'
+  pins:
+  - - D7
+    - '2'
+  - - R12
+    - '1'
 - name: PCIE_TX0_P
   priority: 9
   color: '#2563eb'
