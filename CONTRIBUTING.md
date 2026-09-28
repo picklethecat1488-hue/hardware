@@ -355,6 +355,7 @@ python src/bug_report.py --export-only
 - **Retro Quake Workstation UI**: Styled with the GLQuake console aesthetic, featuring CRT scanlines, beveled stone plaque panels, and interactive Quake 3D embossed controls.
 - **Bug Status Filtering**: Filter issues by status (`OPEN`, `ALL`, `RESOLVED`), with resolved bugs hidden by default so developers focus immediately on active blockers.
 - **Clipboard & File Attachments**: Drag and drop or paste (⌘V / Ctrl+V) screenshots, images, logs, PDFs, and code references directly into issue reports with live previews.
+- **Git LFS Storage & Public Attachments Policy**: Bug report attachments (`build/attachments/` and `feedback/attachments/`) are automatically tracked and stored in **GitHub LFS**. All uploaded attachments are considered **non-confidential** and public to the repository. Never attach sensitive credentials, secret tokens, private keys, or confidential proprietary data.
 - **Automated Markdown Synchronization**: Changes made in the workstation or CLI automatically persist to `build/bugs.sqlite` and sync seamlessly to GitHub-flavored Markdown in `feedback/BUGS.md` and granular issue files `feedback/BUG_<id>.md`.
 - **Graceful Termination**: Clicking "Save and Exit" saves the active bug, syncs `feedback/BUGS.md` and `feedback/BUG_<id>.md`, and gracefully shuts down the server, releasing terminal control.
 

@@ -13,7 +13,7 @@ from model.bug_report import (
     BugStatus,
 )
 from provider.bug_report.markdown_exporter import MarkdownBugExporter
-from provider.bug_report.server import BugReportServer
+from provider.bug_report.server import BugReportRequestHandler, BugReportServer
 from provider.bug_report.sqlite_store import SQLiteBugStore
 
 
@@ -457,3 +457,136 @@ def test_regression_bug_114_rmw_markdown_sync_and_file_watch(tmp_path: Path) -> 
     sqlite_db = server.sqlite_store.load_database()
     assert sqlite_db.get_bug("BUG-001").status == BugStatus.RESOLVED
     assert sqlite_db.get_bug("BUG-002") is not None
+
+
+def test_regression_bug_169_git_lfs_tracking_and_policy() -> None:
+    """Verify BUG-169: Git LFS tracking for bug report attachments and public attachments documentation."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    gitattributes_file = repo_root / ".gitattributes"
+    assert gitattributes_file.exists(), ".gitattributes must exist"
+    ga_content = gitattributes_file.read_text(encoding="utf-8")
+    assert "build/attachments/* filter=lfs diff=lfs merge=lfs -text" in ga_content
+    assert "feedback/attachments/* filter=lfs diff=lfs merge=lfs -text" in ga_content
+
+    # Check CONTRIBUTING.md
+    contrib_file = repo_root / "CONTRIBUTING.md"
+    assert contrib_file.exists()
+    contrib_text = contrib_file.read_text(encoding="utf-8")
+    assert "GitHub LFS" in contrib_text or "Git LFS" in contrib_text
+    assert "non-confidential" in contrib_text
+
+    # Check GEMINI.md
+    gemini_file = repo_root / "GEMINI.md"
+    assert gemini_file.exists()
+    gemini_text = gemini_file.read_text(encoding="utf-8")
+    assert "GitHub LFS" in gemini_text or "Git LFS" in gemini_text
+    assert "non-confidential" in gemini_text
+
+    # Check bug_report template
+    template_file = repo_root / "src" / "provider" / "templates" / "bug_report.html.j2"
+    tpl_text = template_file.read_text(encoding="utf-8")
+    assert "attachment-lfs-notice" in tpl_text
+    assert "GitHub LFS" in tpl_text
+
+
+def test_regression_bug_170_feedback_dir_watch_and_resolution_preservation(tmp_path: Path) -> None:
+    """Verify BUG-170: Feedback directory watch detects external bug resolution and preserves resolution on Save."""
+    feedback_dir = tmp_path / "feedback"
+    feedback_dir.mkdir(parents=True)
+    db_file = tmp_path / "bugs.sqlite"
+    state_file = tmp_path / "bugs_state.json"
+    md_file = feedback_dir / "BUGS.md"
+
+    server = BugReportServer(
+        repo_root=tmp_path,
+        feedback_dir=feedback_dir,
+        sqlite_file=db_file,
+        state_file=state_file,
+        markdown_output=md_file,
+        bind_and_activate=False,
+    )
+
+    # 1. Add bug 166 as OPEN
+    b166 = BugReportModel(
+        id="BUG-166",
+        title="Silkscreen text is mirrored",
+        status=BugStatus.OPEN,
+        severity=BugSeverity.HIGH,
+        category=BugCategory.PCB,
+        description="F.SilkS text is vertically flipped",
+    )
+    server.database.add_or_update(b166)
+    server.save_and_sync()
+
+    bug166_md = feedback_dir / "BUG_166.md"
+    assert bug166_md.exists()
+    assert "- **Status**: `OPEN`" in bug166_md.read_text(encoding="utf-8")
+
+    # 2. Simulate external resolution of BUG-166 in feedback/BUG_166.md
+    # (e.g. by agent turn, git commit, or external edit)
+    import time
+
+    time.sleep(0.05)  # Ensure distinct mtime
+    resolved_md_content = (
+        "# 🟢 `[BUG-166]` Silkscreen text is mirrored\n\n"
+        f"- **UUID**: `{b166.uuid}`\n"
+        "- **ID**: `BUG-166`\n"
+        "- **Status**: `RESOLVED`\n"
+        "- **Severity**: `HIGH`\n"
+        "- **Category**: `PCB`\n"
+        "- **Created**: `2026-09-25 10:00:00 UTC`\n"
+        "- **Resolved**: `2026-09-28 01:00:00 UTC`\n\n"
+        "#### Resolution\n\n"
+        "Corrected UV coordinate mapping in bullet.py and removed mirror flag in KiCad exporter.\n\n"
+        "#### Description\n\n"
+        "F.SilkS text is vertically flipped\n"
+    )
+    bug166_md.write_text(resolved_md_content, encoding="utf-8")
+
+    # 3. Trigger file watch check (called automatically on any incoming GET/POST or watcher loop)
+    assert server.check_file_watch() is True
+
+    # Verify BUG-166 is now RESOLVED in server memory and SQLite
+    reloaded_b166 = server.database.get_bug("BUG-166")
+    assert reloaded_b166 is not None
+    assert reloaded_b166.status == BugStatus.RESOLVED
+    assert "bullet.py" in reloaded_b166.resolution_notes
+
+    # 4. User adds and saves another bug in the bug report tool (the action that previously caused BUG-166 to lose resolution)
+    handler = BugReportRequestHandler.__new__(BugReportRequestHandler)
+    handler.server = server
+    handler._send_json = lambda *args, **kwargs: None
+    handler._handle_save_bug(
+        {
+            "title": "New Bug 177",
+            "status": "OPEN",
+            "severity": "MEDIUM",
+            "category": "CAD",
+            "description": "Enclosure fitment feedback",
+        }
+    )
+
+    # 5. Assert BUG-166 REMAINS RESOLVED across memory, markdown, and SQLite
+    final_b166 = server.database.get_bug("BUG-166")
+    assert final_b166.status == BugStatus.RESOLVED
+    assert "- **Status**: `RESOLVED`" in bug166_md.read_text(encoding="utf-8")
+    assert server.sqlite_store.load_database().get_bug("BUG-166").status == BugStatus.RESOLVED
+
+
+def test_regression_bug_172_vertical_text_panel_and_cli_expansion() -> None:
+    """Verify BUG-172: Allow text panels in bug report tool and CLI console in code review tool to extend vertically."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
+
+    # 1. Verify code_review.html.j2 has vertical CLI console resizing
+    cr_template = (repo_root / "src" / "provider" / "templates" / "code_review.html.j2").read_text(encoding="utf-8")
+    assert "cli-resizer" in cr_template
+    assert "cliResizer" in cr_template
+    assert "setupCliResizer" in cr_template
+    assert "cursor: ns-resize" in cr_template
+
+    # 2. Verify bug_report.html.j2 has vertical text panel expansion
+    br_template = (repo_root / "src" / "provider" / "templates" / "bug_report.html.j2").read_text(encoding="utf-8")
+    assert "panel-expand-btn" in br_template
+    assert "expanded-vertical" in br_template
+    assert "toggleExpandPanel" in br_template
+    assert "resize: vertical" in br_template

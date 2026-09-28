@@ -38,19 +38,9 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         """Suppress default HTTP server logging to preserve clean console output."""
         return
 
-    def _check_markdown_file_watch(self) -> None:
-        """Check if BUGS.md was modified externally and reload database."""
-        if self.server.markdown_output.exists():
-            try:
-                curr_mtime = self.server.markdown_output.stat().st_mtime
-                if curr_mtime > self.server.markdown_mtime + 0.001:
-                    self.server.sync_with_markdown()
-            except OSError:
-                pass
-
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboard and data query endpoints."""
-        self._check_markdown_file_watch()
+        self.server.check_file_watch()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -83,11 +73,20 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(files)
             case "/api/next_bug_id":
                 self._send_json({"next_id": self.server.database.generate_bug_id()})
+            case "/api/version":
+                self._send_json(
+                    {
+                        "version": self.server.db_version,
+                        "bugs_count": len(self.server.database.bugs),
+                        "mtime": self.server.feedback_mtime,
+                    }
+                )
             case _:
                 self.send_error(404, "Endpoint not found")
 
     def do_POST(self) -> None:  # noqa: N802
         """Route POST requests for bug creation, updates, uploads, and export."""
+        self.server.check_file_watch()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
@@ -384,6 +383,8 @@ class BugReportServer(ThreadingHTTPServer):
         self.sqlite_store = SQLiteBugStore(self.sqlite_file)
         self.exporter = MarkdownBugExporter(repo_root=self.repo_root)
         self.markdown_mtime = self.markdown_output.stat().st_mtime if self.markdown_output.exists() else 0.0
+        self.feedback_mtime = self._get_feedback_dir_mtime()
+        self.db_version: int = 1
         self.database = self._initialize_database()
         self._watcher_stop = threading.Event()
 
@@ -391,21 +392,55 @@ class BugReportServer(ThreadingHTTPServer):
             self._start_file_watcher()
             super().__init__((host, port), BugReportRequestHandler)
 
+    def _get_feedback_dir_mtime(self) -> float:
+        """Compute maximum mtime across feedback_dir and all markdown files within it."""
+        if not self.feedback_dir.exists():
+            return 0.0
+        try:
+            max_mtime = self.feedback_dir.stat().st_mtime
+            for p in self.feedback_dir.glob("*.md"):
+                try:
+                    m = p.stat().st_mtime
+                    if m > max_mtime:
+                        max_mtime = m
+                except OSError:
+                    pass
+            return max_mtime
+        except OSError:
+            return 0.0
+
+    def check_file_watch(self) -> bool:
+        """Check if feedback_dir or markdown_output was modified externally and reload state."""
+        changed = False
+        if self.markdown_output.exists():
+            try:
+                curr_mtime = self.markdown_output.stat().st_mtime
+                if curr_mtime > self.markdown_mtime + 0.001:
+                    changed = True
+            except OSError:
+                pass
+
+        curr_fb_mtime = self._get_feedback_dir_mtime()
+        if curr_fb_mtime > self.feedback_mtime + 0.001:
+            changed = True
+
+        if changed:
+            self.sync_with_feedback_dir()
+            return True
+        return False
+
     def _start_file_watcher(self) -> None:
-        """Start background polling thread to watch BUGS.md for external changes."""
+        """Start background polling thread to watch feedback_dir and BUGS.md for external changes."""
 
         def watch_loop() -> None:
             import time
 
             while not self._watcher_stop.is_set():
                 time.sleep(1.0)
-                if self.markdown_output.exists():
-                    try:
-                        curr_mtime = self.markdown_output.stat().st_mtime
-                        if curr_mtime > self.markdown_mtime + 0.001:
-                            self.sync_with_markdown()
-                    except OSError:
-                        pass
+                try:
+                    self.check_file_watch()
+                except Exception:
+                    pass
 
         t = threading.Thread(target=watch_loop, daemon=True)
         t.start()
@@ -486,6 +521,8 @@ class BugReportServer(ThreadingHTTPServer):
         )
         if self.markdown_output.exists():
             self.markdown_mtime = self.markdown_output.stat().st_mtime
+        self.feedback_mtime = self._get_feedback_dir_mtime()
+        self.db_version += 1
         return out
 
     def get_url(self) -> str:

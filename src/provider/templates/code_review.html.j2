@@ -785,6 +785,19 @@
     /* =========================================================
        BOTTOM QUAKE TERMINAL CLI CONSOLE
        ========================================================= */
+    .cli-resizer {
+      height: 6px;
+      background: var(--quake-border-light);
+      cursor: ns-resize;
+      flex-shrink: 0;
+      position: relative;
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+      z-index: 55;
+    }
+    .cli-resizer:hover, .cli-resizer.dragging {
+      background: var(--quake-gold);
+      box-shadow: 0 0 10px rgba(255, 184, 0, 0.7);
+    }
     .pane-cli-drawer {
       height: 230px;
       background: #110a05;
@@ -1263,6 +1276,9 @@
 
   </div>
 
+  <!-- Resizer Handle for Quake CLI Console -->
+  <div id="cliResizer" class="cli-resizer" title="Drag to resize CLI console vertically"></div>
+
   <!-- Bottom: Quake Terminal CLI Console -->
   <footer id="cliDrawer" class="pane-cli-drawer">
     <div class="cli-bar-header">
@@ -1567,6 +1583,7 @@
       await loadCommits();
       setupKeyboardShortcuts();
       setupCliInput();
+      setupCliResizer();
       setupDiffSelectionListener();
     });
 
@@ -2298,6 +2315,44 @@
       }
 
       setupCliAutocomplete();
+    }
+
+    function setupCliResizer() {
+      const resizer = document.getElementById("cliResizer");
+      const drawer = document.getElementById("cliDrawer");
+      if (!resizer || !drawer) return;
+
+      let isDragging = false;
+      let startY = 0;
+      let startHeight = 0;
+
+      resizer.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        startY = e.clientY;
+        startHeight = drawer.offsetHeight;
+        resizer.classList.add("dragging");
+        document.body.style.cursor = "ns-resize";
+        document.body.style.userSelect = "none";
+        e.preventDefault();
+      });
+
+      document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const delta = startY - e.clientY;
+        const newHeight = Math.max(60, Math.min(window.innerHeight * 0.85, startHeight + delta));
+        drawer.style.height = `${newHeight}px`;
+        drawer.classList.remove("minimized");
+        state.panes.cli = true;
+      });
+
+      document.addEventListener("mouseup", () => {
+        if (isDragging) {
+          isDragging = false;
+          resizer.classList.remove("dragging");
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+        }
+      });
     }
 
     function setupCliAutocomplete() {

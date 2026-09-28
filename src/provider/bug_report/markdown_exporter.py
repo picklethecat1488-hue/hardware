@@ -461,7 +461,7 @@ class MarkdownBugExporter:
                         if cleaned_logs.endswith("```"):
                             cleaned_logs = cleaned_logs[:-3]
                         logs = cleaned_logs.strip()
-                    case "resolution notes":
+                    case "resolution notes" | "resolution":
                         res_notes = sub_body
                     case "attachments & references":
                         for att_line in sub_body.splitlines():
@@ -820,7 +820,7 @@ class MarkdownBugExporter:
                         if cleaned.endswith("```"):
                             cleaned = cleaned[:-3]
                         logs = cleaned.strip()
-                    case "resolution notes":
+                    case "resolution notes" | "resolution":
                         res_notes = sub_body
                     case "attachments & references":
                         for att_line in sub_body.splitlines():
