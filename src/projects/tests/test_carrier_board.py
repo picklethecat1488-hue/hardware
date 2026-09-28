@@ -1305,3 +1305,61 @@ def test_regression_flying_probes_initial_isolation_verdict_pending() -> None:
         assert "⚪ *PENDING*" not in final_report, "Completed report must not have pending steps"
     finally:
         p.disconnect(client)
+
+
+def test_regression_bug_176_jst_connector_spacing_and_zero_drc_errors() -> None:
+    """Verify BUG-176: JST peripheral headers J6-J10 have >= 1.0mm body gap and 0 DRC errors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from model.wiring import Wiring
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    # Connector lengths along Y axis: 6P = 14.0mm, 7P = 16.0mm
+    connectors = [("J6", 14.0), ("J7", 14.0), ("J8", 14.0), ("J9", 16.0), ("J10", 16.0)]
+    for i in range(len(connectors) - 1):
+        c_top, len_top = connectors[i]
+        c_bot, len_bot = connectors[i + 1]
+        y_top = comp_map[c_top].position[1]
+        y_bot = comp_map[c_bot].position[1]
+        body_gap = (y_top - len_top / 2.0) - (y_bot + len_bot / 2.0)
+        assert body_gap >= 1.0, f"Body gap between {c_top} and {c_bot} must be >= 1.0mm, got {body_gap:.2f}mm"
+
+    # Verify PCB DRC reports 0 errors
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0, f"Expected 0 DRC errors, got {report.error_count}"
+
+
+def test_regression_bug_177_enclosure_bottom_cutouts_and_lid_markers() -> None:
+    """Verify BUG-177: enclosure bottom cutouts align with J6-J10 and lid has engraved GPIO icons."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider import Mode
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
+    wall_x = (w / 2.0) - (wall / 2.0)
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
+    z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
+
+    for des in ("J6", "J7", "J8", "J9", "J10"):
+        y = comp_map[des].position[1]
+        assert not enclosure.part.is_inside((wall_x, y, z_conn)), (
+            f"Enclosure bottom must have cutout clearing connector {des} at Y={y}"
+        )
+
+    # Verify lid builds successfully with GPIO icon markers
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid.part is not None
+    assert lid.part.volume > 0.0

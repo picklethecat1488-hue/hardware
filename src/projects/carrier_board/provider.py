@@ -615,18 +615,20 @@ class CarrierBoardProvider(Provider):
             with Locations((gpio_x, gpio_y, 0.0)):
                 Box(gpio_w, gpio_l, wall * 4.0, mode=BuildMode.SUBTRACT)
 
-            # GPIO key engraved on enclosure lid exterior surface
+            # GPIO key engraved on enclosure lid exterior surface (BUG-073, BUG-177)
             with BuildSketch(Plane.XY.offset(wall)) as s_key:
-                with Locations((gpio_x - 4.5, gpio_y)):
-                    Text("GPIO", font_size=2.5, rotation=90.0)
+                with Locations((gpio_x - 4.5, gpio_y - 2.0)):
+                    Text("GPIO", font_size=2.2, rotation=90.0)
                 with Locations((gpio_x - 3.5, gpio_y + (gpio_l / 2.0) - 2.0)):
-                    Text("10", font_size=1.5, rotation=90.0)
-                with Locations((gpio_x - 3.5, gpio_y - (gpio_l / 2.0) + 2.0)):
-                    Text("1", font_size=1.5, rotation=90.0)
+                    Text("⏚", font_size=2.0, rotation=90.0)
+                with Locations((gpio_x - 3.5, gpio_y + (gpio_l / 2.0) - 5.0)):
+                    Text("⚡", font_size=2.0, rotation=90.0)
+                with Locations((gpio_x - 3.5, gpio_y - 3.5)):
+                    Text("1..8", font_size=1.6, rotation=90.0)
             extrude(s_key.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
-            # Peripheral bus identifier labels engraved on enclosure lid exterior right margin (BUG-160)
-            bus_labels = {"J6": "I3C", "J7": "I2C", "J8": "SPI", "J9": "UART", "J10": "GPIO"}
+            # Peripheral bus identifier labels engraved on enclosure lid exterior right margin (BUG-160, BUG-177)
+            bus_labels = {"J6": "I2C", "J7": "I3C0", "J8": "I3C1", "J9": "SPI", "J10": "UART"}
             periph_lid_specs = []
             if self.wiring_path.exists():
                 wiring = Wiring(str(self.wiring_path))
@@ -1052,9 +1054,9 @@ class CarrierBoardProvider(Provider):
                 )
 
             # Global optical fiducials (crosshairs)
-            with Locations((-24.0, 38.0), (24.0, -38.0), (-24.0, -38.0)):
+            with Locations((-24.0, 38.0), (21.0, -42.0), (-24.0, -38.0)):
                 SilkscreenText("+", layer="F.SilkS", font_size=1.5, thickness=0.25)
-            with Locations((-24.0, 38.0), (24.0, -38.0), (-24.0, -38.0)):
+            with Locations((-24.0, 38.0), (21.0, -42.0), (-24.0, -38.0)):
                 SilkscreenText("+", layer="B.SilkS", font_size=1.5, thickness=0.25, mirror=True)
 
             # Alignment markers for ICs and connectors
@@ -1115,15 +1117,15 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText("D1", layer="F.SilkS", font_size=0.7, thickness=0.10)
             with Locations((-18.0, -18.5)):
                 SilkscreenText("J5", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, 31.0)):
+            with Locations((20.5, 33.0)):
                 SilkscreenText("J6", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, 19.0)):
+            with Locations((20.5, 17.5)):
                 SilkscreenText("J7", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, 7.0)):
+            with Locations((20.5, 2.0)):
                 SilkscreenText("J8", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, -5.0)):
+            with Locations((20.5, -14.5)):
                 SilkscreenText("J9", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((20.5, -21.0)):
+            with Locations((20.5, -32.0)):
                 SilkscreenText("J10", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((16.0, -28.0)):
                 SilkscreenText("J14", layer="F.SilkS", font_size=0.8, thickness=0.12)
