@@ -1826,26 +1826,92 @@ def test_regression_bug_209_silkscreen_readability_and_spacing() -> None:
         f"LAYER 1-6 text at {layer_text.position} overlaps D2..D7 corridor"
     )
 
-    # 3. Verify STATUS and OVERRIDES silkscreen frames maintain clear horizontal separation
-    status_rect = next(g for g in pcb_cfg.silkscreen_graphics if g.shape == "rect" and abs(g.position[0] - 4.5) < 1.0)
-    overrides_rect = next(
-        g for g in pcb_cfg.silkscreen_graphics if g.shape == "rect" and abs(g.position[0] - 12.2) < 1.0
-    )
-    status_x_max = status_rect.position[0] + status_rect.dimensions[0] / 2.0
-    overrides_x_min = overrides_rect.position[0] - overrides_rect.dimensions[0] / 2.0
-    clearance = overrides_x_min - status_x_max
-    assert clearance >= 0.50, f"STATUS and OVERRIDES frames too close: clearance is {clearance:.2f}mm < 0.50mm"
-
-    # 4. Verify jumper and switch labels are horizontal (rotation == 0.0)
+    # 3. Verify jumper and switch labels are horizontal (rotation == 0.0)
     for label_name in ("NRST", "BOOT0", "ISP", "VBUS", "RESET"):
         lbl = next(t for t in pcb_cfg.silkscreen_texts if t.text == label_name)
         assert lbl.rotation == 0.0, f"Label {label_name} must have horizontal rotation 0.0, got {lbl.rotation}"
 
-    # 5. Verify PCB DRC passes with 0 violations
+    # 4. Verify PCB DRC passes with 0 violations
     drc = PCBDesignRulesChecker(pcb_cfg)
     report = drc.check_all(wiring=Wiring(str(provider.wiring_path)))
     assert report.passed, f"PCB DRC failed:\n{report.summary()}"
     assert report.error_count == 0
+
+
+def test_regression_bug_219_reset_relocation_and_horizontal_jumpers() -> None:
+    """Verify BUG-219: Relocate RESET button, remove grouping borders, orient jumpers horizontally.
+
+    Asserts that:
+    1. SW1 (RESET button) is moved out of the overrides group and placed centrally below U1 at (0.0, -11.0).
+    2. RESET silkscreen label is placed between U1 and SW1 at (0.0, -9.2).
+    3. Rectangular grouping borders around STATUS and OVERRIDES are removed.
+    4. Jumpers JP1, JP2, JP3, JP4 are oriented horizontally with rotation (0.0, 0.0, 0.0).
+    5. Silkscreen text labels (NRST, BOOT0, ISP, VBUS) are positioned to the right of each jumper at X=14.0.
+    6. Complete DRC check passes with zero errors and zero warnings.
+    """
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_cfg = provider.pcb_config
+
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+
+    # 1. SW1 relocation
+    assert "SW1" in fp_map
+    sw1 = fp_map["SW1"]
+    assert abs(sw1.position[0] - 0.0) < 0.1, f"SW1 X position must be 0.0, got {sw1.position[0]}"
+    assert abs(sw1.position[1] - (-11.0)) < 0.1, f"SW1 Y position must be -11.0, got {sw1.position[1]}"
+    assert abs(sw1.rotation[2] - 0.0) < 0.1, f"SW1 rotation must be 0.0, got {sw1.rotation}"
+
+    # 2. RESET silkscreen label
+    reset_text = next(t for t in pcb_cfg.silkscreen_texts if t.layer == "F.SilkS" and t.text == "RESET")
+    assert abs(reset_text.position[0] - 0.0) < 0.1, f"RESET text X must be 0.0, got {reset_text.position[0]}"
+    assert abs(reset_text.position[1] - (-9.2)) < 0.2, f"RESET text Y must be -9.2, got {reset_text.position[1]}"
+
+    # 3. Rectangular grouping borders removed
+    rect_frames = [
+        g
+        for g in pcb_cfg.silkscreen_graphics
+        if g.shape == "rect" and (abs(g.position[0] - 12.2) < 2.0 or abs(g.position[0] - 4.5) < 2.0)
+    ]
+    assert len(rect_frames) == 0, (
+        f"Grouping rectangles for STATUS and OVERRIDES must be removed, found {len(rect_frames)}"
+    )
+
+    # 4. Jumpers oriented horizontally
+    for jp_name in ("JP1", "JP2", "JP3", "JP4"):
+        assert jp_name in fp_map
+        jp = fp_map[jp_name]
+        assert abs(jp.rotation[2] - 0.0) < 0.1, (
+            f"Jumper {jp_name} must have horizontal rotation 0.0, got {jp.rotation[2]}"
+        )
+        assert abs(jp.position[0] - 10.5) < 0.1, f"Jumper {jp_name} must be placed at X=10.5, got {jp.position[0]}"
+
+    # 5. Silkscreen texts to the right at X=14.0
+    text_pos_map = {
+        "NRST": -21.5,
+        "BOOT0": -24.0,
+        "ISP": -27.0,
+        "VBUS": -29.6,
+    }
+    for text_name, expected_y in text_pos_map.items():
+        lbl = next(t for t in pcb_cfg.silkscreen_texts if t.layer == "F.SilkS" and t.text == text_name)
+        assert abs(lbl.position[0] - 14.0) < 0.2, (
+            f"Label {text_name} must be to the right at X=14.0, got {lbl.position[0]}"
+        )
+        assert abs(lbl.position[1] - expected_y) < 0.2, (
+            f"Label {text_name} must be at Y={expected_y}, got {lbl.position[1]}"
+        )
+        assert lbl.rotation == 0.0, f"Label {text_name} must be horizontal (rotation 0.0)"
+
+    # 6. Complete DRC check passes
+    drc = PCBDesignRulesChecker(pcb_cfg)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0
+    assert report.warning_count == 0
 
 
 def test_regression_bug_220_flex_tail_flying_probe_isolation_excluded() -> None:

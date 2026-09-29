@@ -781,8 +781,8 @@ footprints:
 - name: SW1
   package: SW_PUSH_SMD
   position:
-  - 11.25
-  - -18.0
+  - 0.0
+  - -11.0
   - 0.8
   rotation:
   - 0.0
@@ -793,49 +793,49 @@ footprints:
 - name: JP1
   package: pin_header_1x2
   position:
-  - 9.5
-  - -23.0
+  - 10.5
+  - -21.5
   - 0.8
   rotation:
   - 0.0
   - 0.0
-  - 90.0
+  - 0.0
   mpn: TSW-102-07-L-S
   supplier_pn: SAM1026-02-ND
 - name: JP2
   package: pin_header_1x2
   position:
-  - 9.5
-  - -28.5
+  - 10.5
+  - -24.0
   - 0.8
   rotation:
   - 0.0
   - 0.0
-  - 90.0
+  - 0.0
   mpn: TSW-102-07-L-S
   supplier_pn: SAM1026-02-ND
 - name: JP3
   package: pin_header_1x2
   position:
-  - 13.0
-  - -23.0
+  - 10.5
+  - -27.0
   - 0.8
   rotation:
   - 0.0
   - 0.0
-  - 90.0
+  - 0.0
   mpn: TSW-102-07-L-S
   supplier_pn: SAM1026-02-ND
 - name: JP4
   package: pin_header_1x2
   position:
-  - 13.0
-  - -28.5
+  - 10.5
+  - -29.6
   - 0.8
   rotation:
   - 0.0
   - 0.0
-  - 90.0
+  - 0.0
   mpn: TSW-102-07-L-S
   supplier_pn: SAM1026-02-ND
 - name: D2
