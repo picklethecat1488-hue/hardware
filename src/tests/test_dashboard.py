@@ -1603,3 +1603,37 @@ def test_regression_bug_213_ancestor_top_marker_merged_pruning_and_rebase(tmp_pa
     assert "onRebaseClicked()" in tpl_text
     assert "ancestor-top-node" in tpl_text
     assert "node-badge-ancestor" in tpl_text
+
+
+def test_regression_bug_215_diff_view_css_syntax() -> None:
+    """Verify BUG-215 regression: CSS inside diff_view.html.j2 style block has balanced braces.
+
+    A missing closing brace in .node-badge-pr.pr-tag-link caused subsequent modal overlay rules
+    (.quake-modal-overlay) to fail to parse, rendering the commit dialog inline with giant unstyled fonts.
+    """
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # Extract style block
+    start_tag = "<style>"
+    end_tag = "</style>"
+    start_idx = tpl_text.find(start_tag)
+    end_idx = tpl_text.find(end_tag)
+    assert start_idx != -1 and end_idx != -1
+
+    css_content = tpl_text[start_idx + len(start_tag) : end_idx]
+
+    # Check brace balance
+    open_braces = css_content.count("{")
+    close_braces = css_content.count("}")
+    assert open_braces == close_braces, f"Mismatched braces in diff_view CSS: {open_braces} '{{' vs {close_braces} '}}'"
+
+    # Verify .node-badge-pr.pr-tag-link block is properly terminated before .pr-local-badge
+    assert ".node-badge-pr.pr-tag-link:hover {" in css_content
+    node_badge_idx = css_content.find(".node-badge-pr.pr-tag-link:hover {")
+    local_badge_idx = css_content.find(".pr-local-badge {", node_badge_idx)
+    assert local_badge_idx != -1
+    intermediate = css_content[node_badge_idx:local_badge_idx]
+    assert intermediate.count("{") == intermediate.count("}"), (
+        "CSS block between .node-badge-pr.pr-tag-link:hover and .pr-local-badge must have matching braces"
+    )
