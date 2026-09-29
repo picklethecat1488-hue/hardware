@@ -330,7 +330,7 @@ def test_regression_bug_107_carrier_board_flying_probes_simulation() -> None:
         report_md = provider.generate_test_report()
         assert "Flying Probes Automated Acceptance Test Report" in report_md
         assert "TEST_CONTINUITY_GND" in report_md
-        assert "TEST_IMP_PCIE_DIFF" in report_md
+        assert "TEST_UART_BLE_SPEED" in report_md
         assert "PASS" in report_md
         assert "100.0%" in report_md
         assert "Signal Line Isolation Audit" in report_md
@@ -398,8 +398,6 @@ def test_regression_bug_195_flying_probes_diff_pair_and_mutual_cap_compliance() 
     checks = diff_results["checks"]
     pair_names = {c.pair_name for c in checks}
     assert "USB_2_0" in pair_names
-    assert "PCIE_TX0" in pair_names
-    assert "PCIE_RX0" in pair_names
     for c in checks:
         assert c.passed is True
         assert c.skew_ps <= c.max_skew_ps
@@ -418,6 +416,77 @@ def test_regression_bug_195_flying_probes_diff_pair_and_mutual_cap_compliance() 
         assert c.touch_detected is True
         assert c.delta_c_pf >= c.min_delta_c_pf
         assert c.finger_touch_pf > c.baseline_pf
+
+
+def test_regression_bug_214_btle_support_and_enclosure_cover_bluetooth_logo() -> None:
+    """Verify BUG-214: PCIe connector/cutout removed, BTLE UART 1Mb/s added, Bluetooth logo on lid."""
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+    net_map = {n.name: n for n in wiring.nets}
+
+    # 1. PCIe connector J1 removed, U11 BTLE module added with built-in PCB antenna
+    assert "J1" not in comp_map, "PCIe connector J1 must be removed from design (BUG-214)"
+    assert "U11" in comp_map, "U11 BTLE module must exist in carrier board components (BUG-214)"
+    assert comp_map["U11"].package == "MOD-BLE-PCB-ANT"
+    assert tuple(comp_map["U11"].position[:2]) == (0.0, -36.0)
+
+    # 2. BTLE UART interface connected to U1 with minimum 1Mb/s speed
+    for uart_net in ("BLE_TX", "BLE_RX", "BLE_RTS", "BLE_CTS"):
+        assert uart_net in net_map, f"Net {uart_net} must exist in wiring"
+        net_pins = net_map[uart_net].pins
+        u1_pin = next((p for p in net_pins if p[0] == "U1"), None)
+        u11_pin = next((p for p in net_pins if p[0] == "U11"), None)
+        assert u1_pin is not None, f"Net {uart_net} must connect to U1"
+        assert u11_pin is not None, f"Net {uart_net} must connect to U11"
+    assert provider.settings.ble_uart_baud_rate >= 1000000, "BTLE UART baud rate must be >= 1Mb/s"
+
+    # 3. Pairing by capacitive touch input gesture or proximity
+    pcb_cfg = provider.pcb_config
+    cap_sensor_names = [s.name for s in pcb_cfg.capacitive_sensors]
+    assert "ACTION_BUTTON" in cap_sensor_names, "ACTION_BUTTON must exist for cap-touch pairing gesture"
+    assert "PROXIMITY_SENSOR" in cap_sensor_names, "PROXIMITY_SENSOR must exist for proximity-based pairing"
+
+    # 4. Main user LED D1 and piezo buzzer U5 provide BTLE connection status
+    assert "D1" in comp_map, "Main user RGB LED D1 must exist"
+    assert "U5" in comp_map, "Piezo buzzer U5 must exist"
+    signaling = provider.btle_status_signaling
+    assert "pairing" in signaling and "connected" in signaling and "disconnected" in signaling
+    assert "blue" in signaling["pairing"]["led_color"]
+    assert "solid_cyan" in signaling["connected"]["led_color"]
+    assert "buzzer_tone" in signaling["pairing"]
+    assert "buzzer_tone" in signaling["connected"]
+
+    # 5. Integrated PCB antenna and ground plane keepout
+    assert provider.settings.ble_antenna_length > 0
+    ble_keepouts = [obs for obs in provider.pcb_manifest["obstacles"] if "antenna" in obs["name"]]
+    assert len(ble_keepouts) >= 1, "Must define RF ground plane keepout for integrated PCB antenna"
+
+    # 6. Bluetooth logo on enclosure cover (enclosure_lid)
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid.part.is_valid(), "Enclosure lid must be a valid solid"
+    assert len(lid.part.solids()) == 1, "Enclosure lid must be a single solid"
+    assert "bluetooth_logo" in lid.part.joints, "Lid must expose bluetooth_logo joint"
+    wall = provider.settings.enclosure_wall_thickness
+    depth = provider.settings.ble_logo_depth
+    bt_faces = [
+        f
+        for f in lid.part.faces()
+        if abs(f.center().Z - (wall - depth)) < 1e-3 and abs(f.center().X) < 5.0 and -30.0 < f.center().Y < -15.0
+    ]
+    assert len(bt_faces) >= 5, f"Expected engraved Bluetooth logo faces on lid, found {len(bt_faces)}"
+
+    # 7. Zero PCIe cutouts in enclosure bottom
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    floor_z = -h_shell / 2.0 + (wall / 2.0)
+    length = provider.settings.board_length + 2.0 * (provider.settings.enclosure_clearance + wall)
+    rear_wall_y = -length / 2.0 + (wall / 2.0)
+    m2_z = -h_shell / 2.0 + wall + standoff_h + 2.0
+
+    assert enclosure.part.is_inside((0.0, -36.0, floor_z)), "Enclosure bottom floor must be solid under former J1"
+    assert enclosure.part.is_inside((0.0, rear_wall_y, m2_z)), "Enclosure rear wall must be solid without PCIe cutout"
 
 
 def test_regression_bug_131_schematic_collinear_wire_overlaps() -> None:
@@ -603,7 +672,7 @@ def test_regression_bug_141_flex_tail_tab_fit() -> None:
 
 
 def test_regression_bug_142_m2_floor_cutout() -> None:
-    """Verify BUG-142: enclosure bottom floor has pass-through cutout under PCIE connector J1."""
+    """Verify BUG-142 & BUG-214: enclosure bottom floor is completely solid under former PCIe connector J1."""
     provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
@@ -611,16 +680,12 @@ def test_regression_bug_142_m2_floor_cutout() -> None:
     h_shell = standoff_h + provider.settings.board_thickness + 10.0
     floor_z = -h_shell / 2.0 + (wall / 2.0)
 
-    wiring = Wiring(str(provider.wiring_path))
-    j1 = next(c for c in wiring.footprints if c.name == "J1")
-    j1_x, j1_y = j1.position[0], j1.position[1]
-
-    # Floor must have a cutout under J1 connector
-    assert not enclosure.part.is_inside((j1_x, j1_y, floor_z)), (
-        f"Enclosure bottom floor must have cutout under J1 at ({j1_x}, {j1_y})"
+    # Floor must be completely solid under (0.0, -36.0) where J1 was previously pierced
+    assert enclosure.part.is_inside((0.0, -36.0, floor_z)), (
+        "Enclosure bottom floor must be solid under former J1 location after PCIe removal (BUG-214)"
     )
-    # Floor must remain solid away from J1 cutout
-    assert enclosure.part.is_inside((20.0, j1_y, floor_z)), "Enclosure floor must be solid away from cutout"
+    # Floor must remain solid across bottom
+    assert enclosure.part.is_inside((20.0, -36.0, floor_z)), "Enclosure floor must be solid away from center"
 
 
 def test_regression_bug_143_peripheral_cutouts_uniform_size() -> None:
@@ -650,23 +715,21 @@ def test_regression_bug_143_peripheral_cutouts_uniform_size() -> None:
 
 
 def test_regression_bug_144_m2_rear_wall_cutout() -> None:
-    """Verify BUG-144: enclosure bottom rear wall has cutout for J1 insertion."""
+    """Verify BUG-144 & BUG-214: enclosure bottom rear wall has zero PCIe cutout and is completely solid."""
     provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
     standoff_h = provider.settings.standoff_height
     h_shell = standoff_h + provider.settings.board_thickness + 10.0
     length = provider.settings.board_length + 2.0 * (provider.settings.enclosure_clearance + wall)
-    m2_h = provider.settings.enclosure_m2_cutout_height
-    m2_z = -h_shell / 2.0 + wall + standoff_h + (m2_h / 2.0) - 0.5
     rear_wall_y = -length / 2.0 + (wall / 2.0)
 
-    # Cutout aperture must pierce rear wall at center X=0
-    assert not enclosure.part.is_inside((0.0, rear_wall_y, m2_z)), (
-        f"Enclosure rear wall must have M.2 cutout at (0.0, {rear_wall_y}, {m2_z})"
+    # Rear wall at center X=0 must be completely solid without M.2/PCIe cutout
+    m2_z = -h_shell / 2.0 + wall + standoff_h + 2.0
+    assert enclosure.part.is_inside((0.0, rear_wall_y, m2_z)), (
+        f"Enclosure rear wall must be solid at (0.0, {rear_wall_y}, {m2_z}) after PCIe removal (BUG-214)"
     )
-    # Rear wall must remain solid away from cutout
-    assert enclosure.part.is_inside((25.0, rear_wall_y, m2_z)), "Rear wall must be solid outside M.2 cutout"
+    assert enclosure.part.is_inside((25.0, rear_wall_y, m2_z)), "Rear wall must be solid across entire width"
 
 
 @pytest.mark.slow
@@ -774,9 +837,9 @@ def test_regression_bug_150_component_cutout_labels() -> None:
     usb_face = next((f for f in left_engraved if abs(f.center().Y) < 1.0), None)
     assert usb_face is not None, "USB connector trident icon face must be engraved above USB-C cutout"
 
-    # 2. Rear exterior wall (M.2 PCIE label)
+    # 2. Rear exterior wall (solid wall, 0 M.2 PCIE engraved faces after BUG-214)
     rear_engraved = [f for f in enclosure.part.faces() if abs(f.center().Y - (-length / 2.0 + 0.4)) < 1e-3]
-    assert len(rear_engraved) >= 5, f"Expected M.2 PCIE engraved faces, found {len(rear_engraved)}"
+    assert len(rear_engraved) == 0, f"Expected 0 M.2 PCIE engraved faces on rear wall, found {len(rear_engraved)}"
 
     # 3. Front shelf (FLEX TAIL label)
     shelf_engraved = [
@@ -784,9 +847,9 @@ def test_regression_bug_150_component_cutout_labels() -> None:
     ]
     assert len(shelf_engraved) >= 8, f"Expected FLEX TAIL engraved faces, found {len(shelf_engraved)}"
 
-    # 4. Enclosure lid (BATTERY label)
+    # 4. Enclosure lid (BATTERY and BLUETOOTH labels)
     lid_engraved = [f for f in lid.part.faces() if abs(f.center().Z - (wall - 0.4)) < 1e-3]
-    assert len(lid_engraved) >= 5, f"Expected BATTERY engraved faces on lid, found {len(lid_engraved)}"
+    assert len(lid_engraved) >= 10, f"Expected BATTERY and BLUETOOTH engraved faces on lid, found {len(lid_engraved)}"
 
 
 @pytest.mark.slow
@@ -1646,7 +1709,8 @@ def test_regression_bug_207_sheet_17_components_on_carrier_board() -> None:
 
     # Verify existing baseline components were not displaced
     assert tuple(comp_map["U1"].position[:2]) == (0.0, 0.0)
-    assert tuple(comp_map["J1"].position[:2]) == (0.0, -36.0)
+    assert "J1" not in comp_map, "J1 PCIe connector must be removed (BUG-214)"
+    assert tuple(comp_map["U11"].position[:2]) == (0.0, -36.0)
     assert tuple(comp_map["J2"].position[:2]) == (0.0, 38.0)
     assert tuple(comp_map["J3"].position[:2]) == (-25.0, 0.0)
     assert tuple(comp_map["J14"].position[:2]) == (19.0, -28.0)

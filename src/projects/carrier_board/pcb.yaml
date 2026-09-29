@@ -15,17 +15,28 @@ obstacles:
   - 0.0
   - 1.8
   description: MCU BGA at center
-- name: J1
+- name: U11
   shape: box
   dimensions_mm:
-  - 24.0
   - 10.0
-  - 5.0
+  - 14.0
+  - 2.2
   position_mm:
   - 0.0
-  - -36.0
-  - 3.3
-  description: M.2 Key-M edge connector
+  - -34.0
+  - 1.9
+  description: BTLE transceiver module with integrated PCB antenna
+- name: ble_antenna_keepout
+  shape: box
+  dimensions_mm:
+  - 16.0
+  - 5.0
+  - 1.6
+  position_mm:
+  - 0.0
+  - -42.0
+  - 0.8
+  description: RF ground plane keepout for integrated PCB antenna
 - name: J2
   shape: box
   dimensions_mm:
@@ -137,31 +148,18 @@ design_rules:
     track_dangling: ignore
     silk_edge_clearance: ignore
 net_classes:
-- name: PCIE_GEN4
+- name: BTLE_HIGH_SPEED_UART
   trace_width_mm: 0.12
   clearance_mm: 0.12
   via_dia_mm: 0.36
   via_drill_mm: 0.16
-  interface_type: pcie
-  require_ground_stitch_via: true
-  max_stitch_via_distance_mm: 1.0
-  diff_pairs:
-  - name: PCIE_L0_TX
-    pos_net: PCIE_TX0_P
-    neg_net: PCIE_TX0_N
-    target_impedance_ohms: 85.0
-    impedance_tolerance_percent: 15.0
-    max_intra_pair_skew_mm: 0.1
-    max_inter_pair_skew_mm: 0.5
-    max_via_count: 2
-  - name: PCIE_L0_RX
-    pos_net: PCIE_RX0_P
-    neg_net: PCIE_RX0_N
-    target_impedance_ohms: 85.0
-    impedance_tolerance_percent: 15.0
-    max_intra_pair_skew_mm: 0.1
-    max_inter_pair_skew_mm: 0.5
-    max_via_count: 2
+  interface_type: uart
+  description: High-speed 1Mb/s UART interface between U1 MCU and U11 BTLE module
+  single_nets:
+  - BLE_RX
+  - BLE_RTS
+  - BLE_TX
+  - BLE_CTS
 - name: RF_2GHZ
   trace_width_mm: 0.13
   clearance_mm: 0.2
@@ -391,7 +389,7 @@ schematic_sheets:
       Q1:
       - 0
       - 1
-      J1:
+      U11:
       - 0
       - 2
       C8:
@@ -401,7 +399,7 @@ schematic_sheets:
   - U3
   - C6
   - Q1
-  - J1
+  - U11
   - C1
   - C2
   - C3
@@ -417,7 +415,7 @@ schematic_sheets:
     - G
     - S
     - D
-    J1:
+    U11:
     - GND
     - 3V3
     - VLOAD_SW
@@ -828,10 +826,10 @@ schematic_sheets:
     U5:
     - '1'
     - '2'
-- title: High-Speed Differential Interfaces
-  description: PCIe Gen4 x1 differential link
+- title: High-Speed BTLE UART & Wireless Interface
+  description: BTLE transceiver module (U11) with 1Mb/s high-speed UART link, flow control, cap-touch pairing trigger, and integrated PCB antenna
   components:
-  - J1
+  - U11
   - U1
   pin_sides:
     U1:
@@ -839,12 +837,17 @@ schematic_sheets:
       T1: left
       T3: left
       T4: left
+    U11:
+      RXD: left
+      RTS: left
+      TXD: left
+      CTS: left
   pin_breakouts:
-    J1:
-    - PETp0
-    - PETn0
-    - PERp0
-    - PERn0
+    U11:
+    - RXD
+    - RTS
+    - TXD
+    - CTS
     U1:
     - T2
     - T1
@@ -1196,16 +1199,16 @@ assembly_test:
     expected_nominal: 0.05
     tolerance_pct: 20.0
     unit: ohm
-  - step_id: TEST_IMP_PCIE_DIFF
-    description: Measure PCIe Gen4 differential impedance on TX0+/TX0-
-    test_type: impedance
+  - step_id: TEST_UART_BLE_SPEED
+    description: Measure BTLE high-speed 1Mb/s UART signal integrity on BLE_TX / BLE_RX
+    test_type: voltage
     net_or_points:
-    - PCIE_TX0_P
-    - PCIE_TX0_N
-    expected_nominal: 85.0
-    tolerance_pct: 10.0
-    unit: ohm
-    stimulus: 100ps TDR step
+    - BLE_TX
+    - BLE_RX
+    expected_nominal: 3.30
+    tolerance_pct: 3.0
+    unit: V
+    stimulus: 1Mb/s PRBS UART serial test
   - step_id: TEST_CAP_SENSE_CHAN0
     description: Measure baseline mutual capacitance on liquid level electrode Channel
       0

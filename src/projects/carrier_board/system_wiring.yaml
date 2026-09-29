@@ -5,25 +5,28 @@ imports:
   - footprints/ic.yaml
 
 components:
-  - name: m2_host
+  - name: btle_host
     package: board
     position: [-80.0, 0.0, 0.0]
     rotation: [0.0, 0.0, 0.0]
     dimensions: [22.0, 50.0, 1.6]
     color: cornflowerblue
     label:
-      text: "M.2 Host PCIe"
+      text: "BTLE Wireless Host"
       position: [-16.0, 0.0, 0.0]
       align: [max, center]
     pins:
-      - name: "PCIE_TX"
-        label: "TX±"
+      - name: "BLE_RX"
+        label: "RX (1Mb/s)"
         side: right
-      - name: "PCIE_RX"
-        label: "RX±"
+      - name: "BLE_TX"
+        label: "TX (1Mb/s)"
         side: right
-      - name: "REFCLK"
-        label: "CLK±"
+      - name: "BLE_RTS"
+        label: "RTS"
+        side: right
+      - name: "BLE_CTS"
+        label: "CTS"
         side: right
       - name: "3V3"
         label: "3V3"
@@ -67,20 +70,23 @@ components:
       position: [0.0, 0.0, 0.0]
       align: [center, center]
     pins:
-      # Left interface (facing m2_host)
-      - name: "M2_TX"
-        label: "PCIE_TX"
+      # Left interface (facing btle_host)
+      - name: "BLE_RX"
+        label: "BLE_RX"
         side: left
-      - name: "M2_RX"
-        label: "PCIE_RX"
+      - name: "BLE_TX"
+        label: "BLE_TX"
         side: left
-      - name: "M2_CLK"
-        label: "REFCLK"
+      - name: "BLE_RTS"
+        label: "BLE_RTS"
         side: left
-      - name: "M2_3V3"
-        label: "3V3_IN"
+      - name: "BLE_CTS"
+        label: "BLE_CTS"
         side: left
-      - name: "M2_GND"
+      - name: "BLE_3V3"
+        label: "3V3"
+        side: left
+      - name: "BLE_GND"
         label: "GND"
         side: left
 
@@ -167,36 +173,42 @@ components:
         side: bottom
 
 nets:
-  # PCIe and power from M.2 Host to Carrier PCB
-  - name: pcie_tx
+  # BTLE high-speed 1Mb/s UART and power between BTLE Host and Carrier PCB
+  - name: ble_tx
     color: blue
     pins:
-      - [m2_host, PCIE_TX]
-      - [carrier_pcb, M2_TX]
+      - [btle_host, BLE_TX]
+      - [carrier_pcb, BLE_RX]
 
-  - name: pcie_rx
+  - name: ble_rx
     color: blue
     pins:
-      - [m2_host, PCIE_RX]
-      - [carrier_pcb, M2_RX]
+      - [btle_host, BLE_RX]
+      - [carrier_pcb, BLE_TX]
 
-  - name: pcie_clk
+  - name: ble_rts
     color: purple
     pins:
-      - [m2_host, REFCLK]
-      - [carrier_pcb, M2_CLK]
+      - [btle_host, BLE_RTS]
+      - [carrier_pcb, BLE_CTS]
+
+  - name: ble_cts
+    color: purple
+    pins:
+      - [btle_host, BLE_CTS]
+      - [carrier_pcb, BLE_RTS]
 
   - name: pwr_3v3
     color: red
     pins:
-      - [m2_host, 3V3]
-      - [carrier_pcb, M2_3V3]
+      - [btle_host, 3V3]
+      - [carrier_pcb, BLE_3V3]
 
-  - name: gnd_m2
+  - name: gnd_ble
     color: black
     pins:
-      - [m2_host, GND]
-      - [carrier_pcb, M2_GND]
+      - [btle_host, GND]
+      - [carrier_pcb, BLE_GND]
 
   # USB-C 5V and control to Carrier PCB
   - name: vbus_5v

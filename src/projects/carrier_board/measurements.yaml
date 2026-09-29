@@ -85,3 +85,16 @@ test_tdr_rise_time_ps: 100.0
 test_cap_stimulus_freq_khz: 250.0
 test_pcie_diff_target_ohm: 85.0
 
+# Bluetooth Low Energy (BTLE) and antenna specifications
+ble_antenna_length: 12.0
+ble_antenna_width: 4.0
+ble_antenna_keepout_width: 16.0
+ble_antenna_keepout_length: 5.0
+ble_uart_baud_rate: 1000000
+ble_logo_height: 7.0
+ble_logo_width: 4.5
+ble_logo_depth: 0.4
+ble_logo_x: 0.0
+ble_logo_y: -22.0
+
+

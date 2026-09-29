@@ -456,34 +456,6 @@ class CarrierBoardProvider(Provider):
                     Text("SWD", font_size=1.6)
             extrude(s_swd_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
-            # M.2 connector cutout through rear exterior wall (aligned with J1 at [0.0, -36.0, 0.8]) (BUG-144)
-            m2_w = self.settings.enclosure_m2_cutout_width
-            m2_h = self.settings.enclosure_m2_cutout_height
-            m2_z = -h_shell / 2.0 + wall + standoff_h + (m2_h / 2.0) - 0.5
-            with BuildSketch(Plane.XZ.offset(length / 2.0)) as s_m2:
-                with Locations((0.0, m2_z)):
-                    RectangleRounded(m2_w, m2_h, cutout_r)
-            extrude(s_m2.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
-
-            # M.2 PCIe cutout label (BUG-150)
-            with BuildSketch(Plane.XZ.offset(length / 2.0)) as s_m2_lbl:
-                with Locations((0.0, m2_z + (m2_h / 2.0) + 2.0)):
-                    Text("M.2 PCIE", font_size=1.6)
-            extrude(s_m2_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
-
-            # M.2 connector floor pass-through cutout (aligned with J1) (BUG-142)
-            m2_x, m2_y = 0.0, -36.0
-            if self.wiring_path.exists():
-                wiring = Wiring(str(self.wiring_path))
-                comp_map = {c.name: c for c in wiring.footprints}
-                if "J1" in comp_map:
-                    m2_x, m2_y = comp_map["J1"].position[0], comp_map["J1"].position[1]
-            m2_l = self.settings.enclosure_m2_cutout_length
-            with BuildSketch(Plane.XY.offset(-h_shell / 2.0)) as s_m2_floor:
-                with Locations((m2_x, m2_y)):
-                    RectangleRounded(m2_w, m2_l, cutout_r)
-            extrude(s_m2_floor.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
-
             # Peripheral cutouts and bus identifiers through right exterior wall (BUG-074, BUG-090, BUG-110, BUG-113, BUG-143)
             # All cutouts have the exact same width, height, and equal spacing apart from each other
             periph_cutout_h = self.settings.enclosure_periph_cutout_height
@@ -729,9 +701,28 @@ class CarrierBoardProvider(Provider):
                     Text("BATTERY", font_size=1.6)
             extrude(s_batt_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
+            # Bluetooth logo and text engraved on enclosure lid exterior surface (BUG-214)
+            ble_x = self.settings.ble_logo_x
+            ble_y = self.settings.ble_logo_y
+            ble_depth = self.settings.ble_logo_depth
+            with BuildSketch(Plane.XY.offset(wall)) as s_bt_logo:
+                with Locations((ble_x, ble_y)):
+                    # Bluetooth runic emblem (bindrune Hagall + Bjarkan)
+                    Rectangle(0.7, 7.0)
+                    Polygon((0, 0), (1.8, 1.8), (1.3, 2.3), (-0.5, 0.5))
+                    Polygon((1.8, 1.8), (0, 3.5), (-0.5, 3.0), (1.3, 1.3))
+                    Polygon((0, -3.5), (1.8, -1.8), (1.3, -1.3), (-0.5, -3.0))
+                    Polygon((1.8, -1.8), (0, 0), (-0.5, -0.5), (1.3, -2.3))
+                    Polygon((0, 0), (-1.8, 1.8), (-1.3, 2.3), (0.5, 0.5))
+                    Polygon((0, 0), (-1.8, -1.8), (-1.3, -2.3), (0.5, -0.5))
+                with Locations((ble_x, ble_y - 5.2)):
+                    Text("BLUETOOTH", font_size=1.4)
+            extrude(s_bt_logo.sketch, amount=-ble_depth, mode=BuildMode.SUBTRACT)
+
         RigidJoint("led_port", lid.part, Location((led_x, led_y, wall)))
         RigidJoint("battery_mount", lid.part, Location((batt_x, batt_y, wall)))
         RigidJoint("battery_port", lid.part, Location((j13_x, j13_y, wall)))
+        RigidJoint("bluetooth_logo", lid.part, Location((ble_x, ble_y, wall)))
 
         return lid
 
@@ -985,11 +976,11 @@ class CarrierBoardProvider(Provider):
             TestPoint("TP3", net="VBUS", at=(-14.0, -26.0))
             TestPoint("TP4", net="3V3", at=(-10.0, -26.0))
 
-            # PCIe Gen4 differential pair test points (spaced with 4mm pitch)
-            TestPoint("TP5", net="PCIE_TX0_N", at=(-14.0, -22.0))
-            TestPoint("TP6", net="PCIE_TX0_P", at=(-10.0, -22.0))
-            TestPoint("TP7", net="PCIE_RX0_P", at=(-6.0, -22.0))
-            TestPoint("TP8", net="PCIE_RX0_N", at=(-2.0, -22.0))
+            # High-speed BTLE UART test points (spaced with 4mm pitch)
+            TestPoint("TP5", net="BLE_RTS", at=(-14.0, -22.0))
+            TestPoint("TP6", net="BLE_RX", at=(-10.0, -22.0))
+            TestPoint("TP7", net="BLE_TX", at=(-6.0, -22.0))
+            TestPoint("TP8", net="BLE_CTS", at=(-2.0, -22.0))
 
             # I2C test points (through-hole, accessible from both sides, routed on B.Cu)
             TestPoint("TP9", net="I2C_SDA", at=(14.0, -4.0), layer="B.Cu")
@@ -1136,9 +1127,11 @@ class CarrierBoardProvider(Provider):
             # U2 QFN pin-1 indicator
             with Locations((15.0, -6.5)):
                 SilkscreenText("• Pin 1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
-            # J1 M.2 connector edge alignment markers
-            with Locations((-12.0, -38.0), (12.0, -38.0)):
+            # U11 BTLE module alignment markers and antenna keepout outline (BUG-214)
+            with Locations((-5.0, -41.0), (5.0, -41.0)):
                 SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((0.0, -41.5)):
+                SilkscreenText("BLE ANT", layer="F.SilkS", font_size=0.7, thickness=0.10)
             # J2 FPC connector alignment markers
             with Locations((-10.0, 39.5), (10.0, 39.5)):
                 SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
@@ -1156,7 +1149,7 @@ class CarrierBoardProvider(Provider):
             with Locations((18.0, -11.5)):
                 SilkscreenText("U2", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
             with Locations((0.0, -32.5)):
-                SilkscreenText("J1", layer="F.SilkS", font_size=1.0, thickness=0.15)
+                SilkscreenText("U11", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((0.0, 35.5)):
                 SilkscreenText("J2", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((-17.5, 0.0)):
@@ -1244,6 +1237,34 @@ class CarrierBoardProvider(Provider):
             with Locations((14.0, -12.0)):
                 SilkscreenText("C14", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
         return silk.texts
+
+    @property
+    def btle_status_signaling(self) -> dict[str, dict[str, str]]:
+        """Return BTLE connection status signaling configuration for RGB LED (D1) and piezo buzzer (U5).
+
+        Status Modes:
+            - pairing: LED D1 pulses blue, buzzer U5 emits rising chirp (1kHz -> 2kHz).
+              Triggered by capacitive touch input gesture on flex tail or proximity sensor.
+            - connected: LED D1 solid cyan, buzzer U5 emits single confirmation tone (2.5kHz).
+            - disconnected: LED D1 breathing white, buzzer U5 emits descending tone (2kHz -> 1kHz).
+        """
+        return {
+            "pairing": {
+                "led_color": "blue_pulse",
+                "buzzer_tone": "chirp_rising_1khz_2khz",
+                "trigger": "capacitive_touch_gesture_or_proximity",
+            },
+            "connected": {
+                "led_color": "solid_cyan",
+                "buzzer_tone": "confirmation_beep_2.5khz",
+                "trigger": "ble_peer_connected",
+            },
+            "disconnected": {
+                "led_color": "breathing_white",
+                "buzzer_tone": "descending_tone_2khz_1khz",
+                "trigger": "ble_peer_disconnected",
+            },
+        }
 
     @property
     def config(self) -> dict[str, Callable[[str, Optional[str]], Any]]:

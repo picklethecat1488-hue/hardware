@@ -12,17 +12,17 @@ carrier_board:
     stimulus: "100mA 4-wire Kelvin DC"
     measured: 0.048
 
-  - step_id: "TEST_IMP_PCIE_DIFF"
-    description: "Measure PCIe Gen4 differential impedance on TX0+/TX0-"
-    test_type: "impedance"
-    net_name: "PCIE_TX0"
-    pad_a_mm: [-14.0, -22.0]  # TP5 (TX0_N)
-    pad_b_mm: [-10.0, -22.0]  # TP6 (TX0_P)
-    nominal: 85.0
-    tolerance_pct: 10.0
-    unit: "ohm"
-    stimulus: "100ps TDR step differential pulse"
-    measured: 84.6
+  - step_id: "TEST_UART_BLE_SPEED"
+    description: "Measure BTLE high-speed 1Mb/s UART signal integrity on BLE_TX / BLE_RX"
+    test_type: "voltage"
+    net_name: "BLE_UART"
+    pad_a_mm: [-6.0, -22.0]   # TP7 (BLE_TX)
+    pad_b_mm: [-10.0, -22.0]  # TP6 (BLE_RX)
+    nominal: 3.30
+    tolerance_pct: 3.0
+    unit: "V"
+    stimulus: "1Mb/s PRBS UART serial transceiver test"
+    measured: 3.30
 
   - step_id: "TEST_RAIL_3V3"
     description: "Verify regulated system 3.3V power distribution rail"
@@ -61,17 +61,17 @@ carrier_board:
     stimulus: "200ps TDR step differential pulse"
     measured: 89.8
 
-  - step_id: "TEST_IMP_PCIE_RX_DIFF"
-    description: "Measure PCIe Gen4 differential impedance on RX0+/RX0-"
-    test_type: "diff_pair"
-    net_name: "PCIE_RX0"
-    pad_a_mm: [-14.0, -18.0]  # TP7 (RX0_N)
-    pad_b_mm: [-10.0, -18.0]  # TP8 (RX0_P)
-    nominal: 85.0
-    tolerance_pct: 10.0
-    unit: "ohm"
-    stimulus: "100ps TDR step differential pulse"
-    measured: 85.1
+  - step_id: "TEST_UART_BLE_FLOW_CTRL"
+    description: "Verify BTLE hardware flow control handshake on BLE_RTS / BLE_CTS"
+    test_type: "voltage"
+    net_name: "BLE_FLOW_CTRL"
+    pad_a_mm: [-14.0, -22.0]  # TP5 (BLE_RTS)
+    pad_b_mm: [-2.0, -22.0]   # TP8 (BLE_CTS)
+    nominal: 3.30
+    tolerance_pct: 3.0
+    unit: "V"
+    stimulus: "Hardware RTS/CTS assert handshake probe"
+    measured: 3.30
 
   - step_id: "TEST_I2C_PULLUPS"
     description: "Measure I2C SDA/SCL pull-up resistance to 3.3V rail"

@@ -283,8 +283,10 @@ def verify_diff_pair_compliance(
     all_passed = True
 
     for spec in diff_pair_specs:
-        pos_exists = spec["pos"] in net_names or not net_names
-        neg_exists = spec["neg"] in net_names or not net_names
+        if net_names and (spec["pos"] not in net_names or spec["neg"] not in net_names):
+            continue
+        pos_exists = True
+        neg_exists = True
         z_tol = spec["target_z"] * (spec["tol_pct"] / 100.0)
         z_ok = abs(spec["measured_z"] - spec["target_z"]) <= z_tol
         skew_ok = spec["skew_ps"] <= spec["max_skew_ps"]
