@@ -932,6 +932,7 @@ class MarkdownBugExporter:
                     md_bug.id = expected_id_from_fn
                     if store and hasattr(store, "update_bug_id"):
                         store.update_bug_id(existing_by_uuid.uuid, expected_id_from_fn)
+                    renamed += 1
                 if (
                     existing_by_uuid.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
                     and existing_by_uuid.resolution_notes.strip()

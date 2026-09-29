@@ -526,13 +526,14 @@ class GitEngine:
         except RuntimeError:
             pass
 
+        current_local_ref = f"refs/heads/{self.get_current_branch()}" if self.get_current_branch() else None
         for c_cand in [
             "refs/remotes/origin/main",
             "refs/heads/main",
             "refs/remotes/origin/master",
             "refs/heads/master",
         ]:
-            if c_cand not in tracking_candidates:
+            if c_cand != current_local_ref and c_cand not in tracking_candidates:
                 tracking_candidates.append(c_cand)
 
         active_tracking_ref = None
@@ -544,6 +545,16 @@ class GitEngine:
             except RuntimeError:
                 continue
 
+        # Check if target is a topic branch diverging from ancestor
+        target_hash = head_hash if target_ref == "HEAD" else None
+        if not target_hash:
+            try:
+                target_hash = run_git_command(["rev-parse", target_ref], cwd=self.repo_root).strip()
+            except RuntimeError:
+                target_hash = ""
+
+        is_topic_branch = bool(ancestor_merge_base and target_hash != ancestor_merge_base)
+
         merged_commit_hashes: set[str] = set()
         if active_tracking_ref:
             try:
@@ -551,7 +562,7 @@ class GitEngine:
                 merged_commit_hashes = set(out.splitlines())
             except RuntimeError:
                 pass
-        if ancestor_merge_base:
+        if ancestor_merge_base and is_topic_branch:
             merged_commit_hashes.add(ancestor_merge_base)
 
         fmt = "%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%ar%x1f%s%x1f%D%x1f%b%x1e"
@@ -563,16 +574,6 @@ class GitEngine:
 
         raw_records = output.strip().split("\x1e")
         parsed_commits: List[Dict[str, Any]] = []
-
-        # Check if target is a topic branch diverging from ancestor
-        target_hash = head_hash if target_ref == "HEAD" else None
-        if not target_hash:
-            try:
-                target_hash = run_git_command(["rev-parse", target_ref], cwd=self.repo_root).strip()
-            except RuntimeError:
-                target_hash = ""
-
-        is_topic_branch = bool(ancestor_merge_base and target_hash != ancestor_merge_base)
 
         for rec in raw_records:
             if not rec.strip():
