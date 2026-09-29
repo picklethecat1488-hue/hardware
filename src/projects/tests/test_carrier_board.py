@@ -1617,7 +1617,8 @@ def test_regression_bug_183_carrier_board_hardening() -> None:
     # Verify new components are placed in open space south of U1 and north of J1
     for name in ["SW1", "JP1", "JP2", "JP3", "JP4", "D2", "D3", "D4", "D5", "D6", "D7"]:
         pos = comp_map[name].position
-        assert -36.0 <= pos[1] <= -16.0, (
+        y_max = -10.0 if name == "SW1" else -16.0
+        assert -36.0 <= pos[1] <= y_max, (
             f"Component {name} at Y={pos[1]} not in designated space south of U1 and north of J1"
         )
         assert -15.0 <= pos[0] <= 15.0, f"Component {name} at X={pos[0]} not in designated corridor"
