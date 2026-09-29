@@ -259,9 +259,32 @@
       letter-spacing: 0.05em;
       flex-shrink: 0;
     }
+    /* Visible Quake Scrollbars (BUG-202) */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--quake-border-accent) #100a06;
+    }
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #100a06;
+      border: 1px solid var(--quake-border-mid);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--quake-border-accent);
+      border-radius: 4px;
+      border: 1px solid var(--quake-border-mid);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold);
+    }
+
     .column-scroll {
       flex: 1;
-      overflow-y: auto;
+      overflow-y: scroll;
+      scrollbar-gutter: stable;
       padding: 8px;
       display: flex;
       flex-direction: column;
@@ -792,18 +815,28 @@
             <!-- Tags Row (Branches, Tags, PR, Bugs) -->
             <div class="node-tags-row">
               {% for br in node.branches %}
-                <span class="node-badge node-badge-branch {% if 'pr' in br.lower() %}pr-tag-link{% endif %}"
-                      onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
-                      title="{% if 'pr' in br.lower() %}Open PR in GitHub{% else %}Branch {{ br }}{% endif %}">
+                {% set is_pr_br = ('pr' in br.lower() or 'pull' in br.lower()) %}
+                {% set br_url = node.pr_url if (is_pr_br and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ node.pr_number if (is_pr_br and node.pr_number) else ('https://github.com/picklethecat1488-hue/hardware/tree/' ~ br)) %}
+                <a href="{{ br_url }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="node-badge node-badge-branch {% if is_pr_br %}pr-tag-link{% endif %}"
+                   onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
+                   title="{% if is_pr_br %}Open PR in GitHub{% else %}View branch {{ br }} on GitHub{% endif %}">
                   ⎇ {{ br }}
-                </span>
+                </a>
               {% endfor %}
               {% for tag in node.tags %}
-                <span class="node-badge node-badge-tag {% if 'pr' in tag.lower() %}pr-tag-link{% endif %}"
-                      onclick="onBranchBadgeClick(event, '{{ tag }}', '{{ node.pr_url or '' }}')"
-                      title="{% if 'pr' in tag.lower() %}Open PR in GitHub{% else %}Tag {{ tag }}{% endif %}">
+                {% set is_pr_tag = ('pr' in tag.lower() or 'pull' in tag.lower()) %}
+                {% set tag_url = node.pr_url if (is_pr_tag and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ node.pr_number if (is_pr_tag and node.pr_number) else ('https://github.com/picklethecat1488-hue/hardware/releases/tag/' ~ tag)) %}
+                <a href="{{ tag_url }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="node-badge node-badge-tag {% if is_pr_tag %}pr-tag-link{% endif %}"
+                   onclick="onBranchBadgeClick(event, '{{ tag }}', '{{ node.pr_url or '' }}')"
+                   title="{% if is_pr_tag %}Open PR in GitHub{% else %}View tag {{ tag }} on GitHub{% endif %}">
                   🏷 {{ tag }}
-                </span>
+                </a>
               {% endfor %}
               {% if node.pr_status %}
                 <a href="{{ node.pr_url or ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ (node.pr_number or '')) }}"
@@ -1790,10 +1823,10 @@
           body: JSON.stringify({ commits: commits })
         });
         const res = await resp.json();
-        window.open(res.url, "_blank");
+        window.open(res.url, "hardware_code_review");
       } catch (err) {
         const revStr = commits.join(",");
-        window.open(`/review?revisions=${encodeURIComponent(revStr)}`, "_blank");
+        window.open(`/review?revisions=${encodeURIComponent(revStr)}`, "hardware_code_review");
       }
     }
 
@@ -1805,9 +1838,9 @@
           body: JSON.stringify({ bug_id: bugId })
         });
         const res = await resp.json();
-        window.open(res.url, "_blank");
+        window.open(res.url, "hardware_bug_tracker");
       } catch (err) {
-        window.open(`/bugs#BUG-${bugId}`, "_blank");
+        window.open(`/bugs#BUG-${bugId}`, "hardware_bug_tracker");
       }
     }
 
@@ -1819,9 +1852,9 @@
           body: JSON.stringify({})
         });
         const res = await resp.json();
-        window.open(res.url, "_blank");
+        window.open(res.url, "hardware_bug_tracker");
       } catch (err) {
-        window.open("/bugs", "_blank");
+        window.open("/bugs", "hardware_bug_tracker");
       }
     }
 
@@ -1833,9 +1866,9 @@
           body: JSON.stringify({ commit: commitHash })
         });
         const res = await resp.json();
-        window.open(res.url, "_blank");
+        window.open(res.url, "hardware_bug_tracker");
       } catch (err) {
-        window.open(`/bugs#new?commit=${encodeURIComponent(commitHash)}`, "_blank");
+        window.open(`/bugs#new?commit=${encodeURIComponent(commitHash)}`, "hardware_bug_tracker");
       }
     }
 
@@ -1887,12 +1920,15 @@
     }
 
     function onBranchBadgeClick(e, branchName, prUrl) {
-      e.stopPropagation();
-      const match = branchName.match(/(?:pr|pull)[/-]?(\d+)/i) || branchName.match(/(\d+)/);
+      if (e) e.stopPropagation();
+      const match = branchName.match(/(?:^|\/)(?:pr|pull)[/-]?(\d+)\b/i) || branchName.match(/(\d+)/);
       if (match) {
         window.open(`https://github.com/picklethecat1488-hue/hardware/pull/${match[1]}`, "_blank");
       } else if (prUrl) {
         window.open(prUrl, "_blank");
+      } else {
+        const cleaned = branchName.replace(/^(?:remotes\/)?origin\//i, "");
+        window.open(`https://github.com/picklethecat1488-hue/hardware/tree/${cleaned}`, "_blank");
       }
     }
 

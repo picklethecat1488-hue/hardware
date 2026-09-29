@@ -507,7 +507,7 @@
       <div class="metric-pill">RESOLVED: <span id="m-resolved" class="metric-highlight" style="color:var(--quake-green);">0</span></div>
     </div>
     <div class="header-actions">
-      <a href="/" class="quake-btn quake-btn-default" style="text-decoration:none;display:inline-flex;align-items:center;" title="Return to VCS Dashboard">← Dashboard</a>
+      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-default" style="text-decoration:none;display:inline-flex;align-items:center;" title="Return to VCS Dashboard">← Dashboard</a>
       <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
       <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
       <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
@@ -934,6 +934,16 @@
       showToast("Deleted bug & updated BUGS.md");
     }
 
+    function returnToDashboard(e) {
+      if (e) e.preventDefault();
+      if (window.opener && !window.opener.closed) {
+        window.opener.focus();
+        window.close();
+      } else {
+        window.open("/", "hardware_vcs_diff_viewer");
+      }
+    }
+
     async function saveAndExit() {
       const btn = document.getElementById("btn-save-exit");
       btn.innerText = "⏳ Saving...";
@@ -948,7 +958,12 @@
       }
 
       setTimeout(() => {
-        window.location.href = "/";
+        if (window.opener && !window.opener.closed) {
+          window.opener.focus();
+          window.close();
+        } else {
+          window.location.href = "/";
+        }
       }, 500);
     }
 

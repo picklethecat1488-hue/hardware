@@ -1281,3 +1281,81 @@ def test_regression_bug_191_and_205_code_review_revisions_and_multi_commit(tmp_p
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_190_pr_branch_tags_clickable_links(tmp_path: Path) -> None:
+    """Verify BUG-190: PR branch tags in Smartlog render as clickable links to GitHub PR."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 1. Test get_branch_url on GitEngine
+    pr_branch_url = engine.get_branch_url("origin/pr520")
+    assert pr_branch_url.endswith("/pull/520"), f"Expected PR URL for origin/pr520, got {pr_branch_url}"
+
+    norm_branch_url = engine.get_branch_url("origin/feature-xyz")
+    assert norm_branch_url.endswith("/tree/feature-xyz"), f"Expected branch tree URL, got {norm_branch_url}"
+
+    # 2. Test branch tag rendered as anchor link in diff_view.html.j2
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert '<a href="{{ br_url }}"' in tpl_text
+    assert "pr-tag-link" in tpl_text
+    assert "onBranchBadgeClick" in tpl_text
+
+
+def test_regression_bug_200_diff_view_single_bottom_scrollbar_and_max_line_length() -> None:
+    """Verify BUG-200: diff view has a single bottom scrollbar, no per-line scrollbars, and enforces max line length."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_component.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # 1. Verify diff-code-cell does NOT have overflow-x: auto (no per-row scrollbars)
+    assert ".diff-code-cell {\n    overflow-x: hidden;" in tpl_text
+    assert "overflow-x: auto;\n    font-family: inherit;\n    width: calc(50% - 64px);" not in tpl_text
+
+    # 2. Verify diff-scroll-body provides horizontal scrollbar at bottom
+    assert ".diff-scroll-body {\n    flex: 1;\n    overflow-x: auto;\n    overflow-y: auto;" in tpl_text
+    assert ".diff-scroll-body::-webkit-scrollbar" in tpl_text
+
+    # 3. Verify maximum line length enforcement
+    assert "MAX_LINE_LENGTH:" in tpl_text
+    assert "truncateLine(text, maxLen)" in tpl_text
+    assert "… [line truncated]" in tpl_text
+
+
+def test_regression_bug_201_single_diff_viewer_and_bug_tabs_reuse() -> None:
+    """Verify BUG-201: Cross-station links reuse named window targets instead of spawning endless tabs."""
+    diff_view_tpl = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    diff_text = diff_view_tpl.read_text(encoding="utf-8")
+
+    # Diff View uses named window targets for code review and bug tracker
+    assert 'window.open(res.url, "hardware_code_review");' in diff_text
+    assert 'window.open(res.url, "hardware_bug_tracker");' in diff_text
+
+    # Bug report workstation reuses diff viewer window target or closes to focus opener
+    bug_report_tpl = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
+    bug_text = bug_report_tpl.read_text(encoding="utf-8")
+    assert 'target="hardware_vcs_diff_viewer"' in bug_text
+    assert "returnToDashboard" in bug_text
+    assert "window.opener.focus()" in bug_text
+
+    # Code review workstation reuses diff viewer window target or closes to focus opener
+    cr_tpl = Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2"
+    cr_text = cr_tpl.read_text(encoding="utf-8")
+    assert 'target="hardware_vcs_diff_viewer"' in cr_text
+    assert "returnToDashboard" in cr_text
+
+
+def test_regression_bug_202_smartlog_and_files_vertical_scrollbars_visible() -> None:
+    """Verify BUG-202: Smartlog and file view columns have permanently visible Quake scrollbars."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # 1. Custom Quake-styled scrollbars defined
+    assert "/* Visible Quake Scrollbars (BUG-202) */" in tpl_text
+    assert "scrollbar-width: thin;" in tpl_text
+    assert "::-webkit-scrollbar" in tpl_text
+    assert "::-webkit-scrollbar-thumb" in tpl_text
+
+    # 2. column-scroll has overflow-y: scroll and scrollbar-gutter: stable
+    assert "overflow-y: scroll;" in tpl_text
+    assert "scrollbar-gutter: stable;" in tpl_text

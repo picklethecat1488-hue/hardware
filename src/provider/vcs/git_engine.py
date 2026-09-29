@@ -625,6 +625,15 @@ class GitEngine:
             return f"{base}/pull/{pr_number}"
         return f"https://github.com/picklethecat1488-hue/hardware/pull/{pr_number}"
 
+    def get_branch_url(self, branch_name: str) -> str:
+        """Return the GitHub web URL for a branch or PR branch name."""
+        base = self.get_repo_web_url() or "https://github.com/picklethecat1488-hue/hardware"
+        m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", branch_name, re.IGNORECASE)
+        if m:
+            return f"{base}/pull/{m.group(1)}"
+        cleaned = re.sub(r"^(?:remotes/)?origin/", "", branch_name)
+        return f"{base}/tree/{cleaned}"
+
     def _extract_pr_info(
         self, subject: str, body: str, branches: List[str], tags: List[str]
     ) -> Tuple[Optional[str], Optional[int], Optional[str]]:

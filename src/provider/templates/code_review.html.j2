@@ -1329,7 +1329,7 @@
         ✓ Local review server shut down<br>
         ✓ Terminal session released to shell
       </div>
-      <a href="/" class="quake-btn quake-btn-gold" style="padding: 8px 24px; font-size: 13px; text-decoration: none; display: inline-block;">
+      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-gold" style="padding: 8px 24px; font-size: 13px; text-decoration: none; display: inline-block;">
         ← RETURN TO DASHBOARD
       </a>
     </div>
@@ -1343,6 +1343,16 @@
   </div>
 
   <script>
+    function returnToDashboard(e) {
+      if (e) e.preventDefault();
+      if (window.opener && !window.opener.closed) {
+        window.opener.focus();
+        window.close();
+      } else {
+        window.open("/", "hardware_vcs_diff_viewer");
+      }
+    }
+
     // State management
     const state = {
       session: null,
