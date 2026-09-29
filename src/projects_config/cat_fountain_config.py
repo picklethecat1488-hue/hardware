@@ -828,9 +828,54 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("motor_clip_length", 26.0))
 
     @cached_property
-    def motor_clip_cutout_width(self) -> float:
-        """Return the cutout width of the motor retaining clip U-fork."""
-        return float(self._raw_data.get("motor_clip_cutout_width", 14.2))
+    def motor_radius(self) -> float:
+        """Return the outer radius of the motor body in millimeters."""
+        return float(self._raw_data.get("motor_radius", 7.6))
+
+    @cached_property
+    def motor_clearance(self) -> float:
+        """Return the radial clearance around the motor body in millimeters."""
+        return float(self._raw_data.get("motor_clearance", 0.5))
+
+    @cached_property
+    def motor_pocket_radius(self) -> float:
+        """Return the pocket radius for the motor body in the bowl boss."""
+        return float(self._raw_data.get("motor_pocket_radius", self.motor_radius + self.motor_clearance))
+
+    @cached_property
+    def motor_mount_bolt_circle_radius(self) -> float:
+        """Return the bolt circle radius for motor mounting screws."""
+        return float(self._raw_data.get("motor_mount_bolt_circle_radius", 3.3))
+
+    @cached_property
+    def motor_mount_hole_radius(self) -> float:
+        """Return the radius of the motor mounting screw clearance holes."""
+        return float(self._raw_data.get("motor_mount_hole_radius", 0.8))
+
+    @cached_property
+    def motor_shaft_clearance_radius(self) -> float:
+        """Return the clearance radius for the motor shaft / bearing boss."""
+        return float(self._raw_data.get("motor_shaft_clearance_radius", 1.75))
+
+    @cached_property
+    def motor_base_recess_depth(self) -> float:
+        """Return the depth of the triangular anti-rotation motor base recess."""
+        return float(self._raw_data.get("motor_base_recess_depth", 0.8))
+
+    @cached_property
+    def motor_base_lobe_radius(self) -> float:
+        """Return the lobe radius around each mounting hole for the triangular base recess."""
+        return float(self._raw_data.get("motor_base_lobe_radius", 2.2))
+
+    @cached_property
+    def motor_wire_relief_width(self) -> float:
+        """Return the width of the wire relief channel in the motor clip."""
+        return float(self._raw_data.get("motor_wire_relief_width", 7.0))
+
+    @cached_property
+    def motor_wire_relief_depth(self) -> float:
+        """Return the depth of the wire relief channel in the motor clip."""
+        return float(self._raw_data.get("motor_wire_relief_depth", 0.8))
 
     def __init__(self, **data: Any):
         """Initialize settings and calculate physical defaults."""

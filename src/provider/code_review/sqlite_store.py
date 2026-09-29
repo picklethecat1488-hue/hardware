@@ -4,11 +4,12 @@ Provides robust, concurrent, atomic persistence for code review sessions,
 file review statuses, inline comments, and review findings using SQLite.
 """
 
+import contextlib
 from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
-from typing import Dict, List, Optional
+from typing import Dict, Generator, List, Optional
 import uuid as uuid_pkg
 
 from model.code_review import (
@@ -35,13 +36,18 @@ class SQLiteReviewStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
-    def _get_connection(self) -> sqlite3.Connection:
-        """Create and configure a SQLite connection with foreign keys enabled."""
+    @contextlib.contextmanager
+    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+        """Create, configure, and safely close a SQLite connection with foreign keys enabled."""
         conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _init_schema(self) -> None:
         """Initialize tables and indices if they do not already exist."""

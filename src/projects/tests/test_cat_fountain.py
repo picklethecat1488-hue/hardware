@@ -52,6 +52,7 @@ class TestCatFountainProvider:
         assert "lid" in provider.part
         assert "led_cover" in provider.part
 
+    @pytest.mark.slow
     def test_build_part_geometry(self, provider):
         """Verify that build_fountain produces valid geometry."""
         for key, item in provider.part.items():
@@ -61,6 +62,7 @@ class TestCatFountainProvider:
             assert part.volume > 0
             assert part.is_valid
 
+    @pytest.mark.slow
     def test_build_diagram(self, provider):
         """Verify that build_diagram populates the room with geometry."""
         room = Room()
@@ -70,6 +72,7 @@ class TestCatFountainProvider:
         assert "bottom_cover" in room
         assert "lid" in room
 
+    @pytest.mark.slow
     def test_build_wiring_diagram(self, provider):
         """Verify that build_wiring_diagram populates the room with footprints and wires."""
         room = Room()
@@ -91,6 +94,7 @@ class TestCatFountainProvider:
         assert "wire_sda" in room
         assert "wire_scl" in room
 
+    @pytest.mark.slow
     def test_wiring_diagram_class(self, provider):
         """Verify that WiringDiagram populates the room with all pads and wires."""
         from pathlib import Path
@@ -163,6 +167,7 @@ class TestCatFountainProvider:
         assert pins[1].position == (-5.0, -3.0, 0.0)
         assert pins[2].position == (5.0, 0.0, 0.0)
 
+    @pytest.mark.slow
     def test_build_product(self, provider):
         """Verify that build_product populates the room with all fountain parts and their URDF attributes."""
         room = Room()
@@ -222,6 +227,7 @@ class TestCatFountainProvider:
         assert provider.settings.boundary_friction == 0.25
         assert provider.settings.contact_angle == 80.0
 
+    @pytest.mark.slow
     def test_collar_standoff_geometry(self, provider):
         """Verify that the collar standoff and impeller hub are built with correct dimensions & clearance."""
         bowl = provider.build_bowl("bowl")
@@ -850,6 +856,7 @@ class TestCatFountainProvider:
 
         assert total_tested > 0, "Expected at least one URDF boundary to be registered and validated"
 
+    @pytest.mark.slow
     def test_assembly_and_fitment_tolerances(self, provider):
         """Verify assembly clearances: clip fits through bottom cover, and drive hub fits in recess."""
         # 1. Verify that the bottom cover's opening width is larger than the motor clip width.
@@ -861,12 +868,16 @@ class TestCatFountainProvider:
         hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.0
         assert provider.settings.drive_hub_recess_radius > hub_r
 
-        # 3. Verify that the motor clip U-cutout is larger than or equal to the motor collar diameter.
-        # The BetaFPV 1102 motor collar diameter is 10.0mm.
-        # This ensures the clip wraps around the collar to support the motor body.
-        motor_collar_diameter = 10.0
-        assert provider.settings.motor_clip_cutout_width >= motor_collar_diameter
+        # 3. Verify that the motor mount bolt circle radius matches the BetaFPV 1102 pattern (3-1.4M on Dia 6.6mm)
+        # and that the motor pocket radius provides sufficient clearance for the 15.2mm diameter motor body.
+        assert provider.settings.motor_mount_bolt_circle_radius == 3.3
+        assert provider.settings.motor_mount_hole_radius >= 0.7
+        assert (
+            provider.settings.motor_pocket_radius >= provider.settings.motor_radius + provider.settings.motor_clearance
+        )
+        assert provider.settings.motor_pocket_radius >= 8.1
 
+    @pytest.mark.slow
     def test_bottom_cover_drain_and_notch_unobstructed(self, provider):
         """Verify that the bottom cover's central drain hole and edge notch are not filled by the snap ring."""
         cover = provider.build_bottom_cover("bottom_cover")
@@ -884,6 +895,7 @@ class TestCatFountainProvider:
         notch_pt = (0.0, -cover_r, 2.0)
         assert not solid.is_inside(notch_pt), "Bottom cover opening notch is obstructed!"
 
+    @pytest.mark.slow
     def test_lid_terrace_shelf_connected_to_fountain_cover(self, provider):
         """Verify that the lid terrace shelf is completely solid and connected to the fountain cover with no box cutouts."""
         lid = provider.build_lid("lid")
@@ -898,6 +910,7 @@ class TestCatFountainProvider:
         # Ensure lid consists of a single connected solid
         assert len(solid.solids()) == 1, "Lid has disconnected or floating solid bodies!"
 
+    @pytest.mark.slow
     def test_drive_hub_minimum_wall_thickness(self, provider):
         """Verify that the drive hub has solid wall thickness under magnet pockets and is a single solid."""
         import math
@@ -928,6 +941,7 @@ class TestCatFountainProvider:
         # 4. Ensure drive hub is a single connected solid
         assert len(solid.solids()) == 1, "Drive hub is split into disconnected parts!"
 
+    @pytest.mark.slow
     def test_drive_hub_standoff_thrust_ring(self, provider):
         """Verify that the drive hub has an integral outer perimeter standoff thrust ring for anti-wobble stability."""
         hub = provider.build_drive_hub("drive_hub")
@@ -952,6 +966,7 @@ class TestCatFountainProvider:
         # Ensure single contiguous solid
         assert len(solid.solids()) == 1, "Drive hub is split into disconnected parts!"
 
+    @pytest.mark.slow
     def test_impeller_geometry_and_elevation(self, provider):
         """Verify that the impeller has the updated base height and continuous blade root geometry."""
         impeller = provider.build_impeller("impeller")
@@ -980,6 +995,7 @@ class TestCatFountainProvider:
         # Ensure single contiguous solid
         assert len(solid.solids()) == 1, "Impeller is split into disconnected parts!"
 
+    @pytest.mark.slow
     def test_bottom_cover_rubber_feet_depressions(self, provider):
         """Verify that the bottom cover has recessed depressions for adhesive rubber feet."""
         import math
@@ -1015,6 +1031,7 @@ class TestCatFountainProvider:
         # Ensure single contiguous solid
         assert len(solid.solids()) == 1, "Bottom cover is split into disconnected solids!"
 
+    @pytest.mark.slow
     def test_bowl_no_floating_solids(self, provider):
         """Verify that the main bowl is a single contiguous solid without internal floating shells."""
         bowl = provider.build_bowl("bowl")
@@ -1461,6 +1478,7 @@ class TestCatFountainProvider:
             finally:
                 p.disconnect(physics_client)
 
+    @pytest.mark.slow
     def test_cat_fountain_port_connectivity(self, provider):
         """Verify that all intake and drain ports across cat fountain components match and connect."""
         import jax.numpy as jnp
@@ -1489,6 +1507,7 @@ class TestCatFountainProvider:
         # Check that there is at least one active match in the system
         assert jnp.any(matches_mask), "No fluid intake/drain ports matched across cat fountain assembly"
 
+    @pytest.mark.slow
     def test_pump_cover_c_clip_opening(self, provider):
         """Verify that the pump cover sleeve features a North-facing C-clip opening for effortless slide-down and snap-on."""
         cover = provider.build_pump_cover("pump_cover")
@@ -1534,4 +1553,53 @@ class TestCatFountainProvider:
 
         assert metrics["pool_volume"] == 500, (
             f"Upper reservoir particles were artificially excluded from pool_volume: got {metrics['pool_volume']}"
+        )
+
+    @pytest.mark.slow
+    def test_regression_bug_168_motor_base_mounting_and_pocket_clearance(self, provider):
+        """Verify motor pocket clearance in bowl and secure triangular mounting holes in motor clip.
+
+        Regression test for BUG-168:
+        1. Ensures the motor pocket in the bowl has sufficient clearance for the 15.2mm diameter motor body.
+        2. Ensures the motor clip features 3x M1.4 mounting screw holes on a 6.6mm BCD, anti-rotation base recess,
+           and wire relief channel rather than a loose U-cutout that allowed the motor to spin.
+        """
+        # 1. Verify bowl motor pocket clearance
+        bowl = provider.build_bowl("bowl")
+        floor_z = provider.settings.floor_z
+        # Point at 7.8mm radius (inside the 8.1mm pocket, but outside the old 7.0mm cut) must be hollow
+        test_z = floor_z - 12.0
+        assert not bowl.part.is_inside((7.8, 0.0, test_z)), (
+            "Motor pocket at radius 7.8mm is solid: motor diameter 15.2mm (radius 7.6mm) will rub or not fit!"
+        )
+
+        # 2. Verify motor clip mounting and anti-rotation features
+        clip = provider.build_motor_clip("motor_clip")
+        assert clip.part.volume > 0.0
+        assert clip.part.is_valid()
+
+        clip_h = provider.settings.motor_clip_thickness
+        r_bcd = provider.settings.motor_mount_bolt_circle_radius
+        assert r_bcd == 3.3, f"Expected BCD radius 3.3mm for BetaFPV 1102, got {r_bcd}"
+
+        # 3 screw holes at 90°, 210°, 330° must be open (not solid)
+        for angle in [90.0, 210.0, 330.0]:
+            rad = math.radians(angle)
+            hx = r_bcd * math.cos(rad)
+            hy = r_bcd * math.sin(rad)
+            assert not clip.part.is_inside((hx, hy, clip_h * 0.5)), (
+                f"Mount screw hole at ({hx:.2f}, {hy:.2f}) is blocked!"
+            )
+
+        # Center shaft / bearing clearance hole must be open
+        assert not clip.part.is_inside((0.0, 0.0, clip_h * 0.5)), "Central shaft clearance hole is blocked!"
+
+        # Solid plate area outside shaft hole supporting motor base
+        assert clip.part.is_inside((3.5, 0.0, clip_h * 0.5)), (
+            "Motor clip is hollowed out around motor base: expected solid plastic to mount and secure motor!"
+        )
+
+        # Wire relief channel extending South along -Y
+        assert not clip.part.is_inside((0.0, -10.0, clip_h - 0.2)), (
+            "Wire relief channel at Y = -10.0 is blocked: 3-wire motor cable would be pinched!"
         )

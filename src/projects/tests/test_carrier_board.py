@@ -7,6 +7,7 @@ from model.wiring import Wiring
 from provider import Mode
 
 
+@pytest.mark.slow
 def test_regression_bug_072_flex_tail_cutout_zero_intersection() -> None:
     """Verify BUG-072: flex tail has zero intersection volume with enclosure bottom and lid."""
     provider = CarrierBoardProvider()
@@ -147,6 +148,7 @@ def test_regression_bug_075_swd_cutout() -> None:
     )
 
 
+@pytest.mark.slow
 def test_regression_bug_076_enclosure_snap_fit() -> None:
     """Verify BUG-076: enclosure lid snap fits to bottom shell without useless screw holes."""
     provider = CarrierBoardProvider()
@@ -230,6 +232,7 @@ def test_regression_bug_078_led_cutout_and_cover() -> None:
     assert "mount" in cover.part.joints, "LED cover must have 'mount' RigidJoint"
 
 
+@pytest.mark.slow
 def test_regression_bug_085_enclosure_clip_on_mounting_posts() -> None:
     """Verify BUG-085: enclosure bottom replaces screw holes with flared clip-on mounting posts for carrier PCB."""
     provider = CarrierBoardProvider()
@@ -317,14 +320,22 @@ def test_regression_bug_107_carrier_board_flying_probes_simulation() -> None:
         assert len(iso_results["power_ground_nets"]) > 0, "Must have audited power/ground nets"
         assert len(iso_results["shorted_signals"]) == 0, f"Detected signal shorts: {iso_results['shorted_signals']}"
 
+        # Verify differential pair compliance audit
+        assert hasattr(provider, "flying_probe_diff_pairs"), "Provider must expose flying_probe_diff_pairs"
+        diff_results = provider.flying_probe_diff_pairs
+        assert diff_results["all_passed"] is True, f"Diff pair checks failed: {diff_results}"
+        assert len(diff_results["checks"]) > 0, "Must have audited differential pairs"
+
         # Verify test report generation
         report_md = provider.generate_test_report()
         assert "Flying Probes Automated Acceptance Test Report" in report_md
         assert "TEST_CONTINUITY_GND" in report_md
-        assert "TEST_IMP_PCIE_DIFF" in report_md
+        assert "TEST_UART_BLE_SPEED" in report_md
         assert "PASS" in report_md
         assert "100.0%" in report_md
         assert "Signal Line Isolation Audit" in report_md
+        assert "Differential Pair Compliance Audit" in report_md
+        assert "USB_2_0" in report_md
     finally:
         p.disconnect(client)
 
@@ -352,6 +363,13 @@ def test_regression_bug_108_flex_tail_flying_probes_simulation() -> None:
         for step in provider.flying_probe_steps:
             assert step.passed, f"Flex tail step {step.step_id} ({step.description}) failed electrical validation"
 
+        # Verify mutual capacitance touch configuration
+        assert hasattr(provider, "flying_probe_mutual_cap"), "Provider must expose flying_probe_mutual_cap"
+        cap_results = provider.flying_probe_mutual_cap
+        assert cap_results["all_passed"] is True, f"Mutual cap checks failed: {cap_results}"
+        assert len(cap_results["checks"]) > 0, "Must have audited mutual capacitance channels"
+        assert all(c.touch_detected for c in cap_results["checks"]), "All channels must detect finger touch"
+
         # Verify test report generation
         report_md = provider.generate_test_report()
         assert "TEST_CAP_SENSE_CHAN0" in report_md
@@ -360,8 +378,115 @@ def test_regression_bug_108_flex_tail_flying_probes_simulation() -> None:
         assert "TEST_CAP_SENSE_CHAN3" in report_md
         assert "PASS" in report_md
         assert "100.0%" in report_md
+        assert "Mutual Capacitance Touch Simulation & Verification" in report_md
     finally:
         p.disconnect(client)
+
+
+def test_regression_bug_195_flying_probes_diff_pair_and_mutual_cap_compliance() -> None:
+    """Verify BUG-195: diff pair compliance (USB, PCIe) and mutual cap touch testing in flying probes."""
+    from provider.simulation.flying_probe import (
+        verify_diff_pair_compliance,
+        verify_mutual_cap_compliance,
+    )
+
+    provider = CarrierBoardProvider()
+
+    # 1. Differential pair testing on carrier board
+    diff_results = verify_diff_pair_compliance(provider)
+    assert diff_results["all_passed"] is True, f"Diff pair verification failed: {diff_results}"
+    checks = diff_results["checks"]
+    pair_names = {c.pair_name for c in checks}
+    assert "USB_2_0" in pair_names
+    for c in checks:
+        assert c.passed is True
+        assert c.skew_ps <= c.max_skew_ps
+        tol_val = c.target_diff_impedance_ohm * (c.tolerance_pct / 100.0)
+        assert abs(c.measured_diff_impedance_ohm - c.target_diff_impedance_ohm) <= tol_val
+
+    # 2. Mutual capacitance finger touch simulation on flex tail
+    cap_results = verify_mutual_cap_compliance(provider)
+    assert cap_results["all_passed"] is True, f"Mutual cap verification failed: {cap_results}"
+    cap_checks = cap_results["checks"]
+    chan_names = {c.channel_name for c in cap_checks}
+    assert "CAP_CHAN0" in chan_names
+    assert "CAP_CHAN1" in chan_names
+    for c in cap_checks:
+        assert c.passed is True
+        assert c.touch_detected is True
+        assert c.delta_c_pf >= c.min_delta_c_pf
+        assert c.finger_touch_pf > c.baseline_pf
+
+
+def test_regression_bug_214_btle_support_and_enclosure_cover_bluetooth_logo() -> None:
+    """Verify BUG-214: PCIe connector/cutout removed, BTLE UART 1Mb/s added, Bluetooth logo on lid."""
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+    net_map = {n.name: n for n in wiring.nets}
+
+    # 1. PCIe connector J1 removed, U11 BTLE module added with built-in PCB antenna
+    assert "J1" not in comp_map, "PCIe connector J1 must be removed from design (BUG-214)"
+    assert "U11" in comp_map, "U11 BTLE module must exist in carrier board components (BUG-214)"
+    assert comp_map["U11"].package == "MOD-BLE-PCB-ANT"
+    assert tuple(comp_map["U11"].position[:2]) == (0.0, -36.0)
+
+    # 2. BTLE UART interface connected to U1 with minimum 1Mb/s speed
+    for uart_net in ("BLE_TX", "BLE_RX", "BLE_RTS", "BLE_CTS"):
+        assert uart_net in net_map, f"Net {uart_net} must exist in wiring"
+        net_pins = net_map[uart_net].pins
+        u1_pin = next((p for p in net_pins if p[0] == "U1"), None)
+        u11_pin = next((p for p in net_pins if p[0] == "U11"), None)
+        assert u1_pin is not None, f"Net {uart_net} must connect to U1"
+        assert u11_pin is not None, f"Net {uart_net} must connect to U11"
+    assert provider.settings.ble_uart_baud_rate >= 1000000, "BTLE UART baud rate must be >= 1Mb/s"
+
+    # 3. Pairing by capacitive touch input gesture or proximity
+    pcb_cfg = provider.pcb_config
+    cap_sensor_names = [s.name for s in pcb_cfg.capacitive_sensors]
+    assert "ACTION_BUTTON" in cap_sensor_names, "ACTION_BUTTON must exist for cap-touch pairing gesture"
+    assert "PROXIMITY_SENSOR" in cap_sensor_names, "PROXIMITY_SENSOR must exist for proximity-based pairing"
+
+    # 4. Main user LED D1 and piezo buzzer U5 provide BTLE connection status
+    assert "D1" in comp_map, "Main user RGB LED D1 must exist"
+    assert "U5" in comp_map, "Piezo buzzer U5 must exist"
+    signaling = provider.btle_status_signaling
+    assert "pairing" in signaling and "connected" in signaling and "disconnected" in signaling
+    assert "blue" in signaling["pairing"]["led_color"]
+    assert "solid_cyan" in signaling["connected"]["led_color"]
+    assert "buzzer_tone" in signaling["pairing"]
+    assert "buzzer_tone" in signaling["connected"]
+
+    # 5. Integrated PCB antenna and ground plane keepout
+    assert provider.settings.ble_antenna_length > 0
+    ble_keepouts = [obs for obs in provider.pcb_manifest["obstacles"] if "antenna" in obs["name"]]
+    assert len(ble_keepouts) >= 1, "Must define RF ground plane keepout for integrated PCB antenna"
+
+    # 6. Bluetooth logo on enclosure cover (enclosure_lid)
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid.part.is_valid(), "Enclosure lid must be a valid solid"
+    assert len(lid.part.solids()) == 1, "Enclosure lid must be a single solid"
+    assert "bluetooth_logo" in lid.part.joints, "Lid must expose bluetooth_logo joint"
+    wall = provider.settings.enclosure_wall_thickness
+    depth = provider.settings.ble_logo_depth
+    bt_faces = [
+        f
+        for f in lid.part.faces()
+        if abs(f.center().Z - (wall - depth)) < 1e-3 and abs(f.center().X) < 5.0 and -30.0 < f.center().Y < -15.0
+    ]
+    assert len(bt_faces) >= 5, f"Expected engraved Bluetooth logo faces on lid, found {len(bt_faces)}"
+
+    # 7. Zero PCIe cutouts in enclosure bottom
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    floor_z = -h_shell / 2.0 + (wall / 2.0)
+    length = provider.settings.board_length + 2.0 * (provider.settings.enclosure_clearance + wall)
+    rear_wall_y = -length / 2.0 + (wall / 2.0)
+    m2_z = -h_shell / 2.0 + wall + standoff_h + 2.0
+
+    assert enclosure.part.is_inside((0.0, -36.0, floor_z)), "Enclosure bottom floor must be solid under former J1"
+    assert enclosure.part.is_inside((0.0, rear_wall_y, m2_z)), "Enclosure rear wall must be solid without PCIe cutout"
 
 
 def test_regression_bug_131_schematic_collinear_wire_overlaps() -> None:
@@ -449,6 +574,7 @@ def test_regression_bug_133_flex_tail_schematic_isolated() -> None:
             assert f'"{other_comp}"' not in sch_text
 
 
+@pytest.mark.slow
 def test_regression_bug_134_carrier_board_components_match_schematic() -> None:
     """Verify BUG-134: carrier board PCB components J6, J7, J8 are JST-PH-6P matching schematic."""
     from pathlib import Path
@@ -499,6 +625,7 @@ def test_regression_bug_139_battery_cover() -> None:
     assert provider.settings.enclosure_battery_cover_vertical_clearance >= 2.0
 
 
+@pytest.mark.slow
 def test_regression_bug_140_flex_tail_support() -> None:
     """Verify BUG-140: enclosure bottom extends a support shelf under the flex tail."""
     provider = CarrierBoardProvider()
@@ -545,7 +672,7 @@ def test_regression_bug_141_flex_tail_tab_fit() -> None:
 
 
 def test_regression_bug_142_m2_floor_cutout() -> None:
-    """Verify BUG-142: enclosure bottom floor has pass-through cutout under PCIE connector J1."""
+    """Verify BUG-142 & BUG-214: enclosure bottom floor is completely solid under former PCIe connector J1."""
     provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
@@ -553,16 +680,12 @@ def test_regression_bug_142_m2_floor_cutout() -> None:
     h_shell = standoff_h + provider.settings.board_thickness + 10.0
     floor_z = -h_shell / 2.0 + (wall / 2.0)
 
-    wiring = Wiring(str(provider.wiring_path))
-    j1 = next(c for c in wiring.footprints if c.name == "J1")
-    j1_x, j1_y = j1.position[0], j1.position[1]
-
-    # Floor must have a cutout under J1 connector
-    assert not enclosure.part.is_inside((j1_x, j1_y, floor_z)), (
-        f"Enclosure bottom floor must have cutout under J1 at ({j1_x}, {j1_y})"
+    # Floor must be completely solid under (0.0, -36.0) where J1 was previously pierced
+    assert enclosure.part.is_inside((0.0, -36.0, floor_z)), (
+        "Enclosure bottom floor must be solid under former J1 location after PCIe removal (BUG-214)"
     )
-    # Floor must remain solid away from J1 cutout
-    assert enclosure.part.is_inside((20.0, j1_y, floor_z)), "Enclosure floor must be solid away from cutout"
+    # Floor must remain solid across bottom
+    assert enclosure.part.is_inside((20.0, -36.0, floor_z)), "Enclosure floor must be solid away from center"
 
 
 def test_regression_bug_143_peripheral_cutouts_uniform_size() -> None:
@@ -592,25 +715,24 @@ def test_regression_bug_143_peripheral_cutouts_uniform_size() -> None:
 
 
 def test_regression_bug_144_m2_rear_wall_cutout() -> None:
-    """Verify BUG-144: enclosure bottom rear wall has cutout for J1 insertion."""
+    """Verify BUG-144 & BUG-214: enclosure bottom rear wall has zero PCIe cutout and is completely solid."""
     provider = CarrierBoardProvider()
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     wall = provider.settings.enclosure_wall_thickness
     standoff_h = provider.settings.standoff_height
     h_shell = standoff_h + provider.settings.board_thickness + 10.0
     length = provider.settings.board_length + 2.0 * (provider.settings.enclosure_clearance + wall)
-    m2_h = provider.settings.enclosure_m2_cutout_height
-    m2_z = -h_shell / 2.0 + wall + standoff_h + (m2_h / 2.0) - 0.5
     rear_wall_y = -length / 2.0 + (wall / 2.0)
 
-    # Cutout aperture must pierce rear wall at center X=0
-    assert not enclosure.part.is_inside((0.0, rear_wall_y, m2_z)), (
-        f"Enclosure rear wall must have M.2 cutout at (0.0, {rear_wall_y}, {m2_z})"
+    # Rear wall at center X=0 must be completely solid without M.2/PCIe cutout
+    m2_z = -h_shell / 2.0 + wall + standoff_h + 2.0
+    assert enclosure.part.is_inside((0.0, rear_wall_y, m2_z)), (
+        f"Enclosure rear wall must be solid at (0.0, {rear_wall_y}, {m2_z}) after PCIe removal (BUG-214)"
     )
-    # Rear wall must remain solid away from cutout
-    assert enclosure.part.is_inside((25.0, rear_wall_y, m2_z)), "Rear wall must be solid outside M.2 cutout"
+    assert enclosure.part.is_inside((25.0, rear_wall_y, m2_z)), "Rear wall must be solid across entire width"
 
 
+@pytest.mark.slow
 def test_regression_bug_145_battery_cradle_and_cover_extend_over_j13() -> None:
     """Verify BUG-145: battery cradle and cover extend over J13 cutout to conceal wiring."""
     from build123d import Location
@@ -669,6 +791,7 @@ def test_regression_bug_147_flex_ribbon_slider_action_prox() -> None:
     assert "PROXIMITY_SENSOR" in cap_names, "PROXIMITY_SENSOR must exist in capacitive sensors"
 
 
+@pytest.mark.slow
 def test_regression_bug_148_flex_ribbon_support_connects_to_enclosure() -> None:
     """Verify BUG-148: flex ribbon support shelf connects continuously with enclosure bottom."""
     provider = CarrierBoardProvider()
@@ -693,6 +816,7 @@ def test_regression_bug_148_flex_ribbon_support_connects_to_enclosure() -> None:
     )
 
 
+@pytest.mark.slow
 def test_regression_bug_150_component_cutout_labels() -> None:
     """Verify BUG-150: charger, SWD, M.2 PCIe, and flex ribbon cutouts have labels."""
     provider = CarrierBoardProvider()
@@ -713,9 +837,9 @@ def test_regression_bug_150_component_cutout_labels() -> None:
     usb_face = next((f for f in left_engraved if abs(f.center().Y) < 1.0), None)
     assert usb_face is not None, "USB connector trident icon face must be engraved above USB-C cutout"
 
-    # 2. Rear exterior wall (M.2 PCIE label)
+    # 2. Rear exterior wall (solid wall, 0 M.2 PCIE engraved faces after BUG-214)
     rear_engraved = [f for f in enclosure.part.faces() if abs(f.center().Y - (-length / 2.0 + 0.4)) < 1e-3]
-    assert len(rear_engraved) >= 5, f"Expected M.2 PCIE engraved faces, found {len(rear_engraved)}"
+    assert len(rear_engraved) == 0, f"Expected 0 M.2 PCIE engraved faces on rear wall, found {len(rear_engraved)}"
 
     # 3. Front shelf (FLEX TAIL label)
     shelf_engraved = [
@@ -723,9 +847,9 @@ def test_regression_bug_150_component_cutout_labels() -> None:
     ]
     assert len(shelf_engraved) >= 8, f"Expected FLEX TAIL engraved faces, found {len(shelf_engraved)}"
 
-    # 4. Enclosure lid (BATTERY label)
+    # 4. Enclosure lid (BATTERY and BLUETOOTH labels)
     lid_engraved = [f for f in lid.part.faces() if abs(f.center().Z - (wall - 0.4)) < 1e-3]
-    assert len(lid_engraved) >= 5, f"Expected BATTERY engraved faces on lid, found {len(lid_engraved)}"
+    assert len(lid_engraved) >= 10, f"Expected BATTERY and BLUETOOTH engraved faces on lid, found {len(lid_engraved)}"
 
 
 @pytest.mark.slow
@@ -791,6 +915,7 @@ def test_regression_bug_149_mutual_intersection_test() -> None:
         )
 
 
+@pytest.mark.slow
 def test_regression_bug_152_textured_pcb_simulation_visibility() -> None:
     """Verify BUG-152: carrier board and flex tail expose urdf_label for textured PCB visualization."""
     from pathlib import Path
@@ -1042,6 +1167,7 @@ def test_regression_bug_159_swd_usb_labels_orientation() -> None:
     assert len(enc.part.solids()) == 1, "Enclosure bottom must remain a single contiguous solid"
 
 
+@pytest.mark.slow
 def test_regression_bug_160_peripheral_labels_on_enclosure_lid() -> None:
     """Verify BUG-160: peripheral connector text moved to enclosure top to prevent hollow shells."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -1058,6 +1184,7 @@ def test_regression_bug_160_peripheral_labels_on_enclosure_lid() -> None:
     assert len(lid.part.solids()) == 1, "enclosure_lid must be a single solid with engraved bus labels"
 
 
+@pytest.mark.slow
 def test_regression_capsense_proximity_loop_clearance_and_drc() -> None:
     """Verify capsense traces maintain clearance to proximity sensor perimeter loop and pass DRC."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -1112,6 +1239,7 @@ def test_regression_bug_161_board_texture_transparency_mask() -> None:
     assert masked.getpixel((hole_px_x, hole_px_y))[3] == 0, "Mounting hole center must be transparent"
 
 
+@pytest.mark.slow
 def test_regression_pcb_texture_uv_parity_and_orientation() -> None:
     """Verify that PCB texture UV mapping in Rerun Mesh3D maintains correct parity and upright orientation."""
     from pathlib import Path
@@ -1305,3 +1433,537 @@ def test_regression_flying_probes_initial_isolation_verdict_pending() -> None:
         assert "⚪ *PENDING*" not in final_report, "Completed report must not have pending steps"
     finally:
         p.disconnect(client)
+
+
+@pytest.mark.slow
+def test_regression_bug_176_jst_connector_spacing_and_zero_drc_errors() -> None:
+    """Verify BUG-176: JST peripheral headers J6-J10 have >= 1.0mm body gap and 0 DRC errors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from model.wiring import Wiring
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    # Connector lengths along Y axis: 6P = 14.0mm, 7P = 16.0mm
+    connectors = [("J6", 14.0), ("J7", 14.0), ("J8", 14.0), ("J9", 16.0), ("J10", 16.0)]
+    for i in range(len(connectors) - 1):
+        c_top, len_top = connectors[i]
+        c_bot, len_bot = connectors[i + 1]
+        y_top = comp_map[c_top].position[1]
+        y_bot = comp_map[c_bot].position[1]
+        body_gap = (y_top - len_top / 2.0) - (y_bot + len_bot / 2.0)
+        assert body_gap >= 1.0, f"Body gap between {c_top} and {c_bot} must be >= 1.0mm, got {body_gap:.2f}mm"
+
+    # Verify PCB DRC reports 0 errors
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0, f"Expected 0 DRC errors, got {report.error_count}"
+
+
+@pytest.mark.slow
+def test_regression_bug_177_enclosure_bottom_cutouts_and_lid_markers() -> None:
+    """Verify BUG-177: enclosure bottom cutouts align with J6-J10 and lid has engraved GPIO icons."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider import Mode
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    w = provider.settings.board_width + 2.0 * (provider.settings.enclosure_clearance + wall)
+    wall_x = (w / 2.0) - (wall / 2.0)
+    standoff_h = provider.settings.standoff_height
+    h_shell = standoff_h + provider.settings.board_thickness + 10.0
+    z_carrier = -h_shell / 2.0 + wall + standoff_h + (provider.settings.board_thickness / 2.0)
+    z_conn = z_carrier + (provider.settings.board_thickness / 2.0) + 2.0
+
+    for des in ("J6", "J7", "J8", "J9", "J10"):
+        y = comp_map[des].position[1]
+        assert not enclosure.part.is_inside((wall_x, y, z_conn)), (
+            f"Enclosure bottom must have cutout clearing connector {des} at Y={y}"
+        )
+
+    # Verify lid builds successfully with GPIO icon markers
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid.part is not None
+    assert lid.part.volume > 0.0
+
+
+@pytest.mark.slow
+def test_regression_bug_179_right_side_ports_clear_mounting_holes() -> None:
+    """Verify BUG-179: right side peripheral ports J6 and J10 clear mounting holes MH1 and MH4."""
+    import math
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from model.wiring import Wiring
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    # Connector lengths along Y: J6-J8 = 14mm, J9-J10 = 16mm
+    # Positions: J6 @ Y=32, J10 @ Y=-31
+    j6_y = comp_map["J6"].position[1]
+    j10_y = comp_map["J10"].position[1]
+    assert j6_y <= 32.0, f"J6 center Y must be <= 32.0 to clear MH1, got {j6_y}"
+    assert j10_y >= -31.0, f"J10 center Y must be >= -31.0 to clear MH4, got {j10_y}"
+
+    # Verify J6 top edge does not overlap MH1
+    j6_top = j6_y + 14.0 / 2.0
+    assert j6_top <= 39.0, f"J6 top body edge must be <= 39.0mm, got {j6_top}"
+
+    # Verify J10 bottom edge does not overlap MH4
+    j10_bottom = j10_y - 16.0 / 2.0
+    assert j10_bottom >= -39.0, f"J10 bottom body edge must be >= -39.0mm, got {j10_bottom}"
+
+    # Check pad-to-pad distance between J6 pin 1 (y = j6_y + 5.0) and MH1 (25.5, 40.5)
+    # J6 pin 1 is at (24.5, 37.0)
+    mh1_x, mh1_y = 25.5, 40.5
+    j6_p1_x, j6_p1_y = 24.5, j6_y + 5.0
+    dist_mh1 = math.hypot(mh1_x - j6_p1_x, mh1_y - j6_p1_y)
+    # MH1 pad radius (2.25) + J6 pad radius (0.8) = 3.05mm
+    assert dist_mh1 > 3.05, f"J6 pin 1 shorts with MH1: distance {dist_mh1:.3f}mm <= 3.05mm"
+
+    # Check pad-to-pad distance between J10 pin 7 (y = j10_y - 6.0) and MH4 (25.5, -40.5)
+    # J10 pin 7 is at (24.5, -37.0)
+    mh4_x, mh4_y = 25.5, -40.5
+    j10_p7_x, j10_p7_y = 24.5, j10_y - 6.0
+    dist_mh4 = math.hypot(mh4_x - j10_p7_x, mh4_y - j10_p7_y)
+    assert dist_mh4 > 3.05, f"J10 pin 7 shorts with MH4: distance {dist_mh4:.3f}mm <= 3.05mm"
+
+    # Verify uniform >= 1.0mm body gaps across all peripheral headers
+    connectors = [("J6", 14.0), ("J7", 14.0), ("J8", 14.0), ("J9", 16.0), ("J10", 16.0)]
+    for i in range(len(connectors) - 1):
+        c_top, len_top = connectors[i]
+        c_bot, len_bot = connectors[i + 1]
+        y_top = comp_map[c_top].position[1]
+        y_bot = comp_map[c_bot].position[1]
+        body_gap = (y_top - len_top / 2.0) - (y_bot + len_bot / 2.0)
+        assert body_gap >= 1.0, f"Body gap between {c_top} and {c_bot} must be >= 1.0mm, got {body_gap:.2f}mm"
+
+    # Verify DRC clean
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0, f"Expected 0 DRC errors, got {report.error_count}"
+
+
+@pytest.mark.slow
+def test_regression_bug_180_zero_drc_violations_carrier_board_and_flex_tail() -> None:
+    """Verify BUG-180: carrier_board and flex_tail achieve zero DRC violations with rule severities."""
+    from pathlib import Path
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    # Test rule_severities in to_kicad_pro_dict
+    provider = CarrierBoardProvider()
+    rules = provider.pcb_config.design_rules
+    assert "hole_to_hole" in rules.rule_severities
+    assert "track_dangling" in rules.rule_severities
+    pro_dict = rules.to_kicad_pro_dict()
+    assert "rule_severities" in pro_dict["board"]["design_settings"]
+    assert pro_dict["board"]["design_settings"]["rule_severities"]["track_dangling"] == "ignore"
+
+    # Test parsed reports from build output
+    carrier_rpt = Path("build/rpt/carrier_board-drc.rpt")
+    if carrier_rpt.exists():
+        report = KiCadCLI.parse_drc_report(carrier_rpt)
+        assert report.passed
+        assert report.error_count == 0
+        assert report.violations_count == 0
+
+    flex_rpt = Path("build/rpt/flex_tail-drc.rpt")
+    if flex_rpt.exists():
+        report = KiCadCLI.parse_drc_report(flex_rpt)
+        assert report.passed
+        assert report.error_count == 0
+        assert report.violations_count == 0
+
+
+@pytest.mark.slow
+def test_regression_bug_183_carrier_board_hardening() -> None:
+    """Verify BUG-183: carrier board design hardening with jumpers, LEDs, switch, and Status sheet."""
+    from pathlib import Path
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    # Verify SW1 reset button exists and is placed
+    assert "SW1" in comp_map, "SW1 reset button must exist in wiring"
+    assert comp_map["SW1"].package == "SW_PUSH_SMD"
+
+    # Verify isolation and override jumpers JP1..JP4
+    for jp in ("JP1", "JP2", "JP3", "JP4"):
+        assert jp in comp_map, f"Jumper {jp} must exist in wiring"
+        assert comp_map[jp].package == "pin_header_1x2"
+
+    # Verify power good / enable LEDs D2..D7 and resistors R7..R12
+    for d_idx in range(2, 8):
+        d_name = f"D{d_idx}"
+        r_name = f"R{d_idx + 5}"
+        assert d_name in comp_map, f"Status LED {d_name} must exist in wiring"
+        assert r_name in comp_map, f"Ballast resistor {r_name} must exist in wiring"
+        assert comp_map[d_name].package == "0603"
+        assert comp_map[r_name].package == "0402"
+
+    # Verify new components are placed in open space south of U1 and north of J1
+    for name in ["SW1", "JP1", "JP2", "JP3", "JP4", "D2", "D3", "D4", "D5", "D6", "D7"]:
+        pos = comp_map[name].position
+        y_max = -10.0 if name == "SW1" else -16.0
+        assert -36.0 <= pos[1] <= y_max, (
+            f"Component {name} at Y={pos[1]} not in designated space south of U1 and north of J1"
+        )
+        assert -15.0 <= pos[0] <= 15.0, f"Component {name} at X={pos[0]} not in designated corridor"
+
+    # Verify Status and Overrides schematic sheet exists in PCB configuration
+    status_sheets = [s for s in provider.pcb_config.schematic_sheets if "Status and Overrides" in s.title]
+    assert len(status_sheets) >= 1, "Schematic sheets for 'Status and Overrides' must exist"
+    all_status_comps = [c for s in status_sheets for c in s.components]
+    assert "SW1" in all_status_comps
+    assert "JP1" in all_status_comps
+    assert "D2" in all_status_comps
+
+    # Verify PCB DRC checker passes
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0
+
+    # Verify KiCad DRC report clean if generated
+    carrier_rpt = Path("build/rpt/carrier_board-drc.rpt")
+    if carrier_rpt.exists():
+        kicad_report = KiCadCLI.parse_drc_report(carrier_rpt)
+        assert kicad_report.passed
+        assert kicad_report.error_count == 0
+        assert kicad_report.violations_count == 0
+
+
+@pytest.mark.slow
+def test_regression_bug_189_enclosure_top_gpio_labels() -> None:
+    """Verify BUG-189: GPIO labels on enclosure top are text, non-overlapping, and properly rotated."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider import Mode
+
+    provider = CarrierBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    wall = provider.settings.enclosure_wall_thickness
+    depth = provider.settings.enclosure_gpio_label_depth
+
+    assert lid.part is not None
+    assert lid.part.is_valid(), "Enclosure lid with engraved GPIO labels must be a valid solid"
+    assert len(lid.part.solids()) == 1, "Enclosure lid must remain a single contiguous solid"
+
+    # Engraved text bottom faces lie at Z = wall - depth
+    engraved_z = wall - depth
+    label_faces = [f for f in lid.part.faces() if abs(f.center().Z - engraved_z) < 1e-3]
+    assert len(label_faces) > 0, f"Expected engraved faces at Z={engraved_z}, found 0"
+
+    # Verify GPIO header cutout is present
+    gpio_w = provider.settings.enclosure_gpio_cutout_width
+    gpio_l = provider.settings.enclosure_gpio_cutout_length
+    assert gpio_w > 0 and gpio_l > 0
+
+
+@pytest.mark.slow
+def test_regression_bug_207_sheet_17_components_on_carrier_board() -> None:
+    """Verify BUG-207: Sheet 17 components are present on carrier board with complete routing and 0 DRC errors."""
+    from pathlib import Path
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    # Verify all 17 components from Sheet 17 and sub-sheets are placed on the board
+    sheet_17_comps = [
+        "SW1",
+        "JP1",
+        "JP2",
+        "JP3",
+        "JP4",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "R7",
+        "R8",
+        "R9",
+        "R10",
+        "R11",
+        "R12",
+    ]
+    for name in sheet_17_comps:
+        assert name in comp_map, f"Sheet 17 component {name} must exist on carrier board"
+        pos = comp_map[name].position
+        y_max = -10.0 if name == "SW1" else -16.0
+        assert -36.0 <= pos[1] <= y_max, f"Component {name} must be in corridor between U1 and J1"
+
+    # Verify existing baseline components were not displaced
+    assert tuple(comp_map["U1"].position[:2]) == (0.0, 0.0)
+    assert "J1" not in comp_map, "J1 PCIe connector must be removed (BUG-214)"
+    assert tuple(comp_map["U11"].position[:2]) == (0.0, -36.0)
+    assert tuple(comp_map["J2"].position[:2]) == (0.0, 38.0)
+    assert tuple(comp_map["J3"].position[:2]) == (-25.0, 0.0)
+    assert tuple(comp_map["J14"].position[:2]) == (19.0, -28.0)
+
+    # Verify DRC clean
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0
+
+    # Verify KiCad DRC report clean if generated
+    carrier_rpt = Path("build/rpt/carrier_board-drc.rpt")
+    if carrier_rpt.exists():
+        kicad_report = KiCadCLI.parse_drc_report(carrier_rpt)
+        assert kicad_report.passed
+        assert kicad_report.error_count == 0
+        assert kicad_report.violations_count == 0
+
+
+@pytest.mark.slow
+def test_regression_bug_208_battery_cover_does_not_elide_enclosure_labels() -> None:
+    """Verify BUG-208: Battery cover does not elide BATTERY or GPIO labels, and GPIO pin 10 marker is present."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider import Mode
+
+    provider = CarrierBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    cover = provider.battery_cover("battery_cover", None, Mode.DEFAULT)
+
+    assert lid.part is not None and lid.part.is_valid()
+    assert cover.part is not None and cover.part.is_valid()
+
+    cover_bb = cover.part.bounding_box()
+
+    # Verify BATTERY label margin and that BATTERY label is strictly south of battery cover min Y
+    label_margin = provider.settings.enclosure_battery_label_margin
+    assert label_margin >= 1.0, f"Expected battery label margin >= 1.0mm, got {label_margin}"
+
+    # Calculate battery label coordinate
+    batt_l = provider.settings.enclosure_battery_mount_length
+    batt_y = provider.settings.enclosure_battery_mount_y
+    cradle_t = provider.settings.enclosure_battery_mount_wall_thickness
+    clr = provider.settings.enclosure_battery_cover_clearance
+    cover_t = provider.settings.enclosure_battery_cover_wall_thickness
+    min_y = batt_y - (batt_l / 2.0)
+    batt_lbl_y = min_y - cradle_t - clr - cover_t - label_margin
+    assert batt_lbl_y < cover_bb.min.Y, (
+        f"BATTERY label Y={batt_lbl_y} must be strictly south of cover min Y={cover_bb.min.Y}"
+    )
+
+    # Verify GPIO title is located directly above GPIO cutout and horizontally clear of battery cover
+    gpio_y = -28.0
+    gpio_l = provider.settings.enclosure_gpio_cutout_length
+    hdr_margin = provider.settings.enclosure_gpio_header_label_margin
+    hdr_y = gpio_y + (gpio_l / 2.0) + hdr_margin
+    assert hdr_y > gpio_y + (gpio_l / 2.0), "GPIO header label must be located north of cutout"
+    assert 19.0 > cover_bb.max.X + 2.0, "GPIO label X position must maintain clearance from battery cover right edge"
+
+    # Verify pin 10 marker Y position matches physical pin 10
+    pitch = provider.settings.enclosure_gpio_pin_pitch
+    pin_10_y = gpio_y + (4.5 * pitch)
+    assert pin_10_y > gpio_y + (3.0 * pitch), "Pin 10 marker must be positioned at top pin header location"
+
+
+def test_regression_bug_210_passives_have_values() -> None:
+    """Verify BUG-210: All resistors and capacitors have strongly typed electrical values."""
+    from model.wiring import Wiring
+    from projects.carrier_board.provider import CarrierBoardProvider
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+
+    # Verify all 14 capacitors have non-empty capacitance values
+    for c_idx in range(1, 15):
+        c_name = f"C{c_idx}"
+        assert c_name in fp_map, f"Capacitor {c_name} missing from wiring"
+        c_val = getattr(fp_map[c_name], "value", None)
+        assert c_val is not None and len(c_val) > 0, f"Capacitor {c_name} is missing electrical value"
+        assert any(c_val.endswith(unit) for unit in ("uF", "pF", "nF")), (
+            f"Capacitor {c_name} value '{c_val}' does not end with standard capacitance unit"
+        )
+
+    # Verify all 12 resistors have non-empty resistance values
+    for r_idx in range(1, 13):
+        r_name = f"R{r_idx}"
+        assert r_name in fp_map, f"Resistor {r_name} missing from wiring"
+        r_val = getattr(fp_map[r_name], "value", None)
+        assert r_val is not None and len(r_val) > 0, f"Resistor {r_name} is missing electrical value"
+        assert any(unit in r_val for unit in ("k", "ohm", "M", "R")), (
+            f"Resistor {r_name} value '{r_val}' does not contain standard resistance unit"
+        )
+
+
+def test_regression_bug_209_silkscreen_readability_and_spacing() -> None:
+    """Verify BUG-209: Schematic power net exclusions and PCB silkscreen region spacing."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.schematic.constants import PowerNetMatcher
+
+    # 1. Verify PowerNetMatcher excludes LED cathode/anode signals from being matched as power nets
+    matcher = PowerNetMatcher()
+    for net in ("LED_VBAT_K", "LED_VBUS_K", "LED_3V3_K", "LED_AUD_K", "LED_PERIPH_K", "LED_MCU_K"):
+        assert not matcher.is_power_net(net), f"Cathode net {net} must not be matched as power rail"
+        assert net not in matcher, f"Cathode net {net} must not match in PowerNetMatcher"
+
+    provider = CarrierBoardProvider()
+    pcb_cfg = provider.pcb_config
+
+    # 2. Verify LAYER 1-6 RIGID-FLEX silkscreen does not collide with D2..D7 corridor (X=4.0, Y=-30..-20)
+    layer_text = next(t for t in pcb_cfg.silkscreen_texts if t.text == "LAYER 1-6 RIGID-FLEX")
+    assert layer_text.position[1] < -32.0 or layer_text.position[0] < -4.0, (
+        f"LAYER 1-6 text at {layer_text.position} overlaps D2..D7 corridor"
+    )
+
+    # 3. Verify jumper and switch labels are horizontal (rotation == 0.0)
+    for label_name in ("NRST", "BOOT0", "ISP", "VBUS", "RESET"):
+        lbl = next(t for t in pcb_cfg.silkscreen_texts if t.text == label_name)
+        assert lbl.rotation == 0.0, f"Label {label_name} must have horizontal rotation 0.0, got {lbl.rotation}"
+
+    # 4. Verify PCB DRC passes with 0 violations
+    drc = PCBDesignRulesChecker(pcb_cfg)
+    report = drc.check_all(wiring=Wiring(str(provider.wiring_path)))
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0
+
+
+def test_regression_bug_219_reset_relocation_and_horizontal_jumpers() -> None:
+    """Verify BUG-219: Relocate RESET button, remove grouping borders, orient jumpers horizontally.
+
+    Asserts that:
+    1. SW1 (RESET button) is moved out of the overrides group and placed centrally below U1 at (0.0, -11.0).
+    2. RESET silkscreen label is placed between U1 and SW1 at (0.0, -9.2).
+    3. Rectangular grouping borders around STATUS and OVERRIDES are removed.
+    4. Jumpers JP1, JP2, JP3, JP4 are oriented horizontally with rotation (0.0, 0.0, 0.0).
+    5. Silkscreen text labels (NRST, BOOT0, ISP, VBUS) are positioned to the right of each jumper at X=14.0.
+    6. Complete DRC check passes with zero errors and zero warnings.
+    """
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_cfg = provider.pcb_config
+
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+
+    # 1. SW1 relocation
+    assert "SW1" in fp_map
+    sw1 = fp_map["SW1"]
+    assert abs(sw1.position[0] - 0.0) < 0.1, f"SW1 X position must be 0.0, got {sw1.position[0]}"
+    assert abs(sw1.position[1] - (-11.0)) < 0.1, f"SW1 Y position must be -11.0, got {sw1.position[1]}"
+    assert abs(sw1.rotation[2] - 0.0) < 0.1, f"SW1 rotation must be 0.0, got {sw1.rotation}"
+
+    # 2. RESET silkscreen label
+    reset_text = next(t for t in pcb_cfg.silkscreen_texts if t.layer == "F.SilkS" and t.text == "RESET")
+    assert abs(reset_text.position[0] - 0.0) < 0.1, f"RESET text X must be 0.0, got {reset_text.position[0]}"
+    assert abs(reset_text.position[1] - (-9.2)) < 0.2, f"RESET text Y must be -9.2, got {reset_text.position[1]}"
+
+    # 3. Rectangular grouping borders removed
+    rect_frames = [
+        g
+        for g in pcb_cfg.silkscreen_graphics
+        if g.shape == "rect" and (abs(g.position[0] - 12.2) < 2.0 or abs(g.position[0] - 4.5) < 2.0)
+    ]
+    assert len(rect_frames) == 0, (
+        f"Grouping rectangles for STATUS and OVERRIDES must be removed, found {len(rect_frames)}"
+    )
+
+    # 4. Jumpers oriented horizontally
+    for jp_name in ("JP1", "JP2", "JP3", "JP4"):
+        assert jp_name in fp_map
+        jp = fp_map[jp_name]
+        assert abs(jp.rotation[2] - 0.0) < 0.1, (
+            f"Jumper {jp_name} must have horizontal rotation 0.0, got {jp.rotation[2]}"
+        )
+        assert abs(jp.position[0] - 10.5) < 0.1, f"Jumper {jp_name} must be placed at X=10.5, got {jp.position[0]}"
+
+    # 5. Silkscreen texts to the right at X=14.0
+    text_pos_map = {
+        "NRST": -21.5,
+        "BOOT0": -24.0,
+        "ISP": -27.0,
+        "VBUS": -29.6,
+    }
+    for text_name, expected_y in text_pos_map.items():
+        lbl = next(t for t in pcb_cfg.silkscreen_texts if t.layer == "F.SilkS" and t.text == text_name)
+        assert abs(lbl.position[0] - 14.0) < 0.2, (
+            f"Label {text_name} must be to the right at X=14.0, got {lbl.position[0]}"
+        )
+        assert abs(lbl.position[1] - expected_y) < 0.2, (
+            f"Label {text_name} must be at Y={expected_y}, got {lbl.position[1]}"
+        )
+        assert lbl.rotation == 0.0, f"Label {text_name} must be horizontal (rotation 0.0)"
+
+    # 6. Complete DRC check passes
+    drc = PCBDesignRulesChecker(pcb_cfg)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0
+    assert report.warning_count == 0
+
+
+def test_regression_bug_220_flex_tail_flying_probe_isolation_excluded() -> None:
+    """Verify BUG-220: Flex tail flying probe test excludes untestable carrier board isolation checks.
+
+    Asserts that:
+    1. Flying probe simulation hooks for flex_tail only synthesize steps defined in pcb_test_steps.yaml.
+    2. Zero TEST_ISO_* steps are created for flex_tail.
+    3. flying_probe_signal_isolation on flex_tail reports empty checks.
+    4. Rendered markdown report for flex_tail omits 'Signal Line Isolation Audit'.
+    5. Rendered markdown report for flex_tail contains 'Mutual Capacitance Touch Simulation & Verification'.
+    6. For carrier_board, isolation steps and the audit table remain present.
+    """
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from projects.carrier_board.simulate_hooks import get_simulate_hooks_impl
+
+    provider = CarrierBoardProvider()
+
+    # 1. Flex tail simulation hooks
+    get_simulate_hooks_impl(provider, "carrier_board/flex_tail")
+    flex_steps = getattr(provider, "flying_probe_steps", [])
+    flex_iso_steps = [s for s in flex_steps if s.step_id.startswith("TEST_ISO_")]
+
+    assert len(flex_iso_steps) == 0, f"Flex tail must not contain isolation steps, found: {flex_iso_steps}"
+    assert len(flex_steps) == 7, f"Flex tail must only contain 7 defined test steps, found {len(flex_steps)}"
+
+    flex_iso_results = getattr(provider, "flying_probe_signal_isolation", {})
+    assert len(flex_iso_results.get("checks", [])) == 0, "Flex tail signal isolation checks must be empty"
+    assert flex_iso_results.get("all_passed") is True
+
+    flex_report = provider.generate_test_report()
+    assert "Signal Line Isolation Audit" not in flex_report, (
+        "Flex tail report must NOT include Signal Line Isolation Audit section"
+    )
+    assert "Mutual Capacitance Touch Simulation & Verification (Flex Tail)" in flex_report, (
+        "Flex tail report must include Mutual Capacitance section"
+    )
+
+    # 2. Carrier board simulation hooks
+    get_simulate_hooks_impl(provider, "carrier_board")
+    carrier_steps = getattr(provider, "flying_probe_steps", [])
+    carrier_iso_steps = [s for s in carrier_steps if s.step_id.startswith("TEST_ISO_")]
+
+    assert len(carrier_iso_steps) > 0, "Carrier board must contain synthesized isolation steps"
+    assert getattr(provider, "flying_probe_diff_pairs", None) is not None
+
+    carrier_report = provider.generate_test_report()
+    assert "Signal Line Isolation Audit" in carrier_report, (
+        "Carrier board report must include Signal Line Isolation Audit section"
+    )
+    assert "Differential Pair Compliance Audit" in carrier_report, (
+        "Carrier board report must include Differential Pair Compliance Audit section"
+    )

@@ -174,9 +174,42 @@
       box-shadow: 0 0 8px rgba(255, 184, 0, 0.3), inset 2px 2px 4px rgba(0,0,0,0.8);
     }
     textarea {
-      resize: vertical;
+      resize: both !important;
       min-height: 80px;
+      min-width: 200px;
+      max-width: 100%;
       line-height: 1.5;
+    }
+    input[type="text"] {
+      resize: horizontal;
+      min-width: 150px;
+      max-width: 100%;
+    }
+
+    .panel-expand-btn {
+      font-size: 10px;
+      padding: 2px 8px;
+      letter-spacing: 0.04em;
+    }
+    .form-section.expanded-vertical textarea {
+      min-height: 380px !important;
+      height: 480px;
+    }
+    .form-section.expanded-vertical .row .col textarea {
+      min-height: 240px !important;
+      height: 300px;
+    }
+    .attachment-lfs-notice {
+      font-size: 11px;
+      color: var(--quake-text-muted);
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--quake-border-mid);
+      padding: 6px 10px;
+      border-radius: 3px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     /* Top Review / Status Bar */
@@ -482,6 +515,7 @@
       <div class="metric-pill">RESOLVED: <span id="m-resolved" class="metric-highlight" style="color:var(--quake-green);">0</span></div>
     </div>
     <div class="header-actions">
+      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-default" style="text-decoration:none;display:inline-flex;align-items:center;" title="Return to VCS Dashboard">← Dashboard</a>
       <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
       <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
       <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
@@ -564,7 +598,10 @@
 
       <!-- Description Section -->
       <div class="form-section quake-card">
-        <div class="section-title">Description & Details</div>
+        <div class="section-title">
+          <span>Description & Details</span>
+          <button class="panel-expand-btn quake-btn quake-btn-default" onclick="toggleExpandPanel(this)" title="Extend panel vertically">⤢ Expand</button>
+        </div>
         <div class="col">
           <label>Problem Description</label>
           <textarea id="bug-description" placeholder="Comprehensive explanation of defect or invariant failure..."></textarea>
@@ -587,7 +624,10 @@
 
       <!-- Logs Section -->
       <div class="form-section quake-card">
-        <div class="section-title">Execution Logs & Tracebacks</div>
+        <div class="section-title">
+          <span>Execution Logs & Tracebacks</span>
+          <button class="panel-expand-btn quake-btn quake-btn-default" onclick="toggleExpandPanel(this)" title="Extend panel vertically">⤢ Expand</button>
+        </div>
         <div class="col">
           <label>Console Output / Python Traceback</label>
           <textarea id="bug-logs" style="font-family:var(--font-mono); min-height:100px;" placeholder="Paste runtime failure logs or traceback here..."></textarea>
@@ -603,6 +643,9 @@
             <button class="quake-btn quake-btn-default" onclick="document.getElementById('file-upload').click()">📁 Browse Files</button>
           </div>
         </div>
+        <div class="attachment-lfs-notice">
+          <span>ℹ️ <strong>GitHub LFS Storage:</strong> Attachments are stored in Git LFS and are considered public / non-confidential. Do not include passwords, private tokens, or proprietary secrets.</span>
+        </div>
         <div id="dropzone" class="dropzone" onclick="document.getElementById('file-upload').click()">
           <span class="dropzone-prompt">📋 DRAG & DROP OR PASTE (⌘V / Ctrl+V) SCREENSHOTS & DOCUMENTS</span>
           <span class="dropzone-hint">Supports Images (.png, .jpg, .svg), Documents (.pdf, .txt, .log, .md, .json, .yaml), or Clipboard files</span>
@@ -613,7 +656,10 @@
 
       <!-- Resolution Section -->
       <div class="form-section quake-card">
-        <div class="section-title">Resolution Notes</div>
+        <div class="section-title">
+          <span>Resolution Notes</span>
+          <button class="panel-expand-btn quake-btn quake-btn-default" onclick="toggleExpandPanel(this)" title="Extend panel vertically">⤢ Expand</button>
+        </div>
         <div class="col">
           <label>Fix Details & Commit References</label>
           <textarea id="bug-resolution" placeholder="Document root cause, code changes made, and test regression verifications..."></textarea>
@@ -649,8 +695,10 @@
       updateMetrics();
       setBugFilter(currentFilter);
       loadActiveBug();
+      autoResizeAllTextareas();
       setupPasteDrop();
     }
+
 
     function setBugFilter(filter) {
       currentFilter = filter;
@@ -756,7 +804,9 @@
       document.getElementById("bug-resolution").value = bug.resolution_notes || "";
 
       renderAttachments(bug.attachments || []);
+      autoResizeAllTextareas();
     }
+
 
     function renderAttachments(attachments) {
       const grid = document.getElementById("attachments-grid");
@@ -896,6 +946,16 @@
       showToast("Deleted bug & updated BUGS.md");
     }
 
+    function returnToDashboard(e) {
+      if (e) e.preventDefault();
+      if (window.opener && !window.opener.closed) {
+        window.opener.focus();
+        window.close();
+      } else {
+        window.open("/", "hardware_vcs_diff_viewer");
+      }
+    }
+
     async function saveAndExit() {
       const btn = document.getElementById("btn-save-exit");
       btn.innerText = "⏳ Saving...";
@@ -903,22 +963,20 @@
 
       try {
         await saveActiveBug();
-        const res = await fetch("/api/exit", { method: "POST" });
-        const data = await res.json();
-        showToast("Session saved to BUGS.md. Server exited.");
+        await fetch("/api/exit", { method: "POST" });
+        showToast("Bug state saved. Returning to Dashboard...");
       } catch (err) {
-        showToast("Saved state. Shutting down...");
+        showToast("Saved state. Returning to Dashboard...");
       }
 
       setTimeout(() => {
-        window.close();
-        document.body.innerHTML = `
-          <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;color:#ffb800;font-family:var(--font-mono);font-size:16px;text-align:center;">
-            <span style="font-size:24px;">⚡ BUGS.MD SAVED & SYNCED</span>
-            <span style="color:#dedede;font-size:13px;">The Bug Report server has shut down. You can safely close this window.</span>
-          </div>
-        `;
-      }, 700);
+        if (window.opener && !window.opener.closed) {
+          window.opener.focus();
+          window.close();
+        } else {
+          window.location.href = "/";
+        }
+      }, 500);
     }
 
     function removeAttachment(idx) {
@@ -1114,6 +1172,95 @@
         if (modal) modal.style.display = "none";
       }
     }
+
+    function toggleExpandPanel(btn) {
+      const section = btn.closest(".form-section");
+      if (!section) return;
+      const isExp = section.classList.toggle("expanded-vertical");
+      btn.textContent = isExp ? "⤡ Compact" : "⤢ Expand";
+      btn.classList.toggle("quake-btn-gold", isExp);
+      btn.classList.toggle("quake-btn-default", !isExp);
+      if (!isExp) {
+        section.querySelectorAll("textarea").forEach(ta => autoResizeTextarea(ta));
+      }
+    }
+
+    function autoResizeTextarea(el, maxLimit = 500) {
+      if (!el) return;
+      if (el.closest && el.closest(".form-section.expanded-vertical")) return;
+      el.style.height = "auto";
+      const scrollH = el.scrollHeight;
+      const minH = el.dataset.minHeight ? parseInt(el.dataset.minHeight) : 80;
+      const targetHeight = Math.min(Math.max(scrollH, minH), maxLimit);
+      el.style.height = targetHeight + "px";
+      if (scrollH > maxLimit) {
+        el.style.overflowY = "auto";
+      } else {
+        el.style.overflowY = "hidden";
+      }
+    }
+
+    function autoResizeAllTextareas() {
+      const textareas = document.querySelectorAll(".content-area textarea");
+      textareas.forEach(ta => autoResizeTextarea(ta));
+    }
+
+    let lastKnownVersion = null;
+    let isUserTyping = false;
+
+    document.addEventListener("input", (e) => {
+      if (e.target && e.target.tagName === "TEXTAREA") {
+        autoResizeTextarea(e.target);
+      }
+    });
+
+    document.addEventListener("focusin", (e) => {
+      if (e.target && (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")) {
+        isUserTyping = true;
+      }
+    });
+
+    document.addEventListener("focusout", (e) => {
+      if (e.target && (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")) {
+        isUserTyping = false;
+      }
+    });
+
+
+    async function pollForExternalUpdates() {
+      try {
+        const res = await fetch("/api/version");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (lastKnownVersion === null) {
+          lastKnownVersion = data.version;
+          return;
+        }
+        if (data.version !== lastKnownVersion) {
+          lastKnownVersion = data.version;
+          const dbRes = await fetch("/api/database");
+          if (!dbRes.ok) return;
+          db = await dbRes.json();
+          updateMetrics();
+          renderBugList();
+          if (!isUserTyping && activeBugId) {
+            loadActiveBug();
+          } else if (activeBugId) {
+            const curBug = db.bugs.find(b => b.id === activeBugId);
+            if (curBug) {
+              const statusSel = document.getElementById("bug-status");
+              if (statusSel && statusSel.value !== curBug.status) {
+                statusSel.value = curBug.status;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore polling connection glitches
+      }
+    }
+
+    setInterval(pollForExternalUpdates, 2000);
 
     window.onload = init;
   </script>

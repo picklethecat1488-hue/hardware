@@ -4,7 +4,9 @@
 .git
 __pycache__
 out.txt
-build
+build/*
+!build/attachments/
+!build/attachments/**
 scancode-report.json
 TODO.md
 recordings/

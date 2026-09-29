@@ -34,86 +34,15 @@ class FileReviewStatus(str, Enum):
     REVIEWED = "REVIEWED"
 
 
-class DiffMode(str, Enum):
-    """Visual presentation mode for code diffs."""
-
-    SIDE_BY_SIDE = "side_by_side"
-    UNIFIED = "unified"
-    FULL_FILE = "full_file"
-
-
-class DiffLineType(str, Enum):
-    """Type classification for individual diff lines."""
-
-    CONTEXT = "context"
-    ADD = "add"
-    DELETE = "delete"
-    HEADER = "header"
-
-
-class DiffLine(BaseModel):
-    """Single line within a diff hunk."""
-
-    type: DiffLineType
-    old_line_no: Optional[int] = None
-    new_line_no: Optional[int] = None
-    content: str = ""
-
-
-class DiffHunk(BaseModel):
-    """Grouped section of contiguous diff lines with header."""
-
-    header: str
-    old_start: int = 1
-    old_count: int = 0
-    new_start: int = 1
-    new_count: int = 0
-    lines: List[DiffLine] = Field(default_factory=list)
-
-
-class DiffSideBySideRow(BaseModel):
-    """Paired row comparing old and new file state side-by-side."""
-
-    old_no: Optional[int] = None
-    old_text: str = ""
-    new_no: Optional[int] = None
-    new_text: str = ""
-    row_type: str = "equal"  # equal, insert, delete, replace
-
-
-class FileDiffModel(BaseModel):
-    """Complete diff and content representation for a single file."""
-
-    file_path: str
-    old_path: Optional[str] = None
-    status: str = "M"  # M, A, D, R, etc.
-    is_binary: bool = False
-    additions: int = 0
-    deletions: int = 0
-    hunks: List[DiffHunk] = Field(default_factory=list)
-    side_by_side: List[DiffSideBySideRow] = Field(default_factory=list)
-    full_content: str = ""
-    old_content: str = ""
-    new_content: str = ""
-    raw_diff: str = ""
-
-
-class CommitInfoModel(BaseModel):
-    """Git commit metadata and change statistics."""
-
-    commit_hash: str
-    short_hash: str
-    author: str
-    email: str = ""
-    date: str
-    time: str = ""
-    subject: str
-    body: str = ""
-    additions: int = 0
-    deletions: int = 0
-    files_count: int = 0
-    ignored_files_count: int = 0
-    ignored_files: List[str] = Field(default_factory=list)
+from model.vcs import (
+    CommitInfoModel,
+    DiffHunk,
+    DiffLine,
+    DiffLineType,
+    DiffMode,
+    DiffSideBySideRow,
+    FileDiffModel,
+)
 
 
 class CommentModel(BaseModel):

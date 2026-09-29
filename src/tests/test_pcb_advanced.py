@@ -302,6 +302,7 @@ def test_rerun_logger_drc_and_eye(advanced_pcb_stackup: StackupModel):
     log_eye_diagram(eye_res)
 
 
+@pytest.mark.slow
 def test_carrier_board_provider_cad_and_assembly():
     """Verify CarrierBoardProvider builds valid 3D shapes, loads measurements, and populates Room."""
     provider = CarrierBoardProvider()
@@ -395,20 +396,21 @@ def test_schematic_diagram_dynamic_scaling(tmp_path: Path):
     assert svg_height >= 700
 
 
+@pytest.mark.slow
 def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     """Verify that CarrierBoard wiring YAML parses footprints and nets, generates diagrams, and exports BOM/CPL."""
     provider = CarrierBoardProvider()
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 45
+    assert len(wiring.footprints) == 62
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
     assert "U3" in footprint_names
     assert "U4" in footprint_names
     assert "U10" in footprint_names
-    assert "J1" in footprint_names
+    assert "U11" in footprint_names
     assert "J2" in footprint_names
     assert "J3" in footprint_names
     assert "J5" in footprint_names
@@ -443,7 +445,7 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     assert system_wiring_file.exists(), "system_wiring.yaml must exist for top-down architecture diagram"
     sys_wiring = Wiring(system_wiring_file)
     sys_comp_names = {c.name for c in sys_wiring.footprints}
-    assert {"m2_host", "usb_c", "carrier_pcb", "flex_tail"}.issubset(sys_comp_names)
+    assert {"btle_host", "usb_c", "carrier_pcb", "flex_tail"}.issubset(sys_comp_names)
 
     # Verify BOM and CPL export
     pcb_config = provider.pcb_config
@@ -456,11 +458,11 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 45  # header + 44 carrier components (J4 is on flex tail)
+    assert len(bom_lines) == 62  # header + 61 carrier components (J4 is on flex tail)
     assert "MCXN947VDF" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 45  # header + 44 carrier components
+    assert len(pos_lines) == 62  # header + 61 carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -833,6 +835,7 @@ def test_carrier_board_full_milestones_integration(tmp_path: Path):
     assert cap_data["channels"][6]["drive_shield"] is False
 
 
+@pytest.mark.slow
 def test_carrier_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     """Verify carrier_board manufacturing exports (.kicad_pcb, .drl, *.gbr) and pos.csv pad alignment."""
     import csv
@@ -883,8 +886,8 @@ def test_carrier_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path)
     assert kicad_pcb.exists()
 
     pcb_text = kicad_pcb.read_text(encoding="utf-8")
-    # Verify connectors J1 and J2 edge placement
-    assert 'footprint "M.2-KEY-M"' in pcb_text
+    # Verify connectors U11 and J2 edge placement
+    assert 'footprint "MOD-BLE-PCB-ANT"' in pcb_text
     assert 'footprint "FPC-30P-0.5MM"' in pcb_text
     # Verify bottom layer components
     assert '(layer "B.Cu")' in pcb_text
@@ -905,21 +908,21 @@ def test_carrier_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path)
 
     assert "U1" in rows
     assert "U2" in rows
-    assert "J1" in rows
+    assert "U11" in rows
     assert "J2" in rows
     assert "Q1" in rows
     assert "C2" in rows
 
-    # Layers: Q1, U2, C2 on Bottom; U1, J1, J2 on Top
+    # Layers: Q1, U2, C2 on Bottom; U1, U11, J2 on Top
     assert rows["U1"]["Layer"] == "Top"
-    assert rows["J1"]["Layer"] == "Top"
+    assert rows["U11"]["Layer"] == "Top"
     assert rows["J2"]["Layer"] == "Top"
     assert rows["U2"]["Layer"] == "Bottom"
     assert rows["Q1"]["Layer"] == "Bottom"
     assert rows["C2"]["Layer"] == "Bottom"
 
     # Edge connector coordinates
-    assert float(rows["J1"]["Mid Y"].replace("mm", "")) == -36.0
+    assert float(rows["U11"]["Mid Y"].replace("mm", "")) == -36.0
     assert float(rows["J2"]["Mid Y"].replace("mm", "")) == 38.0
 
 
@@ -1077,6 +1080,7 @@ def test_schematic_decoupling_cap_bank_and_pullup_resistors():
     plt.close(fig)
 
 
+@pytest.mark.slow
 def test_carrier_board_test_points_and_zero_drc_errors():
     """Verify carrier_board has drilled test points with 4mm pitch, TP_GND, and 0 DRC violations."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -1316,7 +1320,7 @@ def test_regression_subassembly_footprint_isolation() -> None:
     carrier_fps = carrier_router.get_footprints_for_board()
     carrier_names = {fp.name for fp in carrier_fps}
     assert "U1" in carrier_names
-    assert "J1" in carrier_names
+    assert "U11" in carrier_names
     assert "J2" in carrier_names
     assert "J4" not in carrier_names
 
@@ -1329,7 +1333,7 @@ def test_regression_subassembly_footprint_isolation() -> None:
     flex_names = {fp.name for fp in flex_fps}
     assert "J4" in flex_names
     assert "U1" not in flex_names
-    assert "J1" not in flex_names
+    assert "U11" not in flex_names
 
 
 def test_regression_flex_tail_front_routing_and_silkscreen(tmp_path: Path) -> None:
@@ -1836,6 +1840,7 @@ def test_regression_pinmux_datasheet_verification() -> None:
     assert "M4" in content and "P1_23" in content and "PWR_EN_DEBUG" in content
 
 
+@pytest.mark.slow
 def test_regression_carrier_board_wiring_diagram_top_down_and_colored() -> None:
     """Verify carrier board wiring diagram is 2D top-down and colored with distinct net layers."""
     from model import DiagramStyle
@@ -1855,6 +1860,7 @@ def test_regression_carrier_board_wiring_diagram_top_down_and_colored() -> None:
     assert room_prod.diagram_options.style == DiagramStyle.HIDDEN
 
 
+@pytest.mark.slow
 def test_regression_enclosure_cad_feedback_and_assembly() -> None:
     """Verify enclosure CAD feedback: rounded fillets, cutouts, locating lip, and product assembly."""
     provider = CarrierBoardProvider()
@@ -1914,6 +1920,7 @@ def test_regression_enclosure_cad_feedback_and_assembly() -> None:
     assert abs(carrier_bb.min.Z - expected_carrier_bottom_z) < 0.05
 
 
+@pytest.mark.slow
 def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
     """Verify BUG-065 (M.2 cutout in bottom enclosure) and BUG-066 (component silkscreens on carrier)."""
     provider = CarrierBoardProvider()
@@ -1928,7 +1935,7 @@ def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
     silks = provider.silkscreen()
     silk_texts = {t.text for t in silks}
     expected_components = (
-        ["U1", "U2", "J1", "J2", "J3", "Q1", "U3", "U4", "SPK1", "Y1"]
+        ["U1", "U2", "U11", "J2", "J3", "Q1", "U3", "U4", "SPK1", "Y1"]
         + [f"R{i}" for i in range(1, 7)]
         + [f"C{i}" for i in range(1, 13)]
     )
@@ -2118,6 +2125,7 @@ def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path
     assert dx >= 12.0, f"R1 and R2 must have >= 12.0mm horizontal clearance to prevent overlap, got dx={dx:.1f}mm"
 
 
+@pytest.mark.slow
 def test_regression_bug_082_carrier_board_routing_and_kicad_drc(tmp_path: Path):
     """Verify BUG-082: carrier_board routes cleanly with zero drc.py and zero KiCad DRC errors."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -2455,7 +2463,7 @@ def test_regression_bug_089_schematic_subsystem_organization() -> None:
         "User Interface",
         "Capacitive",
         "Audio",
-        "Differential",
+        "High-Speed",
         "Expansion",
     ]
     for sub in expected_subsystems:
@@ -2487,6 +2495,7 @@ def test_regression_bug_089_schematic_subsystem_organization() -> None:
     assert len(violations.errors) == 0, f"DRC errors on subsystem sheets: {[e.description for e in violations.errors]}"
 
 
+@pytest.mark.slow
 def test_regression_bug_090_enclosure_cad_feedback() -> None:
     """Verify BUG-090: SWD vs USB cutout separation, rounded side cutouts, and lid battery mount."""
     provider = CarrierBoardProvider()
@@ -2549,6 +2558,7 @@ def test_regression_bug_090_enclosure_cad_feedback() -> None:
     )
 
 
+@pytest.mark.slow
 def test_regression_bug_092_carrier_board_top_logo() -> None:
     """Verify BUG-092: Antigravity logo placed as a unique graphic image within a square frame (not text) on carrier board top with zero DRC errors."""
     from pathlib import Path
@@ -2696,7 +2706,7 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
     assert vload_net is not None, "VLOAD_SW net must exist in wiring.yaml"
     vload_pins = set(vload_net.pins)
     assert ("Q1", "3") in vload_pins or ("Q1", "D") in vload_pins
-    assert ("J1", "VLOAD_SW") in vload_pins
+    assert ("U11", "VLOAD_SW") in vload_pins
     gnd_net = next((net for net in wiring.nets if net.name == "GND"), None)
     assert gnd_net is not None
     gnd_pins = set(gnd_net.pins)
@@ -2794,9 +2804,11 @@ def test_regression_bugs_115_through_127() -> None:
     assert not any(n.name == "SWD_SWO" for n in wiring.nets), "BUG-117: SWD_SWO net must be removed"
     nrst_net = next(n for n in wiring.nets if n.name == "NRST")
     nrst_comps = [p[0] for p in nrst_net.pins]
-    assert "J5" not in nrst_comps, "BUG-117: NRST must not connect to J5"
-    # Under BUG-129, NRST connects to U9 pin 23 (CBUS0) for FTDI reboot into ISP mode
-    assert "U9" in nrst_comps, "BUG-129: NRST must connect to U9 for FTDI ISP reboot"
+    # Under BUG-129 & BUG-183, NRST connects to JP1 isolation jumper, and FTDI_NRST connects U9 to JP1
+    assert "JP1" in nrst_comps, "BUG-183: NRST must connect to JP1 isolation jumper"
+    ftdi_nrst_net = next(n for n in wiring.nets if n.name == "FTDI_NRST")
+    ftdi_nrst_comps = [p[0] for p in ftdi_nrst_net.pins]
+    assert "U9" in ftdi_nrst_comps and "JP1" in ftdi_nrst_comps, "BUG-183: FTDI_NRST must connect U9 to JP1"
 
     # BUG-118: U6 pins 6, 7, 8 on right side and pin 15 on left side
     sheet_ui = next((s for s in pcb_cfg.schematic_sheets if "User Interface" in s.title), None)
@@ -2819,10 +2831,10 @@ def test_regression_bugs_115_through_127() -> None:
     assert sheet_audio is not None
     assert "C8" not in sheet_audio.components, "BUG-120: C8 must not be in Audio Subsystem sheet"
 
-    # BUG-121 & BUG-146: J2 removed from High-Speed Differential sheet; all MIPI nets removed
-    sheet_mipi = next((s for s in pcb_cfg.schematic_sheets if "High-Speed Differential" in s.title), None)
+    # BUG-121 & BUG-146: J2 removed from High-Speed sheet; all MIPI nets removed
+    sheet_mipi = next((s for s in pcb_cfg.schematic_sheets if "High-Speed" in s.title), None)
     assert sheet_mipi is not None
-    assert "J2" not in sheet_mipi.components, "BUG-146: J2 must be removed from High-Speed Differential sheet"
+    assert "J2" not in sheet_mipi.components, "BUG-146: J2 must be removed from High-Speed sheet"
     assert not any("MIPI" in n.name for n in wiring.nets), "BUG-146: All MIPI nets must be removed"
 
     # BUG-122: J6, J7, J8 connector style is JST-PH-6P; separate sheet pages exist for each connector
@@ -2946,3 +2958,147 @@ def test_regression_bugs_115_through_127() -> None:
 
     # CR Item 70dba9941823: Peripheral cutouts read dynamically from footprints
     assert hasattr(provider, "enclosure_bottom"), "CarrierBoardProvider must have enclosure_bottom"
+
+
+def test_regression_bug_184_power_and_gnd_symbols_pulled_to_sheet_edges(tmp_path: Path) -> None:
+    """Verify BUG-184: power symbols pulled toward top of sheet (Y >= 165) and GND toward bottom (Y <= 50)."""
+    from unittest.mock import patch
+    from matplotlib.backends.backend_pdf import PdfPages
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.schematic_diagram import SchematicDiagram, POWER_NET_NAMES
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    diag = SchematicDiagram(wiring, pcb_config=provider.pcb_config)
+    plans = diag._build_sheet_plans()
+
+    actual_power_nets = {n.name for n in wiring.nets if n.name.upper() in POWER_NET_NAMES}
+
+    # Validate across all sheets that power symbols are pulled toward top and GND toward bottom
+    test_pdf_path = tmp_path / "dummy.pdf"
+    with PdfPages(test_pdf_path) as pdf:
+        with patch.object(pdf, "savefig") as mock_save:
+            for plan in plans:
+                diag._render_pdf_schematic_sheet(
+                    pdf=pdf,
+                    board_name="carrier_board",
+                    sheet_plan=plan,
+                    total_sheets=len(plans),
+                    all_nets=wiring.nets,
+                    page_num=plan.sheet_idx,
+                    total_pages=len(plans),
+                )
+                fig = mock_save.call_args[0][0]
+                ax = fig.axes[0]
+
+                pwr_texts = [
+                    t for t in ax.texts if t.get_color() == "#dc2626" and t.get_text().strip() in actual_power_nets
+                ]
+                gnd_texts = [t for t in ax.texts if t.get_color() == "#475569" and t.get_text().strip() == "GND"]
+
+                # Assert that all off-sheet power symbols for top components are pulled toward sheet top
+                top_pwr = [t for t in pwr_texts if t.get_position()[1] >= 165.0]
+                if pwr_texts:
+                    assert len(top_pwr) >= 1, (
+                        f"Sheet {plan.sheet_idx} ({plan.title}): Expected at least 1 power symbol near top of sheet"
+                    )
+
+                # Assert that all off-sheet GND symbols for bottom components are pulled toward sheet bottom
+                bot_gnd = [t for t in gnd_texts if t.get_position()[1] <= 50.0]
+                if gnd_texts:
+                    assert len(bot_gnd) >= 1, (
+                        f"Sheet {plan.sheet_idx} ({plan.title}): Expected at least 1 GND symbol near bottom of sheet"
+                    )
+
+    # Verify full PDF export renders completely
+    pdf_path = tmp_path / "schematic_edges_verified.pdf"
+    rendered = diag.render_pdf(pdf_path)
+    assert rendered.exists()
+    assert rendered.stat().st_size > 10000
+
+
+def test_regression_bug_206_off_sheet_schematic_feedback(tmp_path: Path) -> None:
+    """Verify BUG-206: Off-sheet schematic feedback resolutions.
+
+    Guards against:
+    1. Off-sheet GND and power traces intersecting truth tables, component cards, or title blocks.
+    2. Giant discrete component symbols (C8, Q1, R7-R12) exceeding standard discrete sizing (C6).
+    3. Stage antennas on Sheet 8 pull-up resistor power connections extending past the top rail.
+    4. Overcrowded Sheet 17 symbol and text overlaps (split into 4 focused sub-sheets).
+    5. Jumper and LED pin text collisions (pins 1 and 2 placed on same side).
+    6. Schematic text exceeding printable sheet boundaries (e.g. LED_AUD_K, LED_PERIPH_K).
+    7. DRC rule SCHEMATIC_TEXT_COLLISION flagging text overlaps.
+    """
+    from model.wiring import Wiring
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import DRCRuleName, PCBDesignRulesChecker
+    from provider.schematic_diagram import SchematicDiagram
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    cfg = provider.pcb_config
+
+    # 1. Verify Status and Overrides has been split into 4 distinct sub-sheets
+    status_sheets = [s for s in cfg.schematic_sheets if "Status and Overrides" in s.title]
+    assert len(status_sheets) == 4, f"Expected 4 Status and Overrides sub-sheets, found {len(status_sheets)}"
+
+    sheet_17 = status_sheets[0]
+    sheet_18 = status_sheets[1]
+    sheet_19 = status_sheets[2]
+    sheet_20 = status_sheets[3]
+
+    assert set(sheet_17.components) == {"SW1", "JP1", "JP2"}
+    assert set(sheet_18.components) == {"JP3", "JP4"}
+    assert set(sheet_19.components) == {"D2", "D3", "D4", "R7", "R8", "R9"}
+    assert set(sheet_20.components) == {"D5", "D6", "D7", "R10", "R11", "R12"}
+
+    # 2. Verify all LED and Jumper pins are on the left side to prevent label collisions
+    for sheet in [sheet_17, sheet_18, sheet_19, sheet_20]:
+        for comp_name, sides in sheet.pin_sides.items():
+            if comp_name.startswith("JP") or comp_name.startswith("D"):
+                assert sides.get("1") == "left" and sides.get("2") == "left", (
+                    f"Component {comp_name} pins must be on 'left', got {sides}"
+                )
+
+    # 3. Verify schematic passes all DRC checks with 0 errors
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring=wiring)
+    text_collisions = [v for v in violations.errors if v.rule_name == DRCRuleName.SCHEMATIC_TEXT_COLLISION]
+    boundary_errors = [v for v in violations.errors if v.rule_name == DRCRuleName.SCHEMATIC_PAGE_BOUNDARY_EXCEEDED]
+    assert len(text_collisions) == 0, f"Unexpected text collisions: {[e.description for e in text_collisions]}"
+    assert len(boundary_errors) == 0, f"Unexpected boundary errors: {[e.description for e in boundary_errors]}"
+    assert len(violations.errors) == 0, f"Schematic DRC errors: {[e.description for e in violations.errors]}"
+
+    # 4. Verify PDF export renders without error
+    diag = SchematicDiagram(wiring=wiring, pcb_config=cfg)
+    pdf_out = tmp_path / "bug_206_test.pdf"
+    rendered = diag.render_pdf(pdf_out)
+    assert rendered.exists()
+    assert rendered.stat().st_size > 10000
+
+
+def test_regression_bug_204_fast_pytest_suite_timing_and_slow_markers() -> None:
+    """Verify BUG-204: heavy CAD booleans, math models, and full CAM/DRC exports are marked slow."""
+    import inspect
+    import pytest
+    from tests import test_bullet_fluid, test_room, test_pcb_export, test_pcb_drc, test_pcb_advanced
+    from projects.tests import test_cat_fountain, test_carrier_board
+
+    slow_targets = [
+        (test_bullet_fluid.TestBulletFluid, True),
+        (test_room.test_cat_fountain_provider_bowl_collision_types, False),
+        (test_pcb_export.test_pcb_exporter_all_methods_integration, False),
+        (test_pcb_drc.test_carrier_board_carrier_and_flex_tail_zero_drc_errors_and_warnings, False),
+        (test_pcb_advanced.test_carrier_board_manufacturing_artifacts_and_pos_alignment, False),
+        (test_pcb_advanced.test_regression_bug_082_carrier_board_routing_and_kicad_drc, False),
+        (test_cat_fountain.TestCatFountainProvider.test_collar_standoff_geometry, False),
+        (test_carrier_board.test_regression_bug_179_right_side_ports_clear_mounting_holes, False),
+        (test_carrier_board.test_regression_bug_134_carrier_board_components_match_schematic, False),
+        (test_carrier_board.test_regression_bug_207_sheet_17_components_on_carrier_board, False),
+    ]
+
+    for target, is_class in slow_targets:
+        target_name = target.__name__
+        marks = getattr(target, "pytestmark", [])
+        slow_found = any(getattr(m, "name", "") == "slow" for m in marks)
+        assert slow_found, f"{target_name} must be marked with @pytest.mark.slow to keep fast pytest suite fast!"

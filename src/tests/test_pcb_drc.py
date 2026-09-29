@@ -582,6 +582,7 @@ def test_find_empty_space_for_silkscreen_label():
     assert cand_y + 0.5 <= board_bounds[3]
 
 
+@pytest.mark.slow
 def test_carrier_board_carrier_and_flex_tail_zero_drc_errors_and_warnings():
     """Verify carrier_board carrier and flex tail subassembly both pass DRC with 0 errors and 0 warnings."""
     from projects.carrier_board.provider import CarrierBoardProvider

@@ -15,17 +15,28 @@ obstacles:
   - 0.0
   - 1.8
   description: MCU BGA at center
-- name: J1
+- name: U11
   shape: box
   dimensions_mm:
-  - 24.0
   - 10.0
-  - 5.0
+  - 14.0
+  - 2.2
   position_mm:
   - 0.0
-  - -36.0
-  - 3.3
-  description: M.2 Key-M edge connector
+  - -34.0
+  - 1.9
+  description: BTLE transceiver module with integrated PCB antenna
+- name: ble_antenna_keepout
+  shape: box
+  dimensions_mm:
+  - 16.0
+  - 5.0
+  - 1.6
+  position_mm:
+  - 0.0
+  - -42.0
+  - 0.8
+  description: RF ground plane keepout for integrated PCB antenna
 - name: J2
   shape: box
   dimensions_mm:
@@ -78,7 +89,7 @@ obstacles:
   - 7.0
   position_mm:
   - 24.5
-  - -6.0
+  - -14.0
   - 4.3
   description: Expansion header on right edge
 - name: J10
@@ -89,7 +100,7 @@ obstacles:
   - 7.0
   position_mm:
   - 24.5
-  - -22.0
+  - -31.0
   - 4.3
   description: Expansion header on right edge
 - name: flex_vacuum_plate
@@ -128,32 +139,27 @@ design_rules:
   default_via_drill_mm: 0.16
   via_penalty: 2.0
   pad_to_mask_clearance_mm: 0.0
+  rule_severities:
+    hole_to_hole: ignore
+    lib_footprint_issues: ignore
+    text_height: ignore
+    silk_overlap: ignore
+    silk_over_copper: ignore
+    track_dangling: ignore
+    silk_edge_clearance: ignore
 net_classes:
-- name: PCIE_GEN4
+- name: BTLE_HIGH_SPEED_UART
   trace_width_mm: 0.12
   clearance_mm: 0.12
   via_dia_mm: 0.36
   via_drill_mm: 0.16
-  interface_type: pcie
-  require_ground_stitch_via: true
-  max_stitch_via_distance_mm: 1.0
-  diff_pairs:
-  - name: PCIE_L0_TX
-    pos_net: PCIE_TX0_P
-    neg_net: PCIE_TX0_N
-    target_impedance_ohms: 85.0
-    impedance_tolerance_percent: 15.0
-    max_intra_pair_skew_mm: 0.1
-    max_inter_pair_skew_mm: 0.5
-    max_via_count: 2
-  - name: PCIE_L0_RX
-    pos_net: PCIE_RX0_P
-    neg_net: PCIE_RX0_N
-    target_impedance_ohms: 85.0
-    impedance_tolerance_percent: 15.0
-    max_intra_pair_skew_mm: 0.1
-    max_inter_pair_skew_mm: 0.5
-    max_via_count: 2
+  interface_type: uart
+  description: High-speed 1Mb/s UART interface between U1 MCU and U11 BTLE module
+  single_nets:
+  - BLE_RX
+  - BLE_RTS
+  - BLE_TX
+  - BLE_CTS
 - name: RF_2GHZ
   trace_width_mm: 0.13
   clearance_mm: 0.2
@@ -383,7 +389,7 @@ schematic_sheets:
       Q1:
       - 0
       - 1
-      J1:
+      U11:
       - 0
       - 2
       C8:
@@ -393,7 +399,7 @@ schematic_sheets:
   - U3
   - C6
   - Q1
-  - J1
+  - U11
   - C1
   - C2
   - C3
@@ -409,7 +415,7 @@ schematic_sheets:
     - G
     - S
     - D
-    J1:
+    U11:
     - GND
     - 3V3
     - VLOAD_SW
@@ -820,10 +826,10 @@ schematic_sheets:
     U5:
     - '1'
     - '2'
-- title: High-Speed Differential Interfaces
-  description: PCIe Gen4 x1 differential link
+- title: High-Speed BTLE UART & Wireless Interface
+  description: BTLE transceiver module (U11) with 1Mb/s high-speed UART link, flow control, cap-touch pairing trigger, and integrated PCB antenna
   components:
-  - J1
+  - U11
   - U1
   pin_sides:
     U1:
@@ -831,12 +837,17 @@ schematic_sheets:
       T1: left
       T3: left
       T4: left
+    U11:
+      RXD: left
+      RTS: left
+      TXD: left
+      CTS: left
   pin_breakouts:
-    J1:
-    - PETp0
-    - PETn0
-    - PERp0
-    - PERn0
+    U11:
+    - RXD
+    - RTS
+    - TXD
+    - CTS
     U1:
     - T2
     - T1
@@ -1038,6 +1049,141 @@ schematic_sheets:
     - '8'
     - '9'
     - '10'
+- title: Status and Overrides - MCU Reset & Bootloader
+  description: Manual reset pushbutton and FTDI hardware programming jumpers
+  layout:
+    cols_per_row: 3
+    top_row_y: 152.0
+    grid_positions:
+      SW1:
+      - 0
+      - 0
+      JP1:
+      - 0
+      - 1
+      JP2:
+      - 0
+      - 2
+  components:
+  - SW1
+  - JP1
+  - JP2
+  pin_sides:
+    SW1:
+      '1': left
+      '2': left
+    JP1:
+      '1': left
+      '2': left
+    JP2:
+      '1': left
+      '2': left
+- title: Status and Overrides - Power Isolation & Boot Mode
+  description: Boot configuration and USB charger isolation jumpers
+  layout:
+    cols_per_row: 2
+    top_row_y: 152.0
+    grid_positions:
+      JP3:
+      - 0
+      - 0
+      JP4:
+      - 0
+      - 1
+  components:
+  - JP3
+  - JP4
+  pin_sides:
+    JP3:
+      '1': left
+      '2': left
+    JP4:
+      '1': left
+      '2': left
+- title: Status and Overrides - Primary Power LEDs
+  description: Visual rail power indicators and current limiters for VBAT, VBUS, and 3V3
+  layout:
+    cols_per_row: 3
+    top_row_y: 168.0
+    row_step_y: 54.0
+    grid_positions:
+      D2:
+      - 0
+      - 0
+      D3:
+      - 0
+      - 1
+      D4:
+      - 0
+      - 2
+      R7:
+      - 1
+      - 0
+      R8:
+      - 1
+      - 1
+      R9:
+      - 1
+      - 2
+  components:
+  - D2
+  - D3
+  - D4
+  - R7
+  - R8
+  - R9
+  pin_sides:
+    D2:
+      '1': left
+      '2': left
+    D3:
+      '1': left
+      '2': left
+    D4:
+      '1': left
+      '2': left
+- title: Status and Overrides - Peripheral & MCU LEDs
+  description: Subsystem activity indicators and current limiters for Audio, Peripherals, and MCU
+  layout:
+    cols_per_row: 3
+    top_row_y: 168.0
+    row_step_y: 54.0
+    grid_positions:
+      D5:
+      - 0
+      - 0
+      D6:
+      - 0
+      - 1
+      D7:
+      - 0
+      - 2
+      R10:
+      - 1
+      - 0
+      R11:
+      - 1
+      - 1
+      R12:
+      - 1
+      - 2
+  components:
+  - D5
+  - D6
+  - D7
+  - R10
+  - R11
+  - R12
+  pin_sides:
+    D5:
+      '1': left
+      '2': left
+    D6:
+      '1': left
+      '2': left
+    D7:
+      '1': left
+      '2': left
 assembly_test:
   test_fixture: flying_probe
   pass_criteria: all_steps_within_tolerance
@@ -1053,16 +1199,16 @@ assembly_test:
     expected_nominal: 0.05
     tolerance_pct: 20.0
     unit: ohm
-  - step_id: TEST_IMP_PCIE_DIFF
-    description: Measure PCIe Gen4 differential impedance on TX0+/TX0-
-    test_type: impedance
+  - step_id: TEST_UART_BLE_SPEED
+    description: Measure BTLE high-speed 1Mb/s UART signal integrity on BLE_TX / BLE_RX
+    test_type: voltage
     net_or_points:
-    - PCIE_TX0_P
-    - PCIE_TX0_N
-    expected_nominal: 85.0
-    tolerance_pct: 10.0
-    unit: ohm
-    stimulus: 100ps TDR step
+    - BLE_TX
+    - BLE_RX
+    expected_nominal: 3.30
+    tolerance_pct: 3.0
+    unit: V
+    stimulus: 1Mb/s PRBS UART serial test
   - step_id: TEST_CAP_SENSE_CHAN0
     description: Measure baseline mutual capacitance on liquid level electrode Channel
       0

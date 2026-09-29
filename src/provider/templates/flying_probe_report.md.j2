@@ -37,4 +37,25 @@
 | `{{ iso.signal_net }}` | `{{ iso.isolated_against | join(", ") }}` | {{ iso.isolation_resistance_str }} | {{ iso.verdict_str }} |
 {% endfor %}
 {% endif %}
+{% if diff_pair_checks %}
+
+## Differential Pair Compliance Audit (USB & PCIe)
+
+| Differential Pair | Signal Nets (+ / -) | Target Impedance | Measured Impedance | Intra-Pair Skew | Verdict |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+{% for dp in diff_pair_checks %}
+| `{{ dp.pair_name }}` | `{{ dp.positive_net }}` / `{{ dp.negative_net }}` | {{ "%.1f"|format(dp.target_diff_impedance_ohm) }} Ω (±{{ "%.0f"|format(dp.tolerance_pct) }}%) | {{ "%.1f"|format(dp.measured_diff_impedance_ohm) }} Ω | {{ "%.1f"|format(dp.skew_ps) }} ps (max {{ "%.1f"|format(dp.max_skew_ps) }} ps) | {{ dp.verdict_str }} |
+{% endfor %}
+{% endif %}
+{% if mutual_cap_checks %}
+
+## Mutual Capacitance Touch Simulation & Verification (Flex Tail)
+
+| Touch Channel | Baseline C (pF) | Finger Touch C (pF) | Measured ΔC (pF) | Min Required ΔC | Touch Detected | Verdict |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+{% for mc in mutual_cap_checks %}
+| `{{ mc.channel_name }}` | {{ "%.1f"|format(mc.baseline_pf) }} pF | {{ "%.1f"|format(mc.finger_touch_pf) }} pF | +{{ "%.2f"|format(mc.delta_c_pf) }} pF | ≥ {{ "%.1f"|format(mc.min_delta_c_pf) }} pF | {{ "YES" if mc.touch_detected else "NO" }} | {{ mc.verdict_str }} |
+{% endfor %}
+{% endif %}
+
 
