@@ -478,6 +478,45 @@ class GitEngine:
             except RuntimeError:
                 continue
 
+        # Resolve upstream tracking reference to identify merged commits (BUG-218)
+        tracking_candidates = []
+        try:
+            upstream = run_git_command(
+                ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd=self.repo_root
+            ).strip()
+            if upstream:
+                tracking_candidates.append(upstream)
+        except RuntimeError:
+            pass
+
+        for c_cand in [
+            "refs/remotes/origin/main",
+            "refs/heads/main",
+            "refs/remotes/origin/master",
+            "refs/heads/master",
+        ]:
+            if c_cand not in tracking_candidates:
+                tracking_candidates.append(c_cand)
+
+        active_tracking_ref = None
+        for t_ref in tracking_candidates:
+            try:
+                run_git_command(["rev-parse", "--verify", t_ref], cwd=self.repo_root)
+                active_tracking_ref = t_ref
+                break
+            except RuntimeError:
+                continue
+
+        merged_commit_hashes: set[str] = set()
+        if active_tracking_ref:
+            try:
+                out = run_git_command(["rev-list", f"-n{max(limit * 2, 200)}", active_tracking_ref], cwd=self.repo_root)
+                merged_commit_hashes = set(out.splitlines())
+            except RuntimeError:
+                pass
+        if ancestor_merge_base:
+            merged_commit_hashes.add(ancestor_merge_base)
+
         fmt = "%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%ar%x1f%s%x1f%D%x1f%b%x1e"
         cmd = ["log", f"-n{limit}", f"--format={fmt}", "--date=iso-strict", target_ref]
         try:
@@ -528,6 +567,8 @@ class GitEngine:
                             branches.append(dec)
 
                 is_ancestor_top = c_hash == ancestor_merge_base
+
+                is_merged = bool(c_hash in merged_commit_hashes)
                 if is_ancestor_top and ancestor_name and ancestor_name not in branches:
                     branches.append(ancestor_name)
 
@@ -546,6 +587,8 @@ class GitEngine:
                         "tags": tags,
                         "is_head": (c_hash == head_hash),
                         "is_ancestor_top": is_ancestor_top,
+                        "is_merged": is_merged,
+                        "is_merged_into_tracking": is_merged,
                         "ancestor_name": ancestor_name if is_ancestor_top else None,
                     }
                 )
@@ -625,6 +668,8 @@ class GitEngine:
                     tags=commit["tags"],
                     is_head=commit["is_head"],
                     is_ancestor_top=commit.get("is_ancestor_top", False),
+                    is_merged=commit.get("is_merged", False),
+                    is_merged_into_tracking=commit.get("is_merged_into_tracking", False),
                     ancestor_name=commit.get("ancestor_name"),
                     graph_symbol=symbol,
                     graph_art=graph_art,
@@ -851,14 +896,18 @@ class GitEngine:
         nodes = self.get_smartlog_dag(limit=100)
         node_map = {n.commit_hash: n for n in nodes}
 
-        # Validate that no selected commit already has an associated PR
+        curr_branch = self.get_current_branch() or "main"
+
+        # Validate that no selected commit is already merged or already has an associated PR
         for c in commit_hashes:
             node = node_map.get(c)
+            if node and (node.is_merged_into_tracking or node.is_merged):
+                raise ValueError(f"Commit {c[:8]} is already merged into the tracking branch ({curr_branch})")
             if node and node.pr_number:
                 raise ValueError(f"Commit {c[:8]} already has an associated PR (#{node.pr_number})")
 
             try:
-                branches_out = run_git_command(["branch", "-a", "--contains", c], cwd=self.repo_root)
+                branches_out = run_git_command(["branch", "-a", "--points-at", c], cwd=self.repo_root)
                 for b in branches_out.splitlines():
                     clean_b = b.replace("*", "").strip()
                     m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", clean_b, re.IGNORECASE)

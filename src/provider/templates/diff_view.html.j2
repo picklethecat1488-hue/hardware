@@ -560,9 +560,20 @@
       color: #ffffff;
       box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
     }
-
+    .smartlog-node.merged-commit {
+      opacity: 0.75;
+    }
+    #smartlogList.hide-merged .smartlog-node.merged-commit:not(.head-node):not(.active) {
+      display: none !important;
+    }
+    .node-badge-merged {
+      background: rgba(34, 197, 94, 0.2) !important;
+      border-color: #22c55e !important;
+      color: #86efac !important;
+    }
 
     .node-actions-row {
+
       display: flex;
       align-items: center;
       justify-content: flex-end;
@@ -895,7 +906,11 @@
           <button id="btnUnlinkPR" class="quake-btn quake-btn-default quake-btn-sm" onclick="onUnlinkPR()" title="Unlink Pull Request from selected commit(s)">
             <span>✕ Unlink PR</span>
           </button>
+          <button id="btnToggleMerged" class="quake-btn quake-btn-default quake-btn-sm" onclick="toggleMergedCommits()" title="Toggle visibility of merged commits in Smartlog">
+            <span id="mergedToggleIcon">👁️</span> <span id="mergedToggleLabel">Show Merged</span>
+          </button>
           <button class="quake-btn quake-btn-default quake-btn-icon" onclick="togglePane('smartlog')" title="Collapse Smartlog Pane (Shortcut: [)">◀</button>
+
         </div>
       </div>
 
@@ -909,7 +924,7 @@
         </button>
       </div>
 
-      <div class="column-scroll" id="smartlogList">
+      <div class="column-scroll hide-merged" id="smartlogList">
         <!-- Working Tree Node -->
         <div class="smartlog-node {% if session.active_commit == 'working' %}active{% endif %}" id="node-working" onclick="selectCommit('working')">
           <div class="node-header-row">
@@ -922,7 +937,7 @@
 
         <!-- Render Commit Nodes -->
         {% for node in session.smartlog_nodes %}
-          <div class="smartlog-node {% if node.is_head %}head-node{% endif %} {% if node.is_ancestor_top %}ancestor-top-node{% endif %} {% if node.pr_number %}has-pr{% endif %} {% if session.active_commit == node.commit_hash %}active{% endif %}"
+          <div class="smartlog-node {% if node.is_head %}head-node{% endif %} {% if node.is_ancestor_top %}ancestor-top-node{% endif %} {% if node.pr_number %}has-pr{% endif %} {% if session.active_commit == node.commit_hash %}active{% endif %} {% if node.is_merged_into_tracking or node.is_merged %}merged-commit{% endif %}"
                id="node-{{ node.short_hash }}"
                data-hash="{{ node.commit_hash }}"
                onclick="selectCommit('{{ node.commit_hash }}', event)">
@@ -959,6 +974,9 @@
 
             <!-- Tags Row (Branches, Tags, PR, Bugs) -->
             <div class="node-tags-row">
+              {% if node.is_merged_into_tracking or node.is_merged %}
+                <span class="node-badge node-badge-merged" title="Already merged into tracking branch">✓ Merged</span>
+              {% endif %}
               {% if node.is_ancestor_top %}
                 <span class="node-badge node-badge-ancestor" title="Top of ancestor branch ({{ node.ancestor_name or 'main' }})">📌 {{ node.ancestor_name or 'main' }}</span>
               {% endif %}
@@ -2470,6 +2488,34 @@
 
 
 
+    // Toggle merged commits visibility (BUG-218)
+    function isHideMergedEnabled() {
+      const stored = localStorage.getItem("diffview_hide_merged");
+      return stored === null ? true : stored === "true";
+    }
+
+    function updateMergedVisibility() {
+      const hideMerged = isHideMergedEnabled();
+      const listEl = document.getElementById("smartlogList");
+      const iconEl = document.getElementById("mergedToggleIcon");
+      const labelEl = document.getElementById("mergedToggleLabel");
+      if (listEl) {
+        if (hideMerged) {
+          listEl.classList.add("hide-merged");
+        } else {
+          listEl.classList.remove("hide-merged");
+        }
+      }
+      if (iconEl) iconEl.textContent = hideMerged ? "👁️" : "🙈";
+      if (labelEl) labelEl.textContent = hideMerged ? "Show Merged" : "Hide Merged";
+    }
+
+    function toggleMergedCommits() {
+      const nextState = !isHideMergedEnabled();
+      localStorage.setItem("diffview_hide_merged", nextState ? "true" : "false");
+      updateMergedVisibility();
+    }
+
     // Keyboard shortcuts for pane toggling
     document.addEventListener("keydown", (e) => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
@@ -2483,6 +2529,7 @@
     // Initialize on load
     window.addEventListener("DOMContentLoaded", () => {
       initPanelResizers();
+      updateMergedVisibility();
       if (!INITIAL_SYNC_DONE) {
         performInitialSync(false);
       }

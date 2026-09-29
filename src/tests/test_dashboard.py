@@ -1763,3 +1763,66 @@ def test_regression_bug_217_textarea_bidirectional_and_autoresize() -> None:
     # 3. Dynamic resizing invocation
     assert "autoResizeAllTextareas();" in content
     assert "autoResizeTextarea(e.target);" in content
+
+
+def test_regression_bug_218_pr_creation_points_at_and_merged_commits_hidden(tmp_path: Path) -> None:
+    """Verify BUG-218: PR creation uses --points-at instead of --contains and merged commits are detected and hidden."""
+    # 1. Template validation
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    assert template_path.exists()
+    content = template_path.read_text(encoding="utf-8")
+
+    assert 'id="btnToggleMerged"' in content
+    assert "toggleMergedCommits()" in content
+    assert "updateMergedVisibility()" in content
+    assert "isHideMergedEnabled()" in content
+    assert "merged-commit" in content
+    assert "hide-merged" in content
+    assert "node-badge-merged" in content
+
+    # 2. GitEngine verification with isolated git repo
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # Initial repo has main at shas[2]
+    # Create topic branch with 2 commits
+    run_git_command(["checkout", "-b", "feature/my-work"], cwd=repo_dir)
+    f3 = repo_dir / "file3.txt"
+    f3.write_text("commit a\n", encoding="utf-8")
+    run_git_command(["add", "file3.txt"], cwd=repo_dir)
+    run_git_command(["commit", "-m", "feature commit A"], cwd=repo_dir)
+    sha_a = run_git_command(["rev-parse", "HEAD"], cwd=repo_dir).strip()
+
+    f3.write_text("commit b\n", encoding="utf-8")
+    run_git_command(["add", "file3.txt"], cwd=repo_dir)
+    run_git_command(["commit", "-m", "feature commit B"], cwd=repo_dir)
+    sha_b = run_git_command(["rev-parse", "HEAD"], cwd=repo_dir).strip()
+
+    # Create a pr branch pointing at sha_b
+    run_git_command(["branch", "pr123", sha_b], cwd=repo_dir)
+
+    # Query smartlog DAG
+    nodes = engine.get_smartlog_dag(limit=20)
+    node_by_sha = {n.commit_hash: n for n in nodes}
+
+    # Verify sha_a and sha_b are present
+    assert sha_a in node_by_sha
+    assert sha_b in node_by_sha
+
+    # Verify commits on main (e.g. shas[2]) are marked merged
+    if shas[2] in node_by_sha:
+        assert node_by_sha[shas[2]].is_merged_into_tracking is True
+
+    # Commit sha_a has no branch pointing directly to it, but pr123 contains sha_a.
+    # With --points-at, sha_a should NOT be flagged as already having PR #123!
+    # Commit sha_b HAS branch pr123 pointing directly to it, so sha_b should be rejected.
+    import pytest
+
+    # Attempting to create PR for sha_b must fail because pr123 points at it
+    with pytest.raises(ValueError, match="already has an associated PR"):
+        engine.create_prs_for_commits([sha_b])
+
+    # Attempting to create PR for already merged commit must fail
+    if shas[2] in node_by_sha:
+        with pytest.raises(ValueError, match="already merged into the tracking branch"):
+            engine.create_prs_for_commits([shas[2]])

@@ -131,7 +131,10 @@ class CommitNodeModel(BaseModel):
     tags: List[str] = Field(default_factory=list)
     is_head: bool = False
     is_ancestor_top: bool = False
+    is_merged: bool = False
+    is_merged_into_tracking: bool = False
     ancestor_name: Optional[str] = None
+
     graph_symbol: str = "o"  # '@' for HEAD, 'o' for commit, 'x' for conflict/error
     graph_art: str = ""  # ASCII / Unicode tree column prefix (e.g. '@', '| o', '| /')
     bug_tags: List[CommitBugTagModel] = Field(default_factory=list)
