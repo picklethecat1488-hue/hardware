@@ -529,7 +529,6 @@ class MarkdownBugExporter:
                 # Status update: protect resolved/closed bugs from being regressed to OPEN by stale markdown without notes
                 if (
                     existing.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
-                    and existing.resolution_notes.strip()
                     and md_bug.status == BugStatus.OPEN
                     and not md_bug.resolution_notes.strip()
                 ):
@@ -935,7 +934,6 @@ class MarkdownBugExporter:
                     renamed += 1
                 if (
                     existing_by_uuid.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
-                    and existing_by_uuid.resolution_notes.strip()
                     and md_bug.status == BugStatus.OPEN
                     and not md_bug.resolution_notes.strip()
                 ):

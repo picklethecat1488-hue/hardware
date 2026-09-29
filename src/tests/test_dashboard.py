@@ -41,6 +41,7 @@ def create_isolated_git_repo(path: Path) -> Tuple[Path, list[str]]:
     f1.write_text("initial line 1\ninitial line 2\n", encoding="utf-8")
     subprocess.run(["git", "add", "file1.txt"], cwd=repo_dir, check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Initial commit (BUG-168)"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "branch", "-M", "main"], cwd=repo_dir, check=True, capture_output=True)
     sha1 = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo_dir, check=True, capture_output=True, text=True
     ).stdout.strip()

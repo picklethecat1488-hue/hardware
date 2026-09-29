@@ -533,7 +533,11 @@ class BugReportServer(ThreadingHTTPServer):
                 if md_db and md_db.bugs:
                     self.database = self.exporter.merge_databases(self.database, md_db)
                     self._ensure_unique_bug_ids(self.database)
-            return self.save_and_sync()
+            self._is_internal_saving = True
+            try:
+                return self.save_and_sync()
+            finally:
+                self._is_internal_saving = False
 
     def sync_with_feedback_dir(self) -> Dict[str, Any]:
         """Scan feedback/ directory, detect file renames, merge into SQLite, and update markdown."""

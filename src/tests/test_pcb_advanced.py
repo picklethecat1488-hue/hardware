@@ -445,7 +445,7 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     assert system_wiring_file.exists(), "system_wiring.yaml must exist for top-down architecture diagram"
     sys_wiring = Wiring(system_wiring_file)
     sys_comp_names = {c.name for c in sys_wiring.footprints}
-    assert {"m2_host", "usb_c", "carrier_pcb", "flex_tail"}.issubset(sys_comp_names)
+    assert {"btle_host", "usb_c", "carrier_pcb", "flex_tail"}.issubset(sys_comp_names)
 
     # Verify BOM and CPL export
     pcb_config = provider.pcb_config
