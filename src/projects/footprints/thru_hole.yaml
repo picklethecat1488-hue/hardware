@@ -75,6 +75,45 @@ footprints:
         pad_size_mm: [1.7, 1.7]
         drill_dia_mm: 1.00
 
+  "pin_header_1x5":
+    dimensions: [12.70, 2.54, 8.5]
+    pins:
+      - name: "1"
+        position: [-5.08, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: roundrect
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "2"
+        position: [-2.54, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "3"
+        position: [0.0, 0.0]
+        side: left
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "4"
+        position: [2.54, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+      - name: "5"
+        position: [5.08, 0.0]
+        side: right
+        pad_type: thru_hole
+        pad_shape: circle
+        pad_size_mm: [1.7, 1.7]
+        drill_dia_mm: 1.00
+
   "axial_resistor":
     dimensions: [8.5, 2.5, 2.5]
     pins:

@@ -28,9 +28,6 @@ enclosure_corner_radius: 8.0
 enclosure_usb_cutout_width: 12.0
 enclosure_usb_cutout_height: 6.5
 enclosure_lip_height: 2.0
-enclosure_m2_cutout_width: 24.0
-enclosure_m2_cutout_height: 5.0
-enclosure_m2_cutout_length: 10.0
 enclosure_gpio_cutout_width: 5.0
 enclosure_gpio_cutout_length: 28.0
 enclosure_gpio_pin_pitch: 2.54
@@ -95,6 +92,6 @@ ble_logo_height: 7.0
 ble_logo_width: 4.5
 ble_logo_depth: 0.4
 ble_logo_x: 0.0
-ble_logo_y: -22.0
+ble_logo_y: -35.0
 
 

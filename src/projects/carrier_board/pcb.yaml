@@ -19,13 +19,24 @@ obstacles:
   shape: box
   dimensions_mm:
   - 10.0
-  - 14.0
-  - 2.2
+  - 15.0
+  - 2.23
   position_mm:
   - 0.0
-  - -34.0
-  - 1.9
+  - -36.0
+  - 1.915
   description: BTLE transceiver module with integrated PCB antenna
+- name: J15
+  shape: box
+  dimensions_mm:
+  - 12.7
+  - 2.54
+  - 8.5
+  position_mm:
+  - -14.5
+  - -41.0
+  - 5.05
+  description: SWD recovery header
 - name: ble_antenna_keepout
   shape: box
   dimensions_mm:
@@ -827,10 +838,13 @@ schematic_sheets:
     - '1'
     - '2'
 - title: High-Speed BTLE UART & Wireless Interface
-  description: BTLE transceiver module (U11) with 1Mb/s high-speed UART link, flow control, cap-touch pairing trigger, and integrated PCB antenna
+  description: BTLE transceiver module (U11) with 1Mb/s high-speed UART link, flow
+    control, cap-touch pairing trigger, SWD recovery header (J15), and integrated
+    PCB antenna
   components:
   - U11
   - U1
+  - J15
   pin_sides:
     U1:
       T2: left
@@ -842,12 +856,34 @@ schematic_sheets:
       RTS: left
       TXD: left
       CTS: left
+      SWDCLK: right
+      SWDIO: right
+      RESET_N: right
+      GND: right
+      3V3: right
+    J15:
+      '1': left
+      '2': left
+      '3': left
+      '4': left
+      '5': left
   pin_breakouts:
     U11:
     - RXD
     - RTS
     - TXD
     - CTS
+    - SWDCLK
+    - SWDIO
+    - RESET_N
+    - GND
+    - 3V3
+    J15:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
     U1:
     - T2
     - T1
@@ -1101,7 +1137,8 @@ schematic_sheets:
       '1': left
       '2': left
 - title: Status and Overrides - Primary Power LEDs
-  description: Visual rail power indicators and current limiters for VBAT, VBUS, and 3V3
+  description: Visual rail power indicators and current limiters for VBAT, VBUS, and
+    3V3
   layout:
     cols_per_row: 3
     top_row_y: 168.0
@@ -1143,7 +1180,8 @@ schematic_sheets:
       '1': left
       '2': left
 - title: Status and Overrides - Peripheral & MCU LEDs
-  description: Subsystem activity indicators and current limiters for Audio, Peripherals, and MCU
+  description: Subsystem activity indicators and current limiters for Audio, Peripherals,
+    and MCU
   layout:
     cols_per_row: 3
     top_row_y: 168.0
@@ -1205,7 +1243,7 @@ assembly_test:
     net_or_points:
     - BLE_TX
     - BLE_RX
-    expected_nominal: 3.30
+    expected_nominal: 3.3
     tolerance_pct: 3.0
     unit: V
     stimulus: 1Mb/s PRBS UART serial test

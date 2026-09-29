@@ -314,14 +314,20 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     self._send_json(res)
                 except (RuntimeError, ValueError) as e:
                     self._send_json({"error": str(e)}, status=400)
-            case "/api/pr/create":
+            case "/api/pr/create" | "/api/pr/submit":
                 commits = data.get("commits", [])
                 if not commits:
                     self._send_json({"error": "No commits provided for PR creation"}, status=400)
                     return
                 try:
-                    res = self.server.git_engine.create_prs_for_commits(commits)
-                    self._send_json({"status": "ok", "created": res})
+                    res = self.server.git_engine.submit_prs_for_commits(commits)
+                    self._send_json(
+                        {
+                            "status": "ok",
+                            "created": res.get("created", []),
+                            "logs": res.get("logs", []),
+                        }
+                    )
                 except (ValueError, RuntimeError) as e:
                     self._send_json({"error": str(e)}, status=400)
             case "/api/pr/unlink":
@@ -509,22 +515,42 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_add_comment(self, data: Dict[str, Any]) -> None:
         """Add a review comment to the session."""
+        file_path = str(data.get("file_path", "")).strip()
+        body = str(data.get("body", "")).strip()
+        if not file_path or not body:
+            self._send_json(
+                {"status": "error", "error": "Missing file_path or body", "message": "Missing file_path or body"},
+                status=400,
+            )
+            return
+
         commit_target = data.get("commit", "working")
         snippet = extract_line_snippet(
-            file_path=data.get("file_path", ""),
+            file_path=file_path,
             start_line=int(data.get("start_line", 1)),
             end_line=int(data.get("end_line", 1)),
             commit=commit_target,
             repo_root=self.server.repo_root,
         )
         now_str = datetime.now(timezone.utc).isoformat()
+        sev_raw = str(data.get("severity", "MUST_FIX")).strip().upper().replace(" ", "_").replace("-", "_")
+        match sev_raw:
+            case "MUST_FIX" | "MUSTFIX" | "FIX" | "MF":
+                severity = ReviewSeverity.MUST_FIX
+            case "PROPOSAL" | "PROP":
+                severity = ReviewSeverity.PROPOSAL
+            case "NIT":
+                severity = ReviewSeverity.NIT
+            case _:
+                severity = ReviewSeverity.MUST_FIX
+
         comment = CommentModel(
             id=data.get("id") or uuid.uuid4().hex[:12],
-            file_path=data.get("file_path", ""),
+            file_path=file_path,
             start_line=int(data.get("start_line", 1)),
             end_line=int(data.get("end_line", 1)),
-            severity=ReviewSeverity(data.get("severity", ReviewSeverity.MUST_FIX.value)),
-            body=data.get("body", ""),
+            severity=severity,
+            body=body,
             author=data.get("author", "Reviewer"),
             code_snippet=snippet,
             created_at=now_str,
@@ -533,7 +559,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.server.review_server.session.comments.append(comment)
         self.server.review_server.session.auto_update_status_on_comment()
         self.server.review_server.save_and_sync()
-        self._send_json(comment.model_dump(mode="json"))
+        resp = comment.model_dump(mode="json")
+        resp["status"] = "ok"
+        resp["comment"] = comment.model_dump(mode="json")
+        resp["verdict"] = self.server.review_server.session.verdict.value
+        self._send_json(resp)
 
     def _handle_edit_comment(self, data: Dict[str, Any]) -> None:
         """Edit an existing review comment."""
@@ -543,14 +573,24 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 if "body" in data:
                     comment.body = data["body"]
                 if "severity" in data:
-                    comment.severity = ReviewSeverity(data["severity"])
+                    sev_raw = str(data["severity"]).strip().upper().replace(" ", "_").replace("-", "_")
+                    match sev_raw:
+                        case "MUST_FIX" | "MUSTFIX" | "FIX" | "MF":
+                            comment.severity = ReviewSeverity.MUST_FIX
+                        case "PROPOSAL" | "PROP":
+                            comment.severity = ReviewSeverity.PROPOSAL
+                        case "NIT":
+                            comment.severity = ReviewSeverity.NIT
                 if "resolved" in data:
                     comment.resolved = bool(data["resolved"])
                 self.server.review_server.session.auto_update_status_on_comment()
                 self.server.review_server.save_and_sync()
-                self._send_json(comment.model_dump(mode="json"))
+                resp = comment.model_dump(mode="json")
+                resp["status"] = "ok"
+                resp["comment"] = comment.model_dump(mode="json")
+                self._send_json(resp)
                 return
-        self._send_json({"error": "Comment not found"}, status=404)
+        self._send_json({"status": "error", "error": "Comment not found", "message": "Comment not found"}, status=404)
 
     def _handle_update_file_status(self, data: Dict[str, Any]) -> None:
         """Update review status of a file."""
@@ -616,6 +656,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 component=data.get("component", ""),
                 description=data.get("description", ""),
                 reproduction_steps=repro_steps if isinstance(repro_steps, list) else [str(repro_steps)],
+                expected_behavior=data.get("expected_behavior", ""),
+                actual_behavior=data.get("actual_behavior", ""),
+                logs=data.get("logs", ""),
+                resolution_notes=data.get("resolution_notes", ""),
                 attachments=[BugAttachmentModel(**a) for a in data.get("attachments", [])],
                 created_at=now_str,
                 updated_at=now_str,
@@ -648,6 +692,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 bug.component = data["component"]
             if "description" in data:
                 bug.description = data["description"]
+            if "expected_behavior" in data:
+                bug.expected_behavior = data["expected_behavior"]
+            if "actual_behavior" in data:
+                bug.actual_behavior = data["actual_behavior"]
+            if "logs" in data:
+                bug.logs = data["logs"]
             if "resolution_notes" in data:
                 incoming_notes = data["resolution_notes"].strip()
                 if incoming_notes:
@@ -890,8 +940,15 @@ class DashboardServer(ThreadingHTTPServer):
                 node.cr_total_count = st["total"]
                 node.cr_reviewed = st.get("reviewed", False)
 
+        repo_web_url = self.git_engine.get_repo_web_url()
+        github_repo = ""
+        if repo_web_url and "github.com/" in repo_web_url:
+            github_repo = repo_web_url.split("github.com/", 1)[1].rstrip("/")
+
         return DiffViewSessionModel(
             repo_name=self.repo_root.name,
+            repo_web_url=repo_web_url,
+            github_repo=github_repo,
             branches=branches,
             current_branch=curr_branch,
             head_commit=head_sha,

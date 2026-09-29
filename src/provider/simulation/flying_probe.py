@@ -126,15 +126,6 @@ def verify_signal_lines_isolation(
             'shorted_signals': List[Dict[str, Any]]
             'checks': List[FlyingProbeIsolationCheckModel]
     """
-    if subassembly == "flex_tail":
-        return {
-            "all_passed": True,
-            "signal_lines": [],
-            "power_ground_nets": [],
-            "shorted_signals": [],
-            "checks": [],
-        }
-
     if wiring is None:
         pcb_cfg = getattr(provider, "pcb_config", None)
         if pcb_cfg and getattr(pcb_cfg, "wiring", None):
@@ -153,8 +144,15 @@ def verify_signal_lines_isolation(
             "checks": [],
         }
 
+    # Filter candidate nets by active subassembly footprints if specified
+    candidate_nets = wiring.nets
+    if subassembly and getattr(wiring, "footprints", None):
+        sub_fps = {fp.name for fp in wiring.footprints if getattr(fp, "shape_ref", None) == subassembly}
+        if sub_fps:
+            candidate_nets = [n for n in wiring.nets if any(str(p[0]) in sub_fps for p in n.pins)]
+
     pg_nets = set()
-    for net in wiring.nets:
+    for net in candidate_nets:
         name_u = net.name.upper()
         if (
             name_u in POWER_NET_NAMES
@@ -163,7 +161,16 @@ def verify_signal_lines_isolation(
         ):
             pg_nets.add(net.name)
 
-    signal_nets = [n for n in wiring.nets if n.name not in pg_nets]
+    if not pg_nets:
+        return {
+            "all_passed": True,
+            "signal_lines": [n.name for n in candidate_nets],
+            "power_ground_nets": [],
+            "shorted_signals": [],
+            "checks": [],
+        }
+
+    signal_nets = [n for n in candidate_nets if n.name not in pg_nets]
     sorted_pg = sorted(pg_nets)
 
     # Check routing traces/vias if available
@@ -587,8 +594,7 @@ def create_flying_probe_hooks(
     Returns:
         Dictionary mapping Simulate.SETUP and Simulate.STEP to execution callbacks.
     """
-    is_flex = "flex_tail" in sim_name.lower()
-    target_label = "flex_tail" if is_flex else "carrier_board"
+    target_label = sim_name.split("/")[-1] if "/" in sim_name else sim_name
 
     # Resolve test steps yaml path
     if test_steps_path is None:
@@ -641,11 +647,16 @@ def create_flying_probe_hooks(
         for tr in pcb_cfg.traces:
             traces_by_net.setdefault(tr.net, tr.start_mm)
 
-    board_comp_names = (
-        {fp.name for fp in wiring.footprints if (getattr(fp, "shape_ref", None) == "flex_tail") == is_flex}
-        if wiring and getattr(wiring, "footprints", None)
-        else set()
-    )
+    is_main_board = (target_label == getattr(provider, "name", None)) or (target_label == "default")
+    if wiring and getattr(wiring, "footprints", None):
+        if is_main_board:
+            board_comp_names = {
+                fp.name for fp in wiring.footprints if getattr(fp, "shape_ref", None) in (None, target_label)
+            }
+        else:
+            board_comp_names = {fp.name for fp in wiring.footprints if getattr(fp, "shape_ref", None) == target_label}
+    else:
+        board_comp_names = set()
     fp_map = {fp.name: fp for fp in wiring.footprints} if wiring and getattr(wiring, "footprints", None) else {}
 
     from provider.pcb.router import PCBAutoRouter
@@ -697,11 +708,25 @@ def create_flying_probe_hooks(
     total_sim_steps = steps_per_test * num_tests
     isolation_map = {check.signal_net: check.passed for check in isolation_checks}
 
+    target_nets = (
+        {n.name for n in getattr(wiring, "nets", []) if any(str(p[0]) in board_comp_names for p in n.pins)}
+        if wiring and board_comp_names
+        else set()
+    )
+    has_cap_steps = any(getattr(s, "test_type", "") in ("capacitance", "mutual_cap") for s in test_steps)
+    has_diff_pairs = any(getattr(s, "test_type", "") in ("diff_pair", "differential") for s in test_steps) or any(
+        any(spec_kw in net_name for spec_kw in ("USB_", "PCIE_"))
+        for net_name in (target_nets if target_nets else [n.name for n in getattr(wiring, "nets", [])])
+    )
+    if not has_diff_pairs and not has_cap_steps:
+        has_diff_pairs = is_main_board
+        has_cap_steps = not is_main_board
+
     diff_pair_results = verify_diff_pair_compliance(provider, wiring=wiring)
-    diff_pair_checks = diff_pair_results.get("checks", []) if not is_flex else []
+    diff_pair_checks = diff_pair_results.get("checks", []) if has_diff_pairs else []
 
     mutual_cap_results = verify_mutual_cap_compliance(provider, wiring=wiring)
-    mutual_cap_checks = mutual_cap_results.get("checks", []) if is_flex else []
+    mutual_cap_checks = mutual_cap_results.get("checks", []) if has_cap_steps else []
 
     test_categories = []
     for s in test_steps:
@@ -745,9 +770,12 @@ def create_flying_probe_hooks(
             ),
         )
 
+    from model.pcb import BoardType
+
     # Physical clearances in meters
     z_flight = 0.016  # 16mm clearance above board obstacles
-    z_pad = 0.0016 if not is_flex else 0.0003  # Contact pad elevation
+    is_flex_target = (not is_main_board) or (pcb_cfg and getattr(pcb_cfg, "board_type", None) == BoardType.FLEX)
+    z_pad = 0.0003 if is_flex_target else 0.0016  # Contact pad elevation
 
     def setup_simulation(body_id: int, client: int, name: str, boundaries: Any, state_tracker: Any = None) -> None:
         sim_state["client"] = client

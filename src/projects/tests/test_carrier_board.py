@@ -467,14 +467,30 @@ def test_regression_bug_214_btle_support_and_enclosure_cover_bluetooth_logo() ->
     assert lid.part.is_valid(), "Enclosure lid must be a valid solid"
     assert len(lid.part.solids()) == 1, "Enclosure lid must be a single solid"
     assert "bluetooth_logo" in lid.part.joints, "Lid must expose bluetooth_logo joint"
+    batt_w = provider.settings.enclosure_battery_mount_width
+    batt_l = provider.settings.enclosure_battery_mount_length
+    batt_rim_t = provider.settings.enclosure_battery_mount_wall_thickness
+    batt_y = provider.settings.enclosure_battery_mount_y
+    j13_y = 16.0
+    batt_cut_l = provider.settings.enclosure_battery_cutout_length
+    min_y = min(batt_y - (batt_l / 2.0), j13_y - (batt_cut_l / 2.0) - batt_rim_t)
+
+    batt_cov_clr = provider.settings.enclosure_battery_cover_clearance
+    batt_cov_t = provider.settings.enclosure_battery_cover_wall_thickness
+    batt_lbl_margin = provider.settings.enclosure_battery_label_margin
+    batt_lbl_y = min_y - batt_rim_t - batt_cov_clr - batt_cov_t - batt_lbl_margin
+
     wall = provider.settings.enclosure_wall_thickness
     depth = provider.settings.ble_logo_depth
     bt_faces = [
         f
         for f in lid.part.faces()
-        if abs(f.center().Z - (wall - depth)) < 1e-3 and abs(f.center().X) < 5.0 and -30.0 < f.center().Y < -15.0
+        if abs(f.center().Z - (wall - depth)) < 1e-3 and abs(f.center().X) < 5.0 and -40.0 < f.center().Y < -26.0
     ]
     assert len(bt_faces) >= 5, f"Expected engraved Bluetooth logo faces on lid, found {len(bt_faces)}"
+    assert all(f.center().Y < batt_lbl_y for f in bt_faces), (
+        f"Bluetooth logo faces must be located strictly south of BATTERY label (Y < {batt_lbl_y:.2f} mm)"
+    )
 
     # 7. Zero PCIe cutouts in enclosure bottom
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
@@ -1967,3 +1983,62 @@ def test_regression_bug_220_flex_tail_flying_probe_isolation_excluded() -> None:
     assert "Differential Pair Compliance Audit" in carrier_report, (
         "Carrier board report must include Differential Pair Compliance Audit section"
     )
+
+
+def test_regression_bug_231_nina_b312_flashed_module_swd_header_and_footprint() -> None:
+    """Verify BUG-231: Pre-flashed NINA-B312 variant, LGA-72 footprint, SWD header J15, and zero DRC errors.
+
+    Asserts that:
+    1. U11 is updated from unflashed NINA-B302 to pre-flashed NINA-B312-02B.
+    2. J15 exists as a 1x5 SWD recovery header at (-14.5, -41.0, 0.8) with horizontal orientation.
+    3. J15 connects to GND, BLE_SWDIO, BLE_SWDCLK, BLE_RESET_N, and 3V3.
+    4. U11 footprint dimensions match Table 27 LGA-72 (10.0 x 15.0 x 2.23 mm).
+    5. Full DRC report passes with zero errors.
+    """
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_cfg = provider.pcb_config
+
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+
+    # 1. U11 MPN is NINA-B312-02B
+    assert "U11" in fp_map, "Component U11 must exist in wiring footprints"
+    u11 = fp_map["U11"]
+    assert u11.mpn == "NINA-B312-02B", f"U11 MPN must be pre-flashed NINA-B312-02B, got {u11.mpn}"
+
+    # 2. J15 exists at [-14.5, -41.0, 0.8]
+    assert "J15" in fp_map, "J15 must exist in wiring footprints"
+    j15 = fp_map["J15"]
+    assert j15.package == "pin_header_1x5", f"J15 package must be pin_header_1x5, got {j15.package}"
+    assert abs(j15.position[0] - (-14.5)) < 0.1, f"J15 X position must be -14.5, got {j15.position[0]}"
+    assert abs(j15.position[1] - (-41.0)) < 0.1, f"J15 Y position must be -41.0, got {j15.position[1]}"
+    assert abs(j15.rotation[2] - 0.0) < 0.1, f"J15 rotation must be 0.0, got {j15.rotation}"
+
+    # 3. J15 pin connections
+    net_map = {net.name: [pin for comp, pin in net.pins if comp == "J15"] for net in wiring.nets}
+    assert "1" in net_map.get("GND", []), "J15 pin 1 must be GND"
+    assert "2" in net_map.get("BLE_SWDIO", []), "J15 pin 2 must be BLE_SWDIO"
+    assert "3" in net_map.get("BLE_SWDCLK", []), "J15 pin 3 must be BLE_SWDCLK"
+    assert "4" in net_map.get("BLE_RESET_N", []), "J15 pin 4 must be BLE_RESET_N"
+    assert "5" in net_map.get("3V3", []), "J15 pin 5 must be 3V3"
+
+    # 4. Footprint dimensions
+    import yaml
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    with open(repo_root / "src/projects/footprints/ic.yaml") as f:
+        ic_fps = yaml.safe_load(f)["footprints"]
+    assert "MOD-BLE-PCB-ANT" in ic_fps, "MOD-BLE-PCB-ANT footprint must be defined in ic.yaml"
+    ble_fp = ic_fps["MOD-BLE-PCB-ANT"]
+    dims = ble_fp.get("dimensions", [])
+    assert dims == [10.0, 15.0, 2.23], f"U11 dimensions must match LGA-72 Table 27 [10.0, 15.0, 2.23], got {dims}"
+
+    # 5. Full DRC report passes with zero errors
+    drc = PCBDesignRulesChecker(pcb_cfg)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0, f"Expected 0 DRC errors, got {report.error_count}"

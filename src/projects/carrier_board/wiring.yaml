@@ -38,8 +38,20 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: NINA-B302-00B
-  supplier_pn: 1972-NINA-B302-00B-ND
+  mpn: NINA-B312-02B
+  supplier_pn: 1972-NINA-B312-02B-ND
+- name: J15
+  package: pin_header_1x5
+  position:
+  - -14.5
+  - -41.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: SAMTEC-TSW-105-07-G-S
+  supplier_pn: SAM1035-05-ND
 - name: J2
   package: FPC-30P-0.5MM
   position:
@@ -1161,6 +1173,8 @@ nets:
     - '2'
   - - R12
     - '2'
+  - - J15
+    - '1'
 - name: 3V3
   color: '#dc2626'
   pins:
@@ -1225,6 +1239,8 @@ nets:
     - '1'
   - - D4
     - '1'
+  - - J15
+    - '5'
 - name: VBUS
   priority: 24
   color: '#b91c1c'
@@ -1537,6 +1553,30 @@ nets:
     - T4
   - - U11
     - CTS
+- name: BLE_SWDCLK
+  priority: 13
+  color: '#4169e1'
+  pins:
+  - - U11
+    - SWDCLK
+  - - J15
+    - '3'
+- name: BLE_SWDIO
+  priority: 14
+  color: '#1e90ff'
+  pins:
+  - - U11
+    - SWDIO
+  - - J15
+    - '2'
+- name: BLE_RESET_N
+  priority: 15
+  color: '#ff6347'
+  pins:
+  - - U11
+    - RESET_N
+  - - J15
+    - '4'
 - name: CAP_SHIELD
   priority: 25
   color: '#64748b'

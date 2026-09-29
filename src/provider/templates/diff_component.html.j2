@@ -21,6 +21,11 @@
     border-bottom: 2px solid var(--quake-border-mid, #5a381e);
     gap: 10px;
     flex-shrink: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    scrollbar-width: thin;
   }
 
   .diff-file-title {
@@ -108,6 +113,35 @@
     top: 0;
     z-index: 5;
     text-align: left;
+  }
+
+  .sbs-split-resizer {
+    position: absolute;
+    top: 0;
+    right: -5px;
+    width: 10px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 25;
+    user-select: none;
+  }
+
+  .sbs-split-resizer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 2px;
+    background: var(--quake-border-accent, #8d5d33);
+    transition: background 0.15s, width 0.15s, left 0.15s;
+  }
+
+  .sbs-split-resizer:hover::after,
+  .sbs-split-resizer.resizing::after {
+    background: var(--quake-gold, #ffb800);
+    width: 4px;
+    left: 3px;
   }
 
   .diff-sbs-row td {
@@ -409,10 +443,21 @@
       const rows = diffData.side_by_side || [];
       let html = `
         <table class="diff-sbs-table">
+          <colgroup>
+            <col class="col-lineno" style="width: 44px; min-width: 44px;">
+            <col class="col-marker" style="width: 20px; min-width: 20px;">
+            <col class="col-code col-old-code" style="width: 50%;">
+            <col class="col-lineno" style="width: 44px; min-width: 44px;">
+            <col class="col-marker" style="width: 20px; min-width: 20px;">
+            <col class="col-code col-new-code" style="width: 50%;">
+          </colgroup>
           <thead>
             <tr>
-              <th colspan="3">Previous Revision</th>
-              <th colspan="3">Active Revision</th>
+              <th colspan="3" class="th-old" style="position: relative;">
+                Previous Revision
+                <div class="sbs-split-resizer" title="Drag horizontally to resize split panes"></div>
+              </th>
+              <th colspan="3" class="th-new">Active Revision</th>
             </tr>
           </thead>
           <tbody>
@@ -453,6 +498,7 @@
 
       html += `</tbody></table>`;
       container.innerHTML = html;
+      this.setupSbsResizer(container.querySelector(".diff-sbs-table"), "vcs_sbs_split_ratio");
     },
 
     renderUnified(container, diffData, lang, oldHighlighted, newHighlighted) {
@@ -522,6 +568,63 @@
           ${previewHtml}
         </div>
       `;
+    },
+
+    setupSbsResizer(table, storageKey = "vcs_sbs_split_ratio") {
+      if (!table) return;
+      const resizer = table.querySelector(".sbs-split-resizer");
+      if (!resizer) return;
+      const applyRatio = (ratio) => {
+        const pctOld = (ratio * 100).toFixed(1);
+        const pctNew = ((1 - ratio) * 100).toFixed(1);
+        const oldCol = table.querySelector("col.col-old-code");
+        const newCol = table.querySelector("col.col-new-code");
+        if (oldCol && newCol) {
+          oldCol.style.width = pctOld + "%";
+          newCol.style.width = pctNew + "%";
+        }
+        const oldTh = table.querySelector(".th-old");
+        const newTh = table.querySelector(".th-new");
+        if (oldTh && newTh) {
+          oldTh.style.width = pctOld + "%";
+          newTh.style.width = pctNew + "%";
+        }
+      };
+
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= 0.15 && parsed <= 0.85) {
+          applyRatio(parsed);
+        }
+      }
+
+      resizer.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        resizer.classList.add("resizing");
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+        const tableRect = table.getBoundingClientRect();
+
+        const onMouseMove = (moveEvent) => {
+          const x = moveEvent.clientX - tableRect.left;
+          const ratio = Math.max(0.15, Math.min(0.85, x / tableRect.width));
+          applyRatio(ratio);
+          localStorage.setItem(storageKey, ratio.toFixed(4));
+        };
+
+        const onMouseUp = () => {
+          resizer.classList.remove("resizing");
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+          window.removeEventListener("mousemove", onMouseMove);
+          window.removeEventListener("mouseup", onMouseUp);
+        };
+
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+      });
     }
   };
 </script>

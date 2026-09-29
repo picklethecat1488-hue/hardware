@@ -497,6 +497,7 @@ class GitEngine:
         target_ref = branch or "HEAD"
 
         # Determine ancestor branch (e.g. main/master) and merge-base (BUG-213)
+        current_local_ref = f"refs/heads/{self.get_current_branch()}" if self.get_current_branch() else None
         ancestor_name: Optional[str] = None
         ancestor_merge_base: Optional[str] = None
         for candidate_ref, cand_name in [
@@ -505,6 +506,8 @@ class GitEngine:
             ("refs/remotes/origin/master", "master"),
             ("refs/heads/master", "master"),
         ]:
+            if candidate_ref == current_local_ref:
+                continue
             try:
                 run_git_command(["rev-parse", "--verify", candidate_ref], cwd=self.repo_root)
                 mb = run_git_command(["merge-base", target_ref, candidate_ref], cwd=self.repo_root).strip()
@@ -536,15 +539,6 @@ class GitEngine:
             if c_cand != current_local_ref and c_cand not in tracking_candidates:
                 tracking_candidates.append(c_cand)
 
-        active_tracking_ref = None
-        for t_ref in tracking_candidates:
-            try:
-                run_git_command(["rev-parse", "--verify", t_ref], cwd=self.repo_root)
-                active_tracking_ref = t_ref
-                break
-            except RuntimeError:
-                continue
-
         # Check if target is a topic branch diverging from ancestor
         target_hash = head_hash if target_ref == "HEAD" else None
         if not target_hash:
@@ -553,16 +547,28 @@ class GitEngine:
             except RuntimeError:
                 target_hash = ""
 
-        is_topic_branch = bool(ancestor_merge_base and target_hash != ancestor_merge_base)
+        curr_br = self.get_current_branch()
+        is_topic_branch = bool(
+            ancestor_merge_base and (curr_br not in ("main", "master") or target_hash != ancestor_merge_base)
+        )
 
         merged_commit_hashes: set[str] = set()
-        if active_tracking_ref:
+        for t_ref in tracking_candidates:
             try:
-                out = run_git_command(["rev-list", f"-n{max(limit * 2, 200)}", active_tracking_ref], cwd=self.repo_root)
-                merged_commit_hashes = set(out.splitlines())
+                run_git_command(["rev-parse", "--verify", t_ref], cwd=self.repo_root)
+                out = run_git_command(["rev-list", f"-n{max(limit * 2, 500)}", t_ref], cwd=self.repo_root)
+                merged_commit_hashes.update(out.splitlines())
             except RuntimeError:
                 pass
-        if ancestor_merge_base and is_topic_branch:
+
+        if ancestor_merge_base:
+            try:
+                out_anc = run_git_command(
+                    ["rev-list", f"-n{max(limit * 2, 500)}", ancestor_merge_base], cwd=self.repo_root
+                )
+                merged_commit_hashes.update(out_anc.splitlines())
+            except RuntimeError:
+                pass
             merged_commit_hashes.add(ancestor_merge_base)
 
         fmt = "%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%ar%x1f%s%x1f%D%x1f%b%x1e"
@@ -1006,6 +1012,55 @@ class GitEngine:
             )
 
         return created_prs
+
+    def submit_prs_for_commits(self, commit_hashes: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Submit pull requests for commits to GitHub, running the submission workflow.
+
+        If commit_hashes is not provided or empty, defaults to unmerged commits in the stack that do not yet have PRs.
+        Executes 'sl pr submit' if available, otherwise creates and pushes PR branches.
+        """
+        if not commit_hashes:
+            nodes = self.get_smartlog_dag(limit=100)
+            commit_hashes = [
+                n.commit_hash for n in nodes if not n.is_merged and not n.is_merged_into_tracking and not n.pr_number
+            ]
+            if not commit_hashes:
+                commit_hashes = [n.commit_hash for n in nodes if not n.is_merged and not n.is_merged_into_tracking]
+
+        if not commit_hashes:
+            raise ValueError("No unmerged commits provided for PR submission")
+
+        # Validate and create PR branches (validates already-merged and duplicate PRs)
+        created_prs = self.create_prs_for_commits(commit_hashes)
+
+        repo_web_url = self.get_repo_web_url() or "https://github.com/picklethecat1488-hue/hardware"
+        log_lines: List[str] = []
+        log_lines.append(f"pushing {len(commit_hashes)} to {repo_web_url}")
+
+        sl_path = shutil.which("sl")
+        if sl_path:
+            try:
+                out = run_git_command(
+                    [sl_path, "pr", "submit", "--config", "github.max-prs-to-create=-1"],
+                    cwd=self.repo_root,
+                )
+                if out:
+                    log_lines.extend(out.splitlines())
+            except RuntimeError as e:
+                log_lines.append(f"Notice: {e}")
+            for pr in created_prs:
+                target_url = pr.get("pr_url") or f"{repo_web_url}/pull/{pr.get('pr_number')}"
+                log_lines.append(f"created new pull request: {target_url}")
+
+        # Invalidate remote PR cache so new remote PRs reflect immediately
+        if hasattr(self, "_remote_pr_cache"):
+            self._remote_pr_cache = None
+
+        return {
+            "status": "ok",
+            "created": created_prs,
+            "logs": log_lines,
+        }
 
     def unlink_prs_for_commits(self, commit_hashes: List[str]) -> List[Dict[str, Any]]:
         """Unlink PRs from selected commits by removing their associated PR branches.

@@ -57,8 +57,8 @@ flowchart TD
     end
 
     subgraph Sensors["Touch & Audio Peripherals"]
-        CYPRESS["CY8CMBR3116 Touch IC (U2)"] -->|"I2C1 + CAP_INT"| MCU
-        FLEX_TAIL["Capacitive Flex Tail (J2/J4)"] -->|"4 Sensing Channels"| CYPRESS
+        AZOTEQ["Azoteq IQS7222A / IQS7211A Touch IC (U2)"] -->|"I2C1 + CAP_INT"| MCU
+        FLEX_TAIL["Capacitive Flex Tail (J2/J4)"] -->|"4 Sensing Channels"| AZOTEQ
         MCU -->|"PDM Clock / Data"| AUDIO_AMP["MAX98357A Mono Amp (U4)"]
         AUDIO_AMP -->|"Differential Drive"| SPK["Piezo Sounder (U5)"]
     end
@@ -67,7 +67,7 @@ flowchart TD
         MCU -->|"I2C2 (J6), I3C0 (J7), I3C1 (J8)"| SENSOR_HDRS["Peripheral I2C/I3C Breakouts"]
         MCU -->|"SPI0 (J9), UART1 (J10)"| COMM_HDRS["SPI & UART Breakouts"]
         MCU -->|"10x GPIO Breakout (J14)"| GPIO_HDR["General Purpose GPIO Header"]
-        M2_CONN["M.2 Key-M Edge Connector (J1)"] -->|"PCIe / MIPI / PEWAKE#"| MCU
+        BLE_MOD["u-blox NINA-B312 BTLE (U11)"] -->|"UART / Flow Control / BLE_WAKE_N"| MCU
     end
 ```
 
@@ -79,12 +79,13 @@ flowchart TD
 
 | Ref Des | Component Name | Package | MPN | Functional Role in System | Datasheet & Reference Documentation |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`U2`** | Capacitive Touch Controller | QFN-24 (4x4mm, 0.5mm pitch) | `CY8CMBR3116-LQI` | CapSense Express controller driving 4 flex tail electrodes (3 mutual steps, 1 self-cap proximity). Interfaces via I2C1 and `CAP_INT` interrupt. | [Infineon CY8CMBR3116 Portal](https://www.infineon.com/cms/en/product/universal-serial-bus/usb-peripheral-controllers/capsense-controllers/cy8cmbr3116-lqi/) / [DigiKey CY8CMBR3116](https://www.digikey.com/en/products/result?keywords=CY8CMBR3116-LQI) |
+| **`U2`** | Capacitive Touch Controller | QFN-20 (3x3mm, 0.4mm pitch) | `IQS7222A001QNR` | ProxFusion controller driving 4 flex tail electrodes (3 mutual steps, 1 self-cap proximity) with dual internal LDOs (VREGD, VREGA). Interfaces via I2C and `CAP_INT` (`RDY`) interrupt. | [Azoteq IQS7222A Datasheet](datasheets/Azoteq_IQS7222A_datasheet.pdf) / [DigiKey IQS7222A](https://www.digikey.com/en/products/result?keywords=IQS7222A) |
 | **`U4`** | Mono Class D Audio Amplifier | TQFN-16 (3x3mm) | `MAX98357AETE+` | Converts digital PDM / I2S audio streams from the MCU to high-efficiency analog drive for the piezo sounder. | [Analog Devices MAX98357A Portal](https://www.analog.com/en/products/max98357a.html) / [Adafruit Datasheet Mirror](https://cdn-learn.adafruit.com/assets/assets/000/035/778/original/MAX98357A-MAX98357B.pdf) |
 | **`U5`** | Piezoelectric Sounder | 12mm Cylindrical SMD | `PKM13EPYH4000-B0` | High-frequency alert buzzer, alarm feedback, and audible notification emitter. | [Murata PKM13EPYH4000 Portal](https://www.murata.com/en-global/products/productdetail?partno=PKM13EPYH4000-B0) / [DigiKey PKM13EPYH4000](https://www.digikey.com/en/products/result?keywords=PKM13EPYH4000-B0) |
 | **`Q1`** | N-Channel MOSFET Load Switch | SOT-23 | `BSS138` | Low-side power-gating switch controlled by `PWR_EN` to cut quiescent current to expansion sensors during sleep. | [onsemi BSS138 Portal](https://www.onsemi.com/products/discrete-power-modules/mosfets/bss138) / [SparkFun Datasheet Mirror](https://www.sparkfun.com/datasheets/Components/General/BSS138.pdf) |
 | **`Y1`** | High-Frequency Crystal Oscillator | 3225-4P (3.2x2.5mm) | `ECS-240-8-30B-CKM` | 24.000 MHz low-jitter primary system clock for MCU PLLs, USB PHY, and communication peripherals. | [ECS Inc ECX-3B Portal](https://ecsxtal.com/products/ecx-3b/) / [DigiKey ECS-240-8-30B](https://www.digikey.com/en/products/result?keywords=ECS-240-8-30B-CKM) |
-| **`J1`** | M.2 Key-M Edge Connector | M.2-KEY-M | `LOTES-APCI0082` | High-speed host expansion slot carrying PCIe, MIPI telemetry, and primary test harness signals. | [PCI-SIG M.2 Specification](https://pcisig.com/specifications/pciexpress/m.2) |
+| **`U11`** | BTLE 5.0 Wireless Module | LGA-72 (10x15mm) | `u-blox NINA-B312-02B` | Pre-flashed standalone Bluetooth Low Energy 5.0 module with internal antenna replacing legacy edge connector. | [u-blox NINA-B31 Series](https://www.u-blox.com/en/product/nina-b31-series-u-connect) |
+| **`J15`** | 1x5 SWD Recovery Header | TH Header (1x5 2.54mm pitch) | `GENERIC-TH-1X5` | SWD debug and firmware recovery header for U11 BLE module (`GND`, `SWDIO`, `SWDCLK`, `RESET_N`, `3V3`). | [Carrier Board Schematic](carrier_board_schematic.svg) |
 | **`J2` / `J4`** | FPC 30-Pin Connectors | FPC-30P-0.5mm | `HIROSE-FH35C-30S` | Zero-insertion-force (ZIF) 30-pin connectors bridging the rigid carrier board (`J2`) and flexible sensing tail (`J4`). | [Hirose FH35C Series Catalog](https://www.hirose.com/en/product/series/FH35C) |
 | **`J3`** | USB Type-C Receptacle | USB-C-16P (Hybrid SMD/TH) | `TYPE-C-16P` | 5V VBUS power delivery input, CC1/CC2 5.1k configuration channels, and USB 2.0 D+/D- communication. | [USB-IF Type-C Specification](https://www.usb.org/document-library/usb-type-cr-cable-and-connector-specification-release-22) |
 
@@ -104,7 +105,9 @@ flowchart TD
 | **`BUG-053`** | **RGB Status LED** | **`CLV1A-FKB-CJ1M1F1BB7R3S3`** | Cree LED | 4-PLCC SMD (2.1x2.1mm) | Common-anode ultra-bright RGB LED: Red (624nm), Green (527nm), Blue (470nm) | [Cree LED CLV1A-FKB Portal](https://www.cree-led.com/products/leds/smd/high-brightness/clv1a-fkb/) / [Mouser Datasheet Mirror](https://www.mouser.com/datasheet/2/722/1239-2509117.pdf) |
 | **`BUG-051`** | **ARM 10-Pin SWD Header** | **`FTSH-105-01-L-DV-K`** | Samtec | 2x5 SMD (1.27mm / 0.050" pitch) | Keyed shrouded micro-header for Cortex debug probes (J-Link, ST-Link, CMSIS-DAP) | [Samtec FTSH Series Catalog](https://www.samtec.com/products/ftsh) / [DigiKey FTSH-105](https://www.digikey.com/en/products/result?keywords=FTSH-105-01-L-DV-K) |
 | **`BUG-052`** | **I2C / I3C Headers** | **`SM04B-SRSS-TB`** | JST Sales America | 4-Pin 1.0mm SH Series SMD | Compact positive-locking 4-pin headers for external I2C/I3C sensor evaluation (`3V3`, `GND`, `SDA`, `SCL`) | [JST SH Series Documentation](https://www.jst-mfg.com/product/detail_e.php?series=231) / [Local PDF](datasheets/JST_SH_header.pdf) |
-| **`BUG-052`** | **UART & SPI Headers** | **`TSW-106-07-L-S`** | Samtec | 1x6 2.54mm Pitch Through-Hole | Standard 6-pin serial interface headers compatible with FTDI cables, logic analyzers, and breadboards | [Samtec TSW Series Catalog](https://www.samtec.com/products/tsw) / [DigiKey TSW-106](https://www.digikey.com/en/products/result?keywords=TSW-106-07-L-S) |
+| **`BUG-052`** | **UART & SPI Headers (`BUG-110`)** | **`B6B-PH-K-S`** | JST Sales America | 1x6 2.0mm Pitch Through-Hole (`JST-PH-6P`) | Polarized 6-pin serial interface headers providing secure keyed mating and easy insertion for external test boards | [JST PH Series Catalog](https://www.jst-mfg.com/product/detail_e.php?series=199) / [DigiKey B6B-PH-K-S](https://www.digikey.com/en/products/result?keywords=B6B-PH-K-S) |
+| **`BUG-070`** | **Battery Connector (`J13`)** | **`S2B-PH-K-S`** | JST Sales America | 1x2 2.0mm Pitch Through-Hole (`JST-PH-2P`) | Polarized keyed shrouded receptacle for 1S 3.7V Li-Ion / LiPo battery pack | [JST PH Series Catalog](https://www.jst-mfg.com/product/detail_e.php?series=199) / [DigiKey S2B-PH-K-S](https://www.digikey.com/en/products/result?keywords=S2B-PH-K-S) |
+| **`BUG-112`** | **Recommended Battery Model** | **`PKCELL LP352438`** | PKCELL Battery | Pouch Cell ($3.5\times 24\times 38\text{ mm}$) | 1S 3.7V 350 mAh / 1.30 Wh LiPo pouch cell with integrated PCM (overcharge/discharge/overcurrent); pre-terminated with polarized 2-pin JST-PH 2.0mm female connector on 50mm flying leads; fits flush inside enclosure lid cradle ($24\times 38\times 3.5\text{ mm}$) | [PKCELL LP352438 Specification](https://www.pkcell.com/lp352438-3-7v-350mah-lipo-battery-pack.html) |
 | **`BUG-052`** | **MIPI Camera FPC** | **`FH12-15S-0.5SH`** | Hirose Electric | 15-Pin 0.5mm Pitch Bottom-Contact FPC | Standard Raspberry Pi / IMX camera breakout connector carrying 2-lane MIPI CSI-2 differential pairs | [Hirose FH12 Series Catalog](https://www.hirose.com/en/product/series/FH12) / [DigiKey FH12-15S](https://www.digikey.com/en/products/result?keywords=FH12-15S-0.5SH) |
 | **`BUG-055`** | **10-Pin GPIO Breakout** | **`TSW-110-07-L-S`** | Samtec | 1x10 2.54mm Pitch Single Row | Standard 100-mil pin header breaking out 10 configurable MCU GPIOs with ADC, PWM, and IRQ support | [Samtec TSW Series Catalog](https://www.samtec.com/products/tsw) / [DigiKey TSW-110](https://www.digikey.com/en/products/result?keywords=TSW-110-07-L-S) |
 
@@ -122,17 +125,17 @@ To fulfill `BUG-060` ("Support exit from Deep Power Down when connecting the ext
    - **Wake Action**: The falling edge on `WAKEUP0_B` / `VBAT_WAKEUP_b` asserts the MCX N947 Power Management Unit (PMU) wakeup interrupt controller, automatically restoring internal LDOs, releasing reset, and waking the dual Cortex-M33 cores from Deep Power Down into normal run mode.
    - **Passive State**: When disconnected from USB, an external $100\,\text{k}\Omega$ pull-up resistor to `VDD_BAT` maintains the line at logic high with $< 30\,\text{nA}$ leakage.
 
-2. **External M.2 Host Connection Wakeup (`WAKEUP1_B` / `WUU0_IN1`)**:
-   - **Signal**: `M2_WAKE_N` connecting M.2 Key-M edge connector `J1` pin 50 (`PEWAKE#`) to MCX N947 `WUU0_IN1` (ball `C13`, pin `P0_7` / `WAKEUP1_B`).
-   - **Mechanism**: Standard PCI Express M.2 Key-M interfaces define `PEWAKE#` as an active-low open-drain signal driven by the host or endpoint to signal link wakeup or presence. When the test board is inserted into a host M.2 socket or the host controller asserts PCIe wake, `PEWAKE#` is pulled low to ground.
+2. **BTLE Wireless Subsystem Host Wakeup (`WAKEUP1_B` / `WUU0_IN1`)**:
+   - **Signal**: `BLE_WAKE_N` connecting u-blox NINA-B312 BTLE module `U11` host-wake interrupt line to MCX N947 `WUU0_IN1` (ball `C13`, pin `P0_7` / `WAKEUP1_B`).
+   - **Mechanism**: The u-blox NINA-B312 module asserts `BLE_WAKE_N` active-low when an incoming Bluetooth LE advertising connection, pairing request, or serial character arrives over the air.
    - **Wake Action**: The falling edge on `WAKEUP1_B` / `WUU0_IN1` independently triggers the MCX N947 PMU, immediately waking the microcontroller from Deep Power Down into full operational state without user button intervention.
-   - **Passive State**: An external $100\,\text{k}\Omega$ pull-up resistor to `VDD_BAT` keeps `M2_WAKE_N` held high when disconnected from the M.2 host.
+   - **Passive State**: An external $100\,\text{k}\Omega$ pull-up resistor to `VDD_BAT` keeps `BLE_WAKE_N` held high when the BTLE link is dormant.
 
 ```mermaid
 flowchart LR
-    subgraph Wakeup_Sources["External Asynchronous Wakeup Sources (BUG-060)"]
+    subgraph Wakeup_Sources["External Asynchronous Wakeup Sources (BUG-060, BUG-214)"]
         CHG["TI BQ24074 Charger (U3)"] -->|"/PGOOD (Open-Drain)"| W0["Net: CHG_PGOOD_WAKE"]
-        M2["M.2 Key-M Connector (J1)"] -->|"Pin 50: PEWAKE# (Open-Drain)"| W1["Net: M2_WAKE_N"]
+        BLE["u-blox NINA-B312 BTLE (U11)"] -->|"BLE_WAKE_N (Active-Low)"| W1["Net: BLE_WAKE_N"]
     end
 
     subgraph MCXN947_AON["MCX N947 Always-On Domain (VBAT)"]
@@ -338,9 +341,9 @@ Requirement Checklist:
 | **`XTAL_IN`** | `F2` | `P1_31` | `ANALOG - EXTAL48M` | `MED` | Input | `Y1.3` (48MHz Crystal) | High-frequency crystal oscillator amplifier input |
 | **`I2C0_SCL`** | `A10` | `P0_17` | `ALT2 - FC0_P1` | `MED+I2C` | Open-Drain | `U6.SCL`, `U7.SCL` | Core system I2C clock (RGB driver & fuel gauge) |
 | **`I2C0_SDA`** | `B10` | `P0_16` | `ALT2 - FC0_P0` | `MED+I2C+I3C` | Open-Drain | `U6.SDA`, `U7.SDA` | Core system I2C data with 2.2k pull-up to SYS_3V3 |
-| **`I2C1_SCL`** | `C5` | `P1_1` | `ALT2 - FC3_P1` | `MED+I2C` | Open-Drain | `U2.SCL` (CY8CMBR3116) | Dedicated capacitive touch controller I2C clock |
-| **`I2C1_SDA`** | `C6` | `P1_0` | `ALT2 - FC3_P0` | `MED+I2C` | Open-Drain | `U2.SDA` (CY8CMBR3116) | Dedicated capacitive touch controller I2C data |
-| **`CAP_INT`** | `C4` | `P1_2` | `ALT0 - P1_2` | `MED` | Input | `U2.INT_B` (CY8CMBR3116) | Capacitive touch active-low proximity/press IRQ |
+| **`I2C1_SCL`** | `C5` | `P1_1` | `ALT2 - FC3_P1` | `MED+I2C` | Open-Drain | `U2.SCL` (IQS7222A) | Dedicated capacitive touch controller I2C clock |
+| **`I2C1_SDA`** | `C6` | `P1_0` | `ALT2 - FC3_P0` | `MED+I2C` | Open-Drain | `U2.SDA` (IQS7222A) | Dedicated capacitive touch controller I2C data |
+| **`CAP_INT`** | `C4` | `P1_2` | `ALT0 - P1_2` | `MED` | Input | `U2.RDY` (IQS7222A) | Capacitive touch active-low proximity/press IRQ |
 | **`UART0_RXD`** | `B6` | `P0_24` | `ALT2 - FC1_P0` | `MED` | Input | `U9.TXD` (FT232RNQ) | Debug console UART receive (up to 3 Mbaud) |
 | **`UART0_TXD`** | `A6` | `P0_25` | `ALT2 - FC1_P1` | `MED` | Output | `U9.RXD` (FT232RNQ) | Debug console UART transmit (up to 3 Mbaud) |
 | **`UART0_CTS`** | `F10` | `P0_26` | `ALT2 - FC1_P2` | `MED` | Input | `U9.RTS` (FT232RNQ) | Console UART Clear-to-Send hardware flow control |
@@ -378,7 +381,7 @@ Requirement Checklist:
 | **`UART1_TXD`**| `B3`  | `P1_5` | `ALT3 - FC5_P1` | `MED` | Output | `J10.4` (BUG-052) | Peripheral expansion UART transmit (Flexcomm 5) |
 | **`CHG_STAT`** | `G5`  | `P1_19`| `ALT0 - P1_19` | `MED` | Input | `U3./CHG` (BUG-063) | Charger status detect (WUU0_IN15; Sleep/Active) |
 | **`CHG_PGOOD_WAKE`**|`M10`| `P5_2`| `ALT0 - P5_2` | `RST` | Input | `U3./PGOOD` (BUG-060)| USB VBUS detect (VBAT_WAKEUP_b; exits Deep Power Down)|
-| **`M2_WAKE_N`** | `C13` | `P0_7` | `ALT0 - P0_7` | `MED` | Input | `J1.50` (BUG-060) | M.2 host wake detect (WUU0_IN1 / WAKEUP1_B) |
+| **`BLE_WAKE_N`** | `C13` | `P0_7` | `ALT0 - P0_7` | `MED` | Input | `U11.WAKE` (BUG-214, BUG-222) | BTLE host wake detect (WUU0_IN1 / WAKEUP1_B) |
 | **`PWR_EN_AUDIO`**| `L4`| `P1_22`| `ALT0 - P1_22` | `MED` | Output | `Q2.ON` (TPS22918) | Switched audio rail power gate (default-ON via 100k) |
 | **`PWR_EN_SENSORS`**|`L5`| `P1_21`| `ALT0 - P1_21` | `MED` | Output | `Q3.ON` (TPS22918) | Switched sensor rail power gate (default-ON via 100k)|
 | **`PWR_EN_DEBUG`**| `M4` | `P1_23`| `ALT0 - P1_23` | `MED` | Output | `Q4.ON` (TPS22918) | Switched debug rail power gate (default-ON via 100k) |
@@ -431,9 +434,9 @@ All engineering decisions, electrical characteristics, pinmux multiplexing, and 
 | **`U6`** | `LP5009RUKR` | Texas Instruments | WQFN-20 ($3	imes 3	ext{ mm}$) | [TI_LP5009_led_driver.pdf](datasheets/TI_LP5009_led_driver.pdf) | 9-channel $I^2C$ constant-current RGB LED driver with logarithmic dimming, autonomous breathing animation engine, 400kHz fast-mode. |
 | **`U7`** | `MAX17048G+T10` | Analog Devices / Maxim | TDFN-8 ($2	imes 2	ext{ mm}$) | Archived locally in `carrier_board/docs/datasheets/` | ModelGauge fuel gauge IC, 1-cell Li-Ion/LiPo, ultra-low $3\,\mu	ext{A}$ operating current, $I^2C$ telemetry. |
 | **`U9`** | `FT232RNQ-REEL` | FTDI Chip | QFN-32 ($5	imes 5	ext{ mm}$) | Archived locally in `carrier_board/docs/datasheets/` | High-speed USB 2.0 to UART serial converter IC, internal EEPROM, 3 Mbaud data rate, USB VBUS powered. |
-| **`U2`** | `CY8CMBR3116` | Infineon / Cypress | QFN-24 ($4	imes 4	ext{ mm}$) | Archived locally in `carrier_board/docs/datasheets/` | CapSense 16-channel capacitive touch sensing controller with SmartSense auto-tuning, $I^2C$ host interface. |
-| **`U4`** | `MAX98357AETE+` | Analog Devices / Maxim | TQFN-16 ($3	imes 3	ext{ mm}$) | Archived locally in `carrier_board/docs/datasheets/` | 3.2W Class-D audio amplifier with integrated digital PCM/I2S/PDM input stage, 92% efficiency. |
-| **`J5`–`J14`** | `SM0*B-SRSS-TB` | JST (Japan Solderless Terminals)| JST-SH $1.0	ext{ mm}$ pitch | [JST_SH_header.pdf](datasheets/JST_SH_header.pdf) | Ultra-compact 1.0mm pitch surface-mount side-entry headers (3-pin to 10-pin) for SWD, I3C, I2C, SPI, UART, and GPIO breakout. |
+| **`U2`** | `IQS7222A001QNR` | Azoteq | QFN-20 ($3\times 3\text{ mm}$, $0.4\text{ mm}$ pitch) | [Azoteq_IQS7222A_datasheet.pdf](datasheets/Azoteq_IQS7222A_datasheet.pdf) | ProxFusion capacitive sensing controller with dual internal LDOs (VREGD, VREGA), I2C host interface, RDY IRQ. |
+| **`U4`** | `MAX98357AETE+` | Analog Devices / Maxim | TQFN-16 ($3\times 3\text{ mm}$) | Archived locally in `carrier_board/docs/datasheets/` | 3.2W Class-D audio amplifier with integrated digital PCM/I2S/PDM input stage, 92% efficiency. |
+| **`J5`–`J14`** | `SM0*B-SRSS-TB` | JST (Japan Solderless Terminals)| JST-SH $1.0\text{ mm}$ pitch | [JST_SH_header.pdf](datasheets/JST_SH_header.pdf) | Ultra-compact 1.0mm pitch surface-mount side-entry headers (3-pin to 10-pin) for SWD, I3C, I2C, SPI, UART, and GPIO breakout. |
 
 ---
 
@@ -449,7 +452,7 @@ The test board carrier has a compact form factor of $60.0\text{ mm} \times 90.0\
    - **`U5` Piezo Sounder & `U4` Audio Amp**: Placed at $(-18.0, 31.0)$ and $(-18.0, 21.0)$, isolated from high-speed digital buses.
    - **`J_SWD` 10-Pin Header**: Placed at $(18.0, 35.0)$ for convenient top-side debugger cable routing.
 3. **Bottom Edge $(Y \in [-30, -45])$**:
-   - **`J1` M.2 Key-M Connector**: Placed at $(0.0, -36.0)$ facing South along the lower edge.
+   - **`U11` u-blox NINA-B312 BTLE Module & `J15` SWD Header**: Placed at $(0.0, -36.0)$ and $(-14.5, -41.0)$ facing South along the lower edge with $16.0\times 5.0\text{ mm}$ RF keepout at $(0.0, -42.0)$.
    - **`J_GPIO` 10-Pin Breakout Header**: Located along the bottom right $(18.0, -28.0)$.
 4. **Left Edge $(X \in [-30, -15])$**:
    - **`J3` USB-C Receptacle**: Centered at $(-25.0, 0.0)$ facing the left chassis edge.
@@ -457,7 +460,7 @@ The test board carrier has a compact form factor of $60.0\text{ mm} \times 90.0\
    - **`U_CHG` BQ24074 & `U_FUEL` MAX17048**: Located at $(-18.0, 8.0)$ near the USB power entry.
 5. **Right Edge $(X \in [15, 30])$**:
    - **`U_NAND` Winbond W25N01GV**: Placed at $(18.0, 0.0)$ right of the MCU for short, equal-length FlexSPI traces.
-   - **`U2` CY8CMBR3116 Touch Controller**: Placed on Bottom Layer (`B.Cu`) at $(18.0, -15.0)$ near flex tail return paths.
+   - **`U2` Azoteq IQS7222A Touch Controller**: Placed on Bottom Layer (`B.Cu`) at $(18.0, -15.0)$ near flex tail return paths.
    - **`J_I2C`, `J_I3C`, `J_SPI`, `J_UART` Peripheral Headers**: Arranged in an orderly vertical bus strip along the right perimeter $(X = 24.0, Y \in [-15, 20])$.
    - **`U_LED` Driver & RGB Status LED**: Located at $(22.0, 26.0)$ near the corner for maximum visibility through the top lid window.
 6. **Bottom Exterior Enclosure Shell (`BUG-060`)**:
