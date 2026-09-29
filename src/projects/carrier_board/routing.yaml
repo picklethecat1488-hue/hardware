@@ -4962,7 +4962,7 @@ traces:
   - 20.25
   - -5.25
   end_mm:
-  - 24.0
+  - 22.0
   - -5.25
   width_mm: 0.12
   layer: B.Cu
@@ -5016,7 +5016,7 @@ traces:
   - 20.75
   - -13.0
   end_mm:
-  - 23.25
+  - 20.5
   - -13.0
   width_mm: 0.12
   layer: B.Cu
@@ -5187,46 +5187,37 @@ traces:
   - 19.75
   - -13.5
   end_mm:
-  - 20.75
+  - 20.0
   - -13.5
   width_mm: 0.12
   layer: F.Cu
   net: CAP_RX0
 - start_mm:
-  - 20.75
+  - 20.0
   - -13.5
   end_mm:
-  - 23.25
-  - -13.5
+  - 20.0
+  - -22.5
   width_mm: 0.12
   layer: B.Cu
   net: CAP_RX0
 - start_mm:
-  - 23.25
-  - -13.5
-  end_mm:
-  - 23.25
-  - -15.0
-  width_mm: 0.12
-  layer: B.Cu
-  net: CAP_RX0
-- start_mm:
-  - 23.25
-  - -15.0
+  - 20.0
+  - -22.5
   end_mm:
   - 27.0
-  - -15.0
+  - -22.5
   width_mm: 0.12
   layer: B.Cu
   net: CAP_RX0
 - start_mm:
   - 27.0
-  - -15.0
+  - -22.5
   end_mm:
   - 27.0
   - -9.5
   width_mm: 0.12
-  layer: F.Cu
+  layer: B.Cu
   net: CAP_RX0
 - start_mm:
   - -27.5
@@ -6921,60 +6912,6 @@ traces:
   layer: F.Cu
   net: VBUS
 - start_mm:
-  - -24.8
-  - 10.0
-  end_mm:
-  - -24.75
-  - 9.75
-  width_mm: 0.12
-  layer: F.Cu
-  net: VBUS
-- start_mm:
-  - -24.75
-  - 9.75
-  end_mm:
-  - -24.75
-  - 5.5
-  width_mm: 0.12
-  layer: F.Cu
-  net: VBUS
-- start_mm:
-  - -24.75
-  - 5.5
-  end_mm:
-  - -26.5
-  - 5.5
-  width_mm: 0.12
-  layer: F.Cu
-  net: VBUS
-- start_mm:
-  - -26.5
-  - 5.5
-  end_mm:
-  - -26.5
-  - 2.5
-  width_mm: 0.12
-  layer: F.Cu
-  net: VBUS
-- start_mm:
-  - -26.5
-  - 2.5
-  end_mm:
-  - -27.25
-  - 2.5
-  width_mm: 0.12
-  layer: F.Cu
-  net: VBUS
-- start_mm:
-  - -27.25
-  - 2.5
-  end_mm:
-  - -27.5
-  - 2.4
-  width_mm: 0.12
-  layer: F.Cu
-  net: VBUS
-- start_mm:
   - -19.95
   - 8.7
   end_mm:
@@ -6982,7 +6919,7 @@ traces:
   - 9.0
   width_mm: 0.12
   layer: F.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -20.0
   - 9.0
@@ -6991,7 +6928,7 @@ traces:
   - 9.25
   width_mm: 0.12
   layer: F.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -20.0
   - 9.25
@@ -7000,7 +6937,7 @@ traces:
   - 9.25
   width_mm: 0.12
   layer: B.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -24.25
   - 9.25
@@ -7009,7 +6946,7 @@ traces:
   - 9.5
   width_mm: 0.12
   layer: B.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -24.25
   - 9.5
@@ -7018,7 +6955,7 @@ traces:
   - 10.0
   width_mm: 0.12
   layer: F.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -24.25
   - 10.0
@@ -7027,7 +6964,7 @@ traces:
   - 10.0
   width_mm: 0.12
   layer: F.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -18.05
   - 8.7
@@ -7036,7 +6973,7 @@ traces:
   - 9.0
   width_mm: 0.12
   layer: F.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -18.0
   - 9.0
@@ -7045,7 +6982,7 @@ traces:
   - 9.5
   width_mm: 0.12
   layer: F.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -18.0
   - 9.5
@@ -7054,7 +6991,7 @@ traces:
   - 9.5
   width_mm: 0.12
   layer: F.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -19.75
   - 9.5
@@ -7063,7 +7000,7 @@ traces:
   - 8.75
   width_mm: 0.12
   layer: F.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -19.75
   - 8.75
@@ -7072,7 +7009,7 @@ traces:
   - 8.7
   width_mm: 0.12
   layer: F.Cu
-  net: VBUS
+  net: VBUS_CHG
 - start_mm:
   - -24.0
   - 16.0
@@ -8701,16 +8638,7 @@ traces:
   - -31.25
   width_mm: 0.12
   layer: F.Cu
-  net: BOOT0
-- start_mm:
-  - -16.25
-  - -31.25
-  end_mm:
-  - -9.5
-  - -31.25
-  width_mm: 0.12
-  layer: B.Cu
-  net: BOOT0
+  net: FTDI_BOOT0
 - start_mm:
   - -9.5
   - -31.25
@@ -9418,126 +9346,36 @@ traces:
   - -39.25
   end_mm:
   - 16.5
-  - -31.25
+  - -30.54
   width_mm: 0.12
   layer: F.Cu
   net: CBUS2
 - start_mm:
   - 16.5
-  - -31.25
+  - -30.54
   end_mm:
-  - 17.0
-  - -31.25
+  - 22.25
+  - -30.54
   width_mm: 0.12
   layer: B.Cu
   net: CBUS2
 - start_mm:
-  - 17.0
-  - -31.25
+  - 22.25
+  - -30.54
   end_mm:
-  - 17.0
-  - -30.75
+  - 22.25
+  - -31.0
   width_mm: 0.12
   layer: B.Cu
   net: CBUS2
 - start_mm:
-  - 17.0
-  - -30.75
+  - 22.25
+  - -31.0
   end_mm:
-  - 17.5
-  - -30.75
+  - 24.5
+  - -31.0
   width_mm: 0.12
   layer: B.Cu
-  net: CBUS2
-- start_mm:
-  - 17.5
-  - -30.75
-  end_mm:
-  - 17.5
-  - -28.25
-  width_mm: 0.12
-  layer: B.Cu
-  net: CBUS2
-- start_mm:
-  - 17.5
-  - -28.25
-  end_mm:
-  - 17.75
-  - -28.25
-  width_mm: 0.12
-  layer: B.Cu
-  net: CBUS2
-- start_mm:
-  - 17.75
-  - -28.25
-  end_mm:
-  - 17.75
-  - -26.0
-  width_mm: 0.12
-  layer: B.Cu
-  net: CBUS2
-- start_mm:
-  - 17.75
-  - -26.0
-  end_mm:
-  - 18.0
-  - -26.0
-  width_mm: 0.12
-  layer: B.Cu
-  net: CBUS2
-- start_mm:
-  - 18.0
-  - -26.0
-  end_mm:
-  - 18.0
-  - -25.75
-  width_mm: 0.12
-  layer: B.Cu
-  net: CBUS2
-- start_mm:
-  - 18.0
-  - -25.75
-  end_mm:
-  - 18.25
-  - -25.75
-  width_mm: 0.12
-  layer: B.Cu
-  net: CBUS2
-- start_mm:
-  - 18.25
-  - -25.75
-  end_mm:
-  - 18.25
-  - -25.5
-  width_mm: 0.12
-  layer: B.Cu
-  net: CBUS2
-- start_mm:
-  - 18.25
-  - -25.5
-  end_mm:
-  - 23.25
-  - -25.5
-  width_mm: 0.12
-  layer: B.Cu
-  net: CBUS2
-- start_mm:
-  - 23.25
-  - -25.5
-  end_mm:
-  - 23.25
-  - -21.25
-  width_mm: 0.12
-  layer: F.Cu
-  net: CBUS2
-- start_mm:
-  - 23.25
-  - -21.25
-  end_mm:
-  - 24.25
-  - -21.25
-  width_mm: 0.12
-  layer: F.Cu
   net: CBUS2
 - start_mm:
   - -21.25
@@ -9651,17 +9489,26 @@ traces:
   - 17.0
   - -17.75
   end_mm:
-  - 19.25
+  - 23.4
   - -17.75
   width_mm: 0.12
   layer: F.Cu
   net: DCD_N
 - start_mm:
-  - 19.25
+  - 23.4
   - -17.75
   end_mm:
-  - 23.75
-  - -17.75
+  - 23.4
+  - -22.9
+  width_mm: 0.12
+  layer: F.Cu
+  net: DCD_N
+- start_mm:
+  - 23.4
+  - -22.9
+  end_mm:
+  - 23.4
+  - -27.0
   width_mm: 0.12
   layer: B.Cu
   net: DCD_N
@@ -9832,16 +9679,16 @@ traces:
   - -40.75
   end_mm:
   - 20.25
-  - -14.0
+  - -25.0
   width_mm: 0.12
   layer: F.Cu
   net: DSR_N
 - start_mm:
   - 20.25
-  - -14.0
+  - -25.0
   end_mm:
-  - 21.25
-  - -14.0
+  - 24.5
+  - -25.0
   width_mm: 0.12
   layer: F.Cu
   net: DSR_N
@@ -10368,15 +10215,6 @@ traces:
   layer: B.Cu
   net: PWR_EN
 - start_mm:
-  - -17.25
-  - 3.0
-  end_mm:
-  - -17.25
-  - 3.0
-  width_mm: 0.12
-  layer: B.Cu
-  net: PWR_EN
-- start_mm:
   - -19.95
   - -23.0
   end_mm:
@@ -10578,7 +10416,7 @@ traces:
   - 20.75
   - -9.5
   end_mm:
-  - 22.75
+  - 21.5
   - -9.5
   width_mm: 0.12
   layer: B.Cu
@@ -12198,7 +12036,7 @@ traces:
   - 19.0
   - 0.0
   end_mm:
-  - 24.5
+  - 23.5
   - 0.0
   width_mm: 0.12
   layer: F.Cu
@@ -12216,26 +12054,26 @@ traces:
   - 19.25
   - -1.0
   end_mm:
-  - 23.5
+  - 23.0
   - -1.0
   width_mm: 0.12
   layer: F.Cu
   net: SPI0_MISO
 - start_mm:
-  - 23.5
+  - 23.0
   - -1.0
   end_mm:
-  - 23.5
-  - -2.0
+  - 23.0
+  - -10.0
   width_mm: 0.12
   layer: F.Cu
   net: SPI0_MISO
 - start_mm:
-  - 23.5
-  - -2.0
+  - 23.0
+  - -10.0
   end_mm:
   - 24.5
-  - -2.0
+  - -10.0
   width_mm: 0.12
   layer: F.Cu
   net: SPI0_MISO
@@ -12243,53 +12081,53 @@ traces:
   - 21.0
   - -3.5
   end_mm:
-  - 21.0
-  - -4.0
+  - 22.5
+  - -3.5
   width_mm: 0.12
   layer: B.Cu
   net: SPI0_MOSI
 - start_mm:
-  - 21.0
-  - -4.0
+  - 22.5
+  - -3.5
   end_mm:
-  - 24.5
-  - -4.0
+  - 22.5
+  - -12.0
   width_mm: 0.12
   layer: B.Cu
   net: SPI0_MOSI
 - start_mm:
-  - 24.0
+  - 22.0
   - -5.25
   end_mm:
-  - 24.0
-  - -6.0
+  - 22.0
+  - -14.0
   width_mm: 0.12
   layer: B.Cu
   net: SPI0_SCK
 - start_mm:
-  - 24.0
-  - -6.0
+  - 22.0
+  - -14.0
   end_mm:
   - 24.5
-  - -6.0
+  - -14.0
   width_mm: 0.12
   layer: B.Cu
   net: SPI0_SCK
 - start_mm:
-  - 22.75
+  - 21.5
   - -9.5
   end_mm:
-  - 22.75
-  - -8.0
+  - 21.5
+  - -16.0
   width_mm: 0.12
   layer: B.Cu
   net: EXP_INT_SPI
 - start_mm:
-  - 22.75
-  - -8.0
+  - 21.5
+  - -16.0
   end_mm:
   - 24.5
-  - -8.0
+  - -16.0
   width_mm: 0.12
   layer: B.Cu
   net: EXP_INT_SPI
@@ -12298,79 +12136,52 @@ traces:
   - -10.75
   end_mm:
   - 22.0
-  - -13.5
+  - -17.0
   width_mm: 0.12
   layer: F.Cu
   net: CAP_RX2
 - start_mm:
   - 22.0
-  - -13.5
+  - -17.0
+  end_mm:
+  - 22.0
+  - -21.5
+  width_mm: 0.12
+  layer: B.Cu
+  net: CAP_RX2
+- start_mm:
+  - 22.0
+  - -21.5
   end_mm:
   - 26.0
-  - -13.5
+  - -21.5
   width_mm: 0.12
-  layer: F.Cu
+  layer: B.Cu
   net: CAP_RX2
 - start_mm:
   - 26.0
-  - -13.5
+  - -21.5
   end_mm:
   - 26.0
   - 8.0
   width_mm: 0.12
-  layer: F.Cu
+  layer: B.Cu
   net: CAP_RX2
 - start_mm:
-  - 23.25
-  - -13.0
-  end_mm:
   - 26.5
-  - -13.0
-  width_mm: 0.12
-  layer: B.Cu
-  net: CAP_RX1
-- start_mm:
-  - 26.5
-  - -13.0
+  - -22.0
   end_mm:
   - 26.5
   - 8.5
   width_mm: 0.12
-  layer: F.Cu
+  layer: B.Cu
   net: CAP_RX1
 - start_mm:
-  - 21.25
-  - -14.0
-  end_mm:
-  - 21.25
-  - -16.0
-  width_mm: 0.12
-  layer: F.Cu
-  net: DSR_N
-- start_mm:
-  - 21.25
-  - -16.0
+  - 23.4
+  - -27.0
   end_mm:
   - 24.5
-  - -16.0
-  width_mm: 0.12
-  layer: F.Cu
-  net: DSR_N
-- start_mm:
-  - 23.75
-  - -17.75
-  end_mm:
-  - 23.75
-  - -18.0
-  width_mm: 0.12
-  layer: B.Cu
-  net: DCD_N
-- start_mm:
-  - 23.75
-  - -18.0
-  end_mm:
-  - 24.5
-  - -18.0
+  - -27.0
   width_mm: 0.12
   layer: B.Cu
   net: DCD_N
@@ -12379,56 +12190,55 @@ traces:
   - -33.0
   end_mm:
   - 22.75
-  - -20.0
+  - -29.0
   width_mm: 0.12
   layer: F.Cu
   net: CBUS4
 - start_mm:
   - 22.75
-  - -20.0
+  - -29.0
   end_mm:
   - 24.5
-  - -20.0
+  - -29.0
   width_mm: 0.12
   layer: F.Cu
   net: CBUS4
 - start_mm:
-  - 24.25
-  - -21.25
-  end_mm:
-  - 24.25
-  - -22.0
-  width_mm: 0.12
-  layer: F.Cu
-  net: CBUS2
-- start_mm:
-  - 24.25
-  - -22.0
-  end_mm:
-  - 24.5
-  - -22.0
-  width_mm: 0.12
-  layer: F.Cu
-  net: CBUS2
-- start_mm:
   - 18.5
   - -23.0
   end_mm:
-  - 24.5
+  - 22.5
   - -23.0
   width_mm: 0.12
-  layer: B.Cu
+  layer: F.Cu
   net: DTR_N
 - start_mm:
-  - 24.5
+  - 22.5
   - -23.0
   end_mm:
-  - 24.5
-  - -24.0
+  - 22.5
+  - -23.5
   width_mm: 0.12
-  layer: B.Cu
+  layer: F.Cu
   net: DTR_N
-
+- start_mm:
+  - 22.5
+  - -23.5
+  end_mm:
+  - 25.5
+  - -23.5
+  width_mm: 0.12
+  layer: F.Cu
+  net: DTR_N
+- start_mm:
+  - 25.5
+  - -33.0
+  end_mm:
+  - 24.5
+  - -33.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: DTR_N
 - start_mm:
   - -17.55
   - -30.75
@@ -12437,10 +12247,10 @@ traces:
   - -30.75
   width_mm: 0.12
   layer: F.Cu
-  net: NRST
+  net: FTDI_NRST
 - start_mm:
   - -15.75
-  - -30.75
+  - -24.0
   end_mm:
   - -15.75
   - -5.75
@@ -12497,16 +12307,16 @@ traces:
   - 24.5
   end_mm:
   - 22.0
-  - 34.0
+  - 35.0
   width_mm: 0.12
   layer: F.Cu
   net: EXP_INT_I2C
 - start_mm:
   - 22.0
-  - 34.0
+  - 35.0
   end_mm:
   - 24.5
-  - 34.0
+  - 35.0
   width_mm: 0.12
   layer: F.Cu
   net: EXP_INT_I2C
@@ -12524,16 +12334,16 @@ traces:
   - 23.5
   end_mm:
   - 23.0
-  - 32.0
+  - 33.0
   width_mm: 0.12
   layer: F.Cu
   net: I2C2_SDA
 - start_mm:
   - 23.0
-  - 32.0
+  - 33.0
   end_mm:
   - 24.5
-  - 32.0
+  - 33.0
   width_mm: 0.12
   layer: F.Cu
   net: I2C2_SDA
@@ -12560,16 +12370,16 @@ traces:
   - 23.0
   end_mm:
   - 23.5
-  - 30.0
+  - 31.0
   width_mm: 0.12
   layer: F.Cu
   net: I2C2_SCL
 - start_mm:
   - 23.5
-  - 30.0
+  - 31.0
   end_mm:
   - 24.5
-  - 30.0
+  - 31.0
   width_mm: 0.12
   layer: F.Cu
   net: I2C2_SCL
@@ -12578,16 +12388,16 @@ traces:
   - 10.0
   end_mm:
   - 23.25
-  - 18.0
+  - 16.0
   width_mm: 0.12
   layer: B.Cu
   net: I3C0_SCL
 - start_mm:
   - 23.25
-  - 18.0
+  - 16.0
   end_mm:
   - 24.5
-  - 18.0
+  - 16.0
   width_mm: 0.12
   layer: B.Cu
   net: I3C0_SCL
@@ -12605,16 +12415,16 @@ traces:
   - 18.25
   end_mm:
   - 22.75
-  - 20.0
+  - 18.0
   width_mm: 0.12
   layer: F.Cu
   net: I3C0_SDA
 - start_mm:
   - 22.75
-  - 20.0
+  - 18.0
   end_mm:
   - 24.5
-  - 20.0
+  - 18.0
   width_mm: 0.12
   layer: F.Cu
   net: I3C0_SDA
@@ -12632,16 +12442,16 @@ traces:
   - 10.5
   end_mm:
   - 22.25
-  - 22.0
+  - 20.0
   width_mm: 0.12
   layer: F.Cu
   net: EXP_INT_I3C
 - start_mm:
   - 22.25
-  - 22.0
+  - 20.0
   end_mm:
   - 24.5
-  - 22.0
+  - 20.0
   width_mm: 0.12
   layer: F.Cu
   net: EXP_INT_I3C
@@ -12659,16 +12469,16 @@ traces:
   - 4.25
   end_mm:
   - 23.5
-  - 6.0
+  - 1.0
   width_mm: 0.12
   layer: F.Cu
   net: I3C1_SCL
 - start_mm:
   - 23.5
-  - 6.0
+  - 1.0
   end_mm:
   - 24.5
-  - 6.0
+  - 1.0
   width_mm: 0.12
   layer: F.Cu
   net: I3C1_SCL
@@ -12677,16 +12487,16 @@ traces:
   - 5.0
   end_mm:
   - 23.25
-  - 8.0
+  - 3.0
   width_mm: 0.12
   layer: B.Cu
   net: I3C1_SDA
 - start_mm:
   - 23.25
-  - 8.0
+  - 3.0
   end_mm:
   - 24.5
-  - 8.0
+  - 3.0
   width_mm: 0.12
   layer: B.Cu
   net: I3C1_SDA
@@ -12704,16 +12514,16 @@ traces:
   - 7.25
   end_mm:
   - 22.5
-  - 10.0
+  - 5.0
   width_mm: 0.12
   layer: F.Cu
   net: EXP_INT_I3C1
 - start_mm:
   - 22.5
-  - 10.0
+  - 5.0
   end_mm:
   - 24.5
-  - 10.0
+  - 5.0
   width_mm: 0.12
   layer: F.Cu
   net: EXP_INT_I3C1
@@ -12731,133 +12541,115 @@ traces:
   - 26.25
   end_mm:
   - 21.5
-  - 36.0
+  - 37.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 21.5
-  - 36.0
+  - 37.0
   end_mm:
   - 24.5
-  - 36.0
+  - 37.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 24.5
-  - 36.0
+  - 37.0
   end_mm:
   - 25.75
-  - 36.0
+  - 37.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 25.75
-  - 36.0
+  - 37.0
   end_mm:
   - 25.75
-  - 24.0
+  - 22.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 25.75
-  - 24.0
+  - 22.0
   end_mm:
   - 24.5
-  - 24.0
+  - 22.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 25.75
-  - 24.0
+  - 22.0
   end_mm:
   - 25.75
-  - 12.0
+  - 7.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 25.75
-  - 12.0
+  - 7.0
   end_mm:
   - 24.5
-  - 12.0
+  - 7.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 25.75
-  - 12.0
+  - 7.0
   end_mm:
   - 25.75
-  - 11.0
+  - 6.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 25.75
-  - 11.0
-  end_mm:
-  - 27.0
-  - 11.0
-  width_mm: 0.12
-  layer: F.Cu
-  net: PERIPH_3V3
-- start_mm:
-  - 27.0
-  - 11.0
-  end_mm:
-  - 27.0
-  - -9.0
-  width_mm: 0.12
-  layer: F.Cu
-  net: PERIPH_3V3
-- start_mm:
-  - 27.0
-  - -9.0
+  - 6.0
   end_mm:
   - 27.5
-  - -9.0
+  - 6.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 27.5
-  - -9.0
+  - 6.0
   end_mm:
   - 27.5
-  - -10.0
+  - -18.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 27.5
-  - -10.0
+  - -18.0
   end_mm:
   - 24.5
-  - -10.0
-  width_mm: 0.12
-  layer: B.Cu
-  net: PERIPH_3V3
-- start_mm:
-  - 27.5
-  - -10.0
-  end_mm:
-  - 27.5
-  - -26.0
+  - -18.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
 - start_mm:
   - 27.5
-  - -26.0
+  - -18.0
+  end_mm:
+  - 27.5
+  - -35.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 27.5
+  - -35.0
   end_mm:
   - 24.5
-  - -26.0
+  - -35.0
   width_mm: 0.12
   layer: F.Cu
   net: PERIPH_3V3
@@ -12866,22 +12658,22 @@ traces:
   - 8.5
   end_mm:
   - 26.5
-  - 37.0
+  - 25.5
   width_mm: 0.12
   layer: B.Cu
   net: CAP_RX1
 - start_mm:
-  - 26.5
-  - 37.0
+  - 9.75
+  - 36.95
   end_mm:
   - 9.75
-  - 37.0
+  - 33.5
   width_mm: 0.12
   layer: F.Cu
   net: CAP_RX1
 - start_mm:
   - 9.75
-  - 37.0
+  - 36.95
   end_mm:
   - 9.75
   - 33.5
@@ -12896,12 +12688,12 @@ traces:
   - -9.5
   end_mm:
   - 27.0
-  - 38.0
+  - 26.0
 - net: CAP_RX0
   layer: B.Cu
   width_mm: 0.12
   start_mm:
-  - 27.0
+  - 23.0
   - 38.0
   end_mm:
   - 22.0
@@ -12941,25 +12733,1807 @@ traces:
   - 8.0
   end_mm:
   - 26.0
-  - 37.5
+  - 25.0
 - net: CAP_RX2
   layer: B.Cu
   width_mm: 0.12
   start_mm:
-  - 26.0
-  - 37.5
+  - 22.0
+  - 36.5
   end_mm:
   - 9.25
-  - 37.5
+  - 36.5
 - net: CAP_RX2
   layer: B.Cu
   width_mm: 0.12
   start_mm:
   - 9.25
-  - 37.5
+  - 36.5
   end_mm:
   - 9.25
   - 35.5
+- start_mm:
+  - 26.0
+  - 25.0
+  end_mm:
+  - 22.0
+  - 25.0
+  width_mm: 0.12
+  layer: B.Cu
+  net: CAP_RX2
+- start_mm:
+  - 22.0
+  - 25.0
+  end_mm:
+  - 22.0
+  - 36.5
+  width_mm: 0.12
+  layer: B.Cu
+  net: CAP_RX2
+- start_mm:
+  - 26.5
+  - 25.5
+  end_mm:
+  - 22.5
+  - 25.5
+  width_mm: 0.12
+  layer: B.Cu
+  net: CAP_RX1
+- start_mm:
+  - 22.5
+  - 25.5
+  end_mm:
+  - 22.5
+  - 36.95
+  width_mm: 0.12
+  layer: B.Cu
+  net: CAP_RX1
+- start_mm:
+  - 22.5
+  - 36.95
+  end_mm:
+  - 9.75
+  - 36.95
+  width_mm: 0.12
+  layer: B.Cu
+  net: CAP_RX1
+- start_mm:
+  - 27.0
+  - 26.0
+  end_mm:
+  - 23.0
+  - 26.0
+  width_mm: 0.12
+  layer: B.Cu
+  net: CAP_RX0
+- start_mm:
+  - 23.0
+  - 26.0
+  end_mm:
+  - 23.0
+  - 38.0
+  width_mm: 0.12
+  layer: B.Cu
+  net: CAP_RX0
+- start_mm:
+  - 23.5
+  - 0.0
+  end_mm:
+  - 23.5
+  - -8.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: SPI0_CS_N
+- start_mm:
+  - 23.5
+  - -8.0
+  end_mm:
+  - 24.5
+  - -8.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: SPI0_CS_N
+- start_mm:
+  - 22.5
+  - -12.0
+  end_mm:
+  - 24.5
+  - -12.0
+  width_mm: 0.12
+  layer: B.Cu
+  net: SPI0_MOSI
+- start_mm:
+  - 20.5
+  - -13.0
+  end_mm:
+  - 20.5
+  - -22.0
+  width_mm: 0.12
+  layer: B.Cu
+  net: CAP_RX1
+- start_mm:
+  - 20.5
+  - -22.0
+  end_mm:
+  - 26.5
+  - -22.0
+  width_mm: 0.12
+  layer: B.Cu
+  net: CAP_RX1
+- start_mm:
+  - 25.5
+  - -23.5
+  end_mm:
+  - 25.5
+  - -33.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: DTR_N
+- start_mm:
+  - 12.65
+  - -18.0
+  end_mm:
+  - 13.4
+  - -18.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: GND
+- start_mm:
+  - 4.8
+  - -20.0
+  end_mm:
+  - 6.0
+  - -20.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: LED_MCU_K
+- start_mm:
+  - 7.0
+  - -20.0
+  end_mm:
+  - 7.6
+  - -19.2
+  width_mm: 0.15
+  layer: F.Cu
+  net: GND
+- start_mm:
+  - 4.8
+  - -22.0
+  end_mm:
+  - 6.0
+  - -22.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: LED_PERIPH_K
+- start_mm:
+  - 7.0
+  - -22.0
+  end_mm:
+  - 7.6
+  - -22.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: GND
+- start_mm:
+  - 4.8
+  - -24.0
+  end_mm:
+  - 6.0
+  - -24.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: LED_AUD_K
+- start_mm:
+  - 7.0
+  - -24.0
+  end_mm:
+  - 7.6
+  - -24.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: GND
+- start_mm:
+  - 4.8
+  - -26.0
+  end_mm:
+  - 6.0
+  - -26.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: LED_3V3_K
+- start_mm:
+  - 7.0
+  - -26.0
+  end_mm:
+  - 7.6
+  - -26.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: GND
+- start_mm:
+  - 4.8
+  - -28.0
+  end_mm:
+  - 6.0
+  - -28.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: LED_VBUS_K
+- start_mm:
+  - 7.0
+  - -28.0
+  end_mm:
+  - 7.6
+  - -28.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: GND
+- start_mm:
+  - 4.8
+  - -30.0
+  end_mm:
+  - 6.0
+  - -30.0
+  width_mm: 0.12
+  layer: F.Cu
+  net: LED_VBAT_K
+- start_mm:
+  - 7.0
+  - -30.0
+  end_mm:
+  - 7.6
+  - -30.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: GND
+- start_mm:
+  - 13.0
+  - -21.73
+  end_mm:
+  - 13.8
+  - -21.73
+  width_mm: 0.15
+  layer: F.Cu
+  net: 3V3
+- start_mm:
+  - 3.2
+  - -26.0
+  end_mm:
+  - 2.4
+  - -26.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: 3V3
+- start_mm:
+  - 9.85
+  - -18.0
+  end_mm:
+  - 10.75
+  - -18.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: NRST
+- start_mm:
+  - 10.75
+  - -18.0
+  end_mm:
+  - 10.75
+  - -23.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: NRST
+- start_mm:
+  - 10.75
+  - -23.0
+  end_mm:
+  - 9.5
+  - -23.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: NRST
+- start_mm:
+  - 9.5
+  - -23.0
+  end_mm:
+  - 9.5
+  - -24.27
+  width_mm: 0.15
+  layer: F.Cu
+  net: NRST
+- start_mm:
+  - 9.5
+  - -29.77
+  end_mm:
+  - 9.75
+  - -29.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - 9.75
+  - -29.75
+  end_mm:
+  - 11.75
+  - -29.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - 11.75
+  - -29.75
+  end_mm:
+  - 11.75
+  - -26.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - 11.75
+  - -26.0
+  end_mm:
+  - 13.0
+  - -26.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - 13.0
+  - -26.0
+  end_mm:
+  - 13.0
+  - -24.27
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - -15.75
+  - -24.0
+  end_mm:
+  - -16.25
+  - -24.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: NRST
+- start_mm:
+  - -16.25
+  - -24.0
+  end_mm:
+  - -16.25
+  - -22.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: NRST
+- start_mm:
+  - -16.25
+  - -22.5
+  end_mm:
+  - -16.5
+  - -22.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: NRST
+- start_mm:
+  - -16.5
+  - -22.5
+  end_mm:
+  - -16.5
+  - -19.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: NRST
+- start_mm:
+  - -16.5
+  - -19.0
+  end_mm:
+  - 7.0
+  - -19.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: NRST
+- start_mm:
+  - 7.0
+  - -19.0
+  end_mm:
+  - 7.0
+  - -18.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: NRST
+- start_mm:
+  - 7.0
+  - -18.75
+  end_mm:
+  - 9.75
+  - -18.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: NRST
+- start_mm:
+  - 9.75
+  - -18.75
+  end_mm:
+  - 9.75
+  - -18.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: NRST
+- start_mm:
+  - 9.75
+  - -18.25
+  end_mm:
+  - 9.85
+  - -18.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: NRST
+- start_mm:
+  - -15.75
+  - -30.75
+  end_mm:
+  - -16.25
+  - -30.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -16.25
+  - -30.75
+  end_mm:
+  - -16.25
+  - -30.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -16.25
+  - -30.0
+  end_mm:
+  - -10.0
+  - -30.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -10.0
+  - -30.0
+  end_mm:
+  - -10.0
+  - -31.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -10.0
+  - -31.75
+  end_mm:
+  - -9.75
+  - -31.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -9.75
+  - -31.75
+  end_mm:
+  - -9.75
+  - -33.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -9.75
+  - -33.0
+  end_mm:
+  - -7.0
+  - -33.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -7.0
+  - -33.0
+  end_mm:
+  - -7.0
+  - -37.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -7.0
+  - -37.0
+  end_mm:
+  - -5.5
+  - -37.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -5.5
+  - -37.0
+  end_mm:
+  - -5.5
+  - -37.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -5.5
+  - -37.5
+  end_mm:
+  - 7.0
+  - -37.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - 7.0
+  - -37.5
+  end_mm:
+  - 7.0
+  - -35.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - 7.0
+  - -35.0
+  end_mm:
+  - 7.5
+  - -35.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - 7.5
+  - -35.0
+  end_mm:
+  - 7.5
+  - -34.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - 7.5
+  - -34.0
+  end_mm:
+  - 8.25
+  - -34.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - 8.25
+  - -34.0
+  end_mm:
+  - 8.25
+  - -23.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - 8.25
+  - -23.0
+  end_mm:
+  - 9.0
+  - -23.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - 9.0
+  - -23.0
+  end_mm:
+  - 9.0
+  - -22.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - 9.0
+  - -22.5
+  end_mm:
+  - 9.5
+  - -22.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - 9.5
+  - -22.5
+  end_mm:
+  - 9.5
+  - -21.73
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_NRST
+- start_mm:
+  - -16.25
+  - -31.25
+  end_mm:
+  - -10.5
+  - -31.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - -10.5
+  - -31.25
+  end_mm:
+  - -10.5
+  - -32.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - -10.5
+  - -32.25
+  end_mm:
+  - -10.25
+  - -32.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - -10.25
+  - -32.25
+  end_mm:
+  - -10.25
+  - -33.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - -10.25
+  - -33.5
+  end_mm:
+  - -9.75
+  - -33.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - -9.75
+  - -33.5
+  end_mm:
+  - -7.5
+  - -33.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - -7.5
+  - -33.5
+  end_mm:
+  - -1.75
+  - -33.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - -1.75
+  - -33.5
+  end_mm:
+  - 7.75
+  - -33.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - 7.75
+  - -33.5
+  end_mm:
+  - 7.75
+  - -31.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - 7.75
+  - -31.0
+  end_mm:
+  - 8.25
+  - -31.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - 8.25
+  - -31.0
+  end_mm:
+  - 8.25
+  - -28.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - 8.25
+  - -28.5
+  end_mm:
+  - 9.5
+  - -28.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - 9.5
+  - -28.5
+  end_mm:
+  - 9.5
+  - -27.23
+  width_mm: 0.15
+  layer: B.Cu
+  net: FTDI_BOOT0
+- start_mm:
+  - -9.5
+  - -31.25
+  end_mm:
+  - -9.5
+  - -29.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: BOOT0
+- start_mm:
+  - -9.5
+  - -29.5
+  end_mm:
+  - -11.75
+  - -29.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: BOOT0
+- start_mm:
+  - -11.75
+  - -29.5
+  end_mm:
+  - -11.5
+  - -29.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - -11.5
+  - -29.5
+  end_mm:
+  - -11.5
+  - -37.25
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - -11.5
+  - -37.25
+  end_mm:
+  - -7.5
+  - -37.25
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - -7.5
+  - -37.25
+  end_mm:
+  - -7.5
+  - -37.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - -7.5
+  - -37.5
+  end_mm:
+  - -6.0
+  - -37.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - -6.0
+  - -37.5
+  end_mm:
+  - -6.0
+  - -38.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - -6.0
+  - -38.0
+  end_mm:
+  - 9.5
+  - -38.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - 9.5
+  - -38.0
+  end_mm:
+  - 9.5
+  - -29.77
+  width_mm: 0.15
+  layer: F.Cu
+  net: BOOT0
+- start_mm:
+  - -14.0
+  - -26.0
+  end_mm:
+  - -11.0
+  - -26.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS
+- start_mm:
+  - -11.0
+  - -26.0
+  end_mm:
+  - -11.0
+  - -18.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS
+- start_mm:
+  - -11.0
+  - -18.5
+  end_mm:
+  - 6.5
+  - -18.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 6.5
+  - -18.5
+  end_mm:
+  - 6.5
+  - -18.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 6.5
+  - -18.25
+  end_mm:
+  - 9.25
+  - -18.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 9.25
+  - -18.25
+  end_mm:
+  - 9.25
+  - -17.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 9.25
+  - -17.75
+  end_mm:
+  - 12.75
+  - -17.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 12.75
+  - -17.75
+  end_mm:
+  - 12.75
+  - -18.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 12.75
+  - -18.25
+  end_mm:
+  - 13.0
+  - -18.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 13.0
+  - -18.25
+  end_mm:
+  - 13.0
+  - -18.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 13.0
+  - -18.5
+  end_mm:
+  - 14.25
+  - -18.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 14.25
+  - -18.5
+  end_mm:
+  - 14.25
+  - -19.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 14.25
+  - -19.0
+  end_mm:
+  - 14.25
+  - -25.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS
+- start_mm:
+  - 14.25
+  - -25.5
+  end_mm:
+  - 13.5
+  - -25.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS
+- start_mm:
+  - 13.5
+  - -25.5
+  end_mm:
+  - 13.5
+  - -26.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS
+- start_mm:
+  - 13.5
+  - -26.5
+  end_mm:
+  - 13.0
+  - -26.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS
+- start_mm:
+  - 13.0
+  - -26.5
+  end_mm:
+  - 13.0
+  - -27.23
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS
+- start_mm:
+  - 13.0
+  - -27.23
+  end_mm:
+  - 12.75
+  - -27.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 12.75
+  - -27.25
+  end_mm:
+  - 10.75
+  - -27.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 10.75
+  - -27.25
+  end_mm:
+  - 10.75
+  - -26.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 10.75
+  - -26.0
+  end_mm:
+  - 8.25
+  - -26.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 8.25
+  - -26.0
+  end_mm:
+  - 8.25
+  - -26.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 8.25
+  - -26.25
+  end_mm:
+  - 8.0
+  - -26.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 8.0
+  - -26.25
+  end_mm:
+  - 8.0
+  - -26.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 8.0
+  - -26.5
+  end_mm:
+  - 3.25
+  - -26.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 3.25
+  - -26.5
+  end_mm:
+  - 3.25
+  - -27.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS
+- start_mm:
+  - 3.25
+  - -27.75
+  end_mm:
+  - 3.2
+  - -28.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS
+- start_mm:
+  - -20.0
+  - 9.25
+  end_mm:
+  - -20.0
+  - 8.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - -20.0
+  - 8.25
+  end_mm:
+  - -20.0
+  - 0.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS_CHG
+- start_mm:
+  - -20.0
+  - 0.0
+  end_mm:
+  - -20.25
+  - 0.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS_CHG
+- start_mm:
+  - -20.25
+  - 0.0
+  end_mm:
+  - -20.25
+  - -3.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS_CHG
+- start_mm:
+  - -20.25
+  - -3.5
+  end_mm:
+  - -19.5
+  - -3.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - -19.5
+  - -3.5
+  end_mm:
+  - -19.5
+  - -18.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - -19.5
+  - -18.25
+  end_mm:
+  - -11.5
+  - -18.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - -11.5
+  - -18.25
+  end_mm:
+  - -11.5
+  - -18.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - -11.5
+  - -18.0
+  end_mm:
+  - 6.0
+  - -18.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - 6.0
+  - -18.0
+  end_mm:
+  - 6.0
+  - -17.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - 6.0
+  - -17.75
+  end_mm:
+  - 8.75
+  - -17.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - 8.75
+  - -17.75
+  end_mm:
+  - 8.75
+  - -17.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - 8.75
+  - -17.25
+  end_mm:
+  - 11.25
+  - -17.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - 11.25
+  - -17.25
+  end_mm:
+  - 11.25
+  - -27.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBUS_CHG
+- start_mm:
+  - 11.25
+  - -27.75
+  end_mm:
+  - 11.75
+  - -27.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - 11.75
+  - -27.75
+  end_mm:
+  - 11.75
+  - -28.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - 11.75
+  - -28.5
+  end_mm:
+  - 13.0
+  - -28.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - 13.0
+  - -28.5
+  end_mm:
+  - 13.0
+  - -29.77
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBUS_CHG
+- start_mm:
+  - -18.0
+  - -26.0
+  end_mm:
+  - -17.25
+  - -26.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - -17.25
+  - -26.0
+  end_mm:
+  - -17.25
+  - -22.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - -17.25
+  - -22.5
+  end_mm:
+  - -17.0
+  - -22.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - -17.0
+  - -22.5
+  end_mm:
+  - -17.0
+  - -18.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - -17.0
+  - -18.5
+  end_mm:
+  - -16.5
+  - -18.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - -16.5
+  - -18.5
+  end_mm:
+  - -16.5
+  - -17.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - -16.5
+  - -17.75
+  end_mm:
+  - -12.0
+  - -17.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBAT
+- start_mm:
+  - -12.0
+  - -17.75
+  end_mm:
+  - -12.0
+  - -17.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBAT
+- start_mm:
+  - -12.0
+  - -17.5
+  end_mm:
+  - 1.75
+  - -17.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: VBAT
+- start_mm:
+  - 1.75
+  - -17.5
+  end_mm:
+  - 1.75
+  - -26.25
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - 1.75
+  - -26.25
+  end_mm:
+  - 2.0
+  - -26.25
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - 2.0
+  - -26.25
+  end_mm:
+  - 2.0
+  - -26.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - 2.0
+  - -26.5
+  end_mm:
+  - 2.5
+  - -26.5
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - 2.5
+  - -26.5
+  end_mm:
+  - 2.5
+  - -28.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - 2.5
+  - -28.75
+  end_mm:
+  - 3.25
+  - -28.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - 3.25
+  - -28.75
+  end_mm:
+  - 3.25
+  - -29.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - 3.25
+  - -29.75
+  end_mm:
+  - 3.2
+  - -30.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: VBAT
+- start_mm:
+  - -18.25
+  - 0.0
+  end_mm:
+  - -17.75
+  - 0.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -17.75
+  - 0.0
+  end_mm:
+  - -17.75
+  - -0.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -17.75
+  - -0.5
+  end_mm:
+  - -15.75
+  - -0.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -15.75
+  - -0.5
+  end_mm:
+  - -15.75
+  - -0.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -15.75
+  - -0.75
+  end_mm:
+  - -15.5
+  - -0.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -15.5
+  - -0.75
+  end_mm:
+  - -15.5
+  - -3.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -15.5
+  - -3.75
+  end_mm:
+  - -15.5
+  - -5.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -15.5
+  - -5.75
+  end_mm:
+  - -11.0
+  - -5.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -11.0
+  - -5.75
+  end_mm:
+  - -11.0
+  - -6.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -11.0
+  - -6.0
+  end_mm:
+  - -9.75
+  - -6.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -9.75
+  - -6.0
+  end_mm:
+  - -9.75
+  - -7.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -9.75
+  - -7.75
+  end_mm:
+  - -9.5
+  - -7.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -9.5
+  - -7.75
+  end_mm:
+  - -9.5
+  - -9.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -9.5
+  - -9.0
+  end_mm:
+  - -8.5
+  - -9.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -8.5
+  - -9.0
+  end_mm:
+  - -8.5
+  - -12.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -8.5
+  - -12.5
+  end_mm:
+  - -8.0
+  - -12.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -8.0
+  - -12.5
+  end_mm:
+  - -8.0
+  - -15.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -8.0
+  - -15.0
+  end_mm:
+  - -1.5
+  - -15.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -1.5
+  - -15.0
+  end_mm:
+  - -1.5
+  - -15.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -1.5
+  - -15.5
+  end_mm:
+  - 2.5
+  - -15.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - 2.5
+  - -15.5
+  end_mm:
+  - 2.5
+  - -17.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: AUDIO_EN
+- start_mm:
+  - 2.5
+  - -17.5
+  end_mm:
+  - 2.5
+  - -22.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: AUDIO_EN
+- start_mm:
+  - 2.5
+  - -22.75
+  end_mm:
+  - 3.25
+  - -22.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: AUDIO_EN
+- start_mm:
+  - 3.25
+  - -22.75
+  end_mm:
+  - 3.25
+  - -23.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: AUDIO_EN
+- start_mm:
+  - 3.25
+  - -23.75
+  end_mm:
+  - 3.2
+  - -24.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: AUDIO_EN
+- start_mm:
+  - -21.5
+  - -23.0
+  end_mm:
+  - -19.0
+  - -23.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: PWR_EN
+- start_mm:
+  - -19.0
+  - -23.0
+  end_mm:
+  - -19.0
+  - -23.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: PWR_EN
+- start_mm:
+  - -19.0
+  - -23.75
+  end_mm:
+  - -11.5
+  - -23.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: PWR_EN
+- start_mm:
+  - -11.5
+  - -23.75
+  end_mm:
+  - -11.5
+  - -21.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: PWR_EN
+- start_mm:
+  - -11.5
+  - -21.75
+  end_mm:
+  - -11.5
+  - -18.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: PWR_EN
+- start_mm:
+  - -11.5
+  - -18.0
+  end_mm:
+  - -11.0
+  - -18.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: PWR_EN
+- start_mm:
+  - -11.0
+  - -18.0
+  end_mm:
+  - -11.0
+  - -17.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: PWR_EN
+- start_mm:
+  - -11.0
+  - -17.0
+  end_mm:
+  - 2.0
+  - -17.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: PWR_EN
+- start_mm:
+  - 2.0
+  - -17.0
+  end_mm:
+  - 3.25
+  - -17.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: PWR_EN
+- start_mm:
+  - 3.25
+  - -17.0
+  end_mm:
+  - 3.25
+  - -19.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: PWR_EN
+- start_mm:
+  - 3.25
+  - -19.75
+  end_mm:
+  - 3.2
+  - -20.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: PWR_EN
+- start_mm:
+  - 27.5
+  - -35.0
+  end_mm:
+  - 21.0
+  - -35.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 21.0
+  - -35.0
+  end_mm:
+  - 21.0
+  - -29.75
+  width_mm: 0.15
+  layer: F.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 21.0
+  - -29.75
+  end_mm:
+  - 20.25
+  - -29.75
+  width_mm: 0.15
+  layer: B.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 20.25
+  - -29.75
+  end_mm:
+  - 20.25
+  - -28.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 20.25
+  - -28.0
+  end_mm:
+  - 14.25
+  - -28.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 14.25
+  - -28.0
+  end_mm:
+  - 14.25
+  - -26.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 14.25
+  - -26.0
+  end_mm:
+  - 11.25
+  - -26.0
+  width_mm: 0.15
+  layer: B.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 11.25
+  - -26.0
+  end_mm:
+  - 11.25
+  - -25.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 11.25
+  - -25.5
+  end_mm:
+  - 3.25
+  - -25.5
+  width_mm: 0.15
+  layer: B.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 3.25
+  - -25.5
+  end_mm:
+  - 3.25
+  - -22.25
+  width_mm: 0.15
+  layer: B.Cu
+  net: PERIPH_3V3
+- start_mm:
+  - 3.25
+  - -22.25
+  end_mm:
+  - 3.2
+  - -22.0
+  width_mm: 0.15
+  layer: F.Cu
+  net: PERIPH_3V3
 vias:
 - position_mm:
   - 0.0
@@ -14458,8 +16032,8 @@ vias:
   layer_end: B.Cu
   net: CAP_RX2
 - position_mm:
-  - 26.0
-  - 8.0
+  - 22.0
+  - -17.0
   drill_diameter_mm: 0.16
   pad_diameter_mm: 0.36
   layer_start: F.Cu
@@ -14562,14 +16136,6 @@ vias:
   layer_end: B.Cu
   net: CAP_RX1
 - position_mm:
-  - 26.5
-  - 8.5
-  drill_diameter_mm: 0.16
-  pad_diameter_mm: 0.36
-  layer_start: F.Cu
-  layer_end: B.Cu
-  net: CAP_RX1
-- position_mm:
   - 6.25
   - 36.25
   drill_diameter_mm: 0.16
@@ -14610,24 +16176,8 @@ vias:
   layer_end: B.Cu
   net: CAP_RX0
 - position_mm:
-  - 20.75
+  - 20.0
   - -13.5
-  drill_diameter_mm: 0.16
-  pad_diameter_mm: 0.36
-  layer_start: F.Cu
-  layer_end: B.Cu
-  net: CAP_RX0
-- position_mm:
-  - 27.0
-  - -15.0
-  drill_diameter_mm: 0.16
-  pad_diameter_mm: 0.36
-  layer_start: F.Cu
-  layer_end: B.Cu
-  net: CAP_RX0
-- position_mm:
-  - 27.0
-  - -9.5
   drill_diameter_mm: 0.16
   pad_diameter_mm: 0.36
   layer_start: F.Cu
@@ -15016,7 +16566,7 @@ vias:
   pad_diameter_mm: 0.36
   layer_start: F.Cu
   layer_end: B.Cu
-  net: VBUS
+  net: VBUS_CHG
 - position_mm:
   - -24.25
   - 9.5
@@ -15024,7 +16574,7 @@ vias:
   pad_diameter_mm: 0.36
   layer_start: F.Cu
   layer_end: B.Cu
-  net: VBUS
+  net: VBUS_CHG
 - position_mm:
   - -18.75
   - 11.25
@@ -15416,7 +16966,7 @@ vias:
   pad_diameter_mm: 0.36
   layer_start: F.Cu
   layer_end: B.Cu
-  net: BOOT0
+  net: FTDI_BOOT0
 - position_mm:
   - -9.5
   - -31.25
@@ -15611,15 +17161,7 @@ vias:
   net: CBUS2
 - position_mm:
   - 16.5
-  - -31.25
-  drill_diameter_mm: 0.16
-  pad_diameter_mm: 0.36
-  layer_start: F.Cu
-  layer_end: B.Cu
-  net: CBUS2
-- position_mm:
-  - 23.25
-  - -25.5
+  - -30.54
   drill_diameter_mm: 0.16
   pad_diameter_mm: 0.36
   layer_start: F.Cu
@@ -15642,8 +17184,8 @@ vias:
   layer_end: B.Cu
   net: DCD_N
 - position_mm:
-  - 19.25
-  - -17.75
+  - 23.4
+  - -22.9
   drill_diameter_mm: 0.16
   pad_diameter_mm: 0.36
   layer_start: F.Cu
@@ -15753,7 +17295,6 @@ vias:
   layer_start: F.Cu
   layer_end: B.Cu
   net: GND
-
 - position_mm:
   - -7.0
   - -20.5
@@ -15979,22 +17520,6 @@ vias:
   layer_end: B.Cu
   net: GND
 - position_mm:
-  - 27.5
-  - -10.0
-  drill_diameter_mm: 0.16
-  pad_diameter_mm: 0.36
-  layer_start: F.Cu
-  layer_end: B.Cu
-  net: PERIPH_3V3
-- position_mm:
-  - 26.5
-  - -13.0
-  drill_diameter_mm: 0.16
-  pad_diameter_mm: 0.36
-  layer_start: F.Cu
-  layer_end: B.Cu
-  net: CAP_RX1
-- position_mm:
   - -14.5
   - 6.75
   drill_diameter_mm: 0.16
@@ -16043,8 +17568,8 @@ vias:
   layer_end: B.Cu
   net: EXP_INT_I3C
 - position_mm:
-  - 26.5
-  - 37.0
+  - 9.75
+  - 36.95
   drill_diameter_mm: 0.16
   pad_diameter_mm: 0.36
   layer_start: F.Cu
@@ -16066,3 +17591,305 @@ vias:
   layer_start: F.Cu
   layer_end: B.Cu
   net: EXP_INT_I3C1
+- position_mm:
+  - 18.5
+  - -23.0
+  pad_diameter_mm: 0.6
+  drill_diameter_mm: 0.3
+  net: DTR_N
+- position_mm:
+  - 13.4
+  - -18.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: GND
+- position_mm:
+  - 7.6
+  - -19.2
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: GND
+- position_mm:
+  - 7.6
+  - -22.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: GND
+- position_mm:
+  - 7.6
+  - -24.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: GND
+- position_mm:
+  - 7.6
+  - -26.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: GND
+- position_mm:
+  - 7.6
+  - -28.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: GND
+- position_mm:
+  - 7.6
+  - -30.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: GND
+- position_mm:
+  - 13.8
+  - -21.73
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: 3V3
+- position_mm:
+  - 2.4
+  - -26.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: 3V3
+- position_mm:
+  - -16.5
+  - -19.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: NRST
+- position_mm:
+  - 9.75
+  - -18.25
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: NRST
+- position_mm:
+  - -16.25
+  - -30.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: FTDI_NRST
+- position_mm:
+  - -9.75
+  - -33.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: FTDI_NRST
+- position_mm:
+  - -9.75
+  - -33.5
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: FTDI_BOOT0
+- position_mm:
+  - -7.5
+  - -33.5
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: FTDI_BOOT0
+- position_mm:
+  - -1.75
+  - -33.5
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: FTDI_BOOT0
+- position_mm:
+  - 7.75
+  - -31.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: FTDI_BOOT0
+- position_mm:
+  - -11.75
+  - -29.5
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: BOOT0
+- position_mm:
+  - -11.0
+  - -18.5
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: VBUS
+- position_mm:
+  - 14.25
+  - -19.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: VBUS
+- position_mm:
+  - 3.25
+  - -27.75
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: VBUS
+- position_mm:
+  - -20.0
+  - 8.25
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: VBUS_CHG
+- position_mm:
+  - -20.25
+  - -3.5
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: VBUS_CHG
+- position_mm:
+  - 11.25
+  - -17.25
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: VBUS_CHG
+- position_mm:
+  - 11.25
+  - -27.75
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: VBUS_CHG
+- position_mm:
+  - -16.5
+  - -17.75
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: VBAT
+- position_mm:
+  - 1.75
+  - -17.5
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: VBAT
+- position_mm:
+  - -15.75
+  - -0.75
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: AUDIO_EN
+- position_mm:
+  - -15.5
+  - -3.75
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: AUDIO_EN
+- position_mm:
+  - -11.0
+  - -6.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: AUDIO_EN
+- position_mm:
+  - -9.5
+  - -9.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: AUDIO_EN
+- position_mm:
+  - 2.5
+  - -17.5
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: AUDIO_EN
+- position_mm:
+  - -11.5
+  - -21.75
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: PWR_EN
+- position_mm:
+  - -11.0
+  - -17.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: PWR_EN
+- position_mm:
+  - 2.0
+  - -17.0
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: PWR_EN
+- position_mm:
+  - 21.0
+  - -29.75
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: PERIPH_3V3
+- position_mm:
+  - 3.25
+  - -22.25
+  drill_diameter_mm: 0.16
+  pad_diameter_mm: 0.36
+  layer_start: F.Cu
+  layer_end: B.Cu
+  net: PERIPH_3V3

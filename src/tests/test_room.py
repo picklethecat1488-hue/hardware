@@ -729,6 +729,7 @@ def test_room_export_urdf_primitive_collisions():
     assert '<sphere radius="0.005000"/>' in urdf_text
 
 
+@pytest.mark.slow
 def test_cat_fountain_provider_bowl_collision_types():
     """Verify that CatFountainProvider sets bowl collision type depending on simulation mode."""
     from projects.cat_fountain.provider import CatFountainProvider

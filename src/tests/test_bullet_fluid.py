@@ -12,6 +12,7 @@ from model import FluidConfig, ShapeType
 import jax.numpy as jnp
 
 
+@pytest.mark.slow
 class TestBulletFluid:
     """Class containing integration tests for Bullet and SPH Fluid interaction."""
 

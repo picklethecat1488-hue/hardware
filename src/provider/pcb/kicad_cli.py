@@ -428,7 +428,20 @@ class KiCadCLI:
         active_rules = design_rules if design_rules is not None else self.design_rules
         if active_rules is not None and hasattr(active_rules, "to_kicad_pro_dict"):
             pro_path = pcb_file.with_suffix(".kicad_pro")
-            pro_data = active_rules.to_kicad_pro_dict()
+            new_data = active_rules.to_kicad_pro_dict()
+            if pro_path.is_file():
+                try:
+                    with open(pro_path, "r", encoding="utf-8") as f:
+                        pro_data = json.load(f)
+                except Exception:
+                    pro_data = {}
+                if "board" not in pro_data:
+                    pro_data["board"] = {}
+                pro_data["board"]["design_settings"] = new_data.get("board", {}).get("design_settings", {})
+                if "net_settings" not in pro_data and "net_settings" in new_data:
+                    pro_data["net_settings"] = new_data["net_settings"]
+            else:
+                pro_data = new_data
             with open(pro_path, "w", encoding="utf-8") as f:
                 json.dump(pro_data, f, indent=2)
 

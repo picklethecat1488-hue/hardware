@@ -77,6 +77,18 @@ shaft_hole_height: 1.8
 shaft_hole_radius_offset: 0.1
 motor_boss_height: 20.0
 
+# Motor body & mounting parameters (BetaFPV / LAVA 1102: Dia 15.2mm, 3x M1.4 on Dia 6.6mm BCD)
+motor_radius: 7.6
+motor_clearance: 0.5
+motor_pocket_radius: 8.1
+motor_mount_bolt_circle_radius: 3.3
+motor_mount_hole_radius: 0.8
+motor_shaft_clearance_radius: 1.75
+motor_base_recess_depth: 0.8
+motor_base_lobe_radius: 2.2
+motor_wire_relief_width: 7.0
+motor_wire_relief_depth: 0.8
+
 # Set screw & alignment parameters
 motor_spacing_x: 6.6
 motor_set_screw_angle: 45.0
@@ -189,4 +201,3 @@ bottom_cover_opening_width: 20.0
 motor_clip_width: 17.6
 motor_clip_thickness: 1.6
 motor_clip_length: 26.0
-motor_clip_cutout_width: 10.0

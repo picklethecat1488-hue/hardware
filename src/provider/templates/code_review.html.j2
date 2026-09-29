@@ -785,6 +785,19 @@
     /* =========================================================
        BOTTOM QUAKE TERMINAL CLI CONSOLE
        ========================================================= */
+    .cli-resizer {
+      height: 6px;
+      background: var(--quake-border-light);
+      cursor: ns-resize;
+      flex-shrink: 0;
+      position: relative;
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+      z-index: 55;
+    }
+    .cli-resizer:hover, .cli-resizer.dragging {
+      background: var(--quake-gold);
+      box-shadow: 0 0 10px rgba(255, 184, 0, 0.7);
+    }
     .pane-cli-drawer {
       height: 230px;
       background: #110a05;
@@ -1169,13 +1182,14 @@
     </div>
 
     <div class="header-actions">
+      <a href="/" class="quake-btn quake-btn-default" style="text-decoration:none;display:inline-flex;align-items:center;" title="Return to VCS Dashboard">← Dashboard</a>
       <button id="btnSyncFeedback" class="quake-btn quake-btn-default" onclick="syncFeedback()" title="Synchronize review feedback with feedback/ directory and merge commit feedback">
         🔄 Sync Feedback
       </button>
-      <button id="btnVerdictApprove" class="quake-btn quake-btn-green" onclick="setVerdict('APPROVED')" title="Conclude review with Approval (LGTM), export build/CR.md, and release terminal">
+      <button id="btnVerdictApprove" class="quake-btn quake-btn-green" onclick="setVerdict('APPROVED')" title="Conclude review with Approval (LGTM), export build/CR.md, and return to Dashboard">
         ✓ Approve
       </button>
-      <button id="btnVerdictChanges" class="quake-btn quake-btn-red" onclick="setVerdict('CHANGES_REQUESTED')" title="Conclude review with Changes Requested, export build/CR.md, and release terminal">
+      <button id="btnVerdictChanges" class="quake-btn quake-btn-red" onclick="setVerdict('CHANGES_REQUESTED')" title="Conclude review with Changes Requested, export build/CR.md, and return to Dashboard">
         ✗ Request Changes
       </button>
     </div>
@@ -1263,6 +1277,9 @@
 
   </div>
 
+  <!-- Resizer Handle for Quake CLI Console -->
+  <div id="cliResizer" class="cli-resizer" title="Drag to resize CLI console vertically"></div>
+
   <!-- Bottom: Quake Terminal CLI Console -->
   <footer id="cliDrawer" class="pane-cli-drawer">
     <div class="cli-bar-header">
@@ -1312,9 +1329,9 @@
         ✓ Local review server shut down<br>
         ✓ Terminal session released to shell
       </div>
-      <button class="quake-btn quake-btn-gold" onclick="window.close()" style="padding: 8px 24px; font-size: 13px;">
-        CLOSE TAB
-      </button>
+      <a href="/" class="quake-btn quake-btn-gold" style="padding: 8px 24px; font-size: 13px; text-decoration: none; display: inline-block;">
+        ← RETURN TO DASHBOARD
+      </a>
     </div>
   </div>
 
@@ -1567,12 +1584,16 @@
       await loadCommits();
       setupKeyboardShortcuts();
       setupCliInput();
+      setupCliResizer();
       setupDiffSelectionListener();
     });
 
     async function loadSession() {
       try {
-        const res = await fetch("/api/session");
+        const urlParams = new URLSearchParams(window.location.search);
+        const revs = urlParams.get("revisions") || urlParams.get("commit");
+        const sessionUrl = revs ? "/api/session?revisions=" + encodeURIComponent(revs) : "/api/session";
+        const res = await fetch(sessionUrl);
         state.session = await res.json();
         updateSessionUI();
       } catch (e) {
@@ -1582,11 +1603,22 @@
 
     async function loadCommits() {
       try {
-        const res = await fetch("/api/commits");
+        const urlParams = new URLSearchParams(window.location.search);
+        const revs = urlParams.get("revisions") || urlParams.get("commit");
+        const commitsUrl = revs ? "/api/commits?revisions=" + encodeURIComponent(revs) : "/api/commits";
+        const res = await fetch(commitsUrl);
         state.commits = await res.json();
         renderCommitsList();
         if (state.commits.length > 0) {
-          selectCommit(state.commits[0].commit_hash);
+          let targetCommit = state.commits[0].commit_hash;
+          if (revs) {
+            const firstReq = revs.split(",")[0].trim();
+            const matched = state.commits.find(c => c.commit_hash.startsWith(firstReq) || firstReq.startsWith(c.commit_hash) || c.short_hash === firstReq);
+            if (matched) {
+              targetCommit = matched.commit_hash;
+            }
+          }
+          selectCommit(targetCommit);
         }
         // If only one commit is being reviewed, default the commit stream to collapsed
         if (state.commits.length <= 1) {
@@ -2300,6 +2332,44 @@
       setupCliAutocomplete();
     }
 
+    function setupCliResizer() {
+      const resizer = document.getElementById("cliResizer");
+      const drawer = document.getElementById("cliDrawer");
+      if (!resizer || !drawer) return;
+
+      let isDragging = false;
+      let startY = 0;
+      let startHeight = 0;
+
+      resizer.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        startY = e.clientY;
+        startHeight = drawer.offsetHeight;
+        resizer.classList.add("dragging");
+        document.body.style.cursor = "ns-resize";
+        document.body.style.userSelect = "none";
+        e.preventDefault();
+      });
+
+      document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const delta = startY - e.clientY;
+        const newHeight = Math.max(60, Math.min(window.innerHeight * 0.85, startHeight + delta));
+        drawer.style.height = `${newHeight}px`;
+        drawer.classList.remove("minimized");
+        state.panes.cli = true;
+      });
+
+      document.addEventListener("mouseup", () => {
+        if (isDragging) {
+          isDragging = false;
+          resizer.classList.remove("dragging");
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+        }
+      });
+    }
+
     function setupCliAutocomplete() {
       const input = document.getElementById("cliInput");
       const suggestionsEl = document.getElementById("cliSuggestions");
@@ -2800,7 +2870,7 @@
         const res = await fetch("/api/verdict", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ verdict: verdict })
+          body: JSON.stringify({ verdict: verdict, terminate: false })
         });
         const data = await res.json();
         if (data.status === "ok") {
@@ -2809,8 +2879,11 @@
             state.session = data.session;
             updateSessionUI();
           }
-          if (data.terminating) {
-            handleSessionTermination(verdict, data.exported_to);
+          if (verdict === "APPROVED" || verdict === "CHANGES_REQUESTED") {
+            showToast(`Review verdict: [${verdict}]. Returning to Dashboard...`);
+            setTimeout(() => {
+              window.location.href = "/";
+            }, 800);
           } else {
             showToast(`Review verdict: ${verdict}`);
           }

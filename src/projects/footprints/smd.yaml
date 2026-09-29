@@ -1,5 +1,21 @@
 # Shared Surface Mount (SMD) Footprints Library
 footprints:
+  "SW_PUSH_SMD":
+    dimensions: [3.0, 2.5, 1.5]
+    pins:
+      - name: "1"
+        position: [-1.4, 0.0]
+        side: left
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.8, 1.2]
+      - name: "2"
+        position: [1.4, 0.0]
+        side: right
+        pad_type: smd
+        pad_shape: roundrect
+        pad_size_mm: [0.8, 1.2]
+
   "0402":
     dimensions: [1.0, 0.5, 0.35]
     pins:

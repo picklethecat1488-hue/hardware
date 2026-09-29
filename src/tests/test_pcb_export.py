@@ -385,6 +385,7 @@ def test_kicad_cli_nonzero_exit_raises(tmp_path: Path):
             cli.run_command(["pcb", "export"])
 
 
+@pytest.mark.slow
 def test_pcb_exporter_all_methods_integration(
     tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring, mock_kicad_cam_files_if_unavailable
 ):

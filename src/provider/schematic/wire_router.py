@@ -60,16 +60,6 @@ class SchematicWireSegmentPlanner:
                 pin_to_net[pair] = net.name
 
         sheet_fps = sheet_plan.footprints
-        decoupling_caps, pullup_resistors, shunt_caps, main_fps = SchematicPassiveClassifier.classify_passives(
-            sheet_fps, pin_to_net
-        )
-
-        num_comps = len(main_fps)
-        pin_pitch = PIN_PITCH_MM
-        has_bottom_cards = bool(decoupling_caps) or any(
-            getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q") for fp in sheet_fps
-        )
-
         sheet_model = (
             config.schematic_sheets[sheet_plan.sheet_idx - 1]
             if (config and config.schematic_sheets and (0 <= (sheet_plan.sheet_idx - 1) < len(config.schematic_sheets)))
@@ -78,11 +68,27 @@ class SchematicWireSegmentPlanner:
         layout = (
             getattr(sheet_model, "layout", None) or getattr(config, "schematic_layout", None) or SchematicLayoutModel()
         )
+        grid_positions = getattr(layout, "grid_positions", {}) or {}
+
+        decoupling_caps, pullup_resistors, shunt_caps, main_fps = SchematicPassiveClassifier.classify_passives(
+            sheet_fps, pin_to_net, grid_positions=grid_positions
+        )
+
+        num_comps = len(main_fps)
+        pin_pitch = PIN_PITCH_MM
+        has_bottom_cards = bool(decoupling_caps) or any(
+            getattr(fp, "truth_table", None) is not None or fp.name.upper().startswith("Q") for fp in sheet_fps
+        )
+
         page_center_x = layout.sheet_center_x
-        top_row_y = 158.0 if has_bottom_cards else 138.0
+        if getattr(layout, "top_row_y", None) is not None:
+            top_row_y = layout.top_row_y
+        elif has_bottom_cards:
+            top_row_y = 158.0
+        else:
+            top_row_y = 138.0
 
         cols_override = getattr(layout, "cols_per_row", None)
-        grid_positions = getattr(layout, "grid_positions", {}) or {}
 
         if cols_override is not None:
             cols_per_row = cols_override
@@ -399,21 +405,68 @@ class SchematicWireSegmentPlanner:
             y_detour = min_y_bottom - 8.0 - d_idx * 3.5
 
             if s1 == "right" and s2 == "right":
-                x_drop = b2[0] - 6.0 - d_idx * 2.5
-                x_rise = max(b2[0] + b2[2] + 6.0 + d_idx * 2.5, p2[0] + 6.0 + d_idx * 2.5)
+                if abs(b1[0] - b2[0]) < 1.0:
+                    x_col = max(b1[0] + b1[2] + 6.0 + d_idx * 2.5, max(p1[0], p2[0]) + 3.0)
+                    while any(
+                        abs(x_col - s[0]) < 0.2 and (min(max(p1[1], p2[1]), s[2]) - max(min(p1[1], p2[1]), s[1]) > 0.1)
+                        for s in v_segments
+                    ):
+                        x_col += 2.0
+                    h_segments.append((min(p1[0], x_col), max(p1[0], x_col), p1[1], net.name, col))
+                    v_segments.append((x_col, min(p1[1], p2[1]), max(p1[1], p2[1]), net.name, col))
+                    h_segments.append((min(p2[0], x_col), max(p2[0], x_col), p2[1], net.name, col))
+                    wire_labels.append((x_col + 1.5, (p1[1] + p2[1]) / 2.0, net.name))
+                else:
+                    x_drop = b2[0] - 6.0 - d_idx * 2.5
+                    while any(
+                        abs(x_drop - s[0]) < 0.2
+                        and (min(max(p1[1], y_detour), s[2]) - max(min(p1[1], y_detour), s[1]) > 0.1)
+                        for s in v_segments
+                    ):
+                        x_drop -= 2.0
+                    x_rise = max(b2[0] + b2[2] + 6.0 + d_idx * 2.5, p2[0] + 6.0 + d_idx * 2.5)
+                    while any(
+                        abs(x_rise - s[0]) < 0.2
+                        and (min(max(p2[1], y_detour), s[2]) - max(min(p2[1], y_detour), s[1]) > 0.1)
+                        for s in v_segments
+                    ):
+                        x_rise += 2.0
 
-                h_segments.append((min(p1[0], x_drop), max(p1[0], x_drop), p1[1], net.name, col))
-                v_segments.append((x_drop, min(p1[1], y_detour), max(p1[1], y_detour), net.name, col))
-                h_segments.append((min(x_drop, x_rise), max(x_drop, x_rise), y_detour, net.name, col))
-                v_segments.append((x_rise, min(y_detour, p2[1]), max(y_detour, p2[1]), net.name, col))
-                h_segments.append((min(p2[0], x_rise), max(p2[0], x_rise), p2[1], net.name, col))
-                wire_labels.append(((x_drop + x_rise) / 2.0, y_detour + 1.2, net.name))
+                    h_segments.append((min(p1[0], x_drop), max(p1[0], x_drop), p1[1], net.name, col))
+                    v_segments.append((x_drop, min(p1[1], y_detour), max(p1[1], y_detour), net.name, col))
+                    h_segments.append((min(x_drop, x_rise), max(x_drop, x_rise), y_detour, net.name, col))
+                    v_segments.append((x_rise, min(y_detour, p2[1]), max(y_detour, p2[1]), net.name, col))
+                    h_segments.append((min(p2[0], x_rise), max(p2[0], x_rise), p2[1], net.name, col))
+                    wire_labels.append(((x_drop + x_rise) / 2.0, y_detour + 1.2, net.name))
 
             elif s1 == "left" and s2 == "left":
-                if p1[1] >= (b1[1] + b1[3] / 2.0):
+                if abs(b1[0] - b2[0]) < 1.0:
+                    x_col = min(b1[0] - 6.0 - d_idx * 2.5, min(p1[0], p2[0]) - 3.0)
+                    while any(
+                        abs(x_col - s[0]) < 0.2 and (min(max(p1[1], p2[1]), s[2]) - max(min(p1[1], p2[1]), s[1]) > 0.1)
+                        for s in v_segments
+                    ):
+                        x_col -= 2.0
+                    h_segments.append((min(x_col, p1[0]), max(x_col, p1[0]), p1[1], net.name, col))
+                    v_segments.append((x_col, min(p1[1], p2[1]), max(p1[1], p2[1]), net.name, col))
+                    h_segments.append((min(x_col, p2[0]), max(x_col, p2[0]), p2[1], net.name, col))
+                    wire_labels.append((x_col - 1.5, (p1[1] + p2[1]) / 2.0, net.name))
+                elif p1[1] >= (b1[1] + b1[3] / 2.0):
                     x_drop = min(b1[0] - 6.0 - d_idx * 2.5, p1[0] - 6.0 - d_idx * 2.5)
+                    while any(
+                        abs(x_drop - s[0]) < 0.2
+                        and (min(max(p1[1], y_over), s[2]) - max(min(p1[1], y_over), s[1]) > 0.1)
+                        for s in v_segments
+                    ):
+                        x_drop -= 2.0
                     y_over = max(b1[1] + b1[3], b2[1] + b2[3]) + 8.0 + d_idx * 3.5
                     x_rise = min(b2[0] - 6.0 - d_idx * 2.5, p2[0] - 6.0 - d_idx * 2.5)
+                    while any(
+                        abs(x_rise - s[0]) < 0.2
+                        and (min(max(y_over, p2[1]), s[2]) - max(min(y_over, p2[1]), s[1]) > 0.1)
+                        for s in v_segments
+                    ):
+                        x_rise -= 2.0
                     h_segments.append((min(x_drop, p1[0]), max(x_drop, p1[0]), p1[1], net.name, col))
                     v_segments.append((x_drop, min(p1[1], y_over), max(p1[1], y_over), net.name, col))
                     h_segments.append((min(x_drop, x_rise), max(x_drop, x_rise), y_over, net.name, col))
@@ -422,7 +475,19 @@ class SchematicWireSegmentPlanner:
                     wire_labels.append(((x_drop + x_rise) / 2.0, y_over + 1.2, net.name))
                 else:
                     x_drop = min(b1[0] - 6.0 - d_idx * 2.5, p1[0] - 6.0 - d_idx * 2.5)
+                    while any(
+                        abs(x_drop - s[0]) < 0.2
+                        and (min(max(p1[1], y_detour), s[2]) - max(min(p1[1], y_detour), s[1]) > 0.1)
+                        for s in v_segments
+                    ):
+                        x_drop -= 2.0
                     x_rise = min(b2[0] - 6.0 - d_idx * 2.5, p2[0] - 6.0 - d_idx * 2.5)
+                    while any(
+                        abs(x_rise - s[0]) < 0.2
+                        and (min(max(y_detour, p2[1]), s[2]) - max(min(y_detour, p2[1]), s[1]) > 0.1)
+                        for s in v_segments
+                    ):
+                        x_rise -= 2.0
 
                     h_segments.append((min(x_drop, p1[0]), max(x_drop, p1[0]), p1[1], net.name, col))
                     v_segments.append((x_drop, min(p1[1], y_detour), max(p1[1], y_detour), net.name, col))
@@ -442,7 +507,19 @@ class SchematicWireSegmentPlanner:
                     max_y_top = max(b[1] + b[3] for b in [b1, b2] + intervening)
                     y_over = max_y_top + 16.0 + d_idx * 3.5
                     x_rise = b1[0] + b1[2] + 6.0 + d_idx * 2.5
+                    while any(
+                        abs(x_rise - s[0]) < 0.2
+                        and (min(max(p1[1], y_over), s[2]) - max(min(p1[1], y_over), s[1]) > 0.1)
+                        for s in v_segments
+                    ):
+                        x_rise += 2.0
                     x_drop = b2[0] - 6.0 - d_idx * 2.5
+                    while any(
+                        abs(x_drop - s[0]) < 0.2
+                        and (min(max(y_over, p2[1]), s[2]) - max(min(y_over, p2[1]), s[1]) > 0.1)
+                        for s in v_segments
+                    ):
+                        x_drop -= 2.0
                     h_segments.append((min(p1[0], x_rise), max(p1[0], x_rise), p1[1], net.name, col))
                     v_segments.append((x_rise, min(p1[1], y_over), max(p1[1], y_over), net.name, col))
                     h_segments.append((min(x_rise, x_drop), max(x_rise, x_drop), y_over, net.name, col))

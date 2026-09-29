@@ -1,0 +1,1976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diff Viewer &amp; Smartlog: {{ session.repo_name }}</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/monokai-sublime.min.css">
+  <script src="/static/highlight.min.js"></script>
+  <script>
+    if (typeof hljs === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"><\/script>');
+    }
+  </script>
+  <style>
+    :root {
+      --quake-bg: #120c08;
+      --quake-panel: #1b120a;
+      --quake-panel-hover: #261a0f;
+      --quake-header-bg: #291a10;
+      --quake-border-light: #8d5d33;
+      --quake-border-mid: #5a381e;
+      --quake-border-dark: #120a05;
+
+      --quake-gold: #ffb800;
+      --quake-gold-dim: #c98c00;
+      --quake-amber: #e59400;
+      --quake-copper: #c87a32;
+      --quake-red: #ef4444;
+      --quake-green: #22c55e;
+      --quake-cyan: #38bdf8;
+      --quake-purple: #c084fc;
+      --quake-text-light: #dedede;
+      --quake-text-muted: #9e8a78;
+      --quake-text-dim: #716053;
+
+      --font-mono: ui-monospace, "SF Mono", "Courier New", "Lucida Console", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--quake-bg);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.45) 0px, rgba(0, 0, 0, 0.45) 2px, transparent 2px, transparent 4px),
+        radial-gradient(ellipse at 50% 0%, #2e1d13 0%, #0d0704 100%);
+      color: var(--quake-text-light);
+      font-family: var(--font-mono);
+      letter-spacing: 0.02em;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Quake Card & Bevels */
+    .quake-card {
+      background-color: var(--quake-panel);
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 1px 1px 0px var(--quake-border-light), inset -1px -1px 0px var(--quake-border-dark), 0 6px 18px rgba(0,0,0,0.85);
+      border-radius: 4px;
+    }
+
+    /* Buttons */
+    .quake-btn {
+      font-family: var(--font-mono);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+    .quake-btn-default {
+      background: linear-gradient(180deg, #3a2618 0%, #20140c 100%);
+      border: 2px solid;
+      border-color: #7d4e28 #1a0f07 #1a0f07 #7d4e28;
+      color: #d6c6b2;
+      box-shadow: inset 1px 1px 0 #9c6838, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-default:hover {
+      background: linear-gradient(180deg, #4d3320 0%, #2c1c11 100%);
+      border-color: #9c6838 #1a0f07 #1a0f07 #9c6838;
+      color: var(--quake-gold);
+      text-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
+    .quake-btn-gold {
+      background: linear-gradient(180deg, #664614 0%, #3d2807 100%);
+      border: 2px solid;
+      border-color: #a8792a #1c1102 #1c1102 #a8792a;
+      color: #ffe699;
+      box-shadow: inset 1px 1px 0 #d49d3b, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-gold:hover {
+      background: linear-gradient(180deg, #7d5718 0%, #4a3209 100%);
+      border-color: #c99333 #1c1102 #1c1102 #c99333;
+      color: #fff2cc;
+      text-shadow: 0 0 8px rgba(255, 184, 0, 0.6);
+    }
+    .quake-btn-red {
+      background: linear-gradient(180deg, #4a1515 0%, #2a0b0b 100%);
+      border: 2px solid;
+      border-color: #8c2e2e #1a0606 #1a0606 #8c2e2e;
+      color: #fca5a5;
+      box-shadow: inset 1px 1px 0 #b33b3b, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-red:hover {
+      background: linear-gradient(180deg, #5c1b1b 0%, #350e0e 100%);
+      color: #ffffff;
+      text-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+    }
+    .quake-btn-sm {
+      padding: 2px 6px;
+      font-size: 10px;
+    }
+    .quake-btn-icon {
+      padding: 2px 6px;
+      min-width: 24px;
+      justify-content: center;
+      font-size: 11px;
+    }
+
+    /* Top HUD */
+    .quake-hud {
+      background: var(--quake-header-bg);
+      border-bottom: 2px solid var(--quake-border-mid);
+      box-shadow: inset 0 1px 0 var(--quake-border-light), 0 4px 12px rgba(0, 0, 0, 0.6);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .quake-logo-zone {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .quake-logo-badge {
+      background: #3d2311;
+      border: 1px solid var(--quake-gold);
+      color: var(--quake-gold);
+      font-weight: 900;
+      padding: 3px 8px;
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 8px rgba(255, 184, 0, 0.5);
+    }
+    .quake-logo-sub {
+      color: var(--quake-copper);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .hud-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .quake-select {
+      background: #1a0f07;
+      border: 1px solid var(--quake-border-light);
+      color: var(--quake-gold);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+    .quake-select option {
+      background: #1b120a;
+      color: var(--quake-text-light);
+    }
+
+    /* Main Layout */
+    .app-workspace {
+      flex: 1;
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+      overflow: hidden;
+    }
+
+    /* Column Containers */
+    .column-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 100%;
+    }
+    .pane-smartlog {
+      width: 330px;
+      min-width: 0;
+      flex-shrink: 0;
+      transition: width 0.2s ease, opacity 0.2s ease;
+      overflow: hidden;
+    }
+    .pane-smartlog.collapsed {
+      width: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      opacity: 0;
+      pointer-events: none;
+      margin-right: -10px !important;
+    }
+    .pane-smartlog .column-header,
+    .pane-smartlog .column-scroll,
+    .pane-smartlog > div {
+      min-width: 330px;
+    }
+
+    .pane-files {
+      width: 270px;
+      min-width: 0;
+      flex-shrink: 0;
+      transition: width 0.2s ease, opacity 0.2s ease;
+      overflow: hidden;
+    }
+    .pane-files.collapsed {
+      width: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      opacity: 0;
+      pointer-events: none;
+      margin-right: -10px !important;
+    }
+    .pane-files .column-header,
+    .pane-files .column-scroll,
+    .pane-files > div {
+      min-width: 270px;
+    }
+
+    .pane-diff {
+      flex: 1;
+      min-width: 0;
+    }
+    .column-header {
+      background: var(--quake-header-bg);
+      border-bottom: 2px solid var(--quake-border-mid);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--quake-gold);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      flex-shrink: 0;
+    }
+    .column-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* Smartlog DAG nodes */
+    .smartlog-node {
+      background: #160e07;
+      border: 1px solid var(--quake-border-mid);
+      border-radius: 3px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+    }
+    .smartlog-node:hover {
+      background: var(--quake-panel-hover);
+      border-color: var(--quake-copper);
+    }
+    .smartlog-node.active {
+      border-color: var(--quake-gold);
+      background: #24160a;
+      box-shadow: inset 2px 0 0 var(--quake-gold);
+    }
+    .smartlog-node.head-node {
+      border-left: 3px solid var(--quake-cyan);
+    }
+
+    .node-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      gap: 6px;
+    }
+    .node-graph-art {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--quake-gold);
+      white-space: pre;
+    }
+    .node-sha {
+      color: var(--quake-amber);
+      font-weight: 700;
+    }
+    .node-author-date {
+      color: var(--quake-text-dim);
+      font-size: 10px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .node-subject {
+      font-size: 11px;
+      color: var(--quake-text-light);
+      word-break: break-word;
+      line-height: 1.35;
+    }
+
+    .node-tags-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 2px;
+    }
+    .node-badge {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 2px;
+      text-transform: uppercase;
+      text-decoration: none;
+    }
+    .node-badge-branch {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid var(--quake-cyan);
+      color: var(--quake-cyan);
+    }
+    .node-badge-tag {
+      background: rgba(192, 132, 252, 0.15);
+      border: 1px solid var(--quake-purple);
+      color: var(--quake-purple);
+    }
+    .node-badge-pr {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid var(--quake-green);
+      color: var(--quake-green);
+    }
+    .node-badge-bug {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--quake-red);
+      color: var(--quake-red);
+      cursor: pointer;
+    }
+    .node-badge-bug.resolved {
+      background: rgba(34, 197, 94, 0.15);
+      border-color: var(--quake-green);
+      color: var(--quake-green);
+    }
+    .smartlog-node.has-pr {
+      border-left: 3px solid #a855f7 !important;
+      background: linear-gradient(90deg, rgba(168, 85, 247, 0.1) 0%, #160e07 40%);
+    }
+    .pr-highlight-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1px 6px;
+      background: rgba(168, 85, 247, 0.22);
+      border: 1px solid #a855f7;
+      border-radius: 3px;
+      color: #e9d5ff;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: 0 0 6px rgba(168, 85, 247, 0.3);
+    }
+    .pr-highlight-badge:hover {
+      background: rgba(168, 85, 247, 0.4);
+      border-color: #d8b4fe;
+      color: #ffffff;
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.7);
+      transform: translateY(-1px);
+    }
+    .node-badge-branch.pr-tag-link,
+    .node-badge-pr.pr-tag-link {
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .node-badge-branch.pr-tag-link:hover,
+    .node-badge-pr.pr-tag-link:hover {
+      border-color: #d8b4fe;
+      color: #ffffff;
+      background: rgba(168, 85, 247, 0.35);
+      text-decoration: underline;
+      box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+    }
+    .quake-btn-purple {
+      background: rgba(168, 85, 247, 0.2);
+      border-color: #a855f7;
+      color: #e9d5ff;
+    }
+    .quake-btn-purple:hover {
+      background: rgba(168, 85, 247, 0.4);
+      border-color: #c084fc;
+      color: #ffffff;
+      box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+    }
+
+
+    .node-actions-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    /* Working Tree & File list items */
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      background: #140d07;
+      border: 1px solid rgba(90, 56, 30, 0.5);
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+      gap: 6px;
+    }
+    .file-item:hover {
+      background: #201309;
+      border-color: var(--quake-border-light);
+    }
+    .file-item.active {
+      border-color: var(--quake-gold);
+      background: #25160b;
+      box-shadow: inset 2px 0 0 var(--quake-gold);
+    }
+    .file-item.agent-feedback {
+      opacity: 0.6;
+      border-style: dashed;
+      background: #110905;
+    }
+
+    .file-path {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      color: var(--quake-text-light);
+    }
+    .file-status-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .status-m { color: var(--quake-gold); }
+    .status-a { color: var(--quake-green); }
+    .status-d { color: var(--quake-red); }
+    .status-untracked { color: var(--quake-purple); }
+    .status-conflict { color: #f87171; background: rgba(239, 68, 68, 0.25); border: 1px solid var(--quake-red); }
+    .status-lfs { color: #00e5ff; background: rgba(0, 229, 255, 0.15); border: 1px solid #00e5ff; font-weight: 700; }
+    .lfs-file-item { border-left: 2px solid #00e5ff !important; background: rgba(0, 229, 255, 0.04); }
+    .lfs-file-item .file-path { color: #38bdf8 !important; }
+    .lfs-file-item:hover { background: rgba(0, 229, 255, 0.12) !important; }
+
+    .file-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    /* Working Tree Commit Card */
+    .commit-box {
+      background: #1b120a;
+      border: 1px solid var(--quake-border-mid);
+      border-radius: 3px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .commit-input {
+      background: #110a05;
+      border: 1px solid var(--quake-border-light);
+      color: var(--quake-gold);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 6px 8px;
+      border-radius: 2px;
+      outline: none;
+      resize: vertical;
+      min-height: 48px;
+    }
+    .commit-input:focus {
+      border-color: var(--quake-gold);
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.3);
+    }
+
+    /* Collapsible Group */
+    .group-section {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 6px;
+    }
+    .group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--quake-copper);
+      text-transform: uppercase;
+      padding: 4px 6px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 2px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .group-header:hover {
+      color: var(--quake-gold);
+    }
+    .group-items {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding-left: 2px;
+    }
+
+    /* Toast notification */
+    #quakeToast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #2a180d;
+      border: 2px solid var(--quake-gold);
+      color: var(--quake-gold);
+      padding: 10px 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.8);
+      display: none;
+      z-index: 1000;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Quake Modal Dialog */
+    .quake-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .quake-modal {
+      background: var(--quake-panel);
+      border: 2px solid var(--quake-border-light);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9), inset 1px 1px 0 var(--quake-border-light);
+      border-radius: 4px;
+      width: 620px;
+      max-width: 90vw;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .quake-modal-header {
+      background: var(--quake-header-bg);
+      border-bottom: 2px solid var(--quake-border-mid);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--quake-gold);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .quake-modal-body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .quake-modal-footer {
+      background: #140d07;
+      border-top: 1px solid var(--quake-border-mid);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .modal-files-list {
+      max-height: 180px;
+      overflow-y: auto;
+      border: 1px solid var(--quake-border-mid);
+      background: #100a05;
+      border-radius: 3px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 4px;
+    }
+    .modal-file-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px;
+      border-radius: 2px;
+      background: #180f08;
+      font-size: 11px;
+      gap: 8px;
+    }
+    .modal-file-row:hover {
+      background: #24160c;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP QUAKE HUD -->
+  <header class="quake-hud">
+    <div class="quake-logo-zone">
+      <div class="quake-logo-badge">QUAKE VCS</div>
+      <div>
+        <div style="font-weight:700;font-size:12px;color:var(--quake-text-light);">{{ session.repo_name }}</div>
+        <div class="quake-logo-sub">DIFF VIEWER &amp; SMARTLOG</div>
+      </div>
+    </div>
+
+    <div class="hud-controls">
+      <!-- Sync Button -->
+      <button id="btnSync" class="quake-btn quake-btn-default" onclick="onSyncClicked()">
+        <span id="syncSpinner" style="display:none;">⏳</span>
+        <span>🔄 Sync</span>
+      </button>
+
+      <!-- Commit & Amend Buttons -->
+      <button id="btnCommitModal" class="quake-btn quake-btn-gold" onclick="openCommitModal(false)" title="Commit selected working tree changes">
+        <span>+ Commit</span>
+      </button>
+      <button id="btnAmendModal" class="quake-btn quake-btn-default" onclick="openCommitModal(true)" title="Amend HEAD commit">
+        <span>⎇ Amend</span>
+      </button>
+      <button id="btnSyncFeedback" class="quake-btn quake-btn-default" onclick="triggerManualSync()" title="Synchronize SQLite databases with committed feedback files">
+        <span>⚡ Sync DB</span>
+      </button>
+
+      <!-- Pane Toggle Controls -->
+      <div style="display:flex;align-items:center;gap:4px;border-left:1px solid var(--quake-border-mid);border-right:1px solid var(--quake-border-mid);padding:0 6px;">
+        <button id="btnToggleSmartlog" class="quake-btn quake-btn-default quake-btn-active" onclick="togglePane('smartlog')" title="Toggle Smartlog Pane (Shortcut: [)">
+          <span>⎇ Smartlog</span>
+        </button>
+        <button id="btnToggleFiles" class="quake-btn quake-btn-default quake-btn-active" onclick="togglePane('files')" title="Toggle Files Pane (Shortcut: ])">
+          <span>📄 Files</span>
+        </button>
+      </div>
+
+      <!-- Branch Selector -->
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:10px;color:var(--quake-text-dim);">BRANCH:</span>
+        <select id="branchSelect" class="quake-select" onchange="onBranchSelected(this.value)">
+          {% for b in session.branches %}
+            <option value="{{ b.name }}" {% if b.is_current %}selected{% endif %}>
+              {{ b.name }}{% if b.is_current %} (current){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Goto Commit -->
+      <button class="quake-btn quake-btn-default" onclick="onGotoClicked()">
+        <span>🎯 Goto...</span>
+      </button>
+
+      <!-- Inter-Tool Links -->
+      <button class="quake-btn quake-btn-default" onclick="onOpenInCodeReview()" title="Open Code Review">
+        <span>🔍 Code Review</span>
+      </button>
+      <button class="quake-btn quake-btn-default" onclick="openBugTracker()" title="Open Bug Report Tool">
+        <span>🐞 Bug Tracker</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE 3-COLUMN -->
+  <main class="app-workspace">
+
+    <!-- LEFT COLUMN: SMARTLOG ANCESTOR TREE DAG -->
+    <section id="paneSmartlog" class="quake-card column-panel pane-smartlog">
+      <div class="column-header">
+        <span>Smartlog Tree (sl)</span>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button id="btnOpenCR" class="quake-btn quake-btn-gold quake-btn-icon" onclick="onOpenInCodeReview()" title="Review selected commit(s) in Code Review">
+            <span>🔍 <span id="selectedCount">0</span></span>
+          </button>
+          <button id="btnCreatePR" class="quake-btn quake-btn-purple quake-btn-sm" onclick="onCreatePR()" title="Create Pull Request for selected commit(s)">
+            <span>🚀 Create PR</span>
+          </button>
+          <button id="btnUnlinkPR" class="quake-btn quake-btn-default quake-btn-sm" onclick="onUnlinkPR()" title="Unlink Pull Request from selected commit(s)">
+            <span>✕ Unlink PR</span>
+          </button>
+          <button class="quake-btn quake-btn-default quake-btn-icon" onclick="togglePane('smartlog')" title="Collapse Smartlog Pane (Shortcut: [)">◀</button>
+        </div>
+      </div>
+
+      <!-- Commit Manipulation Toolbar -->
+      <div style="display:flex;gap:6px;padding:6px 8px;background:#150d07;border-bottom:1px solid var(--quake-border-mid);justify-content:flex-end;">
+        <button class="quake-btn quake-btn-default quake-btn-icon" onclick="onSplitCommit()" title="Split commit (reset HEAD~1 to working tree)">
+          <span>✂️</span>
+        </button>
+        <button class="quake-btn quake-btn-default quake-btn-icon" onclick="onCombineCommits()" title="Combine/squash selected commits">
+          <span>🔗</span>
+        </button>
+      </div>
+
+      <div class="column-scroll" id="smartlogList">
+        <!-- Working Tree Node -->
+        <div class="smartlog-node {% if session.active_commit == 'working' %}active{% endif %}" id="node-working" onclick="selectCommit('working')">
+          <div class="node-header-row">
+            <span class="node-graph-art">@</span>
+            <span class="node-sha" style="color:var(--quake-cyan);">WORKING TREE</span>
+            <span class="node-author-date">Uncommitted</span>
+          </div>
+          <div class="node-subject">Local working tree changes &amp; staging area</div>
+        </div>
+
+        <!-- Render Commit Nodes -->
+        {% for node in session.smartlog_nodes %}
+          <div class="smartlog-node {% if node.is_head %}head-node{% endif %} {% if node.pr_number %}has-pr{% endif %} {% if session.active_commit == node.commit_hash %}active{% endif %}"
+               id="node-{{ node.short_hash }}"
+               onclick="selectCommit('{{ node.commit_hash }}')">
+            <div class="node-header-row">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <input type="checkbox"
+                       class="commit-checkbox"
+                       value="{{ node.commit_hash }}"
+                       onclick="event.stopPropagation(); onCommitCheckChanged();"
+                       {% if node.commit_hash in session.selected_commits %}checked{% endif %}/>
+                <span class="node-graph-art">{{ node.graph_art or node.graph_symbol }}</span>
+                <span class="node-sha">{{ node.short_hash }}</span>
+                {% if node.pr_number %}
+                  <a href="{{ node.pr_url or ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ node.pr_number) }}"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     class="pr-highlight-badge"
+                     onclick="event.stopPropagation();"
+                     title="Pull Request #{{ node.pr_number }} (Click to open in GitHub)">
+                    <span class="pr-icon">⎇</span> PR #{{ node.pr_number }}
+                  </a>
+                {% endif %}
+              </div>
+              <span class="node-author-date">{{ node.relative_date or node.date }}</span>
+            </div>
+
+            <div class="node-subject">{{ node.subject }}</div>
+
+            <!-- Tags Row (Branches, Tags, PR, Bugs) -->
+            <div class="node-tags-row">
+              {% for br in node.branches %}
+                <span class="node-badge node-badge-branch {% if 'pr' in br.lower() %}pr-tag-link{% endif %}"
+                      onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
+                      title="{% if 'pr' in br.lower() %}Open PR in GitHub{% else %}Branch {{ br }}{% endif %}">
+                  ⎇ {{ br }}
+                </span>
+              {% endfor %}
+              {% for tag in node.tags %}
+                <span class="node-badge node-badge-tag {% if 'pr' in tag.lower() %}pr-tag-link{% endif %}"
+                      onclick="onBranchBadgeClick(event, '{{ tag }}', '{{ node.pr_url or '' }}')"
+                      title="{% if 'pr' in tag.lower() %}Open PR in GitHub{% else %}Tag {{ tag }}{% endif %}">
+                  🏷 {{ tag }}
+                </span>
+              {% endfor %}
+              {% if node.pr_status %}
+                <a href="{{ node.pr_url or ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ (node.pr_number or '')) }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="node-badge node-badge-pr pr-tag-link"
+                   onclick="event.stopPropagation();"
+                   title="Open PR on GitHub">
+                  ⎇ {{ node.pr_status }}
+                </a>
+              {% endif %}
+              {% for bug in node.bug_tags %}
+                <span class="node-badge node-badge-bug {% if bug.status == 'RESOLVED' %}resolved{% endif %}"
+                      onclick="event.stopPropagation(); openBug('{{ bug.id }}');"
+                      title="{{ bug.title }} (Click to open in Bug Viewer)">
+                  {{ bug.id }}: {{ bug.status }}
+                </span>
+              {% endfor %}
+            </div>
+
+            <!-- Actions Row -->
+            <div class="node-actions-row">
+              <button class="quake-btn quake-btn-default quake-btn-icon"
+                      onclick="event.stopPropagation(); createBugForCommit('{{ node.commit_hash }}')"
+                      title="Create bug referencing this commit">
+                <span>🐞+</span>
+              </button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- MIDDLE COLUMN: CHANGED FILES & WORKING TREE OPERATIONS -->
+    <section id="paneFiles" class="quake-card column-panel pane-files">
+      <div class="column-header">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span id="filesHeaderTitle">Changed Files</span>
+          <span id="filesCountBadge" style="color:var(--quake-text-muted);">0 files</span>
+        </div>
+        <button class="quake-btn quake-btn-default quake-btn-icon" onclick="togglePane('files')" title="Collapse Files Pane (Shortcut: ])">◀</button>
+      </div>
+
+      <!-- Working Tree Commit Area (Only visible when active commit is 'working') -->
+      <div id="workingTreeCommitArea" class="commit-box" style="margin:8px; display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;font-weight:700;color:var(--quake-copper);text-transform:uppercase;">Working Tree Actions</span>
+          <div style="display:flex;gap:4px;">
+            <button class="quake-btn quake-btn-gold quake-btn-sm" onclick="openCommitModal(false)">+ Commit</button>
+            <button class="quake-btn quake-btn-default quake-btn-sm" onclick="openCommitModal(true)">⎇ Amend</button>
+          </div>
+        </div>
+        <textarea id="commitMessageInput" class="commit-input" placeholder="feat/fix: quick commit description..."></textarea>
+        <div style="display:flex;gap:6px;justify-content:space-between;">
+          <button class="quake-btn quake-btn-red quake-btn-sm" onclick="discardSelectedWorkingFiles()" title="Discard selected uncommitted files">
+            <span>🗑 Discard</span>
+          </button>
+          <button class="quake-btn quake-btn-gold quake-btn-sm" onclick="onCommitStagedClicked()" style="justify-content:center;">
+            <span>✓ Quick Commit Staged</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="column-scroll" id="filesContainer">
+        <!-- Rendered dynamically by JavaScript -->
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: DIFF WORKSTATION -->
+    <section class="quake-card column-panel pane-diff">
+      <!-- Toolbar -->
+      <div class="diff-toolbar">
+        <div class="diff-file-title" id="diffFileTitle">
+          <span>Select a file to inspect diff</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="diff-stats-badge" id="diffStatsBadge" style="display:none;">
+            <span class="diff-stats-add" id="diffStatsAdd">+0</span>
+            <span>/</span>
+            <span class="diff-stats-del" id="diffStatsDel">-0</span>
+          </div>
+          <div class="diff-mode-controls">
+            <button id="btnModeSbs" class="quake-btn quake-btn-gold quake-btn-sm" onclick="setDiffMode('side_by_side')">Side-by-Side</button>
+            <button id="btnModeUnified" class="quake-btn quake-btn-default quake-btn-sm" onclick="setDiffMode('unified')">Unified</button>
+            <button class="quake-btn quake-btn-default quake-btn-sm" onclick="onCopySnippetClicked()" title="Copy active diff snippet">📋 Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diff Content Area -->
+      <div class="diff-scroll-body" id="diffBodyContainer">
+        <div class="diff-empty-state">
+          <div style="font-size:24px;">⌨</div>
+          <div>Choose a commit and file to inspect diff hunks</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- INITIAL SQLITE SYNC MODAL LOADING SCREEN (BUG-188) -->
+  <div id="syncModalOverlay" class="quake-modal-overlay" style="{% if not session.initial_sync_done %}display: flex;{% else %}display: none;{% endif %} z-index: 2000;">
+    <div class="quake-modal" style="width: 480px; text-align: center; padding: 24px 20px;">
+      <div style="font-size: 15px; font-weight: bold; color: var(--quake-gold); letter-spacing: 1px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ffaa00;box-shadow:0 0 8px #ffaa00;"></span>
+        <span>SYNCHRONIZING FEEDBACK DATABASES</span>
+      </div>
+      <div style="font-size: 12px; color: var(--quake-text-muted); margin-bottom: 18px; line-height: 1.4;">
+        Populating SQLite databases from committed feedback files prior to launching VCS workstation...
+      </div>
+      <div style="background: var(--quake-bg-dark); border: 1px solid var(--quake-border-light); border-radius: 3px; height: 16px; position: relative; overflow: hidden; margin-bottom: 12px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);">
+        <div id="syncProgressBar" style="width: 20%; height: 100%; background: linear-gradient(90deg, #ffaa00, #ff8800); transition: width 0.3s ease; box-shadow: 0 0 10px rgba(255,170,0,0.5);"></div>
+        <div id="syncProgressPercent" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000;">20%</div>
+      </div>
+      <div id="syncStatusText" style="font-size: 11px; color: var(--quake-text-dim); font-family: monospace; min-height: 16px;">
+        Scanning feedback/ directory for bug reports and review comments...
+      </div>
+    </div>
+  </div>
+
+  <!-- COMMIT / AMEND MODAL (BUG-185) -->
+  <div id="commitModalOverlay" class="quake-modal-overlay" onclick="if(event.target===this) closeCommitModal()">
+    <div class="quake-modal">
+      <div class="quake-modal-header">
+        <span id="commitModalTitle">Commit Changes</span>
+        <button class="quake-btn quake-btn-default quake-btn-icon" onclick="closeCommitModal()" title="Close">✕</button>
+      </div>
+      <div class="quake-modal-body">
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:11px;font-weight:700;color:var(--quake-copper);text-transform:uppercase;">Select files to commit/amend:</span>
+            <label style="font-size:10px;color:var(--quake-text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="checkbox" id="modalSelectAll" onchange="toggleModalSelectAll(this.checked)" checked>
+              <span>Select All</span>
+            </label>
+          </div>
+          <div class="modal-files-list" id="modalFilesList">
+            <!-- Populated dynamically with checkboxes, status badges, paths, and discard buttons -->
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--quake-copper);text-transform:uppercase;display:block;margin-bottom:6px;">Commit Message:</label>
+          <textarea id="modalCommitMessage" class="commit-input" style="min-height:90px;" placeholder="feat/fix: commit description..."></textarea>
+        </div>
+      </div>
+      <div class="quake-modal-footer">
+        <button class="quake-btn quake-btn-red quake-btn-sm" onclick="discardSelectedFromModal()" title="Discard changes in selected files">
+          <span>🗑 Discard Selected</span>
+        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="quake-btn quake-btn-default" onclick="closeCommitModal()">Cancel</button>
+          <button id="btnSubmitModalCommit" class="quake-btn quake-btn-gold" onclick="submitCommitModal()">
+            <span>✓ Commit</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="quakeToast"></div>
+
+  {# Include Shared Diff Component and Engine #}
+  {% include "diff_component.html.j2" %}
+
+  <script>
+    // State Model
+    const state = {
+      activeCommit: "{{ session.active_commit or 'working' }}",
+      activeFile: null,
+      diffMode: "side_by_side",
+      files: [],
+      workingFiles: [],
+      conflicts: [],
+      currentDiff: null,
+      selectedCommits: {{ session.selected_commits | tojson }},
+      feedbackCollapsed: false,
+      panes: {
+        smartlog: true,
+        files: true
+      }
+    };
+
+    const INITIAL_SYNC_DONE = {{ session.initial_sync_done | tojson }};
+
+    async function performInitialSync(isManual = false) {
+      const modal = document.getElementById("syncModalOverlay");
+      const statusText = document.getElementById("syncStatusText");
+      const progressBar = document.getElementById("syncProgressBar");
+      const progressPercent = document.getElementById("syncProgressPercent");
+
+      if (modal) modal.style.display = "flex";
+      if (progressBar) progressBar.style.width = "35%";
+      if (progressPercent) progressPercent.textContent = "35%";
+      if (statusText) statusText.textContent = "Scanning feedback/ files and merging into SQLite...";
+
+      try {
+        const resp = await fetch("/api/sync_feedback", { method: "POST" });
+        if (progressBar) progressBar.style.width = "85%";
+        if (progressPercent) progressPercent.textContent = "85%";
+        if (statusText) statusText.textContent = "Updating database records and commit tags...";
+        const data = await resp.json();
+
+        if (progressBar) progressBar.style.width = "100%";
+        if (progressPercent) progressPercent.textContent = "100%";
+        const bugCount = data.bugs?.total_bugs ?? data.bugs?.bugs_count ?? 0;
+        const crCount = data.review?.total_comments ?? 0;
+        if (statusText) statusText.textContent = `✓ Synchronized ${bugCount} bugs and ${crCount} review comments.`;
+
+        setTimeout(() => {
+          if (modal) modal.style.display = "none";
+          if (!INITIAL_SYNC_DONE || isManual) {
+            window.location.reload();
+          }
+        }, 400);
+      } catch (err) {
+        console.error("Sync error:", err);
+        if (statusText) statusText.textContent = "Sync complete with warnings. Continuing...";
+        setTimeout(() => {
+          if (modal) modal.style.display = "none";
+        }, 500);
+      }
+    }
+
+    function triggerManualSync() {
+      performInitialSync(true);
+    }
+
+
+    function togglePane(pane) {
+      if (pane === "smartlog" || pane === "commits") {
+        state.panes.smartlog = !state.panes.smartlog;
+        const el = document.getElementById("paneSmartlog");
+        if (el) el.classList.toggle("collapsed", !state.panes.smartlog);
+        const btn = document.getElementById("btnToggleSmartlog");
+        if (btn) btn.classList.toggle("quake-btn-active", state.panes.smartlog);
+      } else if (pane === "files") {
+        state.panes.files = !state.panes.files;
+        const el = document.getElementById("paneFiles");
+        if (el) el.classList.toggle("collapsed", !state.panes.files);
+        const btn = document.getElementById("btnToggleFiles");
+        if (btn) btn.classList.toggle("quake-btn-active", state.panes.files);
+      }
+    }
+
+    function showToast(message, duration = 3000) {
+      const toast = document.getElementById("quakeToast");
+      toast.textContent = message;
+      toast.style.display = "block";
+      setTimeout(() => { toast.style.display = "none"; }, duration);
+    }
+
+    // Refresh Smartlog & Session
+    async function reloadSession() {
+      try {
+        const resp = await fetch("/api/session");
+        const data = await resp.json();
+        state.workingFiles = data.working_files || [];
+        state.conflicts = data.conflicts || [];
+        updateSelectedCount();
+      } catch (err) {
+        console.error("Failed to load session:", err);
+      }
+    }
+
+    // Select Commit
+    async function selectCommit(commitHash) {
+      state.activeCommit = commitHash;
+      state.activeFile = null;
+      state.currentDiff = null;
+
+      // Update active classes
+      document.querySelectorAll(".smartlog-node").forEach(el => el.classList.remove("active"));
+      const activeEl = commitHash === "working"
+        ? document.getElementById("node-working")
+        : document.getElementById("node-" + commitHash.slice(0, 7));
+      if (activeEl) activeEl.classList.add("active");
+
+      // Toggle commit box
+      const commitArea = document.getElementById("workingTreeCommitArea");
+      commitArea.style.display = commitHash === "working" ? "flex" : "none";
+
+      document.getElementById("filesHeaderTitle").textContent = commitHash === "working" ? "Working Tree Files" : `Files (${commitHash.slice(0, 7)})`;
+
+      await loadFilesForActiveCommit();
+    }
+
+    // Load Files
+    async function loadFilesForActiveCommit() {
+      const container = document.getElementById("filesContainer");
+      container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--quake-text-muted);">Loading files...</div>`;
+
+      try {
+        if (state.activeCommit === "working") {
+          const resp = await fetch("/api/working");
+          const workingFiles = await resp.json();
+          state.workingFiles = workingFiles;
+
+          const conflictResp = await fetch("/api/conflicts");
+          state.conflicts = await conflictResp.json();
+
+          renderWorkingTreeFiles(container);
+        } else {
+          const resp = await fetch(`/api/files?commit=${encodeURIComponent(state.activeCommit)}&include_feedback=true`);
+          state.files = await resp.json();
+          renderCommitFiles(container);
+        }
+      } catch (err) {
+        container.innerHTML = `<div style="color:var(--quake-red);padding:10px;">Failed to load files: ${err}</div>`;
+      }
+    }
+
+    // Render Working Tree Files (Staged, Unstaged, Untracked, Conflicts, Feedback)
+    function renderWorkingTreeFiles(container) {
+      let html = "";
+      const conflicts = state.conflicts;
+      const lfs = state.workingFiles.filter(f => f.is_lfs && !f.is_feedback);
+      const staged = state.workingFiles.filter(f => f.is_staged && !f.is_feedback && !f.is_lfs);
+      const unstaged = state.workingFiles.filter(f => !f.is_staged && !f.is_untracked && !f.is_conflicted && !f.is_feedback && !f.is_lfs);
+      const untracked = state.workingFiles.filter(f => f.is_untracked && !f.is_feedback && !f.is_lfs);
+      const feedback = state.workingFiles.filter(f => f.is_feedback);
+
+      document.getElementById("filesCountBadge").textContent = `${state.workingFiles.length} changes`;
+
+      // 1. Conflicts
+      if (conflicts.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header" style="color:var(--quake-red);">⚠ Merge Conflicts (${conflicts.length})</div>
+            <div class="group-items">
+              ${conflicts.map(c => `
+                <div class="file-item ${state.activeFile === c.path ? 'active' : ''}" onclick="selectFile('${c.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${c.path}" onclick="event.stopPropagation()">
+                  <span class="file-status-badge status-conflict">UU</span>
+                  <span class="file-path" title="${c.path}">${c.path} (${c.conflict_markers_count} markers)</span>
+                  <div class="file-actions">
+                    <button class="quake-btn quake-btn-default quake-btn-icon" onclick="event.stopPropagation(); resolveConflict('${c.path}', 'ours')" title="Accept Ours">👈</button>
+                    <button class="quake-btn quake-btn-default quake-btn-icon" onclick="event.stopPropagation(); resolveConflict('${c.path}', 'theirs')" title="Accept Theirs">👉</button>
+                    <button class="quake-btn quake-btn-gold quake-btn-icon" onclick="event.stopPropagation(); resolveConflict('${c.path}', 'mark_resolved')" title="Mark Resolved">✓</button>
+                    <button class="quake-btn quake-btn-red quake-btn-icon" onclick="event.stopPropagation(); discardFile('${c.path}')" title="Discard conflict file">🗑</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      // 2. LFS Tracked Files
+      if (lfs.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header" style="color:#00e5ff;">📦 LFS Tracked Files (${lfs.length})</div>
+            <div class="group-items">
+              ${lfs.map(f => `
+                <div class="file-item lfs-file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${f.path}" onclick="event.stopPropagation()" ${f.is_staged || !f.is_untracked ? 'checked' : ''}>
+                  <span class="file-status-badge status-lfs">LFS</span>
+                  <span class="file-status-badge ${f.is_staged ? 'status-a' : (f.is_untracked ? 'status-untracked' : 'status-m')}">${f.status}</span>
+                  <span class="file-path" title="${f.path}">${f.path}</span>
+                  <div class="file-actions">
+                    ${f.is_staged ?
+                      `<button class="quake-btn quake-btn-default quake-btn-icon" onclick="event.stopPropagation(); unstageFile('${f.path}')" title="Unstage LFS file">➖</button>` :
+                      `<button class="quake-btn quake-btn-gold quake-btn-icon" onclick="event.stopPropagation(); stageFile('${f.path}')" title="Stage LFS file">➕</button>`
+                    }
+                    <button class="quake-btn quake-btn-red quake-btn-icon" onclick="event.stopPropagation(); discardFile('${f.path}')" title="Discard LFS file">🗑</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      // 3. Staged
+      if (staged.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header" style="color:var(--quake-green);">✓ Staged Changes (${staged.length})</div>
+            <div class="group-items">
+              ${staged.map(f => `
+                <div class="file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${f.path}" onclick="event.stopPropagation()" checked>
+                  <span class="file-status-badge status-a">${f.status}</span>
+                  <span class="file-path" title="${f.path}">${f.path}</span>
+                  <div class="file-actions">
+                    <button class="quake-btn quake-btn-default quake-btn-icon" onclick="event.stopPropagation(); unstageFile('${f.path}')" title="Unstage file">➖</button>
+                    <button class="quake-btn quake-btn-red quake-btn-icon" onclick="event.stopPropagation(); discardFile('${f.path}')" title="Discard staged changes">🗑</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      // 3. Unstaged
+      if (unstaged.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header" style="color:var(--quake-gold);">✎ Unstaged Changes (${unstaged.length})</div>
+            <div class="group-items">
+              ${unstaged.map(f => `
+                <div class="file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${f.path}" onclick="event.stopPropagation()" checked>
+                  <span class="file-status-badge status-m">${f.status}</span>
+                  <span class="file-path" title="${f.path}">${f.path}</span>
+                  <div class="file-actions">
+                    <button class="quake-btn quake-btn-gold quake-btn-icon" onclick="event.stopPropagation(); stageFile('${f.path}')" title="Stage changes">➕</button>
+                    <button class="quake-btn quake-btn-red quake-btn-icon" onclick="event.stopPropagation(); discardFile('${f.path}')" title="Discard changes">🗑</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      // 4. Untracked
+      if (untracked.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header" style="color:var(--quake-purple);">? Untracked Files (${untracked.length})</div>
+            <div class="group-items">
+              ${untracked.map(f => `
+                <div class="file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${f.path}" onclick="event.stopPropagation()">
+                  <span class="file-status-badge status-untracked">??</span>
+                  <span class="file-path" title="${f.path}">${f.path}</span>
+                  <div class="file-actions">
+                    <button class="quake-btn quake-btn-gold quake-btn-icon" onclick="event.stopPropagation(); stageFile('${f.path}')" title="Stage untracked file">➕</button>
+                    <button class="quake-btn quake-btn-red quake-btn-icon" onclick="event.stopPropagation(); discardFile('${f.path}')" title="Delete untracked file">🗑</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      // 5. Agent Feedback (Dimmed/Greyed)
+      if (feedback.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header" onclick="toggleFeedbackGroup()">
+              <span>🤖 Agent Feedback (${feedback.length})</span>
+              <span>${state.feedbackCollapsed ? '▶' : '▼'}</span>
+            </div>
+            <div class="group-items" style="${state.feedbackCollapsed ? 'display:none;' : ''}">
+              ${feedback.map(f => `
+                <div class="file-item agent-feedback ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <input type="checkbox" class="working-file-cb" value="${f.path}" onclick="event.stopPropagation()">
+                  <span class="file-status-badge" style="color:var(--quake-text-muted);">${f.status}</span>
+                  <span class="file-path" title="${f.path}">${f.path}</span>
+                  <div class="file-actions">
+                    <button class="quake-btn quake-btn-default quake-btn-icon" onclick="event.stopPropagation(); stageFile('${f.path}')" title="Stage feedback file">➕</button>
+                    <button class="quake-btn quake-btn-red quake-btn-icon" onclick="event.stopPropagation(); discardFile('${f.path}')" title="Discard feedback file">🗑</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      if (state.workingFiles.length === 0 && conflicts.length === 0) {
+        html = `<div style="text-align:center;padding:30px;color:var(--quake-text-dim);">Working tree is clean.</div>`;
+      }
+
+      container.innerHTML = html;
+
+      // Auto-select first file if none selected
+      if (!state.activeFile) {
+        const first = conflicts[0]?.path || lfs[0]?.path || staged[0]?.path || unstaged[0]?.path || untracked[0]?.path || feedback[0]?.path;
+        if (first) selectFile(first);
+      }
+    }
+
+    // Render Commit Files (Regular vs Feedback)
+    function renderCommitFiles(container) {
+      let html = "";
+      const lfs = state.files.filter(f => f.is_lfs && !f.is_feedback);
+      const regular = state.files.filter(f => !f.is_feedback && !f.is_lfs);
+      const feedback = state.files.filter(f => f.is_feedback);
+
+      document.getElementById("filesCountBadge").textContent = `${state.files.length} files`;
+
+      // LFS Tracked Files
+      if (lfs.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header" style="color:#00e5ff;">📦 LFS Tracked Files (${lfs.length})</div>
+            <div class="group-items">
+              ${lfs.map(f => `
+                <div class="file-item lfs-file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <span class="file-status-badge status-lfs">LFS</span>
+                  <span class="file-status-badge ${f.status === 'A' ? 'status-a' : (f.status === 'D' ? 'status-d' : 'status-m')}">${f.status}</span>
+                  <span class="file-path" title="${f.path}">${f.path}</span>
+                  <span style="font-size:10px;color:var(--quake-text-dim);">+${f.additions || 0} -${f.deletions || 0}</span>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      // Regular Changed Files
+      if (regular.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header">Changed Files (${regular.length})</div>
+            <div class="group-items">
+              ${regular.map(f => `
+                <div class="file-item ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <span class="file-status-badge ${f.status === 'A' ? 'status-a' : (f.status === 'D' ? 'status-d' : 'status-m')}">${f.status}</span>
+                  <span class="file-path" title="${f.path}">${f.path}</span>
+                  <span style="font-size:10px;color:var(--quake-text-dim);">+${f.additions || 0} -${f.deletions || 0}</span>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      // Agent Feedback Files (Dimmed / Greyed out)
+      if (feedback.length > 0) {
+        html += `
+          <div class="group-section">
+            <div class="group-header" onclick="toggleFeedbackGroup()">
+              <span>🤖 Agent Feedback (${feedback.length})</span>
+              <span>${state.feedbackCollapsed ? '▶' : '▼'}</span>
+            </div>
+            <div class="group-items" style="${state.feedbackCollapsed ? 'display:none;' : ''}">
+              ${feedback.map(f => `
+                <div class="file-item agent-feedback ${state.activeFile === f.path ? 'active' : ''}" onclick="selectFile('${f.path}')">
+                  <span class="file-status-badge" style="color:var(--quake-text-muted);">${f.status}</span>
+                  <span class="file-path" title="${f.path}">${f.path}</span>
+                  <span style="font-size:10px;color:var(--quake-text-dim);">+${f.additions || 0} -${f.deletions || 0}</span>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      if (state.files.length === 0) {
+        html = `<div style="text-align:center;padding:30px;color:var(--quake-text-dim);">No files changed in this revision.</div>`;
+      }
+
+      container.innerHTML = html;
+
+      // Auto select first file
+      if (!state.activeFile) {
+        const first = lfs[0]?.path || regular[0]?.path || feedback[0]?.path;
+        if (first) selectFile(first);
+      }
+    }
+
+    function toggleFeedbackGroup() {
+      state.feedbackCollapsed = !state.feedbackCollapsed;
+      const container = document.getElementById("filesContainer");
+      if (state.activeCommit === "working") {
+        renderWorkingTreeFiles(container);
+      } else {
+        renderCommitFiles(container);
+      }
+    }
+
+    // Select File & Fetch Diff
+    async function selectFile(filePath) {
+      state.activeFile = filePath;
+
+      // Update active highlight in file list
+      document.querySelectorAll(".file-item").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".file-item").forEach(el => {
+        if (el.querySelector(".file-path")?.getAttribute("title") === filePath) {
+          el.classList.add("active");
+        }
+      });
+
+      document.getElementById("diffFileTitle").textContent = filePath;
+      const diffBody = document.getElementById("diffBodyContainer");
+      diffBody.innerHTML = `<div style="text-align:center;padding:30px;color:var(--quake-text-muted);">Loading diff...</div>`;
+
+      try {
+        const resp = await fetch(`/api/diff?commit=${encodeURIComponent(state.activeCommit)}&file=${encodeURIComponent(filePath)}`);
+        const diffData = await resp.json();
+        state.currentDiff = diffData;
+
+        // Update stats
+        const statsBadge = document.getElementById("diffStatsBadge");
+        statsBadge.style.display = "inline-flex";
+        document.getElementById("diffStatsAdd").textContent = `+${diffData.additions || 0}`;
+        document.getElementById("diffStatsDel").textContent = `-${diffData.deletions || 0}`;
+
+        QuakeDiffEngine.renderDiff(diffBody, diffData, state.diffMode);
+      } catch (err) {
+        diffBody.innerHTML = `<div style="color:var(--quake-red);padding:20px;">Failed to load diff: ${err}</div>`;
+      }
+    }
+
+    // Toggle Diff Mode (Side-by-side vs Unified)
+    function setDiffMode(mode) {
+      state.diffMode = mode;
+      document.getElementById("btnModeSbs").className = mode === "side_by_side" ? "quake-btn quake-btn-gold quake-btn-sm" : "quake-btn quake-btn-default quake-btn-sm";
+      document.getElementById("btnModeUnified").className = mode === "unified" ? "quake-btn quake-btn-gold quake-btn-sm" : "quake-btn quake-btn-default quake-btn-sm";
+
+      if (state.currentDiff) {
+        const diffBody = document.getElementById("diffBodyContainer");
+        QuakeDiffEngine.renderDiff(diffBody, state.currentDiff, state.diffMode);
+      }
+    }
+
+    function onCopySnippetClicked() {
+      if (state.currentDiff) {
+        const content = state.currentDiff.raw_diff || state.currentDiff.full_content || "";
+        QuakeDiffEngine.copySnippet(content);
+        showToast("Diff copied to clipboard!");
+      }
+    }
+
+    // Working Tree Operations
+    async function stageFile(path) {
+      try {
+        const resp = await fetch("/api/stage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: path })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Error: " + res.error);
+        else {
+          showToast("Staged " + path);
+          await loadFilesForActiveCommit();
+        }
+      } catch (err) {
+        showToast("Failed to stage: " + err);
+      }
+    }
+
+    async function unstageFile(path) {
+      try {
+        const resp = await fetch("/api/unstage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: path })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Error: " + res.error);
+        else {
+          showToast("Unstaged " + path);
+          await loadFilesForActiveCommit();
+        }
+      } catch (err) {
+        showToast("Failed to unstage: " + err);
+      }
+    }
+
+    async function discardFile(path) {
+      if (!confirm(`Discard all changes in ${path}?`)) return;
+      try {
+        const resp = await fetch("/api/discard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: path })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Error: " + res.error);
+        else {
+          showToast("Discarded " + path);
+          await loadFilesForActiveCommit();
+        }
+      } catch (err) {
+        showToast("Failed to discard: " + err);
+      }
+    }
+
+    async function onCommitStagedClicked() {
+      const msgInput = document.getElementById("commitMessageInput");
+      const msg = msgInput.value.trim();
+      if (!msg) {
+        alert("Please enter a commit message.");
+        return;
+      }
+
+      try {
+        const resp = await fetch("/api/commit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msg })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Commit failed: " + res.error);
+        else {
+          showToast("Committed " + res.commit_hash.slice(0, 7));
+          msgInput.value = "";
+          setTimeout(() => location.reload(), 500);
+        }
+      } catch (err) {
+        showToast("Failed to commit: " + err);
+      }
+    }
+
+    // Modal Commit & Amend Implementation (BUG-185)
+    async function openCommitModal(isAmend = false) {
+      state.isAmendMode = isAmend;
+      const modal = document.getElementById("commitModalOverlay");
+      const title = document.getElementById("commitModalTitle");
+      const submitBtn = document.getElementById("btnSubmitModalCommit");
+      const msgInput = document.getElementById("modalCommitMessage");
+
+      title.textContent = isAmend ? "Amend Last Commit (HEAD)" : "Commit Changes";
+      submitBtn.innerHTML = isAmend ? "<span>✓ Amend Commit</span>" : "<span>✓ Commit</span>";
+
+      if (isAmend) {
+        try {
+          const resp = await fetch("/api/head_commit_message");
+          const data = await resp.json();
+          msgInput.value = data.message || "";
+        } catch (e) {
+          msgInput.value = "";
+        }
+      } else {
+        const quickInput = document.getElementById("commitMessageInput");
+        msgInput.value = quickInput ? quickInput.value.trim() : "";
+      }
+
+      await refreshModalFilesList();
+      modal.style.display = "flex";
+    }
+
+    function closeCommitModal() {
+      document.getElementById("commitModalOverlay").style.display = "none";
+    }
+
+    async function refreshModalFilesList() {
+      const listEl = document.getElementById("modalFilesList");
+      listEl.innerHTML = `<div style="text-align:center;padding:10px;color:var(--quake-text-muted);">Loading changed files...</div>`;
+
+      try {
+        const resp = await fetch("/api/working");
+        const workingFiles = await resp.json();
+        state.workingFiles = workingFiles;
+
+        if (workingFiles.length === 0) {
+          listEl.innerHTML = `<div style="text-align:center;padding:12px;color:var(--quake-text-dim);">No uncommitted changes in working tree.</div>`;
+          return;
+        }
+
+        const mainChecked = Array.from(document.querySelectorAll(".working-file-cb:checked")).map(cb => cb.value);
+
+        listEl.innerHTML = workingFiles.map(f => {
+          const isLfs = f.is_lfs || f.path.startsWith('attachments/');
+          const isChecked = mainChecked.length > 0 ? mainChecked.includes(f.path) : (f.is_staged || !f.is_untracked);
+          const badgeClass = f.is_staged ? 'status-a' : (f.is_untracked ? 'status-untracked' : 'status-m');
+          return `
+            <div class="modal-file-row ${isLfs ? 'lfs-file-item' : ''}">
+              <label style="display:flex;align-items:center;gap:6px;flex:1;overflow:hidden;cursor:pointer;">
+                <input type="checkbox" class="modal-file-cb" value="${f.path}" ${isChecked ? 'checked' : ''} onchange="updateModalSelectAllState()">
+                ${isLfs ? '<span class="file-status-badge status-lfs">LFS</span>' : ''}
+                <span class="file-status-badge ${badgeClass}">${f.status}</span>
+                <span class="file-path" title="${f.path}">${f.path}</span>
+              </label>
+              <button class="quake-btn quake-btn-red quake-btn-icon" onclick="discardFromModal('${f.path}')" title="Discard this file">🗑</button>
+            </div>
+          `;
+        }).join("");
+
+        updateModalSelectAllState();
+      } catch (err) {
+        listEl.innerHTML = `<div style="color:var(--quake-red);padding:10px;">Failed to load files: ${err}</div>`;
+      }
+    }
+
+    function toggleModalSelectAll(checked) {
+      document.querySelectorAll(".modal-file-cb").forEach(cb => cb.checked = checked);
+    }
+
+    function updateModalSelectAllState() {
+      const all = document.querySelectorAll(".modal-file-cb");
+      const checked = document.querySelectorAll(".modal-file-cb:checked");
+      const master = document.getElementById("modalSelectAll");
+      if (master) master.checked = all.length > 0 && all.length === checked.length;
+    }
+
+    function getSelectedModalFiles() {
+      return Array.from(document.querySelectorAll(".modal-file-cb:checked")).map(cb => cb.value);
+    }
+
+    async function discardFromModal(path) {
+      if (!confirm(`Discard all changes in ${path}?`)) return;
+      try {
+        const resp = await fetch("/api/discard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: path })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Error: " + res.error);
+        else {
+          showToast("Discarded " + path);
+          await refreshModalFilesList();
+          await loadFilesForActiveCommit();
+        }
+      } catch (err) {
+        showToast("Failed to discard: " + err);
+      }
+    }
+
+    async function discardSelectedFromModal() {
+      const selected = getSelectedModalFiles();
+      if (selected.length === 0) {
+        alert("Please select files to discard.");
+        return;
+      }
+      if (!confirm(`Discard all changes in ${selected.length} selected file(s)? This cannot be undone.`)) return;
+      try {
+        const resp = await fetch("/api/discard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ files: selected })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Error: " + res.error);
+        else {
+          showToast(`Discarded ${selected.length} files`);
+          await refreshModalFilesList();
+          await loadFilesForActiveCommit();
+        }
+      } catch (err) {
+        showToast("Failed to discard: " + err);
+      }
+    }
+
+    async function discardSelectedWorkingFiles() {
+      const selected = Array.from(document.querySelectorAll(".working-file-cb:checked")).map(cb => cb.value);
+      if (selected.length === 0) {
+        alert("Please select at least one file using the checkboxes to discard.");
+        return;
+      }
+      if (!confirm(`Discard changes in ${selected.length} selected file(s)?`)) return;
+      try {
+        const resp = await fetch("/api/discard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ files: selected })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Error: " + res.error);
+        else {
+          showToast(`Discarded ${selected.length} files`);
+          await loadFilesForActiveCommit();
+        }
+      } catch (err) {
+        showToast("Failed to discard: " + err);
+      }
+    }
+
+    async function submitCommitModal() {
+      const msg = document.getElementById("modalCommitMessage").value.trim();
+      if (!msg) {
+        alert("Please enter a commit message.");
+        return;
+      }
+      const selectedFiles = getSelectedModalFiles();
+      if (!state.isAmendMode && selectedFiles.length === 0) {
+        alert("Please select at least one file to commit.");
+        return;
+      }
+
+      const endpoint = state.isAmendMode ? "/api/amend" : "/api/commit";
+      try {
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msg, files: selectedFiles })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Commit failed: " + res.error);
+        else {
+          showToast((state.isAmendMode ? "Amended " : "Committed ") + res.commit_hash.slice(0, 7));
+          closeCommitModal();
+          setTimeout(() => location.reload(), 500);
+        }
+      } catch (err) {
+        showToast("Commit failed: " + err);
+      }
+    }
+
+    // Merge Conflicts
+    async function resolveConflict(path, resolution) {
+      try {
+        const resp = await fetch("/api/resolve_conflict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: path, resolution: resolution })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Resolution error: " + res.error);
+        else {
+          showToast(`Resolved ${path} (${resolution})`);
+          await loadFilesForActiveCommit();
+        }
+      } catch (err) {
+        showToast("Resolution failed: " + err);
+      }
+    }
+
+    // HUD Actions: Sync, Branch, Goto
+    async function onSyncClicked() {
+      const spinner = document.getElementById("syncSpinner");
+      spinner.style.display = "inline";
+      showToast("Syncing repository from remote...");
+
+      try {
+        const resp = await fetch("/api/sync", { method: "POST" });
+        const res = await resp.json();
+        spinner.style.display = "none";
+        showToast(res.message || "Sync completed.");
+        setTimeout(() => location.reload(), 1000);
+      } catch (err) {
+        spinner.style.display = "none";
+        showToast("Sync failed: " + err);
+      }
+    }
+
+    async function onBranchSelected(branchName) {
+      if (!branchName) return;
+      try {
+        const resp = await fetch("/api/checkout_branch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ branch: branchName })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Checkout error: " + res.error);
+        else {
+          showToast("Switched to branch " + branchName);
+          setTimeout(() => location.reload(), 500);
+        }
+      } catch (err) {
+        showToast("Checkout failed: " + err);
+      }
+    }
+
+    async function onGotoClicked() {
+      const target = prompt("Enter commit hash or branch name to inspect:");
+      if (!target || !target.trim()) return;
+      try {
+        const resp = await fetch("/api/goto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target: target.trim() })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Goto error: " + res.error);
+        else {
+          showToast("Loaded " + target);
+          selectCommit(target.trim());
+        }
+      } catch (err) {
+        showToast("Goto failed: " + err);
+      }
+    }
+
+    // Multi-commit selection & Cross-tool Interactivity
+    function onCommitCheckChanged() {
+      const checkboxes = document.querySelectorAll(".commit-checkbox:checked");
+      state.selectedCommits = Array.from(checkboxes).map(cb => cb.value);
+      updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+      const countEl = document.getElementById("selectedCount");
+      if (countEl) countEl.textContent = state.selectedCommits.length;
+    }
+
+    async function onOpenInCodeReview() {
+      const commits = state.selectedCommits.length > 0 ? state.selectedCommits : [state.activeCommit];
+      try {
+        const resp = await fetch("/api/open_code_review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commits: commits })
+        });
+        const res = await resp.json();
+        window.open(res.url, "_blank");
+      } catch (err) {
+        const revStr = commits.join(",");
+        window.open(`/review?revisions=${encodeURIComponent(revStr)}`, "_blank");
+      }
+    }
+
+    async function openBug(bugId) {
+      try {
+        const resp = await fetch("/api/open_bug", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bug_id: bugId })
+        });
+        const res = await resp.json();
+        window.open(res.url, "_blank");
+      } catch (err) {
+        window.open(`/bugs#BUG-${bugId}`, "_blank");
+      }
+    }
+
+    async function openBugTracker() {
+      try {
+        const resp = await fetch("/api/open_bug", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
+        });
+        const res = await resp.json();
+        window.open(res.url, "_blank");
+      } catch (err) {
+        window.open("/bugs", "_blank");
+      }
+    }
+
+    async function createBugForCommit(commitHash) {
+      try {
+        const resp = await fetch("/api/open_bug", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commit: commitHash })
+        });
+        const res = await resp.json();
+        window.open(res.url, "_blank");
+      } catch (err) {
+        window.open(`/bugs#new?commit=${encodeURIComponent(commitHash)}`, "_blank");
+      }
+    }
+
+    // Commit Split and Combine
+    async function onSplitCommit() {
+      const target = state.activeCommit === "working" ? "HEAD" : state.activeCommit;
+      if (!confirm(`Split commit ${target.slice(0, 7)}? This will reset the commit and leave its changes in the working tree for selective restaging.`)) return;
+
+      try {
+        const resp = await fetch("/api/split", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commit: target })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Split failed: " + res.error);
+        else {
+          showToast(res.message || "Commit split successfully.");
+          setTimeout(() => location.reload(), 800);
+        }
+      } catch (err) {
+        showToast("Split error: " + err);
+      }
+    }
+
+    async function onCombineCommits() {
+      if (state.selectedCommits.length < 2) {
+        alert("Please select 2 or more contiguous commits using checkboxes to combine/squash.");
+        return;
+      }
+      const msg = prompt("Enter commit message for combined commit:", "Combined commits");
+      if (!msg || !msg.trim()) return;
+
+      try {
+        const resp = await fetch("/api/combine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commits: state.selectedCommits, message: msg.trim() })
+        });
+        const res = await resp.json();
+        if (res.error) showToast("Combine failed: " + res.error);
+        else {
+          showToast("Combined into " + res.commit_hash.slice(0, 7));
+          setTimeout(() => location.reload(), 800);
+        }
+      } catch (err) {
+        showToast("Combine error: " + err);
+      }
+    }
+
+    function onBranchBadgeClick(e, branchName, prUrl) {
+      e.stopPropagation();
+      const match = branchName.match(/(?:pr|pull)[/-]?(\d+)/i) || branchName.match(/(\d+)/);
+      if (match) {
+        window.open(`https://github.com/picklethecat1488-hue/hardware/pull/${match[1]}`, "_blank");
+      } else if (prUrl) {
+        window.open(prUrl, "_blank");
+      }
+    }
+
+    async function onCreatePR() {
+      if (!state.selectedCommits || state.selectedCommits.length === 0) {
+        alert("Please select one or more commits using the checkboxes to create a PR.");
+        return;
+      }
+
+      showToast(`Creating PR for ${state.selectedCommits.length} commit(s)...`);
+      try {
+        const resp = await fetch("/api/pr/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commits: state.selectedCommits })
+        });
+        const res = await resp.json();
+        if (res.status === "ok") {
+          showToast(`✓ Created ${res.created.length} PR(s) successfully!`);
+          setTimeout(() => location.reload(), 600);
+        } else {
+          alert(`Error creating PR: ${res.error}`);
+        }
+      } catch (err) {
+        alert(`Error communicating with server: ${err}`);
+      }
+    }
+
+    async function onUnlinkPR() {
+      if (!state.selectedCommits || state.selectedCommits.length === 0) {
+        alert("Please select one or more commits using the checkboxes to unlink PR.");
+        return;
+      }
+
+      if (!confirm(`Are you sure you want to unlink PRs from ${state.selectedCommits.length} selected commit(s)?`)) {
+        return;
+      }
+
+      showToast(`Unlinking PR from ${state.selectedCommits.length} commit(s)...`);
+      try {
+        const resp = await fetch("/api/pr/unlink", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commits: state.selectedCommits })
+        });
+        const res = await resp.json();
+        if (res.status === "ok") {
+          showToast(`✓ Unlinked ${res.unlinked.length} PR(s) successfully!`);
+          setTimeout(() => location.reload(), 600);
+        } else {
+          alert(`Error unlinking PR: ${res.error}`);
+        }
+      } catch (err) {
+        alert(`Error communicating with server: ${err}`);
+      }
+    }
+
+
+
+
+    // Keyboard shortcuts for pane toggling
+    document.addEventListener("keydown", (e) => {
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+      if (e.key === "[") {
+        togglePane("smartlog");
+      } else if (e.key === "]") {
+        togglePane("files");
+      }
+    });
+
+    // Initialize on load
+    window.addEventListener("DOMContentLoaded", () => {
+      if (!INITIAL_SYNC_DONE) {
+        performInitialSync(false);
+      }
+      updateSelectedCount();
+      loadFilesForActiveCommit();
+    });
+  </script>
+</body>
+</html>

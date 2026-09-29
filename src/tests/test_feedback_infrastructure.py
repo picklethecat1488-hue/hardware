@@ -295,7 +295,7 @@ def test_code_review_no_feedback_leaves_no_markdown_files(tmp_path: Path) -> Non
     other_comment = CommentModel(
         id="c1",
         uuid=str(uuid.uuid4()),
-        file_path="src/code_review.py",
+        file_path="src/dashboard.py",
         start_line=10,
         end_line=10,
         severity=ReviewSeverity.MUST_FIX,
@@ -321,8 +321,8 @@ def test_code_review_no_feedback_leaves_no_markdown_files(tmp_path: Path) -> Non
     assert "Finding on commit 1" in content
 
     # 3. ReviewServer save_and_sync with empty comments inside feedback_dir does not create CR.md
-    from provider.code_review.git_utils import get_git_root
     from provider.code_review.server import ReviewServer
+    from provider.vcs.git_engine import get_git_root
 
     db_file = tmp_path / "test_store.sqlite"
     state_file = tmp_path / "test_state.json"

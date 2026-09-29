@@ -1,0 +1,488 @@
+{# Reusable Quake Diff Rendering Component & Styling #}
+<style>
+  /* Diff Viewer Styles */
+  .diff-workstation-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    background: var(--quake-panel, #1b120a);
+    border: 2px solid var(--quake-border-mid, #5a381e);
+    border-radius: 4px;
+    box-shadow: inset 1px 1px 0px var(--quake-border-light, #8d5d33), inset -1px -1px 0px var(--quake-border-dark, #120a05);
+  }
+
+  .diff-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--quake-header-bg, #291a10);
+    border-bottom: 2px solid var(--quake-border-mid, #5a381e);
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .diff-file-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--quake-gold, #ffb800);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .diff-stats-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--quake-border-mid, #5a381e);
+  }
+
+  .diff-stats-add { color: #22c55e; }
+  .diff-stats-del { color: #ef4444; }
+
+  .diff-mode-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .diff-scroll-body {
+    flex: 1;
+    overflow: auto;
+    background: #0f0a07;
+    position: relative;
+  }
+
+  /* Side-by-side Table */
+  .diff-sbs-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .diff-sbs-table thead th {
+    background: #23160e;
+    color: var(--quake-copper, #c87a32);
+    font-size: 10px;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--quake-border-mid, #5a381e);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    text-align: left;
+  }
+
+  .diff-sbs-row td {
+    padding: 1px 4px;
+    vertical-align: top;
+    white-space: pre;
+    font-family: inherit;
+  }
+
+  .diff-lineno {
+    width: 44px;
+    user-select: none;
+    text-align: right;
+    color: var(--quake-text-dim, #716053);
+    padding-right: 8px !important;
+    border-right: 1px solid rgba(90, 56, 30, 0.4);
+    background: rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .diff-lineno:hover {
+    color: var(--quake-gold, #ffb800);
+    background: rgba(255, 184, 0, 0.15);
+  }
+
+  .diff-marker-cell {
+    width: 20px;
+    user-select: none;
+    text-align: center;
+    font-weight: 700;
+    color: var(--quake-text-dim, #716053);
+    background: rgba(0, 0, 0, 0.25);
+    border-right: 1px solid rgba(90, 56, 30, 0.25);
+    padding: 1px 2px !important;
+    cursor: pointer;
+  }
+
+  .diff-code-cell {
+    overflow-x: auto;
+    font-family: inherit;
+    width: calc(50% - 64px);
+    max-width: 0;
+  }
+
+  .diff-sbs-row.row-delete td.old-code,
+  .diff-sbs-row.row-delete td.old-lineno,
+  .diff-sbs-row.row-delete td.old-marker {
+    background: rgba(239, 68, 68, 0.22);
+    color: #fca5a5;
+  }
+
+  .diff-sbs-row.row-insert td.new-code,
+  .diff-sbs-row.row-insert td.new-lineno,
+  .diff-sbs-row.row-insert td.new-marker {
+    background: rgba(34, 197, 94, 0.22);
+    color: #86efac;
+  }
+
+  .diff-sbs-row.row-replace td.old-code,
+  .diff-sbs-row.row-replace td.old-marker {
+    background: rgba(239, 68, 68, 0.22);
+    color: #fca5a5;
+  }
+
+  .diff-sbs-row.row-replace td.new-code,
+  .diff-sbs-row.row-replace td.new-marker {
+    background: rgba(34, 197, 94, 0.22);
+    color: #86efac;
+  }
+
+  /* Unified View */
+  .diff-unified-wrap {
+    padding: 10px 14px;
+    min-width: 100%;
+    width: max-content;
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .diff-unified-hunk-bar {
+    background: #201309;
+    border-left: 3px solid var(--quake-gold, #ffb800);
+    color: var(--quake-gold, #ffb800);
+    padding: 4px 8px;
+    margin: 8px 0 4px 0;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .diff-unified-row {
+    display: grid;
+    grid-template-columns: 44px 44px 22px 1fr;
+    cursor: pointer;
+    padding: 1px 0;
+    border-radius: 2px;
+  }
+
+  .diff-unified-num-old,
+  .diff-unified-num-new {
+    width: 44px;
+    text-align: right;
+    padding-right: 6px;
+    user-select: none;
+    color: var(--quake-text-dim, #716053);
+    flex-shrink: 0;
+  }
+
+  .diff-unified-marker {
+    width: 22px;
+    text-align: center;
+    user-select: none;
+    font-weight: 700;
+    color: var(--quake-text-dim, #716053);
+    background: rgba(0, 0, 0, 0.25);
+    border-right: 1px solid rgba(90, 56, 30, 0.25);
+    flex-shrink: 0;
+  }
+
+  .diff-unified-text {
+    white-space: pre;
+    word-break: normal;
+    padding-left: 8px;
+  }
+
+  .diff-unified-row.add,
+  .diff-unified-row.insert {
+    background: rgba(34, 197, 94, 0.22);
+    color: #86efac;
+  }
+  .diff-unified-row.del,
+  .diff-unified-row.delete {
+    background: rgba(239, 68, 68, 0.22);
+    color: #fca5a5;
+  }
+
+  /* Binary Diff Presentation */
+  .diff-binary-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    gap: 16px;
+    color: var(--quake-text-muted, #9e8a78);
+  }
+
+  .diff-binary-icon {
+    font-size: 36px;
+    color: var(--quake-amber, #e59400);
+  }
+
+  .diff-binary-links {
+    display: flex;
+    gap: 12px;
+  }
+
+  .diff-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--quake-text-dim, #716053);
+    font-size: 13px;
+    gap: 8px;
+  }
+</style>
+
+<script>
+  /**
+   * Reusable Quake Diff Rendering Engine
+   */
+  const QuakeDiffEngine = {
+    detectLanguage(filePath) {
+      if (!filePath) return "plaintext";
+      const ext = filePath.split(".").pop().toLowerCase();
+      const map = {
+        py: "python",
+        js: "javascript",
+        ts: "typescript",
+        html: "xml",
+        j2: "xml",
+        yaml: "yaml",
+        yml: "yaml",
+        json: "json",
+        md: "markdown",
+        css: "css",
+        sh: "bash",
+        bash: "bash",
+        zsh: "bash",
+        c: "c",
+        cpp: "cpp",
+        h: "c",
+        hpp: "cpp",
+        sql: "sql",
+        xml: "xml",
+        svg: "xml",
+        ini: "ini",
+        toml: "ini"
+      };
+      return map[ext] || "plaintext";
+    },
+
+    highlightLine(text, lang) {
+      if (!text) return "";
+      if (typeof hljs === "undefined") {
+        return this.escapeHtml(text);
+      }
+      try {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(text, { language: lang, ignoreIllegals: true }).value;
+        }
+        return hljs.highlightAuto(text).value;
+      } catch (e) {
+        return this.escapeHtml(text);
+      }
+    },
+
+    highlightFullDocument(code, lang) {
+      if (!code) return [];
+      if (typeof hljs === "undefined") {
+        return code.split(/\r?\n/).map(l => this.escapeHtml(l));
+      }
+      try {
+        const highlighted = (lang && hljs.getLanguage(lang))
+          ? hljs.highlight(code, { language: lang, ignoreIllegals: true }).value
+          : hljs.highlightAuto(code).value;
+        return highlighted.split(/\r?\n/);
+      } catch (e) {
+        return code.split(/\r?\n/).map(l => this.escapeHtml(l));
+      }
+    },
+
+    escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    },
+
+    copySnippet(text) {
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+    },
+
+    renderDiff(container, diffData, mode = "side_by_side") {
+      if (!container) return;
+      if (!diffData) {
+        container.innerHTML = `<div class="diff-empty-state"><span>No diff content loaded.</span></div>`;
+        return;
+      }
+
+      if (diffData.is_binary) {
+        this.renderBinary(container, diffData);
+        return;
+      }
+
+      const lang = this.detectLanguage(diffData.file_path);
+      const oldHighlighted = this.highlightFullDocument(diffData.old_content || "", lang);
+      const newHighlighted = this.highlightFullDocument(diffData.new_content || diffData.full_content || "", lang);
+
+      if (mode === "unified") {
+        this.renderUnified(container, diffData, lang, oldHighlighted, newHighlighted);
+      } else {
+        this.renderSideBySide(container, diffData, lang, oldHighlighted, newHighlighted);
+      }
+    },
+
+    renderSideBySide(container, diffData, lang, oldHighlighted, newHighlighted) {
+      const rows = diffData.side_by_side || [];
+      let html = `
+        <table class="diff-sbs-table">
+          <thead>
+            <tr>
+              <th colspan="3">Previous Revision</th>
+              <th colspan="3">Active Revision</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      rows.forEach(r => {
+        const rowClass = r.row_type === "equal" ? "row-equal" : ("row-" + r.row_type);
+        let oldHtml = "";
+        if (r.old_no && oldHighlighted && oldHighlighted[r.old_no - 1] !== undefined) {
+          oldHtml = oldHighlighted[r.old_no - 1];
+        } else if (r.old_text) {
+          oldHtml = this.highlightLine(r.old_text, lang);
+        }
+
+        let newHtml = "";
+        if (r.new_no && newHighlighted && newHighlighted[r.new_no - 1] !== undefined) {
+          newHtml = newHighlighted[r.new_no - 1];
+        } else if (r.new_text) {
+          newHtml = this.highlightLine(r.new_text, lang);
+        }
+
+        let oldMarker = " ";
+        if (r.row_type === "delete" || r.row_type === "replace") oldMarker = "-";
+        let newMarker = " ";
+        if (r.row_type === "insert" || r.row_type === "replace") newMarker = "+";
+
+        html += `
+          <tr class="diff-sbs-row ${rowClass}">
+            <td class="diff-lineno old-lineno">${r.old_no || ''}</td>
+            <td class="diff-marker-cell old-marker">${oldMarker}</td>
+            <td class="diff-code-cell old-code hljs">${oldHtml}</td>
+            <td class="diff-lineno new-lineno">${r.new_no || ''}</td>
+            <td class="diff-marker-cell new-marker">${newMarker}</td>
+            <td class="diff-code-cell new-code hljs">${newHtml}</td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    },
+
+    renderUnified(container, diffData, lang, oldHighlighted, newHighlighted) {
+      const hunks = diffData.hunks || [];
+      let html = `<div class="diff-unified-wrap">`;
+
+      hunks.forEach(h => {
+        html += `<div class="diff-unified-hunk-bar">${this.escapeHtml(h.header)}</div>`;
+        (h.lines || []).forEach(l => {
+          const rowType = (l.type === "delete" || l.type === "del") ? "del delete" : ((l.type === "add" || l.type === "insert") ? "add insert" : l.type);
+          let lineHtml = "";
+          if (l.type === "add" && l.new_line_no && newHighlighted && newHighlighted[l.new_line_no - 1] !== undefined) {
+            lineHtml = newHighlighted[l.new_line_no - 1];
+          } else if (l.type === "delete" && l.old_line_no && oldHighlighted && oldHighlighted[l.old_line_no - 1] !== undefined) {
+            lineHtml = oldHighlighted[l.old_line_no - 1];
+          } else {
+            lineHtml = this.highlightLine(l.content, lang);
+          }
+
+          let markerChar = " ";
+          if (l.type === "add" || l.type === "insert") markerChar = "+";
+          else if (l.type === "delete" || l.type === "del") markerChar = "-";
+
+          html += `
+            <div class="diff-unified-row ${rowType}">
+              <span class="diff-unified-num-old">${l.old_line_no || ''}</span>
+              <span class="diff-unified-num-new">${l.new_line_no || ''}</span>
+              <span class="diff-unified-marker">${markerChar}</span>
+              <span class="diff-unified-text hljs">${lineHtml}</span>
+            </div>
+          `;
+        });
+      });
+
+      html += `</div>`;
+      container.innerHTML = html;
+    },
+
+    renderBinary(container, diffData) {
+      const filePath = diffData.file_path;
+      const isImg = /\.(png|jpe?g|gif|svg|webp|ico)$/i.test(filePath);
+      let previewHtml = "";
+      if (isImg) {
+        previewHtml = `
+          <div style="display:flex;gap:20px;justify-content:center;align-items:center;margin-top:12px;">
+            <div style="text-align:center;">
+              <div style="font-size:11px;color:var(--quake-text-muted);margin-bottom:6px;">Previous</div>
+              <img src="/api/raw?commit=${encodeURIComponent(diffData.commit || 'HEAD')}&file=${encodeURIComponent(filePath)}&parent=true" style="max-width:240px;max-height:240px;border:1px solid #5a381e;background:#120c08;" alt="Previous image" onerror="this.style.display='none'"/>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:11px;color:var(--quake-gold);margin-bottom:6px;">Active</div>
+              <img src="/api/raw?commit=${encodeURIComponent(diffData.commit || 'HEAD')}&file=${encodeURIComponent(filePath)}&parent=false" style="max-width:240px;max-height:240px;border:1px solid #ffb800;background:#120c08;" alt="Active image" onerror="this.style.display='none'"/>
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        <div class="diff-binary-box">
+          <div class="diff-binary-icon">💾</div>
+          <div style="font-weight:700;font-size:14px;color:var(--quake-gold);">Binary File Diff</div>
+          <div>${this.escapeHtml(filePath)}</div>
+          <div class="diff-binary-links">
+            <a href="/api/raw?commit=${encodeURIComponent(diffData.commit || 'HEAD')}&file=${encodeURIComponent(filePath)}&parent=true" download class="quake-btn quake-btn-default">Download Old</a>
+            <a href="/api/raw?commit=${encodeURIComponent(diffData.commit || 'HEAD')}&file=${encodeURIComponent(filePath)}&parent=false" download class="quake-btn quake-btn-gold">Download New</a>
+          </div>
+          ${previewHtml}
+        </div>
+      `;
+    }
+  };
+</script>

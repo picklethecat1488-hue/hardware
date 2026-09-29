@@ -13,7 +13,7 @@ import threading
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Optional
+from typing import Any, Optional
 import uuid
 
 import jinja2
@@ -25,8 +25,8 @@ from model.code_review import (
     ReviewSeverity,
     ReviewStatus,
 )
-from provider.code_review.git_utils import (
-    GitReviewEngine,
+from provider.vcs.git_engine import (
+    GitEngine,
     extract_line_snippet,
     get_git_root,
 )
@@ -351,14 +351,23 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(content)))
+        self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(content)
+        self.close_connection = True
 
 
 class ReviewServer(ThreadingHTTPServer):
     """Multi-threaded HTTP review server with embedded state persistence."""
 
     allow_reuse_address = True
+    daemon_threads = True
+
+    def get_request(self) -> Any:
+        """Accept incoming connection and set socket timeout to prevent lingering sockets."""
+        sock, addr = super().get_request()
+        sock.settimeout(10.0)
+        return sock, addr
 
     def __init__(
         self,
@@ -375,7 +384,7 @@ class ReviewServer(ThreadingHTTPServer):
     ) -> None:
         """Initialize review HTTP server with config and persistent paths."""
         self.repo_root = repo_root or get_git_root()
-        self.git_engine = GitReviewEngine(repo_root=self.repo_root)
+        self.git_engine = GitEngine(repo_root=self.repo_root)
         self.exporter = MarkdownReviewExporter(repo_root=self.repo_root)
 
         self.markdown_output = markdown_output or (self.repo_root / "build" / "CR.md")
