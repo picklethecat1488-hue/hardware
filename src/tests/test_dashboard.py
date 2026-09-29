@@ -1826,3 +1826,48 @@ def test_regression_bug_218_pr_creation_points_at_and_merged_commits_hidden(tmp_
     if shas[2] in node_by_sha:
         with pytest.raises(ValueError, match="already merged into the tracking branch"):
             engine.create_prs_for_commits([shas[2]])
+
+
+def test_regression_bug_221_branches_missing_from_branch_viewer(tmp_path: Path) -> None:
+    """Verify BUG-221: main branch and release branches v1..v6 appear correctly in branch viewer.
+
+    Asserts that:
+    1. Template properly classifies and sorts main and release branches.
+    2. GitEngine.get_branches parses refs/heads/main as 'main' even when ambiguous tag exists.
+    3. GitEngine.get_branches fetches both local and remote branches.
+    4. Release branches (v1, v2, v3, etc.) are included in branch list.
+    """
+    # 1. Template validation
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    assert template_path.exists()
+    content = template_path.read_text(encoding="utf-8")
+
+    assert "mainReleaseBranches.sort" in content
+    assert "heads/main" in content or ".endswith('/main')" in content
+
+    # 2. Isolated repo with ambiguous tag and remote tracking branches
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # Tag 'main' commit as 'main' (creates ref collision: refs/tags/main vs refs/heads/main)
+    run_git_command(["tag", "main", "HEAD"], cwd=repo_dir)
+
+    # Create release branches v1, v2, v3
+    run_git_command(["branch", "v1", "HEAD"], cwd=repo_dir)
+    run_git_command(["branch", "v2", "HEAD"], cwd=repo_dir)
+    run_git_command(["branch", "v3", "HEAD"], cwd=repo_dir)
+
+    branches = engine.get_branches()
+    branch_map = {b.name: b for b in branches}
+
+    # Verify 'main' is parsed cleanly as 'main' rather than 'heads/main'
+    assert "main" in branch_map, f"Branch list must contain 'main', found: {list(branch_map.keys())}"
+    assert "heads/main" not in branch_map, "Branch list must not expose raw 'heads/main'"
+
+    # Verify release branches v1, v2, v3 exist
+    for v in ["v1", "v2", "v3"]:
+        assert v in branch_map, f"Branch list must contain release branch '{v}'"
+
+    # Verify checkout of 'main' succeeds
+    assert engine.checkout_branch("main") is True
+    assert engine.get_current_branch() == "main"

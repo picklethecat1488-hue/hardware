@@ -858,14 +858,14 @@
         </button>
         <select id="branchSelect" class="quake-select" style="display:none;" onchange="onBranchSelected(this.value)">
           <optgroup label="⭐ Main &amp; Release Branches">
-            {% for b in session.branches if (b.name in ['main', 'master', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or 'release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v')) %}
+            {% for b in session.branches if (b.name in ['main', 'master', 'heads/main', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or b.name.endswith('/main') or b.name.endswith('/master') or 'release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v') or '/v' in b.name.lower()) %}
               <option value="{{ b.name }}" {% if b.is_current %}selected{% endif %}>
                 ⭐ {{ b.name }}{% if b.is_current %} (current){% endif %}
               </option>
             {% endfor %}
           </optgroup>
           <optgroup label="🌿 Feature &amp; PR Branches">
-            {% for b in session.branches if not (b.name in ['main', 'master', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or 'release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v')) %}
+            {% for b in session.branches if not (b.name in ['main', 'master', 'heads/main', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or b.name.endswith('/main') or b.name.endswith('/master') or 'release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v') or '/v' in b.name.lower()) %}
               <option value="{{ b.name }}" {% if b.is_current %}selected{% endif %}>
                 🌿 {{ b.name }}{% if b.is_current %} (current){% endif %}
               </option>
@@ -2106,15 +2106,15 @@
       }
     }
 
-    // Branch Selection & Formatting (BUG-197)
+    // Branch Selection & Formatting (BUG-197, BUG-221)
     const branchData = [
       {% for b in session.branches %}
         {
           name: "{{ b.name }}",
           is_current: {{ 'true' if b.is_current else 'false' }},
           is_remote: {{ 'true' if b.is_remote else 'false' }},
-          is_main: {{ 'true' if b.name in ['main', 'master', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] else 'false' }},
-          is_release: {{ 'true' if ('release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v')) else 'false' }}
+          is_main: {{ 'true' if (b.name in ['main', 'master', 'heads/main', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or b.name.endswith('/main') or b.name.endswith('/master')) else 'false' }},
+          is_release: {{ 'true' if ('release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v') or '/v' in b.name.lower()) else 'false' }}
         }{% if not loop.last %},{% endif %}
       {% endfor %}
     ];
@@ -2174,6 +2174,13 @@
           featureBranches.push(b);
         }
       }
+
+      // Sort main first, then releases numerically (BUG-221)
+      mainReleaseBranches.sort((a, b) => {
+        if (a.is_main && !b.is_main) return -1;
+        if (!a.is_main && b.is_main) return 1;
+        return a.name.localeCompare(b.name, undefined, { numeric: true });
+      });
 
       mainReleaseBranches.forEach(b => {
         const item = document.createElement("div");

@@ -197,15 +197,24 @@ class GitEngine:
         current_branch = self.get_current_branch()
 
         try:
-            fmt = "%(refname:short)%09%(upstream:short)%09%(upstream:track)"
-            out = run_git_command(["for-each-ref", f"--format={fmt}", "refs/heads/"], cwd=self.repo_root)
+            fmt = "%(refname)%09%(refname:short)%09%(upstream:short)%09%(upstream:track)"
+            out = run_git_command(
+                ["for-each-ref", f"--format={fmt}", "refs/heads/", "refs/remotes/"], cwd=self.repo_root
+            )
+            local_names = set()
+            remote_entries = []
+
             for line in out.splitlines():
                 if not line.strip():
                     continue
                 parts = line.split("\t")
-                name = parts[0].strip()
-                upstream = parts[1].strip() if len(parts) > 1 and parts[1].strip() else None
-                track = parts[2].strip() if len(parts) > 2 else ""
+                refname = parts[0].strip()
+                short_name = parts[1].strip() if len(parts) > 1 else ""
+                upstream = parts[2].strip() if len(parts) > 2 and parts[2].strip() else None
+                track = parts[3].strip() if len(parts) > 3 else ""
+
+                if refname.endswith("/HEAD") or short_name.endswith("/HEAD"):
+                    continue
 
                 ahead = 0
                 behind = 0
@@ -218,11 +227,33 @@ class GitEngine:
                     if m:
                         behind = int(m.group(1))
 
+                if refname.startswith("refs/heads/"):
+                    clean_name = refname[len("refs/heads/") :]
+                    local_names.add(clean_name)
+                    branches.append(
+                        BranchInfoModel(
+                            name=clean_name,
+                            is_current=(clean_name == current_branch or short_name == current_branch),
+                            is_remote=False,
+                            upstream=upstream,
+                            ahead=ahead,
+                            behind=behind,
+                        )
+                    )
+                elif refname.startswith("refs/remotes/"):
+                    remote_name = refname[len("refs/remotes/") :]
+                    remote_entries.append((remote_name, upstream, ahead, behind))
+
+            # Add remote branches that do not have a local branch with the same name
+            for remote_name, upstream, ahead, behind in remote_entries:
+                short_remote = remote_name.split("/", 1)[1] if "/" in remote_name else remote_name
+                if short_remote in local_names:
+                    continue
                 branches.append(
                     BranchInfoModel(
-                        name=name,
-                        is_current=(name == current_branch),
-                        is_remote=False,
+                        name=remote_name,
+                        is_current=False,
+                        is_remote=True,
                         upstream=upstream,
                         ahead=ahead,
                         behind=behind,
@@ -243,6 +274,12 @@ class GitEngine:
             True if checkout succeeded.
         """
         try:
+            if branch_name.startswith("origin/"):
+                try:
+                    run_git_command(["checkout", "--track", branch_name], cwd=self.repo_root)
+                    return True
+                except RuntimeError:
+                    pass
             run_git_command(["checkout", branch_name], cwd=self.repo_root)
             return True
         except RuntimeError:
