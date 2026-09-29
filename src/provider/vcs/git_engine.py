@@ -625,12 +625,38 @@ class GitEngine:
             return f"{base}/pull/{pr_number}"
         return f"https://github.com/picklethecat1488-hue/hardware/pull/{pr_number}"
 
+    def get_remote_pr_numbers(self) -> Set[int]:
+        """Fetch set of valid pull request numbers existing on remote GitHub repository.
+
+        Cached on the instance to avoid repeatedly invoking ls-remote.
+        """
+        if hasattr(self, "_remote_pr_cache") and self._remote_pr_cache is not None:
+            return self._remote_pr_cache
+
+        prs: Set[int] = set()
+        web_url = self.get_repo_web_url()
+        if web_url:
+            try:
+                output = run_git_command(["ls-remote", "origin", "refs/pull/*/head"], cwd=self.repo_root)
+                for line in output.splitlines():
+                    m = re.search(r"refs/pull/(\d+)/head", line)
+                    if m:
+                        prs.add(int(m.group(1)))
+            except RuntimeError:
+                pass
+
+        self._remote_pr_cache = prs
+        return prs
+
     def get_branch_url(self, branch_name: str) -> str:
         """Return the GitHub web URL for a branch or PR branch name."""
         base = self.get_repo_web_url() or "https://github.com/picklethecat1488-hue/hardware"
         m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", branch_name, re.IGNORECASE)
         if m:
-            return f"{base}/pull/{m.group(1)}"
+            pr_num = int(m.group(1))
+            remote_prs = self.get_remote_pr_numbers()
+            if not remote_prs or pr_num in remote_prs:
+                return f"{base}/pull/{pr_num}"
         cleaned = re.sub(r"^(?:remotes/)?origin/", "", branch_name)
         return f"{base}/tree/{cleaned}"
 
@@ -667,8 +693,13 @@ class GitEngine:
                 pr_num = int(m.group(1))
 
         if pr_num is not None:
-            pr_status = f"PR #{pr_num}"
-            pr_url = self.get_pr_url(pr_num)
+            remote_prs = self.get_remote_pr_numbers()
+            if remote_prs and pr_num not in remote_prs:
+                pr_status = f"Local PR #{pr_num}"
+                pr_url = None
+            else:
+                pr_status = f"PR #{pr_num}"
+                pr_url = self.get_pr_url(pr_num)
             return pr_status, pr_num, pr_url
 
         # Check for any other PR branch marker without explicit number

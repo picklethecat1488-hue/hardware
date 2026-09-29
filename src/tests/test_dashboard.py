@@ -1449,3 +1449,36 @@ def test_regression_bug_203_multi_commit_shift_click_selection() -> None:
     # Smartlog nodes carry data-hash and accept event parameter in selectCommit
     assert 'data-hash="{{ node.commit_hash }}"' in tpl_text
     assert "selectCommit('{{ node.commit_hash }}', event)" in tpl_text
+
+
+def test_regression_bug_212_pr_past_535_404_handling(tmp_path: Path) -> None:
+    """Verify BUG-212: PRs past 534 without remote GitHub PRs do not link to 404 URLs."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 1. Mock remote PR numbers simulating GitHub state where only PRs <= 534 exist
+    engine._remote_pr_cache = {530, 531, 532, 533, 534}
+
+    # 2. Existing remote PR 534 resolves to valid GitHub PR URL
+    status_534, num_534, url_534 = engine._extract_pr_info("feat: test", "", ["origin/pr534"], [])
+    assert num_534 == 534
+    assert status_534 == "PR #534"
+    assert url_534 is not None and url_534.endswith("/pull/534")
+
+    # 3. Unsubmitted PR 535 resolves to Local PR with None pr_url to prevent 404
+    status_535, num_535, url_535 = engine._extract_pr_info("feat: test", "", ["pr535"], [])
+    assert num_535 == 535
+    assert status_535 == "Local PR #535"
+    assert url_535 is None, f"Expected None pr_url for uncreated PR 535, got {url_535}"
+
+    # 4. get_branch_url for local pr535 falls back to tree URL instead of 404 PR URL
+    branch_url_535 = engine.get_branch_url("pr535")
+    assert branch_url_535.endswith("/tree/pr535")
+    assert "/pull/535" not in branch_url_535
+
+    # 5. Verify template contains pr-local-badge and local fallback toast
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert "pr-local-badge" in tpl_text
+    assert "has not been created on GitHub yet" in tpl_text
+

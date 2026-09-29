@@ -526,6 +526,17 @@
       background: rgba(168, 85, 247, 0.35);
       text-decoration: underline;
       box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+    .pr-local-badge {
+      background: rgba(255, 176, 0, 0.15) !important;
+      border: 1px dashed rgba(255, 176, 0, 0.5) !important;
+      color: #ffb800 !important;
+      box-shadow: none !important;
+      cursor: pointer;
+    }
+    .pr-local-badge:hover {
+      background: rgba(255, 176, 0, 0.3) !important;
+      border-color: #ffc83b !important;
+      color: #fff !important;
     }
     .quake-btn-purple {
       background: rgba(168, 85, 247, 0.2);
@@ -907,15 +918,21 @@
                        {% if node.commit_hash in session.selected_commits %}checked{% endif %}/>
                 <span class="node-graph-art">{{ node.graph_art or node.graph_symbol }}</span>
                 <span class="node-sha">{{ node.short_hash }}</span>
-                {% if node.pr_number %}
-                  <a href="{{ node.pr_url or ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ node.pr_number) }}"
+                {% if node.pr_number and node.pr_url %}
+                  <a href="{{ node.pr_url }}"
                      target="_blank"
                      rel="noopener noreferrer"
                      class="pr-highlight-badge"
                      onclick="event.stopPropagation();"
                      title="Pull Request #{{ node.pr_number }} (Click to open in GitHub)">
-                    <span class="pr-icon">⎇</span> PR #{{ node.pr_number }}
+                    <span class="pr-icon">⎇</span> {{ node.pr_status or ('PR #' ~ node.pr_number) }}
                   </a>
+                {% elif node.pr_number %}
+                  <span class="pr-highlight-badge pr-local-badge"
+                        onclick="event.stopPropagation(); showToast('{{ node.pr_status or ('PR #' ~ node.pr_number) }} has not been created on GitHub yet');"
+                        title="{{ node.pr_status or ('PR #' ~ node.pr_number) }} (Local branch, not submitted to GitHub)">
+                    <span class="pr-icon">⎇</span> {{ node.pr_status or ('PR #' ~ node.pr_number) }}
+                  </span>
                 {% endif %}
               </div>
               <span class="node-author-date">{{ node.relative_date or node.date }}</span>
@@ -927,30 +944,30 @@
             <div class="node-tags-row">
               {% for br in node.branches %}
                 {% set is_pr_br = ('pr' in br.lower() or 'pull' in br.lower()) %}
-                {% set br_url = node.pr_url if (is_pr_br and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ node.pr_number if (is_pr_br and node.pr_number) else ('https://github.com/picklethecat1488-hue/hardware/tree/' ~ br)) %}
+                {% set br_url = node.pr_url if (is_pr_br and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/tree/' ~ br.replace('origin/', '')) %}
                 <a href="{{ br_url }}"
                    target="_blank"
                    rel="noopener noreferrer"
-                   class="node-badge node-badge-branch {% if is_pr_br %}pr-tag-link{% endif %}"
+                   class="node-badge node-badge-branch {% if is_pr_br and node.pr_url %}pr-tag-link{% elif is_pr_br %}pr-local-badge{% endif %}"
                    onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
-                   title="{% if is_pr_br %}Open PR in GitHub{% else %}View branch {{ br }} on GitHub{% endif %}">
+                   title="{% if is_pr_br and node.pr_url %}Open PR in GitHub{% elif is_pr_br %}Local branch {{ br }} (not on GitHub){% else %}View branch {{ br }} on GitHub{% endif %}">
                   ⎇ {{ br }}
                 </a>
               {% endfor %}
               {% for tag in node.tags %}
                 {% set is_pr_tag = ('pr' in tag.lower() or 'pull' in tag.lower()) %}
-                {% set tag_url = node.pr_url if (is_pr_tag and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ node.pr_number if (is_pr_tag and node.pr_number) else ('https://github.com/picklethecat1488-hue/hardware/releases/tag/' ~ tag)) %}
+                {% set tag_url = node.pr_url if (is_pr_tag and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/releases/tag/' ~ tag) %}
                 <a href="{{ tag_url }}"
                    target="_blank"
                    rel="noopener noreferrer"
-                   class="node-badge node-badge-tag {% if is_pr_tag %}pr-tag-link{% endif %}"
+                   class="node-badge node-badge-tag {% if is_pr_tag and node.pr_url %}pr-tag-link{% elif is_pr_tag %}pr-local-badge{% endif %}"
                    onclick="onBranchBadgeClick(event, '{{ tag }}', '{{ node.pr_url or '' }}')"
-                   title="{% if is_pr_tag %}Open PR in GitHub{% else %}View tag {{ tag }} on GitHub{% endif %}">
+                   title="{% if is_pr_tag and node.pr_url %}Open PR in GitHub{% elif is_pr_tag %}Local tag {{ tag }}{% else %}View tag {{ tag }} on GitHub{% endif %}">
                   🏷 {{ tag }}
                 </a>
               {% endfor %}
-              {% if node.pr_status %}
-                <a href="{{ node.pr_url or ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ (node.pr_number or '')) }}"
+              {% if node.pr_status and node.pr_url %}
+                <a href="{{ node.pr_url }}"
                    target="_blank"
                    rel="noopener noreferrer"
                    class="node-badge node-badge-pr pr-tag-link"
@@ -958,6 +975,12 @@
                    title="Open PR on GitHub">
                   ⎇ {{ node.pr_status }}
                 </a>
+              {% elif node.pr_status %}
+                <span class="node-badge node-badge-pr pr-local-badge"
+                      onclick="event.stopPropagation(); showToast('{{ node.pr_status }} has not been created on GitHub yet');"
+                      title="{{ node.pr_status }} (Not yet created on GitHub)">
+                  ⎇ {{ node.pr_status }}
+                </span>
               {% endif %}
               {% for bug in node.bug_tags %}
                 <span class="node-badge node-badge-bug {% if bug.status == 'RESOLVED' %}resolved{% endif %}"
@@ -2325,14 +2348,23 @@
 
     function onBranchBadgeClick(e, branchName, prUrl) {
       if (e) e.stopPropagation();
-      const match = branchName.match(/(?:^|\/)(?:pr|pull)[/-]?(\d+)\b/i) || branchName.match(/(\d+)/);
-      if (match) {
-        window.open(`https://github.com/picklethecat1488-hue/hardware/pull/${match[1]}`, "_blank");
-      } else if (prUrl) {
+      if (prUrl) {
         window.open(prUrl, "_blank");
-      } else {
+        return;
+      }
+      const match = branchName.match(/(?:^|\/)(?:pr|pull)[/-]?(\d+)\b/i);
+      const isRemote = branchName.startsWith("origin/") || branchName.startsWith("remotes/");
+      if (match && isRemote) {
+        window.open(`https://github.com/picklethecat1488-hue/hardware/pull/${match[1]}`, "_blank");
+        return;
+      }
+      if (isRemote) {
         const cleaned = branchName.replace(/^(?:remotes\/)?origin\//i, "");
         window.open(`https://github.com/picklethecat1488-hue/hardware/tree/${cleaned}`, "_blank");
+      } else if (match) {
+        showToast(`PR #${match[1]} (branch "${branchName}") has not been created on GitHub yet.`);
+      } else {
+        showToast(`Branch "${branchName}" is local only and has not been pushed to GitHub.`);
       }
     }
 
