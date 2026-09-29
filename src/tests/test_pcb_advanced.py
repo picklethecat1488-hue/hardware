@@ -302,6 +302,7 @@ def test_rerun_logger_drc_and_eye(advanced_pcb_stackup: StackupModel):
     log_eye_diagram(eye_res)
 
 
+@pytest.mark.slow
 def test_carrier_board_provider_cad_and_assembly():
     """Verify CarrierBoardProvider builds valid 3D shapes, loads measurements, and populates Room."""
     provider = CarrierBoardProvider()
@@ -395,6 +396,7 @@ def test_schematic_diagram_dynamic_scaling(tmp_path: Path):
     assert svg_height >= 700
 
 
+@pytest.mark.slow
 def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     """Verify that CarrierBoard wiring YAML parses footprints and nets, generates diagrams, and exports BOM/CPL."""
     provider = CarrierBoardProvider()
@@ -833,6 +835,7 @@ def test_carrier_board_full_milestones_integration(tmp_path: Path):
     assert cap_data["channels"][6]["drive_shield"] is False
 
 
+@pytest.mark.slow
 def test_carrier_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path):
     """Verify carrier_board manufacturing exports (.kicad_pcb, .drl, *.gbr) and pos.csv pad alignment."""
     import csv
@@ -1077,6 +1080,7 @@ def test_schematic_decoupling_cap_bank_and_pullup_resistors():
     plt.close(fig)
 
 
+@pytest.mark.slow
 def test_carrier_board_test_points_and_zero_drc_errors():
     """Verify carrier_board has drilled test points with 4mm pitch, TP_GND, and 0 DRC violations."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -1836,6 +1840,7 @@ def test_regression_pinmux_datasheet_verification() -> None:
     assert "M4" in content and "P1_23" in content and "PWR_EN_DEBUG" in content
 
 
+@pytest.mark.slow
 def test_regression_carrier_board_wiring_diagram_top_down_and_colored() -> None:
     """Verify carrier board wiring diagram is 2D top-down and colored with distinct net layers."""
     from model import DiagramStyle
@@ -1855,6 +1860,7 @@ def test_regression_carrier_board_wiring_diagram_top_down_and_colored() -> None:
     assert room_prod.diagram_options.style == DiagramStyle.HIDDEN
 
 
+@pytest.mark.slow
 def test_regression_enclosure_cad_feedback_and_assembly() -> None:
     """Verify enclosure CAD feedback: rounded fillets, cutouts, locating lip, and product assembly."""
     provider = CarrierBoardProvider()
@@ -1914,6 +1920,7 @@ def test_regression_enclosure_cad_feedback_and_assembly() -> None:
     assert abs(carrier_bb.min.Z - expected_carrier_bottom_z) < 0.05
 
 
+@pytest.mark.slow
 def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
     """Verify BUG-065 (M.2 cutout in bottom enclosure) and BUG-066 (component silkscreens on carrier)."""
     provider = CarrierBoardProvider()
@@ -2118,6 +2125,7 @@ def test_regression_bug_083_schematic_symbol_overlap_and_sheet7_pullups(tmp_path
     assert dx >= 12.0, f"R1 and R2 must have >= 12.0mm horizontal clearance to prevent overlap, got dx={dx:.1f}mm"
 
 
+@pytest.mark.slow
 def test_regression_bug_082_carrier_board_routing_and_kicad_drc(tmp_path: Path):
     """Verify BUG-082: carrier_board routes cleanly with zero drc.py and zero KiCad DRC errors."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -2487,6 +2495,7 @@ def test_regression_bug_089_schematic_subsystem_organization() -> None:
     assert len(violations.errors) == 0, f"DRC errors on subsystem sheets: {[e.description for e in violations.errors]}"
 
 
+@pytest.mark.slow
 def test_regression_bug_090_enclosure_cad_feedback() -> None:
     """Verify BUG-090: SWD vs USB cutout separation, rounded side cutouts, and lid battery mount."""
     provider = CarrierBoardProvider()
@@ -2549,6 +2558,7 @@ def test_regression_bug_090_enclosure_cad_feedback() -> None:
     )
 
 
+@pytest.mark.slow
 def test_regression_bug_092_carrier_board_top_logo() -> None:
     """Verify BUG-092: Antigravity logo placed as a unique graphic image within a square frame (not text) on carrier board top with zero DRC errors."""
     from pathlib import Path
@@ -3065,3 +3075,30 @@ def test_regression_bug_206_off_sheet_schematic_feedback(tmp_path: Path) -> None
     rendered = diag.render_pdf(pdf_out)
     assert rendered.exists()
     assert rendered.stat().st_size > 10000
+
+
+def test_regression_bug_204_fast_pytest_suite_timing_and_slow_markers() -> None:
+    """Verify BUG-204: heavy CAD booleans, math models, and full CAM/DRC exports are marked slow."""
+    import inspect
+    import pytest
+    from tests import test_bullet_fluid, test_room, test_pcb_export, test_pcb_drc, test_pcb_advanced
+    from projects.tests import test_cat_fountain, test_carrier_board
+
+    slow_targets = [
+        (test_bullet_fluid.TestBulletFluid, True),
+        (test_room.test_cat_fountain_provider_bowl_collision_types, False),
+        (test_pcb_export.test_pcb_exporter_all_methods_integration, False),
+        (test_pcb_drc.test_carrier_board_carrier_and_flex_tail_zero_drc_errors_and_warnings, False),
+        (test_pcb_advanced.test_carrier_board_manufacturing_artifacts_and_pos_alignment, False),
+        (test_pcb_advanced.test_regression_bug_082_carrier_board_routing_and_kicad_drc, False),
+        (test_cat_fountain.TestCatFountainProvider.test_collar_standoff_geometry, False),
+        (test_carrier_board.test_regression_bug_179_right_side_ports_clear_mounting_holes, False),
+        (test_carrier_board.test_regression_bug_134_carrier_board_components_match_schematic, False),
+        (test_carrier_board.test_regression_bug_207_sheet_17_components_on_carrier_board, False),
+    ]
+
+    for target, is_class in slow_targets:
+        target_name = target.__name__
+        marks = getattr(target, "pytestmark", [])
+        slow_found = any(getattr(m, "name", "") == "slow" for m in marks)
+        assert slow_found, f"{target_name} must be marked with @pytest.mark.slow to keep fast pytest suite fast!"

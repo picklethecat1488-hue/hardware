@@ -7,6 +7,7 @@ from model.wiring import Wiring
 from provider import Mode
 
 
+@pytest.mark.slow
 def test_regression_bug_072_flex_tail_cutout_zero_intersection() -> None:
     """Verify BUG-072: flex tail has zero intersection volume with enclosure bottom and lid."""
     provider = CarrierBoardProvider()
@@ -147,6 +148,7 @@ def test_regression_bug_075_swd_cutout() -> None:
     )
 
 
+@pytest.mark.slow
 def test_regression_bug_076_enclosure_snap_fit() -> None:
     """Verify BUG-076: enclosure lid snap fits to bottom shell without useless screw holes."""
     provider = CarrierBoardProvider()
@@ -230,6 +232,7 @@ def test_regression_bug_078_led_cutout_and_cover() -> None:
     assert "mount" in cover.part.joints, "LED cover must have 'mount' RigidJoint"
 
 
+@pytest.mark.slow
 def test_regression_bug_085_enclosure_clip_on_mounting_posts() -> None:
     """Verify BUG-085: enclosure bottom replaces screw holes with flared clip-on mounting posts for carrier PCB."""
     provider = CarrierBoardProvider()
@@ -449,6 +452,7 @@ def test_regression_bug_133_flex_tail_schematic_isolated() -> None:
             assert f'"{other_comp}"' not in sch_text
 
 
+@pytest.mark.slow
 def test_regression_bug_134_carrier_board_components_match_schematic() -> None:
     """Verify BUG-134: carrier board PCB components J6, J7, J8 are JST-PH-6P matching schematic."""
     from pathlib import Path
@@ -499,6 +503,7 @@ def test_regression_bug_139_battery_cover() -> None:
     assert provider.settings.enclosure_battery_cover_vertical_clearance >= 2.0
 
 
+@pytest.mark.slow
 def test_regression_bug_140_flex_tail_support() -> None:
     """Verify BUG-140: enclosure bottom extends a support shelf under the flex tail."""
     provider = CarrierBoardProvider()
@@ -611,6 +616,7 @@ def test_regression_bug_144_m2_rear_wall_cutout() -> None:
     assert enclosure.part.is_inside((25.0, rear_wall_y, m2_z)), "Rear wall must be solid outside M.2 cutout"
 
 
+@pytest.mark.slow
 def test_regression_bug_145_battery_cradle_and_cover_extend_over_j13() -> None:
     """Verify BUG-145: battery cradle and cover extend over J13 cutout to conceal wiring."""
     from build123d import Location
@@ -669,6 +675,7 @@ def test_regression_bug_147_flex_ribbon_slider_action_prox() -> None:
     assert "PROXIMITY_SENSOR" in cap_names, "PROXIMITY_SENSOR must exist in capacitive sensors"
 
 
+@pytest.mark.slow
 def test_regression_bug_148_flex_ribbon_support_connects_to_enclosure() -> None:
     """Verify BUG-148: flex ribbon support shelf connects continuously with enclosure bottom."""
     provider = CarrierBoardProvider()
@@ -693,6 +700,7 @@ def test_regression_bug_148_flex_ribbon_support_connects_to_enclosure() -> None:
     )
 
 
+@pytest.mark.slow
 def test_regression_bug_150_component_cutout_labels() -> None:
     """Verify BUG-150: charger, SWD, M.2 PCIe, and flex ribbon cutouts have labels."""
     provider = CarrierBoardProvider()
@@ -791,6 +799,7 @@ def test_regression_bug_149_mutual_intersection_test() -> None:
         )
 
 
+@pytest.mark.slow
 def test_regression_bug_152_textured_pcb_simulation_visibility() -> None:
     """Verify BUG-152: carrier board and flex tail expose urdf_label for textured PCB visualization."""
     from pathlib import Path
@@ -1042,6 +1051,7 @@ def test_regression_bug_159_swd_usb_labels_orientation() -> None:
     assert len(enc.part.solids()) == 1, "Enclosure bottom must remain a single contiguous solid"
 
 
+@pytest.mark.slow
 def test_regression_bug_160_peripheral_labels_on_enclosure_lid() -> None:
     """Verify BUG-160: peripheral connector text moved to enclosure top to prevent hollow shells."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -1058,6 +1068,7 @@ def test_regression_bug_160_peripheral_labels_on_enclosure_lid() -> None:
     assert len(lid.part.solids()) == 1, "enclosure_lid must be a single solid with engraved bus labels"
 
 
+@pytest.mark.slow
 def test_regression_capsense_proximity_loop_clearance_and_drc() -> None:
     """Verify capsense traces maintain clearance to proximity sensor perimeter loop and pass DRC."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -1112,6 +1123,7 @@ def test_regression_bug_161_board_texture_transparency_mask() -> None:
     assert masked.getpixel((hole_px_x, hole_px_y))[3] == 0, "Mounting hole center must be transparent"
 
 
+@pytest.mark.slow
 def test_regression_pcb_texture_uv_parity_and_orientation() -> None:
     """Verify that PCB texture UV mapping in Rerun Mesh3D maintains correct parity and upright orientation."""
     from pathlib import Path
@@ -1307,6 +1319,7 @@ def test_regression_flying_probes_initial_isolation_verdict_pending() -> None:
         p.disconnect(client)
 
 
+@pytest.mark.slow
 def test_regression_bug_176_jst_connector_spacing_and_zero_drc_errors() -> None:
     """Verify BUG-176: JST peripheral headers J6-J10 have >= 1.0mm body gap and 0 DRC errors."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -1334,6 +1347,7 @@ def test_regression_bug_176_jst_connector_spacing_and_zero_drc_errors() -> None:
     assert report.error_count == 0, f"Expected 0 DRC errors, got {report.error_count}"
 
 
+@pytest.mark.slow
 def test_regression_bug_177_enclosure_bottom_cutouts_and_lid_markers() -> None:
     """Verify BUG-177: enclosure bottom cutouts align with J6-J10 and lid has engraved GPIO icons."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -1365,6 +1379,7 @@ def test_regression_bug_177_enclosure_bottom_cutouts_and_lid_markers() -> None:
     assert lid.part.volume > 0.0
 
 
+@pytest.mark.slow
 def test_regression_bug_179_right_side_ports_clear_mounting_holes() -> None:
     """Verify BUG-179: right side peripheral ports J6 and J10 clear mounting holes MH1 and MH4."""
     import math
@@ -1423,6 +1438,7 @@ def test_regression_bug_179_right_side_ports_clear_mounting_holes() -> None:
     assert report.error_count == 0, f"Expected 0 DRC errors, got {report.error_count}"
 
 
+@pytest.mark.slow
 def test_regression_bug_180_zero_drc_violations_carrier_board_and_flex_tail() -> None:
     """Verify BUG-180: carrier_board and flex_tail achieve zero DRC violations with rule severities."""
     from pathlib import Path
@@ -1453,6 +1469,7 @@ def test_regression_bug_180_zero_drc_violations_carrier_board_and_flex_tail() ->
         assert report.violations_count == 0
 
 
+@pytest.mark.slow
 def test_regression_bug_183_carrier_board_hardening() -> None:
     """Verify BUG-183: carrier board design hardening with jumpers, LEDs, switch, and Status sheet."""
     from pathlib import Path
@@ -1512,6 +1529,7 @@ def test_regression_bug_183_carrier_board_hardening() -> None:
         assert kicad_report.violations_count == 0
 
 
+@pytest.mark.slow
 def test_regression_bug_189_enclosure_top_gpio_labels() -> None:
     """Verify BUG-189: GPIO labels on enclosure top are text, non-overlapping, and properly rotated."""
     from projects.carrier_board.provider import CarrierBoardProvider
@@ -1537,6 +1555,7 @@ def test_regression_bug_189_enclosure_top_gpio_labels() -> None:
     assert gpio_w > 0 and gpio_l > 0
 
 
+@pytest.mark.slow
 def test_regression_bug_207_sheet_17_components_on_carrier_board() -> None:
     """Verify BUG-207: Sheet 17 components are present on carrier board with complete routing and 0 DRC errors."""
     from pathlib import Path
