@@ -1535,3 +1535,60 @@ def test_regression_bug_189_enclosure_top_gpio_labels() -> None:
     gpio_w = provider.settings.enclosure_gpio_cutout_width
     gpio_l = provider.settings.enclosure_gpio_cutout_length
     assert gpio_w > 0 and gpio_l > 0
+
+
+def test_regression_bug_207_sheet_17_components_on_carrier_board() -> None:
+    """Verify BUG-207: Sheet 17 components are present on carrier board with complete routing and 0 DRC errors."""
+    from pathlib import Path
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.pcb.kicad_cli import KiCadCLI
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    # Verify all 17 components from Sheet 17 and sub-sheets are placed on the board
+    sheet_17_comps = [
+        "SW1",
+        "JP1",
+        "JP2",
+        "JP3",
+        "JP4",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "R7",
+        "R8",
+        "R9",
+        "R10",
+        "R11",
+        "R12",
+    ]
+    for name in sheet_17_comps:
+        assert name in comp_map, f"Sheet 17 component {name} must exist on carrier board"
+        pos = comp_map[name].position
+        assert -36.0 <= pos[1] <= -16.0, f"Component {name} must be in corridor between U1 and J1"
+
+    # Verify existing baseline components were not displaced
+    assert tuple(comp_map["U1"].position[:2]) == (0.0, 0.0)
+    assert tuple(comp_map["J1"].position[:2]) == (0.0, -36.0)
+    assert tuple(comp_map["J2"].position[:2]) == (0.0, 38.0)
+    assert tuple(comp_map["J3"].position[:2]) == (-25.0, 0.0)
+    assert tuple(comp_map["J14"].position[:2]) == (19.0, -28.0)
+
+    # Verify DRC clean
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0
+
+    # Verify KiCad DRC report clean if generated
+    carrier_rpt = Path("build/rpt/carrier_board-drc.rpt")
+    if carrier_rpt.exists():
+        kicad_report = KiCadCLI.parse_drc_report(carrier_rpt)
+        assert kicad_report.passed
+        assert kicad_report.error_count == 0
+        assert kicad_report.violations_count == 0
