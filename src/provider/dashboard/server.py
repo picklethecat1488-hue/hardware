@@ -167,9 +167,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case "/api/database":
                 self._send_json(self.server.bug_server.database.model_dump(mode="json"))
             case "/api/next_bug_id":
-                self._send_json({"id": self.server.bug_server.database.generate_bug_id()})
+                next_id = self.server.bug_server.database.generate_bug_id()
+                self._send_json({"next_id": next_id, "id": next_id})
             case "/api/version":
-                self._send_json({"version": self.server.bug_server.database.updated_at})
+                self._send_json(
+                    {
+                        "version": self.server.bug_server.db_version,
+                        "bugs_count": len(self.server.bug_server.database.bugs),
+                        "mtime": self.server.bug_server.feedback_mtime,
+                    }
+                )
             case "/api/sync_status":
                 self._send_json({"initial_sync_done": self.server.initial_sync_done})
             case _:
@@ -177,7 +184,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         """Route POST requests for mutating actions."""
+        try:
+            self.server.bug_server.check_file_watch()
+        except Exception:
+            pass
         parsed = urllib.parse.urlparse(self.path)
+
         path = parsed.path
 
         content_len = int(self.headers.get("Content-Length", 0))
@@ -371,8 +383,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case "/api/upload":
                 self._handle_file_upload(data)
             case "/api/exit":
+                try:
+                    self.server.bug_server.check_file_watch()
+                except Exception:
+                    pass
                 out_path = self.server.bug_server.save_and_sync()
                 self._send_json({"status": "saved_and_exited", "path": str(out_path), "redirect_to": "/"})
+
             case _:
                 self.send_error(404, "Endpoint not found")
 
@@ -608,11 +625,21 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             if title:
                 bug.title = title
             if "status" in data and data["status"] in [s.value for s in BugStatus]:
-                bug.status = BugStatus(data["status"])
-                if bug.status in (BugStatus.RESOLVED, BugStatus.CLOSED):
-                    bug.resolved_at = now_str
+                new_status = BugStatus(data["status"])
+                if (
+                    bug.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
+                    and bug.resolution_notes.strip()
+                    and new_status == BugStatus.OPEN
+                    and not data.get("resolution_notes", "").strip()
+                ):
+                    pass
                 else:
-                    bug.resolved_at = None
+                    bug.status = new_status
+                    if bug.status in (BugStatus.RESOLVED, BugStatus.CLOSED):
+                        bug.resolved_at = now_str
+                    else:
+                        bug.resolved_at = None
+
             if "severity" in data and data["severity"] in [s.value for s in BugSeverity]:
                 bug.severity = BugSeverity(data["severity"])
             if "category" in data and data["category"] in [c.value for c in BugCategory]:
@@ -622,7 +649,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             if "description" in data:
                 bug.description = data["description"]
             if "resolution_notes" in data:
-                bug.resolution_notes = data["resolution_notes"]
+                incoming_notes = data["resolution_notes"].strip()
+                if incoming_notes:
+                    bug.resolution_notes = incoming_notes
+                elif bug.status not in (BugStatus.RESOLVED, BugStatus.CLOSED):
+                    bug.resolution_notes = ""
             if "reproduction_steps" in data:
                 repro_steps = data["reproduction_steps"]
                 bug.reproduction_steps = repro_steps if isinstance(repro_steps, list) else [str(repro_steps)]

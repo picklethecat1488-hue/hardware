@@ -1637,3 +1637,102 @@ def test_regression_bug_215_diff_view_css_syntax() -> None:
     assert intermediate.count("{") == intermediate.count("}"), (
         "CSS block between .node-badge-pr.pr-tag-link:hover and .pr-local-badge must have matching braces"
     )
+
+
+def test_regression_bug_216_save_and_exit_preserves_resolved_bugs(tmp_path: Path) -> None:
+    """Verify BUG-216 regression: Save and Exit in DashboardServer preserves resolved bugs.
+
+    Ensures:
+    1. /api/next_bug_id returns {"next_id": ...} matching frontend expectations.
+    2. /api/version returns an integer version counter.
+    3. File watcher in embedded BugReportServer detects external bug resolutions.
+    4. Calling /api/exit or POSTing stale OPEN status without notes does not regress resolved bugs.
+    """
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    fb_dir = repo_dir / "feedback"
+    fb_dir.mkdir(parents=True, exist_ok=True)
+
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    base_url = f"http://127.0.0.1:{server.actual_port}"
+
+    try:
+        # 1. Verify /api/next_bug_id has "next_id"
+        with urllib.request.urlopen(f"{base_url}/api/next_bug_id") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert "next_id" in data
+            assert data["next_id"].startswith("BUG-")
+
+        # 2. Verify /api/version returns integer version
+        with urllib.request.urlopen(f"{base_url}/api/version") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert "version" in data
+            assert isinstance(data["version"], int)
+
+        # 3. Create BUG-001 on disk as RESOLVED with notes
+        bug_file = fb_dir / "BUG_001.md"
+        bug_file.write_text(
+            "# 🟢 `[BUG-001]` Power Rail Ripple\n\n"
+            "- **UUID**: `11111111-2222-3333-4444-555555555555`\n"
+            "- **ID**: `BUG-001`\n"
+            "- **Status**: `RESOLVED`\n"
+            "- **Severity**: `HIGH`\n"
+            "- **Category**: `PCB`\n\n"
+            "#### Description\n\nRipple on 3V3 rail.\n\n"
+            "#### Resolution Notes\n\nAdded decoupling capacitor C12.\n",
+            encoding="utf-8",
+        )
+
+        # 4. Trigger file watch check / sync
+        assert server.bug_server.check_file_watch() is True
+        bug_in_db = server.bug_server.database.get_bug("BUG-001")
+        assert bug_in_db is not None
+        assert bug_in_db.status.value == "RESOLVED"
+        assert bug_in_db.resolution_notes == "Added decoupling capacitor C12."
+
+        # 5. POST to /api/bugs with stale OPEN status and no resolution notes (simulating unrefreshed UI form submission)
+        req_stale = urllib.request.Request(
+            f"{base_url}/api/bugs",
+            data=json.dumps(
+                {
+                    "id": "BUG-001",
+                    "title": "Power Rail Ripple",
+                    "status": "OPEN",
+                    "severity": "HIGH",
+                    "category": "PCB",
+                    "description": "Ripple on 3V3 rail.",
+                    "resolution_notes": "",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_stale) as resp:
+            saved_resp = json.loads(resp.read().decode("utf-8"))
+            assert saved_resp["status"] == "RESOLVED"  # Protected from regressing!
+
+        # 6. POST to /api/exit
+        req_exit = urllib.request.Request(
+            f"{base_url}/api/exit",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_exit) as resp:
+            exit_data = json.loads(resp.read().decode("utf-8"))
+            assert exit_data["status"] == "saved_and_exited"
+
+        # 7. Verify BUG_001.md on disk remained RESOLVED
+        disk_content = bug_file.read_text(encoding="utf-8")
+        assert "- **Status**: `RESOLVED`" in disk_content
+        assert "Added decoupling capacitor C12." in disk_content
+
+    finally:
+        server.shutdown()
+        server.server_close()

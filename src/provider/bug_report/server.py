@@ -214,8 +214,15 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
 
         status_val = data.get("status", BugStatus.OPEN.value)
         status = BugStatus(status_val) if status_val in [s.value for s in BugStatus] else BugStatus.OPEN
+        incoming_notes = data.get("resolution_notes", "").strip()
 
         resolved_at = existing.resolved_at if existing else None
+        if existing and existing.status in (BugStatus.RESOLVED, BugStatus.CLOSED):
+            if existing.resolution_notes.strip() and status == BugStatus.OPEN and not incoming_notes:
+                status = existing.status
+                resolved_at = existing.resolved_at
+                incoming_notes = existing.resolution_notes
+
         if status in (BugStatus.RESOLVED, BugStatus.CLOSED) and not resolved_at:
             resolved_at = now_str
         elif status in (BugStatus.OPEN, BugStatus.IN_PROGRESS):
@@ -237,7 +244,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             created_at=created_at,
             updated_at=now_str,
             resolved_at=resolved_at,
-            resolution_notes=data.get("resolution_notes", ""),
+            resolution_notes=incoming_notes,
         )
 
         self.server.database.add_or_update(bug)
@@ -406,9 +413,9 @@ class BugReportServer(ThreadingHTTPServer):
         self.db_version: int = 1
         self.database = self._initialize_database()
         self._watcher_stop = threading.Event()
+        self._start_file_watcher()
 
         if bind_and_activate:
-            self._start_file_watcher()
             super().__init__((host, port), BugReportRequestHandler)
 
     def get_request(self) -> Any:
@@ -418,12 +425,12 @@ class BugReportServer(ThreadingHTTPServer):
         return sock, addr
 
     def _get_feedback_dir_mtime(self) -> float:
-        """Compute maximum mtime across feedback_dir and all markdown files within it."""
+        """Compute maximum mtime across feedback_dir and all BUG_*.md files within it."""
         if not self.feedback_dir.exists():
             return 0.0
         try:
             max_mtime = self.feedback_dir.stat().st_mtime
-            for p in self.feedback_dir.glob("*.md"):
+            for p in self.feedback_dir.glob("BUG_*.md"):
                 try:
                     m = p.stat().st_mtime
                     if m > max_mtime:
@@ -542,6 +549,11 @@ class BugReportServer(ThreadingHTTPServer):
     def save_and_sync(self) -> Path:
         """Persist bug database to SQLite, JSON, BUGS.md, and individual BUG_<id>.md files."""
         with self._lock:
+            if not self._is_internal_saving and self.feedback_dir.exists():
+                curr_fb_mtime = self._get_feedback_dir_mtime()
+                if curr_fb_mtime > self.feedback_mtime + 0.001:
+                    self.exporter.scan_and_sync_feedback_dir(self.feedback_dir, self.database, self.sqlite_store)
+                    self.feedback_mtime = curr_fb_mtime
             self._is_internal_saving = True
             try:
                 self.database.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
