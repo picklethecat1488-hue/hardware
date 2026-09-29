@@ -1126,3 +1126,158 @@ def test_regression_bug_193_create_and_unlink_pr_buttons_and_ancestors(tmp_path:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_198_save_bug_reproduction_steps_no_traceback(tmp_path: Path) -> None:
+    """Verify BUG-198: Saving bug report with steps_to_reproduce and commit does not cause traceback."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        sqlite_bug_file=tmp_path / "bugs.sqlite",
+        sqlite_review_file=tmp_path / "review.sqlite",
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = f"http://127.0.0.1:{server.actual_port}"
+
+        # 1. Create bug with steps_to_reproduce and commit in payload (Save and Exit action)
+        payload = {
+            "title": "Bug with steps",
+            "status": "OPEN",
+            "severity": "HIGH",
+            "category": "INFRASTRUCTURE",
+            "component": "dashboard",
+            "description": "Traceback observed",
+            "steps_to_reproduce": ["Click Save and Exit", "Verify no traceback"],
+            "commit": "947e55f5",
+        }
+        req = urllib.request.Request(
+            f"{base_url}/api/bug/save",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["title"] == "Bug with steps"
+            assert data["reproduction_steps"] == ["Click Save and Exit", "Verify no traceback"]
+            bug_id = data["id"]
+
+        # 2. Update existing bug with steps_to_reproduce
+        update_payload = {
+            "id": bug_id,
+            "title": "Updated Bug",
+            "steps_to_reproduce": ["Step A", "Step B"],
+        }
+        req2 = urllib.request.Request(
+            f"{base_url}/api/bug/save",
+            data=json.dumps(update_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req2) as resp:
+            assert resp.status == 200
+            updated_data = json.loads(resp.read().decode("utf-8"))
+            assert updated_data["title"] == "Updated Bug"
+            assert updated_data["reproduction_steps"] == ["Step A", "Step B"]
+
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_191_and_205_code_review_revisions_and_multi_commit(tmp_path: Path) -> None:
+    """Verify BUG-191 & BUG-205: Code review with single selected commit or multiple commits opens expected commits."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        sqlite_bug_file=tmp_path / "bugs.sqlite",
+        sqlite_review_file=tmp_path / "review.sqlite",
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = f"http://127.0.0.1:{server.actual_port}"
+
+        # BUG-205: Selecting non-HEAD commit (shas[1]) opens that specific commit, not HEAD (shas[2])
+        req = urllib.request.Request(
+            f"{base_url}/api/open_code_review",
+            data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res["status"] == "ok"
+            assert res["url"] == f"/review?revisions={shas[1]}"
+
+        # Session API with revisions query returns selected commit
+        with urllib.request.urlopen(f"{base_url}/api/session?revisions={shas[1]}") as resp:
+            assert resp.status == 200
+            session_data = json.loads(resp.read().decode("utf-8"))
+            assert session_data["commit_hash"] == shas[1]
+            assert session_data["revisions"] == [shas[1]]
+
+        # Commits API with revisions returns CommitInfoModel for requested commit
+        with urllib.request.urlopen(f"{base_url}/api/commits?revisions={shas[1]}") as resp:
+            assert resp.status == 200
+            commits_data = json.loads(resp.read().decode("utf-8"))
+            assert len(commits_data) >= 1
+            assert commits_data[0]["commit_hash"] == shas[1]
+            assert "files_count" in commits_data[0]
+
+        # Review UI HTML renders for requested revision with collapsed pane for single commit
+        with urllib.request.urlopen(f"{base_url}/review?revisions={shas[1]}") as resp:
+            assert resp.status == 200
+            html = resp.read().decode("utf-8")
+            assert "Code Review:" in html
+            assert 'id="paneCommits" class="pane-commits collapsed"' in html
+
+        # BUG-191: Selecting multiple commits (shas[0], shas[1]) creates multi-commit review session
+        multi_revs = f"{shas[0]},{shas[1]}"
+        req_multi = urllib.request.Request(
+            f"{base_url}/api/open_code_review",
+            data=json.dumps({"commits": [shas[0], shas[1]]}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_multi) as resp:
+            assert resp.status == 200
+            res_multi = json.loads(resp.read().decode("utf-8"))
+            assert res_multi["url"] == f"/review?revisions={multi_revs}"
+
+        with urllib.request.urlopen(f"{base_url}/api/session?revisions={multi_revs}") as resp:
+            assert resp.status == 200
+            multi_session = json.loads(resp.read().decode("utf-8"))
+            assert multi_session["commit_hash"] == shas[0]
+            assert multi_session["revisions"] == [shas[0], shas[1]]
+
+        with urllib.request.urlopen(f"{base_url}/api/commits?revisions={multi_revs}") as resp:
+            assert resp.status == 200
+            multi_commits = json.loads(resp.read().decode("utf-8"))
+            assert len(multi_commits) == 2
+            commit_hashes = {c["commit_hash"] for c in multi_commits}
+            assert shas[0] in commit_hashes
+            assert shas[1] in commit_hashes
+
+        with urllib.request.urlopen(f"{base_url}/review?revisions={multi_revs}") as resp:
+            assert resp.status == 200
+            multi_html = resp.read().decode("utf-8")
+            assert "Code Review" in multi_html
+
+    finally:
+        server.shutdown()
+        server.server_close()

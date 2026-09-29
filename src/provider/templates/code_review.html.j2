@@ -1590,7 +1590,10 @@
 
     async function loadSession() {
       try {
-        const res = await fetch("/api/session");
+        const urlParams = new URLSearchParams(window.location.search);
+        const revs = urlParams.get("revisions") || urlParams.get("commit");
+        const sessionUrl = revs ? "/api/session?revisions=" + encodeURIComponent(revs) : "/api/session";
+        const res = await fetch(sessionUrl);
         state.session = await res.json();
         updateSessionUI();
       } catch (e) {
@@ -1600,11 +1603,22 @@
 
     async function loadCommits() {
       try {
-        const res = await fetch("/api/commits");
+        const urlParams = new URLSearchParams(window.location.search);
+        const revs = urlParams.get("revisions") || urlParams.get("commit");
+        const commitsUrl = revs ? "/api/commits?revisions=" + encodeURIComponent(revs) : "/api/commits";
+        const res = await fetch(commitsUrl);
         state.commits = await res.json();
         renderCommitsList();
         if (state.commits.length > 0) {
-          selectCommit(state.commits[0].commit_hash);
+          let targetCommit = state.commits[0].commit_hash;
+          if (revs) {
+            const firstReq = revs.split(",")[0].trim();
+            const matched = state.commits.find(c => c.commit_hash.startsWith(firstReq) || firstReq.startsWith(c.commit_hash) || c.short_hash === firstReq);
+            if (matched) {
+              targetCommit = matched.commit_hash;
+            }
+          }
+          selectCommit(targetCommit);
         }
         // If only one commit is being reviewed, default the commit stream to collapsed
         if (state.commits.length <= 1) {

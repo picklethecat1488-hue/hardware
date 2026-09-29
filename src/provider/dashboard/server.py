@@ -26,7 +26,7 @@ from model.bug_report import (
     BugSeverity,
     BugStatus,
 )
-from model.code_review import CommentModel, ReviewSeverity, ReviewStatus
+from model.code_review import CommentModel, ReviewSessionModel, ReviewSeverity, ReviewStatus
 from model.vcs import (
     BranchInfoModel,
     CommitNodeModel,
@@ -67,23 +67,51 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case "/" | "/index.html":
                 self._handle_serve_diff_ui()
             case "/review" | "/review/":
-                self._handle_serve_review_ui()
+                self._handle_serve_review_ui(query)
             case "/bugs" | "/bugs/":
                 self._handle_serve_bug_ui()
             case "/api/session":
                 referer = self.headers.get("Referer", "")
-                if query.get("type", [""])[0] == "review" or "/review" in referer:
-                    self._send_json(self.server.review_server.session.model_dump(mode="json"))
+                rev_param = query.get("revisions", [""])[0] or query.get("commit", [""])[0]
+                if not rev_param and "/review" in referer and "?" in referer:
+                    ref_query = urllib.parse.parse_qs(urllib.parse.urlparse(referer).query)
+                    rev_param = ref_query.get("revisions", [""])[0] or ref_query.get("commit", [""])[0]
+                revs = [r.strip() for r in rev_param.split(",") if r.strip()] if rev_param else None
+
+                if query.get("type", [""])[0] == "review" or "/review" in referer or revs:
+                    session = self.server.get_review_session(revs)
+                    self._send_json(session.model_dump(mode="json"))
                 else:
                     session = self.server.build_session()
                     self._send_json(session.model_dump(mode="json"))
             case "/api/review/session":
-                self._send_json(self.server.review_server.session.model_dump(mode="json"))
+                referer = self.headers.get("Referer", "")
+                rev_param = query.get("revisions", [""])[0] or query.get("commit", [""])[0]
+                if not rev_param and "/review" in referer and "?" in referer:
+                    ref_query = urllib.parse.parse_qs(urllib.parse.urlparse(referer).query)
+                    rev_param = ref_query.get("revisions", [""])[0] or ref_query.get("commit", [""])[0]
+                revs = [r.strip() for r in rev_param.split(",") if r.strip()] if rev_param else None
+                session = self.server.get_review_session(revs)
+                self._send_json(session.model_dump(mode="json"))
             case "/api/commits":
-                limit_str = query.get("limit", ["40"])[0]
-                limit = int(limit_str) if limit_str.isdigit() else 40
-                commits = self.server.git_engine.get_smartlog_dag(limit=limit)
-                self._send_json([c.model_dump(mode="json") for c in commits])
+                referer = self.headers.get("Referer", "")
+                is_review = "/review" in referer or query.get("type", [""])[0] == "review"
+                rev_param = query.get("revisions", [""])[0] or query.get("commit", [""])[0]
+                if not rev_param and is_review and "?" in referer:
+                    ref_query = urllib.parse.parse_qs(urllib.parse.urlparse(referer).query)
+                    rev_param = ref_query.get("revisions", [""])[0] or ref_query.get("commit", [""])[0]
+
+                if is_review or rev_param:
+                    revs = [r.strip() for r in rev_param.split(",") if r.strip()] if rev_param else None
+                    if not revs and self.server.review_server.session.revisions:
+                        revs = self.server.review_server.session.revisions
+                    commits = self.server.git_engine.get_commits(rev_args=revs)
+                    self._send_json([c.model_dump(mode="json") for c in commits])
+                else:
+                    limit_str = query.get("limit", ["40"])[0]
+                    limit = int(limit_str) if limit_str.isdigit() else 40
+                    commits = self.server.git_engine.get_smartlog_dag(limit=limit)
+                    self._send_json([c.model_dump(mode="json") for c in commits])
             case "/api/branches":
                 branches = self.server.git_engine.get_branches()
                 self._send_json([b.model_dump(mode="json") for b in branches])
@@ -293,6 +321,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case "/api/open_code_review":
                 commits = data.get("commits", [])
                 rev_str = ",".join(commits)
+                if commits:
+                    self.server.get_review_session(commits)
                 target_url = f"/review?revisions={rev_str}" if rev_str else "/review"
                 self._send_json({"status": "ok", "url": target_url})
             case "/api/open_bug":
@@ -330,7 +360,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._send_json({"status": "ok", "commit": commit})
             case "/api/commit_update":
                 self._handle_commit_update(data)
-            case "/api/bugs":
+            case "/api/bugs" | "/api/bug/save":
                 self._handle_save_bug(data)
             case "/api/bugs/delete":
                 self._handle_delete_bug(data)
@@ -380,7 +410,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         )
         self._send_html(html_out)
 
-    def _handle_serve_review_ui(self) -> None:
+    def _handle_serve_review_ui(self, query: Optional[Dict[str, List[str]]] = None) -> None:
         """Render and return Jinja2 code review dashboard template."""
         templates_dir = Path(__file__).resolve().parent.parent / "templates"
         env = jinja2.Environment(
@@ -390,7 +420,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             autoescape=False,
         )
         template = env.get_template("code_review.html.j2")
-        html_out = template.render(session=self.server.review_server.session)
+        rev_param = ""
+        if query:
+            rev_param = query.get("revisions", [""])[0] or query.get("commit", [""])[0]
+        revs = [r.strip() for r in rev_param.split(",") if r.strip()] if rev_param else None
+        session = self.server.get_review_session(revs)
+        html_out = template.render(session=session)
         self._send_html(html_out)
 
     def _handle_serve_bug_ui(self) -> None:
@@ -550,6 +585,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
         if not bug:
+            repro_steps = data.get("reproduction_steps") or data.get("steps_to_reproduce") or []
             bug = BugReportModel(
                 id=bug_id,
                 title=title or "Untitled Defect",
@@ -558,11 +594,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 category=BugCategory(data.get("category", BugCategory.PCB.value)),
                 component=data.get("component", ""),
                 description=data.get("description", ""),
-                steps_to_reproduce=data.get("steps_to_reproduce", []),
+                reproduction_steps=repro_steps if isinstance(repro_steps, list) else [str(repro_steps)],
                 attachments=[BugAttachmentModel(**a) for a in data.get("attachments", [])],
                 created_at=now_str,
                 updated_at=now_str,
-                commit=data.get("commit"),
             )
             self.server.bug_server.database.add_or_update(bug)
         else:
@@ -584,8 +619,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 bug.description = data["description"]
             if "resolution_notes" in data:
                 bug.resolution_notes = data["resolution_notes"]
-            if "steps_to_reproduce" in data:
-                bug.steps_to_reproduce = data["steps_to_reproduce"]
+            if "reproduction_steps" in data:
+                repro_steps = data["reproduction_steps"]
+                bug.reproduction_steps = repro_steps if isinstance(repro_steps, list) else [str(repro_steps)]
+            elif "steps_to_reproduce" in data:
+                repro_steps = data["steps_to_reproduce"]
+                bug.reproduction_steps = repro_steps if isinstance(repro_steps, list) else [str(repro_steps)]
             if "attachments" in data:
                 bug.attachments = [BugAttachmentModel(**a) for a in data["attachments"]]
             bug.updated_at = now_str
@@ -787,6 +826,74 @@ class DashboardServer(ThreadingHTTPServer):
             agent_feedback_files=agent_feedback,
             initial_sync_done=self.initial_sync_done,
         )
+
+    def get_review_session(self, revisions: Optional[List[str]] = None) -> ReviewSessionModel:
+        """Get or initialize a review session for specific revisions or the default session."""
+        if not revisions:
+            return self.review_server.session
+
+        resolved = self.git_engine.resolve_revisions(revisions)
+        if not resolved:
+            return self.review_server.session
+
+        commit_hash = resolved[0]
+        if (
+            self.review_server.session
+            and self.review_server.session.commit_hash == commit_hash
+            and set(self.review_server.session.revisions) == set(resolved)
+        ):
+            return self.review_server.session
+
+        session = ReviewSessionModel(
+            title=f"Code Review: {self.repo_root.name}",
+            repo_name=self.repo_root.name,
+            commit_hash=commit_hash,
+            revisions=resolved,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+        if self.review_server.feedback_dir.exists():
+            cr_commit_path = self.review_server.feedback_dir / f"CR_{commit_hash}.md"
+            if cr_commit_path.exists():
+                session = self.review_server.exporter.merge_commit_feedback(session, cr_commit_path)
+            elif (self.review_server.feedback_dir / "CR.md").exists():
+                session = self.review_server.exporter.merge_commit_feedback(
+                    session, self.review_server.feedback_dir / "CR.md"
+                )
+
+        if self.review_server.sqlite_store:
+            try:
+                with self.review_server.sqlite_store._get_connection() as conn:
+                    comment_rows = conn.execute(
+                        "SELECT id, uuid, commit_hash, file_path, start_line, end_line, severity, body, author, code_snippet, created_at, resolved "
+                        "FROM comments WHERE commit_hash = ? OR commit_hash = '' ORDER BY file_path, start_line",
+                        (commit_hash,),
+                    ).fetchall()
+                    existing_ids = {c.id for c in session.comments}
+                    for row in comment_rows:
+                        if row["id"] not in existing_ids:
+                            session.comments.append(
+                                CommentModel(
+                                    id=row["id"],
+                                    uuid=row["uuid"] or row["id"],
+                                    commit_hash=row["commit_hash"],
+                                    file_path=row["file_path"],
+                                    start_line=row["start_line"],
+                                    end_line=row["end_line"],
+                                    severity=ReviewSeverity(row["severity"]),
+                                    body=row["body"],
+                                    author=row["author"],
+                                    code_snippet=row["code_snippet"],
+                                    created_at=row["created_at"],
+                                    resolved=bool(row["resolved"]),
+                                )
+                            )
+            except Exception:
+                pass
+
+        self.review_server.session = session
+        return session
 
     def sync_feedback(self) -> Dict[str, Any]:
         """Synchronize review and bug report feedback from workspace feedback/ directory."""
