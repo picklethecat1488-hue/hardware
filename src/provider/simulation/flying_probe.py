@@ -109,6 +109,7 @@ def _point_to_seg_dist(pt: np.ndarray, a: np.ndarray, b: np.ndarray) -> float:
 def verify_signal_lines_isolation(
     provider: Any,
     wiring: Optional[Any] = None,
+    subassembly: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Verify that all signal lines are not shorted to any power or ground network.
 
@@ -125,6 +126,15 @@ def verify_signal_lines_isolation(
             'shorted_signals': List[Dict[str, Any]]
             'checks': List[FlyingProbeIsolationCheckModel]
     """
+    if subassembly == "flex_tail":
+        return {
+            "all_passed": True,
+            "signal_lines": [],
+            "power_ground_nets": [],
+            "shorted_signals": [],
+            "checks": [],
+        }
+
     if wiring is None:
         pcb_cfg = getattr(provider, "pcb_config", None)
         if pcb_cfg and getattr(pcb_cfg, "wiring", None):
@@ -593,7 +603,10 @@ def create_flying_probe_hooks(
         test_steps = load_test_steps_from_yaml(test_steps_path, target_label)
 
     # Perform automated signal line power and ground isolation verification
-    isolation_results = verify_signal_lines_isolation(provider)
+    # Note (BUG-220): Isolation testing requires test points and accessible power/ground
+    # references on the target board. Flex tail has no opposing test pads or local DC power rails
+    # for isolation testing; isolation checks apply strictly to rigid carrier board.
+    isolation_results = verify_signal_lines_isolation(provider, subassembly=target_label)
     isolation_checks = isolation_results.get("checks", [])
 
     # Synthesize physical flying probe test steps for all signal line isolation checks
@@ -629,7 +642,9 @@ def create_flying_probe_hooks(
             traces_by_net.setdefault(tr.net, tr.start_mm)
 
     board_comp_names = (
-        {fp.name for fp in wiring.footprints} if wiring and getattr(wiring, "footprints", None) else set()
+        {fp.name for fp in wiring.footprints if (getattr(fp, "shape_ref", None) == "flex_tail") == is_flex}
+        if wiring and getattr(wiring, "footprints", None)
+        else set()
     )
     fp_map = {fp.name: fp for fp in wiring.footprints} if wiring and getattr(wiring, "footprints", None) else {}
 

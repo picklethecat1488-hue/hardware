@@ -1846,3 +1846,56 @@ def test_regression_bug_209_silkscreen_readability_and_spacing() -> None:
     report = drc.check_all(wiring=Wiring(str(provider.wiring_path)))
     assert report.passed, f"PCB DRC failed:\n{report.summary()}"
     assert report.error_count == 0
+
+
+def test_regression_bug_220_flex_tail_flying_probe_isolation_excluded() -> None:
+    """Verify BUG-220: Flex tail flying probe test excludes untestable carrier board isolation checks.
+
+    Asserts that:
+    1. Flying probe simulation hooks for flex_tail only synthesize steps defined in pcb_test_steps.yaml.
+    2. Zero TEST_ISO_* steps are created for flex_tail.
+    3. flying_probe_signal_isolation on flex_tail reports empty checks.
+    4. Rendered markdown report for flex_tail omits 'Signal Line Isolation Audit'.
+    5. Rendered markdown report for flex_tail contains 'Mutual Capacitance Touch Simulation & Verification'.
+    6. For carrier_board, isolation steps and the audit table remain present.
+    """
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from projects.carrier_board.simulate_hooks import get_simulate_hooks_impl
+
+    provider = CarrierBoardProvider()
+
+    # 1. Flex tail simulation hooks
+    get_simulate_hooks_impl(provider, "carrier_board/flex_tail")
+    flex_steps = getattr(provider, "flying_probe_steps", [])
+    flex_iso_steps = [s for s in flex_steps if s.step_id.startswith("TEST_ISO_")]
+
+    assert len(flex_iso_steps) == 0, f"Flex tail must not contain isolation steps, found: {flex_iso_steps}"
+    assert len(flex_steps) == 7, f"Flex tail must only contain 7 defined test steps, found {len(flex_steps)}"
+
+    flex_iso_results = getattr(provider, "flying_probe_signal_isolation", {})
+    assert len(flex_iso_results.get("checks", [])) == 0, "Flex tail signal isolation checks must be empty"
+    assert flex_iso_results.get("all_passed") is True
+
+    flex_report = provider.generate_test_report()
+    assert "Signal Line Isolation Audit" not in flex_report, (
+        "Flex tail report must NOT include Signal Line Isolation Audit section"
+    )
+    assert "Mutual Capacitance Touch Simulation & Verification (Flex Tail)" in flex_report, (
+        "Flex tail report must include Mutual Capacitance section"
+    )
+
+    # 2. Carrier board simulation hooks
+    get_simulate_hooks_impl(provider, "carrier_board")
+    carrier_steps = getattr(provider, "flying_probe_steps", [])
+    carrier_iso_steps = [s for s in carrier_steps if s.step_id.startswith("TEST_ISO_")]
+
+    assert len(carrier_iso_steps) > 0, "Carrier board must contain synthesized isolation steps"
+    assert getattr(provider, "flying_probe_diff_pairs", None) is not None
+
+    carrier_report = provider.generate_test_report()
+    assert "Signal Line Isolation Audit" in carrier_report, (
+        "Carrier board report must include Signal Line Isolation Audit section"
+    )
+    assert "Differential Pair Compliance Audit" in carrier_report, (
+        "Carrier board report must include Differential Pair Compliance Audit section"
+    )
