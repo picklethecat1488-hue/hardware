@@ -1656,3 +1656,76 @@ def test_regression_bug_208_battery_cover_does_not_elide_enclosure_labels() -> N
     pitch = provider.settings.enclosure_gpio_pin_pitch
     pin_10_y = gpio_y + (4.5 * pitch)
     assert pin_10_y > gpio_y + (3.0 * pitch), "Pin 10 marker must be positioned at top pin header location"
+
+
+def test_regression_bug_210_passives_have_values() -> None:
+    """Verify BUG-210: All resistors and capacitors have strongly typed electrical values."""
+    from model.wiring import Wiring
+    from projects.carrier_board.provider import CarrierBoardProvider
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+
+    # Verify all 14 capacitors have non-empty capacitance values
+    for c_idx in range(1, 15):
+        c_name = f"C{c_idx}"
+        assert c_name in fp_map, f"Capacitor {c_name} missing from wiring"
+        c_val = getattr(fp_map[c_name], "value", None)
+        assert c_val is not None and len(c_val) > 0, f"Capacitor {c_name} is missing electrical value"
+        assert any(c_val.endswith(unit) for unit in ("uF", "pF", "nF")), (
+            f"Capacitor {c_name} value '{c_val}' does not end with standard capacitance unit"
+        )
+
+    # Verify all 12 resistors have non-empty resistance values
+    for r_idx in range(1, 13):
+        r_name = f"R{r_idx}"
+        assert r_name in fp_map, f"Resistor {r_name} missing from wiring"
+        r_val = getattr(fp_map[r_name], "value", None)
+        assert r_val is not None and len(r_val) > 0, f"Resistor {r_name} is missing electrical value"
+        assert any(unit in r_val for unit in ("k", "ohm", "M", "R")), (
+            f"Resistor {r_name} value '{r_val}' does not contain standard resistance unit"
+        )
+
+
+def test_regression_bug_209_silkscreen_readability_and_spacing() -> None:
+    """Verify BUG-209: Schematic power net exclusions and PCB silkscreen region spacing."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.schematic.constants import PowerNetMatcher
+
+    # 1. Verify PowerNetMatcher excludes LED cathode/anode signals from being matched as power nets
+    matcher = PowerNetMatcher()
+    for net in ("LED_VBAT_K", "LED_VBUS_K", "LED_3V3_K", "LED_AUD_K", "LED_PERIPH_K", "LED_MCU_K"):
+        assert not matcher.is_power_net(net), f"Cathode net {net} must not be matched as power rail"
+        assert net not in matcher, f"Cathode net {net} must not match in PowerNetMatcher"
+
+    provider = CarrierBoardProvider()
+    pcb_cfg = provider.pcb_config
+
+    # 2. Verify LAYER 1-6 RIGID-FLEX silkscreen does not collide with D2..D7 corridor (X=4.0, Y=-30..-20)
+    layer_text = next(t for t in pcb_cfg.silkscreen_texts if t.text == "LAYER 1-6 RIGID-FLEX")
+    assert layer_text.position[1] < -32.0 or layer_text.position[0] < -4.0, (
+        f"LAYER 1-6 text at {layer_text.position} overlaps D2..D7 corridor"
+    )
+
+    # 3. Verify STATUS and OVERRIDES silkscreen frames maintain clear horizontal separation
+    status_rect = next(g for g in pcb_cfg.silkscreen_graphics if g.shape == "rect" and abs(g.position[0] - 4.5) < 1.0)
+    overrides_rect = next(
+        g for g in pcb_cfg.silkscreen_graphics if g.shape == "rect" and abs(g.position[0] - 12.2) < 1.0
+    )
+    status_x_max = status_rect.position[0] + status_rect.dimensions[0] / 2.0
+    overrides_x_min = overrides_rect.position[0] - overrides_rect.dimensions[0] / 2.0
+    clearance = overrides_x_min - status_x_max
+    assert clearance >= 0.50, f"STATUS and OVERRIDES frames too close: clearance is {clearance:.2f}mm < 0.50mm"
+
+    # 4. Verify jumper and switch labels are horizontal (rotation == 0.0)
+    for label_name in ("NRST", "BOOT0", "ISP", "VBUS", "RESET"):
+        lbl = next(t for t in pcb_cfg.silkscreen_texts if t.text == label_name)
+        assert lbl.rotation == 0.0, f"Label {label_name} must have horizontal rotation 0.0, got {lbl.rotation}"
+
+    # 5. Verify PCB DRC passes with 0 violations
+    drc = PCBDesignRulesChecker(pcb_cfg)
+    report = drc.check_all(wiring=Wiring(str(provider.wiring_path)))
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0

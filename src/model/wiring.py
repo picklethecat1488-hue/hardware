@@ -138,6 +138,7 @@ class FootprintModel(BaseModel):
     )
     slots_per_side: Optional[int] = Field(default=None, description="Optional total number of DIP slots per side")
     label: Optional[LabelModel] = Field(default=None, description="Label settings for the footprint")
+    value: Optional[str] = Field(default=None, description="Component electrical value (e.g. '100nF', '10k', '2.2uF')")
     pins: List[PinModel] = Field(default_factory=list, description="List of pins on the footprint")
     mpn: Optional[str] = Field(default=None, description="Manufacturer part number for BOM generation")
     supplier_pn: Optional[str] = Field(default=None, description="Supplier part number (e.g. LCSC, DigiKey)")
@@ -347,6 +348,7 @@ class Wiring:
                     mounting_holes=tuple(c["mounting_holes"]) if c.get("mounting_holes") is not None else None,
                     slots_per_side=c.get("slots_per_side"),
                     label=label,
+                    value=c.get("value"),
                     pins=pins,
                     mpn=c.get("mpn"),
                     supplier_pn=c.get("supplier_pn"),

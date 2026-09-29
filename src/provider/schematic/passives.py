@@ -137,6 +137,8 @@ class SchematicPassiveDrawer:
     @staticmethod
     def format_resistor_value(fp: FootprintModel) -> str:
         """Format a human-readable, concise resistance string from footprint metadata."""
+        if getattr(fp, "value", None):
+            return fp.value
         if fp.label and fp.label.text and fp.label.text != fp.name:
             return fp.label.text
         mpn = getattr(fp, "mpn", None)
@@ -304,7 +306,7 @@ class SchematicPassiveDrawer:
                 color="#0f172a",
                 zorder=4,
             )
-            val = fp.label.text if fp.label else fp.package
+            val = getattr(fp, "value", None) or (fp.label.text if fp.label else fp.package)
             if val == fp.name:
                 val = fp.package
             ax.text(

@@ -90,6 +90,7 @@ footprints:
   - 0.0
   mpn: CL10A106KP8NNNC
   supplier_pn: 1276-1189-1-ND
+  value: 10uF
 - name: R1
   package: '0402'
   position:
@@ -103,6 +104,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-074K7L
   supplier_pn: 311-4.7KLRCT-ND
+  value: 4.7k
 - name: R2
   package: '0402'
   position:
@@ -116,6 +118,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-074K7L
   supplier_pn: 311-4.7KLRCT-ND
+  value: 4.7k
 - name: C1
   package: '0402'
   position:
@@ -128,6 +131,7 @@ footprints:
   - 0.0
   mpn: CC0402KRX7R9BB104
   supplier_pn: 311-1438-1-ND
+  value: 0.1uF
 - name: C2
   package: '0402'
   position:
@@ -141,6 +145,7 @@ footprints:
   - 0.0
   mpn: CC0402KRX7R9BB104
   supplier_pn: 311-1438-1-ND
+  value: 0.1uF
 - name: C3
   package: '0603'
   position:
@@ -153,6 +158,7 @@ footprints:
   - 0.0
   mpn: CL10A106KP8NNNC
   supplier_pn: 1276-1004-1-ND
+  value: 10uF
 - name: Q1
   package: SOT-23
   position:
@@ -273,6 +279,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-075K1L
   supplier_pn: 311-5.1KLRCT-ND
+  value: 5.1k
 - name: R4
   package: '0402'
   position:
@@ -285,6 +292,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-075K1L
   supplier_pn: 311-5.1KLRCT-ND
+  value: 5.1k
 - name: U3
   package: SOT-23-5
   position:
@@ -309,6 +317,7 @@ footprints:
   - 0.0
   mpn: CL10A475KP8NNNC
   supplier_pn: 1276-1188-1-ND
+  value: 4.7uF
 - name: C7
   package: '0603'
   position:
@@ -321,6 +330,7 @@ footprints:
   - 0.0
   mpn: CL10A475KP8NNNC
   supplier_pn: 1276-1188-1-ND
+  value: 4.7uF
 - name: U4
   package: QFN-16-AMP
   position:
@@ -345,6 +355,7 @@ footprints:
   - 0.0
   mpn: CL10A105KP8NNNC
   supplier_pn: 1276-1002-1-ND
+  value: 1uF
 - name: U5
   package: piezo_speaker_12mm
   position:
@@ -381,6 +392,7 @@ footprints:
   - 0.0
   mpn: CC0402JRNPO9BN120
   supplier_pn: 311-1032-1-ND
+  value: 12pF
 - name: C10
   package: '0402'
   position:
@@ -393,6 +405,7 @@ footprints:
   - 0.0
   mpn: CC0402JRNPO9BN120
   supplier_pn: 311-1032-1-ND
+  value: 12pF
 - name: R5
   package: '0402'
   position:
@@ -405,6 +418,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-0710KL
   supplier_pn: 311-10.0KLRCT-ND
+  value: 10k
 - name: C11
   package: '0402'
   position:
@@ -417,6 +431,7 @@ footprints:
   - 0.0
   mpn: CC0402KRX7R9BB104
   supplier_pn: 311-1438-1-ND
+  value: 0.1uF
 - name: R6
   package: '0402'
   position:
@@ -429,6 +444,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-0710KL
   supplier_pn: 311-10.0KLRCT-ND
+  value: 10k
 - name: C4
   package: '0402'
   position:
@@ -441,6 +457,7 @@ footprints:
   - 0.0
   mpn: CC0402KRX7R9BB104
   supplier_pn: 311-1438-1-ND
+  value: 0.1uF
 - name: C5
   package: '0402'
   position:
@@ -453,6 +470,7 @@ footprints:
   - 0.0
   mpn: CC0402KRX7R9BB104
   supplier_pn: 311-1438-1-ND
+  value: 0.1uF
 - name: C12
   package: '0402'
   position:
@@ -466,6 +484,7 @@ footprints:
   - 180.0
   mpn: CC0402KRX5R6BB225
   supplier_pn: 311-1440-1-ND
+  value: 2.2uF
 - name: C14
   package: '0402'
   position:
@@ -479,6 +498,7 @@ footprints:
   - 180.0
   mpn: CC0402KRX5R6BB225
   supplier_pn: 311-1440-1-ND
+  value: 2.2uF
 - name: J5
   package: pin_header_2x5_1.27mm
   position:
@@ -902,6 +922,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 - name: R8
   package: '0402'
   position:
@@ -914,6 +935,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 - name: R9
   package: '0402'
   position:
@@ -926,6 +948,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 - name: R10
   package: '0402'
   position:
@@ -938,6 +961,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 - name: R11
   package: '0402'
   position:
@@ -950,6 +974,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 - name: R12
   package: '0402'
   position:
@@ -962,6 +987,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 nets:
 - name: GND
   color: '#475569'
