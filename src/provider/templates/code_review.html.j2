@@ -257,7 +257,7 @@
       flex-direction: column;
       gap: 8px;
       flex-shrink: 0;
-      min-width: 310px;
+      min-width: 0;
     }
     .pane-title-row {
       display: flex;
@@ -272,7 +272,7 @@
       flex: 1;
       overflow-y: auto;
       list-style: none;
-      min-width: 310px;
+      min-width: 0;
     }
     .commit-item {
       padding: 10px 12px;
@@ -385,13 +385,54 @@
       pointer-events: none;
     }
     .pane-files .pane-header {
-      min-width: 280px;
+      min-width: 0;
     }
     .files-list {
       flex: 1;
       overflow-y: auto;
       list-style: none;
-      min-width: 280px;
+      min-width: 0;
+    }
+
+    /* Vertical Panel Resizers (BUG-211) */
+    .column-resizer {
+      width: 6px;
+      cursor: col-resize;
+      background: var(--quake-border-mid);
+      position: relative;
+      flex-shrink: 0;
+      z-index: 10;
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+      user-select: none;
+    }
+    .column-resizer:hover, .column-resizer.resizing {
+      background: var(--quake-gold);
+      box-shadow: 0 0 8px rgba(255, 184, 0, 0.7);
+    }
+    .column-resizer.hidden {
+      display: none !important;
+    }
+    .pane-commits.resizing, .pane-files.resizing {
+      transition: none !important;
+      user-select: none;
+    }
+
+    /* LFS Tracked Files Styling (BUG-211) */
+    .quake-badge-lfs {
+      color: #00e5ff !important;
+      background: rgba(0, 229, 255, 0.15) !important;
+      border: 1px solid #00e5ff !important;
+      font-weight: 700 !important;
+    }
+    .lfs-file-item {
+      border-left: 3px solid #00e5ff !important;
+      background: rgba(0, 229, 255, 0.04) !important;
+    }
+    .lfs-file-item .file-title {
+      color: #38bdf8 !important;
+    }
+    .lfs-file-item:hover {
+      background: rgba(0, 229, 255, 0.12) !important;
     }
     .file-item {
       padding: 8px 12px;
@@ -1213,6 +1254,9 @@
       </ul>
     </aside>
 
+    <!-- Resizer between Commits and Files (BUG-211) -->
+    <div class="column-resizer" id="resizerCommits" title="Drag to resize Commits panel"></div>
+
     <!-- Pane 2: Changed Files -->
     <section id="paneFiles" class="pane-files">
       <div class="pane-header">
@@ -1227,6 +1271,9 @@
       </ul>
     </section>
 
+    <!-- Resizer between Files and Diff (BUG-211) -->
+    <div class="column-resizer" id="resizerFiles" title="Drag to resize Files panel"></div>
+
     <!-- Pane 3: Diff Viewer & Inspector -->
     <main class="pane-diff">
       <div class="diff-toolbar">
@@ -1237,6 +1284,7 @@
             <button id="btnFocus" class="quake-btn quake-btn-default" onclick="toggleFocusMode()" title="Focus Mode (Shortcut: \)">⛶ Focus</button>
           </div>
           <span id="activeFilePath" class="active-file-label" title="Active File">Select a file</span>
+          <span id="activeFileLfs" class="quake-badge quake-badge-lfs" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;">📦 LFS</span>
           <span id="activeFileLang" class="quake-badge quake-badge-cyan" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;"></span>
           <span id="selectionLabel" class="selection-label" style="display:none;"></span>
         </div>
@@ -1592,6 +1640,7 @@
     document.addEventListener("DOMContentLoaded", async () => {
       await loadSession();
       await loadCommits();
+      initPanelResizers();
       setupKeyboardShortcuts();
       setupCliInput();
       setupCliResizer();
@@ -1660,12 +1709,16 @@
         const statExtra = isTrackerOnly
           ? `<span style="opacity: 0.55; font-size: 0.85em; margin-left: 4px;">(${c.ignored_files.join(', ')} filtered)</span>`
           : "";
+        const ancestorBadge = c.is_ancestor_top
+          ? `<span class="quake-badge quake-badge-cyan" style="font-size: 0.65em; margin-left: 6px;" title="Top of ancestor branch (${c.ancestor_name || 'main'})">📌 ${c.ancestor_name || 'main'}</span>`
+          : "";
         li.className = "commit-item" + (c.commit_hash === state.selectedCommit ? " active" : "") + (isReviewed ? " reviewed" : "");
         li.onclick = () => selectCommit(c.commit_hash);
         const timeDisplay = c.time ? ` ${c.time}` : (c.date.includes('T') ? ` ${c.date.split('T')[1].slice(0, 8)}` : '');
         li.innerHTML = `
           <div class="commit-top">
             <span class="commit-hash">${c.short_hash}</span>
+            ${ancestorBadge}
             ${trackerBadge}
             <span class="commit-date">${c.date.slice(0, 10)}${timeDisplay}</span>
           </div>
@@ -1745,8 +1798,16 @@
         const isViewed = openedInCommit && openedInCommit.has(f.path) && f.path !== state.selectedFile;
         const isActive = f.path === state.selectedFile;
 
+        const isLfs = Boolean(
+          f.is_lfs ||
+          f.path.startsWith('attachments/') ||
+          f.path.startsWith('build/attachments/') ||
+          f.path.startsWith('feedback/attachments/')
+        );
+        const lfsBadge = isLfs ? `<span class="quake-badge quake-badge-lfs">📦 LFS</span>` : "";
+
         const li = document.createElement("li");
-        li.className = "file-item" + (isActive ? " active" : (isViewed ? " viewed" : ""));
+        li.className = "file-item" + (isActive ? " active" : (isViewed ? " viewed" : "")) + (isLfs ? " lfs-file-item" : "");
         li.onclick = () => goto(f.path);
 
         const statusClass = f.status === "A" ? "quake-badge-green" : (f.status === "D" ? "quake-badge-red" : "quake-badge-cyan");
@@ -1756,6 +1817,7 @@
 
         li.innerHTML = `
           <div class="file-left">
+            ${lfsBadge}
             <span class="quake-badge ${statusClass}">${f.status}</span>
             <div class="file-name-col">
               <span class="file-title" title="${f.path}">${baseName}</span>
@@ -1928,6 +1990,17 @@
           langBadge.style.display = "inline-block";
         }
 
+        const activeFileObj = (state.files || []).find(f => f.path === state.selectedFile);
+        const isLfsActive = Boolean(
+          activeFileObj && (activeFileObj.is_lfs || activeFileObj.path.startsWith('attachments/') || activeFileObj.path.startsWith('build/attachments/') || activeFileObj.path.startsWith('feedback/attachments/'))
+          || (state.currentDiff && state.currentDiff.is_lfs)
+          || (state.selectedFile && (state.selectedFile.startsWith('attachments/') || state.selectedFile.startsWith('build/attachments/') || state.selectedFile.startsWith('feedback/attachments/')))
+        );
+        const lfsBadge = document.getElementById("activeFileLfs");
+        if (lfsBadge) {
+          lfsBadge.style.display = isLfsActive ? "inline-flex" : "none";
+        }
+
         // Tokenize full old and new files for multi-line aware syntax highlighting
         state.oldHighlightedLines = highlightFullDocument(state.currentDiff.old_content || "", state.activeLanguage);
         state.newHighlightedLines = highlightFullDocument(state.currentDiff.new_content || state.currentDiff.full_content || "", state.activeLanguage);
@@ -1941,6 +2014,13 @@
     function renderDiff() {
       const container = document.getElementById("diffContent");
       if (!state.currentDiff) return;
+
+      const activeFileObj = (state.files || []).find(f => f.path === state.selectedFile);
+      const isLfsActive = Boolean(
+        activeFileObj && (activeFileObj.is_lfs || activeFileObj.path.startsWith('attachments/') || activeFileObj.path.startsWith('build/attachments/') || activeFileObj.path.startsWith('feedback/attachments/'))
+        || (state.currentDiff && state.currentDiff.is_lfs)
+        || (state.selectedFile && (state.selectedFile.startsWith('attachments/') || state.selectedFile.startsWith('build/attachments/') || state.selectedFile.startsWith('feedback/attachments/')))
+      );
 
       if (state.currentDiff.is_binary) {
         const commit = state.selectedCommit || "working";
@@ -1969,9 +2049,9 @@
         container.innerHTML = `
           <div class="binary-diff-view">
             <div class="binary-diff-card">
-              <span class="binary-diff-badge">BINARY FILE</span>
+              <span class="binary-diff-badge ${isLfsActive ? 'quake-badge-lfs' : ''}">${isLfsActive ? '📦 LFS TRACKED FILE' : 'BINARY FILE'}</span>
               <div class="binary-diff-title" style="font-weight: 700; font-size: 14px; color: var(--quake-gold);">${escapeHtml(file)}</div>
-              <div class="binary-diff-msg">This file differs and is binary. Direct line-by-line diff is unavailable.</div>
+              <div class="binary-diff-msg">${isLfsActive ? 'This asset is tracked via Git LFS.' : 'This file differs and is binary.'} Direct line-by-line diff is unavailable.</div>
               <div class="binary-diff-links">
                 <a href="${oldUrl}" target="_blank" download class="binary-diff-link">⬇ View / Download Old File</a>
                 <a href="${newUrl}" target="_blank" download class="binary-diff-link">⬇ View / Download New File</a>
@@ -3199,12 +3279,32 @@
     function togglePane(pane) {
       if (pane === "commits") {
         state.panes.commits = !state.panes.commits;
-        document.getElementById("paneCommits").classList.toggle("collapsed", !state.panes.commits);
-        document.getElementById("btnToggleCommits").classList.toggle("quake-btn-active", state.panes.commits);
+        const el = document.getElementById("paneCommits");
+        const resizer = document.getElementById("resizerCommits");
+        if (el) {
+          el.classList.toggle("collapsed", !state.panes.commits);
+          if (state.panes.commits) {
+            const savedW = localStorage.getItem("codereview_commits_width");
+            if (savedW) el.style.width = savedW + "px";
+          }
+        }
+        if (resizer) resizer.classList.toggle("hidden", !state.panes.commits);
+        const btn = document.getElementById("btnToggleCommits");
+        if (btn) btn.classList.toggle("quake-btn-active", state.panes.commits);
       } else if (pane === "files") {
         state.panes.files = !state.panes.files;
-        document.getElementById("paneFiles").classList.toggle("collapsed", !state.panes.files);
-        document.getElementById("btnToggleFiles").classList.toggle("quake-btn-active", state.panes.files);
+        const el = document.getElementById("paneFiles");
+        const resizer = document.getElementById("resizerFiles");
+        if (el) {
+          el.classList.toggle("collapsed", !state.panes.files);
+          if (state.panes.files) {
+            const savedW = localStorage.getItem("codereview_files_width");
+            if (savedW) el.style.width = savedW + "px";
+          }
+        }
+        if (resizer) resizer.classList.toggle("hidden", !state.panes.files);
+        const btn = document.getElementById("btnToggleFiles");
+        if (btn) btn.classList.toggle("quake-btn-active", state.panes.files);
       }
     }
 
@@ -3217,9 +3317,93 @@
         state.panes.commits = false;
         state.panes.files = false;
       }
-      document.getElementById("paneCommits").classList.toggle("collapsed", !state.panes.commits);
-      document.getElementById("paneFiles").classList.toggle("collapsed", !state.panes.files);
-      document.getElementById("btnFocus").classList.toggle("quake-btn-active", !state.panes.commits && !state.panes.files);
+      const commitsPane = document.getElementById("paneCommits");
+      const filesPane = document.getElementById("paneFiles");
+      const resizerCommits = document.getElementById("resizerCommits");
+      const resizerFiles = document.getElementById("resizerFiles");
+      if (commitsPane) {
+        commitsPane.classList.toggle("collapsed", !state.panes.commits);
+        if (state.panes.commits) {
+          const savedW = localStorage.getItem("codereview_commits_width");
+          if (savedW) commitsPane.style.width = savedW + "px";
+        }
+      }
+      if (filesPane) {
+        filesPane.classList.toggle("collapsed", !state.panes.files);
+        if (state.panes.files) {
+          const savedW = localStorage.getItem("codereview_files_width");
+          if (savedW) filesPane.style.width = savedW + "px";
+        }
+      }
+      if (resizerCommits) resizerCommits.classList.toggle("hidden", !state.panes.commits);
+      if (resizerFiles) resizerFiles.classList.toggle("hidden", !state.panes.files);
+      const btnFocus = document.getElementById("btnFocus");
+      if (btnFocus) btnFocus.classList.toggle("quake-btn-active", !state.panes.commits && !state.panes.files);
+      const btnCommits = document.getElementById("btnToggleCommits");
+      if (btnCommits) btnCommits.classList.toggle("quake-btn-active", state.panes.commits);
+      const btnFiles = document.getElementById("btnToggleFiles");
+      if (btnFiles) btnFiles.classList.toggle("quake-btn-active", state.panes.files);
+    }
+
+    function initPanelResizers() {
+      const commitsPane = document.getElementById("paneCommits");
+      const filesPane = document.getElementById("paneFiles");
+      const resizerCommits = document.getElementById("resizerCommits");
+      const resizerFiles = document.getElementById("resizerFiles");
+
+      // Restore widths from localStorage (BUG-211)
+      const savedCommitsWidth = localStorage.getItem("codereview_commits_width");
+      const savedFilesWidth = localStorage.getItem("codereview_files_width");
+      if (savedCommitsWidth && commitsPane && !commitsPane.classList.contains("collapsed")) {
+        commitsPane.style.width = savedCommitsWidth + "px";
+      }
+      if (savedFilesWidth && filesPane && !filesPane.classList.contains("collapsed")) {
+        filesPane.style.width = savedFilesWidth + "px";
+      }
+
+      if (commitsPane && commitsPane.classList.contains("collapsed") && resizerCommits) {
+        resizerCommits.classList.add("hidden");
+      }
+      if (filesPane && filesPane.classList.contains("collapsed") && resizerFiles) {
+        resizerFiles.classList.add("hidden");
+      }
+
+      function setupResizer(resizer, targetPane, storageKey, minW, maxW) {
+        if (!resizer || !targetPane) return;
+        let startX = 0;
+        let startWidth = 0;
+
+        function onMouseMove(e) {
+          const dx = e.clientX - startX;
+          let newWidth = Math.max(minW, Math.min(maxW, startWidth + dx));
+          targetPane.style.width = newWidth + "px";
+          localStorage.setItem(storageKey, newWidth);
+        }
+
+        function onMouseUp() {
+          resizer.classList.remove("resizing");
+          targetPane.classList.remove("resizing");
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", onMouseUp);
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+        }
+
+        resizer.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          startX = e.clientX;
+          startWidth = targetPane.getBoundingClientRect().width;
+          resizer.classList.add("resizing");
+          targetPane.classList.add("resizing");
+          document.body.style.cursor = "col-resize";
+          document.body.style.userSelect = "none";
+          document.addEventListener("mousemove", onMouseMove);
+          document.addEventListener("mouseup", onMouseUp);
+        });
+      }
+
+      setupResizer(resizerCommits, commitsPane, "codereview_commits_width", 180, 800);
+      setupResizer(resizerFiles, filesPane, "codereview_files_width", 160, 700);
     }
 
     function toggleCliDrawer() {

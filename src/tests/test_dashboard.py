@@ -1482,3 +1482,124 @@ def test_regression_bug_212_pr_past_535_404_handling(tmp_path: Path) -> None:
     assert "pr-local-badge" in tpl_text
     assert "has not been created on GitHub yet" in tpl_text
 
+
+def test_regression_bug_211_code_review_panel_resizing_and_lfs_styling() -> None:
+    """Verify BUG-211: Code review panels support draggable resizing and LFS files have special UI formatting."""
+    cr_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2"
+    cr_text = cr_path.read_text(encoding="utf-8")
+
+    # 1. Column resizers present in HTML
+    assert 'id="resizerCommits"' in cr_text
+    assert 'id="resizerFiles"' in cr_text
+    assert 'class="column-resizer"' in cr_text
+
+    # 2. Resizer setup and localStorage persistence in JS
+    assert "initPanelResizers()" in cr_text
+    assert "codereview_commits_width" in cr_text
+    assert "codereview_files_width" in cr_text
+    assert "setupResizer(resizerCommits" in cr_text
+    assert "setupResizer(resizerFiles" in cr_text
+
+    # 3. LFS badges and classes in CSS and templates
+    assert ".quake-badge-lfs" in cr_text
+    assert ".lfs-file-item" in cr_text
+    assert 'id="activeFileLfs"' in cr_text
+    assert "f.is_lfs" in cr_text
+    assert "📦 LFS" in cr_text
+
+    # 4. FileDiffModel supports is_lfs field
+    diff_model = FileDiffModel(file_path="attachments/screenshot.png", is_lfs=True)
+    assert diff_model.is_lfs is True
+
+
+def test_regression_bug_213_ancestor_top_marker_merged_pruning_and_rebase(tmp_path: Path) -> None:
+    """Verify BUG-213: Smartlog identifies ancestor top, prunes older merged commits, and rebase updates ancestor."""
+    # 1. Setup repository with main and feature branch
+    repo_dir = tmp_path / "bug213_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "tester@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test Engineer"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 1 on main
+    f1 = repo_dir / "f1.txt"
+    f1.write_text("commit 1", encoding="utf-8")
+    subprocess.run(["git", "add", "f1.txt"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Commit 1 (old merged)"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 2 on main (divergence point)
+    f2 = repo_dir / "f2.txt"
+    f2.write_text("commit 2", encoding="utf-8")
+    subprocess.run(["git", "add", "f2.txt"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Commit 2 (ancestor top)"], cwd=repo_dir, check=True, capture_output=True)
+    sha_c2 = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_dir, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    # Create feature branch
+    subprocess.run(["git", "checkout", "-b", "feature-x"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 3 on feature
+    f3 = repo_dir / "f3.txt"
+    f3.write_text("commit 3", encoding="utf-8")
+    subprocess.run(["git", "add", "f3.txt"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Commit 3 (feature work)"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 4 on feature
+    f4 = repo_dir / "f4.txt"
+    f4.write_text("commit 4", encoding="utf-8")
+    subprocess.run(["git", "add", "f4.txt"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Commit 4 (feature done)"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Advance main with Commit 5 while on feature
+    subprocess.run(["git", "checkout", "main"], cwd=repo_dir, check=True, capture_output=True)
+    f5 = repo_dir / "f5.txt"
+    f5.write_text("commit 5", encoding="utf-8")
+    subprocess.run(["git", "add", "f5.txt"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Commit 5 (mainline advance)"], cwd=repo_dir, check=True, capture_output=True
+    )
+    sha_c5 = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_dir, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    # Switch back to feature
+    subprocess.run(["git", "checkout", "feature-x"], cwd=repo_dir, check=True, capture_output=True)
+
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 2. Verify get_smartlog_dag shows feature commits down to merge-base (Commit 2) and PRUNES Commit 1
+    dag = engine.get_smartlog_dag(branch="HEAD")
+    hashes = [n.commit_hash for n in dag]
+    assert sha_c2 in hashes, "Ancestor merge-base commit 2 must be present in DAG"
+    ancestor_node = next(n for n in dag if n.commit_hash == sha_c2)
+    assert ancestor_node.is_ancestor_top is True
+    assert ancestor_node.ancestor_name == "main"
+
+    # Commit 1 must be pruned because it was already merged prior to the ancestor top
+    assert len(dag) == 3, f"Expected 3 commits (Commit 4, Commit 3, Commit 2), got {len(dag)}"
+
+    # 3. Test rebase_branch onto main
+    rebase_res = engine.rebase_branch("main")
+    assert rebase_res["status"] == "ok"
+
+    # 4. Verify after rebase, ancestor top marker is updated to Commit 5
+    dag_after = engine.get_smartlog_dag(branch="HEAD")
+    hashes_after = [n.commit_hash for n in dag_after]
+    assert sha_c5 in hashes_after, "New ancestor commit 5 must be present in DAG after rebase"
+    ancestor_node_after = next(n for n in dag_after if n.commit_hash == sha_c5)
+    assert ancestor_node_after.is_ancestor_top is True
+    assert ancestor_node_after.ancestor_name == "main"
+    assert sha_c2 not in hashes_after, "Old ancestor commit 2 must now be pruned after rebase"
+    assert len(dag_after) == 3, (
+        f"Expected 3 commits after rebase (rebased 4, rebased 3, and ancestor 5), got {len(dag_after)}"
+    )
+
+    # 5. Verify diff_view template has rebase button and ancestor top badge
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert 'id="btnRebase"' in tpl_text
+    assert "onRebaseClicked()" in tpl_text
+    assert "ancestor-top-node" in tpl_text
+    assert "node-badge-ancestor" in tpl_text

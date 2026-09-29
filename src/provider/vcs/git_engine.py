@@ -256,6 +256,14 @@ class GitEngine:
         """
         try:
             out = run_git_command(["fetch", "--all", "--prune"], cwd=self.repo_root)
+            curr_branch = self.get_current_branch()
+            if curr_branch not in ("main", "refs/heads/main"):
+                for cand_ref in ["refs/remotes/origin/main", "origin/main"]:
+                    try:
+                        run_git_command(["branch", "-f", "main", cand_ref], cwd=self.repo_root)
+                        break
+                    except RuntimeError:
+                        pass
             return {
                 "status": "ok",
                 "message": out.strip() or "Repository successfully fetched and synchronized.",
@@ -264,6 +272,67 @@ class GitEngine:
             return {
                 "status": "error",
                 "message": f"Fetch failed: {err}",
+            }
+
+    def rebase_branch(self, upstream: Optional[str] = None) -> Dict[str, Any]:
+        """Rebase current branch onto upstream ancestor (e.g., origin/main or main).
+
+        Args:
+            upstream: Ref to rebase onto. Defaults to upstream tracking ref or origin/main / main.
+
+        Returns:
+            Dictionary with status, message, and target ref.
+        """
+        target = upstream
+        if not target:
+            try:
+                target = run_git_command(
+                    ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd=self.repo_root
+                ).strip()
+            except RuntimeError:
+                pass
+        if not target:
+            for candidate in [
+                "refs/remotes/origin/main",
+                "refs/heads/main",
+                "refs/remotes/origin/master",
+                "refs/heads/master",
+            ]:
+                try:
+                    run_git_command(["rev-parse", "--verify", candidate], cwd=self.repo_root)
+                    target = candidate
+                    break
+                except RuntimeError:
+                    continue
+        if not target:
+            return {
+                "status": "error",
+                "message": "No suitable upstream ancestor branch found to rebase onto.",
+                "target": None,
+            }
+
+        try:
+            out = run_git_command(["rebase", target], cwd=self.repo_root)
+            if "origin/main" in target:
+                try:
+                    run_git_command(["branch", "-f", "main", "refs/remotes/origin/main"], cwd=self.repo_root)
+                except RuntimeError:
+                    pass
+            clean_target = target.replace("refs/remotes/origin/", "").replace("refs/heads/", "")
+            return {
+                "status": "ok",
+                "message": out.strip() or f"Successfully rebased onto {clean_target}.",
+                "target": clean_target,
+            }
+        except RuntimeError as err:
+            try:
+                run_git_command(["rebase", "--abort"], cwd=self.repo_root)
+            except RuntimeError:
+                pass
+            return {
+                "status": "error",
+                "message": f"Rebase onto {target} failed: {err}",
+                "target": target,
             }
 
     def resolve_revisions(self, rev_args: Optional[Sequence[str]] = None) -> List[str]:
@@ -390,6 +459,25 @@ class GitEngine:
         head_hash = self.get_head_commit()
         target_ref = branch or "HEAD"
 
+        # Determine ancestor branch (e.g. main/master) and merge-base (BUG-213)
+        ancestor_name: Optional[str] = None
+        ancestor_merge_base: Optional[str] = None
+        for candidate_ref, cand_name in [
+            ("refs/remotes/origin/main", "main"),
+            ("refs/heads/main", "main"),
+            ("refs/remotes/origin/master", "master"),
+            ("refs/heads/master", "master"),
+        ]:
+            try:
+                run_git_command(["rev-parse", "--verify", candidate_ref], cwd=self.repo_root)
+                mb = run_git_command(["merge-base", target_ref, candidate_ref], cwd=self.repo_root).strip()
+                if mb:
+                    ancestor_merge_base = mb
+                    ancestor_name = cand_name
+                    break
+            except RuntimeError:
+                continue
+
         fmt = "%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%ar%x1f%s%x1f%D%x1f%b%x1e"
         cmd = ["log", f"-n{limit}", f"--format={fmt}", "--date=iso-strict", target_ref]
         try:
@@ -399,6 +487,16 @@ class GitEngine:
 
         raw_records = output.strip().split("\x1e")
         parsed_commits: List[Dict[str, Any]] = []
+
+        # Check if target is a topic branch diverging from ancestor
+        target_hash = head_hash if target_ref == "HEAD" else None
+        if not target_hash:
+            try:
+                target_hash = run_git_command(["rev-parse", target_ref], cwd=self.repo_root).strip()
+            except RuntimeError:
+                target_hash = ""
+
+        is_topic_branch = bool(ancestor_merge_base and target_hash != ancestor_merge_base)
 
         for rec in raw_records:
             if not rec.strip():
@@ -429,6 +527,10 @@ class GitEngine:
                         elif dec and dec != "HEAD":
                             branches.append(dec)
 
+                is_ancestor_top = c_hash == ancestor_merge_base
+                if is_ancestor_top and ancestor_name and ancestor_name not in branches:
+                    branches.append(ancestor_name)
+
                 parsed_commits.append(
                     {
                         "hash": c_hash,
@@ -443,8 +545,14 @@ class GitEngine:
                         "branches": branches,
                         "tags": tags,
                         "is_head": (c_hash == head_hash),
+                        "is_ancestor_top": is_ancestor_top,
+                        "ancestor_name": ancestor_name if is_ancestor_top else None,
                     }
                 )
+
+                # Prune older commits already merged into ancestor branch (BUG-213)
+                if is_topic_branch and is_ancestor_top:
+                    break
 
         # Build DAG lanes / column positions
         columns: List[Optional[str]] = []
@@ -516,6 +624,8 @@ class GitEngine:
                     branches=commit["branches"],
                     tags=commit["tags"],
                     is_head=commit["is_head"],
+                    is_ancestor_top=commit.get("is_ancestor_top", False),
+                    ancestor_name=commit.get("ancestor_name"),
                     graph_symbol=symbol,
                     graph_art=graph_art,
                     bug_tags=bug_tags,
@@ -1372,6 +1482,16 @@ class GitEngine:
         }
         is_binary = Path(file_path).suffix.lower() in binary_exts
 
+        clean_path = file_path.replace("\\", "/").strip().lstrip("./")
+        lfs_set = self.check_lfs_paths([file_path, clean_path])
+        is_lfs = (
+            file_path in lfs_set
+            or clean_path in lfs_set
+            or clean_path.startswith("attachments/")
+            or clean_path.startswith("build/attachments/")
+            or clean_path.startswith("feedback/attachments/")
+        )
+
         old_content = ""
         new_content = ""
 
@@ -1382,6 +1502,7 @@ class GitEngine:
                 new_path=file_path,
                 status="M",
                 is_binary=True,
+                is_lfs=is_lfs,
                 additions=0,
                 deletions=0,
                 hunks=[],
@@ -1438,6 +1559,7 @@ class GitEngine:
             new_path=file_path,
             status=status,
             is_binary=False,
+            is_lfs=is_lfs,
             additions=additions,
             deletions=deletions,
             hunks=hunks,

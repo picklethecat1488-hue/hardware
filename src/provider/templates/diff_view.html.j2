@@ -413,6 +413,16 @@
     .smartlog-node.head-node {
       border-left: 3px solid var(--quake-cyan);
     }
+    .smartlog-node.ancestor-top-node {
+      border-left: 3px solid #38bdf8 !important;
+      background: rgba(56, 189, 248, 0.05);
+    }
+    .node-badge-ancestor {
+      background: #1b2a32 !important;
+      color: #38bdf8 !important;
+      border: 1px solid #0284c7 !important;
+      font-weight: 700 !important;
+    }
 
     .node-header-row {
       display: flex;
@@ -800,6 +810,12 @@
         <span>🔄 Sync</span>
       </button>
 
+      <!-- Rebase Button (BUG-213) -->
+      <button id="btnRebase" class="quake-btn quake-btn-default" onclick="onRebaseClicked()" title="Rebase current branch onto top of ancestor branch (e.g., origin/main)">
+        <span id="rebaseSpinner" style="display:none;">⏳</span>
+        <span>⤵ Rebase</span>
+      </button>
+
       <!-- Commit & Amend Buttons -->
       <button id="btnCommitModal" class="quake-btn quake-btn-gold" onclick="openCommitModal(false)" title="Commit selected working tree changes">
         <span>+ Commit</span>
@@ -905,7 +921,7 @@
 
         <!-- Render Commit Nodes -->
         {% for node in session.smartlog_nodes %}
-          <div class="smartlog-node {% if node.is_head %}head-node{% endif %} {% if node.pr_number %}has-pr{% endif %} {% if session.active_commit == node.commit_hash %}active{% endif %}"
+          <div class="smartlog-node {% if node.is_head %}head-node{% endif %} {% if node.is_ancestor_top %}ancestor-top-node{% endif %} {% if node.pr_number %}has-pr{% endif %} {% if session.active_commit == node.commit_hash %}active{% endif %}"
                id="node-{{ node.short_hash }}"
                data-hash="{{ node.commit_hash }}"
                onclick="selectCommit('{{ node.commit_hash }}', event)">
@@ -942,6 +958,9 @@
 
             <!-- Tags Row (Branches, Tags, PR, Bugs) -->
             <div class="node-tags-row">
+              {% if node.is_ancestor_top %}
+                <span class="node-badge node-badge-ancestor" title="Top of ancestor branch ({{ node.ancestor_name or 'main' }})">📌 {{ node.ancestor_name or 'main' }}</span>
+              {% endif %}
               {% for br in node.branches %}
                 {% set is_pr_br = ('pr' in br.lower() or 'pull' in br.lower()) %}
                 {% set br_url = node.pr_url if (is_pr_br and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/tree/' ~ br.replace('origin/', '')) %}
@@ -2040,6 +2059,31 @@
       } catch (err) {
         spinner.style.display = "none";
         showToast("Sync failed: " + err);
+      }
+    }
+
+    async function onRebaseClicked() {
+      const spinner = document.getElementById("rebaseSpinner");
+      if (spinner) spinner.style.display = "inline";
+      showToast("Rebasing onto ancestor branch...");
+
+      try {
+        const resp = await fetch("/api/rebase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
+        });
+        const res = await resp.json();
+        if (spinner) spinner.style.display = "none";
+        if (res.status === "ok") {
+          showToast(res.message || "Rebase completed.");
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          showToast("Rebase failed: " + (res.message || "Unknown error"), 5000);
+        }
+      } catch (err) {
+        if (spinner) spinner.style.display = "none";
+        showToast("Rebase failed: " + err, 5000);
       }
     }
 

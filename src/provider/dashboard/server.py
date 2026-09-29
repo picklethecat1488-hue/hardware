@@ -192,6 +192,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case "/api/sync":
                 res = self.server.git_engine.sync_repo()
                 self._send_json(res)
+            case "/api/rebase":
+                upstream = data.get("upstream") if isinstance(data, dict) else None
+                res = self.server.git_engine.rebase_branch(upstream=upstream)
+                self._send_json(res)
             case "/api/checkout_branch":
                 branch = data.get("branch", "").strip()
                 if not branch:
