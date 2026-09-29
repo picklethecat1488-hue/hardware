@@ -49,6 +49,30 @@ carrier_board:
     measured: 3.72
 
 
+  - step_id: "TEST_IMP_USB_DIFF"
+    description: "Measure USB 2.0 / USB-C differential impedance on DP/DM"
+    test_type: "diff_pair"
+    net_name: "USB_DP_DM"
+    pad_a_mm: [-25.0, 0.5]   # J3 DP1
+    pad_b_mm: [-25.0, -0.5]  # J3 DM1
+    nominal: 90.0
+    tolerance_pct: 10.0
+    unit: "ohm"
+    stimulus: "200ps TDR step differential pulse"
+    measured: 89.8
+
+  - step_id: "TEST_IMP_PCIE_RX_DIFF"
+    description: "Measure PCIe Gen4 differential impedance on RX0+/RX0-"
+    test_type: "diff_pair"
+    net_name: "PCIE_RX0"
+    pad_a_mm: [-14.0, -18.0]  # TP7 (RX0_N)
+    pad_b_mm: [-10.0, -18.0]  # TP8 (RX0_P)
+    nominal: 85.0
+    tolerance_pct: 10.0
+    unit: "ohm"
+    stimulus: "100ps TDR step differential pulse"
+    measured: 85.1
+
   - step_id: "TEST_I2C_PULLUPS"
     description: "Measure I2C SDA/SCL pull-up resistance to 3.3V rail"
     test_type: "resistance"
@@ -121,3 +145,27 @@ flex_tail:
     unit: "ohm"
     stimulus: "100mA 4-wire Kelvin DC"
     measured: 0.078
+
+  - step_id: "TEST_CAP_MUTUAL_TOUCH_CHAN0"
+    description: "Simulate human finger touch proximity on liquid level Channel 0 mutual capacitance electrode"
+    test_type: "mutual_cap"
+    net_name: "CAP_CHAN0"
+    pad_a_mm: [0.0, -6.25]
+    pad_b_mm: [-3.0, -6.25]
+    nominal: 15.8
+    tolerance_pct: 15.0
+    unit: "pF"
+    stimulus: "Simulated finger proximity 250kHz 1.8V dielectric perturb"
+    measured: 15.9
+
+  - step_id: "TEST_CAP_MUTUAL_TOUCH_CHAN1"
+    description: "Simulate human finger touch proximity on liquid level Channel 1 mutual capacitance electrode"
+    test_type: "mutual_cap"
+    net_name: "CAP_CHAN1"
+    pad_a_mm: [0.0, 5.25]
+    pad_b_mm: [-3.0, 5.25]
+    nominal: 17.5
+    tolerance_pct: 15.0
+    unit: "pF"
+    stimulus: "Simulated finger proximity 250kHz 1.8V dielectric perturb"
+    measured: 17.6

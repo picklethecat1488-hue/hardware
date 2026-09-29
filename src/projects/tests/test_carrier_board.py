@@ -320,6 +320,12 @@ def test_regression_bug_107_carrier_board_flying_probes_simulation() -> None:
         assert len(iso_results["power_ground_nets"]) > 0, "Must have audited power/ground nets"
         assert len(iso_results["shorted_signals"]) == 0, f"Detected signal shorts: {iso_results['shorted_signals']}"
 
+        # Verify differential pair compliance audit
+        assert hasattr(provider, "flying_probe_diff_pairs"), "Provider must expose flying_probe_diff_pairs"
+        diff_results = provider.flying_probe_diff_pairs
+        assert diff_results["all_passed"] is True, f"Diff pair checks failed: {diff_results}"
+        assert len(diff_results["checks"]) > 0, "Must have audited differential pairs"
+
         # Verify test report generation
         report_md = provider.generate_test_report()
         assert "Flying Probes Automated Acceptance Test Report" in report_md
@@ -328,6 +334,8 @@ def test_regression_bug_107_carrier_board_flying_probes_simulation() -> None:
         assert "PASS" in report_md
         assert "100.0%" in report_md
         assert "Signal Line Isolation Audit" in report_md
+        assert "Differential Pair Compliance Audit" in report_md
+        assert "USB_2_0" in report_md
     finally:
         p.disconnect(client)
 
@@ -355,6 +363,13 @@ def test_regression_bug_108_flex_tail_flying_probes_simulation() -> None:
         for step in provider.flying_probe_steps:
             assert step.passed, f"Flex tail step {step.step_id} ({step.description}) failed electrical validation"
 
+        # Verify mutual capacitance touch configuration
+        assert hasattr(provider, "flying_probe_mutual_cap"), "Provider must expose flying_probe_mutual_cap"
+        cap_results = provider.flying_probe_mutual_cap
+        assert cap_results["all_passed"] is True, f"Mutual cap checks failed: {cap_results}"
+        assert len(cap_results["checks"]) > 0, "Must have audited mutual capacitance channels"
+        assert all(c.touch_detected for c in cap_results["checks"]), "All channels must detect finger touch"
+
         # Verify test report generation
         report_md = provider.generate_test_report()
         assert "TEST_CAP_SENSE_CHAN0" in report_md
@@ -363,8 +378,46 @@ def test_regression_bug_108_flex_tail_flying_probes_simulation() -> None:
         assert "TEST_CAP_SENSE_CHAN3" in report_md
         assert "PASS" in report_md
         assert "100.0%" in report_md
+        assert "Mutual Capacitance Touch Simulation & Verification" in report_md
     finally:
         p.disconnect(client)
+
+
+def test_regression_bug_195_flying_probes_diff_pair_and_mutual_cap_compliance() -> None:
+    """Verify BUG-195: diff pair compliance (USB, PCIe) and mutual cap touch testing in flying probes."""
+    from provider.simulation.flying_probe import (
+        verify_diff_pair_compliance,
+        verify_mutual_cap_compliance,
+    )
+
+    provider = CarrierBoardProvider()
+
+    # 1. Differential pair testing on carrier board
+    diff_results = verify_diff_pair_compliance(provider)
+    assert diff_results["all_passed"] is True, f"Diff pair verification failed: {diff_results}"
+    checks = diff_results["checks"]
+    pair_names = {c.pair_name for c in checks}
+    assert "USB_2_0" in pair_names
+    assert "PCIE_TX0" in pair_names
+    assert "PCIE_RX0" in pair_names
+    for c in checks:
+        assert c.passed is True
+        assert c.skew_ps <= c.max_skew_ps
+        tol_val = c.target_diff_impedance_ohm * (c.tolerance_pct / 100.0)
+        assert abs(c.measured_diff_impedance_ohm - c.target_diff_impedance_ohm) <= tol_val
+
+    # 2. Mutual capacitance finger touch simulation on flex tail
+    cap_results = verify_mutual_cap_compliance(provider)
+    assert cap_results["all_passed"] is True, f"Mutual cap verification failed: {cap_results}"
+    cap_checks = cap_results["checks"]
+    chan_names = {c.channel_name for c in cap_checks}
+    assert "CAP_CHAN0" in chan_names
+    assert "CAP_CHAN1" in chan_names
+    for c in cap_checks:
+        assert c.passed is True
+        assert c.touch_detected is True
+        assert c.delta_c_pf >= c.min_delta_c_pf
+        assert c.finger_touch_pf > c.baseline_pf
 
 
 def test_regression_bug_131_schematic_collinear_wire_overlaps() -> None:
