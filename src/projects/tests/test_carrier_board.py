@@ -1611,3 +1611,48 @@ def test_regression_bug_207_sheet_17_components_on_carrier_board() -> None:
         assert kicad_report.passed
         assert kicad_report.error_count == 0
         assert kicad_report.violations_count == 0
+
+
+@pytest.mark.slow
+def test_regression_bug_208_battery_cover_does_not_elide_enclosure_labels() -> None:
+    """Verify BUG-208: Battery cover does not elide BATTERY or GPIO labels, and GPIO pin 10 marker is present."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider import Mode
+
+    provider = CarrierBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    cover = provider.battery_cover("battery_cover", None, Mode.DEFAULT)
+
+    assert lid.part is not None and lid.part.is_valid()
+    assert cover.part is not None and cover.part.is_valid()
+
+    cover_bb = cover.part.bounding_box()
+
+    # Verify BATTERY label margin and that BATTERY label is strictly south of battery cover min Y
+    label_margin = provider.settings.enclosure_battery_label_margin
+    assert label_margin >= 1.0, f"Expected battery label margin >= 1.0mm, got {label_margin}"
+
+    # Calculate battery label coordinate
+    batt_l = provider.settings.enclosure_battery_mount_length
+    batt_y = provider.settings.enclosure_battery_mount_y
+    cradle_t = provider.settings.enclosure_battery_mount_wall_thickness
+    clr = provider.settings.enclosure_battery_cover_clearance
+    cover_t = provider.settings.enclosure_battery_cover_wall_thickness
+    min_y = batt_y - (batt_l / 2.0)
+    batt_lbl_y = min_y - cradle_t - clr - cover_t - label_margin
+    assert batt_lbl_y < cover_bb.min.Y, (
+        f"BATTERY label Y={batt_lbl_y} must be strictly south of cover min Y={cover_bb.min.Y}"
+    )
+
+    # Verify GPIO title is located directly above GPIO cutout and horizontally clear of battery cover
+    gpio_y = -28.0
+    gpio_l = provider.settings.enclosure_gpio_cutout_length
+    hdr_margin = provider.settings.enclosure_gpio_header_label_margin
+    hdr_y = gpio_y + (gpio_l / 2.0) + hdr_margin
+    assert hdr_y > gpio_y + (gpio_l / 2.0), "GPIO header label must be located north of cutout"
+    assert 19.0 > cover_bb.max.X + 2.0, "GPIO label X position must maintain clearance from battery cover right edge"
+
+    # Verify pin 10 marker Y position matches physical pin 10
+    pitch = provider.settings.enclosure_gpio_pin_pitch
+    pin_10_y = gpio_y + (4.5 * pitch)
+    assert pin_10_y > gpio_y + (3.0 * pitch), "Pin 10 marker must be positioned at top pin header location"

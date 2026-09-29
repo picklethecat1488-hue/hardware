@@ -615,7 +615,7 @@ class CarrierBoardProvider(Provider):
             with Locations((gpio_x, gpio_y, 0.0)):
                 Box(gpio_w, gpio_l, wall * 4.0, mode=BuildMode.SUBTRACT)
 
-            # GPIO key engraved on enclosure lid exterior surface (BUG-073, BUG-177, BUG-189)
+            # GPIO key engraved on enclosure lid exterior surface (BUG-073, BUG-177, BUG-189, BUG-208)
             pitch = self.settings.enclosure_gpio_pin_pitch
             lbl_margin = self.settings.enclosure_gpio_label_margin
             hdr_margin = self.settings.enclosure_gpio_header_label_margin
@@ -626,17 +626,20 @@ class CarrierBoardProvider(Provider):
             pin_1_y = gpio_y - (4.5 * pitch)
             pin_3v3_y = gpio_y - (0.5 * pitch)
             pin_gnd_y = gpio_y + (0.5 * pitch)
+            pin_10_y = gpio_y + (4.5 * pitch)
             label_x = gpio_x - (gpio_w / 2.0) - lbl_margin
-            hdr_x = gpio_x - (gpio_w / 2.0) - hdr_margin
+            hdr_y = gpio_y + (gpio_l / 2.0) + hdr_margin
             with BuildSketch(Plane.XY.offset(wall)) as s_key:
-                with Locations((hdr_x, gpio_y)):
-                    Text("GPIO", font_size=hdr_sz, rotation=90.0)
+                with Locations((gpio_x, hdr_y)):
+                    Text("GPIO", font_size=hdr_sz, rotation=0.0)
                 with Locations((label_x, pin_gnd_y)):
                     Text("GND", font_size=font_sz, rotation=0.0)
                 with Locations((label_x, pin_3v3_y)):
                     Text("3V3", font_size=font_sz, rotation=0.0)
                 with Locations((label_x + 0.6, pin_1_y)):
                     Text("1", font_size=font_sz, rotation=0.0)
+                with Locations((label_x + 0.3, pin_10_y)):
+                    Text("10", font_size=font_sz, rotation=0.0)
             extrude(s_key.sketch, amount=-depth, mode=BuildMode.SUBTRACT)
 
             # Peripheral bus identifier labels engraved on enclosure lid exterior right margin (BUG-160, BUG-177)
@@ -716,9 +719,13 @@ class CarrierBoardProvider(Provider):
                     RectangleRounded(batt_cut_w, batt_cut_l, cutout_r)
             extrude(s_batt_cut.sketch, amount=-(wall + 2.0), mode=BuildMode.SUBTRACT)
 
-            # Battery label (BUG-150)
+            # Battery label (BUG-150, BUG-208)
+            batt_cov_clr = self.settings.enclosure_battery_cover_clearance
+            batt_cov_t = self.settings.enclosure_battery_cover_wall_thickness
+            batt_lbl_margin = self.settings.enclosure_battery_label_margin
+            batt_lbl_y = min_y - batt_rim_t - batt_cov_clr - batt_cov_t - batt_lbl_margin
             with BuildSketch(Plane.XY.offset(wall)) as s_batt_lbl:
-                with Locations((cradle_cx, min_y - 3.0)):
+                with Locations((cradle_cx, batt_lbl_y)):
                     Text("BATTERY", font_size=1.6)
             extrude(s_batt_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 

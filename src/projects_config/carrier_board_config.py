@@ -349,6 +349,11 @@ class CarrierBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_battery_cover_wall_thickness"])
 
     @property
+    def enclosure_battery_label_margin(self) -> float:
+        """Margin between battery cover perimeter and BATTERY label on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_label_margin"])
+
+    @property
     def enclosure_flex_support_length(self) -> float:
         """Length of support plane extending under flex tail from front wall in mm."""
         return float(self._raw_data["enclosure_flex_support_length"])

@@ -35,10 +35,11 @@ enclosure_gpio_cutout_width: 5.0
 enclosure_gpio_cutout_length: 28.0
 enclosure_gpio_pin_pitch: 2.54
 enclosure_gpio_label_margin: 2.3
-enclosure_gpio_header_label_margin: 6.0
+enclosure_gpio_header_label_margin: 2.5
 enclosure_gpio_label_font_size: 1.4
-enclosure_gpio_header_font_size: 2.2
+enclosure_gpio_header_font_size: 2.0
 enclosure_gpio_label_depth: 0.4
+enclosure_battery_label_margin: 2.5
 enclosure_swd_cutout_width: 8.0
 enclosure_swd_cutout_height: 5.5
 enclosure_cutout_fillet_radius: 0.8
