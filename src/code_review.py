@@ -151,7 +151,14 @@ def main() -> None:
 
     db_path = args.db_file if args.db_file.is_absolute() else (repo_root / args.db_file)
     state_path = db_path.with_suffix(".json")
-    markdown_path = db_path.with_suffix(".md")
+    if hasattr(args, "markdown_output") and args.markdown_output is not None:
+        markdown_path = (
+            args.markdown_output if args.markdown_output.is_absolute() else (repo_root / args.markdown_output)
+        )
+    elif args.db_file != Path("build/code_review.sqlite"):
+        markdown_path = db_path.parent / "CR.md"
+    else:
+        markdown_path = repo_root / "build" / "CR.md"
 
     git_engine = GitReviewEngine(repo_root=repo_root)
     if not args.commits:
@@ -204,6 +211,7 @@ def main() -> None:
             author="Reviewer",
             code_snippet=snippet,
             created_at=datetime.now(timezone.utc).isoformat(),
+            commit=revisions[0] if revisions else "working",
         )
         server.session.comments.append(comment)
         server.session.auto_update_status_on_comment()

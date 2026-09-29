@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
 class KiCadDRCSeverity(str, Enum):
@@ -167,6 +167,11 @@ class KiCadCLI:
         """Return True if kicad-cli supports the 'pcb drc' subcommand (KiCad 8+)."""
         return self.is_available and self.major_version >= 8
 
+    @property
+    def supports_render(self) -> bool:
+        """Return True if kicad-cli supports the 'pcb render' subcommand (KiCad 8+)."""
+        return self.is_available and self.major_version >= 8
+
     def run_command(self, args: List[str]) -> str:
         """Execute a kicad-cli command locally."""
         if not self._local_bin:
@@ -274,6 +279,119 @@ class KiCadCLI:
         self.run_command(args)
 
         return out_svg
+
+    def render_board_image(
+        self,
+        kicad_pcb_path: str | Path,
+        output_png: str | Path,
+        side: str = "top",
+        width: int = 2048,
+        height: int = 2048,
+        transparent: bool = True,
+        corner_radius_mm: Optional[float] = None,
+        board_dimensions_mm: Optional[Tuple[float, float]] = None,
+        mounting_holes: Optional[Sequence[Tuple[float, float, float]]] = None,
+    ) -> Path:
+        """Render photorealistic 3D board view to PNG image using kicad-cli.
+
+        Args:
+            kicad_pcb_path: Path to .kicad_pcb file.
+            output_png: Destination path for rendered PNG image.
+            side: View side ('top' or 'bottom').
+            width: Output image width in pixels.
+            height: Output image height in pixels.
+            transparent: Whether to render with transparent background.
+            corner_radius_mm: Optional corner radius in mm for geometric transparency masking.
+            board_dimensions_mm: Optional (width_mm, length_mm) physical dimensions for mask scaling.
+            mounting_holes: Optional sequence of (x_mm, y_mm, radius_mm) mounting holes to mask.
+
+        Returns:
+            Path to rendered output PNG image.
+        """
+        pcb_file = Path(kicad_pcb_path).resolve()
+        out_png = Path(output_png).resolve()
+        out_png.parent.mkdir(parents=True, exist_ok=True)
+
+        if not pcb_file.is_file():
+            raise FileNotFoundError(f"KiCad PCB file not found: {pcb_file}")
+
+        if not self.supports_render:
+            return out_png
+
+        args = [
+            "pcb",
+            "render",
+            "--side",
+            side,
+            "--width",
+            str(width),
+            "--height",
+            str(height),
+            "--quality",
+            "basic",
+            "-o",
+            str(out_png),
+            str(pcb_file),
+        ]
+        if transparent:
+            args.extend(["--background", "transparent"])
+        self.run_command(args)
+
+        if out_png.is_file() and transparent:
+            from PIL import Image, ImageChops, ImageDraw
+
+            with Image.open(out_png) as img:
+                bbox = img.getbbox()
+                if bbox and (bbox[0] > 0 or bbox[1] > 0 or bbox[2] < img.width or bbox[3] < img.height):
+                    img = img.crop(bbox)
+
+                img = self.apply_transparency_mask(
+                    img,
+                    side=side,
+                    board_dimensions_mm=board_dimensions_mm,
+                    corner_radius_mm=corner_radius_mm,
+                    mounting_holes=mounting_holes,
+                )
+
+                img.save(out_png)
+
+        return out_png
+
+    @staticmethod
+    def apply_transparency_mask(
+        image: Any,
+        side: str = "top",
+        board_dimensions_mm: Optional[Tuple[float, float]] = None,
+        corner_radius_mm: Optional[float] = None,
+        mounting_holes: Optional[Sequence[Tuple[float, float, float]]] = None,
+    ) -> Any:
+        """Apply geometric alpha masking for rounded corners and mounting hole cutouts."""
+        from PIL import Image, ImageChops, ImageDraw
+
+        if not (board_dimensions_mm and corner_radius_mm):
+            return image
+
+        w_mm, l_mm = board_dimensions_mm
+        sx = image.width / w_mm
+        sy = image.height / l_mm
+        r_px = int(round(corner_radius_mm * sx))
+        mask = Image.new("L", (image.width, image.height), 0)
+        draw = ImageDraw.Draw(mask)
+        draw.rounded_rectangle([(0, 0), (image.width - 1, image.height - 1)], radius=r_px, fill=255)
+
+        if mounting_holes:
+            for mh in mounting_holes:
+                x_mm, y_mm, r_hole_mm = mh
+                px = (x_mm + w_mm / 2.0) * sx if side != "bottom" else (w_mm / 2.0 - x_mm) * sx
+                py = (l_mm / 2.0 - y_mm) * sy
+                r_px_x = r_hole_mm * sx
+                r_px_y = r_hole_mm * sy
+                draw.ellipse([(px - r_px_x, py - r_px_y), (px + r_px_x, py + r_px_y)], fill=0)
+
+        current_alpha = image.convert("RGBA").getchannel("A")
+        final_alpha = ImageChops.multiply(current_alpha, mask)
+        image.putalpha(final_alpha)
+        return image
 
     def export_all_board_files(
         self,

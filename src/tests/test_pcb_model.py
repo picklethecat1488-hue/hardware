@@ -251,11 +251,11 @@ def test_build_silkscreen_context_manager_and_locations():
     assert len(shapes) == 6
 
 
-def test_test_board_provider_cad_silkscreen():
-    """Verify that TestBoardProvider dynamically generates silkscreen text from CAD geometry."""
-    from projects.test_board.provider import TestBoardProvider
+def test_carrier_board_provider_cad_silkscreen():
+    """Verify that CarrierBoardProvider dynamically generates silkscreen text from CAD geometry."""
+    from projects.carrier_board.provider import CarrierBoardProvider
 
-    provider = TestBoardProvider()
+    provider = CarrierBoardProvider()
     texts = provider.silkscreen()
     assert len(texts) >= 3
     assert texts[0].text == "TEST BOARD CARRIER REV 2.0"

@@ -847,6 +847,21 @@ class MountingHoleModel(BaseModel):
     net: Optional[str] = Field(default=None, description="Net name if plated (typically GND)")
 
 
+class PCBObstacleModel(BaseModel):
+    """Component or mechanical fixture obstacle for clearance and flying probe test simulation."""
+
+    name: str = Field(description="Obstacle identifier or component designator (e.g. U1, J1, clamp_rail)")
+    shape: str = Field(default="box", description="Geometric collision shape ('box' or 'cylinder')")
+    dimensions_mm: Tuple[float, float, float] = Field(
+        description="Full envelope dimensions (width_x, length_y, height_z) in mm"
+    )
+    position_mm: Tuple[float, float, float] = Field(
+        description="Center position (x, y, z) in mm relative to board origin"
+    )
+    description: Optional[str] = Field(default=None, description="Human-readable description of obstacle")
+    layer: str = Field(default="F.Cu", description="Board layer location ('F.Cu' or 'B.Cu')")
+
+
 class PCBConfig(BaseModel):
     """Top-level configuration model defining complete physical board, stackup, and high-speed rules."""
 
@@ -917,6 +932,10 @@ class PCBConfig(BaseModel):
     design_rules: PCBDesignRulesModel = Field(
         default_factory=PCBDesignRulesModel,
         description="Manufacturing design rules and constraints for routing, clearance, and DRC checks",
+    )
+    obstacles: List[PCBObstacleModel] = Field(
+        default_factory=list,
+        description="Physical component and fixture obstacles for CAD and simulation",
     )
 
     @property

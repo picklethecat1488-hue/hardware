@@ -9,9 +9,11 @@ import json
 from pathlib import Path
 import sqlite3
 from typing import Dict, List, Optional
+import uuid as uuid_pkg
 
 from model.code_review import (
     CommentModel,
+    CommitUpdateModel,
     FileReviewStatus,
     FileStateModel,
     ReviewSessionModel,
@@ -59,6 +61,8 @@ class SQLiteReviewStore:
 
                 CREATE TABLE IF NOT EXISTS comments (
                     id TEXT PRIMARY KEY,
+                    uuid TEXT,
+                    commit_hash TEXT NOT NULL DEFAULT '',
                     file_path TEXT NOT NULL,
                     start_line INTEGER NOT NULL,
                     end_line INTEGER NOT NULL,
@@ -70,11 +74,37 @@ class SQLiteReviewStore:
                     resolved INTEGER NOT NULL DEFAULT 0
                 );
 
+                CREATE TABLE IF NOT EXISTS commit_updates (
+                    id TEXT PRIMARY KEY,
+                    session_uuid TEXT NOT NULL,
+                    original_commit TEXT NOT NULL,
+                    current_commit TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    notes TEXT NOT NULL DEFAULT '',
+                    timestamp TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_comments_file_path ON comments(file_path);
                 CREATE INDEX IF NOT EXISTS idx_comments_severity ON comments(severity);
                 CREATE INDEX IF NOT EXISTS idx_files_status ON files(status);
+                CREATE INDEX IF NOT EXISTS idx_commit_updates_session ON commit_updates(session_uuid);
                 """
             )
+            # Ensure uuid and commit_hash columns exist on preexisting comments table
+            cursor = conn.execute("PRAGMA table_info(comments)")
+            cols = [row["name"] for row in cursor.fetchall()]
+            if "uuid" not in cols:
+                conn.execute("ALTER TABLE comments ADD COLUMN uuid TEXT")
+            if "commit_hash" not in cols:
+                conn.execute("ALTER TABLE comments ADD COLUMN commit_hash TEXT NOT NULL DEFAULT ''")
+
+            # Backfill missing UUIDs on comments
+            null_uuid_rows = conn.execute("SELECT id FROM comments WHERE uuid IS NULL OR uuid = ''").fetchall()
+            for r in null_uuid_rows:
+                conn.execute("UPDATE comments SET uuid = ? WHERE id = ?", (str(uuid_pkg.uuid4()), r["id"]))
+
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_comments_uuid ON comments(uuid)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_comments_commit ON comments(commit_hash)")
 
     def load_session(self) -> Optional[ReviewSessionModel]:
         """Load full review session model from SQLite.
@@ -90,6 +120,10 @@ class SQLiteReviewStore:
 
             meta: Dict[str, str] = {row["key"]: row["value"] for row in meta_rows}
             title = meta.get("title", "Code Review")
+            session_uuid = meta.get("uuid", str(uuid_pkg.uuid4()))
+            commit_hash = meta.get("commit_hash")
+            original_commit = meta.get("original_commit")
+            update_action = meta.get("update_action")
             summary = meta.get("summary", "")
             verdict_str = meta.get("verdict", ReviewStatus.IN_REVIEW.value)
             try:
@@ -106,6 +140,24 @@ class SQLiteReviewStore:
 
             created_at = meta.get("created_at", "")
             updated_at = meta.get("updated_at", "")
+
+            # Load commit updates
+            update_rows = conn.execute(
+                "SELECT id, session_uuid, original_commit, current_commit, action, notes, timestamp "
+                "FROM commit_updates ORDER BY timestamp ASC"
+            ).fetchall()
+            commit_history: List[CommitUpdateModel] = [
+                CommitUpdateModel(
+                    id=ur["id"],
+                    session_uuid=ur["session_uuid"],
+                    original_commit=ur["original_commit"],
+                    current_commit=ur["current_commit"],
+                    action=ur["action"],
+                    notes=ur["notes"] or "",
+                    timestamp=ur["timestamp"],
+                )
+                for ur in update_rows
+            ]
 
             # Load file states
             file_rows = conn.execute("SELECT path, status, notes FROM files ORDER BY path ASC").fetchall()
@@ -124,7 +176,7 @@ class SQLiteReviewStore:
 
             # Load comments
             comment_rows = conn.execute(
-                "SELECT id, file_path, start_line, end_line, severity, body, author, "
+                "SELECT id, uuid, commit_hash, file_path, start_line, end_line, severity, body, author, "
                 "code_snippet, created_at, resolved FROM comments ORDER BY created_at ASC"
             ).fetchall()
             comments: List[CommentModel] = []
@@ -135,8 +187,11 @@ class SQLiteReviewStore:
                 except ValueError:
                     sev = ReviewSeverity.MUST_FIX
 
+                c_uuid = row["uuid"] if ("uuid" in row.keys() and row["uuid"]) else str(uuid_pkg.uuid4())
+                c_commit = row["commit_hash"] if ("commit_hash" in row.keys() and row["commit_hash"]) else ""
                 comment = CommentModel(
                     id=row["id"],
+                    uuid=c_uuid,
                     file_path=row["file_path"],
                     start_line=row["start_line"],
                     end_line=row["end_line"],
@@ -146,11 +201,17 @@ class SQLiteReviewStore:
                     code_snippet=row["code_snippet"] or "",
                     created_at=row["created_at"] or "",
                     resolved=bool(row["resolved"]),
+                    commit=c_commit,
                 )
                 comments.append(comment)
 
             return ReviewSessionModel(
                 title=title,
+                uuid=session_uuid,
+                commit_hash=commit_hash,
+                original_commit=original_commit,
+                update_action=update_action,
+                commit_history=commit_history,
                 summary=summary,
                 verdict=verdict,
                 repo_name=repo_name,
@@ -172,6 +233,10 @@ class SQLiteReviewStore:
             revs_json = json.dumps(session.revisions)
             meta_entries = [
                 ("title", session.title),
+                ("uuid", session.uuid),
+                ("commit_hash", session.commit_hash or ""),
+                ("original_commit", session.original_commit or ""),
+                ("update_action", session.update_action or ""),
                 ("summary", session.summary),
                 ("verdict", session.verdict.value),
                 ("repo_name", session.repo_name),
@@ -185,7 +250,31 @@ class SQLiteReviewStore:
                     (key, val),
                 )
 
-            # 2. Sync files
+            # 2. Sync commit updates
+            for upd in session.commit_history:
+                conn.execute(
+                    """
+                    INSERT INTO commit_updates (id, session_uuid, original_commit, current_commit, action, notes, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        original_commit=excluded.original_commit,
+                        current_commit=excluded.current_commit,
+                        action=excluded.action,
+                        notes=excluded.notes,
+                        timestamp=excluded.timestamp
+                    """,
+                    (
+                        upd.id,
+                        upd.session_uuid or session.uuid,
+                        upd.original_commit,
+                        upd.current_commit,
+                        upd.action,
+                        upd.notes,
+                        upd.timestamp,
+                    ),
+                )
+
+            # 3. Sync files
             current_paths = set(session.files.keys())
             if current_paths:
                 placeholders = ",".join("?" for _ in current_paths)
@@ -200,7 +289,7 @@ class SQLiteReviewStore:
                     (f_state.path, f_state.status.value, f_state.notes),
                 )
 
-            # 3. Sync comments
+            # 4. Sync comments
             current_cids = {c.id for c in session.comments}
             if current_cids:
                 placeholders = ",".join("?" for _ in current_cids)
@@ -222,13 +311,16 @@ class SQLiteReviewStore:
 
     def _upsert_comment_in_conn(self, conn: sqlite3.Connection, comment: CommentModel) -> None:
         """Upsert a single comment in an active database connection."""
+        c_uuid = comment.uuid or str(uuid_pkg.uuid4())
         conn.execute(
             """
             INSERT INTO comments (
-                id, file_path, start_line, end_line, severity, body,
+                id, uuid, commit_hash, file_path, start_line, end_line, severity, body,
                 author, code_snippet, created_at, resolved
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
+                uuid=COALESCE(excluded.uuid, comments.uuid),
+                commit_hash=excluded.commit_hash,
                 file_path=excluded.file_path,
                 start_line=excluded.start_line,
                 end_line=excluded.end_line,
@@ -241,6 +333,8 @@ class SQLiteReviewStore:
             """,
             (
                 comment.id,
+                c_uuid,
+                comment.commit or "",
                 comment.file_path,
                 comment.start_line,
                 comment.end_line,
@@ -327,3 +421,138 @@ class SQLiteReviewStore:
         json_path.parent.mkdir(parents=True, exist_ok=True)
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(session.model_dump(mode="json"), f, indent=2)
+
+    def record_commit_update(
+        self,
+        session_uuid: str,
+        original_commit: str,
+        current_commit: str,
+        action: str,
+        notes: str = "",
+    ) -> CommitUpdateModel:
+        """Record and persist a commit update event (rebase, merge, amend, etc.).
+
+        Args:
+            session_uuid: UUID of the associated review session.
+            original_commit: Pre-update commit hash or reference.
+            current_commit: Post-update commit hash or reference.
+            action: Update action performed (e.g. 'rebase', 'merge', 'update').
+            notes: Optional explanatory notes.
+
+        Returns:
+            The created and persisted CommitUpdateModel.
+        """
+        update = CommitUpdateModel(
+            session_uuid=session_uuid,
+            original_commit=original_commit,
+            current_commit=current_commit,
+            action=action,
+            notes=notes,
+        )
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO commit_updates (id, session_uuid, original_commit, current_commit, action, notes, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    original_commit=excluded.original_commit,
+                    current_commit=excluded.current_commit,
+                    action=excluded.action,
+                    notes=excluded.notes,
+                    timestamp=excluded.timestamp
+                """,
+                (
+                    update.id,
+                    update.session_uuid,
+                    update.original_commit,
+                    update.current_commit,
+                    update.action,
+                    update.notes,
+                    update.timestamp,
+                ),
+            )
+            # Also update session metadata
+            conn.execute(
+                "INSERT INTO metadata (key, value) VALUES ('commit_hash', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (current_commit,),
+            )
+            conn.execute(
+                "INSERT INTO metadata (key, value) VALUES ('original_commit', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (original_commit,),
+            )
+            conn.execute(
+                "INSERT INTO metadata (key, value) VALUES ('update_action', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (action,),
+            )
+        return update
+
+    def get_commit_history(self, session_uuid: Optional[str] = None) -> List[CommitUpdateModel]:
+        """Query stored commit updates, optionally filtered by session UUID.
+
+        Args:
+            session_uuid: Optional session UUID to filter records.
+
+        Returns:
+            List of CommitUpdateModel objects ordered chronologically.
+        """
+        with self._get_connection() as conn:
+            if session_uuid:
+                rows = conn.execute(
+                    "SELECT id, session_uuid, original_commit, current_commit, action, notes, timestamp "
+                    "FROM commit_updates WHERE session_uuid = ? ORDER BY timestamp ASC",
+                    (session_uuid,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT id, session_uuid, original_commit, current_commit, action, notes, timestamp "
+                    "FROM commit_updates ORDER BY timestamp ASC"
+                ).fetchall()
+            return [
+                CommitUpdateModel(
+                    id=r["id"],
+                    session_uuid=r["session_uuid"],
+                    original_commit=r["original_commit"],
+                    current_commit=r["current_commit"],
+                    action=r["action"],
+                    notes=r["notes"] or "",
+                    timestamp=r["timestamp"],
+                )
+                for r in rows
+            ]
+
+    def get_comment_by_uuid(self, comment_uuid: str) -> Optional[CommentModel]:
+        """Find a comment by its unique UUID in SQLite.
+
+        Args:
+            comment_uuid: Unique UUID of comment to find.
+
+        Returns:
+            CommentModel if found, else None.
+        """
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT id, uuid, commit_hash, file_path, start_line, end_line, severity, body, author, "
+                "code_snippet, created_at, resolved FROM comments WHERE uuid = ?",
+                (comment_uuid,),
+            ).fetchone()
+            if not row:
+                return None
+            try:
+                sev = ReviewSeverity(row["severity"])
+            except ValueError:
+                sev = ReviewSeverity.MUST_FIX
+            c_commit = row["commit_hash"] if ("commit_hash" in row.keys() and row["commit_hash"]) else ""
+            return CommentModel(
+                id=row["id"],
+                uuid=row["uuid"] or comment_uuid,
+                file_path=row["file_path"],
+                start_line=row["start_line"],
+                end_line=row["end_line"],
+                severity=sev,
+                body=row["body"],
+                author=row["author"] or "Reviewer",
+                code_snippet=row["code_snippet"] or "",
+                created_at=row["created_at"] or "",
+                resolved=bool(row["resolved"]),
+                commit=c_commit,
+            )

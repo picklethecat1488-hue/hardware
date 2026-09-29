@@ -530,7 +530,7 @@ def test_compiled_aabb_alignment(tmp_path):
 
 
 def test_generate_pcbs_wildcard_resolution():
-    """Verify that wildcard target names (e.g. 'test_board/*') resolve and build PCB targets."""
+    """Verify that wildcard target names (e.g. 'carrier_board/*') resolve and build PCB targets."""
     from model import AppConfig
     from shell import Logger
     from provider import ProviderManager
@@ -554,8 +554,8 @@ def test_generate_pcbs_wildcard_resolution():
         mock_drc.return_value = MagicMock(passed=True, error_count=0)
         mock_kicad_drc.return_value = MagicMock(passed=True, error_count=0)
 
-        builder.generate_pcbs(out_dir="build", names=["test_board/*"])
-        # Wildcard target 'test_board/*' must resolve to carrier_board and flex_tail
+        builder.generate_pcbs(out_dir="build", names=["carrier_board/*"])
+        # Wildcard target 'carrier_board/*' must resolve to carrier_board and flex_tail
         assert mock_export.call_count == 2
 
 
@@ -589,13 +589,13 @@ def test_generate_pcbs_drc_errors_logged_to_file(tmp_path: Path) -> None:
 
         out_dir = tmp_path / "build"
         with pytest.raises(ValueError) as exc_info:
-            builder.generate_pcbs(out_dir=str(out_dir), names=["test_board/carrier_board"])
+            builder.generate_pcbs(out_dir=str(out_dir), names=["carrier_board/carrier_board"])
 
-        expected_log = out_dir / "board" / "test_board" / "carrier_board_drc_violations.log"
+        expected_log = out_dir / "board" / "carrier_board" / "carrier_board_drc_violations.log"
         assert expected_log.exists(), f"DRC log file {expected_log} was not created"
         log_content = expected_log.read_text()
         assert fake_violations_summary == log_content
 
         err_msg = str(exc_info.value)
-        assert f"Failed to build test_board/carrier_board:pcb. Project has DRC errors:  {expected_log}" in err_msg
+        assert f"Failed to build carrier_board/carrier_board:pcb. Project has DRC errors:  {expected_log}" in err_msg
         assert fake_violations_summary not in err_msg

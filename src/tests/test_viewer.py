@@ -333,7 +333,9 @@ class TestViewer:
     ):
         """Verify that show_simulation copies URDF/OBJs, connects to PyBullet, configures motors, and executes simulation hooks."""
         # 1. Setup mocks
-        mock_exists.return_value = True
+        mock_exists.side_effect = lambda path: (
+            False if str(path).endswith((".png", ".jpg", ".jpeg", ".kicad_pcb")) else True
+        )
         mock_connect.return_value = 42
         mock_load_urdf.return_value = 100
         mock_get_num_joints.return_value = 1
@@ -433,7 +435,9 @@ class TestViewer:
     ):
         """Verify that show_simulation copies URDF/OBJs, connects to PyBullet, configures motors, and executes simulation hooks."""
         # 1. Setup mocks
-        mock_exists.return_value = True
+        mock_exists.side_effect = lambda path: (
+            False if str(path).endswith((".png", ".jpg", ".jpeg", ".kicad_pcb")) else True
+        )
         mock_connect.return_value = 42
         mock_load_urdf.return_value = 100
         mock_get_num_joints.return_value = 1
@@ -539,7 +543,7 @@ class TestViewer:
         assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
         assert kwargs.get("proj_name") == "mock"
         assert kwargs.get("sim_target") == "mock/target"
-        assert kwargs.get("steps") == 2000
+        assert kwargs.get("steps") is None
 
         # Verify Builder compiles parts and URDFs prior to simulating
         mock_builder_class.assert_called_once_with(viewer.manager, viewer.logger)
@@ -577,7 +581,7 @@ class TestViewer:
         assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
         assert kwargs.get("proj_name") == "mock"
         assert kwargs.get("sim_target") == "mock/target"
-        assert kwargs.get("steps") == 2000
+        assert kwargs.get("steps") is None
         mock_builder_class.assert_not_called()
 
     @patch("view.show")
@@ -616,7 +620,7 @@ class TestViewer:
         assert kwargs.get("provider_hooks") == m1.provider.get_simulate_hooks.return_value
         assert kwargs.get("proj_name") == "mock"
         assert kwargs.get("sim_target") == "mock/target"
-        assert kwargs.get("steps") == 2000
+        assert kwargs.get("steps") is None
         assert kwargs.get("build_dir") == "custom_build"
 
     def test_show_simulation_empty_room(self, viewer):
@@ -701,7 +705,9 @@ class TestViewer:
         viewer,
     ):
         """Verify that show_simulation configures gravity according to room.gravity."""
-        mock_exists.return_value = True
+        mock_exists.side_effect = lambda path: (
+            False if str(path).endswith((".png", ".jpg", ".jpeg", ".kicad_pcb")) else True
+        )
         mock_connect.return_value = 42
         mock_load_urdf.return_value = 100
         mock_get_num_joints.return_value = 0
@@ -887,14 +893,14 @@ class TestViewer:
     @patch.object(Viewer, "launch_pcb_viewer")
     def test_show_view_pcb_target(self, mock_launch_pcb, mock_show, viewer, tmp_path):
         """Verify show_view handles Section.PCB targets, populates room, and calls launch_pcb_viewer."""
-        target_name = "test_board/carrier_pcb"
+        target_name = "carrier_board/carrier_pcb"
         mock_targets = MagicMock(spec=TargetList)
         mock_targets.__iter__.return_value = iter([target_name])
         mock_targets.__len__.return_value = 1
         viewer.target_parser.resolve = MagicMock(side_effect=[None, None, None, mock_targets])
 
         mock_provider = MagicMock()
-        mock_provider.name = "test_board"
+        mock_provider.name = "carrier_board"
         mock_provider.wiring_path = tmp_path / "wiring.yaml"
         mock_provider.pcb_config = MagicMock()
         mock_provider.pcb_config.dimensions_mm = (50.0, 50.0, 1.6)
@@ -921,15 +927,15 @@ class TestViewer:
     @patch("view.show")
     @patch.object(Viewer, "launch_pcb_viewer")
     def test_show_view_pcb_subassembly_flex_tail(self, mock_launch_pcb, mock_show, viewer, tmp_path):
-        """Verify show_view on test_board/flex_tail exports and launches flex_tail.kicad_pcb."""
-        target_name = "test_board/flex_tail"
+        """Verify show_view on carrier_board/flex_tail exports and launches flex_tail.kicad_pcb."""
+        target_name = "carrier_board/flex_tail"
         mock_targets = MagicMock(spec=TargetList)
         mock_targets.__iter__.return_value = iter([target_name])
         mock_targets.__len__.return_value = 1
         viewer.target_parser.resolve = MagicMock(side_effect=[None, None, None, mock_targets])
 
         mock_provider = MagicMock()
-        mock_provider.name = "test_board"
+        mock_provider.name = "carrier_board"
         mock_provider.wiring_path = tmp_path / "wiring.yaml"
         mock_provider.pcb_config = MagicMock()
         mock_provider.pcb_config.dimensions_mm = (100.0, 15.0, 0.2)

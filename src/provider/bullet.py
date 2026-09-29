@@ -144,9 +144,9 @@ class Bullet:
         provider_hooks: dict[Simulate, Callable[..., Any]],
         proj_name: str,
         sim_target: str,
-        steps: int,
-        manager: Any,
-        logger: Any,
+        steps: Optional[int] = None,
+        manager: Any = None,
+        logger: Any = None,
         build_dir: str = "build",
         save_rrd: Optional[str] = None,
         save_mp4: Optional[str] = None,
@@ -164,7 +164,7 @@ class Bullet:
         self.provider_hooks = provider_hooks
         self.proj_name = proj_name
         self.sim_target = sim_target
-        self.steps = steps
+        self.steps = steps if steps is not None else 20000
         self.manager = manager
         self.logger = logger
         self.build_dir = build_dir
@@ -243,6 +243,22 @@ class Bullet:
             else:
                 raise FileNotFoundError(f"Required OBJ file not found for simulation: {real_obj_path}")
 
+        # Copy any project textures (top/bottom PCB textures or link textures)
+        texture_sources = [
+            os.path.join(self.build_dir, "board", self.proj_name, "textures"),
+            os.path.join("src", "projects", self.proj_name, "textures"),
+            os.path.join(self.build_dir, self.proj_name, "textures"),
+            os.path.join(self.build_dir, "attachments"),
+        ]
+        for src_dir in texture_sources:
+            if os.path.exists(src_dir):
+                for fname in os.listdir(src_dir):
+                    if fname.lower().endswith((".png", ".jpg", ".jpeg")):
+                        src_file = os.path.join(src_dir, fname)
+                        dst_file = os.path.join(proj_dir, fname)
+                        if not os.path.exists(dst_file):
+                            shutil.copy(src_file, dst_file)
+
     def _init_simulation_objects(
         self,
         physics_client: int,
@@ -251,6 +267,7 @@ class Bullet:
         urdf_path: str,
     ) -> dict[str, int]:
         """Configure motor controls, log static assets, and setup concave collisions."""
+        rr.log("world", rr.Clear(recursive=True))
         rr.log("world", rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)
         num_joints = p.getNumJoints(body_id, physicsClientId=physics_client)
         is_real = _is_real_physics_client(physics_client)
@@ -397,28 +414,218 @@ class Bullet:
 
         # Apply exact RGBA colors (including alpha transparency) from the room to PyBullet visual shapes
         if is_real:
+            from target_parser import TargetParser
+
             for name, (geom, rgba) in self.room.items():
                 u_geom = cast(URDFShape, geom)
-                label = getattr(u_geom, "urdf_label", None)
+                label = getattr(u_geom, "urdf_label", None) or getattr(geom, "label", None)
+                if not label:
+                    base_name = name.split("/")[-1].split("_")[-1] if "_" in name else name
+                    if base_name in label_to_link_idx:
+                        label = base_name
+                    elif self.sim_target:
+                        target_base = TargetParser.get_base_target(self.sim_target)
+                        if target_base in label_to_link_idx:
+                            label = target_base
                 if label and label in label_to_link_idx:
                     link_idx = label_to_link_idx[label]
                     p.changeVisualShape(body_id, link_idx, rgbaColor=rgba, physicsClientId=physics_client)
 
         urdf_dir = os.path.dirname(urdf_path) if urdf_path else proj_dir
         link_to_obj = self._parse_urdf_meshes(urdf_dir)
-        for geom, rgba in self.room.values():
+        from target_parser import TargetParser
+
+        for name, (geom, rgba) in self.room.items():
             u_geom = cast(URDFShape, geom)
-            label = getattr(u_geom, "urdf_label", None)
+            label = getattr(u_geom, "urdf_label", None) or getattr(geom, "label", None)
+            if not label:
+                base_name = name.split("/")[-1].split("_")[-1] if "_" in name else name
+                if base_name in link_to_obj or f"{base_name}.obj" in (
+                    os.listdir(proj_dir) if os.path.exists(proj_dir) else []
+                ):
+                    label = base_name
+                elif self.sim_target:
+                    target_base = TargetParser.get_base_target(self.sim_target)
+                    if target_base in link_to_obj or f"{target_base}.obj" in (
+                        os.listdir(proj_dir) if os.path.exists(proj_dir) else []
+                    ):
+                        label = target_base
             if label:
                 obj_filename = link_to_obj.get(label, getattr(u_geom, "urdf_obj_filename", f"{label}.obj"))
                 temp_obj_path = os.path.join(proj_dir, obj_filename)
-                if os.path.exists(temp_obj_path):
+
+                # Check and apply top and bottom textures (BUG-125, BUG-152)
+                alt_tex_dir = os.path.join(self.build_dir, "board", self.proj_name, "textures")
+                top_tex = os.path.join(alt_tex_dir, f"{label}_top.png")
+                bottom_tex = os.path.join(alt_tex_dir, f"{label}_bottom.png")
+                if not os.path.exists(top_tex):
+                    top_tex = os.path.join(proj_dir, f"{label}_top.png")
+                if not os.path.exists(bottom_tex):
+                    bottom_tex = os.path.join(proj_dir, f"{label}_bottom.png")
+
+                kicad_board = os.path.join(self.build_dir, "board", self.proj_name, f"{label}.kicad_pcb")
+                if os.path.exists(kicad_board) and (not os.path.exists(top_tex) or not os.path.exists(bottom_tex)):
+                    raise ValueError(
+                        f"PCB texture not found for '{label}': expected '{top_tex}' and '{bottom_tex}'. Run build first."
+                    )
+
+                has_pcb_texture = os.path.exists(top_tex) or os.path.exists(bottom_tex)
+
+                rr.log(
+                    f"world/{label}",
+                    rr.Transform3D(scale=0.001),
+                    static=True,
+                )
+                if not has_pcb_texture and os.path.exists(temp_obj_path):
                     rgba_255 = [int(round(c * 255.0)) for c in rgba]
                     rr.log(
                         f"world/{label}",
                         rr.Asset3D(path=temp_obj_path, albedo_factor=rgba_255),
                         static=True,
                     )
+
+                # Apply to PyBullet visual shape if texture exists
+                if os.path.exists(top_tex) and is_real and label in label_to_link_idx:
+                    link_idx = label_to_link_idx[label]
+                    tex_id = p.loadTexture(top_tex, physicsClientId=physics_client)
+                    if tex_id >= 0:
+                        p.changeVisualShape(
+                            body_id,
+                            link_idx,
+                            textureUniqueId=tex_id,
+                            rgbaColor=[1.0, 1.0, 1.0, 1.0],
+                            physicsClientId=physics_client,
+                        )
+
+                # Log textured planes in Rerun if available
+                geom_part = getattr(geom, "part", None) or geom
+                if hasattr(geom_part, "bounding_box"):
+                    from PIL import Image
+
+                    bb = geom_part.bounding_box()
+                    pcb_meta = getattr(geom, "pcb_metadata", None) or getattr(geom_part, "pcb_metadata", None)
+                    if pcb_meta and getattr(pcb_meta, "dimensions_mm", None):
+                        w_sub, l_sub, t_sub = pcb_meta.dimensions_mm
+                        min_x, max_x = -w_sub / 2.0, w_sub / 2.0
+                        min_y, max_y = -l_sub / 2.0, l_sub / 2.0
+                        min_z, max_z = -(t_sub / 2.0), (t_sub / 2.0)
+                        z_top = (t_sub / 2.0) + 0.02
+                        z_bot = -(t_sub / 2.0) - 0.02
+                    else:
+                        min_x, max_x = float(bb.min.X), float(bb.max.X)
+                        min_y, max_y = float(bb.min.Y), float(bb.max.Y)
+                        min_z, max_z = float(bb.min.Z), float(bb.max.Z)
+                        z_top = max_z + 0.02
+                        z_bot = min_z - 0.02
+
+                    dx_span = max_x - min_x
+                    dy_span = max_y - min_y
+                    if dx_span <= 0:
+                        dx_span = 1.0
+                    if dy_span <= 0:
+                        dy_span = 1.0
+
+                    if os.path.exists(top_tex):
+                        with Image.open(top_tex) as t_img:
+                            t_rgba = t_img.convert("RGBA")
+                            bbox = t_rgba.getbbox()
+                            if bbox and (
+                                bbox[0] > 0 or bbox[1] > 0 or bbox[2] < t_rgba.width or bbox[3] < t_rgba.height
+                            ):
+                                t_rgba = t_rgba.crop(bbox)
+                            top_img = np.array(t_rgba)
+
+                        top_verts = None
+                        top_tris = None
+                        if hasattr(geom_part, "faces"):
+                            from build123d import Axis
+
+                            z_faces = geom_part.faces().filter_by(Axis.Z)
+                            if z_faces:
+                                top_face = z_faces.sort_by(Axis.Z)[-1]
+                                top_verts, top_tris = top_face.tessellate(0.15)
+
+                        if top_verts and top_tris:
+                            v_positions = [[float(v.X), float(v.Y), z_top] for v in top_verts]
+                            t_indices = [[int(t[0]), int(t[1]), int(t[2])] for t in top_tris]
+                            v_normals = [[0.0, 0.0, 1.0] for _ in top_verts]
+                            v_texcoords = [
+                                [
+                                    float(np.clip((v.X - min_x) / dx_span, 0.0, 1.0)),
+                                    float(np.clip((max_y - v.Y) / dy_span, 0.0, 1.0)),
+                                ]
+                                for v in top_verts
+                            ]
+                        else:
+                            v_positions = [
+                                [min_x, min_y, z_top],
+                                [max_x, min_y, z_top],
+                                [max_x, max_y, z_top],
+                                [min_x, max_y, z_top],
+                            ]
+                            t_indices = [[0, 1, 2], [0, 2, 3]]
+                            v_normals = [[0.0, 0.0, 1.0] for _ in range(4)]
+                            v_texcoords = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]]
+
+                        top_mesh = rr.Mesh3D(
+                            vertex_positions=v_positions,
+                            triangle_indices=t_indices,
+                            vertex_normals=v_normals,
+                            vertex_texcoords=v_texcoords,
+                            albedo_texture=top_img,
+                        )
+                        rr.log(f"world/{label}/texture_top", top_mesh, static=True)
+
+                    if os.path.exists(bottom_tex):
+                        with Image.open(bottom_tex) as b_img:
+                            b_rgba = b_img.convert("RGBA")
+                            bbox = b_rgba.getbbox()
+                            if bbox and (
+                                bbox[0] > 0 or bbox[1] > 0 or bbox[2] < b_rgba.width or bbox[3] < b_rgba.height
+                            ):
+                                b_rgba = b_rgba.crop(bbox)
+                            bot_img = np.array(b_rgba)
+
+                        bot_verts = None
+                        bot_tris = None
+                        if hasattr(geom_part, "faces"):
+                            from build123d import Axis
+
+                            z_faces = geom_part.faces().filter_by(Axis.Z)
+                            if z_faces:
+                                bot_face = z_faces.sort_by(Axis.Z)[0]
+                                bot_verts, bot_tris = bot_face.tessellate(0.15)
+
+                        if bot_verts and bot_tris:
+                            b_positions = [[float(v.X), float(v.Y), z_bot] for v in bot_verts]
+                            b_indices = [[int(t[0]), int(t[2]), int(t[1])] for t in bot_tris]
+                            b_normals = [[0.0, 0.0, -1.0] for _ in bot_verts]
+                            b_texcoords = [
+                                [
+                                    float(np.clip((max_x - v.X) / dx_span, 0.0, 1.0)),
+                                    float(np.clip((max_y - v.Y) / dy_span, 0.0, 1.0)),
+                                ]
+                                for v in bot_verts
+                            ]
+                        else:
+                            b_positions = [
+                                [max_x, min_y, z_bot],
+                                [min_x, min_y, z_bot],
+                                [min_x, max_y, z_bot],
+                                [max_x, max_y, z_bot],
+                            ]
+                            b_indices = [[0, 1, 2], [0, 2, 3]]
+                            b_normals = [[0.0, 0.0, -1.0] for _ in range(4)]
+                            b_texcoords = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]]
+
+                        bot_mesh = rr.Mesh3D(
+                            vertex_positions=b_positions,
+                            triangle_indices=b_indices,
+                            vertex_normals=b_normals,
+                            vertex_texcoords=b_texcoords,
+                            albedo_texture=bot_img,
+                        )
+                        rr.log(f"world/{label}/texture_bottom", bot_mesh, static=True)
 
         return label_to_link_idx
 

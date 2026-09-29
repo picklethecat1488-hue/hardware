@@ -188,12 +188,24 @@ class PCBExporter:
             dim_h = fp.dimensions[1] if fp.dimensions else 4.0
             w_half = round(dim_w / 2.0 + 0.4, 4)
             h_half = round(dim_h / 2.0 + 0.4, 4)
+            rot_deg = fp.rotation[2] if hasattr(fp, "rotation") and len(fp.rotation) >= 3 else 0.0
+            rad = math.radians(rot_deg) if abs(rot_deg) > 1e-4 else 0.0
+            cos_r, sin_r = (math.cos(rad), math.sin(rad)) if rad else (1.0, 0.0)
+
+            pad_max_x = w_half
+            pad_max_y = h_half
             if hasattr(fp, "pins") and fp.pins:
-                pad_max_x = max(abs(p.position[0]) + getattr(p, "pad_size_mm", (0.35, 1.2))[0] / 2.0 for p in fp.pins)
-                pad_max_y = max(abs(p.position[1]) + getattr(p, "pad_size_mm", (0.35, 1.2))[1] / 2.0 for p in fp.pins)
-                w_half = max(w_half, round(pad_max_x + 0.35, 4))
-                h_half = max(h_half, round(pad_max_y + 0.35, 4))
-            val_y = round(h_half + 1.2, 4)
+                pad_xs = []
+                pad_ys = []
+                for p in fp.pins:
+                    rx = p.position[0] * cos_r - p.position[1] * sin_r
+                    ry = p.position[0] * sin_r + p.position[1] * cos_r
+                    p_s = getattr(p, "pad_size_mm", (0.35, 1.2))
+                    pad_xs.append(abs(rx) + max(p_s) / 2.0)
+                    pad_ys.append(abs(ry) + max(p_s) / 2.0)
+                pad_max_x = max(pad_max_x, max(pad_xs))
+                pad_max_y = max(pad_max_y, max(pad_ys))
+            val_y = round(pad_max_y + 1.2, 4)
 
             is_round = (
                 getattr(fp, "shape", None) == "circle"
@@ -203,7 +215,18 @@ class PCBExporter:
             )
             radius = round((fp.dimensions[0] / 2.0) if fp.dimensions else 6.0, 4)
 
-            # Find empty space for component reference label
+            # Edge-aware direction preference to keep designators within board boundaries
+            pref_dir = "north"
+            if fp.position[0] > (w_board / 2.0 - 15.0):
+                pref_dir = "west"
+            elif fp.position[0] < (-w_board / 2.0 + 15.0):
+                pref_dir = "east"
+            elif fp.position[1] < (-l_board / 2.0 + 12.0):
+                pref_dir = "south"
+            elif fp.position[1] > (l_board / 2.0 - 12.0):
+                pref_dir = "north"
+
+            # Find empty space for component reference label clear of all pins and courtyards
             ref_w = len(fp.name) * 0.7 + 0.4
             ref_h = 1.0 + 0.4
             ref_off_x, ref_off_y = find_empty_space_for_label(
@@ -215,14 +238,18 @@ class PCBExporter:
                 bounding_boxes=placed_component_label_boxes,
                 board_bounds=board_bounds,
                 clearance=0.30,
-                preferred_direction="north",
-                step_multiplier=1.2,
+                preferred_direction=pref_dir,
+                step_multiplier=1.0,
+                min_dist_x=pad_max_x + 0.35,
+                min_dist_y=pad_max_y + 0.35,
             )
             cand_ref_x = fp.position[0] + ref_off_x
             cand_ref_y = fp.position[1] + ref_off_y
             if self.is_flex or getattr(fp, "shape_ref", None) == "flex_tail":
                 cand_ref_x = fp.position[0]
                 cand_ref_y = fp.position[1]
+                ref_off_x = 0.0
+                ref_off_y = 0.0
             placed_component_label_boxes.append(
                 (
                     cand_ref_x - ref_w / 2.0,
@@ -231,6 +258,15 @@ class PCBExporter:
                     cand_ref_y + ref_h / 2.0,
                 )
             )
+
+            # Un-rotate world offset into footprint local coordinate frame for KiCad
+            if abs(rot_deg) > 1e-4:
+                inv_rad = math.radians(-rot_deg)
+                local_ref_x = ref_off_x * math.cos(inv_rad) - ref_off_y * math.sin(inv_rad)
+                local_ref_y = ref_off_x * math.sin(inv_rad) + ref_off_y * math.cos(inv_rad)
+            else:
+                local_ref_x = ref_off_x
+                local_ref_y = ref_off_y
 
             tick_w = round(min(1.0, max(0.2, w_half * 0.4)), 4)
             tick_h = round(min(1.0, max(0.2, h_half * 0.4)), 4)
@@ -268,8 +304,10 @@ class PCBExporter:
                     "fab_layer": fab_layer,
                     "paste_layer": paste_layer,
                     "mask_layer": mask_layer,
-                    "ref_x": round(ref_off_x, 4),
-                    "ref_y": round(ref_off_y, 4),
+                    "ref_x": round(local_ref_x, 4),
+                    "ref_y": round(local_ref_y, 4),
+                    "cand_ref_x": round(cand_ref_x, 4),
+                    "cand_ref_y": round(cand_ref_y, 4),
                     "val_y": val_y,
                     "is_round": is_round,
                     "radius": radius,
@@ -285,6 +323,7 @@ class PCBExporter:
             else []
         )
 
+        existing_silk_names = {st.text for st in self.config.silkscreen_texts}
         silkscreen_data = []
         for st in self.config.silkscreen_texts:
             silkscreen_data.append(
@@ -299,6 +338,23 @@ class PCBExporter:
                     "mirror": st.mirror or (st.layer == "B.SilkS"),
                 }
             )
+
+        # Ensure all placed components have a visible silkscreen designator
+        for fp_data in footprints_data:
+            fp_name = fp_data["name"]
+            if fp_name not in existing_silk_names and "cand_ref_x" in fp_data:
+                silkscreen_data.append(
+                    {
+                        "text": fp_name,
+                        "layer": fp_data["silk_layer"],
+                        "x_mm": round(self.config.sheet_center_x_mm + fp_data["cand_ref_x"], 4),
+                        "y_mm": round(self.config.sheet_center_y_mm + fp_data["cand_ref_y"], 4),
+                        "font_size": 0.8,
+                        "thickness": 0.12,
+                        "rotation": 0.0,
+                        "mirror": fp_data["silk_layer"] == "B.SilkS",
+                    }
+                )
 
         silkscreen_graphics_data = []
         for sg in getattr(self.config, "silkscreen_graphics", []):
@@ -318,6 +374,9 @@ class PCBExporter:
                     )
                     for pt in sg.points
                 ]
+                if sg.shape == "line" and len(pts_data) >= 2:
+                    x1, y1 = pts_data[0]
+                    x2, y2 = pts_data[1]
             silkscreen_graphics_data.append(
                 {
                     "shape": sg.shape,
@@ -580,6 +639,7 @@ class PCBExporter:
                         "label_x": round(lbl_off_x, 4),
                         "label_y": round(lbl_off_y, 4),
                         "label_angle": 90,
+                        "mirror": tp.layer == "B.Cu",
                         "layer": tp.layer,
                         "silk_layer": silk_layer,
                         "mask_layer": mask_layer,
@@ -656,7 +716,7 @@ class PCBExporter:
             order = {"J1": 0, "U1": 1, "U2": 2, "J2": 3}
             return (order.get(fp.name, 99), fp.name)
 
-        sorted_fps = sorted(self.wiring.footprints, key=sort_footprints) if self.wiring else []
+        sorted_fps = sorted(self.get_footprints_for_board(), key=sort_footprints) if self.wiring else []
 
         for fp in sorted_fps:
             pkg = fp.package
@@ -920,14 +980,26 @@ class PCBExporter:
         """Generate a vector SVG schematic diagram showing components, pins, and net connections."""
         from provider.schematic_diagram import SchematicDiagram
 
-        diagram = SchematicDiagram(self.wiring, pcb_config=self.config)
+        board_fps = self.get_footprints_for_board()
+        board_wiring = self.wiring
+        if self.wiring and hasattr(self.wiring, "filter_by_footprints"):
+            filtered = self.wiring.filter_by_footprints(board_fps)
+            if hasattr(filtered, "footprints") and isinstance(filtered.footprints, list):
+                board_wiring = filtered
+        diagram = SchematicDiagram(board_wiring, pcb_config=self.config)
         return diagram.render_svg(output_file)
 
     def export_schematic_pdf(self, output_file: str | Path) -> Path:
         """Generate a multi-page PDF schematic showing title page, TOC, and schematic sheets."""
         from provider.schematic_diagram import SchematicDiagram
 
-        diagram = SchematicDiagram(self.wiring, pcb_config=self.config)
+        board_fps = self.get_footprints_for_board()
+        board_wiring = self.wiring
+        if self.wiring and hasattr(self.wiring, "filter_by_footprints"):
+            filtered = self.wiring.filter_by_footprints(board_fps)
+            if hasattr(filtered, "footprints") and isinstance(filtered.footprints, list):
+                board_wiring = filtered
+        diagram = SchematicDiagram(board_wiring, pcb_config=self.config)
         return diagram.render_pdf(output_file)
 
     def export_capacitive_config_json(self, output_file: str | Path) -> Path:
@@ -1006,6 +1078,38 @@ class PCBExporter:
             ]
             cam_files = cli.export_all_board_files(kicad_pcb_path, out_dir, layers=fab_layers)
             exported_files.update(cam_files)
+
+            # Dynamically generate photorealistic top and bottom board textures
+            if cli.supports_render:
+                tex_dir = out_dir / "textures"
+                tex_dir.mkdir(parents=True, exist_ok=True)
+                stem = kicad_pcb_path.stem
+                top_tex = tex_dir / f"{stem}_top.png"
+                bottom_tex = tex_dir / f"{stem}_bottom.png"
+                w_mm, l_mm, _ = self.config.dimensions_mm
+                c_rad = getattr(self.config, "corner_radius_mm", 0.0)
+                m_holes = [
+                    (mh.position_mm[0], mh.position_mm[1], mh.drill_diameter_mm / 2.0)
+                    for mh in getattr(self.config, "mounting_holes", [])
+                ]
+                cli.render_board_image(
+                    kicad_pcb_path,
+                    top_tex,
+                    side="top",
+                    corner_radius_mm=c_rad,
+                    board_dimensions_mm=(w_mm, l_mm),
+                    mounting_holes=m_holes,
+                )
+                cli.render_board_image(
+                    kicad_pcb_path,
+                    bottom_tex,
+                    side="bottom",
+                    corner_radius_mm=c_rad,
+                    board_dimensions_mm=(w_mm, l_mm),
+                    mounting_holes=m_holes,
+                )
+                exported_files[top_tex.name] = top_tex
+                exported_files[bottom_tex.name] = bottom_tex
 
         return exported_files
 

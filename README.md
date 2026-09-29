@@ -89,11 +89,11 @@ python src/view.py exhaust_manifolds/wire
 python src/view.py 'exhaust_manifolds/*:part/print'
 
 # View PCB target (opens interactive KiCode tab in VS Code and shows 3D substrate in ocp_vscode):
-python src/view.py test_board:pcb
-python src/view.py test_board/carrier_pcb
+python src/view.py carrier_board:pcb
+python src/view.py carrier_board/carrier_pcb
 
 # View any compiled KiCad PCB or schematic file directly in VS Code:
-python src/view.py build/board/test_board/test_board.kicad_pcb
+python src/view.py build/board/carrier_board/carrier_board.kicad_pcb
 ```
 
 ### Simulating Rooms and Visualizing in Rerun
@@ -130,7 +130,7 @@ This project includes a declarative wiring and PCB engine driven by native KiCad
 To build PCB and wiring outputs:
 ```bash
 # Build PCB board, schematics, CAM files, and BOM/CPL:
-python src/build.py test_board:pcb
+python src/build.py carrier_board:pcb
 
 # Build wiring diagrams:
 python src/build.py cat_fountain/wiring

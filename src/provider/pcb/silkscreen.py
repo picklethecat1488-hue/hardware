@@ -328,6 +328,8 @@ def find_empty_space_for_label(
     clearance: float = 0.30,
     preferred_direction: str = "auto",
     step_multiplier: float = 1.0,
+    min_dist_x: float = 0.0,
+    min_dist_y: float = 0.0,
 ) -> Tuple[float, float]:
     """Search the 2D PCB placement plane to find collision-free coordinates for silkscreen text.
 
@@ -345,6 +347,8 @@ def find_empty_space_for_label(
         clearance: Minimum clearance between text bounding box and any obstacle in mm.
         preferred_direction: Direction preference ('auto', 'north', 'south', 'east', 'west').
         step_multiplier: Scaling factor for radial candidate distances.
+        min_dist_x: Minimum distance from base_x to ensure clearing component body/pads in X.
+        min_dist_y: Minimum distance from base_y to ensure clearing component body/pads in Y.
 
     Returns:
         Relative (offset_x, offset_y) from (base_x, base_y) that achieves clear placement.
@@ -352,20 +356,56 @@ def find_empty_space_for_label(
     circ_obs = list(circular_obstacles or [])
     boxes = list(bounding_boxes or [])
 
-    # Base steps along X and Y
-    base_dx = (label_w / 2.0 + clearance) * step_multiplier
-    base_dy = (label_h / 2.0 + clearance) * step_multiplier
+    # Base steps along X and Y starting outside component envelope
+    base_dx = max(min_dist_x, (label_w / 2.0 + clearance)) * step_multiplier
+    base_dy = max(min_dist_y, (label_h / 2.0 + clearance)) * step_multiplier
 
     # Build candidate vectors based on preferred direction
     match preferred_direction.lower():
         case "north" | "up" | "above":
-            directional_vectors = [(0.0, -base_dy), (base_dx, 0.0), (-base_dx, 0.0), (0.0, base_dy)]
+            directional_vectors = [
+                (0.0, -base_dy),
+                (0.0, base_dy),
+                (base_dx, 0.0),
+                (-base_dx, 0.0),
+                (base_dx * 0.8, -base_dy * 0.8),
+                (-base_dx * 0.8, -base_dy * 0.8),
+                (base_dx * 0.8, base_dy * 0.8),
+                (-base_dx * 0.8, base_dy * 0.8),
+            ]
         case "south" | "down" | "below":
-            directional_vectors = [(0.0, base_dy), (base_dx, 0.0), (-base_dx, 0.0), (0.0, -base_dy)]
+            directional_vectors = [
+                (0.0, base_dy),
+                (0.0, -base_dy),
+                (base_dx, 0.0),
+                (-base_dx, 0.0),
+                (base_dx * 0.8, base_dy * 0.8),
+                (-base_dx * 0.8, base_dy * 0.8),
+                (base_dx * 0.8, -base_dy * 0.8),
+                (-base_dx * 0.8, -base_dy * 0.8),
+            ]
         case "east" | "right":
-            directional_vectors = [(base_dx, 0.0), (0.0, -base_dy), (0.0, base_dy), (-base_dx, 0.0)]
+            directional_vectors = [
+                (base_dx, 0.0),
+                (-base_dx, 0.0),
+                (0.0, -base_dy),
+                (0.0, base_dy),
+                (base_dx * 0.8, -base_dy * 0.8),
+                (base_dx * 0.8, base_dy * 0.8),
+                (-base_dx * 0.8, -base_dy * 0.8),
+                (-base_dx * 0.8, base_dy * 0.8),
+            ]
         case "west" | "left":
-            directional_vectors = [(-base_dx, 0.0), (0.0, -base_dy), (0.0, base_dy), (base_dx, 0.0)]
+            directional_vectors = [
+                (-base_dx, 0.0),
+                (base_dx, 0.0),
+                (0.0, -base_dy),
+                (0.0, base_dy),
+                (-base_dx * 0.8, -base_dy * 0.8),
+                (-base_dx * 0.8, base_dy * 0.8),
+                (base_dx * 0.8, -base_dy * 0.8),
+                (base_dx * 0.8, base_dy * 0.8),
+            ]
         case _:
             directional_vectors = [
                 (0.0, -base_dy),
@@ -379,9 +419,12 @@ def find_empty_space_for_label(
             ]
 
     candidates: List[Tuple[float, float]] = []
-    for scale in (1.0, 1.4, 1.8, 2.2, 2.8):
+    for scale in (1.0, 1.25, 1.5, 1.8, 2.2, 2.7, 3.3, 4.0):
         for vx, vy in directional_vectors:
             candidates.append((round(vx * scale, 4), round(vy * scale, 4)))
+
+    best_candidate: Optional[Tuple[float, float]] = None
+    min_penalty = float("inf")
 
     for off_x, off_y in candidates:
         cand_x = base_x + off_x
@@ -392,6 +435,8 @@ def find_empty_space_for_label(
         c_min_y = cand_y - (label_h / 2.0)
         c_max_y = cand_y + (label_h / 2.0)
 
+        penalty = 0.0
+
         # 1. Check board envelope containment
         if board_bounds is not None:
             b_min_x, b_min_y, b_max_x, b_max_y = board_bounds
@@ -401,20 +446,15 @@ def find_empty_space_for_label(
                 or c_min_y < b_min_y + clearance
                 or c_max_y > b_max_y - clearance
             ):
-                continue
+                penalty += 100.0
 
         # 2. Check circular obstacles (pads, vias, drill holes)
-        cand_collision = False
         for ox, oy, o_r in circ_obs:
             px = max(c_min_x, min(ox, c_max_x))
             py = max(c_min_y, min(oy, c_max_y))
             dist = math.hypot(ox - px, oy - py) - o_r
             if dist < clearance:
-                cand_collision = True
-                break
-
-        if cand_collision:
-            continue
+                penalty += max(0.1, clearance - dist) * 10.0
 
         # 3. Check rectangular bounding boxes
         for bx_min, by_min, bx_max, by_max in boxes:
@@ -425,12 +465,15 @@ def find_empty_space_for_label(
                 or c_min_y > by_max + clearance
             )
             if overlap:
-                cand_collision = True
-                break
+                ov_x = max(0.0, min(c_max_x, bx_max) - max(c_min_x, bx_min) + clearance)
+                ov_y = max(0.0, min(c_max_y, by_max) - max(c_min_y, by_min) + clearance)
+                penalty += ov_x * ov_y * 10.0
 
-        if cand_collision:
-            continue
+        if penalty == 0.0:
+            return (off_x, off_y)
 
-        return (off_x, off_y)
+        if penalty < min_penalty:
+            min_penalty = penalty
+            best_candidate = (off_x, off_y)
 
-    return candidates[0] if candidates else (0.0, round(base_dy, 4))
+    return best_candidate or (candidates[0] if candidates else (0.0, round(base_dy, 4)))

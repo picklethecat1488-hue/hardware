@@ -68,6 +68,7 @@ def mock_wiring() -> MagicMock:
     wiring = MagicMock()
     wiring.footprints = [fp1, fp2]
     wiring.nets = [net_vdd, net_gnd]
+    wiring.filter_by_footprints = MagicMock(side_effect=lambda fps: wiring)
     return wiring
 
 
@@ -520,7 +521,7 @@ def test_provider_pcb_output_cad_archive(tmp_path: Path, mock_pcb_config: PCBCon
 
     monkeypatch.chdir(tmp_path)
     mock_prov = MagicMock()
-    mock_prov.name = "test_board"
+    mock_prov.name = "carrier_board"
     mock_prov.targets = ("pcb_unit",)
     mock_prov.manifest = {"pcb_unit": {Section.PCB: {"modes": [Mode.DEFAULT]}}}
     mock_prov.pcb = {}
@@ -585,3 +586,71 @@ def test_kicad_cli_run_drc_syncs_design_rules(tmp_path: Path):
         assert pro_file.is_file()
         pro_data = json.loads(pro_file.read_text(encoding="utf-8"))
         assert pro_data["board"]["design_settings"]["rules"]["min_clearance"] == 0.30
+
+
+def test_export_kicad_pcb_silkscreen_parity_and_mirroring(
+    tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring
+):
+    """Verify silkscreen text and test point labels are right-reading on F.SilkS without justify mirror."""
+    mock_pcb_config.silkscreen_texts = [
+        SilkscreenTextModel(
+            text="TEST BOARD CARRIER REV 2.0",
+            layer="F.SilkS",
+            position=(10.0, 15.0),
+            font_size=1.5,
+            thickness=0.2,
+            rotation=0.0,
+        ),
+        SilkscreenTextModel(
+            text="BOTTOM SHIELD / GROUND REF",
+            layer="B.SilkS",
+            position=(10.0, 15.0),
+            font_size=1.0,
+            thickness=0.15,
+            mirror=True,
+        ),
+    ]
+    from model.pcb import TestPointModel, MountingHoleModel
+
+    mock_pcb_config.test_points = [
+        TestPointModel(
+            name="TP1",
+            net="VDD_3V3",
+            position_mm=(5.0, 10.0),
+            layer="F.Cu",
+            pad_diameter_mm=1.0,
+        )
+    ]
+    mock_pcb_config.mounting_holes = [
+        MountingHoleModel(
+            name="MH1",
+            position_mm=(20.0, 30.0),
+            drill_diameter_mm=3.2,
+            pad_diameter_mm=4.5,
+            plated=True,
+            net="GND",
+        )
+    ]
+    exporter = PCBExporter(mock_pcb_config, mock_wiring)
+    out_file = tmp_path / "board_silkscreen.kicad_pcb"
+    exporter.export_kicad_pcb(out_file)
+
+    assert out_file.is_file()
+    content = out_file.read_text(encoding="utf-8")
+    assert "TEST BOARD CARRIER REV 2.0" in content
+    # Assert F.SilkS text is right-reading (rotation 0) and does NOT have justify mirror
+    assert '(gr_text "TEST BOARD CARRIER REV 2.0"' in content
+    assert (
+        'gr_text "TEST BOARD CARRIER REV 2.0"\n    (at' in content
+        or 'gr_text "TEST BOARD CARRIER REV 2.0"\n\t\t(at' in content
+        or 'gr_text "TEST BOARD CARRIER REV 2.0" (at' in content
+    )
+    # Assert B.SilkS text DOES have justify mirror
+    assert "BOTTOM SHIELD / GROUND REF" in content
+    assert "(justify mirror)" in content
+    # Assert TP1 footprint reference on F.SilkS has angle 90 and no justify mirror
+    assert 'fp_text reference "TP1"' in content
+    # Assert MH1 is emitted as footprint reference without hide
+    assert '(footprint "MountingHole:MountingHole_3.2mm_Pad"' in content
+    assert 'fp_text reference "MH1"' in content
+    assert 'fp_text reference "MH1" (at 0 0) (layer "F.SilkS") hide' not in content

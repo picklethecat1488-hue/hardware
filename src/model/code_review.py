@@ -4,8 +4,10 @@ Provides structured schemas for code review sessions, commits, file diffs,
 inline line comments, file statuses, and review severity tags.
 """
 
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional
+import uuid as uuid_pkg
 from pydantic import BaseModel, Field
 
 
@@ -118,6 +120,7 @@ class CommentModel(BaseModel):
     """Inline or file-level review comment."""
 
     id: str
+    uuid: str = Field(default_factory=lambda: str(uuid_pkg.uuid4()))
     file_path: str
     start_line: int
     end_line: int
@@ -127,6 +130,7 @@ class CommentModel(BaseModel):
     code_snippet: str = ""
     created_at: str
     resolved: bool = False
+    commit: str = ""
 
 
 class FileStateModel(BaseModel):
@@ -137,10 +141,27 @@ class FileStateModel(BaseModel):
     notes: str = ""
 
 
+class CommitUpdateModel(BaseModel):
+    """Record of a commit update event (rebase, merge, amend, etc.)."""
+
+    id: str = Field(default_factory=lambda: str(uuid_pkg.uuid4()))
+    session_uuid: str = ""
+    original_commit: str = ""
+    current_commit: str = ""
+    action: str = "update"  # e.g. rebase, merge, amend, sync, cherry-pick
+    notes: str = ""
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
 class ReviewSessionModel(BaseModel):
     """Stateful container for an entire code review session."""
 
     title: str = "Code Review"
+    uuid: str = Field(default_factory=lambda: str(uuid_pkg.uuid4()))
+    commit_hash: Optional[str] = None
+    original_commit: Optional[str] = None
+    update_action: Optional[str] = None
+    commit_history: List[CommitUpdateModel] = Field(default_factory=list)
     summary: str = ""
     verdict: ReviewStatus = ReviewStatus.IN_REVIEW
     repo_name: str = "hardware"
@@ -149,6 +170,30 @@ class ReviewSessionModel(BaseModel):
     comments: List[CommentModel] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
+
+    def record_commit_update(
+        self, original_commit: str, current_commit: str, action: str, notes: str = ""
+    ) -> CommitUpdateModel:
+        """Record a commit update event in the review session."""
+        update = CommitUpdateModel(
+            session_uuid=self.uuid,
+            original_commit=original_commit,
+            current_commit=current_commit,
+            action=action,
+            notes=notes,
+        )
+        self.commit_history.append(update)
+        self.original_commit = original_commit
+        self.commit_hash = current_commit
+        self.update_action = action
+        return update
+
+    def get_comment_by_uuid(self, comment_uuid: str) -> Optional[CommentModel]:
+        """Find a comment by its unique UUID."""
+        for c in self.comments:
+            if c.uuid == comment_uuid:
+                return c
+        return None
 
     def get_file_state(self, file_path: str) -> FileStateModel:
         """Retrieve or create default file review state."""

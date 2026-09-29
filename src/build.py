@@ -586,7 +586,12 @@ class Builder:
                     target_cfg = target_cfg.model_copy(update={"design_rules": pcb_config.design_rules})
                 if sub_pcb_config and not target_cfg.capacitive_sensors and pcb_config.capacitive_sensors:
                     target_cfg = target_cfg.model_copy(update={"capacitive_sensors": pcb_config.capacitive_sensors})
-                if sub_pcb_config and not target_cfg.copper_regions and pcb_config.copper_regions:
+                if (
+                    sub_pcb_config
+                    and not target_cfg.copper_regions
+                    and pcb_config.copper_regions
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
                     target_cfg = target_cfg.model_copy(update={"copper_regions": pcb_config.copper_regions})
                 if sub_pcb_config and not target_cfg.net_classes and pcb_config.net_classes:
                     target_cfg = target_cfg.model_copy(update={"net_classes": pcb_config.net_classes})
@@ -690,7 +695,9 @@ class Builder:
                         )
                     self.logger.print(f"Generated KiCad DRC Report: {rpt_file}", symbol="🔍")
                     if subassembly == "carrier_board":
-                        shutil.copy2(rpt_file, rpt_dir / f"{provider.name}-drc.rpt")
+                        alias_rpt = rpt_dir / f"{provider.name}-drc.rpt"
+                        if alias_rpt != rpt_file and rpt_file.exists():
+                            shutil.copy2(rpt_file, alias_rpt)
 
                 # 3. Export manufacturing BOM, CPL, Schematic vector PDF, and 3D STEP
                 bom_csv = bom_dir / f"{subassembly}_bom.csv" if subassembly != provider.name else bom_dir / "bom.csv"

@@ -1,0 +1,40 @@
+# Flying Probes Automated Acceptance Test Report: {{ target_title }}
+
+> Automated physical and electrical flying probe verification report simulated via PyBullet and Rerun.
+
+## Test Execution Summary
+
+| Metric | Details |
+| :--- | :--- |
+| **Test Fixture** | High-Precision Dual-Head Flying Probe Tester (FP-600) |
+| **Target Unit** | `{{ target_name }}` |
+| **Timestamp** | `{{ timestamp }}` |
+| **Overall Verdict** | {{ status_badge }} |
+| **Tested Steps** | `{{ passed_count }} / {{ total_count }}` |
+| **Yield** | {{ "%.1f"|format(yield_pct) }}% |
+| **Simulation Progress** | `Step {{ current_step_idx }} / {{ total_sim_steps }}` |
+
+## Detailed Step Results
+
+| Step ID | Description | Net | Nominal | Measured | Tolerance | Stimulus | Verdict |
+| :--- | :--- | :--- | :---: | :---: | :---: | :--- | :---: |
+{% for s in steps %}
+| `{{ s.step_id }}` | {{ s.description }} | `{{ s.net_name }}` | {{ s.nominal_str }} | {{ s.measured_str }} | {{ s.tolerance_str }} | {{ s.stimulus }} | {{ s.verdict_str }} |
+{% endfor %}
+
+## Electrical Specifications & Compliance Criteria
+- **Continuity**: Contact resistance strictly ≤ R_nom × (1 + tol%). Zero opens.
+- **Differential Impedance**: PCIe 85 Ω ± 10%. Reflection ≤ -20 dB.
+- **Capacitance**: Liquid sensing pads 12.5 - 15.5 pF ± 15%, Proximity 8.0 pF ± 15%.
+- **Probe Clearance**: Minimum vertical flight height ≥ 15.0 mm above all board component obstacles.
+{% if signal_isolation_checks %}
+
+## Signal Line Isolation Audit (Power & Ground Network Isolation)
+
+| Signal Net | Monitored Power & Ground Nets | Isolation Resistance | Verdict |
+| :--- | :--- | :---: | :---: |
+{% for iso in signal_isolation_checks %}
+| `{{ iso.signal_net }}` | `{{ iso.isolated_against | join(", ") }}` | {{ iso.isolation_resistance_str }} | {{ iso.verdict_str }} |
+{% endfor %}
+{% endif %}
+

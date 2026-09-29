@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import re
 from typing import Dict, List, Optional
+import uuid as uuid_pkg
 
 from model.code_review import (
     CommentModel,
@@ -97,6 +98,21 @@ class MarkdownReviewExporter:
                 ]
             )
 
+        if session.commit_history:
+            lines.extend(
+                [
+                    "## Commit Updates & History",
+                    "",
+                    "| Action | Original Commit | Current Commit | Timestamp | Notes |",
+                    "| :--- | :--- | :--- | :--- | :--- |",
+                ]
+            )
+            for upd in session.commit_history:
+                lines.append(
+                    f"| `{upd.action}` | `{upd.original_commit}` | `{upd.current_commit}` | `{upd.timestamp}` | {upd.notes or '_None_'} |"
+                )
+            lines.append("")
+
         # Severity breakdown table
         lines.extend(
             [
@@ -165,9 +181,12 @@ class MarkdownReviewExporter:
                     lines.extend(
                         [
                             f"#### **[{sev}]** [{file_path}:{line_range_str}]({line_url})",
-                            "",
+                            f"<!-- comment-uuid: {comment.uuid} -->",
                         ]
                     )
+                    if comment.commit:
+                        lines.append(f"<!-- comment-commit: {comment.commit} -->")
+                    lines.append("")
 
                     if comment.code_snippet.strip():
                         lang = self._detect_language(file_path)
@@ -211,7 +230,7 @@ class MarkdownReviewExporter:
                 summary_formatted = self._format_file_references(summary_snippet)
                 sev_tag = comment.severity.value.replace("_", " ")
                 lines.append(
-                    f"- [{checked}] **[{sev_tag}]** [`{comment.file_path}:{line_range_str}`]({abs_file_url}): {summary_formatted}"
+                    f"- [{checked}] **[{sev_tag}]** [`{comment.file_path}:{line_range_str}`]({abs_file_url}): {summary_formatted} <!-- uuid:{comment.uuid} -->"
                 )
             lines.append("")
 
@@ -305,3 +324,197 @@ class MarkdownReviewExporter:
             return ReviewSessionModel.model_validate(data)
         except (json.JSONDecodeError, ValueError):
             return None
+
+    def parse_markdown_text(self, content: str) -> ReviewSessionModel:
+        """Parse raw CR.md or CR_<commit>.md text content into a ReviewSessionModel.
+
+        Args:
+            content: Raw Markdown string.
+
+        Returns:
+            ReviewSessionModel populated with parsed comments.
+        """
+        title_m = re.search(r"^#\s+Code Review Report:\s*(.*?)$", content, re.MULTILINE)
+        title = title_m.group(1).strip() if title_m else "Code Review"
+
+        session = ReviewSessionModel(title=title)
+
+        # Parse checklist items to extract resolution states: - [x] or - [ ]
+        checklist_data: Dict[str, bool] = {}
+        for line in content.splitlines():
+            chk_m = re.match(
+                r"^-\s+\[([ xX])\]\s+\*\*\[(.*?)\]\*\*\s+\[`([^`:]+):L?(\d+)(?:-L?(\d+))?`\](?:\([^)]*\))?:\s*(.*?)(?:\s*<!--\s*uuid:([a-fA-F0-9-]+)\s*-->)?$",
+                line.strip(),
+            )
+            if chk_m:
+                is_resolved = chk_m.group(1).lower() == "x"
+                fpath = chk_m.group(3).strip()
+                s_line = int(chk_m.group(4))
+                e_line = int(chk_m.group(5)) if chk_m.group(5) else s_line
+                uuid_str = chk_m.group(7)
+                if uuid_str:
+                    checklist_data[uuid_str] = is_resolved
+                checklist_data[f"{fpath}:{s_line}-{e_line}"] = is_resolved
+
+        # Parse inline comment sections
+        comment_blocks = re.split(r"\n(?=####\s+\*\*\[)", content)
+        for block in comment_blocks:
+            block_clean = block.strip()
+            if not block_clean.startswith("####"):
+                continue
+
+            header_m = re.match(r"####\s+\*\*\[(.*?)\]\*\*\s+\[([^:]+):L?(\d+)(?:-L?(\d+))?\]", block_clean)
+            if not header_m:
+                continue
+
+            sev_str = header_m.group(1).strip().replace(" ", "_").upper()
+            try:
+                sev = ReviewSeverity(sev_str)
+            except ValueError:
+                sev = ReviewSeverity.MUST_FIX
+
+            fpath = header_m.group(2).strip()
+            start_line = int(header_m.group(3))
+            end_line = int(header_m.group(4)) if header_m.group(4) else start_line
+
+            uuid_m = re.search(r"<!--\s*comment-uuid:\s*([a-fA-F0-9-]+)\s*-->", block_clean)
+            c_uuid = uuid_m.group(1).strip() if uuid_m else str(uuid_pkg.uuid4())
+
+            commit_m = re.search(r"<!--\s*comment-commit:\s*([^\s>]+)\s*-->", block_clean)
+            c_commit = commit_m.group(1).strip() if commit_m else ""
+
+            snippet_m = re.search(r"```[a-zA-Z0-9_-]*\n(.*?)\n```", block_clean, re.DOTALL)
+            code_snippet = snippet_m.group(1).strip() if snippet_m else ""
+
+            body_m = re.search(r">\s+\*\*Reviewer\s*\((.*?)\)\*\*:\s*(.*?)$", block_clean, re.MULTILINE | re.DOTALL)
+            author = "Reviewer"
+            body = ""
+            if body_m:
+                author = body_m.group(1).strip()
+                body = body_m.group(2).strip()
+            else:
+                body_lines = [l.lstrip("> ").strip() for l in block_clean.splitlines() if l.startswith(">")]
+                body = "\n".join(body_lines).strip()
+
+            body = re.sub(r"\[`(@[^`]+)`\]\([^)]+\)", r"\1", body)
+            resolved = checklist_data.get(c_uuid, checklist_data.get(f"{fpath}:{start_line}-{end_line}", False))
+
+            comment = CommentModel(
+                id=c_uuid[:8],
+                uuid=c_uuid,
+                file_path=fpath,
+                start_line=start_line,
+                end_line=end_line,
+                severity=sev,
+                body=body,
+                author=author,
+                code_snippet=code_snippet,
+                created_at=datetime.now(timezone.utc).isoformat(),
+                resolved=resolved,
+                commit=c_commit,
+            )
+            session.comments.append(comment)
+
+        return session
+
+    def merge_commit_feedback(self, session: ReviewSessionModel, cr_commit_file: Path) -> ReviewSessionModel:
+        """Auto-merge CR feedback if the CR file already exists for a commit.
+
+        Args:
+            session: Active review session model.
+            cr_commit_file: Path to existing CR_<commit>.md file.
+
+        Returns:
+            Updated ReviewSessionModel with merged feedback.
+        """
+        if not cr_commit_file.exists() or not cr_commit_file.is_file():
+            return session
+        try:
+            commit_from_filename = ""
+            if cr_commit_file.stem.startswith("CR_") and cr_commit_file.stem != "CR":
+                commit_from_filename = cr_commit_file.stem[3:]
+
+            content = cr_commit_file.read_text(encoding="utf-8")
+            parsed_session = self.parse_markdown_text(content)
+            existing_by_uuid = {c.uuid: c for c in session.comments if c.uuid}
+            existing_by_loc = {(c.file_path, c.start_line, c.end_line): c for c in session.comments}
+
+            for pc in parsed_session.comments:
+                if not pc.commit and commit_from_filename:
+                    pc.commit = commit_from_filename
+
+                match_c = None
+                if pc.uuid and pc.uuid in existing_by_uuid:
+                    match_c = existing_by_uuid[pc.uuid]
+                elif (pc.file_path, pc.start_line, pc.end_line) in existing_by_loc:
+                    match_c = existing_by_loc[(pc.file_path, pc.start_line, pc.end_line)]
+
+                if match_c:
+                    if pc.resolved:
+                        match_c.resolved = True
+                    if pc.body and pc.body != match_c.body:
+                        match_c.body = pc.body
+                else:
+                    session.comments.append(pc)
+                    if pc.uuid:
+                        existing_by_uuid[pc.uuid] = pc
+                    existing_by_loc[(pc.file_path, pc.start_line, pc.end_line)] = pc
+        except Exception:
+            pass
+        return session
+
+    def export_commit_markdown(
+        self,
+        session: ReviewSessionModel,
+        commit_sha: str,
+        feedback_dir: Path,
+        total_repo_files: int = 0,
+    ) -> Optional[Path]:
+        """Export commit-specific review findings to feedback/CR_<commit>.md.
+
+        Only exports if there are comments associated with this commit. If no comments
+        exist for the commit, any existing CR_<commit>.md is unlinked.
+
+        Args:
+            session: Active review session model.
+            commit_sha: Commit hash or identifier.
+            feedback_dir: Directory where CR_<commit>.md is stored.
+            total_repo_files: Total changed files count.
+
+        Returns:
+            Path to written markdown report, or None if no comments exist for commit.
+        """
+        feedback_dir.mkdir(parents=True, exist_ok=True)
+        safe_sha = commit_sha.replace("/", "_").strip()
+        target_path = feedback_dir / f"CR_{safe_sha}.md"
+
+        # Filter comments for commit_sha
+        commit_comments = [
+            c
+            for c in session.comments
+            if (c.commit and (c.commit == safe_sha or safe_sha.startswith(c.commit) or c.commit.startswith(safe_sha)))
+            or (
+                not c.commit
+                and session.commit_hash
+                and (
+                    session.commit_hash == safe_sha
+                    or safe_sha.startswith(session.commit_hash)
+                    or session.commit_hash.startswith(safe_sha)
+                )
+            )
+        ]
+
+        if not commit_comments:
+            if target_path.exists():
+                try:
+                    target_path.unlink()
+                except OSError:
+                    pass
+            return None
+
+        commit_session = session.model_copy(deep=True)
+        commit_session.comments = commit_comments
+        commit_session.revisions = [commit_sha]
+        md_text = self.render_markdown(commit_session, total_repo_files=total_repo_files)
+        target_path.write_text(md_text, encoding="utf-8")
+        return target_path

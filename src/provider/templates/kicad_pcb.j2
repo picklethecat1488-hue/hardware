@@ -60,7 +60,7 @@
 {% for fp in footprints %}
   (footprint "{{ fp.package }}" (layer "{{ fp.layer }}")
     (at {{ fp.x_mm }} {{ fp.y_mm }}{% if fp.rotation and fp.rotation[2] %} {{ fp.rotation[2] }}{% endif %})
-    (fp_text reference "{{ fp.name }}" (at {{ fp.ref_x|default(0) }} {{ fp.ref_y }}) (layer "{{ fp.silk_layer }}") (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
+    (fp_text reference "{{ fp.name }}" (at {{ fp.ref_x|default(0) }} {{ fp.ref_y }}) (layer "{{ fp.silk_layer }}") hide (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
     (fp_text value "{{ fp.value }}" (at 0 {{ fp.val_y }}) (layer "{{ fp.fab_layer }}") hide (effects (font (size 1 1) (thickness 0.15)){% if fp.layer == "B.Cu" %} (justify mirror){% endif %}))
 {% if fp.is_round %}
     (fp_circle (center 0 0) (end {{ fp.radius }} 0) (stroke (width 0.15) (type default)) (fill none) (layer "{{ fp.silk_layer }}"))
@@ -85,7 +85,7 @@
 {% for tp in test_points %}
   (footprint "TestPoint:TestPoint_THTPad_D{{ tp.dia_mm }}mm_Drill{{ tp.drill_mm }}mm" (layer "{{ tp.layer }}")
     (at {{ tp.x_mm }} {{ tp.y_mm }})
-    (fp_text reference "{{ tp.name }}" (at {{ tp.label_x }} {{ tp.label_y }}{% if tp.label_angle %} {{ tp.label_angle }}{% endif %}) (layer "{{ tp.silk_layer }}") (effects (font (size 0.7 0.7) (thickness 0.1)){% if tp.layer == "B.Cu" %} (justify mirror){% endif %}))
+    (fp_text reference "{{ tp.name }}" (at {{ tp.label_x }} {{ tp.label_y }}{% if tp.label_angle %} {{ tp.label_angle }}{% endif %}) (layer "{{ tp.silk_layer }}") (effects (font (size 0.7 0.7) (thickness 0.1)){% if tp.mirror %} (justify mirror){% endif %}))
     (pad "1" thru_hole circle (at 0 0) (size {{ tp.dia_mm }} {{ tp.dia_mm }}) (drill {{ tp.drill_mm }}) (layers "*.Cu" "*.Mask") (net {{ tp.net_idx }} "{{ tp.net_name }}"))
   )
 {% endfor %}

@@ -2,6 +2,6 @@
 
 from .exhaust_manifolds_config import ExhaustManifoldsConfig
 from .cat_fountain_config import CatFountainConfig
-from .test_board_config import TestBoardConfig
+from .carrier_board_config import CarrierBoardConfig
 
-__all__ = ["ExhaustManifoldsConfig", "CatFountainConfig", "TestBoardConfig"]
+__all__ = ["ExhaustManifoldsConfig", "CatFountainConfig", "CarrierBoardConfig"]
