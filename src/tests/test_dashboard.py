@@ -1736,3 +1736,30 @@ def test_regression_bug_216_save_and_exit_preserves_resolved_bugs(tmp_path: Path
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_217_textarea_bidirectional_and_autoresize() -> None:
+    """Verify BUG-217 regression: Bug report text controls support horizontal/vertical resize and auto-expansion.
+
+    Ensures:
+    1. textarea CSS rules specify resize: both !important.
+    2. input[type="text"] supports horizontal resize.
+    3. autoResizeTextarea and autoResizeAllTextareas are present in JavaScript.
+    4. Input event listener actively triggers autoResizeTextarea on textarea input.
+    5. loadActiveBug and init trigger autoResizeAllTextareas.
+    """
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
+    assert template_path.exists()
+    content = template_path.read_text(encoding="utf-8")
+
+    # 1. CSS styling checks
+    assert "resize: both !important;" in content
+    assert 'input[type="text"] {\n      resize: horizontal;' in content or "resize: horizontal;" in content
+
+    # 2. JS function definitions
+    assert "function autoResizeTextarea(" in content
+    assert "function autoResizeAllTextareas()" in content
+
+    # 3. Dynamic resizing invocation
+    assert "autoResizeAllTextareas();" in content
+    assert "autoResizeTextarea(e.target);" in content
