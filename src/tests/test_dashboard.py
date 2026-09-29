@@ -1359,3 +1359,93 @@ def test_regression_bug_202_smartlog_and_files_vertical_scrollbars_visible() -> 
     # 2. column-scroll has overflow-y: scroll and scrollbar-gutter: stable
     assert "overflow-y: scroll;" in tpl_text
     assert "scrollbar-gutter: stable;" in tpl_text
+
+
+def test_regression_bug_196_vertical_panels_resizable_and_persisted() -> None:
+    """Verify BUG-196: Vertical panels (smartlog, files, diff) have draggable resizers and localStorage persistence."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # Resizer elements between panels
+    assert 'id="resizerSmartlog"' in tpl_text
+    assert 'id="resizerFiles"' in tpl_text
+    assert "column-resizer" in tpl_text
+
+    # Resizer initialization and localStorage persistence logic
+    assert "initPanelResizers()" in tpl_text
+    assert 'localStorage.getItem("diffview_smartlog_width")' in tpl_text
+    assert 'localStorage.getItem("diffview_files_width")' in tpl_text
+    assert "localStorage.setItem(storageKey, newWidth)" in tpl_text
+    assert "col-resize" in tpl_text
+
+    # togglePane updates resizers when panes are collapsed or expanded
+    assert 'document.getElementById("resizerSmartlog")' in tpl_text
+    assert 'document.getElementById("resizerFiles")' in tpl_text
+
+
+def test_regression_bug_197_branch_formatting_groups_and_search() -> None:
+    """Verify BUG-197: Branch UI separates main/release branches at top, has search, and filters other users."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # Branch picker button and modal
+    assert 'id="btnBranchDropdown"' in tpl_text
+    assert 'id="modalBranchPicker"' in tpl_text
+    assert 'id="branchSearchInput"' in tpl_text
+    assert 'id="chkHideOtherUsers"' in tpl_text
+    assert 'id="mainReleaseBranchList"' in tpl_text
+    assert 'id="featureBranchList"' in tpl_text
+
+    # Optgroup structure in branchSelect
+    assert '<optgroup label="⭐ Main &amp; Release Branches">' in tpl_text
+    assert '<optgroup label="🌿 Feature &amp; PR Branches">' in tpl_text
+
+    # Client-side filtering logic
+    assert "renderBranchLists()" in tpl_text
+    assert "filterBranchList()" in tpl_text
+    assert "hideOtherUsers" in tpl_text
+
+
+def test_regression_bug_199_jump_to_cr_icon_button_and_comment_counter() -> None:
+    """Verify BUG-199: Commit actions row has Jump to CR button with open/total count and reviewed styling."""
+    from model.vcs import CommitNodeModel
+
+    # Verify CommitNodeModel has CR tracking attributes
+    node = CommitNodeModel(
+        commit_hash="abc1234567890",
+        short_hash="abc1234",
+        author="Tester",
+        date="2026-09-28",
+        subject="Test commit",
+        cr_open_count=2,
+        cr_resolved_count=3,
+        cr_total_count=5,
+        cr_reviewed=True,
+    )
+    assert node.cr_open_count == 2
+    assert node.cr_total_count == 5
+    assert node.cr_reviewed is True
+
+    # Verify template contains jump-cr-btn with dynamic counter and reviewed class
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert "jump-cr-btn" in tpl_text
+    assert "jumpToCR" in tpl_text
+    assert "cr-badge" in tpl_text
+    assert "cr-reviewed" in tpl_text
+    assert "node.cr_open_count" in tpl_text
+
+
+def test_regression_bug_203_multi_commit_shift_click_selection() -> None:
+    """Verify BUG-203: Smartlog commit checkboxes and rows support Shift-Click contiguous range selection."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # Shift-click event handler on checkboxes
+    assert "onCommitCheckChanged(event, this)" in tpl_text
+    assert "event.shiftKey" in tpl_text
+    assert "lastCheckedCommitIndex" in tpl_text
+
+    # Smartlog nodes carry data-hash and accept event parameter in selectCommit
+    assert 'data-hash="{{ node.commit_hash }}"' in tpl_text
+    assert "selectCommit('{{ node.commit_hash }}', event)" in tpl_text

@@ -814,6 +814,47 @@ class DashboardServer(ThreadingHTTPServer):
                     )
             node.bug_tags = tags
 
+        # Load Code Review stats for commits (BUG-199)
+        cr_stats: dict[str, dict[str, Any]] = {}
+        cr_db_path = self.repo_root / "build" / "code_review.sqlite"
+        if cr_db_path.exists():
+            import sqlite3
+
+            try:
+                with sqlite3.connect(str(cr_db_path)) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT commit_hash, COUNT(*), SUM(CASE WHEN resolved = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN resolved = 1 THEN 1 ELSE 0 END) "
+                        "FROM comments GROUP BY commit_hash"
+                    )
+                    for row in cursor.fetchall():
+                        c_hash, total, open_c, res_c = row
+                        if c_hash:
+                            cr_stats[c_hash] = {
+                                "total": total or 0,
+                                "open": open_c or 0,
+                                "resolved": res_c or 0,
+                                "reviewed": True,
+                            }
+                    cursor.execute("SELECT key, value FROM metadata WHERE key IN ('revisions', 'commit_hash')")
+                    meta = dict(cursor.fetchall())
+                    revs = meta.get("revisions", "")
+                    for node in smartlog_nodes:
+                        if node.commit_hash in revs or node.short_hash in revs:
+                            cr_stats.setdefault(node.commit_hash, {"total": 0, "open": 0, "resolved": 0})[
+                                "reviewed"
+                            ] = True
+            except Exception:
+                pass
+
+        for node in smartlog_nodes:
+            if node.commit_hash in cr_stats:
+                st = cr_stats[node.commit_hash]
+                node.cr_open_count = st["open"]
+                node.cr_resolved_count = st["resolved"]
+                node.cr_total_count = st["total"]
+                node.cr_reviewed = st.get("reviewed", False)
+
         return DiffViewSessionModel(
             repo_name=self.repo_root.name,
             branches=branches,

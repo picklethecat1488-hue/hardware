@@ -139,6 +139,10 @@ class CommitNodeModel(BaseModel):
     deletions: int = 0
     files_count: int = 0
     is_feedback_only: bool = False
+    cr_open_count: int = 0
+    cr_resolved_count: int = 0
+    cr_total_count: int = 0
+    cr_reviewed: bool = False
 
 
 class WorkingTreeFileModel(BaseModel):
