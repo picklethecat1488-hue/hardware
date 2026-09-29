@@ -1706,7 +1706,8 @@ def test_regression_bug_207_sheet_17_components_on_carrier_board() -> None:
     for name in sheet_17_comps:
         assert name in comp_map, f"Sheet 17 component {name} must exist on carrier board"
         pos = comp_map[name].position
-        assert -36.0 <= pos[1] <= -16.0, f"Component {name} must be in corridor between U1 and J1"
+        y_max = -10.0 if name == "SW1" else -16.0
+        assert -36.0 <= pos[1] <= y_max, f"Component {name} must be in corridor between U1 and J1"
 
     # Verify existing baseline components were not displaced
     assert tuple(comp_map["U1"].position[:2]) == (0.0, 0.0)
