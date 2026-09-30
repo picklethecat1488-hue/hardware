@@ -2613,3 +2613,19 @@ def test_regression_bug_245_word_wrap_in_diff_views() -> None:
     assert ".diff-word-wrap" in cr_text
     assert "toggleWordWrap" in cr_text
     assert "quake_diff_word_wrap" in cr_text
+
+
+def test_regression_bug_246_auto_sync_panes() -> None:
+    """Verify BUG-246: Auto-sync polls repository changes to update working tree and commit panes automatically."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. diff_view.html.j2 implements automatic background sync
+    assert "startAutoSync" in diff_view_text
+    assert "syncWorkingAndCommitsSilently" in diff_view_text or "autoSyncTimer" in diff_view_text
+    assert "renderSmartlogList" in diff_view_text
+    assert "startAutoSync()" in diff_view_text
+
+    # 2. code_review.html.j2 implements auto-sync for commits and files
+    assert "startAutoSync" in cr_text or "autoSyncTimer" in cr_text
