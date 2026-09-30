@@ -207,6 +207,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         match path:
             case "/api/sync":
                 res = self.server.git_engine.sync_repo()
+                try:
+                    feedback_res = self.server.sync_feedback()
+                    res["feedback"] = feedback_res
+                except Exception:
+                    pass
                 self._send_json(res)
             case "/api/rebase":
                 upstream = data.get("upstream") if isinstance(data, dict) else None

@@ -677,6 +677,27 @@
       text-overflow: ellipsis;
     }
 
+    /* Word Wrap in Code Review (BUG-245) */
+    .diff-word-wrap .sbs-row td.old-code,
+    .diff-word-wrap .sbs-row td.new-code,
+    .diff-word-wrap .sbs-row td.diff-code-cell {
+      white-space: pre-wrap !important;
+      word-break: break-word !important;
+      overflow-wrap: anywhere !important;
+      text-overflow: clip !important;
+      max-width: none !important;
+    }
+    .diff-word-wrap .unified-wrap {
+      width: 100% !important;
+      min-width: 100% !important;
+      max-width: 100% !important;
+    }
+    .diff-word-wrap .unified-text {
+      white-space: pre-wrap !important;
+      word-break: break-word !important;
+      overflow-wrap: anywhere !important;
+    }
+
     /* Binary Diff View */
     .binary-diff-view {
       display: flex;
@@ -1365,6 +1386,8 @@
       <button id="btnModeSbs" class="quake-btn quake-btn-default quake-btn-active" onclick="setDiffMode('side_by_side')" title="Side-by-Side View (Shortcut: S)">Split</button>
       <button id="btnModeUnified" class="quake-btn quake-btn-default" onclick="setDiffMode('unified')" title="Unified View (Shortcut: U)">Unified</button>
       <button id="btnModeFull" class="quake-btn quake-btn-default" onclick="setDiffMode('full_file')" title="Full File (Shortcut: F)">Full</button>
+      <span style="border-left: 1px solid var(--quake-border); margin: 0 4px; height: 16px; align-self: center;"></span>
+      <button id="btnToggleWrap" class="quake-btn quake-btn-default" onclick="toggleWordWrap()" title="Toggle Word Wrap (Shortcut: W)">Wrap: Off</button>
     </div>
 
     <div class="diff-toolbar-right">
@@ -1746,6 +1769,7 @@
     }
 
     document.addEventListener("DOMContentLoaded", async () => {
+      initWordWrap();
       await loadSession();
       await loadCommits();
       initPanelResizers();
@@ -1753,7 +1777,45 @@
       setupCliInput();
       setupCliResizer();
       setupDiffSelectionListener();
+      startAutoSync();
     });
+
+    // Auto-sync commits and files (BUG-246)
+    let autoSyncTimer = null;
+    let isAutoSyncing = false;
+
+    function startAutoSync() {
+      if (autoSyncTimer) clearInterval(autoSyncTimer);
+      autoSyncTimer = setInterval(syncReviewSilently, 3000);
+    }
+
+    async function syncReviewSilently() {
+      if (isAutoSyncing || (document.hidden && document.visibilityState === "hidden")) return;
+      isAutoSyncing = true;
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const revs = urlParams.get("revisions") || urlParams.get("commit");
+        const commitsUrl = revs ? "/api/commits?revisions=" + encodeURIComponent(revs) : "/api/commits";
+        const res = await fetch(commitsUrl);
+        if (!res.ok) return;
+        const commits = await res.json();
+        const fp = JSON.stringify(commits.map(c => [c.commit_hash, c.short_hash, c.subject, c.is_head]));
+        if (state.lastCommitsFingerprint === undefined) {
+          state.lastCommitsFingerprint = fp;
+        } else if (fp !== state.lastCommitsFingerprint) {
+          state.lastCommitsFingerprint = fp;
+          state.commits = commits;
+          renderCommitsList();
+          if (state.selectedCommit) {
+            loadFilesForSelectedCommit();
+          }
+        }
+      } catch (e) {
+        // Silently ignore background polling errors
+      } finally {
+        isAutoSyncing = false;
+      }
+    }
 
     async function loadSession() {
       try {
@@ -3501,6 +3563,33 @@
       renderDiff();
     }
 
+    // Word Wrap Toggle (BUG-245)
+    function toggleWordWrap() {
+      const isWrapped = document.body.classList.toggle("diff-word-wrap");
+      localStorage.setItem("quake_diff_word_wrap", isWrapped ? "true" : "false");
+      updateWrapButtonState(isWrapped);
+    }
+
+    function initWordWrap() {
+      const saved = localStorage.getItem("quake_diff_word_wrap");
+      const isWrapped = saved === "true";
+      if (isWrapped) {
+        document.body.classList.add("diff-word-wrap");
+      } else {
+        document.body.classList.remove("diff-word-wrap");
+      }
+      updateWrapButtonState(isWrapped);
+    }
+
+    function updateWrapButtonState(isWrapped) {
+      const btn = document.getElementById("btnToggleWrap");
+      if (btn) {
+        btn.textContent = isWrapped ? "Wrap: On" : "Wrap: Off";
+        btn.classList.toggle("quake-btn-gold", isWrapped);
+        btn.classList.toggle("quake-btn-active", isWrapped);
+      }
+    }
+
     function togglePane(pane) {
       if (pane === "commits") {
         state.panes.commits = !state.panes.commits;
@@ -3727,6 +3816,7 @@
         if (e.key.toLowerCase() === "s") setDiffMode("side_by_side");
         if (e.key.toLowerCase() === "u") setDiffMode("unified");
         if (e.key.toLowerCase() === "f") setDiffMode("full_file");
+        if (e.key.toLowerCase() === "w") toggleWordWrap();
         if (e.key.toLowerCase() === "j" || (e.altKey && e.key === "ArrowDown")) {
           e.preventDefault();
           await navigateChange(1);

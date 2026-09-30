@@ -1054,8 +1054,6 @@ class CarrierBoardProvider(Provider):
             # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
             with Locations((0.0, 26.0)):
                 SilkscreenText("TEST BOARD CARRIER REV 2.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
-            with Locations((-8.0, -34.5)):
-                SilkscreenText("LAYER 1-6 RIGID-FLEX", layer="F.SilkS", font_size=0.75, thickness=0.11)
             with Locations((0.0, 0.0)):
                 SilkscreenText(
                     "BOTTOM SHIELD / GROUND REF", layer="B.SilkS", font_size=1.0, thickness=0.15, mirror=True

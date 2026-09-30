@@ -900,9 +900,6 @@
       <button id="btnAmendModal" class="quake-btn quake-btn-default" onclick="openCommitModal(true)" title="Amend HEAD commit">
         <span>⎇ Amend</span>
       </button>
-      <button id="btnSyncFeedback" class="quake-btn quake-btn-default" onclick="triggerManualSync()" title="Synchronize SQLite databases with committed feedback files">
-        <span>⚡ Sync DB</span>
-      </button>
 
       <!-- Pane Toggle Controls -->
       <div style="display:flex;align-items:center;gap:4px;border-left:1px solid var(--quake-border-mid);border-right:1px solid var(--quake-border-mid);padding:0 6px;">
@@ -1188,6 +1185,7 @@
           <div class="diff-mode-controls">
             <button id="btnModeSbs" class="quake-btn quake-btn-gold quake-btn-sm" onclick="setDiffMode('side_by_side')">Side-by-Side</button>
             <button id="btnModeUnified" class="quake-btn quake-btn-default quake-btn-sm" onclick="setDiffMode('unified')">Unified</button>
+            <button id="btnToggleWrap" class="quake-btn quake-btn-default quake-btn-sm" onclick="toggleWordWrap()" title="Toggle Word Wrap (Shortcut: W)">Wrap: Off</button>
             <button class="quake-btn quake-btn-default quake-btn-sm" onclick="onCopySnippetClicked()" title="Copy active diff snippet">📋 Copy</button>
           </div>
         </div>
@@ -1363,7 +1361,10 @@
       panes: {
         smartlog: true,
         files: true
-      }
+      },
+      currentBranch: "{{ session.current_branch or session.active_branch or '' }}",
+      lastWorkingFingerprint: null,
+      lastCommitFingerprint: null
     };
 
     const INITIAL_SYNC_DONE = {{ session.initial_sync_done | tojson }};
@@ -1560,6 +1561,239 @@
       document.getElementById("filesHeaderTitle").textContent = commitHash === "working" ? "Working Tree Files" : `Files (${commitHash.slice(0, 7)})`;
 
       await loadFilesForActiveCommit();
+    }
+
+    function escapeHtml(str) {
+      if (typeof QuakeDiffEngine !== "undefined" && QuakeDiffEngine.escapeHtml) {
+        return QuakeDiffEngine.escapeHtml(str);
+      }
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Auto-sync working tree and smartlog commit panes (BUG-246)
+    let autoSyncTimer = null;
+    let isAutoSyncing = false;
+
+    function startAutoSync() {
+      if (autoSyncTimer) clearInterval(autoSyncTimer);
+      autoSyncTimer = setInterval(syncWorkingAndCommitsSilently, 2500);
+    }
+
+    async function syncWorkingAndCommitsSilently() {
+      if (isAutoSyncing || (document.hidden && document.visibilityState === "hidden")) return;
+      isAutoSyncing = true;
+      try {
+        const resp = await fetch("/api/session?type=diff");
+        if (!resp.ok) return;
+        const session = await resp.json();
+
+        // 1. Check Working Tree changes
+        const workingFiles = session.working_tree || [];
+        const workingFp = JSON.stringify(workingFiles.map(f => [f.path, f.is_staged, f.is_untracked, f.is_conflicted, f.status]));
+        if (state.lastWorkingFingerprint === null) {
+          state.lastWorkingFingerprint = workingFp;
+        } else if (workingFp !== state.lastWorkingFingerprint) {
+          state.lastWorkingFingerprint = workingFp;
+          state.workingFiles = workingFiles;
+          if (state.activeCommit === "working") {
+            const container = document.getElementById("filesContainer");
+            if (container) renderWorkingTreeFiles(container);
+          }
+        }
+
+        // 2. Check Smartlog / Commit DAG changes
+        const nodes = session.smartlog_nodes || [];
+        const commitFp = JSON.stringify(nodes.map(n => [n.commit_hash, n.short_hash, n.subject, n.is_head, n.branches, n.tags, n.pr_number, n.pr_status]));
+        if (state.lastCommitFingerprint === null) {
+          state.lastCommitFingerprint = commitFp;
+        } else if (commitFp !== state.lastCommitFingerprint) {
+          state.lastCommitFingerprint = commitFp;
+          renderSmartlogList(nodes);
+        }
+
+        // 3. Update current branch in UI if changed
+        if (session.current_branch && session.current_branch !== state.currentBranch) {
+          state.currentBranch = session.current_branch;
+          const brBtn = document.getElementById("btnBranchDropdown");
+          if (brBtn) {
+            const label = brBtn.querySelector("span");
+            if (label) label.textContent = `🌿 ${session.current_branch}`;
+          }
+        }
+      } catch (e) {
+        // Silently ignore background polling network errors
+      } finally {
+        isAutoSyncing = false;
+      }
+    }
+
+    function renderSmartlogList(nodes) {
+      const listEl = document.getElementById("smartlogList");
+      if (!listEl) return;
+      const repoWebBase = state.repoWebUrl || (state.githubRepo ? `https://github.com/${state.githubRepo}` : `https://github.com/picklethecat1488-hue/${state.repoName}`);
+
+      let html = `
+        <!-- Working Tree Node -->
+        <div class="smartlog-node ${state.activeCommit === 'working' ? 'active' : ''}" id="node-working" onclick="selectCommit('working')">
+          <div class="node-header-row">
+            <span class="node-graph-art">@</span>
+            <span class="node-sha" style="color:var(--quake-cyan);">WORKING TREE</span>
+            <span class="node-author-date">Uncommitted</span>
+          </div>
+          <div class="node-subject">Local working tree changes &amp; staging area</div>
+        </div>
+      `;
+
+      nodes.forEach(node => {
+        const isHead = node.is_head ? "head-node" : "";
+        const isAncestorTop = node.is_ancestor_top ? "ancestor-top-node" : "";
+        const hasPr = node.pr_number ? "has-pr" : "";
+        const isActive = state.activeCommit === node.commit_hash ? "active" : "";
+        const isMerged = (node.is_merged_into_tracking || node.is_merged) ? "merged-commit" : "";
+        const isChecked = state.selectedCommits && state.selectedCommits.includes(node.commit_hash);
+
+        let prBadge = "";
+        if (node.pr_number && node.pr_url) {
+          prBadge = `
+            <a href="${node.pr_url}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="pr-highlight-badge"
+               onclick="event.stopPropagation();"
+               title="Pull Request #${node.pr_number} (Click to open in GitHub)">
+              <span class="pr-icon">⎇</span> ${escapeHtml(node.pr_status || ('PR #' + node.pr_number))}
+            </a>
+          `;
+        } else if (node.pr_number) {
+          prBadge = `
+            <span class="pr-highlight-badge pr-local-badge"
+                  onclick="event.stopPropagation(); showToast('${escapeHtml(node.pr_status || ('PR #' + node.pr_number))} has not been created on GitHub yet');"
+                  title="${escapeHtml(node.pr_status || ('PR #' + node.pr_number))} (Local branch, not submitted to GitHub)">
+              <span class="pr-icon">⎇</span> ${escapeHtml(node.pr_status || ('PR #' + node.pr_number))}
+            </span>
+          `;
+        }
+
+        let tagsHtml = "";
+        if (node.is_merged_into_tracking || node.is_merged) {
+          tagsHtml += `<span class="node-badge node-badge-merged" title="Already merged into tracking branch">✓ Merged</span>`;
+        }
+        if (node.is_ancestor_top) {
+          tagsHtml += `<span class="node-badge node-badge-ancestor" title="Top of ancestor branch (${escapeHtml(node.ancestor_name || 'main')})">📌 ${escapeHtml(node.ancestor_name || 'main')}</span>`;
+        }
+        (node.branches || []).forEach(br => {
+          const isPrBr = br.toLowerCase().includes("pr") || br.toLowerCase().includes("pull");
+          const brUrl = (isPrBr && node.pr_url) ? node.pr_url : `${repoWebBase}/tree/${br.replace('origin/', '')}`;
+          const badgeClass = (isPrBr && node.pr_url) ? "pr-tag-link" : (isPrBr ? "pr-local-badge" : "");
+          tagsHtml += `
+            <a href="${brUrl}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="node-badge node-badge-branch ${badgeClass}"
+               onclick="onBranchBadgeClick(event, '${escapeHtml(br)}', '${node.pr_url || ''}')"
+               title="${isPrBr && node.pr_url ? 'Open PR in GitHub' : (isPrBr ? 'Local branch ' + escapeHtml(br) + ' (not on GitHub)' : 'View branch ' + escapeHtml(br) + ' on GitHub')}">
+              ⎇ ${escapeHtml(br)}
+            </a>
+          `;
+        });
+        (node.tags || []).forEach(tag => {
+          const isPrTag = tag.toLowerCase().includes("pr") || tag.toLowerCase().includes("pull");
+          const tagUrl = (isPrTag && node.pr_url) ? node.pr_url : `${repoWebBase}/releases/tag/${tag}`;
+          const badgeClass = (isPrTag && node.pr_url) ? "pr-tag-link" : (isPrTag ? "pr-local-badge" : "");
+          tagsHtml += `
+            <a href="${tagUrl}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="node-badge node-badge-tag ${badgeClass}"
+               onclick="onBranchBadgeClick(event, '${escapeHtml(tag)}', '${node.pr_url || ''}')"
+               title="${isPrTag && node.pr_url ? 'Open PR in GitHub' : (isPrTag ? 'Local tag ' + escapeHtml(tag) + ' (not on GitHub)' : 'View tag ' + escapeHtml(tag) + ' on GitHub')}">
+              🏷 ${escapeHtml(tag)}
+            </a>
+          `;
+        });
+        if (node.pr_status && node.pr_url) {
+          tagsHtml += `
+            <a href="${node.pr_url}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="node-badge node-badge-pr pr-tag-link"
+               onclick="event.stopPropagation();"
+               title="Open PR on GitHub">
+              ⎇ ${escapeHtml(node.pr_status)}
+            </a>
+          `;
+        } else if (node.pr_status) {
+          tagsHtml += `
+            <span class="node-badge node-badge-pr pr-local-badge"
+                  onclick="event.stopPropagation(); showToast('${escapeHtml(node.pr_status)} has not been created on GitHub yet');"
+                  title="${escapeHtml(node.pr_status)} (Not yet created on GitHub)">
+              ⎇ ${escapeHtml(node.pr_status)}
+            </span>
+          `;
+        }
+        (node.bug_tags || []).forEach(bug => {
+          tagsHtml += `
+            <span class="node-badge node-badge-bug ${bug.status === 'RESOLVED' ? 'resolved' : ''}"
+                  onclick="event.stopPropagation(); openBug('${escapeHtml(bug.id)}');"
+                  title="${escapeHtml(bug.title)}">
+              ${escapeHtml(bug.id)}: ${escapeHtml(bug.status)}
+            </span>
+          `;
+        });
+
+        const crReviewedClass = node.cr_reviewed ? "cr-reviewed" : "";
+        let crCountBadge = "";
+        if (node.cr_total_count && node.cr_total_count > 0) {
+          const badgeColor = node.cr_open_count > 0 ? "cr-open" : "cr-resolved";
+          crCountBadge = `<span class="cr-badge ${badgeColor}">${node.cr_open_count}/${node.cr_total_count}</span>`;
+        }
+
+        html += `
+          <div class="smartlog-node ${isHead} ${isAncestorTop} ${hasPr} ${isActive} ${isMerged}"
+               id="node-${node.short_hash}"
+               data-hash="${node.commit_hash}"
+               onclick="selectCommit('${node.commit_hash}', event)">
+            <div class="node-header-row">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <input type="checkbox"
+                       class="commit-checkbox"
+                       value="${node.commit_hash}"
+                       onclick="event.stopPropagation(); onCommitCheckChanged(event, this);"
+                       ${isChecked ? 'checked' : ''}/>
+                <span class="node-graph-art">${escapeHtml(node.graph_art || node.graph_symbol || 'o')}</span>
+                <span class="node-sha">${escapeHtml(node.short_hash)}</span>
+                ${prBadge}
+              </div>
+              <span class="node-author-date">${escapeHtml(node.relative_date || node.date)}</span>
+            </div>
+            <div class="node-subject">${escapeHtml(node.subject)}</div>
+            <div class="node-tags-row">${tagsHtml}</div>
+            <div class="node-actions-row">
+              <button class="quake-btn quake-btn-default quake-btn-icon jump-cr-btn ${crReviewedClass}"
+                      onclick="event.stopPropagation(); jumpToCR('${node.commit_hash}')"
+                      title="Jump to Code Review for this commit">
+                <span>🔍 CR</span>
+                ${crCountBadge}
+              </button>
+              <button class="quake-btn quake-btn-default quake-btn-icon"
+                      onclick="event.stopPropagation(); createBugForCommit('${node.commit_hash}')"
+                      title="File Bug against this commit">
+                <span>🐛 Bug</span>
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      listEl.innerHTML = html;
+      updateMergedVisibility();
+      updateSelectedCount();
     }
 
     // Load Files
@@ -1950,6 +2184,32 @@
       if (state.currentDiff) {
         const diffBody = document.getElementById("diffBodyContainer");
         QuakeDiffEngine.renderDiff(diffBody, state.currentDiff, state.diffMode);
+      }
+    }
+
+    // Word Wrap Toggle (BUG-245)
+    function toggleWordWrap() {
+      const isWrapped = document.body.classList.toggle("diff-word-wrap");
+      localStorage.setItem("quake_diff_word_wrap", isWrapped ? "true" : "false");
+      updateWrapButtonState(isWrapped);
+    }
+
+    function initWordWrap() {
+      const saved = localStorage.getItem("quake_diff_word_wrap");
+      const isWrapped = saved === "true";
+      if (isWrapped) {
+        document.body.classList.add("diff-word-wrap");
+      } else {
+        document.body.classList.remove("diff-word-wrap");
+      }
+      updateWrapButtonState(isWrapped);
+    }
+
+    function updateWrapButtonState(isWrapped) {
+      const btn = document.getElementById("btnToggleWrap");
+      if (btn) {
+        btn.textContent = isWrapped ? "Wrap: On" : "Wrap: Off";
+        btn.className = isWrapped ? "quake-btn quake-btn-gold quake-btn-sm" : "quake-btn quake-btn-default quake-btn-sm";
       }
     }
 
@@ -2873,11 +3133,14 @@
         togglePane("smartlog");
       } else if (e.key === "]") {
         togglePane("files");
+      } else if (e.key.toLowerCase() === "w") {
+        toggleWordWrap();
       }
     });
 
     // Initialize on load
     window.addEventListener("DOMContentLoaded", () => {
+      initWordWrap();
       initPanelResizers();
       updateMergedVisibility();
       if (!INITIAL_SYNC_DONE) {
@@ -2885,6 +3148,7 @@
       }
       updateSelectedCount();
       loadFilesForActiveCommit();
+      startAutoSync();
     });
   </script>
 </body>

@@ -1838,11 +1838,8 @@ def test_regression_bug_209_silkscreen_readability_and_spacing() -> None:
     provider = CarrierBoardProvider()
     pcb_cfg = provider.pcb_config
 
-    # 2. Verify LAYER 1-6 RIGID-FLEX silkscreen does not collide with D2..D7 corridor (X=4.0, Y=-30..-20)
-    layer_text = next(t for t in pcb_cfg.silkscreen_texts if t.text == "LAYER 1-6 RIGID-FLEX")
-    assert layer_text.position[1] < -32.0 or layer_text.position[0] < -4.0, (
-        f"LAYER 1-6 text at {layer_text.position} overlaps D2..D7 corridor"
-    )
+    # 2. Verify LAYER 1-6 RIGID-FLEX silkscreen has been removed per CR feedback
+    assert all(t.text != "LAYER 1-6 RIGID-FLEX" for t in pcb_cfg.silkscreen_texts)
 
     # 3. Verify jumper and switch labels are horizontal (rotation == 0.0)
     for label_name in ("NRST", "BOOT0", "ISP", "VBUS", "RESET"):

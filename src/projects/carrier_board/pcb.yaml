@@ -877,7 +877,6 @@ schematic_sheets:
       CTS: left
       SWDCLK: right
       SWDIO: right
-      RESET_N: right
       GND: right
       3V3: right
     J15:
@@ -894,7 +893,6 @@ schematic_sheets:
     - CTS
     - SWDCLK
     - SWDIO
-    - RESET_N
     - GND
     - 3V3
     J15:

@@ -854,7 +854,8 @@ def test_regression_bug_188_initial_sqlite_sync_loading_modal(tmp_path: Path) ->
     assert 'id="syncProgressBar"' in tpl_text
     assert 'id="syncProgressPercent"' in tpl_text
     assert 'id="syncStatusText"' in tpl_text
-    assert 'id="btnSyncFeedback"' in tpl_text
+    assert 'id="btnSync"' in tpl_text
+    assert 'id="btnSyncFeedback"' not in tpl_text
     assert "performInitialSync" in tpl_text
     assert "INITIAL_SYNC_DONE" in tpl_text
 
@@ -2586,3 +2587,85 @@ def test_regression_bug_244_commit_subcommand_execution(tmp_path: Path, monkeypa
     main(["--commit", "Commit via top-level flag"])
     assert engine.get_head_commit_message() == "Commit via top-level flag"
     assert len(engine.get_working_tree_files()) == 0
+
+
+def test_regression_bug_245_word_wrap_in_diff_views() -> None:
+    """Verify BUG-245: Word wrap toggle button, persistence, and pre-wrap CSS in diff views."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_comp_text = (templates_dir / "diff_component.html.j2").read_text(encoding="utf-8")
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. diff_component.html.j2 has .diff-word-wrap styling with pre-wrap and overflow-wrap
+    assert ".diff-word-wrap" in diff_comp_text
+    assert "white-space: pre-wrap !important;" in diff_comp_text
+    assert (
+        "overflow-wrap: anywhere !important;" in diff_comp_text
+        or "word-break: break-word !important;" in diff_comp_text
+    )
+
+    # 2. diff_view.html.j2 has wrap button and toggle function
+    assert 'id="btnToggleWrap"' in diff_view_text
+    assert "toggleWordWrap" in diff_view_text
+    assert "quake_diff_word_wrap" in diff_view_text
+
+    # 3. code_review.html.j2 has wrap button, styles, and toggle function
+    assert 'id="btnToggleWrap"' in cr_text
+    assert ".diff-word-wrap" in cr_text
+    assert "toggleWordWrap" in cr_text
+    assert "quake_diff_word_wrap" in cr_text
+
+
+def test_regression_bug_246_auto_sync_panes() -> None:
+    """Verify BUG-246: Auto-sync polls repository changes to update working tree and commit panes automatically."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. diff_view.html.j2 implements automatic background sync
+    assert "startAutoSync" in diff_view_text
+    assert "syncWorkingAndCommitsSilently" in diff_view_text or "autoSyncTimer" in diff_view_text
+    assert "renderSmartlogList" in diff_view_text
+    assert "startAutoSync()" in diff_view_text
+
+    # 2. code_review.html.j2 implements auto-sync for commits and files
+    assert "startAutoSync" in cr_text or "autoSyncTimer" in cr_text
+
+
+def test_regression_bug_247_single_unified_sync_button() -> None:
+    """Verify BUG-247: Remove redundant Sync DB button; keep a single unified Sync button that handles both git and DB sync."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+
+    # 1. Single unified Sync button exists
+    assert 'id="btnSync"' in diff_view_text
+
+    # 2. Separate 'Sync DB' button is removed from UI
+    assert 'id="btnSyncFeedback"' not in diff_view_text
+    assert "⚡ Sync DB" not in diff_view_text
+
+
+def test_regression_bug_247_server_api_sync_unification(tmp_path: Path) -> None:
+    """Verify BUG-247: /api/sync executes both git repository fetch and feedback/bug database synchronization."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        url = f"{server.get_url()}/api/sync"
+        req = urllib.request.Request(url, data=b"{}", headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert "feedback" in data
+            assert data["feedback"]["status"] == "ok"
+            assert data["feedback"]["initial_sync_done"] is True
+    finally:
+        server.server_close()
