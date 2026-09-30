@@ -854,7 +854,8 @@ def test_regression_bug_188_initial_sqlite_sync_loading_modal(tmp_path: Path) ->
     assert 'id="syncProgressBar"' in tpl_text
     assert 'id="syncProgressPercent"' in tpl_text
     assert 'id="syncStatusText"' in tpl_text
-    assert 'id="btnSyncFeedback"' in tpl_text
+    assert 'id="btnSync"' in tpl_text
+    assert 'id="btnSyncFeedback"' not in tpl_text
     assert "performInitialSync" in tpl_text
     assert "INITIAL_SYNC_DONE" in tpl_text
 
@@ -2629,3 +2630,42 @@ def test_regression_bug_246_auto_sync_panes() -> None:
 
     # 2. code_review.html.j2 implements auto-sync for commits and files
     assert "startAutoSync" in cr_text or "autoSyncTimer" in cr_text
+
+
+def test_regression_bug_247_single_unified_sync_button() -> None:
+    """Verify BUG-247: Remove redundant Sync DB button; keep a single unified Sync button that handles both git and DB sync."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+
+    # 1. Single unified Sync button exists
+    assert 'id="btnSync"' in diff_view_text
+
+    # 2. Separate 'Sync DB' button is removed from UI
+    assert 'id="btnSyncFeedback"' not in diff_view_text
+    assert "⚡ Sync DB" not in diff_view_text
+
+
+def test_regression_bug_247_server_api_sync_unification(tmp_path: Path) -> None:
+    """Verify BUG-247: /api/sync executes both git repository fetch and feedback/bug database synchronization."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        url = f"{server.get_url()}/api/sync"
+        req = urllib.request.Request(url, data=b"{}", headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert "feedback" in data
+            assert data["feedback"]["status"] == "ok"
+            assert data["feedback"]["initial_sync_done"] is True
+    finally:
+        server.server_close()
