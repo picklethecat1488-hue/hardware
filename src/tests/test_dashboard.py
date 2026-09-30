@@ -2669,3 +2669,23 @@ def test_regression_bug_247_server_api_sync_unification(tmp_path: Path) -> None:
             assert data["feedback"]["initial_sync_done"] is True
     finally:
         server.server_close()
+
+
+def test_regression_bug_248_bug_report_sort_and_filter_menus() -> None:
+    """Verify BUG-248: Bug Report field contains sort and filter menus with session persistence."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # 1. Sort and filter UI menus present in bug list sidebar
+    assert 'id="select-bug-sort"' in tpl_text
+    assert 'id="select-filter-category"' in tpl_text
+    assert 'id="select-filter-severity"' in tpl_text
+
+    # 2. Event handlers and sorting/filtering logic
+    assert "onBugSortChanged" in tpl_text
+    assert "onFilterCategoryChanged" in tpl_text
+    assert "onFilterSeverityChanged" in tpl_text
+
+    # 3. Session persistence for filter and sorting options
+    assert "sessionStorage" in tpl_text
+    assert "bug_sort" in tpl_text
