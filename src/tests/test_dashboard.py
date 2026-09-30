@@ -2361,3 +2361,160 @@ def test_regression_bug_237_side_by_side_resizer_gripper():
     assert "moveEvent.clientX - containerRect.left" in diff_comp
     assert "containerRect = container.getBoundingClientRect()" in code_rev
     assert "moveEvent.clientX - containerRect.left" in code_rev
+
+
+def test_regression_bug_236_cr_count_persistence_and_file_watch(tmp_path: Path) -> None:
+    """Verify BUG-236: ReviewServer syncs external CR markdown files and updates smartlog counts."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+    feedback_dir = repo_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+
+    cr_sha = shas[0]
+    cr_md = feedback_dir / f"CR_{cr_sha}.md"
+    cr_content = f"""# Code Review Report: Code Review: hardware
+
+## Review Overview
+
+| Metric | Details |
+| :--- | :--- |
+| **Revisions** | `{cr_sha}` |
+| **Overall Verdict** | **`CHANGES_REQUESTED`** |
+
+## File-by-File Review Findings
+
+### [`file1.txt`](file://{repo_dir}/file1.txt)
+
+#### **[MUST FIX]** [file1.txt:L1](file://{repo_dir}/file1.txt#L1)
+<!-- comment-uuid: 11111111-2222-3333-4444-555555555555 -->
+<!-- comment-commit: {cr_sha} -->
+
+> **Reviewer**: fix this
+
+## Action Items Checklist
+
+- [ ] **[MUST FIX]** [`file1.txt:L1`](file://{repo_dir}/file1.txt#L1): fix this <!-- uuid:11111111-2222-3333-4444-555555555555 -->
+"""
+    cr_md.write_text(cr_content, encoding="utf-8")
+
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=False,
+    )
+    session = server.build_session()
+    # Check that the smartlog node received cr_total_count >= 1
+    node = next(n for n in session.smartlog_nodes if n.commit_hash == cr_sha)
+    assert node.cr_total_count >= 1
+
+
+def test_regression_bug_238_auto_rename_cr_working(tmp_path: Path) -> None:
+    """Verify BUG-238: Git commit automatically renames CR_working.md to CR_<commit_sha>.md."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+    feedback_dir = repo_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+
+    cr_working = feedback_dir / "CR_working.md"
+    cr_working.write_text(
+        """# Code Review Report: Code Review: hardware
+
+## Review Overview
+
+| Metric | Details |
+| :--- | :--- |
+| **Revisions** | `working` |
+| **Overall Verdict** | **`APPROVED`** |
+
+## Action Items Checklist
+
+- [ ] **[NIT]** [`test.txt:L1`](test.txt#L1): note <!-- uuid:aaaa0000-bbbb-cccc-dddd-eeee11112222 -->
+""",
+        encoding="utf-8",
+    )
+
+    # Modify a file and commit
+    test_file = repo_dir / "test.txt"
+    test_file.write_text("commit changes", encoding="utf-8")
+    new_sha = engine.commit_files("Auto rename test commit", file_paths=["test.txt"])
+
+    assert not cr_working.exists(), "CR_working.md should be renamed upon commit"
+    expected_cr = feedback_dir / f"CR_{new_sha}.md"
+    assert expected_cr.exists(), f"CR_{new_sha}.md should exist after commit"
+    assert new_sha in expected_cr.read_text(encoding="utf-8")
+
+
+def test_regression_bug_239_per_user_filtering(tmp_path: Path) -> None:
+    """Verify BUG-239: Per-user author queries and CLI filtering options."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    user = engine.get_current_user()
+    assert "name" in user and "email" in user
+    assert len(user["name"]) > 0
+
+    # Uncommitted modified file attributes to current user
+    test_file = repo_dir / "file1.txt"
+    test_file.write_text("modified", encoding="utf-8")
+    author = engine.get_file_author(test_file)
+    assert author["name"] == user["name"]
+
+    # Arguments parse per-user flags
+    parsed_reviews = parse_arguments(["list-reviews", "--all-users"])
+    assert parsed_reviews.all_users is True
+    parsed_bugs = parse_arguments(["list-bugs", "--user", "Alice"])
+    assert parsed_bugs.user == "Alice"
+
+
+def test_regression_bug_240_action_topic_subcommands() -> None:
+    """Verify BUG-240: CLI supports action-topic subcommands with backward compatibility for flags."""
+    # Subcommands
+    args_rev = parse_arguments(["list-reviews", "--open"])
+    assert args_rev.subcommand == "list-reviews"
+    assert args_rev.open is True
+
+    args_bugs = parse_arguments(["list-bugs", "--open", "--severity", "HIGH"])
+    assert args_bugs.subcommand == "list-bugs"
+    assert args_bugs.open is True
+    assert args_bugs.severity == "HIGH"
+
+    args_res_c = parse_arguments(["resolve-comment", "c_12345"])
+    assert args_res_c.subcommand == "resolve-comment"
+    assert args_res_c.id == "c_12345"
+
+    args_res_b = parse_arguments(["resolve-bug", "BUG-999", "--notes", "Fixed properly"])
+    assert args_res_b.subcommand == "resolve-bug"
+    assert args_res_b.id == "BUG-999"
+    assert args_res_b.notes == "Fixed properly"
+
+    # Backward compatibility flags
+    args_flag_b = parse_arguments(["--bugs", "--open"])
+    assert args_flag_b.bugs is True
+    assert args_flag_b.open is True
+
+    args_flag_r = parse_arguments(["--reviews", "--all"])
+    assert args_flag_r.reviews is True
+    assert args_flag_r.all_users is True
+
+
+def test_regression_bug_242_code_review_toolbar_layout() -> None:
+    """Verify BUG-242: Main review toolbar is placed above app-body panes across full width."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2"
+    content = template_path.read_text(encoding="utf-8")
+
+    # Invariant 1: diff-toolbar appears before app-body in template
+    toolbar_idx = content.find('<div class="diff-toolbar">')
+    app_body_idx = content.find('<div class="app-body">')
+    assert toolbar_idx != -1 and app_body_idx != -1
+    assert toolbar_idx < app_body_idx, "diff-toolbar must be placed above app-body"
+
+    # Invariant 2: Toolbar styling enforces full width and prevents horizontal scrollbar
+    toolbar_css = content.split(".diff-toolbar {")[1].split("}")[0]
+    assert "overflow-x: hidden" in toolbar_css
+    assert "width: 100%" in toolbar_css
+
+    # Invariant 3: Toggle controls are in the toolbar
+    assert "btnToggleCommits" in content
+    assert "btnToggleFiles" in content
+    assert "btnFocus" in content

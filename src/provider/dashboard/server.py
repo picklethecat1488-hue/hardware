@@ -904,9 +904,20 @@ class DashboardServer(ThreadingHTTPServer):
                     )
             node.bug_tags = tags
 
+        # Ensure file watcher syncs any newly placed or edited CR feedback files (BUG-236)
+        if hasattr(self, "review_server") and self.review_server:
+            try:
+                self.review_server.check_file_watch()
+            except Exception:
+                pass
+
         # Load Code Review stats for commits (BUG-199)
         cr_stats: dict[str, dict[str, Any]] = {}
-        cr_db_path = self.repo_root / "build" / "code_review.sqlite"
+        cr_db_path = (
+            self.review_server.sqlite_file
+            if hasattr(self, "review_server") and self.review_server
+            else (self.repo_root / "build" / "code_review.sqlite")
+        )
         if cr_db_path.exists():
             import sqlite3
 

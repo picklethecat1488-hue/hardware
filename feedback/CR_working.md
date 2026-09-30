@@ -90,91 +90,91 @@ created_prs = self.create_prs_for_commits(commit_hashes)
 
 ```python
 def create_prs_for_commits(self, commit_hashes: List[str]) -> List[Dict[str, Any]]:
-        """Create a PR for each selected commit and preserve commit ancestors information.
+    """Create a PR for each selected commit and preserve commit ancestors information.
 
-        Validates that none of the selected commits already have an associated PR.
-        Topologically sorts commits so ancestors are created before descendants,
-        setting each commit's PR base to its parent's PR branch (or repository default).
-        """
-        if not commit_hashes:
-            raise ValueError("No commits provided for PR creation")
+    Validates that none of the selected commits already have an associated PR.
+    Topologically sorts commits so ancestors are created before descendants,
+    setting each commit's PR base to its parent's PR branch (or repository default).
+    """
+    if not commit_hashes:
+        raise ValueError("No commits provided for PR creation")
 
-        # 1. Fetch current smartlog / commit info to validate existing PR associations
-        nodes = self.get_smartlog_dag(limit=100)
-        node_map = {n.commit_hash: n for n in nodes}
+    # 1. Fetch current smartlog / commit info to validate existing PR associations
+    nodes = self.get_smartlog_dag(limit=100)
+    node_map = {n.commit_hash: n for n in nodes}
 
-        curr_branch = self.get_current_branch() or "main"
+    curr_branch = self.get_current_branch() or "main"
 
-        # Validate that no selected commit is already merged or already has an associated PR
-        for c in commit_hashes:
-            node = node_map.get(c)
-            if node and (node.is_merged_into_tracking or node.is_merged):
-                raise ValueError(f"Commit {c[:8]} is already merged into the tracking branch ({curr_branch})")
-            if node and node.pr_number:
-                raise ValueError(f"Commit {c[:8]} already has an associated PR (#{node.pr_number})")
+    # Validate that no selected commit is already merged or already has an associated PR
+    for c in commit_hashes:
+        node = node_map.get(c)
+        if node and (node.is_merged_into_tracking or node.is_merged):
+            raise ValueError(f"Commit {c[:8]} is already merged into the tracking branch ({curr_branch})")
+        if node and node.pr_number:
+            raise ValueError(f"Commit {c[:8]} already has an associated PR (#{node.pr_number})")
 
-            try:
-                branches_out = run_git_command(["branch", "-a", "--points-at", c], cwd=self.repo_root)
-                for b in branches_out.splitlines():
-                    clean_b = b.replace("*", "").strip()
-                    m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", clean_b, re.IGNORECASE)
-                    if m:
-                        raise ValueError(f"Commit {c[:8]} already has an associated PR (#{m.group(1)})")
-            except RuntimeError:
-                pass
-
-        # 2. Sort selected commits in topological order (ancestor before descendant)
         try:
-            topo_order = run_git_command(
-                ["rev-list", "--topo-order", "--reverse"] + commit_hashes,
-                cwd=self.repo_root,
-            ).splitlines()
-            sorted_commits = [c for c in topo_order if c in commit_hashes]
+            branches_out = run_git_command(["branch", "-a", "--points-at", c], cwd=self.repo_root)
+            for b in branches_out.splitlines():
+                clean_b = b.replace("*", "").strip()
+                m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", clean_b, re.IGNORECASE)
+                if m:
+                    raise ValueError(f"Commit {c[:8]} already has an associated PR (#{m.group(1)})")
         except RuntimeError:
-            sorted_commits = list(commit_hashes)
+            pass
 
-        for c in commit_hashes:
-            if c not in sorted_commits:
-                sorted_commits.append(c)
+    # 2. Sort selected commits in topological order (ancestor before descendant)
+    try:
+        topo_order = run_git_command(
+            ["rev-list", "--topo-order", "--reverse"] + commit_hashes,
+            cwd=self.repo_root,
+        ).splitlines()
+        sorted_commits = [c for c in topo_order if c in commit_hashes]
+    except RuntimeError:
+        sorted_commits = list(commit_hashes)
 
-        created_prs: List[Dict[str, Any]] = []
-        commit_to_pr_branch: Dict[str, str] = {}
-        curr_branch = self.get_current_branch() or "main"
+    for c in commit_hashes:
+        if c not in sorted_commits:
+            sorted_commits.append(c)
 
-        for c in sorted_commits:
-            try:
-                parents = run_git_command(["log", "-1", "--format=%P", c], cwd=self.repo_root).split()
-            except RuntimeError:
-                parents = []
+    created_prs: List[Dict[str, Any]] = []
+    commit_to_pr_branch: Dict[str, str] = {}
+    curr_branch = self.get_current_branch() or "main"
 
-            base_branch = curr_branch
-            if parents:
-                parent_sha = parents[0]
-                if parent_sha in commit_to_pr_branch:
-                    base_branch = commit_to_pr_branch[parent_sha]
-                else:
-                    parent_node = node_map.get(parent_sha)
-                    if parent_node and parent_node.pr_number:
-                        base_branch = f"pr{parent_node.pr_number}"
+    for c in sorted_commits:
+        try:
+            parents = run_git_command(["log", "-1", "--format=%P", c], cwd=self.repo_root).split()
+        except RuntimeError:
+            parents = []
 
-            pr_num = self.get_next_pr_number()
-            branch_name = f"pr{pr_num}"
+        base_branch = curr_branch
+        if parents:
+            parent_sha = parents[0]
+            if parent_sha in commit_to_pr_branch:
+                base_branch = commit_to_pr_branch[parent_sha]
+            else:
+                parent_node = node_map.get(parent_sha)
+                if parent_node and parent_node.pr_number:
+                    base_branch = f"pr{parent_node.pr_number}"
 
-            run_git_command(["branch", branch_name, c], cwd=self.repo_root)
-            commit_to_pr_branch[c] = branch_name
+        pr_num = self.get_next_pr_number()
+        branch_name = f"pr{pr_num}"
 
-            pr_url = self.get_pr_url(pr_num)
-            created_prs.append(
-                {
-                    "commit": c,
-                    "pr_number": pr_num,
-                    "branch": branch_name,
-                    "base_branch": base_branch,
-                    "pr_url": pr_url,
-                }
-            )
+        run_git_command(["branch", branch_name, c], cwd=self.repo_root)
+        commit_to_pr_branch[c] = branch_name
 
-        return created_prs
+        pr_url = self.get_pr_url(pr_num)
+        created_prs.append(
+            {
+                "commit": c,
+                "pr_number": pr_num,
+                "branch": branch_name,
+                "base_branch": base_branch,
+                "pr_url": pr_url,
+            }
+        )
+
+    return created_prs
 ```
 
 > **Reviewer (Reviewer)**: delete this

@@ -522,15 +522,17 @@
       border-bottom: 2px solid var(--quake-border-mid);
       display: flex;
       flex-wrap: nowrap;
-      overflow-x: auto;
+      overflow-x: hidden;
       overflow-y: hidden;
       white-space: nowrap;
-      scrollbar-width: thin;
       align-items: center;
       justify-content: space-between;
       padding: 4px 12px;
       flex-shrink: 0;
       gap: 12px;
+      width: 100%;
+      box-sizing: border-box;
+      z-index: 10;
     }
     .diff-toolbar-left,
     .diff-toolbar-center,
@@ -587,11 +589,12 @@
     .sbs-table {
       width: 100%;
       min-width: max-content;
+      table-layout: fixed;
       border-collapse: collapse;
     }
     .sbs-table col.col-lineno { width: 44px; min-width: 44px; }
     .sbs-table col.col-marker { width: 22px; min-width: 22px; }
-    .sbs-table col.col-code { width: 50%; min-width: 380px; max-width: 1200px; }
+    .sbs-table col.col-code { width: 50%; }
     .sbs-table th {
       background: #170f09;
       color: var(--quake-text-muted);
@@ -1336,11 +1339,56 @@
     </div>
   </header>
 
+  <!-- Main Toolbar across entire workstation (BUG-242) -->
+  {% set single_commit = session.revisions and session.revisions | length == 1 %}
+  <div class="diff-toolbar">
+    <div class="diff-toolbar-left">
+      <div style="display: flex; gap: 4px; flex-shrink: 0;">
+        <button id="btnToggleCommits" class="quake-btn quake-btn-default{% if not single_commit %} quake-btn-active{% endif %}" onclick="togglePane('commits')">📜 Stream</button>
+        <button id="btnToggleFiles" class="quake-btn quake-btn-default" onclick="togglePane('files')">📁 Files</button>
+        <button id="btnFocus" class="quake-btn quake-btn-default" onclick="toggleFocusMode()" title="Focus Mode (Shortcut: \)">⛶ Focus</button>
+      </div>
+      <span id="activeFilePath" class="active-file-label" title="Active File">Select a file</span>
+      <div id="activeFileActions" style="display:none;align-items:center;gap:6px;flex-shrink:0;">
+        <button class="quake-btn quake-btn-default quake-btn-xs" onclick="copyActiveFilePath()" title="Copy file path">📋</button>
+        <a id="btnOpenVsCode" class="quake-btn quake-btn-default quake-btn-xs" onclick="openInVsCode()" title="Open in VS Code" style="text-decoration:none;cursor:pointer;">💻</a>
+      </div>
+      <span id="activeFileLfs" class="quake-badge quake-badge-lfs" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;">📦 LFS</span>
+      <span id="activeFileLang" class="quake-badge quake-badge-cyan" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;"></span>
+      <span id="selectionLabel" class="selection-label" style="display:none;"></span>
+    </div>
+
+    <div class="diff-toolbar-center">
+      <button id="btnPrevChange" class="quake-btn quake-btn-default" onclick="navigateChange(-1)" title="Previous Change (CLI: prev change / pc, Shortcut: K)">◀ Prev</button>
+      <button id="btnNextChange" class="quake-btn quake-btn-default" onclick="navigateChange(1)" title="Next Change (CLI: next change / nc, Shortcut: J)">Next ▶</button>
+      <span style="border-left: 1px solid var(--quake-border); margin: 0 4px; height: 16px; align-self: center;"></span>
+      <button id="btnModeSbs" class="quake-btn quake-btn-default quake-btn-active" onclick="setDiffMode('side_by_side')" title="Side-by-Side View (Shortcut: S)">Split</button>
+      <button id="btnModeUnified" class="quake-btn quake-btn-default" onclick="setDiffMode('unified')" title="Unified View (Shortcut: U)">Unified</button>
+      <button id="btnModeFull" class="quake-btn quake-btn-default" onclick="setDiffMode('full_file')" title="Full File (Shortcut: F)">Full</button>
+    </div>
+
+    <div class="diff-toolbar-right">
+      <input id="codeSearchInput" class="quake-input" style="width: 125px; font-size: 11px; padding: 3px 6px; background: #130a05; border: 1px solid var(--quake-border-mid); color: var(--quake-text-light);" placeholder="🔍 Search... (Enter)" onkeydown="if (event.key === 'Enter') executeCodeSearch()">
+      <button class="quake-btn quake-btn-default" onclick="executeCodeSearch()" title="Search code/symbol references">Find</button>
+      <button class="quake-btn quake-btn-default" onclick="copyFilePath()" title="Copy file path">📋 Copy</button>
+      <button class="quake-btn quake-btn-default" onclick="loadDiff()" title="Reload Diff">🔄</button>
+    </div>
+  </div>
+
+  <div id="codeSearchResultsModal" class="quake-modal-backdrop" style="display:none;" onclick="if(event.target===this)closeCodeSearchModal()">
+    <div class="quake-card" style="width: 720px; max-height: 80vh; margin: 40px auto; padding: 14px; display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--quake-border-light); padding-bottom: 8px; margin-bottom: 10px;">
+        <span style="color: var(--quake-gold); font-weight: bold; font-size: 12px;" id="codeSearchTitle">Code Search Results</span>
+        <button class="quake-btn quake-btn-red" style="padding: 2px 6px;" onclick="closeCodeSearchModal()">✕ Close</button>
+      </div>
+      <div id="codeSearchResultsList" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px;"></div>
+    </div>
+  </div>
+
   <!-- 3-Column Middle Body -->
   <div class="app-body">
 
     <!-- Pane 1: Commits Timeline -->
-    {% set single_commit = session.revisions and session.revisions | length == 1 %}
     <aside id="paneCommits" class="pane-commits{% if single_commit %} collapsed{% endif %}">
       <div class="pane-header">
         <div class="pane-title-row">
@@ -1376,50 +1424,6 @@
 
     <!-- Pane 3: Diff Viewer & Inspector -->
     <main class="pane-diff">
-      <div class="diff-toolbar">
-        <div class="diff-toolbar-left">
-          <div style="display: flex; gap: 4px; flex-shrink: 0;">
-            <button id="btnToggleCommits" class="quake-btn quake-btn-default{% if not single_commit %} quake-btn-active{% endif %}" onclick="togglePane('commits')">📜 Stream</button>
-            <button id="btnToggleFiles" class="quake-btn quake-btn-default" onclick="togglePane('files')">📁 Files</button>
-            <button id="btnFocus" class="quake-btn quake-btn-default" onclick="toggleFocusMode()" title="Focus Mode (Shortcut: \)">⛶ Focus</button>
-          </div>
-          <span id="activeFilePath" class="active-file-label" title="Active File">Select a file</span>
-          <div id="activeFileActions" style="display:none;align-items:center;gap:6px;flex-shrink:0;">
-            <button class="quake-btn quake-btn-default quake-btn-xs" onclick="copyActiveFilePath()" title="Copy file path">📋</button>
-            <a id="btnOpenVsCode" class="quake-btn quake-btn-default quake-btn-xs" onclick="openInVsCode()" title="Open in VS Code" style="text-decoration:none;cursor:pointer;">💻</a>
-          </div>
-          <span id="activeFileLfs" class="quake-badge quake-badge-lfs" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;">📦 LFS</span>
-          <span id="activeFileLang" class="quake-badge quake-badge-cyan" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;"></span>
-          <span id="selectionLabel" class="selection-label" style="display:none;"></span>
-        </div>
-
-        <div class="diff-toolbar-center">
-          <button id="btnPrevChange" class="quake-btn quake-btn-default" onclick="navigateChange(-1)" title="Previous Change (CLI: prev change / pc, Shortcut: K)">◀ Prev</button>
-          <button id="btnNextChange" class="quake-btn quake-btn-default" onclick="navigateChange(1)" title="Next Change (CLI: next change / nc, Shortcut: J)">Next ▶</button>
-          <span style="border-left: 1px solid var(--quake-border); margin: 0 4px; height: 16px; align-self: center;"></span>
-          <button id="btnModeSbs" class="quake-btn quake-btn-default quake-btn-active" onclick="setDiffMode('side_by_side')" title="Side-by-Side View (Shortcut: S)">Split</button>
-          <button id="btnModeUnified" class="quake-btn quake-btn-default" onclick="setDiffMode('unified')" title="Unified View (Shortcut: U)">Unified</button>
-          <button id="btnModeFull" class="quake-btn quake-btn-default" onclick="setDiffMode('full_file')" title="Full File (Shortcut: F)">Full</button>
-        </div>
-
-        <div class="diff-toolbar-right">
-          <input id="codeSearchInput" class="quake-input" style="width: 125px; font-size: 11px; padding: 3px 6px; background: #130a05; border: 1px solid var(--quake-border-mid); color: var(--quake-text-light);" placeholder="🔍 Search... (Enter)" onkeydown="if (event.key === 'Enter') executeCodeSearch()">
-          <button class="quake-btn quake-btn-default" onclick="executeCodeSearch()" title="Search code/symbol references">Find</button>
-          <button class="quake-btn quake-btn-default" onclick="copyFilePath()" title="Copy file path">📋 Copy</button>
-          <button class="quake-btn quake-btn-default" onclick="loadDiff()" title="Reload Diff">🔄</button>
-        </div>
-      </div>
-
-      <div id="codeSearchResultsModal" class="quake-modal-backdrop" style="display:none;" onclick="if(event.target===this)closeCodeSearchModal()">
-        <div class="quake-card" style="width: 720px; max-height: 80vh; margin: 40px auto; padding: 14px; display: flex; flex-direction: column;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--quake-border-light); padding-bottom: 8px; margin-bottom: 10px;">
-            <span style="color: var(--quake-gold); font-weight: bold; font-size: 12px;" id="codeSearchTitle">Code Search Results</span>
-            <button class="quake-btn quake-btn-red" style="padding: 2px 6px;" onclick="closeCodeSearchModal()">✕ Close</button>
-          </div>
-          <div id="codeSearchResultsList" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px;"></div>
-        </div>
-      </div>
-
       <div id="diffContent" class="diff-container">
         <div style="padding: 40px; text-align: center; color: var(--quake-text-dim);">
           Select a file from the changed files list to inspect its diff and start code review.
@@ -2188,8 +2192,12 @@
       let html = `
         <table class="sbs-table">
           <colgroup>
-            <col class="col-lineno"><col class="col-marker"><col class="col-code col-old-code" style="width: 50%;">
-            <col class="col-lineno"><col class="col-marker"><col class="col-code col-new-code" style="width: 50%;">
+            <col class="col-lineno" style="width: 44px; min-width: 44px;">
+            <col class="col-marker" style="width: 22px; min-width: 22px;">
+            <col class="col-code col-old-code" style="width: 50%;">
+            <col class="col-lineno" style="width: 44px; min-width: 44px;">
+            <col class="col-marker" style="width: 22px; min-width: 22px;">
+            <col class="col-code col-new-code" style="width: 50%;">
           </colgroup>
           <thead>
             <tr>
@@ -2538,8 +2546,10 @@
     function setupSbsResizer(table, storageKey = "cr_sbs_split_ratio") {
       if (!table) return;
       const resizer = table.querySelector(".sbs-split-resizer");
-      if (!resizer) return;
       const applyRatio = (ratio) => {
+        table.style.width = "100%";
+        table.style.minWidth = "100%";
+        table.style.tableLayout = "fixed";
         const pctOld = (ratio * 100).toFixed(1);
         const pctNew = ((1 - ratio) * 100).toFixed(1);
         const oldCol = table.querySelector("col.col-old-code");
@@ -2597,12 +2607,41 @@
       if (resizer) {
         resizer.addEventListener("mousedown", startDrag);
       }
+      table.addEventListener("mousemove", (e) => {
+        if (table.classList.contains("resizing-sbs")) return;
+        const td = e.target.closest("td.old-code, th.th-old");
+        if (td) {
+          const rect = td.getBoundingClientRect();
+          if (rect.right - e.clientX <= 8 && rect.right - e.clientX >= -4) {
+            table.style.cursor = "col-resize";
+            return;
+          }
+        }
+        const newTd = e.target.closest("td.new-lineno, th.th-new");
+        if (newTd) {
+          const rect = newTd.getBoundingClientRect();
+          if (e.clientX - rect.left <= 8 && e.clientX - rect.left >= -4) {
+            table.style.cursor = "col-resize";
+            return;
+          }
+        }
+        table.style.cursor = "";
+      });
       table.addEventListener("mousedown", (e) => {
         const td = e.target.closest("td.old-code, th.th-old");
         if (td) {
           const rect = td.getBoundingClientRect();
           if (rect.right - e.clientX <= 8 && rect.right - e.clientX >= -4) {
             startDrag(e);
+            return;
+          }
+        }
+        const newTd = e.target.closest("td.new-lineno, th.th-new");
+        if (newTd) {
+          const rect = newTd.getBoundingClientRect();
+          if (e.clientX - rect.left <= 8 && e.clientX - rect.left >= -4) {
+            startDrag(e);
+            return;
           }
         }
       });

@@ -14,7 +14,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 from model.vcs import (
     BranchInfoModel,
@@ -482,6 +482,61 @@ class GitEngine:
             commits.append(working_info)
 
         return commits
+
+    def get_current_user(self) -> Dict[str, str]:
+        """Return the configured Git user name and email."""
+        name = ""
+        email = ""
+        try:
+            name = run_git_command(["config", "user.name"], cwd=self.repo_root).strip()
+            email = run_git_command(["config", "user.email"], cwd=self.repo_root).strip()
+        except RuntimeError:
+            pass
+        return {"name": name, "email": email}
+
+    def get_commit_author(self, commit_hash: str) -> Dict[str, str]:
+        """Get the author name and email of a specific commit."""
+        if not commit_hash or commit_hash == "working":
+            return self.get_current_user()
+        try:
+            out = run_git_command(["log", "-1", "--format=%an\t%ae", commit_hash], cwd=self.repo_root).strip()
+            if out and "\t" in out:
+                an, ae = out.split("\t", 1)
+                return {"name": an.strip(), "email": ae.strip()}
+        except RuntimeError:
+            pass
+        return self.get_current_user()
+
+    def get_file_author(self, file_path: Union[str, Path]) -> Dict[str, str]:
+        """Get author name and email of the commit that last modified or added a file.
+
+        If the file has unstaged or staged working tree modifications, or is untracked,
+        it is attributed to the current Git user.
+        """
+        curr_user = self.get_current_user()
+        p = Path(file_path)
+        try:
+            rel_path = (
+                str(p.relative_to(self.repo_root)) if p.is_absolute() and p.is_relative_to(self.repo_root) else str(p)
+            )
+        except ValueError:
+            rel_path = str(p)
+
+        try:
+            status_out = run_git_command(["status", "--porcelain", "--", rel_path], cwd=self.repo_root).strip()
+            if status_out:
+                return curr_user
+        except RuntimeError:
+            pass
+
+        try:
+            out = run_git_command(["log", "-1", "--format=%an\t%ae", "--", rel_path], cwd=self.repo_root).strip()
+            if out and "\t" in out:
+                an, ae = out.split("\t", 1)
+                return {"name": an.strip(), "email": ae.strip()}
+        except RuntimeError:
+            pass
+        return curr_user
 
     def get_smartlog_dag(self, limit: int = 50, branch: Optional[str] = None) -> List[CommitNodeModel]:
         """Build topological smartlog DAG tree with ancestor columns, branch glyphs, and bug tags.
@@ -1911,7 +1966,21 @@ class GitEngine:
             cmd.append("--amend")
         cmd.extend(["-m", message])
         run_git_command(cmd, cwd=self.repo_root)
-        return self.get_head_commit()
+        head_commit = self.get_head_commit()
+
+        # Requirement BUG-238: Auto-rename CR_working.md to CR_<commit_sha>.md
+        cr_working = self.repo_root / "feedback" / "CR_working.md"
+        if cr_working.exists():
+            cr_target = self.repo_root / "feedback" / f"CR_{head_commit}.md"
+            try:
+                txt = cr_working.read_text(encoding="utf-8")
+                txt = txt.replace("working", head_commit)
+                cr_target.write_text(txt, encoding="utf-8")
+                cr_working.unlink()
+            except OSError:
+                pass
+
+        return head_commit
 
     # Commit manipulation: split and combine
 
