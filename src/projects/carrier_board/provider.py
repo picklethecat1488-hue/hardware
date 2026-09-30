@@ -715,8 +715,6 @@ class CarrierBoardProvider(Provider):
                     Polygon((1.8, -1.8), (0, 0), (-0.5, -0.5), (1.3, -2.3))
                     Polygon((0, 0), (-1.8, 1.8), (-1.3, 2.3), (0.5, 0.5))
                     Polygon((0, 0), (-1.8, -1.8), (-1.3, -2.3), (0.5, -0.5))
-                with Locations((ble_x, ble_y - 5.2)):
-                    Text("BLUETOOTH", font_size=1.4)
             extrude(s_bt_logo.sketch, amount=-ble_depth, mode=BuildMode.SUBTRACT)
 
         RigidJoint("led_port", lid.part, Location((led_x, led_y, wall)))
@@ -1063,10 +1061,10 @@ class CarrierBoardProvider(Provider):
                     "BOTTOM SHIELD / GROUND REF", layer="B.SilkS", font_size=1.0, thickness=0.15, mirror=True
                 )
 
-            # BUG-183, BUG-209, BUG-219: Silkscreen labels for Status and Overrides
-            with Locations((10.5, -32.8)):
+            # BUG-183, BUG-209, BUG-219, BUG-231: Silkscreen labels for Status and Overrides
+            with Locations((10.5, -19.0)):
                 SilkscreenText("OVERRIDES", layer="F.SilkS", font_size=0.75, thickness=0.11)
-            with Locations((4.5, -32.8)):
+            with Locations((4.5, -18.5)):
                 SilkscreenText("STATUS", layer="F.SilkS", font_size=0.75, thickness=0.11)
             # Reset button label close to U1 central (0, 0) and SW1 (0, -11) (BUG-219)
             with Locations((0.0, -9.2)):
@@ -1091,7 +1089,7 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText("3V3", layer="F.SilkS", font_size=0.55, thickness=0.08)
             with Locations((1.6, -28.0)):
                 SilkscreenText("VBUS", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -30.0)):
+            with Locations((1.6, -30.8)):
                 SilkscreenText("VBAT", layer="F.SilkS", font_size=0.55, thickness=0.08)
 
             # Component designators for Sheet 17 hardening parts on bottom silkscreen to prevent clutter
@@ -1145,8 +1143,12 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText("U1", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((18.0, -11.5)):
                 SilkscreenText("U2", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
-            with Locations((0.0, -32.5)):
+            with Locations((0.0, -27.2)):
                 SilkscreenText("U11", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((-14.5, -39.0)):
+                SilkscreenText("J15", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-14.5, -43.0)):
+                SilkscreenText("BLE SWD", layer="F.SilkS", font_size=0.6, thickness=0.09)
             with Locations((0.0, 35.5)):
                 SilkscreenText("J2", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((-17.5, 0.0)):

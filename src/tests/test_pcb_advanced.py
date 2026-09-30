@@ -1726,11 +1726,11 @@ def test_regression_deep_power_down_wakeup_and_power_sequencing() -> None:
     assert report_path.is_file(), "Downselection report must exist locally"
     content = report_path.read_text(encoding="utf-8")
 
-    # 1. BUG-060: Verify Deep Power Down wakeup triggers (Charger interface and M.2 connector)
+    # 1. BUG-060 / BUG-214: Verify Deep Power Down wakeup triggers (Charger interface and BTLE wireless subsystem)
     assert "WAKEUP0_B" in content
     assert "WAKEUP1_B" in content
     assert "CHG_PGOOD_WAKE" in content
-    assert "M2_WAKE_N" in content
+    assert "BLE_WAKE_N" in content
     assert "Exit Deep Power Down" in content
 
     # 2. BUG-061: Verify all required power-on sequencing steps
@@ -1834,7 +1834,7 @@ def test_regression_pinmux_datasheet_verification() -> None:
     # 7. Verify Wakeup and Switched Power Rails
     assert "G5" in content and "P1_19" in content and "WUU0_IN15" in content and "CHG_STAT" in content
     assert "M10" in content and "P5_2" in content and "CHG_PGOOD_WAKE" in content
-    assert "C13" in content and "P0_7" in content and "WUU0_IN1" in content and "M2_WAKE_N" in content
+    assert "C13" in content and "P0_7" in content and "WUU0_IN1" in content and "BLE_WAKE_N" in content
     assert "L4" in content and "P1_22" in content and "PWR_EN_AUDIO" in content
     assert "L5" in content and "P1_21" in content and "PWR_EN_SENSORS" in content
     assert "M4" in content and "P1_23" in content and "PWR_EN_DEBUG" in content
@@ -1922,18 +1922,17 @@ def test_regression_enclosure_cad_feedback_and_assembly() -> None:
 
 @pytest.mark.slow
 def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
-    """Verify BUG-065 (M.2 cutout in bottom enclosure) and BUG-066 (component silkscreens on carrier)."""
+    """Verify BUG-214/BUG-222 (bottom enclosure build without M.2) and BUG-066 (component silkscreens on carrier)."""
     provider = CarrierBoardProvider()
 
-    # 1. BUG-065: Verify M.2 cutout settings and bottom enclosure build
-    assert provider.settings.enclosure_m2_cutout_width == 24.0
-    assert provider.settings.enclosure_m2_cutout_height == 5.0
+    # 1. BUG-214/BUG-222: Verify bottom enclosure build with M.2 removed in favor of U11 BTLE
     bottom = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     assert bottom is not None and bottom.part is not None
 
-    # 2. BUG-066: Verify all component reference designators are present in silkscreen
+    # 2. BUG-066 / BUG-214: Verify all component reference designators are present in silkscreen
     silks = provider.silkscreen()
     silk_texts = {t.text for t in silks}
+    assert "J1" not in silk_texts, "Legacy M.2 connector J1 must not be present in silkscreen"
     expected_components = (
         ["U1", "U2", "U11", "J2", "J3", "Q1", "U3", "U4", "SPK1", "Y1"]
         + [f"R{i}" for i in range(1, 7)]

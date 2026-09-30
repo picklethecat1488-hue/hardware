@@ -184,21 +184,6 @@ class CarrierBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_lip_height"])
 
     @property
-    def enclosure_m2_cutout_width(self) -> float:
-        """Width of M.2 connector cutout on enclosure rear wall in mm."""
-        return float(self._raw_data["enclosure_m2_cutout_width"])
-
-    @property
-    def enclosure_m2_cutout_height(self) -> float:
-        """Height of M.2 connector cutout on enclosure rear wall in mm."""
-        return float(self._raw_data["enclosure_m2_cutout_height"])
-
-    @property
-    def enclosure_m2_cutout_length(self) -> float:
-        """Length of M.2 connector floor pass-through cutout along Y in mm."""
-        return float(self._raw_data["enclosure_m2_cutout_length"])
-
-    @property
     def enclosure_gpio_cutout_width(self) -> float:
         """Width of GPIO header cutout in enclosure lid in mm."""
         return float(self._raw_data["enclosure_gpio_cutout_width"])

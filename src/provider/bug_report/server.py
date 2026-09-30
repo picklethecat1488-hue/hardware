@@ -45,6 +45,14 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
 
+        if path.startswith("/static/"):
+            self._handle_serve_static(path)
+            return
+
+        if path in ("/favicon.ico", "/favicon.svg"):
+            self._handle_serve_static("/static/favicon.svg")
+            return
+
         if path.startswith("/attachments/") or path.startswith("/build/attachments/"):
             self._handle_serve_attachment(path)
             return
@@ -354,6 +362,27 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
                 except ValueError:
                     pass
         return f"BUG-{max_idx + 1:03d}"
+
+    def _handle_serve_static(self, path: str) -> None:
+        """Serve static assets such as favicon and vendor bundles."""
+        static_dir = Path(__file__).resolve().parent.parent / "code_review" / "static"
+        filename = path.removeprefix("/static/").strip("/")
+        file_target = (static_dir / filename).resolve()
+        if not str(file_target).startswith(str(static_dir)) or not file_target.is_file():
+            self.send_error(404, "Static asset not found")
+            return
+        content_type = (
+            "image/svg+xml"
+            if file_target.suffix == ".svg"
+            else ("application/javascript" if file_target.suffix == ".js" else "text/plain")
+        )
+        data = file_target.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(data)
 
     def _send_json(self, data: Any, status: int = 200) -> None:
         """Send JSON HTTP response payload."""

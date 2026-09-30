@@ -497,6 +497,7 @@ class GitEngine:
         target_ref = branch or "HEAD"
 
         # Determine ancestor branch (e.g. main/master) and merge-base (BUG-213)
+        current_local_ref = f"refs/heads/{self.get_current_branch()}" if self.get_current_branch() else None
         ancestor_name: Optional[str] = None
         ancestor_merge_base: Optional[str] = None
         for candidate_ref, cand_name in [
@@ -505,6 +506,8 @@ class GitEngine:
             ("refs/remotes/origin/master", "master"),
             ("refs/heads/master", "master"),
         ]:
+            if candidate_ref == current_local_ref:
+                continue
             try:
                 run_git_command(["rev-parse", "--verify", candidate_ref], cwd=self.repo_root)
                 mb = run_git_command(["merge-base", target_ref, candidate_ref], cwd=self.repo_root).strip()
@@ -536,15 +539,6 @@ class GitEngine:
             if c_cand != current_local_ref and c_cand not in tracking_candidates:
                 tracking_candidates.append(c_cand)
 
-        active_tracking_ref = None
-        for t_ref in tracking_candidates:
-            try:
-                run_git_command(["rev-parse", "--verify", t_ref], cwd=self.repo_root)
-                active_tracking_ref = t_ref
-                break
-            except RuntimeError:
-                continue
-
         # Check if target is a topic branch diverging from ancestor
         target_hash = head_hash if target_ref == "HEAD" else None
         if not target_hash:
@@ -553,16 +547,28 @@ class GitEngine:
             except RuntimeError:
                 target_hash = ""
 
-        is_topic_branch = bool(ancestor_merge_base and target_hash != ancestor_merge_base)
+        curr_br = self.get_current_branch()
+        is_topic_branch = bool(
+            ancestor_merge_base and (curr_br not in ("main", "master") or target_hash != ancestor_merge_base)
+        )
 
         merged_commit_hashes: set[str] = set()
-        if active_tracking_ref:
+        for t_ref in tracking_candidates:
             try:
-                out = run_git_command(["rev-list", f"-n{max(limit * 2, 200)}", active_tracking_ref], cwd=self.repo_root)
-                merged_commit_hashes = set(out.splitlines())
+                run_git_command(["rev-parse", "--verify", t_ref], cwd=self.repo_root)
+                out = run_git_command(["rev-list", f"-n{max(limit * 2, 500)}", t_ref], cwd=self.repo_root)
+                merged_commit_hashes.update(out.splitlines())
             except RuntimeError:
                 pass
-        if ancestor_merge_base and is_topic_branch:
+
+        if ancestor_merge_base:
+            try:
+                out_anc = run_git_command(
+                    ["rev-list", f"-n{max(limit * 2, 500)}", ancestor_merge_base], cwd=self.repo_root
+                )
+                merged_commit_hashes.update(out_anc.splitlines())
+            except RuntimeError:
+                pass
             merged_commit_hashes.add(ancestor_merge_base)
 
         fmt = "%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%ar%x1f%s%x1f%D%x1f%b%x1e"
@@ -902,110 +908,46 @@ class GitEngine:
 
         return None, None, None
 
-    def get_next_pr_number(self) -> int:
-        """Determine next available PR number based on existing local and remote PR branches and tags."""
-        existing: List[int] = []
-        try:
-            output = run_git_command(["branch", "-a"], cwd=self.repo_root)
-            for line in output.splitlines():
-                m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", line.strip(), re.IGNORECASE)
-                if m:
-                    existing.append(int(m.group(1)))
-            tag_out = run_git_command(["tag", "-l"], cwd=self.repo_root)
-            for line in tag_out.splitlines():
-                m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", line.strip(), re.IGNORECASE)
-                if m:
-                    existing.append(int(m.group(1)))
-        except RuntimeError:
-            pass
-        return max(existing, default=534) + 1
+    def submit_prs(self) -> Dict[str, Any]:
+        """Submit pull request stack to GitHub using Sapling ('sl pr submit').
 
-    def create_prs_for_commits(self, commit_hashes: List[str]) -> List[Dict[str, Any]]:
-        """Create a PR for each selected commit and preserve commit ancestors information.
-
-        Validates that none of the selected commits already have an associated PR.
-        Topologically sorts commits so ancestors are created before descendants,
-        setting each commit's PR base to its parent's PR branch (or repository default).
+        Submits PR stack for the current commit and all ancestor commits.
         """
-        if not commit_hashes:
-            raise ValueError("No commits provided for PR creation")
-
-        # 1. Fetch current smartlog / commit info to validate existing PR associations
-        nodes = self.get_smartlog_dag(limit=100)
-        node_map = {n.commit_hash: n for n in nodes}
-
-        curr_branch = self.get_current_branch() or "main"
-
-        # Validate that no selected commit is already merged or already has an associated PR
-        for c in commit_hashes:
-            node = node_map.get(c)
-            if node and (node.is_merged_into_tracking or node.is_merged):
-                raise ValueError(f"Commit {c[:8]} is already merged into the tracking branch ({curr_branch})")
-            if node and node.pr_number:
-                raise ValueError(f"Commit {c[:8]} already has an associated PR (#{node.pr_number})")
-
-            try:
-                branches_out = run_git_command(["branch", "-a", "--points-at", c], cwd=self.repo_root)
-                for b in branches_out.splitlines():
-                    clean_b = b.replace("*", "").strip()
-                    m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", clean_b, re.IGNORECASE)
-                    if m:
-                        raise ValueError(f"Commit {c[:8]} already has an associated PR (#{m.group(1)})")
-            except RuntimeError:
-                pass
-
-        # 2. Sort selected commits in topological order (ancestor before descendant)
-        try:
-            topo_order = run_git_command(
-                ["rev-list", "--topo-order", "--reverse"] + commit_hashes,
-                cwd=self.repo_root,
-            ).splitlines()
-            sorted_commits = [c for c in topo_order if c in commit_hashes]
-        except RuntimeError:
-            sorted_commits = list(commit_hashes)
-
-        for c in commit_hashes:
-            if c not in sorted_commits:
-                sorted_commits.append(c)
+        repo_web_url = self.get_repo_web_url()
+        log_lines: List[str] = []
+        if repo_web_url:
+            log_lines.append(f"pushing PR stack to {repo_web_url}")
 
         created_prs: List[Dict[str, Any]] = []
-        commit_to_pr_branch: Dict[str, str] = {}
-        curr_branch = self.get_current_branch() or "main"
-
-        for c in sorted_commits:
+        sl_path = shutil.which("sl")
+        if sl_path:
             try:
-                parents = run_git_command(["log", "-1", "--format=%P", c], cwd=self.repo_root).split()
-            except RuntimeError:
-                parents = []
+                proc = subprocess.run(
+                    [sl_path, "pr", "submit", "--config", "github.max-prs-to-create=-1"],
+                    cwd=str(self.repo_root),
+                    capture_output=True,
+                    text=True,
+                    errors="replace",
+                    check=False,
+                )
+                if proc.stdout:
+                    log_lines.extend(proc.stdout.splitlines())
+                if proc.returncode != 0 and proc.stderr:
+                    log_lines.append(f"Notice: {proc.stderr.strip()}")
+            except Exception as e:
+                log_lines.append(f"Notice: Error running {sl_path}: {e}")
+        else:
+            log_lines.append("Notice: Sapling 'sl' binary not found; skipped 'sl pr submit'")
 
-            base_branch = curr_branch
-            if parents:
-                parent_sha = parents[0]
-                if parent_sha in commit_to_pr_branch:
-                    base_branch = commit_to_pr_branch[parent_sha]
-                else:
-                    parent_node = node_map.get(parent_sha)
-                    if parent_node and parent_node.pr_number:
-                        base_branch = f"pr{parent_node.pr_number}"
+        # Invalidate remote PR cache so new remote PRs reflect immediately
+        if hasattr(self, "_remote_pr_cache"):
+            self._remote_pr_cache = None
 
-            pr_num = self.get_next_pr_number()
-            branch_name = f"pr{pr_num}"
-
-            run_git_command(["branch", branch_name, c], cwd=self.repo_root)
-            commit_to_pr_branch[c] = branch_name
-
-            pr_url = self.get_pr_url(pr_num)
-            created_prs.append(
-                {
-                    "commit": c,
-                    "pr_number": pr_num,
-                    "branch": branch_name,
-                    "base_branch": base_branch,
-                    "pr_url": pr_url,
-                }
-            )
-
-        return created_prs
+        return {
+            "status": "ok",
+            "created": created_prs,
+            "logs": log_lines,
+        }
 
     def unlink_prs_for_commits(self, commit_hashes: List[str]) -> List[Dict[str, Any]]:
         """Unlink PRs from selected commits by removing their associated PR branches.

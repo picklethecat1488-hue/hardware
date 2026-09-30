@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Code Review: {{ session.repo_name or 'hardware' }}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <style>
     /* =========================================================
        QUAKE I / GLQUAKE CONSOLE & RETRO HUD ENGINE THEME
@@ -76,6 +77,11 @@
       align-items: center;
       gap: 5px;
       transition: all 0.15s ease;
+      white-space: nowrap !important;
+      flex-shrink: 0;
+    }
+    .quake-btn * {
+      white-space: nowrap !important;
     }
     .quake-btn-default {
       background: linear-gradient(180deg, #3a2618 0%, #20140c 100%);
@@ -172,19 +178,28 @@
       border-bottom: 2px solid var(--quake-border-mid);
       box-shadow: 0 4px 12px rgba(0,0,0,0.6);
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      scrollbar-width: thin;
       align-items: center;
       justify-content: space-between;
       padding: 4px 14px;
       flex-shrink: 0;
-      gap: 8px 12px;
+      gap: 12px;
       z-index: 100;
     }
-    .brand-block {
+    .brand-block,
+    .metrics-group,
+    .header-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
       flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .brand-block {
+      gap: 8px;
     }
     .brand-title {
       font-size: 13.5px;
@@ -506,19 +521,28 @@
       background: #19100a;
       border-bottom: 2px solid var(--quake-border-mid);
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      scrollbar-width: thin;
       align-items: center;
       justify-content: space-between;
       padding: 4px 12px;
       flex-shrink: 0;
-      gap: 6px 12px;
+      gap: 12px;
     }
-    .diff-toolbar-left {
+    .diff-toolbar-left,
+    .diff-toolbar-center,
+    .diff-toolbar-right {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .diff-toolbar-left {
       min-width: 0;
-      flex: 1 1 auto;
     }
     .active-file-label {
       font-size: 12px;
@@ -579,11 +603,69 @@
       top: 0;
       z-index: 5;
     }
+    .sbs-table thead th.th-old {
+      position: relative;
+      border-right: 2px solid var(--quake-border-accent, #8d5d33);
+    }
+    .sbs-split-resizer {
+      position: absolute;
+      top: 0;
+      right: -6px;
+      width: 12px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 25;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sbs-split-resizer::before {
+      content: "⋮";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 13px;
+      line-height: 1;
+      color: var(--quake-gold, #ffb800);
+      z-index: 26;
+      pointer-events: none;
+      text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+      font-weight: bold;
+    }
+    .sbs-split-resizer::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 5px;
+      width: 2px;
+      background: var(--quake-border-accent, #8d5d33);
+      transition: background 0.15s, width 0.15s, left 0.15s;
+    }
+    .sbs-split-resizer:hover::after,
+    .sbs-split-resizer.resizing::after {
+      background: var(--quake-gold, #ffb800);
+      width: 4px;
+      left: 4px;
+    }
+    .sbs-split-resizer:hover::before,
+    .sbs-split-resizer.resizing::before {
+      color: #fff;
+    }
     .sbs-row td {
       padding: 1px 6px;
       white-space: pre;
       word-break: normal;
       vertical-align: top;
+    }
+    .sbs-row td.old-code {
+      border-right: 2px solid var(--quake-border-accent, #8d5d33);
+      position: relative;
+    }
+    .sbs-row td.old-code:hover {
+      border-right-color: var(--quake-gold, #ffb800);
     }
     .sbs-row td.old-code,
     .sbs-row td.new-code {
@@ -937,11 +1019,29 @@
       padding: 2px 8px !important;
     }
 
-    /* Scrollbars */
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #100905; border: 1px solid #3d2311; }
-    ::-webkit-scrollbar-thumb { background: #5a381e; border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: #8d5d33; }
+    /* Visible Quake Scrollbars (BUG-202, BUG-233) */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
+    }
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e130b;
+      border: 1px solid #3d2311;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #965a25;
+      border-radius: 4px;
+      border: 1px solid #c87a32;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold, #ffb800);
+      border-color: #ffd700;
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
 
     /* Toast Notification */
     #quakeToast {
@@ -1284,6 +1384,10 @@
             <button id="btnFocus" class="quake-btn quake-btn-default" onclick="toggleFocusMode()" title="Focus Mode (Shortcut: \)">⛶ Focus</button>
           </div>
           <span id="activeFilePath" class="active-file-label" title="Active File">Select a file</span>
+          <div id="activeFileActions" style="display:none;align-items:center;gap:6px;flex-shrink:0;">
+            <button class="quake-btn quake-btn-default quake-btn-xs" onclick="copyActiveFilePath()" title="Copy file path">📋</button>
+            <a id="btnOpenVsCode" class="quake-btn quake-btn-default quake-btn-xs" onclick="openInVsCode()" title="Open in VS Code" style="text-decoration:none;cursor:pointer;">💻</a>
+          </div>
           <span id="activeFileLfs" class="quake-badge quake-badge-lfs" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;">📦 LFS</span>
           <span id="activeFileLang" class="quake-badge quake-badge-cyan" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;"></span>
           <span id="selectionLabel" class="selection-label" style="display:none;"></span>
@@ -1976,6 +2080,11 @@
     async function loadDiff() {
       if (!state.selectedFile) return;
       document.getElementById("activeFilePath").innerText = state.selectedFile;
+      const actions = document.getElementById("activeFileActions");
+      if (actions) {
+        actions.style.display = "inline-flex";
+      }
+      updateActiveFileActions(state.selectedFile);
       document.title = `${state.selectedFile} — Code Review: ${state.session ? state.session.repo_name : 'hardware'}`;
 
       try {
@@ -2079,13 +2188,16 @@
       let html = `
         <table class="sbs-table">
           <colgroup>
-            <col class="col-lineno"><col class="col-marker"><col class="col-code">
-            <col class="col-lineno"><col class="col-marker"><col class="col-code">
+            <col class="col-lineno"><col class="col-marker"><col class="col-code col-old-code" style="width: 50%;">
+            <col class="col-lineno"><col class="col-marker"><col class="col-code col-new-code" style="width: 50%;">
           </colgroup>
           <thead>
             <tr>
-              <th colspan="3">Old Revision</th>
-              <th colspan="3">New Revision</th>
+              <th colspan="3" class="th-old" style="position: relative;">
+                Old Revision
+                <div class="sbs-split-resizer" title="Drag horizontally to resize split panes"></div>
+              </th>
+              <th colspan="3" class="th-new">New Revision</th>
             </tr>
           </thead>
           <tbody>
@@ -2146,6 +2258,7 @@
 
       html += `</tbody></table>`;
       container.innerHTML = html;
+      setupSbsResizer(container.querySelector(".sbs-table"), "cr_sbs_split_ratio");
     }
 
     function renderUnified(container) {
@@ -2420,6 +2533,79 @@
       }
 
       setupCliAutocomplete();
+    }
+
+    function setupSbsResizer(table, storageKey = "cr_sbs_split_ratio") {
+      if (!table) return;
+      const resizer = table.querySelector(".sbs-split-resizer");
+      if (!resizer) return;
+      const applyRatio = (ratio) => {
+        const pctOld = (ratio * 100).toFixed(1);
+        const pctNew = ((1 - ratio) * 100).toFixed(1);
+        const oldCol = table.querySelector("col.col-old-code");
+        const newCol = table.querySelector("col.col-new-code");
+        if (oldCol && newCol) {
+          oldCol.style.width = pctOld + "%";
+          newCol.style.width = pctNew + "%";
+        }
+        const oldTh = table.querySelector(".th-old");
+        const newTh = table.querySelector(".th-new");
+        if (oldTh && newTh) {
+          oldTh.style.width = pctOld + "%";
+          newTh.style.width = pctNew + "%";
+        }
+      };
+
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= 0.15 && parsed <= 0.85) {
+          applyRatio(parsed);
+        }
+      }
+
+      const startDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (resizer) resizer.classList.add("resizing");
+        table.classList.add("resizing-sbs");
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+        const container = table.closest(".diff-container") || table.parentElement || table;
+        const containerRect = container.getBoundingClientRect();
+
+        const onMouseMove = (moveEvent) => {
+          const x = moveEvent.clientX - containerRect.left;
+          const ratio = Math.max(0.15, Math.min(0.85, x / containerRect.width));
+          applyRatio(ratio);
+          localStorage.setItem(storageKey, ratio.toFixed(4));
+        };
+
+        const onMouseUp = () => {
+          if (resizer) resizer.classList.remove("resizing");
+          table.classList.remove("resizing-sbs");
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+          window.removeEventListener("mousemove", onMouseMove);
+          window.removeEventListener("mouseup", onMouseUp);
+        };
+
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+      };
+
+      if (resizer) {
+        resizer.addEventListener("mousedown", startDrag);
+      }
+      table.addEventListener("mousedown", (e) => {
+        const td = e.target.closest("td.old-code, th.th-old");
+        if (td) {
+          const rect = td.getBoundingClientRect();
+          if (rect.right - e.clientX <= 8 && rect.right - e.clientX >= -4) {
+            startDrag(e);
+          }
+        }
+      });
     }
 
     function setupCliResizer() {
@@ -2868,14 +3054,14 @@
           body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (data.status === "ok") {
+        if (data.status === "ok" || data.id) {
           logCli(`[${severity}] Added comment to ${state.selectedFile}:L${startLine}${startLine !== endLine ? '-L' + endLine : ''}`, "green");
           await loadSession();
           renderDiff();
           renderFilesList();
           showToast(`Comment saved [${severity}]`);
         } else {
-          logCli("Error saving comment: " + data.message, "red");
+          logCli("Error saving comment: " + (data.message || data.error || JSON.stringify(data)), "red");
         }
       } catch (e) {
         logCli("Error submitting comment: " + e.message, "red");
@@ -2902,14 +3088,14 @@
           body: JSON.stringify({ id: commentId, body: newBody }),
         });
         const data = await res.json();
-        if (data.status === "ok") {
+        if (data.status === "ok" || data.id) {
           logCli(`> Comment [${commentId}] updated successfully.`, "green");
           await loadSession();
           renderDiff();
           renderFilesList();
           showToast("Comment updated");
         } else {
-          logCli(`Error updating comment: ${data.error || "Unknown error"}`, "red");
+          logCli(`Error updating comment: ${data.message || data.error || "Unknown error"}`, "red");
         }
       } catch (err) {
         logCli(`Network error updating comment: ${err.message}`, "red");
@@ -3428,10 +3614,62 @@
       renderFilesList();
     }
 
+    function updateActiveFileActions(filePath) {
+      if (!filePath) return;
+      const repoRoot = (state.session && state.session.repo_root) || "{{ session.repo_root or '' }}";
+      let fullPath = filePath;
+      if (repoRoot && !filePath.startsWith("/")) {
+        fullPath = repoRoot.replace(/\/+$/, "") + "/" + filePath.replace(/^\/+/, "");
+      }
+      const vscodeUrl = `vscode://file${fullPath.startsWith('/') ? '' : '/'}${fullPath}`;
+      const btnVsCode = document.getElementById("btnOpenVsCode");
+      if (btnVsCode) {
+        btnVsCode.href = vscodeUrl;
+      }
+    }
+
+    function fallbackCopy(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      showToast("Copied: " + text);
+    }
+
+    function copyActiveFilePath() {
+      const filePath = state.selectedFile;
+      if (!filePath) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(filePath).then(() => {
+          showToast("Copied: " + filePath);
+        }).catch(() => {
+          fallbackCopy(filePath);
+        });
+      } else {
+        fallbackCopy(filePath);
+      }
+    }
+
     function copyFilePath() {
-      if (!state.selectedFile) return;
-      navigator.clipboard.writeText(state.selectedFile);
-      showToast("Copied: " + state.selectedFile);
+      copyActiveFilePath();
+    }
+
+    function openInVsCode() {
+      const filePath = state.selectedFile;
+      if (!filePath) return;
+      const repoRoot = (state.session && state.session.repo_root) || "{{ session.repo_root or '' }}";
+      if (!repoRoot && !filePath.startsWith("/")) {
+        showToast("Error: Repository root is not configured");
+        return;
+      }
+      let fullPath = filePath;
+      if (repoRoot && !filePath.startsWith("/")) {
+        fullPath = repoRoot.replace(/\/+$/, "") + "/" + filePath.replace(/^\/+/, "");
+      }
+      const vscodeUrl = `vscode://file${fullPath.startsWith('/') ? '' : '/'}${fullPath}`;
+      window.location.href = vscodeUrl;
     }
 
     function showToast(msg) {
