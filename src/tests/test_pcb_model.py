@@ -257,22 +257,22 @@ def test_carrier_board_provider_cad_silkscreen():
 
     provider = CarrierBoardProvider()
     texts = provider.silkscreen()
-    assert len(texts) >= 3
+    assert len(texts) >= 2
     assert texts[0].text == "TEST BOARD CARRIER REV 2.0"
     assert texts[0].position == (0.0, 26.0)
     assert texts[0].layer == "F.SilkS"
 
-    assert texts[1].text == "LAYER 1-6 RIGID-FLEX"
-    assert texts[1].position == (-8.0, -34.5)
+    assert all(t.text != "LAYER 1-6 RIGID-FLEX" for t in texts)
 
-    assert texts[2].text == "BOTTOM SHIELD / GROUND REF"
-    assert texts[2].layer == "B.SilkS"
-    assert texts[2].mirror is True
+    assert texts[1].text == "BOTTOM SHIELD / GROUND REF"
+    assert texts[1].layer == "B.SilkS"
+    assert texts[1].mirror is True
 
     # Check that pcb_config inherits them
     pcb_cfg = provider.pcb_config
     assert pcb_cfg is not None
-    assert len(pcb_cfg.silkscreen_texts) >= 3
+    assert len(pcb_cfg.silkscreen_texts) >= 2
+    assert all(t.text != "LAYER 1-6 RIGID-FLEX" for t in pcb_cfg.silkscreen_texts)
 
 
 def test_schematic_sheet_model():
