@@ -908,149 +908,36 @@ class GitEngine:
 
         return None, None, None
 
-    def get_next_pr_number(self) -> int:
-        """Determine next available PR number based on existing local and remote PR branches and tags."""
-        existing: List[int] = []
-        try:
-            output = run_git_command(["branch", "-a"], cwd=self.repo_root)
-            for line in output.splitlines():
-                m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", line.strip(), re.IGNORECASE)
-                if m:
-                    existing.append(int(m.group(1)))
-            tag_out = run_git_command(["tag", "-l"], cwd=self.repo_root)
-            for line in tag_out.splitlines():
-                m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", line.strip(), re.IGNORECASE)
-                if m:
-                    existing.append(int(m.group(1)))
-        except RuntimeError:
-            pass
-        return max(existing, default=534) + 1
+    def submit_prs(self) -> Dict[str, Any]:
+        """Submit pull request stack to GitHub using Sapling ('sl pr submit').
 
-    def create_prs_for_commits(self, commit_hashes: List[str]) -> List[Dict[str, Any]]:
-        """Create a PR for each selected commit and preserve commit ancestors information.
-
-        Validates that none of the selected commits already have an associated PR.
-        Topologically sorts commits so ancestors are created before descendants,
-        setting each commit's PR base to its parent's PR branch (or repository default).
+        Submits PR stack for the current commit and all ancestor commits.
         """
-        if not commit_hashes:
-            raise ValueError("No commits provided for PR creation")
-
-        # 1. Fetch current smartlog / commit info to validate existing PR associations
-        nodes = self.get_smartlog_dag(limit=100)
-        node_map = {n.commit_hash: n for n in nodes}
-
-        curr_branch = self.get_current_branch() or "main"
-
-        # Validate that no selected commit is already merged or already has an associated PR
-        for c in commit_hashes:
-            node = node_map.get(c)
-            if node and (node.is_merged_into_tracking or node.is_merged):
-                raise ValueError(f"Commit {c[:8]} is already merged into the tracking branch ({curr_branch})")
-            if node and node.pr_number:
-                raise ValueError(f"Commit {c[:8]} already has an associated PR (#{node.pr_number})")
-
-            try:
-                branches_out = run_git_command(["branch", "-a", "--points-at", c], cwd=self.repo_root)
-                for b in branches_out.splitlines():
-                    clean_b = b.replace("*", "").strip()
-                    m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", clean_b, re.IGNORECASE)
-                    if m:
-                        raise ValueError(f"Commit {c[:8]} already has an associated PR (#{m.group(1)})")
-            except RuntimeError:
-                pass
-
-        # 2. Sort selected commits in topological order (ancestor before descendant)
-        try:
-            topo_order = run_git_command(
-                ["rev-list", "--topo-order", "--reverse"] + commit_hashes,
-                cwd=self.repo_root,
-            ).splitlines()
-            sorted_commits = [c for c in topo_order if c in commit_hashes]
-        except RuntimeError:
-            sorted_commits = list(commit_hashes)
-
-        for c in commit_hashes:
-            if c not in sorted_commits:
-                sorted_commits.append(c)
+        repo_web_url = self.get_repo_web_url()
+        log_lines: List[str] = []
+        if repo_web_url:
+            log_lines.append(f"pushing PR stack to {repo_web_url}")
 
         created_prs: List[Dict[str, Any]] = []
-        commit_to_pr_branch: Dict[str, str] = {}
-        curr_branch = self.get_current_branch() or "main"
-
-        for c in sorted_commits:
-            try:
-                parents = run_git_command(["log", "-1", "--format=%P", c], cwd=self.repo_root).split()
-            except RuntimeError:
-                parents = []
-
-            base_branch = curr_branch
-            if parents:
-                parent_sha = parents[0]
-                if parent_sha in commit_to_pr_branch:
-                    base_branch = commit_to_pr_branch[parent_sha]
-                else:
-                    parent_node = node_map.get(parent_sha)
-                    if parent_node and parent_node.pr_number:
-                        base_branch = f"pr{parent_node.pr_number}"
-
-            pr_num = self.get_next_pr_number()
-            branch_name = f"pr{pr_num}"
-
-            run_git_command(["branch", branch_name, c], cwd=self.repo_root)
-            commit_to_pr_branch[c] = branch_name
-
-            pr_url = self.get_pr_url(pr_num)
-            created_prs.append(
-                {
-                    "commit": c,
-                    "pr_number": pr_num,
-                    "branch": branch_name,
-                    "base_branch": base_branch,
-                    "pr_url": pr_url,
-                }
-            )
-
-        return created_prs
-
-    def submit_prs_for_commits(self, commit_hashes: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Submit pull requests for commits to GitHub, running the submission workflow.
-
-        If commit_hashes is not provided or empty, defaults to unmerged commits in the stack that do not yet have PRs.
-        Executes 'sl pr submit' if available, otherwise creates and pushes PR branches.
-        """
-        if not commit_hashes:
-            nodes = self.get_smartlog_dag(limit=100)
-            commit_hashes = [
-                n.commit_hash for n in nodes if not n.is_merged and not n.is_merged_into_tracking and not n.pr_number
-            ]
-            if not commit_hashes:
-                commit_hashes = [n.commit_hash for n in nodes if not n.is_merged and not n.is_merged_into_tracking]
-
-        if not commit_hashes:
-            raise ValueError("No unmerged commits provided for PR submission")
-
-        # Validate and create PR branches (validates already-merged and duplicate PRs)
-        created_prs = self.create_prs_for_commits(commit_hashes)
-
-        repo_web_url = self.get_repo_web_url() or "https://github.com/picklethecat1488-hue/hardware"
-        log_lines: List[str] = []
-        log_lines.append(f"pushing {len(commit_hashes)} to {repo_web_url}")
-
         sl_path = shutil.which("sl")
         if sl_path:
             try:
-                out = run_git_command(
+                proc = subprocess.run(
                     [sl_path, "pr", "submit", "--config", "github.max-prs-to-create=-1"],
-                    cwd=self.repo_root,
+                    cwd=str(self.repo_root),
+                    capture_output=True,
+                    text=True,
+                    errors="replace",
+                    check=False,
                 )
-                if out:
-                    log_lines.extend(out.splitlines())
-            except RuntimeError as e:
-                log_lines.append(f"Notice: {e}")
-            for pr in created_prs:
-                target_url = pr.get("pr_url") or f"{repo_web_url}/pull/{pr.get('pr_number')}"
-                log_lines.append(f"created new pull request: {target_url}")
+                if proc.stdout:
+                    log_lines.extend(proc.stdout.splitlines())
+                if proc.returncode != 0 and proc.stderr:
+                    log_lines.append(f"Notice: {proc.stderr.strip()}")
+            except Exception as e:
+                log_lines.append(f"Notice: Error running {sl_path}: {e}")
+        else:
+            log_lines.append("Notice: Sapling 'sl' binary not found; skipped 'sl pr submit'")
 
         # Invalidate remote PR cache so new remote PRs reflect immediately
         if hasattr(self, "_remote_pr_cache"):

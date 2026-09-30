@@ -421,23 +421,25 @@
     /* Visible Quake Scrollbars (BUG-202) */
     * {
       scrollbar-width: thin;
-      scrollbar-color: var(--quake-border-accent) #100a06;
+      scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
     }
     ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
     }
     ::-webkit-scrollbar-track {
-      background: #100a06;
-      border: 1px solid var(--quake-border-mid);
+      background: #1e130b;
+      border: 1px solid #3d2311;
     }
     ::-webkit-scrollbar-thumb {
-      background: var(--quake-border-accent);
+      background: #965a25;
       border-radius: 4px;
-      border: 1px solid var(--quake-border-mid);
+      border: 1px solid #c87a32;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: var(--quake-gold);
+      background: var(--quake-gold, #ffb800);
+      border-color: #ffd700;
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
     }
 
     .column-scroll {
@@ -1169,8 +1171,12 @@
     <section id="paneDiff" class="quake-card column-panel pane-diff">
       <!-- Toolbar -->
       <div class="diff-toolbar">
-        <div class="diff-file-title" id="diffFileTitle">
-          <span>Select a file to inspect diff</span>
+        <div class="diff-file-title" id="diffFileTitle" style="display:flex;align-items:center;gap:8px;">
+          <span id="diffFileTitleText">Select a file to inspect diff</span>
+          <div id="diffFileActions" style="display:none;align-items:center;gap:6px;">
+            <button class="quake-btn quake-btn-default quake-btn-xs" onclick="copyActiveFilePath()" title="Copy file path">📋</button>
+            <a id="btnOpenVsCode" class="quake-btn quake-btn-default quake-btn-xs" onclick="openInVsCode()" title="Open in VS Code" style="text-decoration:none;cursor:pointer;">💻</a>
+          </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
           <div class="diff-stats-badge" id="diffStatsBadge" style="display:none;">
@@ -1341,6 +1347,7 @@
     // State Model
     const state = {
       repoName: "{{ session.repo_name or 'hardware' }}",
+      repoRoot: "{{ session.repo_root or '' }}",
       repoWebUrl: "{{ session.repo_web_url or '' }}",
       githubRepo: "{{ session.github_repo or '' }}",
       activeCommit: "{{ session.active_commit or 'working' }}",
@@ -1847,7 +1854,18 @@
         }
       });
 
-      document.getElementById("diffFileTitle").textContent = filePath;
+      const titleText = document.getElementById("diffFileTitleText");
+      if (titleText) {
+        titleText.textContent = filePath;
+      } else {
+        document.getElementById("diffFileTitle").textContent = filePath;
+      }
+      const fileActions = document.getElementById("diffFileActions");
+      if (fileActions) {
+        fileActions.style.display = "inline-flex";
+      }
+      updateActiveFileActions(filePath);
+
       const diffBody = document.getElementById("diffBodyContainer");
       diffBody.innerHTML = `<div style="text-align:center;padding:30px;color:var(--quake-text-muted);">Loading diff...</div>`;
 
@@ -1866,6 +1884,60 @@
       } catch (err) {
         diffBody.innerHTML = `<div style="color:var(--quake-red);padding:20px;">Failed to load diff: ${err}</div>`;
       }
+    }
+
+    function updateActiveFileActions(filePath) {
+      if (!filePath) return;
+      const repoRoot = state.repoRoot || "";
+      let fullPath = filePath;
+      if (repoRoot && !filePath.startsWith("/")) {
+        fullPath = repoRoot.replace(/\/+$/, "") + "/" + filePath.replace(/^\/+/, "");
+      }
+      const vscodeUrl = `vscode://file${fullPath.startsWith('/') ? '' : '/'}${fullPath}`;
+      const btnVsCode = document.getElementById("btnOpenVsCode");
+      if (btnVsCode) {
+        btnVsCode.href = vscodeUrl;
+      }
+    }
+
+    function fallbackCopy(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      showToast("Copied: " + text);
+    }
+
+    function copyActiveFilePath() {
+      const filePath = state.activeFile;
+      if (!filePath) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(filePath).then(() => {
+          showToast("Copied: " + filePath);
+        }).catch(() => {
+          fallbackCopy(filePath);
+        });
+      } else {
+        fallbackCopy(filePath);
+      }
+    }
+
+    function openInVsCode() {
+      const filePath = state.activeFile;
+      if (!filePath) return;
+      const repoRoot = state.repoRoot || "{{ session.repo_root or '' }}";
+      if (!repoRoot && !filePath.startsWith("/")) {
+        showToast("Error: Repository root is not configured");
+        return;
+      }
+      let fullPath = filePath;
+      if (repoRoot && !filePath.startsWith("/")) {
+        fullPath = repoRoot.replace(/\/+$/, "") + "/" + filePath.replace(/^\/+/, "");
+      }
+      const vscodeUrl = `vscode://file${fullPath.startsWith('/') ? '' : '/'}${fullPath}`;
+      window.location.href = vscodeUrl;
     }
 
     // Toggle Diff Mode (Side-by-side vs Unified)

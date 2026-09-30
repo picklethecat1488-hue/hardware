@@ -1022,23 +1022,14 @@ def test_regression_bug_193_create_and_unlink_pr_buttons_and_ancestors(tmp_path:
     assert "/api/pr/create" in tpl_text
     assert "/api/pr/unlink" in tpl_text
 
-    # 2. Test multi-commit PR creation preserving ancestor information
-    # Pass commits in reverse order (descendant first) to verify topological sorting
-    prs = engine.create_prs_for_commits([shas[2], shas[1]])
-    assert len(prs) == 2
-    pr1, pr2 = prs[0], prs[1]
-    assert pr1["commit"] == shas[1]
-    assert pr2["commit"] == shas[2]
-    # Ancestor's base branch is repository branch
-    curr_branch = engine.get_current_branch() or "main"
-    assert pr1["base_branch"] == curr_branch
-    # Descendant's base branch is ancestor's PR branch, preserving hierarchy
-    assert pr2["base_branch"] == pr1["branch"]
-    assert pr1["pr_number"] < pr2["pr_number"]
+    # 2. Test PR submission via submit_prs()
+    res = engine.submit_prs()
+    assert res["status"] == "ok"
+    assert "logs" in res
 
-    # 3. Test validation: cannot create PR for commit that already has an associated PR
-    with pytest.raises(ValueError, match="already has an associated PR"):
-        engine.create_prs_for_commits([shas[1]])
+    # 3. Create dummy PR branches to test unlinking
+    run_git_command(["branch", "pr101", shas[1]], cwd=repo_dir)
+    run_git_command(["branch", "pr102", shas[2]], cwd=repo_dir)
 
     # 4. Test unlinking PRs
     unlinked = engine.unlink_prs_for_commits([shas[1], shas[2]])
@@ -1064,21 +1055,10 @@ def test_regression_bug_193_create_and_unlink_pr_buttons_and_ancestors(tmp_path:
     try:
         base_url = server.get_url()
 
-        # Empty commits payload validation
+        # Successful PR creation/submission via API
         req = urllib.request.Request(
             f"{base_url}/api/pr/create",
-            data=json.dumps({"commits": []}).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with pytest.raises(urllib.error.HTTPError) as exc_info:
-            urllib.request.urlopen(req)
-        assert exc_info.value.code == 400
-
-        # Successful PR creation via API
-        req = urllib.request.Request(
-            f"{base_url}/api/pr/create",
-            data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
+            data=json.dumps({}).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
@@ -1086,21 +1066,10 @@ def test_regression_bug_193_create_and_unlink_pr_buttons_and_ancestors(tmp_path:
             assert resp.status == 200
             res = json.loads(resp.read().decode("utf-8"))
             assert res["status"] == "ok"
-            assert len(res["created"]) == 1
-            assert res["created"][0]["commit"] == shas[1]
-
-        # Duplicate PR creation returns 400
-        req = urllib.request.Request(
-            f"{base_url}/api/pr/create",
-            data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with pytest.raises(urllib.error.HTTPError) as exc_info:
-            urllib.request.urlopen(req)
-        assert exc_info.value.code == 400
+            assert "logs" in res
 
         # Successful PR unlink via API
+        run_git_command(["branch", "pr103", shas[1]], cwd=repo_dir)
         req = urllib.request.Request(
             f"{base_url}/api/pr/unlink",
             data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
@@ -1817,17 +1786,8 @@ def test_regression_bug_218_pr_creation_points_at_and_merged_commits_hidden(tmp_
 
     # Commit sha_a has no branch pointing directly to it, but pr123 contains sha_a.
     # With --points-at, sha_a should NOT be flagged as already having PR #123!
-    # Commit sha_b HAS branch pr123 pointing directly to it, so sha_b should be rejected.
-    import pytest
-
-    # Attempting to create PR for sha_b must fail because pr123 points at it
-    with pytest.raises(ValueError, match="already has an associated PR"):
-        engine.create_prs_for_commits([sha_b])
-
-    # Attempting to create PR for already merged commit must fail
-    if shas[2] in node_by_sha:
-        with pytest.raises(ValueError, match="already merged into the tracking branch"):
-            engine.create_prs_for_commits([shas[2]])
+    assert node_by_sha[sha_a].pr_number is None
+    assert node_by_sha[sha_b].pr_number == 123
 
 
 def test_regression_bug_221_branches_missing_from_branch_viewer(tmp_path: Path) -> None:
@@ -2141,20 +2101,13 @@ def test_regression_bug_229_pr_submit_interactive_modal_and_github_submission(tm
     assert "openPrSubmitModal" in diff_view_text
     assert "finishPrSubmitModal" in diff_view_text
 
-    # 2. Test GitEngine.submit_prs_for_commits backend execution
+    # 2. Test GitEngine.submit_prs backend execution
     repo_dir, shas = create_isolated_git_repo(tmp_path)
     engine = GitEngine(repo_root=repo_dir)
 
-    res = engine.submit_prs_for_commits([shas[1]])
+    res = engine.submit_prs()
     assert res["status"] == "ok"
-    assert len(res["created"]) == 1
-    assert res["created"][0]["commit"] == shas[1]
     assert len(res["logs"]) > 0
-    assert any("pushing" in line.lower() or "created" in line.lower() for line in res["logs"])
-
-    # 3. Test duplicate submission raises ValueError
-    with pytest.raises(ValueError, match="already has an associated PR"):
-        engine.submit_prs_for_commits([shas[1]])
 
     # 4. Test DashboardServer endpoint handles /api/pr/submit with logs
     server = DashboardServer(
@@ -2179,7 +2132,7 @@ def test_regression_bug_229_pr_submit_interactive_modal_and_github_submission(tm
             assert resp.status == 200
             data = json.loads(resp.read().decode("utf-8"))
             assert data["status"] == "ok"
-            assert len(data["created"]) == 1
+            assert isinstance(data["created"], list)
             assert "logs" in data
             assert len(data["logs"]) > 0
     finally:
@@ -2255,3 +2208,87 @@ def test_regression_bug_230_execution_logs_and_tracebacks_preserved(tmp_path: Pa
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_232_file_action_buttons_copy_and_vscode(tmp_path: Path):
+    """Verify BUG-232: Copy and Open in VS Code buttons are present next to file names."""
+    template_dir = Path(__file__).parent.parent / "provider" / "templates"
+    diff_view_html = (template_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    code_review_html = (template_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # In VCS diff viewer
+    assert 'id="diffFileActions"' in diff_view_html
+    assert 'onclick="copyActiveFilePath()"' in diff_view_html
+    assert 'onclick="openInVsCode()"' in diff_view_html
+    assert "vscode://file" in diff_view_html
+    assert "btnOpenVsCode" in diff_view_html
+
+    # In Code Review UI
+    assert 'id="activeFileActions"' in code_review_html
+    assert 'onclick="copyActiveFilePath()"' in code_review_html
+    assert 'onclick="openInVsCode()"' in code_review_html
+    assert "vscode://file" in code_review_html
+    assert "btnOpenVsCode" in code_review_html
+
+    # In runtime server rendering
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}/") as resp:
+            content = resp.read().decode("utf-8")
+            assert 'id="diffFileActions"' in content
+            assert "btnOpenVsCode" in content
+            assert str(repo_dir) in content or repo_dir.name in content
+
+        with urllib.request.urlopen(f"{base_url}/review") as resp:
+            content = resp.read().decode("utf-8")
+            assert 'id="activeFileActions"' in content
+            assert "btnOpenVsCode" in content
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_233_visible_high_contrast_scrollbars():
+    """Verify BUG-233: All horizontal and vertical scrollbars are visible and high contrast."""
+    template_dir = Path(__file__).parent.parent / "provider" / "templates"
+    templates = [
+        template_dir / "diff_view.html.j2",
+        template_dir / "diff_component.html.j2",
+        template_dir / "code_review.html.j2",
+        template_dir / "bug_report.html.j2",
+    ]
+
+    for tmpl_path in templates:
+        content = tmpl_path.read_text(encoding="utf-8")
+        assert "scrollbar-color: var(--quake-copper, #c87a32) #1e130b;" in content, (
+            f"Missing standard scrollbar-color in {tmpl_path.name}"
+        )
+        assert "::-webkit-scrollbar" in content, f"Missing webkit scrollbar in {tmpl_path.name}"
+        assert "width: 10px;" in content, f"Scrollbar width too small / invisible in {tmpl_path.name}"
+        assert "#965a25" in content, f"Missing copper thumb background in {tmpl_path.name}"
+        assert "#ffb800" in content, f"Missing gold hover state in {tmpl_path.name}"
+
+
+def test_regression_bug_234_pr_submit_no_git_sl_error(tmp_path: Path):
+    """Verify BUG-234: GitEngine.submit_prs never runs git with sl binary."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    res = engine.submit_prs()
+    assert res["status"] == "ok"
+
+    # Invariant: Never attempt to invoke `git <path-to-sl>`
+    for line in res["logs"]:
+        assert "is not a git command" not in line.lower(), f"Confusing git error in logs: {line}"
+        assert "error running git" not in line.lower(), f"Confusing git error in logs: {line}"

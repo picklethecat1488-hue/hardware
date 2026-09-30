@@ -602,22 +602,43 @@
       top: 0;
       z-index: 5;
     }
+    .sbs-table thead th.th-old {
+      position: relative;
+      border-right: 2px solid var(--quake-border-accent, #8d5d33);
+    }
     .sbs-split-resizer {
       position: absolute;
       top: 0;
-      right: -5px;
-      width: 10px;
+      right: -6px;
+      width: 12px;
       height: 100%;
       cursor: col-resize;
       z-index: 25;
       user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sbs-split-resizer::before {
+      content: "⋮";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 13px;
+      line-height: 1;
+      color: var(--quake-gold, #ffb800);
+      z-index: 26;
+      pointer-events: none;
+      text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+      font-weight: bold;
     }
     .sbs-split-resizer::after {
       content: "";
       position: absolute;
       top: 0;
       bottom: 0;
-      left: 4px;
+      left: 5px;
       width: 2px;
       background: var(--quake-border-accent, #8d5d33);
       transition: background 0.15s, width 0.15s, left 0.15s;
@@ -626,13 +647,24 @@
     .sbs-split-resizer.resizing::after {
       background: var(--quake-gold, #ffb800);
       width: 4px;
-      left: 3px;
+      left: 4px;
+    }
+    .sbs-split-resizer:hover::before,
+    .sbs-split-resizer.resizing::before {
+      color: #fff;
     }
     .sbs-row td {
       padding: 1px 6px;
       white-space: pre;
       word-break: normal;
       vertical-align: top;
+    }
+    .sbs-row td.old-code {
+      border-right: 2px solid var(--quake-border-accent, #8d5d33);
+      position: relative;
+    }
+    .sbs-row td.old-code:hover {
+      border-right-color: var(--quake-gold, #ffb800);
     }
     .sbs-row td.old-code,
     .sbs-row td.new-code {
@@ -986,11 +1018,29 @@
       padding: 2px 8px !important;
     }
 
-    /* Scrollbars */
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #100905; border: 1px solid #3d2311; }
-    ::-webkit-scrollbar-thumb { background: #5a381e; border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: #8d5d33; }
+    /* Visible Quake Scrollbars (BUG-202, BUG-233) */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
+    }
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e130b;
+      border: 1px solid #3d2311;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #965a25;
+      border-radius: 4px;
+      border: 1px solid #c87a32;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold, #ffb800);
+      border-color: #ffd700;
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
 
     /* Toast Notification */
     #quakeToast {
@@ -1333,6 +1383,10 @@
             <button id="btnFocus" class="quake-btn quake-btn-default" onclick="toggleFocusMode()" title="Focus Mode (Shortcut: \)">⛶ Focus</button>
           </div>
           <span id="activeFilePath" class="active-file-label" title="Active File">Select a file</span>
+          <div id="activeFileActions" style="display:none;align-items:center;gap:6px;flex-shrink:0;">
+            <button class="quake-btn quake-btn-default quake-btn-xs" onclick="copyActiveFilePath()" title="Copy file path">📋</button>
+            <a id="btnOpenVsCode" class="quake-btn quake-btn-default quake-btn-xs" onclick="openInVsCode()" title="Open in VS Code" style="text-decoration:none;cursor:pointer;">💻</a>
+          </div>
           <span id="activeFileLfs" class="quake-badge quake-badge-lfs" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;">📦 LFS</span>
           <span id="activeFileLang" class="quake-badge quake-badge-cyan" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;"></span>
           <span id="selectionLabel" class="selection-label" style="display:none;"></span>
@@ -2025,6 +2079,11 @@
     async function loadDiff() {
       if (!state.selectedFile) return;
       document.getElementById("activeFilePath").innerText = state.selectedFile;
+      const actions = document.getElementById("activeFileActions");
+      if (actions) {
+        actions.style.display = "inline-flex";
+      }
+      updateActiveFileActions(state.selectedFile);
       document.title = `${state.selectedFile} — Code Review: ${state.session ? state.session.repo_name : 'hardware'}`;
 
       try {
@@ -2198,6 +2257,7 @@
 
       html += `</tbody></table>`;
       container.innerHTML = html;
+      setupSbsResizer(container.querySelector(".sbs-table"), "cr_sbs_split_ratio");
     }
 
     function renderUnified(container) {
@@ -2255,7 +2315,6 @@
       });
       html += `</div>`;
       container.innerHTML = html;
-      setupSbsResizer(container.querySelector(".sbs-table"), "cr_sbs_split_ratio");
     }
 
     function renderFullFile(container) {
@@ -2504,10 +2563,11 @@
         }
       }
 
-      resizer.addEventListener("mousedown", (e) => {
+      const startDrag = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        resizer.classList.add("resizing");
+        if (resizer) resizer.classList.add("resizing");
+        table.classList.add("resizing-sbs");
         document.body.style.cursor = "col-resize";
         document.body.style.userSelect = "none";
         const tableRect = table.getBoundingClientRect();
@@ -2520,7 +2580,8 @@
         };
 
         const onMouseUp = () => {
-          resizer.classList.remove("resizing");
+          if (resizer) resizer.classList.remove("resizing");
+          table.classList.remove("resizing-sbs");
           document.body.style.cursor = "";
           document.body.style.userSelect = "";
           window.removeEventListener("mousemove", onMouseMove);
@@ -2529,6 +2590,19 @@
 
         window.addEventListener("mousemove", onMouseMove);
         window.addEventListener("mouseup", onMouseUp);
+      };
+
+      if (resizer) {
+        resizer.addEventListener("mousedown", startDrag);
+      }
+      table.addEventListener("mousedown", (e) => {
+        const td = e.target.closest("td.old-code, th.th-old");
+        if (td) {
+          const rect = td.getBoundingClientRect();
+          if (rect.right - e.clientX <= 8 && rect.right - e.clientX >= -4) {
+            startDrag(e);
+          }
+        }
       });
     }
 
@@ -3538,10 +3612,62 @@
       renderFilesList();
     }
 
+    function updateActiveFileActions(filePath) {
+      if (!filePath) return;
+      const repoRoot = (state.session && state.session.repo_root) || "{{ session.repo_root or '' }}";
+      let fullPath = filePath;
+      if (repoRoot && !filePath.startsWith("/")) {
+        fullPath = repoRoot.replace(/\/+$/, "") + "/" + filePath.replace(/^\/+/, "");
+      }
+      const vscodeUrl = `vscode://file${fullPath.startsWith('/') ? '' : '/'}${fullPath}`;
+      const btnVsCode = document.getElementById("btnOpenVsCode");
+      if (btnVsCode) {
+        btnVsCode.href = vscodeUrl;
+      }
+    }
+
+    function fallbackCopy(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      showToast("Copied: " + text);
+    }
+
+    function copyActiveFilePath() {
+      const filePath = state.selectedFile;
+      if (!filePath) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(filePath).then(() => {
+          showToast("Copied: " + filePath);
+        }).catch(() => {
+          fallbackCopy(filePath);
+        });
+      } else {
+        fallbackCopy(filePath);
+      }
+    }
+
     function copyFilePath() {
-      if (!state.selectedFile) return;
-      navigator.clipboard.writeText(state.selectedFile);
-      showToast("Copied: " + state.selectedFile);
+      copyActiveFilePath();
+    }
+
+    function openInVsCode() {
+      const filePath = state.selectedFile;
+      if (!filePath) return;
+      const repoRoot = (state.session && state.session.repo_root) || "{{ session.repo_root or '' }}";
+      if (!repoRoot && !filePath.startsWith("/")) {
+        showToast("Error: Repository root is not configured");
+        return;
+      }
+      let fullPath = filePath;
+      if (repoRoot && !filePath.startsWith("/")) {
+        fullPath = repoRoot.replace(/\/+$/, "") + "/" + filePath.replace(/^\/+/, "");
+      }
+      const vscodeUrl = `vscode://file${fullPath.startsWith('/') ? '' : '/'}${fullPath}`;
+      window.location.href = vscodeUrl;
     }
 
     function showToast(msg) {

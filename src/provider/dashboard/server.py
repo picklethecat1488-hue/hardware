@@ -315,12 +315,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 except (RuntimeError, ValueError) as e:
                     self._send_json({"error": str(e)}, status=400)
             case "/api/pr/create" | "/api/pr/submit":
-                commits = data.get("commits", [])
-                if not commits:
-                    self._send_json({"error": "No commits provided for PR creation"}, status=400)
-                    return
                 try:
-                    res = self.server.git_engine.submit_prs_for_commits(commits)
+                    res = self.server.git_engine.submit_prs()
                     self._send_json(
                         {
                             "status": "ok",
@@ -947,6 +943,7 @@ class DashboardServer(ThreadingHTTPServer):
 
         return DiffViewSessionModel(
             repo_name=self.repo_root.name,
+            repo_root=str(self.repo_root),
             repo_web_url=repo_web_url,
             github_repo=github_repo,
             branches=branches,
@@ -963,10 +960,14 @@ class DashboardServer(ThreadingHTTPServer):
     def get_review_session(self, revisions: Optional[List[str]] = None) -> ReviewSessionModel:
         """Get or initialize a review session for specific revisions or the default session."""
         if not revisions:
+            if self.review_server.session:
+                self.review_server.session.repo_root = str(self.repo_root)
             return self.review_server.session
 
         resolved = self.git_engine.resolve_revisions(revisions)
         if not resolved:
+            if self.review_server.session:
+                self.review_server.session.repo_root = str(self.repo_root)
             return self.review_server.session
 
         commit_hash = resolved[0]
@@ -975,11 +976,13 @@ class DashboardServer(ThreadingHTTPServer):
             and self.review_server.session.commit_hash == commit_hash
             and set(self.review_server.session.revisions) == set(resolved)
         ):
+            self.review_server.session.repo_root = str(self.repo_root)
             return self.review_server.session
 
         session = ReviewSessionModel(
             title=f"Code Review: {self.repo_root.name}",
             repo_name=self.repo_root.name,
+            repo_root=str(self.repo_root),
             commit_hash=commit_hash,
             revisions=resolved,
             created_at=datetime.now(timezone.utc).isoformat(),
