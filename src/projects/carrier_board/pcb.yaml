@@ -404,17 +404,13 @@ schematic_sheets:
       Q1:
       - 0
       - 1
-      U11:
-      - 0
-      - 2
       C8:
       - 0
-      - 3
+      - 2
   components:
   - U3
   - C6
   - Q1
-  - U11
   - C1
   - C2
   - C3
@@ -430,10 +426,6 @@ schematic_sheets:
     - G
     - S
     - D
-    U11:
-    - GND
-    - 3V3
-    - VLOAD_SW
     C8:
     - '1'
     - '2'

@@ -2699,21 +2699,16 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
     assert ("Q1", "1") in pwr_en_pins or ("Q1", "G") in pwr_en_pins
     assert ("U4", "SD_MODE") not in pwr_en_pins, "U4 SD_MODE must NOT be controlled by PWR_EN"
 
-    # 3. Verify VLOAD_SW connects Q1 drain, J1, audio amp U4 ground/gain, C8 cap ground
-    # and NO LONGER connects to peripheral expansion headers J6-J9 (BUG-106)
+    # 3. Verify VLOAD_SW was removed and U11 does not connect to VLOAD_SW (BUG-249)
+    # and peripheral expansion headers J6-J9 do not connect to VLOAD_SW (BUG-106)
     vload_net = next((net for net in wiring.nets if net.name == "VLOAD_SW"), None)
-    assert vload_net is not None, "VLOAD_SW net must exist in wiring.yaml"
-    vload_pins = set(vload_net.pins)
-    assert ("Q1", "3") in vload_pins or ("Q1", "D") in vload_pins
-    assert ("U11", "VLOAD_SW") in vload_pins
+    assert vload_net is None, "VLOAD_SW net must be removed from wiring.yaml (BUG-249)"
     gnd_net = next((net for net in wiring.nets if net.name == "GND"), None)
     assert gnd_net is not None
     gnd_pins = set(gnd_net.pins)
-    assert ("U4", "GND") in gnd_pins or ("U4", "GND") in vload_pins
-    assert ("U4", "GAIN") in gnd_pins or ("U4", "GAIN") in vload_pins
-    assert ("C8", "2") in gnd_pins or ("C8", "2") in vload_pins
-    for j_comp in ["J6", "J7", "J8", "J9"]:
-        assert (j_comp, "2") not in vload_pins, f"{j_comp}.2 must NOT be on VLOAD_SW"
+    assert ("U4", "GND") in gnd_pins
+    assert ("U4", "GAIN") in gnd_pins
+    assert ("C8", "2") in gnd_pins
 
     # 4. Verify dedicated INT GPIOs connect to expansion headers J6-J9 (BUG-106, BUG-110, BUG-173)
     int_mappings = {

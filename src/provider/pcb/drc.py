@@ -1195,7 +1195,7 @@ class PCBDesignRulesChecker:
         for fp in getattr(wiring, "footprints", []):
             for p in getattr(fp, "pins", []):
                 expected_signal = getattr(p, "signal_name", None)
-                if not expected_signal:
+                if not expected_signal or expected_signal.upper() in ("NC", "NONE", "UNCONNECTED", "RESERVED"):
                     continue
                 canonical_pin = getattr(p, "number", None) or getattr(p, "pin_name", None) or p.name
                 connected_nets = set(pin_to_nets.get((fp.name, canonical_pin), []))

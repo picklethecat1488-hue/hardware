@@ -1146,9 +1146,9 @@ def test_regression_bug_157_action_button_routed() -> None:
     action_violations = [
         v
         for v in report.violations
-        if "ACTION_BUTTON" in v.message
-        or ("CAP_TX2" in v.message and v.rule_name == "ANTENNA_TRACE_DETECTED")
-        or ("CAP_RX2" in v.message and v.rule_name == "ANTENNA_TRACE_DETECTED")
+        if "ACTION_BUTTON" in v.description
+        or ("CAP_TX2" in v.description and v.rule_name == "ANTENNA_TRACE_DETECTED")
+        or ("CAP_RX2" in v.description and v.rule_name == "ANTENNA_TRACE_DETECTED")
     ]
     assert not action_violations, f"ACTION_BUTTON routing violations found: {action_violations}"
 
@@ -2066,3 +2066,38 @@ def test_power_hardening_bug_243() -> None:
     drc = PCBDesignRulesChecker(provider.pcb_config)
     report = drc.check_all(wiring=wiring)
     assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_249_remove_vload_sw_from_ble_module() -> None:
+    """Verify BUG-249: VLOAD_SW artifact removed, U11 footprint corrected to NINA datasheet pinout."""
+    import yaml
+    from pathlib import Path
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. MOD-BLE-PCB-ANT footprint in ic.yaml must not have VLOAD_SW
+    ic_yaml_path = Path(__file__).resolve().parent.parent / "footprints" / "ic.yaml"
+    with open(ic_yaml_path, encoding="utf-8") as f:
+        ic_data = yaml.safe_load(f)
+    ble_fp = ic_data["footprints"]["MOD-BLE-PCB-ANT"]
+    ble_pin_names = [p["name"] for p in ble_fp["pins"]]
+    assert "VLOAD_SW" not in ble_pin_names, "MOD-BLE-PCB-ANT footprint must not have VLOAD_SW pin"
+    assert "SWITCH_2" in ble_pin_names, "MOD-BLE-PCB-ANT footprint pin 18 must be SWITCH_2"
+
+    # 2. wiring.yaml must not have VLOAD_SW net or U11.VLOAD_SW pin connection
+    net_names = [n.name for n in wiring.nets]
+    assert "VLOAD_SW" not in net_names, "VLOAD_SW net must be removed from wiring.yaml"
+    for net in wiring.nets:
+        for pin in net.pins:
+            assert pin[0] != "U11" or pin[1] != "VLOAD_SW", "U11 must not have any pin connected to VLOAD_SW"
+
+    # 3. pcb.yaml must not have VLOAD_SW in Sheet 2 pin_breakouts
+    pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
+    with open(pcb_yaml_path, encoding="utf-8") as f:
+        pcb_data = yaml.safe_load(f)
+    sheet_2 = pcb_data["schematic_sheets"][1]
+    if "pin_breakouts" in sheet_2 and "U11" in sheet_2["pin_breakouts"]:
+        assert "VLOAD_SW" not in sheet_2["pin_breakouts"]["U11"]

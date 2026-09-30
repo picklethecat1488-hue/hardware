@@ -221,7 +221,7 @@ footprints:
     name: '3'
     pin_name: D
     label: D
-    signal_name: VLOAD_SW
+    signal_name: NC
     position:
     - 0.0
     - 1.0
@@ -1252,6 +1252,8 @@ nets:
     - MCLR
   - - U11
     - 3V3
+  - - U11
+    - VCC
   - - J2
     - 3V3
   - - R1
@@ -1393,15 +1395,6 @@ nets:
     - SD_MODE
   - - D5
     - '1'
-- name: VLOAD_SW
-  priority: 25
-  color: '#f97316'
-  pins:
-  - - Q1
-    - '3'
-    - D
-  - - U11
-    - VLOAD_SW
 - name: PERIPH_EN
   priority: 24
   color: '#ea580c'
