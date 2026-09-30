@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Code Review: {{ session.repo_name or 'hardware' }}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <style>
     /* =========================================================
        QUAKE I / GLQUAKE CONSOLE & RETRO HUD ENGINE THEME
@@ -2570,11 +2571,12 @@
         table.classList.add("resizing-sbs");
         document.body.style.cursor = "col-resize";
         document.body.style.userSelect = "none";
-        const tableRect = table.getBoundingClientRect();
+        const container = table.closest(".diff-container") || table.parentElement || table;
+        const containerRect = container.getBoundingClientRect();
 
         const onMouseMove = (moveEvent) => {
-          const x = moveEvent.clientX - tableRect.left;
-          const ratio = Math.max(0.15, Math.min(0.85, x / tableRect.width));
+          const x = moveEvent.clientX - containerRect.left;
+          const ratio = Math.max(0.15, Math.min(0.85, x / containerRect.width));
           applyRatio(ratio);
           localStorage.setItem(storageKey, ratio.toFixed(4));
         };

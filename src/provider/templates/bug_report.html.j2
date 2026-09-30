@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bug Report Workstation - Hardware Engineering</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <style>
     /* =========================================================
        QUAKE I / GLQUAKE CONSOLE & RETRO HUD ENGINE THEME
@@ -49,11 +50,29 @@
       overflow: hidden;
     }
 
-    /* Custom Quake Scrollbars */
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #120c08; border: 1px solid #291a10; }
-    ::-webkit-scrollbar-thumb { background: #5a381e; border: 1px solid #8d5d33; border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: #8d5d33; }
+    /* Visible Quake Scrollbars (BUG-202, BUG-233) */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
+    }
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e130b;
+      border: 1px solid #3d2311;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #965a25;
+      border-radius: 4px;
+      border: 1px solid #c87a32;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold, #ffb800);
+      border-color: #ffd700;
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
 
     /* Quake Stone Plaque / Beveled Panels */
     .quake-card {

@@ -59,6 +59,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self._handle_serve_static(path)
             return
 
+        if path in ("/favicon.ico", "/favicon.svg"):
+            self._handle_serve_static("/static/favicon.svg")
+            return
+
         if path.startswith("/attachments/") or path.startswith("/build/attachments/"):
             self._handle_serve_attachment(path)
             return
@@ -482,7 +486,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
         mime_type, _ = mimetypes.guess_type(str(file_target))
         if not mime_type:
-            mime_type = "application/javascript" if filename.endswith(".js") else "text/plain"
+            if filename.endswith(".svg"):
+                mime_type = "image/svg+xml"
+            elif filename.endswith(".js"):
+                mime_type = "application/javascript"
+            else:
+                mime_type = "text/plain"
         content = file_target.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", f"{mime_type}; charset=utf-8")

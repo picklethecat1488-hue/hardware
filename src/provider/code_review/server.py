@@ -53,6 +53,10 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
             self._handle_serve_static(path)
             return
 
+        if path in ("/favicon.ico", "/favicon.svg"):
+            self._handle_serve_static("/static/favicon.svg")
+            return
+
         match path:
             case "/":
                 self._handle_serve_ui()
@@ -191,7 +195,12 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
             self.send_error(404, "Static asset not found")
             return
 
-        content_type = "application/javascript" if file_target.suffix == ".js" else "text/css"
+        if file_target.suffix == ".js":
+            content_type = "application/javascript"
+        elif file_target.suffix == ".svg":
+            content_type = "image/svg+xml"
+        else:
+            content_type = "text/css"
         data = file_target.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
@@ -423,12 +432,14 @@ class ReviewServer(ThreadingHTTPServer):
 
         if loaded_session is not None:
             self.session = loaded_session
+            self.session.repo_root = str(self.repo_root)
             if resolved_revisions is not None:
                 self.session.revisions = resolved_revisions
         else:
             self.session = ReviewSessionModel(
                 title=f"Code Review: {self.repo_root.name}",
                 repo_name=self.repo_root.name,
+                repo_root=str(self.repo_root),
                 revisions=resolved_revisions or [],
                 created_at=datetime.now(timezone.utc).isoformat(),
                 updated_at=datetime.now(timezone.utc).isoformat(),

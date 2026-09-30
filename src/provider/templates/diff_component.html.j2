@@ -68,35 +68,37 @@
     background: #0f0a07;
     position: relative;
     scrollbar-width: thin;
-    scrollbar-color: var(--quake-border-accent, #8d5d33) var(--quake-bg-darker, #0f0a07);
+    scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
   }
 
   .diff-scroll-body::-webkit-scrollbar {
-    width: 8px;
+    width: 10px;
     height: 10px;
   }
 
   .diff-scroll-body::-webkit-scrollbar-track {
-    background: #0f0a07;
-    border-top: 1px solid var(--quake-border-mid, #5a381e);
+    background: #1e130b;
+    border: 1px solid #3d2311;
   }
 
   .diff-scroll-body::-webkit-scrollbar-thumb {
-    background: var(--quake-border-accent, #8d5d33);
+    background: #965a25;
     border-radius: 4px;
-    border: 1px solid var(--quake-border-mid, #5a381e);
+    border: 1px solid #c87a32;
   }
 
   .diff-scroll-body::-webkit-scrollbar-thumb:hover {
     background: var(--quake-gold, #ffb800);
+    border-color: #ffd700;
+    box-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
   }
 
   /* Side-by-side Table */
   .diff-sbs-table {
     border-collapse: collapse;
-    width: 100%;
-    min-width: max-content;
-    table-layout: auto;
+    width: 100% !important;
+    min-width: 100% !important;
+    table-layout: fixed !important;
     font-family: var(--font-mono, monospace);
     font-size: 11px;
     line-height: 1.45;
@@ -115,15 +117,38 @@
     text-align: left;
   }
 
+  .diff-sbs-table thead th.th-old {
+    position: relative;
+    border-right: 2px solid var(--quake-border-accent, #8d5d33);
+  }
+
   .sbs-split-resizer {
     position: absolute;
     top: 0;
-    right: -5px;
-    width: 10px;
+    right: -6px;
+    width: 12px;
     height: 100%;
     cursor: col-resize;
     z-index: 25;
     user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sbs-split-resizer::before {
+    content: "⋮";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 13px;
+    line-height: 1;
+    color: var(--quake-gold, #ffb800);
+    z-index: 26;
+    pointer-events: none;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+    font-weight: bold;
   }
 
   .sbs-split-resizer::after {
@@ -131,7 +156,7 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 4px;
+    left: 5px;
     width: 2px;
     background: var(--quake-border-accent, #8d5d33);
     transition: background 0.15s, width 0.15s, left 0.15s;
@@ -141,7 +166,21 @@
   .sbs-split-resizer.resizing::after {
     background: var(--quake-gold, #ffb800);
     width: 4px;
-    left: 3px;
+    left: 4px;
+  }
+
+  .sbs-split-resizer:hover::before,
+  .sbs-split-resizer.resizing::before {
+    color: #fff;
+  }
+
+  .diff-sbs-row td.old-code {
+    border-right: 2px solid var(--quake-border-accent, #8d5d33);
+    position: relative;
+  }
+
+  .diff-sbs-row td.old-code:hover {
+    border-right-color: var(--quake-gold, #ffb800);
   }
 
   .diff-sbs-row td {
@@ -599,23 +638,26 @@
         }
       }
 
-      resizer.addEventListener("mousedown", (e) => {
+      const startDrag = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        resizer.classList.add("resizing");
+        if (resizer) resizer.classList.add("resizing");
+        table.classList.add("resizing-sbs");
         document.body.style.cursor = "col-resize";
         document.body.style.userSelect = "none";
-        const tableRect = table.getBoundingClientRect();
+        const container = table.closest(".diff-scroll-body, .diff-container") || table.parentElement || table;
+        const containerRect = container.getBoundingClientRect();
 
         const onMouseMove = (moveEvent) => {
-          const x = moveEvent.clientX - tableRect.left;
-          const ratio = Math.max(0.15, Math.min(0.85, x / tableRect.width));
+          const x = moveEvent.clientX - containerRect.left;
+          const ratio = Math.max(0.15, Math.min(0.85, x / containerRect.width));
           applyRatio(ratio);
           localStorage.setItem(storageKey, ratio.toFixed(4));
         };
 
         const onMouseUp = () => {
-          resizer.classList.remove("resizing");
+          if (resizer) resizer.classList.remove("resizing");
+          table.classList.remove("resizing-sbs");
           document.body.style.cursor = "";
           document.body.style.userSelect = "";
           window.removeEventListener("mousemove", onMouseMove);
@@ -624,6 +666,19 @@
 
         window.addEventListener("mousemove", onMouseMove);
         window.addEventListener("mouseup", onMouseUp);
+      };
+
+      if (resizer) {
+        resizer.addEventListener("mousedown", startDrag);
+      }
+      table.addEventListener("mousedown", (e) => {
+        const td = e.target.closest("td.old-code, th.th-old");
+        if (td) {
+          const rect = td.getBoundingClientRect();
+          if (rect.right - e.clientX <= 8 && rect.right - e.clientX >= -4) {
+            startDrag(e);
+          }
+        }
       });
     }
   };

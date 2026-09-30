@@ -2292,3 +2292,72 @@ def test_regression_bug_234_pr_submit_no_git_sl_error(tmp_path: Path):
     for line in res["logs"]:
         assert "is not a git command" not in line.lower(), f"Confusing git error in logs: {line}"
         assert "error running git" not in line.lower(), f"Confusing git error in logs: {line}"
+
+
+def test_regression_bug_235_favicon_web_icon(tmp_path: Path):
+    """Verify BUG-235: High-contrast Quake-themed favicon is created and served across dashboards."""
+    static_favicon = Path(__file__).parent.parent / "provider" / "code_review" / "static" / "favicon.svg"
+    assert static_favicon.exists(), "static/favicon.svg must exist"
+    svg_content = static_favicon.read_text(encoding="utf-8")
+    assert "<svg" in svg_content
+    assert "#ffd700" in svg_content or "#ffb800" in svg_content
+    assert "#c87a32" in svg_content
+
+    # Check templates include the favicon link
+    template_dir = Path(__file__).parent.parent / "provider" / "templates"
+    for tmpl in ["diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"]:
+        content = (template_dir / tmpl).read_text(encoding="utf-8")
+        assert '<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">' in content, (
+            f"Missing favicon link in {tmpl}"
+        )
+
+    # Check DashboardServer serves favicon.ico and static/favicon.svg
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}/favicon.ico") as resp:
+            assert resp.status == 200
+            assert "image/svg+xml" in resp.headers.get("Content-Type")
+            assert len(resp.read()) > 0
+
+        with urllib.request.urlopen(f"{base_url}/static/favicon.svg") as resp:
+            assert resp.status == 200
+            assert "image/svg+xml" in resp.headers.get("Content-Type")
+            assert len(resp.read()) > 0
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_237_side_by_side_resizer_gripper():
+    """Verify BUG-237: Split-pane resizer gripper is visible and uses containerRect with fixed table layout."""
+    template_dir = Path(__file__).parent.parent / "provider" / "templates"
+    diff_comp = (template_dir / "diff_component.html.j2").read_text(encoding="utf-8")
+    code_rev = (template_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # Invariant 1: Grip icon is present in both views
+    assert ".sbs-split-resizer::before" in diff_comp
+    assert 'content: "⋮"' in diff_comp
+    assert ".sbs-split-resizer::before" in code_rev
+    assert 'content: "⋮"' in code_rev
+
+    # Invariant 2: VCS diff view uses fixed table layout to prevent inverted resizer motion
+    assert "table-layout: fixed !important;" in diff_comp
+    assert "width: 100% !important;" in diff_comp
+    assert "min-width: max-content" in code_rev
+
+    # Invariant 3: Mouse drag math uses containerRect, not tableRect
+    assert "containerRect = container.getBoundingClientRect()" in diff_comp
+    assert "moveEvent.clientX - containerRect.left" in diff_comp
+    assert "containerRect = container.getBoundingClientRect()" in code_rev
+    assert "moveEvent.clientX - containerRect.left" in code_rev
