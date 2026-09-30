@@ -29,160 +29,6 @@ pytest
 
 ---
 
-## Software Architecture & Code Guidelines
-
-### 1. Test Isolation & Marking
-* Unit tests MUST be completely isolated from implementation code. Do NOT mix unit tests inside implementation files.
-* Core framework tests go in [src/tests/](file:///Users/daparker/gh/hardware/src/tests/) and project-specific tests go in [src/projects/tests/](file:///Users/daparker/gh/hardware/src/projects/tests/).
-* **Slow Tests**: 3D CAD boolean checks, PyBullet physics simulations, and JAX SPH fluid dynamics tests are highly resource-intensive. They must be decorated with `@pytest.mark.slow` (or have `slow` in their test markers) so they do not block the fast pre-commit check. Run them manually or in nightly validation with:
-  ```bash
-  pytest -m "slow"
-  ```
-* **Regression Unit Testing Mandate**: Whenever a regression is identified, investigated, or bisected to a prior change, you MUST introduce dedicated regression unit tests (or add active regression assertions to existing test suites) that explicitly guard against the identified regression before concluding the task. The test case must assert the expected invariant (such as non-zero sheet flow, steady-state waterfall volume, boundary coordinate alignment, or valid frame intervals) to prevent future regressions.
-
-### 2. Geometry Providers & Discoverability
-* Custom geometry projects must be packages nested within [src/projects/](file:///Users/daparker/gh/hardware/src/projects/).
-* The provider class must inherit from `Provider` and be decorated with `@discover_provider` (imported from [src/provider/utils.py](file:///Users/daparker/gh/hardware/src/provider/utils.py)).
-* Always export the provider at the package level (`__init__.py`) and import it in [src/projects/\_\_init\_\_.py](file:///Users/daparker/gh/hardware/src/projects/__init__.py).
-* **Project Manifest Integration**: All custom geometry parts, components, clips, or support structures that participate in assemblies or are needed for manufacturing MUST be explicitly registered in the project's `manifest.yaml` (nested under the project folder) to ensure correct build-chain discovery, STL/OBJ generation, and inclusion in final build artifacts.
-* Builder methods should return shape/build geometries (e.g., `BuildPart`), while diagram/view actions should populate a `Room` object via `room.add(...)` or `room.add_label(...)`.
-
-### 3. Configuration & Lazy Initialization
-* Always use `@cached_property` for `default_config` and any sub-tools (Builders, Configurators) in your provider class. This guarantees correct orchestration timing, prevents staling configs, and minimizes expensive CAD allocations.
-* **Geometry Parametrization & Measurement Comparands**: Always define base geometry parameters in the project's measurements.yaml and read them dynamically via config settings. Compute derived geometry coordinates, dimensions, and branch comparison thresholds dynamically relative to these settings (e.g., using clearances, wall thicknesses, aperture ratios, and flow channel dimensions) instead of hardcoding absolute values. **Do NOT hardcode absolute numeric literals for coordinates, radii, offsets, or comparison thresholds (e.g., `if drain_r >= 0.030:` or `stream_r = 0.015`) in python source code; they must be parameterized in measurements.yaml, derived from URDF boundary metadata, or queried from build123d CAD geometry.** This prevents geometry regressions (e.g. intersections, misaligned steps, or floating shells) when base dimensions are scaled or overridden. For CAD modeling, measurements must be strictly geometrical; operational and physical simulation parameters (such as `tube_velocity`, `tube_pressure_factor`, etc.) should be composed/derived dynamically from base geometric and material parameters rather than configured as independent arbitrary constants.
-* Settings and configuration schemas must use Pydantic models (subclassing `BaseModel`) defined under [src/projects_config/](file:///Users/daparker/gh/hardware/src/projects_config/).
-* General domain data models (such as SPH boundary configs, fluid properties, and simulator schemas) must be separated into the [src/model/](file:///Users/daparker/gh/hardware/src/model/) subfolder.
-* Config overrides can be injected dynamically via environment variables patterned as `<PROJECT>__<SETTING>` (e.g., `EXHAUST_MANIFOLDS__WALL_THICKNESS`).
-* **Data Model Integrity**: Prefer using strongly typed data models with well-defined properties and methods over runtime dynamic attribute parsing (e.g., avoiding loose `hasattr` or `getattr` checks on untyped objects where static type annotations should instead guarantee structure).
-* **Error Handling & Exception Guardrails**: Use explicit bounds checking and validation rather than generic `try/except` blocks. Do NOT use `try/except` structures in core computation or logic paths except to guard I/O operations (such as filesystem access, networking, or database calls). **Do NOT silently ignore errors with try/except/pass blocks; exceptions should either be logged, raised descriptively, or allowed to propagate.**
-* **Parameter Validation**: Prefer Pydantic parameter validation over manual validation checks in code. If dynamic runtime validation is necessary (e.g., in math or physics functions), raise a descriptive `ValueError` to indicate invalid parameters rather than silently failing or falling back.
-* **Method Parameterization**: Prefer passing parameters and configuration models explicitly into methods and functions rather than having them read instance attributes or parent provider properties internally. This keeps computation blocks pure, modular, and easy to unit test.
-* **Configuration Persistence**: For configuration actions, they should persist saved settings to the Pydantic environment file (`.env`) in addition to updating any source project data files (like `measurements.yaml`). This ensures they are immediately active in the build environment.
-* **No Fallback Constants**: Do NOT place fallback constants directly in the codebase when parsing configs or settings (e.g., using a ternary fallback or `getattr` defaults like `0.004` or `0.90`). All configuration fields must be strongly typed and resolved dynamically via configuration models, metadata definitions, or joint state queries rather than having hardcoded fallback/default values defined in python source code. Fallback constants of `0`, `0.0`, or `None` are acceptable to represent unconfigured properties or missing dimensions. This ensures configuration changes propagate cleanly and prevents silent regressions.
-* **No Dead Code**: Unused code (such as dangling clauses, functions, or parameters that do nothing) and settings that do not affect or update anything must be removed from the repository. Maintain a clean, minimalist codebase to prevent confusion and bugs.
-* **No Backward Compatibility Shims**: Do NOT introduce, retain, or propose backward compatibility shims, aliases, legacy wrappers, deprecated fallbacks, or obsolete re-exports (such as `OldClass = NewClass`, `old_module = new_module`, or maintaining duplicate legacy functions/parameters). This repository does NOT support backward compatibility. When refactoring or renaming symbols, packages, or settings, all callers, imports, configurations, and tests MUST be updated directly to canonical current names, and obsolete identifiers must be purged completely.
-* **Parameter & Signature Hygiene**: Whenever modifying, refactoring, or simplifying functions, subroutines, or methods, any parameters that become unused (such as legacy flags, signs like `normal_sign: float`, unused tolerances, or obsolete scalars) MUST be immediately pruned from both the function signature and all caller invocations with each change. Do NOT leave unused parameters in signatures, accept dummy parameters, or pass dead constant arguments.
-* **Material Schema Encapsulation & CLI Purity**: Material properties—including optical attributes, surface rendering, fluid meshing parameters (such as voxel sizes, splat radii, surface thresholds, adaptivity, and screen-space fluid rendering toggles), and physical characteristics—MUST be declared within the declarative material YAML schema (`print_materials.yaml`) and encapsulated in strongly typed models (`MaterialModel`, `MaterialsModel`) rather than exposed as ad-hoc CLI flags or function arguments. CLI interfaces and runner entrypoints (such as `view.py`) must remain focused on operational orchestration (targets, steps, output paths, FPS, view angles) without polluting CLI options with material-level subparameters.
-
-
-### 4. Physical Simulation & URDF Metadata
-* For components participating in physics simulations (e.g., PyBullet, JAX fluids), attach URDF and simulation attributes to shape geometries.
-* Use `URDFMetadata` blocks to wrap geometries, providing `label`, `material`, `density`, `collision_type` (`URDFCollisionType`), etc.
-* Available fields include:
-  - `urdf_label` (`str`): Unique label in URDF.
-  - `urdf_material` (`str`): Material name (e.g., `"petg"`, `"acrylic"`).
-  - `urdf_density` (`float`): Density in $\text{kg/m}^3$.
-  - `urdf_collision_type` (`URDFCollisionType`): Convex, concave, compound, analytical, or none.
-  - Kinematic joint constraints (`urdf_joint_type`, `urdf_joint_axis`, limits) and motor properties (`urdf_motor_type`, target, force).
-* **Mandated `URDFBoundary.from_shape` & Direct CAD Boundary Derivation**: ALL simulation boundaries (`URDFBoundary`)—across all collision types (`ANALYTICAL`, `CONVEX`, `CONCAVE`, `COMPOUND`, etc.) and physical bodies—MUST be derived directly from build123d shapes, solids, compounds, or attached joint ports using `URDFBoundary.from_shape(shape_geom, ...)` or `URDFBoundary.from_part(part, ...)`. Do NOT manually type duplicate numeric literals or re-compute geometric scalars (`radius`, `height`, `thickness`, `xyz`, `intake_pos`, `drain_pos`, etc.) in python source code. B-Rep face dimensions, bounding envelopes, and fluid port coordinates must be extracted automatically from CAD geometry and `RigidJoint` markers. This eliminates the dual single-source-of-truth problem and guarantees that all physics boundaries remain 100% synchronized with CAD specifications.
-* **Physics Parameters Definition**: All physical properties and simulation parameters—including magnetic coupling attraction forces, joint constraints, kinematics, and physical barriers—MUST be defined in the URDF metadata or settings schema rather than being hardcoded in python source code.
-* **Temporary Debugging Constants**: Adding constant values in physics code is acceptable during active local debugging/iteration. However, before concluding a task, proposing changes, or running pre-commit checks, all such temporary constants MUST be replaced with dynamic queries referencing the boundary configuration model or URDF metadata.
-* **Dynamic Physics via URDF & CAD Geometry**: The physics and simulation code (e.g., in [fluid.py](file:///Users/daparker/gh/hardware/src/provider/fluid.py), [boundary.py](file:///Users/daparker/gh/hardware/src/provider/boundary.py), [fluid_body.py](file:///Users/daparker/gh/hardware/src/model/fluid_body.py), and [bullet.py](file:///Users/daparker/gh/hardware/src/provider/bullet.py)) MUST construct CAD context features, fluid bodies, and physics constraints dynamically using values read from URDF metadata, `BoundaryConfig`, PyBullet joint information, or build123d CAD shapes. All threshold comparisons (such as single-stream vs. multi-spillway cascades or fluid zone bounds) must be derived relative to physical dimensions (e.g. delivery tube radius, aperture ratios, or container depths) rather than hardcoded numeric comparands. Extend the URDF metadata schema as needed to support new physical properties.
-* **Coordination of CAD & URDF**: When modifying physical CAD geometries (such as heights, pockets, snouts, or slots), you MUST update the corresponding `URDFMetadata`, joints, and analytical `URDFBoundary` offsets (e.g. `xyz` translations) to ensure physical simulation models remain accurate and zero-intersection constraints are preserved. **The ultimate goal is that the assembled unit's simulated physical behavior matches real-world expectations derived directly from its CAD specifications (e.g., matching flow behavior, motor torque, and clearances to prevent collision tunneling or incorrect flow visualisations).**
-* **PyBullet & Physics Bug Reproduction Mandate**: When investigating, debugging, or fixing issues in PyBullet physics, kinematics, collision boundaries, or fluid dynamics, you MUST create a reproducible test case or isolated reproduction script BEFORE implementing any fix. Actively assert the failing invariant or flawed dynamics in the reproduction to verify the issue. If reproduction is not possible (due to underspecified initial conditions, missing physical parameters, or ambiguous visual artifacts), you MUST pause and ask the user for clarification before modifying production code.
-
-### 5. SPH Fluid Simulation & Numerical Stability
-* **Analytical Boundaries**: Prefer analytical boundaries (`URDFCollisionType.ANALYTICAL`) over concave meshes (`URDFCollisionType.CONCAVE`) for JAX SPH fluid simulation. This prevents boundary particle tunneling and accelerates collision resolution.
-* **Cylinder Boundaries**: For cylinder cavity boundary configurations, treat height as infinite along the local Z axis where possible to avoid particle escape at high pressures.
-* **Fluid Recycling**: Ensure `fluid.recycle_fluid = True` is used in steady-state flow loops, with boundary coordinates matching physical limits.
-* **JAX-JIT Compilation**: Prefer using `jax.jit` and pure functions during physics computations in JAX to leverage static optimization, compilation speedups, and hardware acceleration.
-* **Semantic Coordinate Transforms**: Direct matrix and raw quaternion operations (`q_inv`, `q_mult`, `q_rotate`) are strictly BANNED in JAX simulation and provider production code. All spatial transitions and frame changes MUST use semantic coordinate transformations (`world_to_base_frame`, `base_to_world_frame`, `base_to_local_frame`, `local_to_base_frame`, `base_to_voxel_coord`) and coordinate system conversions (`cartesian_to_cylindrical`, `cylindrical_to_cartesian`, `cartesian_to_spherical`) from `provider.transforms`. This guarantees mathematical consistency across coordinate frames (World, Base Link, Local Link, Voxel Grid) and prevents phantom collision boundaries or force misprojections.
-* **Numeric Damping**: For long-running simulation validations, enforce stabilization velocity damping (e.g., `0.95`) to prevent numerical velocity buildup.
-* **Physical Contact & Non-Floating Invariants**: Fluid particles residing in containers under gravity must make direct physical contact with the bottom floor ($\min(Z) \le Z_{\text{floor}} + 2 \cdot r_s + \text{margin}$) and spread to outer containment boundaries ($r \to R_{\text{wall}}$), forming a continuous fluid mass. Fluid tests must explicitly assert these contact invariants to prevent artificial mid-air hovering, floating shells, or disconnected particle clusters.
-* **Test Failure Replication**: When unphysical behaviors (such as mid-air hovering, suction traps, or hollow shells) are observed during visual simulation inspection, test cases must be updated with assertions that actively reproduce the failure under flawed dynamics and only pass when the physical dynamics are verified.
-
-### 6. Declarative Wiring & Routing Engine
-* Declare footprint, physical dimensions, pinouts, and net connections in the project's `wiring.yaml` file.
-* Keep orthogonal routing layout automated using pathfinding algorithms. Wire path crossover bumps must be computed automatically to avoid visual intersections.
-
-### 7. Documentation & Lint Style
-* Code documentation MUST be PEP-257 compliant and comprehensive. Write docstrings for all custom classes, methods, functions, and properties.
-* Docstring correctness is checked automatically by ruff linting rules (group `D` configured in [pyproject.toml](file:///Users/daparker/gh/hardware/pyproject.toml)).
-* **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum`) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes. This prevents typos and improves code readability/refactoring.
-* **Named Constant Formatting**: Constant values in production code must be assigned to module-level or class-level `ALL_CAPS` named constant variables rather than being embedded as inline magic literals.
-* **Idiomatic Iteration & Enumeration**: Prefer looping over sequences and arrays directly or using `enumerate(...)` (e.g., `for idx, shape in enumerate(b_shapes):` or `for shape in b_shapes:`) rather than indexing by integer range bounds (such as `for k in range(b_shapes.shape[0]):` or `for i in range(len(items)):`).
-* **Pattern Matching (`match` / `case`)**: Prefer Python `match / case` pattern matching syntax when comparing the same subject field or expression against multiple comparands, enum variants, or constant branches rather than chained `if / elif / elif / else` ladders.
-* **Import Placement**: Imports should be done at the top of the file/listing, unless doing so would cause module load race conditions or circular dependencies (such as importing model classes inside provider packages).
-* **Markdown Preview Asset Location**: All markdown preview galleries, rendered frame previews, inspection figures, and simulation snapshots intended for visual evaluation MUST be placed inside the workspace under `recordings/previews/` (e.g., `recordings/previews/README.md` and `recordings/previews/preview_frame_*.png`) using relative image paths. Never place visual markdown preview assets exclusively in external application data or scratch directories outside the workspace, as VSCode's Markdown Preview security sandbox blocks loading external image resources.
-
-
-### 8. Work Tracking & Task Management
-* **Task List (`TODO.md`)**: Maintain and track planned tasks, active implementation steps, outstanding engineering checklist items, and completed work in a `TODO.md` file in the workspace root. Keep the checklist updated (`[ ]` -> `[x]`) as subtasks progress to provide clear visibility and alignment.
-* **Pending Code Review Inspection (`feedback/CR.md`, `feedback/CR_<commit>.md`, `build/code_review.sqlite`, `build/cr_feedback.json`)**: Whenever beginning a new task, turn, or feature implementation, you MUST inspect the `feedback/` directory—including the primary aggregated report (`feedback/CR.md`), granular commit review files (`feedback/CR_<commit>.md`), or query the review database for pending code review feedback, active review comments, or requested revisions. Review feedback can be accessed and manipulated via three synchronized interfaces:
-  1. **Markdown Reports (`feedback/CR.md` & `feedback/CR_<commit>.md`)**: Human-readable overview containing verdict badges, line-by-line file diff links, formatted code snippets, reviewer notes, and an action items checklist (`- [ ]`). Commit-specific reviews are archived to granular `feedback/CR_<commit>.md` files and merged automatically into the central review session.
-  2. **SQLite Backing Store (`build/code_review.sqlite`)**: Robust ACID SQLite store (`SQLiteReviewStore` in [src/provider/code_review/sqlite_store.py](file:///Users/daparker/gh/hardware/src/provider/code_review/sqlite_store.py)). Inspect programmatically using `sqlite3` (e.g. `sqlite3 build/code_review.sqlite "SELECT id, uuid, file_path, start_line, severity, body FROM comments WHERE resolved = 0;"` or `SELECT * FROM metadata;`).
-  3. **Code Review CLI (`python src/dashboard.py`)**: Query review status in the console (`python src/dashboard.py --reviews`), filter unresolved comments (`python src/dashboard.py --reviews --open`), resolve items (`python src/dashboard.py --resolve-comment <id>`), or launch the interactive Quake HUD review dashboard (`python src/dashboard.py`).
-  Any unaddressed feedback in `feedback/CR.md` or granular `feedback/CR_<commit>.md` files (particularly `MUST_FIX` blockers and architecture `PROPOSAL` items) must be prioritized and resolved before progressing to new development tasks.
-* **Bug Tracker & Historical Context Inspection (`feedback/BUGS.md`, `feedback/BUG_<id>.md`, `build/bugs.sqlite`, `build/bugs_state.json`, BUGS.txt)**: Whenever working on tasks, investigating issues, or modifying existing subsystems, you MUST inspect the `feedback/` directory—including both the aggregated bug registry (`feedback/BUGS.md`) and individual granular bug documents (`feedback/BUG_<id>.md`)—for past context, historical failure modes, reproduction steps, and resolved invariants. Leveraging past context prevents re-introducing known regressions and ensures new implementations respect architectural fixes established in prior resolutions. Bug records can be accessed via:
-  1. **Markdown Tracker (`feedback/BUGS.md` & `feedback/BUG_<id>.md`)**: Human-readable registry with severity/category breakdowns, reproduction step walkthroughs, log/screenshot attachment tables, and resolution notes. Individual bugs are tracked with unique UUIDs and exported to `feedback/BUG_<id>.md`.
-  2. **SQLite Backing Store (`build/bugs.sqlite`)**: ACID SQLite store (`SQLiteBugStore` in [src/provider/bug_report/sqlite_store.py](file:///Users/daparker/gh/hardware/src/provider/bug_report/sqlite_store.py)). Inspect or query via `sqlite3` (e.g. `sqlite3 build/bugs.sqlite "SELECT id, uuid, severity, category, title, status FROM bugs WHERE status = 'OPEN';"`) or Python models.
-  3. **Bug Report CLI (`python src/dashboard.py`)**: List active bugs (`python src/dashboard.py --bugs`), list open bugs only (`python src/dashboard.py --bugs --open`), quickly register bugs (`python src/dashboard.py --add-bug "<title>" --severity <SEV> --category <CAT>`), mark issues resolved (`python src/dashboard.py --resolve-bug <BUG-ID> --notes "<notes>"`), or launch the web workstation (`python src/dashboard.py`).
-* **Proactive GitHub CI Monitoring & Stack Auto-Remediation**: Whenever finalizing a task or committing changes on an active branch that has existing remote CI running, you may inspect GitHub Actions CI run results using the GitHub CLI (`gh run list`, `gh pr checks`, `gh run view <run-id> --log-failed`). If any CI checks fail on your active commit stack, diagnose the root cause, verify the fix locally or on Anvil, and stage/commit the fix.
-* **User-Managed Code Review & Autonomous PR Prohibition**: The assistant is strictly PROHIBITED from autonomously creating pull requests (`gh pr create`) or merging pull requests (`gh pr merge`). All pull request creation, peer code reviews, and PR merges MUST be performed manually by the user. When completing tasks or resolving bugs, the assistant must:
-  1. Commit changes cleanly on the local feature branch.
-  2. Execute all required validation checks and test suites (`ruff`, `pytest`, `compileall`).
-  3. Update tracking records (`TODO.md`, bug reports, code review comments).
-  4. Present a concise summary of the branch name, commit SHAs, and git diff for the user to review and submit.
-* **Single-Bug Focus & Atomic Issue Remediation**: To prevent context pollution and attention degradation ("AI senility") during extended problem-solving sessions, you MUST investigate, diagnose, and resolve only ONE bug or defect at a time. Do NOT attempt to batch, multiplex, or concurrently remediate multiple unrelated bugs in a single turn, PR, or commit stack.
-  For each identified defect:
-  1. **Registry & Context**: Query the bug tracker (`feedback/BUGS.md`, `feedback/BUG_<id>.md`, `python src/dashboard.py --bugs`) or register the new defect with reproduction steps and classification.
-  2. **Isolated Reproduction**: Construct an isolated reproduction script or minimal failing unit test asserting the flawed invariant *before* editing production code.
-  3. **Targeted Fix**: Implement the minimal necessary change strictly scoped to the defect.
-  4. **Dedicated Regression Test**: Codify the reproduction into an active unit test asserting the correct invariant.
-  5. **Verification**: Run pre-commit checks (`compileall`, `ruff`, and `pytest`) to verify 100% pass rate.
-  6. **Resolution & Commit**: If successfully verified, mark the bug resolved in `src/dashboard.py` and commit the fix atomically before picking up the next task. If the defect cannot be resolved, update the bug notes with the blocker and leave it `OPEN`.
-
-### 9. Code Generation & Jinja2 Templates
-* **Jinja2 Templating Engine**: Always use Jinja2 (`jinja2`) to generate templated Python scripts, Blender headless scripts, URDF models, or simulation configurations rather than embedding large multi-line f-strings directly inside Python source files.
-* **Dedicated Templates Directory**: All templated script files (`.py.j2`, `.yaml.j2`, `.urdf.j2`, `.sh.j2`) MUST be stored in a dedicated `templates/` folder nested within the respective package or module (e.g., `src/provider/templates/`).
-* **Clean Rendering & Context Separation**: Render external Jinja2 templates via `jinja2.Environment(loader=jinja2.FileSystemLoader(...), trim_blocks=True, lstrip_blocks=True)` or package loaders, passing configuration parameters as explicit dictionaries or strongly typed models.
-* **No Silent Exception Swallowing in Templates**: Templated scripts (`.py.j2`) MUST follow the same code quality standards as Python source files. Never generate `try/except/pass` fallback ladders inside Jinja2 templates; inspect environment capabilities, platform parameters, or application versions deterministically via template variables or standard version properties.
-
-### 10. PCB Design & Headless KiCad Toolchain
-* **Declarative Pipeline**: The PCB engine follows the strict pipeline:
-  `pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files`.
-* **Standard CAM Generation**: Manufacturing board files (RS-274X Gerbers, Excellon NC drills, Gerber job files) must be generated strictly via headless `kicad-cli` (`KiCadCLI`), not custom DIY string formatting or hand-rolled formatters.
-* **Remote Offload via Anvil**: In environments lacking local KiCad or GUI dependencies, run test suites and manufacturing builds on the `anvil` cloud server via `bin/anvil run`.
-* **Interactive Visualization**: Native `.kicad_pcb` and `.kicad_sch` files are rendered interactively in VS Code via the KiCode extension (`sajadghorbani.kicode`, powered by KiCanvas) and in 3D CAD via `ocp_vscode`.
-* **Subassembly Footprint Scoping & Isolation**: Multi-board and rigid-flex assemblies must scope footprints, passives, and connectors explicitly to target subassemblies (via `shape_ref: carrier_board` or `shape_ref: flex_tail`). Never duplicate components across subassemblies or rely on hardcoded component names (e.g. `J2`) for footprint queries.
-* **Canonical Component Reference Designator Naming**: All components across PCB designs, schematics, netlists, manifests, and BOMs MUST adhere to standard canonical reference designators using single-letter type prefixes followed by sequential digits:
-  - `Rn`: Resistors (`R1`, `R2`, `R3`, ...)
-  - `Cn`: Capacitors (`C1`, `C2`, `C3`, ...)
-  - `Dn`: Diodes (`D1`, `D2`, ...)
-  - `Qn`: Transistors and FETs (`Q1`, `Q2`, ...)
-  - `Yn`: Crystals and resonators (`Y1`, `Y2`, ...)
-  - `Jn`: Connectors, receptacles, and headers (`J1`, `J2`, `J3`, `J4`, ...)
-  - `Un`: Integrated circuits (ICs) and other complex components/transducers (`U1`, `U2`, `U3`, `U4`, `U5`, ...)
-  - `TPn`: Test points (`TP1`, `TP2`, `TP3`, `TP4`, ...)
-  Never use ad-hoc descriptive names (such as `J_USB`, `J_FLEX`, `SPK1`, `C_IN`, `C_AMP`, `R_CC1`, `R_BOOT`, `TP_GND`, `TP_SDA`) in production footprints, netlists, or schematic sheet models.
-* **Planar Flex Routing & Silkscreen Labeling**: Flexible PCB tails and ribbons must maintain planar single-layer routing without trace crossovers, ensure non-overlapping capacitive electrode traces with generous keepouts ($\ge 1.5$ mm clearance to flex outline edges), and provide silkscreen channel callouts directly on the substrate.
-* **Auto-Router Grid & Clearance Parity**: The PCB A* auto-router and DRC clearance definitions must maintain mathematical parity: trace widths and obstacle expansion margins must ensure adjacent grid corridors do not violate trace-to-trace spacing constraints ($s \ge (w_1 + w_2)/2 + \text{clearance}$). Stitching vias to internal power/ground planes and escape corridors must be generated dynamically from netlist graph topology rather than hardcoded polyline routes.
-* **Review Session Feedback & SQLite Persistence**: The interactive code review web dashboard (`dashboard.py /review`) and server (`DashboardServer` / `ReviewServer`) MUST persist session feedback, comments, and file review statuses across server restarts to prevent losing active reviewer notes during development iterations. Feedback is persisted atomically to SQLite (`build/code_review.sqlite`, `SQLiteReviewStore`) with automatic synchronization to JSON state (`build/cr_feedback.json`), Markdown reports (`feedback/CR.md`), and granular commit review files (`feedback/CR_<commit>.md`).
-* **Pre-Computed Route Persistence Purity**: PCB viewing workflows (`view.py`) and standard artifact generation MUST consume pre-computed, persisted routing artifacts (`routing.yaml`, `routing_flex.yaml`) rather than invoking the A* auto-router on the fly. Auto-routing is an explicit orchestration action performed via `python src/config.py '<target>'`.
-* **Net Escape Prioritization in Auto-Routing**: In high-density or mixed-signal PCB layouts, local, pin-dense escape nets (such as MCU crystal oscillators, reset lines, and boot controls) MUST be scheduled and routed before wide global multi-drop buses (PCIe, MIPI). Routing long global buses first greedily consumes corridors adjacent to IC footprints, walling off dense component escape channels on both copper layers and causing A* search failure.
-* **Edge-Mounted Connector DRC Boundary Exemption**: Receptacle connectors intended to mate with external plugs (such as USB-C, card-edge, or FPC sockets) must be permitted to sit flush with or slightly overhang board edges. DRC board boundary containment rules must exempt edge-facing connectors whose bounding center falls within the board outline rather than falsely flagging edge clearances.
-* **Subassembly Netlist Scoping & Antenna Termination Invariants**: Multi-subassembly projects sharing a top-level wiring declaration must scope connectivity DRC checks strictly to nets having two or more terminals on the specific subassembly. In addition, antenna/stub detection algorithms must recognize non-pad copper structures (such as capacitive touch electrodes) as valid termination nodes to avoid false positive antenna violations.
-* **Structured Bug Tracking, SQLite Backing Store & Git LFS Attachments**: Defect investigation, routing anomalies, and visual flaws must be tracked systematically using the Dashboard CLI (`src/dashboard.py`) and persisted in the SQLite backing store (`build/bugs.sqlite`, `SQLiteBugStore`), synchronized automatically to `feedback/BUGS.md`, individual issue files (`feedback/BUG_<id>.md`), and `build/bugs_state.json`. All bug report attachments (`build/attachments/` and `feedback/attachments/`) are tracked in **GitHub LFS** and considered **non-confidential** and public to the repository; never attach sensitive credentials, secret tokens, private keys, or proprietary secrets. Every reported bug must specify clear reproduction criteria, classification metadata, and dedicated regression test coverage before being marked resolved.
-* **Unresolved Bug Persistence & Documentation Mandate**: If a bug or defect cannot be fully resolved in the current turn or session (due to missing datasheets, ambiguous user specifications, external blockers, or incomplete verification), you MUST update the bug entry in SQLite, `feedback/BUGS.md`, and `feedback/BUG_<id>.md` (via `python src/dashboard.py`) with all investigation notes, reproduction steps, and blocking details, and leave its status as `OPEN`. NEVER mark an unresolved or partially completed bug as resolved, closed, or silently drop it from tracking.
-* **Authoritative Datasheet Grounding & Component Sourcing Mandate**: ALWAYS obtain connector, IC, and peripheral information (such as pinmaps, pinmux alternate functions, physical pad assignments, recommended land patterns/footprints, absolute maximum ratings, decoupling rules, voltage tolerances, and powering requirements) directly from the official manufacturer/supplier website via datasheets, hardware manuals, or technical documentation. NEVER trust or rely on third-party internet summaries, unverified forum pinouts, LLM conjectures, or synthetic placeholder ball/pin assignments. All pinmux tables, signal allocations, and component specifications must be cross-referenced with and strictly grounded in manufacturer documentation archived locally in the project's `docs/datasheets/` directory.
-* **Schematic Router Invariants & Detour Routing Rules**:
-  - **No Collinear Overlaps**: Parallel signal wires and dogleg corridor segments must never share collinear coordinates. Staggered doglegs must be sorted directionally (step-down vs step-up) so that vertical drops/rises transition at distinct X coordinates with clean jumper bridge crossings.
-  - **Corridor Boundary Clearance**: Vertical dogleg corridors must be strictly constrained to the channel interior ($x_v \in [x_{\text{left}} + 10.0, x_{\text{right}} - 10.0]$) to ensure wire stubs extending from component symbols have sufficient horizontal clearance and never run on top of connector/IC symbols or pin labels.
-  - **Channel Passive Spacing**: Shunt and pull-up/pull-down passives (capacitors, resistors) residing in the same inter-component channel must be grouped together across overlapping channel spans and spaced with a generous pitch ($\ge 20.0$ mm pitch, minimum separation $\ge 16.0$ mm) to prevent symbol, reference designator, or value text collisions.
-  - **Concentric Detour Routing**: On-sheet wire detours around IC footprints (such as routing underneath components for non-facing pins) must be sorted concentrically by pin Y-coordinates. Lower pins take inner tracks and higher pins take outer tracks (or vice versa depending on pin direction) to guarantee onion-style nested routing with zero wire crossings and no off-sheet connectors.
-
-
-
-### 11. Component Selection & Bare-Metal Firmware Co-Design
-* **Target Firmware Environment**: The downstream target execution environment is bare-metal Rust (`no_std`, Embassy asynchronous executor, `embedded-hal` driver abstractions, `defmt` logging, stack-based zero-allocation concurrency, and static memory analysis) as detailed in the firmware repository guidelines (`/Users/daparker/gh/firmware/CONTRIBUTING.md`).
-* **Programmable Component Qualification**: Any active electronic component, sensor IC, PMIC, touch controller, motor driver, or microcontroller integrated into hardware designs, schematics, manifests, or BOMs that requires software configuration or control MUST meet the following co-design criteria:
-  - **Open-Source Driver Code**: An existing, permissive open-source driver (preferably a Rust crate implementing `embedded-hal` traits, or a clean, readily portable C library) must be publicly available.
-  - **Public Datasheet**: Complete, non-confidential datasheets covering electrical characteristics, pinouts, timing, and typical application circuits must be available.
-  - **Comprehensive Register Maps**: Full register maps documenting all register addresses, bit fields, reset defaults, and initialization/configuration sequences must be accessible.
-  - **No Binary Blobs**: Components requiring proprietary closed-source binary firmware blobs, undocumented black-box registers, or NDA-encumbered software stacks are strictly prohibited.
-
----
-
 ## Remote Cloud Server (`anvil`)
 
 For resource-intensive workloads, parameter sweeps, fluid dynamics simulations, integration smoke tests (`python src/smoke.py`), validation experiments, and data collection, the `anvil` cloud server is available:
@@ -199,7 +45,99 @@ Host anvil
   StrictHostKeyChecking accept-new
 ```
 
-### Usage Guidelines:
+### Usage Guidelines
 1. **Remote Execution**: Use `bin/anvil run "<command>"` or SSH targeting `ubuntu@anvil` (or `ssh anvil`) to run full test suites (`pytest`), slow physics benchmarks (`pytest -m "slow"`), large JAX SPH simulation grids, parameter sweeps, and integration smoke tests (`python src/smoke.py`).
 2. **Conda Environment & Binaries**: On `anvil`, execute commands within the `cq` conda environment using `conda run -n cq --no-capture-output <command>` (prefer relative executable names like `python`, `pytest`, `ruff` over absolute paths).
 3. **Preceding Run Cancellation**: Before initiating a new remote execution or benchmark on `anvil`, ensure any active or stale background runs of the same command are cancelled or terminated to avoid cloud resource contention and duplicate processing.
+
+---
+
+## Core Architecture & Code Invariants
+
+### 1. Test Isolation & Regression Unit Testing
+* Unit tests MUST be completely isolated from implementation code. Core framework tests go in [src/tests/](file:///Users/daparker/gh/hardware/src/tests/) and project-specific tests go in [src/projects/tests/](file:///Users/daparker/gh/hardware/src/projects/tests/).
+* **Slow Tests**: 3D CAD boolean checks, PyBullet physics simulations, and JAX SPH fluid dynamics tests are highly resource-intensive and must be decorated with `@pytest.mark.slow` (or have `slow` in their test markers) so they do not block fast pre-commit checks:
+  ```bash
+  pytest -m "slow"
+  ```
+* **Regression Unit Testing Mandate**: Whenever a regression is identified, investigated, or bisected to a prior change, you MUST introduce dedicated regression unit tests (or add active regression assertions to existing test suites) that explicitly guard against the identified regression before concluding the task.
+
+### 2. Geometry Providers & Discoverability
+* Custom geometry projects must be packages nested within [src/projects/](file:///Users/daparker/gh/hardware/src/projects/).
+* The provider class must inherit from `Provider` and be decorated with `@discover_provider` (imported from [src/provider/utils.py](file:///Users/daparker/gh/hardware/src/provider/utils.py)). Always export the provider at the package level (`__init__.py`) and import it in [src/projects/\_\_init\_\_.py](file:///Users/daparker/gh/hardware/src/projects/__init__.py).
+* **Project Manifest Integration**: All custom geometry parts, components, clips, or support structures that participate in assemblies or are needed for manufacturing MUST be explicitly registered in the project's `manifest.yaml` to ensure correct build-chain discovery and inclusion in build artifacts.
+* Builder methods should return shape/build geometries (e.g., `BuildPart`), while diagram/view actions should populate a `Room` object via `room.add(...)` or `room.add_label(...)`.
+
+### 3. Configuration & Data Model Integrity
+* Always use `@cached_property` for `default_config` and any sub-tools (Builders, Configurators) in your provider class to guarantee correct orchestration timing and minimize expensive CAD allocations.
+* **Geometry Parametrization**: Define base geometry parameters in the project's `measurements.yaml` and read them dynamically via config settings. Compute derived geometry coordinates, dimensions, and branch comparison thresholds dynamically relative to these settings rather than hardcoding numeric literals.
+* **Data Model Integrity & Validation**: Settings and configuration schemas must use Pydantic models (subclassing `BaseModel`) defined under [src/projects_config/](file:///Users/daparker/gh/hardware/src/projects_config/). Prefer strongly typed data models over runtime dynamic attribute parsing (`hasattr` / `getattr`). Prefer Pydantic validation over manual checks in code; if dynamic validation is necessary, raise a descriptive `ValueError`.
+* **Method Parameterization**: Pass parameters and configuration models explicitly into methods and functions rather than having them read instance attributes or parent provider properties internally.
+* **Configuration Persistence**: For configuration actions, persist saved settings to the Pydantic environment file (`.env`) in addition to updating source data files (`measurements.yaml`).
+* **No Fallback Constants**: Do NOT place fallback constants directly in the codebase when parsing configs or settings (e.g., ternary fallbacks or `getattr` defaults like `0.004` or `0.90`). All configuration fields must be strongly typed and resolved dynamically. Fallbacks of `0`, `0.0`, or `None` are acceptable to represent unconfigured properties.
+
+### 4. Strict Code Cleanliness & Hygiene
+* **No Dead Code**: Unused code (dangling clauses, functions, or parameters that do nothing) and settings that do not affect anything must be removed from the repository.
+* **No Backward Compatibility Shims**: Do NOT introduce, retain, or propose backward compatibility shims, aliases, legacy wrappers, deprecated fallbacks, or obsolete re-exports. Update callers, imports, and tests directly to canonical current names and purge obsolete identifiers completely.
+* **Parameter & Signature Hygiene**: When modifying, refactoring, or simplifying functions, subroutines, or methods, any parameters that become unused MUST be immediately pruned from both the function signature and all caller invocations with each change.
+* **Error Handling Guardrails**: Use explicit bounds checking and validation rather than generic `try/except` blocks. Do NOT use `try/except` structures in core computation or logic paths except to guard I/O operations (filesystem, network, database). Never silently ignore errors with `try/except/pass` blocks; exceptions must be logged, raised descriptively, or allowed to propagate.
+
+### 5. Documentation & Lint Style
+* Code documentation MUST be PEP-257 compliant and comprehensive. Write docstrings for all custom classes, methods, functions, and properties.
+* **String Enums for Keys**: Prefer defining structured string enums (subclassing `str` and `Enum`) over passing raw string literals directly for dictionary keys, joint/link labels, or configuration modes.
+* **Named Constant Formatting**: Constant values in production code must be assigned to module-level or class-level `ALL_CAPS` named constant variables rather than being embedded as inline magic literals.
+* **Idiomatic Iteration & Pattern Matching**: Prefer looping over sequences directly or using `enumerate(...)` rather than indexing by integer range bounds. Prefer Python `match / case` pattern matching syntax when comparing against multiple variants or enum branches.
+* **Import Placement**: Imports should be placed at the top of the file, unless doing so would cause circular dependencies.
+* **Markdown Preview Asset Location**: All markdown preview galleries, rendered frame previews, inspection figures, and simulation snapshots intended for visual evaluation MUST be placed inside the workspace under `recordings/previews/` using relative image paths.
+
+---
+
+## Workflow & Issue Tracking Principles
+
+### 1. Work Tracking & Task Management
+* **Task List (`TODO.md`)**: Maintain and track planned tasks, active implementation steps, outstanding engineering checklist items, and completed work in `TODO.md` in the workspace root. Keep checklist items updated (`[ ]` -> `[x]`) as subtasks progress.
+
+### 2. Pending Code Review Inspection
+* Whenever beginning a new task, turn, or feature implementation, you MUST inspect the `feedback/` directory—including the primary aggregated report (`feedback/CR.md`), granular commit review files (`feedback/CR_<commit>.md`), or query the review database (`build/code_review.sqlite`, `python src/dashboard.py list-reviews --open`) for pending code review feedback, active review comments, or requested revisions. Any unaddressed feedback (particularly `MUST_FIX` blockers) must be prioritized and resolved before progressing to new development tasks.
+
+### 3. Bug Tracker & Historical Context Inspection
+* Whenever working on tasks, investigating issues, or modifying existing subsystems, you MUST inspect the bug tracking records (`feedback/BUGS.md`, `feedback/BUG_<id>.md`, `build/bugs.sqlite`, `python src/dashboard.py list-bugs --open`) for past context, historical failure modes, reproduction steps, and resolved invariants. Leveraging past context prevents re-introducing known regressions. All bug report attachments (`attachments/`, `build/attachments/`, `feedback/attachments/`) are tracked in **GitHub LFS** and considered **non-confidential** and public to the repository; never attach sensitive credentials, secret tokens, private keys, or proprietary secrets.
+
+### 4. Single-Bug Focus & Atomic Issue Remediation
+* To prevent context pollution and attention degradation during extended problem-solving sessions, you MUST investigate, diagnose, and resolve only ONE bug or defect at a time:
+  1. **Registry & Context**: Query the bug tracker or register the new defect with reproduction steps and classification.
+  2. **Isolated Reproduction**: Construct an isolated reproduction script or minimal failing unit test asserting the flawed invariant *before* editing production code.
+  3. **Targeted Fix**: Implement the minimal necessary change strictly scoped to the defect.
+  4. **Dedicated Regression Test**: Codify the reproduction into an active unit test asserting the correct invariant.
+  5. **Verification**: Run pre-commit checks (`compileall`, `ruff`, and `pytest`) to verify 100% pass rate.
+  6. **Resolution & Commit**: Mark the bug resolved in `src/dashboard.py` and commit the fix atomically before picking up the next task.
+
+### 5. User-Managed Code Review & Autonomous PR Prohibition
+* The assistant is strictly PROHIBITED from autonomously creating pull requests (`gh pr create`) or merging pull requests (`gh pr merge`). All pull request creation, peer code reviews, and PR merges MUST be performed manually by the user.
+
+---
+
+## Modular Subsystem & Domain Architecture Guides
+
+To minimize global context overhead and prevent unnecessary token burn, domain- and subsystem-specific architectural mandates are maintained in dedicated reference documents under `docs/`:
+
+1. [SPH Fluid Dynamics & Numerical Stability](file:///Users/daparker/gh/hardware/docs/sph_fluid_dynamics.md)
+   - Analytical vs concave boundary representations and cylinder cavity invariants.
+   - JAX-JIT compilation, semantic coordinate transforms, and fluid recycling.
+   - Numerical velocity damping and physical contact non-floating verification.
+
+2. [Physics & URDF Simulation Guidelines](file:///Users/daparker/gh/hardware/docs/physics_urdf_simulation.md)
+   - URDF metadata specification and kinematic joint definitions.
+   - Mandated direct CAD boundary derivation via `URDFBoundary.from_shape` with zero duplicate numeric literals.
+   - Dynamic physics parameter configuration and PyBullet bug reproduction mandate.
+
+3. [Declarative Wiring & PCB Engine](file:///Users/daparker/gh/hardware/docs/declarative_wiring_pcb.md)
+   - Declarative PCB toolchain, manifest pipeline, and headless KiCad CAM generation.
+   - Subassembly footprint scoping and canonical component reference designators (`R1`, `C1`, `D1`, `Q1`, `Y1`, `J1`, `U1`, `TP1`).
+   - PCB routing invariants, flex planar keepouts, DRC exemptions, and schematic router detour rules.
+   - Component selection and bare-metal Rust (`no_std`, Embassy) firmware co-design criteria.
+
+4. [VCS Workstation, Code Review & Quake HUD Templates](file:///Users/daparker/gh/hardware/docs/vcs_code_review.md)
+   - Jinja2 code generation, dedicated template directory structures, and error guardrails.
+   - Review session feedback persistence and atomic SQLite backing store.
+   - Structured bug tracking, Git LFS attachments, and VCS CLI subcommand parity.
