@@ -1188,6 +1188,7 @@
           <div class="diff-mode-controls">
             <button id="btnModeSbs" class="quake-btn quake-btn-gold quake-btn-sm" onclick="setDiffMode('side_by_side')">Side-by-Side</button>
             <button id="btnModeUnified" class="quake-btn quake-btn-default quake-btn-sm" onclick="setDiffMode('unified')">Unified</button>
+            <button id="btnToggleWrap" class="quake-btn quake-btn-default quake-btn-sm" onclick="toggleWordWrap()" title="Toggle Word Wrap (Shortcut: W)">Wrap: Off</button>
             <button class="quake-btn quake-btn-default quake-btn-sm" onclick="onCopySnippetClicked()" title="Copy active diff snippet">📋 Copy</button>
           </div>
         </div>
@@ -1950,6 +1951,32 @@
       if (state.currentDiff) {
         const diffBody = document.getElementById("diffBodyContainer");
         QuakeDiffEngine.renderDiff(diffBody, state.currentDiff, state.diffMode);
+      }
+    }
+
+    // Word Wrap Toggle (BUG-245)
+    function toggleWordWrap() {
+      const isWrapped = document.body.classList.toggle("diff-word-wrap");
+      localStorage.setItem("quake_diff_word_wrap", isWrapped ? "true" : "false");
+      updateWrapButtonState(isWrapped);
+    }
+
+    function initWordWrap() {
+      const saved = localStorage.getItem("quake_diff_word_wrap");
+      const isWrapped = saved === "true";
+      if (isWrapped) {
+        document.body.classList.add("diff-word-wrap");
+      } else {
+        document.body.classList.remove("diff-word-wrap");
+      }
+      updateWrapButtonState(isWrapped);
+    }
+
+    function updateWrapButtonState(isWrapped) {
+      const btn = document.getElementById("btnToggleWrap");
+      if (btn) {
+        btn.textContent = isWrapped ? "Wrap: On" : "Wrap: Off";
+        btn.className = isWrapped ? "quake-btn quake-btn-gold quake-btn-sm" : "quake-btn quake-btn-default quake-btn-sm";
       }
     }
 
@@ -2873,11 +2900,14 @@
         togglePane("smartlog");
       } else if (e.key === "]") {
         togglePane("files");
+      } else if (e.key.toLowerCase() === "w") {
+        toggleWordWrap();
       }
     });
 
     // Initialize on load
     window.addEventListener("DOMContentLoaded", () => {
+      initWordWrap();
       initPanelResizers();
       updateMergedVisibility();
       if (!INITIAL_SYNC_DONE) {

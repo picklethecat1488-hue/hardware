@@ -2586,3 +2586,30 @@ def test_regression_bug_244_commit_subcommand_execution(tmp_path: Path, monkeypa
     main(["--commit", "Commit via top-level flag"])
     assert engine.get_head_commit_message() == "Commit via top-level flag"
     assert len(engine.get_working_tree_files()) == 0
+
+
+def test_regression_bug_245_word_wrap_in_diff_views() -> None:
+    """Verify BUG-245: Word wrap toggle button, persistence, and pre-wrap CSS in diff views."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_comp_text = (templates_dir / "diff_component.html.j2").read_text(encoding="utf-8")
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. diff_component.html.j2 has .diff-word-wrap styling with pre-wrap and overflow-wrap
+    assert ".diff-word-wrap" in diff_comp_text
+    assert "white-space: pre-wrap !important;" in diff_comp_text
+    assert (
+        "overflow-wrap: anywhere !important;" in diff_comp_text
+        or "word-break: break-word !important;" in diff_comp_text
+    )
+
+    # 2. diff_view.html.j2 has wrap button and toggle function
+    assert 'id="btnToggleWrap"' in diff_view_text
+    assert "toggleWordWrap" in diff_view_text
+    assert "quake_diff_word_wrap" in diff_view_text
+
+    # 3. code_review.html.j2 has wrap button, styles, and toggle function
+    assert 'id="btnToggleWrap"' in cr_text
+    assert ".diff-word-wrap" in cr_text
+    assert "toggleWordWrap" in cr_text
+    assert "quake_diff_word_wrap" in cr_text

@@ -226,6 +226,23 @@
     max-width: 900px;
   }
 
+  /* Word Wrap in Diff Views (BUG-245) */
+  .diff-word-wrap .diff-sbs-row td.diff-code-cell,
+  .diff-word-wrap .diff-sbs-row td.old-code,
+  .diff-word-wrap .diff-sbs-row td.new-code,
+  .diff-word-wrap .diff-unified-text {
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    max-width: none !important;
+  }
+
+  .diff-word-wrap .diff-unified-wrap {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+
   .diff-sbs-row.row-delete td.old-code,
   .diff-sbs-row.row-delete td.old-lineno,
   .diff-sbs-row.row-delete td.old-marker {
