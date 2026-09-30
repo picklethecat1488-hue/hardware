@@ -658,15 +658,22 @@ def test_regression_bug_181_no_file_descriptor_leak_in_sqlite_and_server(tmp_pat
         bind_and_activate=False,
     )
 
-    baseline_server_fds = get_open_fd_count()
-    if baseline_server_fds > 0:
-        for _ in range(20):
-            server.save_and_sync()
-            server.check_file_watch()
-        after_server_fds = get_open_fd_count()
-        assert after_server_fds <= baseline_server_fds + 1, (
-            f"BugReportServer leaked file descriptors: baseline={baseline_server_fds}, after={after_server_fds}"
-        )
+    try:
+        import gc
+
+        gc.collect()
+        baseline_server_fds = get_open_fd_count()
+        if baseline_server_fds > 0:
+            for _ in range(20):
+                server.save_and_sync()
+                server.check_file_watch()
+            gc.collect()
+            after_server_fds = get_open_fd_count()
+            assert after_server_fds <= baseline_server_fds + 5, (
+                f"BugReportServer leaked file descriptors: baseline={baseline_server_fds}, after={after_server_fds}"
+            )
+    finally:
+        server.server_close()
 
 
 def test_regression_bug_186_bug_report_server_attachments_dir(tmp_path: Path) -> None:

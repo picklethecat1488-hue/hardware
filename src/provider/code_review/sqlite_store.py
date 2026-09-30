@@ -295,13 +295,31 @@ class SQLiteReviewStore:
                     (f_state.path, f_state.status.value, f_state.notes),
                 )
 
-            # 4. Sync comments
+            # 4. Sync comments: scope deletion to session's revisions or commit to avoid deleting other commits' comments (BUG-236)
             current_cids = {c.id for c in session.comments}
-            if current_cids:
-                placeholders = ",".join("?" for _ in current_cids)
-                conn.execute(f"DELETE FROM comments WHERE id NOT IN ({placeholders})", list(current_cids))
+            scope_commits = list(session.revisions) if session.revisions else []
+            if session.commit_hash and session.commit_hash not in scope_commits:
+                scope_commits.append(session.commit_hash)
+
+            if scope_commits:
+                commit_placeholders = ",".join("?" for _ in scope_commits)
+                if current_cids:
+                    placeholders = ",".join("?" for _ in current_cids)
+                    conn.execute(
+                        f"DELETE FROM comments WHERE (commit_hash IN ({commit_placeholders}) OR commit_hash = '') AND id NOT IN ({placeholders})",
+                        scope_commits + list(current_cids),
+                    )
+                else:
+                    conn.execute(
+                        f"DELETE FROM comments WHERE commit_hash IN ({commit_placeholders}) OR commit_hash = ''",
+                        scope_commits,
+                    )
             else:
-                conn.execute("DELETE FROM comments")
+                if current_cids:
+                    placeholders = ",".join("?" for _ in current_cids)
+                    conn.execute(f"DELETE FROM comments WHERE id NOT IN ({placeholders})", list(current_cids))
+                else:
+                    conn.execute("DELETE FROM comments")
 
             for c in session.comments:
                 self._upsert_comment_in_conn(conn, c)

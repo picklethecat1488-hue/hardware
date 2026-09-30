@@ -45,6 +45,7 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboard and data query endpoints."""
+        self.server.check_file_watch()
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -451,15 +452,14 @@ class ReviewServer(ThreadingHTTPServer):
         if not self.session.commit_hash:
             self.session.commit_hash = head_commit
 
-        # Requirement 7: Auto merge CR feedback if CR file already exists for commit
-        if self.session.commit_hash and self.feedback_dir.exists():
-            cr_commit_path = self.feedback_dir / f"CR_{self.session.commit_hash}.md"
-            if cr_commit_path.exists():
-                self.session = self.exporter.merge_commit_feedback(self.session, cr_commit_path)
-        elif loaded_session is not None and self.feedback_dir.exists():
-            cr_main_path = self.feedback_dir / "CR.md"
-            if cr_main_path.exists():
-                self.session = self.exporter.merge_commit_feedback(self.session, cr_main_path)
+        # Requirement 7: Auto merge CR feedback if CR files exist in feedback_dir
+        if self.feedback_dir.exists():
+            for cr_file in sorted(self.feedback_dir.glob("CR_*.md")):
+                self.session = self.exporter.merge_commit_feedback(self.session, cr_file)
+            if (self.feedback_dir / "CR.md").exists():
+                self.session = self.exporter.merge_commit_feedback(self.session, self.feedback_dir / "CR.md")
+            if self.session.comments:
+                self.sqlite_store.save_session(self.session)
 
         # Attempt port binding if bind_and_activate is enabled
         self.host = host
@@ -476,6 +476,10 @@ class ReviewServer(ThreadingHTTPServer):
             self.actual_port = self.server_port
         else:
             self.actual_port = port
+
+        self._lock = threading.RLock()
+        self._is_internal_saving = False
+        self.feedback_mtime = self._get_feedback_dir_mtime()
 
     def server_close(self) -> None:
         """Close socket if bound."""
@@ -500,6 +504,35 @@ class ReviewServer(ThreadingHTTPServer):
 
         threading.Thread(target=_delayed_shutdown, daemon=True).start()
 
+    def _get_feedback_dir_mtime(self) -> float:
+        """Compute the maximum mtime across all CR markdown files in feedback_dir."""
+        if not self.feedback_dir.exists():
+            return 0.0
+        try:
+            max_mtime = self.feedback_dir.stat().st_mtime
+            for f in self.feedback_dir.glob("CR*.md"):
+                try:
+                    mtime = f.stat().st_mtime
+                    if mtime > max_mtime:
+                        max_mtime = mtime
+                except OSError:
+                    pass
+            return max_mtime
+        except OSError:
+            return 0.0
+
+    def check_file_watch(self) -> bool:
+        """Check if feedback_dir was modified externally and reload state."""
+        with self._lock:
+            if self._is_internal_saving:
+                return False
+            curr_fb_mtime = self._get_feedback_dir_mtime()
+            if curr_fb_mtime > self.feedback_mtime + 0.001:
+                self.sync_feedback()
+                self.feedback_mtime = curr_fb_mtime
+                return True
+            return False
+
     def sync_feedback(self) -> dict:
         """Scan feedback/ directory for CR_*.md files and merge feedback into SQLite."""
         merged_count = 0
@@ -514,49 +547,55 @@ class ReviewServer(ThreadingHTTPServer):
 
     def save_and_sync(self) -> Path:
         """Persist session to SQLite, export JSON, and render updated Markdown report."""
-        self.session.updated_at = datetime.now(timezone.utc).isoformat()
-        self.sqlite_store.save_session(self.session)
-        self.exporter.save_session_json(self.session, self.state_file)
-        total_files = len(self.git_engine.get_changed_files("working"))
-
-        is_feedback_dir = self.markdown_output.resolve().parent.name == "feedback"
-        if self.session.comments or not is_feedback_dir:
-            res = self.exporter.export_markdown(
-                self.session,
-                self.markdown_output,
-                total_repo_files=total_files,
-            )
-        else:
-            if self.markdown_output.exists():
-                try:
-                    self.markdown_output.unlink()
-                except OSError:
-                    pass
-            res = self.markdown_output
-
-        # Export commit-specific CR_<commit>.md ONLY if there are comments for this commit
-        commit_sha = self.session.commit_hash or self.git_engine.get_head_commit()
-        if commit_sha:
+        with self._lock:
+            self._is_internal_saving = True
             try:
-                self.exporter.export_commit_markdown(
-                    self.session, commit_sha, self.feedback_dir, total_repo_files=total_files
-                )
-            except OSError:
-                pass
+                self.session.updated_at = datetime.now(timezone.utc).isoformat()
+                self.sqlite_store.save_session(self.session)
+                self.exporter.save_session_json(self.session, self.state_file)
+                total_files = len(self.git_engine.get_changed_files("working"))
 
-        cr_md = self.repo_root / "build" / "CR.md"
-        if cr_md.parent.exists() and self.markdown_output.resolve() != cr_md.resolve():
-            if self.session.comments:
-                try:
-                    self.exporter.export_markdown(self.session, cr_md, total_repo_files=total_files)
-                except OSError:
-                    pass
-            elif cr_md.exists():
-                try:
-                    cr_md.unlink()
-                except OSError:
-                    pass
-        return res
+                is_feedback_dir = self.markdown_output.resolve().parent.name == "feedback"
+                if self.session.comments or not is_feedback_dir:
+                    res = self.exporter.export_markdown(
+                        self.session,
+                        self.markdown_output,
+                        total_repo_files=total_files,
+                    )
+                else:
+                    if self.markdown_output.exists():
+                        try:
+                            self.markdown_output.unlink()
+                        except OSError:
+                            pass
+                    res = self.markdown_output
+
+                # Export commit-specific CR_<commit>.md ONLY if there are comments for this commit
+                commit_sha = self.session.commit_hash or self.git_engine.get_head_commit()
+                if commit_sha:
+                    try:
+                        self.exporter.export_commit_markdown(
+                            self.session, commit_sha, self.feedback_dir, total_repo_files=total_files
+                        )
+                    except OSError:
+                        pass
+
+                cr_md = self.repo_root / "build" / "CR.md"
+                if cr_md.parent.exists() and self.markdown_output.resolve() != cr_md.resolve():
+                    if self.session.comments:
+                        try:
+                            self.exporter.export_markdown(self.session, cr_md, total_repo_files=total_files)
+                        except OSError:
+                            pass
+                    elif cr_md.exists():
+                        try:
+                            cr_md.unlink()
+                        except OSError:
+                            pass
+                self.feedback_mtime = self._get_feedback_dir_mtime()
+                return res
+            finally:
+                self._is_internal_saving = False
 
     def get_url(self) -> str:
         """Return the browser URL for accessing the review dashboard."""

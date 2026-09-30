@@ -1062,49 +1062,49 @@ class CarrierBoardProvider(Provider):
                 )
 
             # BUG-183, BUG-209, BUG-219, BUG-231: Silkscreen labels for Status and Overrides
-            with Locations((10.5, -19.0)):
+            with Locations((10.5, -13.5)):
                 SilkscreenText("OVERRIDES", layer="F.SilkS", font_size=0.75, thickness=0.11)
-            with Locations((4.5, -18.5)):
+            with Locations((4.5, -12.5)):
                 SilkscreenText("STATUS", layer="F.SilkS", font_size=0.75, thickness=0.11)
             # Reset button label close to U1 central (0, 0) and SW1 (0, -11) (BUG-219)
             with Locations((0.0, -9.2)):
                 SilkscreenText("RESET", layer="F.SilkS", font_size=0.6, thickness=0.09)
             # Jumper labels placed to the right of each horizontal jumper at X=14.0 (BUG-219)
-            with Locations((14.0, -21.5)):
+            with Locations((14.0, -15.5)):
                 SilkscreenText("NRST", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((14.0, -24.0)):
+            with Locations((14.0, -18.0)):
                 SilkscreenText("BOOT0", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((14.0, -27.0)):
+            with Locations((14.0, -21.0)):
                 SilkscreenText("ISP", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((14.0, -29.6)):
+            with Locations((14.0, -23.6)):
                 SilkscreenText("VBUS", layer="F.SilkS", font_size=0.55, thickness=0.08)
             # Status LED labels
-            with Locations((1.6, -20.0)):
+            with Locations((1.6, -14.0)):
                 SilkscreenText("MCU", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -22.0)):
+            with Locations((1.6, -16.0)):
                 SilkscreenText("PERIPH", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -24.0)):
+            with Locations((1.6, -18.0)):
                 SilkscreenText("AUD", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -26.0)):
+            with Locations((1.6, -20.0)):
                 SilkscreenText("3V3", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -28.0)):
+            with Locations((1.6, -22.0)):
                 SilkscreenText("VBUS", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -30.8)):
+            with Locations((1.6, -24.8)):
                 SilkscreenText("VBAT", layer="F.SilkS", font_size=0.55, thickness=0.08)
 
             # Component designators for Sheet 17 hardening parts on bottom silkscreen to prevent clutter
-            for idx, y_pos in enumerate([-30.0, -28.0, -26.0, -24.0, -22.0, -20.0], start=2):
+            for idx, y_pos in enumerate([-24.0, -22.0, -20.0, -18.0, -16.0, -14.0], start=2):
                 with Locations((4.0, y_pos)):
                     SilkscreenText(f"D{idx}", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
                 with Locations((6.5, y_pos)):
                     SilkscreenText(f"R{idx + 5}", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -21.5)):
+            with Locations((10.5, -15.5)):
                 SilkscreenText("JP1", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -24.0)):
+            with Locations((10.5, -18.0)):
                 SilkscreenText("JP2", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -27.0)):
+            with Locations((10.5, -21.0)):
                 SilkscreenText("JP3", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -29.6)):
+            with Locations((10.5, -23.6)):
                 SilkscreenText("JP4", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
             with Locations((0.0, -11.0)):
                 SilkscreenText("SW1", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)

@@ -319,6 +319,7 @@ def test_code_review_no_feedback_leaves_no_markdown_files(tmp_path: Path) -> Non
     assert res3.exists()
     content = res3.read_text(encoding="utf-8")
     assert "Finding on commit 1" in content
+    res3.unlink()
 
     # 3. ReviewServer save_and_sync with empty comments inside feedback_dir does not create CR.md
     from provider.code_review.server import ReviewServer

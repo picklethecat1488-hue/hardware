@@ -29,13 +29,13 @@ obstacles:
 - name: J15
   shape: box
   dimensions_mm:
-  - 12.7
-  - 2.54
-  - 8.5
+  - 6.35
+  - 3.81
+  - 5.0
   position_mm:
   - -14.5
   - -41.0
-  - 5.05
+  - 3.3
   description: SWD recovery header
 - name: ble_antenna_keepout
   shape: box
@@ -355,6 +355,7 @@ schematic_sheets:
   - C13
   - U7
   - C7
+  - C16
   pin_breakouts:
     J3:
     - VBUS
@@ -386,6 +387,9 @@ schematic_sheets:
     - '1'
     - '2'
     C7:
+    - '1'
+    - '2'
+    C16:
     - '1'
     - '2'
 - title: 3.3V Power Regulation & Distribution
@@ -451,6 +455,8 @@ schematic_sheets:
   components:
   - U1
   - U10
+  - D8
+  - C15
   pin_sides:
     U1:
       L5: right
@@ -460,6 +466,9 @@ schematic_sheets:
       '2': left
       '4': right
       '5': right
+    D8:
+      '1': left
+      '2': right
   pin_breakouts:
     U1:
     - L5
@@ -469,6 +478,12 @@ schematic_sheets:
     - '2'
     - '4'
     - '5'
+    D8:
+    - '1'
+    - '2'
+    C15:
+    - '1'
+    - '2'
 - title: Microcontroller Core, Clock & Reset
   description: Primary microcontroller core, 24MHz crystal oscillator, power bypass,
     reset and boot circuitry
@@ -538,6 +553,7 @@ schematic_sheets:
   components:
   - U1
   - U8
+  - C17
   pin_sides:
     U1:
       B17: right
@@ -572,6 +588,9 @@ schematic_sheets:
     - '7'
     - '8'
     - '4'
+    C17:
+    - '1'
+    - '2'
 - title: Telemetry & Debug Communications
   description: FTDI FT232RNQ high-speed USB-to-UART serial bridge and ARM 10-pin SWD
     debug micro-header

@@ -206,6 +206,7 @@ class DiffViewSessionModel(BaseModel):
     """Full session state for the interactive Quake Diff Viewer and Smartlog workstation."""
 
     repo_name: str = "hardware"
+    repo_root: Optional[str] = ""
     repo_web_url: Optional[str] = None
     github_repo: str = ""
     current_branch: str = ""

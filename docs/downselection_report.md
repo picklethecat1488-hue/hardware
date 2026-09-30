@@ -57,7 +57,7 @@ flowchart TD
     end
 
     subgraph Sensors["Touch & Audio Peripherals"]
-        AZOTEQ["Azoteq IQS7222A / IQS7211A Touch IC (U2)"] -->|"I2C1 + CAP_INT"| MCU
+        AZOTEQ["Azoteq IQS7222A Touch IC (U2)"] -->|"I2C1 + CAP_INT"| MCU
         FLEX_TAIL["Capacitive Flex Tail (J2/J4)"] -->|"4 Sensing Channels"| AZOTEQ
         MCU -->|"PDM Clock / Data"| AUDIO_AMP["MAX98357A Mono Amp (U4)"]
         AUDIO_AMP -->|"Differential Drive"| SPK["Piezo Sounder (U5)"]

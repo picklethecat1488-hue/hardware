@@ -2478,6 +2478,21 @@
     function updateSelectedCount() {
       const countEl = document.getElementById("selectedCount");
       if (countEl) countEl.textContent = state.selectedCommits.length;
+      const btnCreate = document.getElementById("btnCreatePR");
+      if (btnCreate) {
+        let topCommit = "";
+        if (state.selectedCommits.length > 0) {
+          topCommit = state.selectedCommits[0].substring(0, 7);
+        } else {
+          const firstUnmerged = document.querySelector(".smartlog-node:not(.merged-commit) .commit-checkbox");
+          if (firstUnmerged) topCommit = firstUnmerged.value.substring(0, 7);
+        }
+        if (topCommit) {
+          btnCreate.title = `Create Pull Request stack up to latest commit (${topCommit})`;
+        } else {
+          btnCreate.title = "Create Pull Request for current commit stack";
+        }
+      }
     }
 
     function selectAllCommits() {
@@ -2644,7 +2659,7 @@
 
     let prSubmitInterval = null;
 
-    function openPrSubmitModal(commitCount) {
+    function openPrSubmitModal(commitCount, topCommit = "") {
       const overlay = document.getElementById("prSubmitModalOverlay");
       if (!overlay) return;
       overlay.style.display = "flex";
@@ -2660,7 +2675,11 @@
         pBar.style.background = "linear-gradient(90deg, #9333ea, #a855f7)";
       }
       if (pText) pText.textContent = "15%";
-      if (sText) sText.textContent = `Preparing submission for ${commitCount} commit(s)...`;
+      if (sText) {
+        sText.textContent = topCommit
+          ? `Preparing submission for ${commitCount} commit(s) up to ${topCommit}...`
+          : `Preparing submission for ${commitCount} commit(s)...`;
+      }
       if (lOut) lOut.textContent = `$ sl pr submit --config github.max-prs-to-create=-1\nInitializing stack submission...`;
       if (btnDone) btnDone.style.display = "none";
       if (btnClose) btnClose.style.display = "none";
@@ -2710,7 +2729,8 @@
         return;
       }
 
-      openPrSubmitModal(targetCommits.length);
+      const topCommit = targetCommits.length > 0 ? targetCommits[0].substring(0, 7) : "";
+      openPrSubmitModal(targetCommits.length, topCommit);
 
       try {
         const resp = await fetch("/api/pr/create", {
