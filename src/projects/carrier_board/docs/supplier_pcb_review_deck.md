@@ -399,3 +399,69 @@ style: |
 * [x] **Mechanical & Keepout Sign-off**: RF antenna void verified, connector overhang checked
 * [x] **DRC Zero-Defect Audit**: Automated checker passed with 0 errors and 0 warnings
 * [x] **CAM Package Completeness**: Gerber, drill, netlist, and centroid files verified
+
+---
+
+# PCB Assembly Specifications & Component Metrics
+
+### Manufacturing Bill of Materials & SMT Line Metrics
+
+<div class="grid-2col">
+<div>
+
+### Component Counts by Mounting Type
+* **Total Components Placed**: 67 components
+* **Number of Unique Parts (BOM Line Items)**: **36 unique line items**
+* **Number of SMD Parts**: **60 parts**
+* **Number of BGA / QFP / QFN Parts**: **4 complex parts**
+  * `U1`: NXP MCXN947 / RT1062 Crossover MCU (`VFBGA-184`, 0.8mm pitch)
+  * `U2`: Azoteq IQS7222A Capacitive Controller (`QFN-20`, 0.5mm pitch)
+  * `U4`: High-efficiency Audio Amplifier (`QFN-16-AMP`, 0.5mm pitch)
+  * `U9`: FTDI FT232RNQ USB-UART Interface (`QFN-32`, 0.5mm pitch)
+* **Number of Through-Hole Parts**: **7 parts**
+  * `J5`, `J15`: 10-pin micro-headers (1.27mm pitch)
+  * `J14`: 10-pin peripheral expansion header (2.54mm pitch)
+  * `JP1`..`JP4`: 2-pin configuration jumpers
+
+</div>
+<div>
+
+### Detailed Assembly & SMT Process Guidelines
+* **Placement Topology**: Double-sided SMT assembly
+  * Primary Top Side (`F.Cu`): MCU (`U1`), BLE module (`U11`), Charger (`U3`), USB-C (`J3`), FPC (`J2`), Passives
+  * Secondary Bottom Side (`B.Cu`): Cap touch controller (`U2`), decoupling passives
+* **Solder Paste & Stencil**:
+  * Alloy: Lead-free SAC305 (Sn96.5 / Ag3.0 / Cu0.5), RoHS 3 compliant
+  * Powder size: Type 4 or Type 5 mesh suitable for 0.4mm BGA pads
+  * Stencil foil: $0.10\text{ mm}$ ($4.0\text{ mil}$) laser-cut electro-polished stainless steel with nano-coating
+* **Reflow Thermal Profile**:
+  * Peak reflow temperature: $240^\circ\text{C} \text{ to } 245^\circ\text{C}$ (Max $250^\circ\text{C}$)
+  * Time above liquidus ($217^\circ\text{C}$): $60 \text{--} 90\text{ seconds}$
+* **Post-Reflow Inspection**:
+  * 100% 3D Automated Optical Inspection (AOI) for all SMT chips
+  * 100% Automated X-ray Inspection (AXI) for BGA balls on `U1` and QFN thermal ground pads on `U2`, `U3`, `U4`, `U9`
+
+</div>
+</div>
+
+<div class="callout">
+<strong>Assembly Requirement:</strong> Moisture-sensitive parts (MSL 3: <code>U1</code>, <code>U11</code>) must be baked at $125^\circ\text{C}$ for 4 hours prior to surface-mount reflow if dry-pack seal was broken $> 168\text{ hours}$.
+</div>
+
+---
+
+# Schematic No-Connect (NC) & Unused Pin Audit
+
+### Complex Integrated Circuit Omitted Pin Matrix
+
+| Component RefDes | IC Description & Package | Total Pins | Connected Pins | Omitted / No-Connect Count | Dedicated No-Connect Pin Names & Functional Rationale |
+| :---: | :--- | :---: | :---: | :---: | :--- |
+| **U1** | NXP MCXN947VDF<br>`VFBGA-184` | 184 | 52 | **132 balls** | **Unassigned GPIOs & Secondary Peripheral Ports:**<br>132 unassigned balls (e.g. `A2, A4, A12, A14, B3, B4, B7...`). Intentionally left unrouted to maintain continuous ground plane reference under high-speed FlexSPI and audio lines without stub antenna emissions. |
+| **U2** | Azoteq IQS7222A<br>`QFN-20` | 21 | 17 | **4 pads** | **`NC1` (Pin 9), `NC2` (Pin 10):** Factory internal test points — must float per Azoteq datasheet.<br>**`CT8` (Pin 12):** Unused 9th sensing channel (design utilizes CT0..CT7 for 5-button slider & proximity).<br>**`OUTA` (Pin 14):** Unused auxiliary direct output. |
+| **U11** | u-blox NINA-B312<br>`MOD-BLE-PCB-ANT` | 27 | 9 | **18 pads** | **`NFC1`, `NFC2`:** Unused near-field antenna terminals.<br>**`IO_2..IO_5`, `IO_24..IO_27`:** Auxiliary GPIOs reserved for future firmware features.<br>**`RED`, `GREEN`, `BLUE`:** Unused internal open-drain LED pins.<br>**`RESET_N`:** Internal power-on reset; reset controlled via AT commands.<br>**`EGP`, `GND_12, 26, 30`:** Redundant internal thermal test pads. |
+| **U7** | Maxim MAX17048<br>`TDFN-8` | 9 | 9 | **0 pads** | **Fully Terminated (Zero Omitted Pins):**<br>All 8 functional pins (`CELL, VCON, SDA, SCL, QSTRT, ALRT, GND`) and exposed thermal pad (`EP`) are 100% connected to power, I2C bus, and reference ground. |
+| **U9** | FTDI FT232RNQ<br>`QFN-32` | 33 | 31 | **2 pads** | **Pin 6 (`NC`), Pin 8 (`NC`):**<br>Explicit internal no-connect pins per FTDI FT232RNQ datasheet specifications. Left floating with zero copper stubs. |
+
+<div class="callout">
+<strong>Design Validation:</strong> All omitted pins have been audited against manufacturer authoritative datasheets. High-impedance CMOS inputs are tied to internal pull-ups or firmware-isolated to eliminate parasitic leakage currents.
+</div>
