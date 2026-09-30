@@ -2518,3 +2518,71 @@ def test_regression_bug_242_code_review_toolbar_layout() -> None:
     assert "btnToggleCommits" in content
     assert "btnToggleFiles" in content
     assert "btnFocus" in content
+
+
+def test_regression_bug_244_commit_subcommand_cli_parsing() -> None:
+    """Verify BUG-244: dashboard CLI argument parsing supports commit subcommand and --commit flag."""
+    # Commit with -m flag
+    args_m = parse_arguments(["commit", "-m", "Test commit message"])
+    assert args_m.subcommand == "commit"
+    assert args_m.commit_message == "Test commit message"
+    assert args_m.amend is False
+
+    # Commit with positional message and files
+    args_pos = parse_arguments(["commit", "Positional message", "file1.txt", "file2.txt"])
+    assert args_pos.subcommand == "commit"
+    assert args_pos.args == ["Positional message", "file1.txt", "file2.txt"]
+
+    # Commit with --files and -a
+    args_files = parse_arguments(["commit", "-m", "Selective", "--files", "a.py", "b.py", "-a"])
+    assert args_files.subcommand == "commit"
+    assert args_files.commit_message == "Selective"
+    assert args_files.flag_files == ["a.py", "b.py"]
+    assert args_files.all_files is True
+
+    # Commit amend
+    args_amend = parse_arguments(["commit", "--amend"])
+    assert args_amend.subcommand == "commit"
+    assert args_amend.amend is True
+
+    # Top-level --commit flag
+    args_top = parse_arguments(["--commit", "Top level message"])
+    assert args_top.commit == "Top level message"
+
+
+def test_regression_bug_244_commit_subcommand_execution(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify BUG-244: dashboard commit subcommand commits untracked and staged changes in repository."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    monkeypatch.chdir(repo_dir)
+
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 1. Selective commit of untracked file via CLI args
+    f_untracked = repo_dir / "untracked.txt"
+    f_untracked.write_text("untracked content\n", encoding="utf-8")
+    f_other = repo_dir / "other.txt"
+    f_other.write_text("other content\n", encoding="utf-8")
+
+    main(["commit", "-m", "Commit untracked selectively", "untracked.txt"])
+    assert engine.get_head_commit_message() == "Commit untracked selectively"
+
+    working_files = engine.get_working_tree_files()
+    working_paths = [f.path for f in working_files]
+    assert "untracked.txt" not in working_paths
+    assert "other.txt" in working_paths
+
+    # 2. Commit all remaining changes without explicit file arguments
+    main(["commit", "Commit remaining files without flag"])
+    assert engine.get_head_commit_message() == "Commit remaining files without flag"
+    assert len(engine.get_working_tree_files()) == 0
+
+    # 3. Amend last commit via CLI
+    main(["commit", "--amend", "-m", "Amended via CLI (BUG-244)"])
+    assert engine.get_head_commit_message() == "Amended via CLI (BUG-244)"
+
+    # 4. Commit via top-level --commit flag
+    f_top = repo_dir / "top_level.txt"
+    f_top.write_text("top level flag content\n", encoding="utf-8")
+    main(["--commit", "Commit via top-level flag"])
+    assert engine.get_head_commit_message() == "Commit via top-level flag"
+    assert len(engine.get_working_tree_files()) == 0

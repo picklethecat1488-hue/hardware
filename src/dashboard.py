@@ -46,6 +46,7 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
         "list-bugs",
         "list-commits",
         "sync",
+        "commit",
         "add-bug",
         "resolve-bug",
         "add-comment",
@@ -91,6 +92,14 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
         "--sync",
         action="store_true",
         help="Download latest changes from remote repository and exit.",
+    )
+    parser.add_argument(
+        "--commit",
+        nargs="?",
+        const="",
+        type=str,
+        default=None,
+        help="Commit changes to repository and exit.",
     )
     parser.add_argument(
         "--browser",
@@ -268,6 +277,22 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
 
     # sync
     subparsers.add_parser("sync", help="Download latest changes from remote repository and exit.")
+
+    # commit
+    p_commit = subparsers.add_parser("commit", help="Commit untracked/staged or specified files.")
+    p_commit.add_argument("-m", "--message", dest="commit_message", default="", help="Commit message.")
+    p_commit.add_argument("args", nargs="*", default=[], help="Commit message (if -m omitted) and/or files to commit.")
+    p_commit.add_argument(
+        "--files", nargs="+", dest="flag_files", default=None, help="Optional specific files to commit."
+    )
+    p_commit.add_argument(
+        "-a",
+        "--all",
+        dest="all_files",
+        action="store_true",
+        help="Stage all tracked and untracked changes before committing.",
+    )
+    p_commit.add_argument("--amend", action="store_true", help="Amend HEAD commit.")
 
     # add-bug
     p_add_b = subparsers.add_parser("add-bug", help="Quickly register a new bug report.")
@@ -478,9 +503,55 @@ def print_cli_reviews(
         print(f"\nShowing {len(comments)} comments ({unresolved_count} unresolved, {total_count} total).\n")
 
 
-def main() -> None:
+def handle_cli_commit(
+    engine: GitEngine,
+    message: str = "",
+    files: Optional[List[str]] = None,
+    all_files: bool = False,
+    amend: bool = False,
+) -> str:
+    """Execute git commit or amend via GitEngine for CLI commands.
+
+    Args:
+        engine: GitEngine instance.
+        message: Commit message string.
+        files: Optional specific files to commit.
+        all_files: If True, stage all working tree changes.
+        amend: If True, amend HEAD commit.
+
+    Returns:
+        Commit SHA string.
+    """
+    if amend and not message:
+        message = engine.get_head_commit_message()
+
+    if not message.strip():
+        print("Error: Commit message cannot be empty.", file=sys.stderr)
+        sys.exit(1)
+
+    file_targets = files
+    if all_files:
+        file_targets = [f.path for f in engine.get_working_tree_files()]
+    elif file_targets is None:
+        working_files = engine.get_working_tree_files()
+        staged = [f.path for f in working_files if f.is_staged]
+        if not staged and working_files:
+            file_targets = [f.path for f in working_files]
+
+    try:
+        sha = engine.commit_files(message=message, file_paths=file_targets, amend=amend)
+        short_sha = sha[:7] if sha else ""
+        action = "Amended" if amend else "Committed"
+        print(f"\n[Quake VCS] {action} {short_sha}: {message}\n")
+        return sha
+    except (RuntimeError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def main(cli_args: Optional[List[str]] = None) -> None:
     """Launch the Quake dashboard CLI or workstation server."""
-    args = parse_arguments()
+    args = parse_arguments(cli_args)
     repo_root = get_git_root()
     engine = GitEngine(repo_root=repo_root)
 
@@ -489,6 +560,8 @@ def main() -> None:
     # Check if this invocation is CLI-only (no server socket needed)
     is_cli_only = bool(
         subcmd
+        or getattr(args, "commit", None) is not None
+        or getattr(args, "sync", False)
         or getattr(args, "bugs", False)
         or getattr(args, "add_bug", None)
         or getattr(args, "resolve_bug", None)
@@ -563,6 +636,32 @@ def main() -> None:
             res = engine.sync_repo()
             print(f"Status : {res.get('status')}")
             print(f"Message: {res.get('message')}\n")
+            return
+        case "commit":
+            commit_msg = getattr(args, "commit_message", "") or ""
+            pos_args = getattr(args, "args", []) or []
+            flag_files = getattr(args, "flag_files", None)
+            all_files = getattr(args, "all_files", False)
+            amend = getattr(args, "amend", False)
+
+            if not commit_msg:
+                if amend and pos_args and any((repo_root / p).exists() or Path(p).exists() for p in pos_args):
+                    file_targets = flag_files or pos_args
+                elif pos_args:
+                    commit_msg = pos_args[0]
+                    file_targets = flag_files or (pos_args[1:] if len(pos_args) > 1 else None)
+                else:
+                    file_targets = flag_files
+            else:
+                file_targets = flag_files or (pos_args if pos_args else None)
+
+            handle_cli_commit(
+                engine=engine,
+                message=commit_msg,
+                files=file_targets,
+                all_files=all_files,
+                amend=amend,
+            )
             return
         case "add-bug":
             title = getattr(args, "bug_title", "") or getattr(args, "title", "")
@@ -698,6 +797,14 @@ def main() -> None:
         res = engine.sync_repo()
         print(f"Status : {res.get('status')}")
         print(f"Message: {res.get('message')}\n")
+        return
+
+    # Direct CLI git commit
+    if getattr(args, "commit", None) is not None:
+        handle_cli_commit(
+            engine=engine,
+            message=args.commit,
+        )
         return
 
     # Handle Bug Tracker CLI

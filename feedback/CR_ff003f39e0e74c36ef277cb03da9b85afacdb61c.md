@@ -7,7 +7,7 @@
 | Metric | Details |
 | :--- | :--- |
 | **Review Date** | `2026-09-30 06:47:53 UTC` |
-| **Revisions** | `working` |
+| **Revisions** | `ff003f39e0e74c36ef277cb03da9b85afacdb61c` |
 | **Overall Verdict** | **`APPROVED`** |
 | **Review Progress** | `0/8 files reviewed (0%)` |
 | **Total Comments** | `6 findings` |
@@ -26,7 +26,7 @@
 
 #### **[MUST FIX]** [src/provider/templates/code_review.html.j2:L1388](file:///Users/daparker/gh/hardware/src/provider/templates/code_review.html.j2#L1388)
 <!-- comment-uuid: 7a69e8a2-8dc5-4495-a02c-78b4b0355e2b -->
-<!-- comment-commit: working -->
+<!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
 ```
 <a id="btnOpenVsCode" class="quake-btn quake-btn-default quake-btn-xs" onclick="openInVsCode()" title="Open in VS Code" style="text-decoration:none;cursor:pointer;">💻 VS Code</a>
@@ -36,7 +36,7 @@
 
 #### **[MUST FIX]** [src/provider/templates/code_review.html.j2:L1386-L1388](file:///Users/daparker/gh/hardware/src/provider/templates/code_review.html.j2#L1386-L1388)
 <!-- comment-uuid: b05c3da1-bf53-49ed-bddf-e0309a119e2a -->
-<!-- comment-commit: working -->
+<!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
 ```
 <div id="activeFileActions" style="display:none;align-items:center;gap:6px;flex-shrink:0;">
@@ -50,7 +50,7 @@
 
 #### **[MUST FIX]** [src/provider/vcs/git_engine.py:L1036](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L1036)
 <!-- comment-uuid: 67147bc4-e98c-420f-934f-8fe56c06f662 -->
-<!-- comment-commit: working -->
+<!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
 ```python
 repo_web_url = self.get_repo_web_url() or "https://github.com/picklethecat1488-hue/hardware"
@@ -60,7 +60,7 @@ repo_web_url = self.get_repo_web_url() or "https://github.com/picklethecat1488-h
 
 #### **[MUST FIX]** [src/provider/vcs/git_engine.py:L1043-L1049](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L1043-L1049)
 <!-- comment-uuid: 1ff8c45e-0b71-411f-b8df-2d72ab1e4b23 -->
-<!-- comment-commit: working -->
+<!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
 ```python
 proc = subprocess.run(
@@ -76,7 +76,7 @@ proc = subprocess.run(
 
 #### **[MUST FIX]** [src/provider/vcs/git_engine.py:L1034](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L1034)
 <!-- comment-uuid: 3845f9dc-c1a7-4a5d-8f11-577c890bbc84 -->
-<!-- comment-commit: working -->
+<!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
 ```python
 created_prs = self.create_prs_for_commits(commit_hashes)
@@ -86,7 +86,7 @@ created_prs = self.create_prs_for_commits(commit_hashes)
 
 #### **[MUST FIX]** [src/provider/vcs/git_engine.py:L929-L1014](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L929-L1014)
 <!-- comment-uuid: e6a64ade-9b06-442b-829d-553776e81df5 -->
-<!-- comment-commit: working -->
+<!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
 ```python
 def create_prs_for_commits(self, commit_hashes: List[str]) -> List[Dict[str, Any]]:
