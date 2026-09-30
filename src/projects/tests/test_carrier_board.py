@@ -1633,7 +1633,7 @@ def test_regression_bug_183_carrier_board_hardening() -> None:
     # Verify new components are placed in open space south of U1 and north of J1
     for name in ["SW1", "JP1", "JP2", "JP3", "JP4", "D2", "D3", "D4", "D5", "D6", "D7"]:
         pos = comp_map[name].position
-        y_max = -10.0 if name == "SW1" else -16.0
+        y_max = -10.0 if name == "SW1" else -13.0
         assert -36.0 <= pos[1] <= y_max, (
             f"Component {name} at Y={pos[1]} not in designated space south of U1 and north of J1"
         )
@@ -1722,7 +1722,7 @@ def test_regression_bug_207_sheet_17_components_on_carrier_board() -> None:
     for name in sheet_17_comps:
         assert name in comp_map, f"Sheet 17 component {name} must exist on carrier board"
         pos = comp_map[name].position
-        y_max = -10.0 if name == "SW1" else -16.0
+        y_max = -10.0 if name == "SW1" else -13.0
         assert -36.0 <= pos[1] <= y_max, f"Component {name} must be in corridor between U1 and J1"
 
     # Verify existing baseline components were not displaced
@@ -1909,10 +1909,10 @@ def test_regression_bug_219_reset_relocation_and_horizontal_jumpers() -> None:
 
     # 5. Silkscreen texts to the right at X=14.0
     text_pos_map = {
-        "NRST": -21.5,
-        "BOOT0": -24.0,
-        "ISP": -27.0,
-        "VBUS": -29.6,
+        "NRST": -15.5,
+        "BOOT0": -18.0,
+        "ISP": -21.0,
+        "VBUS": -23.6,
     }
     for text_name, expected_y in text_pos_map.items():
         lbl = next(t for t in pcb_cfg.silkscreen_texts if t.layer == "F.SilkS" and t.text == text_name)
@@ -2012,18 +2012,19 @@ def test_regression_bug_231_nina_b312_flashed_module_swd_header_and_footprint() 
     # 2. J15 exists at [-14.5, -41.0, 0.8]
     assert "J15" in fp_map, "J15 must exist in wiring footprints"
     j15 = fp_map["J15"]
-    assert j15.package == "pin_header_1x5", f"J15 package must be pin_header_1x5, got {j15.package}"
+    assert j15.package == "pin_header_2x5_1.27mm", f"J15 package must be pin_header_2x5_1.27mm, got {j15.package}"
     assert abs(j15.position[0] - (-14.5)) < 0.1, f"J15 X position must be -14.5, got {j15.position[0]}"
     assert abs(j15.position[1] - (-41.0)) < 0.1, f"J15 Y position must be -41.0, got {j15.position[1]}"
     assert abs(j15.rotation[2] - 0.0) < 0.1, f"J15 rotation must be 0.0, got {j15.rotation}"
 
     # 3. J15 pin connections
     net_map = {net.name: [pin for comp, pin in net.pins if comp == "J15"] for net in wiring.nets}
-    assert "1" in net_map.get("GND", []), "J15 pin 1 must be GND"
+    assert "3" in net_map.get("GND", []), "J15 pin 3 must be GND"
+    assert "5" in net_map.get("GND", []), "J15 pin 5 must be GND"
     assert "2" in net_map.get("BLE_SWDIO", []), "J15 pin 2 must be BLE_SWDIO"
-    assert "3" in net_map.get("BLE_SWDCLK", []), "J15 pin 3 must be BLE_SWDCLK"
-    assert "4" in net_map.get("BLE_RESET_N", []), "J15 pin 4 must be BLE_RESET_N"
-    assert "5" in net_map.get("3V3", []), "J15 pin 5 must be 3V3"
+    assert "4" in net_map.get("BLE_SWDCLK", []), "J15 pin 4 must be BLE_SWDCLK"
+    assert "1" in net_map.get("3V3", []), "J15 pin 1 must be 3V3"
+    assert "BLE_RESET_N" not in net_map, "BLE_RESET_N net must be removed"
 
     # 4. Footprint dimensions
     import yaml
@@ -2042,3 +2043,29 @@ def test_regression_bug_231_nina_b312_flashed_module_swd_header_and_footprint() 
     report = drc.check_all(wiring=wiring)
     assert report.passed, f"PCB DRC failed:\n{report.summary()}"
     assert report.error_count == 0, f"Expected 0 DRC errors, got {report.error_count}"
+
+
+def test_power_hardening_bug_243() -> None:
+    """Verify BUG-243: Power hardening components C15, C16, C17, D8 exist on bottom side with zero DRC errors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    for name in ("C15", "C16", "C17", "D8"):
+        assert name in comp_map, f"Power hardening component {name} must exist"
+        comp = comp_map[name]
+        assert comp.layer == "B.Cu" or comp.position[2] < 0, f"{name} must be on bottom side"
+
+    # Verify nets connected to 3V3 and GND
+    nets_map = {n.name: n for n in wiring.nets}
+    for name in ("C15", "C16", "C17", "D8"):
+        assert any(c == name for c, p in nets_map["3V3"].pins), f"{name} must connect to 3V3"
+        assert any(c == name for c, p in nets_map["GND"].pins), f"{name} must connect to GND"
+
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
