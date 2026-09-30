@@ -5901,3 +5901,86 @@ footprints:
       pad_size_mm:
       - 0.28
       - 0.28
+  MOD-BLE-PCB-ANT:
+    dimensions:
+    - 10.0
+    - 14.0
+    - 2.2
+    pins:
+    - name: GND
+      label: GND
+      position:
+      - -8.0
+      - 0.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.2
+      - 1.2
+    - name: 3V3
+      label: 3V3
+      position:
+      - -4.0
+      - 0.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.2
+      - 1.2
+    - name: VLOAD_SW
+      label: VLOAD_SW
+      position:
+      - -6.0
+      - 0.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.2
+      - 1.2
+    - name: RXD
+      label: RXD
+      position:
+      - 2.0
+      - 0.0
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.2
+      - 1.2
+    - name: RTS
+      label: RTS
+      position:
+      - 4.0
+      - 0.0
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.2
+      - 1.2
+    - name: TXD
+      label: TXD
+      position:
+      - 6.0
+      - 0.0
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.2
+      - 1.2
+    - name: CTS
+      label: CTS
+      position:
+      - 8.0
+      - 0.0
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.2
+      - 1.2

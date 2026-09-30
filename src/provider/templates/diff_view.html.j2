@@ -201,13 +201,19 @@
     }
     .pane-smartlog {
       width: 330px;
-      min-width: 0;
+      min-width: 180px;
+      max-width: 800px;
       flex-shrink: 0;
       transition: width 0.2s ease, opacity 0.2s ease;
       overflow: hidden;
     }
+    .pane-smartlog.resizing,
+    .pane-files.resizing {
+      transition: none !important;
+    }
     .pane-smartlog.collapsed {
       width: 0 !important;
+      min-width: 0 !important;
       padding: 0 !important;
       border: none !important;
       opacity: 0;
@@ -216,29 +222,120 @@
     }
     .pane-smartlog .column-header,
     .pane-smartlog .column-scroll,
-    .pane-smartlog > div {
-      min-width: 330px;
+    .pane-smartlog > div,
+    .pane-files .column-header,
+    .pane-files .column-scroll,
+    .pane-files > div {
+      min-width: 0;
+      width: 100%;
     }
 
     .pane-files {
       width: 270px;
-      min-width: 0;
+      min-width: 160px;
+      max-width: 700px;
       flex-shrink: 0;
       transition: width 0.2s ease, opacity 0.2s ease;
       overflow: hidden;
     }
     .pane-files.collapsed {
       width: 0 !important;
+      min-width: 0 !important;
       padding: 0 !important;
       border: none !important;
       opacity: 0;
       pointer-events: none;
       margin-right: -10px !important;
     }
-    .pane-files .column-header,
-    .pane-files .column-scroll,
-    .pane-files > div {
-      min-width: 270px;
+
+    .column-resizer {
+      width: 6px;
+      cursor: col-resize;
+      background: var(--quake-border-mid);
+      position: relative;
+      flex-shrink: 0;
+      z-index: 10;
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+      user-select: none;
+    }
+    .column-resizer:hover, .column-resizer.resizing {
+      background: var(--quake-gold);
+      box-shadow: 0 0 8px rgba(255, 184, 0, 0.7);
+    }
+    .column-resizer.hidden {
+      display: none !important;
+    }
+
+    /* Branch formatting UI styles (BUG-197) */
+    .branch-group-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px;
+      background: #110a05;
+      border: 1px solid var(--quake-border-mid);
+      border-radius: 3px;
+    }
+    .branch-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-radius: 3px;
+      background: #180f08;
+      border: 1px solid var(--quake-border-dark);
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.15s ease;
+    }
+    .branch-item:hover {
+      background: #2b1a0d;
+      border-color: var(--quake-border-light);
+      color: var(--quake-gold);
+    }
+    .branch-item.active {
+      border-color: var(--quake-gold);
+      background: #2c1a06;
+      box-shadow: inset 1px 1px 0 #5c3b0f;
+    }
+    .branch-item-main {
+      background: linear-gradient(90deg, #2b1a0a 0%, #1a1006 100%);
+      border-color: #8d5d33;
+      font-weight: 700;
+    }
+    .branch-item-main:hover {
+      background: linear-gradient(90deg, #3d250f 0%, #29180a 100%);
+      border-color: var(--quake-gold);
+    }
+
+    /* Jump to CR Button & Badges (BUG-199) */
+    .jump-cr-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      font-size: 10px;
+    }
+    .jump-cr-btn.cr-reviewed {
+      background: linear-gradient(180deg, #1b3818 0%, #0d1e0d 100%);
+      border-color: #22c55e #0a140a #0a140a #22c55e;
+      color: #86efac;
+    }
+    .cr-badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 2px;
+      line-height: 1;
+    }
+    .cr-badge.cr-open {
+      background: var(--quake-amber);
+      color: #120a05;
+    }
+    .cr-badge.cr-resolved {
+      background: #166534;
+      color: #bbf7d0;
     }
 
     .pane-diff {
@@ -259,9 +356,32 @@
       letter-spacing: 0.05em;
       flex-shrink: 0;
     }
+    /* Visible Quake Scrollbars (BUG-202) */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--quake-border-accent) #100a06;
+    }
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #100a06;
+      border: 1px solid var(--quake-border-mid);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--quake-border-accent);
+      border-radius: 4px;
+      border: 1px solid var(--quake-border-mid);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold);
+    }
+
     .column-scroll {
       flex: 1;
-      overflow-y: auto;
+      overflow-y: scroll;
+      scrollbar-gutter: stable;
       padding: 8px;
       display: flex;
       flex-direction: column;
@@ -292,6 +412,16 @@
     }
     .smartlog-node.head-node {
       border-left: 3px solid var(--quake-cyan);
+    }
+    .smartlog-node.ancestor-top-node {
+      border-left: 3px solid #38bdf8 !important;
+      background: rgba(56, 189, 248, 0.05);
+    }
+    .node-badge-ancestor {
+      background: #1b2a32 !important;
+      color: #38bdf8 !important;
+      border: 1px solid #0284c7 !important;
+      font-weight: 700 !important;
     }
 
     .node-header-row {
@@ -407,6 +537,18 @@
       text-decoration: underline;
       box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
     }
+    .pr-local-badge {
+      background: rgba(255, 176, 0, 0.15) !important;
+      border: 1px dashed rgba(255, 176, 0, 0.5) !important;
+      color: #ffb800 !important;
+      box-shadow: none !important;
+      cursor: pointer;
+    }
+    .pr-local-badge:hover {
+      background: rgba(255, 176, 0, 0.3) !important;
+      border-color: #ffc83b !important;
+      color: #fff !important;
+    }
     .quake-btn-purple {
       background: rgba(168, 85, 247, 0.2);
       border-color: #a855f7;
@@ -418,9 +560,20 @@
       color: #ffffff;
       box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
     }
-
+    .smartlog-node.merged-commit {
+      opacity: 0.75;
+    }
+    #smartlogList.hide-merged .smartlog-node.merged-commit:not(.head-node):not(.active) {
+      display: none !important;
+    }
+    .node-badge-merged {
+      background: rgba(34, 197, 94, 0.2) !important;
+      border-color: #22c55e !important;
+      color: #86efac !important;
+    }
 
     .node-actions-row {
+
       display: flex;
       align-items: center;
       justify-content: flex-end;
@@ -669,6 +822,12 @@
         <span>🔄 Sync</span>
       </button>
 
+      <!-- Rebase Button (BUG-213) -->
+      <button id="btnRebase" class="quake-btn quake-btn-default" onclick="onRebaseClicked()" title="Rebase current branch onto top of ancestor branch (e.g., origin/main)">
+        <span id="rebaseSpinner" style="display:none;">⏳</span>
+        <span>⤵ Rebase</span>
+      </button>
+
       <!-- Commit & Amend Buttons -->
       <button id="btnCommitModal" class="quake-btn quake-btn-gold" onclick="openCommitModal(false)" title="Commit selected working tree changes">
         <span>+ Commit</span>
@@ -690,15 +849,28 @@
         </button>
       </div>
 
-      <!-- Branch Selector -->
-      <div style="display:flex;align-items:center;gap:6px;">
+      <!-- Branch Selector (BUG-197) -->
+      <div style="display:flex;align-items:center;gap:6px;position:relative;">
         <span style="font-size:10px;color:var(--quake-text-dim);">BRANCH:</span>
-        <select id="branchSelect" class="quake-select" onchange="onBranchSelected(this.value)">
-          {% for b in session.branches %}
-            <option value="{{ b.name }}" {% if b.is_current %}selected{% endif %}>
-              {{ b.name }}{% if b.is_current %} (current){% endif %}
-            </option>
-          {% endfor %}
+        <button id="btnBranchDropdown" class="quake-btn quake-btn-default" onclick="openBranchModal()" title="Browse, search, and switch branches">
+          <span>🌿 {{ session.current_branch or session.active_branch }}</span>
+          <span style="font-size:8px;color:var(--quake-gold);">▼</span>
+        </button>
+        <select id="branchSelect" class="quake-select" style="display:none;" onchange="onBranchSelected(this.value)">
+          <optgroup label="⭐ Main &amp; Release Branches">
+            {% for b in session.branches if (b.name in ['main', 'master', 'heads/main', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or b.name.endswith('/main') or b.name.endswith('/master') or 'release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v') or '/v' in b.name.lower()) %}
+              <option value="{{ b.name }}" {% if b.is_current %}selected{% endif %}>
+                ⭐ {{ b.name }}{% if b.is_current %} (current){% endif %}
+              </option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="🌿 Feature &amp; PR Branches">
+            {% for b in session.branches if not (b.name in ['main', 'master', 'heads/main', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or b.name.endswith('/main') or b.name.endswith('/master') or 'release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v') or '/v' in b.name.lower()) %}
+              <option value="{{ b.name }}" {% if b.is_current %}selected{% endif %}>
+                🌿 {{ b.name }}{% if b.is_current %} (current){% endif %}
+              </option>
+            {% endfor %}
+          </optgroup>
         </select>
       </div>
 
@@ -734,7 +906,11 @@
           <button id="btnUnlinkPR" class="quake-btn quake-btn-default quake-btn-sm" onclick="onUnlinkPR()" title="Unlink Pull Request from selected commit(s)">
             <span>✕ Unlink PR</span>
           </button>
+          <button id="btnToggleMerged" class="quake-btn quake-btn-default quake-btn-sm" onclick="toggleMergedCommits()" title="Toggle visibility of merged commits in Smartlog">
+            <span id="mergedToggleIcon">👁️</span> <span id="mergedToggleLabel">Show Merged</span>
+          </button>
           <button class="quake-btn quake-btn-default quake-btn-icon" onclick="togglePane('smartlog')" title="Collapse Smartlog Pane (Shortcut: [)">◀</button>
+
         </div>
       </div>
 
@@ -748,7 +924,7 @@
         </button>
       </div>
 
-      <div class="column-scroll" id="smartlogList">
+      <div class="column-scroll hide-merged" id="smartlogList">
         <!-- Working Tree Node -->
         <div class="smartlog-node {% if session.active_commit == 'working' %}active{% endif %}" id="node-working" onclick="selectCommit('working')">
           <div class="node-header-row">
@@ -761,27 +937,34 @@
 
         <!-- Render Commit Nodes -->
         {% for node in session.smartlog_nodes %}
-          <div class="smartlog-node {% if node.is_head %}head-node{% endif %} {% if node.pr_number %}has-pr{% endif %} {% if session.active_commit == node.commit_hash %}active{% endif %}"
+          <div class="smartlog-node {% if node.is_head %}head-node{% endif %} {% if node.is_ancestor_top %}ancestor-top-node{% endif %} {% if node.pr_number %}has-pr{% endif %} {% if session.active_commit == node.commit_hash %}active{% endif %} {% if node.is_merged_into_tracking or node.is_merged %}merged-commit{% endif %}"
                id="node-{{ node.short_hash }}"
-               onclick="selectCommit('{{ node.commit_hash }}')">
+               data-hash="{{ node.commit_hash }}"
+               onclick="selectCommit('{{ node.commit_hash }}', event)">
             <div class="node-header-row">
               <div style="display:flex;align-items:center;gap:6px;">
                 <input type="checkbox"
                        class="commit-checkbox"
                        value="{{ node.commit_hash }}"
-                       onclick="event.stopPropagation(); onCommitCheckChanged();"
+                       onclick="event.stopPropagation(); onCommitCheckChanged(event, this);"
                        {% if node.commit_hash in session.selected_commits %}checked{% endif %}/>
                 <span class="node-graph-art">{{ node.graph_art or node.graph_symbol }}</span>
                 <span class="node-sha">{{ node.short_hash }}</span>
-                {% if node.pr_number %}
-                  <a href="{{ node.pr_url or ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ node.pr_number) }}"
+                {% if node.pr_number and node.pr_url %}
+                  <a href="{{ node.pr_url }}"
                      target="_blank"
                      rel="noopener noreferrer"
                      class="pr-highlight-badge"
                      onclick="event.stopPropagation();"
                      title="Pull Request #{{ node.pr_number }} (Click to open in GitHub)">
-                    <span class="pr-icon">⎇</span> PR #{{ node.pr_number }}
+                    <span class="pr-icon">⎇</span> {{ node.pr_status or ('PR #' ~ node.pr_number) }}
                   </a>
+                {% elif node.pr_number %}
+                  <span class="pr-highlight-badge pr-local-badge"
+                        onclick="event.stopPropagation(); showToast('{{ node.pr_status or ('PR #' ~ node.pr_number) }} has not been created on GitHub yet');"
+                        title="{{ node.pr_status or ('PR #' ~ node.pr_number) }} (Local branch, not submitted to GitHub)">
+                    <span class="pr-icon">⎇</span> {{ node.pr_status or ('PR #' ~ node.pr_number) }}
+                  </span>
                 {% endif %}
               </div>
               <span class="node-author-date">{{ node.relative_date or node.date }}</span>
@@ -791,22 +974,38 @@
 
             <!-- Tags Row (Branches, Tags, PR, Bugs) -->
             <div class="node-tags-row">
+              {% if node.is_merged_into_tracking or node.is_merged %}
+                <span class="node-badge node-badge-merged" title="Already merged into tracking branch">✓ Merged</span>
+              {% endif %}
+              {% if node.is_ancestor_top %}
+                <span class="node-badge node-badge-ancestor" title="Top of ancestor branch ({{ node.ancestor_name or 'main' }})">📌 {{ node.ancestor_name or 'main' }}</span>
+              {% endif %}
               {% for br in node.branches %}
-                <span class="node-badge node-badge-branch {% if 'pr' in br.lower() %}pr-tag-link{% endif %}"
-                      onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
-                      title="{% if 'pr' in br.lower() %}Open PR in GitHub{% else %}Branch {{ br }}{% endif %}">
+                {% set is_pr_br = ('pr' in br.lower() or 'pull' in br.lower()) %}
+                {% set br_url = node.pr_url if (is_pr_br and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/tree/' ~ br.replace('origin/', '')) %}
+                <a href="{{ br_url }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="node-badge node-badge-branch {% if is_pr_br and node.pr_url %}pr-tag-link{% elif is_pr_br %}pr-local-badge{% endif %}"
+                   onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
+                   title="{% if is_pr_br and node.pr_url %}Open PR in GitHub{% elif is_pr_br %}Local branch {{ br }} (not on GitHub){% else %}View branch {{ br }} on GitHub{% endif %}">
                   ⎇ {{ br }}
-                </span>
+                </a>
               {% endfor %}
               {% for tag in node.tags %}
-                <span class="node-badge node-badge-tag {% if 'pr' in tag.lower() %}pr-tag-link{% endif %}"
-                      onclick="onBranchBadgeClick(event, '{{ tag }}', '{{ node.pr_url or '' }}')"
-                      title="{% if 'pr' in tag.lower() %}Open PR in GitHub{% else %}Tag {{ tag }}{% endif %}">
+                {% set is_pr_tag = ('pr' in tag.lower() or 'pull' in tag.lower()) %}
+                {% set tag_url = node.pr_url if (is_pr_tag and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/releases/tag/' ~ tag) %}
+                <a href="{{ tag_url }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="node-badge node-badge-tag {% if is_pr_tag and node.pr_url %}pr-tag-link{% elif is_pr_tag %}pr-local-badge{% endif %}"
+                   onclick="onBranchBadgeClick(event, '{{ tag }}', '{{ node.pr_url or '' }}')"
+                   title="{% if is_pr_tag and node.pr_url %}Open PR in GitHub{% elif is_pr_tag %}Local tag {{ tag }}{% else %}View tag {{ tag }} on GitHub{% endif %}">
                   🏷 {{ tag }}
-                </span>
+                </a>
               {% endfor %}
-              {% if node.pr_status %}
-                <a href="{{ node.pr_url or ('https://github.com/picklethecat1488-hue/hardware/pull/' ~ (node.pr_number or '')) }}"
+              {% if node.pr_status and node.pr_url %}
+                <a href="{{ node.pr_url }}"
                    target="_blank"
                    rel="noopener noreferrer"
                    class="node-badge node-badge-pr pr-tag-link"
@@ -814,6 +1013,12 @@
                    title="Open PR on GitHub">
                   ⎇ {{ node.pr_status }}
                 </a>
+              {% elif node.pr_status %}
+                <span class="node-badge node-badge-pr pr-local-badge"
+                      onclick="event.stopPropagation(); showToast('{{ node.pr_status }} has not been created on GitHub yet');"
+                      title="{{ node.pr_status }} (Not yet created on GitHub)">
+                  ⎇ {{ node.pr_status }}
+                </span>
               {% endif %}
               {% for bug in node.bug_tags %}
                 <span class="node-badge node-badge-bug {% if bug.status == 'RESOLVED' %}resolved{% endif %}"
@@ -824,8 +1029,18 @@
               {% endfor %}
             </div>
 
-            <!-- Actions Row -->
+            <!-- Actions Row (BUG-199) -->
             <div class="node-actions-row">
+              <button class="quake-btn quake-btn-default quake-btn-icon jump-cr-btn {% if node.cr_reviewed %}cr-reviewed{% endif %}"
+                      onclick="event.stopPropagation(); jumpToCR('{{ node.commit_hash }}')"
+                      title="Jump to Code Review for this commit ({% if node.cr_open_count is defined %}{{ node.cr_open_count }} open / {{ node.cr_resolved_count }} resolved{% else %}0 open / 0 resolved{% endif %})">
+                <span>🔍 CR</span>
+                {% if node.cr_total_count and node.cr_total_count > 0 %}
+                  <span class="cr-badge {% if node.cr_open_count > 0 %}cr-open{% else %}cr-resolved{% endif %}">
+                    {{ node.cr_open_count }}/{{ node.cr_total_count }}
+                  </span>
+                {% endif %}
+              </button>
               <button class="quake-btn quake-btn-default quake-btn-icon"
                       onclick="event.stopPropagation(); createBugForCommit('{{ node.commit_hash }}')"
                       title="Create bug referencing this commit">
@@ -836,6 +1051,9 @@
         {% endfor %}
       </div>
     </section>
+
+    <!-- Resizer between Smartlog and Files (BUG-196) -->
+    <div class="column-resizer" id="resizerSmartlog" title="Drag to resize Smartlog panel"></div>
 
     <!-- MIDDLE COLUMN: CHANGED FILES & WORKING TREE OPERATIONS -->
     <section id="paneFiles" class="quake-card column-panel pane-files">
@@ -872,8 +1090,11 @@
       </div>
     </section>
 
+    <!-- Resizer between Files and Diff (BUG-196) -->
+    <div class="column-resizer" id="resizerFiles" title="Drag to resize Files panel"></div>
+
     <!-- RIGHT COLUMN: DIFF WORKSTATION -->
-    <section class="quake-card column-panel pane-diff">
+    <section id="paneDiff" class="quake-card column-panel pane-diff">
       <!-- Toolbar -->
       <div class="diff-toolbar">
         <div class="diff-file-title" id="diffFileTitle">
@@ -964,6 +1185,44 @@
     </div>
   </div>
 
+  <!-- BRANCH PICKER MODAL (BUG-197) -->
+  <div id="modalBranchPicker" class="quake-modal-overlay" onclick="if(event.target===this) closeBranchModal()">
+    <div class="quake-modal" style="width: 580px;">
+      <div class="quake-modal-header">
+        <span>🌿 Git Branches</span>
+        <button class="quake-btn quake-btn-default quake-btn-icon" onclick="closeBranchModal()" title="Close">✕</button>
+      </div>
+      <div class="quake-modal-body" style="gap: 12px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="branchSearchInput" class="commit-input" style="flex:1;min-height:32px;padding:6px 10px;" placeholder="Search PR and feature branches..." oninput="filterBranchList()" />
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--quake-text-muted);cursor:pointer;white-space:nowrap;user-select:none;">
+            <input type="checkbox" id="chkHideOtherUsers" checked onchange="filterBranchList()" />
+            <span>Hide other users</span>
+          </label>
+        </div>
+
+        <div style="font-size:11px;font-weight:700;color:var(--quake-gold);text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;gap:6px;">
+          <span>⭐ Main &amp; Release Branches</span>
+        </div>
+        <div id="mainReleaseBranchList" class="branch-group-list">
+          <!-- Populated dynamically with main, release branches with special formatting -->
+        </div>
+
+        <div style="font-size:11px;font-weight:700;color:var(--quake-copper);text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+          <span>🌿 Feature &amp; PR Branches</span>
+          <span id="featureBranchCount" style="font-size:10px;color:var(--quake-text-dim);"></span>
+        </div>
+        <div id="featureBranchList" class="branch-group-list" style="max-height: 260px; overflow-y: auto;">
+          <!-- Populated dynamically with feature/PR branches -->
+        </div>
+      </div>
+      <div class="quake-modal-footer">
+        <span style="font-size:10px;color:var(--quake-text-dim);">Current user: {{ session.current_user or 'picklethecat1488-hue' }}</span>
+        <button class="quake-btn quake-btn-default" onclick="closeBranchModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="quakeToast"></div>
 
   {# Include Shared Diff Component and Engine #}
@@ -1033,17 +1292,89 @@
     }
 
 
+    function initPanelResizers() {
+      const smartlogPane = document.getElementById("paneSmartlog");
+      const filesPane = document.getElementById("paneFiles");
+      const resizerSmartlog = document.getElementById("resizerSmartlog");
+      const resizerFiles = document.getElementById("resizerFiles");
+
+      // Restore widths from localStorage (BUG-196)
+      const savedSmartlogWidth = localStorage.getItem("diffview_smartlog_width");
+      const savedFilesWidth = localStorage.getItem("diffview_files_width");
+      if (savedSmartlogWidth && smartlogPane && !smartlogPane.classList.contains("collapsed")) {
+        smartlogPane.style.width = savedSmartlogWidth + "px";
+      }
+      if (savedFilesWidth && filesPane && !filesPane.classList.contains("collapsed")) {
+        filesPane.style.width = savedFilesWidth + "px";
+      }
+
+      function setupResizer(resizer, targetPane, storageKey, minW, maxW) {
+        if (!resizer || !targetPane) return;
+        let startX = 0;
+        let startWidth = 0;
+
+        function onMouseMove(e) {
+          const dx = e.clientX - startX;
+          let newWidth = startWidth + dx;
+          if (newWidth < minW) newWidth = minW;
+          if (newWidth > maxW) newWidth = maxW;
+          targetPane.style.width = newWidth + "px";
+          localStorage.setItem(storageKey, newWidth);
+        }
+
+        function onMouseUp() {
+          resizer.classList.remove("resizing");
+          targetPane.classList.remove("resizing");
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", onMouseUp);
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+        }
+
+        resizer.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          startX = e.clientX;
+          startWidth = targetPane.getBoundingClientRect().width;
+          resizer.classList.add("resizing");
+          targetPane.classList.add("resizing");
+          document.body.style.cursor = "col-resize";
+          document.body.style.userSelect = "none";
+          document.addEventListener("mousemove", onMouseMove);
+          document.addEventListener("mouseup", onMouseUp);
+        });
+      }
+
+      setupResizer(resizerSmartlog, smartlogPane, "diffview_smartlog_width", 180, 800);
+      setupResizer(resizerFiles, filesPane, "diffview_files_width", 160, 700);
+    }
+
     function togglePane(pane) {
       if (pane === "smartlog" || pane === "commits") {
         state.panes.smartlog = !state.panes.smartlog;
         const el = document.getElementById("paneSmartlog");
-        if (el) el.classList.toggle("collapsed", !state.panes.smartlog);
+        const resizer = document.getElementById("resizerSmartlog");
+        if (el) {
+          el.classList.toggle("collapsed", !state.panes.smartlog);
+          if (state.panes.smartlog) {
+            const savedW = localStorage.getItem("diffview_smartlog_width");
+            if (savedW) el.style.width = savedW + "px";
+          }
+        }
+        if (resizer) resizer.classList.toggle("hidden", !state.panes.smartlog);
         const btn = document.getElementById("btnToggleSmartlog");
         if (btn) btn.classList.toggle("quake-btn-active", state.panes.smartlog);
       } else if (pane === "files") {
         state.panes.files = !state.panes.files;
         const el = document.getElementById("paneFiles");
-        if (el) el.classList.toggle("collapsed", !state.panes.files);
+        const resizer = document.getElementById("resizerFiles");
+        if (el) {
+          el.classList.toggle("collapsed", !state.panes.files);
+          if (state.panes.files) {
+            const savedW = localStorage.getItem("diffview_files_width");
+            if (savedW) el.style.width = savedW + "px";
+          }
+        }
+        if (resizer) resizer.classList.toggle("hidden", !state.panes.files);
         const btn = document.getElementById("btnToggleFiles");
         if (btn) btn.classList.toggle("quake-btn-active", state.panes.files);
       }
@@ -1069,8 +1400,28 @@
       }
     }
 
-    // Select Commit
-    async function selectCommit(commitHash) {
+    // Select Commit (with Shift-Click multi-selection, BUG-203)
+    async function selectCommit(commitHash, event) {
+      if (event && event.shiftKey && state.activeCommit && state.activeCommit !== commitHash) {
+        const allNodes = Array.from(document.querySelectorAll(".smartlog-node[data-hash]"));
+        const allHashes = allNodes.map(n => n.dataset.hash);
+        const prevIdx = allHashes.indexOf(state.activeCommit);
+        const currIdx = allHashes.indexOf(commitHash);
+        if (prevIdx !== -1 && currIdx !== -1) {
+          const start = Math.min(prevIdx, currIdx);
+          const end = Math.max(prevIdx, currIdx);
+          const rangeHashes = allHashes.slice(start, end + 1);
+          allNodes.forEach((node, idx) => {
+            const cb = node.querySelector(".commit-checkbox");
+            if (cb) {
+              cb.checked = (idx >= start && idx <= end);
+            }
+          });
+          state.selectedCommits = rangeHashes;
+          updateSelectedCount();
+        }
+      }
+
       state.activeCommit = commitHash;
       state.activeFile = null;
       state.currentDiff = null;
@@ -1730,8 +2081,153 @@
       }
     }
 
+    async function onRebaseClicked() {
+      const spinner = document.getElementById("rebaseSpinner");
+      if (spinner) spinner.style.display = "inline";
+      showToast("Rebasing onto ancestor branch...");
+
+      try {
+        const resp = await fetch("/api/rebase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
+        });
+        const res = await resp.json();
+        if (spinner) spinner.style.display = "none";
+        if (res.status === "ok") {
+          showToast(res.message || "Rebase completed.");
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          showToast("Rebase failed: " + (res.message || "Unknown error"), 5000);
+        }
+      } catch (err) {
+        if (spinner) spinner.style.display = "none";
+        showToast("Rebase failed: " + err, 5000);
+      }
+    }
+
+    // Branch Selection & Formatting (BUG-197, BUG-221)
+    const branchData = [
+      {% for b in session.branches %}
+        {
+          name: "{{ b.name }}",
+          is_current: {{ 'true' if b.is_current else 'false' }},
+          is_remote: {{ 'true' if b.is_remote else 'false' }},
+          is_main: {{ 'true' if (b.name in ['main', 'master', 'heads/main', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or b.name.endswith('/main') or b.name.endswith('/master')) else 'false' }},
+          is_release: {{ 'true' if ('release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v') or '/v' in b.name.lower()) else 'false' }}
+        }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ];
+
+    function openBranchModal() {
+      const modal = document.getElementById("modalBranchPicker");
+      if (modal) {
+        modal.style.display = "flex";
+        const input = document.getElementById("branchSearchInput");
+        if (input) {
+          input.value = "";
+          setTimeout(() => input.focus(), 50);
+        }
+        renderBranchLists();
+      }
+    }
+
+    function closeBranchModal() {
+      const modal = document.getElementById("modalBranchPicker");
+      if (modal) modal.style.display = "none";
+    }
+
+    function filterBranchList() {
+      renderBranchLists();
+    }
+
+    function renderBranchLists() {
+      const search = (document.getElementById("branchSearchInput")?.value || "").trim().toLowerCase();
+      const hideOtherUsers = document.getElementById("chkHideOtherUsers")?.checked ?? true;
+      const currentUser = "{{ session.current_user or 'picklethecat1488-hue' }}".toLowerCase();
+
+      const mainContainer = document.getElementById("mainReleaseBranchList");
+      const featContainer = document.getElementById("featureBranchList");
+      const countEl = document.getElementById("featureBranchCount");
+      if (!mainContainer || !featContainer) return;
+
+      mainContainer.innerHTML = "";
+      featContainer.innerHTML = "";
+
+      const mainReleaseBranches = [];
+      const featureBranches = [];
+
+      for (const b of branchData) {
+        if (b.is_main || b.is_release) {
+          mainReleaseBranches.push(b);
+        } else {
+          const lowerName = b.name.toLowerCase();
+          if (hideOtherUsers) {
+            const ghMatch = lowerName.match(/(?:remotes\/origin\/)?gh\/([^/]+)\//);
+            if (ghMatch && ghMatch[1] !== currentUser) {
+              continue;
+            }
+          }
+          if (search && !lowerName.includes(search)) {
+            continue;
+          }
+          featureBranches.push(b);
+        }
+      }
+
+      // Sort main first, then releases numerically (BUG-221)
+      mainReleaseBranches.sort((a, b) => {
+        if (a.is_main && !b.is_main) return -1;
+        if (!a.is_main && b.is_main) return 1;
+        return a.name.localeCompare(b.name, undefined, { numeric: true });
+      });
+
+      mainReleaseBranches.forEach(b => {
+        const item = document.createElement("div");
+        item.className = "branch-item branch-item-main" + (b.is_current ? " active" : "");
+        item.onclick = () => { closeBranchModal(); onBranchSelected(b.name); };
+        item.innerHTML = `
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:var(--quake-gold);">${b.is_main ? '⭐' : '🏷️'}</span>
+            <span>${b.name}</span>
+            ${b.is_current ? '<span class="node-badge node-badge-tag" style="background:var(--quake-gold);color:#140a05;font-weight:700;">CURRENT</span>' : ''}
+          </div>
+          <span style="font-size:10px;color:var(--quake-text-muted);">${b.is_main ? 'Mainline' : 'Release'}</span>
+        `;
+        mainContainer.appendChild(item);
+      });
+
+      if (countEl) countEl.textContent = `${featureBranches.length} branch${featureBranches.length === 1 ? '' : 'es'}`;
+      featureBranches.forEach(b => {
+        const item = document.createElement("div");
+        item.className = "branch-item" + (b.is_current ? " active" : "");
+        item.onclick = () => { closeBranchModal(); onBranchSelected(b.name); };
+        const isPR = b.name.toLowerCase().includes("pr") || b.name.toLowerCase().includes("pull");
+        item.innerHTML = `
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:${isPR ? 'var(--quake-purple)' : 'var(--quake-cyan)'};">${isPR ? '⎇' : '🌿'}</span>
+            <span>${b.name}</span>
+            ${b.is_current ? '<span class="node-badge node-badge-tag" style="background:var(--quake-gold);color:#140a05;font-weight:700;">CURRENT</span>' : ''}
+          </div>
+          <span style="font-size:10px;color:var(--quake-text-dim);">${isPR ? 'PR Branch' : 'Feature'}</span>
+        `;
+        featContainer.appendChild(item);
+      });
+
+      if (featureBranches.length === 0) {
+        featContainer.innerHTML = '<div style="padding:10px;text-align:center;color:var(--quake-text-dim);font-size:11px;">No matching branches found</div>';
+      }
+    }
+
     async function onBranchSelected(branchName) {
       if (!branchName) return;
+      const branchSel = document.getElementById("branchSelect");
+      if (branchSel) branchSel.value = branchName;
+      const btnBranch = document.getElementById("btnBranchDropdown");
+      if (btnBranch) {
+        const span = btnBranch.querySelector("span");
+        if (span) span.textContent = "🌿 " + branchName;
+      }
       try {
         const resp = await fetch("/api/checkout_branch", {
           method: "POST",
@@ -1769,8 +2265,26 @@
       }
     }
 
-    // Multi-commit selection & Cross-tool Interactivity
-    function onCommitCheckChanged() {
+    // Multi-commit selection & Cross-tool Interactivity (Shift-Click, BUG-203)
+    let lastCheckedCommitIndex = -1;
+
+    function onCommitCheckChanged(event, checkbox) {
+      const allCheckboxes = Array.from(document.querySelectorAll(".commit-checkbox"));
+      const currentIndex = checkbox ? allCheckboxes.indexOf(checkbox) : -1;
+
+      if (event && event.shiftKey && lastCheckedCommitIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(lastCheckedCommitIndex, currentIndex);
+        const end = Math.max(lastCheckedCommitIndex, currentIndex);
+        const targetState = checkbox.checked;
+        for (let i = start; i <= end; i++) {
+          allCheckboxes[i].checked = targetState;
+        }
+      }
+
+      if (checkbox) {
+        lastCheckedCommitIndex = currentIndex;
+      }
+
       const checkboxes = document.querySelectorAll(".commit-checkbox:checked");
       state.selectedCommits = Array.from(checkboxes).map(cb => cb.value);
       updateSelectedCount();
@@ -1779,6 +2293,22 @@
     function updateSelectedCount() {
       const countEl = document.getElementById("selectedCount");
       if (countEl) countEl.textContent = state.selectedCommits.length;
+    }
+
+    // Jump to CR for specific commit (BUG-199)
+    async function jumpToCR(commitHash) {
+      if (!commitHash) return;
+      try {
+        const resp = await fetch("/api/open_code_review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commits: [commitHash] })
+        });
+        const res = await resp.json();
+        window.open(res.url, "hardware_code_review");
+      } catch (err) {
+        window.open(`/review?revisions=${encodeURIComponent(commitHash)}`, "hardware_code_review");
+      }
     }
 
     async function onOpenInCodeReview() {
@@ -1790,10 +2320,10 @@
           body: JSON.stringify({ commits: commits })
         });
         const res = await resp.json();
-        window.open(res.url, "_blank");
+        window.open(res.url, "hardware_code_review");
       } catch (err) {
         const revStr = commits.join(",");
-        window.open(`/review?revisions=${encodeURIComponent(revStr)}`, "_blank");
+        window.open(`/review?revisions=${encodeURIComponent(revStr)}`, "hardware_code_review");
       }
     }
 
@@ -1805,9 +2335,9 @@
           body: JSON.stringify({ bug_id: bugId })
         });
         const res = await resp.json();
-        window.open(res.url, "_blank");
+        window.open(res.url, "hardware_bug_tracker");
       } catch (err) {
-        window.open(`/bugs#BUG-${bugId}`, "_blank");
+        window.open(`/bugs#BUG-${bugId}`, "hardware_bug_tracker");
       }
     }
 
@@ -1819,9 +2349,9 @@
           body: JSON.stringify({})
         });
         const res = await resp.json();
-        window.open(res.url, "_blank");
+        window.open(res.url, "hardware_bug_tracker");
       } catch (err) {
-        window.open("/bugs", "_blank");
+        window.open("/bugs", "hardware_bug_tracker");
       }
     }
 
@@ -1833,9 +2363,9 @@
           body: JSON.stringify({ commit: commitHash })
         });
         const res = await resp.json();
-        window.open(res.url, "_blank");
+        window.open(res.url, "hardware_bug_tracker");
       } catch (err) {
-        window.open(`/bugs#new?commit=${encodeURIComponent(commitHash)}`, "_blank");
+        window.open(`/bugs#new?commit=${encodeURIComponent(commitHash)}`, "hardware_bug_tracker");
       }
     }
 
@@ -1887,12 +2417,24 @@
     }
 
     function onBranchBadgeClick(e, branchName, prUrl) {
-      e.stopPropagation();
-      const match = branchName.match(/(?:pr|pull)[/-]?(\d+)/i) || branchName.match(/(\d+)/);
-      if (match) {
-        window.open(`https://github.com/picklethecat1488-hue/hardware/pull/${match[1]}`, "_blank");
-      } else if (prUrl) {
+      if (e) e.stopPropagation();
+      if (prUrl) {
         window.open(prUrl, "_blank");
+        return;
+      }
+      const match = branchName.match(/(?:^|\/)(?:pr|pull)[/-]?(\d+)\b/i);
+      const isRemote = branchName.startsWith("origin/") || branchName.startsWith("remotes/");
+      if (match && isRemote) {
+        window.open(`https://github.com/picklethecat1488-hue/hardware/pull/${match[1]}`, "_blank");
+        return;
+      }
+      if (isRemote) {
+        const cleaned = branchName.replace(/^(?:remotes\/)?origin\//i, "");
+        window.open(`https://github.com/picklethecat1488-hue/hardware/tree/${cleaned}`, "_blank");
+      } else if (match) {
+        showToast(`PR #${match[1]} (branch "${branchName}") has not been created on GitHub yet.`);
+      } else {
+        showToast(`Branch "${branchName}" is local only and has not been pushed to GitHub.`);
       }
     }
 
@@ -1953,6 +2495,34 @@
 
 
 
+    // Toggle merged commits visibility (BUG-218)
+    function isHideMergedEnabled() {
+      const stored = localStorage.getItem("diffview_hide_merged");
+      return stored === null ? true : stored === "true";
+    }
+
+    function updateMergedVisibility() {
+      const hideMerged = isHideMergedEnabled();
+      const listEl = document.getElementById("smartlogList");
+      const iconEl = document.getElementById("mergedToggleIcon");
+      const labelEl = document.getElementById("mergedToggleLabel");
+      if (listEl) {
+        if (hideMerged) {
+          listEl.classList.add("hide-merged");
+        } else {
+          listEl.classList.remove("hide-merged");
+        }
+      }
+      if (iconEl) iconEl.textContent = hideMerged ? "👁️" : "🙈";
+      if (labelEl) labelEl.textContent = hideMerged ? "Show Merged" : "Hide Merged";
+    }
+
+    function toggleMergedCommits() {
+      const nextState = !isHideMergedEnabled();
+      localStorage.setItem("diffview_hide_merged", nextState ? "true" : "false");
+      updateMergedVisibility();
+    }
+
     // Keyboard shortcuts for pane toggling
     document.addEventListener("keydown", (e) => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
@@ -1965,6 +2535,8 @@
 
     // Initialize on load
     window.addEventListener("DOMContentLoaded", () => {
+      initPanelResizers();
+      updateMergedVisibility();
       if (!INITIAL_SYNC_DONE) {
         performInitialSync(false);
       }

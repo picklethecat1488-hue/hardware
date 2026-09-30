@@ -174,10 +174,18 @@
       box-shadow: 0 0 8px rgba(255, 184, 0, 0.3), inset 2px 2px 4px rgba(0,0,0,0.8);
     }
     textarea {
-      resize: vertical !important;
+      resize: both !important;
       min-height: 80px;
+      min-width: 200px;
+      max-width: 100%;
       line-height: 1.5;
     }
+    input[type="text"] {
+      resize: horizontal;
+      min-width: 150px;
+      max-width: 100%;
+    }
+
     .panel-expand-btn {
       font-size: 10px;
       padding: 2px 8px;
@@ -507,7 +515,7 @@
       <div class="metric-pill">RESOLVED: <span id="m-resolved" class="metric-highlight" style="color:var(--quake-green);">0</span></div>
     </div>
     <div class="header-actions">
-      <a href="/" class="quake-btn quake-btn-default" style="text-decoration:none;display:inline-flex;align-items:center;" title="Return to VCS Dashboard">← Dashboard</a>
+      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-default" style="text-decoration:none;display:inline-flex;align-items:center;" title="Return to VCS Dashboard">← Dashboard</a>
       <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
       <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
       <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
@@ -687,8 +695,10 @@
       updateMetrics();
       setBugFilter(currentFilter);
       loadActiveBug();
+      autoResizeAllTextareas();
       setupPasteDrop();
     }
+
 
     function setBugFilter(filter) {
       currentFilter = filter;
@@ -794,7 +804,9 @@
       document.getElementById("bug-resolution").value = bug.resolution_notes || "";
 
       renderAttachments(bug.attachments || []);
+      autoResizeAllTextareas();
     }
+
 
     function renderAttachments(attachments) {
       const grid = document.getElementById("attachments-grid");
@@ -934,6 +946,16 @@
       showToast("Deleted bug & updated BUGS.md");
     }
 
+    function returnToDashboard(e) {
+      if (e) e.preventDefault();
+      if (window.opener && !window.opener.closed) {
+        window.opener.focus();
+        window.close();
+      } else {
+        window.open("/", "hardware_vcs_diff_viewer");
+      }
+    }
+
     async function saveAndExit() {
       const btn = document.getElementById("btn-save-exit");
       btn.innerText = "⏳ Saving...";
@@ -948,7 +970,12 @@
       }
 
       setTimeout(() => {
-        window.location.href = "/";
+        if (window.opener && !window.opener.closed) {
+          window.opener.focus();
+          window.close();
+        } else {
+          window.location.href = "/";
+        }
       }, 500);
     }
 
@@ -1153,10 +1180,39 @@
       btn.textContent = isExp ? "⤡ Compact" : "⤢ Expand";
       btn.classList.toggle("quake-btn-gold", isExp);
       btn.classList.toggle("quake-btn-default", !isExp);
+      if (!isExp) {
+        section.querySelectorAll("textarea").forEach(ta => autoResizeTextarea(ta));
+      }
+    }
+
+    function autoResizeTextarea(el, maxLimit = 500) {
+      if (!el) return;
+      if (el.closest && el.closest(".form-section.expanded-vertical")) return;
+      el.style.height = "auto";
+      const scrollH = el.scrollHeight;
+      const minH = el.dataset.minHeight ? parseInt(el.dataset.minHeight) : 80;
+      const targetHeight = Math.min(Math.max(scrollH, minH), maxLimit);
+      el.style.height = targetHeight + "px";
+      if (scrollH > maxLimit) {
+        el.style.overflowY = "auto";
+      } else {
+        el.style.overflowY = "hidden";
+      }
+    }
+
+    function autoResizeAllTextareas() {
+      const textareas = document.querySelectorAll(".content-area textarea");
+      textareas.forEach(ta => autoResizeTextarea(ta));
     }
 
     let lastKnownVersion = null;
     let isUserTyping = false;
+
+    document.addEventListener("input", (e) => {
+      if (e.target && e.target.tagName === "TEXTAREA") {
+        autoResizeTextarea(e.target);
+      }
+    });
 
     document.addEventListener("focusin", (e) => {
       if (e.target && (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")) {
@@ -1169,6 +1225,7 @@
         isUserTyping = false;
       }
     });
+
 
     async function pollForExternalUpdates() {
       try {

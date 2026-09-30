@@ -263,7 +263,7 @@ def test_carrier_board_provider_cad_silkscreen():
     assert texts[0].layer == "F.SilkS"
 
     assert texts[1].text == "LAYER 1-6 RIGID-FLEX"
-    assert texts[1].position == (0.0, -28.0)
+    assert texts[1].position == (-8.0, -34.5)
 
     assert texts[2].text == "BOTTOM SHIELD / GROUND REF"
     assert texts[2].layer == "B.SilkS"

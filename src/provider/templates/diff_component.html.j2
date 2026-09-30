@@ -58,15 +58,40 @@
 
   .diff-scroll-body {
     flex: 1;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
     background: #0f0a07;
     position: relative;
+    scrollbar-width: thin;
+    scrollbar-color: var(--quake-border-accent, #8d5d33) var(--quake-bg-darker, #0f0a07);
+  }
+
+  .diff-scroll-body::-webkit-scrollbar {
+    width: 8px;
+    height: 10px;
+  }
+
+  .diff-scroll-body::-webkit-scrollbar-track {
+    background: #0f0a07;
+    border-top: 1px solid var(--quake-border-mid, #5a381e);
+  }
+
+  .diff-scroll-body::-webkit-scrollbar-thumb {
+    background: var(--quake-border-accent, #8d5d33);
+    border-radius: 4px;
+    border: 1px solid var(--quake-border-mid, #5a381e);
+  }
+
+  .diff-scroll-body::-webkit-scrollbar-thumb:hover {
+    background: var(--quake-gold, #ffb800);
   }
 
   /* Side-by-side Table */
   .diff-sbs-table {
     border-collapse: collapse;
     width: 100%;
+    min-width: max-content;
+    table-layout: auto;
     font-family: var(--font-mono, monospace);
     font-size: 11px;
     line-height: 1.45;
@@ -122,10 +147,10 @@
   }
 
   .diff-code-cell {
-    overflow-x: auto;
+    overflow-x: hidden;
     font-family: inherit;
-    width: calc(50% - 64px);
-    max-width: 0;
+    white-space: pre;
+    max-width: 900px;
   }
 
   .diff-sbs-row.row-delete td.old-code,
@@ -289,8 +314,20 @@
       return map[ext] || "plaintext";
     },
 
+    MAX_LINE_LENGTH: 1000,
+
+    truncateLine(text, maxLen) {
+      if (!text) return "";
+      const limit = maxLen || this.MAX_LINE_LENGTH;
+      if (text.length > limit) {
+        return text.slice(0, limit) + "… [line truncated]";
+      }
+      return text;
+    },
+
     highlightLine(text, lang) {
       if (!text) return "";
+      text = this.truncateLine(text);
       if (typeof hljs === "undefined") {
         return this.escapeHtml(text);
       }
@@ -306,16 +343,18 @@
 
     highlightFullDocument(code, lang) {
       if (!code) return [];
+      const lines = code.split(/\r?\n/).map(l => this.truncateLine(l));
       if (typeof hljs === "undefined") {
-        return code.split(/\r?\n/).map(l => this.escapeHtml(l));
+        return lines.map(l => this.escapeHtml(l));
       }
       try {
+        const truncatedCode = lines.join("\n");
         const highlighted = (lang && hljs.getLanguage(lang))
-          ? hljs.highlight(code, { language: lang, ignoreIllegals: true }).value
-          : hljs.highlightAuto(code).value;
+          ? hljs.highlight(truncatedCode, { language: lang, ignoreIllegals: true }).value
+          : hljs.highlightAuto(truncatedCode).value;
         return highlighted.split(/\r?\n/);
       } catch (e) {
-        return code.split(/\r?\n/).map(l => this.escapeHtml(l));
+        return lines.map(l => this.escapeHtml(l));
       }
     },
 

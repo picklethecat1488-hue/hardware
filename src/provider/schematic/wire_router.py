@@ -441,7 +441,7 @@ class SchematicWireSegmentPlanner:
 
             elif s1 == "left" and s2 == "left":
                 if abs(b1[0] - b2[0]) < 1.0:
-                    x_col = min(b1[0] - 6.0 - d_idx * 2.5, min(p1[0], p2[0]) - 3.0)
+                    x_col = min(b1[0] - 8.0 - d_idx * 2.5, min(p1[0], p2[0]) - 8.0)
                     while any(
                         abs(x_col - s[0]) < 0.2 and (min(max(p1[1], p2[1]), s[2]) - max(min(p1[1], p2[1]), s[1]) > 0.1)
                         for s in v_segments

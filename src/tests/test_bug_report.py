@@ -581,7 +581,7 @@ def test_regression_bug_172_vertical_text_panel_and_cli_expansion() -> None:
     assert "panel-expand-btn" in br_template
     assert "expanded-vertical" in br_template
     assert "toggleExpandPanel" in br_template
-    assert "resize: vertical" in br_template
+    assert "resize: both" in br_template or "resize: vertical" in br_template
 
 
 def test_regression_bug_181_no_file_descriptor_leak_in_sqlite_and_server(tmp_path: Path) -> None:

@@ -526,8 +526,14 @@ class MarkdownBugExporter:
                 existing_map[md_bug.id] = md_bug
             else:
                 existing = existing_map[md_bug.id]
-                # Status update
-                if md_bug.status != existing.status:
+                # Status update: protect resolved/closed bugs from being regressed to OPEN by stale markdown without notes
+                if (
+                    existing.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
+                    and md_bug.status == BugStatus.OPEN
+                    and not md_bug.resolution_notes.strip()
+                ):
+                    pass
+                elif md_bug.status != existing.status:
                     existing.status = md_bug.status
                     if md_bug.status in (BugStatus.RESOLVED, BugStatus.CLOSED):
                         if not existing.resolved_at:
@@ -673,7 +679,15 @@ class MarkdownBugExporter:
         content = self.render_bug_markdown(bug)
         if target_file.exists():
             try:
-                if target_file.read_text(encoding="utf-8") == content:
+                disk_content = target_file.read_text(encoding="utf-8")
+                if disk_content == content:
+                    return target_file
+                # Protect resolved bug file on disk from being overwritten by un-noted OPEN bug
+                if (
+                    bug.status == BugStatus.OPEN
+                    and not bug.resolution_notes.strip()
+                    and "- **Status**: `RESOLVED`" in disk_content
+                ):
                     return target_file
             except OSError:
                 pass
@@ -918,8 +932,16 @@ class MarkdownBugExporter:
                     if store and hasattr(store, "update_bug_id"):
                         store.update_bug_id(existing_by_uuid.uuid, expected_id_from_fn)
                     renamed += 1
-                database.add_or_update(md_bug)
+                if (
+                    existing_by_uuid.status in (BugStatus.RESOLVED, BugStatus.CLOSED)
+                    and md_bug.status == BugStatus.OPEN
+                    and not md_bug.resolution_notes.strip()
+                ):
+                    pass
+                else:
+                    database.add_or_update(md_bug)
                 merged += 1
+
             else:
                 if expected_id_from_fn:
                     md_bug.id = expected_id_from_fn

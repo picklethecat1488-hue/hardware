@@ -12,17 +12,17 @@ carrier_board:
     stimulus: "100mA 4-wire Kelvin DC"
     measured: 0.048
 
-  - step_id: "TEST_IMP_PCIE_DIFF"
-    description: "Measure PCIe Gen4 differential impedance on TX0+/TX0-"
-    test_type: "impedance"
-    net_name: "PCIE_TX0"
-    pad_a_mm: [-14.0, -22.0]  # TP5 (TX0_N)
-    pad_b_mm: [-10.0, -22.0]  # TP6 (TX0_P)
-    nominal: 85.0
-    tolerance_pct: 10.0
-    unit: "ohm"
-    stimulus: "100ps TDR step differential pulse"
-    measured: 84.6
+  - step_id: "TEST_UART_BLE_SPEED"
+    description: "Measure BTLE high-speed 1Mb/s UART signal integrity on BLE_TX / BLE_RX"
+    test_type: "voltage"
+    net_name: "BLE_UART"
+    pad_a_mm: [-6.0, -22.0]   # TP7 (BLE_TX)
+    pad_b_mm: [-10.0, -22.0]  # TP6 (BLE_RX)
+    nominal: 3.30
+    tolerance_pct: 3.0
+    unit: "V"
+    stimulus: "1Mb/s PRBS UART serial transceiver test"
+    measured: 3.30
 
   - step_id: "TEST_RAIL_3V3"
     description: "Verify regulated system 3.3V power distribution rail"
@@ -48,6 +48,30 @@ carrier_board:
     stimulus: "Battery charge domain sensor"
     measured: 3.72
 
+
+  - step_id: "TEST_IMP_USB_DIFF"
+    description: "Measure USB 2.0 / USB-C differential impedance on DP/DM"
+    test_type: "diff_pair"
+    net_name: "USB_DP_DM"
+    pad_a_mm: [-25.0, 0.5]   # J3 DP1
+    pad_b_mm: [-25.0, -0.5]  # J3 DM1
+    nominal: 90.0
+    tolerance_pct: 10.0
+    unit: "ohm"
+    stimulus: "200ps TDR step differential pulse"
+    measured: 89.8
+
+  - step_id: "TEST_UART_BLE_FLOW_CTRL"
+    description: "Verify BTLE hardware flow control handshake on BLE_RTS / BLE_CTS"
+    test_type: "voltage"
+    net_name: "BLE_FLOW_CTRL"
+    pad_a_mm: [-14.0, -22.0]  # TP5 (BLE_RTS)
+    pad_b_mm: [-2.0, -22.0]   # TP8 (BLE_CTS)
+    nominal: 3.30
+    tolerance_pct: 3.0
+    unit: "V"
+    stimulus: "Hardware RTS/CTS assert handshake probe"
+    measured: 3.30
 
   - step_id: "TEST_I2C_PULLUPS"
     description: "Measure I2C SDA/SCL pull-up resistance to 3.3V rail"
@@ -121,3 +145,27 @@ flex_tail:
     unit: "ohm"
     stimulus: "100mA 4-wire Kelvin DC"
     measured: 0.078
+
+  - step_id: "TEST_CAP_MUTUAL_TOUCH_CHAN0"
+    description: "Simulate human finger touch proximity on liquid level Channel 0 mutual capacitance electrode"
+    test_type: "mutual_cap"
+    net_name: "CAP_CHAN0"
+    pad_a_mm: [0.0, -6.25]
+    pad_b_mm: [-3.0, -6.25]
+    nominal: 15.8
+    tolerance_pct: 15.0
+    unit: "pF"
+    stimulus: "Simulated finger proximity 250kHz 1.8V dielectric perturb"
+    measured: 15.9
+
+  - step_id: "TEST_CAP_MUTUAL_TOUCH_CHAN1"
+    description: "Simulate human finger touch proximity on liquid level Channel 1 mutual capacitance electrode"
+    test_type: "mutual_cap"
+    net_name: "CAP_CHAN1"
+    pad_a_mm: [0.0, 5.25]
+    pad_b_mm: [-3.0, 5.25]
+    nominal: 17.5
+    tolerance_pct: 15.0
+    unit: "pF"
+    stimulus: "Simulated finger proximity 250kHz 1.8V dielectric perturb"
+    measured: 17.6

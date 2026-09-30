@@ -64,6 +64,7 @@ class FileDiffModel(BaseModel):
     new_path: Optional[str] = None
     status: str = "M"  # M, A, D, R, ??, etc.
     is_binary: bool = False
+    is_lfs: bool = False
     additions: int = 0
     deletions: int = 0
     hunks: List[DiffHunk] = Field(default_factory=list)
@@ -129,6 +130,11 @@ class CommitNodeModel(BaseModel):
     branches: List[str] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
     is_head: bool = False
+    is_ancestor_top: bool = False
+    is_merged: bool = False
+    is_merged_into_tracking: bool = False
+    ancestor_name: Optional[str] = None
+
     graph_symbol: str = "o"  # '@' for HEAD, 'o' for commit, 'x' for conflict/error
     graph_art: str = ""  # ASCII / Unicode tree column prefix (e.g. '@', '| o', '| /')
     bug_tags: List[CommitBugTagModel] = Field(default_factory=list)
@@ -139,6 +145,10 @@ class CommitNodeModel(BaseModel):
     deletions: int = 0
     files_count: int = 0
     is_feedback_only: bool = False
+    cr_open_count: int = 0
+    cr_resolved_count: int = 0
+    cr_total_count: int = 0
+    cr_reviewed: bool = False
 
 
 class WorkingTreeFileModel(BaseModel):

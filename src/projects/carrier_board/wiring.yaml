@@ -28,8 +28,8 @@ footprints:
   - 0.0
   mpn: IQS7222A001QNR
   supplier_pn: IQS7222A-QNR-ND
-- name: J1
-  package: M.2-KEY-M
+- name: U11
+  package: MOD-BLE-PCB-ANT
   position:
   - 0.0
   - -36.0
@@ -38,8 +38,8 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: LOTES-APCI0082
-  supplier_pn: LOTES-M2-ND
+  mpn: NINA-B302-00B
+  supplier_pn: 1972-NINA-B302-00B-ND
 - name: J2
   package: FPC-30P-0.5MM
   position:
@@ -90,6 +90,7 @@ footprints:
   - 0.0
   mpn: CL10A106KP8NNNC
   supplier_pn: 1276-1189-1-ND
+  value: 10uF
 - name: R1
   package: '0402'
   position:
@@ -103,6 +104,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-074K7L
   supplier_pn: 311-4.7KLRCT-ND
+  value: 4.7k
 - name: R2
   package: '0402'
   position:
@@ -116,6 +118,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-074K7L
   supplier_pn: 311-4.7KLRCT-ND
+  value: 4.7k
 - name: C1
   package: '0402'
   position:
@@ -128,6 +131,7 @@ footprints:
   - 0.0
   mpn: CC0402KRX7R9BB104
   supplier_pn: 311-1438-1-ND
+  value: 0.1uF
 - name: C2
   package: '0402'
   position:
@@ -141,6 +145,7 @@ footprints:
   - 0.0
   mpn: CC0402KRX7R9BB104
   supplier_pn: 311-1438-1-ND
+  value: 0.1uF
 - name: C3
   package: '0603'
   position:
@@ -153,6 +158,7 @@ footprints:
   - 0.0
   mpn: CL10A106KP8NNNC
   supplier_pn: 1276-1004-1-ND
+  value: 10uF
 - name: Q1
   package: SOT-23
   position:
@@ -273,6 +279,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-075K1L
   supplier_pn: 311-5.1KLRCT-ND
+  value: 5.1k
 - name: R4
   package: '0402'
   position:
@@ -285,6 +292,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-075K1L
   supplier_pn: 311-5.1KLRCT-ND
+  value: 5.1k
 - name: U3
   package: SOT-23-5
   position:
@@ -309,6 +317,7 @@ footprints:
   - 0.0
   mpn: CL10A475KP8NNNC
   supplier_pn: 1276-1188-1-ND
+  value: 4.7uF
 - name: C7
   package: '0603'
   position:
@@ -321,6 +330,7 @@ footprints:
   - 0.0
   mpn: CL10A475KP8NNNC
   supplier_pn: 1276-1188-1-ND
+  value: 4.7uF
 - name: U4
   package: QFN-16-AMP
   position:
@@ -345,6 +355,7 @@ footprints:
   - 0.0
   mpn: CL10A105KP8NNNC
   supplier_pn: 1276-1002-1-ND
+  value: 1uF
 - name: U5
   package: piezo_speaker_12mm
   position:
@@ -381,6 +392,7 @@ footprints:
   - 0.0
   mpn: CC0402JRNPO9BN120
   supplier_pn: 311-1032-1-ND
+  value: 12pF
 - name: C10
   package: '0402'
   position:
@@ -393,6 +405,7 @@ footprints:
   - 0.0
   mpn: CC0402JRNPO9BN120
   supplier_pn: 311-1032-1-ND
+  value: 12pF
 - name: R5
   package: '0402'
   position:
@@ -405,6 +418,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-0710KL
   supplier_pn: 311-10.0KLRCT-ND
+  value: 10k
 - name: C11
   package: '0402'
   position:
@@ -417,6 +431,7 @@ footprints:
   - 0.0
   mpn: CC0402KRX7R9BB104
   supplier_pn: 311-1438-1-ND
+  value: 0.1uF
 - name: R6
   package: '0402'
   position:
@@ -429,6 +444,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-0710KL
   supplier_pn: 311-10.0KLRCT-ND
+  value: 10k
 - name: C4
   package: '0402'
   position:
@@ -441,6 +457,7 @@ footprints:
   - 0.0
   mpn: CC0402KRX7R9BB104
   supplier_pn: 311-1438-1-ND
+  value: 0.1uF
 - name: C5
   package: '0402'
   position:
@@ -453,6 +470,7 @@ footprints:
   - 0.0
   mpn: CC0402KRX7R9BB104
   supplier_pn: 311-1438-1-ND
+  value: 0.1uF
 - name: C12
   package: '0402'
   position:
@@ -466,6 +484,7 @@ footprints:
   - 180.0
   mpn: CC0402KRX5R6BB225
   supplier_pn: 311-1440-1-ND
+  value: 2.2uF
 - name: C14
   package: '0402'
   position:
@@ -479,6 +498,7 @@ footprints:
   - 180.0
   mpn: CC0402KRX5R6BB225
   supplier_pn: 311-1440-1-ND
+  value: 2.2uF
 - name: J5
   package: pin_header_2x5_1.27mm
   position:
@@ -761,8 +781,8 @@ footprints:
 - name: SW1
   package: SW_PUSH_SMD
   position:
-  - 11.25
-  - -18.0
+  - 0.0
+  - -11.0
   - 0.8
   rotation:
   - 0.0
@@ -773,49 +793,49 @@ footprints:
 - name: JP1
   package: pin_header_1x2
   position:
-  - 9.5
-  - -23.0
+  - 10.5
+  - -21.5
   - 0.8
   rotation:
   - 0.0
   - 0.0
-  - 90.0
+  - 0.0
   mpn: TSW-102-07-L-S
   supplier_pn: SAM1026-02-ND
 - name: JP2
   package: pin_header_1x2
   position:
-  - 9.5
-  - -28.5
+  - 10.5
+  - -24.0
   - 0.8
   rotation:
   - 0.0
   - 0.0
-  - 90.0
+  - 0.0
   mpn: TSW-102-07-L-S
   supplier_pn: SAM1026-02-ND
 - name: JP3
   package: pin_header_1x2
   position:
-  - 13.0
-  - -23.0
+  - 10.5
+  - -27.0
   - 0.8
   rotation:
   - 0.0
   - 0.0
-  - 90.0
+  - 0.0
   mpn: TSW-102-07-L-S
   supplier_pn: SAM1026-02-ND
 - name: JP4
   package: pin_header_1x2
   position:
-  - 13.0
-  - -28.5
+  - 10.5
+  - -29.6
   - 0.8
   rotation:
   - 0.0
   - 0.0
-  - 90.0
+  - 0.0
   mpn: TSW-102-07-L-S
   supplier_pn: SAM1026-02-ND
 - name: D2
@@ -902,6 +922,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 - name: R8
   package: '0402'
   position:
@@ -914,6 +935,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 - name: R9
   package: '0402'
   position:
@@ -926,6 +948,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 - name: R10
   package: '0402'
   position:
@@ -938,6 +961,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 - name: R11
   package: '0402'
   position:
@@ -950,6 +974,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 - name: R12
   package: '0402'
   position:
@@ -962,6 +987,7 @@ footprints:
   - 0.0
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
+  value: 1k
 nets:
 - name: GND
   color: '#475569'
@@ -970,7 +996,7 @@ nets:
     - J8
   - - U2
     - VSS
-  - - J1
+  - - U11
     - GND
   - - J2
     - GND
@@ -1144,7 +1170,7 @@ nets:
     - VDD
   - - U2
     - MCLR
-  - - J1
+  - - U11
     - 3V3
   - - J2
     - 3V3
@@ -1284,7 +1310,7 @@ nets:
   - - Q1
     - '3'
     - D
-  - - J1
+  - - U11
     - VLOAD_SW
 - name: PERIPH_EN
   priority: 24
@@ -1479,38 +1505,38 @@ nets:
     - '2'
   - - R12
     - '1'
-- name: PCIE_TX0_P
+- name: BLE_RX
   priority: 9
   color: '#2563eb'
   pins:
   - - U1
     - T2
-  - - J1
-    - PETp0
-- name: PCIE_TX0_N
+  - - U11
+    - RXD
+- name: BLE_RTS
   priority: 10
   color: '#3b82f6'
   pins:
   - - U1
     - T1
-  - - J1
-    - PETn0
-- name: PCIE_RX0_P
+  - - U11
+    - RTS
+- name: BLE_TX
   priority: 11
   color: '#059669'
   pins:
   - - U1
     - T3
-  - - J1
-    - PERp0
-- name: PCIE_RX0_N
+  - - U11
+    - TXD
+- name: BLE_CTS
   priority: 12
   color: '#10b981'
   pins:
   - - U1
     - T4
-  - - J1
-    - PERn0
+  - - U11
+    - CTS
 - name: CAP_SHIELD
   priority: 25
   color: '#64748b'

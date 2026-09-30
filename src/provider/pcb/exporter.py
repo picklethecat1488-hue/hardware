@@ -870,7 +870,9 @@ class PCBExporter:
                 {
                     "package": pkg,
                     "name": fp.name,
-                    "value": getattr(fp, "mpn", None) or (fp.label.text if fp.label else pkg),
+                    "value": getattr(fp, "value", None)
+                    or getattr(fp, "mpn", None)
+                    or (fp.label.text if fp.label else pkg),
                     "mpn": getattr(fp, "mpn", None) or "",
                     "uuid": str(uuid.uuid4()),
                     "x": sym_x,
@@ -933,7 +935,7 @@ class PCBExporter:
                     "Designator": fp.name,
                     "Package": fp.package,
                     "Quantity": 1,
-                    "Designation": fp.label.text if fp.label else fp.package,
+                    "Designation": getattr(fp, "value", None) or (fp.label.text if fp.label else fp.package),
                     "MPN": fp.mpn or f"GENERIC-{fp.package.upper()}",
                     "Supplier_PN": fp.supplier_pn or "N/A",
                 }

@@ -41,6 +41,7 @@ def create_isolated_git_repo(path: Path) -> Tuple[Path, list[str]]:
     f1.write_text("initial line 1\ninitial line 2\n", encoding="utf-8")
     subprocess.run(["git", "add", "file1.txt"], cwd=repo_dir, check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Initial commit (BUG-168)"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "branch", "-M", "main"], cwd=repo_dir, check=True, capture_output=True)
     sha1 = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo_dir, check=True, capture_output=True, text=True
     ).stdout.strip()
@@ -1281,3 +1282,593 @@ def test_regression_bug_191_and_205_code_review_revisions_and_multi_commit(tmp_p
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_190_pr_branch_tags_clickable_links(tmp_path: Path) -> None:
+    """Verify BUG-190: PR branch tags in Smartlog render as clickable links to GitHub PR."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 1. Test get_branch_url on GitEngine
+    pr_branch_url = engine.get_branch_url("origin/pr520")
+    assert pr_branch_url.endswith("/pull/520"), f"Expected PR URL for origin/pr520, got {pr_branch_url}"
+
+    norm_branch_url = engine.get_branch_url("origin/feature-xyz")
+    assert norm_branch_url.endswith("/tree/feature-xyz"), f"Expected branch tree URL, got {norm_branch_url}"
+
+    # 2. Test branch tag rendered as anchor link in diff_view.html.j2
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert '<a href="{{ br_url }}"' in tpl_text
+    assert "pr-tag-link" in tpl_text
+    assert "onBranchBadgeClick" in tpl_text
+
+
+def test_regression_bug_200_diff_view_single_bottom_scrollbar_and_max_line_length() -> None:
+    """Verify BUG-200: diff view has a single bottom scrollbar, no per-line scrollbars, and enforces max line length."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_component.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # 1. Verify diff-code-cell does NOT have overflow-x: auto (no per-row scrollbars)
+    assert ".diff-code-cell {\n    overflow-x: hidden;" in tpl_text
+    assert "overflow-x: auto;\n    font-family: inherit;\n    width: calc(50% - 64px);" not in tpl_text
+
+    # 2. Verify diff-scroll-body provides horizontal scrollbar at bottom
+    assert ".diff-scroll-body {\n    flex: 1;\n    overflow-x: auto;\n    overflow-y: auto;" in tpl_text
+    assert ".diff-scroll-body::-webkit-scrollbar" in tpl_text
+
+    # 3. Verify maximum line length enforcement
+    assert "MAX_LINE_LENGTH:" in tpl_text
+    assert "truncateLine(text, maxLen)" in tpl_text
+    assert "… [line truncated]" in tpl_text
+
+
+def test_regression_bug_201_single_diff_viewer_and_bug_tabs_reuse() -> None:
+    """Verify BUG-201: Cross-station links reuse named window targets instead of spawning endless tabs."""
+    diff_view_tpl = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    diff_text = diff_view_tpl.read_text(encoding="utf-8")
+
+    # Diff View uses named window targets for code review and bug tracker
+    assert 'window.open(res.url, "hardware_code_review");' in diff_text
+    assert 'window.open(res.url, "hardware_bug_tracker");' in diff_text
+
+    # Bug report workstation reuses diff viewer window target or closes to focus opener
+    bug_report_tpl = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
+    bug_text = bug_report_tpl.read_text(encoding="utf-8")
+    assert 'target="hardware_vcs_diff_viewer"' in bug_text
+    assert "returnToDashboard" in bug_text
+    assert "window.opener.focus()" in bug_text
+
+    # Code review workstation reuses diff viewer window target or closes to focus opener
+    cr_tpl = Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2"
+    cr_text = cr_tpl.read_text(encoding="utf-8")
+    assert 'target="hardware_vcs_diff_viewer"' in cr_text
+    assert "returnToDashboard" in cr_text
+
+
+def test_regression_bug_202_smartlog_and_files_vertical_scrollbars_visible() -> None:
+    """Verify BUG-202: Smartlog and file view columns have permanently visible Quake scrollbars."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # 1. Custom Quake-styled scrollbars defined
+    assert "/* Visible Quake Scrollbars (BUG-202) */" in tpl_text
+    assert "scrollbar-width: thin;" in tpl_text
+    assert "::-webkit-scrollbar" in tpl_text
+    assert "::-webkit-scrollbar-thumb" in tpl_text
+
+    # 2. column-scroll has overflow-y: scroll and scrollbar-gutter: stable
+    assert "overflow-y: scroll;" in tpl_text
+    assert "scrollbar-gutter: stable;" in tpl_text
+
+
+def test_regression_bug_196_vertical_panels_resizable_and_persisted() -> None:
+    """Verify BUG-196: Vertical panels (smartlog, files, diff) have draggable resizers and localStorage persistence."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # Resizer elements between panels
+    assert 'id="resizerSmartlog"' in tpl_text
+    assert 'id="resizerFiles"' in tpl_text
+    assert "column-resizer" in tpl_text
+
+    # Resizer initialization and localStorage persistence logic
+    assert "initPanelResizers()" in tpl_text
+    assert 'localStorage.getItem("diffview_smartlog_width")' in tpl_text
+    assert 'localStorage.getItem("diffview_files_width")' in tpl_text
+    assert "localStorage.setItem(storageKey, newWidth)" in tpl_text
+    assert "col-resize" in tpl_text
+
+    # togglePane updates resizers when panes are collapsed or expanded
+    assert 'document.getElementById("resizerSmartlog")' in tpl_text
+    assert 'document.getElementById("resizerFiles")' in tpl_text
+
+
+def test_regression_bug_197_branch_formatting_groups_and_search() -> None:
+    """Verify BUG-197: Branch UI separates main/release branches at top, has search, and filters other users."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # Branch picker button and modal
+    assert 'id="btnBranchDropdown"' in tpl_text
+    assert 'id="modalBranchPicker"' in tpl_text
+    assert 'id="branchSearchInput"' in tpl_text
+    assert 'id="chkHideOtherUsers"' in tpl_text
+    assert 'id="mainReleaseBranchList"' in tpl_text
+    assert 'id="featureBranchList"' in tpl_text
+
+    # Optgroup structure in branchSelect
+    assert '<optgroup label="⭐ Main &amp; Release Branches">' in tpl_text
+    assert '<optgroup label="🌿 Feature &amp; PR Branches">' in tpl_text
+
+    # Client-side filtering logic
+    assert "renderBranchLists()" in tpl_text
+    assert "filterBranchList()" in tpl_text
+    assert "hideOtherUsers" in tpl_text
+
+
+def test_regression_bug_199_jump_to_cr_icon_button_and_comment_counter() -> None:
+    """Verify BUG-199: Commit actions row has Jump to CR button with open/total count and reviewed styling."""
+    from model.vcs import CommitNodeModel
+
+    # Verify CommitNodeModel has CR tracking attributes
+    node = CommitNodeModel(
+        commit_hash="abc1234567890",
+        short_hash="abc1234",
+        author="Tester",
+        date="2026-09-28",
+        subject="Test commit",
+        cr_open_count=2,
+        cr_resolved_count=3,
+        cr_total_count=5,
+        cr_reviewed=True,
+    )
+    assert node.cr_open_count == 2
+    assert node.cr_total_count == 5
+    assert node.cr_reviewed is True
+
+    # Verify template contains jump-cr-btn with dynamic counter and reviewed class
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert "jump-cr-btn" in tpl_text
+    assert "jumpToCR" in tpl_text
+    assert "cr-badge" in tpl_text
+    assert "cr-reviewed" in tpl_text
+    assert "node.cr_open_count" in tpl_text
+
+
+def test_regression_bug_203_multi_commit_shift_click_selection() -> None:
+    """Verify BUG-203: Smartlog commit checkboxes and rows support Shift-Click contiguous range selection."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # Shift-click event handler on checkboxes
+    assert "onCommitCheckChanged(event, this)" in tpl_text
+    assert "event.shiftKey" in tpl_text
+    assert "lastCheckedCommitIndex" in tpl_text
+
+    # Smartlog nodes carry data-hash and accept event parameter in selectCommit
+    assert 'data-hash="{{ node.commit_hash }}"' in tpl_text
+    assert "selectCommit('{{ node.commit_hash }}', event)" in tpl_text
+
+
+def test_regression_bug_212_pr_past_535_404_handling(tmp_path: Path) -> None:
+    """Verify BUG-212: PRs past 534 without remote GitHub PRs do not link to 404 URLs."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 1. Mock remote PR numbers simulating GitHub state where only PRs <= 534 exist
+    engine._remote_pr_cache = {530, 531, 532, 533, 534}
+
+    # 2. Existing remote PR 534 resolves to valid GitHub PR URL
+    status_534, num_534, url_534 = engine._extract_pr_info("feat: test", "", ["origin/pr534"], [])
+    assert num_534 == 534
+    assert status_534 == "PR #534"
+    assert url_534 is not None and url_534.endswith("/pull/534")
+
+    # 3. Unsubmitted PR 535 resolves to Local PR with None pr_url to prevent 404
+    status_535, num_535, url_535 = engine._extract_pr_info("feat: test", "", ["pr535"], [])
+    assert num_535 == 535
+    assert status_535 == "Local PR #535"
+    assert url_535 is None, f"Expected None pr_url for uncreated PR 535, got {url_535}"
+
+    # 4. get_branch_url for local pr535 falls back to tree URL instead of 404 PR URL
+    branch_url_535 = engine.get_branch_url("pr535")
+    assert branch_url_535.endswith("/tree/pr535")
+    assert "/pull/535" not in branch_url_535
+
+    # 5. Verify template contains pr-local-badge and local fallback toast
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert "pr-local-badge" in tpl_text
+    assert "has not been created on GitHub yet" in tpl_text
+
+
+def test_regression_bug_211_code_review_panel_resizing_and_lfs_styling() -> None:
+    """Verify BUG-211: Code review panels support draggable resizing and LFS files have special UI formatting."""
+    cr_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2"
+    cr_text = cr_path.read_text(encoding="utf-8")
+
+    # 1. Column resizers present in HTML
+    assert 'id="resizerCommits"' in cr_text
+    assert 'id="resizerFiles"' in cr_text
+    assert 'class="column-resizer"' in cr_text
+
+    # 2. Resizer setup and localStorage persistence in JS
+    assert "initPanelResizers()" in cr_text
+    assert "codereview_commits_width" in cr_text
+    assert "codereview_files_width" in cr_text
+    assert "setupResizer(resizerCommits" in cr_text
+    assert "setupResizer(resizerFiles" in cr_text
+
+    # 3. LFS badges and classes in CSS and templates
+    assert ".quake-badge-lfs" in cr_text
+    assert ".lfs-file-item" in cr_text
+    assert 'id="activeFileLfs"' in cr_text
+    assert "f.is_lfs" in cr_text
+    assert "📦 LFS" in cr_text
+
+    # 4. FileDiffModel supports is_lfs field
+    diff_model = FileDiffModel(file_path="attachments/screenshot.png", is_lfs=True)
+    assert diff_model.is_lfs is True
+
+
+def test_regression_bug_213_ancestor_top_marker_merged_pruning_and_rebase(tmp_path: Path) -> None:
+    """Verify BUG-213: Smartlog identifies ancestor top, prunes older merged commits, and rebase updates ancestor."""
+    # 1. Setup repository with main and feature branch
+    repo_dir = tmp_path / "bug213_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "tester@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test Engineer"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 1 on main
+    f1 = repo_dir / "f1.txt"
+    f1.write_text("commit 1", encoding="utf-8")
+    subprocess.run(["git", "add", "f1.txt"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Commit 1 (old merged)"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 2 on main (divergence point)
+    f2 = repo_dir / "f2.txt"
+    f2.write_text("commit 2", encoding="utf-8")
+    subprocess.run(["git", "add", "f2.txt"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Commit 2 (ancestor top)"], cwd=repo_dir, check=True, capture_output=True)
+    sha_c2 = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_dir, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    # Create feature branch
+    subprocess.run(["git", "checkout", "-b", "feature-x"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 3 on feature
+    f3 = repo_dir / "f3.txt"
+    f3.write_text("commit 3", encoding="utf-8")
+    subprocess.run(["git", "add", "f3.txt"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Commit 3 (feature work)"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 4 on feature
+    f4 = repo_dir / "f4.txt"
+    f4.write_text("commit 4", encoding="utf-8")
+    subprocess.run(["git", "add", "f4.txt"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Commit 4 (feature done)"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Advance main with Commit 5 while on feature
+    subprocess.run(["git", "checkout", "main"], cwd=repo_dir, check=True, capture_output=True)
+    f5 = repo_dir / "f5.txt"
+    f5.write_text("commit 5", encoding="utf-8")
+    subprocess.run(["git", "add", "f5.txt"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Commit 5 (mainline advance)"], cwd=repo_dir, check=True, capture_output=True
+    )
+    sha_c5 = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_dir, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    # Switch back to feature
+    subprocess.run(["git", "checkout", "feature-x"], cwd=repo_dir, check=True, capture_output=True)
+
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 2. Verify get_smartlog_dag shows feature commits down to merge-base (Commit 2) and PRUNES Commit 1
+    dag = engine.get_smartlog_dag(branch="HEAD")
+    hashes = [n.commit_hash for n in dag]
+    assert sha_c2 in hashes, "Ancestor merge-base commit 2 must be present in DAG"
+    ancestor_node = next(n for n in dag if n.commit_hash == sha_c2)
+    assert ancestor_node.is_ancestor_top is True
+    assert ancestor_node.ancestor_name == "main"
+
+    # Commit 1 must be pruned because it was already merged prior to the ancestor top
+    assert len(dag) == 3, f"Expected 3 commits (Commit 4, Commit 3, Commit 2), got {len(dag)}"
+
+    # 3. Test rebase_branch onto main
+    rebase_res = engine.rebase_branch("main")
+    assert rebase_res["status"] == "ok"
+
+    # 4. Verify after rebase, ancestor top marker is updated to Commit 5
+    dag_after = engine.get_smartlog_dag(branch="HEAD")
+    hashes_after = [n.commit_hash for n in dag_after]
+    assert sha_c5 in hashes_after, "New ancestor commit 5 must be present in DAG after rebase"
+    ancestor_node_after = next(n for n in dag_after if n.commit_hash == sha_c5)
+    assert ancestor_node_after.is_ancestor_top is True
+    assert ancestor_node_after.ancestor_name == "main"
+    assert sha_c2 not in hashes_after, "Old ancestor commit 2 must now be pruned after rebase"
+    assert len(dag_after) == 3, (
+        f"Expected 3 commits after rebase (rebased 4, rebased 3, and ancestor 5), got {len(dag_after)}"
+    )
+
+    # 5. Verify diff_view template has rebase button and ancestor top badge
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+    assert 'id="btnRebase"' in tpl_text
+    assert "onRebaseClicked()" in tpl_text
+    assert "ancestor-top-node" in tpl_text
+    assert "node-badge-ancestor" in tpl_text
+
+
+def test_regression_bug_215_diff_view_css_syntax() -> None:
+    """Verify BUG-215 regression: CSS inside diff_view.html.j2 style block has balanced braces.
+
+    A missing closing brace in .node-badge-pr.pr-tag-link caused subsequent modal overlay rules
+    (.quake-modal-overlay) to fail to parse, rendering the commit dialog inline with giant unstyled fonts.
+    """
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # Extract style block
+    start_tag = "<style>"
+    end_tag = "</style>"
+    start_idx = tpl_text.find(start_tag)
+    end_idx = tpl_text.find(end_tag)
+    assert start_idx != -1 and end_idx != -1
+
+    css_content = tpl_text[start_idx + len(start_tag) : end_idx]
+
+    # Check brace balance
+    open_braces = css_content.count("{")
+    close_braces = css_content.count("}")
+    assert open_braces == close_braces, f"Mismatched braces in diff_view CSS: {open_braces} '{{' vs {close_braces} '}}'"
+
+    # Verify .node-badge-pr.pr-tag-link block is properly terminated before .pr-local-badge
+    assert ".node-badge-pr.pr-tag-link:hover {" in css_content
+    node_badge_idx = css_content.find(".node-badge-pr.pr-tag-link:hover {")
+    local_badge_idx = css_content.find(".pr-local-badge {", node_badge_idx)
+    assert local_badge_idx != -1
+    intermediate = css_content[node_badge_idx:local_badge_idx]
+    assert intermediate.count("{") == intermediate.count("}"), (
+        "CSS block between .node-badge-pr.pr-tag-link:hover and .pr-local-badge must have matching braces"
+    )
+
+
+def test_regression_bug_216_save_and_exit_preserves_resolved_bugs(tmp_path: Path) -> None:
+    """Verify BUG-216 regression: Save and Exit in DashboardServer preserves resolved bugs.
+
+    Ensures:
+    1. /api/next_bug_id returns {"next_id": ...} matching frontend expectations.
+    2. /api/version returns an integer version counter.
+    3. File watcher in embedded BugReportServer detects external bug resolutions.
+    4. Calling /api/exit or POSTing stale OPEN status without notes does not regress resolved bugs.
+    """
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    fb_dir = repo_dir / "feedback"
+    fb_dir.mkdir(parents=True, exist_ok=True)
+
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    base_url = f"http://127.0.0.1:{server.actual_port}"
+
+    try:
+        # 1. Verify /api/next_bug_id has "next_id"
+        with urllib.request.urlopen(f"{base_url}/api/next_bug_id") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert "next_id" in data
+            assert data["next_id"].startswith("BUG-")
+
+        # 2. Verify /api/version returns integer version
+        with urllib.request.urlopen(f"{base_url}/api/version") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert "version" in data
+            assert isinstance(data["version"], int)
+
+        # 3. Create BUG-001 on disk as RESOLVED with notes
+        bug_file = fb_dir / "BUG_001.md"
+        bug_file.write_text(
+            "# 🟢 `[BUG-001]` Power Rail Ripple\n\n"
+            "- **UUID**: `11111111-2222-3333-4444-555555555555`\n"
+            "- **ID**: `BUG-001`\n"
+            "- **Status**: `RESOLVED`\n"
+            "- **Severity**: `HIGH`\n"
+            "- **Category**: `PCB`\n\n"
+            "#### Description\n\nRipple on 3V3 rail.\n\n"
+            "#### Resolution Notes\n\nAdded decoupling capacitor C12.\n",
+            encoding="utf-8",
+        )
+
+        # 4. Trigger file watch check / sync
+        assert server.bug_server.check_file_watch() is True
+        bug_in_db = server.bug_server.database.get_bug("BUG-001")
+        assert bug_in_db is not None
+        assert bug_in_db.status.value == "RESOLVED"
+        assert bug_in_db.resolution_notes == "Added decoupling capacitor C12."
+
+        # 5. POST to /api/bugs with stale OPEN status and no resolution notes (simulating unrefreshed UI form submission)
+        req_stale = urllib.request.Request(
+            f"{base_url}/api/bugs",
+            data=json.dumps(
+                {
+                    "id": "BUG-001",
+                    "title": "Power Rail Ripple",
+                    "status": "OPEN",
+                    "severity": "HIGH",
+                    "category": "PCB",
+                    "description": "Ripple on 3V3 rail.",
+                    "resolution_notes": "",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_stale) as resp:
+            saved_resp = json.loads(resp.read().decode("utf-8"))
+            assert saved_resp["status"] == "RESOLVED"  # Protected from regressing!
+
+        # 6. POST to /api/exit
+        req_exit = urllib.request.Request(
+            f"{base_url}/api/exit",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_exit) as resp:
+            exit_data = json.loads(resp.read().decode("utf-8"))
+            assert exit_data["status"] == "saved_and_exited"
+
+        # 7. Verify BUG_001.md on disk remained RESOLVED
+        disk_content = bug_file.read_text(encoding="utf-8")
+        assert "- **Status**: `RESOLVED`" in disk_content
+        assert "Added decoupling capacitor C12." in disk_content
+
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_217_textarea_bidirectional_and_autoresize() -> None:
+    """Verify BUG-217 regression: Bug report text controls support horizontal/vertical resize and auto-expansion.
+
+    Ensures:
+    1. textarea CSS rules specify resize: both !important.
+    2. input[type="text"] supports horizontal resize.
+    3. autoResizeTextarea and autoResizeAllTextareas are present in JavaScript.
+    4. Input event listener actively triggers autoResizeTextarea on textarea input.
+    5. loadActiveBug and init trigger autoResizeAllTextareas.
+    """
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
+    assert template_path.exists()
+    content = template_path.read_text(encoding="utf-8")
+
+    # 1. CSS styling checks
+    assert "resize: both !important;" in content
+    assert 'input[type="text"] {\n      resize: horizontal;' in content or "resize: horizontal;" in content
+
+    # 2. JS function definitions
+    assert "function autoResizeTextarea(" in content
+    assert "function autoResizeAllTextareas()" in content
+
+    # 3. Dynamic resizing invocation
+    assert "autoResizeAllTextareas();" in content
+    assert "autoResizeTextarea(e.target);" in content
+
+
+def test_regression_bug_218_pr_creation_points_at_and_merged_commits_hidden(tmp_path: Path) -> None:
+    """Verify BUG-218: PR creation uses --points-at instead of --contains and merged commits are detected and hidden."""
+    # 1. Template validation
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    assert template_path.exists()
+    content = template_path.read_text(encoding="utf-8")
+
+    assert 'id="btnToggleMerged"' in content
+    assert "toggleMergedCommits()" in content
+    assert "updateMergedVisibility()" in content
+    assert "isHideMergedEnabled()" in content
+    assert "merged-commit" in content
+    assert "hide-merged" in content
+    assert "node-badge-merged" in content
+
+    # 2. GitEngine verification with isolated git repo
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # Initial repo has main at shas[2]
+    # Create topic branch with 2 commits
+    run_git_command(["checkout", "-b", "feature/my-work"], cwd=repo_dir)
+    f3 = repo_dir / "file3.txt"
+    f3.write_text("commit a\n", encoding="utf-8")
+    run_git_command(["add", "file3.txt"], cwd=repo_dir)
+    run_git_command(["commit", "-m", "feature commit A"], cwd=repo_dir)
+    sha_a = run_git_command(["rev-parse", "HEAD"], cwd=repo_dir).strip()
+
+    f3.write_text("commit b\n", encoding="utf-8")
+    run_git_command(["add", "file3.txt"], cwd=repo_dir)
+    run_git_command(["commit", "-m", "feature commit B"], cwd=repo_dir)
+    sha_b = run_git_command(["rev-parse", "HEAD"], cwd=repo_dir).strip()
+
+    # Create a pr branch pointing at sha_b
+    run_git_command(["branch", "pr123", sha_b], cwd=repo_dir)
+
+    # Query smartlog DAG
+    nodes = engine.get_smartlog_dag(limit=20)
+    node_by_sha = {n.commit_hash: n for n in nodes}
+
+    # Verify sha_a and sha_b are present
+    assert sha_a in node_by_sha
+    assert sha_b in node_by_sha
+
+    # Verify commits on main (e.g. shas[2]) are marked merged
+    if shas[2] in node_by_sha:
+        assert node_by_sha[shas[2]].is_merged_into_tracking is True
+
+    # Commit sha_a has no branch pointing directly to it, but pr123 contains sha_a.
+    # With --points-at, sha_a should NOT be flagged as already having PR #123!
+    # Commit sha_b HAS branch pr123 pointing directly to it, so sha_b should be rejected.
+    import pytest
+
+    # Attempting to create PR for sha_b must fail because pr123 points at it
+    with pytest.raises(ValueError, match="already has an associated PR"):
+        engine.create_prs_for_commits([sha_b])
+
+    # Attempting to create PR for already merged commit must fail
+    if shas[2] in node_by_sha:
+        with pytest.raises(ValueError, match="already merged into the tracking branch"):
+            engine.create_prs_for_commits([shas[2]])
+
+
+def test_regression_bug_221_branches_missing_from_branch_viewer(tmp_path: Path) -> None:
+    """Verify BUG-221: main branch and release branches v1..v6 appear correctly in branch viewer.
+
+    Asserts that:
+    1. Template properly classifies and sorts main and release branches.
+    2. GitEngine.get_branches parses refs/heads/main as 'main' even when ambiguous tag exists.
+    3. GitEngine.get_branches fetches both local and remote branches.
+    4. Release branches (v1, v2, v3, etc.) are included in branch list.
+    """
+    # 1. Template validation
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    assert template_path.exists()
+    content = template_path.read_text(encoding="utf-8")
+
+    assert "mainReleaseBranches.sort" in content
+    assert "heads/main" in content or ".endswith('/main')" in content
+
+    # 2. Isolated repo with ambiguous tag and remote tracking branches
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # Tag 'main' commit as 'main' (creates ref collision: refs/tags/main vs refs/heads/main)
+    run_git_command(["tag", "main", "HEAD"], cwd=repo_dir)
+
+    # Create release branches v1, v2, v3
+    run_git_command(["branch", "v1", "HEAD"], cwd=repo_dir)
+    run_git_command(["branch", "v2", "HEAD"], cwd=repo_dir)
+    run_git_command(["branch", "v3", "HEAD"], cwd=repo_dir)
+
+    branches = engine.get_branches()
+    branch_map = {b.name: b for b in branches}
+
+    # Verify 'main' is parsed cleanly as 'main' rather than 'heads/main'
+    assert "main" in branch_map, f"Branch list must contain 'main', found: {list(branch_map.keys())}"
+    assert "heads/main" not in branch_map, "Branch list must not expose raw 'heads/main'"
+
+    # Verify release branches v1, v2, v3 exist
+    for v in ["v1", "v2", "v3"]:
+        assert v in branch_map, f"Branch list must contain release branch '{v}'"
+
+    # Verify checkout of 'main' succeeds
+    assert engine.checkout_branch("main") is True
+    assert engine.get_current_branch() == "main"

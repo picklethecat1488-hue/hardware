@@ -456,34 +456,6 @@ class CarrierBoardProvider(Provider):
                     Text("SWD", font_size=1.6)
             extrude(s_swd_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
-            # M.2 connector cutout through rear exterior wall (aligned with J1 at [0.0, -36.0, 0.8]) (BUG-144)
-            m2_w = self.settings.enclosure_m2_cutout_width
-            m2_h = self.settings.enclosure_m2_cutout_height
-            m2_z = -h_shell / 2.0 + wall + standoff_h + (m2_h / 2.0) - 0.5
-            with BuildSketch(Plane.XZ.offset(length / 2.0)) as s_m2:
-                with Locations((0.0, m2_z)):
-                    RectangleRounded(m2_w, m2_h, cutout_r)
-            extrude(s_m2.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
-
-            # M.2 PCIe cutout label (BUG-150)
-            with BuildSketch(Plane.XZ.offset(length / 2.0)) as s_m2_lbl:
-                with Locations((0.0, m2_z + (m2_h / 2.0) + 2.0)):
-                    Text("M.2 PCIE", font_size=1.6)
-            extrude(s_m2_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
-
-            # M.2 connector floor pass-through cutout (aligned with J1) (BUG-142)
-            m2_x, m2_y = 0.0, -36.0
-            if self.wiring_path.exists():
-                wiring = Wiring(str(self.wiring_path))
-                comp_map = {c.name: c for c in wiring.footprints}
-                if "J1" in comp_map:
-                    m2_x, m2_y = comp_map["J1"].position[0], comp_map["J1"].position[1]
-            m2_l = self.settings.enclosure_m2_cutout_length
-            with BuildSketch(Plane.XY.offset(-h_shell / 2.0)) as s_m2_floor:
-                with Locations((m2_x, m2_y)):
-                    RectangleRounded(m2_w, m2_l, cutout_r)
-            extrude(s_m2_floor.sketch, amount=wall * 3.0, both=True, mode=BuildMode.SUBTRACT)
-
             # Peripheral cutouts and bus identifiers through right exterior wall (BUG-074, BUG-090, BUG-110, BUG-113, BUG-143)
             # All cutouts have the exact same width, height, and equal spacing apart from each other
             periph_cutout_h = self.settings.enclosure_periph_cutout_height
@@ -615,7 +587,7 @@ class CarrierBoardProvider(Provider):
             with Locations((gpio_x, gpio_y, 0.0)):
                 Box(gpio_w, gpio_l, wall * 4.0, mode=BuildMode.SUBTRACT)
 
-            # GPIO key engraved on enclosure lid exterior surface (BUG-073, BUG-177, BUG-189)
+            # GPIO key engraved on enclosure lid exterior surface (BUG-073, BUG-177, BUG-189, BUG-208)
             pitch = self.settings.enclosure_gpio_pin_pitch
             lbl_margin = self.settings.enclosure_gpio_label_margin
             hdr_margin = self.settings.enclosure_gpio_header_label_margin
@@ -626,17 +598,20 @@ class CarrierBoardProvider(Provider):
             pin_1_y = gpio_y - (4.5 * pitch)
             pin_3v3_y = gpio_y - (0.5 * pitch)
             pin_gnd_y = gpio_y + (0.5 * pitch)
+            pin_10_y = gpio_y + (4.5 * pitch)
             label_x = gpio_x - (gpio_w / 2.0) - lbl_margin
-            hdr_x = gpio_x - (gpio_w / 2.0) - hdr_margin
+            hdr_y = gpio_y + (gpio_l / 2.0) + hdr_margin
             with BuildSketch(Plane.XY.offset(wall)) as s_key:
-                with Locations((hdr_x, gpio_y)):
-                    Text("GPIO", font_size=hdr_sz, rotation=90.0)
+                with Locations((gpio_x, hdr_y)):
+                    Text("GPIO", font_size=hdr_sz, rotation=0.0)
                 with Locations((label_x, pin_gnd_y)):
                     Text("GND", font_size=font_sz, rotation=0.0)
                 with Locations((label_x, pin_3v3_y)):
                     Text("3V3", font_size=font_sz, rotation=0.0)
                 with Locations((label_x + 0.6, pin_1_y)):
                     Text("1", font_size=font_sz, rotation=0.0)
+                with Locations((label_x + 0.3, pin_10_y)):
+                    Text("10", font_size=font_sz, rotation=0.0)
             extrude(s_key.sketch, amount=-depth, mode=BuildMode.SUBTRACT)
 
             # Peripheral bus identifier labels engraved on enclosure lid exterior right margin (BUG-160, BUG-177)
@@ -716,15 +691,38 @@ class CarrierBoardProvider(Provider):
                     RectangleRounded(batt_cut_w, batt_cut_l, cutout_r)
             extrude(s_batt_cut.sketch, amount=-(wall + 2.0), mode=BuildMode.SUBTRACT)
 
-            # Battery label (BUG-150)
+            # Battery label (BUG-150, BUG-208)
+            batt_cov_clr = self.settings.enclosure_battery_cover_clearance
+            batt_cov_t = self.settings.enclosure_battery_cover_wall_thickness
+            batt_lbl_margin = self.settings.enclosure_battery_label_margin
+            batt_lbl_y = min_y - batt_rim_t - batt_cov_clr - batt_cov_t - batt_lbl_margin
             with BuildSketch(Plane.XY.offset(wall)) as s_batt_lbl:
-                with Locations((cradle_cx, min_y - 3.0)):
+                with Locations((cradle_cx, batt_lbl_y)):
                     Text("BATTERY", font_size=1.6)
             extrude(s_batt_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
+
+            # Bluetooth logo and text engraved on enclosure lid exterior surface (BUG-214)
+            ble_x = self.settings.ble_logo_x
+            ble_y = self.settings.ble_logo_y
+            ble_depth = self.settings.ble_logo_depth
+            with BuildSketch(Plane.XY.offset(wall)) as s_bt_logo:
+                with Locations((ble_x, ble_y)):
+                    # Bluetooth runic emblem (bindrune Hagall + Bjarkan)
+                    Rectangle(0.7, 7.0)
+                    Polygon((0, 0), (1.8, 1.8), (1.3, 2.3), (-0.5, 0.5))
+                    Polygon((1.8, 1.8), (0, 3.5), (-0.5, 3.0), (1.3, 1.3))
+                    Polygon((0, -3.5), (1.8, -1.8), (1.3, -1.3), (-0.5, -3.0))
+                    Polygon((1.8, -1.8), (0, 0), (-0.5, -0.5), (1.3, -2.3))
+                    Polygon((0, 0), (-1.8, 1.8), (-1.3, 2.3), (0.5, 0.5))
+                    Polygon((0, 0), (-1.8, -1.8), (-1.3, -2.3), (0.5, -0.5))
+                with Locations((ble_x, ble_y - 5.2)):
+                    Text("BLUETOOTH", font_size=1.4)
+            extrude(s_bt_logo.sketch, amount=-ble_depth, mode=BuildMode.SUBTRACT)
 
         RigidJoint("led_port", lid.part, Location((led_x, led_y, wall)))
         RigidJoint("battery_mount", lid.part, Location((batt_x, batt_y, wall)))
         RigidJoint("battery_port", lid.part, Location((j13_x, j13_y, wall)))
+        RigidJoint("bluetooth_logo", lid.part, Location((ble_x, ble_y, wall)))
 
         return lid
 
@@ -978,11 +976,11 @@ class CarrierBoardProvider(Provider):
             TestPoint("TP3", net="VBUS", at=(-14.0, -26.0))
             TestPoint("TP4", net="3V3", at=(-10.0, -26.0))
 
-            # PCIe Gen4 differential pair test points (spaced with 4mm pitch)
-            TestPoint("TP5", net="PCIE_TX0_N", at=(-14.0, -22.0))
-            TestPoint("TP6", net="PCIE_TX0_P", at=(-10.0, -22.0))
-            TestPoint("TP7", net="PCIE_RX0_P", at=(-6.0, -22.0))
-            TestPoint("TP8", net="PCIE_RX0_N", at=(-2.0, -22.0))
+            # High-speed BTLE UART test points (spaced with 4mm pitch)
+            TestPoint("TP5", net="BLE_RTS", at=(-14.0, -22.0))
+            TestPoint("TP6", net="BLE_RX", at=(-10.0, -22.0))
+            TestPoint("TP7", net="BLE_TX", at=(-6.0, -22.0))
+            TestPoint("TP8", net="BLE_CTS", at=(-2.0, -22.0))
 
             # I2C test points (through-hole, accessible from both sides, routed on B.Cu)
             TestPoint("TP9", net="I2C_SDA", at=(14.0, -4.0), layer="B.Cu")
@@ -1050,10 +1048,6 @@ class CarrierBoardProvider(Provider):
             SilkscreenLine(start_mm=(-2.4, 29.8), end_mm=(-1.4, 31.2), thickness=0.18, layer="F.SilkS")
             SilkscreenLine(start_mm=(2.4, 32.2), end_mm=(1.4, 30.8), thickness=0.18, layer="F.SilkS")
             SilkscreenLine(start_mm=(2.4, 29.8), end_mm=(1.4, 31.2), thickness=0.18, layer="F.SilkS")
-
-            # BUG-183: Silkscreen grouping frames for Status and Overrides
-            SilkscreenRect(position=(12.2, -23.0), dimensions=(7.8, 17.5), thickness=0.15, layer="F.SilkS")
-            SilkscreenRect(position=(4.8, -25.0), dimensions=(6.8, 13.5), thickness=0.15, layer="F.SilkS")
         return silk.graphics
 
     def silkscreen(self) -> list[SilkscreenTextModel]:
@@ -1062,42 +1056,60 @@ class CarrierBoardProvider(Provider):
             # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
             with Locations((0.0, 26.0)):
                 SilkscreenText("TEST BOARD CARRIER REV 2.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
-            with Locations((0.0, -28.0)):
-                SilkscreenText("LAYER 1-6 RIGID-FLEX", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((-8.0, -34.5)):
+                SilkscreenText("LAYER 1-6 RIGID-FLEX", layer="F.SilkS", font_size=0.75, thickness=0.11)
             with Locations((0.0, 0.0)):
                 SilkscreenText(
                     "BOTTOM SHIELD / GROUND REF", layer="B.SilkS", font_size=1.0, thickness=0.15, mirror=True
                 )
 
-            # BUG-183: Silkscreen labels for Status and Overrides
-            with Locations((11.25, -14.6)):
-                SilkscreenText("OVERRIDES", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((4.8, -17.2)):
-                SilkscreenText("STATUS", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            # Jumper and switch labels
-            with Locations((11.25, -16.0)):
+            # BUG-183, BUG-209, BUG-219: Silkscreen labels for Status and Overrides
+            with Locations((10.5, -32.8)):
+                SilkscreenText("OVERRIDES", layer="F.SilkS", font_size=0.75, thickness=0.11)
+            with Locations((4.5, -32.8)):
+                SilkscreenText("STATUS", layer="F.SilkS", font_size=0.75, thickness=0.11)
+            # Reset button label close to U1 central (0, 0) and SW1 (0, -11) (BUG-219)
+            with Locations((0.0, -9.2)):
                 SilkscreenText("RESET", layer="F.SilkS", font_size=0.6, thickness=0.09)
-            with Locations((11.25, -23.0)):
-                SilkscreenText("NRST", layer="F.SilkS", font_size=0.6, thickness=0.09, rotation=90.0)
-            with Locations((11.25, -28.5)):
-                SilkscreenText("BOOT0", layer="F.SilkS", font_size=0.6, thickness=0.09, rotation=90.0)
-            with Locations((14.8, -23.0)):
-                SilkscreenText("ISP", layer="F.SilkS", font_size=0.6, thickness=0.09)
-            with Locations((14.8, -28.5)):
-                SilkscreenText("VBUS", layer="F.SilkS", font_size=0.6, thickness=0.09)
+            # Jumper labels placed to the right of each horizontal jumper at X=14.0 (BUG-219)
+            with Locations((14.0, -21.5)):
+                SilkscreenText("NRST", layer="F.SilkS", font_size=0.55, thickness=0.08)
+            with Locations((14.0, -24.0)):
+                SilkscreenText("BOOT0", layer="F.SilkS", font_size=0.55, thickness=0.08)
+            with Locations((14.0, -27.0)):
+                SilkscreenText("ISP", layer="F.SilkS", font_size=0.55, thickness=0.08)
+            with Locations((14.0, -29.6)):
+                SilkscreenText("VBUS", layer="F.SilkS", font_size=0.55, thickness=0.08)
             # Status LED labels
-            with Locations((1.8, -20.0)):
-                SilkscreenText("MCU", layer="F.SilkS", font_size=0.6, thickness=0.09)
-            with Locations((1.8, -22.0)):
-                SilkscreenText("PERIPH", layer="F.SilkS", font_size=0.6, thickness=0.09)
-            with Locations((1.8, -24.0)):
-                SilkscreenText("AUD", layer="F.SilkS", font_size=0.6, thickness=0.09)
-            with Locations((1.8, -26.0)):
-                SilkscreenText("3V3", layer="F.SilkS", font_size=0.6, thickness=0.09)
-            with Locations((1.8, -28.0)):
-                SilkscreenText("VBUS", layer="F.SilkS", font_size=0.6, thickness=0.09)
-            with Locations((1.8, -30.0)):
-                SilkscreenText("VBAT", layer="F.SilkS", font_size=0.6, thickness=0.09)
+            with Locations((1.6, -20.0)):
+                SilkscreenText("MCU", layer="F.SilkS", font_size=0.55, thickness=0.08)
+            with Locations((1.6, -22.0)):
+                SilkscreenText("PERIPH", layer="F.SilkS", font_size=0.55, thickness=0.08)
+            with Locations((1.6, -24.0)):
+                SilkscreenText("AUD", layer="F.SilkS", font_size=0.55, thickness=0.08)
+            with Locations((1.6, -26.0)):
+                SilkscreenText("3V3", layer="F.SilkS", font_size=0.55, thickness=0.08)
+            with Locations((1.6, -28.0)):
+                SilkscreenText("VBUS", layer="F.SilkS", font_size=0.55, thickness=0.08)
+            with Locations((1.6, -30.0)):
+                SilkscreenText("VBAT", layer="F.SilkS", font_size=0.55, thickness=0.08)
+
+            # Component designators for Sheet 17 hardening parts on bottom silkscreen to prevent clutter
+            for idx, y_pos in enumerate([-30.0, -28.0, -26.0, -24.0, -22.0, -20.0], start=2):
+                with Locations((4.0, y_pos)):
+                    SilkscreenText(f"D{idx}", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
+                with Locations((6.5, y_pos)):
+                    SilkscreenText(f"R{idx + 5}", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
+            with Locations((10.5, -21.5)):
+                SilkscreenText("JP1", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
+            with Locations((10.5, -24.0)):
+                SilkscreenText("JP2", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
+            with Locations((10.5, -27.0)):
+                SilkscreenText("JP3", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
+            with Locations((10.5, -29.6)):
+                SilkscreenText("JP4", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
+            with Locations((0.0, -11.0)):
+                SilkscreenText("SW1", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
 
             # Global optical fiducials (crosshairs)
             with Locations((-24.0, 38.0), (21.0, -42.0), (-24.0, -38.0)):
@@ -1112,9 +1124,11 @@ class CarrierBoardProvider(Provider):
             # U2 QFN pin-1 indicator
             with Locations((15.0, -6.5)):
                 SilkscreenText("• Pin 1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
-            # J1 M.2 connector edge alignment markers
-            with Locations((-12.0, -38.0), (12.0, -38.0)):
+            # U11 BTLE module alignment markers and antenna keepout outline (BUG-214)
+            with Locations((-5.0, -41.0), (5.0, -41.0)):
                 SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((0.0, -41.5)):
+                SilkscreenText("BLE ANT", layer="F.SilkS", font_size=0.7, thickness=0.10)
             # J2 FPC connector alignment markers
             with Locations((-10.0, 39.5), (10.0, 39.5)):
                 SilkscreenText("|", layer="F.SilkS", font_size=1.0, thickness=0.15)
@@ -1132,7 +1146,7 @@ class CarrierBoardProvider(Provider):
             with Locations((18.0, -11.5)):
                 SilkscreenText("U2", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
             with Locations((0.0, -32.5)):
-                SilkscreenText("J1", layer="F.SilkS", font_size=1.0, thickness=0.15)
+                SilkscreenText("U11", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((0.0, 35.5)):
                 SilkscreenText("J2", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((-17.5, 0.0)):
@@ -1191,8 +1205,8 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText("R6", layer="F.SilkS", font_size=0.7, thickness=0.10)
 
             # Capacitors
-            with Locations((13.0, -13.5)):
-                SilkscreenText("C1", layer="F.SilkS", font_size=0.7, thickness=0.10)
+            with Locations((14.5, -15.0)):
+                SilkscreenText("C1", layer="F.SilkS", font_size=0.6, thickness=0.09)
             with Locations((-8.0, -6.5)):
                 SilkscreenText("C2", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
             with Locations((-13.0, -5.5)):
@@ -1220,6 +1234,34 @@ class CarrierBoardProvider(Provider):
             with Locations((14.0, -12.0)):
                 SilkscreenText("C14", layer="B.SilkS", font_size=0.7, thickness=0.10, mirror=True)
         return silk.texts
+
+    @property
+    def btle_status_signaling(self) -> dict[str, dict[str, str]]:
+        """Return BTLE connection status signaling configuration for RGB LED (D1) and piezo buzzer (U5).
+
+        Status Modes:
+            - pairing: LED D1 pulses blue, buzzer U5 emits rising chirp (1kHz -> 2kHz).
+              Triggered by capacitive touch input gesture on flex tail or proximity sensor.
+            - connected: LED D1 solid cyan, buzzer U5 emits single confirmation tone (2.5kHz).
+            - disconnected: LED D1 breathing white, buzzer U5 emits descending tone (2kHz -> 1kHz).
+        """
+        return {
+            "pairing": {
+                "led_color": "blue_pulse",
+                "buzzer_tone": "chirp_rising_1khz_2khz",
+                "trigger": "capacitive_touch_gesture_or_proximity",
+            },
+            "connected": {
+                "led_color": "solid_cyan",
+                "buzzer_tone": "confirmation_beep_2.5khz",
+                "trigger": "ble_peer_connected",
+            },
+            "disconnected": {
+                "led_color": "breathing_white",
+                "buzzer_tone": "descending_tone_2khz_1khz",
+                "trigger": "ble_peer_disconnected",
+            },
+        }
 
     @property
     def config(self) -> dict[str, Callable[[str, Optional[str]], Any]]:

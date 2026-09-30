@@ -197,15 +197,24 @@ class GitEngine:
         current_branch = self.get_current_branch()
 
         try:
-            fmt = "%(refname:short)%09%(upstream:short)%09%(upstream:track)"
-            out = run_git_command(["for-each-ref", f"--format={fmt}", "refs/heads/"], cwd=self.repo_root)
+            fmt = "%(refname)%09%(refname:short)%09%(upstream:short)%09%(upstream:track)"
+            out = run_git_command(
+                ["for-each-ref", f"--format={fmt}", "refs/heads/", "refs/remotes/"], cwd=self.repo_root
+            )
+            local_names = set()
+            remote_entries = []
+
             for line in out.splitlines():
                 if not line.strip():
                     continue
                 parts = line.split("\t")
-                name = parts[0].strip()
-                upstream = parts[1].strip() if len(parts) > 1 and parts[1].strip() else None
-                track = parts[2].strip() if len(parts) > 2 else ""
+                refname = parts[0].strip()
+                short_name = parts[1].strip() if len(parts) > 1 else ""
+                upstream = parts[2].strip() if len(parts) > 2 and parts[2].strip() else None
+                track = parts[3].strip() if len(parts) > 3 else ""
+
+                if refname.endswith("/HEAD") or short_name.endswith("/HEAD"):
+                    continue
 
                 ahead = 0
                 behind = 0
@@ -218,11 +227,33 @@ class GitEngine:
                     if m:
                         behind = int(m.group(1))
 
+                if refname.startswith("refs/heads/"):
+                    clean_name = refname[len("refs/heads/") :]
+                    local_names.add(clean_name)
+                    branches.append(
+                        BranchInfoModel(
+                            name=clean_name,
+                            is_current=(clean_name == current_branch or short_name == current_branch),
+                            is_remote=False,
+                            upstream=upstream,
+                            ahead=ahead,
+                            behind=behind,
+                        )
+                    )
+                elif refname.startswith("refs/remotes/"):
+                    remote_name = refname[len("refs/remotes/") :]
+                    remote_entries.append((remote_name, upstream, ahead, behind))
+
+            # Add remote branches that do not have a local branch with the same name
+            for remote_name, upstream, ahead, behind in remote_entries:
+                short_remote = remote_name.split("/", 1)[1] if "/" in remote_name else remote_name
+                if short_remote in local_names:
+                    continue
                 branches.append(
                     BranchInfoModel(
-                        name=name,
-                        is_current=(name == current_branch),
-                        is_remote=False,
+                        name=remote_name,
+                        is_current=False,
+                        is_remote=True,
                         upstream=upstream,
                         ahead=ahead,
                         behind=behind,
@@ -243,6 +274,12 @@ class GitEngine:
             True if checkout succeeded.
         """
         try:
+            if branch_name.startswith("origin/"):
+                try:
+                    run_git_command(["checkout", "--track", branch_name], cwd=self.repo_root)
+                    return True
+                except RuntimeError:
+                    pass
             run_git_command(["checkout", branch_name], cwd=self.repo_root)
             return True
         except RuntimeError:
@@ -256,6 +293,14 @@ class GitEngine:
         """
         try:
             out = run_git_command(["fetch", "--all", "--prune"], cwd=self.repo_root)
+            curr_branch = self.get_current_branch()
+            if curr_branch not in ("main", "refs/heads/main"):
+                for cand_ref in ["refs/remotes/origin/main", "origin/main"]:
+                    try:
+                        run_git_command(["branch", "-f", "main", cand_ref], cwd=self.repo_root)
+                        break
+                    except RuntimeError:
+                        pass
             return {
                 "status": "ok",
                 "message": out.strip() or "Repository successfully fetched and synchronized.",
@@ -264,6 +309,67 @@ class GitEngine:
             return {
                 "status": "error",
                 "message": f"Fetch failed: {err}",
+            }
+
+    def rebase_branch(self, upstream: Optional[str] = None) -> Dict[str, Any]:
+        """Rebase current branch onto upstream ancestor (e.g., origin/main or main).
+
+        Args:
+            upstream: Ref to rebase onto. Defaults to upstream tracking ref or origin/main / main.
+
+        Returns:
+            Dictionary with status, message, and target ref.
+        """
+        target = upstream
+        if not target:
+            try:
+                target = run_git_command(
+                    ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd=self.repo_root
+                ).strip()
+            except RuntimeError:
+                pass
+        if not target:
+            for candidate in [
+                "refs/remotes/origin/main",
+                "refs/heads/main",
+                "refs/remotes/origin/master",
+                "refs/heads/master",
+            ]:
+                try:
+                    run_git_command(["rev-parse", "--verify", candidate], cwd=self.repo_root)
+                    target = candidate
+                    break
+                except RuntimeError:
+                    continue
+        if not target:
+            return {
+                "status": "error",
+                "message": "No suitable upstream ancestor branch found to rebase onto.",
+                "target": None,
+            }
+
+        try:
+            out = run_git_command(["rebase", target], cwd=self.repo_root)
+            if "origin/main" in target:
+                try:
+                    run_git_command(["branch", "-f", "main", "refs/remotes/origin/main"], cwd=self.repo_root)
+                except RuntimeError:
+                    pass
+            clean_target = target.replace("refs/remotes/origin/", "").replace("refs/heads/", "")
+            return {
+                "status": "ok",
+                "message": out.strip() or f"Successfully rebased onto {clean_target}.",
+                "target": clean_target,
+            }
+        except RuntimeError as err:
+            try:
+                run_git_command(["rebase", "--abort"], cwd=self.repo_root)
+            except RuntimeError:
+                pass
+            return {
+                "status": "error",
+                "message": f"Rebase onto {target} failed: {err}",
+                "target": target,
             }
 
     def resolve_revisions(self, rev_args: Optional[Sequence[str]] = None) -> List[str]:
@@ -390,6 +496,75 @@ class GitEngine:
         head_hash = self.get_head_commit()
         target_ref = branch or "HEAD"
 
+        # Determine ancestor branch (e.g. main/master) and merge-base (BUG-213)
+        ancestor_name: Optional[str] = None
+        ancestor_merge_base: Optional[str] = None
+        for candidate_ref, cand_name in [
+            ("refs/remotes/origin/main", "main"),
+            ("refs/heads/main", "main"),
+            ("refs/remotes/origin/master", "master"),
+            ("refs/heads/master", "master"),
+        ]:
+            try:
+                run_git_command(["rev-parse", "--verify", candidate_ref], cwd=self.repo_root)
+                mb = run_git_command(["merge-base", target_ref, candidate_ref], cwd=self.repo_root).strip()
+                if mb:
+                    ancestor_merge_base = mb
+                    ancestor_name = cand_name
+                    break
+            except RuntimeError:
+                continue
+
+        # Resolve upstream tracking reference to identify merged commits (BUG-218)
+        tracking_candidates = []
+        try:
+            upstream = run_git_command(
+                ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd=self.repo_root
+            ).strip()
+            if upstream:
+                tracking_candidates.append(upstream)
+        except RuntimeError:
+            pass
+
+        current_local_ref = f"refs/heads/{self.get_current_branch()}" if self.get_current_branch() else None
+        for c_cand in [
+            "refs/remotes/origin/main",
+            "refs/heads/main",
+            "refs/remotes/origin/master",
+            "refs/heads/master",
+        ]:
+            if c_cand != current_local_ref and c_cand not in tracking_candidates:
+                tracking_candidates.append(c_cand)
+
+        active_tracking_ref = None
+        for t_ref in tracking_candidates:
+            try:
+                run_git_command(["rev-parse", "--verify", t_ref], cwd=self.repo_root)
+                active_tracking_ref = t_ref
+                break
+            except RuntimeError:
+                continue
+
+        # Check if target is a topic branch diverging from ancestor
+        target_hash = head_hash if target_ref == "HEAD" else None
+        if not target_hash:
+            try:
+                target_hash = run_git_command(["rev-parse", target_ref], cwd=self.repo_root).strip()
+            except RuntimeError:
+                target_hash = ""
+
+        is_topic_branch = bool(ancestor_merge_base and target_hash != ancestor_merge_base)
+
+        merged_commit_hashes: set[str] = set()
+        if active_tracking_ref:
+            try:
+                out = run_git_command(["rev-list", f"-n{max(limit * 2, 200)}", active_tracking_ref], cwd=self.repo_root)
+                merged_commit_hashes = set(out.splitlines())
+            except RuntimeError:
+                pass
+        if ancestor_merge_base and is_topic_branch:
+            merged_commit_hashes.add(ancestor_merge_base)
+
         fmt = "%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%ad%x1f%ar%x1f%s%x1f%D%x1f%b%x1e"
         cmd = ["log", f"-n{limit}", f"--format={fmt}", "--date=iso-strict", target_ref]
         try:
@@ -429,6 +604,12 @@ class GitEngine:
                         elif dec and dec != "HEAD":
                             branches.append(dec)
 
+                is_ancestor_top = c_hash == ancestor_merge_base
+
+                is_merged = bool(c_hash in merged_commit_hashes)
+                if is_ancestor_top and ancestor_name and ancestor_name not in branches:
+                    branches.append(ancestor_name)
+
                 parsed_commits.append(
                     {
                         "hash": c_hash,
@@ -443,8 +624,16 @@ class GitEngine:
                         "branches": branches,
                         "tags": tags,
                         "is_head": (c_hash == head_hash),
+                        "is_ancestor_top": is_ancestor_top,
+                        "is_merged": is_merged,
+                        "is_merged_into_tracking": is_merged,
+                        "ancestor_name": ancestor_name if is_ancestor_top else None,
                     }
                 )
+
+                # Prune older commits already merged into ancestor branch (BUG-213)
+                if is_topic_branch and is_ancestor_top:
+                    break
 
         # Build DAG lanes / column positions
         columns: List[Optional[str]] = []
@@ -516,6 +705,10 @@ class GitEngine:
                     branches=commit["branches"],
                     tags=commit["tags"],
                     is_head=commit["is_head"],
+                    is_ancestor_top=commit.get("is_ancestor_top", False),
+                    is_merged=commit.get("is_merged", False),
+                    is_merged_into_tracking=commit.get("is_merged_into_tracking", False),
+                    ancestor_name=commit.get("ancestor_name"),
                     graph_symbol=symbol,
                     graph_art=graph_art,
                     bug_tags=bug_tags,
@@ -625,6 +818,41 @@ class GitEngine:
             return f"{base}/pull/{pr_number}"
         return f"https://github.com/picklethecat1488-hue/hardware/pull/{pr_number}"
 
+    def get_remote_pr_numbers(self) -> Set[int]:
+        """Fetch set of valid pull request numbers existing on remote GitHub repository.
+
+        Cached on the instance to avoid repeatedly invoking ls-remote.
+        """
+        if hasattr(self, "_remote_pr_cache") and self._remote_pr_cache is not None:
+            return self._remote_pr_cache
+
+        prs: Set[int] = set()
+        web_url = self.get_repo_web_url()
+        if web_url:
+            try:
+                output = run_git_command(["ls-remote", "origin", "refs/pull/*/head"], cwd=self.repo_root)
+                for line in output.splitlines():
+                    m = re.search(r"refs/pull/(\d+)/head", line)
+                    if m:
+                        prs.add(int(m.group(1)))
+            except RuntimeError:
+                pass
+
+        self._remote_pr_cache = prs
+        return prs
+
+    def get_branch_url(self, branch_name: str) -> str:
+        """Return the GitHub web URL for a branch or PR branch name."""
+        base = self.get_repo_web_url() or "https://github.com/picklethecat1488-hue/hardware"
+        m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", branch_name, re.IGNORECASE)
+        if m:
+            pr_num = int(m.group(1))
+            remote_prs = self.get_remote_pr_numbers()
+            if not remote_prs or pr_num in remote_prs:
+                return f"{base}/pull/{pr_num}"
+        cleaned = re.sub(r"^(?:remotes/)?origin/", "", branch_name)
+        return f"{base}/tree/{cleaned}"
+
     def _extract_pr_info(
         self, subject: str, body: str, branches: List[str], tags: List[str]
     ) -> Tuple[Optional[str], Optional[int], Optional[str]]:
@@ -658,8 +886,13 @@ class GitEngine:
                 pr_num = int(m.group(1))
 
         if pr_num is not None:
-            pr_status = f"PR #{pr_num}"
-            pr_url = self.get_pr_url(pr_num)
+            remote_prs = self.get_remote_pr_numbers()
+            if remote_prs and pr_num not in remote_prs:
+                pr_status = f"Local PR #{pr_num}"
+                pr_url = None
+            else:
+                pr_status = f"PR #{pr_num}"
+                pr_url = self.get_pr_url(pr_num)
             return pr_status, pr_num, pr_url
 
         # Check for any other PR branch marker without explicit number
@@ -701,14 +934,18 @@ class GitEngine:
         nodes = self.get_smartlog_dag(limit=100)
         node_map = {n.commit_hash: n for n in nodes}
 
-        # Validate that no selected commit already has an associated PR
+        curr_branch = self.get_current_branch() or "main"
+
+        # Validate that no selected commit is already merged or already has an associated PR
         for c in commit_hashes:
             node = node_map.get(c)
+            if node and (node.is_merged_into_tracking or node.is_merged):
+                raise ValueError(f"Commit {c[:8]} is already merged into the tracking branch ({curr_branch})")
             if node and node.pr_number:
                 raise ValueError(f"Commit {c[:8]} already has an associated PR (#{node.pr_number})")
 
             try:
-                branches_out = run_git_command(["branch", "-a", "--contains", c], cwd=self.repo_root)
+                branches_out = run_git_command(["branch", "-a", "--points-at", c], cwd=self.repo_root)
                 for b in branches_out.splitlines():
                     clean_b = b.replace("*", "").strip()
                     m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", clean_b, re.IGNORECASE)
@@ -1332,6 +1569,16 @@ class GitEngine:
         }
         is_binary = Path(file_path).suffix.lower() in binary_exts
 
+        clean_path = file_path.replace("\\", "/").strip().lstrip("./")
+        lfs_set = self.check_lfs_paths([file_path, clean_path])
+        is_lfs = (
+            file_path in lfs_set
+            or clean_path in lfs_set
+            or clean_path.startswith("attachments/")
+            or clean_path.startswith("build/attachments/")
+            or clean_path.startswith("feedback/attachments/")
+        )
+
         old_content = ""
         new_content = ""
 
@@ -1342,6 +1589,7 @@ class GitEngine:
                 new_path=file_path,
                 status="M",
                 is_binary=True,
+                is_lfs=is_lfs,
                 additions=0,
                 deletions=0,
                 hunks=[],
@@ -1398,6 +1646,7 @@ class GitEngine:
             new_path=file_path,
             status=status,
             is_binary=False,
+            is_lfs=is_lfs,
             additions=additions,
             deletions=deletions,
             hunks=hunks,

@@ -349,6 +349,11 @@ class CarrierBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_battery_cover_wall_thickness"])
 
     @property
+    def enclosure_battery_label_margin(self) -> float:
+        """Margin between battery cover perimeter and BATTERY label on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_label_margin"])
+
+    @property
     def enclosure_flex_support_length(self) -> float:
         """Length of support plane extending under flex tail from front wall in mm."""
         return float(self._raw_data["enclosure_flex_support_length"])
@@ -447,3 +452,53 @@ class CarrierBoardConfig(BaseModel):
     def test_pcie_diff_target_ohm(self) -> float:
         """Target differential impedance in ohms for PCIe lines."""
         return float(self._raw_data["test_pcie_diff_target_ohm"])
+
+    @property
+    def ble_antenna_length(self) -> float:
+        """Length of integrated PCB antenna in mm."""
+        return float(self._raw_data["ble_antenna_length"])
+
+    @property
+    def ble_antenna_width(self) -> float:
+        """Width of integrated PCB antenna in mm."""
+        return float(self._raw_data["ble_antenna_width"])
+
+    @property
+    def ble_antenna_keepout_width(self) -> float:
+        """Width of RF ground plane keepout in mm."""
+        return float(self._raw_data["ble_antenna_keepout_width"])
+
+    @property
+    def ble_antenna_keepout_length(self) -> float:
+        """Length of RF ground plane keepout in mm."""
+        return float(self._raw_data["ble_antenna_keepout_length"])
+
+    @property
+    def ble_uart_baud_rate(self) -> int:
+        """High-speed UART baud rate in bits/s between U1 MCU and U11 BTLE module."""
+        return int(self._raw_data["ble_uart_baud_rate"])
+
+    @property
+    def ble_logo_height(self) -> float:
+        """Height of Bluetooth logo on enclosure lid in mm."""
+        return float(self._raw_data["ble_logo_height"])
+
+    @property
+    def ble_logo_width(self) -> float:
+        """Width of Bluetooth logo on enclosure lid in mm."""
+        return float(self._raw_data["ble_logo_width"])
+
+    @property
+    def ble_logo_depth(self) -> float:
+        """Engraving depth of Bluetooth logo on enclosure lid in mm."""
+        return float(self._raw_data["ble_logo_depth"])
+
+    @property
+    def ble_logo_x(self) -> float:
+        """X position of Bluetooth logo on enclosure lid in mm."""
+        return float(self._raw_data["ble_logo_x"])
+
+    @property
+    def ble_logo_y(self) -> float:
+        """Y position of Bluetooth logo on enclosure lid in mm."""
+        return float(self._raw_data["ble_logo_y"])

@@ -67,6 +67,13 @@ class PowerNetMatcher:
         if not isinstance(item, str):
             return False
         name_u = item.upper()
+        if (
+            name_u.startswith("LED_")
+            or name_u.endswith("_K")
+            or name_u.endswith("_CATHODE")
+            or name_u.endswith("_ANODE")
+        ):
+            return False
         return any(fnmatch.fnmatch(name_u, pat) for pat in self.patterns)
 
     def is_power_net(self, name: str) -> bool:

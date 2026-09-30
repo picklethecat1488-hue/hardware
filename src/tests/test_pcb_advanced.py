@@ -410,7 +410,7 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     assert "U3" in footprint_names
     assert "U4" in footprint_names
     assert "U10" in footprint_names
-    assert "J1" in footprint_names
+    assert "U11" in footprint_names
     assert "J2" in footprint_names
     assert "J3" in footprint_names
     assert "J5" in footprint_names
@@ -445,7 +445,7 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     assert system_wiring_file.exists(), "system_wiring.yaml must exist for top-down architecture diagram"
     sys_wiring = Wiring(system_wiring_file)
     sys_comp_names = {c.name for c in sys_wiring.footprints}
-    assert {"m2_host", "usb_c", "carrier_pcb", "flex_tail"}.issubset(sys_comp_names)
+    assert {"btle_host", "usb_c", "carrier_pcb", "flex_tail"}.issubset(sys_comp_names)
 
     # Verify BOM and CPL export
     pcb_config = provider.pcb_config
@@ -886,8 +886,8 @@ def test_carrier_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path)
     assert kicad_pcb.exists()
 
     pcb_text = kicad_pcb.read_text(encoding="utf-8")
-    # Verify connectors J1 and J2 edge placement
-    assert 'footprint "M.2-KEY-M"' in pcb_text
+    # Verify connectors U11 and J2 edge placement
+    assert 'footprint "MOD-BLE-PCB-ANT"' in pcb_text
     assert 'footprint "FPC-30P-0.5MM"' in pcb_text
     # Verify bottom layer components
     assert '(layer "B.Cu")' in pcb_text
@@ -908,21 +908,21 @@ def test_carrier_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path)
 
     assert "U1" in rows
     assert "U2" in rows
-    assert "J1" in rows
+    assert "U11" in rows
     assert "J2" in rows
     assert "Q1" in rows
     assert "C2" in rows
 
-    # Layers: Q1, U2, C2 on Bottom; U1, J1, J2 on Top
+    # Layers: Q1, U2, C2 on Bottom; U1, U11, J2 on Top
     assert rows["U1"]["Layer"] == "Top"
-    assert rows["J1"]["Layer"] == "Top"
+    assert rows["U11"]["Layer"] == "Top"
     assert rows["J2"]["Layer"] == "Top"
     assert rows["U2"]["Layer"] == "Bottom"
     assert rows["Q1"]["Layer"] == "Bottom"
     assert rows["C2"]["Layer"] == "Bottom"
 
     # Edge connector coordinates
-    assert float(rows["J1"]["Mid Y"].replace("mm", "")) == -36.0
+    assert float(rows["U11"]["Mid Y"].replace("mm", "")) == -36.0
     assert float(rows["J2"]["Mid Y"].replace("mm", "")) == 38.0
 
 
@@ -1320,7 +1320,7 @@ def test_regression_subassembly_footprint_isolation() -> None:
     carrier_fps = carrier_router.get_footprints_for_board()
     carrier_names = {fp.name for fp in carrier_fps}
     assert "U1" in carrier_names
-    assert "J1" in carrier_names
+    assert "U11" in carrier_names
     assert "J2" in carrier_names
     assert "J4" not in carrier_names
 
@@ -1333,7 +1333,7 @@ def test_regression_subassembly_footprint_isolation() -> None:
     flex_names = {fp.name for fp in flex_fps}
     assert "J4" in flex_names
     assert "U1" not in flex_names
-    assert "J1" not in flex_names
+    assert "U11" not in flex_names
 
 
 def test_regression_flex_tail_front_routing_and_silkscreen(tmp_path: Path) -> None:
@@ -1935,7 +1935,7 @@ def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
     silks = provider.silkscreen()
     silk_texts = {t.text for t in silks}
     expected_components = (
-        ["U1", "U2", "J1", "J2", "J3", "Q1", "U3", "U4", "SPK1", "Y1"]
+        ["U1", "U2", "U11", "J2", "J3", "Q1", "U3", "U4", "SPK1", "Y1"]
         + [f"R{i}" for i in range(1, 7)]
         + [f"C{i}" for i in range(1, 13)]
     )
@@ -2463,7 +2463,7 @@ def test_regression_bug_089_schematic_subsystem_organization() -> None:
         "User Interface",
         "Capacitive",
         "Audio",
-        "Differential",
+        "High-Speed",
         "Expansion",
     ]
     for sub in expected_subsystems:
@@ -2706,7 +2706,7 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
     assert vload_net is not None, "VLOAD_SW net must exist in wiring.yaml"
     vload_pins = set(vload_net.pins)
     assert ("Q1", "3") in vload_pins or ("Q1", "D") in vload_pins
-    assert ("J1", "VLOAD_SW") in vload_pins
+    assert ("U11", "VLOAD_SW") in vload_pins
     gnd_net = next((net for net in wiring.nets if net.name == "GND"), None)
     assert gnd_net is not None
     gnd_pins = set(gnd_net.pins)
@@ -2831,10 +2831,10 @@ def test_regression_bugs_115_through_127() -> None:
     assert sheet_audio is not None
     assert "C8" not in sheet_audio.components, "BUG-120: C8 must not be in Audio Subsystem sheet"
 
-    # BUG-121 & BUG-146: J2 removed from High-Speed Differential sheet; all MIPI nets removed
-    sheet_mipi = next((s for s in pcb_cfg.schematic_sheets if "High-Speed Differential" in s.title), None)
+    # BUG-121 & BUG-146: J2 removed from High-Speed sheet; all MIPI nets removed
+    sheet_mipi = next((s for s in pcb_cfg.schematic_sheets if "High-Speed" in s.title), None)
     assert sheet_mipi is not None
-    assert "J2" not in sheet_mipi.components, "BUG-146: J2 must be removed from High-Speed Differential sheet"
+    assert "J2" not in sheet_mipi.components, "BUG-146: J2 must be removed from High-Speed sheet"
     assert not any("MIPI" in n.name for n in wiring.nets), "BUG-146: All MIPI nets must be removed"
 
     # BUG-122: J6, J7, J8 connector style is JST-PH-6P; separate sheet pages exist for each connector

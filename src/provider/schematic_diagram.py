@@ -835,7 +835,7 @@ class SchematicDiagram:
                     color="#0f172a",
                     zorder=3,
                 )
-                label_val = mpn or (fp.label.text if fp.label else fp.package)
+                label_val = getattr(fp, "value", None) or mpn or (fp.label.text if fp.label else fp.package)
                 ax.text(
                     x_mid,
                     cy + ch - 10.5,
@@ -911,7 +911,7 @@ class SchematicDiagram:
                     color="#0f172a",
                     zorder=3,
                 )
-                label_val = mpn or (fp.label.text if fp.label else fp.package)
+                label_val = getattr(fp, "value", None) or mpn or (fp.label.text if fp.label else fp.package)
                 ax.text(
                     x_mid,
                     cy + ch - 10.5,
@@ -1100,7 +1100,9 @@ class SchematicDiagram:
                     )
                     divider_y = cy + ch - 13.8
                 else:
-                    val = fp.label.text if fp.label and fp.label.text != fp.name else fp.package
+                    val = getattr(fp, "value", None) or (
+                        fp.label.text if fp.label and fp.label.text != fp.name else fp.package
+                    )
                     ax.text(
                         cx + cw / 2.0,
                         cy + ch - 8.5,
