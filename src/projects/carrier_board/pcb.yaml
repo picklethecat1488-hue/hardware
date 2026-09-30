@@ -868,6 +868,9 @@ schematic_sheets:
       J15:
       - 1
       - 0
+      SW2:
+      - 1
+      - 1
   components:
   - U11
   - U1
@@ -875,6 +878,7 @@ schematic_sheets:
   - C18
   - C19
   - J16
+  - SW2
   pin_sides:
     U1:
       T2: left
@@ -886,12 +890,14 @@ schematic_sheets:
       RTS: left
       TXD: left
       CTS: left
-      SWDCLK: right
-      SWDIO: right
+      RESET_N: left
       GND: right
       3V3: right
       NFC1: right
       NFC2: right
+    SW2:
+      '1': left
+      '2': right
     J15:
       '1': left
       '2': left
@@ -913,12 +919,14 @@ schematic_sheets:
     - RTS
     - TXD
     - CTS
-    - SWDCLK
-    - SWDIO
+    - RESET_N
     - GND
     - 3V3
     - NFC1
     - NFC2
+    SW2:
+    - '1'
+    - '2'
     J15:
     - '1'
     - '2'

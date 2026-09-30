@@ -159,6 +159,10 @@ class FootprintModel(BaseModel):
         default=False,
         description="Whether this component footprint is intentionally unconnected to the electrical netlist",
     )
+    dnp: bool = Field(
+        default=False,
+        description="Do Not Populate (DNP) flag - excludes component from manufacturing BOM",
+    )
 
 
 class NetModel(BaseModel):

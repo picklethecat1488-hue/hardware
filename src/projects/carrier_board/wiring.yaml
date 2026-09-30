@@ -50,8 +50,24 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: FTSH-105-01-L-DV-K
-  supplier_pn: SAM8796-ND
+  mpn: DNP
+  supplier_pn: N/A
+  unconnected: true
+  dnp: true
+  description: BLE SWD recovery header (unconnected, DNP)
+- name: SW2
+  package: SW_PUSH_SMD
+  position:
+  - -14.5
+  - -36.5
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: PTS645SL43SMTR92LFS
+  supplier_pn: CKN9012CT-ND
+  description: NINA-B312 BLE module reset push button switch
 - name: J2
   package: FPC-30P-0.5MM
   position:
@@ -1282,10 +1298,8 @@ nets:
     - '2'
   - - R12
     - '2'
-  - - J15
-    - '3'
-  - - J15
-    - '5'
+  - - SW2
+    - '2'
 - name: 3V3
   color: '#dc2626'
   pins:
@@ -1359,8 +1373,6 @@ nets:
   - - JP3
     - '1'
   - - D4
-    - '1'
-  - - J15
     - '1'
 - name: VBUS
   priority: 24
@@ -1665,22 +1677,14 @@ nets:
     - T4
   - - U11
     - CTS
-- name: BLE_SWDCLK
+- name: BLE_RESET_N
   priority: 13
-  color: '#4169e1'
+  color: '#f97316'
   pins:
   - - U11
-    - SWDCLK
-  - - J15
-    - '4'
-- name: BLE_SWDIO
-  priority: 14
-  color: '#1e90ff'
-  pins:
-  - - U11
-    - SWDIO
-  - - J15
-    - '2'
+    - RESET_N
+  - - SW2
+    - '1'
 - name: NFC1
   priority: 15
   color: '#8b5cf6'

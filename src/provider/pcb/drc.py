@@ -2358,6 +2358,8 @@ class PCBDesignRulesChecker:
 
             # 3a. Dangling component check
             for fp in sheet_fps:
+                if getattr(fp, "unconnected", False) or getattr(fp, "dnp", False):
+                    continue
                 connected_pins = [p for p in fp.pins if (fp.name, p.name) in pin_to_net]
                 if not connected_pins:
                     violations.add_error(
@@ -2524,6 +2526,8 @@ class PCBDesignRulesChecker:
 
         # 4. Check that all components in the design have connected pins (BUG-088)
         for fp_name, fp in footprints_map.items():
+            if getattr(fp, "unconnected", False) or getattr(fp, "dnp", False):
+                continue
             connected_pins = [p for p in fp.pins if (fp.name, p.name) in pin_to_net]
             if not connected_pins:
                 violations.add_error(

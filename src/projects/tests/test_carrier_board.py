@@ -1,5 +1,6 @@
 """Tests for carrier_board rigid-flex PCB and protective enclosure CAD geometry."""
 
+from pathlib import Path
 import pytest
 from build123d import Location
 from projects.carrier_board.provider import CarrierBoardProvider
@@ -2014,14 +2015,11 @@ def test_regression_bug_231_nina_b312_flashed_module_swd_header_and_footprint() 
     assert abs(j15.position[1] - (-41.0)) < 0.1, f"J15 Y position must be -41.0, got {j15.position[1]}"
     assert abs(j15.rotation[2] - 0.0) < 0.1, f"J15 rotation must be 0.0, got {j15.rotation}"
 
-    # 3. J15 pin connections
-    net_map = {net.name: [pin for comp, pin in net.pins if comp == "J15"] for net in wiring.nets}
-    assert "3" in net_map.get("GND", []), "J15 pin 3 must be GND"
-    assert "5" in net_map.get("GND", []), "J15 pin 5 must be GND"
-    assert "2" in net_map.get("BLE_SWDIO", []), "J15 pin 2 must be BLE_SWDIO"
-    assert "4" in net_map.get("BLE_SWDCLK", []), "J15 pin 4 must be BLE_SWDCLK"
-    assert "1" in net_map.get("3V3", []), "J15 pin 1 must be 3V3"
-    assert "BLE_RESET_N" not in net_map, "BLE_RESET_N net must be removed"
+    # 3. J15 status (superseded by BUG-251: J15 marked DNP/no-connect, U11 wired to SW2 reset button)
+    assert getattr(j15, "unconnected", False) or getattr(j15, "dnp", False), "J15 must be DNP or no-connect"
+    assert "SW2" in fp_map, "SW2 reset button must exist"
+    reset_net = next((n for n in wiring.nets if n.name == "BLE_RESET_N"), None)
+    assert reset_net is not None, "BLE_RESET_N net must exist for SW2 reset button"
 
     # 4. Footprint dimensions
     import yaml
@@ -2141,6 +2139,57 @@ def test_regression_bug_250_nina_nfc_antenna_and_tuning_caps() -> None:
     assert any(c == "J16" for c, _ in nets_map["NFC2"].pins), "J16 must connect to NFC2"
 
     # 5. Verify PCB DRC passes with 0 violations
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_251_j15_no_connect_and_u11_reset_button(tmp_path: Path) -> None:
+    """Verify BUG-251: J15 removed from BOM, marked as no-connect, and U11 RESET_N wired to adjacent push button."""
+    import math
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.exporter import PCBExporter
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. J15 must exist but be marked unconnected/DNP
+    assert "J15" in comp_map, "J15 connector must exist on the board"
+    j15 = comp_map["J15"]
+    assert getattr(j15, "unconnected", False) or getattr(j15, "dnp", False), "J15 must be marked unconnected or DNP"
+
+    # 2. J15 must not appear in exported BOM
+    exporter = PCBExporter(provider.pcb_config, wiring)
+    bom_file = tmp_path / "carrier_board_bom.csv"
+    exporter.export_bom_csv(bom_file)
+    bom_text = bom_file.read_text(encoding="utf-8")
+    assert "J15" not in bom_text, "J15 must be removed from the BOM CSV"
+
+    # 3. J15 pins must not be connected to any active nets in the netlist
+    for net in wiring.nets:
+        for c_name, _ in net.pins:
+            assert c_name != "J15", f"J15 must have no active net connections, found in net '{net.name}'"
+
+    # 4. SW2 push button switch must exist adjacent to J15 (<= 10mm distance)
+    assert "SW2" in comp_map, "SW2 push button switch must exist"
+    sw2 = comp_map["SW2"]
+    dist = math.hypot(sw2.position[0] - j15.position[0], sw2.position[1] - j15.position[1])
+    assert dist <= 10.0, f"SW2 must be placed adjacent to J15 (dist: {dist:.2f}mm > 10.0mm)"
+
+    # 5. U11 RESET_N must connect to SW2
+    reset_net = next((n for n in wiring.nets if ("U11", "RESET_N") in n.pins or ("U11", "19") in n.pins), None)
+    assert reset_net is not None, "U11 RESET_N net must exist"
+    assert any(c == "SW2" for c, _ in reset_net.pins), "SW2 must connect to U11 RESET_N"
+
+    # 6. SW2 must connect to GND
+    gnd_net = nets_map["GND"]
+    assert any(c == "SW2" for c, _ in gnd_net.pins), "SW2 must connect to GND"
+
+    # 7. Zero PCB DRC violations
     drc = PCBDesignRulesChecker(provider.pcb_config)
     report = drc.check_all(wiring=wiring)
     assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
