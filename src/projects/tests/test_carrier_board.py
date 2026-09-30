@@ -2101,3 +2101,46 @@ def test_regression_bug_249_remove_vload_sw_from_ble_module() -> None:
     sheet_2 = pcb_data["schematic_sheets"][1]
     if "pin_breakouts" in sheet_2 and "U11" in sheet_2["pin_breakouts"]:
         assert "VLOAD_SW" not in sheet_2["pin_breakouts"]["U11"]
+
+
+def test_regression_bug_250_nina_nfc_antenna_and_tuning_caps() -> None:
+    """Verify BUG-250: NINA-B312 native NFC1/NFC2 pins routed to antenna header and shunt tuning capacitors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. Verify NFC1 and NFC2 nets exist
+    assert "NFC1" in nets_map, "NFC1 net must exist in wiring.yaml"
+    assert "NFC2" in nets_map, "NFC2 net must exist in wiring.yaml"
+
+    # 2. Verify U11 connects to NFC1 and NFC2
+    nfc1_pins = set(nets_map["NFC1"].pins)
+    nfc2_pins = set(nets_map["NFC2"].pins)
+    assert ("U11", "NFC1") in nfc1_pins or ("U11", "28") in nfc1_pins
+    assert ("U11", "NFC2") in nfc2_pins or ("U11", "29") in nfc2_pins
+
+    # 3. Verify tuning capacitors C18 and C19 (C_tune1, C_tune2) exist and connect between NFC and GND
+    comp_map = {c.name: c for c in wiring.footprints}
+    assert "C18" in comp_map or "C_tune1" in comp_map, "C18 / C_tune1 tuning capacitor must exist"
+    assert "C19" in comp_map or "C_tune2" in comp_map, "C19 / C_tune2 tuning capacitor must exist"
+    c_tune1_name = "C18" if "C18" in comp_map else "C_tune1"
+    c_tune2_name = "C19" if "C19" in comp_map else "C_tune2"
+
+    assert any(c == c_tune1_name for c, _ in nets_map["NFC1"].pins), "C_tune1 must connect to NFC1"
+    assert any(c == c_tune2_name for c, _ in nets_map["NFC2"].pins), "C_tune2 must connect to NFC2"
+    assert any(c == c_tune1_name for c, _ in nets_map["GND"].pins), "C_tune1 must connect to GND"
+    assert any(c == c_tune2_name for c, _ in nets_map["GND"].pins), "C_tune2 must connect to GND"
+
+    # 4. Verify external antenna connector J16 connects to NFC1 and NFC2
+    assert "J16" in comp_map, "External NFC coil antenna header J16 must exist"
+    assert any(c == "J16" for c, _ in nets_map["NFC1"].pins), "J16 must connect to NFC1"
+    assert any(c == "J16" for c, _ in nets_map["NFC2"].pins), "J16 must connect to NFC2"
+
+    # 5. Verify PCB DRC passes with 0 violations
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"

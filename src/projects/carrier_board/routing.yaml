@@ -14192,6 +14192,123 @@ traces:
   - 17.4
   - 32.0
   width_mm: 0.15
+- net: NFC1
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 4.125
+  - -36.0
+  end_mm:
+  - 4.7
+  - -35.5
+- net: NFC1
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 4.7
+  - -35.5
+  end_mm:
+  - 5.3
+  - -35.5
+- net: NFC1
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 5.3
+  - -35.5
+  end_mm:
+  - 6.8
+  - -35.5
+- net: NFC1
+  layer: B.Cu
+  width_mm: 0.15
+  start_mm:
+  - 6.8
+  - -35.5
+  end_mm:
+  - 12.23
+  - -35.5
+- net: NFC1
+  layer: B.Cu
+  width_mm: 0.15
+  start_mm:
+  - 12.23
+  - -35.5
+  end_mm:
+  - 12.23
+  - -36.5
+- net: NFC2
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 4.125
+  - -37.0
+  end_mm:
+  - 6.3
+  - -37.0
+- net: NFC2
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 6.3
+  - -37.0
+  end_mm:
+  - 6.8
+  - -37.0
+- net: NFC2
+  layer: B.Cu
+  width_mm: 0.15
+  start_mm:
+  - 6.8
+  - -37.0
+  end_mm:
+  - 11.0
+  - -37.0
+- net: NFC2
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 11.0
+  - -37.0
+  end_mm:
+  - 11.0
+  - -38.5
+- net: NFC2
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 11.0
+  - -38.5
+  end_mm:
+  - 14.77
+  - -38.5
+- net: NFC2
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 14.77
+  - -38.5
+  end_mm:
+  - 14.77
+  - -36.5
+- net: GND
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 5.3
+  - -36.5
+  end_mm:
+  - 5.8
+  - -36.25
+- net: GND
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 5.8
+  - -36.25
+  end_mm:
+  - 6.3
+  - -36.0
 vias:
 - net: GND
   position_mm:
@@ -17697,3 +17814,36 @@ vias:
   position_mm:
   - 17.4
   - 32.8
+- drill_diameter_mm: 0.16
+  layer_end: B.Cu
+  layer_start: F.Cu
+  net: NFC1
+  pad_diameter_mm: 0.36
+  position_mm:
+  - 6.8
+  - -35.5
+- drill_diameter_mm: 0.16
+  layer_end: B.Cu
+  layer_start: F.Cu
+  net: NFC2
+  pad_diameter_mm: 0.36
+  position_mm:
+  - 6.8
+  - -37.0
+- drill_diameter_mm: 0.16
+  layer_end: B.Cu
+  layer_start: F.Cu
+  net: NFC2
+  pad_diameter_mm: 0.36
+  position_mm:
+  - 11.0
+  - -37.0
+- drill_diameter_mm: 0.16
+  layer_end: In1.Cu
+  layer_start: F.Cu
+  net: GND
+  pad_diameter_mm: 0.36
+  position_mm:
+  - 5.8
+  - -36.25
+

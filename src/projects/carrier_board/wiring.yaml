@@ -1056,6 +1056,47 @@ footprints:
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
   value: 1k
+- name: C18
+  package: '0402'
+  position:
+  - 5.3
+  - -36.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 90.0
+  mpn: GRM1555C1H301JA01D
+  supplier_pn: 490-GRM1555C1H301JA01D-ND
+  value: 300pF
+  description: NFC1 13.56MHz tuning shunt capacitor C_tune1 (300 pF C0G/NP0)
+- name: C19
+  package: '0402'
+  position:
+  - 6.3
+  - -36.5
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 270.0
+  mpn: GRM1555C1H301JA01D
+  supplier_pn: 490-GRM1555C1H301JA01D-ND
+  value: 300pF
+  description: NFC2 13.56MHz tuning shunt capacitor C_tune2 (300 pF C0G/NP0)
+- name: J16
+  package: pin_header_1x2
+  position:
+  - 13.5
+  - -36.5
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: 22-28-4023
+  supplier_pn: WM6402-ND
+  description: External 13.56 MHz tuned coil antenna header
 nets:
 - name: GND
   color: '#475569'
@@ -1085,6 +1126,10 @@ nets:
   - - C17
     - '2'
   - - D8
+    - '2'
+  - - C18
+    - '2'
+  - - C19
     - '2'
   - - Q1
     - '2'
@@ -1635,6 +1680,26 @@ nets:
   - - U11
     - SWDIO
   - - J15
+    - '2'
+- name: NFC1
+  priority: 15
+  color: '#8b5cf6'
+  pins:
+  - - U11
+    - NFC1
+  - - C18
+    - '1'
+  - - J16
+    - '1'
+- name: NFC2
+  priority: 16
+  color: '#a855f7'
+  pins:
+  - - U11
+    - NFC2
+  - - C19
+    - '1'
+  - - J16
     - '2'
 - name: CAP_SHIELD
   priority: 25
