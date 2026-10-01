@@ -554,8 +554,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case _:
                 severity = ReviewSeverity.MUST_FIX
 
+        c_uuid = str(data.get("uuid") or uuid.uuid4())
+        cid = str(data.get("id") or c_uuid[:8])
         comment = CommentModel(
-            id=data.get("id") or uuid.uuid4().hex[:12],
+            id=cid,
+            uuid=c_uuid,
             file_path=file_path,
             start_line=int(data.get("start_line", 1)),
             end_line=int(data.get("end_line", 1)),
@@ -1038,7 +1041,7 @@ class DashboardServer(ThreadingHTTPServer):
                                 CommentModel(
                                     id=row["id"],
                                     uuid=row["uuid"] or row["id"],
-                                    commit_hash=row["commit_hash"],
+                                    commit=row["commit_hash"] or "",
                                     file_path=row["file_path"],
                                     start_line=row["start_line"],
                                     end_line=row["end_line"],

@@ -150,10 +150,15 @@ graph TD
    * Side cutouts (USB-C, SWD, expansion) are radiused with 0.8mm corner fillets to avoid stress concentrations, with separate non-overlapping cutouts and solid wall separation between all expansion ports.
    * Expansion headers J9 and J10 use polarized 6-pin JST-PH connectors (`B6B-PH-K-S`) for easy insertion and keyed polarization.
    * Carrier board top layer features the prominent Antigravity logo in silkscreen.
-8. **BTLE Wireless Subsystem (`U11`) (`BUG-214`, `BUG-222`)**:
-   * u-blox NINA-B302 Bluetooth 5.0 Low Energy standalone module with integrated PCB antenna replaces the legacy PCIe/M.2 connector.
+8. **BTLE Wireless Subsystem (`U11`) & NFC Interface (`BUG-214`, `BUG-222`, `BUG-231`, `BUG-250`, `BUG-251`)**:
+   * u-blox NINA-B312 Bluetooth 5.0 Low Energy standalone pre-flashed module (`NINA-B312-02B`) with integrated PCB antenna replaces the legacy PCIe/M.2 connector.
    * Interfaces with MCU via dedicated high-speed UART (`BLE_TX`, `BLE_RX`, `BLE_RTS`, `BLE_CTS`) with hardware flow control and low-power wakeup interrupts (`BLE_WAKE_N`).
+   * Equipped with SWD recovery header `J15` (1.27mm pitch 2x5 DNP header) and manual tactile reset push-button switch `SW2`.
+   * Native nRF52840 NFC-A tag interface (`NFC1`, `NFC2`) is routed through dual 15 pF shunt tuning capacitors (`C18`, `C19`) to header `J16`. Recommended mating NFC antenna: **Molex 146236-0001** (13.56 MHz flexible NFC antenna with adhesive backing, $15.0 \times 25.0\text{ mm}$, pre-matched for 15 pF tuning).
    * RF keepout zone is preserved on all copper layers directly below the antenna structure to ensure omnidirectional radiation and maximum RF link budget.
+9. **Capacitive Touch Sensing & Auxiliary Channel Routing**:
+   * Azoteq IQS7222A ProxFusion controller drives the 5-button slider and proximity sensing electrodes via `J2` / `J4` (`CR0`..`CR7`).
+   * The 9th sensing channel (`CT8`) is routed from `U2` pin 12 to `J2` pin `NC3` to support optional future revisions to the flex ribbon without modifying the baseline flex connector.
 
 ## Battery Life Estimation
 

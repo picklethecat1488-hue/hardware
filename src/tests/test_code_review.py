@@ -1560,3 +1560,63 @@ def test_regression_bug_175_sqlite_store_missing_commit_hash_migration(tmp_path:
         idx_cursor = verify_conn.execute("PRAGMA index_list(comments)")
         indices = [row[1] for row in idx_cursor.fetchall()]
         assert "idx_comments_commit" in indices
+
+
+def test_regression_bug_253_sqlite_comment_uuid_integrity(tmp_path: Path) -> None:
+    """Verify BUG-253: SQLiteReviewStore upserts comments without crashing on UNIQUE constraint for comments.uuid."""
+    db_path = tmp_path / "cr_test.sqlite"
+    store = SQLiteReviewStore(db_path)
+
+    # 1. Save an initial session with a comment with an explicit UUID and id
+    comment_uuid = "4c49f1ac-8622-4a28-970a-6dfc0302e31c"
+    c1 = CommentModel(
+        id="4c49f1ac",
+        uuid=comment_uuid,
+        file_path="src/projects/carrier_board/pcb.yaml",
+        start_line=904,
+        end_line=904,
+        severity=ReviewSeverity.MUST_FIX,
+        body="Initial comment",
+        created_at="2026-10-01T01:00:00Z",
+        commit="working",
+    )
+    session = ReviewSessionModel(
+        title="Test Session",
+        repo_name="hardware",
+        comments=[c1],
+        created_at="2026-10-01T01:00:00Z",
+        updated_at="2026-10-01T01:00:00Z",
+    )
+    store.save_session(session)
+
+    # 2. Upsert a comment with the same UUID but a different temporary id (e.g., from frontend or markdown import)
+    c2 = CommentModel(
+        id="new_temp_id",
+        uuid=comment_uuid,
+        file_path="src/projects/carrier_board/pcb.yaml",
+        start_line=904,
+        end_line=904,
+        severity=ReviewSeverity.MUST_FIX,
+        body="Updated comment text",
+        created_at="2026-10-01T01:05:00Z",
+        commit="working",
+    )
+    # Must not raise sqlite3.IntegrityError: UNIQUE constraint failed: comments.uuid
+    store.save_comment(c2)
+
+    # 3. Verify comment was updated in place
+    loaded = store.get_comment_by_uuid(comment_uuid)
+    assert loaded is not None
+    assert loaded.body == "Updated comment text"
+    assert loaded.id == "new_temp_id"
+
+    # 4. Save via session upsert
+    loaded_session = store.load_session()
+    assert loaded_session is not None
+    assert len(loaded_session.comments) == 1
+    loaded_session.comments[0].body = "Updated via session"
+    store.save_session(loaded_session)
+
+    loaded_again = store.get_comment_by_uuid(comment_uuid)
+    assert loaded_again is not None
+    assert loaded_again.body == "Updated via session"

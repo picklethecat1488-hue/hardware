@@ -261,6 +261,20 @@ class SchematicDiagram:
             config=self.config,
         )
 
+    def compute_passive_tap_points(
+        self,
+    ) -> Dict[int, List[Tuple[FootprintModel, str, Tuple[float, float]]]]:
+        """Compute signal tap points (footprint, signal_net, (x, y)) for vertical passives on each sheet.
+
+        Returns:
+            Dict mapping sheet_idx -> list of (footprint, signal_net, (x_tap, y_tap)).
+        """
+        return SchematicWireSegmentPlanner.compute_passive_tap_points(
+            wiring=self.wiring,
+            sheet_plans=self._build_sheet_plans(),
+            config=self.config,
+        )
+
     def _compute_sheet_wire_segments_for_plan(
         self, sheet_plan: _SchematicSheetPlan, all_nets: List[NetModel]
     ) -> Tuple[
@@ -269,11 +283,12 @@ class SchematicDiagram:
         List[Tuple[float, float, str]],
     ]:
         """Compute exact wire routes and labels for a single schematic sheet plan."""
-        return SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan(
+        h_segs, v_segs, wire_labels, _ = SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan(
             sheet_plan=sheet_plan,
             all_nets=all_nets,
             config=self.config,
         )
+        return h_segs, v_segs, wire_labels
 
     def render_pdf(self, output_file: str | Path) -> Path:
         """Generate a multi-page PDF schematic including Title page, TOC, and schematic sheets.
@@ -1210,6 +1225,7 @@ class SchematicDiagram:
             h_segments,
             v_segments,
             wire_labels,
+            _,
         ) = SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan(sheet_plan, all_nets, self.config)
 
         # Render all horizontal wire segments

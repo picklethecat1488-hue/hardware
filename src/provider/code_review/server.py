@@ -244,8 +244,11 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
             )
 
         commit = data.get("commit", self.server.session.commit_hash or "working")
+        c_uuid = str(data.get("uuid") or uuid.uuid4())
+        cid = str(data.get("id") or c_uuid[:8])
         comment = CommentModel(
-            id=uuid.uuid4().hex[:12],
+            id=cid,
+            uuid=c_uuid,
             file_path=file_path,
             start_line=start_line,
             end_line=end_line,

@@ -361,6 +361,7 @@ class Wiring:
                     truth_table=truth_table,
                     shape_ref=c.get("shape_ref"),
                     unconnected=bool(c.get("unconnected", False)),
+                    dnp=bool(c.get("dnp", False)),
                 )
             )
         return components

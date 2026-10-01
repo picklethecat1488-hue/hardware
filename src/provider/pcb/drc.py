@@ -187,6 +187,7 @@ class DRCRuleName(StrEnum):
     SCHEMATIC_HEADER_COLLISION = "SCHEMATIC_HEADER_COLLISION"
     SCHEMATIC_UNCONNECTED_COMPONENT = "SCHEMATIC_UNCONNECTED_COMPONENT"
     SCHEMATIC_WIRE_COLLINEAR_OVERLAP = "SCHEMATIC_WIRE_COLLINEAR_OVERLAP"
+    SCHEMATIC_DISCONNECTED_PASSIVE = "SCHEMATIC_DISCONNECTED_PASSIVE"
 
 
 @dataclass
@@ -2376,6 +2377,8 @@ class PCBDesignRulesChecker:
         computed_wire_segments: Dict[
             int, Tuple[List[Tuple[float, float, float, str]], List[Tuple[float, float, float, str]]]
         ] = {}
+        computed_text_boxes: Dict[int, List[Tuple[float, float, float, float, str, str]]] = {}
+        computed_passive_taps: Dict[int, List[Tuple[Any, str, Tuple[float, float]]]] = {}
         if (
             self.config
             and getattr(self.config, "schematic_sheets", None)
@@ -2388,6 +2391,7 @@ class PCBDesignRulesChecker:
             computed_symbol_boxes = diag.compute_symbol_bounding_boxes()
             computed_wire_segments = diag.compute_sheet_wire_segments()
             computed_text_boxes = diag.compute_text_bounding_boxes()
+            computed_passive_taps = diag.compute_passive_tap_points()
 
         for sheet_idx, sheet in enumerate(self.config.schematic_sheets):
             boxes = computed_symbol_boxes.get(sheet_idx + 1, [])
@@ -2522,6 +2526,37 @@ class PCBDesignRulesChecker:
                             f"exceeds page printable boundaries: bounds=({t[0]:.1f}, {t[1]:.1f}, {t[2]:.1f}, {t[3]:.1f})"
                         ),
                         location=(t[0], t[1], 0.0),
+                    )
+
+            # 3h. Vertical passive connection check (SCHEMATIC_DISCONNECTED_PASSIVE)
+            sheet_taps = computed_passive_taps.get(sheet_idx + 1, [])
+            for fp, sig_net, (x_pull, y_base) in sheet_taps:
+                is_connected = False
+                for s in h_segs:
+                    if s[3] == sig_net:
+                        x_min = min(s[0], s[1])
+                        x_max = max(s[0], s[1])
+                        if abs(s[2] - y_base) < 0.2 and (x_min - 0.2 <= x_pull <= x_max + 0.2):
+                            is_connected = True
+                            break
+                if not is_connected:
+                    for s in v_segs:
+                        if s[3] == sig_net:
+                            y_min = min(s[1], s[2])
+                            y_max = max(s[1], s[2])
+                            if abs(s[0] - x_pull) < 0.2 and (y_min - 0.2 <= y_base <= y_max + 0.2):
+                                is_connected = True
+                                break
+                if not is_connected:
+                    violations.add_error(
+                        rule_name=DRCRuleName.SCHEMATIC_DISCONNECTED_PASSIVE,
+                        net_or_zone=f"{fp.name} ({sig_net})",
+                        description=(
+                            f"Schematic passive '{fp.name}' on sheet {sheet_idx + 1} ('{sheet.title}') "
+                            f"is not connected to net '{sig_net}': tap point ({x_pull:.1f}, {y_base:.1f}) "
+                            f"does not lie on any wire segment of '{sig_net}'"
+                        ),
+                        location=(x_pull, y_base, 0.0),
                     )
 
         # 4. Check that all components in the design have connected pins (BUG-088)
