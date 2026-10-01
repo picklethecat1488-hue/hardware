@@ -442,5 +442,10 @@ class Wiring:
             filtered.__dict__["footprints"] = [fp for fp in self.footprints if fp.name in target_names]
         else:
             filtered.__dict__["footprints"] = list(footprints)
-        filtered.__dict__["nets"] = self.nets
+        target_fp_names = {fp.name for fp in filtered.__dict__["footprints"]}
+        filtered.__dict__["nets"] = [
+            net
+            for net in self.nets
+            if any(isinstance(p, (list, tuple)) and len(p) >= 1 and p[0] in target_fp_names for p in net.pins)
+        ]
         return filtered

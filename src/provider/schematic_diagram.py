@@ -310,14 +310,24 @@ class SchematicDiagram:
         sheet_plans = self._build_sheet_plans()
         total_sheets = max(1, len(sheet_plans))
 
+        # Filter primary signal nets to only those connected to footprints present in this schematic
+        schematic_fp_names = {fp.name for fp in fps}
+        if sheet_plans:
+            schematic_fp_names.update(fp.name for sp in sheet_plans for fp in sp.footprints)
+        schematic_nets = [
+            net
+            for net in self.wiring.nets
+            if any(isinstance(p, (list, tuple)) and len(p) >= 1 and p[0] in schematic_fp_names for p in net.pins)
+        ]
+
         # Plan multi-page Table of Contents sheets dynamically
-        toc_plans = self._plan_pdf_toc_pages(fps, self.wiring.nets, sheet_plans)
+        toc_plans = self._plan_pdf_toc_pages(fps, schematic_nets, sheet_plans)
         toc_page_count = len(toc_plans)
         total_pages = 1 + toc_page_count + total_sheets
 
         with PdfPages(out_path) as pdf:
             # Page 1: Title Cover Page
-            self._render_pdf_title_page(pdf, board_name, board_type, layer_count, fps, self.wiring.nets, total_pages)
+            self._render_pdf_title_page(pdf, board_name, board_type, layer_count, fps, schematic_nets, total_pages)
 
             # Pages 2 .. 1 + toc_page_count: Table of Contents & Interconnect Schedule
             for toc_plan in toc_plans:
@@ -338,7 +348,7 @@ class SchematicDiagram:
                     board_name=board_name,
                     sheet_plan=plan,
                     total_sheets=total_sheets,
-                    all_nets=self.wiring.nets,
+                    all_nets=schematic_nets,
                     page_num=1 + toc_page_count + sheet_idx,
                     total_pages=total_pages,
                 )
