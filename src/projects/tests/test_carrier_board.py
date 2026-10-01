@@ -2274,3 +2274,53 @@ def test_regression_bug_254_enclosure_lid_text_stroke_width() -> None:
     assert bar_thickness >= 0.80, (
         f"Expected BATTERY text horizontal bar >= 0.80mm (DFM rule), got {bar_thickness:.3f}mm"
     )
+
+
+def test_regression_bug_255_pullup_resistors_unbridged_with_individual_power_designators() -> None:
+    """Verify BUG-255: Pull-up resistors R1 and R2 on Sheet 8 have individual 3V3 power designators and no bridge."""
+    import matplotlib.pyplot as plt
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model import Wiring
+    from model.pcb import PCBConfig
+    from provider.schematic_diagram import SchematicDiagram
+    import yaml
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
+    with open(pcb_yaml_path) as f:
+        cfg = PCBConfig(**yaml.safe_load(f))
+
+    diag = SchematicDiagram(wiring=wiring, pcb_config=cfg)
+    sheet_plans = diag._build_sheet_plans()
+    sheet_8_plan = next(p for p in sheet_plans if p.sheet_idx == 8)
+
+    from unittest.mock import MagicMock
+
+    mock_pdf = MagicMock()
+    diag._render_pdf_schematic_sheet(
+        mock_pdf,
+        "carrier_board",
+        sheet_8_plan,
+        len(sheet_plans),
+        diag.wiring.nets,
+        15,
+        28,
+    )
+
+    fig = mock_pdf.savefig.call_args[0][0]
+    ax = fig.axes[0]
+    texts = [t.get_text() for t in ax.texts]
+    pwr_labels = [t for t in texts if t == "3V3"]
+    assert len(pwr_labels) >= 2, f"Expected individual 3V3 labels for pullups, got {pwr_labels}"
+
+    red_lines = [line for line in ax.lines if line.get_color() == "#dc2626"]
+    h_red_lines = [
+        line
+        for line in red_lines
+        if len(line.get_ydata()) == 2 and abs(line.get_ydata()[0] - line.get_ydata()[1]) < 0.001
+    ]
+    bridging_lines = [line for line in h_red_lines if abs(line.get_xdata()[1] - line.get_xdata()[0]) > 5.0]
+    assert len(bridging_lines) == 0, (
+        f"Expected 0 horizontal red bridging lines between pullups, found: {bridging_lines}"
+    )

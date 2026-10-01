@@ -609,8 +609,6 @@ class SchematicPassiveDrawer:
             )
 
         pwr_pullups = [p for p in pullup_points if p[4].upper() in POWER_NET_NAMES]
-        same_pwr = len({p[4] for p in pwr_pullups}) == 1 and len(pwr_pullups) > 1
-        common_pwr = pwr_pullups[0][4] if same_pwr else "3V3"
         pullup_max_y = max((p[1] for p in pwr_pullups), default=120.0)
 
         for pt in pullup_points:
@@ -688,30 +686,26 @@ class SchematicPassiveDrawer:
                     zorder=4,
                 )
 
-                if same_pwr:
-                    ax.plot([x_pull, x_pull], [y_zz_top, y_top_rail], color="#dc2626", linewidth=1.2, zorder=2)
-                    ax.plot(x_pull, y_top_rail, marker="o", markersize=2.0, color="#dc2626", zorder=3)
-                else:
-                    y_arrow = y_zz_top + 4.0
-                    ax.plot([x_pull, x_pull], [y_zz_top, y_arrow], color="#dc2626", linewidth=1.2, zorder=2)
-                    ax.plot(
-                        [x_pull - 2.5, x_pull, x_pull + 2.5],
-                        [y_arrow - 1.5, y_arrow + 1.0, y_arrow - 1.5],
-                        color="#dc2626",
-                        linewidth=1.2,
-                        zorder=2,
-                    )
-                    ax.text(
-                        x_pull,
-                        y_arrow + 2.2,
-                        rail_net,
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.8,
-                        fontweight="bold",
-                        color="#dc2626",
-                        zorder=4,
-                    )
+                y_arrow = y_zz_top + 4.0
+                ax.plot([x_pull, x_pull], [y_zz_top, y_arrow], color="#dc2626", linewidth=1.2, zorder=2)
+                ax.plot(
+                    [x_pull - 2.5, x_pull, x_pull + 2.5],
+                    [y_arrow - 1.5, y_arrow + 1.0, y_arrow - 1.5],
+                    color="#dc2626",
+                    linewidth=1.2,
+                    zorder=2,
+                )
+                ax.text(
+                    x_pull,
+                    y_arrow + 2.2,
+                    rail_net,
+                    ha="center",
+                    va="bottom",
+                    fontsize=5.8,
+                    fontweight="bold",
+                    color="#dc2626",
+                    zorder=4,
+                )
             else:
                 y_zz_top = y_base - 8.0
                 y_zz_bot = y_zz_top - 9.0
@@ -773,62 +767,6 @@ class SchematicPassiveDrawer:
                 )
 
                 cls._draw_gnd_3bar(ax, x_pull, y_zz_bot, y_drop)
-
-        if same_pwr and len(pwr_pullups) > 1:
-            x_min_pull = min(p[0] for p in pwr_pullups)
-            x_max_pull = max(p[0] for p in pwr_pullups)
-            y_zz_top = pullup_max_y + 17.0
-            y_top_rail = y_zz_top + 6.0
-
-            card_x = x_min_pull - 5.0
-            card_w = (x_max_pull - x_min_pull) + 16.0
-            card_y = min(p[1] for p in pwr_pullups) + 4.0
-            card_h = (y_top_rail + 16.0) - card_y
-            is_i2c = any("SDA" in p[3].upper() or "SCL" in p[3].upper() for p in pwr_pullups)
-            card_title = "I2C PULL-UP RESISTORS" if is_i2c else "PULL-UP RESISTORS"
-
-            ax.add_patch(
-                patches.Rectangle(
-                    (card_x, card_y),
-                    card_w,
-                    card_h,
-                    facecolor="#f8fafc",
-                    edgecolor="#cbd5e1",
-                    linestyle="--",
-                    linewidth=0.8,
-                    zorder=1,
-                )
-            )
-            ax.text(
-                card_x + 3.0,
-                card_y + card_h - 2.8,
-                card_title,
-                fontsize=5.5,
-                fontweight="bold",
-                color="#334155",
-                zorder=2,
-            )
-            ax.plot([x_min_pull, x_max_pull], [y_top_rail, y_top_rail], color="#dc2626", linewidth=1.2, zorder=2)
-            x_arrow = (x_min_pull + x_max_pull) / 2.0
-            ax.plot([x_arrow, x_arrow], [y_top_rail, y_top_rail + 3.5], color="#dc2626", linewidth=1.2, zorder=2)
-            ax.plot(
-                [x_arrow - 2.5, x_arrow, x_arrow + 2.5],
-                [y_top_rail + 2.0, y_top_rail + 4.5, y_top_rail + 2.0],
-                color="#dc2626",
-                linewidth=1.2,
-                zorder=2,
-            )
-            ax.text(
-                x_arrow,
-                y_top_rail + 5.5,
-                common_pwr,
-                ha="center",
-                va="bottom",
-                fontsize=5.8,
-                fontweight="bold",
-                color="#dc2626",
-                zorder=4,
-            )
 
     @staticmethod
     def _draw_zigzag_resistor(ax: matplotlib.axes.Axes, x: float, y_start: float, y_end: float) -> None:
