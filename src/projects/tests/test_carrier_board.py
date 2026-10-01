@@ -1,5 +1,6 @@
 """Tests for carrier_board rigid-flex PCB and protective enclosure CAD geometry."""
 
+from pathlib import Path
 import pytest
 from build123d import Location
 from projects.carrier_board.provider import CarrierBoardProvider
@@ -1146,9 +1147,9 @@ def test_regression_bug_157_action_button_routed() -> None:
     action_violations = [
         v
         for v in report.violations
-        if "ACTION_BUTTON" in v.message
-        or ("CAP_TX2" in v.message and v.rule_name == "ANTENNA_TRACE_DETECTED")
-        or ("CAP_RX2" in v.message and v.rule_name == "ANTENNA_TRACE_DETECTED")
+        if "ACTION_BUTTON" in v.description
+        or ("CAP_TX2" in v.description and v.rule_name == "ANTENNA_TRACE_DETECTED")
+        or ("CAP_RX2" in v.description and v.rule_name == "ANTENNA_TRACE_DETECTED")
     ]
     assert not action_violations, f"ACTION_BUTTON routing violations found: {action_violations}"
 
@@ -2014,14 +2015,11 @@ def test_regression_bug_231_nina_b312_flashed_module_swd_header_and_footprint() 
     assert abs(j15.position[1] - (-41.0)) < 0.1, f"J15 Y position must be -41.0, got {j15.position[1]}"
     assert abs(j15.rotation[2] - 0.0) < 0.1, f"J15 rotation must be 0.0, got {j15.rotation}"
 
-    # 3. J15 pin connections
-    net_map = {net.name: [pin for comp, pin in net.pins if comp == "J15"] for net in wiring.nets}
-    assert "3" in net_map.get("GND", []), "J15 pin 3 must be GND"
-    assert "5" in net_map.get("GND", []), "J15 pin 5 must be GND"
-    assert "2" in net_map.get("BLE_SWDIO", []), "J15 pin 2 must be BLE_SWDIO"
-    assert "4" in net_map.get("BLE_SWDCLK", []), "J15 pin 4 must be BLE_SWDCLK"
-    assert "1" in net_map.get("3V3", []), "J15 pin 1 must be 3V3"
-    assert "BLE_RESET_N" not in net_map, "BLE_RESET_N net must be removed"
+    # 3. J15 status (superseded by BUG-251: J15 marked DNP/no-connect, U11 wired to SW2 reset button)
+    assert getattr(j15, "unconnected", False) or getattr(j15, "dnp", False), "J15 must be DNP or no-connect"
+    assert "SW2" in fp_map, "SW2 reset button must exist"
+    reset_net = next((n for n in wiring.nets if n.name == "BLE_RESET_N"), None)
+    assert reset_net is not None, "BLE_RESET_N net must exist for SW2 reset button"
 
     # 4. Footprint dimensions
     import yaml
@@ -2063,6 +2061,135 @@ def test_power_hardening_bug_243() -> None:
         assert any(c == name for c, p in nets_map["3V3"].pins), f"{name} must connect to 3V3"
         assert any(c == name for c, p in nets_map["GND"].pins), f"{name} must connect to GND"
 
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_249_remove_vload_sw_from_ble_module() -> None:
+    """Verify BUG-249: VLOAD_SW artifact removed, U11 footprint corrected to NINA datasheet pinout."""
+    import yaml
+    from pathlib import Path
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. MOD-BLE-PCB-ANT footprint in ic.yaml must not have VLOAD_SW
+    ic_yaml_path = Path(__file__).resolve().parent.parent / "footprints" / "ic.yaml"
+    with open(ic_yaml_path, encoding="utf-8") as f:
+        ic_data = yaml.safe_load(f)
+    ble_fp = ic_data["footprints"]["MOD-BLE-PCB-ANT"]
+    ble_pin_names = [p["name"] for p in ble_fp["pins"]]
+    assert "VLOAD_SW" not in ble_pin_names, "MOD-BLE-PCB-ANT footprint must not have VLOAD_SW pin"
+    assert "SWITCH_2" in ble_pin_names, "MOD-BLE-PCB-ANT footprint pin 18 must be SWITCH_2"
+
+    # 2. wiring.yaml must not have VLOAD_SW net or U11.VLOAD_SW pin connection
+    net_names = [n.name for n in wiring.nets]
+    assert "VLOAD_SW" not in net_names, "VLOAD_SW net must be removed from wiring.yaml"
+    for net in wiring.nets:
+        for pin in net.pins:
+            assert pin[0] != "U11" or pin[1] != "VLOAD_SW", "U11 must not have any pin connected to VLOAD_SW"
+
+    # 3. pcb.yaml must not have VLOAD_SW in Sheet 2 pin_breakouts
+    pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
+    with open(pcb_yaml_path, encoding="utf-8") as f:
+        pcb_data = yaml.safe_load(f)
+    sheet_2 = pcb_data["schematic_sheets"][1]
+    if "pin_breakouts" in sheet_2 and "U11" in sheet_2["pin_breakouts"]:
+        assert "VLOAD_SW" not in sheet_2["pin_breakouts"]["U11"]
+
+
+def test_regression_bug_250_nina_nfc_antenna_and_tuning_caps() -> None:
+    """Verify BUG-250: NINA-B312 native NFC1/NFC2 pins routed to antenna header and shunt tuning capacitors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. Verify NFC1 and NFC2 nets exist
+    assert "NFC1" in nets_map, "NFC1 net must exist in wiring.yaml"
+    assert "NFC2" in nets_map, "NFC2 net must exist in wiring.yaml"
+
+    # 2. Verify U11 connects to NFC1 and NFC2
+    nfc1_pins = set(nets_map["NFC1"].pins)
+    nfc2_pins = set(nets_map["NFC2"].pins)
+    assert ("U11", "NFC1") in nfc1_pins or ("U11", "28") in nfc1_pins
+    assert ("U11", "NFC2") in nfc2_pins or ("U11", "29") in nfc2_pins
+
+    # 3. Verify tuning capacitors C18 and C19 (C_tune1, C_tune2) exist and connect between NFC and GND
+    comp_map = {c.name: c for c in wiring.footprints}
+    assert "C18" in comp_map or "C_tune1" in comp_map, "C18 / C_tune1 tuning capacitor must exist"
+    assert "C19" in comp_map or "C_tune2" in comp_map, "C19 / C_tune2 tuning capacitor must exist"
+    c_tune1_name = "C18" if "C18" in comp_map else "C_tune1"
+    c_tune2_name = "C19" if "C19" in comp_map else "C_tune2"
+
+    assert any(c == c_tune1_name for c, _ in nets_map["NFC1"].pins), "C_tune1 must connect to NFC1"
+    assert any(c == c_tune2_name for c, _ in nets_map["NFC2"].pins), "C_tune2 must connect to NFC2"
+    assert any(c == c_tune1_name for c, _ in nets_map["GND"].pins), "C_tune1 must connect to GND"
+    assert any(c == c_tune2_name for c, _ in nets_map["GND"].pins), "C_tune2 must connect to GND"
+
+    # 4. Verify external antenna connector J16 connects to NFC1 and NFC2
+    assert "J16" in comp_map, "External NFC coil antenna header J16 must exist"
+    assert any(c == "J16" for c, _ in nets_map["NFC1"].pins), "J16 must connect to NFC1"
+    assert any(c == "J16" for c, _ in nets_map["NFC2"].pins), "J16 must connect to NFC2"
+
+    # 5. Verify PCB DRC passes with 0 violations
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_251_j15_no_connect_and_u11_reset_button(tmp_path: Path) -> None:
+    """Verify BUG-251: J15 removed from BOM, marked as no-connect, and U11 RESET_N wired to adjacent push button."""
+    import math
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.exporter import PCBExporter
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. J15 must exist but be marked unconnected/DNP
+    assert "J15" in comp_map, "J15 connector must exist on the board"
+    j15 = comp_map["J15"]
+    assert getattr(j15, "unconnected", False) or getattr(j15, "dnp", False), "J15 must be marked unconnected or DNP"
+
+    # 2. J15 must not appear in exported BOM
+    exporter = PCBExporter(provider.pcb_config, wiring)
+    bom_file = tmp_path / "carrier_board_bom.csv"
+    exporter.export_bom_csv(bom_file)
+    bom_text = bom_file.read_text(encoding="utf-8")
+    assert "J15" not in bom_text, "J15 must be removed from the BOM CSV"
+
+    # 3. J15 pins must not be connected to any active nets in the netlist
+    for net in wiring.nets:
+        for c_name, _ in net.pins:
+            assert c_name != "J15", f"J15 must have no active net connections, found in net '{net.name}'"
+
+    # 4. SW2 push button switch must exist adjacent to J15 (<= 10mm distance)
+    assert "SW2" in comp_map, "SW2 push button switch must exist"
+    sw2 = comp_map["SW2"]
+    dist = math.hypot(sw2.position[0] - j15.position[0], sw2.position[1] - j15.position[1])
+    assert dist <= 10.0, f"SW2 must be placed adjacent to J15 (dist: {dist:.2f}mm > 10.0mm)"
+
+    # 5. U11 RESET_N must connect to SW2
+    reset_net = next((n for n in wiring.nets if ("U11", "RESET_N") in n.pins or ("U11", "19") in n.pins), None)
+    assert reset_net is not None, "U11 RESET_N net must exist"
+    assert any(c == "SW2" for c, _ in reset_net.pins), "SW2 must connect to U11 RESET_N"
+
+    # 6. SW2 must connect to GND
+    gnd_net = nets_map["GND"]
+    assert any(c == "SW2" for c, _ in gnd_net.pins), "SW2 must connect to GND"
+
+    # 7. Zero PCB DRC violations
     drc = PCBDesignRulesChecker(provider.pcb_config)
     report = drc.check_all(wiring=wiring)
     assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"

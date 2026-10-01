@@ -577,6 +577,37 @@
           <button id="filter-all" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:10px;" onclick="setBugFilter('all')">ALL</button>
           <button id="filter-resolved" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:10px;" onclick="setBugFilter('resolved')">RESOLVED</button>
         </div>
+        <div style="display:flex; gap:6px; width:100%;">
+          <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+            <label style="font-size:9px;">Category</label>
+            <select id="select-filter-category" onchange="onFilterCategoryChanged(this.value)" style="width:100%; padding:4px; font-size:10px;">
+              <option value="ALL">ALL</option>
+              {% for cat in categories %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+            <label style="font-size:9px;">Severity</label>
+            <select id="select-filter-severity" onchange="onFilterSeverityChanged(this.value)" style="width:100%; padding:4px; font-size:10px;">
+              <option value="ALL">ALL</option>
+              {% for sev in severities %}
+              <option value="{{ sev }}">{{ sev }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:2px; width:100%;">
+          <label style="font-size:9px;">Sort By</label>
+          <select id="select-bug-sort" onchange="onBugSortChanged(this.value)" style="width:100%; padding:4px; font-size:10px;">
+            <option value="id_desc">ID (Newest first)</option>
+            <option value="id_asc">ID (Oldest first)</option>
+            <option value="severity">Severity (Critical first)</option>
+            <option value="status">Status (Open first)</option>
+            <option value="component">Component</option>
+            <option value="title">Title</option>
+          </select>
+        </div>
       </div>
       <ul id="bug-list" class="bug-list"></ul>
     </div>
@@ -705,7 +736,13 @@
   <script>
     let db = {{ database_json | safe }};
     let activeBugId = null;
-    let currentFilter = 'open';
+    let currentFilter = sessionStorage.getItem("bug_filter_status") || 'open';
+    let currentCategoryFilter = sessionStorage.getItem("bug_filter_category") || 'ALL';
+    let currentSeverityFilter = sessionStorage.getItem("bug_filter_severity") || 'ALL';
+    let currentBugSort = sessionStorage.getItem("bug_sort") || 'id_desc';
+
+    const severityOrder = { "CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3 };
+    const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "RESOLVED": 2, "CLOSED": 3 };
 
     function init() {
       // Disambiguate duplicate IDs if any exist in in-memory state
@@ -717,12 +754,19 @@
         seenIds.add(b.id);
       });
 
-      const openBugs = db.bugs.filter(b => b.status !== "RESOLVED" && b.status !== "CLOSED");
-      if (openBugs.length > 0) {
-        activeBugId = openBugs[0].id;
+      // Restore dropdown UI selections
+      const sortSel = document.getElementById("select-bug-sort");
+      if (sortSel) sortSel.value = currentBugSort;
+      const catSel = document.getElementById("select-filter-category");
+      if (catSel) catSel.value = currentCategoryFilter;
+      const sevSel = document.getElementById("select-filter-severity");
+      if (sevSel) sevSel.value = currentSeverityFilter;
+
+      const visibleBugs = getFilteredAndSortedBugs();
+      if (visibleBugs.length > 0) {
+        activeBugId = visibleBugs[0].id;
       } else if (db.bugs && db.bugs.length > 0) {
         activeBugId = db.bugs[0].id;
-        currentFilter = 'all';
       }
       updateMetrics();
       setBugFilter(currentFilter);
@@ -731,9 +775,36 @@
       setupPasteDrop();
     }
 
+    function onBugSortChanged(val) {
+      currentBugSort = val;
+      sessionStorage.setItem("bug_sort", val);
+      renderBugList();
+    }
+
+    function onFilterCategoryChanged(val) {
+      currentCategoryFilter = val;
+      sessionStorage.setItem("bug_filter_category", val);
+      renderBugList();
+      ensureActiveBugVisible();
+    }
+
+    function onFilterSeverityChanged(val) {
+      currentSeverityFilter = val;
+      sessionStorage.setItem("bug_filter_severity", val);
+      renderBugList();
+      ensureActiveBugVisible();
+    }
+
+    function ensureActiveBugVisible() {
+      const visibleBugs = getFilteredAndSortedBugs();
+      if (visibleBugs.length > 0 && !visibleBugs.some(b => b.id === activeBugId)) {
+        selectBug(visibleBugs[0].id);
+      }
+    }
 
     function setBugFilter(filter) {
       currentFilter = filter;
+      sessionStorage.setItem("bug_filter_status", filter);
       const btnOpen = document.getElementById("filter-open");
       const btnAll = document.getElementById("filter-all");
       const btnResolved = document.getElementById("filter-resolved");
@@ -741,16 +812,7 @@
       if (btnAll) btnAll.classList.toggle("quake-btn-active", filter === "all");
       if (btnResolved) btnResolved.classList.toggle("quake-btn-active", filter === "resolved");
       renderBugList();
-
-      const visibleBugs = db.bugs.filter(b => {
-        const isRes = (b.status === "RESOLVED" || b.status === "CLOSED");
-        if (currentFilter === "open" && isRes) return false;
-        if (currentFilter === "resolved" && !isRes) return false;
-        return true;
-      });
-      if (visibleBugs.length > 0 && !visibleBugs.some(b => b.id === activeBugId)) {
-        selectBug(visibleBugs[0].id);
-      }
+      ensureActiveBugVisible();
     }
 
     function showToast(msg) {
@@ -769,23 +831,69 @@
       document.getElementById("m-resolved").innerText = resolved;
     }
 
+    function getFilteredAndSortedBugs() {
+      const searchInput = document.getElementById("search-input");
+      const query = (searchInput ? searchInput.value || "" : "").toLowerCase();
+      let list = (db.bugs || []).filter(bug => {
+        const isResolved = (bug.status === "RESOLVED" || bug.status === "CLOSED");
+        if (currentFilter === "open" && isResolved) return false;
+        if (currentFilter === "resolved" && !isResolved) return false;
+        if (currentCategoryFilter && currentCategoryFilter !== "ALL" && bug.category !== currentCategoryFilter) return false;
+        if (currentSeverityFilter && currentSeverityFilter !== "ALL" && bug.severity !== currentSeverityFilter) return false;
+        if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query) && !(bug.component || "").toLowerCase().includes(query)) {
+          return false;
+        }
+        return true;
+      });
+
+      list.sort((a, b) => {
+        switch (currentBugSort) {
+          case "id_asc": {
+            const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
+            const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
+            return numA - numB;
+          }
+          case "id_desc": {
+            const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
+            const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
+            return numB - numA;
+          }
+          case "severity": {
+            const rankA = severityOrder[a.severity] !== undefined ? severityOrder[a.severity] : 99;
+            const rankB = severityOrder[b.severity] !== undefined ? severityOrder[b.severity] : 99;
+            if (rankA !== rankB) return rankA - rankB;
+            return (b.id || "").localeCompare(a.id || "");
+          }
+          case "status": {
+            const rankA = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 99;
+            const rankB = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 99;
+            if (rankA !== rankB) return rankA - rankB;
+            return (b.id || "").localeCompare(a.id || "");
+          }
+          case "component": {
+            const compA = (a.component || "").toLowerCase();
+            const compB = (b.component || "").toLowerCase();
+            return compA.localeCompare(compB);
+          }
+          case "title": {
+            const titleA = (a.title || "").toLowerCase();
+            const titleB = (b.title || "").toLowerCase();
+            return titleA.localeCompare(titleB);
+          }
+          default:
+            return 0;
+        }
+      });
+
+      return list;
+    }
+
     function renderBugList() {
       const list = document.getElementById("bug-list");
       list.innerHTML = "";
-      const query = (document.getElementById("search-input").value || "").toLowerCase();
+      const visibleBugs = getFilteredAndSortedBugs();
 
-      db.bugs.forEach(bug => {
-        const isResolved = (bug.status === "RESOLVED" || bug.status === "CLOSED");
-        if (currentFilter === "open" && isResolved) {
-          return;
-        }
-        if (currentFilter === "resolved" && !isResolved) {
-          return;
-        }
-        if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query) && !(bug.component || "").toLowerCase().includes(query)) {
-          return;
-        }
-
+      visibleBugs.forEach(bug => {
         const li = document.createElement("li");
         li.className = "bug-item" + (bug.id === activeBugId ? " active" : "");
         li.onclick = () => selectBug(bug.id);

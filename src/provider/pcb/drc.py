@@ -1195,7 +1195,7 @@ class PCBDesignRulesChecker:
         for fp in getattr(wiring, "footprints", []):
             for p in getattr(fp, "pins", []):
                 expected_signal = getattr(p, "signal_name", None)
-                if not expected_signal:
+                if not expected_signal or expected_signal.upper() in ("NC", "NONE", "UNCONNECTED", "RESERVED"):
                     continue
                 canonical_pin = getattr(p, "number", None) or getattr(p, "pin_name", None) or p.name
                 connected_nets = set(pin_to_nets.get((fp.name, canonical_pin), []))
@@ -2358,6 +2358,8 @@ class PCBDesignRulesChecker:
 
             # 3a. Dangling component check
             for fp in sheet_fps:
+                if getattr(fp, "unconnected", False) or getattr(fp, "dnp", False):
+                    continue
                 connected_pins = [p for p in fp.pins if (fp.name, p.name) in pin_to_net]
                 if not connected_pins:
                     violations.add_error(
@@ -2524,6 +2526,8 @@ class PCBDesignRulesChecker:
 
         # 4. Check that all components in the design have connected pins (BUG-088)
         for fp_name, fp in footprints_map.items():
+            if getattr(fp, "unconnected", False) or getattr(fp, "dnp", False):
+                continue
             connected_pins = [p for p in fp.pins if (fp.name, p.name) in pin_to_net]
             if not connected_pins:
                 violations.add_error(

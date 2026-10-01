@@ -6051,9 +6051,9 @@ footprints:
       pad_size_mm:
       - 0.70
       - 1.15
-    - name: VLOAD_SW
+    - name: SWITCH_2
       number: '18'
-      label: VLOAD_SW
+      label: SWITCH_2
       position:
       - 0.5
       - 6.25

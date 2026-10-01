@@ -927,7 +927,11 @@ class PCBExporter:
 
         # Group components by package and MPN to aggregate quantities
         rows = []
-        fps_to_process = self.get_footprints_for_board()
+        fps_to_process = [
+            fp
+            for fp in self.get_footprints_for_board()
+            if not getattr(fp, "dnp", False) and not getattr(fp, "unconnected", False) and getattr(fp, "in_bom", True)
+        ]
         for idx, fp in enumerate(fps_to_process, start=1):
             rows.append(
                 {

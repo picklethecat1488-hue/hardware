@@ -404,17 +404,13 @@ schematic_sheets:
       Q1:
       - 0
       - 1
-      U11:
-      - 0
-      - 2
       C8:
       - 0
-      - 3
+      - 2
   components:
   - U3
   - C6
   - Q1
-  - U11
   - C1
   - C2
   - C3
@@ -430,10 +426,6 @@ schematic_sheets:
     - G
     - S
     - D
-    U11:
-    - GND
-    - 3V3
-    - VLOAD_SW
     C8:
     - '1'
     - '2'
@@ -860,10 +852,33 @@ schematic_sheets:
   description: BTLE transceiver module (U11) with 1Mb/s high-speed UART link, flow
     control, cap-touch pairing trigger, SWD recovery header (J15), and integrated
     PCB antenna
+  layout:
+    cols_per_row: 3
+    col_gap: 50.0
+    grid_positions:
+      U1:
+      - 0
+      - 0
+      U11:
+      - 0
+      - 1
+      J16:
+      - 0
+      - 2
+      J15:
+      - 1
+      - 0
+      SW2:
+      - 1
+      - 1
   components:
   - U11
   - U1
   - J15
+  - C18
+  - C19
+  - J16
+  - SW2
   pin_sides:
     U1:
       T2: left
@@ -875,32 +890,58 @@ schematic_sheets:
       RTS: left
       TXD: left
       CTS: left
-      SWDCLK: right
-      SWDIO: right
+      RESET_N: left
       GND: right
       3V3: right
+      NFC1: right
+      NFC2: right
+    SW2:
+      '1': left
+      '2': right
     J15:
       '1': left
       '2': left
       '3': left
       '4': left
       '5': left
+    C18:
+      '1': left
+      '2': right
+    C19:
+      '1': left
+      '2': right
+    J16:
+      '1': left
+      '2': left
   pin_breakouts:
     U11:
     - RXD
     - RTS
     - TXD
     - CTS
-    - SWDCLK
-    - SWDIO
+    - RESET_N
     - GND
     - 3V3
+    - NFC1
+    - NFC2
+    SW2:
+    - '1'
+    - '2'
     J15:
     - '1'
     - '2'
     - '3'
     - '4'
     - '5'
+    C18:
+    - '1'
+    - '2'
+    C19:
+    - '1'
+    - '2'
+    J16:
+    - '1'
+    - '2'
     U1:
     - T2
     - T1

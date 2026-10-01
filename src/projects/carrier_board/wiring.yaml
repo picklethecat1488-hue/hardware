@@ -50,8 +50,24 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: FTSH-105-01-L-DV-K
-  supplier_pn: SAM8796-ND
+  mpn: DNP
+  supplier_pn: N/A
+  unconnected: true
+  dnp: true
+  description: BLE SWD recovery header (unconnected, DNP)
+- name: SW2
+  package: SW_PUSH_SMD
+  position:
+  - -14.5
+  - -36.5
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: PTS645SL43SMTR92LFS
+  supplier_pn: CKN9012CT-ND
+  description: NINA-B312 BLE module reset push button switch
 - name: J2
   package: FPC-30P-0.5MM
   position:
@@ -221,7 +237,7 @@ footprints:
     name: '3'
     pin_name: D
     label: D
-    signal_name: VLOAD_SW
+    signal_name: NC
     position:
     - 0.0
     - 1.0
@@ -1056,6 +1072,47 @@ footprints:
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
   value: 1k
+- name: C18
+  package: '0402'
+  position:
+  - 5.3
+  - -36.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 90.0
+  mpn: GRM1555C1H301JA01D
+  supplier_pn: 490-GRM1555C1H301JA01D-ND
+  value: 300pF
+  description: NFC1 13.56MHz tuning shunt capacitor C_tune1 (300 pF C0G/NP0)
+- name: C19
+  package: '0402'
+  position:
+  - 6.3
+  - -36.5
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 270.0
+  mpn: GRM1555C1H301JA01D
+  supplier_pn: 490-GRM1555C1H301JA01D-ND
+  value: 300pF
+  description: NFC2 13.56MHz tuning shunt capacitor C_tune2 (300 pF C0G/NP0)
+- name: J16
+  package: pin_header_1x2
+  position:
+  - 13.5
+  - -36.5
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: 22-28-4023
+  supplier_pn: WM6402-ND
+  description: External 13.56 MHz tuned coil antenna header
 nets:
 - name: GND
   color: '#475569'
@@ -1085,6 +1142,10 @@ nets:
   - - C17
     - '2'
   - - D8
+    - '2'
+  - - C18
+    - '2'
+  - - C19
     - '2'
   - - Q1
     - '2'
@@ -1237,10 +1298,8 @@ nets:
     - '2'
   - - R12
     - '2'
-  - - J15
-    - '3'
-  - - J15
-    - '5'
+  - - SW2
+    - '2'
 - name: 3V3
   color: '#dc2626'
   pins:
@@ -1252,6 +1311,8 @@ nets:
     - MCLR
   - - U11
     - 3V3
+  - - U11
+    - VCC
   - - J2
     - 3V3
   - - R1
@@ -1312,8 +1373,6 @@ nets:
   - - JP3
     - '1'
   - - D4
-    - '1'
-  - - J15
     - '1'
 - name: VBUS
   priority: 24
@@ -1393,15 +1452,6 @@ nets:
     - SD_MODE
   - - D5
     - '1'
-- name: VLOAD_SW
-  priority: 25
-  color: '#f97316'
-  pins:
-  - - Q1
-    - '3'
-    - D
-  - - U11
-    - VLOAD_SW
 - name: PERIPH_EN
   priority: 24
   color: '#ea580c'
@@ -1627,21 +1677,33 @@ nets:
     - T4
   - - U11
     - CTS
-- name: BLE_SWDCLK
+- name: BLE_RESET_N
   priority: 13
-  color: '#4169e1'
+  color: '#f97316'
   pins:
   - - U11
-    - SWDCLK
-  - - J15
-    - '4'
-- name: BLE_SWDIO
-  priority: 14
-  color: '#1e90ff'
+    - RESET_N
+  - - SW2
+    - '1'
+- name: NFC1
+  priority: 15
+  color: '#8b5cf6'
   pins:
   - - U11
-    - SWDIO
-  - - J15
+    - NFC1
+  - - C18
+    - '1'
+  - - J16
+    - '1'
+- name: NFC2
+  priority: 16
+  color: '#a855f7'
+  pins:
+  - - U11
+    - NFC2
+  - - C19
+    - '1'
+  - - J16
     - '2'
 - name: CAP_SHIELD
   priority: 25
