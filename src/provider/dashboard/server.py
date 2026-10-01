@@ -51,6 +51,17 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboards and data query endpoints."""
+        if hasattr(self.server, "review_server") and self.server.review_server:
+            try:
+                self.server.review_server.check_file_watch()
+            except Exception:
+                pass
+        if hasattr(self.server, "bug_server") and self.server.bug_server:
+            try:
+                self.server.bug_server.check_file_watch()
+            except Exception:
+                pass
+
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -1003,6 +1014,12 @@ class DashboardServer(ThreadingHTTPServer):
 
     def get_review_session(self, revisions: Optional[List[str]] = None) -> ReviewSessionModel:
         """Get or initialize a review session for specific revisions or the default session."""
+        if hasattr(self, "review_server") and self.review_server:
+            try:
+                self.review_server.check_file_watch()
+            except Exception:
+                pass
+
         if not revisions:
             if self.review_server.session:
                 self.review_server.session.repo_root = str(self.repo_root)

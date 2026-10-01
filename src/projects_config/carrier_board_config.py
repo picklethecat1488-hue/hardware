@@ -339,6 +339,16 @@ class CarrierBoardConfig(BaseModel):
         return float(self._raw_data["enclosure_battery_label_margin"])
 
     @property
+    def enclosure_battery_label_font_size(self) -> float:
+        """Font size for BATTERY engraved label on enclosure lid in mm."""
+        return float(self._raw_data["enclosure_battery_label_font_size"])
+
+    @property
+    def enclosure_battery_label_stroke_offset(self) -> float:
+        """Stroke expansion offset for BATTERY engraved label to achieve >=0.8mm stroke in mm."""
+        return float(self._raw_data["enclosure_battery_label_stroke_offset"])
+
+    @property
     def enclosure_flex_support_length(self) -> float:
         """Length of support plane extending under flex tail from front wall in mm."""
         return float(self._raw_data["enclosure_flex_support_length"])

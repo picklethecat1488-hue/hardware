@@ -88,9 +88,21 @@ class SchematicTOCRenderer:
                 y -= fp_row_h
 
         # Section 3: Primary Signal Nets Summary
-        if nets:
+        active_fp_names = {fp.name for fp in fps}
+        if sheet_plans:
+            active_fp_names.update(fp.name for sp in sheet_plans for fp in sp.footprints)
+        effective_nets = (
+            [
+                net
+                for net in nets
+                if any(isinstance(p, (list, tuple)) and len(p) >= 1 and p[0] in active_fp_names for p in net.pins)
+            ]
+            if active_fp_names
+            else nets
+        )
+        if effective_nets:
             y -= section_gap
-            net_chunks = [nets[i : i + 4] for i in range(0, len(nets), 4)]
+            net_chunks = [effective_nets[i : i + 4] for i in range(0, len(effective_nets), 4)]
             min_nets_space = nets_header_h + nets_row_h
             if y - min_nets_space < y_min:
                 pages.append(_TOCPagePlan(page_index=len(pages) + 1))

@@ -2236,3 +2236,151 @@ def test_regression_proposal_ct8_channel_routed_to_j2_without_flex_modification(
     drc = PCBDesignRulesChecker(provider.pcb_config)
     report = drc.check_all(wiring=wiring)
     assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_254_enclosure_lid_text_stroke_width() -> None:
+    """Verify BUG-254: enclosure_lid BATTERY label has stroke width >= 0.8mm for DFM compliance."""
+    from build123d import Text, FontStyle, offset, Axis
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider import Mode
+
+    provider = CarrierBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid.part is not None and lid.part.is_valid(), "Enclosure lid must be a valid solid"
+
+    # 1. Configured font size and stroke expansion offset
+    font_size = provider.settings.enclosure_battery_label_font_size
+    stroke_offset = provider.settings.enclosure_battery_label_stroke_offset
+    assert font_size >= 4.0, f"Expected BATTERY label font size >= 4.0mm, got {font_size}"
+    assert stroke_offset >= 0.12, f"Expected stroke expansion offset >= 0.12mm, got {stroke_offset}"
+
+    # 2. Geometric stroke width verification on representative 'T' glyph
+    t_glyph = Text("T", font_size=font_size, font_style=FontStyle.BOLD)
+    if stroke_offset > 0.0:
+        t_glyph = offset(t_glyph, amount=stroke_offset)
+
+    # Vertical stem width measurement
+    edges_v = t_glyph.edges().filter_by(Axis.Y)
+    xs = sorted(list({round(e.bounding_box().min.X, 3) for e in edges_v}))
+    assert len(xs) >= 4, "Glyph 'T' must have inner and outer vertical stem boundaries"
+    stem_width = xs[2] - xs[1]
+    assert stem_width >= 0.80, f"Expected BATTERY text stem width >= 0.80mm (DFM rule), got {stem_width:.3f}mm"
+
+    # Horizontal bar thickness measurement
+    edges_h = t_glyph.edges().filter_by(Axis.X)
+    ys = sorted(list({round(e.bounding_box().min.Y, 3) for e in edges_h}))
+    assert len(ys) >= 3, "Glyph 'T' must have top and bottom horizontal bar boundaries"
+    bar_thickness = ys[2] - ys[1]
+    assert bar_thickness >= 0.80, (
+        f"Expected BATTERY text horizontal bar >= 0.80mm (DFM rule), got {bar_thickness:.3f}mm"
+    )
+
+
+def test_regression_bug_255_pullup_resistors_unbridged_with_individual_power_designators() -> None:
+    """Verify BUG-255: Pull-up resistors R1 and R2 on Sheet 8 have individual 3V3 power designators and no bridge."""
+    import matplotlib.pyplot as plt
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model import Wiring
+    from model.pcb import PCBConfig
+    from provider.schematic_diagram import SchematicDiagram
+    import yaml
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
+    with open(pcb_yaml_path) as f:
+        cfg = PCBConfig(**yaml.safe_load(f))
+
+    diag = SchematicDiagram(wiring=wiring, pcb_config=cfg)
+    sheet_plans = diag._build_sheet_plans()
+    sheet_8_plan = next(p for p in sheet_plans if p.sheet_idx == 8)
+
+    from unittest.mock import MagicMock
+
+    mock_pdf = MagicMock()
+    diag._render_pdf_schematic_sheet(
+        mock_pdf,
+        "carrier_board",
+        sheet_8_plan,
+        len(sheet_plans),
+        diag.wiring.nets,
+        15,
+        28,
+    )
+
+    fig = mock_pdf.savefig.call_args[0][0]
+    ax = fig.axes[0]
+    texts = [t.get_text() for t in ax.texts]
+    pwr_labels = [t for t in texts if t == "3V3"]
+    assert len(pwr_labels) >= 2, f"Expected individual 3V3 labels for pullups, got {pwr_labels}"
+
+    red_lines = [line for line in ax.lines if line.get_color() == "#dc2626"]
+    h_red_lines = [
+        line
+        for line in red_lines
+        if len(line.get_ydata()) == 2 and abs(line.get_ydata()[0] - line.get_ydata()[1]) < 0.001
+    ]
+    bridging_lines = [line for line in h_red_lines if abs(line.get_xdata()[1] - line.get_xdata()[0]) > 5.0]
+    assert len(bridging_lines) == 0, (
+        f"Expected 0 horizontal red bridging lines between pullups, found: {bridging_lines}"
+    )
+
+
+def test_regression_bug_256_flex_tail_schematic_primary_signal_nets(tmp_path: Path) -> None:
+    """Verify BUG-256: Flex tail schematic Table of Contents primary signal nets contains only 7 cap sense + 1 proximity channels."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model import Wiring
+    from provider import Mode
+    from provider.pcb.exporter import PCBExporter
+    from provider.schematic_diagram import SchematicDiagram
+    from pdfminer.high_level import extract_text
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. Verify Wiring.filter_by_footprints scopes nets strictly to connected footprints
+    flex_wiring = wiring.filter_by_footprints(["J4"])
+    expected_nets = {
+        "CAP_SHIELD",
+        "CAP_TX0",
+        "CAP_TX1",
+        "CAP_TX2",
+        "CAP_RX0",
+        "CAP_RX1",
+        "CAP_RX2",
+        "CAP_RX3",
+    }
+    net_names = {net.name for net in flex_wiring.nets}
+    assert net_names == expected_nets, f"Expected exactly 8 flex nets, got {net_names}"
+    assert "GND" not in net_names
+    assert "3V3" not in net_names
+    assert "VBUS" not in net_names
+
+    # 2. Verify TOC plan generates only those 8 nets under primary signal nets
+    part_res = provider.part["flex_tail"]("flex_tail", None, Mode.DEFAULT)
+    flex_cfg = part_res.to_pcb_config()
+    diag = SchematicDiagram(wiring=flex_wiring, pcb_config=flex_cfg)
+    sheet_plans = diag._build_sheet_plans()
+    toc_plans = diag._plan_pdf_toc_pages(flex_wiring.footprints, diag.wiring.nets, sheet_plans)
+
+    toc_net_names = {net.name for plan in toc_plans for row in plan.net_rows for net in row}
+    assert toc_net_names == expected_nets, f"TOC nets mismatch: {toc_net_names}"
+    assert len(toc_plans) == 1, f"Expected 1 TOC page when scoped to 8 nets, got {len(toc_plans)}"
+
+    # 3. Export PDF and verify full document pagination and text content
+    exp = PCBExporter(flex_cfg, wiring, subassembly="flex_tail", design_rules=provider.pcb_config.design_rules)
+    out_pdf = tmp_path / "flex_tail_schematic.pdf"
+    exp.export_schematic_pdf(out_pdf)
+    assert out_pdf.exists()
+
+    pdf_text = extract_text(str(out_pdf))
+    assert "CAP_SHIELD (3 pins)" in pdf_text
+    assert "CAP_TX0 (3 pins)" in pdf_text
+    assert "CAP_RX0 (3 pins)" in pdf_text
+    # Carrier board signal and power nets must not leak into flex tail schematic TOC
+    assert "3V3 (36 pins)" not in pdf_text
+    assert "GND (89 pins)" not in pdf_text
+    assert "VBUS (5 pins)" not in pdf_text
+    assert "Page 1 of 3" in pdf_text
+    assert "Page 2 of 3" in pdf_text
+    assert "Page 3 of 3" in pdf_text

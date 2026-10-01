@@ -25,6 +25,7 @@ from build123d import (
     Mode as BuildMode,
     add,
     Text,
+    FontStyle,
 )
 from model import Wiring, DiagramOptions, DiagramStyle
 from model.pcb import (
@@ -691,14 +692,22 @@ class CarrierBoardProvider(Provider):
                     RectangleRounded(batt_cut_w, batt_cut_l, cutout_r)
             extrude(s_batt_cut.sketch, amount=-(wall + 2.0), mode=BuildMode.SUBTRACT)
 
-            # Battery label (BUG-150, BUG-208)
+            # Battery label (BUG-150, BUG-208, BUG-254)
             batt_cov_clr = self.settings.enclosure_battery_cover_clearance
             batt_cov_t = self.settings.enclosure_battery_cover_wall_thickness
             batt_lbl_margin = self.settings.enclosure_battery_label_margin
             batt_lbl_y = min_y - batt_rim_t - batt_cov_clr - batt_cov_t - batt_lbl_margin
+            batt_lbl_fs = self.settings.enclosure_battery_label_font_size
+            batt_lbl_off = self.settings.enclosure_battery_label_stroke_offset
+            ble_x = self.settings.ble_logo_x
+            ble_w = self.settings.ble_logo_width
+            max_avail_x = ble_x - (ble_w / 2.0) - 2.5
+            batt_lbl_x = (min_x + max_avail_x) / 2.0
             with BuildSketch(Plane.XY.offset(wall)) as s_batt_lbl:
-                with Locations((cradle_cx, batt_lbl_y)):
-                    Text("BATTERY", font_size=1.6)
+                with Locations((batt_lbl_x, batt_lbl_y)):
+                    t_lbl = Text("BATTERY", font_size=batt_lbl_fs, font_style=FontStyle.BOLD)
+                    if batt_lbl_off > 0.0:
+                        offset(t_lbl, amount=batt_lbl_off)
             extrude(s_batt_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
             # Bluetooth logo and text engraved on enclosure lid exterior surface (BUG-214)
