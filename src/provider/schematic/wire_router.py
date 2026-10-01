@@ -15,7 +15,7 @@ from provider.schematic.constants import (
     partition_component_pins,
 )
 from provider.schematic.jumper import draw_vertical_wire_with_jumpers
-from provider.schematic.passives import SchematicPassiveClassifier
+from provider.schematic.passives import SchematicPassiveClassifier, SchematicPassiveDrawer
 
 
 class SchematicWireSegmentPlanner:
@@ -267,12 +267,14 @@ class SchematicWireSegmentPlanner:
         v_segments: List[Tuple[float, float, float, str, str]] = []
         wire_labels: List[Tuple[float, float, str]] = []
 
+        vertical_passives = pullup_resistors + shunt_caps
+
         # Route direct adjacent-column wires
         cls._route_direct_wire_pairs(
             direct_wire_pairs=direct_wire_pairs,
             sheet_pin_coords=sheet_pin_coords,
             pin_to_net=pin_to_net,
-            pullup_resistors=pullup_resistors,
+            pullup_resistors=vertical_passives,
             h_segments=h_segments,
             v_segments=v_segments,
             wire_labels=wire_labels,
@@ -290,7 +292,18 @@ class SchematicWireSegmentPlanner:
             wire_labels=wire_labels,
         )
 
-        return h_segments, v_segments, wire_labels
+        tap_points: List[Tuple[FootprintModel, str, Tuple[float, float]]] = []
+        if vertical_passives:
+            pullup_points = SchematicPassiveDrawer.compute_pullup_tap_points(
+                pullups=vertical_passives,
+                pin_to_net=pin_to_net,
+                h_wire_segments=h_segments,
+                sheet_pin_coords=sheet_pin_coords,
+                pin_side_map=pin_side_map,
+            )
+            tap_points = [(fp, sig_net, (x_pull, y_base)) for x_pull, y_base, fp, sig_net, rail_net in pullup_points]
+
+        return h_segments, v_segments, wire_labels, tap_points
 
     @staticmethod
     def _route_direct_wire_pairs(
@@ -571,8 +584,23 @@ class SchematicWireSegmentPlanner:
         all_nets = getattr(wiring, "nets", []) or [] if wiring else []
         result: Dict[int, Tuple[List[Tuple[float, float, float, str]], List[Tuple[float, float, float, str]]]] = {}
         for plan in sheet_plans:
-            h_segs, v_segs, _ = cls.compute_sheet_wire_segments_for_plan(plan, all_nets, config)
+            h_segs, v_segs, _, _ = cls.compute_sheet_wire_segments_for_plan(plan, all_nets, config)
             h_clean = [(min(s[0], s[1]), max(s[0], s[1]), s[2], s[3]) for s in h_segs]
             v_clean = [(s[0], min(s[1], s[2]), max(s[1], s[2]), s[3]) for s in v_segs]
             result[plan.sheet_idx] = (h_clean, v_clean)
+        return result
+
+    @classmethod
+    def compute_passive_tap_points(
+        cls,
+        wiring: Optional[Wiring],
+        sheet_plans: List[_SchematicSheetPlan],
+        config: Optional[PCBConfig] = None,
+    ) -> Dict[int, List[Tuple[FootprintModel, str, Tuple[float, float]]]]:
+        """Compute signal tap points (footprint, signal_net, (x, y)) for vertical passives on each sheet."""
+        all_nets = getattr(wiring, "nets", []) or [] if wiring else []
+        result: Dict[int, List[Tuple[FootprintModel, str, Tuple[float, float]]]] = {}
+        for plan in sheet_plans:
+            _, _, _, taps = cls.compute_sheet_wire_segments_for_plan(plan, all_nets, config)
+            result[plan.sheet_idx] = taps
         return result

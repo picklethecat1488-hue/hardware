@@ -221,15 +221,18 @@ style: |
 <div class="grid-2col">
 <div>
 
-### BLE Integrated Antenna Keepout
-* **Module**: u-blox NINA-B312 (`U11`) with integrated ceramic/PCB antenna
-* **Keepout Dimensions**: $16.00\text{ mm (X)} \times 5.00\text{ mm (Y)}$
+### BLE & NFC Antenna Implementation
+* **BLE Module**: u-blox NINA-B312 (`U11`) with integrated ceramic/PCB antenna
+* **BLE Keepout Dimensions**: $16.00\text{ mm (X)} \times 5.00\text{ mm (Y)}$
 * **Location**: Centered at board bottom edge ($X = 0.00\text{ mm}, Y = -42.00\text{ mm}$)
 * **Exclusion Constraints**:
   * **Zero Copper**: Void across all 6 copper layers (L1 through L6)
   * **Zero Components**: No passives, no ICs, no test points
   * **Zero Fasteners**: No screws, metal brackets, or conductive housings within $10\text{ mm}$
   * **No Solder Mask Requirement**: Bare dielectric with silkscreen antenna boundary outline
+* **Native NFC-A Interface (`J16`)**:
+  * Native nRF52840 NFC tag pins (`NFC1`, `NFC2`) routed with symmetric 15 pF tuning shunt capacitors (`C18`, `C19`)
+  * **Approved Mating Antenna**: **Molex 146236-0001** (13.56 MHz rectangular flexible NFC antenna with adhesive backing, $15.0 \times 25.0\text{ mm}$, pre-matched for 15 pF tuning)
 
 </div>
 <div>
@@ -410,16 +413,17 @@ style: |
 <div>
 
 ### Component Counts by Mounting Type
-* **Total Components Placed**: 67 components
-* **Number of Unique Parts (BOM Line Items)**: **36 unique line items**
-* **Number of SMD Parts**: **60 parts**
+* **Total Components Placed**: 66 components (Q1 removed per power architecture cleanup)
+* **Number of Unique Parts (BOM Line Items)**: **35 unique line items**
+* **Number of SMD Parts**: **59 parts**
 * **Number of BGA / QFP / QFN Parts**: **4 complex parts**
   * `U1`: NXP MCXN947 / RT1062 Crossover MCU (`VFBGA-184`, 0.8mm pitch)
   * `U2`: Azoteq IQS7222A Capacitive Controller (`QFN-20`, 0.5mm pitch)
   * `U4`: High-efficiency Audio Amplifier (`QFN-16-AMP`, 0.5mm pitch)
   * `U9`: FTDI FT232RNQ USB-UART Interface (`QFN-32`, 0.5mm pitch)
 * **Number of Through-Hole Parts**: **7 parts**
-  * `J5`, `J15`: 10-pin micro-headers (1.27mm pitch)
+  * `J5`: 10-pin micro-header (1.27mm pitch)
+  * `J15`: 10-pin SWD recovery micro-header (1.27mm pitch, DNP)
   * `J14`: 10-pin peripheral expansion header (2.54mm pitch)
   * `JP1`..`JP4`: 2-pin configuration jumpers
 
@@ -457,8 +461,8 @@ style: |
 | Component RefDes | IC Description & Package | Total Pins | Connected Pins | Omitted / No-Connect Count | Dedicated No-Connect Pin Names & Functional Rationale |
 | :---: | :--- | :---: | :---: | :---: | :--- |
 | **U1** | NXP MCXN947VDF<br>`VFBGA-184` | 184 | 52 | **132 balls** | **Unassigned GPIOs & Secondary Peripheral Ports:**<br>132 unassigned balls (e.g. `A2, A4, A12, A14, B3, B4, B7...`). Intentionally left unrouted to maintain continuous ground plane reference under high-speed FlexSPI and audio lines without stub antenna emissions. |
-| **U2** | Azoteq IQS7222A<br>`QFN-20` | 21 | 17 | **4 pads** | **`NC1` (Pin 9), `NC2` (Pin 10):** Factory internal test points — must float per Azoteq datasheet.<br>**`CT8` (Pin 12):** Unused 9th sensing channel (design utilizes CT0..CT7 for 5-button slider & proximity).<br>**`OUTA` (Pin 14):** Unused auxiliary direct output. |
-| **U11** | u-blox NINA-B312<br>`MOD-BLE-PCB-ANT` | 27 | 10 | **17 pads** | **`SWDCLK`, `SWDIO`:** Factory programming terminals (J15 unpopulated DNP).<br>**`IO_2..IO_5`, `IO_24..IO_27`:** Auxiliary GPIOs reserved for future firmware features.<br>**`RED`, `GREEN`, `BLUE`:** Unused internal open-drain LED pins.<br>**`EGP`, `GND_12, 26, 30`:** Redundant internal thermal test pads. |
+| **U2** | Azoteq IQS7222A<br>`QFN-20` | 21 | 18 | **3 pads** | **`NC1` (Pin 9), `NC2` (Pin 10):** Factory internal test points — must float per Azoteq datasheet.<br>**`CT8` (Pin 12):** Routed to `J2` (pin `NC3`) as auxiliary 9th sensing channel for optional future flex ribbon revisions (unmodified in current baseline).<br>**`OUTA` (Pin 14):** Unused auxiliary direct output. |
+| **U11** | u-blox NINA-B312<br>`MOD-BLE-PCB-ANT` | 27 | 13 | **14 pads** | **`SWDCLK`, `SWDIO`:** Routed to J15 DNP recovery header.<br>**`RESET_N`:** Routed to SW2 tactile reset push-button switch.<br>**`IO_2..IO_5`, `IO_24..IO_27`:** Auxiliary GPIOs reserved for future firmware features.<br>**`RED`, `GREEN`, `BLUE`:** Unused internal open-drain LED pins.<br>**`EGP`, `GND_12, 26, 30`:** Redundant internal thermal test pads. |
 | **U7** | Maxim MAX17048<br>`TDFN-8` | 9 | 9 | **0 pads** | **Fully Terminated (Zero Omitted Pins):**<br>All 8 functional pins (`CELL, VCON, SDA, SCL, QSTRT, ALRT, GND`) and exposed thermal pad (`EP`) are 100% connected to power, I2C bus, and reference ground. |
 | **U9** | FTDI FT232RNQ<br>`QFN-32` | 33 | 31 | **2 pads** | **Pin 6 (`NC`), Pin 8 (`NC`):**<br>Explicit internal no-connect pins per FTDI FT232RNQ datasheet specifications. Left floating with zero copper stubs. |
 

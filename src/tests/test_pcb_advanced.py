@@ -435,7 +435,7 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     assert "C1" in footprint_names
     assert "C2" in footprint_names
     assert "C3" in footprint_names
-    assert "Q1" in footprint_names
+    assert "Q1" not in footprint_names
 
     # Verify diagram population
     room = Room(config=provider.app_config, materials=provider.materials)
@@ -822,7 +822,8 @@ def test_carrier_board_full_milestones_integration(tmp_path: Path):
     # Milestone 5 & 6: Wiring passives, actives, and flex fanout
     wiring = Wiring(provider.wiring_path)
     fp_names = {fp.name for fp in wiring.footprints}
-    assert {"R1", "R2", "C1", "C2", "C3", "Q1", "J2"}.issubset(fp_names)
+    assert {"R1", "R2", "C1", "C2", "C3", "J2"}.issubset(fp_names)
+    assert "Q1" not in fp_names
 
     # Exporter capacitive configuration JSON
     exporter = PCBExporter(cfg, wiring)
@@ -910,15 +911,14 @@ def test_carrier_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path)
     assert "U2" in rows
     assert "U11" in rows
     assert "J2" in rows
-    assert "Q1" in rows
+    assert "Q1" not in rows
     assert "C2" in rows
 
-    # Layers: Q1, U2, C2 on Bottom; U1, U11, J2 on Top
+    # Layers: U2, C2 on Bottom; U1, U11, J2 on Top
     assert rows["U1"]["Layer"] == "Top"
     assert rows["U11"]["Layer"] == "Top"
     assert rows["J2"]["Layer"] == "Top"
     assert rows["U2"]["Layer"] == "Bottom"
-    assert rows["Q1"]["Layer"] == "Bottom"
     assert rows["C2"]["Layer"] == "Bottom"
 
     # Edge connector coordinates
@@ -1130,28 +1130,60 @@ def test_schematic_discrete_component_truth_table(tmp_path: Path):
     from model.wiring import TruthTableModel, TruthTableRowModel, TruthTableState, LabelModel
     from provider.schematic_diagram import SchematicDiagram
 
-    # 1. Verify parsing of declarative truth table in carrier_board/wiring.yaml
-    provider = CarrierBoardProvider()
-    wiring = Wiring(provider.wiring_path)
-    q1 = next(fp for fp in wiring.footprints if fp.name == "Q1")
-    assert q1.truth_table is not None
-    assert isinstance(q1.truth_table, TruthTableModel)
-    assert q1.truth_table.title == "Q1 Load Switch Truth Table"
-    assert q1.truth_table.input_headers == ["PWR_EN (Gate)"]
-    assert q1.truth_table.output_headers == ["VLOAD_SW (Drain)", "Channel State"]
-    assert len(q1.truth_table.rows) == 4
+    # 1. Verify declarative TruthTableModel model parsing
+    raw_tt = {
+        "title": "Q1 Load Switch Truth Table",
+        "input_headers": ["PWR_EN (Gate)"],
+        "output_headers": ["VLOAD_SW (Drain)", "Channel State"],
+        "rows": [
+            {
+                "inputs": {"PWR_EN (Gate)": "0 (Low, <0.8V)"},
+                "outputs": {"VLOAD_SW (Drain)": "Hi-Z / Pull-up", "Channel State": "Cutoff"},
+                "state": "FALSE",
+                "description": "Load switch disabled; output isolated",
+            },
+            {
+                "inputs": {"PWR_EN (Gate)": "1 (High, >1.5V)"},
+                "outputs": {"VLOAD_SW (Drain)": "0V (Low, GND)", "Channel State": "Conduction"},
+                "state": "TRUE",
+                "description": "Active saturation; load energized",
+            },
+            {
+                "inputs": {"PWR_EN (Gate)": "Float / High-Z"},
+                "outputs": {"VLOAD_SW (Drain)": "Indeterminate", "Channel State": "Undefined"},
+                "state": "INVALID",
+                "description": "Prohibited floating gate; leakage risk",
+            },
+            {
+                "inputs": {"PWR_EN (Gate)": "Over-Voltage (>20V)"},
+                "outputs": {"VLOAD_SW (Drain)": "Breakdown / Short", "Channel State": "Damaged"},
+                "state": "INVALID",
+                "description": "Gate dielectric breakdown; fault",
+            },
+        ],
+    }
+    tt = TruthTableModel(**raw_tt)
+    assert tt.title == "Q1 Load Switch Truth Table"
+    assert tt.input_headers == ["PWR_EN (Gate)"]
+    assert tt.output_headers == ["VLOAD_SW (Drain)", "Channel State"]
+    assert len(tt.rows) == 4
 
-    states = [r.state for r in q1.truth_table.rows]
+    states = [r.state for r in tt.rows]
     assert TruthTableState.FALSE in states
     assert TruthTableState.TRUE in states
     assert TruthTableState.INVALID in states
 
     # Verify custom row model
-    first_row = q1.truth_table.rows[0]
+    first_row = tt.rows[0]
     assert isinstance(first_row, TruthTableRowModel)
     assert first_row.state == TruthTableState.FALSE
     assert "disabled" in first_row.description
     assert first_row.outputs.get("Channel State") == "Cutoff"
+
+    # Verify Q1 was removed from carrier board wiring per CR feedback
+    provider = CarrierBoardProvider()
+    wiring = Wiring(provider.wiring_path)
+    assert not any(fp.name == "Q1" for fp in wiring.footprints)
 
     # 2. Verify auto-generated default transistor truth table for discrete transistor without explicit truth table
     q_auto = FootprintModel(
@@ -1933,8 +1965,9 @@ def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
     silks = provider.silkscreen()
     silk_texts = {t.text for t in silks}
     assert "J1" not in silk_texts, "Legacy M.2 connector J1 must not be present in silkscreen"
+    assert "Q1" not in silk_texts, "Q1 must not be present in silkscreen"
     expected_components = (
-        ["U1", "U2", "U11", "J2", "J3", "Q1", "U3", "U4", "SPK1", "Y1"]
+        ["U1", "U2", "U11", "J2", "J3", "U3", "U4", "SPK1", "Y1"]
         + [f"R{i}" for i in range(1, 7)]
         + [f"C{i}" for i in range(1, 13)]
     )
@@ -2693,13 +2726,10 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
     assert ("U1", "L4") in audio_en_pins
     assert ("U4", "SD_MODE") in audio_en_pins
 
-    # 2. Verify PWR_EN connects only MCU D1 and Q1 gate; decoupled from U4 SD_MODE
+    # 2. Verify PWR_EN net and Q1 are removed from wiring.yaml per CR feedback
     pwr_en_net = next((net for net in wiring.nets if net.name == "PWR_EN"), None)
-    assert pwr_en_net is not None, "PWR_EN net must exist in wiring.yaml"
-    pwr_en_pins = set(pwr_en_net.pins)
-    assert ("U1", "D1") in pwr_en_pins
-    assert ("Q1", "1") in pwr_en_pins or ("Q1", "G") in pwr_en_pins
-    assert ("U4", "SD_MODE") not in pwr_en_pins, "U4 SD_MODE must NOT be controlled by PWR_EN"
+    assert pwr_en_net is None, "PWR_EN net must be removed from wiring.yaml"
+    assert not any(fp.name == "Q1" for fp in wiring.footprints), "Q1 must be removed from wiring.yaml"
 
     # 3. Verify VLOAD_SW was removed and U11 does not connect to VLOAD_SW (BUG-249)
     # and peripheral expansion headers J6-J9 do not connect to VLOAD_SW (BUG-106)

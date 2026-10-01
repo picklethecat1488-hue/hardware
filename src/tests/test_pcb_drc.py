@@ -1075,3 +1075,43 @@ def test_drc_short_circuit_alias_pins(base_pcb_config: PCBConfig) -> None:
     shorts = [v for v in violations if v.rule_name == DRCRuleName.SHORT_CIRCUIT_DETECTED]
     assert len(shorts) == 1
     assert "connected to conflicting nets: GND, VCC" in shorts[0].description
+
+
+def test_drc_schematic_disconnected_passive() -> None:
+    """Verify DRC detects SCHEMATIC_DISCONNECTED_PASSIVE when a vertical passive tap is disconnected."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.schematic.wire_router import SchematicWireSegmentPlanner
+
+    provider = CarrierBoardProvider()
+    cfg = provider.pcb_config
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. On valid board, verify zero SCHEMATIC_DISCONNECTED_PASSIVE violations
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring=wiring)
+    disconnected = [v for v in violations.errors if v.rule_name == DRCRuleName.SCHEMATIC_DISCONNECTED_PASSIVE]
+    assert len(disconnected) == 0, f"Expected 0 disconnected passives on valid board, got: {disconnected}"
+
+    # 2. Simulate disconnected wire segment and assert DRC catches the violation
+    orig_method = SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan
+
+    def disconnected_wire_compute(sheet_plan, all_nets, config=None):
+        h, v, w, taps = orig_method(sheet_plan, all_nets, config)
+        if sheet_plan.sheet_idx == 10:
+            # Filter out segments connecting C19 to net NFC2
+            h = [seg for seg in h if not (seg[3] == "NFC2" and abs(seg[2] - 90.0) < 0.2)]
+            v = [seg for seg in v if not (seg[3] == "NFC2" and abs(seg[1] - 90.0) < 0.2)]
+        return h, v, w, taps
+
+    SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan = staticmethod(disconnected_wire_compute)
+    try:
+        violations_broken = checker.check_schematic(wiring=wiring)
+        broken_disconnected = [
+            v for v in violations_broken.errors if v.rule_name == DRCRuleName.SCHEMATIC_DISCONNECTED_PASSIVE
+        ]
+        assert len(broken_disconnected) == 1
+        assert "C19" in broken_disconnected[0].description
+        assert "NFC2" in broken_disconnected[0].description
+    finally:
+        SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan = orig_method

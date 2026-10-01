@@ -1372,10 +1372,8 @@ def test_regression_bug_173_174_schematic_netlist_disconnects_and_missing_gnd() 
     assert ("J9", "7") in gnd_net.pins or ("J9", "7", "GND") in gnd_net.pins
     assert ("J10", "1") in gnd_net.pins or ("J10", "1", "GND") in gnd_net.pins
 
-    # Verify Q1 pins have number, pin_name, and signal_name
-    q1 = footprints["Q1"]
-    for p in q1.pins:
-        assert p.number is not None and p.pin_name is not None and p.signal_name is not None
+    # Verify Q1 is removed from carrier board
+    assert "Q1" not in footprints, "Q1 must be removed from carrier board"
 
     # Verify DRC check_netlist_connectivity passes with 0 PIN_NAME_MISMATCH or SIGNAL_NAME_MISMATCH
     cfg = provider.pcb_config
@@ -2157,10 +2155,10 @@ def test_regression_bug_251_j15_no_connect_and_u11_reset_button(tmp_path: Path) 
     comp_map = {c.name: c for c in wiring.footprints}
     nets_map = {n.name: n for n in wiring.nets}
 
-    # 1. J15 must exist but be marked unconnected/DNP
+    # 1. J15 must exist and be marked DNP
     assert "J15" in comp_map, "J15 connector must exist on the board"
     j15 = comp_map["J15"]
-    assert getattr(j15, "unconnected", False) or getattr(j15, "dnp", False), "J15 must be marked unconnected or DNP"
+    assert getattr(j15, "dnp", False), "J15 must be marked DNP"
 
     # 2. J15 must not appear in exported BOM
     exporter = PCBExporter(provider.pcb_config, wiring)
@@ -2169,10 +2167,11 @@ def test_regression_bug_251_j15_no_connect_and_u11_reset_button(tmp_path: Path) 
     bom_text = bom_file.read_text(encoding="utf-8")
     assert "J15" not in bom_text, "J15 must be removed from the BOM CSV"
 
-    # 3. J15 pins must not be connected to any active nets in the netlist
-    for net in wiring.nets:
-        for c_name, _ in net.pins:
-            assert c_name != "J15", f"J15 must have no active net connections, found in net '{net.name}'"
+    # 3. J15 connects to BLE SWD, 3V3, and GND
+    assert any(c == "J15" and p == "4" for c, p in nets_map["BLE_SWDCLK"].pins), "J15 pin 4 must connect to BLE_SWDCLK"
+    assert any(c == "J15" and p == "2" for c, p in nets_map["BLE_SWDIO"].pins), "J15 pin 2 must connect to BLE_SWDIO"
+    assert any(c == "J15" and p == "1" for c, p in nets_map["3V3"].pins), "J15 pin 1 must connect to 3V3"
+    assert any(c == "J15" and p in ("3", "5") for c, p in nets_map["GND"].pins), "J15 pin 3/5 must connect to GND"
 
     # 4. SW2 push button switch must exist adjacent to J15 (<= 10mm distance)
     assert "SW2" in comp_map, "SW2 push button switch must exist"
@@ -2189,7 +2188,51 @@ def test_regression_bug_251_j15_no_connect_and_u11_reset_button(tmp_path: Path) 
     gnd_net = nets_map["GND"]
     assert any(c == "SW2" for c, _ in gnd_net.pins), "SW2 must connect to GND"
 
-    # 7. Zero PCB DRC violations
+    # 7. J15 and SW2 must be on dedicated schematic sheet
+    sheet_btle_prog = next(
+        (s for s in provider.pcb_config.schematic_sheets if "BTLE Programming" in s.title or "J15" in s.title), None
+    )
+    assert sheet_btle_prog is not None, "Dedicated BTLE Programming & Reset Interface sheet must exist"
+    assert "J15" in sheet_btle_prog.components and "SW2" in sheet_btle_prog.components
+
+    sheet_hs = next((s for s in provider.pcb_config.schematic_sheets if "High-Speed" in s.title), None)
+    assert sheet_hs is not None
+    assert "J15" not in sheet_hs.components and "SW2" not in sheet_hs.components
+
+    # 8. Zero PCB DRC violations
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_proposal_ct8_channel_routed_to_j2_without_flex_modification() -> None:
+    """Verify PROPOSAL e8e2b4056c95: CT8 9th sensing channel routed from U2 to J2.NC3 without modifying flex tail."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. CAP_CT8 net exists
+    assert "CAP_CT8" in nets_map, "Net CAP_CT8 must exist in wiring.yaml"
+    ct8_net = nets_map["CAP_CT8"]
+
+    # 2. U2.CT8 and J2.NC3 are connected
+    ct8_pins = set(ct8_net.pins)
+    assert ("U2", "CT8") in ct8_pins, "U2.CT8 must connect to CAP_CT8"
+    assert ("J2", "NC3") in ct8_pins, "J2.NC3 must connect to CAP_CT8"
+
+    # 3. Flex tail connector J4 must NOT connect to CAP_CT8
+    assert not any(c == "J4" for c, _ in ct8_net.pins), "Flex tail connector J4 must NOT be modified"
+
+    # 4. Sheet 7 includes CT8 breakout on U2 (J2 maintains 8-channel breakout)
+    sheet_cap = next((s for s in provider.pcb_config.schematic_sheets if "Capacitive" in s.title), None)
+    assert sheet_cap is not None
+    assert "CT8" in sheet_cap.pin_breakouts.get("U2", [])
+
+    # 5. Full DRC passes with zero errors
     drc = PCBDesignRulesChecker(provider.pcb_config)
     report = drc.check_all(wiring=wiring)
     assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
