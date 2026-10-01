@@ -336,40 +336,77 @@ class SQLiteReviewStore:
     def _upsert_comment_in_conn(self, conn: sqlite3.Connection, comment: CommentModel) -> None:
         """Upsert a single comment in an active database connection."""
         c_uuid = comment.uuid or str(uuid_pkg.uuid4())
-        conn.execute(
-            """
-            INSERT INTO comments (
-                id, uuid, commit_hash, file_path, start_line, end_line, severity, body,
-                author, code_snippet, created_at, resolved
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                uuid=COALESCE(excluded.uuid, comments.uuid),
-                commit_hash=excluded.commit_hash,
-                file_path=excluded.file_path,
-                start_line=excluded.start_line,
-                end_line=excluded.end_line,
-                severity=excluded.severity,
-                body=excluded.body,
-                author=excluded.author,
-                code_snippet=excluded.code_snippet,
-                created_at=excluded.created_at,
-                resolved=excluded.resolved
-            """,
-            (
-                comment.id,
-                c_uuid,
-                comment.commit or "",
-                comment.file_path,
-                comment.start_line,
-                comment.end_line,
-                comment.severity.value,
-                comment.body,
-                comment.author,
-                comment.code_snippet,
-                comment.created_at,
-                1 if comment.resolved else 0,
-            ),
-        )
+        existing = conn.execute(
+            "SELECT id, uuid FROM comments WHERE uuid = ? OR id = ?",
+            (c_uuid, comment.id),
+        ).fetchone()
+
+        if existing:
+            target_id = existing["id"]
+            if comment.id and comment.id != target_id:
+                id_conflict = conn.execute(
+                    "SELECT 1 FROM comments WHERE id = ? AND id != ?",
+                    (comment.id, target_id),
+                ).fetchone()
+                if not id_conflict:
+                    target_id = comment.id
+
+            conn.execute(
+                """
+                UPDATE comments SET
+                    id = ?,
+                    uuid = ?,
+                    commit_hash = ?,
+                    file_path = ?,
+                    start_line = ?,
+                    end_line = ?,
+                    severity = ?,
+                    body = ?,
+                    author = ?,
+                    code_snippet = ?,
+                    created_at = ?,
+                    resolved = ?
+                WHERE id = ?
+                """,
+                (
+                    target_id,
+                    c_uuid,
+                    comment.commit or "",
+                    comment.file_path,
+                    comment.start_line,
+                    comment.end_line,
+                    comment.severity.value,
+                    comment.body,
+                    comment.author,
+                    comment.code_snippet,
+                    comment.created_at,
+                    1 if comment.resolved else 0,
+                    existing["id"],
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO comments (
+                    id, uuid, commit_hash, file_path, start_line, end_line, severity, body,
+                    author, code_snippet, created_at, resolved
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    comment.id,
+                    c_uuid,
+                    comment.commit or "",
+                    comment.file_path,
+                    comment.start_line,
+                    comment.end_line,
+                    comment.severity.value,
+                    comment.body,
+                    comment.author,
+                    comment.code_snippet,
+                    comment.created_at,
+                    1 if comment.resolved else 0,
+                ),
+            )
 
     def delete_comment(self, comment_id: str) -> None:
         """Delete a comment by its unique ID.
