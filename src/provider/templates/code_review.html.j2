@@ -696,6 +696,7 @@
       white-space: pre-wrap !important;
       word-break: break-word !important;
       overflow-wrap: anywhere !important;
+      min-width: 0 !important;
     }
 
     /* Binary Diff View */
@@ -862,17 +863,17 @@
       padding: 1px 0;
       border-radius: 2px;
     }
-    .unified-marker {
-      width: 22px;
-      text-align: center;
+    .unified-num-old {
+      grid-column: 1;
+      width: 44px;
+      text-align: right;
+      padding-right: 6px;
       user-select: none;
-      font-weight: 700;
       color: var(--quake-text-dim);
-      background: rgba(0, 0, 0, 0.25);
-      border-right: 1px solid rgba(90, 56, 30, 0.25);
       flex-shrink: 0;
     }
-    .unified-num-old, .unified-num-new {
+    .unified-num-new {
+      grid-column: 2;
       width: 44px;
       text-align: right;
       padding-right: 6px;
@@ -883,7 +884,20 @@
     .unified-num-old:hover, .unified-num-new:hover {
       color: var(--quake-gold);
     }
+    .unified-marker {
+      grid-column: 3;
+      width: 22px;
+      text-align: center;
+      user-select: none;
+      font-weight: 700;
+      color: var(--quake-text-dim);
+      background: rgba(0, 0, 0, 0.25);
+      border-right: 1px solid rgba(90, 56, 30, 0.25);
+      flex-shrink: 0;
+    }
     .unified-text {
+      grid-column: 4;
+      min-width: 0;
       white-space: pre;
       word-break: normal;
       padding-left: 8px;
@@ -1651,11 +1665,13 @@
         let openTags = [];
 
         for (const line of rawLines) {
-          let balancedLine = "";
+          let prefix = "";
           for (const tag of openTags) {
-            balancedLine += tag;
+            prefix += tag;
           }
 
+          let processedLine = "";
+          let lastIndex = 0;
           const tagRegex = /<(\/?)span([^>]*)>/g;
           let match;
 
@@ -1663,19 +1679,27 @@
             const isClosing = match[1] === "/";
             const fullTag = match[0];
             if (isClosing) {
-              if (openTags.length > 0) openTags.pop();
+              if (openTags.length > 0) {
+                openTags.pop();
+                processedLine += line.substring(lastIndex, match.index) + fullTag;
+              } else {
+                // Strip orphan closing tag
+                processedLine += line.substring(lastIndex, match.index);
+              }
             } else {
               openTags.push(fullTag);
+              processedLine += line.substring(lastIndex, match.index) + fullTag;
             }
+            lastIndex = tagRegex.lastIndex;
           }
+          processedLine += line.substring(lastIndex);
 
-          balancedLine += line;
-
+          let suffix = "";
           for (let i = openTags.length - 1; i >= 0; i--) {
-            balancedLine += "</span>";
+            suffix += "</span>";
           }
 
-          resultLines.push(balancedLine);
+          resultLines.push(prefix + processedLine + suffix);
         }
         return resultLines;
       } catch (e) {
@@ -2372,7 +2396,7 @@
               <span class="unified-num-old">${l.old_line_no || ''}</span>
               <span class="unified-num-new">${l.new_line_no || ''}</span>
               <span class="unified-marker">${markerChar}</span>
-              <span class="unified-text hljs">${lineHtml}</span>
+              <div class="unified-text hljs">${lineHtml}</div>
             </div>
           `;
 

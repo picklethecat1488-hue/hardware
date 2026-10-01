@@ -2689,3 +2689,29 @@ def test_regression_bug_248_bug_report_sort_and_filter_menus() -> None:
     # 3. Session persistence for filter and sorting options
     assert "sessionStorage" in tpl_text
     assert "bug_sort" in tpl_text
+
+
+def test_regression_bug_252_unified_diff_word_wrap_and_tag_balancing() -> None:
+    """Verify BUG-252: Unified diff word-wrap containment and tag balancing in diff templates.
+
+    Ensures:
+    1. diff_component.html.j2 and code_review.html.j2 pin .diff-unified-text and .unified-text to column 4 with min-width: 0.
+    2. diff_component.html.j2 balances syntax highlighting spans across lines and strips orphan closing spans.
+    3. Unified diff text is rendered in a div rather than span so rogue inner closing spans cannot close the line container.
+    """
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_comp_text = (templates_dir / "diff_component.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. Grid positioning and min-width containment for unified diff text
+    assert "grid-column: 4" in diff_comp_text
+    assert "min-width: 0" in diff_comp_text
+    assert "grid-column: 4" in cr_text
+
+    # 2. Div container for unified text preventing stray span closure
+    assert '<div class="diff-unified-text hljs">' in diff_comp_text
+    assert '<div class="unified-text hljs">' in cr_text
+
+    # 3. Tag balancing and orphan tag stripping in diff engine
+    assert "balanceLines" in diff_comp_text
+    assert "openTags" in diff_comp_text
