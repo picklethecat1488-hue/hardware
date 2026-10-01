@@ -35,4 +35,4 @@
 
 ## Action Items Checklist
 
-- [ ] **[MUST FIX]** [`src/projects/carrier_board/pcb.yaml:L904`](file:///Users/daparker/gh/hardware/src/projects/carrier_board/pcb.yaml#L904): This is not shown as connected to NFC2 on the PCB schematic. Need to fix this!!! and add a DRC check which will catch this in future revs <!-- uuid:4c49f1ac-8622-4a28-970a-6dfc0302e31c -->
+- [x] **[MUST FIX]** [`src/projects/carrier_board/pcb.yaml:L904`](file:///Users/daparker/gh/hardware/src/projects/carrier_board/pcb.yaml#L904): This is not shown as connected to NFC2 on the PCB schematic. Need to fix this!!! and add a DRC check which will catch this in future revs <!-- uuid:4c49f1ac-8622-4a28-970a-6dfc0302e31c -->

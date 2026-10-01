@@ -1583,6 +1583,14 @@
     function startAutoSync() {
       if (autoSyncTimer) clearInterval(autoSyncTimer);
       autoSyncTimer = setInterval(syncWorkingAndCommitsSilently, 2500);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          syncWorkingAndCommitsSilently();
+        }
+      });
+      window.addEventListener("focus", () => {
+        syncWorkingAndCommitsSilently();
+      });
     }
 
     async function syncWorkingAndCommitsSilently() {
@@ -1595,7 +1603,7 @@
 
         // 1. Check Working Tree changes
         const workingFiles = session.working_tree || [];
-        const workingFp = JSON.stringify(workingFiles.map(f => [f.path, f.is_staged, f.is_untracked, f.is_conflicted, f.status]));
+        const workingFp = JSON.stringify(workingFiles.map(f => [f.path, f.is_staged, f.is_untracked, f.is_conflicted, f.status, f.additions, f.deletions]));
         if (state.lastWorkingFingerprint === null) {
           state.lastWorkingFingerprint = workingFp;
         } else if (workingFp !== state.lastWorkingFingerprint) {
@@ -1604,6 +1612,9 @@
           if (state.activeCommit === "working") {
             const container = document.getElementById("filesContainer");
             if (container) renderWorkingTreeFiles(container);
+            if (state.activeFile) {
+              loadFileDiff(state.activeFile);
+            }
           }
         }
 

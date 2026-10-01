@@ -1811,6 +1811,14 @@
     function startAutoSync() {
       if (autoSyncTimer) clearInterval(autoSyncTimer);
       autoSyncTimer = setInterval(syncReviewSilently, 3000);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          syncReviewSilently();
+        }
+      });
+      window.addEventListener("focus", () => {
+        syncReviewSilently();
+      });
     }
 
     async function syncReviewSilently() {
@@ -1821,17 +1829,39 @@
         const revs = urlParams.get("revisions") || urlParams.get("commit");
         const commitsUrl = revs ? "/api/commits?revisions=" + encodeURIComponent(revs) : "/api/commits";
         const res = await fetch(commitsUrl);
-        if (!res.ok) return;
-        const commits = await res.json();
-        const fp = JSON.stringify(commits.map(c => [c.commit_hash, c.short_hash, c.subject, c.is_head]));
-        if (state.lastCommitsFingerprint === undefined) {
-          state.lastCommitsFingerprint = fp;
-        } else if (fp !== state.lastCommitsFingerprint) {
-          state.lastCommitsFingerprint = fp;
-          state.commits = commits;
-          renderCommitsList();
-          if (state.selectedCommit) {
-            loadFilesForSelectedCommit();
+        if (res.ok) {
+          const commits = await res.json();
+          const fp = JSON.stringify(commits.map(c => [c.commit_hash, c.short_hash, c.subject, c.is_head]));
+          if (state.lastCommitsFingerprint === undefined) {
+            state.lastCommitsFingerprint = fp;
+          } else if (fp !== state.lastCommitsFingerprint) {
+            state.lastCommitsFingerprint = fp;
+            state.commits = commits;
+            renderCommitsList();
+            if (state.selectedCommit) {
+              loadFilesForSelectedCommit();
+            }
+          }
+        }
+
+        const sessionUrl = revs ? "/api/session?revisions=" + encodeURIComponent(revs) : "/api/session";
+        const sRes = await fetch(sessionUrl);
+        if (sRes.ok) {
+          const session = await sRes.json();
+          const sFp = JSON.stringify([
+            session.updated_at,
+            session.verdict,
+            (session.comments || []).map(c => [c.id, c.resolved, c.body, c.severity])
+          ]);
+          if (state.lastSessionFingerprint === undefined) {
+            state.lastSessionFingerprint = sFp;
+          } else if (sFp !== state.lastSessionFingerprint) {
+            state.lastSessionFingerprint = sFp;
+            state.session = session;
+            updateSessionUI();
+            if (state.selectedFile && state.currentDiff) {
+              renderDiff();
+            }
           }
         }
       } catch (e) {

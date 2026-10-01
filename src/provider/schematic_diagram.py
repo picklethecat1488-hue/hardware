@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib
 
@@ -503,6 +503,7 @@ class SchematicDiagram:
         sheet_pin_coords: Dict[Tuple[str, str], Tuple[float, float]],
         wired_pins: Optional[set[Tuple[str, str]]] = None,
         pin_side_map: Optional[Dict[Tuple[str, str], str]] = None,
+        pullup_points: Optional[List[Any]] = None,
     ) -> None:
         """Render pull-up and pull-down resistors as vertical branches directly attached to signal lines."""
         SchematicPassiveDrawer.draw_pullup_resistors(
@@ -513,6 +514,7 @@ class SchematicDiagram:
             sheet_pin_coords=sheet_pin_coords,
             wired_pins=wired_pins,
             pin_side_map=pin_side_map,
+            pullup_points=pullup_points,
         )
 
     def _draw_vertical_wire_with_jumpers(
@@ -773,37 +775,15 @@ class SchematicDiagram:
                 pin_side_map[(fp.name, p.name)] = "left"
             for p in right_p:
                 pin_side_map[(fp.name, p.name)] = "right"
-
-        # Discover direct wire pairs between facing pins and detour wire pairs around components
-        direct_wire_pairs: List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]] = []
-        detour_wire_pairs: List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]] = []
         wired_pins: set[Tuple[str, str]] = set()
-
-        for net in all_nets:
-            if net.name.upper() in POWER_NET_NAMES or net.name.upper() in GROUND_NET_NAMES:
-                continue
-            present_pins = [pair for pair in net.pins if pair in pin_side_map]
-            if len(present_pins) >= 2:
-                for i, pair1 in enumerate(present_pins):
-                    for pair2 in present_pins[i + 1 :]:
-                        if pair1 in wired_pins or pair2 in wired_pins:
-                            continue
-                        if pair1[0] == pair2[0]:
-                            continue
-                        c1, c2 = comp_col_map[pair1[0]], comp_col_map[pair2[0]]
-                        s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
-                        if c1 > c2:
-                            pair1, pair2 = pair2, pair1
-                            c1, c2 = c2, c1
-                            s1, s2 = s2, s1
-                        if (c2 == c1 + 1) and s1 == "right" and s2 == "left":
-                            direct_wire_pairs.append((pair1, pair2, net))
-                            wired_pins.add(pair1)
-                            wired_pins.add(pair2)
-                        else:
-                            detour_wire_pairs.append((pair1, pair2, net))
-                            wired_pins.add(pair1)
-                            wired_pins.add(pair2)
+        (
+            h_segments,
+            v_segments,
+            wire_labels,
+            _,
+        ) = SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan(
+            sheet_plan, all_nets, self.config, wired_pins=wired_pins
+        )
 
         sheet_pin_coords: Dict[Tuple[str, str], Tuple[float, float]] = {}
         comp_boxes: List[Tuple[float, float, float, float]] = []
@@ -1221,13 +1201,6 @@ class SchematicDiagram:
                             zorder=3,
                         )
 
-        (
-            h_segments,
-            v_segments,
-            wire_labels,
-            _,
-        ) = SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan(sheet_plan, all_nets, self.config)
-
         # Render all horizontal wire segments
         for x_start, x_end, y, net_name, col in h_segments:
             ax.plot([x_start, x_end], [y, y], color=col, linewidth=1.2, zorder=2)
@@ -1269,6 +1242,7 @@ class SchematicDiagram:
                 sheet_pin_coords=sheet_pin_coords,
                 wired_pins=wired_pins,
                 pin_side_map=pin_side_map,
+                pullup_points=getattr(sheet_plan, "_computed_pullup_points", None),
             )
 
         # BUG-206: Build full obstacle list (components, cards, truth tables, title block) to stop short

@@ -186,6 +186,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             case _:
                 self.send_error(404, "Endpoint not found")
 
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        """Handle CORS preflight requests."""
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
     def do_POST(self) -> None:  # noqa: N802
         """Route POST requests for mutating actions."""
         try:
@@ -782,6 +791,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(encoded)
@@ -793,6 +803,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(encoded)
@@ -804,6 +815,12 @@ class DashboardServer(ThreadingHTTPServer):
 
     allow_reuse_address = True
     daemon_threads = True
+
+    def get_request(self) -> Any:
+        """Accept incoming connection and set client socket timeout to prevent lingering sockets."""
+        sock, addr = super().get_request()
+        sock.settimeout(10.0)
+        return sock, addr
 
     def __init__(
         self,
@@ -874,7 +891,6 @@ class DashboardServer(ThreadingHTTPServer):
                         raise err
                     bound_port += 1
             self.actual_port = self.server_port
-            self.socket.settimeout(10.0)
         else:
             self.actual_port = port
 
