@@ -2236,3 +2236,41 @@ def test_regression_proposal_ct8_channel_routed_to_j2_without_flex_modification(
     drc = PCBDesignRulesChecker(provider.pcb_config)
     report = drc.check_all(wiring=wiring)
     assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_254_enclosure_lid_text_stroke_width() -> None:
+    """Verify BUG-254: enclosure_lid BATTERY label has stroke width >= 0.8mm for DFM compliance."""
+    from build123d import Text, FontStyle, offset, Axis
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider import Mode
+
+    provider = CarrierBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid.part is not None and lid.part.is_valid(), "Enclosure lid must be a valid solid"
+
+    # 1. Configured font size and stroke expansion offset
+    font_size = provider.settings.enclosure_battery_label_font_size
+    stroke_offset = provider.settings.enclosure_battery_label_stroke_offset
+    assert font_size >= 4.0, f"Expected BATTERY label font size >= 4.0mm, got {font_size}"
+    assert stroke_offset >= 0.12, f"Expected stroke expansion offset >= 0.12mm, got {stroke_offset}"
+
+    # 2. Geometric stroke width verification on representative 'T' glyph
+    t_glyph = Text("T", font_size=font_size, font_style=FontStyle.BOLD)
+    if stroke_offset > 0.0:
+        t_glyph = offset(t_glyph, amount=stroke_offset)
+
+    # Vertical stem width measurement
+    edges_v = t_glyph.edges().filter_by(Axis.Y)
+    xs = sorted(list({round(e.bounding_box().min.X, 3) for e in edges_v}))
+    assert len(xs) >= 4, "Glyph 'T' must have inner and outer vertical stem boundaries"
+    stem_width = xs[2] - xs[1]
+    assert stem_width >= 0.80, f"Expected BATTERY text stem width >= 0.80mm (DFM rule), got {stem_width:.3f}mm"
+
+    # Horizontal bar thickness measurement
+    edges_h = t_glyph.edges().filter_by(Axis.X)
+    ys = sorted(list({round(e.bounding_box().min.Y, 3) for e in edges_h}))
+    assert len(ys) >= 3, "Glyph 'T' must have top and bottom horizontal bar boundaries"
+    bar_thickness = ys[2] - ys[1]
+    assert bar_thickness >= 0.80, (
+        f"Expected BATTERY text horizontal bar >= 0.80mm (DFM rule), got {bar_thickness:.3f}mm"
+    )

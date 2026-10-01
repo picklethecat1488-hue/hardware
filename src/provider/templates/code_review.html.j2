@@ -1827,11 +1827,11 @@
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const revs = urlParams.get("revisions") || urlParams.get("commit");
-        const commitsUrl = revs ? "/api/commits?revisions=" + encodeURIComponent(revs) : "/api/commits";
+        const commitsUrl = revs ? "/api/commits?type=review&revisions=" + encodeURIComponent(revs) : "/api/commits?type=review";
         const res = await fetch(commitsUrl);
         if (res.ok) {
           const commits = await res.json();
-          const fp = JSON.stringify(commits.map(c => [c.commit_hash, c.short_hash, c.subject, c.is_head]));
+          const fp = JSON.stringify(commits.map(c => [c.commit_hash, c.short_hash, c.subject, c.is_head, c.cr_open_count, c.cr_resolved_count, c.cr_total_count, c.cr_reviewed]));
           if (state.lastCommitsFingerprint === undefined) {
             state.lastCommitsFingerprint = fp;
           } else if (fp !== state.lastCommitsFingerprint) {
@@ -1839,19 +1839,20 @@
             state.commits = commits;
             renderCommitsList();
             if (state.selectedCommit) {
-              loadFilesForSelectedCommit();
+              await selectCommit(state.selectedCommit);
             }
           }
         }
 
-        const sessionUrl = revs ? "/api/session?revisions=" + encodeURIComponent(revs) : "/api/session";
+        const sessionUrl = revs ? "/api/review/session?revisions=" + encodeURIComponent(revs) : "/api/review/session";
         const sRes = await fetch(sessionUrl);
         if (sRes.ok) {
           const session = await sRes.json();
           const sFp = JSON.stringify([
             session.updated_at,
             session.verdict,
-            (session.comments || []).map(c => [c.id, c.resolved, c.body, c.severity])
+            Object.entries(session.files || {}).map(([p, f]) => [p, f.status, f.notes]),
+            (session.comments || []).map(c => [c.id, c.resolved, c.body, c.severity, c.commit_hash, c.file_path, c.start_line, c.end_line])
           ]);
           if (state.lastSessionFingerprint === undefined) {
             state.lastSessionFingerprint = sFp;
@@ -1859,6 +1860,8 @@
             state.lastSessionFingerprint = sFp;
             state.session = session;
             updateSessionUI();
+            renderFilesList();
+            renderCommitsList();
             if (state.selectedFile && state.currentDiff) {
               renderDiff();
             }
@@ -1875,7 +1878,7 @@
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const revs = urlParams.get("revisions") || urlParams.get("commit");
-        const sessionUrl = revs ? "/api/session?revisions=" + encodeURIComponent(revs) : "/api/session";
+        const sessionUrl = revs ? "/api/review/session?revisions=" + encodeURIComponent(revs) : "/api/review/session";
         const res = await fetch(sessionUrl);
         state.session = await res.json();
         updateSessionUI();

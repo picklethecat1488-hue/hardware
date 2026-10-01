@@ -1602,30 +1602,35 @@
         const session = await resp.json();
 
         // 1. Check Working Tree changes
-        const workingFiles = session.working_tree || [];
+        const workingFiles = session.working_files || [];
         const workingFp = JSON.stringify(workingFiles.map(f => [f.path, f.is_staged, f.is_untracked, f.is_conflicted, f.status, f.additions, f.deletions]));
         if (state.lastWorkingFingerprint === null) {
           state.lastWorkingFingerprint = workingFp;
         } else if (workingFp !== state.lastWorkingFingerprint) {
           state.lastWorkingFingerprint = workingFp;
           state.workingFiles = workingFiles;
+          state.conflicts = session.conflicts || [];
           if (state.activeCommit === "working") {
             const container = document.getElementById("filesContainer");
             if (container) renderWorkingTreeFiles(container);
             if (state.activeFile) {
-              loadFileDiff(state.activeFile);
+              selectFile(state.activeFile);
             }
           }
         }
 
         // 2. Check Smartlog / Commit DAG changes
         const nodes = session.smartlog_nodes || [];
-        const commitFp = JSON.stringify(nodes.map(n => [n.commit_hash, n.short_hash, n.subject, n.is_head, n.branches, n.tags, n.pr_number, n.pr_status]));
+        const commitFp = JSON.stringify(nodes.map(n => [n.commit_hash, n.short_hash, n.subject, n.is_head, n.branches, n.tags, n.pr_number, n.pr_status, n.cr_open_count, n.cr_resolved_count]));
         if (state.lastCommitFingerprint === null) {
           state.lastCommitFingerprint = commitFp;
         } else if (commitFp !== state.lastCommitFingerprint) {
           state.lastCommitFingerprint = commitFp;
           renderSmartlogList(nodes);
+          loadFilesForActiveCommit();
+          if (state.activeFile) {
+            selectFile(state.activeFile);
+          }
         }
 
         // 3. Update current branch in UI if changed
