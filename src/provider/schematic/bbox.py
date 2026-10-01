@@ -354,7 +354,7 @@ class SchematicBoundingBoxCalculator:
                 for x_pull, y_base, fp, sig_net, rail_net in p_pts:
                     is_pullup = rail_net.upper() in POWER_NET_NAMES
                     if is_pullup:
-                        y_zz_bot = pullup_max_y + 8.0
+                        y_zz_bot = max(pullup_max_y + 8.0, 158.0)
                         boxes.append((x_pull + 4.0, y_zz_bot + 6.5, 12.0, 14.0, fp.name))
                     else:
                         y_zz_top = y_base - 8.0

@@ -1,6 +1,7 @@
 """Design rule checking (DRC) engine for high-speed differential signals, stackup impedance, and flex rules."""
 
 import math
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import List, Optional, Tuple, Dict, Any, Union
@@ -15,6 +16,7 @@ from model.pcb import (
     SchematicLayoutModel,
 )
 from provider.geometry_utils import point_in_polygon
+from provider.schematic import GROUND_NET_NAMES, POWER_NET_NAMES
 
 _point_in_polygon = point_in_polygon
 
@@ -2557,6 +2559,37 @@ class PCBDesignRulesChecker:
                             f"does not lie on any wire segment of '{sig_net}'"
                         ),
                         location=(x_pull, y_base, 0.0),
+                    )
+
+            # 3i. Multi-component on-sheet net connection check (SCHEMATIC_UNCONNECTED_PIN)
+            # If two or more components displayed on the same sheet share a non-power/non-ground net,
+            # there must be schematic wire segments on the sheet routing the connection.
+            sheet_wired_nets = {s[3] for s in h_segs} | {s[3] for s in v_segs}
+            sheet_sig_nets: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
+            for fp_name in sheet.components:
+                fp_obj = footprints_map.get(fp_name)
+                if not fp_obj:
+                    continue
+                layout_grid = getattr(sheet.layout, "grid_positions", {}) if sheet.layout else {}
+                if fp_obj.name in (layout_grid or {}):
+                    has_breakout = bool(sheet.pin_breakouts and fp_obj.name in sheet.pin_breakouts)
+                    allowed_pins = sheet.pin_breakouts[fp_obj.name] if has_breakout else [p.name for p in fp_obj.pins]
+                    for p in fp_obj.pins:
+                        if p.name in allowed_pins:
+                            net_n = pin_to_net.get((fp_obj.name, p.name))
+                            if net_n and net_n.upper() not in GROUND_NET_NAMES and net_n.upper() not in POWER_NET_NAMES:
+                                sheet_sig_nets[net_n].append((fp_obj.name, p.name))
+
+            for net_n, pins_on_sheet in sheet_sig_nets.items():
+                if len(pins_on_sheet) >= 2 and net_n not in sheet_wired_nets:
+                    pin_list_str = ", ".join(f"{c}.{p}" for c, p in pins_on_sheet)
+                    violations.add_error(
+                        rule_name=DRCRuleName.SCHEMATIC_UNCONNECTED_PIN,
+                        net_or_zone=net_n,
+                        description=(
+                            f"Net '{net_n}' connects multiple components on sheet {sheet_idx + 1} ('{sheet.title}') "
+                            f"({pin_list_str}), but has no schematic wire segments routing the connection on this sheet"
+                        ),
                     )
 
         # 4. Check that all components in the design have connected pins (BUG-088)

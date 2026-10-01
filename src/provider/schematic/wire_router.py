@@ -48,12 +48,14 @@ class SchematicWireSegmentPlanner:
         sheet_plan: _SchematicSheetPlan,
         all_nets: List[NetModel],
         config: Optional[PCBConfig] = None,
+        wired_pins: Optional[set[Tuple[str, str]]] = None,
     ) -> Tuple[
         List[Tuple[float, float, float, str, str]],
         List[Tuple[float, float, float, str, str]],
         List[Tuple[float, float, str]],
+        List[Tuple[FootprintModel, str, Tuple[float, float]]],
     ]:
-        """Compute exact wire routes and labels for a single schematic sheet plan."""
+        """Compute exact wire routes, labels, and passive tap points for a single schematic sheet plan."""
         pin_to_net: Dict[Tuple[str, str], str] = {}
         for net in all_nets:
             for pair in net.pins:
@@ -162,7 +164,8 @@ class SchematicWireSegmentPlanner:
 
         direct_wire_pairs = []
         detour_wire_pairs = []
-        wired_pins = set()
+        if wired_pins is None:
+            wired_pins = set()
         for net in all_nets:
             if net.name.upper() in POWER_NET_NAMES or net.name.upper() in GROUND_NET_NAMES:
                 continue
@@ -294,14 +297,20 @@ class SchematicWireSegmentPlanner:
 
         tap_points: List[Tuple[FootprintModel, str, Tuple[float, float]]] = []
         if vertical_passives:
+            if wired_pins is None:
+                wired_pins = set()
             pullup_points = SchematicPassiveDrawer.compute_pullup_tap_points(
                 pullups=vertical_passives,
                 pin_to_net=pin_to_net,
                 h_wire_segments=h_segments,
                 sheet_pin_coords=sheet_pin_coords,
+                wired_pins=wired_pins,
                 pin_side_map=pin_side_map,
             )
-            tap_points = [(fp, sig_net, (x_pull, y_base)) for x_pull, y_base, fp, sig_net, rail_net in pullup_points]
+            tap_points = [
+                (fp, sig_net, (x_pull, y_base)) for x_pull, y_base, fp, sig_net, rail_net, *rest in pullup_points
+            ]
+            sheet_plan._computed_pullup_points = pullup_points
 
         return h_segments, v_segments, wire_labels, tap_points
 

@@ -1115,3 +1115,44 @@ def test_drc_schematic_disconnected_passive() -> None:
         assert "NFC2" in broken_disconnected[0].description
     finally:
         SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan = orig_method
+
+
+def test_drc_schematic_unconnected_pin() -> None:
+    """Verify DRC detects SCHEMATIC_UNCONNECTED_PIN when multiple sheet components share an unrouted net."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.schematic.wire_router import SchematicWireSegmentPlanner
+
+    provider = CarrierBoardProvider()
+    cfg = provider.pcb_config
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. On valid board, verify zero SCHEMATIC_UNCONNECTED_PIN violations
+    checker = PCBDesignRulesChecker(cfg)
+    violations = checker.check_schematic(wiring=wiring)
+    unconnected = [v for v in violations.errors if v.rule_name == DRCRuleName.SCHEMATIC_UNCONNECTED_PIN]
+    assert len(unconnected) == 0, f"Expected 0 unconnected pin violations on valid board, got: {unconnected}"
+
+    # 2. Simulate missing wire routing for NFC2 on Sheet 11 (U11 and J16)
+    orig_method = SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan
+
+    def missing_wire_compute(sheet_plan, all_nets, config=None):
+        h, v, w, taps = orig_method(sheet_plan, all_nets, config)
+        if sheet_plan.sheet_idx == 10:
+            # Completely remove wire segments for NFC2
+            h = [seg for seg in h if seg[3] != "NFC2"]
+            v = [seg for seg in v if seg[3] != "NFC2"]
+        return h, v, w, taps
+
+    SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan = staticmethod(missing_wire_compute)
+    try:
+        violations_broken = checker.check_schematic(wiring=wiring)
+        broken_unconnected = [
+            v for v in violations_broken.errors if v.rule_name == DRCRuleName.SCHEMATIC_UNCONNECTED_PIN
+        ]
+        assert len(broken_unconnected) >= 1
+        nfc2_violation = next(v for v in broken_unconnected if v.net_or_zone == "NFC2")
+        assert "U11" in nfc2_violation.description
+        assert "J16" in nfc2_violation.description
+    finally:
+        SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan = orig_method
