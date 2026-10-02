@@ -1099,23 +1099,6 @@ class CarrierBoardProvider(Provider):
             with Locations((1.6, -24.8)):
                 SilkscreenText("VBAT", layer="F.SilkS", font_size=0.55, thickness=0.08)
 
-            # Component designators for Sheet 17 hardening parts on bottom silkscreen to prevent clutter
-            for idx, y_pos in enumerate([-24.0, -22.0, -20.0, -18.0, -16.0, -14.0], start=2):
-                with Locations((4.0, y_pos)):
-                    SilkscreenText(f"D{idx}", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-                with Locations((6.5, y_pos)):
-                    SilkscreenText(f"R{idx + 5}", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -15.5)):
-                SilkscreenText("JP1", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -18.0)):
-                SilkscreenText("JP2", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -21.0)):
-                SilkscreenText("JP3", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -23.6)):
-                SilkscreenText("JP4", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((0.0, -11.0)):
-                SilkscreenText("SW1", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-
             # Global optical fiducials (crosshairs)
             with Locations((-24.0, 38.0), (21.0, -42.0), (-24.0, -38.0)):
                 SilkscreenText("+", layer="F.SilkS", font_size=1.5, thickness=0.25)

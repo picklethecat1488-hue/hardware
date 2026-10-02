@@ -2593,3 +2593,20 @@ def test_regression_bug_262_supplier_pcb_guidelines_zip_outputs() -> None:
         assert "carrier_board_bottom.png" in names, "assembly_files.zip must contain carrier_board_bottom.png"
         assert "flex_tail_top.png" in names, "assembly_files.zip must contain flex_tail_top.png"
         assert "flex_tail_bottom.png" in names, "assembly_files.zip must contain flex_tail_bottom.png"
+
+
+def test_regression_bug_266_remove_led_and_jumper_opposite_side_designators() -> None:
+    """Verify BUG-266: Component designators for LEDs, jumpers, and switches are removed from B.SilkS."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+
+    provider = CarrierBoardProvider()
+    provider.silkscreen()
+    pcb_cfg = provider.pcb_config
+
+    bottom_texts = [t.text for t in pcb_cfg.silkscreen_texts if t.layer == "B.SilkS"]
+
+    removed_designators = (
+        [f"D{i}" for i in range(2, 8)] + [f"JP{i}" for i in range(1, 5)] + [f"R{i}" for i in range(7, 13)] + ["SW1"]
+    )
+    for des in removed_designators:
+        assert des not in bottom_texts, f"Opposite-side component designator '{des}' found on B.SilkS"
