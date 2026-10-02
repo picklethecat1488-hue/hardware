@@ -546,12 +546,14 @@ class Builder:
         if not target_lists:
             return
 
+        processed_providers = set()
         for base_targets in target_lists:
             for target_name in base_targets:
                 p_name, subassembly = TargetParser.split_target(target_name)
                 provider = next((p for p in self.manager.router.providers if p.name == p_name), None)
                 if not provider:
                     continue
+                processed_providers.add(provider)
 
                 wiring_file = getattr(provider, "wiring_path", None)
                 if not wiring_file or not Path(wiring_file).exists():
@@ -696,12 +698,17 @@ class Builder:
                             shutil.copy2(rpt_file, alias_rpt)
 
                 # 3. Export manufacturing BOM, CPL, Schematic vector PDF, and 3D STEP
-                bom_csv = bom_dir / f"{subassembly}_bom.csv" if subassembly != provider.name else bom_dir / "bom.csv"
-                pos_csv = bom_dir / f"{subassembly}_pos.csv" if subassembly != provider.name else bom_dir / "pos.csv"
+                bom_csv = bom_dir / f"{subassembly}_bom.csv"
+                pos_csv = bom_dir / f"{subassembly}_pos.csv"
                 schematic_pdf = schematics_dir / f"{subassembly}_schematic.pdf"
 
                 exporter.export_bom_csv(bom_csv)
                 exporter.export_pick_and_place_csv(pos_csv)
+                if subassembly == provider.name:
+                    if bom_csv.exists():
+                        shutil.copy2(bom_csv, bom_dir / "bom.csv")
+                    if pos_csv.exists():
+                        shutil.copy2(pos_csv, bom_dir / "pos.csv")
                 exporter.export_schematic_pdf(schematic_pdf)
                 exporter.export_step_solid(step_file)
 
@@ -715,6 +722,110 @@ class Builder:
                 self.logger.print(f"Generated Board Files: {board_dir}", symbol="📦")
                 self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
                 self.logger.print(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
+
+        # Package supplier manufacturing files under build/board (BUG-262)
+        for p in processed_providers:
+            self.package_supplier_pcb_files(out_dir=out_dir, provider=p)
+
+    def package_supplier_pcb_files(self, out_dir: str | Path, provider) -> dict[str, Path]:
+        """Package supplier manufacturing zip files under build/board/<provider.name> per BUG-262.
+
+        Outputs under build/board/<provider.name>/:
+        - gerbers.zip: contains .pcb, .pcbdoc, .cam, .brd and gerber files
+        - bom_templates.zip: contains <PCB name>_bom.csv BOM list for each PCB
+        - centroid_files.zip: contains <PCB name>_pos.csv centroid list for each PCB
+        - assembly_files.zip: contains <PCB name>_top.png, <PCB name>_bottom.png textures for each PCB
+        """
+        out_path = Path(out_dir)
+        board_dir = out_path / "board" / provider.name
+        bom_dir = out_path / "bom" / provider.name
+        textures_dir = board_dir / "textures"
+        board_dir.mkdir(parents=True, exist_ok=True)
+
+        # Clean up any legacy zip archives directly under build/board
+        top_board_dir = out_path / "board"
+        for zip_name in ("gerbers.zip", "bom_templates.zip", "centroid_files.zip", "assembly_files.zip"):
+            stray_zip = top_board_dir / zip_name
+            if stray_zip.is_file():
+                stray_zip.unlink(missing_ok=True)
+
+        # 1. Identify all PCB names from .kicad_pcb files in board_dir
+        pcb_files = list(board_dir.glob("*.kicad_pcb"))
+        pcb_names = [p.stem for p in pcb_files]
+        if not pcb_names and hasattr(provider, "name"):
+            pcb_names = [provider.name]
+
+        # Ensure companion files (.pcb, .pcbdoc, .brd, .cam) exist for each PCB
+        for name in pcb_names:
+            kicad_pcb = board_dir / f"{name}.kicad_pcb"
+            if kicad_pcb.exists():
+                for ext in (".pcb", ".pcbdoc", ".brd"):
+                    companion = board_dir / f"{name}{ext}"
+                    if not companion.exists():
+                        shutil.copy2(kicad_pcb, companion)
+            job_file = board_dir / f"{name}-job.gbrjob"
+            cam_file = board_dir / f"{name}.cam"
+            if not cam_file.exists():
+                if job_file.exists():
+                    shutil.copy2(job_file, cam_file)
+                elif kicad_pcb.exists():
+                    shutil.copy2(kicad_pcb, cam_file)
+
+        def create_zip(target_zip: Path, file_items: list[tuple[Path, str]]) -> Path:
+            target_zip.parent.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(target_zip, "w", zipfile.ZIP_DEFLATED) as zf:
+                for file_path, arcname in file_items:
+                    if file_path.exists():
+                        zf.write(file_path, arcname=arcname)
+            return target_zip
+
+        # 2. Build gerbers.zip
+        # Contains .pcb, .pcbdoc, .cam, .brd, and gerber files (.gbr, .drl, .gbrjob, .kicad_pcb)
+        gerber_extensions = {".gbr", ".drl", ".gbrjob", ".kicad_pcb", ".pcb", ".pcbdoc", ".cam", ".brd"}
+        gerber_files = [f for f in board_dir.iterdir() if f.is_file() and f.suffix.lower() in gerber_extensions]
+        gerber_items = [(f, f.name) for f in sorted(gerber_files, key=lambda x: x.name)]
+
+        # 3. Build bom_templates.zip: <PCB name>_bom.csv for each PCB
+        bom_items = []
+        for name in pcb_names:
+            csv_path = bom_dir / f"{name}_bom.csv"
+            if not csv_path.exists() and (bom_dir / "bom.csv").exists() and name == provider.name:
+                shutil.copy2(bom_dir / "bom.csv", csv_path)
+            if csv_path.exists():
+                bom_items.append((csv_path, f"{name}_bom.csv"))
+
+        # 4. Build centroid_files.zip: <PCB name>_pos.csv for each PCB
+        centroid_items = []
+        for name in pcb_names:
+            csv_path = bom_dir / f"{name}_pos.csv"
+            if not csv_path.exists() and (bom_dir / "pos.csv").exists() and name == provider.name:
+                shutil.copy2(bom_dir / "pos.csv", csv_path)
+            if csv_path.exists():
+                centroid_items.append((csv_path, f"{name}_pos.csv"))
+
+        # 5. Build assembly_files.zip: <PCB name>_top.png, <PCB name>_bottom.png for each PCB
+        assembly_items = []
+        for name in pcb_names:
+            for side in ("top", "bottom"):
+                img_name = f"{name}_{side}.png"
+                img_path = textures_dir / img_name
+                if not img_path.exists():
+                    img_path = board_dir / img_name
+                if img_path.exists():
+                    assembly_items.append((img_path, img_name))
+
+        created_zips = {
+            str(board_dir / "gerbers.zip"): create_zip(board_dir / "gerbers.zip", gerber_items),
+            str(board_dir / "bom_templates.zip"): create_zip(board_dir / "bom_templates.zip", bom_items),
+            str(board_dir / "centroid_files.zip"): create_zip(board_dir / "centroid_files.zip", centroid_items),
+            str(board_dir / "assembly_files.zip"): create_zip(board_dir / "assembly_files.zip", assembly_items),
+        }
+
+        self.logger.print(
+            f"Generated Supplier Packages: {board_dir}/{{gerbers,bom_templates,centroid_files,assembly_files}}.zip",
+            symbol="📦",
+        )
+        return created_zips
 
     def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
