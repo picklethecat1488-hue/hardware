@@ -2595,6 +2595,43 @@ def test_regression_bug_262_supplier_pcb_guidelines_zip_outputs() -> None:
         assert "flex_tail_bottom.png" in names, "assembly_files.zip must contain flex_tail_bottom.png"
 
 
+def test_regression_bug_271_split_supplier_submissions_carrier_board() -> None:
+    """Verify BUG-271: supplier submissions are split by subassembly and include project summary forms."""
+    import zipfile
+
+    board_dir = Path("build/board/carrier_board")
+
+    # 1. Verify subassembly directories exist
+    carrier_dir = board_dir / "carrier_board"
+    flex_dir = board_dir / "flex_tail"
+    assert carrier_dir.is_dir(), "build/board/carrier_board/carrier_board directory must exist"
+    assert flex_dir.is_dir(), "build/board/carrier_board/flex_tail directory must exist"
+
+    # 2. carrier_board/gerbers.zip must contain ONLY carrier_board files
+    with zipfile.ZipFile(carrier_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        assert any("carrier_board" in n for n in names)
+        assert not any("flex_tail" in n for n in names)
+        assert "project_summary.txt" in names
+
+    # 3. flex_tail/gerbers.zip must contain ONLY flex_tail files
+    with zipfile.ZipFile(flex_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        assert any("flex_tail" in n for n in names)
+        assert not any("carrier_board" in n for n in names)
+        assert "project_summary.txt" in names
+
+    # 4. Project summaries exist and specify correct layer counts and types
+    c_summary = (carrier_dir / "project_summary.txt").read_text()
+    assert "Rigid" in c_summary
+    assert "6 Layers" in c_summary
+    assert "ENIG" in c_summary
+
+    f_summary = (flex_dir / "project_summary.txt").read_text()
+    assert "Flex" in f_summary or "FPC" in f_summary
+    assert "2 Layers" in f_summary
+
+
 def test_regression_bug_266_remove_led_and_jumper_opposite_side_designators(tmp_path: Path) -> None:
     """Verify BUG-266: Component designators for LEDs, jumpers, and switches are removed from both B.SilkS and F.SilkS."""
     from projects.carrier_board.provider import CarrierBoardProvider

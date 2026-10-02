@@ -633,3 +633,120 @@ def test_regression_bug_265_simplified_build_logging_and_daemon_log(tmp_path, ca
     for call in mock_logger.print.call_args_list:
         assert "Saved" not in str(call), f"logger.print was called with file save message: {call}"
     mock_logger.log.assert_called_with(f"Saved {fake_file}", symbol="📄")
+
+
+def test_regression_bug_271_split_supplier_pcb_packages_per_subassembly(tmp_path):
+    """BUG-271: Verify supplier packages are split by subassembly and include a project summary form."""
+    import zipfile
+    from build import Builder
+    from model import AppConfig
+    from provider import ProviderManager
+
+    manager = ProviderManager(AppConfig())
+    builder = Builder(manager)
+
+    board_dir = tmp_path / "board" / "carrier_board"
+    bom_dir = tmp_path / "bom" / "carrier_board"
+    textures_dir = board_dir / "textures"
+    board_dir.mkdir(parents=True, exist_ok=True)
+    bom_dir.mkdir(parents=True, exist_ok=True)
+    textures_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Create mock board files for carrier_board (rigid) and flex_tail (flex)
+    (board_dir / "carrier_board.kicad_pcb").write_text("(kicad_pcb carrier_board)")
+    (board_dir / "carrier_board-F_Cu.gbr").write_text("%FSLAX26Y26*%")
+    (board_dir / "carrier_board-B_Cu.gbr").write_text("%FSLAX26Y26*%")
+    (board_dir / "carrier_board-In1_Cu.gbr").write_text("%FSLAX26Y26*%")
+    (board_dir / "carrier_board-In2_Cu.gbr").write_text("%FSLAX26Y26*%")
+    (board_dir / "carrier_board-In3_Cu.gbr").write_text("%FSLAX26Y26*%")
+    (board_dir / "carrier_board-In4_Cu.gbr").write_text("%FSLAX26Y26*%")
+    (board_dir / "carrier_board-Edge_Cuts.gbr").write_text("%FSLAX26Y26*%")
+    (board_dir / "carrier_board.drl").write_text("M48\nFMAT,2\n")
+    (board_dir / "carrier_board-job.gbrjob").write_text(
+        '{"GeneralSpecs": {"Size": {"X": 60.0, "Y": 90.0}, "LayerNumber": 6, "BoardThickness": 1.6, "Finish": "ENIG"}}'
+    )
+
+    (board_dir / "flex_tail.kicad_pcb").write_text("(kicad_pcb flex_tail)")
+    (board_dir / "flex_tail-F_Cu.gbr").write_text("%FSLAX26Y26*%")
+    (board_dir / "flex_tail-B_Cu.gbr").write_text("%FSLAX26Y26*%")
+    (board_dir / "flex_tail-Edge_Cuts.gbr").write_text("%FSLAX26Y26*%")
+    (board_dir / "flex_tail.drl").write_text("M48\nFMAT,2\n")
+    (board_dir / "flex_tail-job.gbrjob").write_text(
+        '{"GeneralSpecs": {"Size": {"X": 24.0, "Y": 54.0}, "LayerNumber": 2, "BoardThickness": 0.20, "Finish": "ENIG"}}'
+    )
+
+    # 2. Create mock BOM and POS files
+    (bom_dir / "carrier_board_bom.csv").write_text("Id,Designator,Package,Quantity\n1,U1,VFBGA-184,1\n2,U2,QFN-20,1\n")
+    (bom_dir / "carrier_board_pos.csv").write_text(
+        "Designator,Val,Package,Mid X,Mid Y,Rotation,Layer\nU1,U1,VFBGA-184,0,0,0,Top\nU2,U2,QFN-20,10,10,0,Bottom\n"
+    )
+    (bom_dir / "flex_tail_bom.csv").write_text("Id,Designator,Package,Quantity\n1,J4,FPC-30P-0.5MM,1\n")
+    (bom_dir / "flex_tail_pos.csv").write_text(
+        "Designator,Val,Package,Mid X,Mid Y,Rotation,Layer\nJ4,J4,FPC-30P-0.5MM,0,0,0,Top\n"
+    )
+
+    # 3. Create mock textures
+    (textures_dir / "carrier_board_top.png").write_bytes(b"dummy_png")
+    (textures_dir / "carrier_board_bottom.png").write_bytes(b"dummy_png")
+    (textures_dir / "flex_tail_top.png").write_bytes(b"dummy_png")
+    (textures_dir / "flex_tail_bottom.png").write_bytes(b"dummy_png")
+
+    mock_provider = MagicMock()
+    mock_provider.name = "carrier_board"
+
+    # Package supplier files
+    created_zips = builder.package_supplier_pcb_files(out_dir=tmp_path, provider=mock_provider)
+
+    # A. Check subassembly directories exist
+    carrier_dir = board_dir / "carrier_board"
+    flex_dir = board_dir / "flex_tail"
+    assert carrier_dir.is_dir(), "carrier_board subassembly directory must exist"
+    assert flex_dir.is_dir(), "flex_tail subassembly directory must exist"
+
+    # B. Check carrier_board submission files (must NOT contain any flex_tail files)
+    assert (carrier_dir / "gerbers.zip").is_file(), "carrier_board/gerbers.zip must exist"
+    with zipfile.ZipFile(carrier_dir / "gerbers.zip", "r") as zf:
+        c_names = zf.namelist()
+        assert any("carrier_board" in n for n in c_names), "carrier_board/gerbers.zip must contain carrier_board files"
+        assert not any("flex_tail" in n for n in c_names), (
+            f"carrier_board/gerbers.zip must NOT contain flex_tail files: {c_names}"
+        )
+        assert "project_summary.txt" in c_names, "carrier_board/gerbers.zip must include project_summary.txt"
+
+    # C. Check flex_tail submission files (must NOT contain any carrier_board files)
+    assert (flex_dir / "gerbers.zip").is_file(), "flex_tail/gerbers.zip must exist"
+    with zipfile.ZipFile(flex_dir / "gerbers.zip", "r") as zf:
+        f_names = zf.namelist()
+        assert any("flex_tail" in n for n in f_names), "flex_tail/gerbers.zip must contain flex_tail files"
+        assert not any("carrier_board" in n for n in f_names), (
+            f"flex_tail/gerbers.zip must NOT contain carrier_board files: {f_names}"
+        )
+        assert "project_summary.txt" in f_names, "flex_tail/gerbers.zip must include project_summary.txt"
+
+    # D. Check top-level per-PCB archives exist
+    assert (board_dir / "carrier_board_gerbers.zip").is_file()
+    assert (board_dir / "flex_tail_gerbers.zip").is_file()
+
+    # E. Check project summary forms exist and contain specifications
+    carrier_summary_file = carrier_dir / "project_summary.txt"
+    assert carrier_summary_file.is_file(), "carrier_board project summary must exist"
+    carrier_summary = carrier_summary_file.read_text()
+    assert "Rigid" in carrier_summary or "FR4" in carrier_summary
+    assert "6" in carrier_summary
+    assert "ENIG" in carrier_summary
+
+    flex_summary_file = flex_dir / "project_summary.txt"
+    assert flex_summary_file.is_file(), "flex_tail project summary must exist"
+    flex_summary = flex_summary_file.read_text()
+    assert "Flex" in flex_summary or "FPC" in flex_summary
+    assert "2" in flex_summary
+
+    # F. Check order remarks within 600 chars limit
+    for summary_text in (carrier_summary, flex_summary):
+        if "REMARKS" in summary_text:
+            remarks_part = summary_text.split("REMARKS")[1].split("=")[0].strip()
+            assert len(remarks_part) <= 600, f"Remarks block must be <= 600 chars, got {len(remarks_part)}"
+
+    # G. Check combined provider-level archives still exist (BUG-262 backward compatibility)
+    assert (board_dir / "gerbers.zip").is_file()
+    assert (board_dir / "bom_templates.zip").is_file()
