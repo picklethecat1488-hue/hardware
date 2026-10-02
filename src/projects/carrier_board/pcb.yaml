@@ -3,6 +3,24 @@ board_type: rigid-flex
 revision: '2.0'
 shape_ref: carrier_board
 sheet_size: A4
+omitted_silkscreen_designators:
+- D2
+- D3
+- D4
+- D5
+- D6
+- D7
+- JP1
+- JP2
+- JP3
+- JP4
+- R7
+- R8
+- R9
+- R10
+- R11
+- R12
+- SW1
 obstacles:
 - name: U1
   shape: box

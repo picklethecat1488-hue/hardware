@@ -903,6 +903,10 @@ class PCBConfig(BaseModel):
         default_factory=list,
         description="Top and bottom silkscreen vector graphic primitives (frames, lines, polygons)",
     )
+    omitted_silkscreen_designators: List[str] = Field(
+        default_factory=list,
+        description="Component designators whose silkscreen labels should not be rendered on any layer",
+    )
     net_classes: List[NetClassModel] = Field(
         default_factory=list, description="High-speed and standard electrical net classes"
     )

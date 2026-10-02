@@ -2595,9 +2595,11 @@ def test_regression_bug_262_supplier_pcb_guidelines_zip_outputs() -> None:
         assert "flex_tail_bottom.png" in names, "assembly_files.zip must contain flex_tail_bottom.png"
 
 
-def test_regression_bug_266_remove_led_and_jumper_opposite_side_designators() -> None:
-    """Verify BUG-266: Component designators for LEDs, jumpers, and switches are removed from B.SilkS."""
+def test_regression_bug_266_remove_led_and_jumper_opposite_side_designators(tmp_path: Path) -> None:
+    """Verify BUG-266: Component designators for LEDs, jumpers, and switches are removed from both B.SilkS and F.SilkS."""
     from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.exporter import PCBExporter
 
     provider = CarrierBoardProvider()
     provider.silkscreen()
@@ -2610,6 +2612,20 @@ def test_regression_bug_266_remove_led_and_jumper_opposite_side_designators() ->
     )
     for des in removed_designators:
         assert des not in bottom_texts, f"Opposite-side component designator '{des}' found on B.SilkS"
+
+    # Verify omitted designators are registered in PCBConfig
+    assert set(removed_designators).issubset(set(pcb_cfg.omitted_silkscreen_designators))
+
+    # Verify that during PCB export, none of these designators are auto-rendered on F.SilkS or any layer
+    wiring = Wiring(str(provider.wiring_path))
+    exp = PCBExporter(pcb_cfg, wiring=wiring)
+    out_pcb = tmp_path / "carrier_board.kicad_pcb"
+    exp.export_kicad_pcb(str(out_pcb))
+    content = out_pcb.read_text(encoding="utf-8")
+    for des in removed_designators:
+        assert f'(gr_text "{des}"' not in content, (
+            f"Component designator '{des}' unexpectedly rendered on silkscreen in KiCad PCB"
+        )
 
 
 def test_regression_bug_267_c18_c19_vertical_stack_and_u11_clearance() -> None:

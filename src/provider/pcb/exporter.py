@@ -226,6 +226,7 @@ class PCBExporter:
             elif fp.position[1] > (l_board / 2.0 - 12.0):
                 pref_dir = "north"
 
+            omitted_designators = set(getattr(self.config, "omitted_silkscreen_designators", []))
             # Find empty space for component reference label clear of all pins and courtyards
             ref_w = len(fp.name) * 0.7 + 0.4
             ref_h = 1.0 + 0.4
@@ -250,14 +251,15 @@ class PCBExporter:
                 cand_ref_y = fp.position[1]
                 ref_off_x = 0.0
                 ref_off_y = 0.0
-            placed_component_label_boxes.append(
-                (
-                    cand_ref_x - ref_w / 2.0,
-                    cand_ref_y - ref_h / 2.0,
-                    cand_ref_x + ref_w / 2.0,
-                    cand_ref_y + ref_h / 2.0,
+            if fp.name not in omitted_designators:
+                placed_component_label_boxes.append(
+                    (
+                        cand_ref_x - ref_w / 2.0,
+                        cand_ref_y - ref_h / 2.0,
+                        cand_ref_x + ref_w / 2.0,
+                        cand_ref_y + ref_h / 2.0,
+                    )
                 )
-            )
 
             # Un-rotate world offset into footprint local coordinate frame for KiCad
             if abs(rot_deg) > 1e-4:
@@ -339,9 +341,12 @@ class PCBExporter:
                 }
             )
 
-        # Ensure all placed components have a visible silkscreen designator
+        omitted_designators = set(getattr(self.config, "omitted_silkscreen_designators", []))
+        # Ensure all placed components have a visible silkscreen designator unless omitted
         for fp_data in footprints_data:
             fp_name = fp_data["name"]
+            if fp_name in omitted_designators:
+                continue
             if fp_name not in existing_silk_names and "cand_ref_x" in fp_data:
                 silkscreen_data.append(
                     {
