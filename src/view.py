@@ -247,8 +247,49 @@ class Viewer:
                 and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
             ):
                 pcb_cfg = pcb_cfg.model_copy(update={"vias": provider.pcb_config.vias})
+            if (
+                sub_pcb_config
+                and not pcb_cfg.silkscreen_graphics
+                and provider.pcb_config.silkscreen_graphics
+                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
+            ):
+                pcb_cfg = pcb_cfg.model_copy(update={"silkscreen_graphics": provider.pcb_config.silkscreen_graphics})
+            if (
+                sub_pcb_config
+                and not pcb_cfg.omitted_silkscreen_designators
+                and provider.pcb_config.omitted_silkscreen_designators
+            ):
+                pcb_cfg = pcb_cfg.model_copy(
+                    update={"omitted_silkscreen_designators": provider.pcb_config.omitted_silkscreen_designators}
+                )
+            if (
+                sub_pcb_config
+                and provider.pcb_config.revision
+                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
+            ):
+                pcb_cfg = pcb_cfg.model_copy(update={"revision": provider.pcb_config.revision})
+            if (
+                sub_pcb_config
+                and not pcb_cfg.schematic_sheets
+                and provider.pcb_config.schematic_sheets
+                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
+            ):
+                pcb_cfg = pcb_cfg.model_copy(update={"schematic_sheets": provider.pcb_config.schematic_sheets})
+            if (
+                sub_pcb_config
+                and not pcb_cfg.schematic_layout
+                and provider.pcb_config.schematic_layout
+                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
+            ):
+                pcb_cfg = pcb_cfg.model_copy(update={"schematic_layout": provider.pcb_config.schematic_layout})
 
-            exporter = PCBExporter(pcb_cfg, wiring, subassembly=subassembly)
+            subassembly_param = subassembly if subassembly != provider.name else None
+            exporter = PCBExporter(
+                pcb_cfg,
+                wiring,
+                subassembly=subassembly_param,
+                design_rules=pcb_cfg.design_rules,
+            )
 
             pcb_filename = f"{subassembly}.kicad_pcb" if subassembly else f"{provider.name}.kicad_pcb"
             sch_filename = f"{subassembly}.kicad_sch" if subassembly else f"{provider.name}.kicad_sch"

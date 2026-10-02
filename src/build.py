@@ -628,6 +628,21 @@ class Builder:
                     and getattr(target_cfg, "board_type", None) != BoardType.FLEX
                 ):
                     target_cfg = target_cfg.model_copy(update={"vias": pcb_config.vias})
+                if (
+                    sub_pcb_config
+                    and not target_cfg.silkscreen_graphics
+                    and pcb_config.silkscreen_graphics
+                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
+                ):
+                    target_cfg = target_cfg.model_copy(update={"silkscreen_graphics": pcb_config.silkscreen_graphics})
+                if (
+                    sub_pcb_config
+                    and not target_cfg.omitted_silkscreen_designators
+                    and pcb_config.omitted_silkscreen_designators
+                ):
+                    target_cfg = target_cfg.model_copy(
+                        update={"omitted_silkscreen_designators": pcb_config.omitted_silkscreen_designators}
+                    )
 
                 # Run DRC and routing connectivity checks
                 board_dir = Path(out_dir) / "board" / provider.name
