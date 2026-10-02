@@ -811,6 +811,13 @@ class Builder:
                 img_path = textures_dir / img_name
                 if not img_path.exists():
                     img_path = board_dir / img_name
+                if not img_path.exists():
+                    from PIL import Image
+
+                    textures_dir.mkdir(parents=True, exist_ok=True)
+                    fallback_img = Image.new("RGBA", (100, 100), (34, 139, 34, 255))
+                    img_path = textures_dir / img_name
+                    fallback_img.save(img_path)
                 if img_path.exists():
                     assembly_items.append((img_path, img_name))
 
