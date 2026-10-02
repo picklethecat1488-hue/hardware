@@ -655,3 +655,94 @@ def test_export_kicad_pcb_silkscreen_parity_and_mirroring(
     assert '(footprint "MountingHole:MountingHole_3.2mm_Pad"' in content
     assert 'fp_text reference "MH1"' in content
     assert 'fp_text reference "MH1" (at 0 0) (layer "F.SilkS") hide' not in content
+
+
+def test_generate_pcb_project_summary_jinja2_templates(tmp_path: Path) -> None:
+    """Verify generate_pcb_project_summary renders plain text and markdown forms via Jinja2."""
+    from provider.pcb.supplier import generate_pcb_project_summary
+    from unittest.mock import MagicMock
+
+    board_dir = tmp_path / "board" / "carrier_board"
+    bom_dir = tmp_path / "bom" / "carrier_board"
+    board_dir.mkdir(parents=True, exist_ok=True)
+    bom_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Create mock gbrjob and POS files for rigid carrier board
+    (board_dir / "carrier_board-job.gbrjob").write_text(
+        '{"GeneralSpecs": {"Size": {"X": 60.0, "Y": 90.0}, "LayerNumber": 6, "BoardThickness": 1.60, "Finish": "ENIG"}}',
+        encoding="utf-8",
+    )
+    (bom_dir / "carrier_board_pos.csv").write_text(
+        "Designator,Val,Package,Mid X,Mid Y,Rotation,Layer\n"
+        "U1,MCU,VFBGA-184,0,0,0,Top\n"
+        "U2,Touch,QFN-20,10,10,0,Bottom\n",
+        encoding="utf-8",
+    )
+
+    mock_provider = MagicMock()
+    mock_provider.name = "carrier_board"
+    mock_provider.manifest = {"carrier_board": {"material": "fr4_core"}}
+    mock_provider.settings = None
+
+    txt, md = generate_pcb_project_summary(
+        board_dir=board_dir,
+        bom_dir=bom_dir,
+        name="carrier_board",
+        provider=mock_provider,
+    )
+
+    assert "PCB MANUFACTURING & ORDER SPECIFICATION SUMMARY" in txt
+    assert "Standard FR4 Rigid Board" in txt
+    assert "6 Layers" in txt
+    assert "60.00 mm x 90.00 mm" in txt
+    assert "Double-sided SMT assembly" in txt
+    assert "U1 (VFBGA-184)" in txt
+    assert "ENIG" in txt
+
+    assert "# PCB Manufacturing & Order Specification: carrier_board" in md
+    assert "**`Standard FR4 Rigid Board`**" in md
+    assert "**6 Layers**" in md
+
+    # 2. Test flex tail rendering
+    (board_dir / "flex_tail-job.gbrjob").write_text(
+        '{"GeneralSpecs": {"Size": {"X": 24.0, "Y": 54.0}, "LayerNumber": 2, "BoardThickness": 0.20, "Finish": "ENIG"}}',
+        encoding="utf-8",
+    )
+    (bom_dir / "flex_tail_pos.csv").write_text(
+        "Designator,Val,Package,Mid X,Mid Y,Rotation,Layer\nJ4,FPC,FPC-30P-0.5MM,0,0,0,Top\n",
+        encoding="utf-8",
+    )
+    mock_provider.manifest = {"flex_tail": {"material": "polyimide_flex"}}
+
+    f_txt, f_md = generate_pcb_project_summary(
+        board_dir=board_dir,
+        bom_dir=bom_dir,
+        name="flex_tail",
+        provider=mock_provider,
+    )
+
+    assert "Flexible Printed Circuit (FPC)" in f_txt
+    assert "Polyimide (PI) Flex Core" in f_txt
+    assert "2 Layers" in f_txt
+    assert "Single-sided SMT assembly (Top Side)" in f_txt
+    assert "# PCB Manufacturing & Order Specification: flex_tail" in f_md
+
+
+def test_pcb_exporter_package_supplier_files_delegation(tmp_path: Path) -> None:
+    """Verify PCBExporter.package_supplier_files delegates to supplier packaging module."""
+    from provider.pcb.exporter import PCBExporter
+    from unittest.mock import MagicMock
+
+    mock_provider = MagicMock()
+    mock_provider.name = "test_board"
+
+    board_dir = tmp_path / "board" / "test_board"
+    board_dir.mkdir(parents=True, exist_ok=True)
+    (board_dir / "test_board.kicad_pcb").write_text("(kicad_pcb test_board)", encoding="utf-8")
+    (board_dir / "test_board-F_Cu.gbr").write_text("%FSLAX26Y26*%", encoding="utf-8")
+    (board_dir / "test_board-B_Cu.gbr").write_text("%FSLAX26Y26*%", encoding="utf-8")
+
+    zips = PCBExporter.package_supplier_files(out_dir=tmp_path, provider=mock_provider)
+    assert isinstance(zips, dict)
+    assert str(board_dir / "gerbers.zip") in zips
+    assert (board_dir / "test_board" / "project_summary.txt").is_file()

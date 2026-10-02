@@ -1,0 +1,40 @@
+# PCB Manufacturing & Order Specification: {{ name }}
+
+> Subassembly form for fabricator ordering and technical sign-off ({{ provider_name }} Rev 2.0).
+
+## Board Specifications
+
+| Parameter | Specification |
+| :--- | :--- |
+| **Project** | `{{ provider_name }}` |
+| **Subassembly** | `{{ name }}` |
+| **Order Category** | **`{{ order_category }}`** |
+| **Base Material** | {{ base_material }} |
+| **Layer Count** | **{{ layer_count }} Layers** |
+| **Board Thickness** | {{ thick_str }} |
+| **Dimensions** | {{ dim_str }} |
+| **Corner Fillet** | R = {{ "%.2f"|format(cr) }} mm |
+| **Surface Finish** | {{ surface_finish }} |
+| **Solder Mask / Coverlay** | {{ coverlay }} |
+| **Silkscreen** | {{ silkscreen }} |
+| **Stiffener** | {{ stiffener }} |
+| **Min Track / Clearance** | {{ min_track }} |
+| **Min Hole Size (Drill)** | {{ min_drill }} |
+
+## SMT Assembly Specifications
+
+| Parameter | Specification |
+| :--- | :--- |
+| **Assembly Type** | {{ assembly_type }} |
+| **Total Placements** | {{ total_placements }} (Top: {{ top_count }}, Bottom: {{ bottom_count }}) |
+| **Critical / Fine-Pitch** | {{ critical_components if bga_qfn_chips else "None" }} |
+| **Solder Paste Alloy** | Lead-free SAC305 (Sn96.5 / Ag3.0 / Cu0.5), RoHS 3 compliant |
+| **Stencil Foil** | 0.10 mm (4.0 mil) laser-cut electro-polished stainless steel |
+| **Reflow Thermal Profile** | Peak 240 deg C to 245 deg C (Max 250 deg C), 60-90s above liquidus (217 deg C) |
+| **Post-Reflow Inspection** | 100% 3D AOI for all SMT chips, 100% AXI for BGA balls & QFN thermal pads |
+
+## Supplier Special Requirements / Order Remarks
+
+```text
+{{ remarks }}
+```
