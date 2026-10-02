@@ -730,3 +730,138 @@ def test_regression_bug_264_recreate_db_after_build_dir_removed(tmp_path: Path) 
     assert db_file.exists()
     db = store.load_database()
     assert any(b.id == "BUG-002" for b in db.bugs)
+
+
+def test_regression_bug_269_scoped_attachments_same_filename(tmp_path: Path) -> None:
+    """Verify BUG-269: Encode attachments scoped by bug ID so multiple bugs can have attachments with the same name."""
+    import threading
+    import urllib.request
+
+    att_dir = tmp_path / "attachments"
+    md_file = tmp_path / "BUGS.md"
+    fb_dir = tmp_path / "feedback"
+    db_file = tmp_path / "bugs.sqlite"
+    json_file = tmp_path / "bugs_state.json"
+
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=tmp_path,
+        feedback_dir=fb_dir,
+        markdown_output=md_file,
+        state_file=json_file,
+        sqlite_file=db_file,
+        attachments_dir=att_dir,
+        fresh=True,
+    )
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+
+    try:
+        base_url = server.get_url()
+
+        # 1. Upload daemon.log for BUG-268
+        payload_268 = json.dumps(
+            {
+                "bug_id": "BUG-268",
+                "filename": "daemon.log",
+                "file_type": "document",
+                "content_text": "daemon log for bug 268",
+                "description": "Build log for BUG-268",
+            }
+        ).encode("utf-8")
+        req1 = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=payload_268,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req1) as resp:
+            assert resp.status == 200
+            res1 = json.loads(resp.read().decode("utf-8"))
+            assert res1["filename"] == "daemon.log"
+            assert res1["file_path"] == "attachments/BUG-268/daemon.log"
+
+        file_268 = att_dir / "BUG-268" / "daemon.log"
+        assert file_268.exists()
+        assert file_268.read_text(encoding="utf-8") == "daemon log for bug 268"
+
+        # 2. Upload another attachment with the EXACT SAME filename daemon.log for BUG-269
+        payload_269 = json.dumps(
+            {
+                "bug_id": "BUG-269",
+                "filename": "daemon.log",
+                "file_type": "document",
+                "content_text": "daemon log for bug 269",
+                "description": "Build log for BUG-269",
+            }
+        ).encode("utf-8")
+        req2 = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=payload_269,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req2) as resp:
+            assert resp.status == 200
+            res2 = json.loads(resp.read().decode("utf-8"))
+            assert res2["filename"] == "daemon.log"
+            assert res2["file_path"] == "attachments/BUG-269/daemon.log"
+
+        file_269 = att_dir / "BUG-269" / "daemon.log"
+        assert file_269.exists()
+        assert file_269.read_text(encoding="utf-8") == "daemon log for bug 269"
+
+        # 3. Assert BUG-268 attachment was NOT overwritten
+        assert file_268.read_text(encoding="utf-8") == "daemon log for bug 268"
+
+        # 4. Verify HTTP serving of both attachments
+        with urllib.request.urlopen(f"{base_url}/attachments/BUG-268/daemon.log") as resp:
+            assert resp.status == 200
+            assert resp.read() == b"daemon log for bug 268"
+
+        with urllib.request.urlopen(f"{base_url}/attachments/BUG-269/daemon.log") as resp:
+            assert resp.status == 200
+            assert resp.read() == b"daemon log for bug 269"
+
+        # 5. Verify database and markdown round trip for both bugs
+        b268 = BugReportModel(
+            id="BUG-268",
+            title="Bug 268",
+            status=BugStatus.RESOLVED,
+            severity=BugSeverity.MEDIUM,
+            category=BugCategory.GENERAL,
+            attachments=[BugAttachmentModel.model_validate(res1)],
+        )
+        b269 = BugReportModel(
+            id="BUG-269",
+            title="Bug 269",
+            status=BugStatus.OPEN,
+            severity=BugSeverity.LOW,
+            category=BugCategory.INFRASTRUCTURE,
+            attachments=[BugAttachmentModel.model_validate(res2)],
+        )
+        server.database.add_or_update(b268)
+        server.database.add_or_update(b269)
+        server.save_and_sync()
+
+        # Check markdown export
+        md_268 = fb_dir / "BUG_268.md"
+        md_269 = fb_dir / "BUG_269.md"
+        assert md_268.exists()
+        assert md_269.exists()
+        assert "[daemon.log](attachments/BUG-268/daemon.log)" in md_268.read_text(encoding="utf-8")
+        assert "[daemon.log](attachments/BUG-269/daemon.log)" in md_269.read_text(encoding="utf-8")
+
+        # Check round-trip parsing from markdown
+        parsed_268 = server.exporter.parse_individual_bug_file(md_268)
+        assert parsed_268 is not None
+        assert len(parsed_268.attachments) == 1
+        assert parsed_268.attachments[0].filename == "daemon.log"
+        assert parsed_268.attachments[0].file_path == "attachments/BUG-268/daemon.log"
+
+        parsed_269 = server.exporter.parse_individual_bug_file(md_269)
+        assert parsed_269 is not None
+        assert len(parsed_269.attachments) == 1
+        assert parsed_269.attachments[0].filename == "daemon.log"
+        assert parsed_269.attachments[0].file_path == "attachments/BUG-269/daemon.log"
+    finally:
+        server.server_close()

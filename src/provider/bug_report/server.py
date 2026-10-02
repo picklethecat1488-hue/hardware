@@ -158,17 +158,20 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_serve_attachment(self, path: str) -> None:
         """Serve uploaded file attachments from attachments directory."""
-        if path.startswith("/build/attachments/"):
-            rel_name = path[len("/build/attachments/") :]
-        elif path.startswith("/attachments/"):
-            rel_name = path[len("/attachments/") :]
+        clean_path = path.lstrip("/")
+        if clean_path.startswith("build/attachments/"):
+            rel_name = clean_path[len("build/attachments/") :]
+        elif clean_path.startswith("attachments/"):
+            rel_name = clean_path[len("attachments/") :]
         else:
-            rel_name = path.lstrip("/")
+            rel_name = clean_path
         file_path = self.server.attachments_dir / rel_name
         if not file_path.exists() or not file_path.is_file():
             fallback = self.server.repo_root / "build" / "attachments" / rel_name
             if fallback.exists() and fallback.is_file():
                 file_path = fallback
+            elif (self.server.repo_root / clean_path).is_file():
+                file_path = self.server.repo_root / clean_path
             else:
                 self.send_error(404, f"Attachment '{rel_name}' not found")
                 return
@@ -300,8 +303,15 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         b64_content = data.get("content_base64", "")
         text_content = data.get("content_text", "")
 
-        self.server.attachments_dir.mkdir(parents=True, exist_ok=True)
-        dest_path = self.server.attachments_dir / filename
+        raw_bug_id = str(data.get("bug_id") or data.get("bugId") or "").strip()
+        if not raw_bug_id and str(data.get("id", "")).startswith("BUG-"):
+            raw_bug_id = str(data.get("id")).strip()
+        bug_id = Path(raw_bug_id).name if raw_bug_id else ""
+        filename = Path(filename).name
+
+        dest_dir = (self.server.attachments_dir / bug_id) if bug_id else self.server.attachments_dir
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = dest_dir / filename
 
         if b64_content:
             file_bytes = base64.b64decode(b64_content)
@@ -446,6 +456,9 @@ class BugReportServer(ThreadingHTTPServer):
 
         if bind_and_activate:
             super().__init__((host, port), BugReportRequestHandler)
+            self.actual_port = self.server_address[1]
+        else:
+            self.actual_port = port
 
     def get_request(self) -> Any:
         """Accept incoming connection and set a socket timeout to prevent lingering sockets."""
@@ -608,4 +621,5 @@ class BugReportServer(ThreadingHTTPServer):
 
     def get_url(self) -> str:
         """Return reachable HTTP URL for browser."""
-        return f"http://{self.host}:{self.port}"
+        port = getattr(self, "actual_port", None) or self.port
+        return f"http://{self.host}:{port}"

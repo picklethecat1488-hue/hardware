@@ -530,6 +530,14 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         rel = path.lstrip("/")
         file_target = (self.server.repo_root / rel).resolve()
         if not file_target.is_file():
+            if hasattr(self.server, "bug_server") and self.server.bug_server:
+                att_dir = getattr(self.server.bug_server, "attachments_dir", None)
+                if att_dir:
+                    clean_rel = rel.removeprefix("attachments/") if rel.startswith("attachments/") else rel
+                    candidate = (att_dir / clean_rel).resolve()
+                    if candidate.is_file():
+                        file_target = candidate
+        if not file_target.is_file():
             self.send_error(404, "Attachment not found")
             return
         mime_type, _ = mimetypes.guess_type(str(file_target))
@@ -765,9 +773,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         b64_content = data.get("content_base64", "")
         text_content = data.get("content_text", "")
 
-        att_dir = self.server.repo_root / "attachments"
-        att_dir.mkdir(parents=True, exist_ok=True)
-        dest_path = att_dir / filename
+        raw_bug_id = str(data.get("bug_id") or data.get("bugId") or "").strip()
+        if not raw_bug_id and str(data.get("id", "")).startswith("BUG-"):
+            raw_bug_id = str(data.get("id")).strip()
+        bug_id = Path(raw_bug_id).name if raw_bug_id else ""
+        filename = Path(filename).name
+
+        att_dir = getattr(self.server.bug_server, "attachments_dir", None) or (self.server.repo_root / "attachments")
+        dest_dir = (att_dir / bug_id) if bug_id else att_dir
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = dest_dir / filename
 
         if b64_content:
             file_bytes = base64.b64decode(b64_content)
