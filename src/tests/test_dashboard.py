@@ -2715,3 +2715,36 @@ def test_regression_bug_252_unified_diff_word_wrap_and_tag_balancing() -> None:
     # 3. Tag balancing and orphan tag stripping in diff engine
     assert "balanceLines" in diff_comp_text
     assert "openTags" in diff_comp_text
+
+
+def test_regression_bug_257_copy_icons_in_dashboard() -> None:
+    """Verify BUG-257: Copy icon buttons next to commit hashes, branch names, and bug IDs in dashboard."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    bug_report_text = (templates_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. diff_view.html.j2 copy buttons:
+    # Commit SHA copy button
+    assert "copy-sha-btn" in diff_view_text
+    assert "copy-icon-btn" in diff_view_text
+    assert "copyText" in diff_view_text
+    # Branch name copy button (current branch & branch list items)
+    assert "btnCopyCurrentBranch" in diff_view_text
+    # Bug ID copy button on smartlog nodes
+    assert "copy-badge-btn" in diff_view_text
+
+    # 2. bug_report.html.j2 copy buttons:
+    # Bug ID in sidebar list and active issue header
+    assert "btn-copy-active-bug" in bug_report_text
+    assert "active-bug-id-display" in bug_report_text
+    assert "copy-icon-btn" in bug_report_text
+    assert "copy-badge-btn" in bug_report_text
+    assert "copyActiveBugId" in bug_report_text
+    assert "copyText" in bug_report_text
+
+    # 3. code_review.html.j2 copy buttons:
+    # Commit SHA copy button in commit drawer
+    assert "copy-sha-btn" in cr_text
+    assert "copy-icon-btn" in cr_text
+    assert "copyText" in cr_text
