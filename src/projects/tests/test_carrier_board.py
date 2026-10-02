@@ -2446,3 +2446,42 @@ def test_regression_bug_259_schematic_floating_pins_and_layout() -> None:
     checker = PCBDesignRulesChecker(provider.pcb_config)
     report = checker.check_schematic(wiring)
     assert len(report.errors) == 0, f"Schematic DRC errors: {[e.description for e in report.errors]}"
+
+
+def test_regression_bug_260_schematic_index_sheet_names_fit_page() -> None:
+    """Verify BUG-260: Schematic Index Document Structure entry names fit within sheet margins."""
+    import matplotlib.pyplot as plt
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model import Wiring
+    from provider.schematic_diagram import SchematicDiagram
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
+    sheet_plans = diag._build_sheet_plans()
+    toc_plans = diag._plan_pdf_toc_pages(wiring.footprints, diag.wiring.nets, sheet_plans)
+
+    # 1. Verify every Document Structure entry is <= 100 characters so it fits on page
+    assert len(toc_plans) >= 1
+    doc_entries = [entry for plan in toc_plans for entry in plan.doc_entries]
+    assert len(doc_entries) >= len(sheet_plans) + 2
+
+    for page_lbl, desc in doc_entries:
+        full_line = f"{page_lbl}: {desc}"
+        assert len(full_line) <= 100, f"Document structure line too long ({len(full_line)} > 100): {full_line}"
+
+    # 2. Render TOC page 1 and verify text objects stay well inside right margin (X < 277)
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from unittest.mock import MagicMock
+
+    mock_pdf = MagicMock()
+    diag._render_pdf_toc_page(mock_pdf, "carrier_board", "Rigid-Flex", 6, toc_plans[0], len(toc_plans), 28)
+    fig = mock_pdf.savefig.call_args[0][0]
+    FigureCanvasAgg(fig)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    ax = fig.axes[0]
+    for t in ax.texts:
+        bbox = t.get_window_extent(renderer).transformed(ax.transData.inverted())
+        # All text elements must stay inside printable boundary X <= 277mm
+        assert bbox.x1 <= 277.0, f"Text '{t.get_text()[:40]}...' exceeded right margin (x1={bbox.x1:.1f} > 277.0)"

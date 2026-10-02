@@ -45,10 +45,13 @@ class SchematicTOCRenderer:
             ("Page 1", "Document Cover & Engineering Specifications"),
             ("Page 2", "Table of Contents, Bill of Footprints & Netlist Summary"),
         ]
+        MAX_ENTRY_LEN = 95
         for sp in sheet_plans:
             desc = f"Schematic Sheet {sp.sheet_idx} - {sp.title}"
-            if sp.description:
-                desc += f" ({sp.description})"
+            if sp.description and len(f"{desc} ({sp.description})") <= MAX_ENTRY_LEN:
+                desc = f"{desc} ({sp.description})"
+            elif len(desc) > MAX_ENTRY_LEN:
+                desc = desc[: MAX_ENTRY_LEN - 3].rstrip() + "..."
             doc_entries.append(("Page ?", desc))
 
         pages: List[_TOCPagePlan] = [_TOCPagePlan(page_index=1)]
@@ -198,7 +201,10 @@ class SchematicTOCRenderer:
             ax.text(20, y, "1. Document Structure", fontsize=11, fontweight="bold", color="#1e293b")
             y -= 9.0
             for page_label, desc in plan.doc_entries:
-                ax.text(28, y, f"{page_label}: {desc}", fontsize=9, color="#334155")
+                text_line = f"{page_label}: {desc}"
+                if len(text_line) > 100:
+                    text_line = text_line[:97].rstrip() + "..."
+                ax.text(28, y, text_line, fontsize=9, color="#334155")
                 y -= 7.0
 
         # Section 2: Footprint Schedule Table
