@@ -13,6 +13,7 @@ import time
 from typing import Tuple
 import urllib.request
 
+from unittest.mock import MagicMock
 import pytest
 
 from dashboard import main, parse_arguments, print_cli_smartlog
@@ -23,7 +24,7 @@ from model.vcs import (
     FileDiffModel,
     WorkingTreeFileModel,
 )
-from provider.dashboard.server import DashboardServer
+from provider.dashboard.server import DashboardRequestHandler, DashboardServer
 from provider.vcs.git_engine import GitEngine, get_git_root, run_git_command
 
 
@@ -2823,3 +2824,45 @@ def test_regression_bug_269_dashboard_scoped_attachments(tmp_path: Path) -> None
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_regression_bug_270_dashboard_server_handles_broken_pipe_gracefully(capsys):
+    """Verify BUG-270: BrokenPipeError and client disconnects are handled cleanly without printing tracebacks."""
+    server = DashboardServer.__new__(DashboardServer)
+
+    # 1. Verify BrokenPipeError in handle_error does not print traceback to stderr
+    try:
+        raise BrokenPipeError(32, "Broken pipe")
+    except BrokenPipeError:
+        server.handle_error(None, ("127.0.0.1", 58468))
+
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "BrokenPipeError" not in captured.err
+
+    # 2. Verify unexpected errors are still reported to super().handle_error
+    try:
+        raise RuntimeError("Real unexpected server failure")
+    except RuntimeError:
+        server.handle_error(None, ("127.0.0.1", 58468))
+
+    captured = capsys.readouterr()
+    assert "Real unexpected server failure" in captured.err
+
+    # 3. Verify handler _send_json and _send_html gracefully handle BrokenPipeError
+    handler = DashboardRequestHandler.__new__(DashboardRequestHandler)
+    mock_wfile = MagicMock()
+    mock_wfile.write.side_effect = BrokenPipeError(32, "Broken pipe")
+    handler.wfile = mock_wfile
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+    handler.close_connection = False
+
+    # Should not raise exception, and should set close_connection = True
+    handler._send_json({"status": "ok"})
+    assert handler.close_connection is True
+
+    handler.close_connection = False
+    handler._send_html("<html><body>test</body></html>")
+    assert handler.close_connection is True

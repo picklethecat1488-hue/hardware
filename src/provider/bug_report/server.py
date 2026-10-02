@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import sys
 import threading
 from typing import Any, Dict, List, Optional
 import urllib.parse
@@ -37,6 +38,20 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:  # noqa: A002
         """Suppress default HTTP server logging to preserve clean console output."""
         return
+
+    def handle_one_request(self) -> None:
+        """Handle a single HTTP request, catching client disconnects gracefully."""
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+
+    def handle(self) -> None:
+        """Handle incoming requests on this connection until closed."""
+        try:
+            super().handle()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
 
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboard and data query endpoints."""
@@ -146,15 +161,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             categories=[c.value for c in BugCategory],
             server_port=self.server.port,
         )
-
-        encoded = html_content.encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(encoded)
-        self.close_connection = True
+        self._send_html(html_content)
 
     def _handle_serve_attachment(self, path: str) -> None:
         """Serve uploaded file attachments from attachments directory."""
@@ -195,13 +202,17 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             ".csv": "text/csv",
         }.get(suffix, "application/octet-stream")
 
-        self.send_response(200)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(content)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(content)
-        self.close_connection = True
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(content)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
+            self.close_connection = True
 
     def _handle_save_bug(self, data: Dict[str, Any]) -> None:
         """Create or update a bug report and persist to storage."""
@@ -387,23 +398,47 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             else ("application/javascript" if file_target.suffix == ".js" else "text/plain")
         )
         data = file_target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", f"{content_type}; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(data)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
+            self.close_connection = True
+
+    def _send_html(self, html: str) -> None:
+        """Send UTF-8 encoded HTML HTTP response payload."""
+        encoded = html.encode("utf-8")
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
+            self.close_connection = True
 
     def _send_json(self, data: Any, status: int = 200) -> None:
         """Send JSON HTTP response payload."""
         encoded = json.dumps(data, indent=2).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(encoded)
-        self.close_connection = True
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
+            self.close_connection = True
 
 
 class BugReportServer(ThreadingHTTPServer):
@@ -411,6 +446,15 @@ class BugReportServer(ThreadingHTTPServer):
 
     allow_reuse_address = True
     daemon_threads = True
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        """Handle client connection errors gracefully without printing tracebacks on client disconnects."""
+        exc_type, _, _ = sys.exc_info()
+        if exc_type is not None and issubclass(
+            exc_type, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
+        ):
+            return
+        super().handle_error(request, client_address)
 
     def __init__(
         self,

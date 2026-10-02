@@ -865,3 +865,50 @@ def test_regression_bug_269_scoped_attachments_same_filename(tmp_path: Path) -> 
         assert parsed_269.attachments[0].file_path == "attachments/BUG-269/daemon.log"
     finally:
         server.server_close()
+
+
+def test_regression_bug_270_bug_report_server_handles_broken_pipe_gracefully(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Verify BUG-270: BrokenPipeError and client disconnects are handled cleanly without printing tracebacks in BugReportServer."""
+    from unittest.mock import MagicMock
+    from provider.bug_report.server import BugReportRequestHandler, BugReportServer
+
+    server = BugReportServer.__new__(BugReportServer)
+
+    # 1. Verify BrokenPipeError in handle_error does not print traceback to stderr
+    try:
+        raise BrokenPipeError(32, "Broken pipe")
+    except BrokenPipeError:
+        server.handle_error(None, ("127.0.0.1", 58468))
+
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "BrokenPipeError" not in captured.err
+
+    # 2. Verify unexpected errors are still reported to super().handle_error
+    try:
+        raise RuntimeError("Real unexpected server failure")
+    except RuntimeError:
+        server.handle_error(None, ("127.0.0.1", 58468))
+
+    captured = capsys.readouterr()
+    assert "Real unexpected server failure" in captured.err
+
+    # 3. Verify handler _send_json and _send_html gracefully handle BrokenPipeError
+    handler = BugReportRequestHandler.__new__(BugReportRequestHandler)
+    mock_wfile = MagicMock()
+    mock_wfile.write.side_effect = BrokenPipeError(32, "Broken pipe")
+    handler.wfile = mock_wfile
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+    handler.close_connection = False
+
+    # Should not raise exception, and should set close_connection = True
+    handler._send_json({"status": "ok"})
+    assert handler.close_connection is True
+
+    handler.close_connection = False
+    handler._send_html("<html><body>test</body></html>")
+    assert handler.close_connection is True
