@@ -530,7 +530,7 @@ class Builder:
     def generate_pcbs(self, out_dir: str, names: list[str] | None = None, force_update: Optional[bool] = None):
         """Export PCB Gerber archives, supplier BOM/CPL, vector schematics, and 3D STEP models."""
         from provider.pcb import PCBExporter, PCBDesignRulesChecker
-        from model.pcb import PCBConfig, BoardType
+        from model.pcb import PCBConfig, resolve_subassembly_pcb_config
         from model.wiring import Wiring
 
         if names:
@@ -575,74 +575,7 @@ class Builder:
                     elif hasattr(part_res, "pcb_metadata"):
                         sub_pcb_config = part_res.pcb_metadata
 
-                target_cfg = sub_pcb_config or pcb_config
-                if sub_pcb_config and pcb_config.revision and getattr(target_cfg, "board_type", None) != BoardType.FLEX:
-                    target_cfg = target_cfg.model_copy(update={"revision": pcb_config.revision})
-                if sub_pcb_config and not target_cfg.stackup:
-                    target_cfg = target_cfg.model_copy(update={"stackup": pcb_config.stackup})
-                if sub_pcb_config and pcb_config.design_rules:
-                    target_cfg = target_cfg.model_copy(update={"design_rules": pcb_config.design_rules})
-                if sub_pcb_config and not target_cfg.capacitive_sensors and pcb_config.capacitive_sensors:
-                    target_cfg = target_cfg.model_copy(update={"capacitive_sensors": pcb_config.capacitive_sensors})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.copper_regions
-                    and pcb_config.copper_regions
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"copper_regions": pcb_config.copper_regions})
-                if sub_pcb_config and not target_cfg.net_classes and pcb_config.net_classes:
-                    target_cfg = target_cfg.model_copy(update={"net_classes": pcb_config.net_classes})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.schematic_sheets
-                    and pcb_config.schematic_sheets
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"schematic_sheets": pcb_config.schematic_sheets})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.schematic_layout
-                    and pcb_config.schematic_layout
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"schematic_layout": pcb_config.schematic_layout})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.silkscreen_texts
-                    and pcb_config.silkscreen_texts
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"silkscreen_texts": pcb_config.silkscreen_texts})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.traces
-                    and pcb_config.traces
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"traces": pcb_config.traces})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.vias
-                    and pcb_config.vias
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"vias": pcb_config.vias})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.silkscreen_graphics
-                    and pcb_config.silkscreen_graphics
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"silkscreen_graphics": pcb_config.silkscreen_graphics})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.omitted_silkscreen_designators
-                    and pcb_config.omitted_silkscreen_designators
-                ):
-                    target_cfg = target_cfg.model_copy(
-                        update={"omitted_silkscreen_designators": pcb_config.omitted_silkscreen_designators}
-                    )
+                target_cfg = resolve_subassembly_pcb_config(sub_pcb_config, pcb_config, subassembly=subassembly)
 
                 # Run DRC and routing connectivity checks
                 board_dir = Path(out_dir) / "board" / provider.name
