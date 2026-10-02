@@ -44,6 +44,7 @@ POWER_NET_PATTERNS = (
     "*SENSOR_3V3*",
     "*PWR*",
     "*POWER*",
+    "*VREG*",
 )
 
 

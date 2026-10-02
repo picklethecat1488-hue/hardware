@@ -32,6 +32,16 @@ class MarkdownReviewExporter:
         """
         self.repo_root = repo_root
 
+    @staticmethod
+    def _is_content_unchanged(disk_content: str, new_content: str) -> bool:
+        """Check if review markdown content is unchanged, ignoring volatile Review Date."""
+        if disk_content == new_content:
+            return True
+        date_pattern = r"\|\s*\*\*Review Date\*\*\s*\|\s*`[^`]*`\s*\|"
+        disk_normalized = re.sub(date_pattern, "", disk_content).strip()
+        new_normalized = re.sub(date_pattern, "", new_content).strip()
+        return disk_normalized == new_normalized
+
     def export_markdown(
         self,
         session: ReviewSessionModel,
@@ -49,6 +59,22 @@ class MarkdownReviewExporter:
             Resolved Path where markdown was saved.
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        if output_path.exists():
+            try:
+                disk_content = output_path.read_text(encoding="utf-8")
+                date_m = re.search(r"\|\s*\*\*Review Date\*\*\s*\|\s*`([^`]+)`\s*\|", disk_content)
+                if date_m and not session.created_at:
+                    session.created_at = date_m.group(1).strip()
+                if total_repo_files == 0:
+                    prog_m = re.search(r"\|\s*\*\*Review Progress\*\*\s*\|\s*`\d+/(\d+)\s+files", disk_content)
+                    if prog_m:
+                        total_repo_files = int(prog_m.group(1))
+                md_text = self.render_markdown(session, total_repo_files=total_repo_files)
+                if self._is_content_unchanged(disk_content, md_text):
+                    return output_path
+            except OSError:
+                pass
+
         md_text = self.render_markdown(session, total_repo_files=total_repo_files)
         output_path.write_text(md_text, encoding="utf-8")
         return output_path
@@ -63,7 +89,20 @@ class MarkdownReviewExporter:
         Returns:
             Formatted Markdown document string.
         """
-        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        if session.created_at and session.created_at.strip():
+            raw_date = session.created_at.strip()
+            if "UTC" in raw_date:
+                now_str = raw_date
+            else:
+                try:
+                    dt = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
+                    now_str = dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+                except ValueError:
+                    now_str = raw_date
+        else:
+            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            session.created_at = now_str
+
         revisions_str = ", ".join(session.revisions) if session.revisions else "Working Tree / HEAD"
 
         severity_counts = session.count_by_severity()
@@ -337,7 +376,10 @@ class MarkdownReviewExporter:
         title_m = re.search(r"^#\s+Code Review Report:\s*(.*?)$", content, re.MULTILINE)
         title = title_m.group(1).strip() if title_m else "Code Review"
 
-        session = ReviewSessionModel(title=title)
+        date_m = re.search(r"\|\s*\*\*Review Date\*\*\s*\|\s*`([^`]+)`\s*\|", content)
+        created_at = date_m.group(1).strip() if date_m else ""
+
+        session = ReviewSessionModel(title=title, created_at=created_at)
 
         # Parse checklist items to extract resolution states: - [x] or - [ ]
         checklist_data: Dict[str, bool] = {}
@@ -436,6 +478,14 @@ class MarkdownReviewExporter:
 
             content = cr_commit_file.read_text(encoding="utf-8")
             parsed_session = self.parse_markdown_text(content)
+            if parsed_session.title and (
+                not session.title
+                or session.title == "Code Review"
+                or session.title == f"Code Review: {session.repo_name}"
+            ):
+                session.title = parsed_session.title
+            if parsed_session.created_at:
+                session.created_at = parsed_session.created_at
             existing_by_uuid = {c.uuid: c for c in session.comments if c.uuid}
             existing_by_loc = {(c.file_path, c.start_line, c.end_line): c for c in session.comments}
 
@@ -515,6 +565,23 @@ class MarkdownReviewExporter:
         commit_session = session.model_copy(deep=True)
         commit_session.comments = commit_comments
         commit_session.revisions = [commit_sha]
+
+        if target_path.exists():
+            try:
+                disk_content = target_path.read_text(encoding="utf-8")
+                date_m = re.search(r"\|\s*\*\*Review Date\*\*\s*\|\s*`([^`]+)`\s*\|", disk_content)
+                if date_m and not commit_session.created_at:
+                    commit_session.created_at = date_m.group(1).strip()
+                if total_repo_files == 0:
+                    prog_m = re.search(r"\|\s*\*\*Review Progress\*\*\s*\|\s*`\d+/(\d+)\s+files", disk_content)
+                    if prog_m:
+                        total_repo_files = int(prog_m.group(1))
+                md_text = self.render_markdown(commit_session, total_repo_files=total_repo_files)
+                if self._is_content_unchanged(disk_content, md_text):
+                    return target_path
+            except OSError:
+                pass
+
         md_text = self.render_markdown(commit_session, total_repo_files=total_repo_files)
         target_path.write_text(md_text, encoding="utf-8")
         return target_path

@@ -2350,10 +2350,15 @@ class PCBDesignRulesChecker:
                     orig_fp = footprints_map[c]
                     if sheet.pin_breakouts and c in sheet.pin_breakouts:
                         allowed_pins = set(sheet.pin_breakouts[c])
+                        orig_pin_names = {p.name for p in orig_fp.pins}
                         matched_pins = [
                             p
                             for p in orig_fp.pins
-                            if p.name in allowed_pins or getattr(p, "label", None) in allowed_pins
+                            if p.name in allowed_pins
+                            or (
+                                getattr(p, "label", None) in allowed_pins
+                                and getattr(p, "label", None) not in orig_pin_names
+                            )
                         ]
                         sheet_fps.append(orig_fp.model_copy(update={"pins": matched_pins}))
                     else:

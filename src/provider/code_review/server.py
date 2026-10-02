@@ -532,7 +532,7 @@ class ReviewServer(ThreadingHTTPServer):
             curr_fb_mtime = self._get_feedback_dir_mtime()
             if curr_fb_mtime > self.feedback_mtime + 0.001:
                 self.sync_feedback()
-                self.feedback_mtime = curr_fb_mtime
+                self.feedback_mtime = self._get_feedback_dir_mtime()
                 return True
             return False
 
@@ -577,8 +577,9 @@ class ReviewServer(ThreadingHTTPServer):
                 commit_sha = self.session.commit_hash or self.git_engine.get_head_commit()
                 if commit_sha:
                     try:
+                        commit_files = len(self.git_engine.get_changed_files(commit_sha))
                         self.exporter.export_commit_markdown(
-                            self.session, commit_sha, self.feedback_dir, total_repo_files=total_files
+                            self.session, commit_sha, self.feedback_dir, total_repo_files=commit_files
                         )
                     except OSError:
                         pass

@@ -363,6 +363,37 @@
       color: var(--quake-text-dim);
       font-size: 10px;
     }
+    .copy-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 1px 3px;
+      margin-left: 3px;
+      font-size: 11px;
+      color: var(--quake-text-dim);
+      opacity: 0.75;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+      line-height: 1;
+      vertical-align: middle;
+    }
+    .copy-icon-btn:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--quake-gold);
+      transform: scale(1.12);
+    }
+    .copy-icon-btn:active {
+      transform: scale(0.92);
+    }
+    .copy-sha-btn {
+      font-size: 10px;
+      padding: 0 2px;
+      margin-left: 4px;
+    }
     .commit-subject {
       color: var(--quake-text-light);
       font-size: 11.5px;
@@ -1944,7 +1975,10 @@
         const timeDisplay = c.time ? ` ${c.time}` : (c.date.includes('T') ? ` ${c.date.split('T')[1].slice(0, 8)}` : '');
         li.innerHTML = `
           <div class="commit-top">
-            <span class="commit-hash">${c.short_hash}</span>
+            <span style="display:inline-flex;align-items:center;">
+              <span class="commit-hash">${c.short_hash}</span>
+              <button class="copy-icon-btn copy-sha-btn" onclick="event.stopPropagation(); copyText('${c.commit_hash}');" title="Copy commit hash ${c.commit_hash}">📋</button>
+            </span>
             ${ancestorBadge}
             ${trackerBadge}
             <span class="commit-date">${c.date.slice(0, 10)}${timeDisplay}</span>
@@ -3821,6 +3855,19 @@
       document.execCommand("copy");
       document.body.removeChild(textarea);
       showToast("Copied: " + text);
+    }
+
+    function copyText(text) {
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast("Copied: " + text);
+        }).catch(() => {
+          fallbackCopy(text);
+        });
+      } else {
+        fallbackCopy(text);
+      }
     }
 
     function copyActiveFilePath() {

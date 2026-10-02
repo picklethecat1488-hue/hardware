@@ -184,12 +184,21 @@ class SchematicDiagram:
                             pin_order_list = sheet_def.pin_breakouts[comp_name]
                             pin_order_map = {name: idx for idx, name in enumerate(pin_order_list)}
                             allowed_pins = set(pin_order_map.keys())
+                            orig_pin_names = {p.name for p in orig_fp.pins}
                             matched_pins = [
-                                p for p in orig_fp.pins if p.name in allowed_pins or p.label in allowed_pins
+                                p
+                                for p in orig_fp.pins
+                                if p.name in allowed_pins
+                                or (
+                                    getattr(p, "label", None) in allowed_pins
+                                    and getattr(p, "label", None) not in orig_pin_names
+                                )
                             ]
                             filtered_pins = sorted(
                                 matched_pins,
-                                key=lambda p: pin_order_map.get(p.name, pin_order_map.get(p.label, 999)),
+                                key=lambda p: pin_order_map.get(
+                                    p.name, pin_order_map.get(getattr(p, "label", None), 999)
+                                ),
                             )
                             sheet_fps.append(orig_fp.model_copy(update={"pins": filtered_pins}))
                         else:
@@ -697,7 +706,7 @@ class SchematicDiagram:
             bottom_cards_y = 60.0
         elif has_bottom_cards:
             top_row_y = 158.0
-            bottom_cards_y = 66.0
+            bottom_cards_y = 52.0
         elif pullup_resistors:
             top_row_y = 138.0
             bottom_cards_y = 60.0
@@ -711,8 +720,14 @@ class SchematicDiagram:
             cols_per_row = cols_override
             col_w = 210.0 / max(1, cols_per_row)
             cw = min(38.0, col_w * 0.55)
-            gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
-            start_x = 45.0
+            layout_col_gap = getattr(layout, "col_gap", 15.0)
+            if layout_col_gap != 15.0:
+                gap = layout_col_gap
+                total_w = cols_per_row * cw + (cols_per_row - 1) * gap
+                start_x = max(35.0, page_center_x - total_w / 2.0)
+            else:
+                gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
+                start_x = 45.0
             col_x_positions = []
             col_y_positions = []
             comp_col_map = {}

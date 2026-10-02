@@ -372,6 +372,36 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .copy-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 1px 3px;
+      margin-left: 3px;
+      font-size: 11px;
+      color: var(--quake-text-dim);
+      opacity: 0.75;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+      line-height: 1;
+      vertical-align: middle;
+    }
+    .copy-icon-btn:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--quake-gold);
+      transform: scale(1.12);
+    }
+    .copy-icon-btn:active {
+      transform: scale(0.92);
+    }
+    .copy-badge-btn {
+      font-size: 9px;
+      padding: 0 2px;
+    }
 
     /* Content Area */
     .content-area {
@@ -617,7 +647,11 @@
       <!-- Bug Identity Section -->
       <div class="form-section quake-card">
         <div class="section-title">
-          <span>Issue Identity</span>
+          <span style="display:flex; align-items:center; gap:8px;">
+            <span>Issue Identity</span>
+            <span id="active-bug-id-display" style="color:var(--quake-gold); font-size:12px;"></span>
+            <button id="btn-copy-active-bug" class="copy-icon-btn copy-badge-btn" onclick="copyActiveBugId()" title="Copy active bug ID" style="display:none;">📋</button>
+          </span>
           <div style="display:flex; gap:8px;">
             <button id="btn-save" class="quake-btn quake-btn-green" onclick="saveActiveBug()">Save Bug</button>
             <button id="btn-delete" class="quake-btn quake-btn-red" onclick="deleteActiveBug()">Delete</button>
@@ -822,6 +856,39 @@
       setTimeout(() => { t.style.display = "none"; }, 3500);
     }
 
+    function copyText(text) {
+      if (!text) return;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(`Copied: ${text}`);
+        }).catch(() => fallbackCopy(text));
+      } else {
+        fallbackCopy(text);
+      }
+    }
+
+    function fallbackCopy(text) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        showToast(`Copied: ${text}`);
+      } catch (err) {
+        console.error("Failed to copy", err);
+      }
+    }
+
+    function copyActiveBugId() {
+      if (activeBugId) {
+        copyText(activeBugId);
+      }
+    }
+
     function updateMetrics() {
       const total = db.bugs.length;
       const open = db.bugs.filter(b => b.status === "OPEN" || b.status === "IN_PROGRESS").length;
@@ -911,7 +978,7 @@
 
         li.innerHTML = `
           <div class="bug-item-top">
-            <span class="bug-id">${bug.id}</span>
+            <span class="bug-id">${bug.id} <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${bug.id}')" title="Copy Bug ID ${bug.id}">📋</button></span>
             <span class="${sevBadgeClass}">${bug.severity}</span>
             <span class="${stBadgeClass}">${bug.status}</span>
           </div>
@@ -930,6 +997,11 @@
     function loadActiveBug() {
       const bug = db.bugs.find(b => b.id === activeBugId);
       if (!bug) return;
+
+      const bugIdDisp = document.getElementById("active-bug-id-display");
+      const btnCopyActiveBug = document.getElementById("btn-copy-active-bug");
+      if (bugIdDisp) bugIdDisp.textContent = `[${bug.id}]`;
+      if (btnCopyActiveBug) btnCopyActiveBug.style.display = "inline-flex";
 
       document.getElementById("bug-title").value = bug.title || "";
       document.getElementById("bug-severity").value = bug.severity || "MEDIUM";

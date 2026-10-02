@@ -561,6 +561,42 @@
       border-color: var(--quake-green);
       color: var(--quake-green);
     }
+    .copy-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 1px 3px;
+      margin-left: 3px;
+      font-size: 11px;
+      color: var(--quake-text-dim);
+      opacity: 0.75;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+      line-height: 1;
+      vertical-align: middle;
+    }
+    .copy-icon-btn:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--quake-gold);
+      transform: scale(1.12);
+    }
+    .copy-icon-btn:active {
+      transform: scale(0.92);
+    }
+    .copy-sha-btn {
+      font-size: 10px;
+      padding: 0 2px;
+      margin-left: 4px;
+    }
+    .copy-badge-btn {
+      font-size: 9px;
+      padding: 0 2px;
+      margin-left: 2px;
+    }
     .smartlog-node.has-pr {
       border-left: 3px solid #a855f7 !important;
       background: linear-gradient(90deg, rgba(168, 85, 247, 0.1) 0%, #160e07 40%);
@@ -918,6 +954,7 @@
           <span>🌿 {{ session.current_branch or session.active_branch }}</span>
           <span style="font-size:8px;color:var(--quake-gold);">▼</span>
         </button>
+        <button id="btnCopyCurrentBranch" class="copy-icon-btn copy-branch-btn" onclick="copyText(state.currentBranch || '{{ session.current_branch or session.active_branch }}')" title="Copy current branch name">📋</button>
         <select id="branchSelect" class="quake-select" style="display:none;" onchange="onBranchSelected(this.value)">
           <optgroup label="⭐ Main &amp; Release Branches">
             {% for b in session.branches if b.is_release_branch_candidate %}
@@ -1021,6 +1058,7 @@
                        {% if node.commit_hash in session.selected_commits %}checked{% endif %}/>
                 <span class="node-graph-art">{{ node.graph_art or node.graph_symbol }}</span>
                 <span class="node-sha">{{ node.short_hash }}</span>
+                <button class="copy-icon-btn copy-sha-btn" onclick="event.stopPropagation(); copyText('{{ node.commit_hash }}');" title="Copy commit hash {{ node.commit_hash }}">📋</button>
                 {% if node.pr_number and node.pr_url %}
                   <a href="{{ node.pr_url }}"
                      target="_blank"
@@ -1055,14 +1093,17 @@
               {% for br in node.branches %}
                 {% set is_pr_br = ('pr' in br.lower() or 'pull' in br.lower()) %}
                 {% set br_url = node.pr_url if (is_pr_br and node.pr_url) else (repo_web_base ~ '/tree/' ~ br.replace('origin/', '')) %}
-                <a href="{{ br_url }}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   class="node-badge node-badge-branch {% if is_pr_br and node.pr_url %}pr-tag-link{% elif is_pr_br %}pr-local-badge{% endif %}"
-                   onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
-                   title="{% if is_pr_br and node.pr_url %}Open PR in GitHub{% elif is_pr_br %}Local branch {{ br }} (not on GitHub){% else %}View branch {{ br }} on GitHub{% endif %}">
-                  ⎇ {{ br }}
-                </a>
+                <span style="display:inline-flex;align-items:center;">
+                  <a href="{{ br_url }}"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     class="node-badge node-badge-branch {% if is_pr_br and node.pr_url %}pr-tag-link{% elif is_pr_br %}pr-local-badge{% endif %}"
+                     onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
+                     title="{% if is_pr_br and node.pr_url %}Open PR in GitHub{% elif is_pr_br %}Local branch {{ br }} (not on GitHub){% else %}View branch {{ br }} on GitHub{% endif %}">
+                    ⎇ {{ br }}
+                  </a>
+                  <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); event.preventDefault(); copyText('{{ br }}');" title="Copy branch {{ br }}">📋</button>
+                </span>
               {% endfor %}
               {% for tag in node.tags %}
                 {% set is_pr_tag = ('pr' in tag.lower() or 'pull' in tag.lower()) %}
@@ -1093,10 +1134,13 @@
                 </span>
               {% endif %}
               {% for bug in node.bug_tags %}
-                <span class="node-badge node-badge-bug {% if bug.status == 'RESOLVED' %}resolved{% endif %}"
-                      onclick="event.stopPropagation(); openBug('{{ bug.id }}');"
-                      title="{{ bug.title }} (Click to open in Bug Viewer)">
-                  {{ bug.id }}: {{ bug.status }}
+                <span style="display:inline-flex;align-items:center;">
+                  <span class="node-badge node-badge-bug {% if bug.status == 'RESOLVED' %}resolved{% endif %}"
+                        onclick="event.stopPropagation(); openBug('{{ bug.id }}');"
+                        title="{{ bug.title }} (Click to open in Bug Viewer)">
+                    {{ bug.id }}: {{ bug.status }}
+                  </span>
+                  <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('{{ bug.id }}');" title="Copy {{ bug.id }}">📋</button>
                 </span>
               {% endfor %}
             </div>
@@ -1708,14 +1752,17 @@
           const brUrl = (isPrBr && node.pr_url) ? node.pr_url : `${repoWebBase}/tree/${br.replace('origin/', '')}`;
           const badgeClass = (isPrBr && node.pr_url) ? "pr-tag-link" : (isPrBr ? "pr-local-badge" : "");
           tagsHtml += `
-            <a href="${brUrl}"
-               target="_blank"
-               rel="noopener noreferrer"
-               class="node-badge node-badge-branch ${badgeClass}"
-               onclick="onBranchBadgeClick(event, '${escapeHtml(br)}', '${node.pr_url || ''}')"
-               title="${isPrBr && node.pr_url ? 'Open PR in GitHub' : (isPrBr ? 'Local branch ' + escapeHtml(br) + ' (not on GitHub)' : 'View branch ' + escapeHtml(br) + ' on GitHub')}">
-              ⎇ ${escapeHtml(br)}
-            </a>
+            <span style="display:inline-flex;align-items:center;">
+              <a href="${brUrl}"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 class="node-badge node-badge-branch ${badgeClass}"
+                 onclick="onBranchBadgeClick(event, '${escapeHtml(br)}', '${node.pr_url || ''}')"
+                 title="${isPrBr && node.pr_url ? 'Open PR in GitHub' : (isPrBr ? 'Local branch ' + escapeHtml(br) + ' (not on GitHub)' : 'View branch ' + escapeHtml(br) + ' on GitHub')}">
+                ⎇ ${escapeHtml(br)}
+              </a>
+              <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); event.preventDefault(); copyText('${escapeHtml(br)}');" title="Copy branch ${escapeHtml(br)}">📋</button>
+            </span>
           `;
         });
         (node.tags || []).forEach(tag => {
@@ -1755,10 +1802,13 @@
         }
         (node.bug_tags || []).forEach(bug => {
           tagsHtml += `
-            <span class="node-badge node-badge-bug ${bug.status === 'RESOLVED' ? 'resolved' : ''}"
-                  onclick="event.stopPropagation(); openBug('${escapeHtml(bug.id)}');"
-                  title="${escapeHtml(bug.title)}">
-              ${escapeHtml(bug.id)}: ${escapeHtml(bug.status)}
+            <span style="display:inline-flex;align-items:center;">
+              <span class="node-badge node-badge-bug ${bug.status === 'RESOLVED' ? 'resolved' : ''}"
+                    onclick="event.stopPropagation(); openBug('${escapeHtml(bug.id)}');"
+                    title="${escapeHtml(bug.title)}">
+                ${escapeHtml(bug.id)}: ${escapeHtml(bug.status)}
+              </span>
+              <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${escapeHtml(bug.id)}');" title="Copy ${escapeHtml(bug.id)}">📋</button>
             </span>
           `;
         });
@@ -1784,6 +1834,7 @@
                        ${isChecked ? 'checked' : ''}/>
                 <span class="node-graph-art">${escapeHtml(node.graph_art || node.graph_symbol || 'o')}</span>
                 <span class="node-sha">${escapeHtml(node.short_hash)}</span>
+                <button class="copy-icon-btn copy-sha-btn" onclick="event.stopPropagation(); copyText('${node.commit_hash}');" title="Copy commit hash ${node.commit_hash}">📋</button>
                 ${prBadge}
               </div>
               <span class="node-author-date">${escapeHtml(node.relative_date || node.date)}</span>
@@ -2651,6 +2702,7 @@
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="color:var(--quake-gold);">${b.is_main ? '⭐' : '🏷️'}</span>
             <span>${b.name}</span>
+            <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${escapeHtml(b.name)}');" title="Copy branch ${escapeHtml(b.name)}">📋</button>
             ${b.is_current ? '<span class="node-badge node-badge-tag" style="background:var(--quake-gold);color:#140a05;font-weight:700;">CURRENT</span>' : ''}
           </div>
           <span style="font-size:10px;color:var(--quake-text-muted);">${b.is_main ? 'Mainline' : 'Release'}</span>
@@ -2668,6 +2720,7 @@
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="color:${isPR ? 'var(--quake-purple)' : 'var(--quake-cyan)'};">${isPR ? '⎇' : '🌿'}</span>
             <span>${b.name}</span>
+            <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${escapeHtml(b.name)}');" title="Copy branch ${escapeHtml(b.name)}">📋</button>
             ${b.is_current ? '<span class="node-badge node-badge-tag" style="background:var(--quake-gold);color:#140a05;font-weight:700;">CURRENT</span>' : ''}
           </div>
           <span style="font-size:10px;color:var(--quake-text-dim);">${isPR ? 'PR Branch' : 'Feature'}</span>
