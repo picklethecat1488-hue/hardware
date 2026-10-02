@@ -2526,13 +2526,13 @@ def test_regression_bug_261_supplier_pcb_docs() -> None:
 
 
 def test_regression_bug_262_supplier_pcb_guidelines_zip_outputs() -> None:
-    """Verify BUG-262: build outputs supplier zip archives under build/board.
+    """Verify BUG-262: build outputs supplier zip archives under build/board/<project>.
 
     - gerbers.zip: contains .pcb .pcbdoc .cam .brd and gerber files
     - bom_templates.zip: contains <PCB name>_bom.csv BOM list for each PCB
     - centroid_files.zip: contains <PCB name>_pos.csv centroid list for each PCB
     - assembly_files.zip: contains <PCB name>_top.png, <PCB name>_bottom.png top and bottom PCB textures for each PCB
-    The zip files should go under build/board.
+    The zip files should go under build/board/<project>, not directly under build/board.
     """
     import zipfile
     from build import Builder
@@ -2546,11 +2546,20 @@ def test_regression_bug_262_supplier_pcb_guidelines_zip_outputs() -> None:
     # Trigger supplier packaging for carrier_board
     builder.generate_pcbs(out_dir="build", names=["carrier_board/*"])
 
-    board_dir = Path("build/board")
-    assert (board_dir / "gerbers.zip").exists(), "build/board/gerbers.zip must exist"
-    assert (board_dir / "bom_templates.zip").exists(), "build/board/bom_templates.zip must exist"
-    assert (board_dir / "centroid_files.zip").exists(), "build/board/centroid_files.zip must exist"
-    assert (board_dir / "assembly_files.zip").exists(), "build/board/assembly_files.zip must exist"
+    top_board_dir = Path("build/board")
+    board_dir = Path("build/board/carrier_board")
+
+    # Verify no zip archives exist directly under build/board/
+    assert not (top_board_dir / "gerbers.zip").exists(), "build/board/gerbers.zip must not exist"
+    assert not (top_board_dir / "bom_templates.zip").exists(), "build/board/bom_templates.zip must not exist"
+    assert not (top_board_dir / "centroid_files.zip").exists(), "build/board/centroid_files.zip must not exist"
+    assert not (top_board_dir / "assembly_files.zip").exists(), "build/board/assembly_files.zip must not exist"
+
+    # Verify zip archives exist under build/board/carrier_board/
+    assert (board_dir / "gerbers.zip").exists(), "build/board/carrier_board/gerbers.zip must exist"
+    assert (board_dir / "bom_templates.zip").exists(), "build/board/carrier_board/bom_templates.zip must exist"
+    assert (board_dir / "centroid_files.zip").exists(), "build/board/carrier_board/centroid_files.zip must exist"
+    assert (board_dir / "assembly_files.zip").exists(), "build/board/carrier_board/assembly_files.zip must exist"
 
     # 1. gerbers.zip: contains .pcb, .pcbdoc, .cam, .brd and gerber files
     with zipfile.ZipFile(board_dir / "gerbers.zip", "r") as zf:

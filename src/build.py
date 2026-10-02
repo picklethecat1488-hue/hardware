@@ -705,8 +705,10 @@ class Builder:
                 exporter.export_bom_csv(bom_csv)
                 exporter.export_pick_and_place_csv(pos_csv)
                 if subassembly == provider.name:
-                    shutil.copy2(bom_csv, bom_dir / "bom.csv")
-                    shutil.copy2(pos_csv, bom_dir / "pos.csv")
+                    if bom_csv.exists():
+                        shutil.copy2(bom_csv, bom_dir / "bom.csv")
+                    if pos_csv.exists():
+                        shutil.copy2(pos_csv, bom_dir / "pos.csv")
                 exporter.export_schematic_pdf(schematic_pdf)
                 exporter.export_step_solid(step_file)
 
@@ -726,9 +728,9 @@ class Builder:
             self.package_supplier_pcb_files(out_dir=out_dir, provider=p)
 
     def package_supplier_pcb_files(self, out_dir: str | Path, provider) -> dict[str, Path]:
-        """Package supplier manufacturing zip files under build/board per BUG-262.
+        """Package supplier manufacturing zip files under build/board/<provider.name> per BUG-262.
 
-        Outputs under build/board/ and build/board/<provider.name>/:
+        Outputs under build/board/<provider.name>/:
         - gerbers.zip: contains .pcb, .pcbdoc, .cam, .brd and gerber files
         - bom_templates.zip: contains <PCB name>_bom.csv BOM list for each PCB
         - centroid_files.zip: contains <PCB name>_pos.csv centroid list for each PCB
@@ -738,10 +740,14 @@ class Builder:
         board_dir = out_path / "board" / provider.name
         bom_dir = out_path / "bom" / provider.name
         textures_dir = board_dir / "textures"
-        dest_board_dirs = [out_path / "board", board_dir]
+        board_dir.mkdir(parents=True, exist_ok=True)
 
-        for d in dest_board_dirs:
-            d.mkdir(parents=True, exist_ok=True)
+        # Clean up any legacy zip archives directly under build/board
+        top_board_dir = out_path / "board"
+        for zip_name in ("gerbers.zip", "bom_templates.zip", "centroid_files.zip", "assembly_files.zip"):
+            stray_zip = top_board_dir / zip_name
+            if stray_zip.is_file():
+                stray_zip.unlink(missing_ok=True)
 
         # 1. Identify all PCB names from .kicad_pcb files in board_dir
         pcb_files = list(board_dir.glob("*.kicad_pcb"))
@@ -808,15 +814,15 @@ class Builder:
                 if img_path.exists():
                     assembly_items.append((img_path, img_name))
 
-        created_zips = {}
-        for d in dest_board_dirs:
-            created_zips[str(d / "gerbers.zip")] = create_zip(d / "gerbers.zip", gerber_items)
-            created_zips[str(d / "bom_templates.zip")] = create_zip(d / "bom_templates.zip", bom_items)
-            created_zips[str(d / "centroid_files.zip")] = create_zip(d / "centroid_files.zip", centroid_items)
-            created_zips[str(d / "assembly_files.zip")] = create_zip(d / "assembly_files.zip", assembly_items)
+        created_zips = {
+            str(board_dir / "gerbers.zip"): create_zip(board_dir / "gerbers.zip", gerber_items),
+            str(board_dir / "bom_templates.zip"): create_zip(board_dir / "bom_templates.zip", bom_items),
+            str(board_dir / "centroid_files.zip"): create_zip(board_dir / "centroid_files.zip", centroid_items),
+            str(board_dir / "assembly_files.zip"): create_zip(board_dir / "assembly_files.zip", assembly_items),
+        }
 
         self.logger.print(
-            f"Generated Supplier Packages: {out_path / 'board'}/{{gerbers,bom_templates,centroid_files,assembly_files}}.zip",
+            f"Generated Supplier Packages: {board_dir}/{{gerbers,bom_templates,centroid_files,assembly_files}}.zip",
             symbol="📦",
         )
         return created_zips
