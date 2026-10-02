@@ -2523,3 +2523,64 @@ def test_regression_bug_261_supplier_pcb_docs() -> None:
     # 5. Redundant MSL 3 bakeout callouts excluded
     assert "Bakeout protocol: $125^\\circ\\text{C}" not in content
     assert "Moisture-sensitive parts (MSL 3: <code>U1</code>" not in content
+
+
+def test_regression_bug_262_supplier_pcb_guidelines_zip_outputs() -> None:
+    """Verify BUG-262: build outputs supplier zip archives under build/board.
+
+    - gerbers.zip: contains .pcb .pcbdoc .cam .brd and gerber files
+    - bom_templates.zip: contains <PCB name>_bom.csv BOM list for each PCB
+    - centroid_files.zip: contains <PCB name>_pos.csv centroid list for each PCB
+    - assembly_files.zip: contains <PCB name>_top.png, <PCB name>_bottom.png top and bottom PCB textures for each PCB
+    The zip files should go under build/board.
+    """
+    import zipfile
+    from build import Builder
+    from config import AppConfig
+    from provider import ProviderManager
+
+    config = AppConfig()
+    manager = ProviderManager(config)
+    builder = Builder(manager)
+
+    # Trigger supplier packaging for carrier_board
+    builder.generate_pcbs(out_dir="build", names=["carrier_board/*"])
+
+    board_dir = Path("build/board")
+    assert (board_dir / "gerbers.zip").exists(), "build/board/gerbers.zip must exist"
+    assert (board_dir / "bom_templates.zip").exists(), "build/board/bom_templates.zip must exist"
+    assert (board_dir / "centroid_files.zip").exists(), "build/board/centroid_files.zip must exist"
+    assert (board_dir / "assembly_files.zip").exists(), "build/board/assembly_files.zip must exist"
+
+    # 1. gerbers.zip: contains .pcb, .pcbdoc, .cam, .brd and gerber files
+    with zipfile.ZipFile(board_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        suffixes = {Path(n).suffix.lower() for n in names}
+        assert ".pcb" in suffixes, "gerbers.zip must contain .pcb files"
+        assert ".pcbdoc" in suffixes, "gerbers.zip must contain .pcbdoc files"
+        assert ".cam" in suffixes, "gerbers.zip must contain .cam files"
+        assert ".brd" in suffixes, "gerbers.zip must contain .brd files"
+        assert ".gbr" in suffixes or any(n.endswith(".gbr") for n in names), "gerbers.zip must contain gerber files"
+        # Check both PCBs are represented
+        assert any("carrier_board" in n for n in names), "gerbers.zip must include carrier_board files"
+        assert any("flex_tail" in n for n in names), "gerbers.zip must include flex_tail files"
+
+    # 2. bom_templates.zip: contains <PCB name>_bom.csv for each PCB
+    with zipfile.ZipFile(board_dir / "bom_templates.zip", "r") as zf:
+        names = zf.namelist()
+        assert "carrier_board_bom.csv" in names, "bom_templates.zip must contain carrier_board_bom.csv"
+        assert "flex_tail_bom.csv" in names, "bom_templates.zip must contain flex_tail_bom.csv"
+
+    # 3. centroid_files.zip: contains <PCB name>_pos.csv centroid list for each PCB
+    with zipfile.ZipFile(board_dir / "centroid_files.zip", "r") as zf:
+        names = zf.namelist()
+        assert "carrier_board_pos.csv" in names, "centroid_files.zip must contain carrier_board_pos.csv"
+        assert "flex_tail_pos.csv" in names, "centroid_files.zip must contain flex_tail_pos.csv"
+
+    # 4. assembly_files.zip: contains <PCB name>_top.png, <PCB name>_bottom.png textures for each PCB
+    with zipfile.ZipFile(board_dir / "assembly_files.zip", "r") as zf:
+        names = zf.namelist()
+        assert "carrier_board_top.png" in names, "assembly_files.zip must contain carrier_board_top.png"
+        assert "carrier_board_bottom.png" in names, "assembly_files.zip must contain carrier_board_bottom.png"
+        assert "flex_tail_top.png" in names, "assembly_files.zip must contain flex_tail_top.png"
+        assert "flex_tail_bottom.png" in names, "assembly_files.zip must contain flex_tail_bottom.png"
