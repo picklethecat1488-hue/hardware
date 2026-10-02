@@ -1197,3 +1197,10 @@ class PCBExporter:
         solid = self.build_solid()
         export_step(solid, str(out_path))
         return out_path
+
+    @staticmethod
+    def package_supplier_files(out_dir: str | Path, provider: Any, logger: Optional[Any] = None) -> dict[str, Path]:
+        """Package supplier manufacturing zip files under build/board/<provider.name> per BUG-262 and BUG-271."""
+        from provider.pcb.supplier import package_supplier_pcb_files
+
+        return package_supplier_pcb_files(out_dir=out_dir, provider=provider, logger=logger)
