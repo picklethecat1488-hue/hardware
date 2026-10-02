@@ -2610,3 +2610,44 @@ def test_regression_bug_266_remove_led_and_jumper_opposite_side_designators() ->
     )
     for des in removed_designators:
         assert des not in bottom_texts, f"Opposite-side component designator '{des}' found on B.SilkS"
+
+
+def test_regression_bug_267_c18_c19_vertical_stack_and_u11_clearance() -> None:
+    """Verify BUG-267: C18 and C19 are stacked vertically outside U11 silkscreen border with 0 DRC errors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. C18 and C19 exist and are stacked vertically at X >= 6.5
+    assert "C18" in comp_map, "C18 tuning capacitor must exist"
+    assert "C19" in comp_map, "C19 tuning capacitor must exist"
+    c18 = comp_map["C18"]
+    c19 = comp_map["C19"]
+
+    # Vertically stacked: same X coordinate, different Y coordinates
+    assert c18.position[0] == c19.position[0], (
+        f"C18 and C19 must be vertically stacked with matching X, got C18.X={c18.position[0]}, C19.X={c19.position[0]}"
+    )
+    assert c18.position[1] != c19.position[1], "C18 and C19 must have distinct Y positions"
+
+    # Well clear of U11 edge (X=5.0) and silkscreen brackets (X=5.25)
+    assert c18.position[0] >= 6.5, (
+        f"C18/C19 X position must be >= 6.5mm to be outside U11 silkscreen border, got {c18.position[0]}"
+    )
+
+    # 2. Verify net connections
+    assert any(c == "C18" and p == "1" for c, p in nets_map["NFC1"].pins), "C18 pin 1 must connect to NFC1"
+    assert any(c == "C18" and p == "2" for c, p in nets_map["GND"].pins), "C18 pin 2 must connect to GND"
+    assert any(c == "C19" and p == "1" for c, p in nets_map["NFC2"].pins), "C19 pin 1 must connect to NFC2"
+    assert any(c == "C19" and p == "2" for c, p in nets_map["GND"].pins), "C19 pin 2 must connect to GND"
+
+    # 3. PCB DRC check passes with 0 violations
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
