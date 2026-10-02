@@ -95,12 +95,15 @@ style: |
 </div>
 </div>
 
-| Parameter | Carrier Board (Rigid) | Flex Tail (Flexible) | Unit |
+| Parameter | Carrier Board (Rigid Section) | Flex Tail (Flexible Section) | Unit |
 | :--- | :--- | :--- | :--- |
 | Board Outline Dimensions | $60.00 \times 90.00$ | $24.00 \times 54.00$ (Tab $17.00$) | mm |
 | Board Thickness | $1.60 \pm 0.10$ | $0.20 \pm 0.03$ | mm |
 | Layer Count | 6 Copper Layers | 2 Copper Layers | - |
 | Substrate Material | FR4 High-Tg ($T_g \ge 170^\circ\text{C}$) | DuPont Pyralux Polyimide | - |
+| Minimum Track Width | $0.10\text{ mm}$ ($3.94\text{ mil}$) | $0.12\text{ mm}$ ($4.72\text{ mil}$) | mm (mil) |
+| Minimum Track Spacing | $0.12\text{ mm}$ ($4.72\text{ mil}$) | $0.15\text{ mm}$ ($5.91\text{ mil}$) | mm (mil) |
+| Minimum Hole / Drill Size | $\varnothing 0.25\text{ mm}$ ($9.84\text{ mil}$) via / $\varnothing 0.16\text{ mm}$ ($6.30\text{ mil}$) microvia | $\varnothing 0.30\text{ mm}$ ($11.81\text{ mil}$) | mm (mil) |
 
 ---
 
@@ -304,10 +307,10 @@ style: |
 
 | Rule Category | Description | Minimum Design Rule | Actual Board Margin | Verification Status |
 | :--- | :--- | :---: | :---: | :---: |
-| **Clearance** | Trace-to-Trace Spacing | $0.150\text{ mm}$ ($6.0\text{ mil}$) | $0.180\text{ mm}$ ($7.1\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
-| **Clearance** | Trace-to-Pad Clearance | $0.150\text{ mm}$ ($6.0\text{ mil}$) | $0.175\text{ mm}$ ($6.9\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
-| **Clearance** | Pad-to-Pad Spacing | $0.150\text{ mm}$ ($6.0\text{ mil}$) | $0.160\text{ mm}$ ($6.3\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
-| **Drill / Via** | Minimum Drill Diameter | $0.250\text{ mm}$ ($10\text{ mil}$) | $0.250\text{ mm}$ ($10\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
+| **Clearance** | Trace-to-Trace Spacing | $0.120\text{ mm}$ ($4.72\text{ mil}$) | $0.180\text{ mm}$ ($7.1\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
+| **Clearance** | Trace-to-Pad Clearance | $0.120\text{ mm}$ ($4.72\text{ mil}$) | $0.175\text{ mm}$ ($6.9\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
+| **Clearance** | Pad-to-Pad Spacing | $0.120\text{ mm}$ ($4.72\text{ mil}$) | $0.160\text{ mm}$ ($6.3\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
+| **Drill / Via** | Minimum Drill Diameter (Hole Size) | $0.160\text{ mm}$ ($6.30\text{ mil}$) microvia / $0.250\text{ mm}$ ($9.84\text{ mil}$) via | $0.160\text{ mm}$ ($6.30\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
 | **Drill / Via** | Annular Ring Width | $0.125\text{ mm}$ ($5.0\text{ mil}$) | $0.150\text{ mm}$ ($6.0\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
 | **Edge Clearance** | Rigid Copper-to-Edge | $0.300\text{ mm}$ ($12\text{ mil}$) | $0.450\text{ mm}$ ($18\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
 | **Edge Clearance** | Flex Copper-to-Edge | $1.500\text{ mm}$ ($60\text{ mil}$) | $1.850\text{ mm}$ ($73\text{ mil}$) | <span class="badge badge-green">PASSED (0 VIOLATIONS)</span> |
@@ -387,7 +390,6 @@ style: |
 ### Packaging & Environmental
 * **Moisture Sensitivity**: IPC/JEDEC J-STD-033 Level 3
   * Vacuum sealed with active desiccant and humidity indicator card
-  * Bakeout protocol: $125^\circ\text{C}$ for 4 hours prior to SMT reflow
 * **RoHS & REACH**: 100% Lead-Free and RoHS 3 compliant
 * **X-Ray Inspection (AXI)**:
   * 100% AXI on RT1062 BGA balls (`U1`)
@@ -430,26 +432,22 @@ style: |
 </div>
 <div>
 
-### Detailed Assembly & SMT Process Guidelines
-* **Placement Topology**: Double-sided SMT assembly
-  * Primary Top Side (`F.Cu`): MCU (`U1`), BLE module (`U11`), Charger (`U3`), USB-C (`J3`), FPC (`J2`), Passives
-  * Secondary Bottom Side (`B.Cu`): Cap touch controller (`U2`), decoupling passives
-* **Solder Paste & Stencil**:
-  * Alloy: Lead-free SAC305 (Sn96.5 / Ag3.0 / Cu0.5), RoHS 3 compliant
-  * Powder size: Type 4 or Type 5 mesh suitable for 0.4mm BGA pads
-  * Stencil foil: $0.10\text{ mm}$ ($4.0\text{ mil}$) laser-cut electro-polished stainless steel with nano-coating
-* **Reflow Thermal Profile**:
-  * Peak reflow temperature: $240^\circ\text{C} \text{ to } 245^\circ\text{C}$ (Max $250^\circ\text{C}$)
-  * Time above liquidus ($217^\circ\text{C}$): $60 \text{--} 90\text{ seconds}$
-* **Post-Reflow Inspection**:
-  * 100% 3D Automated Optical Inspection (AOI) for all SMT chips
-  * 100% Automated X-ray Inspection (AXI) for BGA balls on `U1` and QFN thermal ground pads on `U2`, `U3`, `U4`, `U9`
+### Detailed Assembly and SMT Process Guidelines
+* Placement: Double-sided SMT assembly
+  * Top (F.Cu): MCU (U1), BLE (U11), Charger (U3), USB-C (J3), FPC (J2)
+  * Bottom (B.Cu): Cap touch (U2), passives
+* Solder Paste & Stencil:
+  * Alloy: SAC305 (Sn96.5/Ag3.0/Cu0.5), RoHS 3
+  * Powder size: Type 4/5 mesh for 0.4mm BGA pads
+  * Stencil: 0.10 mm (4.0 mil) laser-cut nano-coated SS
+* Reflow Profile:
+  * Peak temp: 240 deg C to 245 deg C (Max 250 deg C)
+  * Time above liquidus (217 deg C): 60 to 90 seconds
+* Post-Reflow Inspection:
+  * 100% 3D AOI for all SMT chips
+  * 100% AXI for U1 BGA balls and U2, U3, U4, U9 QFN pads
 
 </div>
-</div>
-
-<div class="callout">
-<strong>Assembly Requirement:</strong> Moisture-sensitive parts (MSL 3: <code>U1</code>, <code>U11</code>) must be baked at $125^\circ\text{C}$ for 4 hours prior to surface-mount reflow if dry-pack seal was broken $> 168\text{ hours}$.
 </div>
 
 ---

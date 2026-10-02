@@ -2485,3 +2485,41 @@ def test_regression_bug_260_schematic_index_sheet_names_fit_page() -> None:
         bbox = t.get_window_extent(renderer).transformed(ax.transData.inverted())
         # All text elements must stay inside printable boundary X <= 277mm
         assert bbox.x1 <= 277.0, f"Text '{t.get_text()[:40]}...' exceeded right margin (x1={bbox.x1:.1f} > 277.0)"
+
+
+def test_regression_bug_261_supplier_pcb_docs() -> None:
+    """Verify BUG-261: supplier PCB docs include track spacing in mils, hole size, consistent rigid-flex order, and plain SMT guidelines."""
+    deck_path = Path("src/projects/carrier_board/docs/supplier_pcb_review_deck.md")
+    assert deck_path.exists(), "supplier_pcb_review_deck.md must exist"
+    content = deck_path.read_text()
+
+    # 1. Min track spacing in mils
+    assert "Minimum Track Spacing" in content
+    assert "4.72" in content and "mil" in content
+
+    # 2. Min hole size in mm and mils
+    assert "Minimum Hole / Drill Size" in content
+    assert "6.30" in content and "9.84" in content
+
+    # 3. Rigid Section appears before Flexible Section in table headers and sections
+    rigid_pos = content.find("Carrier Board (Rigid Section)")
+    flex_pos = content.find("Flex Tail (Flexible Section)")
+    assert rigid_pos != -1 and flex_pos != -1
+    assert rigid_pos < flex_pos, "Rigid section must appear before flexible section"
+
+    # 4. Detailed Assembly & SMT Process Guidelines: plain text with no LaTeX math formatting and <= 600 chars
+    guidelines_start = content.find("### Detailed Assembly and SMT Process Guidelines")
+    assert guidelines_start != -1
+    guidelines_heading = "### Detailed Assembly and SMT Process Guidelines\n"
+    guidelines_body_start = guidelines_start + len(guidelines_heading)
+    guidelines_end = content.find("</div>", guidelines_body_start)
+    guidelines_text = content[guidelines_body_start:guidelines_end].strip()
+    assert len(guidelines_text) <= 600, f"SMT guidelines length ({len(guidelines_text)}) exceeds 600 characters"
+    assert "$" not in guidelines_text, "SMT guidelines must not contain LaTeX math delimiters"
+    assert "\\circ" not in guidelines_text
+    assert "\\text" not in guidelines_text
+    assert "240 deg C to 245 deg C" in guidelines_text
+
+    # 5. Redundant MSL 3 bakeout callouts excluded
+    assert "Bakeout protocol: $125^\\circ\\text{C}" not in content
+    assert "Moisture-sensitive parts (MSL 3: <code>U1</code>" not in content
