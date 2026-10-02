@@ -1100,8 +1100,8 @@ def test_drc_schematic_disconnected_passive() -> None:
         h, v, w, taps = orig_method(sheet_plan, all_nets, config)
         if sheet_plan.sheet_idx == 10:
             # Filter out segments connecting C19 to net NFC2
-            h = [seg for seg in h if not (seg[3] == "NFC2" and abs(seg[2] - 90.0) < 0.2)]
-            v = [seg for seg in v if not (seg[3] == "NFC2" and abs(seg[1] - 90.0) < 0.2)]
+            h = [seg for seg in h if seg[3] != "NFC2"]
+            v = [seg for seg in v if seg[3] != "NFC2"]
         return h, v, w, taps
 
     SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan = staticmethod(disconnected_wire_compute)

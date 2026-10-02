@@ -96,8 +96,14 @@ class SchematicWireSegmentPlanner:
             cols_per_row = cols_override
             col_w = 210.0 / max(1, cols_per_row)
             cw = min(38.0, col_w * 0.55)
-            gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
-            start_x = 45.0
+            layout_col_gap = getattr(layout, "col_gap", 15.0)
+            if layout_col_gap != 15.0:
+                gap = layout_col_gap
+                total_w = cols_per_row * cw + (cols_per_row - 1) * gap
+                start_x = max(35.0, page_center_x - total_w / 2.0)
+            else:
+                gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
+                start_x = 45.0
             col_x_positions = []
             col_y_positions = []
             comp_col_map = {}

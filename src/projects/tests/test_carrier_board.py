@@ -2384,3 +2384,65 @@ def test_regression_bug_256_flex_tail_schematic_primary_signal_nets(tmp_path: Pa
     assert "Page 1 of 3" in pdf_text
     assert "Page 2 of 3" in pdf_text
     assert "Page 3 of 3" in pdf_text
+
+
+def test_regression_bug_259_schematic_floating_pins_and_layout() -> None:
+    """Verify BUG-259: Floating pins removed, off-sheet connectors cleaned, and Sheet 11 centered."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.schematic_diagram import SchematicDiagram
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
+    plans = diag._build_sheet_plans()
+
+    # 1. Sheet 3: U10 does not have floating pin 4 (BYP)
+    sheet_3 = next(p for p in plans if "Peripheral Power" in p.title)
+    u10 = next(fp for fp in sheet_3.footprints if fp.name == "U10")
+    u10_pin_names = {p.name for p in u10.pins}
+    assert "4" not in u10_pin_names, f"Pin 4 (BYP) must not appear on U10 symbol: {u10_pin_names}"
+    assert u10_pin_names == {"1", "2", "3", "5"}
+
+    # 2. Sheet 4: U1 does not have floating pin D1
+    sheet_4 = next(p for p in plans if "Microcontroller Core" in p.title)
+    u1_s4 = next(fp for fp in sheet_4.footprints if fp.name == "U1")
+    u1_s4_pins = {p.name for p in u1_s4.pins}
+    assert "D1" not in u1_s4_pins, f"Pin D1 must not appear on U1 symbol: {u1_s4_pins}"
+    assert "M1" not in u1_s4_pins, f"Pin M1 must not appear on U1 symbol: {u1_s4_pins}"
+
+    # 3. Sheet 8: U2 does not have off-sheet connector pins VREGD or VREGA
+    sheet_8 = next(p for p in plans if "Capacitive Sensing" in p.title)
+    u2 = next(fp for fp in sheet_8.footprints if fp.name == "U2")
+    u2_pins = {p.name for p in u2.pins}
+    assert "VREGD" not in u2_pins, f"VREGD pin breakout must not appear on U2: {u2_pins}"
+    assert "VREGA" not in u2_pins, f"VREGA pin breakout must not appear on U2: {u2_pins}"
+
+    # 4. Sheet 10: U11 symbol only has specified pin GND, no EGP or secondary GNDs
+    sheet_10 = next(p for p in plans if "BTLE" in p.title and "UART" in p.title)
+    u11 = next(fp for fp in sheet_10.footprints if fp.name == "U11")
+    u11_pins = {p.name for p in u11.pins}
+    assert "EGP" not in u11_pins, f"Pin EGP must not appear on U11: {u11_pins}"
+    assert "GND_12" not in u11_pins
+    assert "GND_26" not in u11_pins
+    assert "GND_30" not in u11_pins
+    assert "GND" in u11_pins
+
+    # 5. Sheet 11: J15 and SW2 are centered horizontally and vertically
+    boxes = diag.compute_symbol_bounding_boxes()
+    sheet_11_plan = next(p for p in plans if "J15, SW2" in p.title)
+    s11_boxes = boxes.get(sheet_11_plan.sheet_idx, [])
+    j15_box = next(b for b in s11_boxes if b[4] == "J15")
+    sw2_box = next(b for b in s11_boxes if b[4] == "SW2")
+    # Horizontal center of the pair is (j15_cx - w/2 + sw2_cx + w/2) / 2
+    pair_center_x = (j15_box[0] - j15_box[2] / 2.0 + sw2_box[0] + sw2_box[2] / 2.0) / 2.0
+    assert abs(pair_center_x - 148.5) < 1.0, f"Expected Sheet 11 symbols centered at 148.5mm, got {pair_center_x}"
+    # Vertical positioning should be centered (top_row_y <= 115.0)
+    assert j15_box[1] <= 115.0, f"Expected J15 Y <= 115.0, got {j15_box[1]}"
+    assert sw2_box[1] <= 115.0, f"Expected SW2 Y <= 115.0, got {sw2_box[1]}"
+
+    # 6. Entire schematic DRC passes with 0 errors
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+    report = checker.check_schematic(wiring)
+    assert len(report.errors) == 0, f"Schematic DRC errors: {[e.description for e in report.errors]}"

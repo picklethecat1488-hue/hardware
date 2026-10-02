@@ -448,7 +448,6 @@ schematic_sheets:
       '3': left
       '1': left
       '2': left
-      '4': right
       '5': right
     D8:
       '1': left
@@ -460,7 +459,6 @@ schematic_sheets:
     - '3'
     - '1'
     - '2'
-    - '4'
     - '5'
     D8:
     - '1'
@@ -489,8 +487,7 @@ schematic_sheets:
       H8: left
       F2: right
       F1: right
-      D1: left
-      M1: left
+      F3: left
       C14: left
     Y1:
       '1': left
@@ -501,7 +498,6 @@ schematic_sheets:
     U1:
     - J8
     - H8
-    - D1
     - F2
     - F1
     - F3
@@ -729,8 +725,6 @@ schematic_sheets:
       CR7: right
       CT8: right
       OUTA: right
-      VREGD: right
-      VREGA: right
     J2:
       CAP_RX0: left
       CAP_RX1: left
@@ -762,8 +756,6 @@ schematic_sheets:
     - CR6
     - CR7
     - CT8
-    - VREGD
-    - VREGA
     J2:
     - CAP_RX0
     - CAP_RX1
@@ -918,6 +910,7 @@ schematic_sheets:
   layout:
     cols_per_row: 2
     col_gap: 50.0
+    top_row_y: 110.0
     grid_positions:
       J15:
       - 0

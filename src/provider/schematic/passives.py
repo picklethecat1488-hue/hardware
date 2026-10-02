@@ -171,6 +171,8 @@ class SchematicPassiveDrawer:
         delta_x = 28.0
         n_caps = len(caps)
         total_w = (n_caps - 1) * delta_x
+        x_min = base_x
+        x_max = base_x + total_w
 
         y_top = base_y + 16.0
         y_bot = base_y - 12.0
@@ -204,41 +206,48 @@ class SchematicPassiveDrawer:
             zorder=2,
         )
 
-        # Determine common power rail net name
-        pwr_net = "3V3"
+        # Determine power rail for each cap
+        cap_pwr_nets = []
         for fp in caps:
+            pwr = "3V3"
             for p in fp.pins:
                 n = pin_to_net.get((fp.name, p.name), "")
                 if n.upper() in POWER_NET_NAMES:
-                    pwr_net = n
+                    pwr = n
                     break
+            cap_pwr_nets.append(pwr)
 
-        # Common VCC Top Rail
-        x_min = base_x
-        x_max = base_x + total_w
-        ax.plot([x_min, x_max], [y_top, y_top], color="#dc2626", linewidth=1.5, zorder=2)
+        # Group caps by power net
+        pwr_groups: Dict[str, List[int]] = defaultdict(list)
+        for idx, pwr in enumerate(cap_pwr_nets):
+            pwr_groups[pwr].append(idx)
 
-        # Power arrow and label
-        x_arrow = (x_min + x_max) / 2.0
-        ax.plot([x_arrow, x_arrow], [y_top, y_top + 4.0], color="#dc2626", linewidth=1.5, zorder=2)
-        ax.plot(
-            [x_arrow - 2.5, x_arrow, x_arrow + 2.5],
-            [y_top + 2.5, y_top + 5.0, y_top + 2.5],
-            color="#dc2626",
-            linewidth=1.2,
-            zorder=2,
-        )
-        ax.text(
-            x_arrow,
-            y_top + 6.0,
-            pwr_net,
-            ha="center",
-            va="bottom",
-            fontsize=6.5,
-            fontweight="bold",
-            color="#dc2626",
-            zorder=4,
-        )
+        # Draw top rail and arrow for each power net group
+        for pwr_net, indices in pwr_groups.items():
+            grp_x_min = base_x + min(indices) * delta_x
+            grp_x_max = base_x + max(indices) * delta_x
+            if len(indices) > 1:
+                ax.plot([grp_x_min, grp_x_max], [y_top, y_top], color="#dc2626", linewidth=1.5, zorder=2)
+            x_arrow = (grp_x_min + grp_x_max) / 2.0
+            ax.plot([x_arrow, x_arrow], [y_top, y_top + 4.0], color="#dc2626", linewidth=1.5, zorder=2)
+            ax.plot(
+                [x_arrow - 2.5, x_arrow, x_arrow + 2.5],
+                [y_top + 2.5, y_top + 5.0, y_top + 2.5],
+                color="#dc2626",
+                linewidth=1.2,
+                zorder=2,
+            )
+            ax.text(
+                x_arrow,
+                y_top + 6.0,
+                pwr_net,
+                ha="center",
+                va="bottom",
+                fontsize=6.5,
+                fontweight="bold",
+                color="#dc2626",
+                zorder=4,
+            )
 
         # Common GND Bottom Rail
         ax.plot([x_min, x_max], [y_bot, y_bot], color="#475569", linewidth=1.5, zorder=2)
@@ -270,7 +279,9 @@ class SchematicPassiveDrawer:
 
             # Vertical wire from top rail down to top plate
             ax.plot([cx, cx], [y_top, y_mid + (plate_gap / 2.0)], color="#dc2626", linewidth=1.2, zorder=2)
-            ax.plot(cx, y_top, marker="o", markersize=2.5, color="#dc2626", zorder=3)
+            pwr = cap_pwr_nets[idx]
+            if len(pwr_groups[pwr]) > 1:
+                ax.plot(cx, y_top, marker="o", markersize=2.5, color="#dc2626", zorder=3)
 
             # Top plate
             ax.plot(
