@@ -693,3 +693,40 @@ def test_regression_bug_186_bug_report_server_attachments_dir(tmp_path: Path) ->
         bind_and_activate=False,
     )
     assert server.attachments_dir == tmp_path / "attachments"
+
+
+def test_regression_bug_264_recreate_db_after_build_dir_removed(tmp_path: Path) -> None:
+    """Verify BUG-264: SQLite stores seamlessly recover and recreate schema after build directory removal."""
+    import shutil
+
+    build_dir = tmp_path / "build"
+    db_file = build_dir / "bugs.sqlite"
+    store = SQLiteBugStore(db_file)
+    store.save_bug(
+        BugReportModel(
+            id="BUG-001",
+            title="Test Bug",
+            status=BugStatus.OPEN,
+            severity=BugSeverity.MEDIUM,
+            category=BugCategory.INFRASTRUCTURE,
+        )
+    )
+    assert db_file.exists()
+
+    # Simulate rm -rf build/
+    shutil.rmtree(build_dir)
+    assert not build_dir.exists()
+
+    # Saving/loading on the store must recreate directory and schema without OperationalError
+    store.save_bug(
+        BugReportModel(
+            id="BUG-002",
+            title="New Bug",
+            status=BugStatus.OPEN,
+            severity=BugSeverity.MEDIUM,
+            category=BugCategory.INFRASTRUCTURE,
+        )
+    )
+    assert db_file.exists()
+    db = store.load_database()
+    assert any(b.id == "BUG-002" for b in db.bugs)
