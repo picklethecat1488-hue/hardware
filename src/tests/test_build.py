@@ -406,7 +406,7 @@ class TestBuilderLogic:
             # but not for writing ('w').
             for call in mock_zip.call_args_list:
                 assert call[0][1] != "w"
-            builder.logger.print.assert_any_call("build.zip is already up-to-date", symbol="📦")
+            builder.logger.log.assert_any_call("build.zip is already up-to-date", symbol="📦")
 
         # Case 3: One file is newer than zip -> Should recreate
         time.sleep(0.01)
@@ -417,7 +417,7 @@ class TestBuilderLogic:
             builder.generate_all(out_dir=str(out_dir), zip_name=zip_name)
             # ZipFile should be opened with 'w'
             assert any(call[0][1] == "w" for call in mock_zip.call_args_list)
-            builder.logger.print.assert_any_call(f"Done writing {zip_path}", symbol="📦")
+            builder.logger.log.assert_any_call(f"Done writing {zip_path}", symbol="📦")
 
         # Case 4: One expected file is missing from zip -> Should recreate
         # Touch all files to make zip newer
@@ -440,7 +440,7 @@ class TestBuilderLogic:
             builder.generate_all(out_dir=str(out_dir), zip_name=zip_name)
             # ZipFile should be opened with 'w'
             assert any(call[0][1] == "w" for call in mock_zip.call_args_list)
-            builder.logger.print.assert_any_call(f"Done writing {zip_path}", symbol="📦")
+            builder.logger.log.assert_any_call(f"Done writing {zip_path}", symbol="📦")
 
 
 def test_compiled_aabb_alignment(tmp_path):
@@ -599,3 +599,37 @@ def test_generate_pcbs_drc_errors_logged_to_file(tmp_path: Path) -> None:
         err_msg = str(exc_info.value)
         assert f"Failed to build carrier_board/carrier_board:pcb. Project has DRC errors:  {expected_log}" in err_msg
         assert fake_violations_summary not in err_msg
+
+
+def test_regression_bug_265_simplified_build_logging_and_daemon_log(tmp_path, capsys):
+    """BUG-265: Verify individual file outputs log to daemon log via logger.log, not stdout/logger.print."""
+    from model import AppConfig
+    from provider import ProviderManager
+    from shell import Logger
+
+    assert hasattr(Logger, "log"), "Logger must have a log() method for structured daemon logging"
+
+    logger = Logger(enabled=True)
+    logger.log("Saved test_file.stl", symbol="📄")
+    captured = capsys.readouterr()
+    assert captured.out == "", "logger.log must not output to stdout"
+
+    # Verify Builder._export_if_changed uses logger.log, not logger.print
+    mock_logger = MagicMock(spec=Logger)
+    config = AppConfig()
+    manager = ProviderManager(config, logger=mock_logger)
+    builder = Builder(manager, logger=mock_logger)
+
+    fake_file = tmp_path / "test.stl"
+    builder._export_if_changed(
+        path=fake_file,
+        manifest_key="test.stl",
+        current_hash="hash123",
+        export_fn=lambda: fake_file.write_text("dummy"),
+        force_update=True,
+    )
+
+    # logger.print must NOT be called for individual file saves
+    for call in mock_logger.print.call_args_list:
+        assert "Saved" not in str(call), f"logger.print was called with file save message: {call}"
+    mock_logger.log.assert_called_with(f"Saved {fake_file}", symbol="📄")

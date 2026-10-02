@@ -284,7 +284,7 @@ class Builder:
             file_manifest = self.build_manifest.setdefault("file", {})
             brep_manifest[manifest_key] = current_hash
             file_manifest[manifest_key] = self._get_file_hash(path)
-            self.logger.print(f"Saved {path}", symbol="📄")
+            self.logger.log(f"Saved {path}", symbol="📄")
 
     def _resolve_subassemblies(self, targets: Any, base_subs: Any) -> Sequence[str]:
         """Determine which subassemblies should be built for a target."""
@@ -691,7 +691,7 @@ class Builder:
                         raise ValueError(
                             f"Failed to build {provider.name}/{subassembly}:pcb. Project has DRC errors:  {drc_log_file}"
                         )
-                    self.logger.print(f"Generated KiCad DRC Report: {rpt_file}", symbol="🔍")
+                    self.logger.log(f"Generated KiCad DRC Report: {rpt_file}", symbol="🔍")
                     if subassembly == "carrier_board":
                         alias_rpt = rpt_dir / f"{provider.name}-drc.rpt"
                         if alias_rpt != rpt_file and rpt_file.exists():
@@ -715,13 +715,13 @@ class Builder:
                 if target_cfg.capacitive_sensors:
                     cap_json = Path(out_dir) / "config" / provider.name / "capacitive_config.json"
                     exporter.export_capacitive_config_json(cap_json)
-                    self.logger.print(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
+                    self.logger.log(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
 
-                self.logger.print(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
-                self.logger.print(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
-                self.logger.print(f"Generated Board Files: {board_dir}", symbol="📦")
-                self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
-                self.logger.print(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
+                self.logger.log(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
+                self.logger.log(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
+                self.logger.log(f"Generated Board Files: {board_dir}", symbol="📦")
+                self.logger.log(f"Generated BOM: {bom_csv}", symbol="📋")
+                self.logger.log(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
 
         # Package supplier manufacturing files under build/board (BUG-262)
         for p in processed_providers:
@@ -828,7 +828,7 @@ class Builder:
             str(board_dir / "assembly_files.zip"): create_zip(board_dir / "assembly_files.zip", assembly_items),
         }
 
-        self.logger.print(
+        self.logger.log(
             f"Generated Supplier Packages: {board_dir}/{{gerbers,bom_templates,centroid_files,assembly_files}}.zip",
             symbol="📦",
         )
@@ -895,9 +895,9 @@ class Builder:
 
         if needs_zip(zip_path, outputs):
             zip_build(zip_file_str, outputs)
-            self.logger.print(f"Done writing {zip_file_str}", symbol="📦")
+            self.logger.log(f"Done writing {zip_file_str}", symbol="📦")
         else:
-            self.logger.print(f"{zip_name} is already up-to-date", symbol="📦")
+            self.logger.log(f"{zip_name} is already up-to-date", symbol="📦")
 
 
 def get_args():

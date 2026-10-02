@@ -40,7 +40,12 @@ def show(*args, **kwargs):
     if "--no-gui" in sys.argv:
         return None
     try:
-        return ocp_show(*args, **kwargs)
+        import contextlib
+        import logging
+        from shell import StreamToLogger
+
+        with contextlib.redirect_stdout(StreamToLogger(logging.getLogger("daemon"), logging.INFO)):
+            return ocp_show(*args, **kwargs)
     except Exception:
         return None
 
@@ -142,7 +147,7 @@ class Viewer:
     def launch_pcb_viewer(self, file_path: Path, no_gui: bool = False):
         """Open KiCad PCB or schematic file in VS Code using the KiCode extension."""
         resolved_path = file_path.resolve()
-        self.logger.print(f"Viewing KiCad file: {resolved_path}", symbol="🖥️")
+        self.logger.log(f"Viewing KiCad file: {resolved_path}", symbol="🖥️")
         if no_gui:
             return
 
@@ -150,11 +155,11 @@ class Viewer:
         if code_cmd:
             try:
                 subprocess.run([code_cmd, str(resolved_path)], check=False)
-                self.logger.print(f"Opened in VS Code (KiCode): {resolved_path.name}", symbol="✨")
+                self.logger.log(f"Opened in VS Code (KiCode): {resolved_path.name}", symbol="✨")
             except Exception as err:
-                self.logger.print(f"Could not spawn VS Code CLI: {err}", symbol="⚠️")
+                self.logger.log(f"Could not spawn VS Code CLI: {err}", symbol="⚠️")
         else:
-            self.logger.print(
+            self.logger.log(
                 f"Open in VS Code (KiCode extension): file://{resolved_path}",
                 symbol="💡",
             )
