@@ -85,7 +85,8 @@ flowchart TD
 | **`Q1`** | N-Channel MOSFET Load Switch | SOT-23 | `BSS138` | Low-side power-gating switch controlled by `PWR_EN` to cut quiescent current to expansion sensors during sleep. | [onsemi BSS138 Portal](https://www.onsemi.com/products/discrete-power-modules/mosfets/bss138) / [SparkFun Datasheet Mirror](https://www.sparkfun.com/datasheets/Components/General/BSS138.pdf) |
 | **`Y1`** | High-Frequency Crystal Oscillator | 3225-4P (3.2x2.5mm) | `ECS-240-8-30B-CKM` | 24.000 MHz low-jitter primary system clock for MCU PLLs, USB PHY, and communication peripherals. | [ECS Inc ECX-3B Portal](https://ecsxtal.com/products/ecx-3b/) / [DigiKey ECS-240-8-30B](https://www.digikey.com/en/products/result?keywords=ECS-240-8-30B-CKM) |
 | **`U11`** | BTLE 5.0 Wireless Module | LGA-72 (10x15mm) | `u-blox NINA-B312-02B` | Pre-flashed standalone Bluetooth Low Energy 5.0 module with internal antenna replacing legacy edge connector. | [u-blox NINA-B31 Series](https://www.u-blox.com/en/product/nina-b31-series-u-connect) |
-| **`J15`** | 1x5 SWD Recovery Header | TH Header (1x5 2.54mm pitch) | `GENERIC-TH-1X5` | SWD debug and firmware recovery header for U11 BLE module (`GND`, `SWDIO`, `SWDCLK`, `RESET_N`, `3V3`). | [Carrier Board Schematic](carrier_board_schematic.svg) |
+| **`J15`** | 2x5 SWD Recovery Header (DNP) | Micro-Header (2x5 1.27mm pitch) | `pin_header_2x5_1.27mm` | Factory SWD debug and firmware recovery header for U11 BLE module (`GND`, `SWDIO`, `SWDCLK`, `RESET_N`, `VCC_NINA`). Marked Do Not Populate (DNP) in production BOM. | [Carrier Board Schematic](carrier_board_schematic.svg) |
+| **`SW2`** | Tactile Reset Push-Button | SMD Pushbutton Switch | `PTS645SL43SMTR92LFS` | Manual tactile reset push-button switch for U11 BLE module (`RESET_N`). | [C&K PTS645 Series](https://www.ckswitches.com/products/switches/product-details/Tactile/PTS645/) |
 | **`J2` / `J4`** | FPC 30-Pin Connectors | FPC-30P-0.5mm | `HIROSE-FH35C-30S` | Zero-insertion-force (ZIF) 30-pin connectors bridging the rigid carrier board (`J2`) and flexible sensing tail (`J4`). | [Hirose FH35C Series Catalog](https://www.hirose.com/en/product/series/FH35C) |
 | **`J3`** | USB Type-C Receptacle | USB-C-16P (Hybrid SMD/TH) | `TYPE-C-16P` | 5V VBUS power delivery input, CC1/CC2 5.1k configuration channels, and USB 2.0 D+/D- communication. | [USB-IF Type-C Specification](https://www.usb.org/document-library/usb-type-cr-cable-and-connector-specification-release-22) |
 
@@ -452,7 +453,7 @@ The test board carrier has a compact form factor of $60.0\text{ mm} \times 90.0\
    - **`U5` Piezo Sounder & `U4` Audio Amp**: Placed at $(-18.0, 31.0)$ and $(-18.0, 21.0)$, isolated from high-speed digital buses.
    - **`J_SWD` 10-Pin Header**: Placed at $(18.0, 35.0)$ for convenient top-side debugger cable routing.
 3. **Bottom Edge $(Y \in [-30, -45])$**:
-   - **`U11` u-blox NINA-B312 BTLE Module & `J15` SWD Header**: Placed at $(0.0, -36.0)$ and $(-14.5, -41.0)$ facing South along the lower edge with $16.0\times 5.0\text{ mm}$ RF keepout at $(0.0, -42.0)$.
+   - **`U11` u-blox NINA-B312 BTLE Module & `J15` SWD Recovery Header (DNP)**: Placed at $(0.0, -36.0)$ and $(-14.5, -41.0)$ (2x5 1.27mm pitch DNP header, with `SW2` tactile reset switch at $(-14.5, -36.5)$) facing South along the lower edge with $16.0\times 5.0\text{ mm}$ RF keepout at $(0.0, -42.0)$.
    - **`J_GPIO` 10-Pin Breakout Header**: Located along the bottom right $(18.0, -28.0)$.
 4. **Left Edge $(X \in [-30, -15])$**:
    - **`J3` USB-C Receptacle**: Centered at $(-25.0, 0.0)$ facing the left chassis edge.

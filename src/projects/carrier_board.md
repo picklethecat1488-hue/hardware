@@ -84,7 +84,7 @@ graph TD
     %% Wakeup & Interrupts
     CHG -->|CHG_STAT: G5 (WUU0_IN15)| MCU
     CHG -->|CHG_PGOOD_WAKE: M10 (VBAT_WAKEUP)| MCU
-    BLE["u-blox NINA-B302 BTLE (U11)"] <-->|UART1 1Mb/s: T1-T4| MCU
+    BLE["u-blox NINA-B312 BTLE (U11)"] <-->|UART1 1Mb/s: T1-T4| MCU
     TOUCH -->|CAP_INT: C4| MCU
 ```
 
@@ -98,18 +98,22 @@ graph TD
 | **`U7`** | **ADI / Maxim MAX17048G+T10** | 1-Cell Li+ ModelGauge Fuel Gauge IC | TDFN-8 ($2\times 2\text{ mm}$) | Core `I2C0` (`0x36`) | Ultra-low $3\,\mu\text{A}$ operating current, state of charge (SoC) estimation, alert interrupt. |
 | **`U6`** | **TI LP5009RUKR** | 9-Channel Constant-Current RGB LED Driver | WQFN-20 ($3\times 3\text{ mm}$) | Core `I2C0` (`0x14`) | Logarithmic dimming, auto-breathing animation engine, independent RGB color mixing. |
 | **`U9`** | **FTDI FT232RNQ-REEL** | High-Speed USB 2.0 to UART Serial Bridge | QFN-32 ($5\times 5\text{ mm}$) | `FC1` UART0 (`B6`, `A6`, `F10`, `E10`) | Up to 3 Mbaud data rate, internal EEPROM, USB bus powered with reset & boot control GPIOs. |
-| **`U2`** | **Azoteq IQS7222A (`IQS7222A001QNR`) / IQS7211A** | ProxFusion Capacitive Touch & Proximity Controller | QFN-20 ($3\times 3\text{ mm}$, $0.4\text{ mm}$ pitch) | Touch `I2C1` (`0x44`), `CAP_INT` (`C4`)| Multi-channel ProxFusion engine driving 4 flex tail electrodes (3 mutual steps, 1 self-cap proximity) with dual internal LDOs (VREGD, VREGA). |
+| **`U2`** | **Azoteq IQS7222A (`IQS7222A001QNR`)** | ProxFusion Capacitive Touch & Proximity Controller | QFN-20 ($3\times 3\text{ mm}$, $0.4\text{ mm}$ pitch) | Touch `I2C1` (`0x44`), `CAP_INT` (`C4`)| Multi-channel ProxFusion engine driving 4 flex tail electrodes (3 mutual steps, 1 self-cap proximity) with dual internal LDOs (VREGD, VREGA). |
 | **`U4`** | **ADI / Maxim MAX98357AETE+** | 3.2W Class-D Mono Audio Amplifier | TQFN-16 ($3\times 3\text{ mm}$) | `PDM0` Audio (`B14`, `A14`) | Integrated digital PCM/I2S/PDM input stage, filterless Class-D, 92% efficiency into $4\,\Omega$. |
 | **`U5`** | **Piezo Sounder (PKM13EPYH4000)** | Surface-mount piezoelectric audio transducer | Custom Circular ($13\text{ mm}$ dia) | `PIEZO_PWM` (`D15`, `PWM0_X0`) | Resonant frequency 4.0 kHz, SPL $\ge 75\text{ dB}$, audible user feedback. |
-| **`U11`** | **u-blox NINA-B302-00B (`NINA-B302`)** | Bluetooth Low Energy 5.0 Standalone Transceiver Module | MOD-BLE-PCB-ANT ($10\times 14\text{ mm}$) | High-speed 1Mb/s UART (`T1`..`T4`) | Integrated PCB antenna, cap-touch / proximity pairing trigger, status LED & buzzer signaling. |
+| **`U11`** | **u-blox NINA-B312-02B (`NINA-B312`)** | Bluetooth Low Energy 5.0 Standalone Transceiver Module | MOD-BLE-PCB-ANT ($10\times 14\text{ mm}$) | High-speed 1Mb/s UART (`T1`..`T4`) | Integrated PCB antenna, cap-touch / proximity pairing trigger, status LED & buzzer signaling. |
 | **`Q2`–`Q4`**| **TI TPS22918DBVR** | 5.5V, 2A Ultra-Low On-Resistance Power Switches | SOT-23-6 ($2.9\times 1.6\text{ mm}$) | `PWR_EN_AUDIO` (`L4`), `SENSORS` (`L5`), `DEBUG` (`M4`) | $R_{\text{ON}} = 52\text{ m}\Omega$, controlled rise time, active-high enable with 100k pull-up. |
 | **`J3`** | **USB-C 16-Pin Receptacle** | USB Type-C 2.0 Power & Data Receptacle | USB-C Mid-Mount SMD | VBUS, GND, CC1/CC2, D+/D- | Edge-mounted (-X outward) with 5.1k pulldowns on CC pins. |
 | **`J5`** | **JST-SH 10-Pin Micro-Header** | SWD Hardware Debug & Flash Programming Header | 1.0mm Pitch Side-Entry SMD | `SWD_CLK` (`A16`), `DIO` (`A17`), `SWO` (`B16`), `nRESET` (`F3`), `BOOT0` (`C14`) | Compact debug interface for J-Link, MCU-Link, or CMSIS-DAP probes. |
+| **`J15`** | **10-Pin SWD Recovery Header (DNP)** | BTLE (U11) SWD Hardware Recovery & Programming Micro-Header | 1.27mm Pitch 2x5 Through-Hole (`pin_header_2x5_1.27mm`) | `SWDCLK`, `SWDIO`, `RESET_N`, `VCC_NINA`, `GND` | Unpopulated (DNP) factory recovery header for u-blox NINA-B312 firmware reprogramming. |
+| **`SW1`** | **MCU Reset Switch** | Hardware tactile reset push-button switch | SMD Pushbutton (`SW_PUSH_SMD`) | `nRESET` (`F3`) | Manual hardware reset button for MCU. |
+| **`SW2`** | **BLE Reset Switch** | Hardware tactile reset push-button switch | SMD Pushbutton (`SW_PUSH_SMD`) | `RESET_N` (U11 Pin 19) | Manual hardware reset button for u-blox NINA-B312 BLE module. |
 | **`J7`, `J8`**| **JST-SH 5-Pin Micro-Headers** | Primary (`I3C0`) and Secondary (`I3C1`) I3C Headers | 1.0mm Pitch Side-Entry SMD | `I3C0` (`A8`, `C8`, `B8`), `I3C1` (`F4`, `F6`, `E4`) | High-speed MIPI I3C evaluation interface operating up to 12.5 Mbps. |
 | **`J6`** | **JST-SH 4-Pin Micro-Header** | Expansion I2C Bus Header | 1.0mm Pitch Side-Entry SMD | `I2C2` (`B1`, `A1`) | External sensor expansion I2C with 3.3V and GND. |
 | **`J9`** | **JST-PH 7-Pin Header (`B7B-PH-K-S`)** | Expansion SPI Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-7P`) | `SPI0` (`T6`, `T7`, `R8`, `R9`) | 4-wire SPI peripheral bus (SCK, MOSI, MISO, CS#) with 3.3V, interrupt, and dedicated GND. |
 | **`J10`** | **JST-PH 7-Pin Header (`B7B-PH-K-S`)** | Expansion UART / Control Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-7P`) | FTDI auxiliary signals (`DSR_N`, `DCD_N`, `CBUS4`, `CBUS2`, `DTR_N`), `PERIPH_3V3`, `GND` | Dedicated asynchronous serial control link with 3.3V peripheral power and dedicated GND. |
 | **`J14`** | **10-Pin GPIO & Modem Breakout Header** | General-Purpose GPIO & FTDI Breakout Header | 2.54mm Pitch Thru-Hole (`pin_header_1x10`) | `GPIO0`..`GPIO3`, `3V3`, `GND`, `CBUS3/5/6/7` | 4 digital GPIOs, 4 FTDI CBUS control pins, 3.3V power, and dedicated GND. |
+| **`J16`** | **NFC Antenna Header** | 2-Pin Breakout Header for External NFC Antenna | 2.54mm Pitch Thru-Hole (`pin_header_1x2`) | `NFC1`, `NFC2` | Connects external 13.56 MHz flexible NFC antenna (Molex 146236-0001). |
 | **`J13`** | **JST-PH 2-Pin Connector (`S2B-PH-K-S`)** | 1S Li-Ion / LiPo Battery Power Input Connector | 2.0mm Pitch Thru-Hole (`JST-PH-2P`) | `VBAT`, `GND` | Direct connection for 3.7V Li-Ion battery pack with polarized mating shroud. |
 | **`BAT1`** | **PKCELL LP352438 (Recommended Battery)** | 1S 3.7V 350mAh LiPo Rechargeable Pouch Cell | $3.5\times 24\times 38\text{ mm}$ Pouch | `VBAT`, `GND` via J13 | Integrated PCM protection circuit module; pre-terminated with polarized JST-PH 2-pin connector; fits top lid cradle. |
 | **`TP1`** | **Test Point (GND)** | Ground probe through-hole test point | 1.4mm Pad / 0.8mm Drill | `GND` | Located at `(-18.0, -22.0)`. |
