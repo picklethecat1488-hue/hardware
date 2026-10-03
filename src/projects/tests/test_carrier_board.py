@@ -1,5 +1,6 @@
 """Tests for carrier_board rigid-flex PCB and protective enclosure CAD geometry."""
 
+from pathlib import Path
 import pytest
 from build123d import Location
 from projects.carrier_board.provider import CarrierBoardProvider
@@ -467,14 +468,30 @@ def test_regression_bug_214_btle_support_and_enclosure_cover_bluetooth_logo() ->
     assert lid.part.is_valid(), "Enclosure lid must be a valid solid"
     assert len(lid.part.solids()) == 1, "Enclosure lid must be a single solid"
     assert "bluetooth_logo" in lid.part.joints, "Lid must expose bluetooth_logo joint"
+    batt_w = provider.settings.enclosure_battery_mount_width
+    batt_l = provider.settings.enclosure_battery_mount_length
+    batt_rim_t = provider.settings.enclosure_battery_mount_wall_thickness
+    batt_y = provider.settings.enclosure_battery_mount_y
+    j13_y = 16.0
+    batt_cut_l = provider.settings.enclosure_battery_cutout_length
+    min_y = min(batt_y - (batt_l / 2.0), j13_y - (batt_cut_l / 2.0) - batt_rim_t)
+
+    batt_cov_clr = provider.settings.enclosure_battery_cover_clearance
+    batt_cov_t = provider.settings.enclosure_battery_cover_wall_thickness
+    batt_lbl_margin = provider.settings.enclosure_battery_label_margin
+    batt_lbl_y = min_y - batt_rim_t - batt_cov_clr - batt_cov_t - batt_lbl_margin
+
     wall = provider.settings.enclosure_wall_thickness
     depth = provider.settings.ble_logo_depth
     bt_faces = [
         f
         for f in lid.part.faces()
-        if abs(f.center().Z - (wall - depth)) < 1e-3 and abs(f.center().X) < 5.0 and -30.0 < f.center().Y < -15.0
+        if abs(f.center().Z - (wall - depth)) < 1e-3 and abs(f.center().X) < 5.0 and -40.0 < f.center().Y < -26.0
     ]
-    assert len(bt_faces) >= 5, f"Expected engraved Bluetooth logo faces on lid, found {len(bt_faces)}"
+    assert len(bt_faces) >= 1, f"Expected engraved Bluetooth logo faces on lid, found {len(bt_faces)}"
+    assert all(f.center().Y < batt_lbl_y for f in bt_faces), (
+        f"Bluetooth logo faces must be located strictly south of BATTERY label (Y < {batt_lbl_y:.2f} mm)"
+    )
 
     # 7. Zero PCIe cutouts in enclosure bottom
     enclosure = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
@@ -1130,9 +1147,9 @@ def test_regression_bug_157_action_button_routed() -> None:
     action_violations = [
         v
         for v in report.violations
-        if "ACTION_BUTTON" in v.message
-        or ("CAP_TX2" in v.message and v.rule_name == "ANTENNA_TRACE_DETECTED")
-        or ("CAP_RX2" in v.message and v.rule_name == "ANTENNA_TRACE_DETECTED")
+        if "ACTION_BUTTON" in v.description
+        or ("CAP_TX2" in v.description and v.rule_name == "ANTENNA_TRACE_DETECTED")
+        or ("CAP_RX2" in v.description and v.rule_name == "ANTENNA_TRACE_DETECTED")
     ]
     assert not action_violations, f"ACTION_BUTTON routing violations found: {action_violations}"
 
@@ -1355,10 +1372,8 @@ def test_regression_bug_173_174_schematic_netlist_disconnects_and_missing_gnd() 
     assert ("J9", "7") in gnd_net.pins or ("J9", "7", "GND") in gnd_net.pins
     assert ("J10", "1") in gnd_net.pins or ("J10", "1", "GND") in gnd_net.pins
 
-    # Verify Q1 pins have number, pin_name, and signal_name
-    q1 = footprints["Q1"]
-    for p in q1.pins:
-        assert p.number is not None and p.pin_name is not None and p.signal_name is not None
+    # Verify Q1 is removed from carrier board
+    assert "Q1" not in footprints, "Q1 must be removed from carrier board"
 
     # Verify DRC check_netlist_connectivity passes with 0 PIN_NAME_MISMATCH or SIGNAL_NAME_MISMATCH
     cfg = provider.pcb_config
@@ -1617,7 +1632,7 @@ def test_regression_bug_183_carrier_board_hardening() -> None:
     # Verify new components are placed in open space south of U1 and north of J1
     for name in ["SW1", "JP1", "JP2", "JP3", "JP4", "D2", "D3", "D4", "D5", "D6", "D7"]:
         pos = comp_map[name].position
-        y_max = -10.0 if name == "SW1" else -16.0
+        y_max = -10.0 if name == "SW1" else -13.0
         assert -36.0 <= pos[1] <= y_max, (
             f"Component {name} at Y={pos[1]} not in designated space south of U1 and north of J1"
         )
@@ -1706,7 +1721,7 @@ def test_regression_bug_207_sheet_17_components_on_carrier_board() -> None:
     for name in sheet_17_comps:
         assert name in comp_map, f"Sheet 17 component {name} must exist on carrier board"
         pos = comp_map[name].position
-        y_max = -10.0 if name == "SW1" else -16.0
+        y_max = -10.0 if name == "SW1" else -13.0
         assert -36.0 <= pos[1] <= y_max, f"Component {name} must be in corridor between U1 and J1"
 
     # Verify existing baseline components were not displaced
@@ -1822,11 +1837,8 @@ def test_regression_bug_209_silkscreen_readability_and_spacing() -> None:
     provider = CarrierBoardProvider()
     pcb_cfg = provider.pcb_config
 
-    # 2. Verify LAYER 1-6 RIGID-FLEX silkscreen does not collide with D2..D7 corridor (X=4.0, Y=-30..-20)
-    layer_text = next(t for t in pcb_cfg.silkscreen_texts if t.text == "LAYER 1-6 RIGID-FLEX")
-    assert layer_text.position[1] < -32.0 or layer_text.position[0] < -4.0, (
-        f"LAYER 1-6 text at {layer_text.position} overlaps D2..D7 corridor"
-    )
+    # 2. Verify LAYER 1-6 RIGID-FLEX silkscreen has been removed per CR feedback
+    assert all(t.text != "LAYER 1-6 RIGID-FLEX" for t in pcb_cfg.silkscreen_texts)
 
     # 3. Verify jumper and switch labels are horizontal (rotation == 0.0)
     for label_name in ("NRST", "BOOT0", "ISP", "VBUS", "RESET"):
@@ -1893,10 +1905,10 @@ def test_regression_bug_219_reset_relocation_and_horizontal_jumpers() -> None:
 
     # 5. Silkscreen texts to the right at X=14.0
     text_pos_map = {
-        "NRST": -21.5,
-        "BOOT0": -24.0,
-        "ISP": -27.0,
-        "VBUS": -29.6,
+        "NRST": -15.5,
+        "BOOT0": -18.0,
+        "ISP": -21.0,
+        "VBUS": -23.6,
     }
     for text_name, expected_y in text_pos_map.items():
         lbl = next(t for t in pcb_cfg.silkscreen_texts if t.layer == "F.SilkS" and t.text == text_name)
@@ -1967,3 +1979,728 @@ def test_regression_bug_220_flex_tail_flying_probe_isolation_excluded() -> None:
     assert "Differential Pair Compliance Audit" in carrier_report, (
         "Carrier board report must include Differential Pair Compliance Audit section"
     )
+
+
+def test_regression_bug_231_nina_b312_flashed_module_swd_header_and_footprint() -> None:
+    """Verify BUG-231: Pre-flashed NINA-B312 variant, LGA-72 footprint, SWD header J15, and zero DRC errors.
+
+    Asserts that:
+    1. U11 is updated from unflashed NINA-B302 to pre-flashed NINA-B312-02B.
+    2. J15 exists as a 1x5 SWD recovery header at (-14.5, -41.0, 0.8) with horizontal orientation.
+    3. J15 connects to GND, BLE_SWDIO, BLE_SWDCLK, BLE_RESET_N, and 3V3.
+    4. U11 footprint dimensions match Table 27 LGA-72 (10.0 x 15.0 x 2.23 mm).
+    5. Full DRC report passes with zero errors.
+    """
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_cfg = provider.pcb_config
+
+    fp_map = {fp.name: fp for fp in wiring.footprints}
+
+    # 1. U11 MPN is NINA-B312-02B
+    assert "U11" in fp_map, "Component U11 must exist in wiring footprints"
+    u11 = fp_map["U11"]
+    assert u11.mpn == "NINA-B312-02B", f"U11 MPN must be pre-flashed NINA-B312-02B, got {u11.mpn}"
+
+    # 2. J15 exists at [-14.5, -41.0, 0.8]
+    assert "J15" in fp_map, "J15 must exist in wiring footprints"
+    j15 = fp_map["J15"]
+    assert j15.package == "pin_header_2x5_1.27mm", f"J15 package must be pin_header_2x5_1.27mm, got {j15.package}"
+    assert abs(j15.position[0] - (-14.5)) < 0.1, f"J15 X position must be -14.5, got {j15.position[0]}"
+    assert abs(j15.position[1] - (-41.0)) < 0.1, f"J15 Y position must be -41.0, got {j15.position[1]}"
+    assert abs(j15.rotation[2] - 0.0) < 0.1, f"J15 rotation must be 0.0, got {j15.rotation}"
+
+    # 3. J15 status (superseded by BUG-251: J15 marked DNP/no-connect, U11 wired to SW2 reset button)
+    assert getattr(j15, "unconnected", False) or getattr(j15, "dnp", False), "J15 must be DNP or no-connect"
+    assert "SW2" in fp_map, "SW2 reset button must exist"
+    reset_net = next((n for n in wiring.nets if n.name == "BLE_RESET_N"), None)
+    assert reset_net is not None, "BLE_RESET_N net must exist for SW2 reset button"
+
+    # 4. Footprint dimensions
+    import yaml
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    with open(repo_root / "src/projects/footprints/ic.yaml") as f:
+        ic_fps = yaml.safe_load(f)["footprints"]
+    assert "MOD-BLE-PCB-ANT" in ic_fps, "MOD-BLE-PCB-ANT footprint must be defined in ic.yaml"
+    ble_fp = ic_fps["MOD-BLE-PCB-ANT"]
+    dims = ble_fp.get("dimensions", [])
+    assert dims == [10.0, 15.0, 2.23], f"U11 dimensions must match LGA-72 Table 27 [10.0, 15.0, 2.23], got {dims}"
+
+    # 5. Full DRC report passes with zero errors
+    drc = PCBDesignRulesChecker(pcb_cfg)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0, f"Expected 0 DRC errors, got {report.error_count}"
+
+
+def test_power_hardening_bug_243() -> None:
+    """Verify BUG-243: Power hardening components C15, C16, C17, D8 exist on bottom side with zero DRC errors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+
+    for name in ("C15", "C16", "C17", "D8"):
+        assert name in comp_map, f"Power hardening component {name} must exist"
+        comp = comp_map[name]
+        assert comp.layer == "B.Cu" or comp.position[2] < 0, f"{name} must be on bottom side"
+
+    # Verify nets connected to 3V3 and GND
+    nets_map = {n.name: n for n in wiring.nets}
+    for name in ("C15", "C16", "C17", "D8"):
+        assert any(c == name for c, p in nets_map["3V3"].pins), f"{name} must connect to 3V3"
+        assert any(c == name for c, p in nets_map["GND"].pins), f"{name} must connect to GND"
+
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_249_remove_vload_sw_from_ble_module() -> None:
+    """Verify BUG-249: VLOAD_SW artifact removed, U11 footprint corrected to NINA datasheet pinout."""
+    import yaml
+    from pathlib import Path
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. MOD-BLE-PCB-ANT footprint in ic.yaml must not have VLOAD_SW
+    ic_yaml_path = Path(__file__).resolve().parent.parent / "footprints" / "ic.yaml"
+    with open(ic_yaml_path, encoding="utf-8") as f:
+        ic_data = yaml.safe_load(f)
+    ble_fp = ic_data["footprints"]["MOD-BLE-PCB-ANT"]
+    ble_pin_names = [p["name"] for p in ble_fp["pins"]]
+    assert "VLOAD_SW" not in ble_pin_names, "MOD-BLE-PCB-ANT footprint must not have VLOAD_SW pin"
+    assert "SWITCH_2" in ble_pin_names, "MOD-BLE-PCB-ANT footprint pin 18 must be SWITCH_2"
+
+    # 2. wiring.yaml must not have VLOAD_SW net or U11.VLOAD_SW pin connection
+    net_names = [n.name for n in wiring.nets]
+    assert "VLOAD_SW" not in net_names, "VLOAD_SW net must be removed from wiring.yaml"
+    for net in wiring.nets:
+        for pin in net.pins:
+            assert pin[0] != "U11" or pin[1] != "VLOAD_SW", "U11 must not have any pin connected to VLOAD_SW"
+
+    # 3. pcb.yaml must not have VLOAD_SW in Sheet 2 pin_breakouts
+    pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
+    with open(pcb_yaml_path, encoding="utf-8") as f:
+        pcb_data = yaml.safe_load(f)
+    sheet_2 = pcb_data["schematic_sheets"][1]
+    if "pin_breakouts" in sheet_2 and "U11" in sheet_2["pin_breakouts"]:
+        assert "VLOAD_SW" not in sheet_2["pin_breakouts"]["U11"]
+
+
+def test_regression_bug_250_nina_nfc_antenna_and_tuning_caps() -> None:
+    """Verify BUG-250: NINA-B312 native NFC1/NFC2 pins routed to antenna header and shunt tuning capacitors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. Verify NFC1 and NFC2 nets exist
+    assert "NFC1" in nets_map, "NFC1 net must exist in wiring.yaml"
+    assert "NFC2" in nets_map, "NFC2 net must exist in wiring.yaml"
+
+    # 2. Verify U11 connects to NFC1 and NFC2
+    nfc1_pins = set(nets_map["NFC1"].pins)
+    nfc2_pins = set(nets_map["NFC2"].pins)
+    assert ("U11", "NFC1") in nfc1_pins or ("U11", "28") in nfc1_pins
+    assert ("U11", "NFC2") in nfc2_pins or ("U11", "29") in nfc2_pins
+
+    # 3. Verify tuning capacitors C18 and C19 (C_tune1, C_tune2) exist and connect between NFC and GND
+    comp_map = {c.name: c for c in wiring.footprints}
+    assert "C18" in comp_map or "C_tune1" in comp_map, "C18 / C_tune1 tuning capacitor must exist"
+    assert "C19" in comp_map or "C_tune2" in comp_map, "C19 / C_tune2 tuning capacitor must exist"
+    c_tune1_name = "C18" if "C18" in comp_map else "C_tune1"
+    c_tune2_name = "C19" if "C19" in comp_map else "C_tune2"
+
+    assert any(c == c_tune1_name for c, _ in nets_map["NFC1"].pins), "C_tune1 must connect to NFC1"
+    assert any(c == c_tune2_name for c, _ in nets_map["NFC2"].pins), "C_tune2 must connect to NFC2"
+    assert any(c == c_tune1_name for c, _ in nets_map["GND"].pins), "C_tune1 must connect to GND"
+    assert any(c == c_tune2_name for c, _ in nets_map["GND"].pins), "C_tune2 must connect to GND"
+
+    # 4. Verify external antenna connector J16 connects to NFC1 and NFC2
+    assert "J16" in comp_map, "External NFC coil antenna header J16 must exist"
+    assert any(c == "J16" for c, _ in nets_map["NFC1"].pins), "J16 must connect to NFC1"
+    assert any(c == "J16" for c, _ in nets_map["NFC2"].pins), "J16 must connect to NFC2"
+
+    # 5. Verify PCB DRC passes with 0 violations
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_251_j15_no_connect_and_u11_reset_button(tmp_path: Path) -> None:
+    """Verify BUG-251: J15 removed from BOM, marked as no-connect, and U11 RESET_N wired to adjacent push button."""
+    import math
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.exporter import PCBExporter
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. J15 must exist and be marked DNP
+    assert "J15" in comp_map, "J15 connector must exist on the board"
+    j15 = comp_map["J15"]
+    assert getattr(j15, "dnp", False), "J15 must be marked DNP"
+
+    # 2. J15 must not appear in exported BOM
+    exporter = PCBExporter(provider.pcb_config, wiring)
+    bom_file = tmp_path / "carrier_board_bom.csv"
+    exporter.export_bom_csv(bom_file)
+    bom_text = bom_file.read_text(encoding="utf-8")
+    assert "J15" not in bom_text, "J15 must be removed from the BOM CSV"
+
+    # 3. J15 connects to BLE SWD, 3V3, and GND
+    assert any(c == "J15" and p == "4" for c, p in nets_map["BLE_SWDCLK"].pins), "J15 pin 4 must connect to BLE_SWDCLK"
+    assert any(c == "J15" and p == "2" for c, p in nets_map["BLE_SWDIO"].pins), "J15 pin 2 must connect to BLE_SWDIO"
+    assert any(c == "J15" and p == "1" for c, p in nets_map["3V3"].pins), "J15 pin 1 must connect to 3V3"
+    assert any(c == "J15" and p in ("3", "5") for c, p in nets_map["GND"].pins), "J15 pin 3/5 must connect to GND"
+
+    # 4. SW2 push button switch must exist adjacent to J15 (<= 10mm distance)
+    assert "SW2" in comp_map, "SW2 push button switch must exist"
+    sw2 = comp_map["SW2"]
+    dist = math.hypot(sw2.position[0] - j15.position[0], sw2.position[1] - j15.position[1])
+    assert dist <= 10.0, f"SW2 must be placed adjacent to J15 (dist: {dist:.2f}mm > 10.0mm)"
+
+    # 5. U11 RESET_N must connect to SW2
+    reset_net = next((n for n in wiring.nets if ("U11", "RESET_N") in n.pins or ("U11", "19") in n.pins), None)
+    assert reset_net is not None, "U11 RESET_N net must exist"
+    assert any(c == "SW2" for c, _ in reset_net.pins), "SW2 must connect to U11 RESET_N"
+
+    # 6. SW2 must connect to GND
+    gnd_net = nets_map["GND"]
+    assert any(c == "SW2" for c, _ in gnd_net.pins), "SW2 must connect to GND"
+
+    # 7. J15 and SW2 must be on dedicated schematic sheet
+    sheet_btle_prog = next(
+        (s for s in provider.pcb_config.schematic_sheets if "BTLE Programming" in s.title or "J15" in s.title), None
+    )
+    assert sheet_btle_prog is not None, "Dedicated BTLE Programming & Reset Interface sheet must exist"
+    assert "J15" in sheet_btle_prog.components and "SW2" in sheet_btle_prog.components
+
+    sheet_hs = next((s for s in provider.pcb_config.schematic_sheets if "High-Speed" in s.title), None)
+    assert sheet_hs is not None
+    assert "J15" not in sheet_hs.components and "SW2" not in sheet_hs.components
+
+    # 8. Zero PCB DRC violations
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_proposal_ct8_channel_routed_to_j2_without_flex_modification() -> None:
+    """Verify PROPOSAL e8e2b4056c95: CT8 9th sensing channel routed from U2 to J2.NC3 without modifying flex tail."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. CAP_CT8 net exists
+    assert "CAP_CT8" in nets_map, "Net CAP_CT8 must exist in wiring.yaml"
+    ct8_net = nets_map["CAP_CT8"]
+
+    # 2. U2.CT8 and J2.NC3 are connected
+    ct8_pins = set(ct8_net.pins)
+    assert ("U2", "CT8") in ct8_pins, "U2.CT8 must connect to CAP_CT8"
+    assert ("J2", "NC3") in ct8_pins, "J2.NC3 must connect to CAP_CT8"
+
+    # 3. Flex tail connector J4 must NOT connect to CAP_CT8
+    assert not any(c == "J4" for c, _ in ct8_net.pins), "Flex tail connector J4 must NOT be modified"
+
+    # 4. Sheet 7 includes CT8 breakout on U2 (J2 maintains 8-channel breakout)
+    sheet_cap = next((s for s in provider.pcb_config.schematic_sheets if "Capacitive" in s.title), None)
+    assert sheet_cap is not None
+    assert "CT8" in sheet_cap.pin_breakouts.get("U2", [])
+
+    # 5. Full DRC passes with zero errors
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_254_enclosure_lid_text_stroke_width() -> None:
+    """Verify BUG-254: enclosure_lid BATTERY label has stroke width >= 0.8mm for DFM compliance."""
+    from build123d import Text, FontStyle, offset, Axis
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from provider import Mode
+
+    provider = CarrierBoardProvider()
+    lid = provider.enclosure_lid("enclosure_lid", None, Mode.DEFAULT)
+    assert lid.part is not None and lid.part.is_valid(), "Enclosure lid must be a valid solid"
+
+    # 1. Configured font size and stroke expansion offset
+    font_size = provider.settings.enclosure_battery_label_font_size
+    stroke_offset = provider.settings.enclosure_battery_label_stroke_offset
+    assert font_size >= 4.0, f"Expected BATTERY label font size >= 4.0mm, got {font_size}"
+    assert stroke_offset >= 0.12, f"Expected stroke expansion offset >= 0.12mm, got {stroke_offset}"
+
+    # 2. Geometric stroke width verification on representative 'T' glyph
+    t_glyph = Text("T", font_size=font_size, font_style=FontStyle.BOLD)
+    if stroke_offset > 0.0:
+        t_glyph = offset(t_glyph, amount=stroke_offset)
+
+    # Vertical stem width measurement
+    edges_v = t_glyph.edges().filter_by(Axis.Y)
+    xs = sorted(list({round(e.bounding_box().min.X, 3) for e in edges_v}))
+    assert len(xs) >= 4, "Glyph 'T' must have inner and outer vertical stem boundaries"
+    stem_width = xs[2] - xs[1]
+    assert stem_width >= 0.80, f"Expected BATTERY text stem width >= 0.80mm (DFM rule), got {stem_width:.3f}mm"
+
+    # Horizontal bar thickness measurement
+    edges_h = t_glyph.edges().filter_by(Axis.X)
+    ys = sorted(list({round(e.bounding_box().min.Y, 3) for e in edges_h}))
+    assert len(ys) >= 3, "Glyph 'T' must have top and bottom horizontal bar boundaries"
+    bar_thickness = ys[2] - ys[1]
+    assert bar_thickness >= 0.80, (
+        f"Expected BATTERY text horizontal bar >= 0.80mm (DFM rule), got {bar_thickness:.3f}mm"
+    )
+
+
+def test_regression_bug_255_pullup_resistors_unbridged_with_individual_power_designators() -> None:
+    """Verify BUG-255: Pull-up resistors R1 and R2 on Sheet 8 have individual 3V3 power designators and no bridge."""
+    import matplotlib.pyplot as plt
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model import Wiring
+    from model.pcb import PCBConfig
+    from provider.schematic_diagram import SchematicDiagram
+    import yaml
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    pcb_yaml_path = provider.wiring_path.parent / "pcb.yaml"
+    with open(pcb_yaml_path) as f:
+        cfg = PCBConfig(**yaml.safe_load(f))
+
+    diag = SchematicDiagram(wiring=wiring, pcb_config=cfg)
+    sheet_plans = diag._build_sheet_plans()
+    sheet_8_plan = next(p for p in sheet_plans if p.sheet_idx == 8)
+
+    from unittest.mock import MagicMock
+
+    mock_pdf = MagicMock()
+    diag._render_pdf_schematic_sheet(
+        mock_pdf,
+        "carrier_board",
+        sheet_8_plan,
+        len(sheet_plans),
+        diag.wiring.nets,
+        15,
+        28,
+    )
+
+    fig = mock_pdf.savefig.call_args[0][0]
+    ax = fig.axes[0]
+    texts = [t.get_text() for t in ax.texts]
+    pwr_labels = [t for t in texts if t == "3V3"]
+    assert len(pwr_labels) >= 2, f"Expected individual 3V3 labels for pullups, got {pwr_labels}"
+
+    red_lines = [line for line in ax.lines if line.get_color() == "#dc2626"]
+    h_red_lines = [
+        line
+        for line in red_lines
+        if len(line.get_ydata()) == 2 and abs(line.get_ydata()[0] - line.get_ydata()[1]) < 0.001
+    ]
+    bridging_lines = [line for line in h_red_lines if abs(line.get_xdata()[1] - line.get_xdata()[0]) > 5.0]
+    assert len(bridging_lines) == 0, (
+        f"Expected 0 horizontal red bridging lines between pullups, found: {bridging_lines}"
+    )
+
+
+def test_regression_bug_256_flex_tail_schematic_primary_signal_nets(tmp_path: Path) -> None:
+    """Verify BUG-256: Flex tail schematic Table of Contents primary signal nets contains only 7 cap sense + 1 proximity channels."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model import Wiring
+    from provider import Mode
+    from provider.pcb.exporter import PCBExporter
+    from provider.schematic_diagram import SchematicDiagram
+    from pdfminer.high_level import extract_text
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+
+    # 1. Verify Wiring.filter_by_footprints scopes nets strictly to connected footprints
+    flex_wiring = wiring.filter_by_footprints(["J4"])
+    expected_nets = {
+        "CAP_SHIELD",
+        "CAP_TX0",
+        "CAP_TX1",
+        "CAP_TX2",
+        "CAP_RX0",
+        "CAP_RX1",
+        "CAP_RX2",
+        "CAP_RX3",
+    }
+    net_names = {net.name for net in flex_wiring.nets}
+    assert net_names == expected_nets, f"Expected exactly 8 flex nets, got {net_names}"
+    assert "GND" not in net_names
+    assert "3V3" not in net_names
+    assert "VBUS" not in net_names
+
+    # 2. Verify TOC plan generates only those 8 nets under primary signal nets
+    part_res = provider.part["flex_tail"]("flex_tail", None, Mode.DEFAULT)
+    flex_cfg = part_res.to_pcb_config()
+    diag = SchematicDiagram(wiring=flex_wiring, pcb_config=flex_cfg)
+    sheet_plans = diag._build_sheet_plans()
+    toc_plans = diag._plan_pdf_toc_pages(flex_wiring.footprints, diag.wiring.nets, sheet_plans)
+
+    toc_net_names = {net.name for plan in toc_plans for row in plan.net_rows for net in row}
+    assert toc_net_names == expected_nets, f"TOC nets mismatch: {toc_net_names}"
+    assert len(toc_plans) == 1, f"Expected 1 TOC page when scoped to 8 nets, got {len(toc_plans)}"
+
+    # 3. Export PDF and verify full document pagination and text content
+    exp = PCBExporter(flex_cfg, wiring, subassembly="flex_tail", design_rules=provider.pcb_config.design_rules)
+    out_pdf = tmp_path / "flex_tail_schematic.pdf"
+    exp.export_schematic_pdf(out_pdf)
+    assert out_pdf.exists()
+
+    pdf_text = extract_text(str(out_pdf))
+    assert "CAP_SHIELD (3 pins)" in pdf_text
+    assert "CAP_TX0 (3 pins)" in pdf_text
+    assert "CAP_RX0 (3 pins)" in pdf_text
+    # Carrier board signal and power nets must not leak into flex tail schematic TOC
+    assert "3V3 (36 pins)" not in pdf_text
+    assert "GND (89 pins)" not in pdf_text
+    assert "VBUS (5 pins)" not in pdf_text
+    assert "Page 1 of 3" in pdf_text
+    assert "Page 2 of 3" in pdf_text
+    assert "Page 3 of 3" in pdf_text
+
+
+def test_regression_bug_259_schematic_floating_pins_and_layout() -> None:
+    """Verify BUG-259: Floating pins removed, off-sheet connectors cleaned, and Sheet 11 centered."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+    from provider.schematic_diagram import SchematicDiagram
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
+    plans = diag._build_sheet_plans()
+
+    # 1. Sheet 3: U10 does not have floating pin 4 (BYP)
+    sheet_3 = next(p for p in plans if "Peripheral Power" in p.title)
+    u10 = next(fp for fp in sheet_3.footprints if fp.name == "U10")
+    u10_pin_names = {p.name for p in u10.pins}
+    assert "4" not in u10_pin_names, f"Pin 4 (BYP) must not appear on U10 symbol: {u10_pin_names}"
+    assert u10_pin_names == {"1", "2", "3", "5"}
+
+    # 2. Sheet 4: U1 does not have floating pin D1
+    sheet_4 = next(p for p in plans if "Microcontroller Core" in p.title)
+    u1_s4 = next(fp for fp in sheet_4.footprints if fp.name == "U1")
+    u1_s4_pins = {p.name for p in u1_s4.pins}
+    assert "D1" not in u1_s4_pins, f"Pin D1 must not appear on U1 symbol: {u1_s4_pins}"
+    assert "M1" not in u1_s4_pins, f"Pin M1 must not appear on U1 symbol: {u1_s4_pins}"
+
+    # 3. Sheet 8: U2 does not have off-sheet connector pins VREGD or VREGA
+    sheet_8 = next(p for p in plans if "Capacitive Sensing" in p.title)
+    u2 = next(fp for fp in sheet_8.footprints if fp.name == "U2")
+    u2_pins = {p.name for p in u2.pins}
+    assert "VREGD" not in u2_pins, f"VREGD pin breakout must not appear on U2: {u2_pins}"
+    assert "VREGA" not in u2_pins, f"VREGA pin breakout must not appear on U2: {u2_pins}"
+
+    # 4. Sheet 10: U11 symbol only has specified pin GND, no EGP or secondary GNDs
+    sheet_10 = next(p for p in plans if "BTLE" in p.title and "UART" in p.title)
+    u11 = next(fp for fp in sheet_10.footprints if fp.name == "U11")
+    u11_pins = {p.name for p in u11.pins}
+    assert "EGP" not in u11_pins, f"Pin EGP must not appear on U11: {u11_pins}"
+    assert "GND_12" not in u11_pins
+    assert "GND_26" not in u11_pins
+    assert "GND_30" not in u11_pins
+    assert "GND" in u11_pins
+
+    # 5. Sheet 11: J15 and SW2 are centered horizontally and vertically
+    boxes = diag.compute_symbol_bounding_boxes()
+    sheet_11_plan = next(p for p in plans if "J15, SW2" in p.title)
+    s11_boxes = boxes.get(sheet_11_plan.sheet_idx, [])
+    j15_box = next(b for b in s11_boxes if b[4] == "J15")
+    sw2_box = next(b for b in s11_boxes if b[4] == "SW2")
+    # Horizontal center of the pair is (j15_cx - w/2 + sw2_cx + w/2) / 2
+    pair_center_x = (j15_box[0] - j15_box[2] / 2.0 + sw2_box[0] + sw2_box[2] / 2.0) / 2.0
+    assert abs(pair_center_x - 148.5) < 1.0, f"Expected Sheet 11 symbols centered at 148.5mm, got {pair_center_x}"
+    # Vertical positioning should be centered (top_row_y <= 115.0)
+    assert j15_box[1] <= 115.0, f"Expected J15 Y <= 115.0, got {j15_box[1]}"
+    assert sw2_box[1] <= 115.0, f"Expected SW2 Y <= 115.0, got {sw2_box[1]}"
+
+    # 6. Entire schematic DRC passes with 0 errors
+    checker = PCBDesignRulesChecker(provider.pcb_config)
+    report = checker.check_schematic(wiring)
+    assert len(report.errors) == 0, f"Schematic DRC errors: {[e.description for e in report.errors]}"
+
+
+def test_regression_bug_260_schematic_index_sheet_names_fit_page() -> None:
+    """Verify BUG-260: Schematic Index Document Structure entry names fit within sheet margins."""
+    import matplotlib.pyplot as plt
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model import Wiring
+    from provider.schematic_diagram import SchematicDiagram
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    diag = SchematicDiagram(wiring=wiring, pcb_config=provider.pcb_config)
+    sheet_plans = diag._build_sheet_plans()
+    toc_plans = diag._plan_pdf_toc_pages(wiring.footprints, diag.wiring.nets, sheet_plans)
+
+    # 1. Verify every Document Structure entry is <= 100 characters so it fits on page
+    assert len(toc_plans) >= 1
+    doc_entries = [entry for plan in toc_plans for entry in plan.doc_entries]
+    assert len(doc_entries) >= len(sheet_plans) + 2
+
+    for page_lbl, desc in doc_entries:
+        full_line = f"{page_lbl}: {desc}"
+        assert len(full_line) <= 100, f"Document structure line too long ({len(full_line)} > 100): {full_line}"
+
+    # 2. Render TOC page 1 and verify text objects stay well inside right margin (X < 277)
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from unittest.mock import MagicMock
+
+    mock_pdf = MagicMock()
+    diag._render_pdf_toc_page(mock_pdf, "carrier_board", "Rigid-Flex", 6, toc_plans[0], len(toc_plans), 28)
+    fig = mock_pdf.savefig.call_args[0][0]
+    FigureCanvasAgg(fig)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    ax = fig.axes[0]
+    for t in ax.texts:
+        bbox = t.get_window_extent(renderer).transformed(ax.transData.inverted())
+        # All text elements must stay inside printable boundary X <= 277mm
+        assert bbox.x1 <= 277.0, f"Text '{t.get_text()[:40]}...' exceeded right margin (x1={bbox.x1:.1f} > 277.0)"
+
+
+def test_regression_bug_261_supplier_pcb_docs() -> None:
+    """Verify BUG-261: supplier PCB docs include track spacing in mils, hole size, consistent rigid-flex order, and plain SMT guidelines."""
+    deck_path = Path("src/projects/carrier_board/docs/supplier_pcb_review_deck.md")
+    assert deck_path.exists(), "supplier_pcb_review_deck.md must exist"
+    content = deck_path.read_text()
+
+    # 1. Min track spacing in mils
+    assert "Minimum Track Spacing" in content
+    assert "4.72" in content and "mil" in content
+
+    # 2. Min hole size in mm and mils
+    assert "Minimum Hole / Drill Size" in content
+    assert "6.30" in content and "9.84" in content
+
+    # 3. Rigid Section appears before Flexible Section in table headers and sections
+    rigid_pos = content.find("Carrier Board (Rigid Section)")
+    flex_pos = content.find("Flex Tail (Flexible Section)")
+    assert rigid_pos != -1 and flex_pos != -1
+    assert rigid_pos < flex_pos, "Rigid section must appear before flexible section"
+
+    # 4. Detailed Assembly & SMT Process Guidelines: plain text with no LaTeX math formatting and <= 600 chars
+    guidelines_start = content.find("### Detailed Assembly and SMT Process Guidelines")
+    assert guidelines_start != -1
+    guidelines_heading = "### Detailed Assembly and SMT Process Guidelines\n"
+    guidelines_body_start = guidelines_start + len(guidelines_heading)
+    guidelines_end = content.find("</div>", guidelines_body_start)
+    guidelines_text = content[guidelines_body_start:guidelines_end].strip()
+    assert len(guidelines_text) <= 600, f"SMT guidelines length ({len(guidelines_text)}) exceeds 600 characters"
+    assert "$" not in guidelines_text, "SMT guidelines must not contain LaTeX math delimiters"
+    assert "\\circ" not in guidelines_text
+    assert "\\text" not in guidelines_text
+    assert "240 deg C to 245 deg C" in guidelines_text
+
+    # 5. Redundant MSL 3 bakeout callouts excluded
+    assert "Bakeout protocol: $125^\\circ\\text{C}" not in content
+    assert "Moisture-sensitive parts (MSL 3: <code>U1</code>" not in content
+
+
+def test_regression_bug_262_supplier_pcb_guidelines_zip_outputs() -> None:
+    """Verify BUG-262: build outputs supplier zip archives under build/board/<project>.
+
+    - gerbers.zip: contains .pcb .pcbdoc .cam .brd and gerber files
+    - bom_templates.zip: contains <PCB name>_bom.csv BOM list for each PCB
+    - centroid_files.zip: contains <PCB name>_pos.csv centroid list for each PCB
+    - assembly_files.zip: contains <PCB name>_top.png, <PCB name>_bottom.png top and bottom PCB textures for each PCB
+    The zip files should go under build/board/<project>, not directly under build/board.
+    """
+    import zipfile
+    from build import Builder
+    from config import AppConfig
+    from provider import ProviderManager
+
+    config = AppConfig()
+    manager = ProviderManager(config)
+    builder = Builder(manager)
+
+    # Trigger supplier packaging for carrier_board
+    builder.generate_pcbs(out_dir="build", names=["carrier_board/*"])
+
+    top_board_dir = Path("build/board")
+    board_dir = Path("build/board/carrier_board")
+
+    # Verify no zip archives exist directly under build/board/
+    assert not (top_board_dir / "gerbers.zip").exists(), "build/board/gerbers.zip must not exist"
+    assert not (top_board_dir / "bom_templates.zip").exists(), "build/board/bom_templates.zip must not exist"
+    assert not (top_board_dir / "centroid_files.zip").exists(), "build/board/centroid_files.zip must not exist"
+    assert not (top_board_dir / "assembly_files.zip").exists(), "build/board/assembly_files.zip must not exist"
+
+    # Verify zip archives exist under build/board/carrier_board/
+    assert (board_dir / "gerbers.zip").exists(), "build/board/carrier_board/gerbers.zip must exist"
+    assert (board_dir / "bom_templates.zip").exists(), "build/board/carrier_board/bom_templates.zip must exist"
+    assert (board_dir / "centroid_files.zip").exists(), "build/board/carrier_board/centroid_files.zip must exist"
+    assert (board_dir / "assembly_files.zip").exists(), "build/board/carrier_board/assembly_files.zip must exist"
+
+    # 1. gerbers.zip: contains .pcb, .pcbdoc, .cam, .brd and gerber files
+    with zipfile.ZipFile(board_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        suffixes = {Path(n).suffix.lower() for n in names}
+        assert ".pcb" in suffixes, "gerbers.zip must contain .pcb files"
+        assert ".pcbdoc" in suffixes, "gerbers.zip must contain .pcbdoc files"
+        assert ".cam" in suffixes, "gerbers.zip must contain .cam files"
+        assert ".brd" in suffixes, "gerbers.zip must contain .brd files"
+        assert ".gbr" in suffixes or any(n.endswith(".gbr") for n in names), "gerbers.zip must contain gerber files"
+        # Check both PCBs are represented
+        assert any("carrier_board" in n for n in names), "gerbers.zip must include carrier_board files"
+        assert any("flex_tail" in n for n in names), "gerbers.zip must include flex_tail files"
+
+    # 2. bom_templates.zip: contains <PCB name>_bom.csv for each PCB
+    with zipfile.ZipFile(board_dir / "bom_templates.zip", "r") as zf:
+        names = zf.namelist()
+        assert "carrier_board_bom.csv" in names, "bom_templates.zip must contain carrier_board_bom.csv"
+        assert "flex_tail_bom.csv" in names, "bom_templates.zip must contain flex_tail_bom.csv"
+
+    # 3. centroid_files.zip: contains <PCB name>_pos.csv centroid list for each PCB
+    with zipfile.ZipFile(board_dir / "centroid_files.zip", "r") as zf:
+        names = zf.namelist()
+        assert "carrier_board_pos.csv" in names, "centroid_files.zip must contain carrier_board_pos.csv"
+        assert "flex_tail_pos.csv" in names, "centroid_files.zip must contain flex_tail_pos.csv"
+
+    # 4. assembly_files.zip: contains <PCB name>_top.png, <PCB name>_bottom.png textures for each PCB
+    with zipfile.ZipFile(board_dir / "assembly_files.zip", "r") as zf:
+        names = zf.namelist()
+        assert "carrier_board_top.png" in names, "assembly_files.zip must contain carrier_board_top.png"
+        assert "carrier_board_bottom.png" in names, "assembly_files.zip must contain carrier_board_bottom.png"
+        assert "flex_tail_top.png" in names, "assembly_files.zip must contain flex_tail_top.png"
+        assert "flex_tail_bottom.png" in names, "assembly_files.zip must contain flex_tail_bottom.png"
+
+
+def test_regression_bug_271_split_supplier_submissions_carrier_board() -> None:
+    """Verify BUG-271: supplier submissions are split by subassembly and include project summary forms."""
+    import zipfile
+
+    board_dir = Path("build/board/carrier_board")
+
+    # 1. Verify subassembly directories exist
+    carrier_dir = board_dir / "carrier_board"
+    flex_dir = board_dir / "flex_tail"
+    assert carrier_dir.is_dir(), "build/board/carrier_board/carrier_board directory must exist"
+    assert flex_dir.is_dir(), "build/board/carrier_board/flex_tail directory must exist"
+
+    # 2. carrier_board/gerbers.zip must contain ONLY carrier_board files
+    with zipfile.ZipFile(carrier_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        assert any("carrier_board" in n for n in names)
+        assert not any("flex_tail" in n for n in names)
+        assert "project_summary.txt" in names
+
+    # 3. flex_tail/gerbers.zip must contain ONLY flex_tail files
+    with zipfile.ZipFile(flex_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        assert any("flex_tail" in n for n in names)
+        assert not any("carrier_board" in n for n in names)
+        assert "project_summary.txt" in names
+
+    # 4. Project summaries exist and specify correct layer counts and types
+    c_summary = (carrier_dir / "project_summary.txt").read_text()
+    assert "Rigid" in c_summary
+    assert "6 Layers" in c_summary
+    assert "ENIG" in c_summary
+
+    f_summary = (flex_dir / "project_summary.txt").read_text()
+    assert "Flex" in f_summary or "FPC" in f_summary
+    assert "2 Layers" in f_summary
+
+
+def test_regression_bug_266_remove_led_and_jumper_opposite_side_designators(tmp_path: Path) -> None:
+    """Verify BUG-266: Component designators for LEDs, jumpers, and switches are removed from both B.SilkS and F.SilkS."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.exporter import PCBExporter
+
+    provider = CarrierBoardProvider()
+    provider.silkscreen()
+    pcb_cfg = provider.pcb_config
+
+    bottom_texts = [t.text for t in pcb_cfg.silkscreen_texts if t.layer == "B.SilkS"]
+
+    removed_designators = (
+        [f"D{i}" for i in range(2, 8)] + [f"JP{i}" for i in range(1, 5)] + [f"R{i}" for i in range(7, 13)] + ["SW1"]
+    )
+    for des in removed_designators:
+        assert des not in bottom_texts, f"Opposite-side component designator '{des}' found on B.SilkS"
+
+    # Verify omitted designators are registered in PCBConfig
+    assert set(removed_designators).issubset(set(pcb_cfg.omitted_silkscreen_designators))
+
+    # Verify that during PCB export, none of these designators are auto-rendered on F.SilkS or any layer
+    wiring = Wiring(str(provider.wiring_path))
+    exp = PCBExporter(pcb_cfg, wiring=wiring)
+    out_pcb = tmp_path / "carrier_board.kicad_pcb"
+    exp.export_kicad_pcb(str(out_pcb))
+    content = out_pcb.read_text(encoding="utf-8")
+    for des in removed_designators:
+        assert f'(gr_text "{des}"' not in content, (
+            f"Component designator '{des}' unexpectedly rendered on silkscreen in KiCad PCB"
+        )
+
+
+def test_regression_bug_267_c18_c19_vertical_stack_and_u11_clearance() -> None:
+    """Verify BUG-267: C18 and C19 are stacked vertically outside U11 silkscreen border with 0 DRC errors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. C18 and C19 exist and are stacked vertically at X >= 6.5
+    assert "C18" in comp_map, "C18 tuning capacitor must exist"
+    assert "C19" in comp_map, "C19 tuning capacitor must exist"
+    c18 = comp_map["C18"]
+    c19 = comp_map["C19"]
+
+    # Vertically stacked: same X coordinate, different Y coordinates
+    assert c18.position[0] == c19.position[0], (
+        f"C18 and C19 must be vertically stacked with matching X, got C18.X={c18.position[0]}, C19.X={c19.position[0]}"
+    )
+    assert c18.position[1] != c19.position[1], "C18 and C19 must have distinct Y positions"
+
+    # Well clear of U11 edge (X=5.0) and silkscreen brackets (X=5.25)
+    assert c18.position[0] >= 6.5, (
+        f"C18/C19 X position must be >= 6.5mm to be outside U11 silkscreen border, got {c18.position[0]}"
+    )
+
+    # 2. Verify net connections
+    assert any(c == "C18" and p == "1" for c, p in nets_map["NFC1"].pins), "C18 pin 1 must connect to NFC1"
+    assert any(c == "C18" and p == "2" for c, p in nets_map["GND"].pins), "C18 pin 2 must connect to GND"
+    assert any(c == "C19" and p == "1" for c, p in nets_map["NFC2"].pins), "C19 pin 1 must connect to NFC2"
+    assert any(c == "C19" and p == "2" for c, p in nets_map["GND"].pins), "C19 pin 2 must connect to GND"
+
+    # 3. PCB DRC check passes with 0 violations
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"

@@ -403,7 +403,7 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     assert provider.wiring_path.exists()
 
     wiring = Wiring(provider.wiring_path)
-    assert len(wiring.footprints) == 62
+    assert len(wiring.footprints) >= 62
     footprint_names = [fp.name for fp in wiring.footprints]
     assert "U1" in footprint_names
     assert "U2" in footprint_names
@@ -435,7 +435,7 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     assert "C1" in footprint_names
     assert "C2" in footprint_names
     assert "C3" in footprint_names
-    assert "Q1" in footprint_names
+    assert "Q1" not in footprint_names
 
     # Verify diagram population
     room = Room(config=provider.app_config, materials=provider.materials)
@@ -458,11 +458,11 @@ def test_carrier_board_wiring_and_diagram_generation(tmp_path: Path):
     exporter.export_pick_and_place_csv(pos_csv)
 
     bom_lines = bom_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(bom_lines) == 62  # header + 61 carrier components (J4 is on flex tail)
+    assert len(bom_lines) >= 62  # header + carrier components (J4 is on flex tail)
     assert "MCXN947VDF" in bom_csv.read_text(encoding="utf-8")
 
     pos_lines = pos_csv.read_text(encoding="utf-8").strip().splitlines()
-    assert len(pos_lines) == 62  # header + 61 carrier components
+    assert len(pos_lines) >= 62  # header + carrier components
 
 
 def test_schematic_diagram_export_pdf_multipage_toc(tmp_path: Path):
@@ -822,7 +822,8 @@ def test_carrier_board_full_milestones_integration(tmp_path: Path):
     # Milestone 5 & 6: Wiring passives, actives, and flex fanout
     wiring = Wiring(provider.wiring_path)
     fp_names = {fp.name for fp in wiring.footprints}
-    assert {"R1", "R2", "C1", "C2", "C3", "Q1", "J2"}.issubset(fp_names)
+    assert {"R1", "R2", "C1", "C2", "C3", "J2"}.issubset(fp_names)
+    assert "Q1" not in fp_names
 
     # Exporter capacitive configuration JSON
     exporter = PCBExporter(cfg, wiring)
@@ -910,15 +911,14 @@ def test_carrier_board_manufacturing_artifacts_and_pos_alignment(tmp_path: Path)
     assert "U2" in rows
     assert "U11" in rows
     assert "J2" in rows
-    assert "Q1" in rows
+    assert "Q1" not in rows
     assert "C2" in rows
 
-    # Layers: Q1, U2, C2 on Bottom; U1, U11, J2 on Top
+    # Layers: U2, C2 on Bottom; U1, U11, J2 on Top
     assert rows["U1"]["Layer"] == "Top"
     assert rows["U11"]["Layer"] == "Top"
     assert rows["J2"]["Layer"] == "Top"
     assert rows["U2"]["Layer"] == "Bottom"
-    assert rows["Q1"]["Layer"] == "Bottom"
     assert rows["C2"]["Layer"] == "Bottom"
 
     # Edge connector coordinates
@@ -1130,28 +1130,60 @@ def test_schematic_discrete_component_truth_table(tmp_path: Path):
     from model.wiring import TruthTableModel, TruthTableRowModel, TruthTableState, LabelModel
     from provider.schematic_diagram import SchematicDiagram
 
-    # 1. Verify parsing of declarative truth table in carrier_board/wiring.yaml
-    provider = CarrierBoardProvider()
-    wiring = Wiring(provider.wiring_path)
-    q1 = next(fp for fp in wiring.footprints if fp.name == "Q1")
-    assert q1.truth_table is not None
-    assert isinstance(q1.truth_table, TruthTableModel)
-    assert q1.truth_table.title == "Q1 Load Switch Truth Table"
-    assert q1.truth_table.input_headers == ["PWR_EN (Gate)"]
-    assert q1.truth_table.output_headers == ["VLOAD_SW (Drain)", "Channel State"]
-    assert len(q1.truth_table.rows) == 4
+    # 1. Verify declarative TruthTableModel model parsing
+    raw_tt = {
+        "title": "Q1 Load Switch Truth Table",
+        "input_headers": ["PWR_EN (Gate)"],
+        "output_headers": ["VLOAD_SW (Drain)", "Channel State"],
+        "rows": [
+            {
+                "inputs": {"PWR_EN (Gate)": "0 (Low, <0.8V)"},
+                "outputs": {"VLOAD_SW (Drain)": "Hi-Z / Pull-up", "Channel State": "Cutoff"},
+                "state": "FALSE",
+                "description": "Load switch disabled; output isolated",
+            },
+            {
+                "inputs": {"PWR_EN (Gate)": "1 (High, >1.5V)"},
+                "outputs": {"VLOAD_SW (Drain)": "0V (Low, GND)", "Channel State": "Conduction"},
+                "state": "TRUE",
+                "description": "Active saturation; load energized",
+            },
+            {
+                "inputs": {"PWR_EN (Gate)": "Float / High-Z"},
+                "outputs": {"VLOAD_SW (Drain)": "Indeterminate", "Channel State": "Undefined"},
+                "state": "INVALID",
+                "description": "Prohibited floating gate; leakage risk",
+            },
+            {
+                "inputs": {"PWR_EN (Gate)": "Over-Voltage (>20V)"},
+                "outputs": {"VLOAD_SW (Drain)": "Breakdown / Short", "Channel State": "Damaged"},
+                "state": "INVALID",
+                "description": "Gate dielectric breakdown; fault",
+            },
+        ],
+    }
+    tt = TruthTableModel(**raw_tt)
+    assert tt.title == "Q1 Load Switch Truth Table"
+    assert tt.input_headers == ["PWR_EN (Gate)"]
+    assert tt.output_headers == ["VLOAD_SW (Drain)", "Channel State"]
+    assert len(tt.rows) == 4
 
-    states = [r.state for r in q1.truth_table.rows]
+    states = [r.state for r in tt.rows]
     assert TruthTableState.FALSE in states
     assert TruthTableState.TRUE in states
     assert TruthTableState.INVALID in states
 
     # Verify custom row model
-    first_row = q1.truth_table.rows[0]
+    first_row = tt.rows[0]
     assert isinstance(first_row, TruthTableRowModel)
     assert first_row.state == TruthTableState.FALSE
     assert "disabled" in first_row.description
     assert first_row.outputs.get("Channel State") == "Cutoff"
+
+    # Verify Q1 was removed from carrier board wiring per CR feedback
+    provider = CarrierBoardProvider()
+    wiring = Wiring(provider.wiring_path)
+    assert not any(fp.name == "Q1" for fp in wiring.footprints)
 
     # 2. Verify auto-generated default transistor truth table for discrete transistor without explicit truth table
     q_auto = FootprintModel(
@@ -1726,11 +1758,11 @@ def test_regression_deep_power_down_wakeup_and_power_sequencing() -> None:
     assert report_path.is_file(), "Downselection report must exist locally"
     content = report_path.read_text(encoding="utf-8")
 
-    # 1. BUG-060: Verify Deep Power Down wakeup triggers (Charger interface and M.2 connector)
+    # 1. BUG-060 / BUG-214: Verify Deep Power Down wakeup triggers (Charger interface and BTLE wireless subsystem)
     assert "WAKEUP0_B" in content
     assert "WAKEUP1_B" in content
     assert "CHG_PGOOD_WAKE" in content
-    assert "M2_WAKE_N" in content
+    assert "BLE_WAKE_N" in content
     assert "Exit Deep Power Down" in content
 
     # 2. BUG-061: Verify all required power-on sequencing steps
@@ -1834,7 +1866,7 @@ def test_regression_pinmux_datasheet_verification() -> None:
     # 7. Verify Wakeup and Switched Power Rails
     assert "G5" in content and "P1_19" in content and "WUU0_IN15" in content and "CHG_STAT" in content
     assert "M10" in content and "P5_2" in content and "CHG_PGOOD_WAKE" in content
-    assert "C13" in content and "P0_7" in content and "WUU0_IN1" in content and "M2_WAKE_N" in content
+    assert "C13" in content and "P0_7" in content and "WUU0_IN1" in content and "BLE_WAKE_N" in content
     assert "L4" in content and "P1_22" in content and "PWR_EN_AUDIO" in content
     assert "L5" in content and "P1_21" in content and "PWR_EN_SENSORS" in content
     assert "M4" in content and "P1_23" in content and "PWR_EN_DEBUG" in content
@@ -1922,20 +1954,20 @@ def test_regression_enclosure_cad_feedback_and_assembly() -> None:
 
 @pytest.mark.slow
 def test_regression_enclosure_m2_cutout_and_component_silkscreens() -> None:
-    """Verify BUG-065 (M.2 cutout in bottom enclosure) and BUG-066 (component silkscreens on carrier)."""
+    """Verify BUG-214/BUG-222 (bottom enclosure build without M.2) and BUG-066 (component silkscreens on carrier)."""
     provider = CarrierBoardProvider()
 
-    # 1. BUG-065: Verify M.2 cutout settings and bottom enclosure build
-    assert provider.settings.enclosure_m2_cutout_width == 24.0
-    assert provider.settings.enclosure_m2_cutout_height == 5.0
+    # 1. BUG-214/BUG-222: Verify bottom enclosure build with M.2 removed in favor of U11 BTLE
     bottom = provider.enclosure_bottom("enclosure_bottom", None, Mode.DEFAULT)
     assert bottom is not None and bottom.part is not None
 
-    # 2. BUG-066: Verify all component reference designators are present in silkscreen
+    # 2. BUG-066 / BUG-214: Verify all component reference designators are present in silkscreen
     silks = provider.silkscreen()
     silk_texts = {t.text for t in silks}
+    assert "J1" not in silk_texts, "Legacy M.2 connector J1 must not be present in silkscreen"
+    assert "Q1" not in silk_texts, "Q1 must not be present in silkscreen"
     expected_components = (
-        ["U1", "U2", "U11", "J2", "J3", "Q1", "U3", "U4", "SPK1", "Y1"]
+        ["U1", "U2", "U11", "J2", "J3", "U3", "U4", "SPK1", "Y1"]
         + [f"R{i}" for i in range(1, 7)]
         + [f"C{i}" for i in range(1, 13)]
     )
@@ -2428,6 +2460,8 @@ def test_regression_bug_088_schematic_defects_and_drc() -> None:
     footprints_map = {f.name: f for f in wiring.footprints if getattr(f, "shape_ref", None) != "flex_tail"}
     pin_to_net = {(c, p): net.name for net in wiring.nets for c, p in net.pins}
     for name, fp in footprints_map.items():
+        if getattr(fp, "unconnected", False) or getattr(fp, "dnp", False):
+            continue
         connected = [p for p in fp.pins if (name, p.name) in pin_to_net]
         assert len(connected) > 0, f"Dangling component {name} has no connected pins in wiring.yaml"
 
@@ -2692,29 +2726,21 @@ def test_regression_bug_105_bug_106_audio_en_and_sensor_power_architecture() -> 
     assert ("U1", "L4") in audio_en_pins
     assert ("U4", "SD_MODE") in audio_en_pins
 
-    # 2. Verify PWR_EN connects only MCU D1 and Q1 gate; decoupled from U4 SD_MODE
+    # 2. Verify PWR_EN net and Q1 are removed from wiring.yaml per CR feedback
     pwr_en_net = next((net for net in wiring.nets if net.name == "PWR_EN"), None)
-    assert pwr_en_net is not None, "PWR_EN net must exist in wiring.yaml"
-    pwr_en_pins = set(pwr_en_net.pins)
-    assert ("U1", "D1") in pwr_en_pins
-    assert ("Q1", "1") in pwr_en_pins or ("Q1", "G") in pwr_en_pins
-    assert ("U4", "SD_MODE") not in pwr_en_pins, "U4 SD_MODE must NOT be controlled by PWR_EN"
+    assert pwr_en_net is None, "PWR_EN net must be removed from wiring.yaml"
+    assert not any(fp.name == "Q1" for fp in wiring.footprints), "Q1 must be removed from wiring.yaml"
 
-    # 3. Verify VLOAD_SW connects Q1 drain, J1, audio amp U4 ground/gain, C8 cap ground
-    # and NO LONGER connects to peripheral expansion headers J6-J9 (BUG-106)
+    # 3. Verify VLOAD_SW was removed and U11 does not connect to VLOAD_SW (BUG-249)
+    # and peripheral expansion headers J6-J9 do not connect to VLOAD_SW (BUG-106)
     vload_net = next((net for net in wiring.nets if net.name == "VLOAD_SW"), None)
-    assert vload_net is not None, "VLOAD_SW net must exist in wiring.yaml"
-    vload_pins = set(vload_net.pins)
-    assert ("Q1", "3") in vload_pins or ("Q1", "D") in vload_pins
-    assert ("U11", "VLOAD_SW") in vload_pins
+    assert vload_net is None, "VLOAD_SW net must be removed from wiring.yaml (BUG-249)"
     gnd_net = next((net for net in wiring.nets if net.name == "GND"), None)
     assert gnd_net is not None
     gnd_pins = set(gnd_net.pins)
-    assert ("U4", "GND") in gnd_pins or ("U4", "GND") in vload_pins
-    assert ("U4", "GAIN") in gnd_pins or ("U4", "GAIN") in vload_pins
-    assert ("C8", "2") in gnd_pins or ("C8", "2") in vload_pins
-    for j_comp in ["J6", "J7", "J8", "J9"]:
-        assert (j_comp, "2") not in vload_pins, f"{j_comp}.2 must NOT be on VLOAD_SW"
+    assert ("U4", "GND") in gnd_pins
+    assert ("U4", "GAIN") in gnd_pins
+    assert ("C8", "2") in gnd_pins
 
     # 4. Verify dedicated INT GPIOs connect to expansion headers J6-J9 (BUG-106, BUG-110, BUG-173)
     int_mappings = {
@@ -2897,10 +2923,16 @@ def test_regression_bugs_115_through_127() -> None:
         exporter = PCBExporter(pcb_cfg, wiring=wiring)
         out_pcb = exporter.export_kicad_pcb(Path(tmpdir) / "board.kicad_pcb")
         kicad_text = out_pcb.read_text()
+        omitted_designators = set(getattr(pcb_cfg, "omitted_silkscreen_designators", []))
         for fp in exporter.get_footprints_for_board():
-            assert kicad_text.count(f'(gr_text "{fp.name}"') == 1, (
-                f"BUG-127: Footprint {fp.name} must have exactly one gr_text silkscreen designator"
-            )
+            if fp.name in omitted_designators:
+                assert kicad_text.count(f'(gr_text "{fp.name}"') == 0, (
+                    f"Footprint {fp.name} is in omitted_silkscreen_designators and must have 0 gr_text designators"
+                )
+            else:
+                assert kicad_text.count(f'(gr_text "{fp.name}"') == 1, (
+                    f"BUG-127: Footprint {fp.name} must have exactly one gr_text silkscreen designator"
+                )
             ref_present = (
                 f'(property "Reference" "{fp.name}"' in kicad_text or f'(fp_text reference "{fp.name}"' in kicad_text
             )

@@ -75,6 +75,7 @@ footprints:
         pad_size_mm: [1.7, 1.7]
         drill_dia_mm: 1.00
 
+
   "axial_resistor":
     dimensions: [8.5, 2.5, 2.5]
     pins:

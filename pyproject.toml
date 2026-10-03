@@ -22,7 +22,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 120
-extend-exclude = [".git", ".sl"]
+extend-exclude = [".git", ".sl", "feedback"]
 
 [tool.ruff.format]
 quote-style = "double"

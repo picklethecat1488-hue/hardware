@@ -3,6 +3,24 @@ board_type: rigid-flex
 revision: '2.0'
 shape_ref: carrier_board
 sheet_size: A4
+omitted_silkscreen_designators:
+- D2
+- D3
+- D4
+- D5
+- D6
+- D7
+- JP1
+- JP2
+- JP3
+- JP4
+- R7
+- R8
+- R9
+- R10
+- R11
+- R12
+- SW1
 obstacles:
 - name: U1
   shape: box
@@ -19,13 +37,24 @@ obstacles:
   shape: box
   dimensions_mm:
   - 10.0
-  - 14.0
-  - 2.2
+  - 15.0
+  - 2.23
   position_mm:
   - 0.0
-  - -34.0
-  - 1.9
+  - -36.0
+  - 1.915
   description: BTLE transceiver module with integrated PCB antenna
+- name: J15
+  shape: box
+  dimensions_mm:
+  - 6.35
+  - 3.81
+  - 5.0
+  position_mm:
+  - -14.5
+  - -41.0
+  - 3.3
+  description: SWD recovery header
 - name: ble_antenna_keepout
   shape: box
   dimensions_mm:
@@ -344,6 +373,7 @@ schematic_sheets:
   - C13
   - U7
   - C7
+  - C16
   pin_breakouts:
     J3:
     - VBUS
@@ -377,29 +407,24 @@ schematic_sheets:
     C7:
     - '1'
     - '2'
+    C16:
+    - '1'
+    - '2'
 - title: 3.3V Power Regulation & Distribution
-  description: Low-dropout linear voltage regulator, switched power rail MOSFET switch
-    with C8 bulk filtering, and system decoupling
+  description: Low-dropout linear voltage regulator with C8 bulk filtering, and system
+    decoupling
   layout:
     cols_per_row: 4
     grid_positions:
       U3:
       - 0
       - 0
-      Q1:
-      - 0
-      - 1
-      U11:
-      - 0
-      - 2
       C8:
       - 0
-      - 3
+      - 1
   components:
   - U3
   - C6
-  - Q1
-  - U11
   - C1
   - C2
   - C3
@@ -411,14 +436,6 @@ schematic_sheets:
     - '3'
     - '4'
     - '5'
-    Q1:
-    - G
-    - S
-    - D
-    U11:
-    - GND
-    - 3V3
-    - VLOAD_SW
     C8:
     - '1'
     - '2'
@@ -440,6 +457,8 @@ schematic_sheets:
   components:
   - U1
   - U10
+  - D8
+  - C15
   pin_sides:
     U1:
       L5: right
@@ -447,8 +466,10 @@ schematic_sheets:
       '3': left
       '1': left
       '2': left
-      '4': right
       '5': right
+    D8:
+      '1': left
+      '2': right
   pin_breakouts:
     U1:
     - L5
@@ -456,8 +477,13 @@ schematic_sheets:
     - '3'
     - '1'
     - '2'
-    - '4'
     - '5'
+    D8:
+    - '1'
+    - '2'
+    C15:
+    - '1'
+    - '2'
 - title: Microcontroller Core, Clock & Reset
   description: Primary microcontroller core, 24MHz crystal oscillator, power bypass,
     reset and boot circuitry
@@ -479,8 +505,7 @@ schematic_sheets:
       H8: left
       F2: right
       F1: right
-      D1: left
-      M1: left
+      F3: left
       C14: left
     Y1:
       '1': left
@@ -491,7 +516,6 @@ schematic_sheets:
     U1:
     - J8
     - H8
-    - D1
     - F2
     - F1
     - F3
@@ -527,6 +551,7 @@ schematic_sheets:
   components:
   - U1
   - U8
+  - C17
   pin_sides:
     U1:
       B17: right
@@ -561,6 +586,9 @@ schematic_sheets:
     - '7'
     - '8'
     - '4'
+    C17:
+    - '1'
+    - '2'
 - title: Telemetry & Debug Communications
   description: FTDI FT232RNQ high-speed USB-to-UART serial bridge and ARM 10-pin SWD
     debug micro-header
@@ -715,8 +743,6 @@ schematic_sheets:
       CR7: right
       CT8: right
       OUTA: right
-      VREGD: right
-      VREGA: right
     J2:
       CAP_RX0: left
       CAP_RX1: left
@@ -747,8 +773,7 @@ schematic_sheets:
     - CR5
     - CR6
     - CR7
-    - VREGD
-    - VREGA
+    - CT8
     J2:
     - CAP_RX0
     - CAP_RX1
@@ -827,10 +852,27 @@ schematic_sheets:
     - '1'
     - '2'
 - title: High-Speed BTLE UART & Wireless Interface
-  description: BTLE transceiver module (U11) with 1Mb/s high-speed UART link, flow control, cap-touch pairing trigger, and integrated PCB antenna
+  description: BTLE transceiver module (U11) with 1Mb/s high-speed UART link, flow
+    control, cap-touch pairing trigger, and integrated PCB antenna
+  layout:
+    cols_per_row: 3
+    col_gap: 50.0
+    grid_positions:
+      U1:
+      - 0
+      - 0
+      U11:
+      - 0
+      - 1
+      J16:
+      - 0
+      - 2
   components:
   - U11
   - U1
+  - C18
+  - C19
+  - J16
   pin_sides:
     U1:
       T2: left
@@ -842,17 +884,81 @@ schematic_sheets:
       RTS: left
       TXD: left
       CTS: left
+      RESET_N: left
+      GND: right
+      3V3: right
+      NFC1: right
+      NFC2: right
+    C18:
+      '1': left
+      '2': right
+    C19:
+      '1': left
+      '2': right
+    J16:
+      '1': left
+      '2': left
   pin_breakouts:
     U11:
     - RXD
     - RTS
     - TXD
     - CTS
+    - RESET_N
+    - GND
+    - 3V3
+    - NFC1
+    - NFC2
+    C18:
+    - '1'
+    - '2'
+    C19:
+    - '1'
+    - '2'
+    J16:
+    - '1'
+    - '2'
     U1:
     - T2
     - T1
     - T3
     - T4
+- title: BTLE Programming & Reset Interface (J15, SW2)
+  description: BLE SWD debug/recovery header (J15, DNP) and manual reset push button switch (SW2) for the NINA-B312 BLE module
+  layout:
+    cols_per_row: 2
+    col_gap: 50.0
+    top_row_y: 110.0
+    grid_positions:
+      J15:
+      - 0
+      - 0
+      SW2:
+      - 0
+      - 1
+  components:
+  - J15
+  - SW2
+  pin_sides:
+    J15:
+      '1': left
+      '2': left
+      '3': left
+      '4': left
+      '5': left
+    SW2:
+      '1': left
+      '2': right
+  pin_breakouts:
+    J15:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    SW2:
+    - '1'
+    - '2'
 - title: I2C Peripheral Expansion Interface (J6)
   description: Primary I2C peripheral expansion connector (JST-PH-6P)
   components:
@@ -1101,7 +1207,8 @@ schematic_sheets:
       '1': left
       '2': left
 - title: Status and Overrides - Primary Power LEDs
-  description: Visual rail power indicators and current limiters for VBAT, VBUS, and 3V3
+  description: Visual rail power indicators and current limiters for VBAT, VBUS, and
+    3V3
   layout:
     cols_per_row: 3
     top_row_y: 168.0
@@ -1143,7 +1250,8 @@ schematic_sheets:
       '1': left
       '2': left
 - title: Status and Overrides - Peripheral & MCU LEDs
-  description: Subsystem activity indicators and current limiters for Audio, Peripherals, and MCU
+  description: Subsystem activity indicators and current limiters for Audio, Peripherals,
+    and MCU
   layout:
     cols_per_row: 3
     top_row_y: 168.0
@@ -1205,7 +1313,7 @@ assembly_test:
     net_or_points:
     - BLE_TX
     - BLE_RX
-    expected_nominal: 3.30
+    expected_nominal: 3.3
     tolerance_pct: 3.0
     unit: V
     stimulus: 1Mb/s PRBS UART serial test

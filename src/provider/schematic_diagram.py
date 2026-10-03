@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib
 
@@ -184,12 +184,21 @@ class SchematicDiagram:
                             pin_order_list = sheet_def.pin_breakouts[comp_name]
                             pin_order_map = {name: idx for idx, name in enumerate(pin_order_list)}
                             allowed_pins = set(pin_order_map.keys())
+                            orig_pin_names = {p.name for p in orig_fp.pins}
                             matched_pins = [
-                                p for p in orig_fp.pins if p.name in allowed_pins or p.label in allowed_pins
+                                p
+                                for p in orig_fp.pins
+                                if p.name in allowed_pins
+                                or (
+                                    getattr(p, "label", None) in allowed_pins
+                                    and getattr(p, "label", None) not in orig_pin_names
+                                )
                             ]
                             filtered_pins = sorted(
                                 matched_pins,
-                                key=lambda p: pin_order_map.get(p.name, pin_order_map.get(p.label, 999)),
+                                key=lambda p: pin_order_map.get(
+                                    p.name, pin_order_map.get(getattr(p, "label", None), 999)
+                                ),
                             )
                             sheet_fps.append(orig_fp.model_copy(update={"pins": filtered_pins}))
                         else:
@@ -261,6 +270,20 @@ class SchematicDiagram:
             config=self.config,
         )
 
+    def compute_passive_tap_points(
+        self,
+    ) -> Dict[int, List[Tuple[FootprintModel, str, Tuple[float, float]]]]:
+        """Compute signal tap points (footprint, signal_net, (x, y)) for vertical passives on each sheet.
+
+        Returns:
+            Dict mapping sheet_idx -> list of (footprint, signal_net, (x_tap, y_tap)).
+        """
+        return SchematicWireSegmentPlanner.compute_passive_tap_points(
+            wiring=self.wiring,
+            sheet_plans=self._build_sheet_plans(),
+            config=self.config,
+        )
+
     def _compute_sheet_wire_segments_for_plan(
         self, sheet_plan: _SchematicSheetPlan, all_nets: List[NetModel]
     ) -> Tuple[
@@ -269,11 +292,12 @@ class SchematicDiagram:
         List[Tuple[float, float, str]],
     ]:
         """Compute exact wire routes and labels for a single schematic sheet plan."""
-        return SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan(
+        h_segs, v_segs, wire_labels, _ = SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan(
             sheet_plan=sheet_plan,
             all_nets=all_nets,
             config=self.config,
         )
+        return h_segs, v_segs, wire_labels
 
     def render_pdf(self, output_file: str | Path) -> Path:
         """Generate a multi-page PDF schematic including Title page, TOC, and schematic sheets.
@@ -295,14 +319,24 @@ class SchematicDiagram:
         sheet_plans = self._build_sheet_plans()
         total_sheets = max(1, len(sheet_plans))
 
+        # Filter primary signal nets to only those connected to footprints present in this schematic
+        schematic_fp_names = {fp.name for fp in fps}
+        if sheet_plans:
+            schematic_fp_names.update(fp.name for sp in sheet_plans for fp in sp.footprints)
+        schematic_nets = [
+            net
+            for net in self.wiring.nets
+            if any(isinstance(p, (list, tuple)) and len(p) >= 1 and p[0] in schematic_fp_names for p in net.pins)
+        ]
+
         # Plan multi-page Table of Contents sheets dynamically
-        toc_plans = self._plan_pdf_toc_pages(fps, self.wiring.nets, sheet_plans)
+        toc_plans = self._plan_pdf_toc_pages(fps, schematic_nets, sheet_plans)
         toc_page_count = len(toc_plans)
         total_pages = 1 + toc_page_count + total_sheets
 
         with PdfPages(out_path) as pdf:
             # Page 1: Title Cover Page
-            self._render_pdf_title_page(pdf, board_name, board_type, layer_count, fps, self.wiring.nets, total_pages)
+            self._render_pdf_title_page(pdf, board_name, board_type, layer_count, fps, schematic_nets, total_pages)
 
             # Pages 2 .. 1 + toc_page_count: Table of Contents & Interconnect Schedule
             for toc_plan in toc_plans:
@@ -323,7 +357,7 @@ class SchematicDiagram:
                     board_name=board_name,
                     sheet_plan=plan,
                     total_sheets=total_sheets,
-                    all_nets=self.wiring.nets,
+                    all_nets=schematic_nets,
                     page_num=1 + toc_page_count + sheet_idx,
                     total_pages=total_pages,
                 )
@@ -488,6 +522,7 @@ class SchematicDiagram:
         sheet_pin_coords: Dict[Tuple[str, str], Tuple[float, float]],
         wired_pins: Optional[set[Tuple[str, str]]] = None,
         pin_side_map: Optional[Dict[Tuple[str, str], str]] = None,
+        pullup_points: Optional[List[Any]] = None,
     ) -> None:
         """Render pull-up and pull-down resistors as vertical branches directly attached to signal lines."""
         SchematicPassiveDrawer.draw_pullup_resistors(
@@ -498,6 +533,7 @@ class SchematicDiagram:
             sheet_pin_coords=sheet_pin_coords,
             wired_pins=wired_pins,
             pin_side_map=pin_side_map,
+            pullup_points=pullup_points,
         )
 
     def _draw_vertical_wire_with_jumpers(
@@ -670,7 +706,7 @@ class SchematicDiagram:
             bottom_cards_y = 60.0
         elif has_bottom_cards:
             top_row_y = 158.0
-            bottom_cards_y = 66.0
+            bottom_cards_y = 52.0
         elif pullup_resistors:
             top_row_y = 138.0
             bottom_cards_y = 60.0
@@ -684,8 +720,14 @@ class SchematicDiagram:
             cols_per_row = cols_override
             col_w = 210.0 / max(1, cols_per_row)
             cw = min(38.0, col_w * 0.55)
-            gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
-            start_x = 45.0
+            layout_col_gap = getattr(layout, "col_gap", 15.0)
+            if layout_col_gap != 15.0:
+                gap = layout_col_gap
+                total_w = cols_per_row * cw + (cols_per_row - 1) * gap
+                start_x = max(35.0, page_center_x - total_w / 2.0)
+            else:
+                gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
+                start_x = 45.0
             col_x_positions = []
             col_y_positions = []
             comp_col_map = {}
@@ -758,37 +800,15 @@ class SchematicDiagram:
                 pin_side_map[(fp.name, p.name)] = "left"
             for p in right_p:
                 pin_side_map[(fp.name, p.name)] = "right"
-
-        # Discover direct wire pairs between facing pins and detour wire pairs around components
-        direct_wire_pairs: List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]] = []
-        detour_wire_pairs: List[Tuple[Tuple[str, str], Tuple[str, str], NetModel]] = []
         wired_pins: set[Tuple[str, str]] = set()
-
-        for net in all_nets:
-            if net.name.upper() in POWER_NET_NAMES or net.name.upper() in GROUND_NET_NAMES:
-                continue
-            present_pins = [pair for pair in net.pins if pair in pin_side_map]
-            if len(present_pins) >= 2:
-                for i, pair1 in enumerate(present_pins):
-                    for pair2 in present_pins[i + 1 :]:
-                        if pair1 in wired_pins or pair2 in wired_pins:
-                            continue
-                        if pair1[0] == pair2[0]:
-                            continue
-                        c1, c2 = comp_col_map[pair1[0]], comp_col_map[pair2[0]]
-                        s1, s2 = pin_side_map[pair1], pin_side_map[pair2]
-                        if c1 > c2:
-                            pair1, pair2 = pair2, pair1
-                            c1, c2 = c2, c1
-                            s1, s2 = s2, s1
-                        if (c2 == c1 + 1) and s1 == "right" and s2 == "left":
-                            direct_wire_pairs.append((pair1, pair2, net))
-                            wired_pins.add(pair1)
-                            wired_pins.add(pair2)
-                        else:
-                            detour_wire_pairs.append((pair1, pair2, net))
-                            wired_pins.add(pair1)
-                            wired_pins.add(pair2)
+        (
+            h_segments,
+            v_segments,
+            wire_labels,
+            _,
+        ) = SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan(
+            sheet_plan, all_nets, self.config, wired_pins=wired_pins
+        )
 
         sheet_pin_coords: Dict[Tuple[str, str], Tuple[float, float]] = {}
         comp_boxes: List[Tuple[float, float, float, float]] = []
@@ -1206,12 +1226,6 @@ class SchematicDiagram:
                             zorder=3,
                         )
 
-        (
-            h_segments,
-            v_segments,
-            wire_labels,
-        ) = SchematicWireSegmentPlanner.compute_sheet_wire_segments_for_plan(sheet_plan, all_nets, self.config)
-
         # Render all horizontal wire segments
         for x_start, x_end, y, net_name, col in h_segments:
             ax.plot([x_start, x_end], [y, y], color=col, linewidth=1.2, zorder=2)
@@ -1253,6 +1267,7 @@ class SchematicDiagram:
                 sheet_pin_coords=sheet_pin_coords,
                 wired_pins=wired_pins,
                 pin_side_map=pin_side_map,
+                pullup_points=getattr(sheet_plan, "_computed_pullup_points", None),
             )
 
         # BUG-206: Build full obstacle list (components, cards, truth tables, title block) to stop short

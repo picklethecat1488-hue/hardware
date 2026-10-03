@@ -39,78 +39,95 @@ class SQLiteReviewStore:
     @contextlib.contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         """Create, configure, and safely close a SQLite connection with foreign keys enabled."""
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")
+        self._ensure_schema(conn)
         try:
             with conn:
                 yield conn
         finally:
             conn.close()
 
+    def _ensure_schema(self, conn: sqlite3.Connection) -> None:
+        """Ensure schema tables and indices exist in connection."""
+        cursor = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='commit_updates'")
+        if not cursor.fetchone():
+            self._init_schema_with_conn(conn)
+            return
+        cursor = conn.execute("PRAGMA table_info(comments)")
+        cols = [row["name"] for row in cursor.fetchall()]
+        if "uuid" not in cols or "commit_hash" not in cols:
+            self._init_schema_with_conn(conn)
+
     def _init_schema(self) -> None:
         """Initialize tables and indices if they do not already exist."""
-        with self._get_connection() as conn:
-            conn.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS metadata (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                );
+        with self._get_connection():
+            pass
 
-                CREATE TABLE IF NOT EXISTS files (
-                    path TEXT PRIMARY KEY,
-                    status TEXT NOT NULL DEFAULT 'PENDING',
-                    notes TEXT NOT NULL DEFAULT ''
-                );
+    def _init_schema_with_conn(self, conn: sqlite3.Connection) -> None:
+        """Execute table creation and migrations on connection."""
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
 
-                CREATE TABLE IF NOT EXISTS comments (
-                    id TEXT PRIMARY KEY,
-                    uuid TEXT,
-                    commit_hash TEXT NOT NULL DEFAULT '',
-                    file_path TEXT NOT NULL,
-                    start_line INTEGER NOT NULL,
-                    end_line INTEGER NOT NULL,
-                    severity TEXT NOT NULL,
-                    body TEXT NOT NULL,
-                    author TEXT NOT NULL DEFAULT 'Reviewer',
-                    code_snippet TEXT NOT NULL DEFAULT '',
-                    created_at TEXT NOT NULL DEFAULT '',
-                    resolved INTEGER NOT NULL DEFAULT 0
-                );
+            CREATE TABLE IF NOT EXISTS files (
+                path TEXT PRIMARY KEY,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                notes TEXT NOT NULL DEFAULT ''
+            );
 
-                CREATE TABLE IF NOT EXISTS commit_updates (
-                    id TEXT PRIMARY KEY,
-                    session_uuid TEXT NOT NULL,
-                    original_commit TEXT NOT NULL,
-                    current_commit TEXT NOT NULL,
-                    action TEXT NOT NULL,
-                    notes TEXT NOT NULL DEFAULT '',
-                    timestamp TEXT NOT NULL
-                );
+            CREATE TABLE IF NOT EXISTS comments (
+                id TEXT PRIMARY KEY,
+                uuid TEXT,
+                commit_hash TEXT NOT NULL DEFAULT '',
+                file_path TEXT NOT NULL,
+                start_line INTEGER NOT NULL,
+                end_line INTEGER NOT NULL,
+                severity TEXT NOT NULL,
+                body TEXT NOT NULL,
+                author TEXT NOT NULL DEFAULT 'Reviewer',
+                code_snippet TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT '',
+                resolved INTEGER NOT NULL DEFAULT 0
+            );
 
-                CREATE INDEX IF NOT EXISTS idx_comments_file_path ON comments(file_path);
-                CREATE INDEX IF NOT EXISTS idx_comments_severity ON comments(severity);
-                CREATE INDEX IF NOT EXISTS idx_files_status ON files(status);
-                CREATE INDEX IF NOT EXISTS idx_commit_updates_session ON commit_updates(session_uuid);
-                """
-            )
-            # Ensure uuid and commit_hash columns exist on preexisting comments table
-            cursor = conn.execute("PRAGMA table_info(comments)")
-            cols = [row["name"] for row in cursor.fetchall()]
-            if "uuid" not in cols:
-                conn.execute("ALTER TABLE comments ADD COLUMN uuid TEXT")
-            if "commit_hash" not in cols:
-                conn.execute("ALTER TABLE comments ADD COLUMN commit_hash TEXT NOT NULL DEFAULT ''")
+            CREATE TABLE IF NOT EXISTS commit_updates (
+                id TEXT PRIMARY KEY,
+                session_uuid TEXT NOT NULL,
+                original_commit TEXT NOT NULL,
+                current_commit TEXT NOT NULL,
+                action TEXT NOT NULL,
+                notes TEXT NOT NULL DEFAULT '',
+                timestamp TEXT NOT NULL
+            );
 
-            # Backfill missing UUIDs on comments
-            null_uuid_rows = conn.execute("SELECT id FROM comments WHERE uuid IS NULL OR uuid = ''").fetchall()
-            for r in null_uuid_rows:
-                conn.execute("UPDATE comments SET uuid = ? WHERE id = ?", (str(uuid_pkg.uuid4()), r["id"]))
+            CREATE INDEX IF NOT EXISTS idx_comments_file_path ON comments(file_path);
+            CREATE INDEX IF NOT EXISTS idx_comments_severity ON comments(severity);
+            CREATE INDEX IF NOT EXISTS idx_files_status ON files(status);
+            CREATE INDEX IF NOT EXISTS idx_commit_updates_session ON commit_updates(session_uuid);
+            """
+        )
+        # Ensure uuid and commit_hash columns exist on preexisting comments table
+        cursor = conn.execute("PRAGMA table_info(comments)")
+        cols = [row["name"] for row in cursor.fetchall()]
+        if "uuid" not in cols:
+            conn.execute("ALTER TABLE comments ADD COLUMN uuid TEXT")
+        if "commit_hash" not in cols:
+            conn.execute("ALTER TABLE comments ADD COLUMN commit_hash TEXT NOT NULL DEFAULT ''")
 
-            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_comments_uuid ON comments(uuid)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_comments_commit ON comments(commit_hash)")
+        # Backfill missing UUIDs on comments
+        null_uuid_rows = conn.execute("SELECT id FROM comments WHERE uuid IS NULL OR uuid = ''").fetchall()
+        for r in null_uuid_rows:
+            conn.execute("UPDATE comments SET uuid = ? WHERE id = ?", (str(uuid_pkg.uuid4()), r["id"]))
+
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_comments_uuid ON comments(uuid)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_comments_commit ON comments(commit_hash)")
 
     def load_session(self) -> Optional[ReviewSessionModel]:
         """Load full review session model from SQLite.
@@ -295,13 +312,31 @@ class SQLiteReviewStore:
                     (f_state.path, f_state.status.value, f_state.notes),
                 )
 
-            # 4. Sync comments
+            # 4. Sync comments: scope deletion to session's revisions or commit to avoid deleting other commits' comments (BUG-236)
             current_cids = {c.id for c in session.comments}
-            if current_cids:
-                placeholders = ",".join("?" for _ in current_cids)
-                conn.execute(f"DELETE FROM comments WHERE id NOT IN ({placeholders})", list(current_cids))
+            scope_commits = list(session.revisions) if session.revisions else []
+            if session.commit_hash and session.commit_hash not in scope_commits:
+                scope_commits.append(session.commit_hash)
+
+            if scope_commits:
+                commit_placeholders = ",".join("?" for _ in scope_commits)
+                if current_cids:
+                    placeholders = ",".join("?" for _ in current_cids)
+                    conn.execute(
+                        f"DELETE FROM comments WHERE (commit_hash IN ({commit_placeholders}) OR commit_hash = '') AND id NOT IN ({placeholders})",
+                        scope_commits + list(current_cids),
+                    )
+                else:
+                    conn.execute(
+                        f"DELETE FROM comments WHERE commit_hash IN ({commit_placeholders}) OR commit_hash = ''",
+                        scope_commits,
+                    )
             else:
-                conn.execute("DELETE FROM comments")
+                if current_cids:
+                    placeholders = ",".join("?" for _ in current_cids)
+                    conn.execute(f"DELETE FROM comments WHERE id NOT IN ({placeholders})", list(current_cids))
+                else:
+                    conn.execute("DELETE FROM comments")
 
             for c in session.comments:
                 self._upsert_comment_in_conn(conn, c)
@@ -318,40 +353,77 @@ class SQLiteReviewStore:
     def _upsert_comment_in_conn(self, conn: sqlite3.Connection, comment: CommentModel) -> None:
         """Upsert a single comment in an active database connection."""
         c_uuid = comment.uuid or str(uuid_pkg.uuid4())
-        conn.execute(
-            """
-            INSERT INTO comments (
-                id, uuid, commit_hash, file_path, start_line, end_line, severity, body,
-                author, code_snippet, created_at, resolved
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                uuid=COALESCE(excluded.uuid, comments.uuid),
-                commit_hash=excluded.commit_hash,
-                file_path=excluded.file_path,
-                start_line=excluded.start_line,
-                end_line=excluded.end_line,
-                severity=excluded.severity,
-                body=excluded.body,
-                author=excluded.author,
-                code_snippet=excluded.code_snippet,
-                created_at=excluded.created_at,
-                resolved=excluded.resolved
-            """,
-            (
-                comment.id,
-                c_uuid,
-                comment.commit or "",
-                comment.file_path,
-                comment.start_line,
-                comment.end_line,
-                comment.severity.value,
-                comment.body,
-                comment.author,
-                comment.code_snippet,
-                comment.created_at,
-                1 if comment.resolved else 0,
-            ),
-        )
+        existing = conn.execute(
+            "SELECT id, uuid FROM comments WHERE uuid = ? OR id = ?",
+            (c_uuid, comment.id),
+        ).fetchone()
+
+        if existing:
+            target_id = existing["id"]
+            if comment.id and comment.id != target_id:
+                id_conflict = conn.execute(
+                    "SELECT 1 FROM comments WHERE id = ? AND id != ?",
+                    (comment.id, target_id),
+                ).fetchone()
+                if not id_conflict:
+                    target_id = comment.id
+
+            conn.execute(
+                """
+                UPDATE comments SET
+                    id = ?,
+                    uuid = ?,
+                    commit_hash = ?,
+                    file_path = ?,
+                    start_line = ?,
+                    end_line = ?,
+                    severity = ?,
+                    body = ?,
+                    author = ?,
+                    code_snippet = ?,
+                    created_at = ?,
+                    resolved = ?
+                WHERE id = ?
+                """,
+                (
+                    target_id,
+                    c_uuid,
+                    comment.commit or "",
+                    comment.file_path,
+                    comment.start_line,
+                    comment.end_line,
+                    comment.severity.value,
+                    comment.body,
+                    comment.author,
+                    comment.code_snippet,
+                    comment.created_at,
+                    1 if comment.resolved else 0,
+                    existing["id"],
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO comments (
+                    id, uuid, commit_hash, file_path, start_line, end_line, severity, body,
+                    author, code_snippet, created_at, resolved
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    comment.id,
+                    c_uuid,
+                    comment.commit or "",
+                    comment.file_path,
+                    comment.start_line,
+                    comment.end_line,
+                    comment.severity.value,
+                    comment.body,
+                    comment.author,
+                    comment.code_snippet,
+                    comment.created_at,
+                    1 if comment.resolved else 0,
+                ),
+            )
 
     def delete_comment(self, comment_id: str) -> None:
         """Delete a comment by its unique ID.

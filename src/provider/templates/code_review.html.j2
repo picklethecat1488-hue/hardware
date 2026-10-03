@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Code Review: {{ session.repo_name or 'hardware' }}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <style>
     /* =========================================================
        QUAKE I / GLQUAKE CONSOLE & RETRO HUD ENGINE THEME
@@ -76,6 +77,11 @@
       align-items: center;
       gap: 5px;
       transition: all 0.15s ease;
+      white-space: nowrap !important;
+      flex-shrink: 0;
+    }
+    .quake-btn * {
+      white-space: nowrap !important;
     }
     .quake-btn-default {
       background: linear-gradient(180deg, #3a2618 0%, #20140c 100%);
@@ -172,19 +178,28 @@
       border-bottom: 2px solid var(--quake-border-mid);
       box-shadow: 0 4px 12px rgba(0,0,0,0.6);
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      scrollbar-width: thin;
       align-items: center;
       justify-content: space-between;
       padding: 4px 14px;
       flex-shrink: 0;
-      gap: 8px 12px;
+      gap: 12px;
       z-index: 100;
     }
-    .brand-block {
+    .brand-block,
+    .metrics-group,
+    .header-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
       flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .brand-block {
+      gap: 8px;
     }
     .brand-title {
       font-size: 13.5px;
@@ -348,6 +363,37 @@
       color: var(--quake-text-dim);
       font-size: 10px;
     }
+    .copy-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 1px 3px;
+      margin-left: 3px;
+      font-size: 11px;
+      color: var(--quake-text-dim);
+      opacity: 0.75;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+      line-height: 1;
+      vertical-align: middle;
+    }
+    .copy-icon-btn:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--quake-gold);
+      transform: scale(1.12);
+    }
+    .copy-icon-btn:active {
+      transform: scale(0.92);
+    }
+    .copy-sha-btn {
+      font-size: 10px;
+      padding: 0 2px;
+      margin-left: 4px;
+    }
     .commit-subject {
       color: var(--quake-text-light);
       font-size: 11.5px;
@@ -506,19 +552,30 @@
       background: #19100a;
       border-bottom: 2px solid var(--quake-border-mid);
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: hidden;
+      overflow-y: hidden;
+      white-space: nowrap;
       align-items: center;
       justify-content: space-between;
       padding: 4px 12px;
       flex-shrink: 0;
-      gap: 6px 12px;
+      gap: 12px;
+      width: 100%;
+      box-sizing: border-box;
+      z-index: 10;
     }
-    .diff-toolbar-left {
+    .diff-toolbar-left,
+    .diff-toolbar-center,
+    .diff-toolbar-right {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .diff-toolbar-left {
       min-width: 0;
-      flex: 1 1 auto;
     }
     .active-file-label {
       font-size: 12px;
@@ -563,11 +620,12 @@
     .sbs-table {
       width: 100%;
       min-width: max-content;
+      table-layout: fixed;
       border-collapse: collapse;
     }
     .sbs-table col.col-lineno { width: 44px; min-width: 44px; }
     .sbs-table col.col-marker { width: 22px; min-width: 22px; }
-    .sbs-table col.col-code { width: 50%; min-width: 380px; max-width: 1200px; }
+    .sbs-table col.col-code { width: 50%; }
     .sbs-table th {
       background: #170f09;
       color: var(--quake-text-muted);
@@ -579,17 +637,97 @@
       top: 0;
       z-index: 5;
     }
+    .sbs-table thead th.th-old {
+      position: relative;
+      border-right: 2px solid var(--quake-border-accent, #8d5d33);
+    }
+    .sbs-split-resizer {
+      position: absolute;
+      top: 0;
+      right: -6px;
+      width: 12px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 25;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sbs-split-resizer::before {
+      content: "⋮";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 13px;
+      line-height: 1;
+      color: var(--quake-gold, #ffb800);
+      z-index: 26;
+      pointer-events: none;
+      text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+      font-weight: bold;
+    }
+    .sbs-split-resizer::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 5px;
+      width: 2px;
+      background: var(--quake-border-accent, #8d5d33);
+      transition: background 0.15s, width 0.15s, left 0.15s;
+    }
+    .sbs-split-resizer:hover::after,
+    .sbs-split-resizer.resizing::after {
+      background: var(--quake-gold, #ffb800);
+      width: 4px;
+      left: 4px;
+    }
+    .sbs-split-resizer:hover::before,
+    .sbs-split-resizer.resizing::before {
+      color: #fff;
+    }
     .sbs-row td {
       padding: 1px 6px;
       white-space: pre;
       word-break: normal;
       vertical-align: top;
     }
+    .sbs-row td.old-code {
+      border-right: 2px solid var(--quake-border-accent, #8d5d33);
+      position: relative;
+    }
+    .sbs-row td.old-code:hover {
+      border-right-color: var(--quake-gold, #ffb800);
+    }
     .sbs-row td.old-code,
     .sbs-row td.new-code {
       max-width: 1200px;
       overflow-x: hidden;
       text-overflow: ellipsis;
+    }
+
+    /* Word Wrap in Code Review (BUG-245) */
+    .diff-word-wrap .sbs-row td.old-code,
+    .diff-word-wrap .sbs-row td.new-code,
+    .diff-word-wrap .sbs-row td.diff-code-cell {
+      white-space: pre-wrap !important;
+      word-break: break-word !important;
+      overflow-wrap: anywhere !important;
+      text-overflow: clip !important;
+      max-width: none !important;
+    }
+    .diff-word-wrap .unified-wrap {
+      width: 100% !important;
+      min-width: 100% !important;
+      max-width: 100% !important;
+    }
+    .diff-word-wrap .unified-text {
+      white-space: pre-wrap !important;
+      word-break: break-word !important;
+      overflow-wrap: anywhere !important;
+      min-width: 0 !important;
     }
 
     /* Binary Diff View */
@@ -756,17 +894,17 @@
       padding: 1px 0;
       border-radius: 2px;
     }
-    .unified-marker {
-      width: 22px;
-      text-align: center;
+    .unified-num-old {
+      grid-column: 1;
+      width: 44px;
+      text-align: right;
+      padding-right: 6px;
       user-select: none;
-      font-weight: 700;
       color: var(--quake-text-dim);
-      background: rgba(0, 0, 0, 0.25);
-      border-right: 1px solid rgba(90, 56, 30, 0.25);
       flex-shrink: 0;
     }
-    .unified-num-old, .unified-num-new {
+    .unified-num-new {
+      grid-column: 2;
       width: 44px;
       text-align: right;
       padding-right: 6px;
@@ -777,7 +915,20 @@
     .unified-num-old:hover, .unified-num-new:hover {
       color: var(--quake-gold);
     }
+    .unified-marker {
+      grid-column: 3;
+      width: 22px;
+      text-align: center;
+      user-select: none;
+      font-weight: 700;
+      color: var(--quake-text-dim);
+      background: rgba(0, 0, 0, 0.25);
+      border-right: 1px solid rgba(90, 56, 30, 0.25);
+      flex-shrink: 0;
+    }
     .unified-text {
+      grid-column: 4;
+      min-width: 0;
       white-space: pre;
       word-break: normal;
       padding-left: 8px;
@@ -937,11 +1088,29 @@
       padding: 2px 8px !important;
     }
 
-    /* Scrollbars */
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #100905; border: 1px solid #3d2311; }
-    ::-webkit-scrollbar-thumb { background: #5a381e; border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: #8d5d33; }
+    /* Visible Quake Scrollbars (BUG-202, BUG-233) */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
+    }
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e130b;
+      border: 1px solid #3d2311;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #965a25;
+      border-radius: 4px;
+      border: 1px solid #c87a32;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold, #ffb800);
+      border-color: #ffd700;
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
 
     /* Toast Notification */
     #quakeToast {
@@ -1236,11 +1405,58 @@
     </div>
   </header>
 
+  <!-- Main Toolbar across entire workstation (BUG-242) -->
+  {% set single_commit = session.revisions and session.revisions | length == 1 %}
+  <div class="diff-toolbar">
+    <div class="diff-toolbar-left">
+      <div style="display: flex; gap: 4px; flex-shrink: 0;">
+        <button id="btnToggleCommits" class="quake-btn quake-btn-default{% if not single_commit %} quake-btn-active{% endif %}" onclick="togglePane('commits')">📜 Stream</button>
+        <button id="btnToggleFiles" class="quake-btn quake-btn-default" onclick="togglePane('files')">📁 Files</button>
+        <button id="btnFocus" class="quake-btn quake-btn-default" onclick="toggleFocusMode()" title="Focus Mode (Shortcut: \)">⛶ Focus</button>
+      </div>
+      <span id="activeFilePath" class="active-file-label" title="Active File">Select a file</span>
+      <div id="activeFileActions" style="display:none;align-items:center;gap:6px;flex-shrink:0;">
+        <button class="quake-btn quake-btn-default quake-btn-xs" onclick="copyActiveFilePath()" title="Copy file path">📋</button>
+        <a id="btnOpenVsCode" class="quake-btn quake-btn-default quake-btn-xs" onclick="openInVsCode()" title="Open in VS Code" style="text-decoration:none;cursor:pointer;">💻</a>
+      </div>
+      <span id="activeFileLfs" class="quake-badge quake-badge-lfs" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;">📦 LFS</span>
+      <span id="activeFileLang" class="quake-badge quake-badge-cyan" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;"></span>
+      <span id="selectionLabel" class="selection-label" style="display:none;"></span>
+    </div>
+
+    <div class="diff-toolbar-center">
+      <button id="btnPrevChange" class="quake-btn quake-btn-default" onclick="navigateChange(-1)" title="Previous Change (CLI: prev change / pc, Shortcut: K)">◀ Prev</button>
+      <button id="btnNextChange" class="quake-btn quake-btn-default" onclick="navigateChange(1)" title="Next Change (CLI: next change / nc, Shortcut: J)">Next ▶</button>
+      <span style="border-left: 1px solid var(--quake-border); margin: 0 4px; height: 16px; align-self: center;"></span>
+      <button id="btnModeSbs" class="quake-btn quake-btn-default quake-btn-active" onclick="setDiffMode('side_by_side')" title="Side-by-Side View (Shortcut: S)">Split</button>
+      <button id="btnModeUnified" class="quake-btn quake-btn-default" onclick="setDiffMode('unified')" title="Unified View (Shortcut: U)">Unified</button>
+      <button id="btnModeFull" class="quake-btn quake-btn-default" onclick="setDiffMode('full_file')" title="Full File (Shortcut: F)">Full</button>
+      <span style="border-left: 1px solid var(--quake-border); margin: 0 4px; height: 16px; align-self: center;"></span>
+      <button id="btnToggleWrap" class="quake-btn quake-btn-default" onclick="toggleWordWrap()" title="Toggle Word Wrap (Shortcut: W)">Wrap: Off</button>
+    </div>
+
+    <div class="diff-toolbar-right">
+      <input id="codeSearchInput" class="quake-input" style="width: 125px; font-size: 11px; padding: 3px 6px; background: #130a05; border: 1px solid var(--quake-border-mid); color: var(--quake-text-light);" placeholder="🔍 Search... (Enter)" onkeydown="if (event.key === 'Enter') executeCodeSearch()">
+      <button class="quake-btn quake-btn-default" onclick="executeCodeSearch()" title="Search code/symbol references">Find</button>
+      <button class="quake-btn quake-btn-default" onclick="copyFilePath()" title="Copy file path">📋 Copy</button>
+      <button class="quake-btn quake-btn-default" onclick="loadDiff()" title="Reload Diff">🔄</button>
+    </div>
+  </div>
+
+  <div id="codeSearchResultsModal" class="quake-modal-backdrop" style="display:none;" onclick="if(event.target===this)closeCodeSearchModal()">
+    <div class="quake-card" style="width: 720px; max-height: 80vh; margin: 40px auto; padding: 14px; display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--quake-border-light); padding-bottom: 8px; margin-bottom: 10px;">
+        <span style="color: var(--quake-gold); font-weight: bold; font-size: 12px;" id="codeSearchTitle">Code Search Results</span>
+        <button class="quake-btn quake-btn-red" style="padding: 2px 6px;" onclick="closeCodeSearchModal()">✕ Close</button>
+      </div>
+      <div id="codeSearchResultsList" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px;"></div>
+    </div>
+  </div>
+
   <!-- 3-Column Middle Body -->
   <div class="app-body">
 
     <!-- Pane 1: Commits Timeline -->
-    {% set single_commit = session.revisions and session.revisions | length == 1 %}
     <aside id="paneCommits" class="pane-commits{% if single_commit %} collapsed{% endif %}">
       <div class="pane-header">
         <div class="pane-title-row">
@@ -1276,46 +1492,6 @@
 
     <!-- Pane 3: Diff Viewer & Inspector -->
     <main class="pane-diff">
-      <div class="diff-toolbar">
-        <div class="diff-toolbar-left">
-          <div style="display: flex; gap: 4px; flex-shrink: 0;">
-            <button id="btnToggleCommits" class="quake-btn quake-btn-default{% if not single_commit %} quake-btn-active{% endif %}" onclick="togglePane('commits')">📜 Stream</button>
-            <button id="btnToggleFiles" class="quake-btn quake-btn-default" onclick="togglePane('files')">📁 Files</button>
-            <button id="btnFocus" class="quake-btn quake-btn-default" onclick="toggleFocusMode()" title="Focus Mode (Shortcut: \)">⛶ Focus</button>
-          </div>
-          <span id="activeFilePath" class="active-file-label" title="Active File">Select a file</span>
-          <span id="activeFileLfs" class="quake-badge quake-badge-lfs" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;">📦 LFS</span>
-          <span id="activeFileLang" class="quake-badge quake-badge-cyan" style="display:none; font-size:9px; padding:1px 6px; flex-shrink: 0;"></span>
-          <span id="selectionLabel" class="selection-label" style="display:none;"></span>
-        </div>
-
-        <div class="diff-toolbar-center">
-          <button id="btnPrevChange" class="quake-btn quake-btn-default" onclick="navigateChange(-1)" title="Previous Change (CLI: prev change / pc, Shortcut: K)">◀ Prev</button>
-          <button id="btnNextChange" class="quake-btn quake-btn-default" onclick="navigateChange(1)" title="Next Change (CLI: next change / nc, Shortcut: J)">Next ▶</button>
-          <span style="border-left: 1px solid var(--quake-border); margin: 0 4px; height: 16px; align-self: center;"></span>
-          <button id="btnModeSbs" class="quake-btn quake-btn-default quake-btn-active" onclick="setDiffMode('side_by_side')" title="Side-by-Side View (Shortcut: S)">Split</button>
-          <button id="btnModeUnified" class="quake-btn quake-btn-default" onclick="setDiffMode('unified')" title="Unified View (Shortcut: U)">Unified</button>
-          <button id="btnModeFull" class="quake-btn quake-btn-default" onclick="setDiffMode('full_file')" title="Full File (Shortcut: F)">Full</button>
-        </div>
-
-        <div class="diff-toolbar-right">
-          <input id="codeSearchInput" class="quake-input" style="width: 125px; font-size: 11px; padding: 3px 6px; background: #130a05; border: 1px solid var(--quake-border-mid); color: var(--quake-text-light);" placeholder="🔍 Search... (Enter)" onkeydown="if (event.key === 'Enter') executeCodeSearch()">
-          <button class="quake-btn quake-btn-default" onclick="executeCodeSearch()" title="Search code/symbol references">Find</button>
-          <button class="quake-btn quake-btn-default" onclick="copyFilePath()" title="Copy file path">📋 Copy</button>
-          <button class="quake-btn quake-btn-default" onclick="loadDiff()" title="Reload Diff">🔄</button>
-        </div>
-      </div>
-
-      <div id="codeSearchResultsModal" class="quake-modal-backdrop" style="display:none;" onclick="if(event.target===this)closeCodeSearchModal()">
-        <div class="quake-card" style="width: 720px; max-height: 80vh; margin: 40px auto; padding: 14px; display: flex; flex-direction: column;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--quake-border-light); padding-bottom: 8px; margin-bottom: 10px;">
-            <span style="color: var(--quake-gold); font-weight: bold; font-size: 12px;" id="codeSearchTitle">Code Search Results</span>
-            <button class="quake-btn quake-btn-red" style="padding: 2px 6px;" onclick="closeCodeSearchModal()">✕ Close</button>
-          </div>
-          <div id="codeSearchResultsList" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px;"></div>
-        </div>
-      </div>
-
       <div id="diffContent" class="diff-container">
         <div style="padding: 40px; text-align: center; color: var(--quake-text-dim);">
           Select a file from the changed files list to inspect its diff and start code review.
@@ -1520,11 +1696,13 @@
         let openTags = [];
 
         for (const line of rawLines) {
-          let balancedLine = "";
+          let prefix = "";
           for (const tag of openTags) {
-            balancedLine += tag;
+            prefix += tag;
           }
 
+          let processedLine = "";
+          let lastIndex = 0;
           const tagRegex = /<(\/?)span([^>]*)>/g;
           let match;
 
@@ -1532,19 +1710,27 @@
             const isClosing = match[1] === "/";
             const fullTag = match[0];
             if (isClosing) {
-              if (openTags.length > 0) openTags.pop();
+              if (openTags.length > 0) {
+                openTags.pop();
+                processedLine += line.substring(lastIndex, match.index) + fullTag;
+              } else {
+                // Strip orphan closing tag
+                processedLine += line.substring(lastIndex, match.index);
+              }
             } else {
               openTags.push(fullTag);
+              processedLine += line.substring(lastIndex, match.index) + fullTag;
             }
+            lastIndex = tagRegex.lastIndex;
           }
+          processedLine += line.substring(lastIndex);
 
-          balancedLine += line;
-
+          let suffix = "";
           for (let i = openTags.length - 1; i >= 0; i--) {
-            balancedLine += "</span>";
+            suffix += "</span>";
           }
 
-          resultLines.push(balancedLine);
+          resultLines.push(prefix + processedLine + suffix);
         }
         return resultLines;
       } catch (e) {
@@ -1638,6 +1824,7 @@
     }
 
     document.addEventListener("DOMContentLoaded", async () => {
+      initWordWrap();
       await loadSession();
       await loadCommits();
       initPanelResizers();
@@ -1645,13 +1832,84 @@
       setupCliInput();
       setupCliResizer();
       setupDiffSelectionListener();
+      startAutoSync();
     });
+
+    // Auto-sync commits and files (BUG-246)
+    let autoSyncTimer = null;
+    let isAutoSyncing = false;
+
+    function startAutoSync() {
+      if (autoSyncTimer) clearInterval(autoSyncTimer);
+      autoSyncTimer = setInterval(syncReviewSilently, 3000);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          syncReviewSilently();
+        }
+      });
+      window.addEventListener("focus", () => {
+        syncReviewSilently();
+      });
+    }
+
+    async function syncReviewSilently() {
+      if (isAutoSyncing || (document.hidden && document.visibilityState === "hidden")) return;
+      isAutoSyncing = true;
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const revs = urlParams.get("revisions") || urlParams.get("commit");
+        const commitsUrl = revs ? "/api/commits?type=review&revisions=" + encodeURIComponent(revs) : "/api/commits?type=review";
+        const res = await fetch(commitsUrl);
+        if (res.ok) {
+          const commits = await res.json();
+          const fp = JSON.stringify(commits.map(c => [c.commit_hash, c.short_hash, c.subject, c.is_head, c.cr_open_count, c.cr_resolved_count, c.cr_total_count, c.cr_reviewed]));
+          if (state.lastCommitsFingerprint === undefined) {
+            state.lastCommitsFingerprint = fp;
+          } else if (fp !== state.lastCommitsFingerprint) {
+            state.lastCommitsFingerprint = fp;
+            state.commits = commits;
+            renderCommitsList();
+            if (state.selectedCommit) {
+              await selectCommit(state.selectedCommit);
+            }
+          }
+        }
+
+        const sessionUrl = revs ? "/api/review/session?revisions=" + encodeURIComponent(revs) : "/api/review/session";
+        const sRes = await fetch(sessionUrl);
+        if (sRes.ok) {
+          const session = await sRes.json();
+          const sFp = JSON.stringify([
+            session.updated_at,
+            session.verdict,
+            Object.entries(session.files || {}).map(([p, f]) => [p, f.status, f.notes]),
+            (session.comments || []).map(c => [c.id, c.resolved, c.body, c.severity, c.commit_hash, c.file_path, c.start_line, c.end_line])
+          ]);
+          if (state.lastSessionFingerprint === undefined) {
+            state.lastSessionFingerprint = sFp;
+          } else if (sFp !== state.lastSessionFingerprint) {
+            state.lastSessionFingerprint = sFp;
+            state.session = session;
+            updateSessionUI();
+            renderFilesList();
+            renderCommitsList();
+            if (state.selectedFile && state.currentDiff) {
+              renderDiff();
+            }
+          }
+        }
+      } catch (e) {
+        // Silently ignore background polling errors
+      } finally {
+        isAutoSyncing = false;
+      }
+    }
 
     async function loadSession() {
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const revs = urlParams.get("revisions") || urlParams.get("commit");
-        const sessionUrl = revs ? "/api/session?revisions=" + encodeURIComponent(revs) : "/api/session";
+        const sessionUrl = revs ? "/api/review/session?revisions=" + encodeURIComponent(revs) : "/api/review/session";
         const res = await fetch(sessionUrl);
         state.session = await res.json();
         updateSessionUI();
@@ -1717,7 +1975,10 @@
         const timeDisplay = c.time ? ` ${c.time}` : (c.date.includes('T') ? ` ${c.date.split('T')[1].slice(0, 8)}` : '');
         li.innerHTML = `
           <div class="commit-top">
-            <span class="commit-hash">${c.short_hash}</span>
+            <span style="display:inline-flex;align-items:center;">
+              <span class="commit-hash">${c.short_hash}</span>
+              <button class="copy-icon-btn copy-sha-btn" onclick="event.stopPropagation(); copyText('${c.commit_hash}');" title="Copy commit hash ${c.commit_hash}">📋</button>
+            </span>
             ${ancestorBadge}
             ${trackerBadge}
             <span class="commit-date">${c.date.slice(0, 10)}${timeDisplay}</span>
@@ -1976,6 +2237,11 @@
     async function loadDiff() {
       if (!state.selectedFile) return;
       document.getElementById("activeFilePath").innerText = state.selectedFile;
+      const actions = document.getElementById("activeFileActions");
+      if (actions) {
+        actions.style.display = "inline-flex";
+      }
+      updateActiveFileActions(state.selectedFile);
       document.title = `${state.selectedFile} — Code Review: ${state.session ? state.session.repo_name : 'hardware'}`;
 
       try {
@@ -2079,13 +2345,20 @@
       let html = `
         <table class="sbs-table">
           <colgroup>
-            <col class="col-lineno"><col class="col-marker"><col class="col-code">
-            <col class="col-lineno"><col class="col-marker"><col class="col-code">
+            <col class="col-lineno" style="width: 44px; min-width: 44px;">
+            <col class="col-marker" style="width: 22px; min-width: 22px;">
+            <col class="col-code col-old-code" style="width: 50%;">
+            <col class="col-lineno" style="width: 44px; min-width: 44px;">
+            <col class="col-marker" style="width: 22px; min-width: 22px;">
+            <col class="col-code col-new-code" style="width: 50%;">
           </colgroup>
           <thead>
             <tr>
-              <th colspan="3">Old Revision</th>
-              <th colspan="3">New Revision</th>
+              <th colspan="3" class="th-old" style="position: relative;">
+                Old Revision
+                <div class="sbs-split-resizer" title="Drag horizontally to resize split panes"></div>
+              </th>
+              <th colspan="3" class="th-new">New Revision</th>
             </tr>
           </thead>
           <tbody>
@@ -2146,6 +2419,7 @@
 
       html += `</tbody></table>`;
       container.innerHTML = html;
+      setupSbsResizer(container.querySelector(".sbs-table"), "cr_sbs_split_ratio");
     }
 
     function renderUnified(container) {
@@ -2189,7 +2463,7 @@
               <span class="unified-num-old">${l.old_line_no || ''}</span>
               <span class="unified-num-new">${l.new_line_no || ''}</span>
               <span class="unified-marker">${markerChar}</span>
-              <span class="unified-text hljs">${lineHtml}</span>
+              <div class="unified-text hljs">${lineHtml}</div>
             </div>
           `;
 
@@ -2420,6 +2694,110 @@
       }
 
       setupCliAutocomplete();
+    }
+
+    function setupSbsResizer(table, storageKey = "cr_sbs_split_ratio") {
+      if (!table) return;
+      const resizer = table.querySelector(".sbs-split-resizer");
+      const applyRatio = (ratio) => {
+        table.style.width = "100%";
+        table.style.minWidth = "100%";
+        table.style.tableLayout = "fixed";
+        const pctOld = (ratio * 100).toFixed(1);
+        const pctNew = ((1 - ratio) * 100).toFixed(1);
+        const oldCol = table.querySelector("col.col-old-code");
+        const newCol = table.querySelector("col.col-new-code");
+        if (oldCol && newCol) {
+          oldCol.style.width = pctOld + "%";
+          newCol.style.width = pctNew + "%";
+        }
+        const oldTh = table.querySelector(".th-old");
+        const newTh = table.querySelector(".th-new");
+        if (oldTh && newTh) {
+          oldTh.style.width = pctOld + "%";
+          newTh.style.width = pctNew + "%";
+        }
+      };
+
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= 0.15 && parsed <= 0.85) {
+          applyRatio(parsed);
+        }
+      }
+
+      const startDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (resizer) resizer.classList.add("resizing");
+        table.classList.add("resizing-sbs");
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+        const container = table.closest(".diff-container") || table.parentElement || table;
+        const containerRect = container.getBoundingClientRect();
+
+        const onMouseMove = (moveEvent) => {
+          const x = moveEvent.clientX - containerRect.left;
+          const ratio = Math.max(0.15, Math.min(0.85, x / containerRect.width));
+          applyRatio(ratio);
+          localStorage.setItem(storageKey, ratio.toFixed(4));
+        };
+
+        const onMouseUp = () => {
+          if (resizer) resizer.classList.remove("resizing");
+          table.classList.remove("resizing-sbs");
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+          window.removeEventListener("mousemove", onMouseMove);
+          window.removeEventListener("mouseup", onMouseUp);
+        };
+
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+      };
+
+      if (resizer) {
+        resizer.addEventListener("mousedown", startDrag);
+      }
+      table.addEventListener("mousemove", (e) => {
+        if (table.classList.contains("resizing-sbs")) return;
+        const td = e.target.closest("td.old-code, th.th-old");
+        if (td) {
+          const rect = td.getBoundingClientRect();
+          if (rect.right - e.clientX <= 8 && rect.right - e.clientX >= -4) {
+            table.style.cursor = "col-resize";
+            return;
+          }
+        }
+        const newTd = e.target.closest("td.new-lineno, th.th-new");
+        if (newTd) {
+          const rect = newTd.getBoundingClientRect();
+          if (e.clientX - rect.left <= 8 && e.clientX - rect.left >= -4) {
+            table.style.cursor = "col-resize";
+            return;
+          }
+        }
+        table.style.cursor = "";
+      });
+      table.addEventListener("mousedown", (e) => {
+        const td = e.target.closest("td.old-code, th.th-old");
+        if (td) {
+          const rect = td.getBoundingClientRect();
+          if (rect.right - e.clientX <= 8 && rect.right - e.clientX >= -4) {
+            startDrag(e);
+            return;
+          }
+        }
+        const newTd = e.target.closest("td.new-lineno, th.th-new");
+        if (newTd) {
+          const rect = newTd.getBoundingClientRect();
+          if (e.clientX - rect.left <= 8 && e.clientX - rect.left >= -4) {
+            startDrag(e);
+            return;
+          }
+        }
+      });
     }
 
     function setupCliResizer() {
@@ -2868,14 +3246,14 @@
           body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (data.status === "ok") {
+        if (data.status === "ok" || data.id) {
           logCli(`[${severity}] Added comment to ${state.selectedFile}:L${startLine}${startLine !== endLine ? '-L' + endLine : ''}`, "green");
           await loadSession();
           renderDiff();
           renderFilesList();
           showToast(`Comment saved [${severity}]`);
         } else {
-          logCli("Error saving comment: " + data.message, "red");
+          logCli("Error saving comment: " + (data.message || data.error || JSON.stringify(data)), "red");
         }
       } catch (e) {
         logCli("Error submitting comment: " + e.message, "red");
@@ -2902,14 +3280,14 @@
           body: JSON.stringify({ id: commentId, body: newBody }),
         });
         const data = await res.json();
-        if (data.status === "ok") {
+        if (data.status === "ok" || data.id) {
           logCli(`> Comment [${commentId}] updated successfully.`, "green");
           await loadSession();
           renderDiff();
           renderFilesList();
           showToast("Comment updated");
         } else {
-          logCli(`Error updating comment: ${data.error || "Unknown error"}`, "red");
+          logCli(`Error updating comment: ${data.message || data.error || "Unknown error"}`, "red");
         }
       } catch (err) {
         logCli(`Network error updating comment: ${err.message}`, "red");
@@ -3276,6 +3654,33 @@
       renderDiff();
     }
 
+    // Word Wrap Toggle (BUG-245)
+    function toggleWordWrap() {
+      const isWrapped = document.body.classList.toggle("diff-word-wrap");
+      localStorage.setItem("quake_diff_word_wrap", isWrapped ? "true" : "false");
+      updateWrapButtonState(isWrapped);
+    }
+
+    function initWordWrap() {
+      const saved = localStorage.getItem("quake_diff_word_wrap");
+      const isWrapped = saved === "true";
+      if (isWrapped) {
+        document.body.classList.add("diff-word-wrap");
+      } else {
+        document.body.classList.remove("diff-word-wrap");
+      }
+      updateWrapButtonState(isWrapped);
+    }
+
+    function updateWrapButtonState(isWrapped) {
+      const btn = document.getElementById("btnToggleWrap");
+      if (btn) {
+        btn.textContent = isWrapped ? "Wrap: On" : "Wrap: Off";
+        btn.classList.toggle("quake-btn-gold", isWrapped);
+        btn.classList.toggle("quake-btn-active", isWrapped);
+      }
+    }
+
     function togglePane(pane) {
       if (pane === "commits") {
         state.panes.commits = !state.panes.commits;
@@ -3428,10 +3833,75 @@
       renderFilesList();
     }
 
+    function updateActiveFileActions(filePath) {
+      if (!filePath) return;
+      const repoRoot = (state.session && state.session.repo_root) || "{{ session.repo_root or '' }}";
+      let fullPath = filePath;
+      if (repoRoot && !filePath.startsWith("/")) {
+        fullPath = repoRoot.replace(/\/+$/, "") + "/" + filePath.replace(/^\/+/, "");
+      }
+      const vscodeUrl = `vscode://file${fullPath.startsWith('/') ? '' : '/'}${fullPath}`;
+      const btnVsCode = document.getElementById("btnOpenVsCode");
+      if (btnVsCode) {
+        btnVsCode.href = vscodeUrl;
+      }
+    }
+
+    function fallbackCopy(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      showToast("Copied: " + text);
+    }
+
+    function copyText(text) {
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast("Copied: " + text);
+        }).catch(() => {
+          fallbackCopy(text);
+        });
+      } else {
+        fallbackCopy(text);
+      }
+    }
+
+    function copyActiveFilePath() {
+      const filePath = state.selectedFile;
+      if (!filePath) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(filePath).then(() => {
+          showToast("Copied: " + filePath);
+        }).catch(() => {
+          fallbackCopy(filePath);
+        });
+      } else {
+        fallbackCopy(filePath);
+      }
+    }
+
     function copyFilePath() {
-      if (!state.selectedFile) return;
-      navigator.clipboard.writeText(state.selectedFile);
-      showToast("Copied: " + state.selectedFile);
+      copyActiveFilePath();
+    }
+
+    function openInVsCode() {
+      const filePath = state.selectedFile;
+      if (!filePath) return;
+      const repoRoot = (state.session && state.session.repo_root) || "{{ session.repo_root or '' }}";
+      if (!repoRoot && !filePath.startsWith("/")) {
+        showToast("Error: Repository root is not configured");
+        return;
+      }
+      let fullPath = filePath;
+      if (repoRoot && !filePath.startsWith("/")) {
+        fullPath = repoRoot.replace(/\/+$/, "") + "/" + filePath.replace(/^\/+/, "");
+      }
+      const vscodeUrl = `vscode://file${fullPath.startsWith('/') ? '' : '/'}${fullPath}`;
+      window.location.href = vscodeUrl;
     }
 
     function showToast(msg) {
@@ -3450,6 +3920,7 @@
         if (e.key.toLowerCase() === "s") setDiffMode("side_by_side");
         if (e.key.toLowerCase() === "u") setDiffMode("unified");
         if (e.key.toLowerCase() === "f") setDiffMode("full_file");
+        if (e.key.toLowerCase() === "w") toggleWordWrap();
         if (e.key.toLowerCase() === "j" || (e.altKey && e.key === "ArrowDown")) {
           e.preventDefault();
           await navigateChange(1);

@@ -94,6 +94,7 @@ class ReviewSessionModel(BaseModel):
     summary: str = ""
     verdict: ReviewStatus = ReviewStatus.IN_REVIEW
     repo_name: str = "hardware"
+    repo_root: Optional[str] = ""
     revisions: List[str] = Field(default_factory=list)
     files: Dict[str, FileStateModel] = Field(default_factory=dict)
     comments: List[CommentModel] = Field(default_factory=list)

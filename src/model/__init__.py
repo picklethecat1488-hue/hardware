@@ -50,5 +50,6 @@ from .pcb import (
     SilkscreenGraphicModel,
     SchematicLayoutModel,
     SchematicSheetModel,
+    resolve_subassembly_pcb_config,
 )
 from .simulation import FlyingProbeReportModel, FlyingProbeStepReportModel

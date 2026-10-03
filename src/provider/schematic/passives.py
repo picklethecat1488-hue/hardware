@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.axes
 import matplotlib.patches as patches
@@ -171,6 +171,8 @@ class SchematicPassiveDrawer:
         delta_x = 28.0
         n_caps = len(caps)
         total_w = (n_caps - 1) * delta_x
+        x_min = base_x
+        x_max = base_x + total_w
 
         y_top = base_y + 16.0
         y_bot = base_y - 12.0
@@ -204,41 +206,48 @@ class SchematicPassiveDrawer:
             zorder=2,
         )
 
-        # Determine common power rail net name
-        pwr_net = "3V3"
+        # Determine power rail for each cap
+        cap_pwr_nets = []
         for fp in caps:
+            pwr = "3V3"
             for p in fp.pins:
                 n = pin_to_net.get((fp.name, p.name), "")
                 if n.upper() in POWER_NET_NAMES:
-                    pwr_net = n
+                    pwr = n
                     break
+            cap_pwr_nets.append(pwr)
 
-        # Common VCC Top Rail
-        x_min = base_x
-        x_max = base_x + total_w
-        ax.plot([x_min, x_max], [y_top, y_top], color="#dc2626", linewidth=1.5, zorder=2)
+        # Group caps by power net
+        pwr_groups: Dict[str, List[int]] = defaultdict(list)
+        for idx, pwr in enumerate(cap_pwr_nets):
+            pwr_groups[pwr].append(idx)
 
-        # Power arrow and label
-        x_arrow = (x_min + x_max) / 2.0
-        ax.plot([x_arrow, x_arrow], [y_top, y_top + 4.0], color="#dc2626", linewidth=1.5, zorder=2)
-        ax.plot(
-            [x_arrow - 2.5, x_arrow, x_arrow + 2.5],
-            [y_top + 2.5, y_top + 5.0, y_top + 2.5],
-            color="#dc2626",
-            linewidth=1.2,
-            zorder=2,
-        )
-        ax.text(
-            x_arrow,
-            y_top + 6.0,
-            pwr_net,
-            ha="center",
-            va="bottom",
-            fontsize=6.5,
-            fontweight="bold",
-            color="#dc2626",
-            zorder=4,
-        )
+        # Draw top rail and arrow for each power net group
+        for pwr_net, indices in pwr_groups.items():
+            grp_x_min = base_x + min(indices) * delta_x
+            grp_x_max = base_x + max(indices) * delta_x
+            if len(indices) > 1:
+                ax.plot([grp_x_min, grp_x_max], [y_top, y_top], color="#dc2626", linewidth=1.5, zorder=2)
+            x_arrow = (grp_x_min + grp_x_max) / 2.0
+            ax.plot([x_arrow, x_arrow], [y_top, y_top + 4.0], color="#dc2626", linewidth=1.5, zorder=2)
+            ax.plot(
+                [x_arrow - 2.5, x_arrow, x_arrow + 2.5],
+                [y_top + 2.5, y_top + 5.0, y_top + 2.5],
+                color="#dc2626",
+                linewidth=1.2,
+                zorder=2,
+            )
+            ax.text(
+                x_arrow,
+                y_top + 6.0,
+                pwr_net,
+                ha="center",
+                va="bottom",
+                fontsize=6.5,
+                fontweight="bold",
+                color="#dc2626",
+                zorder=4,
+            )
 
         # Common GND Bottom Rail
         ax.plot([x_min, x_max], [y_bot, y_bot], color="#475569", linewidth=1.5, zorder=2)
@@ -270,7 +279,9 @@ class SchematicPassiveDrawer:
 
             # Vertical wire from top rail down to top plate
             ax.plot([cx, cx], [y_top, y_mid + (plate_gap / 2.0)], color="#dc2626", linewidth=1.2, zorder=2)
-            ax.plot(cx, y_top, marker="o", markersize=2.5, color="#dc2626", zorder=3)
+            pwr = cap_pwr_nets[idx]
+            if len(pwr_groups[pwr]) > 1:
+                ax.plot(cx, y_top, marker="o", markersize=2.5, color="#dc2626", zorder=3)
 
             # Top plate
             ax.plot(
@@ -321,19 +332,19 @@ class SchematicPassiveDrawer:
             )
 
     @classmethod
-    def draw_pullup_resistors(
+    def compute_pullup_tap_points(
         cls,
-        ax: matplotlib.axes.Axes,
         pullups: List[FootprintModel],
         pin_to_net: Dict[Tuple[str, str], str],
         h_wire_segments: List[Tuple[float, float, float, str, str]],
         sheet_pin_coords: Dict[Tuple[str, str], Tuple[float, float]],
         wired_pins: Optional[set[Tuple[str, str]]] = None,
         pin_side_map: Optional[Dict[Tuple[str, str], str]] = None,
-    ) -> None:
-        """Render pull-up and pull-down resistors as vertical branches directly attached to signal lines."""
+        ax: Optional[matplotlib.axes.Axes] = None,
+    ) -> List[Tuple[float, float, FootprintModel, str, str]]:
+        """Compute connection coordinates (x_pull, y_base) and net assignments for vertical passives."""
         if not pullups:
-            return
+            return []
         if wired_pins is None:
             wired_pins = set()
 
@@ -370,6 +381,8 @@ class SchematicPassiveDrawer:
                 rail_net = n2
                 sig_net = n1
 
+            term_x_end: Optional[float] = None
+            term_side: Optional[str] = None
             matching_segs = [s for s in h_wire_segments if s[3] == sig_net]
             if matching_segs:
                 x_start = min(min(s[0], s[1]) for s in matching_segs)
@@ -422,13 +435,14 @@ class SchematicPassiveDrawer:
                             cand_x += 10.0
                         else:
                             break
-                    ax.plot(
-                        [cand_x, x_start],
-                        [matching_segs[0][2], matching_segs[0][2]],
-                        color="#2563eb",
-                        linewidth=1.2,
-                        zorder=2,
-                    )
+                    if ax is not None:
+                        ax.plot(
+                            [cand_x, x_start],
+                            [matching_segs[0][2], matching_segs[0][2]],
+                            color="#2563eb",
+                            linewidth=1.2,
+                            zorder=2,
+                        )
                     h_wire_segments.append((cand_x, x_start, matching_segs[0][2], sig_net, "#2563eb"))
                 else:
                     max_page_x = 265.0
@@ -442,16 +456,41 @@ class SchematicPassiveDrawer:
                             cand_x -= 10.0
                         else:
                             break
-                    ax.plot(
-                        [x_end, cand_x],
-                        [matching_segs[0][2], matching_segs[0][2]],
-                        color="#2563eb",
-                        linewidth=1.2,
-                        zorder=2,
-                    )
+                    if ax is not None:
+                        ax.plot(
+                            [x_end, cand_x],
+                            [matching_segs[0][2], matching_segs[0][2]],
+                            color="#2563eb",
+                            linewidth=1.2,
+                            zorder=2,
+                        )
                     h_wire_segments.append((x_end, cand_x, matching_segs[0][2], sig_net, "#2563eb"))
                 x_pull = cand_x
-                y_base = matching_segs[0][2]
+                containing_seg = next(
+                    (s for s in matching_segs if min(s[0], s[1]) - 0.1 <= cand_x <= max(s[0], s[1]) + 0.1),
+                    None,
+                )
+                if containing_seg:
+                    y_base = containing_seg[2]
+                else:
+                    closest_seg = min(
+                        matching_segs,
+                        key=lambda s: min(abs(s[0] - cand_x), abs(s[1] - cand_x)),
+                    )
+                    y_base = closest_seg[2]
+                    seg_min = min(closest_seg[0], closest_seg[1])
+                    seg_max = max(closest_seg[0], closest_seg[1])
+                    if cand_x < seg_min:
+                        bridge_x1, bridge_x2 = cand_x, seg_min
+                    elif cand_x > seg_max:
+                        bridge_x1, bridge_x2 = seg_max, cand_x
+                    else:
+                        bridge_x1, bridge_x2 = cand_x, cand_x
+
+                    if bridge_x2 - bridge_x1 > 0.05:
+                        if ax is not None:
+                            ax.plot([bridge_x1, bridge_x2], [y_base, y_base], color="#2563eb", linewidth=1.2, zorder=2)
+                        h_wire_segments.append((bridge_x1, bridge_x2, y_base, sig_net, "#2563eb"))
             else:
                 target_pair = next(
                     (p for p, c in sheet_pin_coords.items() if pin_to_net.get(p) == sig_net and p[0] != fp.name),
@@ -490,53 +529,137 @@ class SchematicPassiveDrawer:
                                 cand_x -= 7.0
                             else:
                                 break
+                        x_end = min(next_comp_left - 8.0, max(cand_x + 12.0, p_x + 28.0 + stub_idx * 12.0))
                     else:
                         min_page_x = 22.0
-                        cand_x = max(min_page_x, p_x - 24.0 - stub_idx * 16.0)
+                        cand_x = max(min_page_x + 8.0, p_x - 24.0 - stub_idx * 16.0)
                         for _ in range(10):
                             if not any(abs(cand_x - ux) < 10.0 for ux in used_x_positions):
                                 break
-                            if cand_x - step >= min_page_x:
+                            if cand_x - step >= min_page_x + 8.0:
                                 cand_x -= step
                             elif cand_x + step <= p_x - 6.0:
                                 cand_x += step
                             else:
                                 break
+                        x_end = min_page_x
                     x_pull = cand_x
+                    term_x_end = x_end
+                    term_side = side
 
-                    # Draw connecting line from component pin to pullup junction
-                    ax.plot([p_x, x_pull], [y_base, y_base], color="#2563eb", linewidth=1.2, zorder=2)
-                    ax.text(
-                        (p_x + x_pull) / 2.0,
-                        y_base + 1.2,
-                        sig_net,
-                        ha="center",
-                        va="bottom",
-                        fontsize=6.5,
-                        fontweight="bold",
-                        color="#0369a1",
-                        zorder=4,
-                    )
-                    wired_pins.add(target_pair)
-                    h_wire_segments.append((min(p_x, x_pull), max(p_x, x_pull), y_base, sig_net, "#2563eb"))
+                    w_x1 = min(p_x, x_end)
+                    w_x2 = max(p_x, x_end)
+                    if not any(abs(s[2] - y_base) < 0.2 and s[3] == sig_net for s in h_wire_segments):
+                        h_wire_segments.append((w_x1, w_x2, y_base, sig_net, "#2563eb"))
+                    if wired_pins is not None:
+                        wired_pins.add(target_pair)
+
+                    if ax is not None:
+                        ax.plot([w_x1, w_x2], [y_base, y_base], color="#2563eb", linewidth=1.2, zorder=2)
+                        ax.plot(x_end, y_base, marker="o", markersize=2.5, color="#2563eb", zorder=3)
+                        if side == "left":
+                            ax.text(
+                                x_end - 1.5,
+                                y_base,
+                                sig_net,
+                                ha="right",
+                                va="center",
+                                fontsize=6.5,
+                                fontweight="bold",
+                                color="#0369a1",
+                                zorder=4,
+                            )
+                        else:
+                            ax.text(
+                                x_end + 1.5,
+                                y_base,
+                                sig_net,
+                                ha="left",
+                                va="center",
+                                fontsize=6.5,
+                                fontweight="bold",
+                                color="#0369a1",
+                                zorder=4,
+                            )
                 else:
                     x_pull = center_x - total_span / 2.0 + idx * pitch
                     y_base = 120.0
 
             used_x_positions.append(x_pull)
-            pullup_points.append((x_pull, y_base, fp, sig_net, rail_net))
+            pullup_points.append((x_pull, y_base, fp, sig_net, rail_net, term_x_end, term_side))
+
+        return pullup_points
+
+    @classmethod
+    def draw_pullup_resistors(
+        cls,
+        ax: matplotlib.axes.Axes,
+        pullups: List[FootprintModel],
+        pin_to_net: Dict[Tuple[str, str], str],
+        h_wire_segments: List[Tuple[float, float, float, str, str]],
+        sheet_pin_coords: Dict[Tuple[str, str], Tuple[float, float]],
+        wired_pins: Optional[set[Tuple[str, str]]] = None,
+        pin_side_map: Optional[Dict[Tuple[str, str], str]] = None,
+        pullup_points: Optional[List[Any]] = None,
+    ) -> None:
+        """Render pull-up and pull-down resistors as vertical branches directly attached to signal lines."""
+        if not pullups:
+            return
+        if wired_pins is None:
+            wired_pins = set()
+
+        if pullup_points is None:
+            pullup_points = cls.compute_pullup_tap_points(
+                pullups=pullups,
+                pin_to_net=pin_to_net,
+                h_wire_segments=h_wire_segments,
+                sheet_pin_coords=sheet_pin_coords,
+                wired_pins=wired_pins,
+                pin_side_map=pin_side_map,
+                ax=ax,
+            )
 
         pwr_pullups = [p for p in pullup_points if p[4].upper() in POWER_NET_NAMES]
-        same_pwr = len({p[4] for p in pwr_pullups}) == 1 and len(pwr_pullups) > 1
-        common_pwr = pwr_pullups[0][4] if same_pwr else "3V3"
         pullup_max_y = max((p[1] for p in pwr_pullups), default=120.0)
 
-        for x_pull, y_base, fp, sig_net, rail_net in pullup_points:
+        for pt in pullup_points:
+            x_pull, y_base, fp, sig_net, rail_net = pt[0], pt[1], pt[2], pt[3], pt[4]
+            term_x_end = pt[5] if len(pt) > 5 else None
+            term_side = pt[6] if len(pt) > 6 else None
+
+            # Render wire end terminal dot and off-sheet designator if computed
+            if term_x_end is not None:
+                ax.plot(term_x_end, y_base, marker="o", markersize=2.5, color="#2563eb", zorder=3)
+                if term_side == "left":
+                    ax.text(
+                        term_x_end - 1.5,
+                        y_base,
+                        sig_net,
+                        ha="right",
+                        va="center",
+                        fontsize=6.5,
+                        fontweight="bold",
+                        color="#0369a1",
+                        zorder=4,
+                    )
+                else:
+                    ax.text(
+                        term_x_end + 1.5,
+                        y_base,
+                        sig_net,
+                        ha="left",
+                        va="center",
+                        fontsize=6.5,
+                        fontweight="bold",
+                        color="#0369a1",
+                        zorder=4,
+                    )
+
             ax.plot(x_pull, y_base, marker="o", markersize=3.0, color="#2563eb", zorder=4)
 
             is_pullup = rail_net.upper() in POWER_NET_NAMES
             if is_pullup:
-                y_zz_bot = pullup_max_y + 8.0
+                y_zz_bot = max(pullup_max_y + 8.0, 158.0)
                 y_zz_top = y_zz_bot + 9.0
                 y_top_rail = y_zz_top + 6.0
 
@@ -574,30 +697,26 @@ class SchematicPassiveDrawer:
                     zorder=4,
                 )
 
-                if same_pwr:
-                    ax.plot([x_pull, x_pull], [y_zz_top, y_top_rail], color="#dc2626", linewidth=1.2, zorder=2)
-                    ax.plot(x_pull, y_top_rail, marker="o", markersize=2.0, color="#dc2626", zorder=3)
-                else:
-                    y_arrow = y_zz_top + 4.0
-                    ax.plot([x_pull, x_pull], [y_zz_top, y_arrow], color="#dc2626", linewidth=1.2, zorder=2)
-                    ax.plot(
-                        [x_pull - 2.5, x_pull, x_pull + 2.5],
-                        [y_arrow - 1.5, y_arrow + 1.0, y_arrow - 1.5],
-                        color="#dc2626",
-                        linewidth=1.2,
-                        zorder=2,
-                    )
-                    ax.text(
-                        x_pull,
-                        y_arrow + 2.2,
-                        rail_net,
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.8,
-                        fontweight="bold",
-                        color="#dc2626",
-                        zorder=4,
-                    )
+                y_arrow = y_zz_top + 4.0
+                ax.plot([x_pull, x_pull], [y_zz_top, y_arrow], color="#dc2626", linewidth=1.2, zorder=2)
+                ax.plot(
+                    [x_pull - 2.5, x_pull, x_pull + 2.5],
+                    [y_arrow - 1.5, y_arrow + 1.0, y_arrow - 1.5],
+                    color="#dc2626",
+                    linewidth=1.2,
+                    zorder=2,
+                )
+                ax.text(
+                    x_pull,
+                    y_arrow + 2.2,
+                    rail_net,
+                    ha="center",
+                    va="bottom",
+                    fontsize=5.8,
+                    fontweight="bold",
+                    color="#dc2626",
+                    zorder=4,
+                )
             else:
                 y_zz_top = y_base - 8.0
                 y_zz_bot = y_zz_top - 9.0
@@ -659,62 +778,6 @@ class SchematicPassiveDrawer:
                 )
 
                 cls._draw_gnd_3bar(ax, x_pull, y_zz_bot, y_drop)
-
-        if same_pwr and len(pwr_pullups) > 1:
-            x_min_pull = min(p[0] for p in pwr_pullups)
-            x_max_pull = max(p[0] for p in pwr_pullups)
-            y_zz_top = pullup_max_y + 17.0
-            y_top_rail = y_zz_top + 6.0
-
-            card_x = x_min_pull - 5.0
-            card_w = (x_max_pull - x_min_pull) + 16.0
-            card_y = min(p[1] for p in pwr_pullups) + 4.0
-            card_h = (y_top_rail + 16.0) - card_y
-            is_i2c = any("SDA" in p[3].upper() or "SCL" in p[3].upper() for p in pwr_pullups)
-            card_title = "I2C PULL-UP RESISTORS" if is_i2c else "PULL-UP RESISTORS"
-
-            ax.add_patch(
-                patches.Rectangle(
-                    (card_x, card_y),
-                    card_w,
-                    card_h,
-                    facecolor="#f8fafc",
-                    edgecolor="#cbd5e1",
-                    linestyle="--",
-                    linewidth=0.8,
-                    zorder=1,
-                )
-            )
-            ax.text(
-                card_x + 3.0,
-                card_y + card_h - 2.8,
-                card_title,
-                fontsize=5.5,
-                fontweight="bold",
-                color="#334155",
-                zorder=2,
-            )
-            ax.plot([x_min_pull, x_max_pull], [y_top_rail, y_top_rail], color="#dc2626", linewidth=1.2, zorder=2)
-            x_arrow = (x_min_pull + x_max_pull) / 2.0
-            ax.plot([x_arrow, x_arrow], [y_top_rail, y_top_rail + 3.5], color="#dc2626", linewidth=1.2, zorder=2)
-            ax.plot(
-                [x_arrow - 2.5, x_arrow, x_arrow + 2.5],
-                [y_top_rail + 2.0, y_top_rail + 4.5, y_top_rail + 2.0],
-                color="#dc2626",
-                linewidth=1.2,
-                zorder=2,
-            )
-            ax.text(
-                x_arrow,
-                y_top_rail + 5.5,
-                common_pwr,
-                ha="center",
-                va="bottom",
-                fontsize=5.8,
-                fontweight="bold",
-                color="#dc2626",
-                zorder=4,
-            )
 
     @staticmethod
     def _draw_zigzag_resistor(ax: matplotlib.axes.Axes, x: float, y_start: float, y_end: float) -> None:

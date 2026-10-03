@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bug Report Workstation - Hardware Engineering</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <style>
     /* =========================================================
        QUAKE I / GLQUAKE CONSOLE & RETRO HUD ENGINE THEME
@@ -49,11 +50,29 @@
       overflow: hidden;
     }
 
-    /* Custom Quake Scrollbars */
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #120c08; border: 1px solid #291a10; }
-    ::-webkit-scrollbar-thumb { background: #5a381e; border: 1px solid #8d5d33; border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: #8d5d33; }
+    /* Visible Quake Scrollbars (BUG-202, BUG-233) */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
+    }
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e130b;
+      border: 1px solid #3d2311;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #965a25;
+      border-radius: 4px;
+      border: 1px solid #c87a32;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold, #ffb800);
+      border-color: #ffd700;
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
 
     /* Quake Stone Plaque / Beveled Panels */
     .quake-card {
@@ -78,6 +97,11 @@
       gap: 6px;
       transition: all 0.15s ease;
       text-decoration: none;
+      white-space: nowrap !important;
+      flex-shrink: 0;
+    }
+    .quake-btn * {
+      white-space: nowrap !important;
     }
     .quake-btn-default {
       background: linear-gradient(180deg, #3a2618 0%, #20140c 100%);
@@ -220,19 +244,27 @@
       border-bottom: 2px solid var(--quake-border-mid);
       box-shadow: 0 4px 12px rgba(0,0,0,0.6);
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      scrollbar-width: thin;
       align-items: center;
       justify-content: space-between;
       padding: 6px 16px;
       flex-shrink: 0;
-      gap: 8px 12px;
+      gap: 12px;
       z-index: 100;
     }
-    .brand-block {
+    .brand-block,
+    .header-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
       flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .brand-block {
+      gap: 10px;
     }
     .brand-title {
       font-size: 14px;
@@ -339,6 +371,36 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .copy-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 1px 3px;
+      margin-left: 3px;
+      font-size: 11px;
+      color: var(--quake-text-dim);
+      opacity: 0.75;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+      line-height: 1;
+      vertical-align: middle;
+    }
+    .copy-icon-btn:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--quake-gold);
+      transform: scale(1.12);
+    }
+    .copy-icon-btn:active {
+      transform: scale(0.92);
+    }
+    .copy-badge-btn {
+      font-size: 9px;
+      padding: 0 2px;
     }
 
     /* Content Area */
@@ -545,6 +607,37 @@
           <button id="filter-all" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:10px;" onclick="setBugFilter('all')">ALL</button>
           <button id="filter-resolved" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:10px;" onclick="setBugFilter('resolved')">RESOLVED</button>
         </div>
+        <div style="display:flex; gap:6px; width:100%;">
+          <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+            <label style="font-size:9px;">Category</label>
+            <select id="select-filter-category" onchange="onFilterCategoryChanged(this.value)" style="width:100%; padding:4px; font-size:10px;">
+              <option value="ALL">ALL</option>
+              {% for cat in categories %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+            <label style="font-size:9px;">Severity</label>
+            <select id="select-filter-severity" onchange="onFilterSeverityChanged(this.value)" style="width:100%; padding:4px; font-size:10px;">
+              <option value="ALL">ALL</option>
+              {% for sev in severities %}
+              <option value="{{ sev }}">{{ sev }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:2px; width:100%;">
+          <label style="font-size:9px;">Sort By</label>
+          <select id="select-bug-sort" onchange="onBugSortChanged(this.value)" style="width:100%; padding:4px; font-size:10px;">
+            <option value="id_desc">ID (Newest first)</option>
+            <option value="id_asc">ID (Oldest first)</option>
+            <option value="severity">Severity (Critical first)</option>
+            <option value="status">Status (Open first)</option>
+            <option value="component">Component</option>
+            <option value="title">Title</option>
+          </select>
+        </div>
       </div>
       <ul id="bug-list" class="bug-list"></ul>
     </div>
@@ -554,7 +647,11 @@
       <!-- Bug Identity Section -->
       <div class="form-section quake-card">
         <div class="section-title">
-          <span>Issue Identity</span>
+          <span style="display:flex; align-items:center; gap:8px;">
+            <span>Issue Identity</span>
+            <span id="active-bug-id-display" style="color:var(--quake-gold); font-size:12px;"></span>
+            <button id="btn-copy-active-bug" class="copy-icon-btn copy-badge-btn" onclick="copyActiveBugId()" title="Copy active bug ID" style="display:none;">📋</button>
+          </span>
           <div style="display:flex; gap:8px;">
             <button id="btn-save" class="quake-btn quake-btn-green" onclick="saveActiveBug()">Save Bug</button>
             <button id="btn-delete" class="quake-btn quake-btn-red" onclick="deleteActiveBug()">Delete</button>
@@ -673,7 +770,13 @@
   <script>
     let db = {{ database_json | safe }};
     let activeBugId = null;
-    let currentFilter = 'open';
+    let currentFilter = sessionStorage.getItem("bug_filter_status") || 'open';
+    let currentCategoryFilter = sessionStorage.getItem("bug_filter_category") || 'ALL';
+    let currentSeverityFilter = sessionStorage.getItem("bug_filter_severity") || 'ALL';
+    let currentBugSort = sessionStorage.getItem("bug_sort") || 'id_desc';
+
+    const severityOrder = { "CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3 };
+    const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "RESOLVED": 2, "CLOSED": 3 };
 
     function init() {
       // Disambiguate duplicate IDs if any exist in in-memory state
@@ -685,12 +788,19 @@
         seenIds.add(b.id);
       });
 
-      const openBugs = db.bugs.filter(b => b.status !== "RESOLVED" && b.status !== "CLOSED");
-      if (openBugs.length > 0) {
-        activeBugId = openBugs[0].id;
+      // Restore dropdown UI selections
+      const sortSel = document.getElementById("select-bug-sort");
+      if (sortSel) sortSel.value = currentBugSort;
+      const catSel = document.getElementById("select-filter-category");
+      if (catSel) catSel.value = currentCategoryFilter;
+      const sevSel = document.getElementById("select-filter-severity");
+      if (sevSel) sevSel.value = currentSeverityFilter;
+
+      const visibleBugs = getFilteredAndSortedBugs();
+      if (visibleBugs.length > 0) {
+        activeBugId = visibleBugs[0].id;
       } else if (db.bugs && db.bugs.length > 0) {
         activeBugId = db.bugs[0].id;
-        currentFilter = 'all';
       }
       updateMetrics();
       setBugFilter(currentFilter);
@@ -699,9 +809,36 @@
       setupPasteDrop();
     }
 
+    function onBugSortChanged(val) {
+      currentBugSort = val;
+      sessionStorage.setItem("bug_sort", val);
+      renderBugList();
+    }
+
+    function onFilterCategoryChanged(val) {
+      currentCategoryFilter = val;
+      sessionStorage.setItem("bug_filter_category", val);
+      renderBugList();
+      ensureActiveBugVisible();
+    }
+
+    function onFilterSeverityChanged(val) {
+      currentSeverityFilter = val;
+      sessionStorage.setItem("bug_filter_severity", val);
+      renderBugList();
+      ensureActiveBugVisible();
+    }
+
+    function ensureActiveBugVisible() {
+      const visibleBugs = getFilteredAndSortedBugs();
+      if (visibleBugs.length > 0 && !visibleBugs.some(b => b.id === activeBugId)) {
+        selectBug(visibleBugs[0].id);
+      }
+    }
 
     function setBugFilter(filter) {
       currentFilter = filter;
+      sessionStorage.setItem("bug_filter_status", filter);
       const btnOpen = document.getElementById("filter-open");
       const btnAll = document.getElementById("filter-all");
       const btnResolved = document.getElementById("filter-resolved");
@@ -709,16 +846,7 @@
       if (btnAll) btnAll.classList.toggle("quake-btn-active", filter === "all");
       if (btnResolved) btnResolved.classList.toggle("quake-btn-active", filter === "resolved");
       renderBugList();
-
-      const visibleBugs = db.bugs.filter(b => {
-        const isRes = (b.status === "RESOLVED" || b.status === "CLOSED");
-        if (currentFilter === "open" && isRes) return false;
-        if (currentFilter === "resolved" && !isRes) return false;
-        return true;
-      });
-      if (visibleBugs.length > 0 && !visibleBugs.some(b => b.id === activeBugId)) {
-        selectBug(visibleBugs[0].id);
-      }
+      ensureActiveBugVisible();
     }
 
     function showToast(msg) {
@@ -726,6 +854,39 @@
       t.innerText = msg;
       t.style.display = "block";
       setTimeout(() => { t.style.display = "none"; }, 3500);
+    }
+
+    function copyText(text) {
+      if (!text) return;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(`Copied: ${text}`);
+        }).catch(() => fallbackCopy(text));
+      } else {
+        fallbackCopy(text);
+      }
+    }
+
+    function fallbackCopy(text) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        showToast(`Copied: ${text}`);
+      } catch (err) {
+        console.error("Failed to copy", err);
+      }
+    }
+
+    function copyActiveBugId() {
+      if (activeBugId) {
+        copyText(activeBugId);
+      }
     }
 
     function updateMetrics() {
@@ -737,23 +898,69 @@
       document.getElementById("m-resolved").innerText = resolved;
     }
 
+    function getFilteredAndSortedBugs() {
+      const searchInput = document.getElementById("search-input");
+      const query = (searchInput ? searchInput.value || "" : "").toLowerCase();
+      let list = (db.bugs || []).filter(bug => {
+        const isResolved = (bug.status === "RESOLVED" || bug.status === "CLOSED");
+        if (currentFilter === "open" && isResolved) return false;
+        if (currentFilter === "resolved" && !isResolved) return false;
+        if (currentCategoryFilter && currentCategoryFilter !== "ALL" && bug.category !== currentCategoryFilter) return false;
+        if (currentSeverityFilter && currentSeverityFilter !== "ALL" && bug.severity !== currentSeverityFilter) return false;
+        if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query) && !(bug.component || "").toLowerCase().includes(query)) {
+          return false;
+        }
+        return true;
+      });
+
+      list.sort((a, b) => {
+        switch (currentBugSort) {
+          case "id_asc": {
+            const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
+            const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
+            return numA - numB;
+          }
+          case "id_desc": {
+            const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
+            const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
+            return numB - numA;
+          }
+          case "severity": {
+            const rankA = severityOrder[a.severity] !== undefined ? severityOrder[a.severity] : 99;
+            const rankB = severityOrder[b.severity] !== undefined ? severityOrder[b.severity] : 99;
+            if (rankA !== rankB) return rankA - rankB;
+            return (b.id || "").localeCompare(a.id || "");
+          }
+          case "status": {
+            const rankA = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 99;
+            const rankB = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 99;
+            if (rankA !== rankB) return rankA - rankB;
+            return (b.id || "").localeCompare(a.id || "");
+          }
+          case "component": {
+            const compA = (a.component || "").toLowerCase();
+            const compB = (b.component || "").toLowerCase();
+            return compA.localeCompare(compB);
+          }
+          case "title": {
+            const titleA = (a.title || "").toLowerCase();
+            const titleB = (b.title || "").toLowerCase();
+            return titleA.localeCompare(titleB);
+          }
+          default:
+            return 0;
+        }
+      });
+
+      return list;
+    }
+
     function renderBugList() {
       const list = document.getElementById("bug-list");
       list.innerHTML = "";
-      const query = (document.getElementById("search-input").value || "").toLowerCase();
+      const visibleBugs = getFilteredAndSortedBugs();
 
-      db.bugs.forEach(bug => {
-        const isResolved = (bug.status === "RESOLVED" || bug.status === "CLOSED");
-        if (currentFilter === "open" && isResolved) {
-          return;
-        }
-        if (currentFilter === "resolved" && !isResolved) {
-          return;
-        }
-        if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query) && !(bug.component || "").toLowerCase().includes(query)) {
-          return;
-        }
-
+      visibleBugs.forEach(bug => {
         const li = document.createElement("li");
         li.className = "bug-item" + (bug.id === activeBugId ? " active" : "");
         li.onclick = () => selectBug(bug.id);
@@ -771,7 +978,7 @@
 
         li.innerHTML = `
           <div class="bug-item-top">
-            <span class="bug-id">${bug.id}</span>
+            <span class="bug-id">${bug.id} <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${bug.id}')" title="Copy Bug ID ${bug.id}">📋</button></span>
             <span class="${sevBadgeClass}">${bug.severity}</span>
             <span class="${stBadgeClass}">${bug.status}</span>
           </div>
@@ -790,6 +997,11 @@
     function loadActiveBug() {
       const bug = db.bugs.find(b => b.id === activeBugId);
       if (!bug) return;
+
+      const bugIdDisp = document.getElementById("active-bug-id-display");
+      const btnCopyActiveBug = document.getElementById("btn-copy-active-bug");
+      if (bugIdDisp) bugIdDisp.textContent = `[${bug.id}]`;
+      if (btnCopyActiveBug) btnCopyActiveBug.style.display = "inline-flex";
 
       document.getElementById("bug-title").value = bug.title || "";
       document.getElementById("bug-severity").value = bug.severity || "MEDIUM";
@@ -1130,6 +1342,9 @@
     }
 
     async function uploadPayload(payload) {
+      if (activeBugId && !payload.bug_id) {
+        payload.bug_id = activeBugId;
+      }
       showToast("Uploading " + payload.filename + "...");
       const res = await fetch("/api/upload", {
         method: "POST",

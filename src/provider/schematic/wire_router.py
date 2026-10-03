@@ -15,7 +15,7 @@ from provider.schematic.constants import (
     partition_component_pins,
 )
 from provider.schematic.jumper import draw_vertical_wire_with_jumpers
-from provider.schematic.passives import SchematicPassiveClassifier
+from provider.schematic.passives import SchematicPassiveClassifier, SchematicPassiveDrawer
 
 
 class SchematicWireSegmentPlanner:
@@ -48,12 +48,14 @@ class SchematicWireSegmentPlanner:
         sheet_plan: _SchematicSheetPlan,
         all_nets: List[NetModel],
         config: Optional[PCBConfig] = None,
+        wired_pins: Optional[set[Tuple[str, str]]] = None,
     ) -> Tuple[
         List[Tuple[float, float, float, str, str]],
         List[Tuple[float, float, float, str, str]],
         List[Tuple[float, float, str]],
+        List[Tuple[FootprintModel, str, Tuple[float, float]]],
     ]:
-        """Compute exact wire routes and labels for a single schematic sheet plan."""
+        """Compute exact wire routes, labels, and passive tap points for a single schematic sheet plan."""
         pin_to_net: Dict[Tuple[str, str], str] = {}
         for net in all_nets:
             for pair in net.pins:
@@ -94,8 +96,14 @@ class SchematicWireSegmentPlanner:
             cols_per_row = cols_override
             col_w = 210.0 / max(1, cols_per_row)
             cw = min(38.0, col_w * 0.55)
-            gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
-            start_x = 45.0
+            layout_col_gap = getattr(layout, "col_gap", 15.0)
+            if layout_col_gap != 15.0:
+                gap = layout_col_gap
+                total_w = cols_per_row * cw + (cols_per_row - 1) * gap
+                start_x = max(35.0, page_center_x - total_w / 2.0)
+            else:
+                gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
+                start_x = 45.0
             col_x_positions = []
             col_y_positions = []
             comp_col_map = {}
@@ -162,7 +170,8 @@ class SchematicWireSegmentPlanner:
 
         direct_wire_pairs = []
         detour_wire_pairs = []
-        wired_pins = set()
+        if wired_pins is None:
+            wired_pins = set()
         for net in all_nets:
             if net.name.upper() in POWER_NET_NAMES or net.name.upper() in GROUND_NET_NAMES:
                 continue
@@ -267,12 +276,14 @@ class SchematicWireSegmentPlanner:
         v_segments: List[Tuple[float, float, float, str, str]] = []
         wire_labels: List[Tuple[float, float, str]] = []
 
+        vertical_passives = pullup_resistors + shunt_caps
+
         # Route direct adjacent-column wires
         cls._route_direct_wire_pairs(
             direct_wire_pairs=direct_wire_pairs,
             sheet_pin_coords=sheet_pin_coords,
             pin_to_net=pin_to_net,
-            pullup_resistors=pullup_resistors,
+            pullup_resistors=vertical_passives,
             h_segments=h_segments,
             v_segments=v_segments,
             wire_labels=wire_labels,
@@ -290,7 +301,24 @@ class SchematicWireSegmentPlanner:
             wire_labels=wire_labels,
         )
 
-        return h_segments, v_segments, wire_labels
+        tap_points: List[Tuple[FootprintModel, str, Tuple[float, float]]] = []
+        if vertical_passives:
+            if wired_pins is None:
+                wired_pins = set()
+            pullup_points = SchematicPassiveDrawer.compute_pullup_tap_points(
+                pullups=vertical_passives,
+                pin_to_net=pin_to_net,
+                h_wire_segments=h_segments,
+                sheet_pin_coords=sheet_pin_coords,
+                wired_pins=wired_pins,
+                pin_side_map=pin_side_map,
+            )
+            tap_points = [
+                (fp, sig_net, (x_pull, y_base)) for x_pull, y_base, fp, sig_net, rail_net, *rest in pullup_points
+            ]
+            sheet_plan._computed_pullup_points = pullup_points
+
+        return h_segments, v_segments, wire_labels, tap_points
 
     @staticmethod
     def _route_direct_wire_pairs(
@@ -571,8 +599,23 @@ class SchematicWireSegmentPlanner:
         all_nets = getattr(wiring, "nets", []) or [] if wiring else []
         result: Dict[int, Tuple[List[Tuple[float, float, float, str]], List[Tuple[float, float, float, str]]]] = {}
         for plan in sheet_plans:
-            h_segs, v_segs, _ = cls.compute_sheet_wire_segments_for_plan(plan, all_nets, config)
+            h_segs, v_segs, _, _ = cls.compute_sheet_wire_segments_for_plan(plan, all_nets, config)
             h_clean = [(min(s[0], s[1]), max(s[0], s[1]), s[2], s[3]) for s in h_segs]
             v_clean = [(s[0], min(s[1], s[2]), max(s[1], s[2]), s[3]) for s in v_segs]
             result[plan.sheet_idx] = (h_clean, v_clean)
+        return result
+
+    @classmethod
+    def compute_passive_tap_points(
+        cls,
+        wiring: Optional[Wiring],
+        sheet_plans: List[_SchematicSheetPlan],
+        config: Optional[PCBConfig] = None,
+    ) -> Dict[int, List[Tuple[FootprintModel, str, Tuple[float, float]]]]:
+        """Compute signal tap points (footprint, signal_net, (x, y)) for vertical passives on each sheet."""
+        all_nets = getattr(wiring, "nets", []) or [] if wiring else []
+        result: Dict[int, List[Tuple[FootprintModel, str, Tuple[float, float]]]] = {}
+        for plan in sheet_plans:
+            _, _, _, taps = cls.compute_sheet_wire_segments_for_plan(plan, all_nets, config)
+            result[plan.sheet_idx] = taps
         return result

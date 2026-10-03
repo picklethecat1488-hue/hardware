@@ -57,7 +57,7 @@ flowchart TD
     end
 
     subgraph Sensors["Touch & Audio Peripherals"]
-        AZOTEQ["Azoteq IQS7222A / IQS7211A Touch IC (U2)"] -->|"I2C1 + CAP_INT"| MCU
+        AZOTEQ["Azoteq IQS7222A Touch IC (U2)"] -->|"I2C1 + CAP_INT"| MCU
         FLEX_TAIL["Capacitive Flex Tail (J2/J4)"] -->|"4 Sensing Channels"| AZOTEQ
         MCU -->|"PDM Clock / Data"| AUDIO_AMP["MAX98357A Mono Amp (U4)"]
         AUDIO_AMP -->|"Differential Drive"| SPK["Piezo Sounder (U5)"]
@@ -67,7 +67,7 @@ flowchart TD
         MCU -->|"I2C2 (J6), I3C0 (J7), I3C1 (J8)"| SENSOR_HDRS["Peripheral I2C/I3C Breakouts"]
         MCU -->|"SPI0 (J9), UART1 (J10)"| COMM_HDRS["SPI & UART Breakouts"]
         MCU -->|"10x GPIO Breakout (J14)"| GPIO_HDR["General Purpose GPIO Header"]
-        M2_CONN["M.2 Key-M Edge Connector (J1)"] -->|"PCIe / MIPI / PEWAKE#"| MCU
+        BLE_MOD["u-blox NINA-B312 BTLE (U11)"] -->|"UART / Flow Control / BLE_WAKE_N"| MCU
     end
 ```
 
@@ -84,7 +84,11 @@ flowchart TD
 | **`U5`** | Piezoelectric Sounder | 12mm Cylindrical SMD | `PKM13EPYH4000-B0` | High-frequency alert buzzer, alarm feedback, and audible notification emitter. | [Murata PKM13EPYH4000 Portal](https://www.murata.com/en-global/products/productdetail?partno=PKM13EPYH4000-B0) / [DigiKey PKM13EPYH4000](https://www.digikey.com/en/products/result?keywords=PKM13EPYH4000-B0) |
 | **`Q1`** | N-Channel MOSFET Load Switch | SOT-23 | `BSS138` | Low-side power-gating switch controlled by `PWR_EN` to cut quiescent current to expansion sensors during sleep. | [onsemi BSS138 Portal](https://www.onsemi.com/products/discrete-power-modules/mosfets/bss138) / [SparkFun Datasheet Mirror](https://www.sparkfun.com/datasheets/Components/General/BSS138.pdf) |
 | **`Y1`** | High-Frequency Crystal Oscillator | 3225-4P (3.2x2.5mm) | `ECS-240-8-30B-CKM` | 24.000 MHz low-jitter primary system clock for MCU PLLs, USB PHY, and communication peripherals. | [ECS Inc ECX-3B Portal](https://ecsxtal.com/products/ecx-3b/) / [DigiKey ECS-240-8-30B](https://www.digikey.com/en/products/result?keywords=ECS-240-8-30B-CKM) |
-| **`J1`** | M.2 Key-M Edge Connector | M.2-KEY-M | `LOTES-APCI0082` | High-speed host expansion slot carrying PCIe, MIPI telemetry, and primary test harness signals. | [PCI-SIG M.2 Specification](https://pcisig.com/specifications/pciexpress/m.2) |
+| **`U11`** | BTLE 5.0 Wireless Module | LGA-72 (10x15mm) | `u-blox NINA-B312-02B` | Pre-flashed standalone Bluetooth Low Energy 5.0 module with internal antenna replacing legacy edge connector. | [u-blox NINA-B31 Series](https://www.u-blox.com/en/product/nina-b31-series-u-connect) |
+| **`J15`** | 2x5 SWD Recovery Header (DNP) | Micro-Header (2x5 1.27mm pitch) | `pin_header_2x5_1.27mm` | Factory SWD debug and firmware recovery header for U11 BLE module (`GND`, `SWDIO`, `SWDCLK`, `RESET_N`, `VCC_NINA`). Marked Do Not Populate (DNP) in production BOM. | [Carrier Board Schematic](carrier_board_schematic.svg) |
+| **`SW2`** | Tactile Reset Push-Button | SMD Pushbutton Switch | `PTS645SL43SMTR92LFS` | Manual tactile reset push-button switch for U11 BLE module (`RESET_N`). | [C&K PTS645 Series](https://www.ckswitches.com/products/switches/product-details/Tactile/PTS645/) |
+| **`J16`** | NFC Antenna Header | pin_header_1x2 (2.54mm pitch) | `pin_header_1x2` | 2-pin breakout header connecting external 13.56 MHz flexible NFC coil antenna (Molex 146236-0001) to NINA-B312 NFC pins. | [Molex 146236 Portal](https://www.molex.com/molex/products/part-detail/antennas/1462360001) |
+| **`C18`, `C19`** | NFC Tuning Shunt Capacitors | 0402 SMD (1.0x0.5mm) | `GRM1555C1H301JA01D` | Symmetrical 300 pF C0G/NP0 50V shunt tuning capacitors for NFC1 and NFC2 antenna matching; vertically stacked at $(7.0, -35.2)$ and $(7.0, -37.3)$ on F.Cu outside U11 silkscreen border. | [Murata GRM1555 Portal](https://www.murata.com/en-global/products/productdetail?partno=GRM1555C1H301JA01D) |
 | **`J2` / `J4`** | FPC 30-Pin Connectors | FPC-30P-0.5mm | `HIROSE-FH35C-30S` | Zero-insertion-force (ZIF) 30-pin connectors bridging the rigid carrier board (`J2`) and flexible sensing tail (`J4`). | [Hirose FH35C Series Catalog](https://www.hirose.com/en/product/series/FH35C) |
 | **`J3`** | USB Type-C Receptacle | USB-C-16P (Hybrid SMD/TH) | `TYPE-C-16P` | 5V VBUS power delivery input, CC1/CC2 5.1k configuration channels, and USB 2.0 D+/D- communication. | [USB-IF Type-C Specification](https://www.usb.org/document-library/usb-type-cr-cable-and-connector-specification-release-22) |
 
@@ -124,17 +128,17 @@ To fulfill `BUG-060` ("Support exit from Deep Power Down when connecting the ext
    - **Wake Action**: The falling edge on `WAKEUP0_B` / `VBAT_WAKEUP_b` asserts the MCX N947 Power Management Unit (PMU) wakeup interrupt controller, automatically restoring internal LDOs, releasing reset, and waking the dual Cortex-M33 cores from Deep Power Down into normal run mode.
    - **Passive State**: When disconnected from USB, an external $100\,\text{k}\Omega$ pull-up resistor to `VDD_BAT` maintains the line at logic high with $< 30\,\text{nA}$ leakage.
 
-2. **External M.2 Host Connection Wakeup (`WAKEUP1_B` / `WUU0_IN1`)**:
-   - **Signal**: `M2_WAKE_N` connecting M.2 Key-M edge connector `J1` pin 50 (`PEWAKE#`) to MCX N947 `WUU0_IN1` (ball `C13`, pin `P0_7` / `WAKEUP1_B`).
-   - **Mechanism**: Standard PCI Express M.2 Key-M interfaces define `PEWAKE#` as an active-low open-drain signal driven by the host or endpoint to signal link wakeup or presence. When the test board is inserted into a host M.2 socket or the host controller asserts PCIe wake, `PEWAKE#` is pulled low to ground.
+2. **BTLE Wireless Subsystem Host Wakeup (`WAKEUP1_B` / `WUU0_IN1`)**:
+   - **Signal**: `BLE_WAKE_N` connecting u-blox NINA-B312 BTLE module `U11` host-wake interrupt line to MCX N947 `WUU0_IN1` (ball `C13`, pin `P0_7` / `WAKEUP1_B`).
+   - **Mechanism**: The u-blox NINA-B312 module asserts `BLE_WAKE_N` active-low when an incoming Bluetooth LE advertising connection, pairing request, or serial character arrives over the air.
    - **Wake Action**: The falling edge on `WAKEUP1_B` / `WUU0_IN1` independently triggers the MCX N947 PMU, immediately waking the microcontroller from Deep Power Down into full operational state without user button intervention.
-   - **Passive State**: An external $100\,\text{k}\Omega$ pull-up resistor to `VDD_BAT` keeps `M2_WAKE_N` held high when disconnected from the M.2 host.
+   - **Passive State**: An external $100\,\text{k}\Omega$ pull-up resistor to `VDD_BAT` keeps `BLE_WAKE_N` held high when the BTLE link is dormant.
 
 ```mermaid
 flowchart LR
-    subgraph Wakeup_Sources["External Asynchronous Wakeup Sources (BUG-060)"]
+    subgraph Wakeup_Sources["External Asynchronous Wakeup Sources (BUG-060, BUG-214)"]
         CHG["TI BQ24074 Charger (U3)"] -->|"/PGOOD (Open-Drain)"| W0["Net: CHG_PGOOD_WAKE"]
-        M2["M.2 Key-M Connector (J1)"] -->|"Pin 50: PEWAKE# (Open-Drain)"| W1["Net: M2_WAKE_N"]
+        BLE["u-blox NINA-B312 BTLE (U11)"] -->|"BLE_WAKE_N (Active-Low)"| W1["Net: BLE_WAKE_N"]
     end
 
     subgraph MCXN947_AON["MCX N947 Always-On Domain (VBAT)"]
@@ -380,7 +384,7 @@ Requirement Checklist:
 | **`UART1_TXD`**| `B3`  | `P1_5` | `ALT3 - FC5_P1` | `MED` | Output | `J10.4` (BUG-052) | Peripheral expansion UART transmit (Flexcomm 5) |
 | **`CHG_STAT`** | `G5`  | `P1_19`| `ALT0 - P1_19` | `MED` | Input | `U3./CHG` (BUG-063) | Charger status detect (WUU0_IN15; Sleep/Active) |
 | **`CHG_PGOOD_WAKE`**|`M10`| `P5_2`| `ALT0 - P5_2` | `RST` | Input | `U3./PGOOD` (BUG-060)| USB VBUS detect (VBAT_WAKEUP_b; exits Deep Power Down)|
-| **`M2_WAKE_N`** | `C13` | `P0_7` | `ALT0 - P0_7` | `MED` | Input | `J1.50` (BUG-060) | M.2 host wake detect (WUU0_IN1 / WAKEUP1_B) |
+| **`BLE_WAKE_N`** | `C13` | `P0_7` | `ALT0 - P0_7` | `MED` | Input | `U11.WAKE` (BUG-214, BUG-222) | BTLE host wake detect (WUU0_IN1 / WAKEUP1_B) |
 | **`PWR_EN_AUDIO`**| `L4`| `P1_22`| `ALT0 - P1_22` | `MED` | Output | `Q2.ON` (TPS22918) | Switched audio rail power gate (default-ON via 100k) |
 | **`PWR_EN_SENSORS`**|`L5`| `P1_21`| `ALT0 - P1_21` | `MED` | Output | `Q3.ON` (TPS22918) | Switched sensor rail power gate (default-ON via 100k)|
 | **`PWR_EN_DEBUG`**| `M4` | `P1_23`| `ALT0 - P1_23` | `MED` | Output | `Q4.ON` (TPS22918) | Switched debug rail power gate (default-ON via 100k) |
@@ -451,7 +455,8 @@ The test board carrier has a compact form factor of $60.0\text{ mm} \times 90.0\
    - **`U5` Piezo Sounder & `U4` Audio Amp**: Placed at $(-18.0, 31.0)$ and $(-18.0, 21.0)$, isolated from high-speed digital buses.
    - **`J_SWD` 10-Pin Header**: Placed at $(18.0, 35.0)$ for convenient top-side debugger cable routing.
 3. **Bottom Edge $(Y \in [-30, -45])$**:
-   - **`J1` M.2 Key-M Connector**: Placed at $(0.0, -36.0)$ facing South along the lower edge.
+   - **`U11` u-blox NINA-B312 BTLE Module & `J15` SWD Recovery Header (DNP)**: Placed at $(0.0, -36.0)$ and $(-14.5, -41.0)$ (2x5 1.27mm pitch DNP header, with `SW2` tactile reset switch at $(-14.5, -36.5)$) facing South along the lower edge with $16.0\times 5.0\text{ mm}$ RF keepout at $(0.0, -42.0)$.
+   - **`C18` & `C19` Shunt Tuning Capacitors**: Vertically stacked at $(7.0, -35.2)$ and $(7.0, -37.3)$ on `F.Cu`, positioned cleanly outside U11 package boundary and silkscreen brackets, routing NFC1/NFC2 to external NFC coil header `J16` at $(13.5, -36.5)$.
    - **`J_GPIO` 10-Pin Breakout Header**: Located along the bottom right $(18.0, -28.0)$.
 4. **Left Edge $(X \in [-30, -15])$**:
    - **`J3` USB-C Receptacle**: Centered at $(-25.0, 0.0)$ facing the left chassis edge.
@@ -464,6 +469,22 @@ The test board carrier has a compact form factor of $60.0\text{ mm} \times 90.0\
    - **`U_LED` Driver & RGB Status LED**: Located at $(22.0, 26.0)$ near the corner for maximum visibility through the top lid window.
 6. **Bottom Exterior Enclosure Shell (`BUG-060`)**:
    - Four cylindrical recesses of diameter $8.0\text{ mm}$ and depth $1.0\text{ mm}$ located at coordinates $(\pm 25.5, \pm 40.5)$ on the bottom face ($Z = -h_{\text{shell}}/2$), precisely capturing rubber non-skid feet.
+
+### 6.1 Detailed Assembly and SMT Process Guidelines
+
+* Placement Topology: Double-sided SMT assembly
+  * Primary Top Side (F.Cu): MCU (U1), BLE module (U11), Charger (U3), USB-C (J3), FPC (J2), Passives
+  * Secondary Bottom Side (B.Cu): Cap touch controller (U2), decoupling passives
+* Solder Paste and Stencil:
+  * Alloy: Lead-free SAC305 (Sn96.5 / Ag3.0 / Cu0.5), RoHS 3 compliant
+  * Powder size: Type 4 or Type 5 mesh suitable for 0.4mm BGA pads
+  * Stencil foil: 0.10 mm (4.0 mil) laser-cut electro-polished stainless steel with nano-coating
+* Reflow Thermal Profile:
+  * Peak reflow temperature: 240 deg C to 245 deg C (Max 250 deg C)
+  * Time above liquidus (217 deg C): 60 to 90 seconds
+* Post-Reflow Inspection:
+  * 100% 3D Automated Optical Inspection (AOI) for all SMT chips
+  * 100% Automated X-ray Inspection (AXI) for BGA balls on U1 and QFN thermal ground pads on U2, U3, U4, U9
 
 ---
 

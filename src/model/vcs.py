@@ -103,6 +103,31 @@ class BranchInfoModel(BaseModel):
     ahead: int = 0
     behind: int = 0
 
+    @property
+    def is_release_branch_candidate(self) -> bool:
+        """Return True if this branch represents a main, master, or release branch."""
+        name_lower = self.name.lower()
+        if self.name in [
+            "main",
+            "master",
+            "heads/main",
+            "origin/main",
+            "origin/master",
+            "remotes/origin/main",
+            "remotes/origin/master",
+        ]:
+            return True
+        return bool(
+            self.name.endswith("/main")
+            or self.name.endswith("/master")
+            or "release" in name_lower
+            or "rel/" in name_lower
+            or self.name.startswith("v")
+            or self.name.startswith("origin/v")
+            or self.name.startswith("remotes/origin/v")
+            or "/v" in name_lower
+        )
+
 
 class CommitBugTagModel(BaseModel):
     """Bug status badge associated with a commit."""
@@ -181,6 +206,9 @@ class DiffViewSessionModel(BaseModel):
     """Full session state for the interactive Quake Diff Viewer and Smartlog workstation."""
 
     repo_name: str = "hardware"
+    repo_root: Optional[str] = ""
+    repo_web_url: Optional[str] = None
+    github_repo: str = ""
     current_branch: str = ""
     head_commit: str = ""
     active_commit: str = "working"

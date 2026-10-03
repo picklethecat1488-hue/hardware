@@ -76,3 +76,30 @@ class TestLogger:
         logger.done()
 
         assert logger.running is False
+
+    def test_log_to_daemon(self, mocker, capsys):
+        """Verify log() routes message to daemon logger without printing to console."""
+        from shell import Logger
+
+        logger = Logger(enabled=True)
+        mock_daemon = mocker.MagicMock()
+        logger._daemon_logger = mock_daemon
+
+        logger.log("Saved test.stl", symbol="📄")
+
+        mock_daemon.info.assert_called_once_with("📄 Saved test.stl")
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+    def test_stream_to_logger(self, mocker):
+        """Verify StreamToLogger routes buffer lines to logger.log."""
+        import logging
+        from shell import StreamToLogger
+
+        mock_target_logger = mocker.MagicMock()
+        stream = StreamToLogger(mock_target_logger, log_level=logging.INFO)
+
+        stream.write("First line\nSecond line\n")
+        assert mock_target_logger.log.call_count == 2
+        mock_target_logger.log.assert_any_call(logging.INFO, "First line")
+        mock_target_logger.log.assert_any_call(logging.INFO, "Second line")

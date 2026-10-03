@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Diff Viewer &amp; Smartlog: {{ session.repo_name }}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/monokai-sublime.min.css">
   <script src="/static/highlight.min.js"></script>
   <script>
@@ -76,6 +77,11 @@
       gap: 5px;
       transition: all 0.15s ease;
       text-decoration: none;
+      white-space: nowrap !important;
+      flex-shrink: 0;
+    }
+    .quake-btn * {
+      white-space: nowrap !important;
     }
     .quake-btn-default {
       background: linear-gradient(180deg, #3a2618 0%, #20140c 100%);
@@ -138,6 +144,11 @@
       gap: 16px;
       flex-shrink: 0;
       z-index: 10;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      scrollbar-width: thin;
     }
 
     .quake-logo-zone {
@@ -355,27 +366,81 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       flex-shrink: 0;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      scrollbar-width: thin;
+      gap: 8px;
+    }
+    .column-header > span,
+    .column-header > div {
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .commit-toolbar {
+      display: flex;
+      gap: 6px;
+      padding: 6px 8px;
+      background: #150d07;
+      border-bottom: 1px solid var(--quake-border-mid);
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      scrollbar-width: thin;
+      flex-shrink: 0;
+    }
+    .commit-toolbar > div {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .diff-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--quake-header-bg, #291a10);
+      border-bottom: 2px solid var(--quake-border-mid, #5a381e);
+      gap: 10px;
+      flex-shrink: 0;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      scrollbar-width: thin;
+    }
+    .diff-toolbar > div {
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     /* Visible Quake Scrollbars (BUG-202) */
     * {
       scrollbar-width: thin;
-      scrollbar-color: var(--quake-border-accent) #100a06;
+      scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
     }
     ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
     }
     ::-webkit-scrollbar-track {
-      background: #100a06;
-      border: 1px solid var(--quake-border-mid);
+      background: #1e130b;
+      border: 1px solid #3d2311;
     }
     ::-webkit-scrollbar-thumb {
-      background: var(--quake-border-accent);
+      background: #965a25;
       border-radius: 4px;
-      border: 1px solid var(--quake-border-mid);
+      border: 1px solid #c87a32;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: var(--quake-gold);
+      background: var(--quake-gold, #ffb800);
+      border-color: #ffd700;
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
     }
 
     .column-scroll {
@@ -495,6 +560,42 @@
       background: rgba(34, 197, 94, 0.15);
       border-color: var(--quake-green);
       color: var(--quake-green);
+    }
+    .copy-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 1px 3px;
+      margin-left: 3px;
+      font-size: 11px;
+      color: var(--quake-text-dim);
+      opacity: 0.75;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+      line-height: 1;
+      vertical-align: middle;
+    }
+    .copy-icon-btn:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--quake-gold);
+      transform: scale(1.12);
+    }
+    .copy-icon-btn:active {
+      transform: scale(0.92);
+    }
+    .copy-sha-btn {
+      font-size: 10px;
+      padding: 0 2px;
+      margin-left: 4px;
+    }
+    .copy-badge-btn {
+      font-size: 9px;
+      padding: 0 2px;
+      margin-left: 2px;
     }
     .smartlog-node.has-pr {
       border-left: 3px solid #a855f7 !important;
@@ -835,9 +936,6 @@
       <button id="btnAmendModal" class="quake-btn quake-btn-default" onclick="openCommitModal(true)" title="Amend HEAD commit">
         <span>⎇ Amend</span>
       </button>
-      <button id="btnSyncFeedback" class="quake-btn quake-btn-default" onclick="triggerManualSync()" title="Synchronize SQLite databases with committed feedback files">
-        <span>⚡ Sync DB</span>
-      </button>
 
       <!-- Pane Toggle Controls -->
       <div style="display:flex;align-items:center;gap:4px;border-left:1px solid var(--quake-border-mid);border-right:1px solid var(--quake-border-mid);padding:0 6px;">
@@ -856,16 +954,17 @@
           <span>🌿 {{ session.current_branch or session.active_branch }}</span>
           <span style="font-size:8px;color:var(--quake-gold);">▼</span>
         </button>
+        <button id="btnCopyCurrentBranch" class="copy-icon-btn copy-branch-btn" onclick="copyText(state.currentBranch || '{{ session.current_branch or session.active_branch }}')" title="Copy current branch name">📋</button>
         <select id="branchSelect" class="quake-select" style="display:none;" onchange="onBranchSelected(this.value)">
           <optgroup label="⭐ Main &amp; Release Branches">
-            {% for b in session.branches if (b.name in ['main', 'master', 'heads/main', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or b.name.endswith('/main') or b.name.endswith('/master') or 'release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v') or '/v' in b.name.lower()) %}
+            {% for b in session.branches if b.is_release_branch_candidate %}
               <option value="{{ b.name }}" {% if b.is_current %}selected{% endif %}>
                 ⭐ {{ b.name }}{% if b.is_current %} (current){% endif %}
               </option>
             {% endfor %}
           </optgroup>
           <optgroup label="🌿 Feature &amp; PR Branches">
-            {% for b in session.branches if not (b.name in ['main', 'master', 'heads/main', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or b.name.endswith('/main') or b.name.endswith('/master') or 'release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v') or '/v' in b.name.lower()) %}
+            {% for b in session.branches if not b.is_release_branch_candidate %}
               <option value="{{ b.name }}" {% if b.is_current %}selected{% endif %}>
                 🌿 {{ b.name }}{% if b.is_current %} (current){% endif %}
               </option>
@@ -896,7 +995,7 @@
     <section id="paneSmartlog" class="quake-card column-panel pane-smartlog">
       <div class="column-header">
         <span>Smartlog Tree (sl)</span>
-        <div style="display:flex;gap:4px;align-items:center;">
+        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;white-space:nowrap;">
           <button id="btnOpenCR" class="quake-btn quake-btn-gold quake-btn-icon" onclick="onOpenInCodeReview()" title="Review selected commit(s) in Code Review">
             <span>🔍 <span id="selectedCount">0</span></span>
           </button>
@@ -910,18 +1009,27 @@
             <span id="mergedToggleIcon">👁️</span> <span id="mergedToggleLabel">Show Merged</span>
           </button>
           <button class="quake-btn quake-btn-default quake-btn-icon" onclick="togglePane('smartlog')" title="Collapse Smartlog Pane (Shortcut: [)">◀</button>
-
         </div>
       </div>
 
-      <!-- Commit Manipulation Toolbar -->
-      <div style="display:flex;gap:6px;padding:6px 8px;background:#150d07;border-bottom:1px solid var(--quake-border-mid);justify-content:flex-end;">
-        <button class="quake-btn quake-btn-default quake-btn-icon" onclick="onSplitCommit()" title="Split commit (reset HEAD~1 to working tree)">
-          <span>✂️</span>
-        </button>
-        <button class="quake-btn quake-btn-default quake-btn-icon" onclick="onCombineCommits()" title="Combine/squash selected commits">
-          <span>🔗</span>
-        </button>
+      <!-- Commit Manipulation Toolbar (BUG-228: Select All, Select None) -->
+      <div class="commit-toolbar">
+        <div>
+          <button id="btnSelectAll" class="quake-btn quake-btn-default quake-btn-sm" onclick="selectAllCommits()" title="Select all commits in stack">
+            <span>Select All</span>
+          </button>
+          <button id="btnSelectNone" class="quake-btn quake-btn-default quake-btn-sm" onclick="selectNoneCommits()" title="Deselect all commits">
+            <span>Select None</span>
+          </button>
+        </div>
+        <div>
+          <button class="quake-btn quake-btn-default quake-btn-icon" onclick="onSplitCommit()" title="Split commit (reset HEAD~1 to working tree)">
+            <span>✂️</span>
+          </button>
+          <button class="quake-btn quake-btn-default quake-btn-icon" onclick="onCombineCommits()" title="Combine/squash selected commits">
+            <span>🔗</span>
+          </button>
+        </div>
       </div>
 
       <div class="column-scroll hide-merged" id="smartlogList">
@@ -950,6 +1058,7 @@
                        {% if node.commit_hash in session.selected_commits %}checked{% endif %}/>
                 <span class="node-graph-art">{{ node.graph_art or node.graph_symbol }}</span>
                 <span class="node-sha">{{ node.short_hash }}</span>
+                <button class="copy-icon-btn copy-sha-btn" onclick="event.stopPropagation(); copyText('{{ node.commit_hash }}');" title="Copy commit hash {{ node.commit_hash }}">📋</button>
                 {% if node.pr_number and node.pr_url %}
                   <a href="{{ node.pr_url }}"
                      target="_blank"
@@ -980,21 +1089,25 @@
               {% if node.is_ancestor_top %}
                 <span class="node-badge node-badge-ancestor" title="Top of ancestor branch ({{ node.ancestor_name or 'main' }})">📌 {{ node.ancestor_name or 'main' }}</span>
               {% endif %}
+              {% set repo_web_base = session.repo_web_url or ('https://github.com/' ~ (session.github_repo or ('picklethecat1488-hue/' ~ session.repo_name))) %}
               {% for br in node.branches %}
                 {% set is_pr_br = ('pr' in br.lower() or 'pull' in br.lower()) %}
-                {% set br_url = node.pr_url if (is_pr_br and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/tree/' ~ br.replace('origin/', '')) %}
-                <a href="{{ br_url }}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   class="node-badge node-badge-branch {% if is_pr_br and node.pr_url %}pr-tag-link{% elif is_pr_br %}pr-local-badge{% endif %}"
-                   onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
-                   title="{% if is_pr_br and node.pr_url %}Open PR in GitHub{% elif is_pr_br %}Local branch {{ br }} (not on GitHub){% else %}View branch {{ br }} on GitHub{% endif %}">
-                  ⎇ {{ br }}
-                </a>
+                {% set br_url = node.pr_url if (is_pr_br and node.pr_url) else (repo_web_base ~ '/tree/' ~ br.replace('origin/', '')) %}
+                <span style="display:inline-flex;align-items:center;">
+                  <a href="{{ br_url }}"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     class="node-badge node-badge-branch {% if is_pr_br and node.pr_url %}pr-tag-link{% elif is_pr_br %}pr-local-badge{% endif %}"
+                     onclick="onBranchBadgeClick(event, '{{ br }}', '{{ node.pr_url or '' }}')"
+                     title="{% if is_pr_br and node.pr_url %}Open PR in GitHub{% elif is_pr_br %}Local branch {{ br }} (not on GitHub){% else %}View branch {{ br }} on GitHub{% endif %}">
+                    ⎇ {{ br }}
+                  </a>
+                  <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); event.preventDefault(); copyText('{{ br }}');" title="Copy branch {{ br }}">📋</button>
+                </span>
               {% endfor %}
               {% for tag in node.tags %}
                 {% set is_pr_tag = ('pr' in tag.lower() or 'pull' in tag.lower()) %}
-                {% set tag_url = node.pr_url if (is_pr_tag and node.pr_url) else ('https://github.com/picklethecat1488-hue/hardware/releases/tag/' ~ tag) %}
+                {% set tag_url = node.pr_url if (is_pr_tag and node.pr_url) else (repo_web_base ~ '/releases/tag/' ~ tag) %}
                 <a href="{{ tag_url }}"
                    target="_blank"
                    rel="noopener noreferrer"
@@ -1021,10 +1134,13 @@
                 </span>
               {% endif %}
               {% for bug in node.bug_tags %}
-                <span class="node-badge node-badge-bug {% if bug.status == 'RESOLVED' %}resolved{% endif %}"
-                      onclick="event.stopPropagation(); openBug('{{ bug.id }}');"
-                      title="{{ bug.title }} (Click to open in Bug Viewer)">
-                  {{ bug.id }}: {{ bug.status }}
+                <span style="display:inline-flex;align-items:center;">
+                  <span class="node-badge node-badge-bug {% if bug.status == 'RESOLVED' %}resolved{% endif %}"
+                        onclick="event.stopPropagation(); openBug('{{ bug.id }}');"
+                        title="{{ bug.title }} (Click to open in Bug Viewer)">
+                    {{ bug.id }}: {{ bug.status }}
+                  </span>
+                  <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('{{ bug.id }}');" title="Copy {{ bug.id }}">📋</button>
                 </span>
               {% endfor %}
             </div>
@@ -1097,8 +1213,12 @@
     <section id="paneDiff" class="quake-card column-panel pane-diff">
       <!-- Toolbar -->
       <div class="diff-toolbar">
-        <div class="diff-file-title" id="diffFileTitle">
-          <span>Select a file to inspect diff</span>
+        <div class="diff-file-title" id="diffFileTitle" style="display:flex;align-items:center;gap:8px;">
+          <span id="diffFileTitleText">Select a file to inspect diff</span>
+          <div id="diffFileActions" style="display:none;align-items:center;gap:6px;">
+            <button class="quake-btn quake-btn-default quake-btn-xs" onclick="copyActiveFilePath()" title="Copy file path">📋</button>
+            <a id="btnOpenVsCode" class="quake-btn quake-btn-default quake-btn-xs" onclick="openInVsCode()" title="Open in VS Code" style="text-decoration:none;cursor:pointer;">💻</a>
+          </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
           <div class="diff-stats-badge" id="diffStatsBadge" style="display:none;">
@@ -1109,6 +1229,7 @@
           <div class="diff-mode-controls">
             <button id="btnModeSbs" class="quake-btn quake-btn-gold quake-btn-sm" onclick="setDiffMode('side_by_side')">Side-by-Side</button>
             <button id="btnModeUnified" class="quake-btn quake-btn-default quake-btn-sm" onclick="setDiffMode('unified')">Unified</button>
+            <button id="btnToggleWrap" class="quake-btn quake-btn-default quake-btn-sm" onclick="toggleWordWrap()" title="Toggle Word Wrap (Shortcut: W)">Wrap: Off</button>
             <button class="quake-btn quake-btn-default quake-btn-sm" onclick="onCopySnippetClicked()" title="Copy active diff snippet">📋 Copy</button>
           </div>
         </div>
@@ -1141,6 +1262,43 @@
       </div>
       <div id="syncStatusText" style="font-size: 11px; color: var(--quake-text-dim); font-family: monospace; min-height: 16px;">
         Scanning feedback/ directory for bug reports and review comments...
+      </div>
+    </div>
+  </div>
+
+  <!-- PR SUBMIT PROGRESS MODAL (BUG-229) -->
+  <div id="prSubmitModalOverlay" class="quake-modal-overlay" style="display: none; z-index: 2000;">
+    <div class="quake-modal" style="width: 580px; max-width: 90vw; padding: 20px 24px;">
+      <div class="quake-modal-header" style="padding: 0 0 12px 0; margin-bottom: 12px; border-bottom: 1px solid var(--quake-border-mid);">
+        <div style="font-size: 14px; font-weight: bold; color: var(--quake-gold); letter-spacing: 1px; display: flex; align-items: center; gap: 8px;">
+          <span>🚀</span>
+          <span id="prSubmitModalTitle">SUBMITTING PULL REQUESTS TO GITHUB</span>
+        </div>
+        <button id="btnPrSubmitClose" class="quake-btn quake-btn-default quake-btn-icon" onclick="closePrSubmitModal()" style="display: none;" title="Close">✕</button>
+      </div>
+
+      <div style="font-size: 11px; color: var(--quake-text-muted); margin-bottom: 12px; line-height: 1.4;" id="prSubmitDescription">
+        Executing pull request submission and synchronizing remote review branches...
+      </div>
+
+      <!-- Progress bar -->
+      <div style="background: var(--quake-bg-dark); border: 1px solid var(--quake-border-light); border-radius: 3px; height: 18px; position: relative; overflow: hidden; margin-bottom: 12px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);">
+        <div id="prSubmitProgressBar" style="width: 15%; height: 100%; background: linear-gradient(90deg, #9333ea, #a855f7); transition: width 0.3s ease; box-shadow: 0 0 10px rgba(168,85,247,0.5);"></div>
+        <div id="prSubmitProgressPercent" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000;">15%</div>
+      </div>
+
+      <div id="prSubmitStatusText" style="font-size: 11px; color: var(--quake-copper); font-family: var(--font-mono); margin-bottom: 10px; font-weight: bold;">
+        Initializing submission...
+      </div>
+
+      <!-- Terminal Log Output Area -->
+      <div id="prSubmitLogOutput" style="background: #0d0703; border: 1px solid var(--quake-border-dark); border-radius: 3px; padding: 10px; max-height: 180px; overflow-y: auto; font-family: var(--font-mono); font-size: 11px; color: #d6c6b2; line-height: 1.5; white-space: pre-wrap; word-break: break-all;">
+      </div>
+
+      <div class="quake-modal-footer" style="padding: 12px 0 0 0; margin-top: 14px; border-top: 1px solid var(--quake-border-mid); justify-content: flex-end;">
+        <button id="btnPrSubmitDone" class="quake-btn quake-btn-gold quake-btn-sm" onclick="finishPrSubmitModal()" style="display: none;">
+          ✓ Done
+        </button>
       </div>
     </div>
   </div>
@@ -1231,6 +1389,10 @@
   <script>
     // State Model
     const state = {
+      repoName: "{{ session.repo_name or 'hardware' }}",
+      repoRoot: "{{ session.repo_root or '' }}",
+      repoWebUrl: "{{ session.repo_web_url or '' }}",
+      githubRepo: "{{ session.github_repo or '' }}",
       activeCommit: "{{ session.active_commit or 'working' }}",
       activeFile: null,
       diffMode: "side_by_side",
@@ -1243,7 +1405,10 @@
       panes: {
         smartlog: true,
         files: true
-      }
+      },
+      currentBranch: "{{ session.current_branch or session.active_branch or '' }}",
+      lastWorkingFingerprint: null,
+      lastCommitFingerprint: null
     };
 
     const INITIAL_SYNC_DONE = {{ session.initial_sync_done | tojson }};
@@ -1440,6 +1605,262 @@
       document.getElementById("filesHeaderTitle").textContent = commitHash === "working" ? "Working Tree Files" : `Files (${commitHash.slice(0, 7)})`;
 
       await loadFilesForActiveCommit();
+    }
+
+    function escapeHtml(str) {
+      if (typeof QuakeDiffEngine !== "undefined" && QuakeDiffEngine.escapeHtml) {
+        return QuakeDiffEngine.escapeHtml(str);
+      }
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Auto-sync working tree and smartlog commit panes (BUG-246)
+    let autoSyncTimer = null;
+    let isAutoSyncing = false;
+
+    function startAutoSync() {
+      if (autoSyncTimer) clearInterval(autoSyncTimer);
+      autoSyncTimer = setInterval(syncWorkingAndCommitsSilently, 2500);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          syncWorkingAndCommitsSilently();
+        }
+      });
+      window.addEventListener("focus", () => {
+        syncWorkingAndCommitsSilently();
+      });
+    }
+
+    async function syncWorkingAndCommitsSilently() {
+      if (isAutoSyncing || (document.hidden && document.visibilityState === "hidden")) return;
+      isAutoSyncing = true;
+      try {
+        const resp = await fetch("/api/session?type=diff");
+        if (!resp.ok) return;
+        const session = await resp.json();
+
+        // 1. Check Working Tree changes
+        const workingFiles = session.working_files || [];
+        const workingFp = JSON.stringify(workingFiles.map(f => [f.path, f.is_staged, f.is_untracked, f.is_conflicted, f.status, f.additions, f.deletions]));
+        if (state.lastWorkingFingerprint === null) {
+          state.lastWorkingFingerprint = workingFp;
+        } else if (workingFp !== state.lastWorkingFingerprint) {
+          state.lastWorkingFingerprint = workingFp;
+          state.workingFiles = workingFiles;
+          state.conflicts = session.conflicts || [];
+          if (state.activeCommit === "working") {
+            const container = document.getElementById("filesContainer");
+            if (container) renderWorkingTreeFiles(container);
+            if (state.activeFile) {
+              selectFile(state.activeFile);
+            }
+          }
+        }
+
+        // 2. Check Smartlog / Commit DAG changes
+        const nodes = session.smartlog_nodes || [];
+        const commitFp = JSON.stringify(nodes.map(n => [n.commit_hash, n.short_hash, n.subject, n.is_head, n.branches, n.tags, n.pr_number, n.pr_status, n.cr_open_count, n.cr_resolved_count]));
+        if (state.lastCommitFingerprint === null) {
+          state.lastCommitFingerprint = commitFp;
+        } else if (commitFp !== state.lastCommitFingerprint) {
+          state.lastCommitFingerprint = commitFp;
+          renderSmartlogList(nodes);
+          loadFilesForActiveCommit();
+          if (state.activeFile) {
+            selectFile(state.activeFile);
+          }
+        }
+
+        // 3. Update current branch in UI if changed
+        if (session.current_branch && session.current_branch !== state.currentBranch) {
+          state.currentBranch = session.current_branch;
+          const brBtn = document.getElementById("btnBranchDropdown");
+          if (brBtn) {
+            const label = brBtn.querySelector("span");
+            if (label) label.textContent = `🌿 ${session.current_branch}`;
+          }
+        }
+      } catch (e) {
+        // Silently ignore background polling network errors
+      } finally {
+        isAutoSyncing = false;
+      }
+    }
+
+    function renderSmartlogList(nodes) {
+      const listEl = document.getElementById("smartlogList");
+      if (!listEl) return;
+      const repoWebBase = state.repoWebUrl || (state.githubRepo ? `https://github.com/${state.githubRepo}` : `https://github.com/picklethecat1488-hue/${state.repoName}`);
+
+      let html = `
+        <!-- Working Tree Node -->
+        <div class="smartlog-node ${state.activeCommit === 'working' ? 'active' : ''}" id="node-working" onclick="selectCommit('working')">
+          <div class="node-header-row">
+            <span class="node-graph-art">@</span>
+            <span class="node-sha" style="color:var(--quake-cyan);">WORKING TREE</span>
+            <span class="node-author-date">Uncommitted</span>
+          </div>
+          <div class="node-subject">Local working tree changes &amp; staging area</div>
+        </div>
+      `;
+
+      nodes.forEach(node => {
+        const isHead = node.is_head ? "head-node" : "";
+        const isAncestorTop = node.is_ancestor_top ? "ancestor-top-node" : "";
+        const hasPr = node.pr_number ? "has-pr" : "";
+        const isActive = state.activeCommit === node.commit_hash ? "active" : "";
+        const isMerged = (node.is_merged_into_tracking || node.is_merged) ? "merged-commit" : "";
+        const isChecked = state.selectedCommits && state.selectedCommits.includes(node.commit_hash);
+
+        let prBadge = "";
+        if (node.pr_number && node.pr_url) {
+          prBadge = `
+            <a href="${node.pr_url}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="pr-highlight-badge"
+               onclick="event.stopPropagation();"
+               title="Pull Request #${node.pr_number} (Click to open in GitHub)">
+              <span class="pr-icon">⎇</span> ${escapeHtml(node.pr_status || ('PR #' + node.pr_number))}
+            </a>
+          `;
+        } else if (node.pr_number) {
+          prBadge = `
+            <span class="pr-highlight-badge pr-local-badge"
+                  onclick="event.stopPropagation(); showToast('${escapeHtml(node.pr_status || ('PR #' + node.pr_number))} has not been created on GitHub yet');"
+                  title="${escapeHtml(node.pr_status || ('PR #' + node.pr_number))} (Local branch, not submitted to GitHub)">
+              <span class="pr-icon">⎇</span> ${escapeHtml(node.pr_status || ('PR #' + node.pr_number))}
+            </span>
+          `;
+        }
+
+        let tagsHtml = "";
+        if (node.is_merged_into_tracking || node.is_merged) {
+          tagsHtml += `<span class="node-badge node-badge-merged" title="Already merged into tracking branch">✓ Merged</span>`;
+        }
+        if (node.is_ancestor_top) {
+          tagsHtml += `<span class="node-badge node-badge-ancestor" title="Top of ancestor branch (${escapeHtml(node.ancestor_name || 'main')})">📌 ${escapeHtml(node.ancestor_name || 'main')}</span>`;
+        }
+        (node.branches || []).forEach(br => {
+          const isPrBr = br.toLowerCase().includes("pr") || br.toLowerCase().includes("pull");
+          const brUrl = (isPrBr && node.pr_url) ? node.pr_url : `${repoWebBase}/tree/${br.replace('origin/', '')}`;
+          const badgeClass = (isPrBr && node.pr_url) ? "pr-tag-link" : (isPrBr ? "pr-local-badge" : "");
+          tagsHtml += `
+            <span style="display:inline-flex;align-items:center;">
+              <a href="${brUrl}"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 class="node-badge node-badge-branch ${badgeClass}"
+                 onclick="onBranchBadgeClick(event, '${escapeHtml(br)}', '${node.pr_url || ''}')"
+                 title="${isPrBr && node.pr_url ? 'Open PR in GitHub' : (isPrBr ? 'Local branch ' + escapeHtml(br) + ' (not on GitHub)' : 'View branch ' + escapeHtml(br) + ' on GitHub')}">
+                ⎇ ${escapeHtml(br)}
+              </a>
+              <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); event.preventDefault(); copyText('${escapeHtml(br)}');" title="Copy branch ${escapeHtml(br)}">📋</button>
+            </span>
+          `;
+        });
+        (node.tags || []).forEach(tag => {
+          const isPrTag = tag.toLowerCase().includes("pr") || tag.toLowerCase().includes("pull");
+          const tagUrl = (isPrTag && node.pr_url) ? node.pr_url : `${repoWebBase}/releases/tag/${tag}`;
+          const badgeClass = (isPrTag && node.pr_url) ? "pr-tag-link" : (isPrTag ? "pr-local-badge" : "");
+          tagsHtml += `
+            <a href="${tagUrl}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="node-badge node-badge-tag ${badgeClass}"
+               onclick="onBranchBadgeClick(event, '${escapeHtml(tag)}', '${node.pr_url || ''}')"
+               title="${isPrTag && node.pr_url ? 'Open PR in GitHub' : (isPrTag ? 'Local tag ' + escapeHtml(tag) + ' (not on GitHub)' : 'View tag ' + escapeHtml(tag) + ' on GitHub')}">
+              🏷 ${escapeHtml(tag)}
+            </a>
+          `;
+        });
+        if (node.pr_status && node.pr_url) {
+          tagsHtml += `
+            <a href="${node.pr_url}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="node-badge node-badge-pr pr-tag-link"
+               onclick="event.stopPropagation();"
+               title="Open PR on GitHub">
+              ⎇ ${escapeHtml(node.pr_status)}
+            </a>
+          `;
+        } else if (node.pr_status) {
+          tagsHtml += `
+            <span class="node-badge node-badge-pr pr-local-badge"
+                  onclick="event.stopPropagation(); showToast('${escapeHtml(node.pr_status)} has not been created on GitHub yet');"
+                  title="${escapeHtml(node.pr_status)} (Not yet created on GitHub)">
+              ⎇ ${escapeHtml(node.pr_status)}
+            </span>
+          `;
+        }
+        (node.bug_tags || []).forEach(bug => {
+          tagsHtml += `
+            <span style="display:inline-flex;align-items:center;">
+              <span class="node-badge node-badge-bug ${bug.status === 'RESOLVED' ? 'resolved' : ''}"
+                    onclick="event.stopPropagation(); openBug('${escapeHtml(bug.id)}');"
+                    title="${escapeHtml(bug.title)}">
+                ${escapeHtml(bug.id)}: ${escapeHtml(bug.status)}
+              </span>
+              <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${escapeHtml(bug.id)}');" title="Copy ${escapeHtml(bug.id)}">📋</button>
+            </span>
+          `;
+        });
+
+        const crReviewedClass = node.cr_reviewed ? "cr-reviewed" : "";
+        let crCountBadge = "";
+        if (node.cr_total_count && node.cr_total_count > 0) {
+          const badgeColor = node.cr_open_count > 0 ? "cr-open" : "cr-resolved";
+          crCountBadge = `<span class="cr-badge ${badgeColor}">${node.cr_open_count}/${node.cr_total_count}</span>`;
+        }
+
+        html += `
+          <div class="smartlog-node ${isHead} ${isAncestorTop} ${hasPr} ${isActive} ${isMerged}"
+               id="node-${node.short_hash}"
+               data-hash="${node.commit_hash}"
+               onclick="selectCommit('${node.commit_hash}', event)">
+            <div class="node-header-row">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <input type="checkbox"
+                       class="commit-checkbox"
+                       value="${node.commit_hash}"
+                       onclick="event.stopPropagation(); onCommitCheckChanged(event, this);"
+                       ${isChecked ? 'checked' : ''}/>
+                <span class="node-graph-art">${escapeHtml(node.graph_art || node.graph_symbol || 'o')}</span>
+                <span class="node-sha">${escapeHtml(node.short_hash)}</span>
+                <button class="copy-icon-btn copy-sha-btn" onclick="event.stopPropagation(); copyText('${node.commit_hash}');" title="Copy commit hash ${node.commit_hash}">📋</button>
+                ${prBadge}
+              </div>
+              <span class="node-author-date">${escapeHtml(node.relative_date || node.date)}</span>
+            </div>
+            <div class="node-subject">${escapeHtml(node.subject)}</div>
+            <div class="node-tags-row">${tagsHtml}</div>
+            <div class="node-actions-row">
+              <button class="quake-btn quake-btn-default quake-btn-icon jump-cr-btn ${crReviewedClass}"
+                      onclick="event.stopPropagation(); jumpToCR('${node.commit_hash}')"
+                      title="Jump to Code Review for this commit">
+                <span>🔍 CR</span>
+                ${crCountBadge}
+              </button>
+              <button class="quake-btn quake-btn-default quake-btn-icon"
+                      onclick="event.stopPropagation(); createBugForCommit('${node.commit_hash}')"
+                      title="File Bug against this commit">
+                <span>🐛 Bug</span>
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      listEl.innerHTML = html;
+      updateMergedVisibility();
+      updateSelectedCount();
     }
 
     // Load Files
@@ -1735,7 +2156,18 @@
         }
       });
 
-      document.getElementById("diffFileTitle").textContent = filePath;
+      const titleText = document.getElementById("diffFileTitleText");
+      if (titleText) {
+        titleText.textContent = filePath;
+      } else {
+        document.getElementById("diffFileTitle").textContent = filePath;
+      }
+      const fileActions = document.getElementById("diffFileActions");
+      if (fileActions) {
+        fileActions.style.display = "inline-flex";
+      }
+      updateActiveFileActions(filePath);
+
       const diffBody = document.getElementById("diffBodyContainer");
       diffBody.innerHTML = `<div style="text-align:center;padding:30px;color:var(--quake-text-muted);">Loading diff...</div>`;
 
@@ -1756,6 +2188,60 @@
       }
     }
 
+    function updateActiveFileActions(filePath) {
+      if (!filePath) return;
+      const repoRoot = state.repoRoot || "";
+      let fullPath = filePath;
+      if (repoRoot && !filePath.startsWith("/")) {
+        fullPath = repoRoot.replace(/\/+$/, "") + "/" + filePath.replace(/^\/+/, "");
+      }
+      const vscodeUrl = `vscode://file${fullPath.startsWith('/') ? '' : '/'}${fullPath}`;
+      const btnVsCode = document.getElementById("btnOpenVsCode");
+      if (btnVsCode) {
+        btnVsCode.href = vscodeUrl;
+      }
+    }
+
+    function fallbackCopy(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      showToast("Copied: " + text);
+    }
+
+    function copyActiveFilePath() {
+      const filePath = state.activeFile;
+      if (!filePath) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(filePath).then(() => {
+          showToast("Copied: " + filePath);
+        }).catch(() => {
+          fallbackCopy(filePath);
+        });
+      } else {
+        fallbackCopy(filePath);
+      }
+    }
+
+    function openInVsCode() {
+      const filePath = state.activeFile;
+      if (!filePath) return;
+      const repoRoot = state.repoRoot || "{{ session.repo_root or '' }}";
+      if (!repoRoot && !filePath.startsWith("/")) {
+        showToast("Error: Repository root is not configured");
+        return;
+      }
+      let fullPath = filePath;
+      if (repoRoot && !filePath.startsWith("/")) {
+        fullPath = repoRoot.replace(/\/+$/, "") + "/" + filePath.replace(/^\/+/, "");
+      }
+      const vscodeUrl = `vscode://file${fullPath.startsWith('/') ? '' : '/'}${fullPath}`;
+      window.location.href = vscodeUrl;
+    }
+
     // Toggle Diff Mode (Side-by-side vs Unified)
     function setDiffMode(mode) {
       state.diffMode = mode;
@@ -1765,6 +2251,32 @@
       if (state.currentDiff) {
         const diffBody = document.getElementById("diffBodyContainer");
         QuakeDiffEngine.renderDiff(diffBody, state.currentDiff, state.diffMode);
+      }
+    }
+
+    // Word Wrap Toggle (BUG-245)
+    function toggleWordWrap() {
+      const isWrapped = document.body.classList.toggle("diff-word-wrap");
+      localStorage.setItem("quake_diff_word_wrap", isWrapped ? "true" : "false");
+      updateWrapButtonState(isWrapped);
+    }
+
+    function initWordWrap() {
+      const saved = localStorage.getItem("quake_diff_word_wrap");
+      const isWrapped = saved === "true";
+      if (isWrapped) {
+        document.body.classList.add("diff-word-wrap");
+      } else {
+        document.body.classList.remove("diff-word-wrap");
+      }
+      updateWrapButtonState(isWrapped);
+    }
+
+    function updateWrapButtonState(isWrapped) {
+      const btn = document.getElementById("btnToggleWrap");
+      if (btn) {
+        btn.textContent = isWrapped ? "Wrap: On" : "Wrap: Off";
+        btn.className = isWrapped ? "quake-btn quake-btn-gold quake-btn-sm" : "quake-btn quake-btn-default quake-btn-sm";
       }
     }
 
@@ -2114,7 +2626,7 @@
           is_current: {{ 'true' if b.is_current else 'false' }},
           is_remote: {{ 'true' if b.is_remote else 'false' }},
           is_main: {{ 'true' if (b.name in ['main', 'master', 'heads/main', 'origin/main', 'origin/master', 'remotes/origin/main', 'remotes/origin/master'] or b.name.endswith('/main') or b.name.endswith('/master')) else 'false' }},
-          is_release: {{ 'true' if ('release' in b.name.lower() or 'rel/' in b.name.lower() or b.name.startswith('v') or b.name.startswith('origin/v') or b.name.startswith('remotes/origin/v') or '/v' in b.name.lower()) else 'false' }}
+          is_release: {{ 'true' if b.is_release_branch_candidate else 'false' }}
         }{% if not loop.last %},{% endif %}
       {% endfor %}
     ];
@@ -2190,6 +2702,7 @@
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="color:var(--quake-gold);">${b.is_main ? '⭐' : '🏷️'}</span>
             <span>${b.name}</span>
+            <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${escapeHtml(b.name)}');" title="Copy branch ${escapeHtml(b.name)}">📋</button>
             ${b.is_current ? '<span class="node-badge node-badge-tag" style="background:var(--quake-gold);color:#140a05;font-weight:700;">CURRENT</span>' : ''}
           </div>
           <span style="font-size:10px;color:var(--quake-text-muted);">${b.is_main ? 'Mainline' : 'Release'}</span>
@@ -2207,6 +2720,7 @@
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="color:${isPR ? 'var(--quake-purple)' : 'var(--quake-cyan)'};">${isPR ? '⎇' : '🌿'}</span>
             <span>${b.name}</span>
+            <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${escapeHtml(b.name)}');" title="Copy branch ${escapeHtml(b.name)}">📋</button>
             ${b.is_current ? '<span class="node-badge node-badge-tag" style="background:var(--quake-gold);color:#140a05;font-weight:700;">CURRENT</span>' : ''}
           </div>
           <span style="font-size:10px;color:var(--quake-text-dim);">${isPR ? 'PR Branch' : 'Feature'}</span>
@@ -2293,6 +2807,39 @@
     function updateSelectedCount() {
       const countEl = document.getElementById("selectedCount");
       if (countEl) countEl.textContent = state.selectedCommits.length;
+      const btnCreate = document.getElementById("btnCreatePR");
+      if (btnCreate) {
+        let topCommit = "";
+        if (state.selectedCommits.length > 0) {
+          topCommit = state.selectedCommits[0].substring(0, 7);
+        } else {
+          const firstUnmerged = document.querySelector(".smartlog-node:not(.merged-commit) .commit-checkbox");
+          if (firstUnmerged) topCommit = firstUnmerged.value.substring(0, 7);
+        }
+        if (topCommit) {
+          btnCreate.title = `Create Pull Request stack up to latest commit (${topCommit})`;
+        } else {
+          btnCreate.title = "Create Pull Request for current commit stack";
+        }
+      }
+    }
+
+    function selectAllCommits() {
+      const allCheckboxes = document.querySelectorAll(".commit-checkbox");
+      allCheckboxes.forEach(cb => {
+        cb.checked = true;
+      });
+      state.selectedCommits = Array.from(allCheckboxes).map(cb => cb.value);
+      updateSelectedCount();
+    }
+
+    function selectNoneCommits() {
+      const allCheckboxes = document.querySelectorAll(".commit-checkbox");
+      allCheckboxes.forEach(cb => {
+        cb.checked = false;
+      });
+      state.selectedCommits = [];
+      updateSelectedCount();
     }
 
     // Jump to CR for specific commit (BUG-199)
@@ -2305,9 +2852,9 @@
           body: JSON.stringify({ commits: [commitHash] })
         });
         const res = await resp.json();
-        window.open(res.url, "hardware_code_review");
+        window.open(res.url, `${state.repoName || 'repo'}_code_review`);
       } catch (err) {
-        window.open(`/review?revisions=${encodeURIComponent(commitHash)}`, "hardware_code_review");
+        window.open(`/review?revisions=${encodeURIComponent(commitHash)}`, `${state.repoName || 'repo'}_code_review`);
       }
     }
 
@@ -2320,10 +2867,10 @@
           body: JSON.stringify({ commits: commits })
         });
         const res = await resp.json();
-        window.open(res.url, "hardware_code_review");
+        window.open(res.url, `${state.repoName || 'repo'}_code_review`);
       } catch (err) {
         const revStr = commits.join(",");
-        window.open(`/review?revisions=${encodeURIComponent(revStr)}`, "hardware_code_review");
+        window.open(`/review?revisions=${encodeURIComponent(revStr)}`, `${state.repoName || 'repo'}_code_review`);
       }
     }
 
@@ -2335,9 +2882,9 @@
           body: JSON.stringify({ bug_id: bugId })
         });
         const res = await resp.json();
-        window.open(res.url, "hardware_bug_tracker");
+        window.open(res.url, `${state.repoName || 'repo'}_bug_tracker`);
       } catch (err) {
-        window.open(`/bugs#BUG-${bugId}`, "hardware_bug_tracker");
+        window.open(`/bugs#BUG-${bugId}`, `${state.repoName || 'repo'}_bug_tracker`);
       }
     }
 
@@ -2349,9 +2896,9 @@
           body: JSON.stringify({})
         });
         const res = await resp.json();
-        window.open(res.url, "hardware_bug_tracker");
+        window.open(res.url, `${state.repoName || 'repo'}_bug_tracker`);
       } catch (err) {
-        window.open("/bugs", "hardware_bug_tracker");
+        window.open("/bugs", `${state.repoName || 'repo'}_bug_tracker`);
       }
     }
 
@@ -2363,9 +2910,9 @@
           body: JSON.stringify({ commit: commitHash })
         });
         const res = await resp.json();
-        window.open(res.url, "hardware_bug_tracker");
+        window.open(res.url, `${state.repoName || 'repo'}_bug_tracker`);
       } catch (err) {
-        window.open(`/bugs#new?commit=${encodeURIComponent(commitHash)}`, "hardware_bug_tracker");
+        window.open(`/bugs#new?commit=${encodeURIComponent(commitHash)}`, `${state.repoName || 'repo'}_bug_tracker`);
       }
     }
 
@@ -2424,13 +2971,14 @@
       }
       const match = branchName.match(/(?:^|\/)(?:pr|pull)[/-]?(\d+)\b/i);
       const isRemote = branchName.startsWith("origin/") || branchName.startsWith("remotes/");
+      const repoBase = state.repoWebUrl || (state.githubRepo ? `https://github.com/${state.githubRepo}` : `https://github.com/picklethecat1488-hue/${state.repoName || 'hardware'}`);
       if (match && isRemote) {
-        window.open(`https://github.com/picklethecat1488-hue/hardware/pull/${match[1]}`, "_blank");
+        window.open(`${repoBase}/pull/${match[1]}`, "_blank");
         return;
       }
       if (isRemote) {
         const cleaned = branchName.replace(/^(?:remotes\/)?origin\//i, "");
-        window.open(`https://github.com/picklethecat1488-hue/hardware/tree/${cleaned}`, "_blank");
+        window.open(`${repoBase}/tree/${cleaned}`, "_blank");
       } else if (match) {
         showToast(`PR #${match[1]} (branch "${branchName}") has not been created on GitHub yet.`);
       } else {
@@ -2438,28 +2986,152 @@
       }
     }
 
+    let prSubmitInterval = null;
+
+    function openPrSubmitModal(commitCount, topCommit = "") {
+      const overlay = document.getElementById("prSubmitModalOverlay");
+      if (!overlay) return;
+      overlay.style.display = "flex";
+      const pBar = document.getElementById("prSubmitProgressBar");
+      const pText = document.getElementById("prSubmitProgressPercent");
+      const sText = document.getElementById("prSubmitStatusText");
+      const lOut = document.getElementById("prSubmitLogOutput");
+      const btnDone = document.getElementById("btnPrSubmitDone");
+      const btnClose = document.getElementById("btnPrSubmitClose");
+
+      if (pBar) {
+        pBar.style.width = "15%";
+        pBar.style.background = "linear-gradient(90deg, #9333ea, #a855f7)";
+      }
+      if (pText) pText.textContent = "15%";
+      if (sText) {
+        sText.textContent = topCommit
+          ? `Preparing submission for ${commitCount} commit(s) up to ${topCommit}...`
+          : `Preparing submission for ${commitCount} commit(s)...`;
+      }
+      if (lOut) lOut.textContent = `$ sl pr submit --config github.max-prs-to-create=-1\nInitializing stack submission...`;
+      if (btnDone) btnDone.style.display = "none";
+      if (btnClose) btnClose.style.display = "none";
+
+      let progress = 15;
+      clearInterval(prSubmitInterval);
+      prSubmitInterval = setInterval(() => {
+        if (progress < 85) {
+          progress += Math.floor(Math.random() * 8) + 3;
+          if (progress > 85) progress = 85;
+          if (pBar) pBar.style.width = `${progress}%`;
+          if (pText) pText.textContent = `${progress}%`;
+          if (sText) {
+            if (progress > 60) sText.textContent = "Creating and synchronizing pull requests on GitHub...";
+            else if (progress > 30) sText.textContent = "Pushing commit stack to remote repository...";
+          }
+        }
+      }, 300);
+    }
+
+    function closePrSubmitModal() {
+      clearInterval(prSubmitInterval);
+      const overlay = document.getElementById("prSubmitModalOverlay");
+      if (overlay) overlay.style.display = "none";
+    }
+
+    function finishPrSubmitModal() {
+      closePrSubmitModal();
+      location.reload();
+    }
+
     async function onCreatePR() {
-      if (!state.selectedCommits || state.selectedCommits.length === 0) {
-        alert("Please select one or more commits using the checkboxes to create a PR.");
+      let targetCommits = state.selectedCommits;
+      if (!targetCommits || targetCommits.length === 0) {
+        // BUG-228: If nothing is selected when clicking 'Create PR', default behavior is to create PRs for the whole stack of committed changes
+        const unmergedCheckboxes = Array.from(document.querySelectorAll(".smartlog-node:not(.merged-commit) .commit-checkbox"));
+        const eligibleCheckboxes = unmergedCheckboxes.filter(cb => {
+          const node = cb.closest(".smartlog-node");
+          return node && !node.classList.contains("has-pr");
+        });
+        const targets = eligibleCheckboxes.length > 0 ? eligibleCheckboxes : unmergedCheckboxes;
+        targetCommits = targets.map(cb => cb.value);
+      }
+
+      if (!targetCommits || targetCommits.length === 0) {
+        alert("No committed changes in current stack to create or submit PRs.");
         return;
       }
 
-      showToast(`Creating PR for ${state.selectedCommits.length} commit(s)...`);
+      const topCommit = targetCommits.length > 0 ? targetCommits[0].substring(0, 7) : "";
+      openPrSubmitModal(targetCommits.length, topCommit);
+
       try {
         const resp = await fetch("/api/pr/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ commits: state.selectedCommits })
+          body: JSON.stringify({ commits: targetCommits })
         });
         const res = await resp.json();
-        if (res.status === "ok") {
-          showToast(`✓ Created ${res.created.length} PR(s) successfully!`);
-          setTimeout(() => location.reload(), 600);
+        clearInterval(prSubmitInterval);
+
+        const pBar = document.getElementById("prSubmitProgressBar");
+        const pText = document.getElementById("prSubmitProgressPercent");
+        const sText = document.getElementById("prSubmitStatusText");
+        const lOut = document.getElementById("prSubmitLogOutput");
+        const btnDone = document.getElementById("btnPrSubmitDone");
+        const btnClose = document.getElementById("btnPrSubmitClose");
+
+        if (resp.ok && res.status === "ok") {
+          if (pBar) {
+            pBar.style.width = "100%";
+            pBar.style.background = "linear-gradient(90deg, #16a34a, #22c55e)";
+          }
+          if (pText) pText.textContent = "100%";
+          const count = (res.created && res.created.length) || targetCommits.length;
+          if (sText) sText.textContent = `✓ Successfully submitted ${count} PR(s) to GitHub!`;
+
+          let logText = `$ sl pr submit --config github.max-prs-to-create=-1\n`;
+          if (res.logs && Array.isArray(res.logs)) {
+            logText += res.logs.join("\n");
+          } else if (res.created) {
+            res.created.forEach(p => {
+              logText += `created new pull request: ${p.pr_url || ('#' + p.pr_number)}\n`;
+            });
+          }
+          if (lOut) {
+            lOut.textContent = logText;
+            lOut.scrollTop = lOut.scrollHeight;
+          }
+          if (btnDone) btnDone.style.display = "inline-flex";
+          if (btnClose) btnClose.style.display = "inline-flex";
         } else {
-          alert(`Error creating PR: ${res.error}`);
+          if (pBar) {
+            pBar.style.width = "100%";
+            pBar.style.background = "linear-gradient(90deg, #b91c1c, #ef4444)";
+          }
+          if (pText) pText.textContent = "ERROR";
+          if (sText) sText.textContent = `✗ Submission Error: ${res.error || 'Failed to submit PRs'}`;
+          if (lOut) {
+            lOut.textContent += `\n\nERROR: ${res.error || 'Unknown error occurred during submission'}`;
+            lOut.scrollTop = lOut.scrollHeight;
+          }
+          if (btnClose) btnClose.style.display = "inline-flex";
         }
       } catch (err) {
-        alert(`Error communicating with server: ${err}`);
+        clearInterval(prSubmitInterval);
+        const pBar = document.getElementById("prSubmitProgressBar");
+        const pText = document.getElementById("prSubmitProgressPercent");
+        const sText = document.getElementById("prSubmitStatusText");
+        const lOut = document.getElementById("prSubmitLogOutput");
+        const btnClose = document.getElementById("btnPrSubmitClose");
+
+        if (pBar) {
+          pBar.style.width = "100%";
+          pBar.style.background = "linear-gradient(90deg, #b91c1c, #ef4444)";
+        }
+        if (pText) pText.textContent = "ERROR";
+        if (sText) sText.textContent = `✗ Network Error: ${err}`;
+        if (lOut) {
+          lOut.textContent += `\n\nNETWORK ERROR: ${err}`;
+          lOut.scrollTop = lOut.scrollHeight;
+        }
+        if (btnClose) btnClose.style.display = "inline-flex";
       }
     }
 
@@ -2530,11 +3202,14 @@
         togglePane("smartlog");
       } else if (e.key === "]") {
         togglePane("files");
+      } else if (e.key.toLowerCase() === "w") {
+        toggleWordWrap();
       }
     });
 
     // Initialize on load
     window.addEventListener("DOMContentLoaded", () => {
+      initWordWrap();
       initPanelResizers();
       updateMergedVisibility();
       if (!INITIAL_SYNC_DONE) {
@@ -2542,6 +3217,7 @@
       }
       updateSelectedCount();
       loadFilesForActiveCommit();
+      startAutoSync();
     });
   </script>
 </body>

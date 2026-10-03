@@ -5904,83 +5904,330 @@ footprints:
   MOD-BLE-PCB-ANT:
     dimensions:
     - 10.0
-    - 14.0
-    - 2.2
+    - 15.0
+    - 2.23
     pins:
+    - name: RED
+      number: '1'
+      label: RED
+      position:
+      - -4.125
+      - 4.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.15
+      - 0.70
+    - name: IO_2
+      number: '2'
+      label: IO_2
+      position:
+      - -4.125
+      - 3.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.15
+      - 0.70
+    - name: IO_3
+      number: '3'
+      label: IO_3
+      position:
+      - -4.125
+      - 2.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.15
+      - 0.70
+    - name: IO_4
+      number: '4'
+      label: IO_4
+      position:
+      - -4.125
+      - 1.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.15
+      - 0.70
+    - name: IO_5
+      number: '5'
+      label: IO_5
+      position:
+      - -4.125
+      - 0.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.15
+      - 0.70
     - name: GND
+      number: '6'
       label: GND
       position:
-      - -8.0
-      - 0.0
+      - -2.5
+      - 6.25
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.70
+      - 1.15
+    - name: GREEN
+      number: '7'
+      label: GREEN
+      position:
+      - -4.125
+      - -1.0
       side: left
       pad_type: smd
       pad_shape: roundrect
       pad_size_mm:
-      - 1.2
-      - 1.2
+      - 1.15
+      - 0.70
+    - name: BLUE
+      number: '8'
+      label: BLUE
+      position:
+      - -4.125
+      - -2.0
+      side: left
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.15
+      - 0.70
     - name: 3V3
+      number: '9'
       label: 3V3
       position:
-      - -4.0
-      - 0.0
+      - -4.125
+      - -3.0
       side: left
       pad_type: smd
       pad_shape: roundrect
       pad_size_mm:
-      - 1.2
-      - 1.2
-    - name: VLOAD_SW
-      label: VLOAD_SW
+      - 1.15
+      - 0.70
+    - name: VCC
+      number: '10'
+      label: VCC
       position:
-      - -6.0
-      - 0.0
+      - -4.125
+      - -4.0
       side: left
       pad_type: smd
       pad_shape: roundrect
       pad_size_mm:
-      - 1.2
-      - 1.2
+      - 1.15
+      - 0.70
+    - name: SWDCLK
+      number: '11'
+      label: SWDCLK
+      position:
+      - -1.5
+      - 6.25
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.70
+      - 1.15
+    - name: GND_12
+      number: '12'
+      label: GND
+      position:
+      - -0.5
+      - 6.25
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.70
+      - 1.15
+    - name: SWITCH_2
+      number: '18'
+      label: SWITCH_2
+      position:
+      - 0.5
+      - 6.25
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.70
+      - 1.15
+    - name: SWDIO
+      number: '15'
+      label: SWDIO
+      position:
+      - 1.5
+      - 6.25
+      side: top
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.70
+      - 1.15
+    - name: RESET_N
+      number: '19'
+      label: RESET_N
+      position:
+      - -2.0
+      - -4.0
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.70
+      - 1.15
+    - name: RTS
+      number: '20'
+      label: RTS
+      position:
+      - -1.0
+      - -4.0
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.70
+      - 1.15
+    - name: CTS
+      number: '21'
+      label: CTS
+      position:
+      - 0.0
+      - -4.0
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.70
+      - 1.15
+    - name: TXD
+      number: '22'
+      label: TXD
+      position:
+      - 1.0
+      - -4.0
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 0.70
+      - 1.15
     - name: RXD
+      number: '23'
       label: RXD
       position:
       - 2.0
-      - 0.0
-      side: right
+      - -4.0
+      side: bottom
       pad_type: smd
       pad_shape: roundrect
       pad_size_mm:
-      - 1.2
-      - 1.2
-    - name: RTS
-      label: RTS
+      - 0.70
+      - 1.15
+    - name: IO_24
+      number: '24'
+      label: IO_24
       position:
+      - 4.125
       - 4.0
-      - 0.0
       side: right
       pad_type: smd
       pad_shape: roundrect
       pad_size_mm:
-      - 1.2
-      - 1.2
-    - name: TXD
-      label: TXD
+      - 1.15
+      - 0.70
+    - name: IO_25
+      number: '25'
+      label: IO_25
       position:
-      - 6.0
-      - 0.0
+      - 4.125
+      - 3.0
       side: right
       pad_type: smd
       pad_shape: roundrect
       pad_size_mm:
-      - 1.2
-      - 1.2
-    - name: CTS
-      label: CTS
+      - 1.15
+      - 0.70
+    - name: GND_26
+      number: '26'
+      label: GND
       position:
-      - 8.0
+      - 4.125
+      - 2.0
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.15
+      - 0.70
+    - name: IO_27
+      number: '27'
+      label: IO_27
+      position:
+      - 4.125
+      - 1.0
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.15
+      - 0.70
+    - name: NFC1
+      number: '28'
+      label: NFC1
+      position:
+      - 4.125
       - 0.0
       side: right
       pad_type: smd
       pad_shape: roundrect
       pad_size_mm:
-      - 1.2
-      - 1.2
+      - 1.15
+      - 0.70
+    - name: NFC2
+      number: '29'
+      label: NFC2
+      position:
+      - 4.125
+      - -1.0
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.15
+      - 0.70
+    - name: GND_30
+      number: '30'
+      label: GND
+      position:
+      - 4.125
+      - -2.0
+      side: right
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.15
+      - 0.70
+    - name: EGP
+      number: '53'
+      label: GND
+      position:
+      - 0.0
+      - 1.0
+      side: bottom
+      pad_type: smd
+      pad_shape: roundrect
+      pad_size_mm:
+      - 1.5
+      - 1.5

@@ -1,6 +1,7 @@
 """Design rule checking (DRC) engine for high-speed differential signals, stackup impedance, and flex rules."""
 
 import math
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import List, Optional, Tuple, Dict, Any, Union
@@ -15,6 +16,7 @@ from model.pcb import (
     SchematicLayoutModel,
 )
 from provider.geometry_utils import point_in_polygon
+from provider.schematic import GROUND_NET_NAMES, POWER_NET_NAMES
 
 _point_in_polygon = point_in_polygon
 
@@ -187,6 +189,7 @@ class DRCRuleName(StrEnum):
     SCHEMATIC_HEADER_COLLISION = "SCHEMATIC_HEADER_COLLISION"
     SCHEMATIC_UNCONNECTED_COMPONENT = "SCHEMATIC_UNCONNECTED_COMPONENT"
     SCHEMATIC_WIRE_COLLINEAR_OVERLAP = "SCHEMATIC_WIRE_COLLINEAR_OVERLAP"
+    SCHEMATIC_DISCONNECTED_PASSIVE = "SCHEMATIC_DISCONNECTED_PASSIVE"
 
 
 @dataclass
@@ -1195,7 +1198,7 @@ class PCBDesignRulesChecker:
         for fp in getattr(wiring, "footprints", []):
             for p in getattr(fp, "pins", []):
                 expected_signal = getattr(p, "signal_name", None)
-                if not expected_signal:
+                if not expected_signal or expected_signal.upper() in ("NC", "NONE", "UNCONNECTED", "RESERVED"):
                     continue
                 canonical_pin = getattr(p, "number", None) or getattr(p, "pin_name", None) or p.name
                 connected_nets = set(pin_to_nets.get((fp.name, canonical_pin), []))
@@ -2347,10 +2350,15 @@ class PCBDesignRulesChecker:
                     orig_fp = footprints_map[c]
                     if sheet.pin_breakouts and c in sheet.pin_breakouts:
                         allowed_pins = set(sheet.pin_breakouts[c])
+                        orig_pin_names = {p.name for p in orig_fp.pins}
                         matched_pins = [
                             p
                             for p in orig_fp.pins
-                            if p.name in allowed_pins or getattr(p, "label", None) in allowed_pins
+                            if p.name in allowed_pins
+                            or (
+                                getattr(p, "label", None) in allowed_pins
+                                and getattr(p, "label", None) not in orig_pin_names
+                            )
                         ]
                         sheet_fps.append(orig_fp.model_copy(update={"pins": matched_pins}))
                     else:
@@ -2358,6 +2366,8 @@ class PCBDesignRulesChecker:
 
             # 3a. Dangling component check
             for fp in sheet_fps:
+                if getattr(fp, "unconnected", False) or getattr(fp, "dnp", False):
+                    continue
                 connected_pins = [p for p in fp.pins if (fp.name, p.name) in pin_to_net]
                 if not connected_pins:
                     violations.add_error(
@@ -2374,6 +2384,8 @@ class PCBDesignRulesChecker:
         computed_wire_segments: Dict[
             int, Tuple[List[Tuple[float, float, float, str]], List[Tuple[float, float, float, str]]]
         ] = {}
+        computed_text_boxes: Dict[int, List[Tuple[float, float, float, float, str, str]]] = {}
+        computed_passive_taps: Dict[int, List[Tuple[Any, str, Tuple[float, float]]]] = {}
         if (
             self.config
             and getattr(self.config, "schematic_sheets", None)
@@ -2386,6 +2398,7 @@ class PCBDesignRulesChecker:
             computed_symbol_boxes = diag.compute_symbol_bounding_boxes()
             computed_wire_segments = diag.compute_sheet_wire_segments()
             computed_text_boxes = diag.compute_text_bounding_boxes()
+            computed_passive_taps = diag.compute_passive_tap_points()
 
         for sheet_idx, sheet in enumerate(self.config.schematic_sheets):
             boxes = computed_symbol_boxes.get(sheet_idx + 1, [])
@@ -2522,8 +2535,72 @@ class PCBDesignRulesChecker:
                         location=(t[0], t[1], 0.0),
                     )
 
+            # 3h. Vertical passive connection check (SCHEMATIC_DISCONNECTED_PASSIVE)
+            sheet_taps = computed_passive_taps.get(sheet_idx + 1, [])
+            for fp, sig_net, (x_pull, y_base) in sheet_taps:
+                is_connected = False
+                for s in h_segs:
+                    if s[3] == sig_net:
+                        x_min = min(s[0], s[1])
+                        x_max = max(s[0], s[1])
+                        if abs(s[2] - y_base) < 0.2 and (x_min - 0.2 <= x_pull <= x_max + 0.2):
+                            is_connected = True
+                            break
+                if not is_connected:
+                    for s in v_segs:
+                        if s[3] == sig_net:
+                            y_min = min(s[1], s[2])
+                            y_max = max(s[1], s[2])
+                            if abs(s[0] - x_pull) < 0.2 and (y_min - 0.2 <= y_base <= y_max + 0.2):
+                                is_connected = True
+                                break
+                if not is_connected:
+                    violations.add_error(
+                        rule_name=DRCRuleName.SCHEMATIC_DISCONNECTED_PASSIVE,
+                        net_or_zone=f"{fp.name} ({sig_net})",
+                        description=(
+                            f"Schematic passive '{fp.name}' on sheet {sheet_idx + 1} ('{sheet.title}') "
+                            f"is not connected to net '{sig_net}': tap point ({x_pull:.1f}, {y_base:.1f}) "
+                            f"does not lie on any wire segment of '{sig_net}'"
+                        ),
+                        location=(x_pull, y_base, 0.0),
+                    )
+
+            # 3i. Multi-component on-sheet net connection check (SCHEMATIC_UNCONNECTED_PIN)
+            # If two or more components displayed on the same sheet share a non-power/non-ground net,
+            # there must be schematic wire segments on the sheet routing the connection.
+            sheet_wired_nets = {s[3] for s in h_segs} | {s[3] for s in v_segs}
+            sheet_sig_nets: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
+            for fp_name in sheet.components:
+                fp_obj = footprints_map.get(fp_name)
+                if not fp_obj:
+                    continue
+                layout_grid = getattr(sheet.layout, "grid_positions", {}) if sheet.layout else {}
+                if fp_obj.name in (layout_grid or {}):
+                    has_breakout = bool(sheet.pin_breakouts and fp_obj.name in sheet.pin_breakouts)
+                    allowed_pins = sheet.pin_breakouts[fp_obj.name] if has_breakout else [p.name for p in fp_obj.pins]
+                    for p in fp_obj.pins:
+                        if p.name in allowed_pins:
+                            net_n = pin_to_net.get((fp_obj.name, p.name))
+                            if net_n and net_n.upper() not in GROUND_NET_NAMES and net_n.upper() not in POWER_NET_NAMES:
+                                sheet_sig_nets[net_n].append((fp_obj.name, p.name))
+
+            for net_n, pins_on_sheet in sheet_sig_nets.items():
+                if len(pins_on_sheet) >= 2 and net_n not in sheet_wired_nets:
+                    pin_list_str = ", ".join(f"{c}.{p}" for c, p in pins_on_sheet)
+                    violations.add_error(
+                        rule_name=DRCRuleName.SCHEMATIC_UNCONNECTED_PIN,
+                        net_or_zone=net_n,
+                        description=(
+                            f"Net '{net_n}' connects multiple components on sheet {sheet_idx + 1} ('{sheet.title}') "
+                            f"({pin_list_str}), but has no schematic wire segments routing the connection on this sheet"
+                        ),
+                    )
+
         # 4. Check that all components in the design have connected pins (BUG-088)
         for fp_name, fp in footprints_map.items():
+            if getattr(fp, "unconnected", False) or getattr(fp, "dnp", False):
+                continue
             connected_pins = [p for p in fp.pins if (fp.name, p.name) in pin_to_net]
             if not connected_pins:
                 violations.add_error(

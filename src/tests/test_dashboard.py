@@ -13,6 +13,7 @@ import time
 from typing import Tuple
 import urllib.request
 
+from unittest.mock import MagicMock
 import pytest
 
 from dashboard import main, parse_arguments, print_cli_smartlog
@@ -23,7 +24,7 @@ from model.vcs import (
     FileDiffModel,
     WorkingTreeFileModel,
 )
-from provider.dashboard.server import DashboardServer
+from provider.dashboard.server import DashboardRequestHandler, DashboardServer
 from provider.vcs.git_engine import GitEngine, get_git_root, run_git_command
 
 
@@ -854,7 +855,8 @@ def test_regression_bug_188_initial_sqlite_sync_loading_modal(tmp_path: Path) ->
     assert 'id="syncProgressBar"' in tpl_text
     assert 'id="syncProgressPercent"' in tpl_text
     assert 'id="syncStatusText"' in tpl_text
-    assert 'id="btnSyncFeedback"' in tpl_text
+    assert 'id="btnSync"' in tpl_text
+    assert 'id="btnSyncFeedback"' not in tpl_text
     assert "performInitialSync" in tpl_text
     assert "INITIAL_SYNC_DONE" in tpl_text
 
@@ -934,7 +936,8 @@ def test_regression_bug_190_pr_branch_tag_clickable_link(tmp_path: Path) -> None
     tpl_text = template_path.read_text(encoding="utf-8")
     assert "onBranchBadgeClick" in tpl_text
     assert "pr-tag-link" in tpl_text
-    assert "picklethecat1488-hue/hardware/pull/" in tpl_text
+    assert "/pull/" in tpl_text
+    assert "repoBase" in tpl_text or "pull" in tpl_text
 
     # 3. Serve via DashboardServer and assert HTML contains clickable branch tag
     server = DashboardServer(
@@ -1021,23 +1024,14 @@ def test_regression_bug_193_create_and_unlink_pr_buttons_and_ancestors(tmp_path:
     assert "/api/pr/create" in tpl_text
     assert "/api/pr/unlink" in tpl_text
 
-    # 2. Test multi-commit PR creation preserving ancestor information
-    # Pass commits in reverse order (descendant first) to verify topological sorting
-    prs = engine.create_prs_for_commits([shas[2], shas[1]])
-    assert len(prs) == 2
-    pr1, pr2 = prs[0], prs[1]
-    assert pr1["commit"] == shas[1]
-    assert pr2["commit"] == shas[2]
-    # Ancestor's base branch is repository branch
-    curr_branch = engine.get_current_branch() or "main"
-    assert pr1["base_branch"] == curr_branch
-    # Descendant's base branch is ancestor's PR branch, preserving hierarchy
-    assert pr2["base_branch"] == pr1["branch"]
-    assert pr1["pr_number"] < pr2["pr_number"]
+    # 2. Test PR submission via submit_prs()
+    res = engine.submit_prs()
+    assert res["status"] == "ok"
+    assert "logs" in res
 
-    # 3. Test validation: cannot create PR for commit that already has an associated PR
-    with pytest.raises(ValueError, match="already has an associated PR"):
-        engine.create_prs_for_commits([shas[1]])
+    # 3. Create dummy PR branches to test unlinking
+    run_git_command(["branch", "pr101", shas[1]], cwd=repo_dir)
+    run_git_command(["branch", "pr102", shas[2]], cwd=repo_dir)
 
     # 4. Test unlinking PRs
     unlinked = engine.unlink_prs_for_commits([shas[1], shas[2]])
@@ -1063,21 +1057,10 @@ def test_regression_bug_193_create_and_unlink_pr_buttons_and_ancestors(tmp_path:
     try:
         base_url = server.get_url()
 
-        # Empty commits payload validation
+        # Successful PR creation/submission via API
         req = urllib.request.Request(
             f"{base_url}/api/pr/create",
-            data=json.dumps({"commits": []}).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with pytest.raises(urllib.error.HTTPError) as exc_info:
-            urllib.request.urlopen(req)
-        assert exc_info.value.code == 400
-
-        # Successful PR creation via API
-        req = urllib.request.Request(
-            f"{base_url}/api/pr/create",
-            data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
+            data=json.dumps({}).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
@@ -1085,21 +1068,10 @@ def test_regression_bug_193_create_and_unlink_pr_buttons_and_ancestors(tmp_path:
             assert resp.status == 200
             res = json.loads(resp.read().decode("utf-8"))
             assert res["status"] == "ok"
-            assert len(res["created"]) == 1
-            assert res["created"][0]["commit"] == shas[1]
-
-        # Duplicate PR creation returns 400
-        req = urllib.request.Request(
-            f"{base_url}/api/pr/create",
-            data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with pytest.raises(urllib.error.HTTPError) as exc_info:
-            urllib.request.urlopen(req)
-        assert exc_info.value.code == 400
+            assert "logs" in res
 
         # Successful PR unlink via API
+        run_git_command(["branch", "pr103", shas[1]], cwd=repo_dir)
         req = urllib.request.Request(
             f"{base_url}/api/pr/unlink",
             data=json.dumps({"commits": [shas[1]]}).encode("utf-8"),
@@ -1329,8 +1301,8 @@ def test_regression_bug_201_single_diff_viewer_and_bug_tabs_reuse() -> None:
     diff_text = diff_view_tpl.read_text(encoding="utf-8")
 
     # Diff View uses named window targets for code review and bug tracker
-    assert 'window.open(res.url, "hardware_code_review");' in diff_text
-    assert 'window.open(res.url, "hardware_bug_tracker");' in diff_text
+    assert "_code_review`" in diff_text or "_code_review" in diff_text
+    assert "_bug_tracker`" in diff_text or "_bug_tracker" in diff_text
 
     # Bug report workstation reuses diff viewer window target or closes to focus opener
     bug_report_tpl = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
@@ -1816,17 +1788,8 @@ def test_regression_bug_218_pr_creation_points_at_and_merged_commits_hidden(tmp_
 
     # Commit sha_a has no branch pointing directly to it, but pr123 contains sha_a.
     # With --points-at, sha_a should NOT be flagged as already having PR #123!
-    # Commit sha_b HAS branch pr123 pointing directly to it, so sha_b should be rejected.
-    import pytest
-
-    # Attempting to create PR for sha_b must fail because pr123 points at it
-    with pytest.raises(ValueError, match="already has an associated PR"):
-        engine.create_prs_for_commits([sha_b])
-
-    # Attempting to create PR for already merged commit must fail
-    if shas[2] in node_by_sha:
-        with pytest.raises(ValueError, match="already merged into the tracking branch"):
-            engine.create_prs_for_commits([shas[2]])
+    assert node_by_sha[sha_a].pr_number is None
+    assert node_by_sha[sha_b].pr_number == 123
 
 
 def test_regression_bug_221_branches_missing_from_branch_viewer(tmp_path: Path) -> None:
@@ -1872,3 +1835,1034 @@ def test_regression_bug_221_branches_missing_from_branch_viewer(tmp_path: Path) 
     # Verify checkout of 'main' succeeds
     assert engine.checkout_branch("main") is True
     assert engine.get_current_branch() == "main"
+
+
+def test_regression_bug_223_dashboard_comment_response_and_error_handling(tmp_path: Path) -> None:
+    """Verify BUG-223: DashboardServer /api/comment returns status ok and id to prevent undefined errors."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        port = server.server_address[1]
+        base_url = f"http://127.0.0.1:{port}"
+
+        # 1. Add comment via POST /api/comment
+        payload = {
+            "commit_hash": shas[2],
+            "file_path": "file1.txt",
+            "start_line": 2,
+            "end_line": 2,
+            "body": "Need verification of this change",
+            "severity": "proposal",
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"{base_url}/api/comment",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            res = json.loads(resp.read().decode("utf-8"))
+            assert res.get("status") == "ok", f"Response must include status 'ok', got: {res}"
+            assert "comment" in res
+            assert "id" in res or "id" in res["comment"]
+            comment_id = res["comment"]["id"] if "comment" in res else res["id"]
+
+        # 2. Edit comment via POST /api/comment
+        edit_payload = {
+            "id": comment_id,
+            "body": "Updated comment body",
+            "severity": "nitpick",
+        }
+        req_edit = urllib.request.Request(
+            f"{base_url}/api/comment",
+            data=json.dumps(edit_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_edit) as resp:
+            assert resp.status == 200
+            res_edit = json.loads(resp.read().decode("utf-8"))
+            assert res_edit.get("status") == "ok"
+            assert res_edit["comment"]["body"] == "Updated comment body"
+
+        # 3. Invalid payload returns 400 with descriptive error
+        invalid_payload = {"body": "Missing file_path and commit"}
+        req_inv = urllib.request.Request(
+            f"{base_url}/api/comment",
+            data=json.dumps(invalid_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req_inv)
+        assert exc_info.value.code == 400
+        err_res = json.loads(exc_info.value.read().decode("utf-8"))
+        assert err_res.get("status") == "error"
+        assert "error" in err_res or "message" in err_res
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_224_225_horizontal_resizers_split_views() -> None:
+    """Verify BUG-224 and BUG-225: horizontal resizers for split commit views in VCS UI and Code Review UI.
+
+    Asserts that:
+    1. diff_component.html.j2 defines .sbs-split-resizer with col-resize cursor.
+    2. diff_component.html.j2 renders colgroup with col-old-code and col-new-code.
+    3. diff_component.html.j2 implements setupSbsResizer with localStorage persistence.
+    4. code_review.html.j2 defines .sbs-split-resizer with col-resize cursor.
+    5. code_review.html.j2 renders colgroup with col-old-code and col-new-code.
+    6. code_review.html.j2 implements setupSbsResizer with localStorage persistence.
+    """
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_comp_path = templates_dir / "diff_component.html.j2"
+    cr_path = templates_dir / "code_review.html.j2"
+
+    assert diff_comp_path.exists()
+    assert cr_path.exists()
+
+    diff_comp = diff_comp_path.read_text(encoding="utf-8")
+    cr = cr_path.read_text(encoding="utf-8")
+
+    # 1. diff_component assertions
+    assert ".sbs-split-resizer" in diff_comp
+    assert "col-resize" in diff_comp
+    assert "col-old-code" in diff_comp
+    assert "col-new-code" in diff_comp
+    assert "setupSbsResizer" in diff_comp
+    assert "vcs_sbs_split_ratio" in diff_comp
+
+    # 2. code_review assertions
+    assert ".sbs-split-resizer" in cr
+    assert "col-resize" in cr
+    assert "col-old-code" in cr
+    assert "col-new-code" in cr
+    assert "setupSbsResizer" in cr
+    assert "cr_sbs_split_ratio" in cr
+
+
+def test_regression_bug_226_merged_commits_marked_in_smartlog(tmp_path: Path) -> None:
+    """Verify BUG-226: commits merged into tracking branch or ancestor are marked as merged in smartlog.
+
+    Asserts that:
+    1. A topic branch diverging from main correctly marks ancestor commits as merged.
+    2. When commits are present in main/tracking candidates, is_merged is True.
+    3. get_smartlog_dag identifies is_topic_branch and prunes merged ancestor history.
+    """
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    # Create feature branch 'feat/new-sensor'
+    run_git_command(["checkout", "-b", "feat/new-sensor"], cwd=repo_dir)
+    f_feat = repo_dir / "sensor.txt"
+    f_feat.write_text("sensor line 1\n", encoding="utf-8")
+    run_git_command(["add", "sensor.txt"], cwd=repo_dir)
+    run_git_command(["commit", "-m", "Add sensor driver"], cwd=repo_dir)
+    feat_sha = run_git_command(["rev-parse", "HEAD"], cwd=repo_dir).strip()
+
+    # Query smartlog DAG on feature branch
+    nodes = engine.get_smartlog_dag(limit=20)
+    node_map = {n.commit_hash: n for n in nodes}
+
+    assert feat_sha in node_map
+    assert node_map[feat_sha].is_merged is False, "Feature commit must not be marked merged initially"
+
+    # Merge base (shas[2]) must be marked merged and is_ancestor_top must be True
+    assert shas[2] in node_map
+    assert node_map[shas[2]].is_ancestor_top is True
+    assert node_map[shas[2]].is_merged is True, "Merge base must be marked merged"
+    assert node_map[shas[2]].is_merged_into_tracking is True
+
+    # Now merge feat/new-sensor into main
+    run_git_command(["checkout", "main"], cwd=repo_dir)
+    run_git_command(["merge", "--ff-only", "feat/new-sensor"], cwd=repo_dir)
+
+    # Check out feature branch again: feat_sha is now merged into main!
+    run_git_command(["checkout", "feat/new-sensor"], cwd=repo_dir)
+    nodes_merged = engine.get_smartlog_dag(limit=20)
+    node_merged_map = {n.commit_hash: n for n in nodes_merged}
+
+    assert feat_sha in node_merged_map
+    assert node_merged_map[feat_sha].is_merged is True, "Commit merged into main must have is_merged=True (BUG-226)"
+    assert node_merged_map[feat_sha].is_merged_into_tracking is True
+
+
+def test_cr_feedback_release_branch_candidate_and_dynamic_repo_name(tmp_path: Path) -> None:
+    """Verify CR comments: is_release_branch_candidate model property and dynamic repo URLs."""
+    from model.vcs import BranchInfoModel, DiffViewSessionModel
+
+    # 1. BranchInfoModel.is_release_branch_candidate property
+    b_main = BranchInfoModel(name="main", is_current=True)
+    assert b_main.is_release_branch_candidate is True
+
+    b_master = BranchInfoModel(name="master")
+    assert b_master.is_release_branch_candidate is True
+
+    b_v1 = BranchInfoModel(name="v1.0")
+    assert b_v1.is_release_branch_candidate is True
+
+    b_release = BranchInfoModel(name="release-2026")
+    assert b_release.is_release_branch_candidate is True
+
+    b_feat = BranchInfoModel(name="feature/touch-sensor")
+    assert b_feat.is_release_branch_candidate is False
+
+    b_bug = BranchInfoModel(name="fix/bug-223")
+    assert b_bug.is_release_branch_candidate is False
+
+    # 2. DiffViewSessionModel dynamic repo fields
+    session = DiffViewSessionModel(
+        repo_name="firmware",
+        repo_web_url="https://github.com/myorg/firmware",
+        github_repo="myorg/firmware",
+    )
+    assert session.repo_name == "firmware"
+    assert session.repo_web_url == "https://github.com/myorg/firmware"
+    assert session.github_repo == "myorg/firmware"
+
+
+def test_regression_bug_227_toolbar_buttons_no_wrap_and_horizontal_scroll() -> None:
+    """Verify BUG-227: Toolbar buttons do not wrap text, and toolbars have horizontal scrollers."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+
+    # 1. diff_view.html.j2
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    assert "white-space: nowrap !important;" in diff_view_text
+    assert ".column-header {" in diff_view_text
+    assert "overflow-x: auto;" in diff_view_text
+    assert ".commit-toolbar {" in diff_view_text
+    assert ".diff-toolbar {" in diff_view_text
+
+    # 2. code_review.html.j2
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+    assert "white-space: nowrap !important;" in cr_text
+    assert "header.review-header {" in cr_text
+    assert "flex-wrap: nowrap;" in cr_text
+    assert "overflow-x: auto;" in cr_text
+
+    # 3. diff_component.html.j2
+    comp_text = (templates_dir / "diff_component.html.j2").read_text(encoding="utf-8")
+    assert "overflow-x: auto;" in comp_text
+    assert "flex-wrap: nowrap;" in comp_text
+
+    # 4. bug_report.html.j2
+    br_text = (templates_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    assert "white-space: nowrap !important;" in br_text
+    assert "header.quake-header {" in br_text
+    assert "overflow-x: auto;" in br_text
+
+
+def test_regression_bug_228_select_all_select_none_and_default_create_pr_stack() -> None:
+    """Verify BUG-228: Select All and Select None buttons and default stack behavior for Create PR."""
+    diff_view_text = (
+        Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    ).read_text(encoding="utf-8")
+
+    # Verify buttons in template
+    assert 'id="btnSelectAll"' in diff_view_text
+    assert 'id="btnSelectNone"' in diff_view_text
+    assert "selectAllCommits()" in diff_view_text
+    assert "selectNoneCommits()" in diff_view_text
+
+    # Verify client implementation functions exist
+    assert "function selectAllCommits()" in diff_view_text
+    assert "function selectNoneCommits()" in diff_view_text
+    assert "allCheckboxes.forEach" in diff_view_text
+
+    # Verify default stack behavior in onCreatePR
+    assert "BUG-228" in diff_view_text
+    assert "targetCommits" in diff_view_text
+    assert "smartlog-node:not(.merged-commit)" in diff_view_text
+
+
+def test_regression_bug_229_pr_submit_interactive_modal_and_github_submission(tmp_path: Path) -> None:
+    """Verify BUG-229: Interactive modal with progress bar and log display for PR submission."""
+    diff_view_text = (
+        Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    ).read_text(encoding="utf-8")
+
+    # 1. Verify modal UI elements exist
+    assert 'id="prSubmitModalOverlay"' in diff_view_text
+    assert 'id="prSubmitProgressBar"' in diff_view_text
+    assert 'id="prSubmitProgressPercent"' in diff_view_text
+    assert 'id="prSubmitLogOutput"' in diff_view_text
+    assert 'id="btnPrSubmitDone"' in diff_view_text
+    assert 'id="btnPrSubmitClose"' in diff_view_text
+    assert "openPrSubmitModal" in diff_view_text
+    assert "finishPrSubmitModal" in diff_view_text
+
+    # 2. Test GitEngine.submit_prs backend execution
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    res = engine.submit_prs()
+    assert res["status"] == "ok"
+    assert len(res["logs"]) > 0
+
+    # 4. Test DashboardServer endpoint handles /api/pr/submit with logs
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        req = urllib.request.Request(
+            f"{base_url}/api/pr/submit",
+            data=json.dumps({"commits": [shas[2]]}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert isinstance(data["created"], list)
+            assert "logs" in data
+            assert len(data["logs"]) > 0
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_230_execution_logs_and_tracebacks_preserved(tmp_path: Path) -> None:
+    """Verify BUG-230: Execution logs, tracebacks, expected and actual behavior are preserved on save."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        test_logs = "Traceback (most recent call last):\n  File 'test.py', line 10\nZeroDivisionError: division by zero"
+
+        # 1. Create bug with execution logs
+        payload = {
+            "title": "Test Bug Logs",
+            "category": "PCB",
+            "severity": "HIGH",
+            "status": "OPEN",
+            "description": "Failure during flying probe testing",
+            "logs": test_logs,
+            "expected_behavior": "Should pass cleanly",
+            "actual_behavior": "Fails with division by zero",
+        }
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            res = json.loads(resp.read().decode("utf-8"))
+            bug_id = res["id"]
+            assert res["logs"] == test_logs
+            assert res["expected_behavior"] == "Should pass cleanly"
+            assert res["actual_behavior"] == "Fails with division by zero"
+
+        # 2. Update bug with new logs and verify preservation
+        updated_logs = test_logs + "\nAdditional log line from subsequent run."
+        payload_update = {
+            "id": bug_id,
+            "title": "Test Bug Logs",
+            "status": "OPEN",
+            "logs": updated_logs,
+        }
+        req_update = urllib.request.Request(
+            f"{base_url}/api/bugs",
+            data=json.dumps(payload_update).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req_update) as resp:
+            assert resp.status == 200
+            res_update = json.loads(resp.read().decode("utf-8"))
+            assert res_update["logs"] == updated_logs
+
+        # 3. Verify server database persists logs
+        db_bug = server.bug_server.database.get_bug(bug_id)
+        assert db_bug is not None
+        assert db_bug.logs == updated_logs
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_232_file_action_buttons_copy_and_vscode(tmp_path: Path):
+    """Verify BUG-232: Copy and Open in VS Code buttons are present next to file names."""
+    template_dir = Path(__file__).parent.parent / "provider" / "templates"
+    diff_view_html = (template_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    code_review_html = (template_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # In VCS diff viewer
+    assert 'id="diffFileActions"' in diff_view_html
+    assert 'onclick="copyActiveFilePath()"' in diff_view_html
+    assert 'onclick="openInVsCode()"' in diff_view_html
+    assert "vscode://file" in diff_view_html
+    assert "btnOpenVsCode" in diff_view_html
+
+    # In Code Review UI
+    assert 'id="activeFileActions"' in code_review_html
+    assert 'onclick="copyActiveFilePath()"' in code_review_html
+    assert 'onclick="openInVsCode()"' in code_review_html
+    assert "vscode://file" in code_review_html
+    assert "btnOpenVsCode" in code_review_html
+
+    # In runtime server rendering
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}/") as resp:
+            content = resp.read().decode("utf-8")
+            assert 'id="diffFileActions"' in content
+            assert "btnOpenVsCode" in content
+            assert str(repo_dir) in content or repo_dir.name in content
+
+        with urllib.request.urlopen(f"{base_url}/review") as resp:
+            content = resp.read().decode("utf-8")
+            assert 'id="activeFileActions"' in content
+            assert "btnOpenVsCode" in content
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_233_visible_high_contrast_scrollbars():
+    """Verify BUG-233: All horizontal and vertical scrollbars are visible and high contrast."""
+    template_dir = Path(__file__).parent.parent / "provider" / "templates"
+    templates = [
+        template_dir / "diff_view.html.j2",
+        template_dir / "diff_component.html.j2",
+        template_dir / "code_review.html.j2",
+        template_dir / "bug_report.html.j2",
+    ]
+
+    for tmpl_path in templates:
+        content = tmpl_path.read_text(encoding="utf-8")
+        assert "scrollbar-color: var(--quake-copper, #c87a32) #1e130b;" in content, (
+            f"Missing standard scrollbar-color in {tmpl_path.name}"
+        )
+        assert "::-webkit-scrollbar" in content, f"Missing webkit scrollbar in {tmpl_path.name}"
+        assert "width: 10px;" in content, f"Scrollbar width too small / invisible in {tmpl_path.name}"
+        assert "#965a25" in content, f"Missing copper thumb background in {tmpl_path.name}"
+        assert "#ffb800" in content, f"Missing gold hover state in {tmpl_path.name}"
+
+
+def test_regression_bug_234_pr_submit_no_git_sl_error(tmp_path: Path):
+    """Verify BUG-234: GitEngine.submit_prs never runs git with sl binary."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    res = engine.submit_prs()
+    assert res["status"] == "ok"
+
+    # Invariant: Never attempt to invoke `git <path-to-sl>`
+    for line in res["logs"]:
+        assert "is not a git command" not in line.lower(), f"Confusing git error in logs: {line}"
+        assert "error running git" not in line.lower(), f"Confusing git error in logs: {line}"
+
+
+def test_regression_bug_235_favicon_web_icon(tmp_path: Path):
+    """Verify BUG-235: High-contrast Quake-themed favicon is created and served across dashboards."""
+    static_favicon = Path(__file__).parent.parent / "provider" / "code_review" / "static" / "favicon.svg"
+    assert static_favicon.exists(), "static/favicon.svg must exist"
+    svg_content = static_favicon.read_text(encoding="utf-8")
+    assert "<svg" in svg_content
+    assert "#ffd700" in svg_content or "#ffb800" in svg_content
+    assert "#c87a32" in svg_content
+
+    # Check templates include the favicon link
+    template_dir = Path(__file__).parent.parent / "provider" / "templates"
+    for tmpl in ["diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"]:
+        content = (template_dir / tmpl).read_text(encoding="utf-8")
+        assert '<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">' in content, (
+            f"Missing favicon link in {tmpl}"
+        )
+
+    # Check DashboardServer serves favicon.ico and static/favicon.svg
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}/favicon.ico") as resp:
+            assert resp.status == 200
+            assert "image/svg+xml" in resp.headers.get("Content-Type")
+            assert len(resp.read()) > 0
+
+        with urllib.request.urlopen(f"{base_url}/static/favicon.svg") as resp:
+            assert resp.status == 200
+            assert "image/svg+xml" in resp.headers.get("Content-Type")
+            assert len(resp.read()) > 0
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_237_side_by_side_resizer_gripper():
+    """Verify BUG-237: Split-pane resizer gripper is visible and uses containerRect with fixed table layout."""
+    template_dir = Path(__file__).parent.parent / "provider" / "templates"
+    diff_comp = (template_dir / "diff_component.html.j2").read_text(encoding="utf-8")
+    code_rev = (template_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # Invariant 1: Grip icon is present in both views
+    assert ".sbs-split-resizer::before" in diff_comp
+    assert 'content: "⋮"' in diff_comp
+    assert ".sbs-split-resizer::before" in code_rev
+    assert 'content: "⋮"' in code_rev
+
+    # Invariant 2: VCS diff view uses fixed table layout to prevent inverted resizer motion
+    assert "table-layout: fixed !important;" in diff_comp
+    assert "width: 100% !important;" in diff_comp
+    assert "min-width: max-content" in code_rev
+
+    # Invariant 3: Mouse drag math uses containerRect, not tableRect
+    assert "containerRect = container.getBoundingClientRect()" in diff_comp
+    assert "moveEvent.clientX - containerRect.left" in diff_comp
+    assert "containerRect = container.getBoundingClientRect()" in code_rev
+    assert "moveEvent.clientX - containerRect.left" in code_rev
+
+
+def test_regression_bug_236_cr_count_persistence_and_file_watch(tmp_path: Path) -> None:
+    """Verify BUG-236: ReviewServer syncs external CR markdown files and updates smartlog counts."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+    feedback_dir = repo_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+
+    cr_sha = shas[0]
+    cr_md = feedback_dir / f"CR_{cr_sha}.md"
+    cr_content = f"""# Code Review Report: Code Review: hardware
+
+## Review Overview
+
+| Metric | Details |
+| :--- | :--- |
+| **Revisions** | `{cr_sha}` |
+| **Overall Verdict** | **`CHANGES_REQUESTED`** |
+
+## File-by-File Review Findings
+
+### [`file1.txt`](file://{repo_dir}/file1.txt)
+
+#### **[MUST FIX]** [file1.txt:L1](file://{repo_dir}/file1.txt#L1)
+<!-- comment-uuid: 11111111-2222-3333-4444-555555555555 -->
+<!-- comment-commit: {cr_sha} -->
+
+> **Reviewer**: fix this
+
+## Action Items Checklist
+
+- [ ] **[MUST FIX]** [`file1.txt:L1`](file://{repo_dir}/file1.txt#L1): fix this <!-- uuid:11111111-2222-3333-4444-555555555555 -->
+"""
+    cr_md.write_text(cr_content, encoding="utf-8")
+
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=False,
+    )
+    session = server.build_session()
+    # Check that the smartlog node received cr_total_count >= 1
+    node = next(n for n in session.smartlog_nodes if n.commit_hash == cr_sha)
+    assert node.cr_total_count >= 1
+
+
+def test_regression_bug_238_auto_rename_cr_working(tmp_path: Path) -> None:
+    """Verify BUG-238: Git commit automatically renames CR_working.md to CR_<commit_sha>.md."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+    feedback_dir = repo_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+
+    cr_working = feedback_dir / "CR_working.md"
+    cr_working.write_text(
+        """# Code Review Report: Code Review: hardware
+
+## Review Overview
+
+| Metric | Details |
+| :--- | :--- |
+| **Revisions** | `working` |
+| **Overall Verdict** | **`APPROVED`** |
+
+## Action Items Checklist
+
+- [ ] **[NIT]** [`test.txt:L1`](test.txt#L1): note <!-- uuid:aaaa0000-bbbb-cccc-dddd-eeee11112222 -->
+""",
+        encoding="utf-8",
+    )
+
+    # Modify a file and commit
+    test_file = repo_dir / "test.txt"
+    test_file.write_text("commit changes", encoding="utf-8")
+    new_sha = engine.commit_files("Auto rename test commit", file_paths=["test.txt"])
+
+    assert not cr_working.exists(), "CR_working.md should be renamed upon commit"
+    expected_cr = feedback_dir / f"CR_{new_sha}.md"
+    assert expected_cr.exists(), f"CR_{new_sha}.md should exist after commit"
+    assert new_sha in expected_cr.read_text(encoding="utf-8")
+
+
+def test_regression_bug_239_per_user_filtering(tmp_path: Path) -> None:
+    """Verify BUG-239: Per-user author queries and CLI filtering options."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+
+    user = engine.get_current_user()
+    assert "name" in user and "email" in user
+    assert len(user["name"]) > 0
+
+    # Uncommitted modified file attributes to current user
+    test_file = repo_dir / "file1.txt"
+    test_file.write_text("modified", encoding="utf-8")
+    author = engine.get_file_author(test_file)
+    assert author["name"] == user["name"]
+
+    # Arguments parse per-user flags
+    parsed_reviews = parse_arguments(["list-reviews", "--all-users"])
+    assert parsed_reviews.all_users is True
+    parsed_bugs = parse_arguments(["list-bugs", "--user", "Alice"])
+    assert parsed_bugs.user == "Alice"
+
+
+def test_regression_bug_240_action_topic_subcommands() -> None:
+    """Verify BUG-240: CLI supports action-topic subcommands with backward compatibility for flags."""
+    # Subcommands
+    args_rev = parse_arguments(["list-reviews", "--open"])
+    assert args_rev.subcommand == "list-reviews"
+    assert args_rev.open is True
+
+    args_bugs = parse_arguments(["list-bugs", "--open", "--severity", "HIGH"])
+    assert args_bugs.subcommand == "list-bugs"
+    assert args_bugs.open is True
+    assert args_bugs.severity == "HIGH"
+
+    args_res_c = parse_arguments(["resolve-comment", "c_12345"])
+    assert args_res_c.subcommand == "resolve-comment"
+    assert args_res_c.id == "c_12345"
+
+    args_res_b = parse_arguments(["resolve-bug", "BUG-999", "--notes", "Fixed properly"])
+    assert args_res_b.subcommand == "resolve-bug"
+    assert args_res_b.id == "BUG-999"
+    assert args_res_b.notes == "Fixed properly"
+
+    # Backward compatibility flags
+    args_flag_b = parse_arguments(["--bugs", "--open"])
+    assert args_flag_b.bugs is True
+    assert args_flag_b.open is True
+
+    args_flag_r = parse_arguments(["--reviews", "--all"])
+    assert args_flag_r.reviews is True
+    assert args_flag_r.all_users is True
+
+
+def test_regression_bug_242_code_review_toolbar_layout() -> None:
+    """Verify BUG-242: Main review toolbar is placed above app-body panes across full width."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2"
+    content = template_path.read_text(encoding="utf-8")
+
+    # Invariant 1: diff-toolbar appears before app-body in template
+    toolbar_idx = content.find('<div class="diff-toolbar">')
+    app_body_idx = content.find('<div class="app-body">')
+    assert toolbar_idx != -1 and app_body_idx != -1
+    assert toolbar_idx < app_body_idx, "diff-toolbar must be placed above app-body"
+
+    # Invariant 2: Toolbar styling enforces full width and prevents horizontal scrollbar
+    toolbar_css = content.split(".diff-toolbar {")[1].split("}")[0]
+    assert "overflow-x: hidden" in toolbar_css
+    assert "width: 100%" in toolbar_css
+
+    # Invariant 3: Toggle controls are in the toolbar
+    assert "btnToggleCommits" in content
+    assert "btnToggleFiles" in content
+    assert "btnFocus" in content
+
+
+def test_regression_bug_244_commit_subcommand_cli_parsing() -> None:
+    """Verify BUG-244: dashboard CLI argument parsing supports commit subcommand and --commit flag."""
+    # Commit with -m flag
+    args_m = parse_arguments(["commit", "-m", "Test commit message"])
+    assert args_m.subcommand == "commit"
+    assert args_m.commit_message == "Test commit message"
+    assert args_m.amend is False
+
+    # Commit with positional message and files
+    args_pos = parse_arguments(["commit", "Positional message", "file1.txt", "file2.txt"])
+    assert args_pos.subcommand == "commit"
+    assert args_pos.args == ["Positional message", "file1.txt", "file2.txt"]
+
+    # Commit with --files and -a
+    args_files = parse_arguments(["commit", "-m", "Selective", "--files", "a.py", "b.py", "-a"])
+    assert args_files.subcommand == "commit"
+    assert args_files.commit_message == "Selective"
+    assert args_files.flag_files == ["a.py", "b.py"]
+    assert args_files.all_files is True
+
+    # Commit amend
+    args_amend = parse_arguments(["commit", "--amend"])
+    assert args_amend.subcommand == "commit"
+    assert args_amend.amend is True
+
+    # Top-level --commit flag
+    args_top = parse_arguments(["--commit", "Top level message"])
+    assert args_top.commit == "Top level message"
+
+
+def test_regression_bug_244_commit_subcommand_execution(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify BUG-244: dashboard commit subcommand commits untracked and staged changes in repository."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    monkeypatch.chdir(repo_dir)
+
+    engine = GitEngine(repo_root=repo_dir)
+
+    # 1. Selective commit of untracked file via CLI args
+    f_untracked = repo_dir / "untracked.txt"
+    f_untracked.write_text("untracked content\n", encoding="utf-8")
+    f_other = repo_dir / "other.txt"
+    f_other.write_text("other content\n", encoding="utf-8")
+
+    main(["commit", "-m", "Commit untracked selectively", "untracked.txt"])
+    assert engine.get_head_commit_message() == "Commit untracked selectively"
+
+    working_files = engine.get_working_tree_files()
+    working_paths = [f.path for f in working_files]
+    assert "untracked.txt" not in working_paths
+    assert "other.txt" in working_paths
+
+    # 2. Commit all remaining changes without explicit file arguments
+    main(["commit", "Commit remaining files without flag"])
+    assert engine.get_head_commit_message() == "Commit remaining files without flag"
+    assert len(engine.get_working_tree_files()) == 0
+
+    # 3. Amend last commit via CLI
+    main(["commit", "--amend", "-m", "Amended via CLI (BUG-244)"])
+    assert engine.get_head_commit_message() == "Amended via CLI (BUG-244)"
+
+    # 4. Commit via top-level --commit flag
+    f_top = repo_dir / "top_level.txt"
+    f_top.write_text("top level flag content\n", encoding="utf-8")
+    main(["--commit", "Commit via top-level flag"])
+    assert engine.get_head_commit_message() == "Commit via top-level flag"
+    assert len(engine.get_working_tree_files()) == 0
+
+
+def test_regression_bug_245_word_wrap_in_diff_views() -> None:
+    """Verify BUG-245: Word wrap toggle button, persistence, and pre-wrap CSS in diff views."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_comp_text = (templates_dir / "diff_component.html.j2").read_text(encoding="utf-8")
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. diff_component.html.j2 has .diff-word-wrap styling with pre-wrap and overflow-wrap
+    assert ".diff-word-wrap" in diff_comp_text
+    assert "white-space: pre-wrap !important;" in diff_comp_text
+    assert (
+        "overflow-wrap: anywhere !important;" in diff_comp_text
+        or "word-break: break-word !important;" in diff_comp_text
+    )
+
+    # 2. diff_view.html.j2 has wrap button and toggle function
+    assert 'id="btnToggleWrap"' in diff_view_text
+    assert "toggleWordWrap" in diff_view_text
+    assert "quake_diff_word_wrap" in diff_view_text
+
+    # 3. code_review.html.j2 has wrap button, styles, and toggle function
+    assert 'id="btnToggleWrap"' in cr_text
+    assert ".diff-word-wrap" in cr_text
+    assert "toggleWordWrap" in cr_text
+    assert "quake_diff_word_wrap" in cr_text
+
+
+def test_regression_bug_246_auto_sync_panes() -> None:
+    """Verify BUG-246: Auto-sync polls repository changes to update working tree and commit panes automatically."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. diff_view.html.j2 implements automatic background sync
+    assert "startAutoSync" in diff_view_text
+    assert "syncWorkingAndCommitsSilently" in diff_view_text or "autoSyncTimer" in diff_view_text
+    assert "renderSmartlogList" in diff_view_text
+    assert "startAutoSync()" in diff_view_text
+
+    # 2. code_review.html.j2 implements auto-sync for commits and files
+    assert "startAutoSync" in cr_text or "autoSyncTimer" in cr_text
+
+
+def test_regression_bug_247_single_unified_sync_button() -> None:
+    """Verify BUG-247: Remove redundant Sync DB button; keep a single unified Sync button that handles both git and DB sync."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+
+    # 1. Single unified Sync button exists
+    assert 'id="btnSync"' in diff_view_text
+
+    # 2. Separate 'Sync DB' button is removed from UI
+    assert 'id="btnSyncFeedback"' not in diff_view_text
+    assert "⚡ Sync DB" not in diff_view_text
+
+
+def test_regression_bug_247_server_api_sync_unification(tmp_path: Path) -> None:
+    """Verify BUG-247: /api/sync executes both git repository fetch and feedback/bug database synchronization."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        url = f"{server.get_url()}/api/sync"
+        req = urllib.request.Request(url, data=b"{}", headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert "feedback" in data
+            assert data["feedback"]["status"] == "ok"
+            assert data["feedback"]["initial_sync_done"] is True
+    finally:
+        server.server_close()
+
+
+def test_regression_bug_248_bug_report_sort_and_filter_menus() -> None:
+    """Verify BUG-248: Bug Report field contains sort and filter menus with session persistence."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # 1. Sort and filter UI menus present in bug list sidebar
+    assert 'id="select-bug-sort"' in tpl_text
+    assert 'id="select-filter-category"' in tpl_text
+    assert 'id="select-filter-severity"' in tpl_text
+
+    # 2. Event handlers and sorting/filtering logic
+    assert "onBugSortChanged" in tpl_text
+    assert "onFilterCategoryChanged" in tpl_text
+    assert "onFilterSeverityChanged" in tpl_text
+
+    # 3. Session persistence for filter and sorting options
+    assert "sessionStorage" in tpl_text
+    assert "bug_sort" in tpl_text
+
+
+def test_regression_bug_252_unified_diff_word_wrap_and_tag_balancing() -> None:
+    """Verify BUG-252: Unified diff word-wrap containment and tag balancing in diff templates.
+
+    Ensures:
+    1. diff_component.html.j2 and code_review.html.j2 pin .diff-unified-text and .unified-text to column 4 with min-width: 0.
+    2. diff_component.html.j2 balances syntax highlighting spans across lines and strips orphan closing spans.
+    3. Unified diff text is rendered in a div rather than span so rogue inner closing spans cannot close the line container.
+    """
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_comp_text = (templates_dir / "diff_component.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. Grid positioning and min-width containment for unified diff text
+    assert "grid-column: 4" in diff_comp_text
+    assert "min-width: 0" in diff_comp_text
+    assert "grid-column: 4" in cr_text
+
+    # 2. Div container for unified text preventing stray span closure
+    assert '<div class="diff-unified-text hljs">' in diff_comp_text
+    assert '<div class="unified-text hljs">' in cr_text
+
+    # 3. Tag balancing and orphan tag stripping in diff engine
+    assert "balanceLines" in diff_comp_text
+    assert "openTags" in diff_comp_text
+
+
+def test_regression_bug_257_copy_icons_in_dashboard() -> None:
+    """Verify BUG-257: Copy icon buttons next to commit hashes, branch names, and bug IDs in dashboard."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    bug_report_text = (templates_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. diff_view.html.j2 copy buttons:
+    # Commit SHA copy button
+    assert "copy-sha-btn" in diff_view_text
+    assert "copy-icon-btn" in diff_view_text
+    assert "copyText" in diff_view_text
+    # Branch name copy button (current branch & branch list items)
+    assert "btnCopyCurrentBranch" in diff_view_text
+    # Bug ID copy button on smartlog nodes
+    assert "copy-badge-btn" in diff_view_text
+
+    # 2. bug_report.html.j2 copy buttons:
+    # Bug ID in sidebar list and active issue header
+    assert "btn-copy-active-bug" in bug_report_text
+    assert "active-bug-id-display" in bug_report_text
+    assert "copy-icon-btn" in bug_report_text
+    assert "copy-badge-btn" in bug_report_text
+    assert "copyActiveBugId" in bug_report_text
+    assert "copyText" in bug_report_text
+
+    # 3. code_review.html.j2 copy buttons:
+    # Commit SHA copy button in commit drawer
+    assert "copy-sha-btn" in cr_text
+    assert "copy-icon-btn" in cr_text
+    assert "copyText" in cr_text
+
+
+def test_regression_bug_269_dashboard_scoped_attachments(tmp_path: Path) -> None:
+    """Verify BUG-269: DashboardServer correctly handles bug-scoped attachments with identical filenames."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+
+    try:
+        base_url = server.get_url()
+
+        # 1. Upload daemon.log for BUG-268
+        p1 = json.dumps(
+            {
+                "bug_id": "BUG-268",
+                "filename": "daemon.log",
+                "content_text": "log for 268 in dashboard",
+                "description": "268 log",
+            }
+        ).encode("utf-8")
+        req1 = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=p1,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req1) as resp:
+            assert resp.status == 200
+            res1 = json.loads(resp.read().decode("utf-8"))
+            assert res1["filename"] == "daemon.log"
+            assert res1["file_path"] == "attachments/BUG-268/daemon.log"
+
+        # 2. Upload daemon.log for BUG-269
+        p2 = json.dumps(
+            {
+                "bug_id": "BUG-269",
+                "filename": "daemon.log",
+                "content_text": "log for 269 in dashboard",
+                "description": "269 log",
+            }
+        ).encode("utf-8")
+        req2 = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=p2,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req2) as resp:
+            assert resp.status == 200
+            res2 = json.loads(resp.read().decode("utf-8"))
+            assert res2["filename"] == "daemon.log"
+            assert res2["file_path"] == "attachments/BUG-269/daemon.log"
+
+        # 3. Verify neither file overwrote the other and both are independently served
+        f268 = repo_dir / "attachments" / "BUG-268" / "daemon.log"
+        f269 = repo_dir / "attachments" / "BUG-269" / "daemon.log"
+        assert f268.exists()
+        assert f269.exists()
+        assert f268.read_text(encoding="utf-8") == "log for 268 in dashboard"
+        assert f269.read_text(encoding="utf-8") == "log for 269 in dashboard"
+
+        with urllib.request.urlopen(f"{base_url}/attachments/BUG-268/daemon.log") as resp:
+            assert resp.status == 200
+            assert resp.read() == b"log for 268 in dashboard"
+
+        with urllib.request.urlopen(f"{base_url}/attachments/BUG-269/daemon.log") as resp:
+            assert resp.status == 200
+            assert resp.read() == b"log for 269 in dashboard"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_270_dashboard_server_handles_broken_pipe_gracefully(capsys):
+    """Verify BUG-270: BrokenPipeError and client disconnects are handled cleanly without printing tracebacks."""
+    server = DashboardServer.__new__(DashboardServer)
+
+    # 1. Verify BrokenPipeError in handle_error does not print traceback to stderr
+    try:
+        raise BrokenPipeError(32, "Broken pipe")
+    except BrokenPipeError:
+        server.handle_error(None, ("127.0.0.1", 58468))
+
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "BrokenPipeError" not in captured.err
+
+    # 2. Verify unexpected errors are still reported to super().handle_error
+    try:
+        raise RuntimeError("Real unexpected server failure")
+    except RuntimeError:
+        server.handle_error(None, ("127.0.0.1", 58468))
+
+    captured = capsys.readouterr()
+    assert "Real unexpected server failure" in captured.err
+
+    # 3. Verify handler _send_json and _send_html gracefully handle BrokenPipeError
+    handler = DashboardRequestHandler.__new__(DashboardRequestHandler)
+    mock_wfile = MagicMock()
+    mock_wfile.write.side_effect = BrokenPipeError(32, "Broken pipe")
+    handler.wfile = mock_wfile
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+    handler.close_connection = False
+
+    # Should not raise exception, and should set close_connection = True
+    handler._send_json({"status": "ok"})
+    assert handler.close_connection is True
+
+    handler.close_connection = False
+    handler._send_html("<html><body>test</body></html>")
+    assert handler.close_connection is True

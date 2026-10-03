@@ -84,7 +84,7 @@ graph TD
     %% Wakeup & Interrupts
     CHG -->|CHG_STAT: G5 (WUU0_IN15)| MCU
     CHG -->|CHG_PGOOD_WAKE: M10 (VBAT_WAKEUP)| MCU
-    M2["M.2 Key-M Host (J1)"] -->|M2_WAKE_N: C13 (WUU0_IN1)| MCU
+    BLE["u-blox NINA-B312 BTLE (U11)"] <-->|UART1 1Mb/s: T1-T4| MCU
     TOUCH -->|CAP_INT: C4| MCU
 ```
 
@@ -98,22 +98,28 @@ graph TD
 | **`U7`** | **ADI / Maxim MAX17048G+T10** | 1-Cell Li+ ModelGauge Fuel Gauge IC | TDFN-8 ($2\times 2\text{ mm}$) | Core `I2C0` (`0x36`) | Ultra-low $3\,\mu\text{A}$ operating current, state of charge (SoC) estimation, alert interrupt. |
 | **`U6`** | **TI LP5009RUKR** | 9-Channel Constant-Current RGB LED Driver | WQFN-20 ($3\times 3\text{ mm}$) | Core `I2C0` (`0x14`) | Logarithmic dimming, auto-breathing animation engine, independent RGB color mixing. |
 | **`U9`** | **FTDI FT232RNQ-REEL** | High-Speed USB 2.0 to UART Serial Bridge | QFN-32 ($5\times 5\text{ mm}$) | `FC1` UART0 (`B6`, `A6`, `F10`, `E10`) | Up to 3 Mbaud data rate, internal EEPROM, USB bus powered with reset & boot control GPIOs. |
-| **`U2`** | **Azoteq IQS7222A (`IQS7222A001QNR`) / IQS7211A** | ProxFusion Capacitive Touch & Proximity Controller | QFN-20 ($3\times 3\text{ mm}$, $0.4\text{ mm}$ pitch) | Touch `I2C1` (`0x44`), `CAP_INT` (`C4`)| Multi-channel ProxFusion engine driving 4 flex tail electrodes (3 mutual steps, 1 self-cap proximity) with dual internal LDOs (VREGD, VREGA). |
+| **`U2`** | **Azoteq IQS7222A (`IQS7222A001QNR`)** | ProxFusion Capacitive Touch & Proximity Controller | QFN-20 ($3\times 3\text{ mm}$, $0.4\text{ mm}$ pitch) | Touch `I2C1` (`0x44`), `CAP_INT` (`C4`)| Multi-channel ProxFusion engine driving 4 flex tail electrodes (3 mutual steps, 1 self-cap proximity) with dual internal LDOs (VREGD, VREGA). |
 | **`U4`** | **ADI / Maxim MAX98357AETE+** | 3.2W Class-D Mono Audio Amplifier | TQFN-16 ($3\times 3\text{ mm}$) | `PDM0` Audio (`B14`, `A14`) | Integrated digital PCM/I2S/PDM input stage, filterless Class-D, 92% efficiency into $4\,\Omega$. |
 | **`U5`** | **Piezo Sounder (PKM13EPYH4000)** | Surface-mount piezoelectric audio transducer | Custom Circular ($13\text{ mm}$ dia) | `PIEZO_PWM` (`D15`, `PWM0_X0`) | Resonant frequency 4.0 kHz, SPL $\ge 75\text{ dB}$, audible user feedback. |
+| **`U11`** | **u-blox NINA-B312-02B (`NINA-B312`)** | Bluetooth Low Energy 5.0 Standalone Transceiver Module | MOD-BLE-PCB-ANT ($10\times 14\text{ mm}$) | High-speed 1Mb/s UART (`T1`..`T4`) | Integrated PCB antenna, cap-touch / proximity pairing trigger, status LED & buzzer signaling. |
 | **`Q2`–`Q4`**| **TI TPS22918DBVR** | 5.5V, 2A Ultra-Low On-Resistance Power Switches | SOT-23-6 ($2.9\times 1.6\text{ mm}$) | `PWR_EN_AUDIO` (`L4`), `SENSORS` (`L5`), `DEBUG` (`M4`) | $R_{\text{ON}} = 52\text{ m}\Omega$, controlled rise time, active-high enable with 100k pull-up. |
 | **`J3`** | **USB-C 16-Pin Receptacle** | USB Type-C 2.0 Power & Data Receptacle | USB-C Mid-Mount SMD | VBUS, GND, CC1/CC2, D+/D- | Edge-mounted (-X outward) with 5.1k pulldowns on CC pins. |
 | **`J5`** | **JST-SH 10-Pin Micro-Header** | SWD Hardware Debug & Flash Programming Header | 1.0mm Pitch Side-Entry SMD | `SWD_CLK` (`A16`), `DIO` (`A17`), `SWO` (`B16`), `nRESET` (`F3`), `BOOT0` (`C14`) | Compact debug interface for J-Link, MCU-Link, or CMSIS-DAP probes. |
+| **`J15`** | **10-Pin SWD Recovery Header (DNP)** | BTLE (U11) SWD Hardware Recovery & Programming Micro-Header | 1.27mm Pitch 2x5 Through-Hole (`pin_header_2x5_1.27mm`) | `SWDCLK`, `SWDIO`, `RESET_N`, `VCC_NINA`, `GND` | Unpopulated (DNP) factory recovery header for u-blox NINA-B312 firmware reprogramming. |
+| **`SW1`** | **MCU Reset Switch** | Hardware tactile reset push-button switch | SMD Pushbutton (`SW_PUSH_SMD`) | `nRESET` (`F3`) | Manual hardware reset button for MCU. |
+| **`SW2`** | **BLE Reset Switch** | Hardware tactile reset push-button switch | SMD Pushbutton (`SW_PUSH_SMD`) | `RESET_N` (U11 Pin 19) | Manual hardware reset button for u-blox NINA-B312 BLE module. |
 | **`J7`, `J8`**| **JST-SH 5-Pin Micro-Headers** | Primary (`I3C0`) and Secondary (`I3C1`) I3C Headers | 1.0mm Pitch Side-Entry SMD | `I3C0` (`A8`, `C8`, `B8`), `I3C1` (`F4`, `F6`, `E4`) | High-speed MIPI I3C evaluation interface operating up to 12.5 Mbps. |
 | **`J6`** | **JST-SH 4-Pin Micro-Header** | Expansion I2C Bus Header | 1.0mm Pitch Side-Entry SMD | `I2C2` (`B1`, `A1`) | External sensor expansion I2C with 3.3V and GND. |
 | **`J9`** | **JST-PH 7-Pin Header (`B7B-PH-K-S`)** | Expansion SPI Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-7P`) | `SPI0` (`T6`, `T7`, `R8`, `R9`) | 4-wire SPI peripheral bus (SCK, MOSI, MISO, CS#) with 3.3V, interrupt, and dedicated GND. |
 | **`J10`** | **JST-PH 7-Pin Header (`B7B-PH-K-S`)** | Expansion UART / Control Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-7P`) | FTDI auxiliary signals (`DSR_N`, `DCD_N`, `CBUS4`, `CBUS2`, `DTR_N`), `PERIPH_3V3`, `GND` | Dedicated asynchronous serial control link with 3.3V peripheral power and dedicated GND. |
 | **`J14`** | **10-Pin GPIO & Modem Breakout Header** | General-Purpose GPIO & FTDI Breakout Header | 2.54mm Pitch Thru-Hole (`pin_header_1x10`) | `GPIO0`..`GPIO3`, `3V3`, `GND`, `CBUS3/5/6/7` | 4 digital GPIOs, 4 FTDI CBUS control pins, 3.3V power, and dedicated GND. |
+| **`J16`** | **NFC Antenna Header** | 2-Pin Breakout Header for External NFC Antenna | 2.54mm Pitch Thru-Hole (`pin_header_1x2`) | `NFC1`, `NFC2` | Connects external 13.56 MHz flexible NFC antenna (Molex 146236-0001). |
+| **`C18`, `C19`**| **Murata GRM1555C1H301JA01D** | NFC 13.56MHz Antenna Tuning Shunt Capacitors | 0402 SMD ($1.0\times 0.5\text{ mm}$) | `NFC1`, `NFC2` to `GND` | Symmetrical 300 pF C0G/NP0 50V shunt tuning capacitors; vertically stacked at $(7.0, -35.2)$ and $(7.0, -37.3)$ clear of U11 silkscreen border. |
 | **`J13`** | **JST-PH 2-Pin Connector (`S2B-PH-K-S`)** | 1S Li-Ion / LiPo Battery Power Input Connector | 2.0mm Pitch Thru-Hole (`JST-PH-2P`) | `VBAT`, `GND` | Direct connection for 3.7V Li-Ion battery pack with polarized mating shroud. |
 | **`BAT1`** | **PKCELL LP352438 (Recommended Battery)** | 1S 3.7V 350mAh LiPo Rechargeable Pouch Cell | $3.5\times 24\times 38\text{ mm}$ Pouch | `VBAT`, `GND` via J13 | Integrated PCM protection circuit module; pre-terminated with polarized JST-PH 2-pin connector; fits top lid cradle. |
 | **`TP1`** | **Test Point (GND)** | Ground probe through-hole test point | 1.4mm Pad / 0.8mm Drill | `GND` | Located at `(-18.0, -22.0)`. |
 | **`TP2`..`TP4`** | **Test Points (Power)** | Power rail through-hole test points | 1.4mm Pad / 0.8mm Drill | `VBAT`, `VBUS`, `3V3` | 4mm pitch at `(-18.0, -26.0)`, `(-14.0, -26.0)`, `(-10.0, -26.0)`. |
-| **`TP5`..`TP8`** | **Test Points (PCIe)** | PCIe Gen4 Tx/Rx differential pair test points | 1.4mm Pad / 0.8mm Drill | `PCIE_TX0_N/P`, `RX0_P/N` | 4mm pitch at `(-14.0, -22.0)`, `(-10.0, -22.0)`, `(-6.0, -22.0)`, `(-2.0, -22.0)`. |
+| **`TP5`..`TP8`** | **Test Points (BTLE)** | BTLE high-speed 1Mb/s UART test points | 1.4mm Pad / 0.8mm Drill | `BLE_RTS`, `BLE_RX`, `BLE_TX`, `BLE_CTS` | 4mm pitch at `(-14.0, -22.0)`, `(-10.0, -22.0)`, `(-6.0, -22.0)`, `(-2.0, -22.0)`. |
 | **`TP9`..`TP10`**| **Test Points (I2C)** | Capacitive touch I2C bus test points | 1.4mm Pad / 0.8mm Drill | `I2C_SDA`, `I2C_SCL` | 4mm pitch at `(14.0, -4.0)`, `(18.0, -4.0)` on bottom layer B.Cu. |
 | **`TP11`..`TP14`**| **Test Points (Reserved)** | Unpopulated reserve test points (formerly MIPI D-PHY, removed in BUG-146) | 1.4mm Pad / 0.8mm Drill | Unconnected / Reserved | 4mm pitch at `(-14.0, 22.0)`, `(-10.0, 22.0)`, `(-6.0, 22.0)`, `(-2.0, 22.0)`. |
 
@@ -146,9 +152,34 @@ graph TD
 7. **Mechanical Enclosure & Assembly Features (`BUG-085`, `BUG-090`, `BUG-092`, `BUG-110`, `BUG-113`)**:
    * Lower enclosure features integral mounting posts with flared retention snap-heads replacing loose screws.
    * Upper enclosure lid incorporates an internal battery retention cradle ($24\times 38\times 3.5\text{ mm}$) and pass-through cutout for J13.
-   * Side cutouts (USB-C, SWD, expansion, M.2) are radiused with 0.8mm corner fillets to avoid stress concentrations, with separate non-overlapping cutouts and solid wall separation between all expansion ports.
+   * Side cutouts (USB-C, SWD, expansion) are radiused with 0.8mm corner fillets to avoid stress concentrations, with separate non-overlapping cutouts and solid wall separation between all expansion ports.
    * Expansion headers J9 and J10 use polarized 6-pin JST-PH connectors (`B6B-PH-K-S`) for easy insertion and keyed polarization.
    * Carrier board top layer features the prominent Antigravity logo in silkscreen.
+8. **BTLE Wireless Subsystem (`U11`) & NFC Interface (`BUG-214`, `BUG-222`, `BUG-231`, `BUG-250`, `BUG-251`)**:
+   * u-blox NINA-B312 Bluetooth 5.0 Low Energy standalone pre-flashed module (`NINA-B312-02B`) with integrated PCB antenna replaces the legacy PCIe/M.2 connector.
+   * Interfaces with MCU via dedicated high-speed UART (`BLE_TX`, `BLE_RX`, `BLE_RTS`, `BLE_CTS`) with hardware flow control and low-power wakeup interrupts (`BLE_WAKE_N`).
+   * Equipped with SWD recovery header `J15` (1.27mm pitch 2x5 DNP header) and manual tactile reset push-button switch `SW2`.
+   * Native nRF52840 NFC-A tag interface (`NFC1`, `NFC2`) is routed through dual 300 pF shunt tuning capacitors (`C18`, `C19`, vertically stacked at $X = 7.0\text{ mm}$ outside U11 silkscreen border) to header `J16`. Recommended mating NFC antenna: **Molex 146236-0001** (13.56 MHz flexible NFC antenna with adhesive backing, $15.0 \times 25.0\text{ mm}$, pre-matched for 15 pF / 300 pF tuning).
+   * RF keepout zone is preserved on all copper layers directly below the antenna structure to ensure omnidirectional radiation and maximum RF link budget.
+9. **Capacitive Touch Sensing & Auxiliary Channel Routing**:
+   * Azoteq IQS7222A ProxFusion controller drives the 5-button slider and proximity sensing electrodes via `J2` / `J4` (`CR0`..`CR7`).
+   * The 9th sensing channel (`CT8`) is routed from `U2` pin 12 to `J2` pin `NC3` to support optional future revisions to the flex ribbon without modifying the baseline flex connector.
+
+## Assembly & SMT Manufacturing Guidelines
+
+* Placement Topology: Double-sided SMT assembly
+  * Primary Top Side (F.Cu): MCU (U1), BLE module (U11), Charger (U3), USB-C (J3), FPC (J2), Passives
+  * Secondary Bottom Side (B.Cu): Cap touch controller (U2), decoupling passives
+* Solder Paste and Stencil:
+  * Alloy: Lead-free SAC305 (Sn96.5 / Ag3.0 / Cu0.5), RoHS 3 compliant
+  * Powder size: Type 4 or Type 5 mesh suitable for 0.4mm BGA pads
+  * Stencil foil: 0.10 mm (4.0 mil) laser-cut electro-polished stainless steel with nano-coating
+* Reflow Thermal Profile:
+  * Peak reflow temperature: 240 deg C to 245 deg C (Max 250 deg C)
+  * Time above liquidus (217 deg C): 60 to 90 seconds
+* Post-Reflow Inspection:
+  * 100% 3D Automated Optical Inspection (AOI) for all SMT chips
+  * 100% Automated X-ray Inspection (AXI) for BGA balls on U1 and QFN thermal ground pads on U2, U3, U4, U9
 
 ## Battery Life Estimation
 
@@ -161,7 +192,7 @@ Operating on the recommended **PKCELL LP352438 3.7V LiPo pouch cell (350 mAh / 1
 | **Active Mode** (Processing, NAND R/W, Audio, Telemetry) | MCU active @ 150MHz, NAND R/W active, MAX98357A audio driving speaker, FT232RNQ active, RGB LED on | **~65 mA** | 240 mW | **2.0%** (28.8 mins/day) |
 | **Sleep Mode** (Active Processing, Audio Disabled, Touch Low-Power) | MCU active @ 150MHz, NAND/FT232RNQ active, audio amplifier disabled (Q2 off), IQS7222A in low-power ProxFusion mode | **~35 mA** | 130 mW | **3.0%** (43.2 mins/day) |
 | **Standby Mode** (Deep Sleep, Touch & Sensor Monitoring, PERIPH_3V3 Enabled) | MCU Deep Sleep (SRAM retained, RTC running), IQS7222A in Low-Power ProxFusion scan mode, PERIPH_3V3 buck regulator enabled with external peripherals in low-power idle (~150 µA), Q2/Q4 off | **~220 µA** | 0.81 mW | **95.0%** (idle evaluation monitoring) |
-| **Deep Power Down** (Storage / Shipping / Off) | MCU Deep Power Down ($2.5\,\mu\text{A}$), BQ24074 in battery standby ($1.5\,\mu\text{A}$), MAX17048 ($3\,\mu\text{A}$), All load switches off | **~7.0 µA** | 0.026 mW | **Storage mode** (exited via USB plug-in or M.2 wake) |
+| **Deep Power Down** (Storage / Shipping / Off) | MCU Deep Power Down ($2.5\,\mu\text{A}$), BQ24074 in battery standby ($1.5\,\mu\text{A}$), MAX17048 ($3\,\mu\text{A}$), All load switches off | **~7.0 µA** | 0.026 mW | **Storage mode** (exited via USB plug-in or BTLE/button wake) |
 
 ### Calculations
 * **Average Daily Operating Current**:

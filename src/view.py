@@ -9,10 +9,9 @@ import shutil
 import subprocess
 import tempfile
 import time
-import pybullet as p
 from daemon import DaemonClient
 from model import AppConfig
-from model.pcb import BoardType
+from model.pcb import resolve_subassembly_pcb_config
 from pathlib import Path
 from typing import Sequence, Optional, List, Any, cast, Iterable, Union
 from build123d import *  # type: ignore
@@ -40,7 +39,12 @@ def show(*args, **kwargs):
     if "--no-gui" in sys.argv:
         return None
     try:
-        return ocp_show(*args, **kwargs)
+        import contextlib
+        import logging
+        from shell import StreamToLogger
+
+        with contextlib.redirect_stdout(StreamToLogger(logging.getLogger("daemon"), logging.INFO)):
+            return ocp_show(*args, **kwargs)
     except Exception:
         return None
 
@@ -142,7 +146,7 @@ class Viewer:
     def launch_pcb_viewer(self, file_path: Path, no_gui: bool = False):
         """Open KiCad PCB or schematic file in VS Code using the KiCode extension."""
         resolved_path = file_path.resolve()
-        self.logger.print(f"Viewing KiCad file: {resolved_path}", symbol="🖥️")
+        self.logger.log(f"Viewing KiCad file: {resolved_path}", symbol="🖥️")
         if no_gui:
             return
 
@@ -150,11 +154,11 @@ class Viewer:
         if code_cmd:
             try:
                 subprocess.run([code_cmd, str(resolved_path)], check=False)
-                self.logger.print(f"Opened in VS Code (KiCode): {resolved_path.name}", symbol="✨")
+                self.logger.log(f"Opened in VS Code (KiCode): {resolved_path.name}", symbol="✨")
             except Exception as err:
-                self.logger.print(f"Could not spawn VS Code CLI: {err}", symbol="⚠️")
+                self.logger.log(f"Could not spawn VS Code CLI: {err}", symbol="⚠️")
         else:
-            self.logger.print(
+            self.logger.log(
                 f"Open in VS Code (KiCode extension): file://{resolved_path}",
                 symbol="💡",
             )
@@ -199,51 +203,15 @@ class Viewer:
                 elif hasattr(part_res, "pcb_metadata"):
                     sub_pcb_config = part_res.pcb_metadata
 
-            pcb_cfg = sub_pcb_config or provider.pcb_config
-            if subassembly and not sub_pcb_config:
-                pcb_cfg = provider.pcb_config.model_copy(update={"name": subassembly})
-            elif sub_pcb_config and not sub_pcb_config.stackup:
-                pcb_cfg = sub_pcb_config.model_copy(update={"stackup": provider.pcb_config.stackup})
-            if sub_pcb_config and not pcb_cfg.capacitive_sensors and provider.pcb_config.capacitive_sensors:
-                pcb_cfg = pcb_cfg.model_copy(update={"capacitive_sensors": provider.pcb_config.capacitive_sensors})
-            if (
-                sub_pcb_config
-                and not pcb_cfg.copper_regions
-                and provider.pcb_config.copper_regions
-                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
-            ):
-                pcb_cfg = pcb_cfg.model_copy(update={"copper_regions": provider.pcb_config.copper_regions})
-            if sub_pcb_config and not pcb_cfg.net_classes and provider.pcb_config.net_classes:
-                pcb_cfg = pcb_cfg.model_copy(update={"net_classes": provider.pcb_config.net_classes})
-            if (
-                sub_pcb_config
-                and provider.pcb_config.design_rules
-                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
-            ):
-                pcb_cfg = pcb_cfg.model_copy(update={"design_rules": provider.pcb_config.design_rules})
-            if (
-                sub_pcb_config
-                and not pcb_cfg.silkscreen_texts
-                and provider.pcb_config.silkscreen_texts
-                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
-            ):
-                pcb_cfg = pcb_cfg.model_copy(update={"silkscreen_texts": provider.pcb_config.silkscreen_texts})
-            if (
-                sub_pcb_config
-                and not pcb_cfg.traces
-                and provider.pcb_config.traces
-                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
-            ):
-                pcb_cfg = pcb_cfg.model_copy(update={"traces": provider.pcb_config.traces})
-            if (
-                sub_pcb_config
-                and not pcb_cfg.vias
-                and provider.pcb_config.vias
-                and getattr(pcb_cfg, "board_type", None) != BoardType.FLEX
-            ):
-                pcb_cfg = pcb_cfg.model_copy(update={"vias": provider.pcb_config.vias})
+            pcb_cfg = resolve_subassembly_pcb_config(sub_pcb_config, provider.pcb_config, subassembly=subassembly)
 
-            exporter = PCBExporter(pcb_cfg, wiring, subassembly=subassembly)
+            subassembly_param = subassembly if subassembly != provider.name else None
+            exporter = PCBExporter(
+                pcb_cfg,
+                wiring,
+                subassembly=subassembly_param,
+                design_rules=pcb_cfg.design_rules,
+            )
 
             pcb_filename = f"{subassembly}.kicad_pcb" if subassembly else f"{provider.name}.kicad_pcb"
             sch_filename = f"{subassembly}.kicad_sch" if subassembly else f"{provider.name}.kicad_sch"

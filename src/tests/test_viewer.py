@@ -1029,3 +1029,40 @@ class TestViewer:
         with patch("provider.room.Compound", side_effect=lambda children: MagicMock(children=children)):
             viewer.show_view([str(step_file)], no_gui=False)
             mock_ocp_show.assert_called_once()
+
+    @patch("view.show")
+    def test_regression_bug_268_view_pcb_updates_without_prior_build(self, mock_show, viewer, tmp_path):
+        """Verify BUG-268: show_view generates and updates PCB artifacts without requiring a prior build.py run."""
+        target_name = "carrier_board/carrier_board:pcb"
+        mock_targets = MagicMock(spec=TargetList)
+        mock_targets.__iter__.return_value = iter(["carrier_board/carrier_board"])
+        mock_targets.__len__.return_value = 1
+        viewer.target_parser.resolve = MagicMock(side_effect=[None, None, None, mock_targets])
+
+        mock_provider = MagicMock()
+        mock_provider.name = "carrier_board"
+        mock_provider.wiring_path = tmp_path / "wiring.yaml"
+        mock_provider.pcb_config = MagicMock()
+        mock_provider.pcb_config.dimensions_mm = (60.0, 90.0, 1.51)
+        mock_provider.pcb_config.stackup.total_thickness_mm = 1.51
+        mock_provider.pcb_config.stackup.soldermask_color = "matte_black"
+        mock_provider.pcb_config.omitted_silkscreen_designators = ["D2", "SW1"]
+        mock_provider.pcb_config.design_rules = MagicMock()
+        mock_provider.pcb_config.net_classes = [MagicMock()]
+        mock_provider.pcb_config.revision = "2.0"
+        mock_provider.part = {}
+
+        viewer.manager.router.providers = [mock_provider]
+
+        with (
+            patch("view.ProviderResolver.resolve", return_value=mock_provider),
+            patch("provider.pcb.exporter.PCBExporter.build_solid", return_value=Box(10, 10, 1.6)),
+            patch("provider.pcb.exporter.PCBExporter.export_board") as mock_exp_board,
+            patch("provider.pcb.exporter.PCBExporter.export_kicad_sch") as mock_exp_sch,
+        ):
+            viewer.show_view([target_name], build_dir=str(tmp_path), no_gui=True)
+
+            mock_exp_board.assert_called_once()
+            mock_exp_sch.assert_called_once()
+            board_dir_arg = mock_exp_board.call_args[0][0]
+            assert board_dir_arg == tmp_path / "board" / "carrier_board"

@@ -38,8 +38,35 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: NINA-B302-00B
-  supplier_pn: 1972-NINA-B302-00B-ND
+  mpn: NINA-B312-02B
+  supplier_pn: 1972-NINA-B312-02B-ND
+- name: J15
+  package: pin_header_2x5_1.27mm
+  position:
+  - -14.5
+  - -41.0
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: DNP
+  supplier_pn: N/A
+  dnp: true
+  description: BLE SWD recovery header (DNP)
+- name: SW2
+  package: SW_PUSH_SMD
+  position:
+  - -14.5
+  - -36.5
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: PTS645SL43SMTR92LFS
+  supplier_pn: CKN9012CT-ND
+  description: NINA-B312 BLE module reset push button switch
 - name: J2
   package: FPC-30P-0.5MM
   position:
@@ -122,8 +149,8 @@ footprints:
 - name: C1
   package: '0402'
   position:
-  - 13.0
-  - -15.0
+  - 13.5
+  - -14.5
   - 0.8
   rotation:
   - 0.0
@@ -159,102 +186,6 @@ footprints:
   mpn: CL10A106KP8NNNC
   supplier_pn: 1276-1004-1-ND
   value: 10uF
-- name: Q1
-  package: SOT-23
-  position:
-  - -19.0
-  - -22.0
-  - -0.8
-  layer: B.Cu
-  rotation:
-  - 0.0
-  - 0.0
-  - 0.0
-  dimensions:
-  - 2.9
-  - 1.3
-  - 1.1
-  mpn: BSS138
-  supplier_pn: BSS138CT-ND
-  pins:
-  - number: '1'
-    name: '1'
-    pin_name: G
-    label: G
-    signal_name: PWR_EN
-    position:
-    - -0.95
-    - -1.0
-    side: left
-    pad_type: smd
-    pad_shape: roundrect
-    pad_size_mm:
-    - 0.6
-    - 1.0
-  - number: '2'
-    name: '2'
-    pin_name: S
-    label: S
-    signal_name: GND
-    position:
-    - 0.95
-    - -1.0
-    side: bottom
-    pad_type: smd
-    pad_shape: roundrect
-    pad_size_mm:
-    - 0.6
-    - 1.0
-  - number: '3'
-    name: '3'
-    pin_name: D
-    label: D
-    signal_name: VLOAD_SW
-    position:
-    - 0.0
-    - 1.0
-    side: right
-    pad_type: smd
-    pad_shape: roundrect
-    pad_size_mm:
-    - 0.6
-    - 1.0
-  truth_table:
-    title: Q1 Load Switch Truth Table
-    input_headers:
-    - PWR_EN (Gate)
-    output_headers:
-    - VLOAD_SW (Drain)
-    - Channel State
-    rows:
-    - inputs:
-        PWR_EN (Gate): 0 (Low, <0.8V)
-      outputs:
-        VLOAD_SW (Drain): Hi-Z / Pull-up
-        Channel State: Cutoff
-      state: 'FALSE'
-      description: Load switch disabled; output isolated
-    - inputs:
-        PWR_EN (Gate): 1 (High, >1.5V)
-      outputs:
-        VLOAD_SW (Drain): 0V (Low, GND)
-        Channel State: Conduction
-      state: 'TRUE'
-      description: Active saturation; load energized
-    - inputs:
-        PWR_EN (Gate): Float / High-Z
-      outputs:
-        VLOAD_SW (Drain): Indeterminate
-        Channel State: Undefined
-      state: INVALID
-      description: Prohibited floating gate; leakage risk
-    - inputs:
-        PWR_EN (Gate): Over-Voltage (>20V)
-      outputs:
-        VLOAD_SW (Drain): Breakdown / Short
-        Channel State: Damaged
-      state: INVALID
-      description: Gate dielectric breakdown; fault
 - name: J3
   package: USB-C-16P
   position:
@@ -499,6 +430,62 @@ footprints:
   mpn: CC0402KRX5R6BB225
   supplier_pn: 311-1440-1-ND
   value: 2.2uF
+- name: C15
+  package: '0603'
+  position:
+  - 13.0
+  - 29.0
+  - -0.8
+  layer: B.Cu
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: GRM188R61A106KE69D
+  supplier_pn: 490-10uF-0603-ND
+  value: 10uF
+- name: C16
+  package: '0603'
+  position:
+  - 16.0
+  - 29.0
+  - -0.8
+  layer: B.Cu
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: GRM188R61A106KE69D
+  supplier_pn: 490-10uF-0603-ND
+  value: 10uF
+- name: C17
+  package: '0402'
+  position:
+  - 13.0
+  - 32.0
+  - -0.8
+  layer: B.Cu
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: CC0402KRX7R9BB104
+  supplier_pn: 311-1438-1-ND
+  value: 0.1uF
+- name: D8
+  package: SOD-123
+  position:
+  - 16.0
+  - 32.0
+  - -0.8
+  layer: B.Cu
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: SMF05CT1G
+  supplier_pn: ONSEMI-SMF05C-ND
+  value: TVS_3V3
 - name: J5
   package: pin_header_2x5_1.27mm
   position:
@@ -794,7 +781,7 @@ footprints:
   package: pin_header_1x2
   position:
   - 10.5
-  - -21.5
+  - -15.5
   - 0.8
   rotation:
   - 0.0
@@ -806,7 +793,7 @@ footprints:
   package: pin_header_1x2
   position:
   - 10.5
-  - -24.0
+  - -18.0
   - 0.8
   rotation:
   - 0.0
@@ -818,7 +805,7 @@ footprints:
   package: pin_header_1x2
   position:
   - 10.5
-  - -27.0
+  - -21.0
   - 0.8
   rotation:
   - 0.0
@@ -830,7 +817,7 @@ footprints:
   package: pin_header_1x2
   position:
   - 10.5
-  - -29.6
+  - -23.6
   - 0.8
   rotation:
   - 0.0
@@ -842,7 +829,7 @@ footprints:
   package: '0603'
   position:
   - 4.0
-  - -30.0
+  - -24.0
   - 0.8
   rotation:
   - 0.0
@@ -854,7 +841,7 @@ footprints:
   package: '0603'
   position:
   - 4.0
-  - -28.0
+  - -22.0
   - 0.8
   rotation:
   - 0.0
@@ -866,7 +853,7 @@ footprints:
   package: '0603'
   position:
   - 4.0
-  - -26.0
+  - -20.0
   - 0.8
   rotation:
   - 0.0
@@ -878,7 +865,7 @@ footprints:
   package: '0603'
   position:
   - 4.0
-  - -24.0
+  - -18.0
   - 0.8
   rotation:
   - 0.0
@@ -890,7 +877,7 @@ footprints:
   package: '0603'
   position:
   - 4.0
-  - -22.0
+  - -16.0
   - 0.8
   rotation:
   - 0.0
@@ -902,7 +889,7 @@ footprints:
   package: '0603'
   position:
   - 4.0
-  - -20.0
+  - -14.0
   - 0.8
   rotation:
   - 0.0
@@ -914,7 +901,7 @@ footprints:
   package: '0402'
   position:
   - 6.5
-  - -30.0
+  - -24.0
   - 0.8
   rotation:
   - 0.0
@@ -927,7 +914,7 @@ footprints:
   package: '0402'
   position:
   - 6.5
-  - -28.0
+  - -22.0
   - 0.8
   rotation:
   - 0.0
@@ -940,7 +927,7 @@ footprints:
   package: '0402'
   position:
   - 6.5
-  - -26.0
+  - -20.0
   - 0.8
   rotation:
   - 0.0
@@ -953,7 +940,7 @@ footprints:
   package: '0402'
   position:
   - 6.5
-  - -24.0
+  - -18.0
   - 0.8
   rotation:
   - 0.0
@@ -966,7 +953,7 @@ footprints:
   package: '0402'
   position:
   - 6.5
-  - -22.0
+  - -16.0
   - 0.8
   rotation:
   - 0.0
@@ -979,7 +966,7 @@ footprints:
   package: '0402'
   position:
   - 6.5
-  - -20.0
+  - -14.0
   - 0.8
   rotation:
   - 0.0
@@ -988,6 +975,47 @@ footprints:
   mpn: RC0402FR-071KL
   supplier_pn: 311-1.00KLRCT-ND
   value: 1k
+- name: C18
+  package: '0402'
+  position:
+  - 7.0
+  - -35.2
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 90.0
+  mpn: GRM1555C1H301JA01D
+  supplier_pn: 490-GRM1555C1H301JA01D-ND
+  value: 300pF
+  description: NFC1 13.56MHz tuning shunt capacitor C_tune1 (300 pF C0G/NP0)
+- name: C19
+  package: '0402'
+  position:
+  - 7.0
+  - -37.3
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 270.0
+  mpn: GRM1555C1H301JA01D
+  supplier_pn: 490-GRM1555C1H301JA01D-ND
+  value: 300pF
+  description: NFC2 13.56MHz tuning shunt capacitor C_tune2 (300 pF C0G/NP0)
+- name: J16
+  package: pin_header_1x2
+  position:
+  - 13.5
+  - -36.5
+  - 0.8
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0
+  mpn: 22-28-4023
+  supplier_pn: WM6402-ND
+  description: External 13.56 MHz tuned coil antenna header
 nets:
 - name: GND
   color: '#475569'
@@ -1010,9 +1038,22 @@ nets:
     - '2'
   - - C3
     - '2'
-  - - Q1
+  - - C15
     - '2'
-    - S
+  - - C16
+    - '2'
+  - - C17
+    - '2'
+  - - D8
+    - '2'
+  - - C18
+    - '2'
+  - - C19
+    - '2'
+  - - J15
+    - '3'
+  - - J15
+    - '5'
   - - J3
     - GND
   - - J3
@@ -1161,6 +1202,8 @@ nets:
     - '2'
   - - R12
     - '2'
+  - - SW2
+    - '2'
 - name: 3V3
   color: '#dc2626'
   pins:
@@ -1172,6 +1215,8 @@ nets:
     - MCLR
   - - U11
     - 3V3
+  - - U11
+    - VCC
   - - J2
     - 3V3
   - - R1
@@ -1183,6 +1228,14 @@ nets:
   - - C2
     - '1'
   - - C3
+    - '1'
+  - - C15
+    - '1'
+  - - C16
+    - '1'
+  - - C17
+    - '1'
+  - - D8
     - '1'
   - - U3
     - '5'
@@ -1224,6 +1277,10 @@ nets:
   - - JP3
     - '1'
   - - D4
+    - '1'
+  - - D7
+    - '1'
+  - - J15
     - '1'
 - name: VBUS
   priority: 24
@@ -1281,17 +1338,6 @@ nets:
     - CC2
   - - R4
     - '1'
-- name: PWR_EN
-  priority: 24
-  color: '#ea580c'
-  pins:
-  - - U1
-    - D1
-  - - Q1
-    - '1'
-    - G
-  - - D7
-    - '1'
 - name: AUDIO_EN
   priority: 16
   color: '#ea580c'
@@ -1303,15 +1349,6 @@ nets:
     - SD_MODE
   - - D5
     - '1'
-- name: VLOAD_SW
-  priority: 25
-  color: '#f97316'
-  pins:
-  - - Q1
-    - '3'
-    - D
-  - - U11
-    - VLOAD_SW
 - name: PERIPH_EN
   priority: 24
   color: '#ea580c'
@@ -1537,6 +1574,50 @@ nets:
     - T4
   - - U11
     - CTS
+- name: BLE_RESET_N
+  priority: 13
+  color: '#f97316'
+  pins:
+  - - U11
+    - RESET_N
+  - - SW2
+    - '1'
+- name: BLE_SWDCLK
+  priority: 13
+  color: '#4169e1'
+  pins:
+  - - U11
+    - SWDCLK
+  - - J15
+    - '4'
+- name: BLE_SWDIO
+  priority: 14
+  color: '#1e90ff'
+  pins:
+  - - U11
+    - SWDIO
+  - - J15
+    - '2'
+- name: NFC1
+  priority: 15
+  color: '#8b5cf6'
+  pins:
+  - - U11
+    - NFC1
+  - - C18
+    - '1'
+  - - J16
+    - '1'
+- name: NFC2
+  priority: 16
+  color: '#a855f7'
+  pins:
+  - - U11
+    - NFC2
+  - - C19
+    - '1'
+  - - J16
+    - '2'
 - name: CAP_SHIELD
   priority: 25
   color: '#64748b'
@@ -1617,6 +1698,14 @@ nets:
     - CAP_RX0
   - - J4
     - CAP_RX0
+- name: CAP_CT8
+  priority: 33
+  color: '#0284c7'
+  pins:
+  - - U2
+    - CT8
+  - - J2
+    - NC3
 - name: PDM_CLK
   priority: 13
   color: '#a855f7'

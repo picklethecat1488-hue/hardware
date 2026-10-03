@@ -13,6 +13,7 @@ import mimetypes
 from pathlib import Path
 import re
 import socket
+import sys
 from typing import Any, Dict, List, Optional
 import urllib.parse
 import uuid
@@ -49,14 +50,43 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         """Suppress default HTTP server logging to preserve clean console output."""
         return
 
+    def handle_one_request(self) -> None:
+        """Handle a single HTTP request, catching client disconnects gracefully."""
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+
+    def handle(self) -> None:
+        """Handle incoming requests on this connection until closed."""
+        try:
+            super().handle()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboards and data query endpoints."""
+        if hasattr(self.server, "review_server") and self.server.review_server:
+            try:
+                self.server.review_server.check_file_watch()
+            except Exception:
+                pass
+        if hasattr(self.server, "bug_server") and self.server.bug_server:
+            try:
+                self.server.bug_server.check_file_watch()
+            except Exception:
+                pass
+
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
 
         if path.startswith("/static/"):
             self._handle_serve_static(path)
+            return
+
+        if path in ("/favicon.ico", "/favicon.svg"):
+            self._handle_serve_static("/static/favicon.svg")
             return
 
         if path.startswith("/attachments/") or path.startswith("/build/attachments/"):
@@ -155,15 +185,18 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 mime_type, _ = mimetypes.guess_type(file_path)
                 if not mime_type:
                     mime_type = "application/octet-stream"
-                self.send_response(200)
-                self.send_header("Content-Type", mime_type)
-                self.send_header("Content-Length", str(len(raw_bytes)))
-                filename = Path(file_path).name
-                self.send_header("Content-Disposition", f'inline; filename="{filename}"')
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Connection", "close")
-                self.end_headers()
-                self.wfile.write(raw_bytes)
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", mime_type)
+                    self.send_header("Content-Length", str(len(raw_bytes)))
+                    filename = Path(file_path).name
+                    self.send_header("Content-Disposition", f'inline; filename="{filename}"')
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.wfile.write(raw_bytes)
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                    self.close_connection = True
             case "/api/database":
                 self._send_json(self.server.bug_server.database.model_dump(mode="json"))
             case "/api/next_bug_id":
@@ -181,6 +214,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._send_json({"initial_sync_done": self.server.initial_sync_done})
             case _:
                 self.send_error(404, "Endpoint not found")
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        """Handle CORS preflight requests."""
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Connection", "close")
+        self.end_headers()
 
     def do_POST(self) -> None:  # noqa: N802
         """Route POST requests for mutating actions."""
@@ -203,6 +245,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         match path:
             case "/api/sync":
                 res = self.server.git_engine.sync_repo()
+                try:
+                    feedback_res = self.server.sync_feedback()
+                    res["feedback"] = feedback_res
+                except Exception:
+                    pass
                 self._send_json(res)
             case "/api/rebase":
                 upstream = data.get("upstream") if isinstance(data, dict) else None
@@ -314,14 +361,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     self._send_json(res)
                 except (RuntimeError, ValueError) as e:
                     self._send_json({"error": str(e)}, status=400)
-            case "/api/pr/create":
-                commits = data.get("commits", [])
-                if not commits:
-                    self._send_json({"error": "No commits provided for PR creation"}, status=400)
-                    return
+            case "/api/pr/create" | "/api/pr/submit":
                 try:
-                    res = self.server.git_engine.create_prs_for_commits(commits)
-                    self._send_json({"status": "ok", "created": res})
+                    res = self.server.git_engine.submit_prs()
+                    self._send_json(
+                        {
+                            "status": "ok",
+                            "created": res.get("created", []),
+                            "logs": res.get("logs", []),
+                        }
+                    )
                 except (ValueError, RuntimeError) as e:
                     self._send_json({"error": str(e)}, status=400)
             case "/api/pr/unlink":
@@ -480,19 +529,35 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
         mime_type, _ = mimetypes.guess_type(str(file_target))
         if not mime_type:
-            mime_type = "application/javascript" if filename.endswith(".js") else "text/plain"
+            if filename.endswith(".svg"):
+                mime_type = "image/svg+xml"
+            elif filename.endswith(".js"):
+                mime_type = "application/javascript"
+            else:
+                mime_type = "text/plain"
         content = file_target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", f"{mime_type}; charset=utf-8")
-        self.send_header("Content-Length", str(len(content)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(content)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", f"{mime_type}; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(content)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
 
     def _handle_serve_attachment(self, path: str) -> None:
         """Serve uploaded attachments."""
         rel = path.lstrip("/")
         file_target = (self.server.repo_root / rel).resolve()
+        if not file_target.is_file():
+            if hasattr(self.server, "bug_server") and self.server.bug_server:
+                att_dir = getattr(self.server.bug_server, "attachments_dir", None)
+                if att_dir:
+                    clean_rel = rel.removeprefix("attachments/") if rel.startswith("attachments/") else rel
+                    candidate = (att_dir / clean_rel).resolve()
+                    if candidate.is_file():
+                        file_target = candidate
         if not file_target.is_file():
             self.send_error(404, "Attachment not found")
             return
@@ -500,31 +565,57 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if not mime_type:
             mime_type = "application/octet-stream"
         content = file_target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", mime_type)
-        self.send_header("Content-Length", str(len(content)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(content)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", mime_type)
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(content)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
 
     def _handle_add_comment(self, data: Dict[str, Any]) -> None:
         """Add a review comment to the session."""
+        file_path = str(data.get("file_path", "")).strip()
+        body = str(data.get("body", "")).strip()
+        if not file_path or not body:
+            self._send_json(
+                {"status": "error", "error": "Missing file_path or body", "message": "Missing file_path or body"},
+                status=400,
+            )
+            return
+
         commit_target = data.get("commit", "working")
         snippet = extract_line_snippet(
-            file_path=data.get("file_path", ""),
+            file_path=file_path,
             start_line=int(data.get("start_line", 1)),
             end_line=int(data.get("end_line", 1)),
             commit=commit_target,
             repo_root=self.server.repo_root,
         )
         now_str = datetime.now(timezone.utc).isoformat()
+        sev_raw = str(data.get("severity", "MUST_FIX")).strip().upper().replace(" ", "_").replace("-", "_")
+        match sev_raw:
+            case "MUST_FIX" | "MUSTFIX" | "FIX" | "MF":
+                severity = ReviewSeverity.MUST_FIX
+            case "PROPOSAL" | "PROP":
+                severity = ReviewSeverity.PROPOSAL
+            case "NIT":
+                severity = ReviewSeverity.NIT
+            case _:
+                severity = ReviewSeverity.MUST_FIX
+
+        c_uuid = str(data.get("uuid") or uuid.uuid4())
+        cid = str(data.get("id") or c_uuid[:8])
         comment = CommentModel(
-            id=data.get("id") or uuid.uuid4().hex[:12],
-            file_path=data.get("file_path", ""),
+            id=cid,
+            uuid=c_uuid,
+            file_path=file_path,
             start_line=int(data.get("start_line", 1)),
             end_line=int(data.get("end_line", 1)),
-            severity=ReviewSeverity(data.get("severity", ReviewSeverity.MUST_FIX.value)),
-            body=data.get("body", ""),
+            severity=severity,
+            body=body,
             author=data.get("author", "Reviewer"),
             code_snippet=snippet,
             created_at=now_str,
@@ -533,7 +624,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.server.review_server.session.comments.append(comment)
         self.server.review_server.session.auto_update_status_on_comment()
         self.server.review_server.save_and_sync()
-        self._send_json(comment.model_dump(mode="json"))
+        resp = comment.model_dump(mode="json")
+        resp["status"] = "ok"
+        resp["comment"] = comment.model_dump(mode="json")
+        resp["verdict"] = self.server.review_server.session.verdict.value
+        self._send_json(resp)
 
     def _handle_edit_comment(self, data: Dict[str, Any]) -> None:
         """Edit an existing review comment."""
@@ -543,14 +638,24 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 if "body" in data:
                     comment.body = data["body"]
                 if "severity" in data:
-                    comment.severity = ReviewSeverity(data["severity"])
+                    sev_raw = str(data["severity"]).strip().upper().replace(" ", "_").replace("-", "_")
+                    match sev_raw:
+                        case "MUST_FIX" | "MUSTFIX" | "FIX" | "MF":
+                            comment.severity = ReviewSeverity.MUST_FIX
+                        case "PROPOSAL" | "PROP":
+                            comment.severity = ReviewSeverity.PROPOSAL
+                        case "NIT":
+                            comment.severity = ReviewSeverity.NIT
                 if "resolved" in data:
                     comment.resolved = bool(data["resolved"])
                 self.server.review_server.session.auto_update_status_on_comment()
                 self.server.review_server.save_and_sync()
-                self._send_json(comment.model_dump(mode="json"))
+                resp = comment.model_dump(mode="json")
+                resp["status"] = "ok"
+                resp["comment"] = comment.model_dump(mode="json")
+                self._send_json(resp)
                 return
-        self._send_json({"error": "Comment not found"}, status=404)
+        self._send_json({"status": "error", "error": "Comment not found", "message": "Comment not found"}, status=404)
 
     def _handle_update_file_status(self, data: Dict[str, Any]) -> None:
         """Update review status of a file."""
@@ -616,6 +721,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 component=data.get("component", ""),
                 description=data.get("description", ""),
                 reproduction_steps=repro_steps if isinstance(repro_steps, list) else [str(repro_steps)],
+                expected_behavior=data.get("expected_behavior", ""),
+                actual_behavior=data.get("actual_behavior", ""),
+                logs=data.get("logs", ""),
+                resolution_notes=data.get("resolution_notes", ""),
                 attachments=[BugAttachmentModel(**a) for a in data.get("attachments", [])],
                 created_at=now_str,
                 updated_at=now_str,
@@ -648,6 +757,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 bug.component = data["component"]
             if "description" in data:
                 bug.description = data["description"]
+            if "expected_behavior" in data:
+                bug.expected_behavior = data["expected_behavior"]
+            if "actual_behavior" in data:
+                bug.actual_behavior = data["actual_behavior"]
+            if "logs" in data:
+                bug.logs = data["logs"]
             if "resolution_notes" in data:
                 incoming_notes = data["resolution_notes"].strip()
                 if incoming_notes:
@@ -682,9 +797,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         b64_content = data.get("content_base64", "")
         text_content = data.get("content_text", "")
 
-        att_dir = self.server.repo_root / "attachments"
-        att_dir.mkdir(parents=True, exist_ok=True)
-        dest_path = att_dir / filename
+        raw_bug_id = str(data.get("bug_id") or data.get("bugId") or "").strip()
+        if not raw_bug_id and str(data.get("id", "")).startswith("BUG-"):
+            raw_bug_id = str(data.get("id")).strip()
+        bug_id = Path(raw_bug_id).name if raw_bug_id else ""
+        filename = Path(filename).name
+
+        att_dir = getattr(self.server.bug_server, "attachments_dir", None) or (self.server.repo_root / "attachments")
+        dest_dir = (att_dir / bug_id) if bug_id else att_dir
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = dest_dir / filename
 
         if b64_content:
             file_bytes = base64.b64decode(b64_content)
@@ -716,24 +838,34 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
     def _send_html(self, html: str) -> None:
         """Send HTML payload with UTF-8 encoding."""
         encoded = html.encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(encoded)
-        self.close_connection = True
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
+            self.close_connection = True
 
     def _send_json(self, data: Any, status: int = 200) -> None:
         """Send JSON response payload."""
         encoded = json.dumps(data, indent=2).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(encoded)
-        self.close_connection = True
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
+            self.close_connection = True
 
 
 class DashboardServer(ThreadingHTTPServer):
@@ -741,6 +873,21 @@ class DashboardServer(ThreadingHTTPServer):
 
     allow_reuse_address = True
     daemon_threads = True
+
+    def get_request(self) -> Any:
+        """Accept incoming connection and set client socket timeout to prevent lingering sockets."""
+        sock, addr = super().get_request()
+        sock.settimeout(10.0)
+        return sock, addr
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        """Handle client connection errors gracefully without printing tracebacks on client disconnects."""
+        exc_type, _, _ = sys.exc_info()
+        if exc_type is not None and issubclass(
+            exc_type, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
+        ):
+            return
+        super().handle_error(request, client_address)
 
     def __init__(
         self,
@@ -811,7 +958,6 @@ class DashboardServer(ThreadingHTTPServer):
                         raise err
                     bound_port += 1
             self.actual_port = self.server_port
-            self.socket.settimeout(10.0)
         else:
             self.actual_port = port
 
@@ -849,9 +995,20 @@ class DashboardServer(ThreadingHTTPServer):
                     )
             node.bug_tags = tags
 
+        # Ensure file watcher syncs any newly placed or edited CR feedback files (BUG-236)
+        if hasattr(self, "review_server") and self.review_server:
+            try:
+                self.review_server.check_file_watch()
+            except Exception:
+                pass
+
         # Load Code Review stats for commits (BUG-199)
         cr_stats: dict[str, dict[str, Any]] = {}
-        cr_db_path = self.repo_root / "build" / "code_review.sqlite"
+        cr_db_path = (
+            self.review_server.sqlite_file
+            if hasattr(self, "review_server") and self.review_server
+            else (self.repo_root / "build" / "code_review.sqlite")
+        )
         if cr_db_path.exists():
             import sqlite3
 
@@ -890,8 +1047,16 @@ class DashboardServer(ThreadingHTTPServer):
                 node.cr_total_count = st["total"]
                 node.cr_reviewed = st.get("reviewed", False)
 
+        repo_web_url = self.git_engine.get_repo_web_url()
+        github_repo = ""
+        if repo_web_url and "github.com/" in repo_web_url:
+            github_repo = repo_web_url.split("github.com/", 1)[1].rstrip("/")
+
         return DiffViewSessionModel(
             repo_name=self.repo_root.name,
+            repo_root=str(self.repo_root),
+            repo_web_url=repo_web_url,
+            github_repo=github_repo,
             branches=branches,
             current_branch=curr_branch,
             head_commit=head_sha,
@@ -905,11 +1070,21 @@ class DashboardServer(ThreadingHTTPServer):
 
     def get_review_session(self, revisions: Optional[List[str]] = None) -> ReviewSessionModel:
         """Get or initialize a review session for specific revisions or the default session."""
+        if hasattr(self, "review_server") and self.review_server:
+            try:
+                self.review_server.check_file_watch()
+            except Exception:
+                pass
+
         if not revisions:
+            if self.review_server.session:
+                self.review_server.session.repo_root = str(self.repo_root)
             return self.review_server.session
 
         resolved = self.git_engine.resolve_revisions(revisions)
         if not resolved:
+            if self.review_server.session:
+                self.review_server.session.repo_root = str(self.repo_root)
             return self.review_server.session
 
         commit_hash = resolved[0]
@@ -918,11 +1093,13 @@ class DashboardServer(ThreadingHTTPServer):
             and self.review_server.session.commit_hash == commit_hash
             and set(self.review_server.session.revisions) == set(resolved)
         ):
+            self.review_server.session.repo_root = str(self.repo_root)
             return self.review_server.session
 
         session = ReviewSessionModel(
             title=f"Code Review: {self.repo_root.name}",
             repo_name=self.repo_root.name,
+            repo_root=str(self.repo_root),
             commit_hash=commit_hash,
             revisions=resolved,
             created_at=datetime.now(timezone.utc).isoformat(),
@@ -953,7 +1130,7 @@ class DashboardServer(ThreadingHTTPServer):
                                 CommentModel(
                                     id=row["id"],
                                     uuid=row["uuid"] or row["id"],
-                                    commit_hash=row["commit_hash"],
+                                    commit=row["commit_hash"] or "",
                                     file_path=row["file_path"],
                                     start_line=row["start_line"],
                                     end_line=row["end_line"],

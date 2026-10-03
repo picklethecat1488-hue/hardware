@@ -4,6 +4,9 @@ import math
 from pathlib import Path
 import pytest
 from model.pcb import (
+    BoardType,
+    CapacitiveElectrodeModel,
+    CopperRegionModel,
     LayerType,
     StackupLayerModel,
     StackupModel,
@@ -16,9 +19,14 @@ from model.pcb import (
     PCBDesignRulesModel,
     PCBConfig,
     SheetSize,
+    SilkscreenGraphicModel,
     SilkscreenTextModel,
+    SchematicLayoutModel,
     SchematicSheetModel,
     MountingHoleModel,
+    TraceSegmentModel,
+    ViaModel,
+    resolve_subassembly_pcb_config,
 )
 
 
@@ -257,22 +265,22 @@ def test_carrier_board_provider_cad_silkscreen():
 
     provider = CarrierBoardProvider()
     texts = provider.silkscreen()
-    assert len(texts) >= 3
+    assert len(texts) >= 2
     assert texts[0].text == "TEST BOARD CARRIER REV 2.0"
     assert texts[0].position == (0.0, 26.0)
     assert texts[0].layer == "F.SilkS"
 
-    assert texts[1].text == "LAYER 1-6 RIGID-FLEX"
-    assert texts[1].position == (-8.0, -34.5)
+    assert all(t.text != "LAYER 1-6 RIGID-FLEX" for t in texts)
 
-    assert texts[2].text == "BOTTOM SHIELD / GROUND REF"
-    assert texts[2].layer == "B.SilkS"
-    assert texts[2].mirror is True
+    assert texts[1].text == "BOTTOM SHIELD / GROUND REF"
+    assert texts[1].layer == "B.SilkS"
+    assert texts[1].mirror is True
 
     # Check that pcb_config inherits them
     pcb_cfg = provider.pcb_config
     assert pcb_cfg is not None
-    assert len(pcb_cfg.silkscreen_texts) >= 3
+    assert len(pcb_cfg.silkscreen_texts) >= 2
+    assert all(t.text != "LAYER 1-6 RIGID-FLEX" for t in pcb_cfg.silkscreen_texts)
 
 
 def test_schematic_sheet_model():
@@ -406,3 +414,186 @@ def test_pcb_design_rules_model_and_kicad_pro_generation():
     assert pro_dict["net_settings"]["classes"][0]["track_width"] == 0.30
     assert pro_dict["net_settings"]["classes"][1]["name"] == "POWER"
     assert pro_dict["net_settings"]["classes"][1]["clearance"] == 0.35
+
+
+def test_resolve_subassembly_pcb_config_none_handling():
+    """Verify resolve_subassembly_pcb_config handles None arguments gracefully."""
+    parent = PCBConfig(name="carrier_board", board_type=BoardType.RIGID)
+
+    # Both None -> None
+    assert resolve_subassembly_pcb_config(None, None) is None
+
+    # Child is None -> returns parent, updating name if subassembly specified
+    resolved = resolve_subassembly_pcb_config(None, parent, subassembly="daughter_board")
+    assert resolved is not None
+    assert resolved.name == "daughter_board"
+
+    resolved_no_sub = resolve_subassembly_pcb_config(None, parent, subassembly=None)
+    assert resolved_no_sub is parent
+
+    # Parent is None -> returns child directly
+    child = PCBConfig(name="daughter_board", board_type=BoardType.RIGID)
+    assert resolve_subassembly_pcb_config(child, None) is child
+
+
+def test_resolve_subassembly_pcb_config_rigid_inheritance(standard_6_layer_stackup):
+    """Verify rigid subassembly inherits missing stackup, rules, layers, and schematics."""
+    parent_rules = PCBDesignRulesModel(min_clearance_mm=0.15)
+    parent = PCBConfig(
+        name="carrier_board",
+        board_type=BoardType.RIGID,
+        revision="2.5",
+        stackup=standard_6_layer_stackup,
+        design_rules=parent_rules,
+        capacitive_sensors=[
+            CapacitiveElectrodeModel(
+                name="S1",
+                area_mm=(5.0, 5.0),
+            )
+        ],
+        net_classes=[NetClassModel(name="HIGH_SPEED", clearance_mm=0.2, trace_width_mm=0.25)],
+        omitted_silkscreen_designators=["D1", "R1"],
+        copper_regions=[
+            CopperRegionModel(
+                net="GND",
+                layer="F.Cu",
+                polygon_points_mm=[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)],
+            )
+        ],
+        schematic_sheets=[
+            SchematicSheetModel(
+                title="Power",
+                page_number=1,
+                subassemblies=["power_sub"],
+                signals=["VBUS", "3V3"],
+            )
+        ],
+        schematic_layout=SchematicLayoutModel(col_width=75.0),
+        silkscreen_texts=[
+            SilkscreenTextModel(
+                text="TEST_RIGID",
+                position_mm=(0.0, 0.0),
+                layer="F.SilkS",
+            )
+        ],
+        traces=[
+            TraceSegmentModel(
+                net="3V3",
+                layer="F.Cu",
+                start_mm=(0.0, 0.0),
+                end_mm=(5.0, 0.0),
+                width_mm=0.2,
+            )
+        ],
+        vias=[
+            ViaModel(
+                net="GND",
+                position_mm=(2.0, 2.0),
+                drill_diameter_mm=0.3,
+                pad_diameter_mm=0.6,
+            )
+        ],
+        silkscreen_graphics=[
+            SilkscreenGraphicModel(
+                shape="rect",
+                layer="F.SilkS",
+                position=(0.0, 0.0),
+                dimensions=(10.0, 10.0),
+            )
+        ],
+    )
+
+    child = PCBConfig(
+        name="daughter_board",
+        board_type=BoardType.RIGID,
+        # revision is default "1.0", should be overwritten by parent's "2.5"
+    )
+
+    resolved = resolve_subassembly_pcb_config(child, parent, subassembly="daughter_board")
+    assert resolved.name == "daughter_board"
+    assert resolved.revision == "2.5"
+    assert resolved.stackup == standard_6_layer_stackup
+    assert resolved.design_rules.min_clearance_mm == 0.15
+    assert len(resolved.capacitive_sensors) == 1
+    assert resolved.capacitive_sensors[0].name == "S1"
+    assert len(resolved.net_classes) == 1
+    assert resolved.net_classes[0].name == "HIGH_SPEED"
+    assert resolved.omitted_silkscreen_designators == ["D1", "R1"]
+    assert len(resolved.copper_regions) == 1
+    assert len(resolved.schematic_sheets) == 1
+    assert resolved.schematic_layout.col_width == 75.0
+    assert len(resolved.silkscreen_texts) == 1
+    assert len(resolved.traces) == 1
+    assert len(resolved.vias) == 1
+    assert len(resolved.silkscreen_graphics) == 1
+
+
+def test_resolve_subassembly_pcb_config_flex_isolation(standard_6_layer_stackup):
+    """Verify flex subassembly inherits common rules/stackup but isolates rigid layers and revision."""
+    parent = PCBConfig(
+        name="carrier_board",
+        board_type=BoardType.RIGID,
+        revision="2.5",
+        stackup=standard_6_layer_stackup,
+        design_rules=PCBDesignRulesModel(min_clearance_mm=0.03),
+        capacitive_sensors=[
+            CapacitiveElectrodeModel(
+                name="FLEX_SENSOR",
+                area_mm=(8.0, 8.0),
+            )
+        ],
+        omitted_silkscreen_designators=["J1"],
+        copper_regions=[
+            CopperRegionModel(
+                net="GND",
+                layer="F.Cu",
+                polygon_points_mm=[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)],
+            )
+        ],
+        schematic_sheets=[
+            SchematicSheetModel(
+                title="Carrier Schematics",
+                page_number=1,
+                subassemblies=["carrier_board"],
+                signals=["VBUS"],
+            )
+        ],
+        silkscreen_texts=[
+            SilkscreenTextModel(
+                text="CARRIER TEXT",
+                position_mm=(0.0, 0.0),
+                layer="F.SilkS",
+            )
+        ],
+        traces=[
+            TraceSegmentModel(
+                net="VBUS",
+                layer="F.Cu",
+                start_mm=(0.0, 0.0),
+                end_mm=(5.0, 0.0),
+                width_mm=0.3,
+            )
+        ],
+    )
+
+    flex_child = PCBConfig(
+        name="flex_tail",
+        board_type=BoardType.FLEX,
+        revision="1.0",
+    )
+
+    resolved = resolve_subassembly_pcb_config(flex_child, parent, subassembly="flex_tail")
+    # Shared properties inherited
+    assert resolved.name == "flex_tail"
+    assert resolved.stackup == standard_6_layer_stackup
+    assert resolved.design_rules.min_clearance_mm == 0.03
+    assert len(resolved.capacitive_sensors) == 1
+    assert resolved.capacitive_sensors[0].name == "FLEX_SENSOR"
+    assert resolved.omitted_silkscreen_designators == ["J1"]
+
+    # Rigid-specific properties isolated (NOT inherited by flex)
+    assert resolved.revision == "1.0"  # Did NOT inherit parent's "2.5"
+    assert len(resolved.copper_regions) == 0
+    assert len(resolved.schematic_sheets) == 0
+    assert len(resolved.silkscreen_texts) == 0
+    assert len(resolved.traces) == 0

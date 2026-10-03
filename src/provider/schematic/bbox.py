@@ -88,8 +88,14 @@ class SchematicBoundingBoxCalculator:
                 cols_per_row = cols_override
                 col_w = 210.0 / max(1, cols_per_row)
                 cw = min(38.0, col_w * 0.55)
-                gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
-                start_x = 45.0
+                layout_col_gap = getattr(layout, "col_gap", 15.0)
+                if layout_col_gap != 15.0:
+                    gap = layout_col_gap
+                    total_w = cols_per_row * cw + (cols_per_row - 1) * gap
+                    start_x = max(35.0, page_center_x - total_w / 2.0)
+                else:
+                    gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
+                    start_x = 45.0
                 col_x_positions = []
                 col_y_positions = []
                 comp_col_map = {}
@@ -233,7 +239,7 @@ class SchematicBoundingBoxCalculator:
                 target_base_x = max(35.0, page_center_x - total_w / 2.0)
                 cap_base_x = max(35.0, min(target_base_x, max_card_x + 12.0))
                 card_x = cap_base_x - 12.0
-                base_y = 66.0 if has_bottom_cards else 60.0
+                base_y = 52.0 if has_bottom_cards else 50.0
                 y_top = base_y + 16.0
                 y_bot = base_y - 12.0
                 card_y = y_bot - 12.0
@@ -354,7 +360,7 @@ class SchematicBoundingBoxCalculator:
                 for x_pull, y_base, fp, sig_net, rail_net in p_pts:
                     is_pullup = rail_net.upper() in POWER_NET_NAMES
                     if is_pullup:
-                        y_zz_bot = pullup_max_y + 8.0
+                        y_zz_bot = max(pullup_max_y + 8.0, 158.0)
                         boxes.append((x_pull + 4.0, y_zz_bot + 6.5, 12.0, 14.0, fp.name))
                     else:
                         y_zz_top = y_base - 8.0
@@ -432,8 +438,14 @@ class SchematicBoundingBoxCalculator:
                 cols_per_row = cols_override
                 col_w = 210.0 / max(1, cols_per_row)
                 cw = min(38.0, col_w * 0.55)
-                gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
-                start_x = 45.0
+                layout_col_gap = getattr(layout, "col_gap", 15.0)
+                if layout_col_gap != 15.0:
+                    gap = layout_col_gap
+                    total_w = cols_per_row * cw + (cols_per_row - 1) * gap
+                    start_x = max(35.0, page_center_x - total_w / 2.0)
+                else:
+                    gap = (210.0 - (cols_per_row * cw)) / max(1, cols_per_row - 1) if cols_per_row > 1 else 0.0
+                    start_x = 45.0
                 col_x_positions = []
                 col_y_positions = []
                 comp_col_map = {}

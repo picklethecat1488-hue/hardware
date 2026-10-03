@@ -25,6 +25,7 @@ from build123d import (
     Mode as BuildMode,
     add,
     Text,
+    FontStyle,
 )
 from model import Wiring, DiagramOptions, DiagramStyle
 from model.pcb import (
@@ -691,14 +692,22 @@ class CarrierBoardProvider(Provider):
                     RectangleRounded(batt_cut_w, batt_cut_l, cutout_r)
             extrude(s_batt_cut.sketch, amount=-(wall + 2.0), mode=BuildMode.SUBTRACT)
 
-            # Battery label (BUG-150, BUG-208)
+            # Battery label (BUG-150, BUG-208, BUG-254)
             batt_cov_clr = self.settings.enclosure_battery_cover_clearance
             batt_cov_t = self.settings.enclosure_battery_cover_wall_thickness
             batt_lbl_margin = self.settings.enclosure_battery_label_margin
             batt_lbl_y = min_y - batt_rim_t - batt_cov_clr - batt_cov_t - batt_lbl_margin
+            batt_lbl_fs = self.settings.enclosure_battery_label_font_size
+            batt_lbl_off = self.settings.enclosure_battery_label_stroke_offset
+            ble_x = self.settings.ble_logo_x
+            ble_w = self.settings.ble_logo_width
+            max_avail_x = ble_x - (ble_w / 2.0) - 2.5
+            batt_lbl_x = (min_x + max_avail_x) / 2.0
             with BuildSketch(Plane.XY.offset(wall)) as s_batt_lbl:
-                with Locations((cradle_cx, batt_lbl_y)):
-                    Text("BATTERY", font_size=1.6)
+                with Locations((batt_lbl_x, batt_lbl_y)):
+                    t_lbl = Text("BATTERY", font_size=batt_lbl_fs, font_style=FontStyle.BOLD)
+                    if batt_lbl_off > 0.0:
+                        offset(t_lbl, amount=batt_lbl_off)
             extrude(s_batt_lbl.sketch, amount=-0.4, mode=BuildMode.SUBTRACT)
 
             # Bluetooth logo and text engraved on enclosure lid exterior surface (BUG-214)
@@ -715,8 +724,6 @@ class CarrierBoardProvider(Provider):
                     Polygon((1.8, -1.8), (0, 0), (-0.5, -0.5), (1.3, -2.3))
                     Polygon((0, 0), (-1.8, 1.8), (-1.3, 2.3), (0.5, 0.5))
                     Polygon((0, 0), (-1.8, -1.8), (-1.3, -2.3), (0.5, -0.5))
-                with Locations((ble_x, ble_y - 5.2)):
-                    Text("BLUETOOTH", font_size=1.4)
             extrude(s_bt_logo.sketch, amount=-ble_depth, mode=BuildMode.SUBTRACT)
 
         RigidJoint("led_port", lid.part, Location((led_x, led_y, wall)))
@@ -1056,60 +1063,41 @@ class CarrierBoardProvider(Provider):
             # Position silkscreen markings cleanly clear of connector J2 (Y=38) and connector J1 (Y=-36)
             with Locations((0.0, 26.0)):
                 SilkscreenText("TEST BOARD CARRIER REV 2.0", layer="F.SilkS", font_size=1.2, thickness=0.18)
-            with Locations((-8.0, -34.5)):
-                SilkscreenText("LAYER 1-6 RIGID-FLEX", layer="F.SilkS", font_size=0.75, thickness=0.11)
             with Locations((0.0, 0.0)):
                 SilkscreenText(
                     "BOTTOM SHIELD / GROUND REF", layer="B.SilkS", font_size=1.0, thickness=0.15, mirror=True
                 )
 
-            # BUG-183, BUG-209, BUG-219: Silkscreen labels for Status and Overrides
-            with Locations((10.5, -32.8)):
+            # BUG-183, BUG-209, BUG-219, BUG-231: Silkscreen labels for Status and Overrides
+            with Locations((10.5, -13.5)):
                 SilkscreenText("OVERRIDES", layer="F.SilkS", font_size=0.75, thickness=0.11)
-            with Locations((4.5, -32.8)):
+            with Locations((4.5, -12.5)):
                 SilkscreenText("STATUS", layer="F.SilkS", font_size=0.75, thickness=0.11)
             # Reset button label close to U1 central (0, 0) and SW1 (0, -11) (BUG-219)
             with Locations((0.0, -9.2)):
                 SilkscreenText("RESET", layer="F.SilkS", font_size=0.6, thickness=0.09)
             # Jumper labels placed to the right of each horizontal jumper at X=14.0 (BUG-219)
-            with Locations((14.0, -21.5)):
+            with Locations((14.0, -15.5)):
                 SilkscreenText("NRST", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((14.0, -24.0)):
+            with Locations((14.0, -18.0)):
                 SilkscreenText("BOOT0", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((14.0, -27.0)):
+            with Locations((14.0, -21.0)):
                 SilkscreenText("ISP", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((14.0, -29.6)):
+            with Locations((14.0, -23.6)):
                 SilkscreenText("VBUS", layer="F.SilkS", font_size=0.55, thickness=0.08)
             # Status LED labels
-            with Locations((1.6, -20.0)):
+            with Locations((1.6, -14.0)):
                 SilkscreenText("MCU", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -22.0)):
+            with Locations((1.6, -16.0)):
                 SilkscreenText("PERIPH", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -24.0)):
+            with Locations((1.6, -18.0)):
                 SilkscreenText("AUD", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -26.0)):
+            with Locations((1.6, -20.0)):
                 SilkscreenText("3V3", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -28.0)):
+            with Locations((1.6, -22.0)):
                 SilkscreenText("VBUS", layer="F.SilkS", font_size=0.55, thickness=0.08)
-            with Locations((1.6, -30.0)):
+            with Locations((1.6, -24.8)):
                 SilkscreenText("VBAT", layer="F.SilkS", font_size=0.55, thickness=0.08)
-
-            # Component designators for Sheet 17 hardening parts on bottom silkscreen to prevent clutter
-            for idx, y_pos in enumerate([-30.0, -28.0, -26.0, -24.0, -22.0, -20.0], start=2):
-                with Locations((4.0, y_pos)):
-                    SilkscreenText(f"D{idx}", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-                with Locations((6.5, y_pos)):
-                    SilkscreenText(f"R{idx + 5}", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -21.5)):
-                SilkscreenText("JP1", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -24.0)):
-                SilkscreenText("JP2", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -27.0)):
-                SilkscreenText("JP3", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((10.5, -29.6)):
-                SilkscreenText("JP4", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
-            with Locations((0.0, -11.0)):
-                SilkscreenText("SW1", layer="B.SilkS", font_size=0.6, thickness=0.09, mirror=True)
 
             # Global optical fiducials (crosshairs)
             with Locations((-24.0, 38.0), (21.0, -42.0), (-24.0, -38.0)):
@@ -1145,16 +1133,18 @@ class CarrierBoardProvider(Provider):
                 SilkscreenText("U1", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((18.0, -11.5)):
                 SilkscreenText("U2", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
-            with Locations((0.0, -32.5)):
+            with Locations((0.0, -27.2)):
                 SilkscreenText("U11", layer="F.SilkS", font_size=1.0, thickness=0.15)
+            with Locations((-14.5, -39.0)):
+                SilkscreenText("J15", layer="F.SilkS", font_size=0.8, thickness=0.12)
+            with Locations((-14.5, -43.0)):
+                SilkscreenText("BLE SWD", layer="F.SilkS", font_size=0.6, thickness=0.09)
             with Locations((0.0, 35.5)):
                 SilkscreenText("J2", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((-17.5, 0.0)):
                 SilkscreenText("J3", layer="F.SilkS", font_size=1.0, thickness=0.15)
             with Locations((-23.0, 19.5)):
                 SilkscreenText("J13", layer="F.SilkS", font_size=0.8, thickness=0.12)
-            with Locations((-21.5, -22.0)):
-                SilkscreenText("Q1", layer="B.SilkS", font_size=0.8, thickness=0.12, mirror=True)
             with Locations((-19.0, 12.5)):
                 SilkscreenText("U3", layer="F.SilkS", font_size=0.8, thickness=0.12)
             with Locations((-18.0, 24.5)):

@@ -1560,3 +1560,146 @@ def test_regression_bug_175_sqlite_store_missing_commit_hash_migration(tmp_path:
         idx_cursor = verify_conn.execute("PRAGMA index_list(comments)")
         indices = [row[1] for row in idx_cursor.fetchall()]
         assert "idx_comments_commit" in indices
+
+
+def test_regression_bug_253_sqlite_comment_uuid_integrity(tmp_path: Path) -> None:
+    """Verify BUG-253: SQLiteReviewStore upserts comments without crashing on UNIQUE constraint for comments.uuid."""
+    db_path = tmp_path / "cr_test.sqlite"
+    store = SQLiteReviewStore(db_path)
+
+    # 1. Save an initial session with a comment with an explicit UUID and id
+    comment_uuid = "4c49f1ac-8622-4a28-970a-6dfc0302e31c"
+    c1 = CommentModel(
+        id="4c49f1ac",
+        uuid=comment_uuid,
+        file_path="src/projects/carrier_board/pcb.yaml",
+        start_line=904,
+        end_line=904,
+        severity=ReviewSeverity.MUST_FIX,
+        body="Initial comment",
+        created_at="2026-10-01T01:00:00Z",
+        commit="working",
+    )
+    session = ReviewSessionModel(
+        title="Test Session",
+        repo_name="hardware",
+        comments=[c1],
+        created_at="2026-10-01T01:00:00Z",
+        updated_at="2026-10-01T01:00:00Z",
+    )
+    store.save_session(session)
+
+    # 2. Upsert a comment with the same UUID but a different temporary id (e.g., from frontend or markdown import)
+    c2 = CommentModel(
+        id="new_temp_id",
+        uuid=comment_uuid,
+        file_path="src/projects/carrier_board/pcb.yaml",
+        start_line=904,
+        end_line=904,
+        severity=ReviewSeverity.MUST_FIX,
+        body="Updated comment text",
+        created_at="2026-10-01T01:05:00Z",
+        commit="working",
+    )
+    # Must not raise sqlite3.IntegrityError: UNIQUE constraint failed: comments.uuid
+    store.save_comment(c2)
+
+    # 3. Verify comment was updated in place
+    loaded = store.get_comment_by_uuid(comment_uuid)
+    assert loaded is not None
+    assert loaded.body == "Updated comment text"
+    assert loaded.id == "new_temp_id"
+
+    # 4. Save via session upsert
+    loaded_session = store.load_session()
+    assert loaded_session is not None
+    assert len(loaded_session.comments) == 1
+    loaded_session.comments[0].body = "Updated via session"
+    store.save_session(loaded_session)
+
+    loaded_again = store.get_comment_by_uuid(comment_uuid)
+    assert loaded_again is not None
+    assert loaded_again.body == "Updated via session"
+
+
+def test_regression_bug_258_cr_feedback_timestamp_not_modified(tmp_path: Path) -> None:
+    """Verify BUG-258: CR feedback markdown is not rewritten when only timestamp would change.
+
+    When export_commit_markdown or sync_feedback is called on an existing CR_<commit>.md file,
+    the file must NOT be rewritten or touched if the review findings/comments have not changed.
+    """
+    import time
+    import uuid as uuid_pkg
+
+    repo_dir, commits = create_isolated_git_repo(tmp_path)
+    feedback_dir = repo_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    exporter = MarkdownReviewExporter(repo_root=repo_dir)
+
+    commit_sha = commits[-1]
+    c1 = CommentModel(
+        id="c1",
+        uuid=str(uuid_pkg.uuid4()),
+        file_path="src/model/wiring.py",
+        start_line=364,
+        end_line=364,
+        severity=ReviewSeverity.MUST_FIX,
+        body="Review finding text",
+        author="Reviewer",
+        code_snippet="dnp=False",
+        created_at="2026-10-01T23:52:00Z",
+        resolved=False,
+        commit=commit_sha,
+    )
+    session = ReviewSessionModel(
+        title="Code Review: hardware",
+        revisions=[commit_sha],
+        comments=[c1],
+        created_at="2026-10-01 23:52:00 UTC",
+    )
+
+    # 1. Initial export writes CR_<commit>.md
+    out_file = exporter.export_commit_markdown(session, commit_sha, feedback_dir)
+    assert out_file is not None
+    assert out_file.exists()
+
+    initial_content = out_file.read_text(encoding="utf-8")
+    initial_mtime = out_file.stat().st_mtime_ns
+
+    # Wait slightly to ensure timestamp/mtime would differ if rewritten
+    time.sleep(0.02)
+
+    # 2. Call export_commit_markdown again with session (potentially newly initialized)
+    session_again = ReviewSessionModel(
+        title="Code Review: hardware",
+        revisions=[commit_sha],
+        comments=[c1.model_copy(deep=True)],
+    )
+    out_file_2 = exporter.export_commit_markdown(session_again, commit_sha, feedback_dir)
+    assert out_file_2 is not None
+
+    after_content = out_file.read_text(encoding="utf-8")
+    after_mtime = out_file.stat().st_mtime_ns
+
+    # File content and mtime must remain identical - no timestamp-only rewrite
+    assert initial_content == after_content
+    assert initial_mtime == after_mtime
+
+    # 3. Verify parse_markdown_text preserves Review Date as created_at
+    parsed = exporter.parse_markdown_text(initial_content)
+    assert parsed.created_at == "2026-10-01 23:52:00 UTC"
+
+    # 4. Verify ReviewServer.sync_feedback() does not rewrite or touch mtime of unchanged CR file
+    server = ReviewServer(
+        repo_root=repo_dir,
+        state_file=repo_dir / "review_state.json",
+        markdown_output=repo_dir / "build" / "CR.md",
+        bind_and_activate=False,
+    )
+    time.sleep(0.02)
+    server.sync_feedback()
+
+    after_sync_content = out_file.read_text(encoding="utf-8")
+    after_sync_mtime = out_file.stat().st_mtime_ns
+    assert initial_content == after_sync_content
+    assert initial_mtime == after_sync_mtime

@@ -1,0 +1,32 @@
+================================================================================
+PCB MANUFACTURING & ORDER SPECIFICATION SUMMARY
+================================================================================
+Project:               {{ provider_name }}
+Subassembly / Board:   {{ name }}
+Order Category:        {{ order_category }}
+Base Material:         {{ base_material }}
+Layer Count:           {{ layer_count }} Layers
+Board Thickness:       {{ thick_str }}
+Board Dimensions:      {{ dim_str }}
+Corner Fillet:         R = {{ "%.2f"|format(cr) }} mm
+Surface Finish:        {{ surface_finish }}
+Solder Mask / Cover:   {{ coverlay }}
+Silkscreen:            {{ silkscreen }}
+Stiffener:             {{ stiffener }}
+Min Track / Spacing:   {{ min_track }}
+Min Hole Size (Drill): {{ min_drill }}
+
+SMT ASSEMBLY SPECIFICATIONS:
+--------------------------------------------------------------------------------
+Assembly Type:         {{ assembly_type }}
+Total Placements:      {{ total_placements }} (Top: {{ top_count }}, Bottom: {{ bottom_count }})
+Critical Components:   {{ critical_components }}
+Solder Paste / Alloy:  Lead-free SAC305 (Sn96.5 / Ag3.0 / Cu0.5), RoHS 3 compliant
+Stencil Foil:          0.10 mm (4.0 mil) laser-cut electro-polished stainless steel with nano-coating
+Reflow Profile:        Peak 240-245 C (Max 250 C), Time above liquidus (217 C): 60-90 sec
+Inspection:            100% 3D AOI for SMT, 100% AXI for BGA and QFN thermal ground pads
+
+SUPPLIER SPECIAL REQUIREMENTS / ORDER REMARKS (<= 600 CHARS):
+--------------------------------------------------------------------------------
+{{ remarks }}
+================================================================================
