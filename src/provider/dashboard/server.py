@@ -13,6 +13,7 @@ import mimetypes
 from pathlib import Path
 import re
 import socket
+import sys
 from typing import Any, Dict, List, Optional
 import urllib.parse
 import uuid
@@ -48,6 +49,20 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:  # noqa: A002
         """Suppress default HTTP server logging to preserve clean console output."""
         return
+
+    def handle_one_request(self) -> None:
+        """Handle a single HTTP request, catching client disconnects gracefully."""
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+
+    def handle(self) -> None:
+        """Handle incoming requests on this connection until closed."""
+        try:
+            super().handle()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
 
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboards and data query endpoints."""
@@ -170,15 +185,18 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 mime_type, _ = mimetypes.guess_type(file_path)
                 if not mime_type:
                     mime_type = "application/octet-stream"
-                self.send_response(200)
-                self.send_header("Content-Type", mime_type)
-                self.send_header("Content-Length", str(len(raw_bytes)))
-                filename = Path(file_path).name
-                self.send_header("Content-Disposition", f'inline; filename="{filename}"')
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Connection", "close")
-                self.end_headers()
-                self.wfile.write(raw_bytes)
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", mime_type)
+                    self.send_header("Content-Length", str(len(raw_bytes)))
+                    filename = Path(file_path).name
+                    self.send_header("Content-Disposition", f'inline; filename="{filename}"')
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.wfile.write(raw_bytes)
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                    self.close_connection = True
             case "/api/database":
                 self._send_json(self.server.bug_server.database.model_dump(mode="json"))
             case "/api/next_bug_id":
@@ -518,17 +536,28 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             else:
                 mime_type = "text/plain"
         content = file_target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", f"{mime_type}; charset=utf-8")
-        self.send_header("Content-Length", str(len(content)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(content)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", f"{mime_type}; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(content)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
 
     def _handle_serve_attachment(self, path: str) -> None:
         """Serve uploaded attachments."""
         rel = path.lstrip("/")
         file_target = (self.server.repo_root / rel).resolve()
+        if not file_target.is_file():
+            if hasattr(self.server, "bug_server") and self.server.bug_server:
+                att_dir = getattr(self.server.bug_server, "attachments_dir", None)
+                if att_dir:
+                    clean_rel = rel.removeprefix("attachments/") if rel.startswith("attachments/") else rel
+                    candidate = (att_dir / clean_rel).resolve()
+                    if candidate.is_file():
+                        file_target = candidate
         if not file_target.is_file():
             self.send_error(404, "Attachment not found")
             return
@@ -536,12 +565,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if not mime_type:
             mime_type = "application/octet-stream"
         content = file_target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", mime_type)
-        self.send_header("Content-Length", str(len(content)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(content)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", mime_type)
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(content)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
 
     def _handle_add_comment(self, data: Dict[str, Any]) -> None:
         """Add a review comment to the session."""
@@ -765,9 +797,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         b64_content = data.get("content_base64", "")
         text_content = data.get("content_text", "")
 
-        att_dir = self.server.repo_root / "attachments"
-        att_dir.mkdir(parents=True, exist_ok=True)
-        dest_path = att_dir / filename
+        raw_bug_id = str(data.get("bug_id") or data.get("bugId") or "").strip()
+        if not raw_bug_id and str(data.get("id", "")).startswith("BUG-"):
+            raw_bug_id = str(data.get("id")).strip()
+        bug_id = Path(raw_bug_id).name if raw_bug_id else ""
+        filename = Path(filename).name
+
+        att_dir = getattr(self.server.bug_server, "attachments_dir", None) or (self.server.repo_root / "attachments")
+        dest_dir = (att_dir / bug_id) if bug_id else att_dir
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = dest_dir / filename
 
         if b64_content:
             file_bytes = base64.b64decode(b64_content)
@@ -799,26 +838,34 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
     def _send_html(self, html: str) -> None:
         """Send HTML payload with UTF-8 encoding."""
         encoded = html.encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(encoded)
-        self.close_connection = True
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
+            self.close_connection = True
 
     def _send_json(self, data: Any, status: int = 200) -> None:
         """Send JSON response payload."""
         encoded = json.dumps(data, indent=2).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(encoded)
-        self.close_connection = True
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
+            self.close_connection = True
 
 
 class DashboardServer(ThreadingHTTPServer):
@@ -832,6 +879,15 @@ class DashboardServer(ThreadingHTTPServer):
         sock, addr = super().get_request()
         sock.settimeout(10.0)
         return sock, addr
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        """Handle client connection errors gracefully without printing tracebacks on client disconnects."""
+        exc_type, _, _ = sys.exc_info()
+        if exc_type is not None and issubclass(
+            exc_type, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
+        ):
+            return
+        super().handle_error(request, client_address)
 
     def __init__(
         self,

@@ -2923,10 +2923,16 @@ def test_regression_bugs_115_through_127() -> None:
         exporter = PCBExporter(pcb_cfg, wiring=wiring)
         out_pcb = exporter.export_kicad_pcb(Path(tmpdir) / "board.kicad_pcb")
         kicad_text = out_pcb.read_text()
+        omitted_designators = set(getattr(pcb_cfg, "omitted_silkscreen_designators", []))
         for fp in exporter.get_footprints_for_board():
-            assert kicad_text.count(f'(gr_text "{fp.name}"') == 1, (
-                f"BUG-127: Footprint {fp.name} must have exactly one gr_text silkscreen designator"
-            )
+            if fp.name in omitted_designators:
+                assert kicad_text.count(f'(gr_text "{fp.name}"') == 0, (
+                    f"Footprint {fp.name} is in omitted_silkscreen_designators and must have 0 gr_text designators"
+                )
+            else:
+                assert kicad_text.count(f'(gr_text "{fp.name}"') == 1, (
+                    f"BUG-127: Footprint {fp.name} must have exactly one gr_text silkscreen designator"
+                )
             ref_present = (
                 f'(property "Reference" "{fp.name}"' in kicad_text or f'(fp_text reference "{fp.name}"' in kicad_text
             )

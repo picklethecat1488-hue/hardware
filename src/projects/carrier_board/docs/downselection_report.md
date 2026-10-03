@@ -87,6 +87,8 @@ flowchart TD
 | **`U11`** | BTLE 5.0 Wireless Module | LGA-72 (10x15mm) | `u-blox NINA-B312-02B` | Pre-flashed standalone Bluetooth Low Energy 5.0 module with internal antenna replacing legacy edge connector. | [u-blox NINA-B31 Series](https://www.u-blox.com/en/product/nina-b31-series-u-connect) |
 | **`J15`** | 2x5 SWD Recovery Header (DNP) | Micro-Header (2x5 1.27mm pitch) | `pin_header_2x5_1.27mm` | Factory SWD debug and firmware recovery header for U11 BLE module (`GND`, `SWDIO`, `SWDCLK`, `RESET_N`, `VCC_NINA`). Marked Do Not Populate (DNP) in production BOM. | [Carrier Board Schematic](carrier_board_schematic.svg) |
 | **`SW2`** | Tactile Reset Push-Button | SMD Pushbutton Switch | `PTS645SL43SMTR92LFS` | Manual tactile reset push-button switch for U11 BLE module (`RESET_N`). | [C&K PTS645 Series](https://www.ckswitches.com/products/switches/product-details/Tactile/PTS645/) |
+| **`J16`** | NFC Antenna Header | pin_header_1x2 (2.54mm pitch) | `pin_header_1x2` | 2-pin breakout header connecting external 13.56 MHz flexible NFC coil antenna (Molex 146236-0001) to NINA-B312 NFC pins. | [Molex 146236 Portal](https://www.molex.com/molex/products/part-detail/antennas/1462360001) |
+| **`C18`, `C19`** | NFC Tuning Shunt Capacitors | 0402 SMD (1.0x0.5mm) | `GRM1555C1H301JA01D` | Symmetrical 300 pF C0G/NP0 50V shunt tuning capacitors for NFC1 and NFC2 antenna matching; vertically stacked at $(7.0, -35.2)$ and $(7.0, -37.3)$ on F.Cu outside U11 silkscreen border. | [Murata GRM1555 Portal](https://www.murata.com/en-global/products/productdetail?partno=GRM1555C1H301JA01D) |
 | **`J2` / `J4`** | FPC 30-Pin Connectors | FPC-30P-0.5mm | `HIROSE-FH35C-30S` | Zero-insertion-force (ZIF) 30-pin connectors bridging the rigid carrier board (`J2`) and flexible sensing tail (`J4`). | [Hirose FH35C Series Catalog](https://www.hirose.com/en/product/series/FH35C) |
 | **`J3`** | USB Type-C Receptacle | USB-C-16P (Hybrid SMD/TH) | `TYPE-C-16P` | 5V VBUS power delivery input, CC1/CC2 5.1k configuration channels, and USB 2.0 D+/D- communication. | [USB-IF Type-C Specification](https://www.usb.org/document-library/usb-type-cr-cable-and-connector-specification-release-22) |
 
@@ -454,6 +456,7 @@ The test board carrier has a compact form factor of $60.0\text{ mm} \times 90.0\
    - **`J_SWD` 10-Pin Header**: Placed at $(18.0, 35.0)$ for convenient top-side debugger cable routing.
 3. **Bottom Edge $(Y \in [-30, -45])$**:
    - **`U11` u-blox NINA-B312 BTLE Module & `J15` SWD Recovery Header (DNP)**: Placed at $(0.0, -36.0)$ and $(-14.5, -41.0)$ (2x5 1.27mm pitch DNP header, with `SW2` tactile reset switch at $(-14.5, -36.5)$) facing South along the lower edge with $16.0\times 5.0\text{ mm}$ RF keepout at $(0.0, -42.0)$.
+   - **`C18` & `C19` Shunt Tuning Capacitors**: Vertically stacked at $(7.0, -35.2)$ and $(7.0, -37.3)$ on `F.Cu`, positioned cleanly outside U11 package boundary and silkscreen brackets, routing NFC1/NFC2 to external NFC coil header `J16` at $(13.5, -36.5)$.
    - **`J_GPIO` 10-Pin Breakout Header**: Located along the bottom right $(18.0, -28.0)$.
 4. **Left Edge $(X \in [-30, -15])$**:
    - **`J3` USB-C Receptacle**: Centered at $(-25.0, 0.0)$ facing the left chassis edge.
@@ -466,6 +469,22 @@ The test board carrier has a compact form factor of $60.0\text{ mm} \times 90.0\
    - **`U_LED` Driver & RGB Status LED**: Located at $(22.0, 26.0)$ near the corner for maximum visibility through the top lid window.
 6. **Bottom Exterior Enclosure Shell (`BUG-060`)**:
    - Four cylindrical recesses of diameter $8.0\text{ mm}$ and depth $1.0\text{ mm}$ located at coordinates $(\pm 25.5, \pm 40.5)$ on the bottom face ($Z = -h_{\text{shell}}/2$), precisely capturing rubber non-skid feet.
+
+### 6.1 Detailed Assembly and SMT Process Guidelines
+
+* Placement Topology: Double-sided SMT assembly
+  * Primary Top Side (F.Cu): MCU (U1), BLE module (U11), Charger (U3), USB-C (J3), FPC (J2), Passives
+  * Secondary Bottom Side (B.Cu): Cap touch controller (U2), decoupling passives
+* Solder Paste and Stencil:
+  * Alloy: Lead-free SAC305 (Sn96.5 / Ag3.0 / Cu0.5), RoHS 3 compliant
+  * Powder size: Type 4 or Type 5 mesh suitable for 0.4mm BGA pads
+  * Stencil foil: 0.10 mm (4.0 mil) laser-cut electro-polished stainless steel with nano-coating
+* Reflow Thermal Profile:
+  * Peak reflow temperature: 240 deg C to 245 deg C (Max 250 deg C)
+  * Time above liquidus (217 deg C): 60 to 90 seconds
+* Post-Reflow Inspection:
+  * 100% 3D Automated Optical Inspection (AOI) for all SMT chips
+  * 100% Automated X-ray Inspection (AXI) for BGA balls on U1 and QFN thermal ground pads on U2, U3, U4, U9
 
 ---
 

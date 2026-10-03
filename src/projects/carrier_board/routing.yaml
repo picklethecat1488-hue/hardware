@@ -13929,31 +13929,40 @@ traces:
   - 4.125
   - -36.0
   end_mm:
-  - 4.7
-  - -35.5
+  - 5.425
+  - -34.7
 - net: NFC1
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 4.7
-  - -35.5
+  - 5.425
+  - -34.7
   end_mm:
-  - 5.3
-  - -35.5
+  - 7.0
+  - -34.7
 - net: NFC1
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 5.3
-  - -35.5
+  - 7.0
+  - -34.7
   end_mm:
-  - 6.8
+  - 7.6
+  - -34.7
+- net: NFC1
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 7.6
+  - -34.7
+  end_mm:
+  - 7.6
   - -35.5
 - net: NFC1
   layer: B.Cu
   width_mm: 0.15
   start_mm:
-  - 6.8
+  - 7.6
   - -35.5
   end_mm:
   - 12.23
@@ -13974,22 +13983,40 @@ traces:
   - 4.125
   - -37.0
   end_mm:
-  - 6.3
-  - -37.0
+  - 4.925
+  - -37.8
 - net: NFC2
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 6.3
-  - -37.0
+  - 4.925
+  - -37.8
   end_mm:
-  - 6.8
+  - 7.0
+  - -37.8
+- net: NFC2
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 7.0
+  - -37.8
+  end_mm:
+  - 7.6
+  - -37.8
+- net: NFC2
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 7.6
+  - -37.8
+  end_mm:
+  - 7.6
   - -37.0
 - net: NFC2
   layer: B.Cu
   width_mm: 0.15
   start_mm:
-  - 6.8
+  - 7.6
   - -37.0
   end_mm:
   - 11.0
@@ -14025,8 +14052,17 @@ traces:
   layer: F.Cu
   width_mm: 0.15
   start_mm:
-  - 5.3
-  - -36.5
+  - 7.0
+  - -35.7
+  end_mm:
+  - 6.35
+  - -35.7
+- net: GND
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 6.35
+  - -35.7
   end_mm:
   - 5.8
   - -36.25
@@ -14034,11 +14070,20 @@ traces:
   layer: F.Cu
   width_mm: 0.15
   start_mm:
+  - 7.0
+  - -36.8
+  end_mm:
+  - 6.35
+  - -36.8
+- net: GND
+  layer: F.Cu
+  width_mm: 0.15
+  start_mm:
+  - 6.35
+  - -36.8
+  end_mm:
   - 5.8
   - -36.25
-  end_mm:
-  - 6.3
-  - -36.0
 - net: 3V3
   layer: F.Cu
   width_mm: 0.15
@@ -17918,7 +17963,7 @@ vias:
   net: NFC1
   pad_diameter_mm: 0.36
   position_mm:
-  - 6.8
+  - 7.6
   - -35.5
 - drill_diameter_mm: 0.16
   layer_end: B.Cu
@@ -17926,7 +17971,7 @@ vias:
   net: NFC2
   pad_diameter_mm: 0.36
   position_mm:
-  - 6.8
+  - 7.6
   - -37.0
 - drill_diameter_mm: 0.16
   layer_end: B.Cu

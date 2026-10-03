@@ -284,7 +284,7 @@ class Builder:
             file_manifest = self.build_manifest.setdefault("file", {})
             brep_manifest[manifest_key] = current_hash
             file_manifest[manifest_key] = self._get_file_hash(path)
-            self.logger.print(f"Saved {path}", symbol="📄")
+            self.logger.log(f"Saved {path}", symbol="📄")
 
     def _resolve_subassemblies(self, targets: Any, base_subs: Any) -> Sequence[str]:
         """Determine which subassemblies should be built for a target."""
@@ -530,7 +530,7 @@ class Builder:
     def generate_pcbs(self, out_dir: str, names: list[str] | None = None, force_update: Optional[bool] = None):
         """Export PCB Gerber archives, supplier BOM/CPL, vector schematics, and 3D STEP models."""
         from provider.pcb import PCBExporter, PCBDesignRulesChecker
-        from model.pcb import PCBConfig, BoardType
+        from model.pcb import PCBConfig, resolve_subassembly_pcb_config
         from model.wiring import Wiring
 
         if names:
@@ -575,59 +575,7 @@ class Builder:
                     elif hasattr(part_res, "pcb_metadata"):
                         sub_pcb_config = part_res.pcb_metadata
 
-                target_cfg = sub_pcb_config or pcb_config
-                if sub_pcb_config and pcb_config.revision and getattr(target_cfg, "board_type", None) != BoardType.FLEX:
-                    target_cfg = target_cfg.model_copy(update={"revision": pcb_config.revision})
-                if sub_pcb_config and not target_cfg.stackup:
-                    target_cfg = target_cfg.model_copy(update={"stackup": pcb_config.stackup})
-                if sub_pcb_config and pcb_config.design_rules:
-                    target_cfg = target_cfg.model_copy(update={"design_rules": pcb_config.design_rules})
-                if sub_pcb_config and not target_cfg.capacitive_sensors and pcb_config.capacitive_sensors:
-                    target_cfg = target_cfg.model_copy(update={"capacitive_sensors": pcb_config.capacitive_sensors})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.copper_regions
-                    and pcb_config.copper_regions
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"copper_regions": pcb_config.copper_regions})
-                if sub_pcb_config and not target_cfg.net_classes and pcb_config.net_classes:
-                    target_cfg = target_cfg.model_copy(update={"net_classes": pcb_config.net_classes})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.schematic_sheets
-                    and pcb_config.schematic_sheets
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"schematic_sheets": pcb_config.schematic_sheets})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.schematic_layout
-                    and pcb_config.schematic_layout
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"schematic_layout": pcb_config.schematic_layout})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.silkscreen_texts
-                    and pcb_config.silkscreen_texts
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"silkscreen_texts": pcb_config.silkscreen_texts})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.traces
-                    and pcb_config.traces
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"traces": pcb_config.traces})
-                if (
-                    sub_pcb_config
-                    and not target_cfg.vias
-                    and pcb_config.vias
-                    and getattr(target_cfg, "board_type", None) != BoardType.FLEX
-                ):
-                    target_cfg = target_cfg.model_copy(update={"vias": pcb_config.vias})
+                target_cfg = resolve_subassembly_pcb_config(sub_pcb_config, pcb_config, subassembly=subassembly)
 
                 # Run DRC and routing connectivity checks
                 board_dir = Path(out_dir) / "board" / provider.name
@@ -691,7 +639,7 @@ class Builder:
                         raise ValueError(
                             f"Failed to build {provider.name}/{subassembly}:pcb. Project has DRC errors:  {drc_log_file}"
                         )
-                    self.logger.print(f"Generated KiCad DRC Report: {rpt_file}", symbol="🔍")
+                    self.logger.log(f"Generated KiCad DRC Report: {rpt_file}", symbol="🔍")
                     if subassembly == "carrier_board":
                         alias_rpt = rpt_dir / f"{provider.name}-drc.rpt"
                         if alias_rpt != rpt_file and rpt_file.exists():
@@ -715,117 +663,23 @@ class Builder:
                 if target_cfg.capacitive_sensors:
                     cap_json = Path(out_dir) / "config" / provider.name / "capacitive_config.json"
                     exporter.export_capacitive_config_json(cap_json)
-                    self.logger.print(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
+                    self.logger.log(f"Generated Capacitive Config: {cap_json}", symbol="⚡")
 
-                self.logger.print(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
-                self.logger.print(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
-                self.logger.print(f"Generated Board Files: {board_dir}", symbol="📦")
-                self.logger.print(f"Generated BOM: {bom_csv}", symbol="📋")
-                self.logger.print(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
+                self.logger.log(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
+                self.logger.log(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
+                self.logger.log(f"Generated Board Files: {board_dir}", symbol="📦")
+                self.logger.log(f"Generated BOM: {bom_csv}", symbol="📋")
+                self.logger.log(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
 
         # Package supplier manufacturing files under build/board (BUG-262)
         for p in processed_providers:
             self.package_supplier_pcb_files(out_dir=out_dir, provider=p)
 
     def package_supplier_pcb_files(self, out_dir: str | Path, provider) -> dict[str, Path]:
-        """Package supplier manufacturing zip files under build/board/<provider.name> per BUG-262.
+        """Package supplier manufacturing zip files under build/board/<provider.name> per BUG-262 and BUG-271."""
+        from provider.pcb import package_supplier_pcb_files
 
-        Outputs under build/board/<provider.name>/:
-        - gerbers.zip: contains .pcb, .pcbdoc, .cam, .brd and gerber files
-        - bom_templates.zip: contains <PCB name>_bom.csv BOM list for each PCB
-        - centroid_files.zip: contains <PCB name>_pos.csv centroid list for each PCB
-        - assembly_files.zip: contains <PCB name>_top.png, <PCB name>_bottom.png textures for each PCB
-        """
-        out_path = Path(out_dir)
-        board_dir = out_path / "board" / provider.name
-        bom_dir = out_path / "bom" / provider.name
-        textures_dir = board_dir / "textures"
-        board_dir.mkdir(parents=True, exist_ok=True)
-
-        # Clean up any legacy zip archives directly under build/board
-        top_board_dir = out_path / "board"
-        for zip_name in ("gerbers.zip", "bom_templates.zip", "centroid_files.zip", "assembly_files.zip"):
-            stray_zip = top_board_dir / zip_name
-            if stray_zip.is_file():
-                stray_zip.unlink(missing_ok=True)
-
-        # 1. Identify all PCB names from .kicad_pcb files in board_dir
-        pcb_files = list(board_dir.glob("*.kicad_pcb"))
-        pcb_names = [p.stem for p in pcb_files]
-        if not pcb_names and hasattr(provider, "name"):
-            pcb_names = [provider.name]
-
-        # Ensure companion files (.pcb, .pcbdoc, .brd, .cam) exist for each PCB
-        for name in pcb_names:
-            kicad_pcb = board_dir / f"{name}.kicad_pcb"
-            if kicad_pcb.exists():
-                for ext in (".pcb", ".pcbdoc", ".brd"):
-                    companion = board_dir / f"{name}{ext}"
-                    if not companion.exists():
-                        shutil.copy2(kicad_pcb, companion)
-            job_file = board_dir / f"{name}-job.gbrjob"
-            cam_file = board_dir / f"{name}.cam"
-            if not cam_file.exists():
-                if job_file.exists():
-                    shutil.copy2(job_file, cam_file)
-                elif kicad_pcb.exists():
-                    shutil.copy2(kicad_pcb, cam_file)
-
-        def create_zip(target_zip: Path, file_items: list[tuple[Path, str]]) -> Path:
-            target_zip.parent.mkdir(parents=True, exist_ok=True)
-            with zipfile.ZipFile(target_zip, "w", zipfile.ZIP_DEFLATED) as zf:
-                for file_path, arcname in file_items:
-                    if file_path.exists():
-                        zf.write(file_path, arcname=arcname)
-            return target_zip
-
-        # 2. Build gerbers.zip
-        # Contains .pcb, .pcbdoc, .cam, .brd, and gerber files (.gbr, .drl, .gbrjob, .kicad_pcb)
-        gerber_extensions = {".gbr", ".drl", ".gbrjob", ".kicad_pcb", ".pcb", ".pcbdoc", ".cam", ".brd"}
-        gerber_files = [f for f in board_dir.iterdir() if f.is_file() and f.suffix.lower() in gerber_extensions]
-        gerber_items = [(f, f.name) for f in sorted(gerber_files, key=lambda x: x.name)]
-
-        # 3. Build bom_templates.zip: <PCB name>_bom.csv for each PCB
-        bom_items = []
-        for name in pcb_names:
-            csv_path = bom_dir / f"{name}_bom.csv"
-            if not csv_path.exists() and (bom_dir / "bom.csv").exists() and name == provider.name:
-                shutil.copy2(bom_dir / "bom.csv", csv_path)
-            if csv_path.exists():
-                bom_items.append((csv_path, f"{name}_bom.csv"))
-
-        # 4. Build centroid_files.zip: <PCB name>_pos.csv for each PCB
-        centroid_items = []
-        for name in pcb_names:
-            csv_path = bom_dir / f"{name}_pos.csv"
-            if not csv_path.exists() and (bom_dir / "pos.csv").exists() and name == provider.name:
-                shutil.copy2(bom_dir / "pos.csv", csv_path)
-            if csv_path.exists():
-                centroid_items.append((csv_path, f"{name}_pos.csv"))
-
-        # 5. Build assembly_files.zip: <PCB name>_top.png, <PCB name>_bottom.png for each PCB
-        assembly_items = []
-        for name in pcb_names:
-            for side in ("top", "bottom"):
-                img_name = f"{name}_{side}.png"
-                img_path = textures_dir / img_name
-                if not img_path.exists():
-                    img_path = board_dir / img_name
-                if img_path.exists():
-                    assembly_items.append((img_path, img_name))
-
-        created_zips = {
-            str(board_dir / "gerbers.zip"): create_zip(board_dir / "gerbers.zip", gerber_items),
-            str(board_dir / "bom_templates.zip"): create_zip(board_dir / "bom_templates.zip", bom_items),
-            str(board_dir / "centroid_files.zip"): create_zip(board_dir / "centroid_files.zip", centroid_items),
-            str(board_dir / "assembly_files.zip"): create_zip(board_dir / "assembly_files.zip", assembly_items),
-        }
-
-        self.logger.print(
-            f"Generated Supplier Packages: {board_dir}/{{gerbers,bom_templates,centroid_files,assembly_files}}.zip",
-            symbol="📦",
-        )
-        return created_zips
+        return package_supplier_pcb_files(out_dir=out_dir, provider=provider, logger=self.logger)
 
     def generate_all(self, out_dir, names: list[str] | None = None, zip_name="build.zip"):
         """Generate diagrams, parts, and package them."""
@@ -888,9 +742,9 @@ class Builder:
 
         if needs_zip(zip_path, outputs):
             zip_build(zip_file_str, outputs)
-            self.logger.print(f"Done writing {zip_file_str}", symbol="📦")
+            self.logger.log(f"Done writing {zip_file_str}", symbol="📦")
         else:
-            self.logger.print(f"{zip_name} is already up-to-date", symbol="📦")
+            self.logger.log(f"{zip_name} is already up-to-date", symbol="📦")
 
 
 def get_args():

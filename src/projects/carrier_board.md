@@ -114,6 +114,7 @@ graph TD
 | **`J10`** | **JST-PH 7-Pin Header (`B7B-PH-K-S`)** | Expansion UART / Control Bus Header | 2.0mm Pitch Thru-Hole (`JST-PH-7P`) | FTDI auxiliary signals (`DSR_N`, `DCD_N`, `CBUS4`, `CBUS2`, `DTR_N`), `PERIPH_3V3`, `GND` | Dedicated asynchronous serial control link with 3.3V peripheral power and dedicated GND. |
 | **`J14`** | **10-Pin GPIO & Modem Breakout Header** | General-Purpose GPIO & FTDI Breakout Header | 2.54mm Pitch Thru-Hole (`pin_header_1x10`) | `GPIO0`..`GPIO3`, `3V3`, `GND`, `CBUS3/5/6/7` | 4 digital GPIOs, 4 FTDI CBUS control pins, 3.3V power, and dedicated GND. |
 | **`J16`** | **NFC Antenna Header** | 2-Pin Breakout Header for External NFC Antenna | 2.54mm Pitch Thru-Hole (`pin_header_1x2`) | `NFC1`, `NFC2` | Connects external 13.56 MHz flexible NFC antenna (Molex 146236-0001). |
+| **`C18`, `C19`**| **Murata GRM1555C1H301JA01D** | NFC 13.56MHz Antenna Tuning Shunt Capacitors | 0402 SMD ($1.0\times 0.5\text{ mm}$) | `NFC1`, `NFC2` to `GND` | Symmetrical 300 pF C0G/NP0 50V shunt tuning capacitors; vertically stacked at $(7.0, -35.2)$ and $(7.0, -37.3)$ clear of U11 silkscreen border. |
 | **`J13`** | **JST-PH 2-Pin Connector (`S2B-PH-K-S`)** | 1S Li-Ion / LiPo Battery Power Input Connector | 2.0mm Pitch Thru-Hole (`JST-PH-2P`) | `VBAT`, `GND` | Direct connection for 3.7V Li-Ion battery pack with polarized mating shroud. |
 | **`BAT1`** | **PKCELL LP352438 (Recommended Battery)** | 1S 3.7V 350mAh LiPo Rechargeable Pouch Cell | $3.5\times 24\times 38\text{ mm}$ Pouch | `VBAT`, `GND` via J13 | Integrated PCM protection circuit module; pre-terminated with polarized JST-PH 2-pin connector; fits top lid cradle. |
 | **`TP1`** | **Test Point (GND)** | Ground probe through-hole test point | 1.4mm Pad / 0.8mm Drill | `GND` | Located at `(-18.0, -22.0)`. |
@@ -158,11 +159,27 @@ graph TD
    * u-blox NINA-B312 Bluetooth 5.0 Low Energy standalone pre-flashed module (`NINA-B312-02B`) with integrated PCB antenna replaces the legacy PCIe/M.2 connector.
    * Interfaces with MCU via dedicated high-speed UART (`BLE_TX`, `BLE_RX`, `BLE_RTS`, `BLE_CTS`) with hardware flow control and low-power wakeup interrupts (`BLE_WAKE_N`).
    * Equipped with SWD recovery header `J15` (1.27mm pitch 2x5 DNP header) and manual tactile reset push-button switch `SW2`.
-   * Native nRF52840 NFC-A tag interface (`NFC1`, `NFC2`) is routed through dual 15 pF shunt tuning capacitors (`C18`, `C19`) to header `J16`. Recommended mating NFC antenna: **Molex 146236-0001** (13.56 MHz flexible NFC antenna with adhesive backing, $15.0 \times 25.0\text{ mm}$, pre-matched for 15 pF tuning).
+   * Native nRF52840 NFC-A tag interface (`NFC1`, `NFC2`) is routed through dual 300 pF shunt tuning capacitors (`C18`, `C19`, vertically stacked at $X = 7.0\text{ mm}$ outside U11 silkscreen border) to header `J16`. Recommended mating NFC antenna: **Molex 146236-0001** (13.56 MHz flexible NFC antenna with adhesive backing, $15.0 \times 25.0\text{ mm}$, pre-matched for 15 pF / 300 pF tuning).
    * RF keepout zone is preserved on all copper layers directly below the antenna structure to ensure omnidirectional radiation and maximum RF link budget.
 9. **Capacitive Touch Sensing & Auxiliary Channel Routing**:
    * Azoteq IQS7222A ProxFusion controller drives the 5-button slider and proximity sensing electrodes via `J2` / `J4` (`CR0`..`CR7`).
    * The 9th sensing channel (`CT8`) is routed from `U2` pin 12 to `J2` pin `NC3` to support optional future revisions to the flex ribbon without modifying the baseline flex connector.
+
+## Assembly & SMT Manufacturing Guidelines
+
+* Placement Topology: Double-sided SMT assembly
+  * Primary Top Side (F.Cu): MCU (U1), BLE module (U11), Charger (U3), USB-C (J3), FPC (J2), Passives
+  * Secondary Bottom Side (B.Cu): Cap touch controller (U2), decoupling passives
+* Solder Paste and Stencil:
+  * Alloy: Lead-free SAC305 (Sn96.5 / Ag3.0 / Cu0.5), RoHS 3 compliant
+  * Powder size: Type 4 or Type 5 mesh suitable for 0.4mm BGA pads
+  * Stencil foil: 0.10 mm (4.0 mil) laser-cut electro-polished stainless steel with nano-coating
+* Reflow Thermal Profile:
+  * Peak reflow temperature: 240 deg C to 245 deg C (Max 250 deg C)
+  * Time above liquidus (217 deg C): 60 to 90 seconds
+* Post-Reflow Inspection:
+  * 100% 3D Automated Optical Inspection (AOI) for all SMT chips
+  * 100% Automated X-ray Inspection (AXI) for BGA balls on U1 and QFN thermal ground pads on U2, U3, U4, U9
 
 ## Battery Life Estimation
 

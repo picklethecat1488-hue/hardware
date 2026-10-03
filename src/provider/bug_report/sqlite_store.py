@@ -37,74 +37,91 @@ class SQLiteBugStore:
     @contextlib.contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         """Create, configure, and safely close a SQLite connection with foreign keys enabled."""
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")
+        self._ensure_schema(conn)
         try:
             with conn:
                 yield conn
         finally:
             conn.close()
 
+    def _ensure_schema(self, conn: sqlite3.Connection) -> None:
+        """Ensure schema tables and indices exist in connection."""
+        cursor = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='attachments'")
+        if not cursor.fetchone():
+            self._init_schema_with_conn(conn)
+            return
+        cursor = conn.execute("PRAGMA table_info(bugs)")
+        cols = [row["name"] for row in cursor.fetchall()]
+        if "uuid" not in cols:
+            self._init_schema_with_conn(conn)
+
     def _init_schema(self) -> None:
         """Initialize tables and indices if they do not already exist."""
-        with self._get_connection() as conn:
-            conn.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS metadata (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                );
+        with self._get_connection():
+            pass
 
-                CREATE TABLE IF NOT EXISTS bugs (
-                    id TEXT PRIMARY KEY,
-                    uuid TEXT,
-                    title TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    severity TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    component TEXT NOT NULL DEFAULT '',
-                    description TEXT NOT NULL DEFAULT '',
-                    reproduction_steps TEXT NOT NULL DEFAULT '[]',
-                    expected_behavior TEXT NOT NULL DEFAULT '',
-                    actual_behavior TEXT NOT NULL DEFAULT '',
-                    logs TEXT NOT NULL DEFAULT '',
-                    created_at TEXT NOT NULL DEFAULT '',
-                    updated_at TEXT NOT NULL DEFAULT '',
-                    resolved_at TEXT,
-                    resolution_notes TEXT NOT NULL DEFAULT ''
-                );
+    def _init_schema_with_conn(self, conn: sqlite3.Connection) -> None:
+        """Execute table creation and migrations on connection."""
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
 
-                CREATE TABLE IF NOT EXISTS attachments (
-                    id TEXT PRIMARY KEY,
-                    bug_id TEXT NOT NULL,
-                    filename TEXT NOT NULL,
-                    file_type TEXT NOT NULL DEFAULT 'reference',
-                    file_path TEXT NOT NULL,
-                    size_bytes INTEGER NOT NULL DEFAULT 0,
-                    description TEXT NOT NULL DEFAULT '',
-                    created_at TEXT NOT NULL DEFAULT '',
-                    FOREIGN KEY (bug_id) REFERENCES bugs(id) ON DELETE CASCADE ON UPDATE CASCADE
-                );
+            CREATE TABLE IF NOT EXISTS bugs (
+                id TEXT PRIMARY KEY,
+                uuid TEXT,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                category TEXT NOT NULL,
+                component TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                reproduction_steps TEXT NOT NULL DEFAULT '[]',
+                expected_behavior TEXT NOT NULL DEFAULT '',
+                actual_behavior TEXT NOT NULL DEFAULT '',
+                logs TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT '',
+                resolved_at TEXT,
+                resolution_notes TEXT NOT NULL DEFAULT ''
+            );
 
-                CREATE INDEX IF NOT EXISTS idx_attachments_bug_id ON attachments(bug_id);
-                CREATE INDEX IF NOT EXISTS idx_bugs_status ON bugs(status);
-                CREATE INDEX IF NOT EXISTS idx_bugs_severity ON bugs(severity);
-                """
-            )
-            # Ensure uuid column exists on preexisting databases
-            cursor = conn.execute("PRAGMA table_info(bugs)")
-            cols = [row["name"] for row in cursor.fetchall()]
-            if "uuid" not in cols:
-                conn.execute("ALTER TABLE bugs ADD COLUMN uuid TEXT")
+            CREATE TABLE IF NOT EXISTS attachments (
+                id TEXT PRIMARY KEY,
+                bug_id TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                file_type TEXT NOT NULL DEFAULT 'reference',
+                file_path TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL DEFAULT 0,
+                description TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (bug_id) REFERENCES bugs(id) ON DELETE CASCADE ON UPDATE CASCADE
+            );
 
-            # Backfill any missing UUIDs
-            null_uuid_rows = conn.execute("SELECT id FROM bugs WHERE uuid IS NULL OR uuid = ''").fetchall()
-            for r in null_uuid_rows:
-                conn.execute("UPDATE bugs SET uuid = ? WHERE id = ?", (str(uuid_pkg.uuid4()), r["id"]))
+            CREATE INDEX IF NOT EXISTS idx_attachments_bug_id ON attachments(bug_id);
+            CREATE INDEX IF NOT EXISTS idx_bugs_status ON bugs(status);
+            CREATE INDEX IF NOT EXISTS idx_bugs_severity ON bugs(severity);
+            """
+        )
+        # Ensure uuid column exists on preexisting databases
+        cursor = conn.execute("PRAGMA table_info(bugs)")
+        cols = [row["name"] for row in cursor.fetchall()]
+        if "uuid" not in cols:
+            conn.execute("ALTER TABLE bugs ADD COLUMN uuid TEXT")
 
-            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_bugs_uuid ON bugs(uuid)")
+        # Backfill any missing UUIDs
+        null_uuid_rows = conn.execute("SELECT id FROM bugs WHERE uuid IS NULL OR uuid = ''").fetchall()
+        for r in null_uuid_rows:
+            conn.execute("UPDATE bugs SET uuid = ? WHERE id = ?", (str(uuid_pkg.uuid4()), r["id"]))
+
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_bugs_uuid ON bugs(uuid)")
 
     def load_database(self) -> BugDatabaseModel:
         """Load full bug database model from SQLite.

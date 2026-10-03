@@ -903,6 +903,10 @@ class PCBConfig(BaseModel):
         default_factory=list,
         description="Top and bottom silkscreen vector graphic primitives (frames, lines, polygons)",
     )
+    omitted_silkscreen_designators: List[str] = Field(
+        default_factory=list,
+        description="Component designators whose silkscreen labels should not be rendered on any layer",
+    )
     net_classes: List[NetClassModel] = Field(
         default_factory=list, description="High-speed and standard electrical net classes"
     )
@@ -981,3 +985,86 @@ class PCBConfig(BaseModel):
     def sheet_center_y_mm(self) -> float:
         """Y coordinate of sheet center in mm."""
         return self.sheet_height_mm / 2.0
+
+    def inherit_from_parent(self, parent_config: "PCBConfig") -> "PCBConfig":
+        """Inherit configuration parameters from a parent carrier board PCBConfig.
+
+        Copies shared manufacturing, stackup, and routing parameters while preserving
+        subassembly-specific properties and respecting substrate constraints
+        (such as flex board design rules and rigid layer exemptions).
+
+        Args:
+            parent_config: The top-level carrier board PCBConfig.
+
+        Returns:
+            A new PCBConfig instance with inherited settings.
+        """
+        is_flex = getattr(self, "board_type", None) == BoardType.FLEX
+        updates: Dict[str, Any] = {}
+
+        if not self.stackup and parent_config.stackup:
+            updates["stackup"] = parent_config.stackup
+        if parent_config.design_rules:
+            updates["design_rules"] = parent_config.design_rules
+        if not self.capacitive_sensors and parent_config.capacitive_sensors:
+            updates["capacitive_sensors"] = parent_config.capacitive_sensors
+        if not self.net_classes and parent_config.net_classes:
+            updates["net_classes"] = parent_config.net_classes
+        if not self.omitted_silkscreen_designators and parent_config.omitted_silkscreen_designators:
+            updates["omitted_silkscreen_designators"] = parent_config.omitted_silkscreen_designators
+
+        if not is_flex:
+            if parent_config.revision:
+                updates["revision"] = parent_config.revision
+            if not self.copper_regions and parent_config.copper_regions:
+                updates["copper_regions"] = parent_config.copper_regions
+            if not self.schematic_sheets and parent_config.schematic_sheets:
+                updates["schematic_sheets"] = parent_config.schematic_sheets
+            if (
+                not self.schematic_layout or self.schematic_layout == SchematicLayoutModel()
+            ) and parent_config.schematic_layout:
+                updates["schematic_layout"] = parent_config.schematic_layout
+            if not self.silkscreen_texts and parent_config.silkscreen_texts:
+                updates["silkscreen_texts"] = parent_config.silkscreen_texts
+            if not self.traces and parent_config.traces:
+                updates["traces"] = parent_config.traces
+            if not self.vias and parent_config.vias:
+                updates["vias"] = parent_config.vias
+            if not self.silkscreen_graphics and parent_config.silkscreen_graphics:
+                updates["silkscreen_graphics"] = parent_config.silkscreen_graphics
+
+        if updates:
+            return self.model_copy(update=updates)
+        return self
+
+
+def resolve_subassembly_pcb_config(
+    sub_pcb_config: Optional[PCBConfig],
+    parent_config: Optional[PCBConfig],
+    subassembly: Optional[str] = None,
+) -> Optional[PCBConfig]:
+    """Resolve and propagate PCB configuration settings for a subassembly.
+
+    Inherits shared properties (stackup, design rules, net classes, capacitive sensors,
+    omitted silkscreen designators, and rigid-specific parameters like revision, copper regions,
+    silkscreen, traces, vias, and schematics) from the parent board configuration.
+
+    Args:
+        sub_pcb_config: Optional child or subassembly PCB configuration.
+        parent_config: Optional parent carrier board PCB configuration.
+        subassembly: Optional subassembly name identifier.
+
+    Returns:
+        The merged or resolved PCBConfig, or None if neither configuration is provided.
+    """
+    if sub_pcb_config is None:
+        if parent_config is None:
+            return None
+        if subassembly:
+            return parent_config.model_copy(update={"name": subassembly})
+        return parent_config
+
+    if parent_config is None:
+        return sub_pcb_config
+
+    return sub_pcb_config.inherit_from_parent(parent_config)

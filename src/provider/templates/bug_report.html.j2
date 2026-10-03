@@ -1342,6 +1342,9 @@
     }
 
     async function uploadPayload(payload) {
+      if (activeBugId && !payload.bug_id) {
+        payload.bug_id = activeBugId;
+      }
       showToast("Uploading " + payload.filename + "...");
       const res = await fetch("/api/upload", {
         method: "POST",

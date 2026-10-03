@@ -2593,3 +2593,114 @@ def test_regression_bug_262_supplier_pcb_guidelines_zip_outputs() -> None:
         assert "carrier_board_bottom.png" in names, "assembly_files.zip must contain carrier_board_bottom.png"
         assert "flex_tail_top.png" in names, "assembly_files.zip must contain flex_tail_top.png"
         assert "flex_tail_bottom.png" in names, "assembly_files.zip must contain flex_tail_bottom.png"
+
+
+def test_regression_bug_271_split_supplier_submissions_carrier_board() -> None:
+    """Verify BUG-271: supplier submissions are split by subassembly and include project summary forms."""
+    import zipfile
+
+    board_dir = Path("build/board/carrier_board")
+
+    # 1. Verify subassembly directories exist
+    carrier_dir = board_dir / "carrier_board"
+    flex_dir = board_dir / "flex_tail"
+    assert carrier_dir.is_dir(), "build/board/carrier_board/carrier_board directory must exist"
+    assert flex_dir.is_dir(), "build/board/carrier_board/flex_tail directory must exist"
+
+    # 2. carrier_board/gerbers.zip must contain ONLY carrier_board files
+    with zipfile.ZipFile(carrier_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        assert any("carrier_board" in n for n in names)
+        assert not any("flex_tail" in n for n in names)
+        assert "project_summary.txt" in names
+
+    # 3. flex_tail/gerbers.zip must contain ONLY flex_tail files
+    with zipfile.ZipFile(flex_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        assert any("flex_tail" in n for n in names)
+        assert not any("carrier_board" in n for n in names)
+        assert "project_summary.txt" in names
+
+    # 4. Project summaries exist and specify correct layer counts and types
+    c_summary = (carrier_dir / "project_summary.txt").read_text()
+    assert "Rigid" in c_summary
+    assert "6 Layers" in c_summary
+    assert "ENIG" in c_summary
+
+    f_summary = (flex_dir / "project_summary.txt").read_text()
+    assert "Flex" in f_summary or "FPC" in f_summary
+    assert "2 Layers" in f_summary
+
+
+def test_regression_bug_266_remove_led_and_jumper_opposite_side_designators(tmp_path: Path) -> None:
+    """Verify BUG-266: Component designators for LEDs, jumpers, and switches are removed from both B.SilkS and F.SilkS."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.exporter import PCBExporter
+
+    provider = CarrierBoardProvider()
+    provider.silkscreen()
+    pcb_cfg = provider.pcb_config
+
+    bottom_texts = [t.text for t in pcb_cfg.silkscreen_texts if t.layer == "B.SilkS"]
+
+    removed_designators = (
+        [f"D{i}" for i in range(2, 8)] + [f"JP{i}" for i in range(1, 5)] + [f"R{i}" for i in range(7, 13)] + ["SW1"]
+    )
+    for des in removed_designators:
+        assert des not in bottom_texts, f"Opposite-side component designator '{des}' found on B.SilkS"
+
+    # Verify omitted designators are registered in PCBConfig
+    assert set(removed_designators).issubset(set(pcb_cfg.omitted_silkscreen_designators))
+
+    # Verify that during PCB export, none of these designators are auto-rendered on F.SilkS or any layer
+    wiring = Wiring(str(provider.wiring_path))
+    exp = PCBExporter(pcb_cfg, wiring=wiring)
+    out_pcb = tmp_path / "carrier_board.kicad_pcb"
+    exp.export_kicad_pcb(str(out_pcb))
+    content = out_pcb.read_text(encoding="utf-8")
+    for des in removed_designators:
+        assert f'(gr_text "{des}"' not in content, (
+            f"Component designator '{des}' unexpectedly rendered on silkscreen in KiCad PCB"
+        )
+
+
+def test_regression_bug_267_c18_c19_vertical_stack_and_u11_clearance() -> None:
+    """Verify BUG-267: C18 and C19 are stacked vertically outside U11 silkscreen border with 0 DRC errors."""
+    from projects.carrier_board.provider import CarrierBoardProvider
+    from model.wiring import Wiring
+    from provider.pcb.drc import PCBDesignRulesChecker
+
+    provider = CarrierBoardProvider()
+    wiring = Wiring(str(provider.wiring_path))
+    comp_map = {c.name: c for c in wiring.footprints}
+    nets_map = {n.name: n for n in wiring.nets}
+
+    # 1. C18 and C19 exist and are stacked vertically at X >= 6.5
+    assert "C18" in comp_map, "C18 tuning capacitor must exist"
+    assert "C19" in comp_map, "C19 tuning capacitor must exist"
+    c18 = comp_map["C18"]
+    c19 = comp_map["C19"]
+
+    # Vertically stacked: same X coordinate, different Y coordinates
+    assert c18.position[0] == c19.position[0], (
+        f"C18 and C19 must be vertically stacked with matching X, got C18.X={c18.position[0]}, C19.X={c19.position[0]}"
+    )
+    assert c18.position[1] != c19.position[1], "C18 and C19 must have distinct Y positions"
+
+    # Well clear of U11 edge (X=5.0) and silkscreen brackets (X=5.25)
+    assert c18.position[0] >= 6.5, (
+        f"C18/C19 X position must be >= 6.5mm to be outside U11 silkscreen border, got {c18.position[0]}"
+    )
+
+    # 2. Verify net connections
+    assert any(c == "C18" and p == "1" for c, p in nets_map["NFC1"].pins), "C18 pin 1 must connect to NFC1"
+    assert any(c == "C18" and p == "2" for c, p in nets_map["GND"].pins), "C18 pin 2 must connect to GND"
+    assert any(c == "C19" and p == "1" for c, p in nets_map["NFC2"].pins), "C19 pin 1 must connect to NFC2"
+    assert any(c == "C19" and p == "2" for c, p in nets_map["GND"].pins), "C19 pin 2 must connect to GND"
+
+    # 3. PCB DRC check passes with 0 violations
+    drc = PCBDesignRulesChecker(provider.pcb_config)
+    report = drc.check_all(wiring=wiring)
+    assert report.passed, f"PCB DRC failed:\n{report.summary()}"
+    assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"

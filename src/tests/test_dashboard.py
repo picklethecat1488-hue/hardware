@@ -13,6 +13,7 @@ import time
 from typing import Tuple
 import urllib.request
 
+from unittest.mock import MagicMock
 import pytest
 
 from dashboard import main, parse_arguments, print_cli_smartlog
@@ -23,7 +24,7 @@ from model.vcs import (
     FileDiffModel,
     WorkingTreeFileModel,
 )
-from provider.dashboard.server import DashboardServer
+from provider.dashboard.server import DashboardRequestHandler, DashboardServer
 from provider.vcs.git_engine import GitEngine, get_git_root, run_git_command
 
 
@@ -2748,3 +2749,120 @@ def test_regression_bug_257_copy_icons_in_dashboard() -> None:
     assert "copy-sha-btn" in cr_text
     assert "copy-icon-btn" in cr_text
     assert "copyText" in cr_text
+
+
+def test_regression_bug_269_dashboard_scoped_attachments(tmp_path: Path) -> None:
+    """Verify BUG-269: DashboardServer correctly handles bug-scoped attachments with identical filenames."""
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+
+    try:
+        base_url = server.get_url()
+
+        # 1. Upload daemon.log for BUG-268
+        p1 = json.dumps(
+            {
+                "bug_id": "BUG-268",
+                "filename": "daemon.log",
+                "content_text": "log for 268 in dashboard",
+                "description": "268 log",
+            }
+        ).encode("utf-8")
+        req1 = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=p1,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req1) as resp:
+            assert resp.status == 200
+            res1 = json.loads(resp.read().decode("utf-8"))
+            assert res1["filename"] == "daemon.log"
+            assert res1["file_path"] == "attachments/BUG-268/daemon.log"
+
+        # 2. Upload daemon.log for BUG-269
+        p2 = json.dumps(
+            {
+                "bug_id": "BUG-269",
+                "filename": "daemon.log",
+                "content_text": "log for 269 in dashboard",
+                "description": "269 log",
+            }
+        ).encode("utf-8")
+        req2 = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=p2,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req2) as resp:
+            assert resp.status == 200
+            res2 = json.loads(resp.read().decode("utf-8"))
+            assert res2["filename"] == "daemon.log"
+            assert res2["file_path"] == "attachments/BUG-269/daemon.log"
+
+        # 3. Verify neither file overwrote the other and both are independently served
+        f268 = repo_dir / "attachments" / "BUG-268" / "daemon.log"
+        f269 = repo_dir / "attachments" / "BUG-269" / "daemon.log"
+        assert f268.exists()
+        assert f269.exists()
+        assert f268.read_text(encoding="utf-8") == "log for 268 in dashboard"
+        assert f269.read_text(encoding="utf-8") == "log for 269 in dashboard"
+
+        with urllib.request.urlopen(f"{base_url}/attachments/BUG-268/daemon.log") as resp:
+            assert resp.status == 200
+            assert resp.read() == b"log for 268 in dashboard"
+
+        with urllib.request.urlopen(f"{base_url}/attachments/BUG-269/daemon.log") as resp:
+            assert resp.status == 200
+            assert resp.read() == b"log for 269 in dashboard"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regression_bug_270_dashboard_server_handles_broken_pipe_gracefully(capsys):
+    """Verify BUG-270: BrokenPipeError and client disconnects are handled cleanly without printing tracebacks."""
+    server = DashboardServer.__new__(DashboardServer)
+
+    # 1. Verify BrokenPipeError in handle_error does not print traceback to stderr
+    try:
+        raise BrokenPipeError(32, "Broken pipe")
+    except BrokenPipeError:
+        server.handle_error(None, ("127.0.0.1", 58468))
+
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "BrokenPipeError" not in captured.err
+
+    # 2. Verify unexpected errors are still reported to super().handle_error
+    try:
+        raise RuntimeError("Real unexpected server failure")
+    except RuntimeError:
+        server.handle_error(None, ("127.0.0.1", 58468))
+
+    captured = capsys.readouterr()
+    assert "Real unexpected server failure" in captured.err
+
+    # 3. Verify handler _send_json and _send_html gracefully handle BrokenPipeError
+    handler = DashboardRequestHandler.__new__(DashboardRequestHandler)
+    mock_wfile = MagicMock()
+    mock_wfile.write.side_effect = BrokenPipeError(32, "Broken pipe")
+    handler.wfile = mock_wfile
+    handler.send_response = MagicMock()
+    handler.send_header = MagicMock()
+    handler.end_headers = MagicMock()
+    handler.close_connection = False
+
+    # Should not raise exception, and should set close_connection = True
+    handler._send_json({"status": "ok"})
+    assert handler.close_connection is True
+
+    handler.close_connection = False
+    handler._send_html("<html><body>test</body></html>")
+    assert handler.close_connection is True
