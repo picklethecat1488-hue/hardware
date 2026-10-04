@@ -20,6 +20,28 @@
 | **Stiffener** | {{ stiffener }} |
 | **Min Track / Clearance** | {{ min_track }} |
 | **Min Hole Size (Drill)** | {{ min_drill }} |
+| **Via Process** | {{ via_process }} |
+{% if has_impedance_control %}
+
+## Controlled Impedance Specifications
+
+* **Impedance Control**: Required (100% TDR coupon test per lot, tolerance $\pm 10\%$)
+* **Reference Ground**: Layer 2 (`In1.Cu` unbroken GND plane, $H = 0.100\text{ mm}$, $\varepsilon_r = 4.2$)
+
+| Net / Bus Class | Structure / Topology | Target Z | Layer / Position | Trace Width | Trace Spacing |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+{% for entry in impedance_entries %}
+| `{{ entry.net_class }}` | {{ entry.topology }} | **{{ entry.target_z }}** | {{ entry.layer }} | {{ entry.width }} | {{ entry.spacing }} |
+{% endfor %}
+
+## Via Process & Hole Plugging Specifications
+
+| Parameter | Specification |
+| :--- | :--- |
+| **Via Process** | {{ via_process }} |
+| **VIPPO Standard** | IPC-4761 Type VII (Non-conductive resin fill and planarized copper plated-over) |
+| **BGA Area Plugging** | 100% vias under U1 BGA-184 and adjacent SMD passives filled and capped flush |
+{% endif %}
 
 ## SMT Assembly Specifications
 

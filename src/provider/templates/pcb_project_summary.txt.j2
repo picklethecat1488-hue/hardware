@@ -15,6 +15,23 @@ Silkscreen:            {{ silkscreen }}
 Stiffener:             {{ stiffener }}
 Min Track / Spacing:   {{ min_track }}
 Min Hole Size (Drill): {{ min_drill }}
+Via Process:           {{ via_process }}
+
+{% if has_impedance_control %}
+CONTROLLED IMPEDANCE SPECIFICATION:
+--------------------------------------------------------------------------------
+Impedance Control:     Required (100% TDR coupon testing per lot, tolerance +/- 10%)
+Stackup Reference:     L1 Microstrip referenced to unbroken L2 GND plane (H=0.100 mm, Er=4.2)
+
+Target Impedance Table:
++----------------------------+-----------------------------+--------------+------------------+---------------------+-----------------------+
+| Net / Bus Class            | Structure / Topology        | Target Z     | Layer / Position | Trace Width (mm/mil)| Trace Spacing (mm/mil)|
++----------------------------+-----------------------------+--------------+------------------+---------------------+-----------------------+
+{% for entry in impedance_entries %}
+| {{ entry.net_class.ljust(26) }} | {{ entry.topology.ljust(27) }} | {{ entry.target_z.ljust(12) }} | {{ entry.layer.ljust(16) }} | {{ entry.width.ljust(19) }} | {{ entry.spacing.ljust(21) }} |
+{% endfor %}
++----------------------------+-----------------------------+--------------+------------------+---------------------+-----------------------+
+{% endif %}
 
 SMT ASSEMBLY SPECIFICATIONS:
 --------------------------------------------------------------------------------
@@ -25,6 +42,9 @@ Solder Paste / Alloy:  Lead-free SAC305 (Sn96.5 / Ag3.0 / Cu0.5), RoHS 3 complia
 Stencil Foil:          0.10 mm (4.0 mil) laser-cut electro-polished stainless steel with nano-coating
 Reflow Profile:        Peak 240-245 C (Max 250 C), Time above liquidus (217 C): 60-90 sec
 Inspection:            100% 3D AOI for SMT, 100% AXI for BGA and QFN thermal ground pads
+{% if has_impedance_control %}
+BGA / SMD Via Process: 100% Resin filled and capped / planarized copper plated-over (VIPPO / IPC-4761 Type VII)
+{% endif %}
 
 SUPPLIER SPECIAL REQUIREMENTS / ORDER REMARKS (<= 600 CHARS):
 --------------------------------------------------------------------------------
