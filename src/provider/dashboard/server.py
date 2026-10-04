@@ -13,6 +13,7 @@ import mimetypes
 from pathlib import Path
 import re
 import socket
+import sqlite3
 import sys
 from typing import Any, Dict, List, Optional
 import urllib.parse
@@ -50,11 +51,18 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         """Suppress default HTTP server logging to preserve clean console output."""
         return
 
+    def send_error(self, code: int, message: Optional[str] = None, explain: Optional[str] = None) -> None:
+        """Send HTTP error response and immediately mark connection to close."""
+        self.close_connection = True
+        super().send_error(code, message, explain)
+
     def handle_one_request(self) -> None:
         """Handle a single HTTP request, catching client disconnects gracefully."""
         try:
             super().handle_one_request()
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
             self.close_connection = True
 
     def handle(self) -> None:
@@ -62,6 +70,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         try:
             super().handle()
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
             self.close_connection = True
 
     def do_GET(self) -> None:  # noqa: N802
@@ -1010,10 +1020,9 @@ class DashboardServer(ThreadingHTTPServer):
             else (self.repo_root / "build" / "code_review.sqlite")
         )
         if cr_db_path.exists():
-            import sqlite3
-
             try:
-                with sqlite3.connect(str(cr_db_path)) as conn:
+                conn = sqlite3.connect(str(cr_db_path))
+                try:
                     cursor = conn.cursor()
                     cursor.execute(
                         "SELECT commit_hash, COUNT(*), SUM(CASE WHEN resolved = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN resolved = 1 THEN 1 ELSE 0 END) "
@@ -1036,6 +1045,8 @@ class DashboardServer(ThreadingHTTPServer):
                             cr_stats.setdefault(node.commit_hash, {"total": 0, "open": 0, "resolved": 0})[
                                 "reviewed"
                             ] = True
+                finally:
+                    conn.close()
             except Exception:
                 pass
 
