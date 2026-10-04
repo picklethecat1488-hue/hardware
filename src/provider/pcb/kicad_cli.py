@@ -329,6 +329,7 @@ class KiCadCLI:
             str(height),
             "--quality",
             "basic",
+            "--use-board-stackup-colors",
             "-o",
             str(out_png),
             str(pcb_file),

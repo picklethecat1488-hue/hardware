@@ -698,10 +698,17 @@ def test_generate_pcb_project_summary_jinja2_templates(tmp_path: Path) -> None:
     assert "Double-sided SMT assembly" in txt
     assert "U1 (VFBGA-184)" in txt
     assert "ENIG" in txt
+    assert "CONTROLLED IMPEDANCE" in txt
+    assert "50 Ohm" in txt
+    assert "90 Ohm" in txt
+    assert "85 Ohm" in txt
+    assert "VIPPO" in txt or "Resin" in txt
 
     assert "# PCB Manufacturing & Order Specification: carrier_board" in md
     assert "**`Standard FR4 Rigid Board`**" in md
     assert "**6 Layers**" in md
+    assert "Controlled Impedance Specifications" in md
+    assert "Via Process & Hole Plugging Specifications" in md
 
     # 2. Test flex tail rendering
     (board_dir / "flex_tail-job.gbrjob").write_text(
@@ -746,3 +753,4 @@ def test_pcb_exporter_package_supplier_files_delegation(tmp_path: Path) -> None:
     assert isinstance(zips, dict)
     assert str(board_dir / "gerbers.zip") in zips
     assert (board_dir / "test_board" / "project_summary.txt").is_file()
+    assert (board_dir / "test_board" / "impedance_control_info.txt").is_file()

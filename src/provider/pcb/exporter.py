@@ -1086,6 +1086,7 @@ class PCBExporter:
                 "F.SilkS",
                 "B.SilkS",
                 "Edge.Cuts",
+                "Dwgs.User",
             ]
             cam_files = cli.export_all_board_files(kicad_pcb_path, out_dir, layers=fab_layers)
             exported_files.update(cam_files)

@@ -1068,6 +1068,29 @@ class CarrierBoardProvider(Provider):
                     "BOTTOM SHIELD / GROUND REF", layer="B.SilkS", font_size=1.0, thickness=0.15, mirror=True
                 )
 
+            # BUG-272: Fabrication notes and controlled impedance specification table on Dwgs.User
+            with Locations((0.0, 42.0)):
+                SilkscreenText(
+                    "FAB NOTES: 6-LAYER TG170 ENIG | SOLDERMASK: MATTE BLACK | SILK: WHITE",
+                    layer="Dwgs.User",
+                    font_size=0.7,
+                    thickness=0.1,
+                )
+            with Locations((0.0, 40.5)):
+                SilkscreenText(
+                    "IMPEDANCE: 50 OHM SE (L1 W=0.18mm REF L2) | 90 OHM DIFF (L1 W=0.16 S=0.18 REF L2) | 85 OHM DIFF (L1 W=0.18 S=0.15 REF L2)",
+                    layer="Dwgs.User",
+                    font_size=0.55,
+                    thickness=0.08,
+                )
+            with Locations((0.0, -43.5)):
+                SilkscreenText(
+                    "VIA PROCESS: RESIN FILL & CAP (VIPPO / IPC-4761 TYPE VII) FOR BGA & SMD PADS",
+                    layer="Dwgs.User",
+                    font_size=0.55,
+                    thickness=0.08,
+                )
+
             # BUG-183, BUG-209, BUG-219, BUG-231: Silkscreen labels for Status and Overrides
             with Locations((10.5, -13.5)):
                 SilkscreenText("OVERRIDES", layer="F.SilkS", font_size=0.75, thickness=0.11)

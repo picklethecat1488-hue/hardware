@@ -45,10 +45,20 @@
   )
   (setup
     (stackup
+{% if board.stackup %}
+{% set sm_color = 'Black' if ('black' in (board.stackup.soldermask_color|lower)) else ('Yellow' if ('amber' in (board.stackup.soldermask_color|lower) or 'yellow' in (board.stackup.soldermask_color|lower)) else board.stackup.soldermask_color|title) %}
+{% set silk_color = (board.stackup.silkscreen_color and board.stackup.silkscreen_color|title) or 'White' %}
+      (layer "F.SilkS" (type "Top Silk Screen") (color "{{ silk_color }}"))
+      (layer "F.Paste" (type "Top Solder Paste"))
+      (layer "F.Mask" (type "Top Solder Mask") (color "{{ sm_color }}") (thickness 0.01))
 {% for layer in board.stackup.layers %}
       (layer "{{ layer.name }}" (type "{{ layer.layer_type }}") (color "{{ layer.material }}") (thickness {{ layer.thickness_mm }}){% if layer.dielectric_constant %} (epsilon_r {{ layer.dielectric_constant }}){% endif %})
 {% endfor %}
+      (layer "B.Mask" (type "Bottom Solder Mask") (color "{{ sm_color }}") (thickness 0.01))
+      (layer "B.Paste" (type "Bottom Solder Paste"))
+      (layer "B.SilkS" (type "Bottom Silk Screen") (color "{{ silk_color }}"))
       (copper_finish "{{ board.stackup.finish }}")
+{% endif %}
     )
     (pad_to_mask_clearance {{ (board.design_rules and board.design_rules.pad_to_mask_clearance_mm) if (board.design_rules and board.design_rules.pad_to_mask_clearance_mm is not none) else 0.0 }})
   )

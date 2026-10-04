@@ -96,6 +96,9 @@ def generate_pcb_project_summary(
         surface_finish = job_finish or 'ENIG (Electroless Nickel Immersion Gold, Au: 1-2 u", Ni: 100-200 u")'
         min_track = "0.15 mm / 0.15 mm (6.0 mil / 6.0 mil)"
         min_drill = "0.30 mm (11.8 mil)"
+        via_process = "Standard tented vias (No VIPPO / BGA required)"
+        has_impedance_control = False
+        impedance_entries: list[dict[str, str]] = []
     else:
         order_category = "Standard FR4 Rigid Board"
         base_material = "TG150/TG170 FR-4"
@@ -112,6 +115,37 @@ def generate_pcb_project_summary(
         surface_finish = job_finish or 'ENIG (Electroless Nickel Immersion Gold, Au: 1-2 u", Ni: 100-200 u")'
         min_track = "0.10 mm / 0.10 mm (4.0 mil / 4.0 mil)"
         min_drill = "0.25 mm (9.84 mil) via drill / 0.16 mm (6.30 mil) microvia"
+        via_process = "Non-conductive epoxy resin filled & capped / plated-over (VIPPO / IPC-4761 Type VII) on all vias in BGA area and SMD pads"
+        has_impedance_control = True
+        impedance_entries = [
+            {
+                "net_class": "FlexSPI / RF / High-Speed",
+                "topology": "Single-Ended Microstrip",
+                "target_z": "50 Ohm (+/- 10%)",
+                "layer": "Layer 1 (F.Cu)",
+                "ref_layer": "Layer 2 (In1.Cu GND)",
+                "width": "0.180 mm (7.1 mil)",
+                "spacing": "N/A",
+            },
+            {
+                "net_class": "USB 2.0 (DP/DM)",
+                "topology": "Edge-Coupled Diff Microstrip",
+                "target_z": "90 Ohm (+/- 10%)",
+                "layer": "Layer 1 (F.Cu)",
+                "ref_layer": "Layer 2 (In1.Cu GND)",
+                "width": "0.160 mm (6.3 mil)",
+                "spacing": "0.180 mm (7.1 mil)",
+            },
+            {
+                "net_class": "PCIe / Diff Pairs",
+                "topology": "Edge-Coupled Diff Microstrip",
+                "target_z": "85 Ohm (+/- 10%)",
+                "layer": "Layer 1 (F.Cu)",
+                "ref_layer": "Layer 2 (In1.Cu GND)",
+                "width": "0.180 mm (7.1 mil)",
+                "spacing": "0.150 mm (5.9 mil)",
+            },
+        ]
 
     # 3. Read POS and BOM
     pos_file = bom_dir / f"{name}_pos.csv"
@@ -157,12 +191,13 @@ def generate_pcb_project_summary(
             "Single-sided SMT on top for J4 (0.5mm pitch FPC connector). SAC305 lead-free RoHS paste, 100% AOI inspection."
         )
     else:
-        chips_note = "U1 0.4mm BGA on top, U2 QFN on bottom" if bga_qfn_chips else "SMT chips"
+        chips_note = "U1 0.4mm BGA, U2 QFN" if bga_qfn_chips else "SMT chips"
         remarks = (
-            f"{layer_count}-Layer Rigid FR4 PCB (TG150/TG170), {int(w)}x{int(l)}mm, {t:.1f}mm thickness, "
-            "ENIG finish, Matte Black mask, White silkscreen. Min track/space 4/4 mil, min drill 0.25mm. "
-            f"Double-sided SMT: {chips_note}. SAC305 lead-free RoHS paste, 0.10mm nano-coated stencil. "
-            "100% 3D AOI for SMT, 100% AXI for U1 BGA balls and QFN ground pads."
+            f"{layer_count}-Layer Rigid FR4 (TG170), {int(w)}x{int(l)}mm, {t:.1f}mm, ENIG, Matte Black mask, White silk. "
+            "Min 4/4 mil, min drill 0.25mm. Double-sided SMT: "
+            f"{chips_note}. IMPEDANCE: 50Ω SE (L1 w=0.18mm ref L2), 90Ω diff (L1 w=0.16mm, s=0.18mm ref L2), "
+            "85Ω diff (L1 w=0.18mm, s=0.15mm ref L2). VIAS: Fill all vias in BGA/SMD pads with resin and cap (VIPPO/IPC-4761 Type VII). "
+            "SAC305 lead-free RoHS, 100% 3D AOI & AXI."
         )
 
     context = {
@@ -180,6 +215,9 @@ def generate_pcb_project_summary(
         "stiffener": stiffener,
         "min_track": min_track,
         "min_drill": min_drill,
+        "via_process": via_process,
+        "has_impedance_control": has_impedance_control,
+        "impedance_entries": impedance_entries,
         "assembly_type": assembly_type,
         "total_placements": total_placements,
         "top_count": top_count,
@@ -216,6 +254,69 @@ def create_zip(target_zip: Path, file_items: list[tuple[Path, str]]) -> Path:
     return target_zip
 
 
+def generate_impedance_control_info(
+    provider_name: str,
+    name: str,
+    layer_count: int = 6,
+) -> str:
+    """Generate standalone controlled impedance and via process specification text for fabricators.
+
+    Args:
+        provider_name: Name of the project provider.
+        name: Name of the target PCB subassembly.
+        layer_count: Number of conductive copper layers.
+
+    Returns:
+        Formatted specification string detailing impedance parameters and VIPPO via processes.
+    """
+    return f"""================================================================================
+CONTROLLED IMPEDANCE & VIA PROCESS SPECIFICATION
+================================================================================
+Project:               {provider_name}
+Subassembly / Board:   {name}
+Layer Count:           {layer_count} Layers
+Base Material:         TG150/TG170 FR-4
+Stackup Reference:     L1 Microstrip referenced to unbroken L2 GND plane (H=0.100 mm, Er=4.2)
+Solder Mask:           Matte Black LPI Solder Mask (Both Sides)
+Surface Finish:        ENIG (Electroless Nickel Immersion Gold)
+Test Requirement:      100% TDR coupon test report per manufacturing lot (Tolerance: +/- 10%)
+
+CONTROLLED IMPEDANCE TARGETS:
+--------------------------------------------------------------------------------
+1. Single-Ended Microstrip (FlexSPI / RF / High-Speed Signals):
+   - Layer / Position:      Layer 1 (F.Cu - Top Layer)
+   - Reference Plane:       Layer 2 (In1.Cu - Continuous GND Plane)
+   - Target Impedance:      50.0 Ohms +/- 10% (45.0 - 55.0 Ohms)
+   - Nominal Trace Width:   0.180 mm (7.09 mil)
+   - Dielectric Distance:   0.100 mm (Prepreg 2116, Er = 4.2)
+
+2. Differential Microstrip (USB 2.0 High-Speed D+ / D-):
+   - Layer / Position:      Layer 1 (F.Cu - Top Layer)
+   - Reference Plane:       Layer 2 (In1.Cu - Continuous GND Plane)
+   - Target Impedance:      90.0 Ohms +/- 10% (81.0 - 99.0 Ohms differential)
+   - Nominal Trace Width:   0.160 mm (6.30 mil)
+   - Nominal Trace Spacing: 0.180 mm (7.09 mil)
+   - Intra-Pair Skew:       < 0.15 mm (< 1.0 ps)
+
+3. Differential Microstrip (PCIe / High-Speed Differential Pairs):
+   - Layer / Position:      Layer 1 (F.Cu - Top Layer)
+   - Reference Plane:       Layer 2 (In1.Cu - Continuous GND Plane)
+   - Target Impedance:      85.0 Ohms +/- 10% (76.5 - 93.5 Ohms differential)
+   - Nominal Trace Width:   0.180 mm (7.09 mil)
+   - Nominal Trace Spacing: 0.150 mm (5.91 mil)
+
+VIA PROCESS & HOLE PLUGGING SPECIFICATION:
+--------------------------------------------------------------------------------
+- Via Process:          Non-conductive epoxy resin filled and capped (plated over)
+- Applicable Standard:  IPC-4761 Type VII (VIPPO - Via In Pad Plated Over)
+- Scope / Area:         100% of vias within MCU U1 (0.4mm pitch BGA) courtyard area
+                        and all vias located on or directly adjacent to SMD component pads.
+- Surface Planarity:    Resin fill cured, planarized/sanded flush with copper surface,
+                        and over-plated with copper (< 15 um dimple depth).
+================================================================================
+"""
+
+
 def package_supplier_pcb_files(
     out_dir: str | Path,
     provider: Any,
@@ -230,6 +331,7 @@ def package_supplier_pcb_files(
       - centroid_files.zip: contains <subassembly>_pos.csv
       - assembly_files.zip: contains <subassembly>_top.png, <subassembly>_bottom.png textures
       - project_summary.txt, project_summary.md: supplier order specification form
+      - impedance_control_info.txt: standalone controlled impedance specification
     - <subassembly>_{gerbers,bom_templates,centroid_files,assembly_files}.zip: per-subassembly archives
     - {gerbers,bom_templates,centroid_files,assembly_files}.zip: combined provider-level archives (BUG-262)
 
@@ -286,6 +388,17 @@ def package_supplier_pcb_files(
         sub_dir = board_dir / name
         sub_dir.mkdir(parents=True, exist_ok=True)
 
+        # Check if flex or rigid
+        is_flex = False
+        manifest_data = getattr(provider, "manifest", None)
+        if isinstance(manifest_data, dict):
+            sub_manifest = manifest_data.get(name, {})
+            mat = sub_manifest.get("material", "")
+            if "flex" in str(mat).lower():
+                is_flex = True
+        if not is_flex and ("flex" in name.lower() or "fpc" in name.lower()):
+            is_flex = True
+
         # Generate project summary form for this subassembly
         summary_txt, summary_md = generate_pcb_project_summary(
             board_dir=board_dir,
@@ -315,6 +428,21 @@ def package_supplier_pcb_files(
         name_gerber_items = [(f, f.name) for f in sorted(name_gerber_files, key=lambda x: x.name)]
         name_gerber_items.append((sub_summary_txt, "project_summary.txt"))
         name_gerber_items.append((sub_summary_md, "project_summary.md"))
+
+        # Generate impedance control info file for rigid boards
+        if not is_flex:
+            cu_files = list(board_dir.glob(f"{name}*Cu.gbr"))
+            l_count = len(cu_files) if len(cu_files) >= 2 else 6
+            imp_info = generate_impedance_control_info(
+                provider_name=provider.name,
+                name=name,
+                layer_count=l_count,
+            )
+            sub_imp_txt = sub_dir / "impedance_control_info.txt"
+            sub_imp_txt.write_text(imp_info, encoding="utf-8")
+            top_imp_txt = board_dir / f"{name}_impedance_control_info.txt"
+            top_imp_txt.write_text(imp_info, encoding="utf-8")
+            name_gerber_items.append((sub_imp_txt, "impedance_control_info.txt"))
 
         # Scope BOM to this PCB
         name_bom_items = []
