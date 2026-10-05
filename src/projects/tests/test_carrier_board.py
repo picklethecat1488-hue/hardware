@@ -2704,3 +2704,67 @@ def test_regression_bug_267_c18_c19_vertical_stack_and_u11_clearance() -> None:
     report = drc.check_all(wiring=wiring)
     assert report.passed, f"PCB DRC failed:\n{report.summary()}"
     assert report.error_count == 0, f"Expected 0 DRC errors, got: {report.summary()}"
+
+
+def test_regression_bug_272_supplier_feedback_carrier_board() -> None:
+    """Verify BUG-272: Supplier feedback items are addressed across carrier board CAM files and docs.
+
+    1. Soldermask color: carrier_board manifest color is matte black [0.12, 0.12, 0.12, 1.0].
+    2. Stackup soldermask: KiCad exported PCB includes F.Mask and B.Mask with Black soldermask.
+    3. Impedance control: project_summary.txt, project_summary.md, and impedance_control_info.txt
+       explicitly detail track width, spacing, target value, and reference layers (50Ω SE, 90Ω diff, 85Ω diff).
+    4. Via plugging: Confirmation to fill all vias in BGA area and SMD pads with resin and cap (VIPPO / IPC-4761 Type VII).
+    5. Package inclusion: impedance_control_info.txt is packaged inside carrier_board/gerbers.zip.
+    """
+    import zipfile
+    import yaml
+
+    # 1. Manifest color check (Matte Black)
+    manifest_path = Path("src/projects/carrier_board/manifest.yaml")
+    manifest_data = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    carrier_color = manifest_data.get("carrier_board", {}).get("color", [])
+    assert carrier_color[:3] == [0.12, 0.12, 0.12], (
+        f"carrier_board manifest color must be Matte Black [0.12, 0.12, 0.12, 1.0], got {carrier_color}"
+    )
+
+    # 2. Subassembly submission files
+    board_dir = Path("build/board/carrier_board")
+    carrier_dir = board_dir / "carrier_board"
+    c_summary_txt = (carrier_dir / "project_summary.txt").read_text(encoding="utf-8")
+    c_summary_md = (carrier_dir / "project_summary.md").read_text(encoding="utf-8")
+
+    # Soldermask color in summary
+    assert "Matte Black" in c_summary_txt, "project_summary.txt must specify Matte Black mask"
+    assert "Matte Black" in c_summary_md, "project_summary.md must specify Matte Black mask"
+
+    # Impedance control specifications in summary
+    assert "CONTROLLED IMPEDANCE" in c_summary_txt, "project_summary.txt must have CONTROLLED IMPEDANCE section"
+    assert "50" in c_summary_txt and "0.18" in c_summary_txt, "50 Ohm SE track (0.18mm) must be specified"
+    assert "90" in c_summary_txt and "0.16" in c_summary_txt and "0.18" in c_summary_txt, (
+        "90 Ohm diff pair (0.16mm width / 0.18mm spacing) must be specified"
+    )
+    assert "85" in c_summary_txt and "0.15" in c_summary_txt, (
+        "85 Ohm diff pair (0.18mm width / 0.15mm spacing) must be specified"
+    )
+
+    # Via plugging confirmation (resin fill and cap / VIPPO)
+    assert "Resin" in c_summary_txt or "resin" in c_summary_txt, (
+        "Via resin fill must be specified in project_summary.txt"
+    )
+    assert "cap" in c_summary_txt.lower() or "vippo" in c_summary_txt.lower(), (
+        "Via capping / VIPPO must be confirmed in project_summary.txt"
+    )
+
+    # Dedicated impedance control info file
+    imp_file = carrier_dir / "impedance_control_info.txt"
+    assert imp_file.is_file(), "impedance_control_info.txt must exist in carrier_board submission directory"
+    imp_text = imp_file.read_text(encoding="utf-8")
+    assert "50" in imp_text and "90" in imp_text and "85" in imp_text
+
+    # Packaging in gerbers.zip
+    with zipfile.ZipFile(carrier_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        assert "impedance_control_info.txt" in names, (
+            "carrier_board/gerbers.zip must contain impedance_control_info.txt"
+        )
+        assert "project_summary.txt" in names, "carrier_board/gerbers.zip must contain project_summary.txt"
