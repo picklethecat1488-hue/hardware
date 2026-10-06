@@ -9,7 +9,18 @@ from typing import Any, Optional
 import jinja2
 
 TEMPLATES_DIR: Path = Path(__file__).parent.parent / "templates"
-GERBER_EXTENSIONS: set[str] = {".gbr", ".drl", ".gbrjob", ".kicad_pcb", ".pcb", ".pcbdoc", ".cam", ".brd"}
+GERBER_EXTENSIONS: set[str] = {
+    ".gbr",
+    ".drl",
+    ".gbrjob",
+    ".kicad_pcb",
+    ".pcb",
+    ".pcbdoc",
+    ".cam",
+    ".brd",
+    ".txt",
+    ".rpt",
+}
 
 
 def get_supplier_jinja_env() -> jinja2.Environment:
@@ -95,8 +106,12 @@ def generate_pcb_project_summary(
         silkscreen = "White"
         surface_finish = job_finish or 'ENIG (Electroless Nickel Immersion Gold, Au: 1-2 u", Ni: 100-200 u")'
         min_track = "0.15 mm / 0.15 mm (6.0 mil / 6.0 mil)"
-        min_drill = "0.30 mm (11.8 mil)"
-        via_process = "Standard tented vias (No VIPPO / BGA required)"
+        min_drill = (
+            "None (SMT only, 0 drill holes / 0 vias). Valid drill file included. "
+            "Panel tooling holes on 64x64mm rails provided by supplier."
+        )
+        via_process = "None (SMT only, no through-holes or vias required)"
+        panel_spec = "1*2 panel in 64*64mm, accept x-out board in panel (CONFIRMED & APPROVED)"
         has_impedance_control = False
         impedance_entries: list[dict[str, str]] = []
     else:
@@ -116,7 +131,9 @@ def generate_pcb_project_summary(
         min_track = "0.10 mm / 0.10 mm (4.0 mil / 4.0 mil)"
         min_drill = "0.25 mm (9.84 mil) via drill / 0.16 mm (6.30 mil) microvia"
         via_process = "Non-conductive epoxy resin filled & capped / plated-over (VIPPO / IPC-4761 Type VII) on all vias in BGA area and SMD pads"
+        panel_spec = "Single piece or supplier panelized per order specifications"
         has_impedance_control = True
+
         impedance_entries = [
             {
                 "net_class": "FlexSPI / RF / High-Speed",
@@ -185,10 +202,11 @@ def generate_pcb_project_summary(
 
     if is_flex:
         remarks = (
-            f"{layer_count}-Layer Flexible PCB (Polyimide FPC), {int(w)}x{int(l)}mm with {int(tab_w or 17)}mm insertion tab, "
-            f"{t:.2f}mm thickness, ENIG finish, Yellow PI coverlay, White silkscreen. "
-            "0.80mm FR4 stiffener bonded under 30-pin connector tab. Min track/space 6/6 mil. "
-            "Single-sided SMT on top for J4 (0.5mm pitch FPC connector). SAC305 lead-free RoHS paste, 100% AOI inspection."
+            f"{layer_count}-Layer Polyimide FPC, {int(w)}x{int(l)}mm ({int(tab_w or 17)}mm tab), "
+            f"{t:.2f}mm thick, ENIG, Yellow coverlay, White silk. "
+            "0.80mm FR4 stiffener under 30-pin tab. SMT only, ZERO drilled holes / NO vias on board; valid drill file included. "
+            "1*2 panel in 64*64mm accepted with x-out board accepted. "
+            "Single-sided SMT on top for J4 (0.5mm pitch FPC connector). SAC305 RoHS paste, 100% AOI."
         )
     else:
         chips_note = "U1 0.4mm BGA, U2 QFN" if bga_qfn_chips else "SMT chips"
@@ -216,6 +234,7 @@ def generate_pcb_project_summary(
         "min_track": min_track,
         "min_drill": min_drill,
         "via_process": via_process,
+        "panel_spec": panel_spec,
         "has_impedance_control": has_impedance_control,
         "impedance_entries": impedance_entries,
         "assembly_type": assembly_type,
@@ -417,13 +436,15 @@ def package_supplier_pcb_files(
         top_summary_md = board_dir / f"{name}_project_summary.md"
         top_summary_md.write_text(summary_md, encoding="utf-8")
 
-        # Scope gerber files strictly to this PCB
+        # Scope gerber and drill files strictly to this PCB
         name_gerber_files = [
             f
             for f in board_dir.iterdir()
             if f.is_file()
             and f.suffix.lower() in GERBER_EXTENSIONS
             and (f.name.startswith(f"{name}-") or f.name.startswith(f"{name}."))
+            and not f.name.endswith("_project_summary.txt")
+            and not f.name.endswith("_impedance_control_info.txt")
         ]
         name_gerber_items = [(f, f.name) for f in sorted(name_gerber_files, key=lambda x: x.name)]
         name_gerber_items.append((sub_summary_txt, "project_summary.txt"))
@@ -480,6 +501,15 @@ def package_supplier_pcb_files(
                 name_assembly_items.append((img_path, img_name))
                 all_assembly_items.append((img_path, img_name))
 
+        # Deduplicate gerber archive items by archive filename
+        seen_arcnames: set[str] = set()
+        deduped_gerber_items: list[tuple[Path, str]] = []
+        for file_p, arc_name in name_gerber_items:
+            if arc_name not in seen_arcnames:
+                seen_arcnames.add(arc_name)
+                deduped_gerber_items.append((file_p, arc_name))
+        name_gerber_items = deduped_gerber_items
+
         # Create subassembly isolated archives
         created_zips[str(sub_dir / "gerbers.zip")] = create_zip(sub_dir / "gerbers.zip", name_gerber_items)
         created_zips[str(sub_dir / "bom_templates.zip")] = create_zip(sub_dir / "bom_templates.zip", name_bom_items)
@@ -505,7 +535,14 @@ def package_supplier_pcb_files(
         )
 
     # 3. Create combined provider-level archives under build/board/<provider.name> (BUG-262)
-    all_gerber_files = [f for f in board_dir.iterdir() if f.is_file() and f.suffix.lower() in GERBER_EXTENSIONS]
+    all_gerber_files = [
+        f
+        for f in board_dir.iterdir()
+        if f.is_file()
+        and f.suffix.lower() in GERBER_EXTENSIONS
+        and not f.name.endswith("_project_summary.txt")
+        and not f.name.endswith("_impedance_control_info.txt")
+    ]
     all_gerber_items = [(f, f.name) for f in sorted(all_gerber_files, key=lambda x: x.name)]
 
     created_zips[str(board_dir / "gerbers.zip")] = create_zip(board_dir / "gerbers.zip", all_gerber_items)

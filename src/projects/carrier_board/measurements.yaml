@@ -96,4 +96,10 @@ ble_logo_depth: 0.4
 ble_logo_x: 0.0
 ble_logo_y: -35.0
 
+# Panelization parameters for flex tail manufacturing (BUG-275)
+flex_tail_panel_rows: 1
+flex_tail_panel_cols: 2
+flex_tail_panel_width: 64.0
+flex_tail_panel_length: 64.0
+flex_tail_panel_accept_xout: 1
 

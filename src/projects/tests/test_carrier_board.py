@@ -2768,3 +2768,76 @@ def test_regression_bug_272_supplier_feedback_carrier_board() -> None:
             "carrier_board/gerbers.zip must contain impedance_control_info.txt"
         )
         assert "project_summary.txt" in names, "carrier_board/gerbers.zip must contain project_summary.txt"
+
+
+def test_regression_bug_275_supplier_feedback_flex_tail() -> None:
+    """Verify BUG-275: Supplier feedback items are addressed for flex_tail.
+
+    1. Panelization confirmation: 1*2 panel in 64*64mm with x-out accepted.
+    2. SMT only / 0 drill holes / 0 vias clarified in project summary and order remarks (<= 600 chars).
+    3. Multi-format drill files (.drl, -PTH.drl, -NPTH.drl, .txt, -drl_map.gbr) included in gerbers.zip.
+    4. Dwgs.User fabrication & panelization notes added to flex_tail PCB.
+    """
+    import zipfile
+    import yaml
+
+    # 1. Manifest panel specification
+    manifest_path = Path("src/projects/carrier_board/manifest.yaml")
+    manifest_data = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    flex_manifest = manifest_data.get("flex_tail", {})
+    assert "panel" in flex_manifest, "flex_tail manifest must declare panel specification"
+    assert "1*2" in flex_manifest["panel"] and "64*64" in flex_manifest["panel"]
+    assert "x-out" in flex_manifest["panel"]
+
+    # 2. Config parametrization from measurements.yaml
+    from projects.carrier_board.provider import CarrierBoardProvider
+
+    provider = CarrierBoardProvider()
+    cfg = provider.settings
+
+    assert hasattr(cfg, "flex_tail_panel_array")
+    assert cfg.flex_tail_panel_array == "1*2"
+    assert cfg.flex_tail_panel_width == 64.0
+    assert cfg.flex_tail_panel_length == 64.0
+    assert cfg.flex_tail_panel_accept_xout is True
+
+    # 3. Subassembly submission summary files
+    board_dir = Path("build/board/carrier_board")
+    flex_dir = board_dir / "flex_tail"
+    f_summary_txt = (flex_dir / "project_summary.txt").read_text(encoding="utf-8")
+    f_summary_md = (flex_dir / "project_summary.md").read_text(encoding="utf-8")
+
+    # Panelization in summary
+    assert "1*2 panel in 64*64mm" in f_summary_txt
+    assert "x-out" in f_summary_txt
+    assert "1*2 panel in 64*64mm" in f_summary_md
+    assert "x-out" in f_summary_md
+
+    # Zero drill holes / 0 vias clarity in summary
+    assert "0 drill holes" in f_summary_txt or "SMT only" in f_summary_txt
+    assert "0 vias" in f_summary_txt or "no through-holes" in f_summary_txt
+
+    # Remarks <= 600 chars
+    remarks_text = f_summary_txt.split("-" * 80)[-1].split("=" * 80)[0].strip()
+    assert len(remarks_text) <= 600, f"Remarks must be <= 600 chars, got {len(remarks_text)}"
+    assert "64*64mm" in remarks_text
+    assert "x-out" in remarks_text
+
+    # 4. Packaging in flex_tail/gerbers.zip
+    with zipfile.ZipFile(flex_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        assert "project_summary.txt" in names
+        assert "project_summary.md" in names
+        # Must contain drill deliverables
+        has_drl = any(n.endswith(".drl") for n in names)
+        has_txt = any(n.startswith("flex_tail") and n.endswith(".txt") for n in names)
+        has_map = any("drl_map.gbr" in n for n in names)
+        assert has_drl, f"flex_tail/gerbers.zip must contain .drl drill files, got: {names}"
+        assert has_txt, f"flex_tail/gerbers.zip must contain .txt drill files, got: {names}"
+        assert has_map, f"flex_tail/gerbers.zip must contain Gerber drill map (-drl_map.gbr), got: {names}"
+
+    # 5. Dwgs.User fabrication & panelization notes on PCB
+    pcb_content = (board_dir / "flex_tail.kicad_pcb").read_text(encoding="utf-8")
+    assert "PANEL: 1*2 PANEL IN 64x64mm ACCEPTED WITH X-OUT BOARD ACCEPTED" in pcb_content
+    assert "FAB: 2-LAYER POLYIMIDE FPC (0.20mm) | SMT ONLY: 0 DRILL HOLES / 0 VIAS" in pcb_content
+    assert "Dwgs.User" in pcb_content
