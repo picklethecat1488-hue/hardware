@@ -167,6 +167,9 @@ class GitEngine:
             repo_root: Root path of git repository.
         """
         self.repo_root = repo_root or get_git_root()
+        self._commit_diff_cache: Dict[str, Tuple[int, int, int, bool]] = {}
+        self._commit_stat_cache: Dict[str, Tuple[int, int, int, List[str]]] = {}
+        self._bug_tag_cache: Dict[str, Dict[str, str]] = {}
 
     def get_head_commit(self) -> str:
         """Retrieve the commit hash of HEAD in the repository.
@@ -793,24 +796,33 @@ class GitEngine:
 
         tags: List[CommitBugTagModel] = []
         db_map: Dict[str, Dict[str, str]] = {}
+        missing_ids = []
+        for bid in bug_ids:
+            norm_id = bid.replace("_", "-").upper()
+            if norm_id in self._bug_tag_cache:
+                db_map[norm_id] = self._bug_tag_cache[norm_id]
+            else:
+                missing_ids.append((bid, norm_id))
+
         sqlite_path = self.repo_root / "build" / "bugs.sqlite"
-        if sqlite_path.exists():
+        if missing_ids and sqlite_path.exists():
             try:
                 conn = sqlite3.connect(str(sqlite_path))
                 try:
                     cur = conn.cursor()
-                    for bid in bug_ids:
-                        norm_id = bid.replace("_", "-").upper()
+                    for bid, norm_id in missing_ids:
                         cur.execute(
                             "SELECT id, title, status, severity FROM bugs WHERE id = ? OR id = ?", (norm_id, bid)
                         )
                         row = cur.fetchone()
                         if row:
-                            db_map[norm_id] = {
+                            info = {
                                 "title": str(row[1]),
                                 "status": str(row[2]),
                                 "severity": str(row[3]),
                             }
+                            db_map[norm_id] = info
+                            self._bug_tag_cache[norm_id] = info
                 finally:
                     conn.close()
             except Exception:
@@ -1057,6 +1069,9 @@ class GitEngine:
 
     def _get_commit_diff_summary(self, commit_hash: str) -> Tuple[int, int, int, bool]:
         """Compute additions, deletions, file count, and whether commit strictly touches feedback."""
+        if commit_hash in self._commit_diff_cache:
+            return self._commit_diff_cache[commit_hash]
+
         cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit_hash]
         try:
             output = run_git_command(cmd, cwd=self.repo_root)
@@ -1082,7 +1097,9 @@ class GitEngine:
                     deletions += int(cols[1])
 
         is_feedback_only = file_count > 0 and non_feedback_count == 0
-        return additions, deletions, file_count, is_feedback_only
+        result = (additions, deletions, file_count, is_feedback_only)
+        self._commit_diff_cache[commit_hash] = result
+        return result
 
     def has_working_tree_changes(self) -> bool:
         """Check whether repository contains any uncommitted or untracked changes."""
@@ -1344,6 +1361,9 @@ class GitEngine:
 
     def _get_commit_stat_summary(self, commit_hash: str) -> Tuple[int, int, int, List[str]]:
         """Calculate additions, deletions, file count, and ignored files list for a commit."""
+        if commit_hash in self._commit_stat_cache:
+            return self._commit_stat_cache[commit_hash]
+
         cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit_hash]
         try:
             output = run_git_command(cmd, cwd=self.repo_root)
@@ -1368,7 +1388,9 @@ class GitEngine:
                     additions += int(cols[0])
                 if cols[1].isdigit():
                     deletions += int(cols[1])
-        return additions, deletions, file_count, ignored_files
+        res = (additions, deletions, file_count, ignored_files)
+        self._commit_stat_cache[commit_hash] = res
+        return res
 
     def get_changed_files(self, commit: str, include_feedback: bool = False) -> List[Dict[str, Any]]:
         """List changed files with status and stats for a revision."""

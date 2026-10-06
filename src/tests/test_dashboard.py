@@ -2866,3 +2866,50 @@ def test_regression_bug_270_dashboard_server_handles_broken_pipe_gracefully(caps
     handler.close_connection = False
     handler._send_html("<html><body>test</body></html>")
     assert handler.close_connection is True
+
+
+def test_regression_bug_273_dashboard_fd_limit_and_stability(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify BUG-273: Dashboard elevates soft FD limit, caches commit diffs, and absorbs EMFILE cleanly."""
+    import errno
+    import resource
+    from provider.dashboard.server import ensure_high_fd_limit
+
+    # 1. Verify ensure_high_fd_limit raises soft limit when constrained
+    orig_soft, orig_hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    try:
+        # Simulate lower soft limit (e.g., 256 default on macOS)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (256, orig_hard))
+        new_soft = ensure_high_fd_limit(min_limit=10240)
+        curr_soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
+        assert curr_soft >= 10240 or curr_soft == orig_hard
+        assert new_soft == curr_soft
+    finally:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (orig_soft, orig_hard))
+
+    # 2. Verify GitEngine commit diff caching prevents redundant subprocess spawns
+    repo_dir, commit_shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+    assert hasattr(engine, "_commit_diff_cache")
+
+    c1 = commit_shas[0]
+    res1 = engine._get_commit_diff_summary(c1)
+    assert c1 in engine._commit_diff_cache
+    assert engine._commit_diff_cache[c1] == res1
+
+    # Second call returns cached result directly
+    res2 = engine._get_commit_diff_summary(c1)
+    assert res2 == res1
+
+    # 3. Verify EMFILE (Errno 24 Too many open files) in handle_error does not dump traceback
+    server = DashboardServer.__new__(DashboardServer)
+    emfile_err = OSError(errno.EMFILE, "Too many open files")
+    try:
+        raise emfile_err
+    except OSError:
+        server.handle_error(None, ("127.0.0.1", 56253))
+
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "Too many open files" not in captured.err
