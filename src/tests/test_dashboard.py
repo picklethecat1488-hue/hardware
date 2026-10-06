@@ -2913,3 +2913,43 @@ def test_regression_bug_273_dashboard_fd_limit_and_stability(
     captured = capsys.readouterr()
     assert "Traceback" not in captured.err
     assert "Too many open files" not in captured.err
+
+
+def test_regression_bug_274_workstations_modal_windows() -> None:
+    """Verify BUG-274: Code review and bug report workstations are modal windows over VCS UI."""
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_text = (tpl_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    cr_text = (tpl_dir / "code_review.html.j2").read_text(encoding="utf-8")
+    bug_text = (tpl_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+
+    # 1. Diff view includes workstation modal overlay and iframe container
+    assert 'id="workstationModal"' in diff_text
+    assert 'id="workstationIframe"' in diff_text
+    assert "workstation-modal-overlay" in diff_text
+    assert "workstation-modal-container" in diff_text
+    assert "workstation-modal-iframe" in diff_text
+
+    # 2. Fixed size with tiny margin and darkened backdrop
+    assert "rgba(0, 0, 0, 0.75)" in diff_text
+    assert "calc(100vw - 36px)" in diff_text
+    assert "calc(100vh - 36px)" in diff_text
+
+    # 3. Diff view JavaScript exposes modal open and close
+    assert "function openWorkstationModal(url, targetName)" in diff_text
+    assert "function closeWorkstationModal()" in diff_text
+    assert "window.closeWorkstationModal = closeWorkstationModal;" in diff_text
+    assert "openWorkstationModal(res.url" in diff_text
+
+    # 4. Code review header replaces back button with X close button
+    assert "← Dashboard" not in cr_text
+    assert "modal-close-btn" in cr_text
+    assert "✕" in cr_text
+    assert "closeWorkstation()" in cr_text
+    assert "window.parent.closeWorkstationModal()" in cr_text
+
+    # 5. Bug report header replaces back button with X close button
+    assert "← Dashboard" not in bug_text
+    assert "modal-close-btn" in bug_text
+    assert "✕" in bug_text
+    assert "closeWorkstation()" in bug_text
+    assert "window.parent.closeWorkstationModal()" in bug_text
