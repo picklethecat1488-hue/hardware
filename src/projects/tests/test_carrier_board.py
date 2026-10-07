@@ -2841,3 +2841,51 @@ def test_regression_bug_275_supplier_feedback_flex_tail() -> None:
     assert "PANEL: 1*2 PANEL IN 64x64mm ACCEPTED WITH X-OUT BOARD ACCEPTED" in pcb_content
     assert "FAB: 2-LAYER POLYIMIDE FPC (0.20mm) | SMT ONLY: 0 DRILL HOLES / 0 VIAS" in pcb_content
     assert "Dwgs.User" in pcb_content
+
+
+def test_regression_bug_276_j4_fpc_connector_mpn_and_supplier_pn() -> None:
+    """Verify BUG-276: J2 and J4 30-pin 0.5mm FPC connectors have valid Hirose FH12-30S-0.5SH(55) MPN and HFJ130CT-ND Digi-Key PN."""
+    from model.wiring import Wiring
+
+    wiring = Wiring("src/projects/carrier_board/wiring.yaml")
+
+    # 1. Verify wiring.yaml footprints for J2 (carrier_board) and J4 (flex_tail)
+    j2 = next(c for c in wiring.footprints if c.name == "J2")
+    j4 = next(c for c in wiring.footprints if c.name == "J4")
+
+    assert j2.mpn == "FH12-30S-0.5SH(55)", f"J2 MPN must be FH12-30S-0.5SH(55), got {j2.mpn}"
+    assert j2.supplier_pn == "HFJ130CT-ND", f"J2 supplier_pn must be HFJ130CT-ND, got {j2.supplier_pn}"
+    assert j4.mpn == "FH12-30S-0.5SH(55)", f"J4 MPN must be FH12-30S-0.5SH(55), got {j4.mpn}"
+    assert j4.supplier_pn == "HFJ130CT-ND", f"J4 supplier_pn must be HFJ130CT-ND, got {j4.supplier_pn}"
+
+    # Verify no placeholder or 100-pin connector PN remains
+    for fp in (j2, j4):
+        assert fp.supplier_pn != "H1234-ND", f"{fp.name} must not use dummy placeholder H1234-ND"
+        assert "FH35C" not in fp.mpn, f"{fp.name} MPN must not reference FH35C"
+
+    # 2. Downselection documentation verification
+    for doc_path in [
+        Path("docs/downselection_report.md"),
+        Path("src/projects/carrier_board/docs/downselection_report.md"),
+    ]:
+        content = doc_path.read_text(encoding="utf-8")
+        assert "FH12-30S-0.5SH(55)" in content, f"{doc_path} must document FH12-30S-0.5SH(55)"
+        assert "HIROSE-FH35C-30S" not in content, f"{doc_path} must not reference obsolete HIROSE-FH35C-30S"
+
+    # 3. Exported BOM CSV and zip archive verification
+    import zipfile
+
+    flex_bom = Path("build/bom/carrier_board/flex_tail_bom.csv")
+    carrier_bom = Path("build/bom/carrier_board/carrier_board_bom.csv")
+    assert flex_bom.exists(), "flex_tail_bom.csv must exist"
+    assert carrier_bom.exists(), "carrier_board_bom.csv must exist"
+    assert "FH12-30S-0.5SH(55)" in flex_bom.read_text(encoding="utf-8")
+    assert "HFJ130CT-ND" in flex_bom.read_text(encoding="utf-8")
+    assert "FH12-30S-0.5SH(55)" in carrier_bom.read_text(encoding="utf-8")
+    assert "HFJ130CT-ND" in carrier_bom.read_text(encoding="utf-8")
+
+    with zipfile.ZipFile("build/board/carrier_board/flex_tail/bom_templates.zip") as zf:
+        bom_text = zf.read("flex_tail_bom.csv").decode("utf-8")
+        assert "FH12-30S-0.5SH(55)" in bom_text
+        assert "HFJ130CT-ND" in bom_text
+        assert "H1234-ND" not in bom_text
