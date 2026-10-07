@@ -647,14 +647,18 @@ class Builder:
 
                 # 3. Export manufacturing BOM, CPL, Schematic vector PDF, and 3D STEP
                 bom_csv = bom_dir / f"{subassembly}_bom.csv"
+                bom_xlsx = bom_dir / f"{subassembly}_bom.xlsx"
                 pos_csv = bom_dir / f"{subassembly}_pos.csv"
                 schematic_pdf = schematics_dir / f"{subassembly}_schematic.pdf"
 
                 exporter.export_bom_csv(bom_csv)
+                exporter.export_bom_excel(bom_xlsx, title=f"{provider.name}/{subassembly}")
                 exporter.export_pick_and_place_csv(pos_csv)
                 if subassembly == provider.name:
                     if bom_csv.exists():
                         shutil.copy2(bom_csv, bom_dir / "bom.csv")
+                    if bom_xlsx.exists():
+                        shutil.copy2(bom_xlsx, bom_dir / "bom.xlsx")
                     if pos_csv.exists():
                         shutil.copy2(pos_csv, bom_dir / "pos.csv")
                 exporter.export_schematic_pdf(schematic_pdf)
@@ -668,7 +672,8 @@ class Builder:
                 self.logger.log(f"Generated KiCad PCB: {kicad_pcb}", symbol="🖥️")
                 self.logger.log(f"Generated KiCad Schematic: {kicad_sch}", symbol="📄")
                 self.logger.log(f"Generated Board Files: {board_dir}", symbol="📦")
-                self.logger.log(f"Generated BOM: {bom_csv}", symbol="📋")
+                self.logger.log(f"Generated BOM CSV: {bom_csv}", symbol="📋")
+                self.logger.log(f"Generated BOM Excel: {bom_xlsx}", symbol="📊")
                 self.logger.log(f"Generated Schematic PDF: {schematic_pdf}", symbol="📑")
 
         # Package supplier manufacturing files under build/board (BUG-262)

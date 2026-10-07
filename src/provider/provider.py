@@ -160,6 +160,7 @@ class ProviderOrchestrator(Orchestrator):
                     exporter.export_board(board_dir)
                     cad_zip = exporter.export_board_archive(out_dir / f"{target}_cad.zip")
                     bom_csv = exporter.export_bom_csv(out_dir / f"{target}_bom.csv")
+                    bom_xlsx = exporter.export_bom_excel(out_dir / f"{target}_bom.xlsx")
                     cpl_csv = exporter.export_pick_and_place_csv(out_dir / f"{target}_cpl.csv")
                     sch_pdf = exporter.export_schematic_pdf(out_dir / f"{target}_schematic.pdf")
                     cap_json = exporter.export_capacitive_config_json(out_dir / f"{target}_capacitive_config.json")
@@ -167,6 +168,7 @@ class ProviderOrchestrator(Orchestrator):
                         "board": board_dir,
                         "cad": cad_zip,
                         "bom": bom_csv,
+                        "bom_xlsx": bom_xlsx,
                         "cpl": cpl_csv,
                         "schematic": sch_pdf,
                         "schematic_pdf": sch_pdf,

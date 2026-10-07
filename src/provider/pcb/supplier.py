@@ -473,6 +473,19 @@ def package_supplier_pcb_files(
         if csv_path.exists():
             name_bom_items.append((csv_path, f"{name}_bom.csv"))
             all_bom_items.append((csv_path, f"{name}_bom.csv"))
+            sub_csv = sub_dir / f"{name}_bom.csv"
+            if not sub_csv.exists() or sub_csv.stat().st_mtime < csv_path.stat().st_mtime:
+                shutil.copy2(csv_path, sub_csv)
+
+        xlsx_path = bom_dir / f"{name}_bom.xlsx"
+        if not xlsx_path.exists() and (bom_dir / "bom.xlsx").exists() and name == provider.name:
+            shutil.copy2(bom_dir / "bom.xlsx", xlsx_path)
+        if xlsx_path.exists():
+            name_bom_items.append((xlsx_path, f"{name}_bom.xlsx"))
+            all_bom_items.append((xlsx_path, f"{name}_bom.xlsx"))
+            sub_xlsx = sub_dir / f"{name}_bom.xlsx"
+            if not sub_xlsx.exists() or sub_xlsx.stat().st_mtime < xlsx_path.stat().st_mtime:
+                shutil.copy2(xlsx_path, sub_xlsx)
 
         # Scope POS/centroid to this PCB
         name_centroid_items = []
