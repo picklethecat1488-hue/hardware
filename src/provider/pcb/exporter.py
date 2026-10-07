@@ -939,18 +939,39 @@ class PCBExporter:
             for fp in self.get_footprints_for_board()
             if not getattr(fp, "dnp", False) and not getattr(fp, "unconnected", False) and getattr(fp, "in_bom", True)
         ]
-        for idx, fp in enumerate(fps_to_process, start=1):
-            rows.append(
-                {
-                    "Id": idx,
-                    "Designator": fp.name,
-                    "Package": fp.package,
-                    "Quantity": 1,
-                    "Designation": getattr(fp, "value", None) or (fp.label.text if fp.label else fp.package),
-                    "MPN": fp.mpn or f"GENERIC-{fp.package.upper()}",
-                    "Supplier_PN": fp.supplier_pn or "N/A",
-                }
-            )
+        if not fps_to_process:
+            for idx, fp in enumerate(
+                [
+                    f
+                    for f in self.get_footprints_for_board()
+                    if not getattr(f, "unconnected", False) and getattr(f, "in_bom", True)
+                ],
+                start=1,
+            ):
+                rows.append(
+                    {
+                        "Id": idx,
+                        "Designator": fp.name,
+                        "Package": fp.package,
+                        "Quantity": 0,
+                        "Designation": getattr(fp, "value", None) or "Do Not Populate (DNP)",
+                        "MPN": fp.mpn or "N/A",
+                        "Supplier_PN": fp.supplier_pn or "DNP",
+                    }
+                )
+        else:
+            for idx, fp in enumerate(fps_to_process, start=1):
+                rows.append(
+                    {
+                        "Id": idx,
+                        "Designator": fp.name,
+                        "Package": fp.package,
+                        "Quantity": 1,
+                        "Designation": getattr(fp, "value", None) or (fp.label.text if fp.label else fp.package),
+                        "MPN": fp.mpn or f"GENERIC-{fp.package.upper()}",
+                        "Supplier_PN": fp.supplier_pn or "N/A",
+                    }
+                )
 
         with open(out_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -967,6 +988,9 @@ class PCBExporter:
         mpn = str(getattr(fp, "mpn", "") or "")
         pkg = str(getattr(fp, "package", "") or "")
         name = str(getattr(fp, "name", "") or "")
+
+        if "Mating Tab" in mpn or "Male" in mpn or name == "J4":
+            return "N/A (Bare Flex PCB)"
 
         mpn_upper = mpn.upper()
         if mpn_upper.startswith("MCX"):
@@ -1083,7 +1107,16 @@ class PCBExporter:
 
             notes_parts = []
             if is_dnp:
-                notes_parts.append("Do Not Stuff (DNP)")
+                if (
+                    any(getattr(f, "name", "") == "J4" for f in grp_fps)
+                    or "Male" in str(mpn)
+                    or "Mating Tab" in str(mpn)
+                ):
+                    notes_parts.append(
+                        "Male plug / contact fingers for J2 on carrier board; no component to populate (bare flex PCB)"
+                    )
+                else:
+                    notes_parts.append("Do Not Stuff (DNP)")
             if supp_pn and supp_pn != "N/A":
                 notes_parts.append(f"Supplier PN: {supp_pn}")
             notes_str = "; ".join(notes_parts)
