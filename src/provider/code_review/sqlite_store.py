@@ -21,6 +21,7 @@ from model.code_review import (
     ReviewSeverity,
     ReviewStatus,
 )
+from provider.sanitizer import elide_personal_info
 
 
 class SQLiteReviewStore:
@@ -260,7 +261,7 @@ class SQLiteReviewStore:
                 ("commit_hash", session.commit_hash or ""),
                 ("original_commit", session.original_commit or ""),
                 ("update_action", session.update_action or ""),
-                ("summary", session.summary),
+                ("summary", elide_personal_info(session.summary)),
                 ("verdict", session.verdict.value),
                 ("repo_name", session.repo_name),
                 ("revisions", revs_json),
@@ -353,6 +354,8 @@ class SQLiteReviewStore:
     def _upsert_comment_in_conn(self, conn: sqlite3.Connection, comment: CommentModel) -> None:
         """Upsert a single comment in an active database connection."""
         c_uuid = comment.uuid or str(uuid_pkg.uuid4())
+        body_clean = elide_personal_info(comment.body)
+        snippet_clean = elide_personal_info(comment.code_snippet)
         existing = conn.execute(
             "SELECT id, uuid FROM comments WHERE uuid = ? OR id = ?",
             (c_uuid, comment.id),
@@ -393,9 +396,9 @@ class SQLiteReviewStore:
                     comment.start_line,
                     comment.end_line,
                     comment.severity.value,
-                    comment.body,
+                    body_clean,
                     comment.author,
-                    comment.code_snippet,
+                    snippet_clean,
                     comment.created_at,
                     1 if comment.resolved else 0,
                     existing["id"],
@@ -417,9 +420,9 @@ class SQLiteReviewStore:
                     comment.start_line,
                     comment.end_line,
                     comment.severity.value,
-                    comment.body,
+                    body_clean,
                     comment.author,
-                    comment.code_snippet,
+                    snippet_clean,
                     comment.created_at,
                     1 if comment.resolved else 0,
                 ),

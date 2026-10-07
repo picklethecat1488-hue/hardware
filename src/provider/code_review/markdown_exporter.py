@@ -18,6 +18,7 @@ from model.code_review import (
     ReviewSessionModel,
     ReviewSeverity,
 )
+from provider.sanitizer import elide_personal_info
 from provider.vcs.git_engine import is_file_ignored
 
 
@@ -69,13 +70,13 @@ class MarkdownReviewExporter:
                     prog_m = re.search(r"\|\s*\*\*Review Progress\*\*\s*\|\s*`\d+/(\d+)\s+files", disk_content)
                     if prog_m:
                         total_repo_files = int(prog_m.group(1))
-                md_text = self.render_markdown(session, total_repo_files=total_repo_files)
+                md_text = elide_personal_info(self.render_markdown(session, total_repo_files=total_repo_files))
                 if self._is_content_unchanged(disk_content, md_text):
                     return output_path
             except OSError:
                 pass
 
-        md_text = self.render_markdown(session, total_repo_files=total_repo_files)
+        md_text = elide_personal_info(self.render_markdown(session, total_repo_files=total_repo_files))
         output_path.write_text(md_text, encoding="utf-8")
         return output_path
 
@@ -273,7 +274,7 @@ class MarkdownReviewExporter:
                 )
             lines.append("")
 
-        return "\n".join(lines)
+        return elide_personal_info("\n".join(lines))
 
     def _detect_language(self, file_path: str) -> str:
         """Infer markdown code block language from file extension."""
@@ -576,12 +577,12 @@ class MarkdownReviewExporter:
                     prog_m = re.search(r"\|\s*\*\*Review Progress\*\*\s*\|\s*`\d+/(\d+)\s+files", disk_content)
                     if prog_m:
                         total_repo_files = int(prog_m.group(1))
-                md_text = self.render_markdown(commit_session, total_repo_files=total_repo_files)
+                md_text = elide_personal_info(self.render_markdown(commit_session, total_repo_files=total_repo_files))
                 if self._is_content_unchanged(disk_content, md_text):
                     return target_path
             except OSError:
                 pass
 
-        md_text = self.render_markdown(commit_session, total_repo_files=total_repo_files)
+        md_text = elide_personal_info(self.render_markdown(commit_session, total_repo_files=total_repo_files))
         target_path.write_text(md_text, encoding="utf-8")
         return target_path
