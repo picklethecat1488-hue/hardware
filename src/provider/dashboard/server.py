@@ -32,6 +32,7 @@ from model.bug_report import (
 from model.code_review import CommentModel, ReviewSessionModel, ReviewSeverity, ReviewStatus
 from model.vcs import (
     BranchInfoModel,
+    CommitBugTagModel,
     CommitNodeModel,
     DiffViewSessionModel,
     FileDiffModel,
@@ -183,6 +184,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     if not revs and self.server.review_server.session.revisions:
                         revs = self.server.review_server.session.revisions
                     commits = self.server.git_engine.get_commits(rev_args=revs)
+                    if not commits and revs == ["working"]:
+                        commits = self.server.git_engine.get_commits()
                     self._send_json([c.model_dump(mode="json") for c in commits])
                 else:
                     limit_str = query.get("limit", ["40"])[0]
@@ -1036,24 +1039,104 @@ class DashboardServer(ThreadingHTTPServer):
         agent_feedback = [f for f in working_files if f.is_feedback]
 
         # Match bug reports with commits
-        bug_dict = {b.id: b for b in self.bug_server.database.bugs}
+        bug_dict: Dict[str, Any] = {}
+        for b in self.bug_server.database.bugs:
+            num = re.sub(r"^(?:BUG|WORM)[-_]", "", b.id, flags=re.IGNORECASE)
+            bug_dict[f"BUG-{num}"] = b
+            bug_dict[f"WORM-{num}"] = b
+            if num.isdigit():
+                norm_num = f"{int(num):03d}"
+                bug_dict[f"BUG-{norm_num}"] = b
+                bug_dict[f"WORM-{norm_num}"] = b
+            bug_dict[b.id] = b
+
         for node in smartlog_nodes:
-            bug_ids = re.findall(r"\bBUG-\d+\b", node.subject)
-            tags = []
-            for bid in bug_ids:
-                if bid in bug_dict:
-                    tags.append(bug_dict[bid])
+            # Canonicalize existing tag IDs and filter out non-existent bugs
+            retained_tags: List[CommitBugTagModel] = []
+            for tag in node.bug_tags:
+                num = re.sub(r"^(?:BUG|WORM)[-_]", "", tag.id, flags=re.IGNORECASE)
+                canonical_id = f"BUG-{int(num):03d}" if num.isdigit() else f"BUG-{num}"
+                if canonical_id in bug_dict:
+                    b = bug_dict[canonical_id]
+                    tag.id = canonical_id
+                    tag.title = b.title
+                    tag.status = b.status.value if hasattr(b.status, "value") else str(b.status)
+                    tag.severity = b.severity.value if hasattr(b.severity, "value") else str(b.severity)
+                    retained_tags.append(tag)
                 else:
-                    tags.append(
-                        BugReportModel(
-                            id=bid,
-                            title=bid,
-                            status=BugStatus.OPEN,
-                            severity=BugSeverity.MEDIUM,
-                            category=BugCategory.PCB,
+                    md_path = self.repo_root / "feedback" / f"BUG_{num}.md"
+                    if not md_path.exists() and num.isdigit():
+                        md_path = self.repo_root / "feedback" / f"BUG_{int(num):03d}.md"
+                    if not md_path.exists() and num.isdigit():
+                        md_path = self.repo_root / "feedback" / f"BUG_{int(num)}.md"
+                    if not md_path.exists():
+                        md_path = self.repo_root / "feedback" / f"WORM_{num}.md"
+                    if not md_path.exists() and num.isdigit():
+                        md_path = self.repo_root / "feedback" / f"WORM_{int(num):03d}.md"
+                    if not md_path.exists() and num.isdigit():
+                        md_path = self.repo_root / "feedback" / f"WORM_{int(num)}.md"
+                    if md_path.exists():
+                        tag.id = canonical_id
+                        retained_tags.append(tag)
+            node.bug_tags = retained_tags
+
+            bug_ids = re.findall(r"\b((?:BUG|WORM)[_-]\d+)\b", node.subject, re.IGNORECASE)
+            existing_ids = {t.id for t in node.bug_tags}
+            for bid in bug_ids:
+                num = re.sub(r"^(?:BUG|WORM)[-_]", "", bid, flags=re.IGNORECASE)
+                canonical_id = f"BUG-{int(num):03d}" if num.isdigit() else f"BUG-{num}"
+                if canonical_id not in existing_ids:
+                    if canonical_id in bug_dict:
+                        b = bug_dict[canonical_id]
+                        node.bug_tags.append(
+                            CommitBugTagModel(
+                                id=canonical_id,
+                                title=b.title,
+                                status=b.status.value if hasattr(b.status, "value") else str(b.status),
+                                severity=b.severity.value if hasattr(b.severity, "value") else str(b.severity),
+                            )
                         )
-                    )
-            node.bug_tags = tags
+                        existing_ids.add(canonical_id)
+                    else:
+                        md_path = self.repo_root / "feedback" / f"BUG_{num}.md"
+                        if not md_path.exists() and num.isdigit():
+                            md_path = self.repo_root / "feedback" / f"BUG_{int(num):03d}.md"
+                        if not md_path.exists() and num.isdigit():
+                            md_path = self.repo_root / "feedback" / f"BUG_{int(num)}.md"
+                        if not md_path.exists():
+                            md_path = self.repo_root / "feedback" / f"WORM_{num}.md"
+                        if not md_path.exists() and num.isdigit():
+                            md_path = self.repo_root / "feedback" / f"WORM_{int(num):03d}.md"
+                        if not md_path.exists() and num.isdigit():
+                            md_path = self.repo_root / "feedback" / f"WORM_{int(num)}.md"
+                        if md_path.exists():
+                            status = "OPEN"
+                            title = canonical_id
+                            severity = "LOW"
+                            try:
+                                content = md_path.read_text(encoding="utf-8", errors="replace")
+                                for line in content.splitlines():
+                                    if line.startswith("# ") and ("BUG-" in line or "WORM-" in line):
+                                        title = line.split("]", 1)[-1].strip()
+                                    if line.startswith("- **Status**:"):
+                                        parts = line.split("`")
+                                        if len(parts) >= 2:
+                                            status = parts[1].strip()
+                                    if line.startswith("- **Severity**:"):
+                                        parts = line.split("`")
+                                        if len(parts) >= 2:
+                                            severity = parts[1].strip()
+                            except Exception:
+                                pass
+                            node.bug_tags.append(
+                                CommitBugTagModel(
+                                    id=canonical_id,
+                                    title=title,
+                                    status=status,
+                                    severity=severity,
+                                )
+                            )
+                            existing_ids.add(canonical_id)
 
         # Ensure file watcher syncs any newly placed or edited CR feedback files (BUG-236)
         if hasattr(self, "review_server") and self.review_server:
