@@ -55,7 +55,7 @@ Host anvil
 ## Core Architecture & Code Invariants
 
 ### 1. Test Isolation & Regression Unit Testing
-* Unit tests MUST be completely isolated from implementation code. Core framework tests go in [src/tests/](file:///Users/daparker/gh/hardware/src/tests/) and project-specific tests go in [src/projects/tests/](file:///Users/daparker/gh/hardware/src/projects/tests/).
+* Unit tests MUST be completely isolated from implementation code. Core framework tests go in [src/tests/](src/tests/) and project-specific tests go in [src/projects/tests/](src/projects/tests/).
 * **Slow Tests**: 3D CAD boolean checks, PyBullet physics simulations, and JAX SPH fluid dynamics tests are highly resource-intensive and must be decorated with `@pytest.mark.slow` (or have `slow` in their test markers) so they do not block fast pre-commit checks:
   ```bash
   pytest -m "slow"
@@ -63,15 +63,15 @@ Host anvil
 * **Regression Unit Testing Mandate**: Whenever a regression is identified, investigated, or bisected to a prior change, you MUST introduce dedicated regression unit tests (or add active regression assertions to existing test suites) that explicitly guard against the identified regression before concluding the task.
 
 ### 2. Geometry Providers & Discoverability
-* Custom geometry projects must be packages nested within [src/projects/](file:///Users/daparker/gh/hardware/src/projects/).
-* The provider class must inherit from `Provider` and be decorated with `@discover_provider` (imported from [src/provider/utils.py](file:///Users/daparker/gh/hardware/src/provider/utils.py)). Always export the provider at the package level (`__init__.py`) and import it in [src/projects/\_\_init\_\_.py](file:///Users/daparker/gh/hardware/src/projects/__init__.py).
+* Custom geometry projects must be packages nested within [src/projects/](src/projects/).
+* The provider class must inherit from `Provider` and be decorated with `@discover_provider` (imported from [src/provider/utils.py](src/provider/utils.py)). Always export the provider at the package level (`__init__.py`) and import it in [src/projects/\_\_init\_\_.py](src/projects/__init__.py).
 * **Project Manifest Integration**: All custom geometry parts, components, clips, or support structures that participate in assemblies or are needed for manufacturing MUST be explicitly registered in the project's `manifest.yaml` to ensure correct build-chain discovery and inclusion in build artifacts.
 * Builder methods should return shape/build geometries (e.g., `BuildPart`), while diagram/view actions should populate a `Room` object via `room.add(...)` or `room.add_label(...)`.
 
 ### 3. Configuration & Data Model Integrity
 * Always use `@cached_property` for `default_config` and any sub-tools (Builders, Configurators) in your provider class to guarantee correct orchestration timing and minimize expensive CAD allocations.
 * **Geometry Parametrization**: Define base geometry parameters in the project's `measurements.yaml` and read them dynamically via config settings. Compute derived geometry coordinates, dimensions, and branch comparison thresholds dynamically relative to these settings rather than hardcoding numeric literals.
-* **Data Model Integrity & Validation**: Settings and configuration schemas must use Pydantic models (subclassing `BaseModel`) defined under [src/projects_config/](file:///Users/daparker/gh/hardware/src/projects_config/). Prefer strongly typed data models over runtime dynamic attribute parsing (`hasattr` / `getattr`). Prefer Pydantic validation over manual checks in code; if dynamic validation is necessary, raise a descriptive `ValueError`.
+* **Data Model Integrity & Validation**: Settings and configuration schemas must use Pydantic models (subclassing `BaseModel`) defined under [src/projects_config/](src/projects_config/). Prefer strongly typed data models over runtime dynamic attribute parsing (`hasattr` / `getattr`). Prefer Pydantic validation over manual checks in code; if dynamic validation is necessary, raise a descriptive `ValueError`.
 * **Method Parameterization**: Pass parameters and configuration models explicitly into methods and functions rather than having them read instance attributes or parent provider properties internally.
 * **Configuration Persistence**: For configuration actions, persist saved settings to the Pydantic environment file (`.env`) in addition to updating source data files (`measurements.yaml`).
 * **No Fallback Constants**: Do NOT place fallback constants directly in the codebase when parsing configs or settings (e.g., ternary fallbacks or `getattr` defaults like `0.004` or `0.90`). All configuration fields must be strongly typed and resolved dynamically. Fallbacks of `0`, `0.0`, or `None` are acceptable to represent unconfigured properties.
@@ -121,23 +121,23 @@ Host anvil
 
 To minimize global context overhead and prevent unnecessary token burn, domain- and subsystem-specific architectural mandates are maintained in dedicated reference documents under `docs/`:
 
-1. [SPH Fluid Dynamics & Numerical Stability](file:///Users/daparker/gh/hardware/docs/sph_fluid_dynamics.md)
+1. [SPH Fluid Dynamics & Numerical Stability](docs/sph_fluid_dynamics.md)
    - Analytical vs concave boundary representations and cylinder cavity invariants.
    - JAX-JIT compilation, semantic coordinate transforms, and fluid recycling.
    - Numerical velocity damping and physical contact non-floating verification.
 
-2. [Physics & URDF Simulation Guidelines](file:///Users/daparker/gh/hardware/docs/physics_urdf_simulation.md)
+2. [Physics & URDF Simulation Guidelines](docs/physics_urdf_simulation.md)
    - URDF metadata specification and kinematic joint definitions.
    - Mandated direct CAD boundary derivation via `URDFBoundary.from_shape` with zero duplicate numeric literals.
    - Dynamic physics parameter configuration and PyBullet bug reproduction mandate.
 
-3. [Declarative Wiring & PCB Engine](file:///Users/daparker/gh/hardware/docs/declarative_wiring_pcb.md)
+3. [Declarative Wiring & PCB Engine](docs/declarative_wiring_pcb.md)
    - Declarative PCB toolchain, manifest pipeline, and headless KiCad CAM generation.
    - Subassembly footprint scoping and canonical component reference designators (`R1`, `C1`, `D1`, `Q1`, `Y1`, `J1`, `U1`, `TP1`).
    - PCB routing invariants, flex planar keepouts, DRC exemptions, and schematic router detour rules.
    - Component selection and bare-metal Rust (`no_std`, Embassy) firmware co-design criteria.
 
-4. [VCS Workstation, Code Review & Quake HUD Templates](file:///Users/daparker/gh/hardware/docs/vcs_code_review.md)
+4. [VCS Workstation, Code Review & Quake HUD Templates](docs/vcs_code_review.md)
    - Jinja2 code generation, dedicated template directory structures, and error guardrails.
    - Review session feedback persistence and atomic SQLite backing store.
    - Structured bug tracking, Git LFS attachments, and VCS CLI subcommand parity.

@@ -20,6 +20,7 @@ from model.bug_report import (
     BugSeverity,
     BugStatus,
 )
+from provider.sanitizer import elide_personal_info
 
 
 class MarkdownBugExporter:
@@ -67,7 +68,7 @@ class MarkdownBugExporter:
         if store and hasattr(store, "resolve_duplicate_ids"):
             store.resolve_duplicate_ids()
 
-        md_text = self.render_markdown(database)
+        md_text = elide_personal_info(self.render_markdown(database))
         output_path.write_text(md_text, encoding="utf-8")
 
         # Export individual BUG_<id>.md files into feedback/ (or custom feedback_dir)
@@ -275,7 +276,7 @@ class MarkdownBugExporter:
 
             lines.append("---\n")
 
-        return "\n".join(lines).strip() + "\n"
+        return elide_personal_info("\n".join(lines).strip() + "\n")
 
     def export_state_json(self, database: BugDatabaseModel, state_path: Path) -> Path:
         """Persist bug database to JSON file.
@@ -661,7 +662,7 @@ class MarkdownBugExporter:
         if bug.resolution_notes.strip():
             lines.extend(["#### Resolution Notes", "", bug.resolution_notes.strip(), ""])
 
-        return "\n".join(lines).strip() + "\n"
+        return elide_personal_info("\n".join(lines).strip() + "\n")
 
     def export_individual_bug(self, bug: BugReportModel, feedback_dir: Path) -> Path:
         """Export a single bug to feedback/BUG_<id>.md.
@@ -676,7 +677,7 @@ class MarkdownBugExporter:
         feedback_dir.mkdir(parents=True, exist_ok=True)
         clean_id = bug.id.removeprefix("BUG-").removeprefix("BUG_")
         target_file = feedback_dir / f"BUG_{clean_id}.md"
-        content = self.render_bug_markdown(bug)
+        content = elide_personal_info(self.render_bug_markdown(bug))
         if target_file.exists():
             try:
                 disk_content = target_file.read_text(encoding="utf-8")

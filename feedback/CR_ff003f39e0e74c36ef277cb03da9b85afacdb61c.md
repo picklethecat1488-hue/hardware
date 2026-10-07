@@ -22,9 +22,9 @@
 
 ## File-by-File Review Findings
 
-### [`src/provider/templates/code_review.html.j2`](file:///Users/daparker/gh/hardware/src/provider/templates/code_review.html.j2) — ⏳ `PENDING`
+### [`src/provider/templates/code_review.html.j2`](file:///Users/<username>/gh/hardware/src/provider/templates/code_review.html.j2) — ⏳ `PENDING`
 
-#### **[MUST FIX]** [src/provider/templates/code_review.html.j2:L1388](file:///Users/daparker/gh/hardware/src/provider/templates/code_review.html.j2#L1388)
+#### **[MUST FIX]** [src/provider/templates/code_review.html.j2:L1388](file:///Users/<username>/gh/hardware/src/provider/templates/code_review.html.j2#L1388)
 <!-- comment-uuid: 7a69e8a2-8dc5-4495-a02c-78b4b0355e2b -->
 <!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
@@ -34,7 +34,7 @@
 
 > **Reviewer (Reviewer)**: Tried thris UI on this page, got "The path '/src/provider/templates/code_review.html.j2' does not exist on this computer."
 
-#### **[MUST FIX]** [src/provider/templates/code_review.html.j2:L1386-L1388](file:///Users/daparker/gh/hardware/src/provider/templates/code_review.html.j2#L1386-L1388)
+#### **[MUST FIX]** [src/provider/templates/code_review.html.j2:L1386-L1388](file:///Users/<username>/gh/hardware/src/provider/templates/code_review.html.j2#L1386-L1388)
 <!-- comment-uuid: b05c3da1-bf53-49ed-bddf-e0309a119e2a -->
 <!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
@@ -46,9 +46,9 @@
 
 > **Reviewer (Reviewer)**: we can remove the text labels from both these buttons
 
-### [`src/provider/vcs/git_engine.py`](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py) — ⏳ `PENDING`
+### [`src/provider/vcs/git_engine.py`](file:///Users/<username>/gh/hardware/src/provider/vcs/git_engine.py) — ⏳ `PENDING`
 
-#### **[MUST FIX]** [src/provider/vcs/git_engine.py:L1036](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L1036)
+#### **[MUST FIX]** [src/provider/vcs/git_engine.py:L1036](file:///Users/<username>/gh/hardware/src/provider/vcs/git_engine.py#L1036)
 <!-- comment-uuid: 67147bc4-e98c-420f-934f-8fe56c06f662 -->
 <!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
@@ -58,7 +58,7 @@ repo_web_url = self.get_repo_web_url() or "https://github.com/picklethecat1488-h
 
 > **Reviewer (Reviewer)**: remove direct fallbacks from the codebase please
 
-#### **[MUST FIX]** [src/provider/vcs/git_engine.py:L1043-L1049](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L1043-L1049)
+#### **[MUST FIX]** [src/provider/vcs/git_engine.py:L1043-L1049](file:///Users/<username>/gh/hardware/src/provider/vcs/git_engine.py#L1043-L1049)
 <!-- comment-uuid: 1ff8c45e-0b71-411f-b8df-2d72ab1e4b23 -->
 <!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
@@ -74,7 +74,7 @@ proc = subprocess.run(
 
 > **Reviewer (Reviewer)**: this command will create a PR stack for the current commit and all ancestor commits. Since this is the case, I don't think we need to pass "commit hashes" to this function
 
-#### **[MUST FIX]** [src/provider/vcs/git_engine.py:L1034](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L1034)
+#### **[MUST FIX]** [src/provider/vcs/git_engine.py:L1034](file:///Users/<username>/gh/hardware/src/provider/vcs/git_engine.py#L1034)
 <!-- comment-uuid: 3845f9dc-c1a7-4a5d-8f11-577c890bbc84 -->
 <!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
@@ -84,7 +84,7 @@ created_prs = self.create_prs_for_commits(commit_hashes)
 
 > **Reviewer (Reviewer)**: let's just remove this command and support sapling pr stacks instead. they have a better user experience in GitHub, than regular gh PR's. IMO
 
-#### **[MUST FIX]** [src/provider/vcs/git_engine.py:L929-L1014](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L929-L1014)
+#### **[MUST FIX]** [src/provider/vcs/git_engine.py:L929-L1014](file:///Users/<username>/gh/hardware/src/provider/vcs/git_engine.py#L929-L1014)
 <!-- comment-uuid: e6a64ade-9b06-442b-829d-553776e81df5 -->
 <!-- comment-commit: ff003f39e0e74c36ef277cb03da9b85afacdb61c -->
 
@@ -181,9 +181,9 @@ def create_prs_for_commits(self, commit_hashes: List[str]) -> List[Dict[str, Any
 
 ## Action Items Checklist
 
-- [x] **[MUST FIX]** [`src/provider/templates/code_review.html.j2:L1388`](file:///Users/daparker/gh/hardware/src/provider/templates/code_review.html.j2#L1388): Tried thris UI on this page, got "The path '/src/provider/templates/code_review.html.j2' does not exist on this computer." <!-- uuid:7a69e8a2-8dc5-4495-a02c-78b4b0355e2b -->
-- [x] **[MUST FIX]** [`src/provider/templates/code_review.html.j2:L1386-L1388`](file:///Users/daparker/gh/hardware/src/provider/templates/code_review.html.j2#L1386-L1388): we can remove the text labels from both these buttons <!-- uuid:b05c3da1-bf53-49ed-bddf-e0309a119e2a -->
-- [x] **[MUST FIX]** [`src/provider/vcs/git_engine.py:L1036`](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L1036): remove direct fallbacks from the codebase please <!-- uuid:67147bc4-e98c-420f-934f-8fe56c06f662 -->
-- [x] **[MUST FIX]** [`src/provider/vcs/git_engine.py:L1043-L1049`](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L1043-L1049): this command will create a PR stack for the current commit and all ancestor commits. Since this is the case, I don't think we need to pass "commit hashes" to this function <!-- uuid:1ff8c45e-0b71-411f-b8df-2d72ab1e4b23 -->
-- [x] **[MUST FIX]** [`src/provider/vcs/git_engine.py:L1034`](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L1034): let's just remove this command and support sapling pr stacks instead. they have a better user experience in GitHub, than regular gh PR's. IMO <!-- uuid:3845f9dc-c1a7-4a5d-8f11-577c890bbc84 -->
-- [x] **[MUST FIX]** [`src/provider/vcs/git_engine.py:L929-L1014`](file:///Users/daparker/gh/hardware/src/provider/vcs/git_engine.py#L929-L1014): delete this <!-- uuid:e6a64ade-9b06-442b-829d-553776e81df5 -->
+- [x] **[MUST FIX]** [`src/provider/templates/code_review.html.j2:L1388`](file:///Users/<username>/gh/hardware/src/provider/templates/code_review.html.j2#L1388): Tried thris UI on this page, got "The path '/src/provider/templates/code_review.html.j2' does not exist on this computer." <!-- uuid:7a69e8a2-8dc5-4495-a02c-78b4b0355e2b -->
+- [x] **[MUST FIX]** [`src/provider/templates/code_review.html.j2:L1386-L1388`](file:///Users/<username>/gh/hardware/src/provider/templates/code_review.html.j2#L1386-L1388): we can remove the text labels from both these buttons <!-- uuid:b05c3da1-bf53-49ed-bddf-e0309a119e2a -->
+- [x] **[MUST FIX]** [`src/provider/vcs/git_engine.py:L1036`](file:///Users/<username>/gh/hardware/src/provider/vcs/git_engine.py#L1036): remove direct fallbacks from the codebase please <!-- uuid:67147bc4-e98c-420f-934f-8fe56c06f662 -->
+- [x] **[MUST FIX]** [`src/provider/vcs/git_engine.py:L1043-L1049`](file:///Users/<username>/gh/hardware/src/provider/vcs/git_engine.py#L1043-L1049): this command will create a PR stack for the current commit and all ancestor commits. Since this is the case, I don't think we need to pass "commit hashes" to this function <!-- uuid:1ff8c45e-0b71-411f-b8df-2d72ab1e4b23 -->
+- [x] **[MUST FIX]** [`src/provider/vcs/git_engine.py:L1034`](file:///Users/<username>/gh/hardware/src/provider/vcs/git_engine.py#L1034): let's just remove this command and support sapling pr stacks instead. they have a better user experience in GitHub, than regular gh PR's. IMO <!-- uuid:3845f9dc-c1a7-4a5d-8f11-577c890bbc84 -->
+- [x] **[MUST FIX]** [`src/provider/vcs/git_engine.py:L929-L1014`](file:///Users/<username>/gh/hardware/src/provider/vcs/git_engine.py#L929-L1014): delete this <!-- uuid:e6a64ade-9b06-442b-829d-553776e81df5 -->
