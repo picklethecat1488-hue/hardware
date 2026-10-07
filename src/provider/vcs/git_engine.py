@@ -790,7 +790,7 @@ class GitEngine:
 
     def _extract_bug_tags(self, text: str) -> List[CommitBugTagModel]:
         """Extract bug IDs from commit text and resolve current status via SQLite/Markdown."""
-        bug_ids = sorted(list(set(re.findall(r"\b(BUG[_-]\d+)\b", text, re.IGNORECASE))))
+        bug_ids = sorted(list(set(re.findall(r"\b((?:BUG|WORM)[_-]\d+)\b", text, re.IGNORECASE))))
         if not bug_ids:
             return []
 
@@ -798,11 +798,12 @@ class GitEngine:
         db_map: Dict[str, Dict[str, str]] = {}
         missing_ids = []
         for bid in bug_ids:
-            norm_id = bid.replace("_", "-").upper()
+            clean = re.sub(r"^(?:BUG|WORM)[-_]", "", bid, flags=re.IGNORECASE)
+            norm_id = f"BUG-{int(clean):03d}" if clean.isdigit() else f"BUG-{clean}"
             if norm_id in self._bug_tag_cache:
                 db_map[norm_id] = self._bug_tag_cache[norm_id]
             else:
-                missing_ids.append((bid, norm_id))
+                missing_ids.append((bid, norm_id, clean))
 
         sqlite_path = self.repo_root / "build" / "bugs.sqlite"
         if missing_ids and sqlite_path.exists():
@@ -810,9 +811,15 @@ class GitEngine:
                 conn = sqlite3.connect(str(sqlite_path))
                 try:
                     cur = conn.cursor()
-                    for bid, norm_id in missing_ids:
+                    for bid, norm_id, clean in missing_ids:
                         cur.execute(
-                            "SELECT id, title, status, severity FROM bugs WHERE id = ? OR id = ?", (norm_id, bid)
+                            "SELECT id, title, status, severity FROM bugs WHERE id = ? OR id = ? OR id = ? OR id = ?",
+                            (
+                                norm_id,
+                                bid,
+                                f"BUG_{clean}",
+                                f"BUG_{int(clean):03d}" if clean.isdigit() else f"BUG_{clean}",
+                            ),
                         )
                         row = cur.fetchone()
                         if row:
@@ -829,7 +836,8 @@ class GitEngine:
                 pass
 
         for bid in bug_ids:
-            norm_id = bid.replace("_", "-").upper()
+            clean = re.sub(r"^(?:BUG|WORM)[-_]", "", bid, flags=re.IGNORECASE)
+            norm_id = f"BUG-{int(clean):03d}" if clean.isdigit() else f"BUG-{clean}"
             if norm_id in db_map:
                 tags.append(
                     CommitBugTagModel(
@@ -840,30 +848,45 @@ class GitEngine:
                     )
                 )
             else:
-                num = norm_id.replace("BUG-", "").replace("BUG_", "")
+                num = clean
                 md_path = self.repo_root / "feedback" / f"BUG_{num}.md"
-                status = "OPEN"
-                title = ""
+                if not md_path.exists() and num.isdigit():
+                    md_path = self.repo_root / "feedback" / f"BUG_{int(num):03d}.md"
+                if not md_path.exists() and num.isdigit():
+                    md_path = self.repo_root / "feedback" / f"BUG_{int(num)}.md"
+                if not md_path.exists():
+                    md_path = self.repo_root / "feedback" / f"WORM_{num}.md"
+                if not md_path.exists() and num.isdigit():
+                    md_path = self.repo_root / "feedback" / f"WORM_{int(num):03d}.md"
+                if not md_path.exists() and num.isdigit():
+                    md_path = self.repo_root / "feedback" / f"WORM_{int(num)}.md"
                 if md_path.exists():
+                    status = "OPEN"
+                    title = ""
+                    severity = "LOW"
                     try:
                         content = md_path.read_text(encoding="utf-8", errors="replace")
                         for line in content.splitlines():
-                            if line.startswith("# ") and "BUG-" in line:
+                            if line.startswith("# ") and ("BUG-" in line or "WORM-" in line):
                                 title = line.split("]", 1)[-1].strip()
                             if line.startswith("- **Status**:"):
                                 parts = line.split("`")
                                 if len(parts) >= 2:
                                     status = parts[1].strip()
+                            if line.startswith("- **Severity**:"):
+                                parts = line.split("`")
+                                if len(parts) >= 2:
+                                    severity = parts[1].strip()
                     except Exception:
                         pass
-                tags.append(
-                    CommitBugTagModel(
-                        id=norm_id,
-                        title=title,
-                        status=status,
-                        severity="LOW",
+                    tags.append(
+                        CommitBugTagModel(
+                            id=norm_id,
+                            title=title or norm_id,
+                            status=status,
+                            severity=severity,
+                        )
                     )
-                )
         return tags
 
     def get_repo_web_url(self) -> Optional[str]:

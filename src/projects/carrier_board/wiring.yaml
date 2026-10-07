@@ -78,8 +78,8 @@ footprints:
   - 0.0
   - 0.0
   shape_ref: carrier_board
-  mpn: HIROSE-FH35C-30S
-  supplier_pn: H1234-ND
+  mpn: FH12-30S-0.5SH(55)
+  supplier_pn: HFJ130CT-ND
 - name: J4
   package: FPC-30P-0.5MM
   position:
@@ -91,8 +91,8 @@ footprints:
   - 0.0
   - 0.0
   shape_ref: flex_tail
-  mpn: HIROSE-FH35C-30S
-  supplier_pn: H1234-ND
+  mpn: FH12-30S-0.5SH(55)
+  supplier_pn: HFJ130CT-ND
 - name: J13
   package: JST-PH-2P
   position:

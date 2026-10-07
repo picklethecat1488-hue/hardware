@@ -2947,7 +2947,10 @@
     }
 
     async function onOpenInCodeReview() {
-      const commits = state.selectedCommits.length > 0 ? state.selectedCommits : [state.activeCommit];
+      let commits = state.selectedCommits.length > 0 ? state.selectedCommits : (state.activeCommit ? [state.activeCommit] : []);
+      if (commits.length === 1 && commits[0] === "working" && (!state.workingFiles || state.workingFiles.length === 0)) {
+        commits = [];
+      }
       const targetName = `${state.repoName || 'repo'}_code_review`;
       try {
         const resp = await fetch("/api/open_code_review", {
@@ -2959,7 +2962,8 @@
         openWorkstationModal(res.url, targetName);
       } catch (err) {
         const revStr = commits.join(",");
-        openWorkstationModal(`/review?revisions=${encodeURIComponent(revStr)}`, targetName);
+        const fallbackUrl = revStr ? `/review?revisions=${encodeURIComponent(revStr)}` : "/review";
+        openWorkstationModal(fallbackUrl, targetName);
       }
     }
 

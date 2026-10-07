@@ -8,6 +8,7 @@ and inter-tool navigation to code_review and bug_report.
 import json
 from pathlib import Path
 import subprocess
+import sqlite3
 import threading
 import time
 from typing import Tuple
@@ -2953,3 +2954,148 @@ def test_regression_bug_274_workstations_modal_windows() -> None:
     assert "✕" in bug_text
     assert "closeWorkstation()" in bug_text
     assert "window.parent.closeWorkstationModal()" in bug_text
+
+
+def test_regression_worm_014_nonexistent_bugs_not_tagged_as_open(tmp_path: Path) -> None:
+    """Verify WORM-014: Non-existent bug IDs are not assigned phantom OPEN tags."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    build_dir = repo / "build"
+    build_dir.mkdir()
+
+    # Create build/bugs.sqlite with only BUG-274 marked RESOLVED
+    bugs_db = build_dir / "bugs.sqlite"
+    conn = sqlite3.connect(str(bugs_db))
+    conn.execute(
+        "CREATE TABLE bugs (id TEXT PRIMARY KEY, title TEXT, status TEXT, severity TEXT, category TEXT, description TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO bugs (id, title, status, severity, category, description) "
+        "VALUES ('BUG-274', 'Make code review modal', 'RESOLVED', 'MEDIUM', 'UI', 'Desc')"
+    )
+    conn.commit()
+    conn.close()
+
+    engine = GitEngine(repo_root=repo)
+
+    # 1. Commit mentioning non-existent bug BUG-999
+    tags_999 = engine._extract_bug_tags("feat(dashboard): dummy test commit (BUG-999)")
+    assert len(tags_999) == 0, f"Expected no tags for non-existent BUG-999, but got: {tags_999}"
+
+    # 2. Commit mentioning BUG-274 and non-existent WORM-999
+    tags_mixed = engine._extract_bug_tags("fix(dashboard): resolve modal issue (BUG-274 / WORM-999)")
+    assert len(tags_mixed) == 1, f"Expected exactly 1 tag (BUG-274), but got: {tags_mixed}"
+    assert tags_mixed[0].id == "BUG-274"
+    assert tags_mixed[0].status == "RESOLVED"
+    assert not any(t.id == "WORM-999" or t.id == "BUG-999" for t in tags_mixed)
+
+
+def test_regression_worm_014_repo_smartlog_no_ghost_bugs() -> None:
+    """Verify WORM-014: The repository's smartlog does not display ghost bug tags."""
+    workspace_root = Path(__file__).resolve().parent.parent.parent
+    engine = GitEngine(repo_root=workspace_root)
+    nodes = engine.get_smartlog_dag()
+
+    # Load valid bug IDs from DB and feedback files
+    valid_ids = set()
+    sqlite_path = workspace_root / "build" / "bugs.sqlite"
+    if sqlite_path.exists():
+        try:
+            conn = sqlite3.connect(str(sqlite_path))
+            for row in conn.execute("SELECT id FROM bugs"):
+                valid_ids.add(row[0].upper().replace("_", "-"))
+            conn.close()
+        except Exception:
+            pass
+    feedback_dir = workspace_root / "feedback"
+    if feedback_dir.exists():
+        for p in feedback_dir.glob("BUG_*.md"):
+            clean = p.stem.replace("BUG_", "")
+            valid_ids.add(f"BUG-{clean}".upper())
+            if clean.isdigit():
+                valid_ids.add(f"BUG-{int(clean):03d}")
+
+    ghost_tags = []
+    for node in nodes:
+        for tag in node.bug_tags:
+            norm = tag.id.upper().replace("_", "-")
+            if norm not in valid_ids and tag.status == "OPEN":
+                ghost_tags.append((node.short_hash, tag.id, tag.status))
+
+    assert not ghost_tags, f"Found ghost bug tags in repository smartlog: {ghost_tags}"
+
+
+def test_regression_worm_015_workstation_modal_dom_hierarchy_and_rendering() -> None:
+    """Verify WORM-015: workstationModal is NOT nested inside modalBranchPicker or hidden modals."""
+    from bs4 import BeautifulSoup
+    from html.parser import HTMLParser
+    import jinja2
+    from model.vcs import BranchInfoModel, DiffViewSessionModel
+
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(tpl_dir)),
+        trim_blocks=True,
+        lstrip_blocks=True,
+        autoescape=False,
+    )
+    template = env.get_template("diff_view.html.j2")
+
+    dummy_session = DiffViewSessionModel(
+        title="VCS Dashboard",
+        current_user="picklethecat1488-hue",
+        active_commit="working",
+        branches=[
+            BranchInfoModel(name="main", is_current=True, is_remote=False),
+        ],
+        smartlog_tree=[],
+        working_files=[],
+        selected_commits=[],
+    )
+    rendered_html = template.render(
+        session=dummy_session,
+        active_branch="main",
+        active_commit="working",
+    )
+
+    soup = BeautifulSoup(rendered_html, "html.parser")
+
+    # 1. workstationModal must exist
+    workstation_modal = soup.find(id="workstationModal")
+    assert workstation_modal is not None, "workstationModal not found in rendered diff_view"
+
+    # 2. modalBranchPicker must exist
+    branch_modal = soup.find(id="modalBranchPicker")
+    assert branch_modal is not None, "modalBranchPicker not found in rendered diff_view"
+
+    # 3. workstationModal must NOT be a child or descendant of modalBranchPicker or any other modal
+    assert branch_modal.find(id="workstationModal") is None, (
+        "workstationModal is incorrectly nested inside modalBranchPicker, causing it to be hidden by display: none"
+    )
+    for overlay in soup.find_all(class_="quake-modal-overlay"):
+        if overlay.get("id") != "workstationModal":
+            assert overlay.find(id="workstationModal") is None, (
+                f"workstationModal is incorrectly nested inside {overlay.get('id')}"
+            )
+
+    # 4. Check for tag balance (no unclosed div tags leaking through the template)
+    class DivBalanceChecker(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.div_depth = 0
+            self.mismatches = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "div":
+                self.div_depth += 1
+
+        def handle_endtag(self, tag):
+            if tag == "div":
+                self.div_depth -= 1
+                if self.div_depth < 0:
+                    self.mismatches.append("Extra closing </div> encountered")
+
+    checker = DivBalanceChecker()
+    checker.feed(rendered_html)
+    assert checker.div_depth == 0, f"Unbalanced <div> tags in diff_view.html.j2: depth is {checker.div_depth}"
+    assert len(checker.mismatches) == 0, f"Encountered div mismatches: {checker.mismatches}"
