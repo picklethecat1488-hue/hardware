@@ -2844,7 +2844,7 @@ def test_regression_bug_275_supplier_feedback_flex_tail() -> None:
 
 
 def test_regression_bug_276_j4_fpc_connector_mpn_and_supplier_pn() -> None:
-    """Verify BUG-276: J2 and J4 30-pin 0.5mm FPC connectors have valid Hirose FH12-30S-0.5SH(55) MPN and HFJ130CT-ND Digi-Key PN."""
+    """Verify BUG-276: J2 is Hirose FH12-30S-0.5SH(55) receptacle on carrier board, and J4 is integral male mating tab marked DNP."""
     from model.wiring import Wiring
 
     wiring = Wiring("src/projects/carrier_board/wiring.yaml")
@@ -2855,8 +2855,13 @@ def test_regression_bug_276_j4_fpc_connector_mpn_and_supplier_pn() -> None:
 
     assert j2.mpn == "FH12-30S-0.5SH(55)", f"J2 MPN must be FH12-30S-0.5SH(55), got {j2.mpn}"
     assert j2.supplier_pn == "HFJ130CT-ND", f"J2 supplier_pn must be HFJ130CT-ND, got {j2.supplier_pn}"
-    assert j4.mpn == "FH12-30S-0.5SH(55)", f"J4 MPN must be FH12-30S-0.5SH(55), got {j4.mpn}"
-    assert j4.supplier_pn == "HFJ130CT-ND", f"J4 supplier_pn must be HFJ130CT-ND, got {j4.supplier_pn}"
+    assert not getattr(j2, "dnp", False), "J2 is populated connector receptacle on carrier board"
+
+    # J4 is the integral FPC male mating tab that inserts into J2 (not a populated connector)
+    assert getattr(j4, "dnp", False), "J4 must be marked DNP (integral male mating tab, not populated)"
+    assert "Mating Tab" in j4.mpn or "Male plug" in j4.mpn
+    assert j4.supplier_pn == "N/A"
+    assert "Male Plug" in (j4.value or "")
 
     # Verify no placeholder or 100-pin connector PN remains
     for fp in (j2, j4):
@@ -2879,15 +2884,13 @@ def test_regression_bug_276_j4_fpc_connector_mpn_and_supplier_pn() -> None:
     carrier_bom = Path("build/bom/carrier_board/carrier_board_bom.csv")
     assert flex_bom.exists(), "flex_tail_bom.csv must exist"
     assert carrier_bom.exists(), "carrier_board_bom.csv must exist"
-    assert "FH12-30S-0.5SH(55)" in flex_bom.read_text(encoding="utf-8")
-    assert "HFJ130CT-ND" in flex_bom.read_text(encoding="utf-8")
+    assert "Mating Tab" in flex_bom.read_text(encoding="utf-8") or "Male Plug" in flex_bom.read_text(encoding="utf-8")
     assert "FH12-30S-0.5SH(55)" in carrier_bom.read_text(encoding="utf-8")
     assert "HFJ130CT-ND" in carrier_bom.read_text(encoding="utf-8")
 
     with zipfile.ZipFile("build/board/carrier_board/flex_tail/bom_templates.zip") as zf:
         bom_text = zf.read("flex_tail_bom.csv").decode("utf-8")
-        assert "FH12-30S-0.5SH(55)" in bom_text
-        assert "HFJ130CT-ND" in bom_text
+        assert "Mating Tab" in bom_text or "Male Plug" in bom_text
         assert "H1234-ND" not in bom_text
 
 
@@ -2962,16 +2965,16 @@ def test_regression_bug_277_bom_excel_pcbway_export() -> None:
     assert r6["H"] == "Type"
     assert r6["I"] == "Your Instructions / Notes"
 
-    # Check row 7 (J4 component)
+    # Check row 7 (J4 component - DNP integral mating tab)
     r7 = rows_map[7]
     assert r7["A"] == "1"
     assert r7["B"] == "J4"
     assert r7["C"] == "1"
-    assert r7["D"] == "Hirose Electric"
-    assert r7["E"] == "FH12-30S-0.5SH(55)"
+    assert r7["D"] == "N/A (Bare Flex PCB)"
+    assert "Mating Tab" in r7["E"] or "Male plug" in r7["E"]
     assert r7["G"] == "FPC-30P-0.5MM"
-    assert r7["H"] == "SMD"
-    assert "HFJ130CT-ND" in r7["I"]
+    assert r7["H"] == "DNS"
+    assert "no component to populate" in r7["I"] or "Male plug" in r7["I"]
 
     # 4. Verify carrier_board_bom.xlsx contains J2 and DNP component J15
     with zipfile.ZipFile(carrier_bom_xlsx) as zf:

@@ -101,7 +101,7 @@ def generate_pcb_project_summary(
         t = _get_dim("flex_tail_thickness", job_thickness or 0.20)
         tab_w = _get_dim("flex_tail_tab_width", 17.0)
         cr = _get_dim("flex_tail_corner_radius", 1.0)
-        stiffener = "0.80 mm FR-4 stiffener under connector tab and sensing electrode array"
+        stiffener = "0.30 mm stiffener under 30-pin mating tab (male plug for J2, 0.30mm total mating thickness)"
         coverlay = "Yellow Polyimide Coverlay (Both Sides)"
         silkscreen = "White"
         surface_finish = job_finish or 'ENIG (Electroless Nickel Immersion Gold, Au: 1-2 u", Ni: 100-200 u")'
@@ -204,9 +204,10 @@ def generate_pcb_project_summary(
         remarks = (
             f"{layer_count}-Layer Polyimide FPC, {int(w)}x{int(l)}mm ({int(tab_w or 17)}mm tab), "
             f"{t:.2f}mm thick, ENIG, Yellow coverlay, White silk. "
-            "0.80mm FR4 stiffener under 30-pin tab. SMT only, ZERO drilled holes / NO vias on board; valid drill file included. "
+            "0.30mm stiffener under 30-pin tab (male plug for J2). "
+            "SMT only, ZERO drilled holes / NO vias on board; valid drill file included. "
             "1*2 panel in 64*64mm accepted with x-out board accepted. "
-            "Single-sided SMT on top for J4 (0.5mm pitch FPC connector). SAC305 RoHS paste, 100% AOI."
+            "J4 is male mating tab for J2 (no component to populate)."
         )
     else:
         chips_note = "U1 0.4mm BGA, U2 QFN" if bga_qfn_chips else "SMT chips"

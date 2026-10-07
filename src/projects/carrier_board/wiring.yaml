@@ -91,8 +91,10 @@ footprints:
   - 0.0
   - 0.0
   shape_ref: flex_tail
-  mpn: FH12-30S-0.5SH(55)
-  supplier_pn: HFJ130CT-ND
+  dnp: true
+  mpn: N/A - FPC Mating Tab (Male plug for J2)
+  supplier_pn: N/A
+  value: Male Plug for J2
 - name: J13
   package: JST-PH-2P
   position:
