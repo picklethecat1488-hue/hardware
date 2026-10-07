@@ -8,6 +8,7 @@ merge conflict resolution, interactive line-by-line Code Review, and Bug Tracker
 import base64
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import errno
 import json
 import mimetypes
 from pathlib import Path
@@ -40,6 +41,31 @@ from model.vcs import (
 from provider.bug_report.server import BugReportServer
 from provider.code_review.server import ReviewServer
 from provider.vcs.git_engine import GitEngine, extract_line_snippet, get_git_root
+
+
+def ensure_high_fd_limit(min_limit: int = 10240) -> int:
+    """Raise process soft file descriptor limit (RLIMIT_NOFILE) up to hard limit.
+
+    Args:
+        min_limit: Target soft limit to achieve (defaults to 10240, capped at 65536).
+
+    Returns:
+        The current or newly set soft limit.
+    """
+    try:
+        import resource
+
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        target = min(hard, 65536) if hard != resource.RLIM_INFINITY else 65536
+        target = max(target, min_limit)
+        if hard != resource.RLIM_INFINITY and target > hard:
+            target = hard
+        if soft < target:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+            return target
+        return soft
+    except (ImportError, OSError, ValueError):
+        return 0
 
 
 class DashboardRequestHandler(BaseHTTPRequestHandler):
@@ -76,6 +102,17 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboards and data query endpoints."""
+        try:
+            self._do_get_impl()
+        except OSError as e:
+            if getattr(e, "errno", None) == errno.EMFILE:
+                self.send_error(503, "Server file descriptor limit reached")
+            else:
+                self.send_error(500, f"Internal server error: {e}")
+        except Exception as e:
+            self.send_error(500, f"Internal server error: {e}")
+
+    def _do_get_impl(self) -> None:
         if hasattr(self.server, "review_server") and self.server.review_server:
             try:
                 self.server.review_server.check_file_watch()
@@ -236,6 +273,17 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         """Route POST requests for mutating actions."""
+        try:
+            self._do_post_impl()
+        except OSError as e:
+            if getattr(e, "errno", None) == errno.EMFILE:
+                self.send_error(503, "Server file descriptor limit reached")
+            else:
+                self.send_error(500, f"Internal server error: {e}")
+        except Exception as e:
+            self.send_error(500, f"Internal server error: {e}")
+
+    def _do_post_impl(self) -> None:
         try:
             self.server.bug_server.check_file_watch()
         except Exception:
@@ -892,11 +940,12 @@ class DashboardServer(ThreadingHTTPServer):
 
     def handle_error(self, request: Any, client_address: Any) -> None:
         """Handle client connection errors gracefully without printing tracebacks on client disconnects."""
-        exc_type, _, _ = sys.exc_info()
-        if exc_type is not None and issubclass(
-            exc_type, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
-        ):
-            return
+        exc_type, exc_val, _ = sys.exc_info()
+        if exc_type is not None:
+            if issubclass(exc_type, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+                return
+            if isinstance(exc_val, OSError) and getattr(exc_val, "errno", None) == errno.EMFILE:
+                return
         super().handle_error(request, client_address)
 
     def __init__(
@@ -915,6 +964,7 @@ class DashboardServer(ThreadingHTTPServer):
         bind_and_activate: bool = True,
     ) -> None:
         """Initialize the unified dashboard workstation server."""
+        ensure_high_fd_limit()
         self.repo_root = (repo_root or get_git_root()).resolve()
         self.git_engine = GitEngine(repo_root=self.repo_root)
         self.host = host

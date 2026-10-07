@@ -89,6 +89,36 @@ class CarrierBoardConfig(BaseModel):
         return float(self._raw_data["flex_bend_radius"])
 
     @property
+    def flex_tail_panel_rows(self) -> int:
+        """Panel row count."""
+        return int(float(self._raw_data["flex_tail_panel_rows"]))
+
+    @property
+    def flex_tail_panel_cols(self) -> int:
+        """Panel column count."""
+        return int(float(self._raw_data["flex_tail_panel_cols"]))
+
+    @property
+    def flex_tail_panel_array(self) -> str:
+        """Panel array configuration for flex tail (e.g. '1*2')."""
+        return f"{self.flex_tail_panel_rows}*{self.flex_tail_panel_cols}"
+
+    @property
+    def flex_tail_panel_width(self) -> float:
+        """Panel overall width in mm including routing waste tabs and tooling rails."""
+        return float(self._raw_data["flex_tail_panel_width"])
+
+    @property
+    def flex_tail_panel_length(self) -> float:
+        """Panel overall length in mm including routing waste tabs and tooling rails."""
+        return float(self._raw_data["flex_tail_panel_length"])
+
+    @property
+    def flex_tail_panel_accept_xout(self) -> bool:
+        """Whether x-out boards in panel are accepted by customer."""
+        return bool(int(float(self._raw_data["flex_tail_panel_accept_xout"])))
+
+    @property
     def enclosure_wall_thickness(self) -> float:
         """Wall thickness of protective enclosure in mm."""
         return float(self._raw_data["enclosure_wall_thickness"])

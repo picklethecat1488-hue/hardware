@@ -21,6 +21,10 @@
 | **Min Track / Clearance** | {{ min_track }} |
 | **Min Hole Size (Drill)** | {{ min_drill }} |
 | **Via Process** | {{ via_process }} |
+{% if panel_spec %}
+| **Panelization** | {{ panel_spec }} |
+{% endif %}
+
 {% if has_impedance_control %}
 
 ## Controlled Impedance Specifications

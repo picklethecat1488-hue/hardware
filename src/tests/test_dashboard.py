@@ -2866,3 +2866,90 @@ def test_regression_bug_270_dashboard_server_handles_broken_pipe_gracefully(caps
     handler.close_connection = False
     handler._send_html("<html><body>test</body></html>")
     assert handler.close_connection is True
+
+
+def test_regression_bug_273_dashboard_fd_limit_and_stability(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify BUG-273: Dashboard elevates soft FD limit, caches commit diffs, and absorbs EMFILE cleanly."""
+    import errno
+    import resource
+    from provider.dashboard.server import ensure_high_fd_limit
+
+    # 1. Verify ensure_high_fd_limit raises soft limit when constrained
+    orig_soft, orig_hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    try:
+        # Simulate lower soft limit (e.g., 256 default on macOS)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (256, orig_hard))
+        new_soft = ensure_high_fd_limit(min_limit=10240)
+        curr_soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
+        assert curr_soft >= 10240 or curr_soft == orig_hard
+        assert new_soft == curr_soft
+    finally:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (orig_soft, orig_hard))
+
+    # 2. Verify GitEngine commit diff caching prevents redundant subprocess spawns
+    repo_dir, commit_shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_dir)
+    assert hasattr(engine, "_commit_diff_cache")
+
+    c1 = commit_shas[0]
+    res1 = engine._get_commit_diff_summary(c1)
+    assert c1 in engine._commit_diff_cache
+    assert engine._commit_diff_cache[c1] == res1
+
+    # Second call returns cached result directly
+    res2 = engine._get_commit_diff_summary(c1)
+    assert res2 == res1
+
+    # 3. Verify EMFILE (Errno 24 Too many open files) in handle_error does not dump traceback
+    server = DashboardServer.__new__(DashboardServer)
+    emfile_err = OSError(errno.EMFILE, "Too many open files")
+    try:
+        raise emfile_err
+    except OSError:
+        server.handle_error(None, ("127.0.0.1", 56253))
+
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "Too many open files" not in captured.err
+
+
+def test_regression_bug_274_workstations_modal_windows() -> None:
+    """Verify BUG-274: Code review and bug report workstations are modal windows over VCS UI."""
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_text = (tpl_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    cr_text = (tpl_dir / "code_review.html.j2").read_text(encoding="utf-8")
+    bug_text = (tpl_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+
+    # 1. Diff view includes workstation modal overlay and iframe container
+    assert 'id="workstationModal"' in diff_text
+    assert 'id="workstationIframe"' in diff_text
+    assert "workstation-modal-overlay" in diff_text
+    assert "workstation-modal-container" in diff_text
+    assert "workstation-modal-iframe" in diff_text
+
+    # 2. Fixed size with tiny margin and darkened backdrop
+    assert "rgba(0, 0, 0, 0.75)" in diff_text
+    assert "calc(100vw - 36px)" in diff_text
+    assert "calc(100vh - 36px)" in diff_text
+
+    # 3. Diff view JavaScript exposes modal open and close
+    assert "function openWorkstationModal(url, targetName)" in diff_text
+    assert "function closeWorkstationModal()" in diff_text
+    assert "window.closeWorkstationModal = closeWorkstationModal;" in diff_text
+    assert "openWorkstationModal(res.url" in diff_text
+
+    # 4. Code review header replaces back button with X close button
+    assert "← Dashboard" not in cr_text
+    assert "modal-close-btn" in cr_text
+    assert "✕" in cr_text
+    assert "closeWorkstation()" in cr_text
+    assert "window.parent.closeWorkstationModal()" in cr_text
+
+    # 5. Bug report header replaces back button with X close button
+    assert "← Dashboard" not in bug_text
+    assert "modal-close-btn" in bug_text
+    assert "✕" in bug_text
+    assert "closeWorkstation()" in bug_text
+    assert "window.parent.closeWorkstationModal()" in bug_text

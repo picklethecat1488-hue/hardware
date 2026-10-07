@@ -226,6 +226,22 @@ class CarrierBoardProvider(Provider):
                 with Locations((-7.5, -21.0)):
                     SilkscreenText("• Pin 1", layer="F.SilkS", font_size=0.5, thickness=0.08)
 
+                # BUG-275: Fabrication notes and panelization specifications on Dwgs.User
+                with Locations((0.0, -24.5)):
+                    SilkscreenText(
+                        "FAB: 2-LAYER POLYIMIDE FPC (0.20mm) | SMT ONLY: 0 DRILL HOLES / 0 VIAS",
+                        layer="Dwgs.User",
+                        font_size=0.5,
+                        thickness=0.08,
+                    )
+                with Locations((0.0, -25.5)):
+                    SilkscreenText(
+                        "PANEL: 1*2 PANEL IN 64x64mm ACCEPTED WITH X-OUT BOARD ACCEPTED",
+                        layer="Dwgs.User",
+                        font_size=0.5,
+                        thickness=0.08,
+                    )
+
                 # Inner Touch Sensing Region Outline (enclosing slider and action button without intersecting traces)
                 SilkscreenLine((-6.85, -15.5), (-6.85, 21.8), layer="F.SilkS", thickness=0.15)
                 SilkscreenLine((6.85, -15.5), (6.85, 21.8), layer="F.SilkS", thickness=0.15)

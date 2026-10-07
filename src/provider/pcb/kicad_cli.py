@@ -236,7 +236,7 @@ class KiCadCLI:
         kicad_pcb_path: str | Path,
         output_dir: str | Path,
     ) -> List[Path]:
-        """Export Excellon drill files (.drl) from a .kicad_pcb file."""
+        """Export Excellon drill files (.drl), Gerber drill maps, and drill reports from a .kicad_pcb file."""
         pcb_file = Path(kicad_pcb_path).resolve()
         out_dir = Path(output_dir).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -244,10 +244,38 @@ class KiCadCLI:
         if not pcb_file.is_file():
             raise FileNotFoundError(f"KiCad PCB file not found: {pcb_file}")
 
-        args = ["pcb", "export", "drill", "-o", f"{out_dir}/", str(pcb_file)]
-        self.run_command(args)
+        # 1. Standard unified drill export
+        args_unified = ["pcb", "export", "drill", "-o", f"{out_dir}/", str(pcb_file)]
+        self.run_command(args_unified)
 
-        return list(out_dir.glob("*.drl"))
+        # 2. Separated PTH and NPTH drill files with Gerber drill map and report (BUG-275)
+        args_sep = [
+            "pcb",
+            "export",
+            "drill",
+            "--excellon-separate-th",
+            "--generate-map",
+            "--map-format",
+            "gerberx2",
+        ]
+        if self.major_version >= 8:
+            args_sep.append("--generate-report")
+        args_sep.extend(["-o", f"{out_dir}/", str(pcb_file)])
+        self.run_command(args_sep)
+
+        # 3. Create companion .txt copies for CAM software that expect .txt extension
+        stem = pcb_file.stem
+        for drl in out_dir.glob(f"{stem}*.drl"):
+            txt_copy = drl.with_suffix(".txt")
+            if not txt_copy.exists() or txt_copy.stat().st_mtime < drl.stat().st_mtime:
+                shutil.copy2(drl, txt_copy)
+
+        # 4. Gather all drill-related deliverables
+        drill_files: List[Path] = []
+        for pattern in (f"{stem}*.drl", f"{stem}*.txt", f"{stem}*-drl_map.gbr", f"{stem}*-drill.rpt"):
+            drill_files.extend(out_dir.glob(pattern))
+
+        return sorted(list(set(drill_files)), key=lambda p: p.name)
 
     def export_board_svg(
         self,
