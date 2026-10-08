@@ -3,7 +3,7 @@
 Guards against:
 1. Missing concurrency cancellation in CI gate workflow leading to duplicate/stuck stacked PR runs.
 2. Missing ready_for_review trigger on pull_request events.
-3. Smoke tests spawning persistent background build daemons without --no-daemon.
+3. Missing unconditional daemon teardown in CI workflow after smoke tests.
 4. DaemonServer not terminating cleanly on SIGTERM.
 """
 
@@ -44,17 +44,15 @@ def test_ci_gate_workflow_concurrency_and_triggers() -> None:
     assert "synchronize" in types
     assert "reopened" in types
 
-    # 3. Smoke tests step must stop daemon
+    # 3. Dedicated daemon teardown step must stop daemon unconditionally (even on failure)
     steps = data.get("jobs", {}).get("validate", {}).get("steps", [])
-    smoke_step = next((s for s in steps if "Run Smoke Tests" in s.get("name", "")), None)
-    assert smoke_step is not None, "Must have 'Run Smoke Tests' step"
-    assert "python src/daemon.py stop" in smoke_step.get("run", ""), (
-        "Run Smoke Tests step must cleanly stop the daemon with 'python src/daemon.py stop || true'"
-    )
+    daemon_stop_step = next((s for s in steps if "python src/daemon.py stop" in s.get("run", "")), None)
+    assert daemon_stop_step is not None, "Workflow must include a step that runs 'python src/daemon.py stop'"
+    assert daemon_stop_step.get("if") == "always()", "Daemon stop step must run unconditionally (if: always())"
 
 
-def test_smoke_test_enforces_no_daemon_flag() -> None:
-    """Verify BUG-280: TestSmoke.run_command automatically injects --no-daemon for build/view/config commands."""
+def test_smoke_test_runs_with_typical_user_setup() -> None:
+    """Verify smoke tests preserve typical user setup and do not inject --no-daemon into CLI commands."""
     from smoke import TestSmoke
 
     smoke = TestSmoke()
@@ -77,17 +75,17 @@ def test_smoke_test_enforces_no_daemon_flag() -> None:
     with unittest.mock.patch("subprocess.run", side_effect=mock_run):
         # 1. build.py command
         smoke.run_command(["src/build.py", "exhaust_manifolds/*"])
-        assert "--no-daemon" in captured_args, f"src/build.py must include --no-daemon, got: {captured_args}"
+        assert "--no-daemon" not in captured_args, f"src/build.py should not force --no-daemon, got: {captured_args}"
 
         # 2. view.py command
         captured_args.clear()
         smoke.run_command(["src/view.py", "cat_fountain/product", "--no-gui"])
-        assert "--no-daemon" in captured_args, f"src/view.py must include --no-daemon, got: {captured_args}"
+        assert "--no-daemon" not in captured_args, f"src/view.py should not force --no-daemon, got: {captured_args}"
 
         # 3. config.py command
         captured_args.clear()
         smoke.run_command(["src/config.py", "-e", "test.env"])
-        assert "--no-daemon" in captured_args, f"src/config.py must include --no-daemon, got: {captured_args}"
+        assert "--no-daemon" not in captured_args, f"src/config.py should not force --no-daemon, got: {captured_args}"
 
 
 def test_daemon_server_sigterm_handling() -> None:

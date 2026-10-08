@@ -61,7 +61,11 @@ jobs:
         run: |
           set -o pipefail
           python src/smoke.py
-          python src/daemon.py stop || true
+
+      - name: Stop Build Daemon
+        if: always()
+        shell: bash -el {0}
+        run: python src/daemon.py stop || true
 
       - name: Upload Daemon Logs
         if: always()

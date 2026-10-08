@@ -28,7 +28,6 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 import uuid
-import webbrowser
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -103,9 +102,9 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--browser",
-        choices=["eel", "vscode", "system", "none"],
+        choices=["eel"],
         default="eel",
-        help="Target browser environment to display dashboard (default: eel).",
+        help="Target display environment (only 'eel' standalone window supported).",
     )
     parser.add_argument(
         "--eel",
@@ -123,8 +122,10 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--no-browser",
+        "--no-app",
         action="store_true",
-        help="Disable automatic browser opening on server launch.",
+        dest="no_browser",
+        help="Disable automatic Eel application window launch on server start.",
     )
 
     # Database & Session Configuration
@@ -347,29 +348,15 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     return parsed
 
 
-def launch_browser(url: str, target: str = "eel") -> None:
-    """Open the review or diff workstation dashboard in the specified browser environment.
+def launch_browser(url: str) -> None:
+    """Open the review or diff workstation dashboard in the Eel standalone application window.
 
     Args:
         url: The web URL of the workstation dashboard.
-        target: Target browser environment ('eel', 'vscode', 'system', 'none').
     """
-    match target:
-        case "none":
-            return
-        case "eel":
-            from provider.eel.launcher import launch_eel
+    from provider.eel.launcher import launch_eel
 
-            launch_eel(url)
-        case "vscode":
-            # In VS Code, the integrated terminal intercepts localhost links with
-            # workbench.externalUriOpeners configured for simpleBrowser.open.
-            # We avoid spawning the system browser or the 'code' binary.
-            return
-        case "system":
-            webbrowser.open(url)
-        case _:
-            webbrowser.open(url)
+    launch_eel(url)
 
 
 def print_cli_smartlog(engine: GitEngine) -> None:
@@ -931,48 +918,24 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             engine=engine,
         )
         return
-        return
 
     # Interactive Server Mode
     url = server.get_url()
-    curr_branch = engine.get_current_branch()
 
-    banner = rf"""
-======================================================================
-  QUAKE VCS // UNIFIED DASHBOARD WORKSTATION v1.0
-======================================================================
-  * Dashboard URL  : {url}
-  * Repository     : {repo_root.name}
-  * Active Branch  : {curr_branch}
-  * Sub-Stations   :
-      - VCS / Diff View : {url}/
-      - Code Review     : {url}/review
-      - Bug Tracker     : {url}/bugs
-  * Browser Target : {args.browser.upper()}
-  * Press [Ctrl+C] to shut down server.
-======================================================================
-  ➜ In VS Code: [Cmd+Click] the Dashboard URL above to open inside
-    the integrated Simple Browser (or press [F5] / run Task).
-======================================================================
-"""
-    print(banner)
-
-    browser_mode = "none" if args.no_browser else args.browser
-    if browser_mode != "none":
+    if not args.no_browser:
 
         def _open() -> None:
             time.sleep(0.3)
-            launch_browser(url, target=browser_mode)
+            launch_browser(url)
 
         threading.Thread(target=_open, daemon=True).start()
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nShutting down Dashboard server via interrupt...")
+        pass
     finally:
         server.server_close()
-        print("Dashboard server shut down. Terminal released.\n")
 
 
 if __name__ == "__main__":

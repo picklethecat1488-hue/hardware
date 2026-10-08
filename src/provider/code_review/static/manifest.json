@@ -1,0 +1,28 @@
+{
+  "name": "Quake VCS Workstation",
+  "short_name": "Quake",
+  "description": "Quake VCS Unified Diff, Code Review, and Bug Tracker Workstation",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#291a10",
+  "background_color": "#120c08",
+  "icons": [
+    {
+      "src": "/static/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
