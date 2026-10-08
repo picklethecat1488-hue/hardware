@@ -7,11 +7,9 @@ desktop window frame without browser tabs or URL address bars.
 
 import os
 from pathlib import Path
-import plistlib
 import shutil
 import subprocess
 import sys
-import tempfile
 from typing import Optional, Tuple
 import urllib.parse
 
@@ -139,92 +137,6 @@ def get_eel_profile_dir(app_name: str = "Quake") -> Path:
     return profile
 
 
-def ensure_macos_app_bundle(
-    url: str,
-    browser_path: Optional[str] = None,
-    app_name: str = "Quake",
-    size: Tuple[int, int] = (1400, 900),
-    target_dir: Optional[Path] = None,
-) -> Optional[Path]:
-    """Ensure a native macOS .app shim exists for launching with custom dock icon."""
-    if sys.platform != "darwin":
-        return None
-
-    if not browser_path or not Path(browser_path).exists():
-        return None
-
-    # Determine bundle location
-    if target_dir is not None:
-        apps_dir = target_dir
-    else:
-        apps_dir = Path.home() / "Applications" / "Chrome Apps.localized"
-        if not apps_dir.exists():
-            try:
-                apps_dir.mkdir(parents=True, exist_ok=True)
-            except OSError:
-                apps_dir = Path(tempfile.gettempdir())
-
-    app_bundle = apps_dir / f"{app_name}.app"
-    contents = app_bundle / "Contents"
-    macos = contents / "MacOS"
-    resources = contents / "Resources"
-    macos.mkdir(parents=True, exist_ok=True)
-    resources.mkdir(parents=True, exist_ok=True)
-
-    # 1. Write executable launcher script
-    profile_dir = get_eel_profile_dir(app_name)
-    launcher_script = macos / app_name
-    script_content = f"""#!/bin/bash
-exec "{browser_path}" \\
-  --app="{url}" \\
-  --user-data-dir="{profile_dir}" \\
-  --window-size={size[0]},{size[1]} \\
-  --force-dark-mode \\
-  --enable-features=OverlayScrollbar \\
-  --disable-http-cache \\
-  --no-first-run \\
-  --no-default-browser-check \\
-  "$@"
-"""
-    launcher_script.write_text(script_content)
-    launcher_script.chmod(0o755)
-
-    # 2. Icon: copy app.icns from static directory
-    static_dir = Path(__file__).resolve().parent.parent / "code_review" / "static"
-    icns_src = static_dir / "app.icns"
-    if icns_src.exists():
-        shutil.copy2(icns_src, resources / "app.icns")
-
-    # 3. Write Info.plist
-    plist_data = {
-        "CFBundleDevelopmentRegion": "en",
-        "CFBundleExecutable": app_name,
-        "CFBundleIconFile": "app.icns",
-        "CFBundleIdentifier": f"com.google.Chrome.app.{app_name.lower()}-workstation",
-        "CFBundleInfoDictionaryVersion": "6.0",
-        "CFBundleName": app_name,
-        "CFBundlePackageType": "APPL",
-        "CFBundleShortVersionString": "1.0",
-        "CFBundleSignature": "????",
-        "CFBundleVersion": "1.0",
-        "LSEnvironment": {"MallocNanoZone": "0"},
-        "LSHasLocalizedDisplayName": True,
-        "LSMinimumSystemVersion": "12.0",
-        "NSAppleScriptEnabled": True,
-        "NSHighResolutionCapable": True,
-        "NSRequiresAquaSystemAppearance": False,
-    }
-    (contents / "Info.plist").write_bytes(plistlib.dumps(plist_data))
-
-    # 4. Ad-hoc codesign
-    try:
-        subprocess.run(["codesign", "--force", "--sign", "-", str(app_bundle)], check=True, capture_output=True)
-    except (subprocess.SubprocessError, OSError):
-        pass
-
-    return app_bundle
-
-
 def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
     """Launch the dashboard workstation in a standalone Eel application window.
 
@@ -244,23 +156,6 @@ def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
         print("[EEL] No supported Chromium-based browser found for Eel standalone app mode.", file=sys.stderr)
         return False
 
-    # 1. On macOS, launch via dedicated .app bundle to display the themed Dock icon
-    if sys.platform == "darwin":
-        app_bundle = ensure_macos_app_bundle(
-            url,
-            browser_path=browser_path,
-            app_name="Quake",
-            size=size,
-        )
-        if app_bundle and app_bundle.exists():
-            try:
-                cmd = ["open", "-n", str(app_bundle)]
-                subprocess.Popen(cmd)
-                return True
-            except (subprocess.SubprocessError, OSError):
-                pass
-
-    # 2. Standard Chromium browser launch fallback
     parsed = urllib.parse.urlparse(url)
     host = parsed.hostname or "127.0.0.1"
     port = parsed.port or 80

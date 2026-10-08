@@ -27,6 +27,7 @@ import os
 from pathlib import Path
 import signal
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -107,9 +108,16 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--browser",
-        choices=["eel"],
-        default="eel",
-        help="Target display environment (only 'eel' standalone window supported).",
+        choices=["webview", "eel"],
+        default="webview",
+        help="Target display environment ('webview' native window, or 'eel').",
+    )
+    parser.add_argument(
+        "--webview",
+        action="store_const",
+        dest="browser",
+        const="webview",
+        help="Open dashboard in a native desktop application window.",
     )
     parser.add_argument(
         "--eel",
@@ -122,15 +130,15 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
         "--app",
         action="store_const",
         dest="browser",
-        const="eel",
-        help="Alias for --eel: open dashboard in a standalone application window.",
+        const="webview",
+        help="Alias for native standalone application window.",
     )
     parser.add_argument(
         "--no-browser",
         "--no-app",
         action="store_true",
         dest="no_browser",
-        help="Disable automatic Eel application window launch on server start.",
+        help="Disable automatic desktop application window launch on server start.",
     )
     parser.add_argument(
         "--no-detach",
@@ -430,15 +438,24 @@ def check_existing_instance(lock_file: Path, host: str, port: int) -> Optional[T
     return None
 
 
-def launch_browser(url: str) -> None:
-    """Open the review or diff workstation dashboard in the Eel standalone application window.
+def launch_browser(url: str, browser: str = "webview") -> bool:
+    """Open the review or diff workstation dashboard in a standalone desktop window.
 
     Args:
         url: The web URL of the workstation dashboard.
-    """
-    from provider.eel.launcher import launch_eel
+        browser: Display environment ('webview' or 'eel').
 
-    launch_eel(url)
+    Returns:
+        True if successfully launched, False otherwise.
+    """
+    if browser == "eel":
+        from provider.eel.launcher import launch_eel
+
+        return launch_eel(url)
+
+    from provider.webview.launcher import launch_webview
+
+    return launch_webview(url)
 
 
 def print_cli_smartlog(engine: GitEngine) -> None:
@@ -723,7 +740,11 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             pid_str = f" (PID {pid})" if pid else ""
             print(f"Dashboard workstation is already running at {existing_url}{pid_str}.")
             if not getattr(args, "no_browser", False):
-                launch_browser(existing_url)
+                browser_target = getattr(args, "browser", "webview")
+                if browser_target == "webview":
+                    launch_browser(existing_url)
+                else:
+                    launch_browser(existing_url, browser=browser_target)
             return
 
     server = DashboardServer(
@@ -1058,36 +1079,61 @@ def main(cli_args: Optional[List[str]] = None) -> None:
     # Interactive Server Mode
     url = server.get_url()
 
-    if not args.no_browser:
-        launch_browser(url)
-
     # Detach from terminal unless --no-detach / --foreground is requested
-    if not getattr(args, "no_detach", False) and os.name == "posix":
-        child_pid = os.fork()
-        if child_pid > 0:
-            # Parent process writes child PID to lock file, prints status, and exits
-            lock_file.parent.mkdir(parents=True, exist_ok=True)
-            lock_file.write_text(json.dumps({"pid": child_pid, "url": url}), encoding="utf-8")
-            print(f"➜ Dashboard workstation running at {url} (PID {child_pid}).")
-            print("➜ Detached from terminal.")
-            sys.exit(0)
+    if not getattr(args, "no_detach", False):
+        log_dir = repo_root / "build" if (repo_root / "build").exists() else repo_root / "target"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / "dashboard.log"
+        log_file = open(log_path, "a", encoding="utf-8")
 
-        # Child process creates new session and redirects standard streams
-        os.setsid()
-        try:
-            devnull = open(os.devnull, "r+")
-            os.dup2(devnull.fileno(), sys.stdin.fileno())
-            log_dir = repo_root / "build" if (repo_root / "build").exists() else repo_root / "target"
-            log_path = log_dir / "dashboard.log"
-            log_file = open(log_path, "a", encoding="utf-8")
-            os.dup2(log_file.fileno(), sys.stdout.fileno())
-            os.dup2(log_file.fileno(), sys.stderr.fileno())
-        except Exception:
-            pass
-    else:
-        lock_file.parent.mkdir(parents=True, exist_ok=True)
-        lock_file.write_text(json.dumps({"pid": os.getpid(), "url": url}), encoding="utf-8")
-        print(f"➜ Dashboard workstation running at {url} (PID {os.getpid()}).")
+        child_args = [sys.executable, str(Path(sys.argv[0]).resolve())] + [
+            a for a in sys.argv[1:] if a not in ("--no-detach", "--foreground")
+        ] + ["--no-detach"]
+
+        popen_kwargs = {
+            "stdout": log_file,
+            "stderr": log_file,
+            "stdin": subprocess.DEVNULL,
+        }
+        if os.name == "posix":
+            popen_kwargs["start_new_session"] = True
+        elif sys.platform in ("win32", "win64"):
+            detached_flag = getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+            new_grp_flag = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+            popen_kwargs["creationflags"] = detached_flag | new_grp_flag
+
+        server.server_close()
+        proc = subprocess.Popen(child_args, **popen_kwargs)
+
+        deadline = time.time() + 3.0
+        while time.time() < deadline:
+            if proc.poll() is not None:
+                print("Error: Dashboard workstation failed to start.", file=sys.stderr)
+                sys.exit(1)
+            if lock_file.exists():
+                try:
+                    data = json.loads(lock_file.read_text(encoding="utf-8"))
+                    if data.get("pid") == proc.pid:
+                        break
+                except (json.JSONDecodeError, OSError):
+                    pass
+            time.sleep(0.05)
+
+        print(f"➜ Dashboard workstation running at {url} (PID {proc.pid}).")
+        print("➜ Detached from terminal.")
+        sys.exit(0)
+
+    # Foreground / non-detached server process
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
+    lock_file.write_text(json.dumps({"pid": os.getpid(), "url": url}), encoding="utf-8")
+    print(f"➜ Dashboard workstation running at {url} (PID {os.getpid()}).")
+
+    if not args.no_browser:
+        browser_target = getattr(args, "browser", "webview")
+        if browser_target == "webview":
+            launch_browser(url)
+        else:
+            launch_browser(url, browser=browser_target)
 
     try:
         server.serve_forever()

@@ -579,10 +579,10 @@ def test_launch_browser_and_webpage_title(tmp_path: Path) -> None:
             html = resp.read().decode("utf-8")
             assert f"<title>Code Review: {repo_root.name}</title>" in html
 
-        # Test CLI arguments default to Eel standalone app window
+        # Test CLI arguments default to native webview standalone app window
         with patch("sys.argv", ["dashboard.py"]):
             args = parse_arguments()
-            assert args.browser == "eel"
+            assert args.browser == "webview"
             assert not args.no_browser
 
         with patch("sys.argv", ["dashboard.py", "--no-browser"]):
@@ -593,8 +593,8 @@ def test_launch_browser_and_webpage_title(tmp_path: Path) -> None:
             args_no_app = parse_arguments()
             assert args_no_app.no_browser
 
-        # Test launch_browser invokes Eel standalone app launcher
-        with patch("provider.eel.launcher.launch_eel") as mock_launch:
+        # Test launch_browser invokes native webview launcher by default
+        with patch("provider.webview.launcher.launch_webview") as mock_launch:
             launch_browser("http://127.0.0.1:8765/")
             mock_launch.assert_called_once_with("http://127.0.0.1:8765/")
     finally:

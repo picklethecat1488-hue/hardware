@@ -1,0 +1,216 @@
+"""Cross-platform native OS webview launcher for Quake VCS Dashboard.
+
+Provides native desktop application window integration using pywebview (Cocoa WKWebView
+on macOS, WebKitGTK on Linux, and WebView2 on Windows), applying system theme colors,
+custom application icons, and full standalone desktop window presentation without
+browser URL address bars or tabs.
+"""
+
+import argparse
+import os
+from pathlib import Path
+import subprocess
+import sys
+from typing import Optional, Tuple
+
+APP_NAME: str = "Quake"
+DEFAULT_WINDOW_TITLE: str = "Quake Workstation"
+DEFAULT_WINDOW_SIZE: Tuple[int, int] = (1400, 900)
+MIN_WINDOW_SIZE: Tuple[int, int] = (800, 600)
+DEFAULT_BG_COLOR: str = "#291a10"
+
+
+def get_webview_storage_path(app_name: str = APP_NAME) -> Path:
+    """Return the dedicated storage and cache directory for the native webview application.
+
+    Args:
+        app_name: Application name identifier for profile path construction.
+
+    Returns:
+        Path to the dedicated application storage directory.
+    """
+    if sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support" / app_name
+    elif sys.platform in ("win32", "win64"):
+        appdata = os.environ.get("APPDATA")
+        base = Path(appdata) / app_name if appdata else Path.home() / f".{app_name.lower()}"
+    else:
+        config_home = os.environ.get("XDG_CONFIG_HOME")
+        base = Path(config_home) / app_name.lower() if config_home else Path.home() / ".config" / app_name.lower()
+
+    storage_dir = base / "webview"
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    return storage_dir
+
+
+def get_app_icon_path(static_dir: Optional[Path] = None) -> Optional[Path]:
+    """Return the platform-preferred application icon file path.
+
+    Args:
+        static_dir: Optional directory containing static assets.
+
+    Returns:
+        Path to the preferred icon file, or None if no icon is found.
+    """
+    if static_dir is None:
+        static_dir = Path(__file__).resolve().parent.parent / "code_review" / "static"
+
+    if not static_dir.exists():
+        return None
+
+    if sys.platform == "darwin":
+        icns_path = static_dir / "app.icns"
+        if icns_path.exists():
+            return icns_path
+
+    if sys.platform in ("win32", "win64"):
+        ico_path = static_dir / "favicon.ico"
+        if ico_path.exists():
+            return ico_path
+
+    png_path = static_dir / "icon-512.png"
+    if png_path.exists():
+        return png_path
+
+    fallback_ico = static_dir / "favicon.ico"
+    if fallback_ico.exists():
+        return fallback_ico
+
+    return None
+
+
+def run_webview_window(
+    url: str,
+    title: str = DEFAULT_WINDOW_TITLE,
+    width: int = DEFAULT_WINDOW_SIZE[0],
+    height: int = DEFAULT_WINDOW_SIZE[1],
+    bg_color: str = DEFAULT_BG_COLOR,
+    icon_path: Optional[str] = None,
+    storage_path: Optional[str] = None,
+) -> None:
+    """Run the native OS webview GUI event loop in the current process.
+
+    Args:
+        url: Web URL to display in the native webview.
+        title: Window title text displayed in the system title bar.
+        width: Initial window width in pixels.
+        height: Initial window height in pixels.
+        bg_color: Hex color string for native window background and title bar tint.
+        icon_path: Optional filesystem path to application icon.
+        storage_path: Optional filesystem path for webview data storage.
+    """
+    import webview
+
+    webview.create_window(
+        title=title,
+        url=url,
+        width=width,
+        height=height,
+        min_size=MIN_WINDOW_SIZE,
+        background_color=bg_color,
+        text_select=True,
+        zoomable=True,
+    )
+
+    start_kwargs = {
+        "private_mode": False,
+    }
+    if icon_path and Path(icon_path).exists():
+        start_kwargs["icon"] = str(icon_path)
+    if storage_path:
+        start_kwargs["storage_path"] = str(storage_path)
+
+    webview.start(**start_kwargs)
+
+
+def launch_webview(
+    url: str,
+    title: str = DEFAULT_WINDOW_TITLE,
+    size: Tuple[int, int] = DEFAULT_WINDOW_SIZE,
+    bg_color: str = DEFAULT_BG_COLOR,
+    icon_path: Optional[Path] = None,
+    storage_path: Optional[Path] = None,
+) -> bool:
+    """Spawn a detached native webview standalone window process.
+
+    Spawns an independent process running the native webview GUI event loop,
+    ensuring the caller process (e.g. background HTTP server) does not block.
+
+    Args:
+        url: Web URL to display in the standalone webview window.
+        title: Window title bar text.
+        size: Width and height of the window in pixels.
+        bg_color: Hex color string for native window background tint.
+        icon_path: Optional filesystem path to application icon.
+        storage_path: Optional filesystem path for webview persistent cache.
+
+    Returns:
+        True if the webview process was spawned successfully, False otherwise.
+    """
+    if icon_path is None:
+        icon_path = get_app_icon_path()
+
+    if storage_path is None:
+        storage_path = get_webview_storage_path()
+
+    cmd = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--url",
+        url,
+        "--title",
+        title,
+        "--width",
+        str(size[0]),
+        "--height",
+        str(size[1]),
+        "--bg",
+        bg_color,
+    ]
+    if icon_path and Path(icon_path).exists():
+        cmd.extend(["--icon", str(icon_path)])
+    if storage_path:
+        cmd.extend(["--storage-path", str(storage_path)])
+
+    popen_kwargs = {
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if os.name == "posix":
+        popen_kwargs["start_new_session"] = True
+    elif sys.platform in ("win32", "win64"):
+        detached_flag = getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+        popen_kwargs["creationflags"] = detached_flag
+
+    try:
+        subprocess.Popen(cmd, **popen_kwargs)
+        return True
+    except (OSError, subprocess.SubprocessError) as err:
+        print(f"[WEBVIEW] Failed to launch native webview process: {err}", file=sys.stderr)
+        return False
+
+
+def _parse_cli_arguments() -> argparse.Namespace:
+    """Parse command line arguments when invoked as a standalone script."""
+    parser = argparse.ArgumentParser(description="Standalone native webview window process")
+    parser.add_argument("--url", type=str, required=True, help="Target URL to load")
+    parser.add_argument("--title", type=str, default=DEFAULT_WINDOW_TITLE, help="Window title text")
+    parser.add_argument("--width", type=int, default=DEFAULT_WINDOW_SIZE[0], help="Window width in pixels")
+    parser.add_argument("--height", type=int, default=DEFAULT_WINDOW_SIZE[1], help="Window height in pixels")
+    parser.add_argument("--bg", type=str, default=DEFAULT_BG_COLOR, help="Hex window background color")
+    parser.add_argument("--icon", type=str, default=None, help="Path to window icon")
+    parser.add_argument("--storage-path", type=str, default=None, help="Path to storage cache directory")
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    cli_args = _parse_cli_arguments()
+    run_webview_window(
+        url=cli_args.url,
+        title=cli_args.title,
+        width=cli_args.width,
+        height=cli_args.height,
+        bg_color=cli_args.bg,
+        icon_path=cli_args.icon,
+        storage_path=cli_args.storage_path,
+    )

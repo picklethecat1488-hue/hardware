@@ -33,3 +33,4 @@ dependencies:
     - typecode-libmagic
     - cbor2
     - eel
+    - pywebview

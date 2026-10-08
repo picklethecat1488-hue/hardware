@@ -1,22 +1,30 @@
-"""Regression unit test for WORM-022: Themed PWA and Dock/Taskbar application icon.
+"""Regression unit test for WORM-022: Cross-platform native application icon and themed window.
 
 Verifies:
 1. PWA manifest.json exists with theme_color, background_color, and icons.
 2. Themed app.icns exists in static asset directory for macOS Dock/taskbar.
-3. ensure_macos_app_bundle generates a valid .app bundle with Info.plist, app.icns, and app_mode_loader.
-4. Info.plist contains CFBundleIconFile ('app.icns') and NSRequiresAquaSystemAppearance (False) for themed title bar.
-5. launch_eel utilizes the themed app bundle on macOS.
+3. get_app_icon_path resolves platform icon (app.icns on macOS, favicon.ico on Windows, icon-512.png on Linux).
+4. run_webview_window configures native window with theme background_color, dimensions, text selection, and icon.
+5. launch_webview spawns a detached subprocess running the native webview GUI.
+6. launch_browser defaults to native webview.
 """
 
 import json
 from pathlib import Path
-import plistlib
 import sys
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from provider.eel.launcher import ensure_macos_app_bundle, launch_eel
+from dashboard import launch_browser
+from provider.webview.launcher import (
+    DEFAULT_BG_COLOR,
+    DEFAULT_WINDOW_SIZE,
+    get_app_icon_path,
+    get_webview_storage_path,
+    launch_webview,
+    run_webview_window,
+)
 
 
 def test_manifest_theme_and_icons() -> None:
@@ -38,54 +46,91 @@ def test_static_app_icns_exists() -> None:
     assert icns_path.stat().st_size > 1000, "app.icns must not be empty"
 
 
-def test_ensure_macos_app_bundle_structure(tmp_path: Path) -> None:
-    """Verify ensure_macos_app_bundle generates valid bundle structure."""
-    if sys.platform != "darwin":
-        pytest.skip("macOS app bundle test only runs on darwin platform")
+def test_get_app_icon_path_resolution() -> None:
+    """Verify get_app_icon_path resolves platform-appropriate icon files."""
+    static_dir = Path(__file__).resolve().parent.parent / "provider" / "code_review" / "static"
 
-    chrome_app = Path("/Applications/Google Chrome.app")
-    if not chrome_app.exists():
-        pytest.skip("Google Chrome.app not installed on test host")
+    with patch("sys.platform", "darwin"):
+        icon = get_app_icon_path(static_dir)
+        assert icon is not None
+        assert icon.name == "app.icns"
 
-    chrome_bin = chrome_app / "Contents" / "MacOS" / "Google Chrome"
-    bundle = ensure_macos_app_bundle(
-        "http://127.0.0.1:8877/",
-        browser_path=str(chrome_bin),
-        app_name="Quake",
-        target_dir=tmp_path,
-    )
-    assert bundle is not None
-    assert bundle.exists()
-    launcher_exe = bundle / "Contents" / "MacOS" / "Quake"
-    assert launcher_exe.exists()
-    assert "--app=" in launcher_exe.read_text()
-    assert "--user-data-dir=" in launcher_exe.read_text()
-    assert (bundle / "Contents" / "Resources" / "app.icns").exists()
+    with patch("sys.platform", "win32"):
+        icon = get_app_icon_path(static_dir)
+        assert icon is not None
+        assert icon.name == "favicon.ico"
 
-    plist_path = bundle / "Contents" / "Info.plist"
-    assert plist_path.exists()
-    plist = plistlib.loads(plist_path.read_bytes())
-    assert plist.get("CFBundleIconFile") == "app.icns"
-    assert plist.get("CFBundleName") == "Quake"
-    assert plist.get("CFBundleExecutable") == "Quake"
-    assert plist.get("NSRequiresAquaSystemAppearance") is False
+    with patch("sys.platform", "linux"):
+        icon = get_app_icon_path(static_dir)
+        assert icon is not None
+        assert icon.name in ("icon-512.png", "favicon.ico")
 
 
-def test_launch_eel_uses_app_bundle() -> None:
-    """Verify launch_eel attempts to launch via macOS app bundle when on darwin."""
-    with (
-        patch("sys.platform", "darwin"),
-        patch(
-            "provider.eel.launcher.find_eel_app_browser",
-            return_value="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        ),
-        patch("provider.eel.launcher.ensure_macos_app_bundle") as mock_ensure,
-        patch("subprocess.Popen") as mock_popen,
-    ):
-        mock_ensure.return_value = Path("/tmp/Quake.app")
-        with patch.object(Path, "exists", return_value=True):
-            res = launch_eel("http://127.0.0.1:8877/")
-            assert res is True
-            assert mock_popen.called
-            args, _ = mock_popen.call_args
-            assert args[0] == ["open", "-n", "/tmp/Quake.app"]
+def test_run_webview_window_parameters() -> None:
+    """Verify run_webview_window configures create_window and start with theme and icon."""
+    mock_webview = MagicMock()
+    with patch.dict("sys.modules", {"webview": mock_webview}):
+        run_webview_window(
+            url="http://127.0.0.1:8767/",
+            title="Quake Workstation",
+            width=1400,
+            height=900,
+            bg_color=DEFAULT_BG_COLOR,
+            icon_path="/mock/app.icns",
+            storage_path="/mock/storage",
+        )
+
+        mock_webview.create_window.assert_called_once_with(
+            title="Quake Workstation",
+            url="http://127.0.0.1:8767/",
+            width=1400,
+            height=900,
+            min_size=(800, 600),
+            background_color="#291a10",
+            text_select=True,
+            zoomable=True,
+        )
+
+        with patch("pathlib.Path.exists", return_value=True):
+            mock_webview.reset_mock()
+            run_webview_window(
+                url="http://127.0.0.1:8767/",
+                title="Quake Workstation",
+                width=1400,
+                height=900,
+                bg_color="#291a10",
+                icon_path="/mock/app.icns",
+                storage_path="/mock/storage",
+            )
+            mock_webview.start.assert_called_once_with(
+                private_mode=False,
+                icon="/mock/app.icns",
+                storage_path="/mock/storage",
+            )
+
+
+def test_launch_webview_spawns_process() -> None:
+    """Verify launch_webview executes child process with webview CLI arguments."""
+    with patch("subprocess.Popen") as mock_popen, \
+         patch("pathlib.Path.exists", return_value=True):
+        res = launch_webview("http://127.0.0.1:8767/")
+        assert res is True
+        assert mock_popen.called
+
+        cmd_args, kwargs = mock_popen.call_args
+        cmd = cmd_args[0]
+        assert "--url" in cmd
+        assert "http://127.0.0.1:8767/" in cmd
+        assert "--title" in cmd
+        assert "Quake Workstation" in cmd
+        assert "--bg" in cmd
+        assert DEFAULT_BG_COLOR in cmd
+
+
+def test_launch_browser_defaults_to_webview() -> None:
+    """Verify launch_browser invokes native webview launcher by default."""
+    with patch("provider.webview.launcher.launch_webview") as mock_webview:
+        mock_webview.return_value = True
+        res = launch_browser("http://127.0.0.1:8767/")
+        assert res is True
+        mock_webview.assert_called_once_with("http://127.0.0.1:8767/")
