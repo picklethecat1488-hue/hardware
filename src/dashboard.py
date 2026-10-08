@@ -918,30 +918,9 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             engine=engine,
         )
         return
-        return
 
     # Interactive Server Mode
     url = server.get_url()
-    curr_branch = engine.get_current_branch()
-
-    banner = rf"""
-======================================================================
-  QUAKE VCS // UNIFIED DASHBOARD WORKSTATION v1.0
-======================================================================
-  * Dashboard URL  : {url}
-  * Repository     : {repo_root.name}
-  * Active Branch  : {curr_branch}
-  * Sub-Stations   :
-      - VCS / Diff View : {url}/
-      - Code Review     : {url}/review
-      - Bug Tracker     : {url}/bugs
-  * Visual Display : EEL STANDALONE APP
-  * Press [Ctrl+C] to shut down server.
-======================================================================
-  ➜ Standalone application window running via Eel.
-======================================================================
-"""
-    print(banner)
 
     if not args.no_browser:
 
@@ -954,10 +933,9 @@ def main(cli_args: Optional[List[str]] = None) -> None:
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nShutting down Dashboard server via interrupt...")
+        pass
     finally:
         server.server_close()
-        print("Dashboard server shut down. Terminal released.\n")
 
 
 if __name__ == "__main__":

@@ -102,3 +102,78 @@ def test_dashboard_server_serves_eel_js(tmp_path: Path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_dashboard_server_serves_manifest_and_icons(tmp_path: Path) -> None:
+    """Verify DashboardServer serves Web App Manifest, favicon.ico, and PNG icons."""
+    repo_root = get_git_root()
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        sqlite_bug_file=tmp_path / "bugs.sqlite",
+        sqlite_review_file=tmp_path / "cr.sqlite",
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base = server.get_url()
+
+        # 1. Manifest
+        with urllib.request.urlopen(f"{base}/manifest.json") as resp:
+            assert resp.status == 200
+            content_type = resp.headers.get("Content-Type", "")
+            assert "manifest+json" in content_type or "json" in content_type
+            data = resp.read().decode("utf-8")
+            assert '"theme_color": "#291a10"' in data
+            assert '"display": "standalone"' in data
+
+        # 2. Favicon ICO
+        with urllib.request.urlopen(f"{base}/favicon.ico") as resp:
+            assert resp.status == 200
+            content_type = resp.headers.get("Content-Type", "")
+            assert "x-icon" in content_type or "vnd.microsoft.icon" in content_type
+            data = resp.read()
+            assert len(data) > 0
+
+        # 3. PNG icons
+        for icon_path in ("/static/icon-192.png", "/static/icon-512.png", "/apple-touch-icon.png"):
+            with urllib.request.urlopen(f"{base}{icon_path}") as resp:
+                assert resp.status == 200
+                content_type = resp.headers.get("Content-Type", "")
+                assert "image/png" in content_type
+                assert len(resp.read()) > 0
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_templates_have_theme_color_and_manifest() -> None:
+    """Verify all dashboard HTML templates define theme-color, dark scheme, manifest, and icons."""
+    templates_dir = Path(__file__).parent.parent / "provider" / "templates"
+    for tpl_name in ("diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"):
+        tpl_path = templates_dir / tpl_name
+        assert tpl_path.exists()
+        content = tpl_path.read_text(encoding="utf-8")
+        assert '<meta name="theme-color" content="#291a10">' in content
+        assert '<meta name="color-scheme" content="dark">' in content
+        assert '<link rel="manifest" href="/static/manifest.json">' in content
+        assert '<link rel="shortcut icon" href="/static/favicon.ico">' in content
+        assert '<link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">' in content
+
+
+def test_launch_eel_commandline_args_include_theme_and_scrollbars() -> None:
+    """Verify launch_eel configures dark mode and overlay scrollbars in Chrome cmdline_args."""
+    with patch("src.provider.eel.launcher.find_eel_app_browser", return_value="/mock/chrome"), \
+         patch("eel.browsers.open") as mock_open:
+        res = launch_eel("http://127.0.0.1:8877/")
+        assert res is True
+        args, kwargs = mock_open.call_args
+        options = args[1]
+        cmdline = options.get("cmdline_args", [])
+        assert "--force-dark-mode" in cmdline
+        assert "--enable-features=OverlayScrollbar" in cmdline
+
