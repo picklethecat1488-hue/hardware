@@ -37,11 +37,6 @@ class TestSmoke:
         if args and "src/build.py" in args[0] and "-out" not in args:
             args.extend(["-out", str(self.build_dir)])
 
-        # Ensure smoke tests run synchronously without spawning background daemon processes
-        if args and any(cmd in args[0] for cmd in ("src/build.py", "src/view.py", "src/config.py")):
-            if "--no-daemon" not in args:
-                args.append("--no-daemon")
-
         cmd = [sys.executable] + args
         result = subprocess.run(cmd, cwd=self.root_dir, capture_output=True, text=True, env=env)
         assert result.returncode == 0, (
