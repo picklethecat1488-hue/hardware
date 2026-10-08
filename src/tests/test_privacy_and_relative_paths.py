@@ -25,9 +25,7 @@ def test_no_personal_username_in_tracked_files() -> None:
     """Verify git tracked files do not contain the personal username."""
     cmd = ["git", "grep", "-i", "-I", TEST_USERNAME]
     proc = subprocess.run(cmd, cwd=WORKSPACE_ROOT, capture_output=True, text=True)
-    assert proc.returncode != 0, (
-        f"Found occurrences of personal username in git tracked files:\n{proc.stdout}"
-    )
+    assert proc.returncode != 0, f"Found occurrences of personal username in git tracked files:\n{proc.stdout}"
 
 
 def test_elide_personal_info_tracebacks_and_paths() -> None:

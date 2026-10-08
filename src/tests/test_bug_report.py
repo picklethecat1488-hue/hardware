@@ -912,3 +912,77 @@ def test_regression_bug_270_bug_report_server_handles_broken_pipe_gracefully(
     handler.close_connection = False
     handler._send_html("<html><body>test</body></html>")
     assert handler.close_connection is True
+
+
+def test_regression_bug_279_component_autocomplete_datalist() -> None:
+    """Verify BUG-279: populate component textbox with autocomplete datalist from prior bug history."""
+    import jinja2
+    from model.bug_report import BugCategory, BugDatabaseModel, BugReportModel, BugSeverity, BugStatus
+
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    tpl_path = templates_dir / "bug_report.html.j2"
+    assert tpl_path.is_file(), "bug_report.html.j2 must exist"
+    content = tpl_path.read_text(encoding="utf-8")
+
+    # 1. Component textbox must bind to datalist via list attribute
+    assert 'id="bug-component"' in content
+    assert 'list="bug-component-list"' in content or 'list="component-list"' in content, (
+        "bug-component input must have a list attribute referencing a datalist"
+    )
+
+    # 2. Datalist element must exist
+    assert '<datalist id="bug-component-list">' in content or '<datalist id="component-list">' in content, (
+        "bug_report.html.j2 must contain datalist for component autocomplete"
+    )
+
+    # 3. Dynamic JS updater must be present
+    assert "updateComponentDatalist" in content, (
+        "bug_report.html.j2 must define updateComponentDatalist to keep autocomplete in sync"
+    )
+
+    # 4. Jinja2 render with prior bug history renders unique option elements
+    db = BugDatabaseModel(title="Autocomplete Test")
+    db.bugs = [
+        BugReportModel(
+            id="BUG-001",
+            title="B1",
+            status=BugStatus.OPEN,
+            severity=BugSeverity.LOW,
+            category=BugCategory.PCB,
+            component="carrier_board",
+        ),
+        BugReportModel(
+            id="BUG-002",
+            title="B2",
+            status=BugStatus.OPEN,
+            severity=BugSeverity.LOW,
+            category=BugCategory.PCB,
+            component="flex_tail",
+        ),
+        BugReportModel(
+            id="BUG-003",
+            title="B3",
+            status=BugStatus.OPEN,
+            severity=BugSeverity.LOW,
+            category=BugCategory.PCB,
+            component="carrier_board",  # duplicate, must be deduplicated
+        ),
+    ]
+
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(templates_dir)),
+        autoescape=jinja2.select_autoescape(["html", "xml"]),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    tpl = env.get_template("bug_report.html.j2")
+    rendered = tpl.render(
+        database=db,
+        database_json=db.model_dump_json(),
+        statuses=[s.value for s in BugStatus],
+        severities=[s.value for s in BugSeverity],
+        categories=[c.value for c in BugCategory],
+    )
+
+    assert '<option value="carrier_board">' in rendered or '<option value="carrier_board"></option>' in rendered
+    assert '<option value="flex_tail">' in rendered or '<option value="flex_tail"></option>' in rendered

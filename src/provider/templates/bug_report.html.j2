@@ -688,7 +688,21 @@
           </div>
           <div class="col">
             <label>Component</label>
-            <input type="text" id="bug-component" placeholder="e.g. carrier_board, flex_tail, U1">
+            <input type="text" id="bug-component" placeholder="e.g. carrier_board, flex_tail, U1" list="bug-component-list">
+            <datalist id="bug-component-list">
+              {% if components is defined and components %}
+                {% for comp in components %}
+                <option value="{{ comp }}"></option>
+                {% endfor %}
+              {% else %}
+                {% set bugs_list = (database.bugs if database and database.bugs is defined else (database.worms if database and database.worms is defined else [])) %}
+                {% if bugs_list %}
+                {% for comp in bugs_list | map(attribute='component', default='') | reject('none') | map('trim') | reject('equalto', '') | unique | sort %}
+                <option value="{{ comp }}"></option>
+                {% endfor %}
+                {% endif %}
+              {% endif %}
+            </datalist>
           </div>
         </div>
       </div>
@@ -803,6 +817,7 @@
         activeBugId = db.bugs[0].id;
       }
       updateMetrics();
+      updateComponentDatalist();
       setBugFilter(currentFilter);
       loadActiveBug();
       autoResizeAllTextareas();
@@ -896,6 +911,26 @@
       document.getElementById("m-total").innerText = total;
       document.getElementById("m-open").innerText = open;
       document.getElementById("m-resolved").innerText = resolved;
+    }
+
+    function updateComponentDatalist() {
+      const datalist = document.getElementById("bug-component-list") || document.getElementById("component-list");
+      if (!datalist) return;
+      const items = (db.bugs || db.worms || []);
+      const comps = new Set();
+      items.forEach(item => {
+        if (item && item.component && typeof item.component === "string") {
+          const c = item.component.trim();
+          if (c) comps.add(c);
+        }
+      });
+      const sortedComps = Array.from(comps).sort((a, b) => a.localeCompare(b));
+      datalist.innerHTML = "";
+      sortedComps.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        datalist.appendChild(opt);
+      });
     }
 
     function getFilteredAndSortedBugs() {
@@ -1139,6 +1174,7 @@
       const saved = await res.json();
       updateMetrics();
       renderBugList();
+      updateComponentDatalist();
       showToast("Saved bug " + saved.id + " & synced BUGS.md");
       return saved;
     }
@@ -1154,6 +1190,7 @@
       activeBugId = db.bugs.length > 0 ? db.bugs[0].id : null;
       updateMetrics();
       renderBugList();
+      updateComponentDatalist();
       loadActiveBug();
       showToast("Deleted bug & updated BUGS.md");
     }
@@ -1471,6 +1508,7 @@
           db = await dbRes.json();
           updateMetrics();
           renderBugList();
+          updateComponentDatalist();
           if (!isUserTyping && activeBugId) {
             loadActiveBug();
           } else if (activeBugId) {
