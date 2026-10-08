@@ -142,6 +142,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
 
         match path:
+            case "/eel.js":
+                self._handle_serve_eel_js()
             case "/" | "/index.html":
                 self._handle_serve_diff_ui()
             case "/review" | "/review/":
@@ -583,6 +585,34 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             server_port=self.server.actual_port,
         )
         self._send_html(html_content)
+
+    def _handle_serve_eel_js(self) -> None:
+        """Serve eel.js library file for Eel standalone app client."""
+        content: bytes = b""
+        try:
+            import eel
+
+            eel_js_path = Path(eel.__file__).resolve().parent / "eel.js"
+            if eel_js_path.is_file():
+                content = eel_js_path.read_bytes()
+        except Exception:
+            pass
+
+        if not content:
+            content = b"// eel.js fallback\nwindow.eel = window.eel || {};\n"
+
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(content)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
+            self.close_connection = True
 
     def _handle_serve_static(self, path: str) -> None:
         """Serve static files such as JavaScript vendor bundles and CSS."""

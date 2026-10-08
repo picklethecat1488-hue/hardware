@@ -7,6 +7,7 @@ import cbor2
 import json
 import logging
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -315,6 +316,28 @@ class DaemonServer:
         daemon_log.info(f"Build Daemon started on UDS: {self.socket_path}")
 
         self.last_request_time = time.time()
+        self.is_shutting_down = False
+
+        def handle_sigterm(signum, frame):
+            self.is_shutting_down = True
+            daemon_log.info("SIGTERM received. Shutting down daemon.")
+            try:
+                server_socket.close()
+            except OSError:
+                pass
+            if self.socket_path.exists():
+                try:
+                    self.socket_path.unlink()
+                except OSError:
+                    pass
+            if self.pid_path.exists():
+                try:
+                    self.pid_path.unlink()
+                except OSError:
+                    pass
+            sys.exit(0)
+
+        old_sigterm = signal.signal(signal.SIGTERM, handle_sigterm)
 
         while True:
             try:
@@ -412,6 +435,8 @@ class DaemonServer:
                                 main_func(logger, args)
                             exit_code = 0
                         except SystemExit as e:
+                            if self.is_shutting_down:
+                                raise
                             exit_code = e.code if e.code is not None else 0
                             # Gracefully handle normal or error tool exits without crashing daemon
                             if exit_code != 0:
@@ -444,6 +469,10 @@ class DaemonServer:
             else:
                 conn.close()
 
+        try:
+            signal.signal(signal.SIGTERM, old_sigterm)
+        except Exception:
+            pass
         server_socket.close()
         if self.socket_path.exists():
             try:
