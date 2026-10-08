@@ -167,8 +167,10 @@ def test_templates_have_theme_color_and_manifest() -> None:
 
 def test_launch_eel_commandline_args_include_theme_and_scrollbars() -> None:
     """Verify launch_eel configures dark mode and overlay scrollbars in Chrome cmdline_args."""
-    with patch("provider.eel.launcher.find_eel_app_browser", return_value="/mock/chrome"), \
-         patch("eel.browsers.open") as mock_open:
+    with (
+        patch("provider.eel.launcher.find_eel_app_browser", return_value="/mock/chrome"),
+        patch("eel.browsers.open") as mock_open,
+    ):
         res = launch_eel("http://127.0.0.1:8877/")
         assert res is True
         args, kwargs = mock_open.call_args
@@ -176,4 +178,3 @@ def test_launch_eel_commandline_args_include_theme_and_scrollbars() -> None:
         cmdline = options.get("cmdline_args", [])
         assert "--force-dark-mode" in cmdline
         assert "--enable-features=OverlayScrollbar" in cmdline
-

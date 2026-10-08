@@ -974,7 +974,11 @@ def main(cli_args: Optional[List[str]] = None) -> None:
         print(f"Resolved bug [{bug.id}]: {bug.title}")
         return
 
-    if getattr(args, "bugs", False) or getattr(args, "planned", False) or (getattr(args, "list", False) and args.db_file and "bug" in str(args.db_file)):
+    if (
+        getattr(args, "bugs", False)
+        or getattr(args, "planned", False)
+        or (getattr(args, "list", False) and args.db_file and "bug" in str(args.db_file))
+    ):
         print_cli_bugs(
             server,
             open_only=getattr(args, "open", False),

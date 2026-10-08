@@ -85,11 +85,13 @@ def test_second_instance_exits_cleanly(tmp_path: Path) -> None:
     from src.dashboard import main
 
     out = StringIO()
-    with patch("src.dashboard.get_dashboard_lock_file", return_value=lock_file), \
-         patch("src.dashboard.is_port_in_use", return_value=True), \
-         patch("src.dashboard.launch_browser") as mock_launch, \
-         patch("sys.stdout", out), \
-         patch("sys.argv", ["dashboard.py"]):
+    with (
+        patch("src.dashboard.get_dashboard_lock_file", return_value=lock_file),
+        patch("src.dashboard.is_port_in_use", return_value=True),
+        patch("src.dashboard.launch_browser") as mock_launch,
+        patch("sys.stdout", out),
+        patch("sys.argv", ["dashboard.py"]),
+    ):
         main()
 
     output = out.getvalue()
@@ -105,11 +107,13 @@ def test_cli_stop_active_instance(tmp_path: Path) -> None:
     from src.dashboard import main
 
     out = StringIO()
-    with patch("src.dashboard.get_dashboard_lock_file", return_value=lock_file), \
-         patch("src.dashboard.check_existing_instance", return_value=(12345, "http://127.0.0.1:8877")), \
-         patch("os.kill") as mock_kill, \
-         patch("sys.stdout", out), \
-         patch("sys.argv", ["dashboard.py", "--stop"]):
+    with (
+        patch("src.dashboard.get_dashboard_lock_file", return_value=lock_file),
+        patch("src.dashboard.check_existing_instance", return_value=(12345, "http://127.0.0.1:8877")),
+        patch("os.kill") as mock_kill,
+        patch("sys.stdout", out),
+        patch("sys.argv", ["dashboard.py", "--stop"]),
+    ):
         main()
 
     mock_kill.assert_called_once_with(12345, signal.SIGTERM)
@@ -124,10 +128,12 @@ def test_cli_stop_no_instance(tmp_path: Path) -> None:
     from src.dashboard import main
 
     out = StringIO()
-    with patch("src.dashboard.get_dashboard_lock_file", return_value=lock_file), \
-         patch("src.dashboard.check_existing_instance", return_value=None), \
-         patch("sys.stdout", out), \
-         patch("sys.argv", ["dashboard.py", "--stop"]):
+    with (
+        patch("src.dashboard.get_dashboard_lock_file", return_value=lock_file),
+        patch("src.dashboard.check_existing_instance", return_value=None),
+        patch("sys.stdout", out),
+        patch("sys.argv", ["dashboard.py", "--stop"]),
+    ):
         main()
 
     assert "No dashboard workstation is running" in out.getvalue()
