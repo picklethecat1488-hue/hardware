@@ -577,10 +577,10 @@
       <div class="metric-pill">RESOLVED: <span id="m-resolved" class="metric-highlight" style="color:var(--quake-green);">0</span></div>
     </div>
     <div class="header-actions">
-      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-default" style="text-decoration:none;display:inline-flex;align-items:center;" title="Return to VCS Dashboard">← Dashboard</a>
       <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
       <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
       <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
+      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-default modal-close-btn" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:16px;padding:2px 10px;line-height:1;" title="Close workstation (Esc)">✕</a>
     </div>
   </header>
 
@@ -688,7 +688,21 @@
           </div>
           <div class="col">
             <label>Component</label>
-            <input type="text" id="bug-component" placeholder="e.g. carrier_board, flex_tail, U1">
+            <input type="text" id="bug-component" placeholder="e.g. carrier_board, flex_tail, U1" list="bug-component-list">
+            <datalist id="bug-component-list">
+              {% if components is defined and components %}
+                {% for comp in components %}
+                <option value="{{ comp }}"></option>
+                {% endfor %}
+              {% else %}
+                {% set bugs_list = (database.bugs if database and database.bugs is defined else (database.worms if database and database.worms is defined else [])) %}
+                {% if bugs_list %}
+                {% for comp in bugs_list | map(attribute='component', default='') | reject('none') | map('trim') | reject('equalto', '') | unique | sort %}
+                <option value="{{ comp }}"></option>
+                {% endfor %}
+                {% endif %}
+              {% endif %}
+            </datalist>
           </div>
         </div>
       </div>
@@ -803,6 +817,7 @@
         activeBugId = db.bugs[0].id;
       }
       updateMetrics();
+      updateComponentDatalist();
       setBugFilter(currentFilter);
       loadActiveBug();
       autoResizeAllTextareas();
@@ -896,6 +911,26 @@
       document.getElementById("m-total").innerText = total;
       document.getElementById("m-open").innerText = open;
       document.getElementById("m-resolved").innerText = resolved;
+    }
+
+    function updateComponentDatalist() {
+      const datalist = document.getElementById("bug-component-list") || document.getElementById("component-list");
+      if (!datalist) return;
+      const items = (db.bugs || db.worms || []);
+      const comps = new Set();
+      items.forEach(item => {
+        if (item && item.component && typeof item.component === "string") {
+          const c = item.component.trim();
+          if (c) comps.add(c);
+        }
+      });
+      const sortedComps = Array.from(comps).sort((a, b) => a.localeCompare(b));
+      datalist.innerHTML = "";
+      sortedComps.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        datalist.appendChild(opt);
+      });
     }
 
     function getFilteredAndSortedBugs() {
@@ -1139,6 +1174,7 @@
       const saved = await res.json();
       updateMetrics();
       renderBugList();
+      updateComponentDatalist();
       showToast("Saved bug " + saved.id + " & synced BUGS.md");
       return saved;
     }
@@ -1154,19 +1190,38 @@
       activeBugId = db.bugs.length > 0 ? db.bugs[0].id : null;
       updateMetrics();
       renderBugList();
+      updateComponentDatalist();
       loadActiveBug();
       showToast("Deleted bug & updated BUGS.md");
     }
 
     function returnToDashboard(e) {
       if (e) e.preventDefault();
-      if (window.opener && !window.opener.closed) {
+      closeWorkstation();
+    }
+
+    function closeWorkstation() {
+      if (window.parent && window.parent !== window && typeof window.parent.closeWorkstationModal === "function") {
+        window.parent.closeWorkstationModal();
+      } else if (window.opener && !window.opener.closed) {
         window.opener.focus();
         window.close();
       } else {
-        window.open("/", "hardware_vcs_diff_viewer");
+        window.location.href = "/";
       }
+      try {
+        window.parent.postMessage({ action: "close_workstation", type: "close_modal" }, "*");
+      } catch (err) {}
     }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const loadingModal = document.getElementById("feedback-loading-modal");
+        if (!loadingModal || loadingModal.style.display === "none") {
+          closeWorkstation();
+        }
+      }
+    });
 
     async function saveAndExit() {
       const btn = document.getElementById("btn-save-exit");
@@ -1182,12 +1237,7 @@
       }
 
       setTimeout(() => {
-        if (window.opener && !window.opener.closed) {
-          window.opener.focus();
-          window.close();
-        } else {
-          window.location.href = "/";
-        }
+        closeWorkstation();
       }, 500);
     }
 
@@ -1458,6 +1508,7 @@
           db = await dbRes.json();
           updateMetrics();
           renderBugList();
+          updateComponentDatalist();
           if (!isUserTyping && activeBugId) {
             loadActiveBug();
           } else if (activeBugId) {

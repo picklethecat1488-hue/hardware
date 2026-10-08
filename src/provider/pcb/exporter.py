@@ -5,12 +5,14 @@ import io
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import uuid
 import zipfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
+from xml.sax.saxutils import escape as xml_escape
 
 import jinja2
 from build123d import Box, BuildPart, Compound, Part, Solid, export_step
@@ -937,23 +939,390 @@ class PCBExporter:
             for fp in self.get_footprints_for_board()
             if not getattr(fp, "dnp", False) and not getattr(fp, "unconnected", False) and getattr(fp, "in_bom", True)
         ]
-        for idx, fp in enumerate(fps_to_process, start=1):
-            rows.append(
-                {
-                    "Id": idx,
-                    "Designator": fp.name,
-                    "Package": fp.package,
-                    "Quantity": 1,
-                    "Designation": getattr(fp, "value", None) or (fp.label.text if fp.label else fp.package),
-                    "MPN": fp.mpn or f"GENERIC-{fp.package.upper()}",
-                    "Supplier_PN": fp.supplier_pn or "N/A",
-                }
-            )
+        if not fps_to_process:
+            for idx, fp in enumerate(
+                [
+                    f
+                    for f in self.get_footprints_for_board()
+                    if not getattr(f, "unconnected", False) and getattr(f, "in_bom", True)
+                ],
+                start=1,
+            ):
+                rows.append(
+                    {
+                        "Id": idx,
+                        "Designator": fp.name,
+                        "Package": fp.package,
+                        "Quantity": 0,
+                        "Designation": getattr(fp, "value", None) or "Do Not Populate (DNP)",
+                        "MPN": fp.mpn or "N/A",
+                        "Supplier_PN": fp.supplier_pn or "DNP",
+                    }
+                )
+        else:
+            for idx, fp in enumerate(fps_to_process, start=1):
+                rows.append(
+                    {
+                        "Id": idx,
+                        "Designator": fp.name,
+                        "Package": fp.package,
+                        "Quantity": 1,
+                        "Designation": getattr(fp, "value", None) or (fp.label.text if fp.label else fp.package),
+                        "MPN": fp.mpn or f"GENERIC-{fp.package.upper()}",
+                        "Supplier_PN": fp.supplier_pn or "N/A",
+                    }
+                )
 
         with open(out_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
+
+        return out_path
+
+    @staticmethod
+    def _infer_component_manufacturer(fp: Any) -> str:
+        """Infer component manufacturer name from footprint properties, MPN prefix, or package."""
+        if getattr(fp, "manufacturer", None):
+            return str(fp.manufacturer)
+        mpn = str(getattr(fp, "mpn", "") or "")
+        pkg = str(getattr(fp, "package", "") or "")
+        name = str(getattr(fp, "name", "") or "")
+
+        if "Mating Tab" in mpn or "Male" in mpn or name == "J4":
+            return "N/A (Bare Flex PCB)"
+
+        mpn_upper = mpn.upper()
+        if mpn_upper.startswith("MCX"):
+            return "NXP Semiconductors"
+        if mpn_upper.startswith("STM32"):
+            return "STMicroelectronics"
+        if mpn_upper.startswith("IQS"):
+            return "Azoteq"
+        if mpn_upper.startswith("MAX"):
+            return "Analog Devices"
+        if mpn_upper.startswith("PKM"):
+            return "Murata"
+        if mpn_upper.startswith("BSS"):
+            return "onsemi"
+        if mpn_upper.startswith("ECS"):
+            return "ECS Inc"
+        if mpn_upper.startswith(("NINA", "U-BLOX")):
+            return "u-blox"
+        if mpn_upper.startswith("PTS"):
+            return "C&K"
+        if mpn_upper.startswith(("FH12", "FH34", "FH35", "HIROSE")):
+            return "Hirose Electric"
+        if mpn_upper.startswith("TYPE-C"):
+            return "USB-IF / Standard"
+        if mpn_upper.startswith("W25"):
+            return "Winbond Electronics"
+        if mpn_upper.startswith("FT232"):
+            return "FTDI Chip"
+        if mpn_upper.startswith(("BQ", "LP50", "TLV")):
+            return "Texas Instruments"
+        if mpn_upper.startswith("CLV"):
+            return "Cree LED"
+        if mpn_upper.startswith(("FTSH", "TSW", "SAM")):
+            return "Samtec"
+        if mpn_upper.startswith(("B6B", "S2B", "SM04", "JST")):
+            return "JST"
+        if mpn_upper.startswith(("GRM", "MURATA")):
+            return "Murata"
+        if mpn_upper.startswith(("ERJ", "PANASONIC")):
+            return "Panasonic"
+        if mpn_upper.startswith(("AP2112", "DIODES")):
+            return "Diodes Inc"
+        if mpn_upper.startswith("PKCELL"):
+            return "PKCELL"
+
+        if name.startswith("R"):
+            return "Panasonic"
+        if name.startswith("C"):
+            return "Murata"
+        if name.startswith("D") and "LED" in pkg:
+            return "Cree LED"
+        if name.startswith("J"):
+            return "Hirose Electric" if "FPC" in pkg else "JST"
+        if name.startswith("U"):
+            return "Generic IC"
+        return "Generic"
+
+    @staticmethod
+    def _infer_component_type(fp: Any) -> str:
+        """Infer mounting type ('SMD', 'thru-hole', or 'DNS') matching PCBWay BOM template schema."""
+        if getattr(fp, "dnp", False):
+            return "DNS"
+        if getattr(fp, "thru_hole", False):
+            return "thru-hole"
+        pkg = str(getattr(fp, "package", "") or "")
+        th_indicators = ("pin_header", "JST-PH", "TSW-", "thru-hole", "TH")
+        if any(ind in pkg for ind in th_indicators):
+            return "thru-hole"
+        return "SMD"
+
+    def export_bom_excel(self, output_file: str | Path, title: Optional[str] = None) -> Path:
+        """Export Bill of Materials (BOM) in Excel (.xlsx) format matching PCBWay's template schema."""
+        out_path = Path(output_file).resolve()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if not title:
+            title_prefix = f"{self.config.name} {self.subassembly or ''}".strip()
+            title = f"{title_prefix} BOM  (Sample Bill of Materials)"
+
+        fps_to_process = [
+            fp
+            for fp in self.get_footprints_for_board()
+            if not getattr(fp, "unconnected", False) and getattr(fp, "in_bom", True)
+        ]
+
+        def natural_sort_key(s: str) -> list[Any]:
+            return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", s)]
+
+        # Group components by MPN, Package, Value, Type, Manufacturer, Supplier_PN, and DNP
+        groups: dict[tuple, list[Any]] = {}
+        for fp in fps_to_process:
+            pkg = getattr(fp, "package", "") or ""
+            val = getattr(fp, "value", None) or (fp.label.text if fp.label else pkg)
+            mpn = getattr(fp, "mpn", None) or f"GENERIC-{pkg.upper()}"
+            supp_pn = getattr(fp, "supplier_pn", None) or "N/A"
+            comp_type = self._infer_component_type(fp)
+            mfg = self._infer_component_manufacturer(fp)
+            is_dnp = getattr(fp, "dnp", False)
+            key = (mpn, pkg, val, comp_type, mfg, supp_pn, is_dnp)
+            groups.setdefault(key, []).append(fp)
+
+        # Sort groups by the first designator in natural sort order
+        sorted_groups = sorted(
+            groups.items(),
+            key=lambda item: natural_sort_key(sorted((f.name for f in item[1]), key=natural_sort_key)[0]),
+        )
+
+        rows: list[dict[str, Any]] = []
+        for idx, (key, grp_fps) in enumerate(sorted_groups, start=1):
+            mpn, pkg, val, comp_type, mfg, supp_pn, is_dnp = key
+            des_list = sorted((f.name for f in grp_fps), key=natural_sort_key)
+            des_str = ", ".join(des_list)
+            qty = len(des_list)
+
+            notes_parts = []
+            if is_dnp:
+                if (
+                    any(getattr(f, "name", "") == "J4" for f in grp_fps)
+                    or "Male" in str(mpn)
+                    or "Mating Tab" in str(mpn)
+                ):
+                    notes_parts.append(
+                        "Male plug / contact fingers for J2 on carrier board; no component to populate (bare flex PCB)"
+                    )
+                else:
+                    notes_parts.append("Do Not Stuff (DNP)")
+            if supp_pn and supp_pn != "N/A":
+                notes_parts.append(f"Supplier PN: {supp_pn}")
+            notes_str = "; ".join(notes_parts)
+
+            rows.append(
+                {
+                    "item": idx,
+                    "designator": des_str,
+                    "qty": qty,
+                    "manufacturer": mfg,
+                    "mpn": mpn,
+                    "description": val,
+                    "package": pkg,
+                    "type": comp_type,
+                    "notes": notes_str,
+                }
+            )
+
+        # Build OpenXML package
+        shared_strings: list[str] = []
+        string_to_id: dict[str, int] = {}
+
+        def get_sst_id(text: str) -> int:
+            if text not in string_to_id:
+                string_to_id[text] = len(shared_strings)
+                shared_strings.append(text)
+            return string_to_id[text]
+
+        title_id = get_sst_id(title)
+        hdr_item = get_sst_id("Item #")
+        hdr_des = get_sst_id("*Designator")
+        hdr_qty = get_sst_id("*Qty")
+        hdr_mfg = get_sst_id("Manufacturer")
+        hdr_mpn = get_sst_id("*Mfg Part #")
+        hdr_desc = get_sst_id("Description / Value")
+        hdr_pkg = get_sst_id("*Package/Footprint")
+        hdr_type = get_sst_id("Type")
+        hdr_notes = get_sst_id("Your Instructions / Notes")
+
+        # Sheet rows
+        sheet_rows = [
+            f'<row r="2"><c r="D2" s="2" t="s"><v>{title_id}</v></c></row>',
+            '<row r="6" ht="28" customHeight="1">'
+            f'<c r="A6" s="1" t="s"><v>{hdr_item}</v></c>'
+            f'<c r="B6" s="1" t="s"><v>{hdr_des}</v></c>'
+            f'<c r="C6" s="1" t="s"><v>{hdr_qty}</v></c>'
+            f'<c r="D6" s="1" t="s"><v>{hdr_mfg}</v></c>'
+            f'<c r="E6" s="1" t="s"><v>{hdr_mpn}</v></c>'
+            f'<c r="F6" s="1" t="s"><v>{hdr_desc}</v></c>'
+            f'<c r="G6" s="1" t="s"><v>{hdr_pkg}</v></c>'
+            f'<c r="H6" s="1" t="s"><v>{hdr_type}</v></c>'
+            f'<c r="I6" s="1" t="s"><v>{hdr_notes}</v></c>'
+            "</row>",
+        ]
+
+        for r_idx, r in enumerate(rows, start=7):
+            des_id = get_sst_id(r["designator"])
+            mfg_id = get_sst_id(r["manufacturer"])
+            mpn_id = get_sst_id(r["mpn"])
+            desc_id = get_sst_id(r["description"])
+            pkg_id = get_sst_id(r["package"])
+            type_id = get_sst_id(r["type"])
+            notes_cell = (
+                f'<c r="I{r_idx}" s="3" t="s"><v>{get_sst_id(r["notes"])}</v></c>'
+                if r["notes"]
+                else f'<c r="I{r_idx}" s="3"/>'
+            )
+
+            row_xml = (
+                f'<row r="{r_idx}">'
+                f'<c r="A{r_idx}" s="4"><v>{r["item"]}</v></c>'
+                f'<c r="B{r_idx}" s="3" t="s"><v>{des_id}</v></c>'
+                f'<c r="C{r_idx}" s="4"><v>{r["qty"]}</v></c>'
+                f'<c r="D{r_idx}" s="3" t="s"><v>{mfg_id}</v></c>'
+                f'<c r="E{r_idx}" s="3" t="s"><v>{mpn_id}</v></c>'
+                f'<c r="F{r_idx}" s="3" t="s"><v>{desc_id}</v></c>'
+                f'<c r="G{r_idx}" s="3" t="s"><v>{pkg_id}</v></c>'
+                f'<c r="H{r_idx}" s="4" t="s"><v>{type_id}</v></c>'
+                f"{notes_cell}"
+                f"</row>"
+            )
+            sheet_rows.append(row_xml)
+
+        sheet_data = "".join(sheet_rows)
+        sst_items = "".join(f"<si><t>{xml_escape(s)}</t></si>" for s in shared_strings)
+        sst_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            f'count="{len(shared_strings)}" uniqueCount="{len(shared_strings)}">'
+            f"{sst_items}</sst>"
+        )
+
+        sheet1_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\n'
+            "  <cols>\n"
+            '    <col min="1" max="1" width="8" customWidth="1"/>\n'
+            '    <col min="2" max="2" width="22" customWidth="1"/>\n'
+            '    <col min="3" max="3" width="8" customWidth="1"/>\n'
+            '    <col min="4" max="4" width="24" customWidth="1"/>\n'
+            '    <col min="5" max="5" width="28" customWidth="1"/>\n'
+            '    <col min="6" max="6" width="36" customWidth="1"/>\n'
+            '    <col min="7" max="7" width="22" customWidth="1"/>\n'
+            '    <col min="8" max="8" width="12" customWidth="1"/>\n'
+            '    <col min="9" max="9" width="32" customWidth="1"/>\n'
+            "  </cols>\n"
+            "  <sheetData>\n"
+            f"    {sheet_data}\n"
+            "  </sheetData>\n"
+            "</worksheet>"
+        )
+
+        content_types_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n'
+            '  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n'
+            '  <Default Extension="xml" ContentType="application/xml"/>\n'
+            '  <Override PartName="/xl/workbook.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>\n'
+            '  <Override PartName="/xl/worksheets/sheet1.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>\n'
+            '  <Override PartName="/xl/sharedStrings.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>\n'
+            '  <Override PartName="/xl/styles.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>\n'
+            "</Types>"
+        )
+
+        rels_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'
+            '  <Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            'Target="xl/workbook.xml"/>\n'
+            "</Relationships>"
+        )
+
+        wb_rels_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'
+            '  <Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            'Target="worksheets/sheet1.xml"/>\n'
+            '  <Relationship Id="rId2" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" '
+            'Target="sharedStrings.xml"/>\n'
+            '  <Relationship Id="rId3" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" '
+            'Target="styles.xml"/>\n'
+            "</Relationships>"
+        )
+
+        workbook_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">\n'
+            "  <sheets>\n"
+            '    <sheet name="BOM" sheetId="1" r:id="rId1"/>\n'
+            "  </sheets>\n"
+            "</workbook>"
+        )
+
+        styles_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\n'
+            '  <fonts count="3">\n'
+            '    <font><sz val="10"/><name val="Arial"/></font>\n'
+            '    <font><b/><sz val="10"/><name val="Arial"/></font>\n'
+            '    <font><b/><sz val="14"/><name val="Arial"/></font>\n'
+            "  </fonts>\n"
+            '  <fills count="3">\n'
+            '    <fill><patternFill patternType="none"/></fill>\n'
+            '    <fill><patternFill patternType="gray125"/></fill>\n'
+            '    <fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/></patternFill></fill>\n'
+            "  </fills>\n"
+            '  <borders count="2">\n'
+            "    <border><left/><right/><top/><bottom/><diagonal/></border>\n"
+            "    <border>\n"
+            '      <left style="thin"><color auto="1"/></left>\n'
+            '      <right style="thin"><color auto="1"/></right>\n'
+            '      <top style="thin"><color auto="1"/></top>\n'
+            '      <bottom style="thin"><color auto="1"/></bottom>\n'
+            "      <diagonal/>\n"
+            "    </border>\n"
+            "  </borders>\n"
+            '  <cellStyleXfs count="1">\n'
+            '    <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>\n'
+            "  </cellStyleXfs>\n"
+            '  <cellXfs count="5">\n'
+            '    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"><alignment vertical="center"/></xf>\n'
+            '    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>\n'
+            '    <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>\n'
+            '    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>\n'
+            '    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>\n'
+            "  </cellXfs>\n"
+            "</styleSheet>"
+        )
+
+        with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("[Content_Types].xml", content_types_xml)
+            z.writestr("_rels/.rels", rels_xml)
+            z.writestr("xl/_rels/workbook.xml.rels", wb_rels_xml)
+            z.writestr("xl/workbook.xml", workbook_xml)
+            z.writestr("xl/styles.xml", styles_xml)
+            z.writestr("xl/sharedStrings.xml", sst_xml)
+            z.writestr("xl/worksheets/sheet1.xml", sheet1_xml)
 
         return out_path
 

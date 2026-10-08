@@ -2768,3 +2768,242 @@ def test_regression_bug_272_supplier_feedback_carrier_board() -> None:
             "carrier_board/gerbers.zip must contain impedance_control_info.txt"
         )
         assert "project_summary.txt" in names, "carrier_board/gerbers.zip must contain project_summary.txt"
+
+
+def test_regression_bug_275_supplier_feedback_flex_tail() -> None:
+    """Verify BUG-275: Supplier feedback items are addressed for flex_tail.
+
+    1. Panelization confirmation: 1*2 panel in 64*64mm with x-out accepted.
+    2. SMT only / 0 drill holes / 0 vias clarified in project summary and order remarks (<= 600 chars).
+    3. Multi-format drill files (.drl, -PTH.drl, -NPTH.drl, .txt, -drl_map.gbr) included in gerbers.zip.
+    4. Dwgs.User fabrication & panelization notes added to flex_tail PCB.
+    """
+    import zipfile
+    import yaml
+
+    # 1. Manifest panel specification
+    manifest_path = Path("src/projects/carrier_board/manifest.yaml")
+    manifest_data = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    flex_manifest = manifest_data.get("flex_tail", {})
+    assert "panel" in flex_manifest, "flex_tail manifest must declare panel specification"
+    assert "1*2" in flex_manifest["panel"] and "64*64" in flex_manifest["panel"]
+    assert "x-out" in flex_manifest["panel"]
+
+    # 2. Config parametrization from measurements.yaml
+    from projects.carrier_board.provider import CarrierBoardProvider
+
+    provider = CarrierBoardProvider()
+    cfg = provider.settings
+
+    assert hasattr(cfg, "flex_tail_panel_array")
+    assert cfg.flex_tail_panel_array == "1*2"
+    assert cfg.flex_tail_panel_width == 64.0
+    assert cfg.flex_tail_panel_length == 64.0
+    assert cfg.flex_tail_panel_accept_xout is True
+
+    # 3. Subassembly submission summary files
+    board_dir = Path("build/board/carrier_board")
+    flex_dir = board_dir / "flex_tail"
+    f_summary_txt = (flex_dir / "project_summary.txt").read_text(encoding="utf-8")
+    f_summary_md = (flex_dir / "project_summary.md").read_text(encoding="utf-8")
+
+    # Panelization in summary
+    assert "1*2 panel in 64*64mm" in f_summary_txt
+    assert "x-out" in f_summary_txt
+    assert "1*2 panel in 64*64mm" in f_summary_md
+    assert "x-out" in f_summary_md
+
+    # Zero drill holes / 0 vias clarity in summary
+    assert "0 drill holes" in f_summary_txt or "SMT only" in f_summary_txt
+    assert "0 vias" in f_summary_txt or "no through-holes" in f_summary_txt
+
+    # Remarks <= 600 chars
+    remarks_text = f_summary_txt.split("-" * 80)[-1].split("=" * 80)[0].strip()
+    assert len(remarks_text) <= 600, f"Remarks must be <= 600 chars, got {len(remarks_text)}"
+    assert "64*64mm" in remarks_text
+    assert "x-out" in remarks_text
+
+    # 4. Packaging in flex_tail/gerbers.zip
+    with zipfile.ZipFile(flex_dir / "gerbers.zip", "r") as zf:
+        names = zf.namelist()
+        assert "project_summary.txt" in names
+        assert "project_summary.md" in names
+        # Must contain drill deliverables
+        has_drl = any(n.endswith(".drl") for n in names)
+        has_txt = any(n.startswith("flex_tail") and n.endswith(".txt") for n in names)
+        has_map = any("drl_map.gbr" in n for n in names)
+        assert has_drl, f"flex_tail/gerbers.zip must contain .drl drill files, got: {names}"
+        assert has_txt, f"flex_tail/gerbers.zip must contain .txt drill files, got: {names}"
+        assert has_map, f"flex_tail/gerbers.zip must contain Gerber drill map (-drl_map.gbr), got: {names}"
+
+    # 5. Dwgs.User fabrication & panelization notes on PCB
+    pcb_content = (board_dir / "flex_tail.kicad_pcb").read_text(encoding="utf-8")
+    assert "PANEL: 1*2 PANEL IN 64x64mm ACCEPTED WITH X-OUT BOARD ACCEPTED" in pcb_content
+    assert "FAB: 2-LAYER POLYIMIDE FPC (0.20mm) | SMT ONLY: 0 DRILL HOLES / 0 VIAS" in pcb_content
+    assert "Dwgs.User" in pcb_content
+
+
+def test_regression_bug_276_j4_fpc_connector_mpn_and_supplier_pn() -> None:
+    """Verify BUG-276: J2 is Hirose FH12-30S-0.5SH(55) receptacle on carrier board, and J4 is integral male mating tab marked DNP."""
+    from model.wiring import Wiring
+
+    wiring = Wiring("src/projects/carrier_board/wiring.yaml")
+
+    # 1. Verify wiring.yaml footprints for J2 (carrier_board) and J4 (flex_tail)
+    j2 = next(c for c in wiring.footprints if c.name == "J2")
+    j4 = next(c for c in wiring.footprints if c.name == "J4")
+
+    assert j2.mpn == "FH12-30S-0.5SH(55)", f"J2 MPN must be FH12-30S-0.5SH(55), got {j2.mpn}"
+    assert j2.supplier_pn == "HFJ130CT-ND", f"J2 supplier_pn must be HFJ130CT-ND, got {j2.supplier_pn}"
+    assert not getattr(j2, "dnp", False), "J2 is populated connector receptacle on carrier board"
+
+    # J4 is the integral FPC male mating tab that inserts into J2 (not a populated connector)
+    assert getattr(j4, "dnp", False), "J4 must be marked DNP (integral male mating tab, not populated)"
+    assert "Mating Tab" in j4.mpn or "Male plug" in j4.mpn
+    assert j4.supplier_pn == "N/A"
+    assert "Male Plug" in (j4.value or "")
+
+    # Verify no placeholder or 100-pin connector PN remains
+    for fp in (j2, j4):
+        assert fp.supplier_pn != "H1234-ND", f"{fp.name} must not use dummy placeholder H1234-ND"
+        assert "FH35C" not in fp.mpn, f"{fp.name} MPN must not reference FH35C"
+
+    # 2. Downselection documentation verification
+    for doc_path in [
+        Path("docs/downselection_report.md"),
+        Path("src/projects/carrier_board/docs/downselection_report.md"),
+    ]:
+        content = doc_path.read_text(encoding="utf-8")
+        assert "FH12-30S-0.5SH(55)" in content, f"{doc_path} must document FH12-30S-0.5SH(55)"
+        assert "HIROSE-FH35C-30S" not in content, f"{doc_path} must not reference obsolete HIROSE-FH35C-30S"
+
+    # 3. Exported BOM CSV and zip archive verification
+    import zipfile
+
+    flex_bom = Path("build/bom/carrier_board/flex_tail_bom.csv")
+    carrier_bom = Path("build/bom/carrier_board/carrier_board_bom.csv")
+    assert flex_bom.exists(), "flex_tail_bom.csv must exist"
+    assert carrier_bom.exists(), "carrier_board_bom.csv must exist"
+    assert "Mating Tab" in flex_bom.read_text(encoding="utf-8") or "Male Plug" in flex_bom.read_text(encoding="utf-8")
+    assert "FH12-30S-0.5SH(55)" in carrier_bom.read_text(encoding="utf-8")
+    assert "HFJ130CT-ND" in carrier_bom.read_text(encoding="utf-8")
+
+    with zipfile.ZipFile("build/board/carrier_board/flex_tail/bom_templates.zip") as zf:
+        bom_text = zf.read("flex_tail_bom.csv").decode("utf-8")
+        assert "Mating Tab" in bom_text or "Male Plug" in bom_text
+        assert "H1234-ND" not in bom_text
+
+
+def test_regression_bug_277_bom_excel_pcbway_export() -> None:
+    """Verify BUG-277: Bill of Materials is exported as .xlsx matching PCBWay template schema and bundled in archives."""
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    board_dir = Path("build/board/carrier_board")
+    bom_dir = Path("build/bom/carrier_board")
+
+    # 1. Verify .xlsx BOM files exist in build/bom and build/board subassemblies
+    flex_bom_xlsx = bom_dir / "flex_tail_bom.xlsx"
+    carrier_bom_xlsx = bom_dir / "carrier_board_bom.xlsx"
+    assert flex_bom_xlsx.is_file(), "build/bom/carrier_board/flex_tail_bom.xlsx must exist"
+    assert carrier_bom_xlsx.is_file(), "build/bom/carrier_board/carrier_board_bom.xlsx must exist"
+
+    sub_flex_xlsx = board_dir / "flex_tail" / "flex_tail_bom.xlsx"
+    sub_carrier_xlsx = board_dir / "carrier_board" / "carrier_board_bom.xlsx"
+    assert sub_flex_xlsx.is_file(), "flex_tail/flex_tail_bom.xlsx must exist in subassembly folder"
+    assert sub_carrier_xlsx.is_file(), "carrier_board/carrier_board_bom.xlsx must exist in subassembly folder"
+
+    # 2. Verify bom_templates.zip packaging contains .csv AND .xlsx
+    with zipfile.ZipFile(board_dir / "flex_tail" / "bom_templates.zip") as zf:
+        names = zf.namelist()
+        assert "flex_tail_bom.csv" in names, "flex_tail bom_templates.zip must contain flex_tail_bom.csv"
+        assert "flex_tail_bom.xlsx" in names, "flex_tail bom_templates.zip must contain flex_tail_bom.xlsx"
+
+    with zipfile.ZipFile(board_dir / "carrier_board" / "bom_templates.zip") as zf:
+        names = zf.namelist()
+        assert "carrier_board_bom.csv" in names, "carrier_board bom_templates.zip must contain carrier_board_bom.csv"
+        assert "carrier_board_bom.xlsx" in names, "carrier_board bom_templates.zip must contain carrier_board_bom.xlsx"
+
+    with zipfile.ZipFile(board_dir / "bom_templates.zip") as zf:
+        names = zf.namelist()
+        assert "carrier_board_bom.csv" in names
+        assert "carrier_board_bom.xlsx" in names
+        assert "flex_tail_bom.csv" in names
+        assert "flex_tail_bom.xlsx" in names
+
+    # 3. Verify flex_tail_bom.xlsx OpenXML structure and PCBWay template compliance
+    ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    with zipfile.ZipFile(flex_bom_xlsx) as zf:
+        sst = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+        strings = ["".join(t.text or "" for t in si.findall(".//s:t", ns)) for si in sst.findall(".//s:si", ns)]
+        sheet = ET.fromstring(zf.read("xl/worksheets/sheet1.xml"))
+
+        rows_map = {}
+        for row in sheet.findall(".//s:row", ns):
+            r_num = int(row.attrib.get("r"))
+            col_map = {}
+            for c in row.findall("s:c", ns):
+                coord = c.attrib.get("r")
+                col_letter = "".join(filter(str.isalpha, coord))
+                t = c.attrib.get("t")
+                v = c.find("s:v", ns)
+                if v is not None and v.text:
+                    col_map[col_letter] = strings[int(v.text)] if t == "s" else v.text
+                else:
+                    col_map[col_letter] = ""
+            rows_map[r_num] = col_map
+
+    # Check row 6 headers
+    r6 = rows_map[6]
+    assert r6["A"] == "Item #"
+    assert r6["B"] == "*Designator"
+    assert r6["C"] == "*Qty"
+    assert r6["D"] == "Manufacturer"
+    assert r6["E"] == "*Mfg Part #"
+    assert r6["F"] == "Description / Value"
+    assert r6["G"] == "*Package/Footprint"
+    assert r6["H"] == "Type"
+    assert r6["I"] == "Your Instructions / Notes"
+
+    # Check row 7 (J4 component - DNP integral mating tab)
+    r7 = rows_map[7]
+    assert r7["A"] == "1"
+    assert r7["B"] == "J4"
+    assert r7["C"] == "1"
+    assert r7["D"] == "N/A (Bare Flex PCB)"
+    assert "Mating Tab" in r7["E"] or "Male plug" in r7["E"]
+    assert r7["G"] == "FPC-30P-0.5MM"
+    assert r7["H"] == "DNS"
+    assert "no component to populate" in r7["I"] or "Male plug" in r7["I"]
+
+    # 4. Verify carrier_board_bom.xlsx contains J2 and DNP component J15
+    with zipfile.ZipFile(carrier_bom_xlsx) as zf:
+        sst = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+        strings = ["".join(t.text or "" for t in si.findall(".//s:t", ns)) for si in sst.findall(".//s:si", ns)]
+        sheet = ET.fromstring(zf.read("xl/worksheets/sheet1.xml"))
+
+        cb_rows = []
+        for row in sheet.findall(".//s:row", ns):
+            r_num = int(row.attrib.get("r"))
+            if r_num < 7:
+                continue
+            col_map = {}
+            for c in row.findall("s:c", ns):
+                coord = c.attrib.get("r")
+                col_letter = "".join(filter(str.isalpha, coord))
+                t = c.attrib.get("t")
+                v = c.find("s:v", ns)
+                if v is not None and v.text:
+                    col_map[col_letter] = strings[int(v.text)] if t == "s" else v.text
+                else:
+                    col_map[col_letter] = ""
+            cb_rows.append(col_map)
+
+    j2_row = next(r for r in cb_rows if r.get("B") == "J2")
+    assert j2_row["E"] == "FH12-30S-0.5SH(55)"
+    assert j2_row["H"] == "SMD"
+    assert "HFJ130CT-ND" in j2_row["I"]
+
+    j15_row = next(r for r in cb_rows if r.get("B") == "J15")
+    assert j15_row["H"] == "DNS"
+    assert "Do Not Stuff (DNP)" in j15_row["I"]

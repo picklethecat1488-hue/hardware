@@ -8,6 +8,7 @@ merge conflict resolution, interactive line-by-line Code Review, and Bug Tracker
 import base64
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import errno
 import json
 import mimetypes
 from pathlib import Path
@@ -31,6 +32,7 @@ from model.bug_report import (
 from model.code_review import CommentModel, ReviewSessionModel, ReviewSeverity, ReviewStatus
 from model.vcs import (
     BranchInfoModel,
+    CommitBugTagModel,
     CommitNodeModel,
     DiffViewSessionModel,
     FileDiffModel,
@@ -40,6 +42,31 @@ from model.vcs import (
 from provider.bug_report.server import BugReportServer
 from provider.code_review.server import ReviewServer
 from provider.vcs.git_engine import GitEngine, extract_line_snippet, get_git_root
+
+
+def ensure_high_fd_limit(min_limit: int = 10240) -> int:
+    """Raise process soft file descriptor limit (RLIMIT_NOFILE) up to hard limit.
+
+    Args:
+        min_limit: Target soft limit to achieve (defaults to 10240, capped at 65536).
+
+    Returns:
+        The current or newly set soft limit.
+    """
+    try:
+        import resource
+
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        target = min(hard, 65536) if hard != resource.RLIM_INFINITY else 65536
+        target = max(target, min_limit)
+        if hard != resource.RLIM_INFINITY and target > hard:
+            target = hard
+        if soft < target:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+            return target
+        return soft
+    except (ImportError, OSError, ValueError):
+        return 0
 
 
 class DashboardRequestHandler(BaseHTTPRequestHandler):
@@ -76,6 +103,17 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         """Route GET requests for UI dashboards and data query endpoints."""
+        try:
+            self._do_get_impl()
+        except OSError as e:
+            if getattr(e, "errno", None) == errno.EMFILE:
+                self.send_error(503, "Server file descriptor limit reached")
+            else:
+                self.send_error(500, f"Internal server error: {e}")
+        except Exception as e:
+            self.send_error(500, f"Internal server error: {e}")
+
+    def _do_get_impl(self) -> None:
         if hasattr(self.server, "review_server") and self.server.review_server:
             try:
                 self.server.review_server.check_file_watch()
@@ -146,6 +184,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     if not revs and self.server.review_server.session.revisions:
                         revs = self.server.review_server.session.revisions
                     commits = self.server.git_engine.get_commits(rev_args=revs)
+                    if not commits and revs == ["working"]:
+                        commits = self.server.git_engine.get_commits()
                     self._send_json([c.model_dump(mode="json") for c in commits])
                 else:
                     limit_str = query.get("limit", ["40"])[0]
@@ -236,6 +276,17 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         """Route POST requests for mutating actions."""
+        try:
+            self._do_post_impl()
+        except OSError as e:
+            if getattr(e, "errno", None) == errno.EMFILE:
+                self.send_error(503, "Server file descriptor limit reached")
+            else:
+                self.send_error(500, f"Internal server error: {e}")
+        except Exception as e:
+            self.send_error(500, f"Internal server error: {e}")
+
+    def _do_post_impl(self) -> None:
         try:
             self.server.bug_server.check_file_watch()
         except Exception:
@@ -519,12 +570,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         )
         template = env.get_template("bug_report.html.j2")
         db_dump = self.server.bug_server.database.model_dump(mode="json")
+        components = sorted(
+            {b.component.strip() for b in self.server.bug_server.database.bugs if b.component and b.component.strip()}
+        )
         html_content = template.render(
             database=self.server.bug_server.database,
             database_json=json.dumps(db_dump),
             statuses=[s.value for s in BugStatus],
             severities=[s.value for s in BugSeverity],
             categories=[c.value for c in BugCategory],
+            components=components,
             server_port=self.server.actual_port,
         )
         self._send_html(html_content)
@@ -892,11 +947,12 @@ class DashboardServer(ThreadingHTTPServer):
 
     def handle_error(self, request: Any, client_address: Any) -> None:
         """Handle client connection errors gracefully without printing tracebacks on client disconnects."""
-        exc_type, _, _ = sys.exc_info()
-        if exc_type is not None and issubclass(
-            exc_type, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
-        ):
-            return
+        exc_type, exc_val, _ = sys.exc_info()
+        if exc_type is not None:
+            if issubclass(exc_type, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+                return
+            if isinstance(exc_val, OSError) and getattr(exc_val, "errno", None) == errno.EMFILE:
+                return
         super().handle_error(request, client_address)
 
     def __init__(
@@ -915,6 +971,7 @@ class DashboardServer(ThreadingHTTPServer):
         bind_and_activate: bool = True,
     ) -> None:
         """Initialize the unified dashboard workstation server."""
+        ensure_high_fd_limit()
         self.repo_root = (repo_root or get_git_root()).resolve()
         self.git_engine = GitEngine(repo_root=self.repo_root)
         self.host = host
@@ -986,24 +1043,104 @@ class DashboardServer(ThreadingHTTPServer):
         agent_feedback = [f for f in working_files if f.is_feedback]
 
         # Match bug reports with commits
-        bug_dict = {b.id: b for b in self.bug_server.database.bugs}
+        bug_dict: Dict[str, Any] = {}
+        for b in self.bug_server.database.bugs:
+            num = re.sub(r"^(?:BUG|WORM)[-_]", "", b.id, flags=re.IGNORECASE)
+            bug_dict[f"BUG-{num}"] = b
+            bug_dict[f"WORM-{num}"] = b
+            if num.isdigit():
+                norm_num = f"{int(num):03d}"
+                bug_dict[f"BUG-{norm_num}"] = b
+                bug_dict[f"WORM-{norm_num}"] = b
+            bug_dict[b.id] = b
+
         for node in smartlog_nodes:
-            bug_ids = re.findall(r"\bBUG-\d+\b", node.subject)
-            tags = []
-            for bid in bug_ids:
-                if bid in bug_dict:
-                    tags.append(bug_dict[bid])
+            # Canonicalize existing tag IDs and filter out non-existent bugs
+            retained_tags: List[CommitBugTagModel] = []
+            for tag in node.bug_tags:
+                num = re.sub(r"^(?:BUG|WORM)[-_]", "", tag.id, flags=re.IGNORECASE)
+                canonical_id = f"BUG-{int(num):03d}" if num.isdigit() else f"BUG-{num}"
+                if canonical_id in bug_dict:
+                    b = bug_dict[canonical_id]
+                    tag.id = canonical_id
+                    tag.title = b.title
+                    tag.status = b.status.value if hasattr(b.status, "value") else str(b.status)
+                    tag.severity = b.severity.value if hasattr(b.severity, "value") else str(b.severity)
+                    retained_tags.append(tag)
                 else:
-                    tags.append(
-                        BugReportModel(
-                            id=bid,
-                            title=bid,
-                            status=BugStatus.OPEN,
-                            severity=BugSeverity.MEDIUM,
-                            category=BugCategory.PCB,
+                    md_path = self.repo_root / "feedback" / f"BUG_{num}.md"
+                    if not md_path.exists() and num.isdigit():
+                        md_path = self.repo_root / "feedback" / f"BUG_{int(num):03d}.md"
+                    if not md_path.exists() and num.isdigit():
+                        md_path = self.repo_root / "feedback" / f"BUG_{int(num)}.md"
+                    if not md_path.exists():
+                        md_path = self.repo_root / "feedback" / f"WORM_{num}.md"
+                    if not md_path.exists() and num.isdigit():
+                        md_path = self.repo_root / "feedback" / f"WORM_{int(num):03d}.md"
+                    if not md_path.exists() and num.isdigit():
+                        md_path = self.repo_root / "feedback" / f"WORM_{int(num)}.md"
+                    if md_path.exists():
+                        tag.id = canonical_id
+                        retained_tags.append(tag)
+            node.bug_tags = retained_tags
+
+            bug_ids = re.findall(r"\b((?:BUG|WORM)[_-]\d+)\b", node.subject, re.IGNORECASE)
+            existing_ids = {t.id for t in node.bug_tags}
+            for bid in bug_ids:
+                num = re.sub(r"^(?:BUG|WORM)[-_]", "", bid, flags=re.IGNORECASE)
+                canonical_id = f"BUG-{int(num):03d}" if num.isdigit() else f"BUG-{num}"
+                if canonical_id not in existing_ids:
+                    if canonical_id in bug_dict:
+                        b = bug_dict[canonical_id]
+                        node.bug_tags.append(
+                            CommitBugTagModel(
+                                id=canonical_id,
+                                title=b.title,
+                                status=b.status.value if hasattr(b.status, "value") else str(b.status),
+                                severity=b.severity.value if hasattr(b.severity, "value") else str(b.severity),
+                            )
                         )
-                    )
-            node.bug_tags = tags
+                        existing_ids.add(canonical_id)
+                    else:
+                        md_path = self.repo_root / "feedback" / f"BUG_{num}.md"
+                        if not md_path.exists() and num.isdigit():
+                            md_path = self.repo_root / "feedback" / f"BUG_{int(num):03d}.md"
+                        if not md_path.exists() and num.isdigit():
+                            md_path = self.repo_root / "feedback" / f"BUG_{int(num)}.md"
+                        if not md_path.exists():
+                            md_path = self.repo_root / "feedback" / f"WORM_{num}.md"
+                        if not md_path.exists() and num.isdigit():
+                            md_path = self.repo_root / "feedback" / f"WORM_{int(num):03d}.md"
+                        if not md_path.exists() and num.isdigit():
+                            md_path = self.repo_root / "feedback" / f"WORM_{int(num)}.md"
+                        if md_path.exists():
+                            status = "OPEN"
+                            title = canonical_id
+                            severity = "LOW"
+                            try:
+                                content = md_path.read_text(encoding="utf-8", errors="replace")
+                                for line in content.splitlines():
+                                    if line.startswith("# ") and ("BUG-" in line or "WORM-" in line):
+                                        title = line.split("]", 1)[-1].strip()
+                                    if line.startswith("- **Status**:"):
+                                        parts = line.split("`")
+                                        if len(parts) >= 2:
+                                            status = parts[1].strip()
+                                    if line.startswith("- **Severity**:"):
+                                        parts = line.split("`")
+                                        if len(parts) >= 2:
+                                            severity = parts[1].strip()
+                            except Exception:
+                                pass
+                            node.bug_tags.append(
+                                CommitBugTagModel(
+                                    id=canonical_id,
+                                    title=title,
+                                    status=status,
+                                    severity=severity,
+                                )
+                            )
+                            existing_ids.add(canonical_id)
 
         # Ensure file watcher syncs any newly placed or edited CR feedback files (BUG-236)
         if hasattr(self, "review_server") and self.review_server:

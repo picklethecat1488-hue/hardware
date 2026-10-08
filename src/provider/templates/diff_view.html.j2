@@ -902,6 +902,43 @@
     .modal-file-row:hover {
       background: #24160c;
     }
+
+    /* Quake Workstation Modal Dialog (BUG-274) */
+    .workstation-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    .workstation-modal-container {
+      background: var(--quake-bg);
+      border: 2px solid var(--quake-gold);
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.95), 0 0 15px rgba(255, 184, 0, 0.3);
+      border-radius: 4px;
+      width: calc(100vw - 36px);
+      height: calc(100vh - 36px);
+      max-width: calc(100vw - 36px);
+      max-height: calc(100vh - 36px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .workstation-modal-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: transparent;
+      display: block;
+      flex: 1;
+    }
   </style>
 </head>
 <body>
@@ -1175,14 +1212,14 @@
     <section id="paneFiles" class="quake-card column-panel pane-files">
       <div class="column-header">
         <div style="display:flex;align-items:center;gap:6px;">
-          <span id="filesHeaderTitle">Changed Files</span>
+          <span id="filesHeaderTitle">{% if not session.active_commit or session.active_commit == 'working' %}Working Tree Files{% else %}Files ({{ session.active_commit[:7] }}){% endif %}</span>
           <span id="filesCountBadge" style="color:var(--quake-text-muted);">0 files</span>
         </div>
         <button class="quake-btn quake-btn-default quake-btn-icon" onclick="togglePane('files')" title="Collapse Files Pane (Shortcut: ])">◀</button>
       </div>
 
       <!-- Working Tree Commit Area (Only visible when active commit is 'working') -->
-      <div id="workingTreeCommitArea" class="commit-box" style="margin:8px; display:none;">
+      <div id="workingTreeCommitArea" class="commit-box" style="margin:8px; display:{% if not session.active_commit or session.active_commit == 'working' %}flex{% else %}none{% endif %};">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:10px;font-weight:700;color:var(--quake-copper);text-transform:uppercase;">Working Tree Actions</span>
           <div style="display:flex;gap:4px;">
@@ -1378,6 +1415,13 @@
         <span style="font-size:10px;color:var(--quake-text-dim);">Current user: {{ session.current_user or 'picklethecat1488-hue' }}</span>
         <button class="quake-btn quake-btn-default" onclick="closeBranchModal()">Close</button>
       </div>
+    </div>
+  </div>
+
+  <!-- WORKSTATION MODAL WINDOW (Code Review & Bug Report) (BUG-274) -->
+  <div id="workstationModal" class="workstation-modal-overlay" onclick="if(event.target===this) closeWorkstationModal()">
+    <div class="workstation-modal-container">
+      <iframe id="workstationIframe" class="workstation-modal-iframe" src="about:blank" title="Workstation"></iframe>
     </div>
   </div>
 
@@ -1867,6 +1911,11 @@
     async function loadFilesForActiveCommit() {
       const container = document.getElementById("filesContainer");
       container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--quake-text-muted);">Loading files...</div>`;
+
+      const commitArea = document.getElementById("workingTreeCommitArea");
+      if (commitArea) {
+        commitArea.style.display = state.activeCommit === "working" ? "flex" : "none";
+      }
 
       try {
         if (state.activeCommit === "working") {
@@ -2842,9 +2891,53 @@
       updateSelectedCount();
     }
 
-    // Jump to CR for specific commit (BUG-199)
+    // Workstation Modal Management (BUG-274)
+    function openWorkstationModal(url, targetName) {
+      const modal = document.getElementById("workstationModal");
+      const iframe = document.getElementById("workstationIframe");
+      if (!modal || !iframe) {
+        if (targetName) {
+          window.open(url, targetName);
+        } else {
+          window.open(url, "_blank");
+        }
+        return;
+      }
+      iframe.src = url;
+      modal.style.display = "flex";
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeWorkstationModal() {
+      const modal = document.getElementById("workstationModal");
+      const iframe = document.getElementById("workstationIframe");
+      if (!modal) return;
+      modal.style.display = "none";
+      if (iframe) iframe.src = "about:blank";
+      document.body.style.overflow = "";
+      fetchSession(false);
+    }
+    window.closeWorkstationModal = closeWorkstationModal;
+
+    window.addEventListener("message", (event) => {
+      if (event.data && (event.data.action === "close_workstation" || event.data.type === "close_modal")) {
+        closeWorkstationModal();
+      }
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const modal = document.getElementById("workstationModal");
+        if (modal && modal.style.display === "flex") {
+          closeWorkstationModal();
+        }
+      }
+    });
+
+    // Jump to CR for specific commit (BUG-199, BUG-274)
     async function jumpToCR(commitHash) {
       if (!commitHash) return;
+      const targetName = `${state.repoName || 'repo'}_code_review`;
       try {
         const resp = await fetch("/api/open_code_review", {
           method: "POST",
@@ -2852,14 +2945,18 @@
           body: JSON.stringify({ commits: [commitHash] })
         });
         const res = await resp.json();
-        window.open(res.url, `${state.repoName || 'repo'}_code_review`);
+        openWorkstationModal(res.url, targetName);
       } catch (err) {
-        window.open(`/review?revisions=${encodeURIComponent(commitHash)}`, `${state.repoName || 'repo'}_code_review`);
+        openWorkstationModal(`/review?revisions=${encodeURIComponent(commitHash)}`, targetName);
       }
     }
 
     async function onOpenInCodeReview() {
-      const commits = state.selectedCommits.length > 0 ? state.selectedCommits : [state.activeCommit];
+      let commits = state.selectedCommits.length > 0 ? state.selectedCommits : (state.activeCommit ? [state.activeCommit] : []);
+      if (commits.length === 1 && commits[0] === "working" && (!state.workingFiles || state.workingFiles.length === 0)) {
+        commits = [];
+      }
+      const targetName = `${state.repoName || 'repo'}_code_review`;
       try {
         const resp = await fetch("/api/open_code_review", {
           method: "POST",
@@ -2867,14 +2964,16 @@
           body: JSON.stringify({ commits: commits })
         });
         const res = await resp.json();
-        window.open(res.url, `${state.repoName || 'repo'}_code_review`);
+        openWorkstationModal(res.url, targetName);
       } catch (err) {
         const revStr = commits.join(",");
-        window.open(`/review?revisions=${encodeURIComponent(revStr)}`, `${state.repoName || 'repo'}_code_review`);
+        const fallbackUrl = revStr ? `/review?revisions=${encodeURIComponent(revStr)}` : "/review";
+        openWorkstationModal(fallbackUrl, targetName);
       }
     }
 
     async function openBug(bugId) {
+      const targetName = `${state.repoName || 'repo'}_bug_tracker`;
       try {
         const resp = await fetch("/api/open_bug", {
           method: "POST",
@@ -2882,13 +2981,14 @@
           body: JSON.stringify({ bug_id: bugId })
         });
         const res = await resp.json();
-        window.open(res.url, `${state.repoName || 'repo'}_bug_tracker`);
+        openWorkstationModal(res.url, targetName);
       } catch (err) {
-        window.open(`/bugs#BUG-${bugId}`, `${state.repoName || 'repo'}_bug_tracker`);
+        openWorkstationModal(`/bugs#BUG-${bugId}`, targetName);
       }
     }
 
     async function openBugTracker() {
+      const targetName = `${state.repoName || 'repo'}_bug_tracker`;
       try {
         const resp = await fetch("/api/open_bug", {
           method: "POST",
@@ -2896,13 +2996,14 @@
           body: JSON.stringify({})
         });
         const res = await resp.json();
-        window.open(res.url, `${state.repoName || 'repo'}_bug_tracker`);
+        openWorkstationModal(res.url, targetName);
       } catch (err) {
-        window.open("/bugs", `${state.repoName || 'repo'}_bug_tracker`);
+        openWorkstationModal("/bugs", targetName);
       }
     }
 
     async function createBugForCommit(commitHash) {
+      const targetName = `${state.repoName || 'repo'}_bug_tracker`;
       try {
         const resp = await fetch("/api/open_bug", {
           method: "POST",
@@ -2910,9 +3011,9 @@
           body: JSON.stringify({ commit: commitHash })
         });
         const res = await resp.json();
-        window.open(res.url, `${state.repoName || 'repo'}_bug_tracker`);
+        openWorkstationModal(res.url, targetName);
       } catch (err) {
-        window.open(`/bugs#new?commit=${encodeURIComponent(commitHash)}`, `${state.repoName || 'repo'}_bug_tracker`);
+        openWorkstationModal(`/bugs#new?commit=${encodeURIComponent(commitHash)}`, targetName);
       }
     }
 
@@ -3216,6 +3317,17 @@
         performInitialSync(false);
       }
       updateSelectedCount();
+
+      // Ensure working tree commit area is visible on initial load if active commit is 'working' (BUG-278)
+      const commitArea = document.getElementById("workingTreeCommitArea");
+      if (commitArea) {
+        commitArea.style.display = state.activeCommit === "working" ? "flex" : "none";
+      }
+      const filesTitle = document.getElementById("filesHeaderTitle");
+      if (filesTitle) {
+        filesTitle.textContent = state.activeCommit === "working" ? "Working Tree Files" : `Files (${state.activeCommit.slice(0, 7)})`;
+      }
+
       loadFilesForActiveCommit();
       startAutoSync();
     });

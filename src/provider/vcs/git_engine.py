@@ -167,6 +167,9 @@ class GitEngine:
             repo_root: Root path of git repository.
         """
         self.repo_root = repo_root or get_git_root()
+        self._commit_diff_cache: Dict[str, Tuple[int, int, int, bool]] = {}
+        self._commit_stat_cache: Dict[str, Tuple[int, int, int, List[str]]] = {}
+        self._bug_tag_cache: Dict[str, Dict[str, str]] = {}
 
     def get_head_commit(self) -> str:
         """Retrieve the commit hash of HEAD in the repository.
@@ -787,37 +790,54 @@ class GitEngine:
 
     def _extract_bug_tags(self, text: str) -> List[CommitBugTagModel]:
         """Extract bug IDs from commit text and resolve current status via SQLite/Markdown."""
-        bug_ids = sorted(list(set(re.findall(r"\b(BUG[_-]\d+)\b", text, re.IGNORECASE))))
+        bug_ids = sorted(list(set(re.findall(r"\b((?:BUG|WORM)[_-]\d+)\b", text, re.IGNORECASE))))
         if not bug_ids:
             return []
 
         tags: List[CommitBugTagModel] = []
         db_map: Dict[str, Dict[str, str]] = {}
+        missing_ids = []
+        for bid in bug_ids:
+            clean = re.sub(r"^(?:BUG|WORM)[-_]", "", bid, flags=re.IGNORECASE)
+            norm_id = f"BUG-{int(clean):03d}" if clean.isdigit() else f"BUG-{clean}"
+            if norm_id in self._bug_tag_cache:
+                db_map[norm_id] = self._bug_tag_cache[norm_id]
+            else:
+                missing_ids.append((bid, norm_id, clean))
+
         sqlite_path = self.repo_root / "build" / "bugs.sqlite"
-        if sqlite_path.exists():
+        if missing_ids and sqlite_path.exists():
             try:
                 conn = sqlite3.connect(str(sqlite_path))
                 try:
                     cur = conn.cursor()
-                    for bid in bug_ids:
-                        norm_id = bid.replace("_", "-").upper()
+                    for bid, norm_id, clean in missing_ids:
                         cur.execute(
-                            "SELECT id, title, status, severity FROM bugs WHERE id = ? OR id = ?", (norm_id, bid)
+                            "SELECT id, title, status, severity FROM bugs WHERE id = ? OR id = ? OR id = ? OR id = ?",
+                            (
+                                norm_id,
+                                bid,
+                                f"BUG_{clean}",
+                                f"BUG_{int(clean):03d}" if clean.isdigit() else f"BUG_{clean}",
+                            ),
                         )
                         row = cur.fetchone()
                         if row:
-                            db_map[norm_id] = {
+                            info = {
                                 "title": str(row[1]),
                                 "status": str(row[2]),
                                 "severity": str(row[3]),
                             }
+                            db_map[norm_id] = info
+                            self._bug_tag_cache[norm_id] = info
                 finally:
                     conn.close()
             except Exception:
                 pass
 
         for bid in bug_ids:
-            norm_id = bid.replace("_", "-").upper()
+            clean = re.sub(r"^(?:BUG|WORM)[-_]", "", bid, flags=re.IGNORECASE)
+            norm_id = f"BUG-{int(clean):03d}" if clean.isdigit() else f"BUG-{clean}"
             if norm_id in db_map:
                 tags.append(
                     CommitBugTagModel(
@@ -828,30 +848,45 @@ class GitEngine:
                     )
                 )
             else:
-                num = norm_id.replace("BUG-", "").replace("BUG_", "")
+                num = clean
                 md_path = self.repo_root / "feedback" / f"BUG_{num}.md"
-                status = "OPEN"
-                title = ""
+                if not md_path.exists() and num.isdigit():
+                    md_path = self.repo_root / "feedback" / f"BUG_{int(num):03d}.md"
+                if not md_path.exists() and num.isdigit():
+                    md_path = self.repo_root / "feedback" / f"BUG_{int(num)}.md"
+                if not md_path.exists():
+                    md_path = self.repo_root / "feedback" / f"WORM_{num}.md"
+                if not md_path.exists() and num.isdigit():
+                    md_path = self.repo_root / "feedback" / f"WORM_{int(num):03d}.md"
+                if not md_path.exists() and num.isdigit():
+                    md_path = self.repo_root / "feedback" / f"WORM_{int(num)}.md"
                 if md_path.exists():
+                    status = "OPEN"
+                    title = ""
+                    severity = "LOW"
                     try:
                         content = md_path.read_text(encoding="utf-8", errors="replace")
                         for line in content.splitlines():
-                            if line.startswith("# ") and "BUG-" in line:
+                            if line.startswith("# ") and ("BUG-" in line or "WORM-" in line):
                                 title = line.split("]", 1)[-1].strip()
                             if line.startswith("- **Status**:"):
                                 parts = line.split("`")
                                 if len(parts) >= 2:
                                     status = parts[1].strip()
+                            if line.startswith("- **Severity**:"):
+                                parts = line.split("`")
+                                if len(parts) >= 2:
+                                    severity = parts[1].strip()
                     except Exception:
                         pass
-                tags.append(
-                    CommitBugTagModel(
-                        id=norm_id,
-                        title=title,
-                        status=status,
-                        severity="LOW",
+                    tags.append(
+                        CommitBugTagModel(
+                            id=norm_id,
+                            title=title or norm_id,
+                            status=status,
+                            severity=severity,
+                        )
                     )
-                )
         return tags
 
     def get_repo_web_url(self) -> Optional[str]:
@@ -1057,6 +1092,9 @@ class GitEngine:
 
     def _get_commit_diff_summary(self, commit_hash: str) -> Tuple[int, int, int, bool]:
         """Compute additions, deletions, file count, and whether commit strictly touches feedback."""
+        if commit_hash in self._commit_diff_cache:
+            return self._commit_diff_cache[commit_hash]
+
         cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit_hash]
         try:
             output = run_git_command(cmd, cwd=self.repo_root)
@@ -1082,7 +1120,9 @@ class GitEngine:
                     deletions += int(cols[1])
 
         is_feedback_only = file_count > 0 and non_feedback_count == 0
-        return additions, deletions, file_count, is_feedback_only
+        result = (additions, deletions, file_count, is_feedback_only)
+        self._commit_diff_cache[commit_hash] = result
+        return result
 
     def has_working_tree_changes(self) -> bool:
         """Check whether repository contains any uncommitted or untracked changes."""
@@ -1344,6 +1384,9 @@ class GitEngine:
 
     def _get_commit_stat_summary(self, commit_hash: str) -> Tuple[int, int, int, List[str]]:
         """Calculate additions, deletions, file count, and ignored files list for a commit."""
+        if commit_hash in self._commit_stat_cache:
+            return self._commit_stat_cache[commit_hash]
+
         cmd = ["diff-tree", "--no-commit-id", "--numstat", "-r", commit_hash]
         try:
             output = run_git_command(cmd, cwd=self.repo_root)
@@ -1368,7 +1411,9 @@ class GitEngine:
                     additions += int(cols[0])
                 if cols[1].isdigit():
                     deletions += int(cols[1])
-        return additions, deletions, file_count, ignored_files
+        res = (additions, deletions, file_count, ignored_files)
+        self._commit_stat_cache[commit_hash] = res
+        return res
 
     def get_changed_files(self, commit: str, include_feedback: bool = False) -> List[Dict[str, Any]]:
         """List changed files with status and stats for a revision."""

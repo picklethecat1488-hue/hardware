@@ -180,6 +180,77 @@ def test_export_bom_csv(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring:
     assert row_u1["Supplier_PN"] == "C2682619"
 
 
+def test_export_bom_excel(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
+    """Verify export of supplier Bill of Materials (BOM) Excel (.xlsx) matching PCBWay template (BUG-277)."""
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    exporter = PCBExporter(mock_pcb_config, mock_wiring)
+    out_file = tmp_path / "bom.xlsx"
+    res = exporter.export_bom_excel(out_file, title="Test PCB")
+
+    assert res.exists()
+    assert res.suffix == ".xlsx"
+
+    with zipfile.ZipFile(res, "r") as zf:
+        names = zf.namelist()
+        assert "[Content_Types].xml" in names
+        assert "xl/workbook.xml" in names
+        assert "xl/worksheets/sheet1.xml" in names
+        assert "xl/sharedStrings.xml" in names
+
+        # Parse shared strings
+        ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        sst_root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+        shared_strings = [
+            "".join(t.text or "" for t in si.findall(".//s:t", ns)) for si in sst_root.findall(".//s:si", ns)
+        ]
+
+        # Parse sheet1 data
+        sheet_root = ET.fromstring(zf.read("xl/worksheets/sheet1.xml"))
+        rows_data = {}
+        for row in sheet_root.findall(".//s:row", ns):
+            r_idx = int(row.attrib.get("r"))
+            col_map = {}
+            for c in row.findall("s:c", ns):
+                coord = c.attrib.get("r")
+                col_letter = "".join(filter(str.isalpha, coord))
+                t = c.attrib.get("t")
+                v = c.find("s:v", ns)
+                if v is not None and v.text:
+                    col_map[col_letter] = shared_strings[int(v.text)] if t == "s" else v.text
+                else:
+                    col_map[col_letter] = ""
+            rows_data[r_idx] = col_map
+
+    # Row 6: PCBWay template headers
+    expected_headers = {
+        "A": "Item #",
+        "B": "*Designator",
+        "C": "*Qty",
+        "D": "Manufacturer",
+        "E": "*Mfg Part #",
+        "F": "Description / Value",
+        "G": "*Package/Footprint",
+        "H": "Type",
+        "I": "Your Instructions / Notes",
+    }
+    header_row = rows_data[6]
+    for col, expected_title in expected_headers.items():
+        assert expected_title in header_row.get(col, ""), (
+            f"Header {col} must be {expected_title}, got {header_row.get(col)}"
+        )
+
+    # Row 7+: Data rows
+    data_rows = [rows_data[r] for r in sorted(rows_data.keys()) if r >= 7]
+    assert len(data_rows) >= 2
+    u1_row = next(r for r in data_rows if "U1" in r["B"])
+    assert u1_row["C"] == "1"
+    assert u1_row["E"] == "STM32H7B3IIT6"
+    assert u1_row["G"] == "BGA-196"
+    assert u1_row["H"] == "SMD"
+
+
 def test_export_pick_and_place_csv(tmp_path: Path, mock_pcb_config: PCBConfig, mock_wiring: Wiring):
     """Verify export of Centroid / Pick-and-Place (CPL) CSV."""
     exporter = PCBExporter(mock_pcb_config, mock_wiring)
