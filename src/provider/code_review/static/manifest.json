@@ -4,6 +4,7 @@
   "description": "Quake VCS Unified Diff, Code Review, and Bug Tracker Workstation",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "theme_color": "#291a10",
   "background_color": "#120c08",
   "icons": [
