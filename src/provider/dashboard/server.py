@@ -570,12 +570,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         )
         template = env.get_template("bug_report.html.j2")
         db_dump = self.server.bug_server.database.model_dump(mode="json")
+        components = sorted(
+            {b.component.strip() for b in self.server.bug_server.database.bugs if b.component and b.component.strip()}
+        )
         html_content = template.render(
             database=self.server.bug_server.database,
             database_json=json.dumps(db_dump),
             statuses=[s.value for s in BugStatus],
             severities=[s.value for s in BugSeverity],
             categories=[c.value for c in BugCategory],
+            components=components,
             server_port=self.server.actual_port,
         )
         self._send_html(html_content)
