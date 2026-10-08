@@ -102,6 +102,7 @@ Host anvil
 
 ### 3. Bug Tracker & Historical Context Inspection
 * Whenever working on tasks, investigating issues, or modifying existing subsystems, you MUST inspect the bug tracking records (`feedback/BUGS.md`, `feedback/BUG_<id>.md`, `build/bugs.sqlite`, `python src/dashboard.py list-bugs --open`) for past context, historical failure modes, reproduction steps, and resolved invariants. Leveraging past context prevents re-introducing known regressions. All bug report attachments (`attachments/`, `build/attachments/`, `feedback/attachments/`) are tracked in **GitHub LFS** and considered **non-confidential** and public to the repository; never attach sensitive credentials, secret tokens, private keys, or proprietary secrets.
+* **Planned Bug Exemption**: Issues marked with status `PLANNED` represent deferred work or backlog roadmaps. `python src/dashboard.py list-bugs --open` excludes `PLANNED` bugs by default. The assistant MUST NOT autonomously pick up or work on `PLANNED` bugs unless specifically and explicitly requested by the user.
 
 ### 4. Single-Bug Focus & Atomic Issue Remediation
 * To prevent context pollution and attention degradation during extended problem-solving sessions, you MUST investigate, diagnose, and resolve only ONE bug or defect at a time:

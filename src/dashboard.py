@@ -155,6 +155,11 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
         help="When listing bugs or reviews, only show open / unresolved issues.",
     )
     parser.add_argument(
+        "--planned",
+        action="store_true",
+        help="When listing bugs, only show Planned issues.",
+    )
+    parser.add_argument(
         "--add-bug",
         "--add",
         dest="add_bug",
@@ -272,6 +277,7 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     # list-bugs
     p_bugs = subparsers.add_parser("list-bugs", help="List all active bugs directly in terminal and exit.")
     p_bugs.add_argument("--open", action="store_true", help="Only show open / unresolved issues.")
+    p_bugs.add_argument("--planned", action="store_true", help="Only show Planned issues.")
     p_bugs.add_argument(
         "--severity",
         choices=[s.value for s in BugSeverity],
@@ -405,8 +411,9 @@ def print_cli_smartlog(engine: GitEngine) -> None:
 
 
 def print_cli_bugs(
-    server: DashboardServer,
+    server: Any,
     open_only: bool = False,
+    planned_only: bool = False,
     all_users: bool = False,
     filter_user: str = "",
     engine: Optional[GitEngine] = None,
@@ -414,7 +421,19 @@ def print_cli_bugs(
     category: Optional[str] = None,
 ) -> None:
     """Print bug tracker status to terminal console with optional filtering."""
-    bugs = server.bug_server.database.bugs
+    if hasattr(server, "bug_server"):
+        bugs = server.bug_server.database.bugs
+        actual_server = server
+    elif hasattr(server, "database"):
+        bugs = server.database.bugs
+        actual_server = getattr(server, "server", None)
+    elif hasattr(server, "bugs"):
+        bugs = server.bugs
+        actual_server = None
+    else:
+        bugs = []
+        actual_server = None
+
     print("\n=== Hardware Bug Tracker ===")
     if not bugs:
         print("No bugs registered.\n")
@@ -423,7 +442,9 @@ def print_cli_bugs(
     curr_user = engine.get_current_user() if engine else {"name": "", "email": ""}
     filtered = []
     for b in bugs:
-        if open_only and b.status in (BugStatus.RESOLVED, BugStatus.CLOSED):
+        if open_only and b.status in (BugStatus.RESOLVED, BugStatus.CLOSED, BugStatus.PLANNED):
+            continue
+        if planned_only and b.status != BugStatus.PLANNED:
             continue
         if severity and b.severity.value != severity:
             continue
@@ -431,8 +452,8 @@ def print_cli_bugs(
             continue
 
         # Per-user filtering (BUG-239)
-        if not all_users and engine:
-            bug_file = server.repo_root / "feedback" / f"{b.id}.md"
+        if not all_users and engine and actual_server:
+            bug_file = actual_server.repo_root / "feedback" / f"{b.id}.md"
             b_author = engine.get_file_author(bug_file)
             if filter_user:
                 if (
@@ -450,7 +471,7 @@ def print_cli_bugs(
         comp = f" ({b.component})" if b.component else ""
         print(f"  {chk} [{b.id}] [{b.severity.value}] [{b.category.value}] {b.title}{comp} -> {b.status.value}")
 
-    total_open = sum(1 for b in filtered if b.status not in (BugStatus.RESOLVED, BugStatus.CLOSED))
+    total_open = sum(1 for b in filtered if b.status not in (BugStatus.RESOLVED, BugStatus.CLOSED, BugStatus.PLANNED))
     total_all = len(filtered)
     print(f"\nShowing {len(filtered)} issues ({total_open} open, {total_all} total).\n")
 
@@ -590,6 +611,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
     is_bug_cmd = bool(
         subcmd in ("list-bugs", "add-bug", "resolve-bug")
         or getattr(args, "bugs", False)
+        or getattr(args, "planned", False)
         or getattr(args, "add_bug", None)
         or getattr(args, "resolve_bug", None)
     )
@@ -627,6 +649,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             print_cli_bugs(
                 server,
                 open_only=getattr(args, "open", False),
+                planned_only=getattr(args, "planned", False),
                 all_users=all_users,
                 filter_user=filter_user,
                 engine=engine,
@@ -843,10 +866,11 @@ def main(cli_args: Optional[List[str]] = None) -> None:
         print(f"Resolved bug [{bug.id}]: {bug.title}")
         return
 
-    if getattr(args, "bugs", False) or (getattr(args, "list", False) and args.db_file and "bug" in str(args.db_file)):
+    if getattr(args, "bugs", False) or getattr(args, "planned", False) or (getattr(args, "list", False) and args.db_file and "bug" in str(args.db_file)):
         print_cli_bugs(
             server,
             open_only=getattr(args, "open", False),
+            planned_only=getattr(args, "planned", False),
             all_users=all_users,
             filter_user=filter_user,
             engine=engine,

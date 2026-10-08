@@ -615,6 +615,7 @@
         <input type="text" id="search-input" class="sidebar-search" placeholder="Search bugs..." oninput="renderBugList()">
         <div class="filter-pills" style="display:flex; gap:6px; width:100%;">
           <button id="filter-open" class="quake-btn quake-btn-default quake-btn-active" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('open')">OPEN</button>
+          <button id="filter-planned" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('planned')">PLANNED</button>
           <button id="filter-all" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('all')">ALL</button>
           <button id="filter-resolved" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('resolved')">RESOLVED</button>
         </div>
@@ -801,7 +802,7 @@
     let currentBugSort = sessionStorage.getItem("bug_sort") || 'id_desc';
 
     const severityOrder = { "CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3 };
-    const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "RESOLVED": 2, "CLOSED": 3 };
+    const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "PLANNED": 2, "RESOLVED": 3, "CLOSED": 4 };
 
     function init() {
       // Disambiguate duplicate IDs if any exist in in-memory state
@@ -866,9 +867,11 @@
       currentFilter = filter;
       sessionStorage.setItem("bug_filter_status", filter);
       const btnOpen = document.getElementById("filter-open");
+      const btnPlanned = document.getElementById("filter-planned");
       const btnAll = document.getElementById("filter-all");
       const btnResolved = document.getElementById("filter-resolved");
       if (btnOpen) btnOpen.classList.toggle("quake-btn-active", filter === "open");
+      if (btnPlanned) btnPlanned.classList.toggle("quake-btn-active", filter === "planned");
       if (btnAll) btnAll.classList.toggle("quake-btn-active", filter === "all");
       if (btnResolved) btnResolved.classList.toggle("quake-btn-active", filter === "resolved");
       renderBugList();
@@ -949,7 +952,8 @@
       const query = (searchInput ? searchInput.value || "" : "").toLowerCase();
       let list = (db.bugs || []).filter(bug => {
         const isResolved = (bug.status === "RESOLVED" || bug.status === "CLOSED");
-        if (currentFilter === "open" && isResolved) return false;
+        if (currentFilter === "open" && (isResolved || bug.status === "PLANNED")) return false;
+        if (currentFilter === "planned" && bug.status !== "PLANNED") return false;
         if (currentFilter === "resolved" && !isResolved) return false;
         if (currentCategoryFilter && currentCategoryFilter !== "ALL" && bug.category !== currentCategoryFilter) return false;
         if (currentSeverityFilter && currentSeverityFilter !== "ALL" && bug.severity !== currentSeverityFilter) return false;
@@ -1020,6 +1024,8 @@
         let stBadgeClass = "quake-badge quake-badge-amber";
         if (bug.status === "RESOLVED" || bug.status === "CLOSED") {
           stBadgeClass = "quake-badge quake-badge-green";
+        } else if (bug.status === "PLANNED") {
+          stBadgeClass = "quake-badge quake-badge-muted";
         }
 
         li.innerHTML = `

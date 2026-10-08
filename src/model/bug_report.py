@@ -23,6 +23,7 @@ class BugStatus(StrEnum):
     """Lifecycle status for a bug report."""
 
     OPEN = "OPEN"
+    PLANNED = "PLANNED"
     IN_PROGRESS = "IN_PROGRESS"
     RESOLVED = "RESOLVED"
     CLOSED = "CLOSED"
