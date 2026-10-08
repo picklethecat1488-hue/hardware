@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 import urllib.request
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -16,11 +16,12 @@ if str(_src_dir) not in sys.path:
 
 from dashboard import parse_arguments, launch_browser
 from provider.dashboard.server import DashboardServer
+from provider.eel.launcher import launch_eel
 from provider.vcs.git_engine import get_git_root
 
 
 def test_cli_eel_arguments_and_defaults() -> None:
-    """Verify CLI arguments default to Eel standalone app mode and support --eel/--app flags."""
+    """Verify CLI arguments strictly default to Eel standalone app mode and reject other browsers."""
     # 1. Default should be 'eel' standalone window
     with patch("sys.argv", ["dashboard.py"]):
         args = parse_arguments()
@@ -42,22 +43,37 @@ def test_cli_eel_arguments_and_defaults() -> None:
         args = parse_arguments()
         assert args.browser == "eel"
 
-    # 5. Backward-compatible explicit --browser vscode
-    with patch("sys.argv", ["dashboard.py", "--browser", "vscode"]):
+    # 5. Non-Eel browser targets are strictly rejected (dropped support for non-Eel targets)
+    with pytest.raises(SystemExit):
+        with patch("sys.argv", ["dashboard.py", "--browser", "vscode"]):
+            parse_arguments()
+
+    with pytest.raises(SystemExit):
+        with patch("sys.argv", ["dashboard.py", "--browser", "system"]):
+            parse_arguments()
+
+    # 6. --no-browser and --no-app disable launching the window
+    with patch("sys.argv", ["dashboard.py", "--no-browser"]):
         args = parse_arguments()
-        assert args.browser == "vscode"
+        assert args.no_browser
 
-    # 6. Explicit --browser system
-    with patch("sys.argv", ["dashboard.py", "--browser", "system"]):
+    with patch("sys.argv", ["dashboard.py", "--no-app"]):
         args = parse_arguments()
-        assert args.browser == "system"
+        assert args.no_browser
 
 
-def test_launch_browser_eel_target() -> None:
-    """Verify launch_browser invokes Eel standalone app launcher when target='eel'."""
+def test_launch_browser_invokes_eel() -> None:
+    """Verify launch_browser invokes Eel standalone app launcher."""
     with patch("provider.eel.launcher.launch_eel") as mock_launch_eel:
-        launch_browser("http://127.0.0.1:8877/", target="eel")
+        launch_browser("http://127.0.0.1:8877/")
         mock_launch_eel.assert_called_once_with("http://127.0.0.1:8877/")
+
+
+def test_launch_eel_no_webbrowser_fallback() -> None:
+    """Verify launch_eel does not fall back to webbrowser when no Chromium browser is found."""
+    with patch("provider.eel.launcher.find_eel_app_browser", return_value=None):
+        result = launch_eel("http://127.0.0.1:8877/")
+        assert result is False
 
 
 def test_dashboard_server_serves_eel_js(tmp_path: Path) -> None:

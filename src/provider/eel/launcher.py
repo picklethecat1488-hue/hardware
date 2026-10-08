@@ -12,7 +12,6 @@ import subprocess
 import sys
 from typing import Optional, Tuple
 import urllib.parse
-import webbrowser
 
 import eel
 import eel.browsers as eel_browsers
@@ -125,15 +124,14 @@ def init_eel_bridge(static_dir: Optional[Path] = None) -> None:
 def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
     """Launch the dashboard workstation in a standalone Eel application window.
 
-    Attempts to locate an app-mode browser and launch without browser chrome.
-    If no app-mode browser is present, falls back gracefully to the system browser.
+    Locates an app-mode Chromium-based browser binary and launches in standalone window mode.
 
     Args:
         url: Full HTTP URL of the running dashboard server.
         size: Width and height of the standalone application window in pixels.
 
     Returns:
-        True if launched in standalone app mode, False if fallen back to web browser.
+        True if successfully launched in standalone app mode, False otherwise.
     """
     init_eel_bridge()
 
@@ -163,8 +161,8 @@ def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
             eel_browsers.open([page], options)
             return True
         except (OSError, subprocess.SubprocessError) as err:
-            print(f"[EEL] Standalone window launch failed ({err}), falling back to system browser.")
+            print(f"[EEL] Standalone window launch failed: {err}", file=sys.stderr)
+            return False
 
-    # Graceful fallback to default browser
-    webbrowser.open(url)
+    print("[EEL] No supported Chromium-based browser found for Eel standalone app mode.", file=sys.stderr)
     return False
