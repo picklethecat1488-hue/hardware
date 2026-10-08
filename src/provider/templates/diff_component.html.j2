@@ -29,7 +29,7 @@
   }
 
   .diff-file-title {
-    font-size: 13px;
+    font-size: 10px;
     font-weight: 700;
     color: var(--quake-gold, #ffb800);
     display: flex;
@@ -44,7 +44,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 700;
     padding: 2px 6px;
     border-radius: 3px;
@@ -100,14 +100,14 @@
     min-width: 100% !important;
     table-layout: fixed !important;
     font-family: var(--font-mono, monospace);
-    font-size: 11px;
+    font-size: 9px;
     line-height: 1.45;
   }
 
   .diff-sbs-table thead th {
     background: #23160e;
     color: var(--quake-copper, #c87a32);
-    font-size: 10px;
+    font-size: 8px;
     text-transform: uppercase;
     padding: 4px 8px;
     border-bottom: 1px solid var(--quake-border-mid, #5a381e);
@@ -142,7 +142,7 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 13px;
+    font-size: 10px;
     line-height: 1;
     color: var(--quake-gold, #ffb800);
     z-index: 26;
@@ -276,7 +276,7 @@
     min-width: 100%;
     width: max-content;
     font-family: var(--font-mono, monospace);
-    font-size: 11px;
+    font-size: 9px;
     line-height: 1.45;
   }
 
@@ -286,7 +286,7 @@
     color: var(--quake-gold, #ffb800);
     padding: 4px 8px;
     margin: 8px 0 4px 0;
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 700;
   }
 
@@ -378,7 +378,7 @@
     justify-content: center;
     height: 100%;
     color: var(--quake-text-dim, #716053);
-    font-size: 13px;
+    font-size: 10px;
     gap: 8px;
   }
 </style>
@@ -667,11 +667,11 @@
         previewHtml = `
           <div style="display:flex;gap:20px;justify-content:center;align-items:center;margin-top:12px;">
             <div style="text-align:center;">
-              <div style="font-size:11px;color:var(--quake-text-muted);margin-bottom:6px;">Previous</div>
+              <div style="font-size:9px;color:var(--quake-text-muted);margin-bottom:6px;">Previous</div>
               <img src="/api/raw?commit=${encodeURIComponent(diffData.commit || 'HEAD')}&file=${encodeURIComponent(filePath)}&parent=true" style="max-width:240px;max-height:240px;border:1px solid #5a381e;background:#120c08;" alt="Previous image" onerror="this.style.display='none'"/>
             </div>
             <div style="text-align:center;">
-              <div style="font-size:11px;color:var(--quake-gold);margin-bottom:6px;">Active</div>
+              <div style="font-size:9px;color:var(--quake-gold);margin-bottom:6px;">Active</div>
               <img src="/api/raw?commit=${encodeURIComponent(diffData.commit || 'HEAD')}&file=${encodeURIComponent(filePath)}&parent=false" style="max-width:240px;max-height:240px;border:1px solid #ffb800;background:#120c08;" alt="Active image" onerror="this.style.display='none'"/>
             </div>
           </div>
@@ -681,7 +681,7 @@
       container.innerHTML = `
         <div class="diff-binary-box">
           <div class="diff-binary-icon">💾</div>
-          <div style="font-weight:700;font-size:14px;color:var(--quake-gold);">Binary File Diff</div>
+          <div style="font-weight:700;font-size:11px;color:var(--quake-gold);">Binary File Diff</div>
           <div>${this.escapeHtml(filePath)}</div>
           <div class="diff-binary-links">
             <a href="/api/raw?commit=${encodeURIComponent(diffData.commit || 'HEAD')}&file=${encodeURIComponent(filePath)}&parent=true" download class="quake-btn quake-btn-default">Download Old</a>
