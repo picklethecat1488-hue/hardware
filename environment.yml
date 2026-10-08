@@ -32,3 +32,4 @@ dependencies:
     - scancode-toolkit
     - typecode-libmagic
     - cbor2
+    - eel
