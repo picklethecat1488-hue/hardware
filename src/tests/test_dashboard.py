@@ -3099,3 +3099,71 @@ def test_regression_worm_015_workstation_modal_dom_hierarchy_and_rendering() -> 
     checker.feed(rendered_html)
     assert checker.div_depth == 0, f"Unbalanced <div> tags in diff_view.html.j2: depth is {checker.div_depth}"
     assert len(checker.mismatches) == 0, f"Encountered div mismatches: {checker.mismatches}"
+
+
+def test_regression_bug_278_working_tree_actions_visible_on_load() -> None:
+    """Verify BUG-278 / WORM-017: Working tree actions are visible on initial load when active_commit is 'working'."""
+    import jinja2
+    from bs4 import BeautifulSoup
+
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(tpl_dir)),
+        trim_blocks=True,
+        lstrip_blocks=True,
+        autoescape=False,
+    )
+    template = env.get_template("diff_view.html.j2")
+
+    # 1. When active_commit is "working", workingTreeCommitArea must be visible (display: flex)
+    session_working = DiffViewSessionModel(
+        title="VCS Dashboard",
+        current_user="picklethecat1488-hue",
+        active_commit="working",
+        branches=[
+            BranchInfoModel(name="main", is_current=True, is_remote=False),
+        ],
+        smartlog_tree=[],
+        working_files=[],
+        selected_commits=[],
+    )
+    html_working = template.render(
+        session=session_working,
+        active_branch="main",
+        active_commit="working",
+    )
+    soup_working = BeautifulSoup(html_working, "html.parser")
+    commit_area_working = soup_working.find(id="workingTreeCommitArea")
+    assert commit_area_working is not None, "workingTreeCommitArea element must exist"
+    style_working = commit_area_working.get("style", "")
+    assert "display: flex" in style_working or "display:flex" in style_working, (
+        f"workingTreeCommitArea must have display: flex when active_commit is 'working', but got: '{style_working}'"
+    )
+    assert "display: none" not in style_working and "display:none" not in style_working, (
+        f"workingTreeCommitArea must NOT be hidden when active_commit is 'working', but got: '{style_working}'"
+    )
+
+    # 2. When active_commit is a specific commit hash, workingTreeCommitArea must be hidden (display: none)
+    session_commit = DiffViewSessionModel(
+        title="VCS Dashboard",
+        current_user="picklethecat1488-hue",
+        active_commit="12345678",
+        branches=[
+            BranchInfoModel(name="main", is_current=True, is_remote=False),
+        ],
+        smartlog_tree=[],
+        working_files=[],
+        selected_commits=[],
+    )
+    html_commit = template.render(
+        session=session_commit,
+        active_branch="main",
+        active_commit="12345678",
+    )
+    soup_commit = BeautifulSoup(html_commit, "html.parser")
+    commit_area_commit = soup_commit.find(id="workingTreeCommitArea")
+    assert commit_area_commit is not None, "workingTreeCommitArea element must exist"
+    style_commit = commit_area_commit.get("style", "")
+    assert "display: none" in style_commit or "display:none" in style_commit, (
+        f"workingTreeCommitArea must have display: none when active_commit is a commit hash, but got: '{style_commit}'"
+    )

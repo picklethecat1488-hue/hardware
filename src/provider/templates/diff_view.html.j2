@@ -1212,14 +1212,14 @@
     <section id="paneFiles" class="quake-card column-panel pane-files">
       <div class="column-header">
         <div style="display:flex;align-items:center;gap:6px;">
-          <span id="filesHeaderTitle">Changed Files</span>
+          <span id="filesHeaderTitle">{% if not session.active_commit or session.active_commit == 'working' %}Working Tree Files{% else %}Files ({{ session.active_commit[:7] }}){% endif %}</span>
           <span id="filesCountBadge" style="color:var(--quake-text-muted);">0 files</span>
         </div>
         <button class="quake-btn quake-btn-default quake-btn-icon" onclick="togglePane('files')" title="Collapse Files Pane (Shortcut: ])">◀</button>
       </div>
 
       <!-- Working Tree Commit Area (Only visible when active commit is 'working') -->
-      <div id="workingTreeCommitArea" class="commit-box" style="margin:8px; display:none;">
+      <div id="workingTreeCommitArea" class="commit-box" style="margin:8px; display:{% if not session.active_commit or session.active_commit == 'working' %}flex{% else %}none{% endif %};">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:10px;font-weight:700;color:var(--quake-copper);text-transform:uppercase;">Working Tree Actions</span>
           <div style="display:flex;gap:4px;">
@@ -1911,6 +1911,11 @@
     async function loadFilesForActiveCommit() {
       const container = document.getElementById("filesContainer");
       container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--quake-text-muted);">Loading files...</div>`;
+
+      const commitArea = document.getElementById("workingTreeCommitArea");
+      if (commitArea) {
+        commitArea.style.display = state.activeCommit === "working" ? "flex" : "none";
+      }
 
       try {
         if (state.activeCommit === "working") {
@@ -3312,6 +3317,17 @@
         performInitialSync(false);
       }
       updateSelectedCount();
+
+      // Ensure working tree commit area is visible on initial load if active commit is 'working' (BUG-278)
+      const commitArea = document.getElementById("workingTreeCommitArea");
+      if (commitArea) {
+        commitArea.style.display = state.activeCommit === "working" ? "flex" : "none";
+      }
+      const filesTitle = document.getElementById("filesHeaderTitle");
+      if (filesTitle) {
+        filesTitle.textContent = state.activeCommit === "working" ? "Working Tree Files" : `Files (${state.activeCommit.slice(0, 7)})`;
+      }
+
       loadFilesForActiveCommit();
       startAutoSync();
     });
