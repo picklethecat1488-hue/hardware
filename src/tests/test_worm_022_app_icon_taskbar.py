@@ -47,10 +47,19 @@ def test_ensure_macos_app_bundle_structure(tmp_path: Path) -> None:
     if not chrome_app.exists():
         pytest.skip("Google Chrome.app not installed on test host")
 
-    bundle = ensure_macos_app_bundle("http://127.0.0.1:8877/", app_name="Quake", target_dir=tmp_path)
+    chrome_bin = chrome_app / "Contents" / "MacOS" / "Google Chrome"
+    bundle = ensure_macos_app_bundle(
+        "http://127.0.0.1:8877/",
+        browser_path=str(chrome_bin),
+        app_name="Quake",
+        target_dir=tmp_path,
+    )
     assert bundle is not None
     assert bundle.exists()
-    assert (bundle / "Contents" / "MacOS" / "app_mode_loader").exists()
+    launcher_exe = bundle / "Contents" / "MacOS" / "Quake"
+    assert launcher_exe.exists()
+    assert "--app=" in launcher_exe.read_text()
+    assert "--user-data-dir=" in launcher_exe.read_text()
     assert (bundle / "Contents" / "Resources" / "app.icns").exists()
 
     plist_path = bundle / "Contents" / "Info.plist"
@@ -58,21 +67,25 @@ def test_ensure_macos_app_bundle_structure(tmp_path: Path) -> None:
     plist = plistlib.loads(plist_path.read_bytes())
     assert plist.get("CFBundleIconFile") == "app.icns"
     assert plist.get("CFBundleName") == "Quake"
+    assert plist.get("CFBundleExecutable") == "Quake"
     assert plist.get("NSRequiresAquaSystemAppearance") is False
 
 
 def test_launch_eel_uses_app_bundle() -> None:
     """Verify launch_eel attempts to launch via macOS app bundle when on darwin."""
-    with patch("sys.platform", "darwin"), \
-         patch("provider.eel.launcher.find_eel_app_browser", return_value="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"), \
-         patch("provider.eel.launcher.ensure_macos_app_bundle") as mock_ensure, \
-         patch("subprocess.Popen") as mock_popen:
+    with (
+        patch("sys.platform", "darwin"),
+        patch(
+            "provider.eel.launcher.find_eel_app_browser",
+            return_value="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        ),
+        patch("provider.eel.launcher.ensure_macos_app_bundle") as mock_ensure,
+        patch("subprocess.Popen") as mock_popen,
+    ):
         mock_ensure.return_value = Path("/tmp/Quake.app")
         with patch.object(Path, "exists", return_value=True):
             res = launch_eel("http://127.0.0.1:8877/")
             assert res is True
             assert mock_popen.called
             args, _ = mock_popen.call_args
-            assert args[0][:3] == ["open", "-n", "/tmp/Quake.app"]
-            assert "--args" in args[0]
-            assert "--force-dark-mode" in args[0]
+            assert args[0] == ["open", "-n", "/tmp/Quake.app"]

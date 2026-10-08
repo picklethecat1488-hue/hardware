@@ -124,61 +124,40 @@ def init_eel_bridge(static_dir: Optional[Path] = None) -> None:
     _EEL_INITIALIZED = True
 
 
+def get_eel_profile_dir(app_name: str = "Quake") -> Path:
+    """Return the dedicated application profile directory for standalone app mode."""
+    if sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support" / app_name
+    elif sys.platform in ("win32", "win64"):
+        appdata = os.environ.get("APPDATA")
+        base = Path(appdata) / app_name if appdata else Path.home() / f".{app_name.lower()}"
+    else:
+        config_home = os.environ.get("XDG_CONFIG_HOME")
+        base = Path(config_home) / app_name.lower() if config_home else Path.home() / ".config" / app_name.lower()
+    profile = base / "profile"
+    profile.mkdir(parents=True, exist_ok=True)
+    return profile
+
+
 def ensure_macos_app_bundle(
     url: str,
     browser_path: Optional[str] = None,
     app_name: str = "Quake",
-    theme_color: str = "#291a10",
+    size: Tuple[int, int] = (1400, 900),
     target_dir: Optional[Path] = None,
 ) -> Optional[Path]:
     """Ensure a native macOS .app shim exists for launching with custom dock icon."""
     if sys.platform != "darwin":
         return None
 
-    # Check if Google Chrome exists
-    chrome_app: Optional[Path] = None
-    if browser_path:
-        bpath = Path(browser_path)
-        for parent in [bpath] + list(bpath.parents):
-            if parent.suffix == ".app":
-                chrome_app = parent
-                break
-        if chrome_app is None or not chrome_app.exists():
-            return None
-    else:
-        for candidate in (
-            Path("/Applications/Google Chrome.app"),
-            Path(os.path.expanduser("~/Applications/Google Chrome.app")),
-        ):
-            if candidate.exists():
-                chrome_app = candidate
-                break
-
-    if chrome_app is None or not chrome_app.exists():
+    if not browser_path or not Path(browser_path).exists():
         return None
-
-    helpers_dir = (
-        chrome_app
-        / "Contents"
-        / "Frameworks"
-        / "Google Chrome Framework.framework"
-        / "Versions"
-        / "Current"
-        / "Helpers"
-    )
-    loader_src = helpers_dir / "app_mode_loader"
-    if not loader_src.exists():
-        loaders = list(chrome_app.glob("**/Helpers/app_mode_loader"))
-        if loaders:
-            loader_src = loaders[0]
-        else:
-            return None
 
     # Determine bundle location
     if target_dir is not None:
         apps_dir = target_dir
     else:
-        apps_dir = Path(os.path.expanduser("~/Applications/Chrome Apps.localized"))
+        apps_dir = Path.home() / "Applications" / "Chrome Apps.localized"
         if not apps_dir.exists():
             try:
                 apps_dir.mkdir(parents=True, exist_ok=True)
@@ -192,11 +171,23 @@ def ensure_macos_app_bundle(
     macos.mkdir(parents=True, exist_ok=True)
     resources.mkdir(parents=True, exist_ok=True)
 
-    # 1. Copy app_mode_loader
-    target_loader = macos / "app_mode_loader"
-    if not target_loader.exists() or target_loader.stat().st_size != loader_src.stat().st_size:
-        shutil.copy2(loader_src, target_loader)
-        target_loader.chmod(0o755)
+    # 1. Write executable launcher script
+    profile_dir = get_eel_profile_dir(app_name)
+    launcher_script = macos / app_name
+    script_content = f"""#!/bin/bash
+exec "{browser_path}" \\
+  --app="{url}" \\
+  --user-data-dir="{profile_dir}" \\
+  --window-size={size[0]},{size[1]} \\
+  --force-dark-mode \\
+  --enable-features=OverlayScrollbar \\
+  --disable-http-cache \\
+  --no-first-run \\
+  --no-default-browser-check \\
+  "$@"
+"""
+    launcher_script.write_text(script_content)
+    launcher_script.chmod(0o755)
 
     # 2. Icon: copy app.icns from static directory
     static_dir = Path(__file__).resolve().parent.parent / "code_review" / "static"
@@ -204,23 +195,10 @@ def ensure_macos_app_bundle(
     if icns_src.exists():
         shutil.copy2(icns_src, resources / "app.icns")
 
-    # 3. Read Chrome version for CrBundleVersion
-    chrome_info = chrome_app / "Contents" / "Info.plist"
-    chrome_ver = "8059.40"
-    chrome_short_ver = "155.0.8059.40"
-    if chrome_info.exists():
-        try:
-            plist = plistlib.loads(chrome_info.read_bytes())
-            chrome_ver = plist.get("CFBundleVersion", chrome_ver)
-            chrome_short_ver = plist.get("CFBundleShortVersionString", chrome_short_ver)
-        except Exception:
-            pass
-
-    # 4. Write Info.plist
-    user_data = os.path.expanduser(f"~/Library/Application Support/Google/Chrome/-/Web Applications/{app_name.lower()}")
+    # 3. Write Info.plist
     plist_data = {
         "CFBundleDevelopmentRegion": "en",
-        "CFBundleExecutable": "app_mode_loader",
+        "CFBundleExecutable": app_name,
         "CFBundleIconFile": "app.icns",
         "CFBundleIdentifier": f"com.google.Chrome.app.{app_name.lower()}-workstation",
         "CFBundleInfoDictionaryVersion": "6.0",
@@ -228,24 +206,17 @@ def ensure_macos_app_bundle(
         "CFBundlePackageType": "APPL",
         "CFBundleShortVersionString": "1.0",
         "CFBundleSignature": "????",
-        "CFBundleVersion": chrome_ver,
-        "CrAppModeIsAdhocSigned": True,
-        "CrAppModeShortcutID": f"{app_name.lower()}-workstation",
-        "CrAppModeShortcutName": f"{app_name} Tactical Workstation",
-        "CrAppModeShortcutURL": url,
-        "CrAppModeUserDataDir": user_data,
-        "CrBundleIdentifier": "com.google.Chrome",
-        "CrBundleVersion": chrome_short_ver,
+        "CFBundleVersion": "1.0",
         "LSEnvironment": {"MallocNanoZone": "0"},
         "LSHasLocalizedDisplayName": True,
-        "LSMinimumSystemVersion": "13.0",
+        "LSMinimumSystemVersion": "12.0",
         "NSAppleScriptEnabled": True,
         "NSHighResolutionCapable": True,
         "NSRequiresAquaSystemAppearance": False,
     }
     (contents / "Info.plist").write_bytes(plistlib.dumps(plist_data))
 
-    # 5. Ad-hoc codesign
+    # 4. Ad-hoc codesign
     try:
         subprocess.run(["codesign", "--force", "--sign", "-", str(app_bundle)], check=True, capture_output=True)
     except (subprocess.SubprocessError, OSError):
@@ -279,20 +250,11 @@ def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
             url,
             browser_path=browser_path,
             app_name="Quake",
-            theme_color="#291a10",
+            size=size,
         )
         if app_bundle and app_bundle.exists():
             try:
-                cmd = [
-                    "open",
-                    "-n",
-                    str(app_bundle),
-                    "--args",
-                    f"--window-size={size[0]},{size[1]}",
-                    "--force-dark-mode",
-                    "--enable-features=OverlayScrollbar",
-                    "--disable-http-cache",
-                ]
+                cmd = ["open", "-n", str(app_bundle)]
                 subprocess.Popen(cmd)
                 return True
             except (subprocess.SubprocessError, OSError):
@@ -306,6 +268,7 @@ def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
     if parsed.query:
         page = f"{page}?{parsed.query}"
 
+    profile_dir = get_eel_profile_dir("Quake")
     eel_browsers.set_path("chrome", browser_path)
     options = {
         "mode": "chrome",
@@ -313,6 +276,9 @@ def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
         "port": port,
         "app_mode": True,
         "cmdline_args": [
+            f"--user-data-dir={profile_dir}",
+            "--no-first-run",
+            "--no-default-browser-check",
             f"--window-size={size[0]},{size[1]}",
             "--force-dark-mode",
             "--enable-features=OverlayScrollbar",
