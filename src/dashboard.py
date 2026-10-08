@@ -22,11 +22,16 @@ Usage:
 
 import argparse
 from datetime import datetime, timezone
+import json
+import os
 from pathlib import Path
+import signal
+import socket
 import sys
+import tempfile
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -126,6 +131,18 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
         action="store_true",
         dest="no_browser",
         help="Disable automatic Eel application window launch on server start.",
+    )
+    parser.add_argument(
+        "--no-detach",
+        "--foreground",
+        action="store_true",
+        dest="no_detach",
+        help="Run workstation server in the foreground without detaching from terminal.",
+    )
+    parser.add_argument(
+        "--stop",
+        action="store_true",
+        help="Stop any running background dashboard workstation server.",
     )
 
     # Database & Session Configuration
@@ -352,6 +369,65 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     if not hasattr(parsed, "commits"):
         parsed.commits = []
     return parsed
+
+
+def is_pid_alive(pid: int) -> bool:
+    """Check if a process with the given PID is running on the local system."""
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def is_port_in_use(host: str, port: int) -> bool:
+    """Check if a network port is currently open and accepting connections."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        try:
+            s.connect((host, port))
+            return True
+        except (OSError, ConnectionRefusedError):
+            return False
+
+
+def get_dashboard_lock_file(repo_root: Path, port: int = 8877) -> Path:
+    """Return filesystem path for the dashboard single-instance lock file."""
+    build_dir = repo_root / "build"
+    target_dir = repo_root / "target"
+    if build_dir.exists():
+        return build_dir / f"dashboard_{port}.lock"
+    if target_dir.exists():
+        return target_dir / f"dashboard_{port}.lock"
+    return Path(tempfile.gettempdir()) / f"dashboard_{repo_root.name}_{port}.lock"
+
+
+def check_existing_instance(lock_file: Path, host: str, port: int) -> Optional[Tuple[int, str]]:
+    """Check if another dashboard instance is already running.
+
+    Returns (pid, url) if running, or None otherwise.
+    """
+    if lock_file.exists():
+        try:
+            content = lock_file.read_text(encoding="utf-8").strip()
+            data = json.loads(content)
+            pid = data.get("pid", 0)
+            url = data.get("url", f"http://{host}:{port}")
+            if pid and is_pid_alive(pid) and is_port_in_use(host, port):
+                return (pid, url)
+        except Exception:
+            pass
+        try:
+            lock_file.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    if is_port_in_use(host, port):
+        return (0, f"http://{host}:{port}")
+
+    return None
 
 
 def launch_browser(url: str) -> None:
@@ -617,6 +693,38 @@ def main(cli_args: Optional[List[str]] = None) -> None:
     )
     review_db = args.db_file if (args.db_file and not is_bug_cmd) else None
     bug_db = args.db_file if (args.db_file and not is_review_cmd) else None
+
+    lock_file = get_dashboard_lock_file(repo_root, args.port)
+
+    if getattr(args, "stop", False):
+        existing = check_existing_instance(lock_file, args.host, args.port)
+        if existing is not None:
+            pid, _ = existing
+            if pid > 0:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    print(f"Stopped dashboard workstation (PID {pid}).")
+                except OSError as e:
+                    print(f"Failed to stop dashboard workstation: {e}", file=sys.stderr)
+            else:
+                print("Dashboard workstation is running on port, but PID is unknown.")
+            try:
+                lock_file.unlink(missing_ok=True)
+            except OSError:
+                pass
+        else:
+            print("No dashboard workstation is running.")
+        return
+
+    if not is_cli_only:
+        existing = check_existing_instance(lock_file, args.host, args.port)
+        if existing is not None:
+            pid, existing_url = existing
+            pid_str = f" (PID {pid})" if pid else ""
+            print(f"Dashboard workstation is already running at {existing_url}{pid_str}.")
+            if not getattr(args, "no_browser", False):
+                launch_browser(existing_url)
+            return
 
     server = DashboardServer(
         host=args.host,
@@ -947,18 +1055,45 @@ def main(cli_args: Optional[List[str]] = None) -> None:
     url = server.get_url()
 
     if not args.no_browser:
+        launch_browser(url)
 
-        def _open() -> None:
-            time.sleep(0.3)
-            launch_browser(url)
+    # Detach from terminal unless --no-detach / --foreground is requested
+    if not getattr(args, "no_detach", False) and os.name == "posix":
+        child_pid = os.fork()
+        if child_pid > 0:
+            # Parent process writes child PID to lock file, prints status, and exits
+            lock_file.parent.mkdir(parents=True, exist_ok=True)
+            lock_file.write_text(json.dumps({"pid": child_pid, "url": url}), encoding="utf-8")
+            print(f"➜ Dashboard workstation running at {url} (PID {child_pid}).")
+            print("➜ Detached from terminal.")
+            sys.exit(0)
 
-        threading.Thread(target=_open, daemon=True).start()
+        # Child process creates new session and redirects standard streams
+        os.setsid()
+        try:
+            devnull = open(os.devnull, "r+")
+            os.dup2(devnull.fileno(), sys.stdin.fileno())
+            log_dir = repo_root / "build" if (repo_root / "build").exists() else repo_root / "target"
+            log_path = log_dir / "dashboard.log"
+            log_file = open(log_path, "a", encoding="utf-8")
+            os.dup2(log_file.fileno(), sys.stdout.fileno())
+            os.dup2(log_file.fileno(), sys.stderr.fileno())
+        except Exception:
+            pass
+    else:
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+        lock_file.write_text(json.dumps({"pid": os.getpid(), "url": url}), encoding="utf-8")
+        print(f"➜ Dashboard workstation running at {url} (PID {os.getpid()}).")
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        try:
+            lock_file.unlink(missing_ok=True)
+        except OSError:
+            pass
         server.server_close()
 
 
