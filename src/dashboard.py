@@ -103,9 +103,23 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--browser",
-        choices=["vscode", "system", "none"],
-        default="vscode",
-        help="Target browser environment to display dashboard (default: vscode).",
+        choices=["eel", "vscode", "system", "none"],
+        default="eel",
+        help="Target browser environment to display dashboard (default: eel).",
+    )
+    parser.add_argument(
+        "--eel",
+        action="store_const",
+        dest="browser",
+        const="eel",
+        help="Open dashboard in a standalone Eel application window.",
+    )
+    parser.add_argument(
+        "--app",
+        action="store_const",
+        dest="browser",
+        const="eel",
+        help="Alias for --eel: open dashboard in a standalone application window.",
     )
     parser.add_argument(
         "--no-browser",
@@ -333,16 +347,20 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     return parsed
 
 
-def launch_browser(url: str, target: str = "vscode") -> None:
+def launch_browser(url: str, target: str = "eel") -> None:
     """Open the review or diff workstation dashboard in the specified browser environment.
 
     Args:
         url: The web URL of the workstation dashboard.
-        target: Target browser environment ('vscode', 'system', 'none').
+        target: Target browser environment ('eel', 'vscode', 'system', 'none').
     """
     match target:
         case "none":
             return
+        case "eel":
+            from provider.eel.launcher import launch_eel
+
+            launch_eel(url)
         case "vscode":
             # In VS Code, the integrated terminal intercepts localhost links with
             # workbench.externalUriOpeners configured for simpleBrowser.open.

@@ -579,10 +579,10 @@ def test_launch_browser_and_webpage_title(tmp_path: Path) -> None:
             html = resp.read().decode("utf-8")
             assert f"<title>Code Review: {repo_root.name}</title>" in html
 
-        # Test CLI arguments default to VS Code
+        # Test CLI arguments default to Eel standalone app window
         with patch("sys.argv", ["dashboard.py"]):
             args = parse_arguments()
-            assert args.browser == "vscode"
+            assert args.browser == "eel"
             assert not args.no_browser
 
         with patch("sys.argv", ["dashboard.py", "--no-browser"]):
