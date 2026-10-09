@@ -12,13 +12,54 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
-from typing import Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 APP_NAME: str = "Quake"
 DEFAULT_WINDOW_TITLE: str = "Quake Workstation"
 DEFAULT_WINDOW_SIZE: Tuple[int, int] = (1400, 900)
 MIN_WINDOW_SIZE: Tuple[int, int] = (800, 600)
 DEFAULT_BG_COLOR: str = "#291a10"
+
+
+def apply_native_window_theme(window: Any, bg_color: str = DEFAULT_BG_COLOR) -> None:
+    """Apply system theme, dark appearance, and titlebar styling to the native OS window.
+
+    Args:
+        window: The pywebview Window instance.
+        bg_color: Hex color string for the theme background.
+    """
+    if sys.platform == "darwin":
+        try:
+            from PyObjCTools import AppHelper
+
+            def _configure_cocoa() -> None:
+                try:
+                    import AppKit
+
+                    native_window = getattr(window, "native", None)
+                    if native_window is not None:
+                        dark_app = AppKit.NSAppearance.appearanceNamed_(AppKit.NSAppearanceNameDarkAqua)
+                        if dark_app and hasattr(native_window, "setAppearance_"):
+                            native_window.setAppearance_(dark_app)
+                        if (
+                            bg_color
+                            and bg_color.startswith("#")
+                            and len(bg_color) == 7
+                            and hasattr(native_window, "setBackgroundColor_")
+                        ):
+                            r = int(bg_color[1:3], 16) / 255.0
+                            g = int(bg_color[3:5], 16) / 255.0
+                            b = int(bg_color[5:7], 16) / 255.0
+                            color = AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(r, g, b, 1.0)
+                            native_window.setBackgroundColor_(color)
+                        if hasattr(native_window, "setTitlebarAppearsTransparent_"):
+                            native_window.setTitlebarAppearsTransparent_(True)
+                except Exception:
+                    pass
+
+            AppHelper.callAfter(_configure_cocoa)
+        except Exception:
+            pass
 
 
 def get_webview_storage_path(app_name: str = APP_NAME) -> Path:
@@ -114,6 +155,13 @@ def run_webview_window(
         text_select=True,
         zoomable=True,
     )
+
+    if window is not None and hasattr(window, "events") and hasattr(window.events, "shown"):
+
+        def _on_shown() -> None:
+            apply_native_window_theme(window, bg_color)
+
+        window.events.shown += _on_shown
 
     if exit_on_close and window is not None and hasattr(window, "events") and hasattr(window.events, "closed"):
 
