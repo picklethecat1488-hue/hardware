@@ -88,6 +88,7 @@ def run_webview_window(
     bg_color: str = DEFAULT_BG_COLOR,
     icon_path: Optional[str] = None,
     storage_path: Optional[str] = None,
+    exit_on_close: bool = False,
 ) -> None:
     """Run the native OS webview GUI event loop in the current process.
 
@@ -99,10 +100,11 @@ def run_webview_window(
         bg_color: Hex color string for native window background and title bar tint.
         icon_path: Optional filesystem path to application icon.
         storage_path: Optional filesystem path for webview data storage.
+        exit_on_close: Whether to terminate the process immediately via os._exit on close.
     """
     import webview
 
-    webview.create_window(
+    window = webview.create_window(
         title=title,
         url=url,
         width=width,
@@ -113,6 +115,13 @@ def run_webview_window(
         zoomable=True,
     )
 
+    if exit_on_close and window is not None and hasattr(window, "events") and hasattr(window.events, "closed"):
+
+        def _on_closed() -> None:
+            os._exit(0)
+
+        window.events.closed += _on_closed
+
     start_kwargs = {
         "private_mode": False,
     }
@@ -122,6 +131,8 @@ def run_webview_window(
         start_kwargs["storage_path"] = str(storage_path)
 
     webview.start(**start_kwargs)
+    if exit_on_close:
+        os._exit(0)
 
 
 def launch_webview(
@@ -226,4 +237,5 @@ if __name__ == "__main__":
         bg_color=cli_args.bg,
         icon_path=cli_args.icon,
         storage_path=cli_args.storage_path,
+        exit_on_close=True,
     )

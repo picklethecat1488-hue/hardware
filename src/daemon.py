@@ -11,6 +11,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 from enum import StrEnum
 from pathlib import Path
@@ -337,7 +338,12 @@ class DaemonServer:
                     pass
             sys.exit(0)
 
-        old_sigterm = signal.signal(signal.SIGTERM, handle_sigterm)
+        old_sigterm = None
+        if threading.current_thread() is threading.main_thread():
+            try:
+                old_sigterm = signal.signal(signal.SIGTERM, handle_sigterm)
+            except (ValueError, OSError):
+                pass
 
         while True:
             try:
@@ -469,10 +475,11 @@ class DaemonServer:
             else:
                 conn.close()
 
-        try:
-            signal.signal(signal.SIGTERM, old_sigterm)
-        except Exception:
-            pass
+        if old_sigterm is not None and threading.current_thread() is threading.main_thread():
+            try:
+                signal.signal(signal.SIGTERM, old_sigterm)
+            except (ValueError, OSError):
+                pass
         server_socket.close()
         if self.socket_path.exists():
             try:

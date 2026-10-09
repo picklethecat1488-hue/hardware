@@ -412,10 +412,54 @@ def get_dashboard_lock_file(repo_root: Path, port: int = 8877) -> Path:
     return Path(tempfile.gettempdir()) / f"dashboard_{repo_root.name}_{port}.lock"
 
 
-def check_existing_instance(lock_file: Path, host: str, port: int) -> Optional[Tuple[int, str]]:
+def has_active_window_process(server_pid: int) -> bool:
+    """Check if the given server PID has an active child GUI window process.
+
+    Args:
+        server_pid: Process identifier of the dashboard server.
+
+    Returns:
+        True if an active child GUI process is running, False otherwise.
+    """
+    if server_pid <= 0:
+        return False
+    try:
+        import psutil
+
+        parent = psutil.Process(server_pid)
+        for child in parent.children(recursive=True):
+            if child.is_running():
+                cmdline = " ".join(child.cmdline()).lower()
+                if any(k in cmdline for k in ("webview", "chrome", "edge", "brave", "eel")):
+                    return True
+        return False
+    except Exception:
+        if os.name == "posix":
+            try:
+                res = subprocess.run(["pgrep", "-P", str(server_pid)], capture_output=True, text=True)
+                return bool(res.stdout.strip())
+            except Exception:
+                pass
+        return False
+
+
+def check_existing_instance(
+    lock_file: Path,
+    host: str,
+    port: int,
+    cleanup_orphaned: bool = False,
+) -> Optional[Tuple[int, str]]:
     """Check if another dashboard instance is already running.
 
-    Returns (pid, url) if running, or None otherwise.
+    Args:
+        lock_file: Path to the PID lock file.
+        host: Host interface string.
+        port: Port integer.
+        cleanup_orphaned: If True and the server is running without an active GUI window,
+            terminate the stale server process and clear the lock file.
+
+    Returns:
+        (pid, url) if running, or None otherwise.
     """
     if lock_file.exists():
         try:
@@ -423,7 +467,18 @@ def check_existing_instance(lock_file: Path, host: str, port: int) -> Optional[T
             data = json.loads(content)
             pid = data.get("pid", 0)
             url = data.get("url", f"http://{host}:{port}")
+            no_browser = data.get("no_browser", False)
             if pid and is_pid_alive(pid) and is_port_in_use(host, port):
+                if cleanup_orphaned and not no_browser and pid != os.getpid() and not has_active_window_process(pid):
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                    except OSError:
+                        pass
+                    try:
+                        lock_file.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    return None
                 return (pid, url)
         except Exception:
             pass
@@ -743,7 +798,12 @@ def main(cli_args: Optional[List[str]] = None) -> None:
         return
 
     if not is_cli_only:
-        existing = check_existing_instance(lock_file, args.host, args.port)
+        existing = check_existing_instance(
+            lock_file,
+            args.host,
+            args.port,
+            cleanup_orphaned=not getattr(args, "no_browser", False),
+        )
         if existing is not None:
             pid, existing_url = existing
             pid_str = f" (PID {pid})" if pid else ""
@@ -1134,7 +1194,14 @@ def main(cli_args: Optional[List[str]] = None) -> None:
 
     # Foreground / non-detached server process
     lock_file.parent.mkdir(parents=True, exist_ok=True)
-    lock_file.write_text(json.dumps({"pid": os.getpid(), "url": url}), encoding="utf-8")
+    lock_file.write_text(
+        json.dumps({
+            "pid": os.getpid(),
+            "url": url,
+            "no_browser": getattr(args, "no_browser", False),
+        }),
+        encoding="utf-8",
+    )
     print(f"➜ Dashboard workstation running at {url} (PID {os.getpid()}).")
 
     if not args.no_browser:
@@ -1147,6 +1214,12 @@ def main(cli_args: Optional[List[str]] = None) -> None:
                     server.shutdown()
                 except Exception:
                     pass
+                if lock_file.exists():
+                    try:
+                        lock_file.unlink()
+                    except OSError:
+                        pass
+                os._exit(0)
 
             threading.Thread(target=_shutdown, daemon=True).start()
 
