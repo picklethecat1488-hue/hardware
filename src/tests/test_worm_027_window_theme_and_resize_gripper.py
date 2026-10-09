@@ -48,12 +48,19 @@ def test_apply_native_window_theme_execution() -> None:
     mock_native = MagicMock()
     mock_window.native = mock_native
 
-    with patch("sys.platform", "darwin"), patch("PyObjCTools.AppHelper.callAfter") as mock_call_after:
+    mock_apphelper = MagicMock()
+    mock_pyobjc = MagicMock()
+    mock_pyobjc.AppHelper = mock_apphelper
+
+    with (
+        patch("sys.platform", "darwin"),
+        patch.dict("sys.modules", {"PyObjCTools": mock_pyobjc, "PyObjCTools.AppHelper": mock_apphelper}),
+    ):
         apply_native_window_theme(mock_window, "#291a10")
-        assert mock_call_after.called
+        assert mock_apphelper.callAfter.called
 
         # Invoke the callback passed to callAfter
-        callback = mock_call_after.call_args[0][0]
+        callback = mock_apphelper.callAfter.call_args[0][0]
         mock_appkit = MagicMock()
         with patch.dict("sys.modules", {"AppKit": mock_appkit}):
             callback()
