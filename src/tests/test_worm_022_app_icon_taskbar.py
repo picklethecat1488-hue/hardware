@@ -111,8 +111,7 @@ def test_run_webview_window_parameters() -> None:
 
 def test_launch_webview_spawns_process() -> None:
     """Verify launch_webview executes child process with webview CLI arguments."""
-    with patch("subprocess.Popen") as mock_popen, \
-         patch("pathlib.Path.exists", return_value=True):
+    with patch("subprocess.Popen") as mock_popen, patch("pathlib.Path.exists", return_value=True):
         res = launch_webview("http://127.0.0.1:8767/")
         assert res is True
         assert mock_popen.called

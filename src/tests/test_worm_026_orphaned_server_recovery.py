@@ -31,7 +31,13 @@ def test_has_active_window_process_with_mock_child() -> None:
     """Verify has_active_window_process returns True when child command line matches webview/chrome/eel."""
     mock_child = MagicMock()
     mock_child.is_running.return_value = True
-    mock_child.cmdline.return_value = ["/usr/bin/python", "-m", "provider.webview.launcher", "--url", "http://127.0.0.1:8767"]
+    mock_child.cmdline.return_value = [
+        "/usr/bin/python",
+        "-m",
+        "provider.webview.launcher",
+        "--url",
+        "http://127.0.0.1:8767",
+    ]
 
     mock_parent = MagicMock()
     mock_parent.children.return_value = [mock_child]
@@ -43,12 +49,16 @@ def test_has_active_window_process_with_mock_child() -> None:
 def test_orphaned_server_recovery_cleans_lock_file() -> None:
     """Verify an orphaned server process without an active window is terminated and restarted."""
     lock_file = Path(tempfile.mktemp(suffix=".lock"))
-    lock_file.write_text(json.dumps({"pid": 99999, "url": "http://127.0.0.1:8767", "no_browser": False}), encoding="utf-8")
+    lock_file.write_text(
+        json.dumps({"pid": 99999, "url": "http://127.0.0.1:8767", "no_browser": False}), encoding="utf-8"
+    )
 
-    with patch("dashboard.is_pid_alive", return_value=True), \
-         patch("dashboard.is_port_in_use", return_value=True), \
-         patch("dashboard.has_active_window_process", return_value=False), \
-         patch("os.kill") as mock_kill:
+    with (
+        patch("dashboard.is_pid_alive", return_value=True),
+        patch("dashboard.is_port_in_use", return_value=True),
+        patch("dashboard.has_active_window_process", return_value=False),
+        patch("os.kill") as mock_kill,
+    ):
         existing = check_existing_instance(lock_file, "127.0.0.1", 8767, cleanup_orphaned=True)
         # Should detect as orphaned and clean it up, returning None so a fresh server starts
         assert existing is None

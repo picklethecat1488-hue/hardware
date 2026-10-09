@@ -37,9 +37,7 @@ def test_templates_have_window_resize_gripper() -> None:
         tpl_path = TEMPLATES_DIR / tpl_name
         assert tpl_path.exists(), f"Template {tpl_name} not found"
         content = tpl_path.read_text(encoding="utf-8")
-        assert 'class="window-resize-gripper"' in content, (
-            f"{tpl_name} must contain .window-resize-gripper element"
-        )
+        assert 'class="window-resize-gripper"' in content, f"{tpl_name} must contain .window-resize-gripper element"
         assert ".window-resize-gripper" in content, f"{tpl_name} must contain CSS for .window-resize-gripper"
         assert "cursor: nwse-resize" in content, f"{tpl_name} gripper must have nwse-resize cursor"
 
@@ -50,8 +48,7 @@ def test_apply_native_window_theme_execution() -> None:
     mock_native = MagicMock()
     mock_window.native = mock_native
 
-    with patch("sys.platform", "darwin"), \
-         patch("PyObjCTools.AppHelper.callAfter") as mock_call_after:
+    with patch("sys.platform", "darwin"), patch("PyObjCTools.AppHelper.callAfter") as mock_call_after:
         apply_native_window_theme(mock_window, "#291a10")
         assert mock_call_after.called
 

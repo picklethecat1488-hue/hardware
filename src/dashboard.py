@@ -1155,9 +1155,11 @@ def main(cli_args: Optional[List[str]] = None) -> None:
         log_path = log_dir / "dashboard.log"
         log_file = open(log_path, "a", encoding="utf-8")
 
-        child_args = [sys.executable, str(Path(sys.argv[0]).resolve())] + [
-            a for a in sys.argv[1:] if a not in ("--no-detach", "--foreground")
-        ] + ["--no-detach"]
+        child_args = (
+            [sys.executable, str(Path(sys.argv[0]).resolve())]
+            + [a for a in sys.argv[1:] if a not in ("--no-detach", "--foreground")]
+            + ["--no-detach"]
+        )
 
         popen_kwargs = {
             "stdout": log_file,
@@ -1195,11 +1197,13 @@ def main(cli_args: Optional[List[str]] = None) -> None:
     # Foreground / non-detached server process
     lock_file.parent.mkdir(parents=True, exist_ok=True)
     lock_file.write_text(
-        json.dumps({
-            "pid": os.getpid(),
-            "url": url,
-            "no_browser": getattr(args, "no_browser", False),
-        }),
+        json.dumps(
+            {
+                "pid": os.getpid(),
+                "url": url,
+                "no_browser": getattr(args, "no_browser", False),
+            }
+        ),
         encoding="utf-8",
     )
     print(f"➜ Dashboard workstation running at {url} (PID {os.getpid()}).")
