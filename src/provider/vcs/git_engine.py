@@ -790,7 +790,9 @@ class GitEngine:
 
     def _extract_bug_tags(self, text: str) -> List[CommitBugTagModel]:
         """Extract bug IDs from commit text and resolve current status via SQLite/Markdown."""
-        bug_ids = sorted(list(set(re.findall(r"\b((?:BUG|WORM)[_-]\d+)\b", text, re.IGNORECASE))))
+        bug_ids = sorted(
+            list(set(re.findall(r"\b((?:BUG|WORM)[_-][A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)\b", text, re.IGNORECASE)))
+        )
         if not bug_ids:
             return []
 
@@ -868,7 +870,7 @@ class GitEngine:
                         content = md_path.read_text(encoding="utf-8", errors="replace")
                         for line in content.splitlines():
                             if line.startswith("# ") and ("BUG-" in line or "WORM-" in line):
-                                title = line.split("]", 1)[-1].strip()
+                                title = line.split("]", 1)[-1].strip().lstrip("`").strip()
                             if line.startswith("- **Status**:"):
                                 parts = line.split("`")
                                 if len(parts) >= 2:
