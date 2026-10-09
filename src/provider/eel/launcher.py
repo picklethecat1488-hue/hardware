@@ -122,6 +122,21 @@ def init_eel_bridge(static_dir: Optional[Path] = None) -> None:
     _EEL_INITIALIZED = True
 
 
+def get_eel_profile_dir(app_name: str = "Quake") -> Path:
+    """Return the dedicated application profile directory for standalone app mode."""
+    if sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support" / app_name
+    elif sys.platform in ("win32", "win64"):
+        appdata = os.environ.get("APPDATA")
+        base = Path(appdata) / app_name if appdata else Path.home() / f".{app_name.lower()}"
+    else:
+        config_home = os.environ.get("XDG_CONFIG_HOME")
+        base = Path(config_home) / app_name.lower() if config_home else Path.home() / ".config" / app_name.lower()
+    profile = base / "profile"
+    profile.mkdir(parents=True, exist_ok=True)
+    return profile
+
+
 def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
     """Launch the dashboard workstation in a standalone Eel application window.
 
@@ -137,6 +152,10 @@ def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
     init_eel_bridge()
 
     browser_path = find_eel_app_browser()
+    if not browser_path:
+        print("[EEL] No supported Chromium-based browser found for Eel standalone app mode.", file=sys.stderr)
+        return False
+
     parsed = urllib.parse.urlparse(url)
     host = parsed.hostname or "127.0.0.1"
     port = parsed.port or 80
@@ -144,28 +163,30 @@ def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
     if parsed.query:
         page = f"{page}?{parsed.query}"
 
-    if browser_path:
-        eel_browsers.set_path("chrome", browser_path)
-        options = {
-            "mode": "chrome",
-            "host": host,
-            "port": port,
-            "app_mode": True,
-            "cmdline_args": [
-                f"--window-size={size[0]},{size[1]}",
-                "--force-dark-mode",
-                "--enable-features=OverlayScrollbar",
-                "--disable-http-cache",
-            ],
-            "size": size,
-            "block": False,
-        }
-        try:
-            eel_browsers.open([page], options)
-            return True
-        except (OSError, subprocess.SubprocessError) as err:
-            print(f"[EEL] Standalone window launch failed: {err}", file=sys.stderr)
-            return False
-
-    print("[EEL] No supported Chromium-based browser found for Eel standalone app mode.", file=sys.stderr)
-    return False
+    profile_dir = get_eel_profile_dir("Quake")
+    eel_browsers.set_path("chrome", browser_path)
+    options = {
+        "mode": "chrome",
+        "host": host,
+        "port": port,
+        "app_mode": True,
+        "cmdline_args": [
+            f"--user-data-dir={profile_dir}",
+            "--no-first-run",
+            "--no-default-browser-check",
+            f"--window-size={size[0]},{size[1]}",
+            "--force-dark-mode",
+            "--enable-features=OverlayScrollbar",
+            "--disable-http-cache",
+            "--class=Quake",
+            "--app-id=Quake",
+        ],
+        "size": size,
+        "block": False,
+    }
+    try:
+        eel_browsers.open([page], options)
+        return True
+    except (OSError, subprocess.SubprocessError) as err:
+        print(f"[EEL] Standalone window launch failed: {err}", file=sys.stderr)
+        return False

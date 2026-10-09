@@ -21,29 +21,38 @@ from provider.vcs.git_engine import get_git_root
 
 
 def test_cli_eel_arguments_and_defaults() -> None:
-    """Verify CLI arguments strictly default to Eel standalone app mode and reject other browsers."""
-    # 1. Default should be 'eel' standalone window
+    """Verify CLI arguments default to native webview and support Eel as an alternative."""
+    # 1. Default should be 'webview' native standalone window
     with patch("sys.argv", ["dashboard.py"]):
         args = parse_arguments()
-        assert args.browser == "eel", "Dashboard CLI should default to 'eel' standalone window mode"
+        assert args.browser == "webview", "Dashboard CLI should default to 'webview' standalone window mode"
         assert not args.no_browser
 
-    # 2. --eel flag sets browser to eel
+    # 2. --webview flag sets browser to webview
+    with patch("sys.argv", ["dashboard.py", "--webview"]):
+        args = parse_arguments()
+        assert args.browser == "webview"
+
+    # 3. --eel flag sets browser to eel
     with patch("sys.argv", ["dashboard.py", "--eel"]):
         args = parse_arguments()
         assert args.browser == "eel"
 
-    # 3. --app flag sets browser to eel
+    # 4. --app flag sets browser to webview
     with patch("sys.argv", ["dashboard.py", "--app"]):
         args = parse_arguments()
-        assert args.browser == "eel"
+        assert args.browser == "webview"
 
-    # 4. Explicit --browser eel
+    # 5. Explicit --browser webview and --browser eel
+    with patch("sys.argv", ["dashboard.py", "--browser", "webview"]):
+        args = parse_arguments()
+        assert args.browser == "webview"
+
     with patch("sys.argv", ["dashboard.py", "--browser", "eel"]):
         args = parse_arguments()
         assert args.browser == "eel"
 
-    # 5. Non-Eel browser targets are strictly rejected (dropped support for non-Eel targets)
+    # 6. Non-supported browser targets are strictly rejected
     with pytest.raises(SystemExit):
         with patch("sys.argv", ["dashboard.py", "--browser", "vscode"]):
             parse_arguments()
@@ -52,7 +61,7 @@ def test_cli_eel_arguments_and_defaults() -> None:
         with patch("sys.argv", ["dashboard.py", "--browser", "system"]):
             parse_arguments()
 
-    # 6. --no-browser and --no-app disable launching the window
+    # 7. --no-browser and --no-app disable launching the window
     with patch("sys.argv", ["dashboard.py", "--no-browser"]):
         args = parse_arguments()
         assert args.no_browser
@@ -63,9 +72,9 @@ def test_cli_eel_arguments_and_defaults() -> None:
 
 
 def test_launch_browser_invokes_eel() -> None:
-    """Verify launch_browser invokes Eel standalone app launcher."""
+    """Verify launch_browser with browser='eel' invokes Eel standalone app launcher."""
     with patch("provider.eel.launcher.launch_eel") as mock_launch_eel:
-        launch_browser("http://127.0.0.1:8877/")
+        launch_browser("http://127.0.0.1:8877/", browser="eel")
         mock_launch_eel.assert_called_once_with("http://127.0.0.1:8877/")
 
 
@@ -167,8 +176,10 @@ def test_templates_have_theme_color_and_manifest() -> None:
 
 def test_launch_eel_commandline_args_include_theme_and_scrollbars() -> None:
     """Verify launch_eel configures dark mode and overlay scrollbars in Chrome cmdline_args."""
-    with patch("src.provider.eel.launcher.find_eel_app_browser", return_value="/mock/chrome"), \
-         patch("eel.browsers.open") as mock_open:
+    with (
+        patch("provider.eel.launcher.find_eel_app_browser", return_value="/mock/chrome"),
+        patch("eel.browsers.open") as mock_open,
+    ):
         res = launch_eel("http://127.0.0.1:8877/")
         assert res is True
         args, kwargs = mock_open.call_args
@@ -176,4 +187,3 @@ def test_launch_eel_commandline_args_include_theme_and_scrollbars() -> None:
         cmdline = options.get("cmdline_args", [])
         assert "--force-dark-mode" in cmdline
         assert "--enable-features=OverlayScrollbar" in cmdline
-
