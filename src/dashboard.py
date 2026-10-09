@@ -32,7 +32,7 @@ import sys
 import tempfile
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -438,12 +438,17 @@ def check_existing_instance(lock_file: Path, host: str, port: int) -> Optional[T
     return None
 
 
-def launch_browser(url: str, browser: str = "webview") -> bool:
+def launch_browser(
+    url: str,
+    browser: str = "webview",
+    on_close: Optional[Callable[[], None]] = None,
+) -> bool:
     """Open the review or diff workstation dashboard in a standalone desktop window.
 
     Args:
         url: The web URL of the workstation dashboard.
         browser: Display environment ('webview' or 'eel').
+        on_close: Optional callback invoked when the standalone window process terminates.
 
     Returns:
         True if successfully launched, False otherwise.
@@ -451,10 +456,14 @@ def launch_browser(url: str, browser: str = "webview") -> bool:
     if browser == "eel":
         from provider.eel.launcher import launch_eel
 
+        if on_close is not None:
+            return launch_eel(url, on_close=on_close)
         return launch_eel(url)
 
     from provider.webview.launcher import launch_webview
 
+    if on_close is not None:
+        return launch_webview(url, on_close=on_close)
     return launch_webview(url)
 
 
@@ -1129,11 +1138,23 @@ def main(cli_args: Optional[List[str]] = None) -> None:
     print(f"➜ Dashboard workstation running at {url} (PID {os.getpid()}).")
 
     if not args.no_browser:
+
+        def _on_app_close() -> None:
+            """Shut down server when application window is closed."""
+
+            def _shutdown() -> None:
+                try:
+                    server.shutdown()
+                except Exception:
+                    pass
+
+            threading.Thread(target=_shutdown, daemon=True).start()
+
         browser_target = getattr(args, "browser", "webview")
         if browser_target == "webview":
-            launch_browser(url)
+            launch_browser(url, on_close=_on_app_close)
         else:
-            launch_browser(url, browser=browser_target)
+            launch_browser(url, browser=browser_target, on_close=_on_app_close)
 
     try:
         server.serve_forever()

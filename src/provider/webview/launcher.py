@@ -11,7 +11,8 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-from typing import Optional, Tuple
+import threading
+from typing import Callable, Optional, Tuple
 
 APP_NAME: str = "Quake"
 DEFAULT_WINDOW_TITLE: str = "Quake Workstation"
@@ -130,6 +131,7 @@ def launch_webview(
     bg_color: str = DEFAULT_BG_COLOR,
     icon_path: Optional[Path] = None,
     storage_path: Optional[Path] = None,
+    on_close: Optional[Callable[[], None]] = None,
 ) -> bool:
     """Spawn a detached native webview standalone window process.
 
@@ -143,6 +145,7 @@ def launch_webview(
         bg_color: Hex color string for native window background tint.
         icon_path: Optional filesystem path to application icon.
         storage_path: Optional filesystem path for webview persistent cache.
+        on_close: Optional callback invoked when the standalone webview process terminates.
 
     Returns:
         True if the webview process was spawned successfully, False otherwise.
@@ -183,7 +186,17 @@ def launch_webview(
         popen_kwargs["creationflags"] = detached_flag
 
     try:
-        subprocess.Popen(cmd, **popen_kwargs)
+        proc = subprocess.Popen(cmd, **popen_kwargs)
+        if on_close is not None:
+
+            def _wait_and_close() -> None:
+                proc.wait()
+                try:
+                    on_close()
+                except Exception:
+                    pass
+
+            threading.Thread(target=_wait_and_close, daemon=True).start()
         return True
     except (OSError, subprocess.SubprocessError) as err:
         print(f"[WEBVIEW] Failed to launch native webview process: {err}", file=sys.stderr)

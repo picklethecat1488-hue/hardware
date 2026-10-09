@@ -10,7 +10,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-from typing import Optional, Tuple
+import threading
+from typing import Callable, Optional, Tuple
 import urllib.parse
 
 import eel
@@ -137,7 +138,11 @@ def get_eel_profile_dir(app_name: str = "Quake") -> Path:
     return profile
 
 
-def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
+def launch_eel(
+    url: str,
+    size: Tuple[int, int] = (1400, 900),
+    on_close: Optional[Callable[[], None]] = None,
+) -> bool:
     """Launch the dashboard workstation in a standalone Eel application window.
 
     Locates an app-mode Chromium-based browser binary and launches in standalone window mode.
@@ -145,6 +150,7 @@ def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
     Args:
         url: Full HTTP URL of the running dashboard server.
         size: Width and height of the standalone application window in pixels.
+        on_close: Optional callback invoked when the browser process terminates.
 
     Returns:
         True if successfully launched in standalone app mode, False otherwise.
@@ -184,8 +190,36 @@ def launch_eel(url: str, size: Tuple[int, int] = (1400, 900)) -> bool:
         "size": size,
         "block": False,
     }
+
     try:
-        eel_browsers.open([page], options)
+        if on_close is not None:
+            orig_popen = subprocess.Popen
+            captured_procs = []
+
+            def popen_hook(*p_args, **p_kwargs):
+                proc = orig_popen(*p_args, **p_kwargs)
+                captured_procs.append(proc)
+                return proc
+
+            subprocess.Popen = popen_hook
+            try:
+                eel_browsers.open([page], options)
+            finally:
+                subprocess.Popen = orig_popen
+
+            if captured_procs:
+                proc = captured_procs[0]
+
+                def _wait_and_close() -> None:
+                    proc.wait()
+                    try:
+                        on_close()
+                    except Exception:
+                        pass
+
+                threading.Thread(target=_wait_and_close, daemon=True).start()
+        else:
+            eel_browsers.open([page], options)
         return True
     except (OSError, subprocess.SubprocessError) as err:
         print(f"[EEL] Standalone window launch failed: {err}", file=sys.stderr)
