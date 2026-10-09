@@ -4,10 +4,13 @@ Provides structured schemas for bug reports, severities, statuses, categories,
 attachments (logs, screenshots, references), and bug collection management.
 """
 
+from collections.abc import Collection
 from enum import StrEnum
 from typing import Dict, List, Optional
 import uuid as uuid_pkg
 from pydantic import BaseModel, Field
+
+from model.id_generator import generate_docker_pattern_id
 
 
 class BugSeverity(StrEnum):
@@ -83,9 +86,18 @@ class BugDatabaseModel(BaseModel):
     updated_at: str = ""
 
     def get_bug(self, bug_id: str) -> Optional[BugReportModel]:
-        """Find a bug by its unique ID."""
+        """Find a bug by its unique ID (exact, case-insensitive, or prefix-normalized)."""
+        clean_target = bug_id.strip()
         for b in self.bugs:
-            if b.id == bug_id:
+            if b.id == clean_target:
+                return b
+        for b in self.bugs:
+            if b.id.upper() == clean_target.upper():
+                return b
+        for b in self.bugs:
+            norm_b = b.id.removeprefix("BUG-").removeprefix("WORM-").upper()
+            norm_target = clean_target.removeprefix("BUG-").removeprefix("WORM-").upper()
+            if norm_b == norm_target:
                 return b
         return None
 
@@ -125,15 +137,16 @@ class BugDatabaseModel(BaseModel):
             counts[b.category.value] = counts.get(b.category.value, 0) + 1
         return counts
 
-    def generate_bug_id(self) -> str:
-        """Generate next sequential bug ID (e.g. BUG-001, BUG-002)."""
-        max_idx = 0
+    def generate_bug_id(self, existing_ids: Optional[Collection[str]] = None) -> str:
+        """Generate a random Docker-pattern bug ID using a CRNG (secrets/os.urandom).
+
+        Format: BUG-[ADJECTIVE]-[ANIMAL/NOUN]-[3 digits]
+        Examples:
+            - BUG-SWIFT-FOX-42
+            - BUG-BOLD-LYNX-809
+            - BUG-IRON-CRANE-17
+        """
+        known = set(existing_ids or [])
         for b in self.bugs:
-            if b.id.startswith("BUG-"):
-                try:
-                    idx = int(b.id[4:])
-                    if idx > max_idx:
-                        max_idx = idx
-                except ValueError:
-                    pass
-        return f"BUG-{max_idx + 1:03d}"
+            known.add(b.id)
+        return generate_docker_pattern_id(prefix="BUG", existing_ids=known)

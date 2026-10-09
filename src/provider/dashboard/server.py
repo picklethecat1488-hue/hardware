@@ -1140,7 +1140,7 @@ class DashboardServer(ThreadingHTTPServer):
                         retained_tags.append(tag)
             node.bug_tags = retained_tags
 
-            bug_ids = re.findall(r"\b((?:BUG|WORM)[_-]\d+)\b", node.subject, re.IGNORECASE)
+            bug_ids = re.findall(r"\b((?:BUG|WORM)[_-][A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)\b", node.subject, re.IGNORECASE)
             existing_ids = {t.id for t in node.bug_tags}
             for bid in bug_ids:
                 num = re.sub(r"^(?:BUG|WORM)[-_]", "", bid, flags=re.IGNORECASE)
@@ -1177,7 +1177,7 @@ class DashboardServer(ThreadingHTTPServer):
                                 content = md_path.read_text(encoding="utf-8", errors="replace")
                                 for line in content.splitlines():
                                     if line.startswith("# ") and ("BUG-" in line or "WORM-" in line):
-                                        title = line.split("]", 1)[-1].strip()
+                                        title = line.split("]", 1)[-1].strip().lstrip("`").strip()
                                     if line.startswith("- **Status**:"):
                                         parts = line.split("`")
                                         if len(parts) >= 2:

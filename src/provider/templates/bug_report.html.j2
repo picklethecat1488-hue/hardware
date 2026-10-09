@@ -1130,20 +1130,28 @@
       });
     }
 
+    const DOCKER_ADJS = "SWIFT BOLD IRON AGILE BRAVE BRIGHT CALM CLEAR COOL DEFT EPIC FAST FLASH GLOW GOLD GRAND GREEN KEEN LOUD LUNAR MIGHTY NOBLE NOVA PEAK PRIME PROUD QUICK RAPID ROCK RUBY RUST SHARP SILENT SILVER SLEEK SOLAR SONIC STEADY STERN STORM SUN TIDAL TOUGH TRUE ULTRA VITAL VIVID WARM WILD WISE ZENITH".split(" ");
+    const DOCKER_NOUNS = "FOX LYNX CRANE BEAR BISON COBRA CROW DEER DOLPHIN DUCK EAGLE ELK FALCON FINCH FROG HAWK HERON HORSE IBIS JAGUAR JAY KOALA LARK LION MOOSE MOUSE OTTER OWL PANDA PERCH PIKE PUMA RAM RAVEN RAY RHINO ROBIN SEAL SHARK SNAKE SPARROW SWAN TIGER TROUT VIPER WALRUS WHALE WOLF WREN YAK ZEBRA".split(" ");
+
     function generateNextBugId() {
-      let maxIdx = 0;
-      (db.bugs || []).forEach(b => {
-        if (b.id && b.id.startsWith("BUG-")) {
-          const num = parseInt(b.id.slice(4), 10);
-          if (!isNaN(num) && num > maxIdx) {
-            maxIdx = num;
-          }
-        }
-      });
-      let nextId = "BUG-" + String(maxIdx + 1).padStart(3, "0");
-      while (db.bugs && db.bugs.some(b => b.id === nextId)) {
-        maxIdx++;
-        nextId = "BUG-" + String(maxIdx + 1).padStart(3, "0");
+      const cryptoObj = window.crypto || window.msCrypto;
+      const randArr = new Uint32Array(3);
+      if (cryptoObj && cryptoObj.getRandomValues) {
+        cryptoObj.getRandomValues(randArr);
+      } else {
+        randArr[0] = Math.floor(Math.random() * 1000000);
+        randArr[1] = Math.floor(Math.random() * 1000000);
+        randArr[2] = Math.floor(Math.random() * 1000000);
+      }
+      const adj = DOCKER_ADJS[randArr[0] % DOCKER_ADJS.length];
+      const noun = DOCKER_NOUNS[randArr[1] % DOCKER_NOUNS.length];
+      const num = (randArr[2] % 999) + 1;
+      let nextId = `BUG-${adj}-${noun}-${num}`;
+      let attempts = 0;
+      while (db.bugs && db.bugs.some(b => b.id === nextId) && attempts < 100) {
+        attempts++;
+        const nextNum = Math.floor(Math.random() * 999) + 1;
+        nextId = `BUG-${adj}-${noun}-${nextNum}`;
       }
       return nextId;
     }
