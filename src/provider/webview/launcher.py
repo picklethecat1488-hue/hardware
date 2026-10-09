@@ -12,13 +12,54 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
-from typing import Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 APP_NAME: str = "Quake"
 DEFAULT_WINDOW_TITLE: str = "Quake Workstation"
 DEFAULT_WINDOW_SIZE: Tuple[int, int] = (1400, 900)
 MIN_WINDOW_SIZE: Tuple[int, int] = (800, 600)
 DEFAULT_BG_COLOR: str = "#291a10"
+
+
+def apply_native_window_theme(window: Any, bg_color: str = DEFAULT_BG_COLOR) -> None:
+    """Apply system theme, dark appearance, and titlebar styling to the native OS window.
+
+    Args:
+        window: The pywebview Window instance.
+        bg_color: Hex color string for the theme background.
+    """
+    if sys.platform == "darwin":
+        try:
+            from PyObjCTools import AppHelper
+
+            def _configure_cocoa() -> None:
+                try:
+                    import AppKit
+
+                    native_window = getattr(window, "native", None)
+                    if native_window is not None:
+                        dark_app = AppKit.NSAppearance.appearanceNamed_(AppKit.NSAppearanceNameDarkAqua)
+                        if dark_app and hasattr(native_window, "setAppearance_"):
+                            native_window.setAppearance_(dark_app)
+                        if (
+                            bg_color
+                            and bg_color.startswith("#")
+                            and len(bg_color) == 7
+                            and hasattr(native_window, "setBackgroundColor_")
+                        ):
+                            r = int(bg_color[1:3], 16) / 255.0
+                            g = int(bg_color[3:5], 16) / 255.0
+                            b = int(bg_color[5:7], 16) / 255.0
+                            color = AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(r, g, b, 1.0)
+                            native_window.setBackgroundColor_(color)
+                        if hasattr(native_window, "setTitlebarAppearsTransparent_"):
+                            native_window.setTitlebarAppearsTransparent_(True)
+                except Exception:
+                    pass
+
+            AppHelper.callAfter(_configure_cocoa)
+        except Exception:
+            pass
 
 
 def get_webview_storage_path(app_name: str = APP_NAME) -> Path:
@@ -88,6 +129,7 @@ def run_webview_window(
     bg_color: str = DEFAULT_BG_COLOR,
     icon_path: Optional[str] = None,
     storage_path: Optional[str] = None,
+    exit_on_close: bool = False,
 ) -> None:
     """Run the native OS webview GUI event loop in the current process.
 
@@ -99,10 +141,11 @@ def run_webview_window(
         bg_color: Hex color string for native window background and title bar tint.
         icon_path: Optional filesystem path to application icon.
         storage_path: Optional filesystem path for webview data storage.
+        exit_on_close: Whether to terminate the process immediately via os._exit on close.
     """
     import webview
 
-    webview.create_window(
+    window = webview.create_window(
         title=title,
         url=url,
         width=width,
@@ -113,6 +156,20 @@ def run_webview_window(
         zoomable=True,
     )
 
+    if window is not None and hasattr(window, "events") and hasattr(window.events, "shown"):
+
+        def _on_shown() -> None:
+            apply_native_window_theme(window, bg_color)
+
+        window.events.shown += _on_shown
+
+    if exit_on_close and window is not None and hasattr(window, "events") and hasattr(window.events, "closed"):
+
+        def _on_closed() -> None:
+            os._exit(0)
+
+        window.events.closed += _on_closed
+
     start_kwargs = {
         "private_mode": False,
     }
@@ -122,6 +179,8 @@ def run_webview_window(
         start_kwargs["storage_path"] = str(storage_path)
 
     webview.start(**start_kwargs)
+    if exit_on_close:
+        os._exit(0)
 
 
 def launch_webview(
@@ -226,4 +285,5 @@ if __name__ == "__main__":
         bg_color=cli_args.bg,
         icon_path=cli_args.icon,
         storage_path=cli_args.storage_path,
+        exit_on_close=True,
     )

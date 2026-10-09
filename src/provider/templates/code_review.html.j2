@@ -64,6 +64,24 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.2), 0 0 10px rgba(200, 122, 50, 0.1);
+    }
+
+    /* Window Resize Gripper (WORM-027) */
+    .window-resize-gripper {
+      position: fixed;
+      bottom: 2px;
+      right: 2px;
+      width: 16px;
+      height: 16px;
+      cursor: nwse-resize;
+      z-index: 99999;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, transparent 0%, transparent 40%, var(--quake-border-mid) 40%, var(--quake-border-mid) 50%, transparent 50%, transparent 65%, var(--quake-border-light) 65%, var(--quake-border-light) 75%, transparent 75%, transparent 90%, var(--quake-gold) 90%, var(--quake-gold) 100%);
+      opacity: 0.85;
+      filter: drop-shadow(0 0 2px var(--quake-gold));
     }
 
     /* Quake Stone Plaque / Beveled Panels */
@@ -3971,5 +3989,6 @@
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
   </script>
+  <div class="window-resize-gripper" title="Resize Window" aria-label="Resize Window"></div>
 </body>
 </html>

@@ -30,8 +30,10 @@ def test_launch_webview_accepts_and_invokes_on_close() -> None:
     def on_close() -> None:
         closed_event.set()
 
-    with patch("subprocess.Popen", return_value=mock_proc) as mock_popen, \
-         patch("pathlib.Path.exists", return_value=True):
+    with (
+        patch("subprocess.Popen", return_value=mock_proc) as mock_popen,
+        patch("pathlib.Path.exists", return_value=True),
+    ):
         res = launch_webview("http://127.0.0.1:8767/", on_close=on_close)
         assert res is True
         assert mock_popen.called
