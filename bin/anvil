@@ -163,7 +163,8 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
         sync_code
         echo "🧪 Running pytest on ${REMOTE_HOST}..."
         trap kill_remote_pytest INT TERM
-        ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} pytest $*"
+        cmd_args=$(printf ' %q' "$@")
+        ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} pytest${cmd_args}"
         trap - INT TERM
         ;;
     run|exec)

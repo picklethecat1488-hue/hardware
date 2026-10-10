@@ -133,8 +133,20 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self._handle_serve_static(path)
             return
 
-        if path in ("/favicon.ico", "/favicon.svg"):
+        if path == "/manifest.json":
+            self._handle_serve_static("/static/manifest.json")
+            return
+
+        if path == "/favicon.ico":
+            self._handle_serve_static("/static/favicon.ico")
+            return
+
+        if path == "/favicon.svg":
             self._handle_serve_static("/static/favicon.svg")
+            return
+
+        if path == "/apple-touch-icon.png":
+            self._handle_serve_static("/static/apple-touch-icon.png")
             return
 
         if path.startswith("/attachments/") or path.startswith("/build/attachments/"):
@@ -142,6 +154,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
 
         match path:
+            case "/eel.js":
+                self._handle_serve_eel_js()
             case "/" | "/index.html":
                 self._handle_serve_diff_ui()
             case "/review" | "/review/":
@@ -584,6 +598,34 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         )
         self._send_html(html_content)
 
+    def _handle_serve_eel_js(self) -> None:
+        """Serve eel.js library file for Eel standalone app client."""
+        content: bytes = b""
+        try:
+            import eel
+
+            eel_js_path = Path(eel.__file__).resolve().parent / "eel.js"
+            if eel_js_path.is_file():
+                content = eel_js_path.read_bytes()
+        except Exception:
+            pass
+
+        if not content:
+            content = b"// eel.js fallback\nwindow.eel = window.eel || {};\n"
+
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(content)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
+            self.close_connection = True
+
     def _handle_serve_static(self, path: str) -> None:
         """Serve static files such as JavaScript vendor bundles and CSS."""
         static_dir = Path(__file__).resolve().parent.parent / "code_review" / "static"
@@ -593,18 +635,32 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.send_error(404, "Static asset not found")
             return
         mime_type, _ = mimetypes.guess_type(str(file_target))
-        if not mime_type:
-            if filename.endswith(".svg"):
-                mime_type = "image/svg+xml"
-            elif filename.endswith(".js"):
-                mime_type = "application/javascript"
-            else:
-                mime_type = "text/plain"
+        if filename.endswith(".svg"):
+            mime_type = "image/svg+xml"
+        elif filename.endswith(".png"):
+            mime_type = "image/png"
+        elif filename.endswith(".ico"):
+            mime_type = "image/x-icon"
+        elif filename.endswith("manifest.json"):
+            mime_type = "application/manifest+json"
+        elif filename.endswith(".json"):
+            mime_type = "application/json"
+        elif filename.endswith(".js"):
+            mime_type = "application/javascript"
+        elif filename.endswith(".css"):
+            mime_type = "text/css"
+        elif not mime_type:
+            mime_type = "application/octet-stream"
+
         content = file_target.read_bytes()
         try:
             self.send_response(200)
-            self.send_header("Content-Type", f"{mime_type}; charset=utf-8")
+            if mime_type.startswith("text/") or mime_type.startswith("application/"):
+                self.send_header("Content-Type", f"{mime_type}; charset=utf-8")
+            else:
+                self.send_header("Content-Type", mime_type)
             self.send_header("Content-Length", str(len(content)))
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(content)
@@ -1084,7 +1140,7 @@ class DashboardServer(ThreadingHTTPServer):
                         retained_tags.append(tag)
             node.bug_tags = retained_tags
 
-            bug_ids = re.findall(r"\b((?:BUG|WORM)[_-]\d+)\b", node.subject, re.IGNORECASE)
+            bug_ids = re.findall(r"\b((?:BUG|WORM)[_-][A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)\b", node.subject, re.IGNORECASE)
             existing_ids = {t.id for t in node.bug_tags}
             for bid in bug_ids:
                 num = re.sub(r"^(?:BUG|WORM)[-_]", "", bid, flags=re.IGNORECASE)
@@ -1121,7 +1177,7 @@ class DashboardServer(ThreadingHTTPServer):
                                 content = md_path.read_text(encoding="utf-8", errors="replace")
                                 for line in content.splitlines():
                                     if line.startswith("# ") and ("BUG-" in line or "WORM-" in line):
-                                        title = line.split("]", 1)[-1].strip()
+                                        title = line.split("]", 1)[-1].strip().lstrip("`").strip()
                                     if line.startswith("- **Status**:"):
                                         parts = line.split("`")
                                         if len(parts) >= 2:

@@ -4,8 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bug Report Workstation - Hardware Engineering</title>
+  <meta name="theme-color" content="#291a10">
+  <meta name="color-scheme" content="dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Quake">
+  <link rel="manifest" href="/static/manifest.json">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+  <link rel="shortcut icon" href="/static/favicon.ico">
   <style>
+    html { font-size: 80%; }
     /* =========================================================
        QUAKE I / GLQUAKE CONSOLE & RETRO HUD ENGINE THEME
        ========================================================= */
@@ -48,6 +59,24 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.2), 0 0 10px rgba(200, 122, 50, 0.1);
+    }
+
+    /* Window Resize Gripper (WORM-027) */
+    .window-resize-gripper {
+      position: fixed;
+      bottom: 2px;
+      right: 2px;
+      width: 16px;
+      height: 16px;
+      cursor: nwse-resize;
+      z-index: 99999;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, transparent 0%, transparent 40%, var(--quake-border-mid) 40%, var(--quake-border-mid) 50%, transparent 50%, transparent 65%, var(--quake-border-light) 65%, var(--quake-border-light) 75%, transparent 75%, transparent 90%, var(--quake-gold) 90%, var(--quake-gold) 100%);
+      opacity: 0.85;
+      filter: drop-shadow(0 0 2px var(--quake-gold));
     }
 
     /* Visible Quake Scrollbars (BUG-202, BUG-233) */
@@ -88,7 +117,7 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
       font-weight: 700;
-      font-size: 11px;
+      font-size: 9px;
       padding: 6px 12px;
       border-radius: 3px;
       cursor: pointer;
@@ -161,7 +190,7 @@
 
     /* Badges */
     .quake-badge {
-      font-size: 10px;
+      font-size: 8px;
       font-weight: 800;
       letter-spacing: 0.05em;
       padding: 2px 6px;
@@ -186,7 +215,7 @@
       border-color: #140b06 #663f21 #663f21 #140b06;
       color: var(--quake-gold);
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 10px;
       padding: 6px 10px;
       border-radius: 3px;
       box-shadow: inset 2px 2px 4px rgba(0,0,0,0.8);
@@ -211,7 +240,7 @@
     }
 
     .panel-expand-btn {
-      font-size: 10px;
+      font-size: 8px;
       padding: 2px 8px;
       letter-spacing: 0.04em;
     }
@@ -224,7 +253,7 @@
       height: 300px;
     }
     .attachment-lfs-notice {
-      font-size: 11px;
+      font-size: 9px;
       color: var(--quake-text-muted);
       background: rgba(0, 0, 0, 0.4);
       border: 1px solid var(--quake-border-mid);
@@ -267,7 +296,7 @@
       gap: 10px;
     }
     .brand-title {
-      font-size: 14px;
+      font-size: 11px;
       font-weight: 800;
       color: var(--quake-gold);
       text-shadow: 1px 1px 0 #000, 0 0 8px rgba(255, 184, 0, 0.4);
@@ -282,7 +311,7 @@
       flex-wrap: wrap;
     }
     .metric-pill {
-      font-size: 11px;
+      font-size: 9px;
       color: var(--quake-text-muted);
       background: rgba(0, 0, 0, 0.4);
       border: 1px solid var(--quake-border-mid);
@@ -358,14 +387,14 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 6px;
-      font-size: 11px;
+      font-size: 9px;
     }
     .bug-id {
       font-weight: 800;
       color: var(--quake-gold);
     }
     .bug-item-title {
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 600;
       color: var(--quake-text-light);
       white-space: nowrap;
@@ -381,7 +410,7 @@
       cursor: pointer;
       padding: 1px 3px;
       margin-left: 3px;
-      font-size: 11px;
+      font-size: 9px;
       color: var(--quake-text-dim);
       opacity: 0.75;
       border-radius: 3px;
@@ -399,7 +428,7 @@
       transform: scale(0.92);
     }
     .copy-badge-btn {
-      font-size: 9px;
+      font-size: 7.5px;
       padding: 0 2px;
     }
 
@@ -425,7 +454,7 @@
       gap: 12px;
     }
     .section-title {
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 800;
       letter-spacing: 0.06em;
       text-transform: uppercase;
@@ -442,7 +471,7 @@
     .col { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 6px; }
 
     label {
-      font-size: 10.5px;
+      font-size: 8.5px;
       font-weight: 700;
       color: var(--quake-text-muted);
       text-transform: uppercase;
@@ -478,7 +507,7 @@
       color: var(--quake-gold);
     }
     .dropzone-hint {
-      font-size: 10.5px;
+      font-size: 8.5px;
       color: var(--quake-text-dim);
     }
 
@@ -522,16 +551,16 @@
       text-align: center;
     }
     .document-preview-box .doc-icon {
-      font-size: 28px;
+      font-size: 22px;
     }
     .document-preview-box .doc-type {
-      font-size: 10px;
+      font-size: 8px;
       font-weight: 800;
       color: var(--quake-gold);
       letter-spacing: 0.05em;
     }
     .attachment-name {
-      font-size: 11px;
+      font-size: 9px;
       font-weight: 600;
       color: var(--quake-text-light);
       white-space: nowrap;
@@ -542,7 +571,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 10px;
+      font-size: 8px;
       color: var(--quake-text-muted);
     }
 
@@ -557,7 +586,7 @@
       box-shadow: 0 4px 18px rgba(0, 0, 0, 0.9), 0 0 10px rgba(255, 184, 0, 0.3);
       padding: 10px 18px;
       border-radius: 3px;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
       display: none;
       z-index: 1000;
@@ -580,19 +609,19 @@
       <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
       <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
       <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
-      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-default modal-close-btn" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:16px;padding:2px 10px;line-height:1;" title="Close workstation (Esc)">✕</a>
+      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-default modal-close-btn" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;padding:2px 10px;line-height:1;" title="Close workstation (Esc)">✕</a>
     </div>
   </header>
 
   <!-- Feedback Sync Progress Modal -->
   <div id="feedback-loading-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:99999; align-items:center; justify-content:center;">
     <div class="quake-card" style="padding:24px 32px; max-width:480px; width:90%; text-align:center; border:2px solid var(--quake-gold);">
-      <h3 style="color:var(--quake-gold); margin-bottom:12px; font-size:16px;">🔄 MERGING AGENT FEEDBACK</h3>
-      <p id="loading-status-text" style="color:var(--quake-text-light); font-size:13px; margin-bottom:16px;">Merging stored agent feedback from feedback/ directory into SQLite database...</p>
+      <h3 style="color:var(--quake-gold); margin-bottom:12px; font-size:13px;">🔄 MERGING AGENT FEEDBACK</h3>
+      <p id="loading-status-text" style="color:var(--quake-text-light); font-size:10px; margin-bottom:16px;">Merging stored agent feedback from feedback/ directory into SQLite database...</p>
       <div style="background:#120c08; border:1px solid #5a381e; border-radius:4px; height:12px; overflow:hidden; margin-bottom:12px;">
         <div id="loading-progress-bar" style="background:var(--quake-gold); width:30%; height:100%; transition:width 0.3s ease;"></div>
       </div>
-      <div id="loading-step-text" style="color:var(--quake-text-muted); font-size:11px;">Scanning feedback/ directory for BUG_*.md files...</div>
+      <div id="loading-step-text" style="color:var(--quake-text-muted); font-size:9px;">Scanning feedback/ directory for BUG_*.md files...</div>
     </div>
   </div>
 
@@ -603,14 +632,15 @@
       <div class="sidebar-header" style="flex-direction:column; gap:8px;">
         <input type="text" id="search-input" class="sidebar-search" placeholder="Search bugs..." oninput="renderBugList()">
         <div class="filter-pills" style="display:flex; gap:6px; width:100%;">
-          <button id="filter-open" class="quake-btn quake-btn-default quake-btn-active" style="flex:1; padding:4px 6px; font-size:10px;" onclick="setBugFilter('open')">OPEN</button>
-          <button id="filter-all" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:10px;" onclick="setBugFilter('all')">ALL</button>
-          <button id="filter-resolved" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:10px;" onclick="setBugFilter('resolved')">RESOLVED</button>
+          <button id="filter-open" class="quake-btn quake-btn-default quake-btn-active" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('open')">OPEN</button>
+          <button id="filter-planned" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('planned')">PLANNED</button>
+          <button id="filter-all" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('all')">ALL</button>
+          <button id="filter-resolved" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('resolved')">RESOLVED</button>
         </div>
         <div style="display:flex; gap:6px; width:100%;">
           <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
-            <label style="font-size:9px;">Category</label>
-            <select id="select-filter-category" onchange="onFilterCategoryChanged(this.value)" style="width:100%; padding:4px; font-size:10px;">
+            <label style="font-size:7.5px;">Category</label>
+            <select id="select-filter-category" onchange="onFilterCategoryChanged(this.value)" style="width:100%; padding:4px; font-size:8px;">
               <option value="ALL">ALL</option>
               {% for cat in categories %}
               <option value="{{ cat }}">{{ cat }}</option>
@@ -618,8 +648,8 @@
             </select>
           </div>
           <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
-            <label style="font-size:9px;">Severity</label>
-            <select id="select-filter-severity" onchange="onFilterSeverityChanged(this.value)" style="width:100%; padding:4px; font-size:10px;">
+            <label style="font-size:7.5px;">Severity</label>
+            <select id="select-filter-severity" onchange="onFilterSeverityChanged(this.value)" style="width:100%; padding:4px; font-size:8px;">
               <option value="ALL">ALL</option>
               {% for sev in severities %}
               <option value="{{ sev }}">{{ sev }}</option>
@@ -628,8 +658,8 @@
           </div>
         </div>
         <div style="display:flex; flex-direction:column; gap:2px; width:100%;">
-          <label style="font-size:9px;">Sort By</label>
-          <select id="select-bug-sort" onchange="onBugSortChanged(this.value)" style="width:100%; padding:4px; font-size:10px;">
+          <label style="font-size:7.5px;">Sort By</label>
+          <select id="select-bug-sort" onchange="onBugSortChanged(this.value)" style="width:100%; padding:4px; font-size:8px;">
             <option value="id_desc">ID (Newest first)</option>
             <option value="id_asc">ID (Oldest first)</option>
             <option value="severity">Severity (Critical first)</option>
@@ -649,7 +679,7 @@
         <div class="section-title">
           <span style="display:flex; align-items:center; gap:8px;">
             <span>Issue Identity</span>
-            <span id="active-bug-id-display" style="color:var(--quake-gold); font-size:12px;"></span>
+            <span id="active-bug-id-display" style="color:var(--quake-gold); font-size:10px;"></span>
             <button id="btn-copy-active-bug" class="copy-icon-btn copy-badge-btn" onclick="copyActiveBugId()" title="Copy active bug ID" style="display:none;">📋</button>
           </span>
           <div style="display:flex; gap:8px;">
@@ -790,7 +820,7 @@
     let currentBugSort = sessionStorage.getItem("bug_sort") || 'id_desc';
 
     const severityOrder = { "CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3 };
-    const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "RESOLVED": 2, "CLOSED": 3 };
+    const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "PLANNED": 2, "RESOLVED": 3, "CLOSED": 4 };
 
     function init() {
       // Disambiguate duplicate IDs if any exist in in-memory state
@@ -855,9 +885,11 @@
       currentFilter = filter;
       sessionStorage.setItem("bug_filter_status", filter);
       const btnOpen = document.getElementById("filter-open");
+      const btnPlanned = document.getElementById("filter-planned");
       const btnAll = document.getElementById("filter-all");
       const btnResolved = document.getElementById("filter-resolved");
       if (btnOpen) btnOpen.classList.toggle("quake-btn-active", filter === "open");
+      if (btnPlanned) btnPlanned.classList.toggle("quake-btn-active", filter === "planned");
       if (btnAll) btnAll.classList.toggle("quake-btn-active", filter === "all");
       if (btnResolved) btnResolved.classList.toggle("quake-btn-active", filter === "resolved");
       renderBugList();
@@ -938,7 +970,8 @@
       const query = (searchInput ? searchInput.value || "" : "").toLowerCase();
       let list = (db.bugs || []).filter(bug => {
         const isResolved = (bug.status === "RESOLVED" || bug.status === "CLOSED");
-        if (currentFilter === "open" && isResolved) return false;
+        if (currentFilter === "open" && (isResolved || bug.status === "PLANNED")) return false;
+        if (currentFilter === "planned" && bug.status !== "PLANNED") return false;
         if (currentFilter === "resolved" && !isResolved) return false;
         if (currentCategoryFilter && currentCategoryFilter !== "ALL" && bug.category !== currentCategoryFilter) return false;
         if (currentSeverityFilter && currentSeverityFilter !== "ALL" && bug.severity !== currentSeverityFilter) return false;
@@ -1009,6 +1042,8 @@
         let stBadgeClass = "quake-badge quake-badge-amber";
         if (bug.status === "RESOLVED" || bug.status === "CLOSED") {
           stBadgeClass = "quake-badge quake-badge-green";
+        } else if (bug.status === "PLANNED") {
+          stBadgeClass = "quake-badge quake-badge-muted";
         }
 
         li.innerHTML = `
@@ -1095,20 +1130,28 @@
       });
     }
 
+    const DOCKER_ADJS = "ANNELIDIC BLIND BRISTLY BURROWING CHITINOUS COILING COMPOSTED CREEPING DAMP DEEP DIRT EARTHEN EMBEDDED FERTILE FLESHY FLEXIBLE FOSSORIAL GLIDING GLOWING GROUNDED HUMIC INCHING LARVAL LITHE LOAMY LUBRICATED LUMINESCENT LUSTROUS MOIST MUDDY NOCTURNAL ORGANIC PEATY PINK PROBOSCID RADIANT ROOTED ROUND SEGMENTED SERPENTINE SETOSE SILKEN SLICK SLIMY SLITHERING SOILBOUND SQUIRMY SUBTERRANEAN SUPPLE TRANSLUCENT TUNNELING UNDULATING VELVETY VERMICULAR VERMIFORM WRIGGLY WRITHING".split(" ");
+    const DOCKER_NOUNS = "ANNELID BEETLE BLOODWORM BOBBIT BOOKWORM BRISTLE BRISTLEWORM BURROWER CASTING CATERPILLAR CENTIPEDE CHAETOPOD CHRYSALIS CLITELLUM COCOON COMPOSTER CRAWLER CREEPER DIGGER EARTHWORM EEL ENCHYTRAEID FIREWORM FLATWORM GLOWWORM GRUB HELMINTH INCHWORM LARVA LEECH LOOPER LUGWORM LUMBRICUS MAGGOT MEALWORM MILLIPEDE MINER NEMATODE NIGHTCRAWLER NYMPH OLIGOCHAETE PALOLO PLANARIAN POLYCHAETE PUPA REDWORM RIBBONWORM ROOTER ROUNDWORM SANDWORM SEGMENT SERPULA SETAE SILKWORM SIPUNCULID SLUG SNAIL SQUIRMER TAPEWORM TUBEWORM TUNNELER VELVETWORM VERMIS VINEGARWORM WAXWORM WIREWORM WOODLOUSE WRIGGLER".split(" ");
+
     function generateNextBugId() {
-      let maxIdx = 0;
-      (db.bugs || []).forEach(b => {
-        if (b.id && b.id.startsWith("BUG-")) {
-          const num = parseInt(b.id.slice(4), 10);
-          if (!isNaN(num) && num > maxIdx) {
-            maxIdx = num;
-          }
-        }
-      });
-      let nextId = "BUG-" + String(maxIdx + 1).padStart(3, "0");
-      while (db.bugs && db.bugs.some(b => b.id === nextId)) {
-        maxIdx++;
-        nextId = "BUG-" + String(maxIdx + 1).padStart(3, "0");
+      const cryptoObj = window.crypto || window.msCrypto;
+      const randArr = new Uint32Array(3);
+      if (cryptoObj && cryptoObj.getRandomValues) {
+        cryptoObj.getRandomValues(randArr);
+      } else {
+        randArr[0] = Math.floor(Math.random() * 1000000);
+        randArr[1] = Math.floor(Math.random() * 1000000);
+        randArr[2] = Math.floor(Math.random() * 1000000);
+      }
+      const adj = DOCKER_ADJS[randArr[0] % DOCKER_ADJS.length];
+      const noun = DOCKER_NOUNS[randArr[1] % DOCKER_NOUNS.length];
+      const num = (randArr[2] % 999) + 1;
+      let nextId = `BUG-${adj}-${noun}-${num}`;
+      let attempts = 0;
+      while (db.bugs && db.bugs.some(b => b.id === nextId) && attempts < 100) {
+        attempts++;
+        const nextNum = Math.floor(Math.random() * 999) + 1;
+        nextId = `BUG-${adj}-${noun}-${nextNum}`;
       }
       return nextId;
     }
@@ -1530,5 +1573,6 @@
 
     window.onload = init;
   </script>
+  <div class="window-resize-gripper" title="Resize Window" aria-label="Resize Window"></div>
 </body>
 </html>

@@ -579,34 +579,24 @@ def test_launch_browser_and_webpage_title(tmp_path: Path) -> None:
             html = resp.read().decode("utf-8")
             assert f"<title>Code Review: {repo_root.name}</title>" in html
 
-        # Test CLI arguments default to VS Code
+        # Test CLI arguments default to native webview standalone app window
         with patch("sys.argv", ["dashboard.py"]):
             args = parse_arguments()
-            assert args.browser == "vscode"
+            assert args.browser == "webview"
             assert not args.no_browser
 
         with patch("sys.argv", ["dashboard.py", "--no-browser"]):
             args_no = parse_arguments()
             assert args_no.no_browser
 
-        with patch("sys.argv", ["dashboard.py", "--browser", "system"]):
-            args_sys = parse_arguments()
-            assert args_sys.browser == "system"
+        with patch("sys.argv", ["dashboard.py", "--no-app"]):
+            args_no_app = parse_arguments()
+            assert args_no_app.no_browser
 
-        # Test launch_browser with VS Code does not spawn system browser or external process
-        with patch("webbrowser.open") as mock_wb:
-            launch_browser("http://127.0.0.1:8765/", target="vscode")
-            mock_wb.assert_not_called()
-
-        # Test launch_browser target='none' does nothing
-        with patch("webbrowser.open") as mock_wb:
-            launch_browser("http://127.0.0.1:8765/", target="none")
-            mock_wb.assert_not_called()
-
-        # Test launch_browser target='system' invokes webbrowser.open
-        with patch("webbrowser.open") as mock_wb:
-            launch_browser("http://127.0.0.1:8765/", target="system")
-            mock_wb.assert_called_once_with("http://127.0.0.1:8765/")
+        # Test launch_browser invokes native webview launcher by default
+        with patch("provider.webview.launcher.launch_webview") as mock_launch:
+            launch_browser("http://127.0.0.1:8765/")
+            mock_launch.assert_called_once_with("http://127.0.0.1:8765/")
     finally:
         server.shutdown()
         server.server_close()

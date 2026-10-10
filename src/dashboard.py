@@ -22,13 +22,18 @@ Usage:
 
 import argparse
 from datetime import datetime, timezone
+import json
+import os
 from pathlib import Path
+import signal
+import socket
+import subprocess
 import sys
+import tempfile
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 import uuid
-import webbrowser
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -103,14 +108,49 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--browser",
-        choices=["vscode", "system", "none"],
-        default="vscode",
-        help="Target browser environment to display dashboard (default: vscode).",
+        choices=["webview", "eel"],
+        default="webview",
+        help="Target display environment ('webview' native window, or 'eel').",
+    )
+    parser.add_argument(
+        "--webview",
+        action="store_const",
+        dest="browser",
+        const="webview",
+        help="Open dashboard in a native desktop application window.",
+    )
+    parser.add_argument(
+        "--eel",
+        action="store_const",
+        dest="browser",
+        const="eel",
+        help="Open dashboard in a standalone Eel application window.",
+    )
+    parser.add_argument(
+        "--app",
+        action="store_const",
+        dest="browser",
+        const="webview",
+        help="Alias for native standalone application window.",
     )
     parser.add_argument(
         "--no-browser",
+        "--no-app",
         action="store_true",
-        help="Disable automatic browser opening on server launch.",
+        dest="no_browser",
+        help="Disable automatic desktop application window launch on server start.",
+    )
+    parser.add_argument(
+        "--no-detach",
+        "--foreground",
+        action="store_true",
+        dest="no_detach",
+        help="Run workstation server in the foreground without detaching from terminal.",
+    )
+    parser.add_argument(
+        "--stop",
+        action="store_true",
+        help="Stop any running background dashboard workstation server.",
     )
 
     # Database & Session Configuration
@@ -138,6 +178,11 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
         "--open",
         action="store_true",
         help="When listing bugs or reviews, only show open / unresolved issues.",
+    )
+    parser.add_argument(
+        "--planned",
+        action="store_true",
+        help="When listing bugs, only show Planned issues.",
     )
     parser.add_argument(
         "--add-bug",
@@ -257,6 +302,7 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     # list-bugs
     p_bugs = subparsers.add_parser("list-bugs", help="List all active bugs directly in terminal and exit.")
     p_bugs.add_argument("--open", action="store_true", help="Only show open / unresolved issues.")
+    p_bugs.add_argument("--planned", action="store_true", help="Only show Planned issues.")
     p_bugs.add_argument(
         "--severity",
         choices=[s.value for s in BugSeverity],
@@ -333,25 +379,147 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     return parsed
 
 
-def launch_browser(url: str, target: str = "vscode") -> None:
-    """Open the review or diff workstation dashboard in the specified browser environment.
+def is_pid_alive(pid: int) -> bool:
+    """Check if a process with the given PID is running on the local system."""
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def is_port_in_use(host: str, port: int) -> bool:
+    """Check if a network port is currently open and accepting connections."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        try:
+            s.connect((host, port))
+            return True
+        except (OSError, ConnectionRefusedError):
+            return False
+
+
+def get_dashboard_lock_file(repo_root: Path, port: int = 8877) -> Path:
+    """Return filesystem path for the dashboard single-instance lock file."""
+    build_dir = repo_root / "build"
+    target_dir = repo_root / "target"
+    if build_dir.exists():
+        return build_dir / f"dashboard_{port}.lock"
+    if target_dir.exists():
+        return target_dir / f"dashboard_{port}.lock"
+    return Path(tempfile.gettempdir()) / f"dashboard_{repo_root.name}_{port}.lock"
+
+
+def has_active_window_process(server_pid: int) -> bool:
+    """Check if the given server PID has an active child GUI window process.
+
+    Args:
+        server_pid: Process identifier of the dashboard server.
+
+    Returns:
+        True if an active child GUI process is running, False otherwise.
+    """
+    if server_pid <= 0:
+        return False
+    try:
+        import psutil
+
+        parent = psutil.Process(server_pid)
+        for child in parent.children(recursive=True):
+            if child.is_running():
+                cmdline = " ".join(child.cmdline()).lower()
+                if any(k in cmdline for k in ("webview", "chrome", "edge", "brave", "eel")):
+                    return True
+        return False
+    except Exception:
+        if os.name == "posix":
+            try:
+                res = subprocess.run(["pgrep", "-P", str(server_pid)], capture_output=True, text=True)
+                return bool(res.stdout.strip())
+            except Exception:
+                pass
+        return False
+
+
+def check_existing_instance(
+    lock_file: Path,
+    host: str,
+    port: int,
+    cleanup_orphaned: bool = False,
+) -> Optional[Tuple[int, str]]:
+    """Check if another dashboard instance is already running.
+
+    Args:
+        lock_file: Path to the PID lock file.
+        host: Host interface string.
+        port: Port integer.
+        cleanup_orphaned: If True and the server is running without an active GUI window,
+            terminate the stale server process and clear the lock file.
+
+    Returns:
+        (pid, url) if running, or None otherwise.
+    """
+    if lock_file.exists():
+        try:
+            content = lock_file.read_text(encoding="utf-8").strip()
+            data = json.loads(content)
+            pid = data.get("pid", 0)
+            url = data.get("url", f"http://{host}:{port}")
+            no_browser = data.get("no_browser", False)
+            if pid and is_pid_alive(pid) and is_port_in_use(host, port):
+                if cleanup_orphaned and not no_browser and pid != os.getpid() and not has_active_window_process(pid):
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                    except OSError:
+                        pass
+                    try:
+                        lock_file.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    return None
+                return (pid, url)
+        except Exception:
+            pass
+        try:
+            lock_file.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    if is_port_in_use(host, port):
+        return (0, f"http://{host}:{port}")
+
+    return None
+
+
+def launch_browser(
+    url: str,
+    browser: str = "webview",
+    on_close: Optional[Callable[[], None]] = None,
+) -> bool:
+    """Open the review or diff workstation dashboard in a standalone desktop window.
 
     Args:
         url: The web URL of the workstation dashboard.
-        target: Target browser environment ('vscode', 'system', 'none').
+        browser: Display environment ('webview' or 'eel').
+        on_close: Optional callback invoked when the standalone window process terminates.
+
+    Returns:
+        True if successfully launched, False otherwise.
     """
-    match target:
-        case "none":
-            return
-        case "vscode":
-            # In VS Code, the integrated terminal intercepts localhost links with
-            # workbench.externalUriOpeners configured for simpleBrowser.open.
-            # We avoid spawning the system browser or the 'code' binary.
-            return
-        case "system":
-            webbrowser.open(url)
-        case _:
-            webbrowser.open(url)
+    if browser == "eel":
+        from provider.eel.launcher import launch_eel
+
+        if on_close is not None:
+            return launch_eel(url, on_close=on_close)
+        return launch_eel(url)
+
+    from provider.webview.launcher import launch_webview
+
+    if on_close is not None:
+        return launch_webview(url, on_close=on_close)
+    return launch_webview(url)
 
 
 def print_cli_smartlog(engine: GitEngine) -> None:
@@ -400,8 +568,9 @@ def print_cli_smartlog(engine: GitEngine) -> None:
 
 
 def print_cli_bugs(
-    server: DashboardServer,
+    server: Any,
     open_only: bool = False,
+    planned_only: bool = False,
     all_users: bool = False,
     filter_user: str = "",
     engine: Optional[GitEngine] = None,
@@ -409,7 +578,19 @@ def print_cli_bugs(
     category: Optional[str] = None,
 ) -> None:
     """Print bug tracker status to terminal console with optional filtering."""
-    bugs = server.bug_server.database.bugs
+    if hasattr(server, "bug_server"):
+        bugs = server.bug_server.database.bugs
+        actual_server = server
+    elif hasattr(server, "database"):
+        bugs = server.database.bugs
+        actual_server = getattr(server, "server", None)
+    elif hasattr(server, "bugs"):
+        bugs = server.bugs
+        actual_server = None
+    else:
+        bugs = []
+        actual_server = None
+
     print("\n=== Hardware Bug Tracker ===")
     if not bugs:
         print("No bugs registered.\n")
@@ -418,7 +599,9 @@ def print_cli_bugs(
     curr_user = engine.get_current_user() if engine else {"name": "", "email": ""}
     filtered = []
     for b in bugs:
-        if open_only and b.status in (BugStatus.RESOLVED, BugStatus.CLOSED):
+        if open_only and b.status in (BugStatus.RESOLVED, BugStatus.CLOSED, BugStatus.PLANNED):
+            continue
+        if planned_only and b.status != BugStatus.PLANNED:
             continue
         if severity and b.severity.value != severity:
             continue
@@ -426,8 +609,8 @@ def print_cli_bugs(
             continue
 
         # Per-user filtering (BUG-239)
-        if not all_users and engine:
-            bug_file = server.repo_root / "feedback" / f"{b.id}.md"
+        if not all_users and engine and actual_server:
+            bug_file = actual_server.repo_root / "feedback" / f"{b.id}.md"
             b_author = engine.get_file_author(bug_file)
             if filter_user:
                 if (
@@ -445,7 +628,7 @@ def print_cli_bugs(
         comp = f" ({b.component})" if b.component else ""
         print(f"  {chk} [{b.id}] [{b.severity.value}] [{b.category.value}] {b.title}{comp} -> {b.status.value}")
 
-    total_open = sum(1 for b in filtered if b.status not in (BugStatus.RESOLVED, BugStatus.CLOSED))
+    total_open = sum(1 for b in filtered if b.status not in (BugStatus.RESOLVED, BugStatus.CLOSED, BugStatus.PLANNED))
     total_all = len(filtered)
     print(f"\nShowing {len(filtered)} issues ({total_open} open, {total_all} total).\n")
 
@@ -585,11 +768,53 @@ def main(cli_args: Optional[List[str]] = None) -> None:
     is_bug_cmd = bool(
         subcmd in ("list-bugs", "add-bug", "resolve-bug")
         or getattr(args, "bugs", False)
+        or getattr(args, "planned", False)
         or getattr(args, "add_bug", None)
         or getattr(args, "resolve_bug", None)
     )
     review_db = args.db_file if (args.db_file and not is_bug_cmd) else None
     bug_db = args.db_file if (args.db_file and not is_review_cmd) else None
+
+    lock_file = get_dashboard_lock_file(repo_root, args.port)
+
+    if getattr(args, "stop", False):
+        existing = check_existing_instance(lock_file, args.host, args.port)
+        if existing is not None:
+            pid, _ = existing
+            if pid > 0:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    print(f"Stopped dashboard workstation (PID {pid}).")
+                except OSError as e:
+                    print(f"Failed to stop dashboard workstation: {e}", file=sys.stderr)
+            else:
+                print("Dashboard workstation is running on port, but PID is unknown.")
+            try:
+                lock_file.unlink(missing_ok=True)
+            except OSError:
+                pass
+        else:
+            print("No dashboard workstation is running.")
+        return
+
+    if not is_cli_only:
+        existing = check_existing_instance(
+            lock_file,
+            args.host,
+            args.port,
+            cleanup_orphaned=not getattr(args, "no_browser", False),
+        )
+        if existing is not None:
+            pid, existing_url = existing
+            pid_str = f" (PID {pid})" if pid else ""
+            print(f"Dashboard workstation is already running at {existing_url}{pid_str}.")
+            if not getattr(args, "no_browser", False):
+                browser_target = getattr(args, "browser", "webview")
+                if browser_target == "webview":
+                    launch_browser(existing_url)
+                else:
+                    launch_browser(existing_url, browser=browser_target)
+            return
 
     server = DashboardServer(
         host=args.host,
@@ -622,6 +847,7 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             print_cli_bugs(
                 server,
                 open_only=getattr(args, "open", False),
+                planned_only=getattr(args, "planned", False),
                 all_users=all_users,
                 filter_user=filter_user,
                 engine=engine,
@@ -838,10 +1064,15 @@ def main(cli_args: Optional[List[str]] = None) -> None:
         print(f"Resolved bug [{bug.id}]: {bug.title}")
         return
 
-    if getattr(args, "bugs", False) or (getattr(args, "list", False) and args.db_file and "bug" in str(args.db_file)):
+    if (
+        getattr(args, "bugs", False)
+        or getattr(args, "planned", False)
+        or (getattr(args, "list", False) and args.db_file and "bug" in str(args.db_file))
+    ):
         print_cli_bugs(
             server,
             open_only=getattr(args, "open", False),
+            planned_only=getattr(args, "planned", False),
             all_users=all_users,
             filter_user=filter_user,
             engine=engine,
@@ -913,48 +1144,105 @@ def main(cli_args: Optional[List[str]] = None) -> None:
             engine=engine,
         )
         return
-        return
 
     # Interactive Server Mode
     url = server.get_url()
-    curr_branch = engine.get_current_branch()
 
-    banner = rf"""
-======================================================================
-  QUAKE VCS // UNIFIED DASHBOARD WORKSTATION v1.0
-======================================================================
-  * Dashboard URL  : {url}
-  * Repository     : {repo_root.name}
-  * Active Branch  : {curr_branch}
-  * Sub-Stations   :
-      - VCS / Diff View : {url}/
-      - Code Review     : {url}/review
-      - Bug Tracker     : {url}/bugs
-  * Browser Target : {args.browser.upper()}
-  * Press [Ctrl+C] to shut down server.
-======================================================================
-  ➜ In VS Code: [Cmd+Click] the Dashboard URL above to open inside
-    the integrated Simple Browser (or press [F5] / run Task).
-======================================================================
-"""
-    print(banner)
+    # Detach from terminal unless --no-detach / --foreground is requested
+    if not getattr(args, "no_detach", False):
+        log_dir = repo_root / "build" if (repo_root / "build").exists() else repo_root / "target"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / "dashboard.log"
+        log_file = open(log_path, "a", encoding="utf-8")
 
-    browser_mode = "none" if args.no_browser else args.browser
-    if browser_mode != "none":
+        child_args = (
+            [sys.executable, str(Path(sys.argv[0]).resolve())]
+            + [a for a in sys.argv[1:] if a not in ("--no-detach", "--foreground")]
+            + ["--no-detach"]
+        )
 
-        def _open() -> None:
-            time.sleep(0.3)
-            launch_browser(url, target=browser_mode)
+        popen_kwargs = {
+            "stdout": log_file,
+            "stderr": log_file,
+            "stdin": subprocess.DEVNULL,
+        }
+        if os.name == "posix":
+            popen_kwargs["start_new_session"] = True
+        elif sys.platform in ("win32", "win64"):
+            detached_flag = getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+            new_grp_flag = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+            popen_kwargs["creationflags"] = detached_flag | new_grp_flag
 
-        threading.Thread(target=_open, daemon=True).start()
+        server.server_close()
+        proc = subprocess.Popen(child_args, **popen_kwargs)
+
+        deadline = time.time() + 3.0
+        while time.time() < deadline:
+            if proc.poll() is not None:
+                print("Error: Dashboard workstation failed to start.", file=sys.stderr)
+                sys.exit(1)
+            if lock_file.exists():
+                try:
+                    data = json.loads(lock_file.read_text(encoding="utf-8"))
+                    if data.get("pid") == proc.pid:
+                        break
+                except (json.JSONDecodeError, OSError):
+                    pass
+            time.sleep(0.05)
+
+        print(f"➜ Dashboard workstation running at {url} (PID {proc.pid}).")
+        print("➜ Detached from terminal.")
+        sys.exit(0)
+
+    # Foreground / non-detached server process
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
+    lock_file.write_text(
+        json.dumps(
+            {
+                "pid": os.getpid(),
+                "url": url,
+                "no_browser": getattr(args, "no_browser", False),
+            }
+        ),
+        encoding="utf-8",
+    )
+    print(f"➜ Dashboard workstation running at {url} (PID {os.getpid()}).")
+
+    if not args.no_browser:
+
+        def _on_app_close() -> None:
+            """Shut down server when application window is closed."""
+
+            def _shutdown() -> None:
+                try:
+                    server.shutdown()
+                except Exception:
+                    pass
+                if lock_file.exists():
+                    try:
+                        lock_file.unlink()
+                    except OSError:
+                        pass
+                os._exit(0)
+
+            threading.Thread(target=_shutdown, daemon=True).start()
+
+        browser_target = getattr(args, "browser", "webview")
+        if browser_target == "webview":
+            launch_browser(url, on_close=_on_app_close)
+        else:
+            launch_browser(url, browser=browser_target, on_close=_on_app_close)
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nShutting down Dashboard server via interrupt...")
+        pass
     finally:
+        try:
+            lock_file.unlink(missing_ok=True)
+        except OSError:
+            pass
         server.server_close()
-        print("Dashboard server shut down. Terminal released.\n")
 
 
 if __name__ == "__main__":

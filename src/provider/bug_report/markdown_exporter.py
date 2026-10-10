@@ -342,7 +342,7 @@ class MarkdownBugExporter:
         # Check list items for quick-action statuses: - [x] or - [ ]
         checklist_status: Dict[str, BugStatus] = {}
         for line in content.splitlines():
-            chk_m = re.match(r"^-\s+\[([ xX])\]\s+.*?\b(BUG-\d+)\b", line)
+            chk_m = re.match(r"^-\s+\[([ xX])\]\s+.*?\b((?:BUG|WORM)[_-][A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)\b", line)
             if chk_m:
                 is_checked = chk_m.group(1).lower() == "x"
                 chk_id = chk_m.group(2)
@@ -358,7 +358,9 @@ class MarkdownBugExporter:
                 continue
 
             header_match = re.search(
-                r'###\s+(?:<a id=".*?></a>\s*)?(?:[^\n\[]*?)?`\[(BUG-\d+)\]`\s*(.*?)$', sec_clean, re.MULTILINE
+                r'###\s+(?:<a id=".*?></a>\s*)?(?:[^\n\[]*?)?`\[((?:BUG|WORM)[_-][A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)\]`\s*(.*?)$',
+                sec_clean,
+                re.MULTILINE,
             )
             if not header_match:
                 continue
@@ -724,14 +726,16 @@ class MarkdownBugExporter:
             return None
         try:
             content = file_path.read_text(encoding="utf-8")
-            m_header = re.search(r"^#\s+(?:[^\n\[]*?)?`\[(BUG-[^\]]+|[^\]]+)\]`\s*(.*?)$", content, re.MULTILINE)
-            m_fn = re.match(r"^BUG[_-](.+)\.md$", file_path.name, re.IGNORECASE)
+            m_header = re.search(
+                r"^#\s+(?:[^\n\[]*?)?`\[((?:BUG|WORM)-[^\]]+|[^\]]+)\]`\s*(.*?)$", content, re.MULTILINE
+            )
+            m_fn = re.match(r"^(?:BUG|WORM)[_-](.+)\.md$", file_path.name, re.IGNORECASE)
             fn_id = ""
             if m_fn:
                 fn_part = m_fn.group(1)
                 if fn_part.isdigit():
                     fn_id = f"BUG-{int(fn_part):03d}"
-                elif fn_part.startswith("BUG-"):
+                elif fn_part.startswith("BUG-") or fn_part.startswith("WORM-"):
                     fn_id = fn_part
                 else:
                     fn_id = f"BUG-{fn_part}"

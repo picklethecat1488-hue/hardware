@@ -1,7 +1,11 @@
 name: CI Gate Validation
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
@@ -57,6 +61,11 @@ jobs:
         run: |
           set -o pipefail
           python src/smoke.py
+
+      - name: Stop Build Daemon
+        if: always()
+        shell: bash -el {0}
+        run: python src/daemon.py stop || true
 
       - name: Upload Daemon Logs
         if: always()

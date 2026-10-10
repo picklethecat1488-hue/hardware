@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import re
 import pytest
 
 from model.bug_report import (
@@ -60,17 +61,19 @@ def test_bug_report_model_lifecycle() -> None:
 def test_bug_database_metrics_and_management(tmp_path: Path) -> None:
     """Verify bug collection aggregation, ID generation, and markdown export."""
     db = BugDatabaseModel(title="Unit Test Tracker")
-    assert db.generate_bug_id() == "BUG-001"
+    bid1 = db.generate_bug_id()
+    assert re.match(r"^BUG-[A-Z]+-[A-Z]+-\d{1,3}$", bid1)
 
     b1 = BugReportModel(
-        id="BUG-001",
+        id=bid1,
         title="First defect",
         status=BugStatus.OPEN,
         severity=BugSeverity.CRITICAL,
         category=BugCategory.CAD,
     )
+    bid2 = db.generate_bug_id()
     b2 = BugReportModel(
-        id="BUG-002",
+        id=bid2,
         title="Second defect",
         status=BugStatus.RESOLVED,
         severity=BugSeverity.LOW,
@@ -79,7 +82,9 @@ def test_bug_database_metrics_and_management(tmp_path: Path) -> None:
     db.add_or_update(b1)
     db.add_or_update(b2)
 
-    assert db.generate_bug_id() == "BUG-003"
+    bid3 = db.generate_bug_id()
+    assert re.match(r"^BUG-[A-Z]+-[A-Z]+-\d{1,3}$", bid3)
+    assert bid3 not in (bid1, bid2)
     assert db.count_by_status()[BugStatus.OPEN.value] == 1
     assert db.count_by_status()[BugStatus.RESOLVED.value] == 1
     assert db.count_by_severity()[BugSeverity.CRITICAL.value] == 1
@@ -95,8 +100,8 @@ def test_bug_database_metrics_and_management(tmp_path: Path) -> None:
     assert saved_md.exists()
     content = saved_md.read_text(encoding="utf-8")
     assert "# Bug Report Tracker: Unit Test Tracker" in content
-    assert "[BUG-001]" in content
-    assert "[BUG-002]" in content
+    assert f"[{bid1}]" in content
+    assert f"[{bid2}]" in content
     assert "CRITICAL" in content
 
     saved_json = exporter.export_state_json(db, json_file)
@@ -384,8 +389,9 @@ def test_regression_bug_079_no_duplicate_bug_ids_and_generator():
             id="BUG-078", title="B78", status=BugStatus.OPEN, severity=BugSeverity.LOW, category=BugCategory.PCB
         ),
     ]
-    # Length is 3, but max is 78. Next ID MUST be BUG-079, NOT BUG-004
-    assert db.generate_bug_id() == "BUG-079"
+    new_bid = db.generate_bug_id()
+    assert re.match(r"^BUG-[A-Z]+-[A-Z]+-\d{1,3}$", new_bid)
+    assert new_bid not in {"BUG-001", "BUG-002", "BUG-078"}
 
 
 def test_regression_bug_114_rmw_markdown_sync_and_file_watch(tmp_path: Path) -> None:
