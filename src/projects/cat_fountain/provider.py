@@ -52,6 +52,35 @@ class CatFountainProvider(Provider):
     SLOT_WIDTH = 2.0
     SLOT_LENGTH = 100.0
 
+    # RP2040 GPIO Key constants for wiring diagram
+    RP2040_KEY_BOX_WIDTH = 64.0
+    RP2040_KEY_BOX_HEIGHT = 50.0
+    RP2040_KEY_CENTER = (-95.0, -88.0)
+    RP2040_KEY_CORNER_RADIUS = 2.5
+    RP2040_KEY_SWATCH_LENGTH = 4.0
+    RP2040_KEY_DOT_RADIUS = 0.5
+    RP2040_KEY_ROW_PITCH = 3.6
+    RP2040_KEY_LEFT_GPIOS = (
+        "GP4",
+        "GP5",
+        "GP6",
+        "GP7",
+        "GP9",
+        "GP10",
+        "GP11",
+        "GP12",
+        "GP13",
+        "GP14",
+    )
+    RP2040_KEY_RIGHT_GPIOS = (
+        "GP26",
+        "GP22",
+        "GP21",
+        "GP20",
+        "GP19",
+        "GP18",
+    )
+
     water_sim: Optional[Any] = None
 
     @property
@@ -1503,6 +1532,95 @@ class CatFountainProvider(Provider):
         # Build the diagram using the diagram class
         diagram = WiringDiagram(wiring)
         diagram.build(room)
+
+        # Add dedicated RP2040 GPIO pinout key
+        self._build_rp2040_key(room, wiring)
+
+    def _build_rp2040_key(self, room: Room, wiring: Wiring) -> None:
+        """Add a dedicated RP2040 GPIO pinout key in the bottom-left corner of the wiring diagram."""
+        # Query nets dynamically from wiring configuration
+        pico_nets: dict[str, tuple[str, str]] = {}
+        for net in wiring.config.get("nets", []):
+            color = net.get("color", "grey")
+            net_name = net.get("name", "")
+            for pin in net.get("pins", []):
+                if len(pin) >= 2 and pin[0] == "pico":
+                    pico_nets[pin[1]] = (net_name, color)
+
+        signal_labels = {
+            "sda": "I2C_SDA",
+            "scl": "I2C_SCL",
+        }
+
+        box_cx, box_cy = self.RP2040_KEY_CENTER
+        box_w = self.RP2040_KEY_BOX_WIDTH
+        box_h = self.RP2040_KEY_BOX_HEIGHT
+
+        with BuildSketch() as key_border:
+            Rectangle(box_w, box_h)
+            fillet(key_border.vertices(), radius=self.RP2040_KEY_CORNER_RADIUS)
+        room.add(
+            "rp2040_key_border",
+            key_border.sketch.moved(Location((box_cx, box_cy))),
+            color="grey",
+            line_weight=1.5,
+        )
+
+        room.add_label(
+            "rp2040_key_title",
+            "RP2040 GPIO KEY",
+            Vector(box_cx, box_cy + box_h / 2.0 - 4.0, 0.0),
+            options=TextArgs(font_size=2.0, align=(Align.CENTER, Align.CENTER), font="Serif"),
+        )
+
+        with BuildLine() as div:
+            Line(
+                (box_cx - box_w / 2.0 + 3.0, box_cy + box_h / 2.0 - 7.0),
+                (box_cx + box_w / 2.0 - 3.0, box_cy + box_h / 2.0 - 7.0),
+            )
+        room.add("rp2040_key_divider", div.line, color="grey", line_weight=1.0)
+
+        start_y = box_cy + box_h / 2.0 - 11.0
+        col1_x = box_cx - box_w / 2.0 + 3.5
+        col2_x = box_cx + 2.0
+
+        for idx, gpio in enumerate(self.RP2040_KEY_LEFT_GPIOS):
+            if gpio not in pico_nets:
+                continue
+            net_name, color = pico_nets[gpio]
+            display_name = signal_labels.get(net_name, net_name.upper())
+            y = start_y - idx * self.RP2040_KEY_ROW_PITCH
+            with BuildLine() as sw:
+                Line((col1_x, y), (col1_x + self.RP2040_KEY_SWATCH_LENGTH, y))
+            room.add(f"rp2040_key_swatch_{gpio.lower()}", sw.line, color=color, line_weight=2.0)
+            with BuildSketch() as dot:
+                Circle(radius=self.RP2040_KEY_DOT_RADIUS)
+            room.add(f"rp2040_key_dot_{gpio.lower()}", dot.sketch.moved(Location((col1_x, y))), color=color)
+            room.add_label(
+                f"rp2040_key_lbl_{gpio.lower()}",
+                f"{gpio}: {display_name}",
+                Vector(col1_x + self.RP2040_KEY_SWATCH_LENGTH + 1.0, y, 0.0),
+                options=TextArgs(font_size=1.4, align=(Align.MIN, Align.CENTER), font="Serif"),
+            )
+
+        for idx, gpio in enumerate(self.RP2040_KEY_RIGHT_GPIOS):
+            if gpio not in pico_nets:
+                continue
+            net_name, color = pico_nets[gpio]
+            display_name = signal_labels.get(net_name, net_name.upper())
+            y = start_y - idx * self.RP2040_KEY_ROW_PITCH
+            with BuildLine() as sw:
+                Line((col2_x, y), (col2_x + self.RP2040_KEY_SWATCH_LENGTH, y))
+            room.add(f"rp2040_key_swatch_{gpio.lower()}", sw.line, color=color, line_weight=2.0)
+            with BuildSketch() as dot:
+                Circle(radius=self.RP2040_KEY_DOT_RADIUS)
+            room.add(f"rp2040_key_dot_{gpio.lower()}", dot.sketch.moved(Location((col2_x, y))), color=color)
+            room.add_label(
+                f"rp2040_key_lbl_{gpio.lower()}",
+                f"{gpio}: {display_name}",
+                Vector(col2_x + self.RP2040_KEY_SWATCH_LENGTH + 1.0, y, 0.0),
+                options=TextArgs(font_size=1.4, align=(Align.MIN, Align.CENTER), font="Serif"),
+            )
 
     def compute_flow_metrics(self) -> dict[str, Any]:
         """Compute continuous flow and drainage metrics delegating to simulation hooks."""

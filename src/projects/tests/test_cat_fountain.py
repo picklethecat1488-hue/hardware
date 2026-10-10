@@ -94,6 +94,22 @@ class TestCatFountainProvider:
         assert "wire_sda" in room
         assert "wire_scl" in room
 
+        # Verify RP2040 GPIO Key (BUG-FOSSORIAL-BRISTLE-291)
+        assert "rp2040_key_border" in room
+        assert "rp2040_key_divider" in room
+        for gpio in provider.RP2040_KEY_LEFT_GPIOS:
+            assert f"rp2040_key_swatch_{gpio.lower()}" in room
+            assert f"rp2040_key_dot_{gpio.lower()}" in room
+        for gpio in provider.RP2040_KEY_RIGHT_GPIOS:
+            assert f"rp2040_key_swatch_{gpio.lower()}" in room
+            assert f"rp2040_key_dot_{gpio.lower()}" in room
+
+        # Verify label contents
+        label_names = {lbl[0] for lbl in room._labels}
+        assert "rp2040_key_title" in label_names
+        assert "rp2040_key_lbl_gp4" in label_names
+        assert "rp2040_key_lbl_gp26" in label_names
+
     @pytest.mark.slow
     def test_wiring_diagram_class(self, provider):
         """Verify that WiringDiagram populates the room with all pads and wires."""
