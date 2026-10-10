@@ -1489,6 +1489,41 @@ class CatFountainProvider(Provider):
                     mode=Mode.SUBTRACT,
                 )
 
+            # Side wiring connector relief cutout (giving clip an "R" shape, BUG-TRANSLUCENT-LARVA-792)
+            stub_l = self.settings.motor_clip_arm_stub_length
+            relief_r = self.settings.motor_clip_side_relief_radius
+            relief_fillet = self.settings.motor_clip_side_relief_fillet
+            y_stub = -clip_l + stub_l
+
+            with BuildSketch(Plane.XY) as relief_sketch:
+                with BuildLine() as relief_line:
+                    p_top_inner = (-wire_w / 2.0 + 0.5, y_stub)
+                    p_top_outer = (-clip_w / 2.0 - 2.0, y_stub)
+                    p_front_outer = (-clip_w / 2.0 - 2.0, 5.0 + 1.0)
+                    p_front_edge = (-clip_w / 2.0 + 1.8, 5.0)
+                    p_lobe_notch = (mount_pts[1][0] - 1.2, mount_pts[1][1])
+
+                    Line(p_top_inner, p_top_outer)
+                    Line(p_top_outer, p_front_outer)
+                    Line(p_front_outer, (p_front_edge[0], 5.0 + 1.0))
+                    Line((p_front_edge[0], 5.0 + 1.0), p_front_edge)
+                    RadiusArc(p_front_edge, p_lobe_notch, radius=-relief_r)
+                    Line(p_lobe_notch, (-wire_w / 2.0 + 0.5, p_lobe_notch[1]))
+                    Line((-wire_w / 2.0 + 0.5, p_lobe_notch[1]), p_top_inner)
+                make_face()
+            extrude(relief_sketch.sketch, amount=clip_h + 5.0, mode=Mode.SUBTRACT)
+
+            # Stress-relief fillet on re-entrant corner of remaining arm stub
+            reentrant_edges = [
+                e
+                for e in clip.part.edges()
+                if abs(e.center().X - (-wire_w / 2.0)) < 1.0
+                and abs(e.center().Y - y_stub) < 1.0
+                and abs(e.length - clip_h) < 0.2
+            ]
+            if reentrant_edges:
+                fillet(reentrant_edges, radius=relief_fillet)
+
             URDFMetadata(
                 label=target,
                 material=self.get_material(target) or "petg",

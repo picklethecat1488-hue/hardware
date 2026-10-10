@@ -828,6 +828,21 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("motor_clip_length", 26.0))
 
     @cached_property
+    def motor_clip_arm_stub_length(self) -> float:
+        """Return the length of the remaining guide stub on the relieved arm of the motor clip."""
+        return float(self._raw_data.get("motor_clip_arm_stub_length", 10.0))
+
+    @cached_property
+    def motor_clip_side_relief_radius(self) -> float:
+        """Return the arc radius for the wiring connector relief on the motor clip."""
+        return float(self._raw_data.get("motor_clip_side_relief_radius", 20.0))
+
+    @cached_property
+    def motor_clip_side_relief_fillet(self) -> float:
+        """Return the fillet radius for the re-entrant corner of the motor clip relief."""
+        return float(self._raw_data.get("motor_clip_side_relief_fillet", 1.0))
+
+    @cached_property
     def motor_radius(self) -> float:
         """Return the outer radius of the motor body in millimeters."""
         return float(self._raw_data.get("motor_radius", 7.6))
