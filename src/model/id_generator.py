@@ -3,9 +3,9 @@
 Implements WORM-029:
 Format: [PREFIX]-[ADJECTIVE]-[ANIMAL/NOUN]-[3 digits]
 Examples:
-    - BUG-SWIFT-FOX-42
-    - BUG-BOLD-LYNX-809
-    - BUG-IRON-CRANE-17
+    - BUG-BURROWING-ANNELID-42
+    - BUG-WRIGGLY-EARTHWORM-809
+    - BUG-SLIMY-NIGHTCRAWLER-17
 
 Adjective and noun lists are compressed with zlib + base64 to save code space.
 """
@@ -17,21 +17,22 @@ import secrets
 from typing import List, Optional
 import zlib
 
-# Compressed word lists to minimize source code footprint per WORM-029
+# Compressed worm-themed word lists to minimize source code footprint
 _B64_ADJS = (
-    "eJwlkGGWgCAIhK8yV6EiYzNtEe3V/Q+y49s/HwrKDEiyrJCsHlhq3rC4DCUtHYFV8oU1q/jkUIZa"
-    "MzbdAyqJd71txS4tsJv6qtiztINUZcorCynXB2n2Ti5lUiUmteAQ314c781W5rXgRzYlvg/nrOfa"
-    "N+S+ni9ZaOOavl4U5dti10Lzpf5zCG6VE7fbpeT8+tttPeFy2wav89iXl6CtRu0bjeOXmGFO12j7"
-    "RKuZSq0WjtZChQ4ZvJDVL7S+BAVbZ+IxbiJsk4yoPR0I74qewwXdFykYkk2oMCz4aNigk0fY5jFu"
-    "5LGm+LRYHH9OmmlB"
+    "eNolkVuWxCAIRLfCVnzQhtMoDmLPZP8bmTL9Ewoi5QXTGKxSpVBWGZWyywq9KW93+5XRqFwSMmwv"
+    "Kib6VKxPW8GVijPPU6qpT6pIqIoHcfK4eBD3zLXi4Is9RJleyuu6T/iTfHJby1ySUjsUcGr6vba5"
+    "7XFar91BJwMcKGvyD06rwJ/UUr9JN6BLOjyKs4NX4RHQK/xgd8NI1HetNw0rsX3AwbylAePJKW7C"
+    "EG+abtlWkUqeqiR4uNmxfVBocesw5qN8QuEqyLCFIPrGvEulvM8XWOth9AO9sLj89fjZ4ufnzsHu"
+    "aXBC154TuwikS/cDH/t5F/Sia2uKIz+sHwbshx0rQdW/8mXe6delNTwcYpxN/QPweYLC"
 )
 
 _B64_NOUNS = (
-    "eJwVkFuSxSAIRLfSW8FIolciFmpMZv8LGfzwVMmraQLFiw2Bekdgso1nB3LXiqA7MkVwaDDCYVTZ"
-    "qQuRvSrmeimiSku5IhoVRpxHAdMlDJaCk+TwSWeuR8KpL07TC9eemcjYsQoSm9cktc7IgV9H7vjR"
-    "NV3/Rx+KkhCErEBYG1mEZG+Rr764Vb3v1unUMXwvXYJGNdLm8OlobK7fsi/Y5k0wuv09XJ0fzNdX"
-    "mAZ30ZkEPW2pLjoSet22uotu333oziyqGHmfbpjOgSe7Ah5114vEZsdKtD8qJ5a5zkcFf+xX/Aed"
-    "nGJK"
+    "eNo1UlGSxSAIuwpXQctTZlFcxHbf/S+ytE6/EkGBBLF3Ej4gEbkQJFE9LrUGSVNiD9CffTaez42N"
+    "O7bM9CKDjNO5l0AnGyyCEaPuPOggyBXJdegRzL4ThSdkYSeR1SBrVu0Bbej0u5jhJQ8SjcCDSwkg"
+    "NK9PWyIB6rl+3ZBi9g/bnucj6A8potcmthJUksbdK3A8esIx34kgRLlCKL67yCo7tVpIzGtCw1LU"
+    "oRHKk2mhawuKavGiU0PXOHYu1d+p+7eNCipc9NFNMFBUFIZgR2PsMFS+b24NBKNtuXFK2jdVva0w"
+    "XX3nJr6ESgtnA20swUBHgsmy1zR5rJ7XvdIZkmB2ZIH5u9haFHQc2ypf6SX3D4jUSXLStu8ka7Gj"
+    "M2QWtCd04d/G1+srPoromgSXxYKiwj+DtKN6"
 )
 
 
@@ -66,9 +67,9 @@ def generate_docker_pattern_id(
 
     Format: [PREFIX]-[ADJECTIVE]-[ANIMAL/NOUN]-[3 digits]
     Examples:
-        - BUG-SWIFT-FOX-42
-        - BUG-BOLD-LYNX-809
-        - BUG-IRON-CRANE-17
+        - BUG-BURROWING-ANNELID-42
+        - BUG-WRIGGLY-EARTHWORM-809
+        - BUG-SLIMY-NIGHTCRAWLER-17
 
     Args:
         prefix: Prefix string (e.g. 'BUG' or 'WORM').

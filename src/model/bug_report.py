@@ -142,9 +142,9 @@ class BugDatabaseModel(BaseModel):
 
         Format: BUG-[ADJECTIVE]-[ANIMAL/NOUN]-[3 digits]
         Examples:
-            - BUG-SWIFT-FOX-42
-            - BUG-BOLD-LYNX-809
-            - BUG-IRON-CRANE-17
+            - BUG-BUZZING-BEETLE-42
+            - BUG-CHITINOUS-MANTIS-809
+            - BUG-SCUTTLING-CICADA-17
         """
         known = set(existing_ids or [])
         for b in self.bugs:
