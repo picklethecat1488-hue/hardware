@@ -1102,7 +1102,7 @@
 
         let previewHtml = "";
         if (isImg) {
-          previewHtml = `<a href="/${att.file_path}" target="_blank"><img src="/${att.file_path}" class="attachment-preview" alt="${att.filename}"></a>`;
+          previewHtml = `<a href="/${att.file_path}" target="_blank"><img src="/${att.file_path}?t=${encodeURIComponent(att.created_at || Date.now())}" class="attachment-preview" alt="${att.filename}"></a>`;
         } else {
           const icon = isPdf ? "📕" : "📄";
           const docTypeLabel = isPdf ? "PDF DOCUMENT" : (att.file_type ? att.file_type.toUpperCase() : "DOCUMENT");
@@ -1324,7 +1324,7 @@
 
         if (hasFiles) {
           e.preventDefault();
-          handleFileUpload(e.clipboardData.files);
+          handleFileUpload(e.clipboardData.files, true);
           return;
         }
 
@@ -1335,7 +1335,9 @@
             if (item.kind === "file") {
               const blob = item.getAsFile();
               if (blob) {
-                const fname = blob.name || (blob.type.startsWith("image/") ? "screenshot_paste_" + Date.now() + ".png" : "doc_paste_" + Date.now() + ".txt");
+                const isGeneric = !blob.name || blob.name === "image.png" || blob.name === "blob" || blob.name === "screenshot.png";
+                const randSuffix = Math.random().toString(36).slice(2, 7);
+                const fname = (!isGeneric && blob.name) ? blob.name : (blob.type.startsWith("image/") ? "screenshot_paste_" + Date.now() + "_" + randSuffix + ".png" : "doc_paste_" + Date.now() + "_" + randSuffix + ".txt");
                 const ftype = blob.type.startsWith("image/") ? "screenshot" : "document";
                 uploadBlob(blob, fname, ftype);
                 handled = true;
@@ -1365,13 +1367,14 @@
           const clipboardItems = await navigator.clipboard.read();
           for (const item of clipboardItems) {
             for (const type of item.types) {
+              const randSuffix = Math.random().toString(36).slice(2, 7);
               if (type.startsWith("image/")) {
                 const blob = await item.getType(type);
-                uploadBlob(blob, "pasted_screenshot_" + Date.now() + ".png", "screenshot");
+                uploadBlob(blob, "pasted_screenshot_" + Date.now() + "_" + randSuffix + ".png", "screenshot");
                 return;
               } else if (type === "application/pdf") {
                 const blob = await item.getType(type);
-                uploadBlob(blob, "pasted_document_" + Date.now() + ".pdf", "document");
+                uploadBlob(blob, "pasted_document_" + Date.now() + "_" + randSuffix + ".pdf", "document");
                 return;
               }
             }
@@ -1390,9 +1393,10 @@
       }
     }
 
-    function handleFileUpload(files) {
+    function handleFileUpload(files, isPaste = false) {
       if (!files || files.length === 0) return;
-      for (let f of files) {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
         const reader = new FileReader();
         reader.onload = () => {
           const b64 = reader.result.split(",")[1];
@@ -1400,11 +1404,18 @@
           const isImg = lowerName.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i);
           const isDoc = lowerName.match(/\.(pdf|txt|log|json|yaml|yml|md|csv)$/i);
           const fileType = isImg ? "screenshot" : (isDoc ? "document" : "reference");
+          let targetName = f.name;
+          const isGeneric = targetName === "image.png" || targetName === "blob" || targetName === "screenshot.png";
+          if (isPaste || isGeneric) {
+            const randSuffix = Math.random().toString(36).slice(2, 7);
+            const ext = isImg ? (lowerName.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i)[0]) : ".png";
+            targetName = `screenshot_paste_${Date.now()}_${randSuffix}${ext}`;
+          }
           uploadPayload({
-            filename: f.name,
+            filename: targetName,
             file_type: fileType,
             content_base64: b64,
-            description: "Uploaded " + fileType + " " + f.name
+            description: (isPaste ? "Pasted " : "Uploaded ") + fileType + " " + targetName
           });
         };
         reader.readAsDataURL(f);
