@@ -122,6 +122,17 @@ class TestCatFountainProvider:
         assert "rp2040_key_lbl_gp4" in label_names
         assert "rp2040_key_lbl_gp26" in label_names
 
+        # Verify TMC6300 Pin Key (BUG-DEEP-BURROWER-108)
+        assert "tmc6300_key_border" in room
+        assert "tmc6300_key_divider" in room
+        for pin, _ in provider.TMC6300_KEY_ENTRIES:
+            assert f"tmc6300_key_swatch_{pin.lower()}" in room
+            assert f"tmc6300_key_dot_{pin.lower()}" in room
+
+        assert "tmc6300_key_title" in label_names
+        for pin, _ in provider.TMC6300_KEY_ENTRIES:
+            assert f"tmc6300_key_lbl_{pin.lower()}" in label_names
+
     @pytest.mark.slow
     def test_wiring_diagram_class(self, provider):
         """Verify that WiringDiagram populates the room with all pads and wires."""

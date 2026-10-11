@@ -121,3 +121,22 @@ def test_pico_gpio_labels_simplified():
     non_gpio = [p for p in pico.pins if not p.name.startswith("GP")]
     actual_labels = {p.label for p in non_gpio}
     assert power_gnd_labels.issubset(actual_labels)
+
+
+def test_tmc6300_motor_driver_pins():
+    """Verify that TMC6300 motor driver output pins are renamed to U, V, W (BUG-DEEP-BURROWER-108)."""
+    yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+    wiring = Wiring(yaml_path)
+
+    driver = next(f for f in wiring.footprints if f.name == "motor_driver")
+    pin_names = {p.name for p in driver.pins}
+    assert {"U", "V", "W"}.issubset(pin_names)
+    assert "OUT1" not in pin_names
+    assert "OUT2" not in pin_names
+    assert "OUT3" not in pin_names
+
+    # Check wires connecting to motor phases
+    for net_name, phase in [("motor_u", "U"), ("motor_v", "V"), ("motor_w", "W")]:
+        net = next(n for n in wiring.nets if n.name == net_name)
+        assert ("motor_driver", phase) in net.pins
+        assert ("motor", phase) in net.pins
