@@ -1496,46 +1496,43 @@ class CatFountainProvider(Provider):
                     make_hull()
                 extrude(base_sketch.sketch, amount=-recess_d, mode=Mode.SUBTRACT)
 
-            # Wire relief channel extending South along -Y
-            with Locations((0, -1.5, clip_h)):
-                Box(
-                    wire_w,
-                    clip_l + 5.0,
-                    wire_d + 3.5,
-                    align=(Align.CENTER, Align.MAX, Align.MAX),
-                    mode=Mode.SUBTRACT,
-                )
-
-            # Side wiring connector relief cutout (giving clip an "R" shape, BUG-TRANSLUCENT-LARVA-792)
+            # Side wiring connector relief cutout and wire channel with support web (BUG-TRANSLUCENT-LARVA-792)
             stub_l = self.settings.motor_clip_arm_stub_length
             relief_r = self.settings.motor_clip_side_relief_radius
             relief_fillet = self.settings.motor_clip_side_relief_fillet
+            support_rise = self.settings.motor_clip_support_rise
+            support_r = self.settings.motor_clip_support_radius
             y_stub = -clip_l + stub_l
 
-            with BuildSketch(Plane.XY) as relief_sketch:
-                with BuildLine() as relief_line:
-                    p_top_inner = (-wire_w / 2.0 + 0.5, y_stub)
-                    p_top_outer = (-clip_w / 2.0 - 2.0, y_stub)
-                    p_front_outer = (-clip_w / 2.0 - 2.0, 5.0 + 1.0)
-                    p_front_edge = (-clip_w / 2.0 + 1.8, 5.0)
-                    p_lobe_notch = (mount_pts[1][0] - 1.2, mount_pts[1][1])
+            p_stub_outer = (-clip_w / 2.0 - 2.0, y_stub)
+            p_stub_inner = (-wire_w / 2.0, y_stub)
+            p_support_end = (wire_w / 2.0, y_stub + support_rise)
+            p_slot_top_right = (wire_w / 2.0, -1.5)
+            p_slot_top_left = (-wire_w / 2.0, -1.5)
+            p_lobe_notch = (mount_pts[1][0] - 1.2, mount_pts[1][1])
+            p_front_edge = (-clip_w / 2.0 + 1.8, 5.0)
+            p_front_outer = (-clip_w / 2.0 - 2.0, 5.0 + 1.0)
 
-                    Line(p_top_inner, p_top_outer)
-                    Line(p_top_outer, p_front_outer)
-                    Line(p_front_outer, (p_front_edge[0], 5.0 + 1.0))
-                    Line((p_front_edge[0], 5.0 + 1.0), p_front_edge)
-                    RadiusArc(p_front_edge, p_lobe_notch, radius=-relief_r)
-                    Line(p_lobe_notch, (-wire_w / 2.0 + 0.5, p_lobe_notch[1]))
-                    Line((-wire_w / 2.0 + 0.5, p_lobe_notch[1]), p_top_inner)
+            with BuildSketch(Plane.XY) as cut_sketch:
+                with BuildLine() as cut_line:
+                    Line(p_stub_outer, p_stub_inner)
+                    RadiusArc(p_stub_inner, p_support_end, radius=-support_r)
+                    Line(p_support_end, p_slot_top_right)
+                    Line(p_slot_top_right, p_slot_top_left)
+                    Line(p_slot_top_left, p_lobe_notch)
+                    RadiusArc(p_lobe_notch, p_front_edge, radius=relief_r)
+                    Line(p_front_edge, (p_front_edge[0], 5.0 + 1.0))
+                    Line((p_front_edge[0], 5.0 + 1.0), p_front_outer)
+                    Line(p_front_outer, p_stub_outer)
                 make_face()
-            extrude(relief_sketch.sketch, amount=clip_h + 5.0, mode=Mode.SUBTRACT)
+            extrude(cut_sketch.sketch, amount=clip_h + 5.0, mode=Mode.SUBTRACT)
 
             # Stress-relief fillet on re-entrant corner of remaining arm stub
             reentrant_edges = [
                 e
                 for e in clip.part.edges()
-                if abs(e.center().X - (-wire_w / 2.0)) < 1.0
-                and abs(e.center().Y - y_stub) < 1.0
+                if abs(e.center().X - (-wire_w / 2.0)) < 0.5
+                and abs(e.center().Y - y_stub) < 0.5
                 and abs(e.length - clip_h) < 0.2
             ]
             if reentrant_edges:

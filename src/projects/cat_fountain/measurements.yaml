@@ -204,4 +204,6 @@ motor_clip_length: 26.0
 motor_clip_arm_stub_length: 10.0
 motor_clip_side_relief_radius: 20.0
 motor_clip_side_relief_fillet: 1.0
+motor_clip_support_rise: 6.0
+motor_clip_support_radius: 15.0
 
