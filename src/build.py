@@ -39,13 +39,6 @@ class Builder:
         self.build_manifest: dict[str, dict[str, str]] = {"brep": {}, "file": {}}
         self.lock = threading.Lock()
         self.executor = ThreadPoolExecutor()
-        template_path = Path(__file__).parent / "urdf_template.yaml"
-        with open(template_path, "r") as f:
-            templates = yaml.safe_load(f)
-        self.robot_template = templates["robot_template"].strip()
-        self.link_template = templates["link_template"].strip()
-        self.joint_template = templates["joint_template"].strip()
-        self.axis_limit_template = templates["axis_limit_template"].strip()
 
     def _get_summary(self, names: Sequence[str]) -> str:
         """Return a truncated summary string of the target names."""

@@ -691,7 +691,7 @@ class Room(dict[str, tuple[Any, tuple[float, float, float, float]]]):
             if label:
                 label_to_geom[label] = u_geom
 
-        template_path = Path(__file__).parent.parent / "urdf_template.yaml"
+        template_path = Path(__file__).parent / "templates" / "urdf_template.yaml"
         with open(template_path, "r") as f:
             templates = yaml.safe_load(f)
         robot_template = templates["robot_template"].strip()
