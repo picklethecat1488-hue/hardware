@@ -311,7 +311,7 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: ECS-240-8-30B-CKM
+  mpn: ECS-240-8-32B-CKM
   supplier_pn: XC2345-ND
 - name: C9
   package: '0402'
