@@ -81,6 +81,23 @@ class CatFountainProvider(Provider):
         "GP18",
     )
 
+    # TMC6300 Pin Key constants for wiring diagram
+    TMC6300_KEY_BOX_WIDTH = 50.0
+    TMC6300_KEY_BOX_HEIGHT = 38.0
+    TMC6300_KEY_CENTER = (95.0, 88.0)
+    TMC6300_KEY_CORNER_RADIUS = 2.5
+    TMC6300_KEY_SWATCH_LENGTH = 4.0
+    TMC6300_KEY_DOT_RADIUS = 0.5
+    TMC6300_KEY_ROW_PITCH = 3.6
+    TMC6300_KEY_ENTRIES = (
+        ("IN1", "IN1: UL, UH (Bridge)"),
+        ("IN2", "IN2: VL, VH (Bridge)"),
+        ("IN3", "IN3: WL, WH (Bridge)"),
+        ("U", "U: OUT1 (Phase U)"),
+        ("V", "V: OUT2 (Phase V)"),
+        ("W", "W: OUT3 (Phase W)"),
+    )
+
     water_sim: Optional[Any] = None
 
     @property
@@ -1571,6 +1588,9 @@ class CatFountainProvider(Provider):
         # Add dedicated RP2040 GPIO pinout key
         self._build_rp2040_key(room, wiring)
 
+        # Add dedicated TMC6300 pinout key
+        self._build_tmc6300_key(room, wiring)
+
     def _build_rp2040_key(self, room: Room, wiring: Wiring) -> None:
         """Add a dedicated RP2040 GPIO pinout key in the bottom-left corner of the wiring diagram."""
         # Query nets dynamically from wiring configuration
@@ -1654,6 +1674,64 @@ class CatFountainProvider(Provider):
                 f"rp2040_key_lbl_{gpio.lower()}",
                 f"{gpio}: {display_name}",
                 Vector(col2_x + self.RP2040_KEY_SWATCH_LENGTH + 1.0, y, 0.0),
+                options=TextArgs(font_size=1.4, align=(Align.MIN, Align.CENTER), font="Serif"),
+            )
+
+    def _build_tmc6300_key(self, room: Room, wiring: Wiring) -> None:
+        """Add a dedicated TMC6300 pinout key in the top-right corner of the wiring diagram."""
+        # Query nets dynamically from wiring configuration
+        driver_nets: dict[str, tuple[str, str]] = {}
+        for net in wiring.config.get("nets", []):
+            color = net.get("color", "grey")
+            net_name = net.get("name", "")
+            for pin in net.get("pins", []):
+                if len(pin) >= 2 and pin[0] == "motor_driver":
+                    driver_nets[pin[1]] = (net_name, color)
+
+        box_cx, box_cy = self.TMC6300_KEY_CENTER
+        box_w = self.TMC6300_KEY_BOX_WIDTH
+        box_h = self.TMC6300_KEY_BOX_HEIGHT
+
+        with BuildSketch() as key_border:
+            Rectangle(box_w, box_h)
+            fillet(key_border.vertices(), radius=self.TMC6300_KEY_CORNER_RADIUS)
+        room.add(
+            "tmc6300_key_border",
+            key_border.sketch.moved(Location((box_cx, box_cy))),
+            color="grey",
+            line_weight=1.5,
+        )
+
+        room.add_label(
+            "tmc6300_key_title",
+            "TMC6300 PIN KEY",
+            Vector(box_cx, box_cy + box_h / 2.0 - 4.0, 0.0),
+            options=TextArgs(font_size=2.0, align=(Align.CENTER, Align.CENTER), font="Serif"),
+        )
+
+        with BuildLine() as div:
+            Line(
+                (box_cx - box_w / 2.0 + 3.0, box_cy + box_h / 2.0 - 7.0),
+                (box_cx + box_w / 2.0 - 3.0, box_cy + box_h / 2.0 - 7.0),
+            )
+        room.add("tmc6300_key_divider", div.line, color="grey", line_weight=1.0)
+
+        start_y = box_cy + box_h / 2.0 - 11.0
+        col_x = box_cx - box_w / 2.0 + 3.5
+
+        for idx, (pin, label_text) in enumerate(self.TMC6300_KEY_ENTRIES):
+            _, color = driver_nets.get(pin, ("", "grey"))
+            y = start_y - idx * self.TMC6300_KEY_ROW_PITCH
+            with BuildLine() as sw:
+                Line((col_x, y), (col_x + self.TMC6300_KEY_SWATCH_LENGTH, y))
+            room.add(f"tmc6300_key_swatch_{pin.lower()}", sw.line, color=color, line_weight=2.0)
+            with BuildSketch() as dot:
+                Circle(radius=self.TMC6300_KEY_DOT_RADIUS)
+            room.add(f"tmc6300_key_dot_{pin.lower()}", dot.sketch.moved(Location((col_x, y))), color=color)
+            room.add_label(
+                f"tmc6300_key_lbl_{pin.lower()}",
+                label_text,
+                Vector(col_x + self.TMC6300_KEY_SWATCH_LENGTH + 1.0, y, 0.0),
                 options=TextArgs(font_size=1.4, align=(Align.MIN, Align.CENTER), font="Serif"),
             )
 

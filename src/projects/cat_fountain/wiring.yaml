@@ -256,14 +256,14 @@ components:
       - name: "DIAG"
         label: "DIAG"
         side: right
-      - name: "OUT1"
-        label: "OUT1"
+      - name: "U"
+        label: "U"
         side: left
-      - name: "OUT2"
-        label: "OUT2"
+      - name: "V"
+        label: "V"
         side: left
-      - name: "OUT3"
-        label: "OUT3"
+      - name: "W"
+        label: "W"
         side: left
 
   - name: motor
@@ -501,19 +501,19 @@ nets:
   - name: motor_u
     color: purple
     pins:
-      - [motor_driver, OUT1]
+      - [motor_driver, U]
       - [motor, U]
 
   - name: motor_v
     color: green
     pins:
-      - [motor_driver, OUT2]
+      - [motor_driver, V]
       - [motor, V]
 
   - name: motor_w
     color: blue
     pins:
-      - [motor_driver, OUT3]
+      - [motor_driver, W]
       - [motor, W]
 
   - name: led_data
