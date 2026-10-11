@@ -1,8 +1,11 @@
 """Unit and regression tests for Bug Report CLI, models, and markdown tracker."""
 
+import base64
 import json
 from pathlib import Path
 import re
+import threading
+import urllib.request
 import pytest
 
 from model.bug_report import (
@@ -992,3 +995,90 @@ def test_regression_bug_279_component_autocomplete_datalist() -> None:
 
     assert '<option value="carrier_board">' in rendered or '<option value="carrier_board"></option>' in rendered
     assert '<option value="flex_tail">' in rendered or '<option value="flex_tail"></option>' in rendered
+
+
+def test_regression_bug_subterranean_vinegarworm_291_duplicate_screenshot_paste(tmp_path: Path):
+    """Verify BUG-SUBTERRANEAN-VINEGARWORM-291: screenshot paste collision avoidance.
+
+    Verifies that uploading or pasting multiple screenshots with identical filenames
+    (e.g., 'image.png' from the clipboard) assigns unique filenames and does not
+    overwrite previously uploaded screenshots.
+    """
+    att_dir = tmp_path / "attachments"
+    att_dir.mkdir(parents=True, exist_ok=True)
+    fb_dir = tmp_path / "feedback"
+    fb_dir.mkdir(parents=True, exist_ok=True)
+    md_file = tmp_path / "BUGS.md"
+    db_file = tmp_path / "bugs.sqlite"
+    json_file = tmp_path / "bugs_state.json"
+
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=tmp_path,
+        feedback_dir=fb_dir,
+        markdown_output=md_file,
+        state_file=json_file,
+        sqlite_file=db_file,
+        attachments_dir=att_dir,
+        fresh=True,
+    )
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    base_url = server.get_url()
+
+    try:
+        # First paste/upload of image.png
+        payload1 = {
+            "bug_id": "BUG-TEST-291",
+            "filename": "image.png",
+            "file_type": "screenshot",
+            "content_base64": base64.b64encode(b"FIRST_SCREENSHOT_DATA").decode("utf-8"),
+            "description": "First pasted screenshot",
+        }
+        req1 = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=json.dumps(payload1).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req1) as resp1:
+            assert resp1.status == 200
+            res1 = json.loads(resp1.read().decode("utf-8"))
+
+        # Second paste/upload with the same filename image.png
+        payload2 = {
+            "bug_id": "BUG-TEST-291",
+            "filename": "image.png",
+            "file_type": "screenshot",
+            "content_base64": base64.b64encode(b"SECOND_SCREENSHOT_DATA").decode("utf-8"),
+            "description": "Second pasted screenshot",
+        }
+        req2 = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=json.dumps(payload2).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req2) as resp2:
+            assert resp2.status == 200
+            res2 = json.loads(resp2.read().decode("utf-8"))
+
+        # Verify distinct filenames and paths were assigned
+        assert res1["filename"] == "image.png"
+        assert res2["filename"] == "image_1.png"
+        assert res1["file_path"] != res2["file_path"]
+
+        # Verify files on disk exist and contain distinct contents without overwriting
+        file1 = tmp_path / "attachments" / "BUG-TEST-291" / "image.png"
+        file2 = tmp_path / "attachments" / "BUG-TEST-291" / "image_1.png"
+        assert file1.exists()
+        assert file2.exists()
+        assert file1.read_bytes() == b"FIRST_SCREENSHOT_DATA"
+        assert file2.read_bytes() == b"SECOND_SCREENSHOT_DATA"
+
+        # Verify both are accessible over HTTP and return distinct bytes
+        with urllib.request.urlopen(f"{base_url}/attachments/BUG-TEST-291/image.png") as r1:
+            assert r1.read() == b"FIRST_SCREENSHOT_DATA"
+        with urllib.request.urlopen(f"{base_url}/attachments/BUG-TEST-291/image_1.png") as r2:
+            assert r2.read() == b"SECOND_SCREENSHOT_DATA"
+    finally:
+        server.server_close()
