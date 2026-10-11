@@ -843,6 +843,16 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("motor_clip_side_relief_fillet", 1.0))
 
     @cached_property
+    def motor_clip_support_rise(self) -> float:
+        """Return the vertical rise along Y of the motor clip support web."""
+        return float(self._raw_data.get("motor_clip_support_rise", 0.0))
+
+    @cached_property
+    def motor_clip_support_radius(self) -> float:
+        """Return the curvature radius of the motor clip support web."""
+        return float(self._raw_data.get("motor_clip_support_radius", 0.0))
+
+    @cached_property
     def motor_radius(self) -> float:
         """Return the outer radius of the motor body in millimeters."""
         return float(self._raw_data.get("motor_radius", 7.6))

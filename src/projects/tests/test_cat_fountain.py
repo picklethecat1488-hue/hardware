@@ -65,6 +65,11 @@ class TestCatFountainProvider:
         assert clip.part.is_inside((-6.0, -20.0, clip_h * 0.5))
         # Opposite continuous arm must remain solid
         assert clip.part.is_inside((6.0, -10.0, clip_h * 0.5))
+        # Support web connecting stub to continuous arm must be solid below the support curve
+        assert clip.part.is_inside((0.0, -18.0, clip_h * 0.5))
+        assert clip.part.is_inside((0.0, -14.5, clip_h * 0.5))
+        # Wire channel above support web must remain open
+        assert not clip.part.is_inside((0.0, -5.0, clip_h * 0.5))
 
     @pytest.mark.slow
     def test_build_part_geometry(self, provider):
