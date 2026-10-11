@@ -52,6 +52,20 @@ class TestCatFountainProvider:
         assert "lid" in provider.part
         assert "led_cover" in provider.part
 
+    def test_motor_clip_r_shape_relief(self, provider):
+        """Verify motor clip R-shape connector relief geometry without building full bowl (BUG-TRANSLUCENT-LARVA-792)."""
+        clip = provider.build_motor_clip("motor_clip")
+        assert clip.part.volume > 0.0
+        assert clip.part.is_valid()
+
+        clip_h = provider.settings.motor_clip_thickness
+        # Relieved arm must be open at Y = -10.0 to allow connector rotation
+        assert not clip.part.is_inside((-6.0, -10.0, clip_h * 0.5))
+        # Guide stub near handle must remain solid for slide-in slot alignment
+        assert clip.part.is_inside((-6.0, -20.0, clip_h * 0.5))
+        # Opposite continuous arm must remain solid
+        assert clip.part.is_inside((6.0, -10.0, clip_h * 0.5))
+
     @pytest.mark.slow
     def test_build_part_geometry(self, provider):
         """Verify that build_fountain produces valid geometry."""
@@ -93,6 +107,33 @@ class TestCatFountainProvider:
         assert "wire_vcc_logic" in room
         assert "wire_sda" in room
         assert "wire_scl" in room
+
+        # Verify RP2040 GPIO Key (BUG-FOSSORIAL-BRISTLE-291)
+        assert "rp2040_key_border" in room
+        assert "rp2040_key_divider" in room
+        for gpio in provider.RP2040_KEY_LEFT_GPIOS:
+            assert f"rp2040_key_swatch_{gpio.lower()}" in room
+            assert f"rp2040_key_dot_{gpio.lower()}" in room
+        for gpio in provider.RP2040_KEY_RIGHT_GPIOS:
+            assert f"rp2040_key_swatch_{gpio.lower()}" in room
+            assert f"rp2040_key_dot_{gpio.lower()}" in room
+
+        # Verify label contents
+        label_names = {lbl[0] for lbl in room._labels}
+        assert "rp2040_key_title" in label_names
+        assert "rp2040_key_lbl_gp4" in label_names
+        assert "rp2040_key_lbl_gp26" in label_names
+
+        # Verify TMC6300 Pin Key (BUG-DEEP-BURROWER-108)
+        assert "tmc6300_key_border" in room
+        assert "tmc6300_key_divider" in room
+        for pin, _ in provider.TMC6300_KEY_ENTRIES:
+            assert f"tmc6300_key_swatch_{pin.lower()}" in room
+            assert f"tmc6300_key_dot_{pin.lower()}" in room
+
+        assert "tmc6300_key_title" in label_names
+        for pin, _ in provider.TMC6300_KEY_ENTRIES:
+            assert f"tmc6300_key_lbl_{pin.lower()}" in label_names
 
     @pytest.mark.slow
     def test_wiring_diagram_class(self, provider):
@@ -1602,4 +1643,18 @@ class TestCatFountainProvider:
         # Wire relief channel extending South along -Y
         assert not clip.part.is_inside((0.0, -10.0, clip_h - 0.2)), (
             "Wire relief channel at Y = -10.0 is blocked: 3-wire motor cable would be pinched!"
+        )
+
+        # Dedicated R-shape side relief for 1102 motor connector rotation (BUG-TRANSLUCENT-LARVA-792)
+        # Relieved arm must be open to allow connector rotation
+        assert not clip.part.is_inside((-6.0, -10.0, clip_h * 0.5)), (
+            "Motor clip side relief cutout at (-6.0, -10.0) is blocked: connector cannot rotate into position!"
+        )
+        # Guide stub near handle must remain solid for slide-in slot alignment
+        assert clip.part.is_inside((-6.0, -20.0, clip_h * 0.5)), (
+            "Motor clip guide stub at (-6.0, -20.0) is missing: clip cannot align in bowl slide slot!"
+        )
+        # Opposite continuous arm must remain solid
+        assert clip.part.is_inside((6.0, -10.0, clip_h * 0.5)), (
+            "Motor clip continuous arm at (6.0, -10.0) is missing: structural integrity lost!"
         )

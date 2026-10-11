@@ -61,6 +61,9 @@ def test_wiring_class():
 
 def test_register_layout_overlap():
     """Verify that registering duplicate layouts raises a ValueError."""
+    # Ensure layouts are registered
+    import projects.cat_fountain.layouts  # type: ignore
+
     # Try to register a mock layout for a key that is already registered
     # 'cat_fountain:board' is already registered
     with pytest.raises(ValueError, match="already registered"):
@@ -95,3 +98,45 @@ def test_automatic_namespace_inference():
     decorator(dummy_layout)
 
     assert "my_cool_project:dummy_pkg" in PIN_LAYOUT_REGISTRY
+
+
+def test_pico_gpio_labels_simplified():
+    """Verify that Pico GPIO pins have simplified GPx labels without net name collisions (BUG-FOSSORIAL-BRISTLE-291)."""
+    yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+    wiring = Wiring(yaml_path)
+
+    pico = next(f for f in wiring.footprints if f.name == "pico")
+    power_gnd_labels = {"3 (GND)", "39 (VSYS)", "38 (GND)", "36 (3V3)"}
+
+    gpio_pins = [p for p in pico.pins if p.name.startswith("GP")]
+    assert len(gpio_pins) >= 16
+
+    for pin in gpio_pins:
+        # GPIO labels must be strictly their GPIO pin number, no parenthesized net names
+        assert pin.label == pin.name
+        assert "(" not in pin.label
+        assert ")" not in pin.label
+
+    # Power and GND pins should stay intact
+    non_gpio = [p for p in pico.pins if not p.name.startswith("GP")]
+    actual_labels = {p.label for p in non_gpio}
+    assert power_gnd_labels.issubset(actual_labels)
+
+
+def test_tmc6300_motor_driver_pins():
+    """Verify that TMC6300 motor driver output pins are renamed to U, V, W (BUG-DEEP-BURROWER-108)."""
+    yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+    wiring = Wiring(yaml_path)
+
+    driver = next(f for f in wiring.footprints if f.name == "motor_driver")
+    pin_names = {p.name for p in driver.pins}
+    assert {"U", "V", "W"}.issubset(pin_names)
+    assert "OUT1" not in pin_names
+    assert "OUT2" not in pin_names
+    assert "OUT3" not in pin_names
+
+    # Check wires connecting to motor phases
+    for net_name, phase in [("motor_u", "U"), ("motor_v", "V"), ("motor_w", "W")]:
+        net = next(n for n in wiring.nets if n.name == net_name)
+        assert ("motor_driver", phase) in net.pins
+        assert ("motor", phase) in net.pins

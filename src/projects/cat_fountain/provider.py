@@ -52,6 +52,52 @@ class CatFountainProvider(Provider):
     SLOT_WIDTH = 2.0
     SLOT_LENGTH = 100.0
 
+    # RP2040 GPIO Key constants for wiring diagram
+    RP2040_KEY_BOX_WIDTH = 64.0
+    RP2040_KEY_BOX_HEIGHT = 50.0
+    RP2040_KEY_CENTER = (-95.0, -88.0)
+    RP2040_KEY_CORNER_RADIUS = 2.5
+    RP2040_KEY_SWATCH_LENGTH = 4.0
+    RP2040_KEY_DOT_RADIUS = 0.5
+    RP2040_KEY_ROW_PITCH = 3.6
+    RP2040_KEY_LEFT_GPIOS = (
+        "GP4",
+        "GP5",
+        "GP6",
+        "GP7",
+        "GP9",
+        "GP10",
+        "GP11",
+        "GP12",
+        "GP13",
+        "GP14",
+    )
+    RP2040_KEY_RIGHT_GPIOS = (
+        "GP26",
+        "GP22",
+        "GP21",
+        "GP20",
+        "GP19",
+        "GP18",
+    )
+
+    # TMC6300 Pin Key constants for wiring diagram
+    TMC6300_KEY_BOX_WIDTH = 50.0
+    TMC6300_KEY_BOX_HEIGHT = 38.0
+    TMC6300_KEY_CENTER = (95.0, 88.0)
+    TMC6300_KEY_CORNER_RADIUS = 2.5
+    TMC6300_KEY_SWATCH_LENGTH = 4.0
+    TMC6300_KEY_DOT_RADIUS = 0.5
+    TMC6300_KEY_ROW_PITCH = 3.6
+    TMC6300_KEY_ENTRIES = (
+        ("IN1", "IN1: UL, UH (Bridge)"),
+        ("IN2", "IN2: VL, VH (Bridge)"),
+        ("IN3", "IN3: WL, WH (Bridge)"),
+        ("U", "U: OUT1 (Phase U)"),
+        ("V", "V: OUT2 (Phase V)"),
+        ("W", "W: OUT3 (Phase W)"),
+    )
+
     water_sim: Optional[Any] = None
 
     @property
@@ -1460,6 +1506,41 @@ class CatFountainProvider(Provider):
                     mode=Mode.SUBTRACT,
                 )
 
+            # Side wiring connector relief cutout (giving clip an "R" shape, BUG-TRANSLUCENT-LARVA-792)
+            stub_l = self.settings.motor_clip_arm_stub_length
+            relief_r = self.settings.motor_clip_side_relief_radius
+            relief_fillet = self.settings.motor_clip_side_relief_fillet
+            y_stub = -clip_l + stub_l
+
+            with BuildSketch(Plane.XY) as relief_sketch:
+                with BuildLine() as relief_line:
+                    p_top_inner = (-wire_w / 2.0 + 0.5, y_stub)
+                    p_top_outer = (-clip_w / 2.0 - 2.0, y_stub)
+                    p_front_outer = (-clip_w / 2.0 - 2.0, 5.0 + 1.0)
+                    p_front_edge = (-clip_w / 2.0 + 1.8, 5.0)
+                    p_lobe_notch = (mount_pts[1][0] - 1.2, mount_pts[1][1])
+
+                    Line(p_top_inner, p_top_outer)
+                    Line(p_top_outer, p_front_outer)
+                    Line(p_front_outer, (p_front_edge[0], 5.0 + 1.0))
+                    Line((p_front_edge[0], 5.0 + 1.0), p_front_edge)
+                    RadiusArc(p_front_edge, p_lobe_notch, radius=-relief_r)
+                    Line(p_lobe_notch, (-wire_w / 2.0 + 0.5, p_lobe_notch[1]))
+                    Line((-wire_w / 2.0 + 0.5, p_lobe_notch[1]), p_top_inner)
+                make_face()
+            extrude(relief_sketch.sketch, amount=clip_h + 5.0, mode=Mode.SUBTRACT)
+
+            # Stress-relief fillet on re-entrant corner of remaining arm stub
+            reentrant_edges = [
+                e
+                for e in clip.part.edges()
+                if abs(e.center().X - (-wire_w / 2.0)) < 1.0
+                and abs(e.center().Y - y_stub) < 1.0
+                and abs(e.length - clip_h) < 0.2
+            ]
+            if reentrant_edges:
+                fillet(reentrant_edges, radius=relief_fillet)
+
             URDFMetadata(
                 label=target,
                 material=self.get_material(target) or "petg",
@@ -1503,6 +1584,156 @@ class CatFountainProvider(Provider):
         # Build the diagram using the diagram class
         diagram = WiringDiagram(wiring)
         diagram.build(room)
+
+        # Add dedicated RP2040 GPIO pinout key
+        self._build_rp2040_key(room, wiring)
+
+        # Add dedicated TMC6300 pinout key
+        self._build_tmc6300_key(room, wiring)
+
+    def _build_rp2040_key(self, room: Room, wiring: Wiring) -> None:
+        """Add a dedicated RP2040 GPIO pinout key in the bottom-left corner of the wiring diagram."""
+        # Query nets dynamically from wiring configuration
+        pico_nets: dict[str, tuple[str, str]] = {}
+        for net in wiring.config.get("nets", []):
+            color = net.get("color", "grey")
+            net_name = net.get("name", "")
+            for pin in net.get("pins", []):
+                if len(pin) >= 2 and pin[0] == "pico":
+                    pico_nets[pin[1]] = (net_name, color)
+
+        signal_labels = {
+            "sda": "I2C_SDA",
+            "scl": "I2C_SCL",
+        }
+
+        box_cx, box_cy = self.RP2040_KEY_CENTER
+        box_w = self.RP2040_KEY_BOX_WIDTH
+        box_h = self.RP2040_KEY_BOX_HEIGHT
+
+        with BuildSketch() as key_border:
+            Rectangle(box_w, box_h)
+            fillet(key_border.vertices(), radius=self.RP2040_KEY_CORNER_RADIUS)
+        room.add(
+            "rp2040_key_border",
+            key_border.sketch.moved(Location((box_cx, box_cy))),
+            color="grey",
+            line_weight=1.5,
+        )
+
+        room.add_label(
+            "rp2040_key_title",
+            "RP2040 GPIO KEY",
+            Vector(box_cx, box_cy + box_h / 2.0 - 4.0, 0.0),
+            options=TextArgs(font_size=2.0, align=(Align.CENTER, Align.CENTER), font="Serif"),
+        )
+
+        with BuildLine() as div:
+            Line(
+                (box_cx - box_w / 2.0 + 3.0, box_cy + box_h / 2.0 - 7.0),
+                (box_cx + box_w / 2.0 - 3.0, box_cy + box_h / 2.0 - 7.0),
+            )
+        room.add("rp2040_key_divider", div.line, color="grey", line_weight=1.0)
+
+        start_y = box_cy + box_h / 2.0 - 11.0
+        col1_x = box_cx - box_w / 2.0 + 3.5
+        col2_x = box_cx + 2.0
+
+        for idx, gpio in enumerate(self.RP2040_KEY_LEFT_GPIOS):
+            if gpio not in pico_nets:
+                continue
+            net_name, color = pico_nets[gpio]
+            display_name = signal_labels.get(net_name, net_name.upper())
+            y = start_y - idx * self.RP2040_KEY_ROW_PITCH
+            with BuildLine() as sw:
+                Line((col1_x, y), (col1_x + self.RP2040_KEY_SWATCH_LENGTH, y))
+            room.add(f"rp2040_key_swatch_{gpio.lower()}", sw.line, color=color, line_weight=2.0)
+            with BuildSketch() as dot:
+                Circle(radius=self.RP2040_KEY_DOT_RADIUS)
+            room.add(f"rp2040_key_dot_{gpio.lower()}", dot.sketch.moved(Location((col1_x, y))), color=color)
+            room.add_label(
+                f"rp2040_key_lbl_{gpio.lower()}",
+                f"{gpio}: {display_name}",
+                Vector(col1_x + self.RP2040_KEY_SWATCH_LENGTH + 1.0, y, 0.0),
+                options=TextArgs(font_size=1.4, align=(Align.MIN, Align.CENTER), font="Serif"),
+            )
+
+        for idx, gpio in enumerate(self.RP2040_KEY_RIGHT_GPIOS):
+            if gpio not in pico_nets:
+                continue
+            net_name, color = pico_nets[gpio]
+            display_name = signal_labels.get(net_name, net_name.upper())
+            y = start_y - idx * self.RP2040_KEY_ROW_PITCH
+            with BuildLine() as sw:
+                Line((col2_x, y), (col2_x + self.RP2040_KEY_SWATCH_LENGTH, y))
+            room.add(f"rp2040_key_swatch_{gpio.lower()}", sw.line, color=color, line_weight=2.0)
+            with BuildSketch() as dot:
+                Circle(radius=self.RP2040_KEY_DOT_RADIUS)
+            room.add(f"rp2040_key_dot_{gpio.lower()}", dot.sketch.moved(Location((col2_x, y))), color=color)
+            room.add_label(
+                f"rp2040_key_lbl_{gpio.lower()}",
+                f"{gpio}: {display_name}",
+                Vector(col2_x + self.RP2040_KEY_SWATCH_LENGTH + 1.0, y, 0.0),
+                options=TextArgs(font_size=1.4, align=(Align.MIN, Align.CENTER), font="Serif"),
+            )
+
+    def _build_tmc6300_key(self, room: Room, wiring: Wiring) -> None:
+        """Add a dedicated TMC6300 pinout key in the top-right corner of the wiring diagram."""
+        # Query nets dynamically from wiring configuration
+        driver_nets: dict[str, tuple[str, str]] = {}
+        for net in wiring.config.get("nets", []):
+            color = net.get("color", "grey")
+            net_name = net.get("name", "")
+            for pin in net.get("pins", []):
+                if len(pin) >= 2 and pin[0] == "motor_driver":
+                    driver_nets[pin[1]] = (net_name, color)
+
+        box_cx, box_cy = self.TMC6300_KEY_CENTER
+        box_w = self.TMC6300_KEY_BOX_WIDTH
+        box_h = self.TMC6300_KEY_BOX_HEIGHT
+
+        with BuildSketch() as key_border:
+            Rectangle(box_w, box_h)
+            fillet(key_border.vertices(), radius=self.TMC6300_KEY_CORNER_RADIUS)
+        room.add(
+            "tmc6300_key_border",
+            key_border.sketch.moved(Location((box_cx, box_cy))),
+            color="grey",
+            line_weight=1.5,
+        )
+
+        room.add_label(
+            "tmc6300_key_title",
+            "TMC6300 PIN KEY",
+            Vector(box_cx, box_cy + box_h / 2.0 - 4.0, 0.0),
+            options=TextArgs(font_size=2.0, align=(Align.CENTER, Align.CENTER), font="Serif"),
+        )
+
+        with BuildLine() as div:
+            Line(
+                (box_cx - box_w / 2.0 + 3.0, box_cy + box_h / 2.0 - 7.0),
+                (box_cx + box_w / 2.0 - 3.0, box_cy + box_h / 2.0 - 7.0),
+            )
+        room.add("tmc6300_key_divider", div.line, color="grey", line_weight=1.0)
+
+        start_y = box_cy + box_h / 2.0 - 11.0
+        col_x = box_cx - box_w / 2.0 + 3.5
+
+        for idx, (pin, label_text) in enumerate(self.TMC6300_KEY_ENTRIES):
+            _, color = driver_nets.get(pin, ("", "grey"))
+            y = start_y - idx * self.TMC6300_KEY_ROW_PITCH
+            with BuildLine() as sw:
+                Line((col_x, y), (col_x + self.TMC6300_KEY_SWATCH_LENGTH, y))
+            room.add(f"tmc6300_key_swatch_{pin.lower()}", sw.line, color=color, line_weight=2.0)
+            with BuildSketch() as dot:
+                Circle(radius=self.TMC6300_KEY_DOT_RADIUS)
+            room.add(f"tmc6300_key_dot_{pin.lower()}", dot.sketch.moved(Location((col_x, y))), color=color)
+            room.add_label(
+                f"tmc6300_key_lbl_{pin.lower()}",
+                label_text,
+                Vector(col_x + self.TMC6300_KEY_SWATCH_LENGTH + 1.0, y, 0.0),
+                options=TextArgs(font_size=1.4, align=(Align.MIN, Align.CENTER), font="Serif"),
+            )
 
     def compute_flow_metrics(self) -> dict[str, Any]:
         """Compute continuous flow and drainage metrics delegating to simulation hooks."""
