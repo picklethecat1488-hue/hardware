@@ -270,12 +270,22 @@ class WiringDiagram:
 
             room.add(f"{fp.name}_footprint", f_sketch.sketch.moved(Location((cx, cy))), color="grey", line_weight=2.0)
 
-            # Add component label centered inside the footprint
+            # Add component label positioned according to footprint configuration (defaulting to center)
+            lbl_pos = (
+                Vector(cx + fp.label.position[0], cy + fp.label.position[1], 0.0)
+                if fp.label and fp.label.position
+                else Vector(cx, cy, 0.0)
+            )
+            lbl_align = (
+                (parse_align(fp.label.align[0]), parse_align(fp.label.align[1]))
+                if fp.label and fp.label.align
+                else (Align.CENTER, Align.CENTER)
+            )
             room.add_label(
                 f"{fp.name}_label",
-                fp.label.text,
-                Vector(cx, cy, 0.0),
-                options=TextArgs(font_size=TEXT_FONT_SIZE, align=(Align.CENTER, Align.CENTER), font="Serif"),
+                fp.label.text if fp.label else fp.name.upper(),
+                lbl_pos,
+                options=TextArgs(font_size=TEXT_FONT_SIZE, align=lbl_align, font="Serif"),
             )
 
             # Add pins

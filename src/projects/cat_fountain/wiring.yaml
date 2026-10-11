@@ -136,19 +136,19 @@ components:
         side: left
         slot: 7
       - name: "GND_L"
-        label: "3 (GND)"
+        label: "GND"
         side: right
         slot: 2
       - name: "VSYS"
-        label: "39 (VSYS)"
+        label: "VSYS"
         side: left
         slot: 18
       - name: "GND_R"
-        label: "38 (GND)"
+        label: "GND"
         side: left
         slot: 17
       - name: "3V3"
-        label: "36 (3V3)"
+        label: "3V3"
         side: left
         slot: 15
       - name: "GP26"
