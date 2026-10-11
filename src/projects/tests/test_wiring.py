@@ -106,7 +106,7 @@ def test_pico_gpio_labels_simplified():
     wiring = Wiring(yaml_path)
 
     pico = next(f for f in wiring.footprints if f.name == "pico")
-    power_gnd_labels = {"3 (GND)", "39 (VSYS)", "38 (GND)", "36 (3V3)"}
+    power_gnd_labels = {"GND", "VSYS", "3V3"}
 
     gpio_pins = [p for p in pico.pins if p.name.startswith("GP")]
     assert len(gpio_pins) >= 16
@@ -140,3 +140,35 @@ def test_tmc6300_motor_driver_pins():
         net = next(n for n in wiring.nets if n.name == net_name)
         assert ("motor_driver", phase) in net.pins
         assert ("motor", phase) in net.pins
+
+
+def test_footprint_label_positions_and_pico_gnd_no_overlap():
+    """Verify that footprint labels respect position offsets and Pico GND labels do not collide (BUG-PROBOSCID-NIGHTCRAWLER-523)."""
+    import projects.cat_fountain.layouts  # type: ignore
+    from provider import Room, WiringDiagram
+
+    yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+    wiring = Wiring(yaml_path)
+
+    room = Room()
+    diagram = WiringDiagram(wiring)
+    diagram.build(room)
+
+    # Check that labels are located at their custom offset positions
+    label_dict = {lbl[0]: (lbl[1], lbl[2], lbl[3]) for lbl in room._labels}
+
+    # LED label should be offset above the LED package at Y = 6.0 (offset 6.0), not centered at Y = 0.0
+    assert "led_label" in label_dict
+    assert label_dict["led_label"][1].Y == 6.0
+
+    # Charger label should be offset below the charger package at Y = -96.5 (-79.0 - 17.5)
+    assert "charger_label" in label_dict
+    assert label_dict["charger_label"][1].Y == -96.5
+
+    # Pico label should be offset above the Pico at Y = 29.0 (0.0 + 29.0)
+    assert "pico_label" in label_dict
+    assert label_dict["pico_label"][1].Y == 29.0
+
+    # Verify Pico GND labels are simplified to 'GND'
+    assert label_dict["pico_lbl_GND_L"][0] == "GND"
+    assert label_dict["pico_lbl_GND_R"][0] == "GND"
