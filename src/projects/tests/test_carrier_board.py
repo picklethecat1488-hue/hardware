@@ -3042,3 +3042,60 @@ def test_regression_bug_segmented_palolo_739_bom_supplier_questions() -> None:
         "attachments/BUG-SEGMENTED-PALOLO-739/T-E68W908185A-2units-bom_templates(2026-10-11)_replied.xlsx"
     )
     assert replied_xls.is_file(), "Replied BOM questions spreadsheet must exist"
+
+
+def test_regression_bug_glowing_oligochaete_544_rev_bom_export() -> None:
+    """Verify BUG-GLOWING-OLIGOCHAETE-544: Revised BOM spreadsheets generated for PCBWay Order #T-E68W908185A.
+
+    Verifies that revised quote templates (.xlsx/.xls) and clean EDA BOM files (.xlsx/.csv)
+    properly reflect IQS7222C101QNR substitution, customer consignment deductions for U1 & U2,
+    and 3225-4P package update for Y1.
+    """
+    import openpyxl
+
+    rev_dir = Path("attachments/BUG-GLOWING-OLIGOCHAETE-544")
+    assert rev_dir.is_dir(), "Revised BOM attachments directory must exist"
+
+    rev_xlsx = rev_dir / "T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xlsx"
+    rev_xls = rev_dir / "T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xls"
+    eda_xlsx = rev_dir / "carrier_board_bom_rev1.xlsx"
+    eda_csv = rev_dir / "carrier_board_bom_rev1.csv"
+
+    assert rev_xlsx.is_file(), f"{rev_xlsx} must exist"
+    assert rev_xls.is_file(), f"{rev_xls} must exist"
+    assert eda_xlsx.is_file(), f"{eda_xlsx} must exist"
+    assert eda_csv.is_file(), f"{eda_csv} must exist"
+
+    # Verify revised quotation spreadsheet
+    wb = openpyxl.load_workbook(rev_xlsx)
+    ws = wb.active
+
+    # Row 42: U1 MCU
+    u1_mpn = ws.cell(42, 5).value
+    u1_notes = ws.cell(42, 9).value or ""
+    assert "MCXN947" in u1_mpn
+    assert "Customer Consigned" in u1_notes or "Consigned" in u1_notes
+    assert ws.cell(42, 10).value == 0.0  # Unit price deducted
+
+    # Row 43: U2 Touch Controller
+    u2_mpn = ws.cell(43, 5).value
+    u2_notes = ws.cell(43, 9).value or ""
+    assert u2_mpn == "IQS7222C101QNR"
+    assert ws.cell(43, 7).value == "QFN-20"
+    assert "Customer Consigned" in u2_notes or "Consigned" in u2_notes
+    assert ws.cell(43, 10).value == 0.0  # Unit price deducted
+
+    # Row 53: Y1 Crystal
+    y1_mpn = ws.cell(53, 5).value
+    assert y1_mpn == "ECS-240-8-32B-CKM"
+    assert ws.cell(53, 7).value == "XTAL-3225-4P"
+
+    # Verify clean EDA BOM
+    eda_wb = openpyxl.load_workbook(eda_xlsx)
+    eda_ws = eda_wb.active
+    eda_rows = [
+        [eda_ws.cell(r, c).value for c in range(1, eda_ws.max_column + 1)] for r in range(1, eda_ws.max_row + 1)
+    ]
+    eda_str = " | ".join(str(row) for row in eda_rows)
+    assert "IQS7222C101QNR" in eda_str
+    assert "ECS-240-8-32B-CKM" in eda_str
