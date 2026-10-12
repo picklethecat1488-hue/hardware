@@ -68,19 +68,19 @@ components:
         side: right
         slot: 4
       - name: "GP4"
-        label: "GP4 (CTRL_XSHUT_N)"
+        label: "GP4"
         side: right
         slot: 5
       - name: "GP5"
-        label: "GP5 (CTRL_XSHUT_E)"
+        label: "GP5"
         side: right
         slot: 6
       - name: "GP6"
-        label: "GP6 (CTRL_XSHUT_W)"
+        label: "GP6"
         side: right
         slot: 8
       - name: "GP7"
-        label: "GP7 (CTRL_INT_N)"
+        label: "GP7"
         side: right
         slot: 9
       - name: "GP8"
@@ -88,27 +88,27 @@ components:
         side: right
         slot: 10
       - name: "GP9"
-        label: "GP9 (CTRL_INT_E)"
+        label: "GP9"
         side: right
         slot: 11
       - name: "GP10"
-        label: "GP10 (CTRL_INT_W)"
+        label: "GP10"
         side: right
         slot: 13
       - name: "GP11"
-        label: "GP11 (LED_DATA)"
+        label: "GP11"
         side: right
         slot: 12
       - name: "GP12"
-        label: "GP12 (I2C_SDA)"
+        label: "GP12"
         side: right
         slot: 15
       - name: "GP13"
-        label: "GP13 (I2C_SCL)"
+        label: "GP13"
         side: right
         slot: 16
       - name: "GP14"
-        label: "GP14 (CTRL_ALRT)"
+        label: "GP14"
         side: right
         slot: 18
       - name: "GP15"
@@ -116,43 +116,43 @@ components:
         side: right
         slot: 19
       - name: "GP18"
-        label: "GP18 (CTRL_EN)"
+        label: "GP18"
         side: left
         slot: 3
       - name: "GP19"
-        label: "GP19 (CTRL_IN1)"
+        label: "GP19"
         side: left
         slot: 4
       - name: "GP20"
-        label: "GP20 (CTRL_IN2)"
+        label: "GP20"
         side: left
         slot: 5
       - name: "GP21"
-        label: "GP21 (CTRL_IN3)"
+        label: "GP21"
         side: left
         slot: 6
       - name: "GP22"
-        label: "GP22 (CTRL_DIAG)"
+        label: "GP22"
         side: left
         slot: 7
       - name: "GND_L"
-        label: "3 (GND)"
+        label: "GND"
         side: right
         slot: 2
       - name: "VSYS"
-        label: "39 (VSYS)"
+        label: "VSYS"
         side: left
         slot: 18
       - name: "GND_R"
-        label: "38 (GND)"
+        label: "GND"
         side: left
         slot: 17
       - name: "3V3"
-        label: "36 (3V3)"
+        label: "3V3"
         side: left
         slot: 15
       - name: "GP26"
-        label: "GP26 (SPEED_SENSE)"
+        label: "GP26"
         side: left
         slot: 11
 
@@ -251,14 +251,14 @@ components:
       - name: "DIAG"
         label: "DIAG"
         side: right
-      - name: "OUT1"
-        label: "OUT1"
+      - name: "U"
+        label: "U"
         side: left
-      - name: "OUT2"
-        label: "OUT2"
+      - name: "V"
+        label: "V"
         side: left
-      - name: "OUT3"
-        label: "OUT3"
+      - name: "W"
+        label: "W"
         side: left
 
   - name: motor
@@ -496,19 +496,19 @@ nets:
   - name: motor_u
     color: purple
     pins:
-      - [motor_driver, OUT1]
+      - [motor_driver, U]
       - [motor, U]
 
   - name: motor_v
     color: green
     pins:
-      - [motor_driver, OUT2]
+      - [motor_driver, V]
       - [motor, V]
 
   - name: motor_w
     color: blue
     pins:
-      - [motor_driver, OUT3]
+      - [motor_driver, W]
       - [motor, W]
 
   - name: led_data
