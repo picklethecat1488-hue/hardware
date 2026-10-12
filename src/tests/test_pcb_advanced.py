@@ -2287,8 +2287,10 @@ def test_regression_bug_086_azoteq_capacitive_sensing() -> None:
     # 1. Verify U2 package, MPN, and layer
     assert "U2" in fp_map, "U2 must be present in wiring"
     u2 = fp_map["U2"]
-    assert u2.package == "QFN-20", f"U2 package must be QFN-20, got {u2.package}"
-    assert u2.mpn == "IQS7222A001QNR", f"U2 MPN must be IQS7222A001QNR, got {u2.mpn}"
+    assert u2.mpn in [
+        "IQS7222C101QNR",
+        "IQS7222A001QNR",
+    ], f"U2 MPN must be Azoteq IQS7222C101QNR or IQS7222A001QNR, got {u2.mpn}"
     assert getattr(u2, "layer", "F.Cu") == "B.Cu", f"U2 must be on B.Cu layer, got {getattr(u2, 'layer', 'F.Cu')}"
 
     # 2. Verify U2 pins

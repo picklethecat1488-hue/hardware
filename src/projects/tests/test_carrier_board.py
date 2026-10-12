@@ -3033,6 +3033,7 @@ def test_regression_bug_segmented_palolo_739_bom_supplier_questions() -> None:
     assert consignment_guide.is_file(), "Consignment sourcing and shipping guide must exist"
     guide_text = consignment_guide.read_text(encoding="utf-8")
     assert "MCXN947VDF" in guide_text
+    assert "IQS7222C101QNR" in guide_text
     assert "IQS7222A001QNR" in guide_text
     assert "T-E68W908185A" in guide_text
 
