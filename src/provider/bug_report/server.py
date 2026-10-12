@@ -328,6 +328,15 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest_path = dest_dir / filename
 
+        if dest_path.exists():
+            stem = dest_path.stem
+            suffix = dest_path.suffix
+            counter = 1
+            while (dest_dir / f"{stem}_{counter}{suffix}").exists():
+                counter += 1
+            filename = f"{stem}_{counter}{suffix}"
+            dest_path = dest_dir / filename
+
         if b64_content:
             file_bytes = base64.b64decode(b64_content)
             dest_path.write_bytes(file_bytes)
