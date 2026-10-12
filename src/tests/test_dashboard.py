@@ -3175,6 +3175,28 @@ def test_regression_bug_278_working_tree_actions_visible_on_load() -> None:
     )
 
 
+def test_regression_bug_bristly_setae_415_copy_paste_definition_and_handling() -> None:
+    """Verify BUG-BRISTLY-SETAE-415: copyText and fallbackCopy functions are defined across all dashboard templates."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    diff_view_text = (templates_dir / "diff_view.html.j2").read_text(encoding="utf-8")
+    bug_report_text = (templates_dir / "bug_report.html.j2").read_text(encoding="utf-8")
+    cr_text = (templates_dir / "code_review.html.j2").read_text(encoding="utf-8")
+
+    # 1. diff_view.html.j2 must explicitly define function copyText(text)
+    assert "function copyText(text)" in diff_view_text, "diff_view.html.j2 must define function copyText(text)"
+    assert "function fallbackCopy(text)" in diff_view_text, "diff_view.html.j2 must define function fallbackCopy(text)"
+
+    # 2. bug_report.html.j2 must explicitly define function copyText(text)
+    assert "function copyText(text)" in bug_report_text, "bug_report.html.j2 must define function copyText(text)"
+    assert "function fallbackCopy(text)" in bug_report_text, (
+        "bug_report.html.j2 must define function fallbackCopy(text)"
+    )
+
+    # 3. code_review.html.j2 must explicitly define function copyText(text)
+    assert "function copyText(text)" in cr_text, "code_review.html.j2 must define function copyText(text)"
+    assert "function fallbackCopy(text)" in cr_text, "code_review.html.j2 must define function fallbackCopy(text)"
+
+
 def test_regression_bug_subterranean_vinegarworm_291_dashboard_upload_collision(tmp_path: Path) -> None:
     """Verify BUG-SUBTERRANEAN-VINEGARWORM-291: DashboardServer file upload endpoint assigns unique filenames.
 

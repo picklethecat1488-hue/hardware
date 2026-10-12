@@ -2280,28 +2280,45 @@
       }
     }
 
+    function copyText(text) {
+      if (!text) return;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(`Copied: ${text}`);
+        }).catch(() => fallbackCopy(text));
+      } else {
+        fallbackCopy(text);
+      }
+    }
+
     function fallbackCopy(text) {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-      showToast("Copied: " + text);
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "0";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const successful = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (successful) {
+          showToast(`Copied: ${text}`);
+        } else {
+          showToast("Copy failed");
+        }
+      } catch (err) {
+        console.error("Fallback copy failed", err);
+        showToast("Copy failed");
+      }
     }
 
     function copyActiveFilePath() {
       const filePath = state.activeFile;
       if (!filePath) return;
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(filePath).then(() => {
-          showToast("Copied: " + filePath);
-        }).catch(() => {
-          fallbackCopy(filePath);
-        });
-      } else {
-        fallbackCopy(filePath);
-      }
+      copyText(filePath);
     }
 
     function openInVsCode() {

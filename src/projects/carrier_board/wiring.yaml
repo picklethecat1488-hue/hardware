@@ -26,8 +26,8 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: IQS7222A001QNR
-  supplier_pn: IQS7222A-QNR-ND
+  mpn: IQS7222C101QNR
+  supplier_pn: 1790-IQS7222C101QNRCT-ND
 - name: U11
   package: MOD-BLE-PCB-ANT
   position:
@@ -311,7 +311,7 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: ECS-240-8-30B-CKM
+  mpn: ECS-240-8-32B-CKM
   supplier_pn: XC2345-ND
 - name: C9
   package: '0402'

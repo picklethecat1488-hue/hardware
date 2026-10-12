@@ -3007,3 +3007,38 @@ def test_regression_bug_277_bom_excel_pcbway_export() -> None:
     j15_row = next(r for r in cb_rows if r.get("B") == "J15")
     assert j15_row["H"] == "DNS"
     assert "Do Not Stuff (DNP)" in j15_row["I"]
+
+
+def test_regression_bug_segmented_palolo_739_bom_supplier_questions() -> None:
+    """Verify BUG-SEGMENTED-PALOLO-739: Supplier questions resolved, Y1 package matches 3225, and consignment docs exist."""
+    from model.wiring import Wiring
+
+    # 1. Y1 crystal MPN must be ECS-240-8-32B-CKM to match XTAL-3225-4P package
+    wiring = Wiring("src/projects/carrier_board/wiring.yaml")
+    y1 = next(c for c in wiring.footprints if c.name == "Y1")
+    assert y1.mpn == "ECS-240-8-32B-CKM", f"Y1 MPN must be ECS-240-8-32B-CKM for 3225 package, got {y1.mpn}"
+    assert y1.package == "XTAL-3225-4P"
+
+    # 2. Downselection documentation must reflect ECS-240-8-32B-CKM
+    for doc in [
+        Path("docs/downselection_report.md"),
+        Path("src/projects/carrier_board/docs/downselection_report.md"),
+    ]:
+        content = doc.read_text(encoding="utf-8")
+        assert "ECS-240-8-32B-CKM" in content, f"{doc} must document ECS-240-8-32B-CKM"
+        assert "ECS-240-8-30B-CKM" not in content, f"{doc} must not reference 5032 MPN ECS-240-8-30B-CKM"
+
+    # 3. Consignment sourcing and shipping guide must exist
+    consignment_guide = Path("src/projects/carrier_board/docs/consignment_sourcing_and_shipping_guide.md")
+    assert consignment_guide.is_file(), "Consignment sourcing and shipping guide must exist"
+    guide_text = consignment_guide.read_text(encoding="utf-8")
+    assert "MCXN947VDF" in guide_text
+    assert "IQS7222C101QNR" in guide_text
+    assert "IQS7222A001QNR" in guide_text
+    assert "T-E68W908185A" in guide_text
+
+    # 4. Replied BOM questions spreadsheet must exist in attachments
+    replied_xls = Path(
+        "attachments/BUG-SEGMENTED-PALOLO-739/T-E68W908185A-2units-bom_templates(2026-10-11)_replied.xlsx"
+    )
+    assert replied_xls.is_file(), "Replied BOM questions spreadsheet must exist"
