@@ -5,6 +5,7 @@ staging/unstaging/discarding/committing, commit split/combine, merge conflict re
 and inter-tool navigation to code_review and bug_report.
 """
 
+import base64
 import json
 from pathlib import Path
 import subprocess
@@ -3194,3 +3195,76 @@ def test_regression_bug_bristly_setae_415_copy_paste_definition_and_handling() -
     # 3. code_review.html.j2 must explicitly define function copyText(text)
     assert "function copyText(text)" in cr_text, "code_review.html.j2 must define function copyText(text)"
     assert "function fallbackCopy(text)" in cr_text, "code_review.html.j2 must define function fallbackCopy(text)"
+
+
+def test_regression_bug_subterranean_vinegarworm_291_dashboard_upload_collision(tmp_path: Path) -> None:
+    """Verify BUG-SUBTERRANEAN-VINEGARWORM-291: DashboardServer file upload endpoint assigns unique filenames.
+
+    Ensures that when multiple files or screenshots are uploaded with identical names,
+    subsequent uploads do not overwrite earlier files on disk.
+    """
+    repo_dir, _ = create_isolated_git_repo(tmp_path)
+    att_dir = repo_dir / "attachments"
+    att_dir.mkdir(parents=True, exist_ok=True)
+
+    server = DashboardServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_dir,
+        bind_and_activate=True,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+
+        # First upload
+        payload1 = {
+            "bug_id": "BUG-DASH-291",
+            "filename": "image.png",
+            "file_type": "screenshot",
+            "content_base64": base64.b64encode(b"DASHBOARD_SCREENSHOT_1").decode("utf-8"),
+            "description": "First pasted screenshot in dashboard",
+        }
+        req1 = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=json.dumps(payload1).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req1) as resp1:
+            assert resp1.status == 200
+            res1 = json.loads(resp1.read().decode("utf-8"))
+
+        # Second upload with the same filename image.png
+        payload2 = {
+            "bug_id": "BUG-DASH-291",
+            "filename": "image.png",
+            "file_type": "screenshot",
+            "content_base64": base64.b64encode(b"DASHBOARD_SCREENSHOT_2").decode("utf-8"),
+            "description": "Second pasted screenshot in dashboard",
+        }
+        req2 = urllib.request.Request(
+            f"{base_url}/api/upload",
+            data=json.dumps(payload2).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req2) as resp2:
+            assert resp2.status == 200
+            res2 = json.loads(resp2.read().decode("utf-8"))
+
+        assert res1["filename"] == "image.png"
+        assert res2["filename"] == "image_1.png"
+        assert res1["file_path"] != res2["file_path"]
+
+        # Check files on disk
+        f1 = att_dir / "BUG-DASH-291" / "image.png"
+        f2 = att_dir / "BUG-DASH-291" / "image_1.png"
+        assert f1.exists()
+        assert f2.exists()
+        assert f1.read_bytes() == b"DASHBOARD_SCREENSHOT_1"
+        assert f2.read_bytes() == b"DASHBOARD_SCREENSHOT_2"
+    finally:
+        server.shutdown()
+        server.server_close()
