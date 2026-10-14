@@ -3099,3 +3099,42 @@ def test_regression_bug_glowing_oligochaete_544_rev_bom_export() -> None:
     eda_str = " | ".join(str(row) for row in eda_rows)
     assert "IQS7222C101QNR" in eda_str
     assert "ECS-240-8-32B-CKM" in eda_str
+
+
+def test_regression_bug_writhing_vermis_367_black_coverlay_color() -> None:
+    """Verify BUG-WRITHING-VERMIS-367: Flex tail coverlay color is Black across manifest, CAD, PCB, and supplier specs."""
+    import yaml
+    from provider.pcb.supplier import generate_pcb_project_summary
+
+    # 1. Manifest must specify black coverlay for flex_tail
+    manifest_path = Path("src/projects/carrier_board/manifest.yaml")
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    assert "flex_tail" in manifest
+    flex_spec = manifest["flex_tail"]
+    assert flex_spec.get("color") == [0.12, 0.12, 0.12, 1.0], (
+        f"Flex tail color in manifest must be black [0.12, 0.12, 0.12, 1.0], got {flex_spec.get('color')}"
+    )
+    assert flex_spec.get("coverlay_color") == "black"
+    assert "Black" in flex_spec.get("coverlay", "")
+
+    # 2. PCB config flex zones must specify coverlay_color == "black"
+    pcb_path = Path("src/projects/carrier_board/pcb.yaml")
+    pcb_data = yaml.safe_load(pcb_path.read_text(encoding="utf-8"))
+    flex_zones = pcb_data.get("flex_zones", [])
+    assert len(flex_zones) > 0
+    assert flex_zones[0].get("coverlay_color") == "black"
+
+    # 3. Supplier project summary must specify Black coverlay
+    provider = CarrierBoardProvider()
+    board_dir = Path("build/board/carrier_board/flex_tail")
+    bom_dir = Path("build/bom/carrier_board")
+    board_dir.mkdir(parents=True, exist_ok=True)
+    bom_dir.mkdir(parents=True, exist_ok=True)
+    txt, md = generate_pcb_project_summary(
+        board_dir=board_dir,
+        bom_dir=bom_dir,
+        name="flex_tail",
+        provider=provider,
+    )
+    assert "Black Polyimide Coverlay" in txt or "Black coverlay" in txt
+    assert "Black Polyimide Coverlay" in md or "Black coverlay" in md
