@@ -120,6 +120,14 @@ components:
         label: "GP15"
         side: right
         slot: 19
+      - name: "GP16"
+        label: "GP16"
+        side: left
+        slot: 1
+      - name: "GP17"
+        label: "GP17"
+        side: left
+        slot: 2
       - name: "GP18"
         label: "GP18"
         side: left
@@ -241,17 +249,23 @@ components:
       - name: "GND"
         label: "GND"
         side: right
-      - name: "IN1"
-        label: "IN1"
+      - name: "UH"
+        label: "UH"
         side: right
-      - name: "IN2"
-        label: "IN2"
+      - name: "UL"
+        label: "UL"
         side: right
-      - name: "IN3"
-        label: "IN3"
+      - name: "VH"
+        label: "VH"
         side: right
-      - name: "EN"
-        label: "EN"
+      - name: "VL"
+        label: "VL"
+        side: right
+      - name: "WH"
+        label: "WH"
+        side: right
+      - name: "WL"
+        label: "WL"
         side: right
       - name: "DIAG"
         label: "DIAG"
@@ -564,29 +578,44 @@ nets:
       - [pico, GP14]
       - [fuel_gauge, ALRT]
 
-  - name: ctrl_in1
+  - name: ctrl_uh
     color: cyan
     pins:
-      - [pico, GP19]
-      - [motor_driver, IN1]
+      - [pico, GP16]
+      - [motor_driver, UH]
 
-  - name: ctrl_in2
+  - name: ctrl_ul
+    color: teal
+    offset: [1.0, 1.0]
+    pins:
+      - [pico, GP17]
+      - [motor_driver, UL]
+
+  - name: ctrl_vh
     color: magenta
     pins:
-      - [pico, GP20]
-      - [motor_driver, IN2]
+      - [pico, GP18]
+      - [motor_driver, VH]
 
-  - name: ctrl_in3
+  - name: ctrl_vl
+    color: purple
+    offset: [1.0, 1.0]
+    pins:
+      - [pico, GP19]
+      - [motor_driver, VL]
+
+  - name: ctrl_wh
     color: yellow
     pins:
-      - [pico, GP21]
-      - [motor_driver, IN3]
+      - [pico, GP20]
+      - [motor_driver, WH]
 
-  - name: ctrl_en
+  - name: ctrl_wl
     color: orange
+    offset: [1.0, 1.0]
     pins:
-      - [pico, GP18]
-      - [motor_driver, EN]
+      - [pico, GP21]
+      - [motor_driver, WL]
 
   - name: ctrl_diag
     color: blue

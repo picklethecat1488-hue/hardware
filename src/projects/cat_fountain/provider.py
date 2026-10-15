@@ -79,23 +79,28 @@ class CatFountainProvider(Provider):
         "GP20",
         "GP19",
         "GP18",
+        "GP17",
+        "GP16",
     )
 
     # TMC6300 Pin Key constants for wiring diagram
-    TMC6300_KEY_BOX_WIDTH = 50.0
-    TMC6300_KEY_BOX_HEIGHT = 38.0
+    TMC6300_KEY_BOX_WIDTH = 54.0
+    TMC6300_KEY_BOX_HEIGHT = 48.0
     TMC6300_KEY_CENTER = (95.0, 88.0)
     TMC6300_KEY_CORNER_RADIUS = 2.5
     TMC6300_KEY_SWATCH_LENGTH = 4.0
     TMC6300_KEY_DOT_RADIUS = 0.5
     TMC6300_KEY_ROW_PITCH = 3.6
     TMC6300_KEY_ENTRIES = (
-        ("IN1", "IN1: UL, UH (Bridge)"),
-        ("IN2", "IN2: VL, VH (Bridge)"),
-        ("IN3", "IN3: WL, WH (Bridge)"),
-        ("U", "U: OUT1 (Phase U)"),
-        ("V", "V: OUT2 (Phase V)"),
-        ("W", "W: OUT3 (Phase W)"),
+        ("UH", "UH: High-side Phase U"),
+        ("UL", "UL: Low-side Phase U"),
+        ("VH", "VH: High-side Phase V"),
+        ("VL", "VL: Low-side Phase V"),
+        ("WH", "WH: High-side Phase W"),
+        ("WL", "WL: Low-side Phase W"),
+        ("U", "U: Phase U Output"),
+        ("V", "V: Phase V Output"),
+        ("W", "W: Phase W Output"),
     )
 
     water_sim: Optional[Any] = None

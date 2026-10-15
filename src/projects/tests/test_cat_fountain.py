@@ -126,7 +126,8 @@ class TestCatFountainProvider:
         # Verify label contents
         label_names = {lbl[0] for lbl in room._labels}
         assert "rp2040_key_title" in label_names
-        assert "rp2040_key_lbl_gp4" in label_names
+        assert "rp2040_key_lbl_gp16" in label_names
+        assert "rp2040_key_lbl_gp22" in label_names
         assert "rp2040_key_lbl_gp26" in label_names
 
         # Verify TMC6300 Pin Key (BUG-DEEP-BURROWER-108)
@@ -1663,3 +1664,47 @@ class TestCatFountainProvider:
         assert clip.part.is_inside((6.0, -10.0, clip_h * 0.5)), (
             "Motor clip continuous arm at (6.0, -10.0) is missing: structural integrity lost!"
         )
+
+    def test_regression_bug_hairy_wasp_932_tmc6300_6pwm_wiring_and_no_sense_pin(self, provider):
+        """Verify BUG-HAIRY-WASP-932: TMC6300 uses 6-PWM control (UH..WL), SEN pin is disconnected, and GP26 speed sensor is preserved."""
+        from pathlib import Path
+        from model.wiring import Wiring
+
+        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+        wiring = Wiring(yaml_path)
+
+        # 1. Pico pin allocation: GP16..GP21 for 6-PWM, GP22 for DIAG, and GP26 for speed sensor
+        pico = next(f for f in wiring.footprints if f.name == "pico")
+        pico_pin_names = {p.name for p in pico.pins}
+        expected_pico_gpios = {"GP16", "GP17", "GP18", "GP19", "GP20", "GP21", "GP22", "GP26"}
+        assert expected_pico_gpios.issubset(pico_pin_names)
+
+        # 2. Motor driver: 6 independent phase inputs (UH, UL, VH, VL, WH, WL) and outputs (U, V, W)
+        driver = next(f for f in wiring.footprints if f.name == "motor_driver")
+        driver_pin_names = {p.name for p in driver.pins}
+        assert {"UH", "UL", "VH", "VL", "WH", "WL", "DIAG", "U", "V", "W"}.issubset(driver_pin_names)
+        assert "IN1" not in driver_pin_names
+        assert "IN2" not in driver_pin_names
+        assert "IN3" not in driver_pin_names
+        assert "EN" not in driver_pin_names
+
+        # 3. Speed sensor component preserved on GP26
+        footprint_names = {f.name for f in wiring.footprints}
+        assert "speed_sensor" in footprint_names, "Speed sensor footprint must be present"
+
+        # 4. Nets: 6 control nets connect Pico GP16..GP21 to TMC6300 UH..WL, GP22 to DIAG, GP26 to speed sensor
+        net_map = {n.name: [tuple(p) for p in n.pins] for n in wiring.nets}
+        assert ("pico", "GP16") in net_map["ctrl_uh"] and ("motor_driver", "UH") in net_map["ctrl_uh"]
+        assert ("pico", "GP17") in net_map["ctrl_ul"] and ("motor_driver", "UL") in net_map["ctrl_ul"]
+        assert ("pico", "GP18") in net_map["ctrl_vh"] and ("motor_driver", "VH") in net_map["ctrl_vh"]
+        assert ("pico", "GP19") in net_map["ctrl_vl"] and ("motor_driver", "VL") in net_map["ctrl_vl"]
+        assert ("pico", "GP20") in net_map["ctrl_wh"] and ("motor_driver", "WH") in net_map["ctrl_wh"]
+        assert ("pico", "GP21") in net_map["ctrl_wl"] and ("motor_driver", "WL") in net_map["ctrl_wl"]
+        assert ("pico", "GP22") in net_map["ctrl_diag"] and ("motor_driver", "DIAG") in net_map["ctrl_diag"]
+        assert ("pico", "GP26") in net_map["speed_sense"] and ("speed_sensor", "OUT") in net_map["speed_sense"]
+
+        # 5. Provider key definitions
+        assert "GP16" in provider.RP2040_KEY_RIGHT_GPIOS
+        assert "GP26" in provider.RP2040_KEY_RIGHT_GPIOS
+        key_entry_pins = [entry[0] for entry in provider.TMC6300_KEY_ENTRIES]
+        assert key_entry_pins == ["UH", "UL", "VH", "VL", "WH", "WL", "U", "V", "W"]
