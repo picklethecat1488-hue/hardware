@@ -60,7 +60,7 @@ graph TD
     TOF2 -->|GP9: INT| PICO
     TOF3 -->|GP10: INT| PICO
     MAX -->|GP14: ALRT| PICO
-    PICO -->|GP18, GP19, GP20, GP21: Control| DRV
+    PICO -->|GP16, GP17, GP18, GP19, GP20, GP21: 6-PWM Control| DRV
     PICO -->|GP22: DIAG| DRV
     PICO -->|GP26: SPEED_SENSE| SENS["AH3577 Speed Sensor"]
     PICO -->|GP11: PIO/WS2812| LED["RGB NeoPixel LED"]
@@ -85,10 +85,10 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 | **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | *N/A (Standalone)* | Standalone linear charger. Uses jumpers/resistors to configure chemistry/current. S1 (FAULT) & S2 (CHG) are left disconnected. |
 | **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Primary interface to access battery and charging status. The 18650 battery connects directly to this board, which is then jumpered to the charger. Includes configurable alert interrupt (ALRT) pin connected to GP14. |
 | **Battery** | **Standard 18650 3.7V Li-ion Cell** | Main energy source (e.g. Samsung 30Q or Panasonic NCR18650B, 3000+ mAh). | *N/A (Analog)* | Rechargeable lithium-ion cell to fit the internal battery storage area. |
-| **BLDC Motor Driver** | **SparkFun TMC6300 Breakout** | Low-voltage three-phase brushless motor driver breakout to drive the 15W BLDC motor. | *N/A (Driven by GP18, GP19, GP20, GP21, GP22)* | Supports 2V-11V range, up to 2A continuous, breadboard-compatible 25.4mm x 20.3mm footprint. |
+| **BLDC Motor Driver** | **SparkFun TMC6300 Breakout** | Low-voltage three-phase brushless motor driver breakout to drive the 15W BLDC motor. | *N/A (Driven by GP16..GP22)* | Supports 2V-11V range, up to 2A continuous, breadboard-compatible 25.4mm x 20.3mm footprint. |
 | **BLDC Motor (15W)** | **BetaFPV 1102 (18000KV) Brushless Motor** | Ultra-lightweight 1S-compatible brushless motor to drive the dry-side magnet hub. | *N/A (Driven by TMC6300)* | 15W power class, 13.8mm diameter, 1.5mm shaft, lightweight 2.9g, mounts with M1.4 screws. |
 | **Coupling Magnets (Qty: 6)** | **6mm x 3mm N52 Neodymium Discs** | Rare-earth magnets to couple the dry motor shaft to the wet impeller. | *N/A (Magnetic)* | Strong N52 grade, 3 magnets on the dry hub and 3 on the wet impeller with alternating polarities. |
-| **I2C Current Sensor** | [Adafruit INA219 Current Sensor](https://www.adafruit.com/product/904) | High-side current and power monitor to measure motor current draw and calculate load torque. | `0x40` | Measures current up to 3.2A with 1% accuracy. Used for low water / refill detection. |
+| **I2C Current Sensor** | [Adafruit INA219 Current Sensor](https://www.adafruit.com/product/904) | High-side current and power monitor to measure motor current draw, stall detection, and load torque. | `0x40` | Measures current up to 3.2A with 1% accuracy. Used for low water / refill detection and stall protection. |
 | **Speed Sensor** | **Digital Latching Hall Sensor (e.g., US1881 / AH3577)** | Measures impeller rotation speed contactlessly by detecting alternating magnet poles. | *N/A (Driven by GP26)* | Latching digital output, SOT-23 or TO-92 package, fits inside custom pocket in the motor boss. |
 
 ### Technical Integration Notes
@@ -97,9 +97,9 @@ To build the cat fountain with I2C communication across key monitoring subsystem
    Since all three `VL53L0X` sensors share the same default I2C address (`0x29`), you must connect the `XSHUT` (shutdown) pin of each sensor to a GPIO pin on the Pico. At boot, pull all `XSHUT` pins LOW to disable the sensors. Then, enable them one by one (pull `XSHUT` HIGH) and send an I2C command to assign a unique address (`0x30`, `0x31`, `0x32`) to the active sensor.
 2. **I2C Bus Voltage & Pull-Ups**:
    The Raspberry Pi Pico operates at 3.3V logic. Ensure all boards are powered at 3.3V (or have 3.3V level-shifting built-in). Add `4.7kΩ` pull-up resistors to the `SDA` and `SCL` lines of each active I2C bus.
-3. **Motor Speed & Torque Control**:
-   * The TMC6300 brushless motor driver allows adjusting the motor speed via 3-phase PWM driven directly by Pico GPIO pins `GP19`, `GP20`, and `GP21`, with `GP18` acting as the active-high driver enable. This can be modulated depending on cat proximity to dynamically speed up the Archimedes screw pump when a cat approaches, and slow down or enter standby when idle.
-   * **Water Level / Refill Detection**: The INA219 current sensor measures motor current draw over I2C. When the water level in the bowl runs low, the impeller spins in air rather than water, causing motor load torque and current draw to drop significantly. The RP2040 can monitor this current drop over I2C, trigger a "low water" alert, and pulse the RGB NeoPixel status LED to notify the user.
+3. **Motor Speed & 6-PWM Control**:
+   * The TMC6300 brushless motor driver is driven via 6-PWM phase control directly by Pico GPIO pins `GP16` (UH), `GP17` (UL), `GP18` (VH), `GP19` (VL), `GP20` (WH), and `GP21` (WL), with `GP22` monitoring the active-high hardware diagnostic fault pin (`DIAG`). This allows full 6-step trapezoidal commutation with independent high-side and low-side FET conduction. The breakout's `SEN` pin is left disconnected from the MCU as current monitoring is handled directly by the INA219. Speed can be modulated depending on cat proximity to dynamically speed up the Archimedes screw pump when a cat approaches, and slow down or enter standby when idle.
+   * **Water Level / Refill Detection & Stall Protection**: The INA219 current sensor measures motor current draw over I2C, providing real-time feedback for stall protection and low-water refill detection. When the water level in the bowl runs low, the impeller spins in air rather than water, causing motor load torque and current draw to drop significantly. The RP2040 can monitor this current drop over I2C, trigger a "low water" alert, and pulse the RGB NeoPixel status LED to notify the user. Contactless rotation speed feedback is provided by the AH3577 latching Hall sensor on `GP26`.
 4. **Debug SWD & UART Pins**:
    * **SWD Debugging**: The separate 3-pin debug header at the bottom edge of the Pico W provides **SWCLK**, **GND**, and **SWDIO** for hardware debugging (e.g., using a Raspberry Pi Debug Probe or Picoprobe). These do not occupy standard GPIO pins.
    * **UART Console / Printf Debugging**: **GP0 (TX)** and **GP1 (RX)** are reserved as the default debug UART0 port, leaving them completely free from control or sensor connections.
