@@ -219,4 +219,5 @@ class DiffViewSessionModel(BaseModel):
     working_files: List[WorkingTreeFileModel] = Field(default_factory=list)
     conflicts: List[MergeConflictFileModel] = Field(default_factory=list)
     initial_sync_done: bool = False
+    author_blacklist: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)

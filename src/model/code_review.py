@@ -98,6 +98,7 @@ class ReviewSessionModel(BaseModel):
     revisions: List[str] = Field(default_factory=list)
     files: Dict[str, FileStateModel] = Field(default_factory=dict)
     comments: List[CommentModel] = Field(default_factory=list)
+    author_blacklist: List[str] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
 
