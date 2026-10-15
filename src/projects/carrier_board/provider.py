@@ -74,6 +74,9 @@ class CarrierBoardProvider(Provider):
 
     __test__ = False
 
+    CARRIER_BOARD_COLOR: tuple[float, float, float] = (0.08, 0.40, 0.20)
+    FLEX_TAIL_COVERLAY_COLOR: tuple[float, float, float] = (0.12, 0.12, 0.12)
+
     @cached_property
     def default_config(self) -> CarrierBoardConfig:
         """Return the default configuration for the carrier board project."""
@@ -210,6 +213,7 @@ class CarrierBoardProvider(Provider):
             flex_type=FlexType.CAPACITIVE,
             capacitive_sensors=self.pcb_config.capacitive_sensors if self.pcb_config else None,
             outline_polygon=pts,
+            coverlay_color="black",
         ) as tail:
             # Manifold hull enclosing connector and sensing channels with minimal wasted space
             with BuildSketch() as s:
@@ -868,8 +872,8 @@ class CarrierBoardProvider(Provider):
 
         batt_cov_geom = batt_cov.part.locate(Location((0.0, 0.0, z_lid + wall + 0.5)))
 
-        room.add("carrier_board", carrier_geom, color=(0.08, 0.40, 0.20), alpha=1.0)
-        room.add("flex_tail", tail_geom, color=(0.85, 0.65, 0.15), alpha=0.9)
+        room.add("carrier_board", carrier_geom, color=self.CARRIER_BOARD_COLOR, alpha=1.0)
+        room.add("flex_tail", tail_geom, color=self.FLEX_TAIL_COVERLAY_COLOR, alpha=0.9)
         room.add("enclosure_bottom", enclosure.part, color=(0.15, 0.16, 0.20), alpha=0.4)
         room.add("enclosure_lid", lid_geom, color=(0.20, 0.22, 0.28), alpha=0.4)
         room.add("led_cover", cover_geom, color=(0.90, 0.95, 1.0), alpha=0.6)
@@ -914,12 +918,12 @@ class CarrierBoardProvider(Provider):
     def view_carrier_board(self, room: Room, mode: Mode) -> None:
         """Assemble rigid carrier PCB with component obstacles and test points for inspection and simulation."""
         carrier = self.carrier_board("carrier_board", None, mode)
-        room.add("carrier_board", carrier.part, color=(0.08, 0.40, 0.20), alpha=1.0)
+        room.add("carrier_board", carrier.part, color=self.CARRIER_BOARD_COLOR, alpha=1.0)
 
     def view_flex_tail(self, room: Room, mode: Mode) -> None:
         """Assemble flex tail PCB with sensor pads and test points for inspection and simulation."""
         tail = self.flex_tail("flex_tail", None, mode)
-        room.add("flex_tail", tail.part, color=(0.85, 0.65, 0.15), alpha=0.9)
+        room.add("flex_tail", tail.part, color=self.FLEX_TAIL_COVERLAY_COLOR, alpha=0.9)
 
     def view_battery_cover(self, room: Room, mode: Mode) -> None:
         """Render standalone snap-fit battery cover."""

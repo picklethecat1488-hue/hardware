@@ -32,6 +32,7 @@ from provider.vcs.git_engine import (
 )
 from provider.code_review.markdown_exporter import MarkdownReviewExporter
 from provider.code_review.sqlite_store import SQLiteReviewStore
+from provider.sanitizer import get_author_blacklist
 
 
 class ReviewRequestHandler(BaseHTTPRequestHandler):
@@ -177,6 +178,9 @@ class ReviewRequestHandler(BaseHTTPRequestHandler):
             autoescape=False,
         )
         template = env.get_template("code_review.html.j2")
+        if hasattr(self.server, "session") and self.server.session:
+            if not self.server.session.author_blacklist:
+                self.server.session.author_blacklist = get_author_blacklist()
         html_out = template.render(session=self.server.session)
 
         encoded = html_out.encode("utf-8")

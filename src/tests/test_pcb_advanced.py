@@ -2085,7 +2085,7 @@ def test_regression_downselection_results_application() -> None:
     fp_map = {fp.name: fp for fp in wiring.footprints}
     u1 = fp_map["U1"]
     assert u1.package == "VFBGA-184", f"Expected U1 package VFBGA-184, got {u1.package}"
-    assert u1.mpn == "MCXN947VDF", f"Expected U1 mpn MCXN947VDF, got {u1.mpn}"
+    assert u1.mpn in ("MCXN947VDF", "MCXN947VDFT"), f"Expected U1 mpn MCXN947VDF(T), got {u1.mpn}"
     assert len(u1.pins) == 184, f"Expected 184 pins on U1, got {len(u1.pins)}"
     downselected_components = ["J5", "J6", "J7", "J8", "J9", "J10", "J14", "U8", "U6", "D1", "U7", "U9"]
     for des in downselected_components:

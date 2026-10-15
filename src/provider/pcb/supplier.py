@@ -102,7 +102,16 @@ def generate_pcb_project_summary(
         tab_w = _get_dim("flex_tail_tab_width", 17.0)
         cr = _get_dim("flex_tail_corner_radius", 1.0)
         stiffener = "0.30 mm stiffener under 30-pin mating tab (male plug for J2, 0.30mm total mating thickness)"
-        coverlay = "Yellow Polyimide Coverlay (Both Sides)"
+        manifest = getattr(provider, "manifest", {}) or {}
+        sub_manifest = manifest.get(name, {}) if isinstance(manifest, dict) else {}
+        coverlay_val = sub_manifest.get("coverlay")
+        coverlay_color_val = sub_manifest.get("coverlay_color", "black")
+        if coverlay_val:
+            coverlay = str(coverlay_val)
+        elif coverlay_color_val:
+            coverlay = f"Matte {str(coverlay_color_val).capitalize()} Polyimide Coverlay (Both Sides)"
+        else:
+            coverlay = "Matte Black Polyimide Coverlay (Both Sides)"
         silkscreen = "White"
         surface_finish = job_finish or 'ENIG (Electroless Nickel Immersion Gold, Au: 1-2 u", Ni: 100-200 u")'
         min_track = "0.15 mm / 0.15 mm (6.0 mil / 6.0 mil)"
@@ -201,9 +210,10 @@ def generate_pcb_project_summary(
     thick_str = f"{t:.2f} mm ({t / 25.4:.3f} in) +/- 10%"
 
     if is_flex:
+        coverlay_remark = f"{str(coverlay_color_val or 'Black').capitalize()} coverlay"
         remarks = (
             f"{layer_count}-Layer Polyimide FPC, {int(w)}x{int(l)}mm ({int(tab_w or 17)}mm tab), "
-            f"{t:.2f}mm thick, ENIG, Yellow coverlay, White silk. "
+            f"{t:.2f}mm thick, ENIG, {coverlay_remark}, White silk. "
             "0.30mm stiffener under 30-pin tab (male plug for J2). "
             "SMT only, ZERO drilled holes / NO vias on board; valid drill file included. "
             "1*2 panel in 64*64mm accepted with x-out board accepted. "
