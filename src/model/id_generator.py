@@ -1,11 +1,11 @@
 """Docker-pattern issue ID generator using a cryptographically secure random number generator (CRNG).
 
-Implements WORM-029:
-Format: [PREFIX]-[ADJECTIVE]-[ANIMAL/NOUN]-[3 digits]
+Implements Docker pattern ID generation:
+Format: [PREFIX]-[ADJECTIVE]-[INSECT/BUG/NOUN]-[3 digits]
 Examples:
-    - BUG-BURROWING-ANNELID-42
-    - BUG-WRIGGLY-EARTHWORM-809
-    - BUG-SLIMY-NIGHTCRAWLER-17
+    - BUG-BUZZING-CICADA-42
+    - BUG-WINGED-DRAGONFLY-809
+    - BUG-CHITINOUS-BEETLE-17
 
 Adjective and noun lists are compressed with zlib + base64 to save code space.
 """
@@ -17,22 +17,23 @@ import secrets
 from typing import List, Optional
 import zlib
 
-# Compressed worm-themed word lists to minimize source code footprint
+# Compressed bug and insect-themed word lists to minimize source code footprint
 _B64_ADJS = (
-    "eNolkVuWxCAIRLfCVnzQhtMoDmLPZP8bmTL9Ewoi5QXTGKxSpVBWGZWyywq9KW93+5XRqFwSMmwv"
-    "Kib6VKxPW8GVijPPU6qpT6pIqIoHcfK4eBD3zLXi4Is9RJleyuu6T/iTfHJby1ySUjsUcGr6vba5"
-    "7XFar91BJwMcKGvyD06rwJ/UUr9JN6BLOjyKs4NX4RHQK/xgd8NI1HetNw0rsX3AwbylAePJKW7C"
-    "EG+abtlWkUqeqiR4uNmxfVBocesw5qN8QuEqyLCFIPrGvEulvM8XWOth9AO9sLj89fjZ4ufnzsHu"
-    "aXBC154TuwikS/cDH/t5F/Sia2uKIz+sHwbshx0rQdW/8mXe6delNTwcYpxN/QPweYLC"
+    "eNo9kVF2AyEIRbfCVlCZkQZ1ijg5yf4XUjBtf3wIiPcpniwE2BIpYDfqHQVQ21AqkLCXLZpClM9qIdPk"
+    "BWm939xPyNjGOgRPb8mVjftYE7JwfuyyEl2fgNscHQqqxb7w0risDJ0u1EhRChw4DQ5CqxQIB5NmgkOI"
+    "PC1s++whr5BTxnPrkEIdKrK+fNWbfEYdN2lU63JfCqxcaGbqBl+rbSQh/Ohq3H9rsqZpOGhunpM4QyND"
+    "cT/QuMU6zCLduXkZ+sj2cTLS5MLYwYfmTX/55JAh4nyXjjRmZk+sng2N4Hv5M4FiHDNQv/sFM2OMn3Q2"
+    "B9qRKu6gcg/eyfLwefOi/NitlyNtDcO7w/4Dt70E7W9zRd/Tf3gnnnwYGOpk57c6FLM7NMU+Ze33uElu"
+    "cqqbkwZjPDiVH+W3my0="
 )
 
 _B64_NOUNS = (
-    "eNo1UlGSxSAIuwpXQctTZlFcxHbf/S+ytE6/EkGBBLF3Ej4gEbkQJFE9LrUGSVNiD9CffTaez42N"
-    "O7bM9CKDjNO5l0AnGyyCEaPuPOggyBXJdegRzL4ThSdkYSeR1SBrVu0Bbej0u5jhJQ8SjcCDSwkg"
-    "NK9PWyIB6rl+3ZBi9g/bnucj6A8potcmthJUksbdK3A8esIx34kgRLlCKL67yCo7tVpIzGtCw1LU"
-    "oRHKk2mhawuKavGiU0PXOHYu1d+p+7eNCipc9NFNMFBUFIZgR2PsMFS+b24NBKNtuXFK2jdVva0w"
-    "XX3nJr6ESgtnA20swUBHgsmy1zR5rJ7XvdIZkmB2ZIH5u9haFHQc2ypf6SX3D4jUSXLStu8ka7Gj"
-    "M2QWtCd04d/G1+srPoromgSXxYKiwj+DtKN6"
+    "eNo1UVmWxCAIvApXQaWVidsA6bzc/yKDJvPRUI801CJ2A5yFEwSMh17cGgkEovWz6q2O61NvCGcLlfaH"
+    "04xkzSKmxPogH02uFQUideNJiSAWuRUrK0T2/yLEEQ8ZGMtCY3SIwvEgg4RNqa5LCaW7gjSCjr4HgvlB"
+    "hHJxhg8LhfPpa/yphLCBnGwL5I4GWVC1jDn9WpYzQEH5klrDDmU4ia2m+0QZ38cRdzW38EMX1TeAA+1O"
+    "nk/FSBf37CDdi9+9fhGc/POy1BFPNW89LwJwJnPvDe91unHK5LXWJ5zG5mXor4seDqxAv9ssMKvvvSfn"
+    "ORGexMQ1vpIU95NoRMHgbXj0HqZyXTZYC+jBe18np93ElRtyBfeX/88Y92M5URt95+DenfusCP6cW6AV"
+    "4alg/kxeMsm7a0L0arxQpxffUJNNdxF9neoaI4UhJH+SJqhx"
 )
 
 

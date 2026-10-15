@@ -32,13 +32,14 @@ def test_compressed_word_lists_save_code_space() -> None:
     assert len(_B64_ADJS) < 500, "Compressed adjectives base64 string must be compact"
     assert len(_B64_NOUNS) < 500, "Compressed nouns base64 string must be compact"
 
-    # Must contain representative words from worm-themed word lists
-    assert "BURROWING" in ADJECTIVES
-    assert "WRIGGLY" in ADJECTIVES
-    assert "LOAMY" in ADJECTIVES
-    assert "ANNELID" in NOUNS
-    assert "EARTHWORM" in NOUNS
-    assert "NIGHTCRAWLER" in NOUNS
+    # Must contain representative words from bug-themed word lists
+    assert "BUZZING" in ADJECTIVES
+    assert "CHITINOUS" in ADJECTIVES
+    assert "WINGED" in ADJECTIVES
+    assert "CICADA" in NOUNS
+    assert "MANTIS" in NOUNS
+    assert "DRAGONFLY" in NOUNS
+    assert "BEETLE" in NOUNS
 
     assert len(ADJECTIVES) >= 50
     assert len(NOUNS) >= 50
@@ -178,3 +179,65 @@ def test_git_engine_extracts_docker_pattern_bug_tags(tmp_path: Path) -> None:
     assert tags[0].title == "Burrowing annelid bug"
     assert tags[0].status == "OPEN"
     assert tags[0].severity == "HIGH"
+
+
+def test_regression_bug_vermiform_crawler_442_bug_themed_id_generator() -> None:
+    """Verify BUG-VERMIFORM-CRAWLER-442: ID generator uses bug/insect themed dictionaries.
+
+    Ensures:
+    1. NOUNS contains true insect/bug names (CICADA, DRAGONFLY, MANTIS, FIREFLY, etc.)
+    2. ADJECTIVES contains bug-themed attributes (BUZZING, WINGED, CHITINOUS, IRIDESCENT, etc.)
+    3. Worm-specific terms (TAPEWORM, SANDWORM, OLIGOCHAETE, PALOLO, ANNELIDIC, etc.) are purged
+    4. Generated IDs match the Docker pattern and use bug words
+    5. Historical IDs (BUG-BURROWING-ANNELID-42, BUG-FERTILE-SANDWORM-588) remain backward-compatible
+    6. Frontend bug_report.html.j2 template matches bug word lists
+    """
+    # 1. Bug nouns present
+    bug_nouns = {"CICADA", "DRAGONFLY", "MANTIS", "FIREFLY", "BEETLE", "CRICKET", "KATYDID", "LADYBUG", "WEEVIL"}
+    for bn in bug_nouns:
+        assert bn in NOUNS, f"Expected insect/bug noun '{bn}' in NOUNS"
+
+    # 2. Bug adjectives present
+    bug_adjs = {"BUZZING", "WINGED", "CHITINOUS", "IRIDESCENT", "STRIDULATING", "SWARMING", "MANDIBLED"}
+    for ba in bug_adjs:
+        assert ba in ADJECTIVES, f"Expected bug-themed adjective '{ba}' in ADJECTIVES"
+
+    # 3. Worm-specific terms purged
+    worm_nouns = {"TAPEWORM", "SANDWORM", "OLIGOCHAETE", "PALOLO", "ANNELID", "EARTHWORM", "NIGHTCRAWLER"}
+    for wn in worm_nouns:
+        assert wn not in NOUNS, f"Worm noun '{wn}' should not be present in active bug NOUNS list"
+
+    worm_adjs = {"ANNELIDIC", "VERMIFORM", "VERMICULAR"}
+    for wa in worm_adjs:
+        assert wa not in ADJECTIVES, f"Worm adjective '{wa}' should not be in active bug ADJECTIVES list"
+
+    # 4. Generate random IDs and verify format
+    for _ in range(25):
+        bid = generate_docker_pattern_id(prefix="BUG")
+        assert is_docker_pattern_id(bid)
+        parts = bid.split("-")
+        assert parts[0] == "BUG"
+        assert parts[1] in ADJECTIVES
+        assert parts[2] in NOUNS
+        assert 1 <= int(parts[3]) <= 999
+
+    # 5. Backward compatibility for historical IDs
+    historical_ids = [
+        "BUG-BURROWING-ANNELID-42",
+        "BUG-FERTILE-SANDWORM-588",
+        "BUG-GLOWING-OLIGOCHAETE-544",
+        "BUG-TRANSLUCENT-TAPEWORM-953",
+        "BUG-VERMIFORM-CRAWLER-442",
+    ]
+    for hid in historical_ids:
+        assert is_docker_pattern_id(hid), f"Historical ID '{hid}' must remain valid Docker pattern"
+
+    # 6. Verify frontend bug_report.html.j2 template has bug lists
+    template_path = Path("src/provider/templates/bug_report.html.j2")
+    if template_path.exists():
+        content = template_path.read_text(encoding="utf-8")
+        assert "CICADA" in content, "Expected CICADA in bug_report.html.j2"
+        assert "DRAGONFLY" in content, "Expected DRAGONFLY in bug_report.html.j2"
+        assert "TAPEWORM" not in content, "TAPEWORM should not be in bug_report.html.j2"
+        assert "SANDWORM" not in content, "SANDWORM should not be in bug_report.html.j2"
+        assert "OLIGOCHAETE" not in content, "OLIGOCHAETE should not be in bug_report.html.j2"
