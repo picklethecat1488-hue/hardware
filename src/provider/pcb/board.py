@@ -49,6 +49,7 @@ class BuildPcb(BuildPart):
         stackup: Optional[Union[BuildStackup, StackupModel]] = None,
         capacitive_sensors: Optional[Sequence[CapacitiveElectrodeModel]] = None,
         outline_polygon: Optional[Sequence[Tuple[float, float]]] = None,
+        coverlay_color: Optional[str] = None,
         mode: Any = None,
     ) -> None:
         """Initialize PCB part builder context.
@@ -59,12 +60,14 @@ class BuildPcb(BuildPart):
             revision: Board revision identifier.
             stackup: Multi-layer stackup model or BuildStackup context.
             capacitive_sensors: Optional sequence of capacitive electrode models.
+            coverlay_color: Optional protective coverlay film color (e.g. 'black').
             mode: Optional BuildMode for build123d part builder.
         """
         super().__init__(mode=mode)
         self.name = name
         self.board_type: BoardType = BoardType(board_type) if isinstance(board_type, str) else board_type
         self.revision = revision
+        self.coverlay_color = coverlay_color
 
         if isinstance(stackup, BuildStackup):
             self.stackup_model: Optional[StackupModel] = stackup.to_model()
@@ -123,6 +126,7 @@ class BuildPcb(BuildPart):
             name=self.name,
             board_type=self.board_type,
             revision=self.revision,
+            coverlay_color=self.coverlay_color,
             dimensions_mm=dims,
             shape_ref=self.name,
             stackup=self.stackup_model,
@@ -157,6 +161,7 @@ class BuildFlexPCB(BuildPcb):
         stackup: Optional[Union[BuildStackup, StackupModel]] = None,
         capacitive_sensors: Optional[Sequence[CapacitiveElectrodeModel]] = None,
         outline_polygon: Optional[Sequence[Tuple[float, float]]] = None,
+        coverlay_color: Optional[str] = "black",
         mode: Any = None,
     ) -> None:
         """Initialize flexible PCB context with typed flex_type."""
@@ -167,6 +172,7 @@ class BuildFlexPCB(BuildPcb):
             stackup=stackup,
             capacitive_sensors=capacitive_sensors,
             outline_polygon=outline_polygon,
+            coverlay_color=coverlay_color,
             mode=mode,
         )
         self.flex_type: FlexType = FlexType(flex_type) if isinstance(flex_type, str) else flex_type
@@ -174,4 +180,4 @@ class BuildFlexPCB(BuildPcb):
     def to_pcb_config(self) -> PCBConfig:
         """Construct strongly-typed PCBConfig including flex_type metadata."""
         cfg = super().to_pcb_config()
-        return cfg.model_copy(update={"flex_type": self.flex_type})
+        return cfg.model_copy(update={"flex_type": self.flex_type, "coverlay_color": self.coverlay_color})

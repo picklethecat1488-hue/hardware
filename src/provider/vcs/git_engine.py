@@ -29,6 +29,7 @@ from model.vcs import (
     MergeConflictFileModel,
     WorkingTreeFileModel,
 )
+from provider.sanitizer import elide_commit_author, elide_commit_email, elide_personal_info
 
 MAX_DIFF_LINE_LENGTH: int = 1000
 IGNORED_REVIEW_FILES: frozenset[str] = frozenset({"BUGS.md", "BUGS.txt", "CR.md"})
@@ -456,11 +457,11 @@ class GitEngine:
             if len(parts) >= 6:
                 c_hash = parts[0].strip()
                 s_hash = parts[1].strip()
-                author = parts[2].strip()
-                email = parts[3].strip()
+                author = elide_commit_author(parts[2].strip())
+                email = elide_commit_email(parts[3].strip())
                 date_str = parts[4].strip()
-                subject = parts[5].strip()
-                body = parts[6].strip() if len(parts) > 6 else ""
+                subject = elide_personal_info(parts[5].strip())
+                body = elide_personal_info(parts[6].strip()) if len(parts) > 6 else ""
 
                 additions, deletions, file_count, ignored_files = self._get_commit_stat_summary(c_hash)
                 commits.append(
@@ -495,7 +496,7 @@ class GitEngine:
             email = run_git_command(["config", "user.email"], cwd=self.repo_root).strip()
         except RuntimeError:
             pass
-        return {"name": name, "email": email}
+        return {"name": elide_commit_author(name) or name, "email": elide_commit_email(email) or email}
 
     def get_commit_author(self, commit_hash: str) -> Dict[str, str]:
         """Get the author name and email of a specific commit."""
@@ -505,7 +506,7 @@ class GitEngine:
             out = run_git_command(["log", "-1", "--format=%an\t%ae", commit_hash], cwd=self.repo_root).strip()
             if out and "\t" in out:
                 an, ae = out.split("\t", 1)
-                return {"name": an.strip(), "email": ae.strip()}
+                return {"name": elide_commit_author(an.strip()), "email": elide_commit_email(ae.strip())}
         except RuntimeError:
             pass
         return self.get_current_user()
@@ -536,7 +537,7 @@ class GitEngine:
             out = run_git_command(["log", "-1", "--format=%an\t%ae", "--", rel_path], cwd=self.repo_root).strip()
             if out and "\t" in out:
                 an, ae = out.split("\t", 1)
-                return {"name": an.strip(), "email": ae.strip()}
+                return {"name": elide_commit_author(an.strip()), "email": elide_commit_email(ae.strip())}
         except RuntimeError:
             pass
         return curr_user
@@ -647,13 +648,13 @@ class GitEngine:
                 c_hash = parts[0].strip()
                 s_hash = parts[1].strip()
                 parents = parts[2].strip().split() if parts[2].strip() else []
-                author = parts[3].strip()
-                email = parts[4].strip()
+                author = elide_commit_author(parts[3].strip())
+                email = elide_commit_email(parts[4].strip())
                 date_str = parts[5].strip()
                 rel_date = parts[6].strip()
-                subject = parts[7].strip()
+                subject = elide_personal_info(parts[7].strip())
                 decorations_str = parts[8].strip() if len(parts) > 8 else ""
-                body = parts[9].strip() if len(parts) > 9 else ""
+                body = elide_personal_info(parts[9].strip()) if len(parts) > 9 else ""
 
                 # Parse branches and tags from decorations
                 branches: List[str] = []
@@ -911,10 +912,8 @@ class GitEngine:
 
     def get_pr_url(self, pr_number: int | str) -> str:
         """Return the web URL for a GitHub Pull Request number."""
-        base = self.get_repo_web_url()
-        if base:
-            return f"{base}/pull/{pr_number}"
-        return f"https://github.com/picklethecat1488-hue/hardware/pull/{pr_number}"
+        base = self.get_repo_web_url() or f"https://github.com/workspace/{self.repo_root.name}"
+        return f"{base}/pull/{pr_number}"
 
     def get_remote_pr_numbers(self) -> Set[int]:
         """Fetch set of valid pull request numbers existing on remote GitHub repository.
@@ -941,7 +940,7 @@ class GitEngine:
 
     def get_branch_url(self, branch_name: str) -> str:
         """Return the GitHub web URL for a branch or PR branch name."""
-        base = self.get_repo_web_url() or "https://github.com/picklethecat1488-hue/hardware"
+        base = self.get_repo_web_url() or f"https://github.com/workspace/{self.repo_root.name}"
         m = re.search(r"(?:^|/)(?:pr|pull)[/-]?(\d+)\b", branch_name, re.IGNORECASE)
         if m:
             pr_num = int(m.group(1))
@@ -1309,11 +1308,11 @@ class GitEngine:
         if len(parts) >= 6:
             c_hash = parts[0].strip()
             s_hash = parts[1].strip()
-            author = parts[2].strip()
-            email = parts[3].strip()
+            author = elide_commit_author(parts[2].strip())
+            email = elide_commit_email(parts[3].strip())
             date_str = parts[4].strip()
-            subject = parts[5].strip()
-            body = parts[6].strip() if len(parts) > 6 else ""
+            subject = elide_personal_info(parts[5].strip())
+            body = elide_personal_info(parts[6].strip()) if len(parts) > 6 else ""
 
             additions, deletions, file_count, ignored_files = self._get_commit_stat_summary(c_hash)
             return CommitInfoModel(

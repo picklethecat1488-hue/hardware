@@ -1003,6 +1003,8 @@ class PCBExporter:
             return "Analog Devices"
         if mpn_upper.startswith("PKM"):
             return "Murata"
+        if mpn_upper.startswith(("CPT", "CUI")):
+            return "CUI Devices"
         if mpn_upper.startswith("BSS"):
             return "onsemi"
         if mpn_upper.startswith("ECS"):
@@ -1025,6 +1027,8 @@ class PCBExporter:
             return "Cree LED"
         if mpn_upper.startswith(("FTSH", "TSW", "SAM")):
             return "Samtec"
+        if mpn_upper.startswith(("22-28", "MOLEX")):
+            return "Molex"
         if mpn_upper.startswith(("B6B", "S2B", "SM04", "JST")):
             return "JST"
         if mpn_upper.startswith(("GRM", "MURATA")):
@@ -1056,7 +1060,7 @@ class PCBExporter:
         if getattr(fp, "thru_hole", False):
             return "thru-hole"
         pkg = str(getattr(fp, "package", "") or "")
-        th_indicators = ("pin_header", "JST-PH", "TSW-", "thru-hole", "TH")
+        th_indicators = ("pin_header", "JST-PH", "TSW-", "thru-hole", "TH", "piezo_speaker")
         if any(ind in pkg for ind in th_indicators):
             return "thru-hole"
         return "SMD"

@@ -1155,7 +1155,7 @@
               {% if node.is_ancestor_top %}
                 <span class="node-badge node-badge-ancestor" title="Top of ancestor branch ({{ node.ancestor_name or 'main' }})">📌 {{ node.ancestor_name or 'main' }}</span>
               {% endif %}
-              {% set repo_web_base = session.repo_web_url or ('https://github.com/' ~ (session.github_repo or ('picklethecat1488-hue/' ~ session.repo_name))) %}
+              {% set repo_web_base = session.repo_web_url or ('https://github.com/' ~ (session.github_repo or ('workspace/' ~ session.repo_name))) %}
               {% for br in node.branches %}
                 {% set is_pr_br = ('pr' in br.lower() or 'pull' in br.lower()) %}
                 {% set br_url = node.pr_url if (is_pr_br and node.pr_url) else (repo_web_base ~ '/tree/' ~ br.replace('origin/', '')) %}
@@ -1441,7 +1441,7 @@
         </div>
       </div>
       <div class="quake-modal-footer">
-        <span style="font-size:8px;color:var(--quake-text-dim);">Current user: {{ session.current_user or 'picklethecat1488-hue' }}</span>
+        <span style="font-size:8px;color:var(--quake-text-dim);">Current user: {{ session.current_user or 'User' }}</span>
         <button class="quake-btn quake-btn-default" onclick="closeBranchModal()">Close</button>
       </div>
     </div>
@@ -1693,6 +1693,16 @@
         .replace(/'/g, "&#039;");
     }
 
+    const FORBIDDEN_AUTHORS = {{ session.author_blacklist | tojson if session and session.author_blacklist else [] }};
+    function sanitizeAuthor(str) {
+      if (!str) return "";
+      const lower = String(str).toLowerCase().trim();
+      if (FORBIDDEN_AUTHORS.some(f => lower === f.toLowerCase() || lower.includes(f.toLowerCase()))) {
+        return "User";
+      }
+      return str;
+    }
+
     // Auto-sync working tree and smartlog commit panes (BUG-246)
     let autoSyncTimer = null;
     let isAutoSyncing = false;
@@ -1769,7 +1779,7 @@
     function renderSmartlogList(nodes) {
       const listEl = document.getElementById("smartlogList");
       if (!listEl) return;
-      const repoWebBase = state.repoWebUrl || (state.githubRepo ? `https://github.com/${state.githubRepo}` : `https://github.com/picklethecat1488-hue/${state.repoName}`);
+      const repoWebBase = state.repoWebUrl || (state.githubRepo ? `https://github.com/${state.githubRepo}` : `https://github.com/workspace/${state.repoName}`);
 
       let html = `
         <!-- Working Tree Node -->
@@ -2751,7 +2761,7 @@
     function renderBranchLists() {
       const search = (document.getElementById("branchSearchInput")?.value || "").trim().toLowerCase();
       const hideOtherUsers = document.getElementById("chkHideOtherUsers")?.checked ?? true;
-      const currentUser = "{{ session.current_user or 'picklethecat1488-hue' }}".toLowerCase();
+      const currentUser = "{{ session.current_user or 'User' }}".toLowerCase();
 
       const mainContainer = document.getElementById("mainReleaseBranchList");
       const featContainer = document.getElementById("featureBranchList");
@@ -3118,7 +3128,7 @@
       }
       const match = branchName.match(/(?:^|\/)(?:pr|pull)[/-]?(\d+)\b/i);
       const isRemote = branchName.startsWith("origin/") || branchName.startsWith("remotes/");
-      const repoBase = state.repoWebUrl || (state.githubRepo ? `https://github.com/${state.githubRepo}` : `https://github.com/picklethecat1488-hue/${state.repoName || 'hardware'}`);
+      const repoBase = state.repoWebUrl || (state.githubRepo ? `https://github.com/${state.githubRepo}` : `https://github.com/workspace/${state.repoName || 'hardware'}`);
       if (match && isRemote) {
         window.open(`${repoBase}/pull/${match[1]}`, "_blank");
         return;
@@ -3355,7 +3365,7 @@
     });
 
     // Initialize on load
-    window.addEventListener("DOMContentLoaded", () => {
+    function initDiffView() {
       initWordWrap();
       initPanelResizers();
       updateMergedVisibility();
@@ -3376,7 +3386,13 @@
 
       loadFilesForActiveCommit();
       startAutoSync();
-    });
+    }
+
+    if (document.readyState === "loading") {
+      window.addEventListener("DOMContentLoaded", initDiffView);
+    } else {
+      initDiffView();
+    }
   </script>
   <div class="window-resize-gripper" title="Resize Window" aria-label="Resize Window"></div>
 </body>

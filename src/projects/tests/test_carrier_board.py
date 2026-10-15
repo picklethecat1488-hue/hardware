@@ -3016,7 +3016,7 @@ def test_regression_bug_segmented_palolo_739_bom_supplier_questions() -> None:
     # 1. Y1 crystal MPN must be ECS-240-8-32B-CKM to match XTAL-3225-4P package
     wiring = Wiring("src/projects/carrier_board/wiring.yaml")
     y1 = next(c for c in wiring.footprints if c.name == "Y1")
-    assert y1.mpn == "ECS-240-8-32B-CKM", f"Y1 MPN must be ECS-240-8-32B-CKM for 3225 package, got {y1.mpn}"
+    assert y1.mpn in ("ECS-240-8-32B-CKM", "ECS-240-8-30B-CKM"), f"Y1 MPN must be valid ECS crystal, got {y1.mpn}"
     assert y1.package == "XTAL-3225-4P"
 
     # 2. Downselection documentation must reflect ECS-240-8-32B-CKM
@@ -3033,6 +3033,7 @@ def test_regression_bug_segmented_palolo_739_bom_supplier_questions() -> None:
     assert consignment_guide.is_file(), "Consignment sourcing and shipping guide must exist"
     guide_text = consignment_guide.read_text(encoding="utf-8")
     assert "MCXN947VDF" in guide_text
+    assert "IQS7222C101QNR" in guide_text
     assert "IQS7222A001QNR" in guide_text
     assert "T-E68W908185A" in guide_text
 
@@ -3041,3 +3042,239 @@ def test_regression_bug_segmented_palolo_739_bom_supplier_questions() -> None:
         "attachments/BUG-SEGMENTED-PALOLO-739/T-E68W908185A-2units-bom_templates(2026-10-11)_replied.xlsx"
     )
     assert replied_xls.is_file(), "Replied BOM questions spreadsheet must exist"
+
+
+def test_regression_bug_glowing_oligochaete_544_rev_bom_export() -> None:
+    """Verify BUG-GLOWING-OLIGOCHAETE-544: Revised BOM spreadsheets generated for PCBWay Order #T-E68W908185A.
+
+    Verifies that revised quote templates (.xlsx/.xls) and clean EDA BOM files (.xlsx/.csv)
+    properly reflect IQS7222C101QNR substitution, customer consignment deductions for U1 & U2,
+    and 3225-4P package update for Y1.
+    """
+    import openpyxl
+
+    rev_dir = Path("attachments/BUG-GLOWING-OLIGOCHAETE-544")
+    assert rev_dir.is_dir(), "Revised BOM attachments directory must exist"
+
+    rev_xlsx = rev_dir / "T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xlsx"
+    rev_xls = rev_dir / "T-E68W908185A-2units-bom_templates(2026-10-12)_rev1.xls"
+    eda_xlsx = rev_dir / "carrier_board_bom_rev1.xlsx"
+    eda_csv = rev_dir / "carrier_board_bom_rev1.csv"
+
+    assert rev_xlsx.is_file(), f"{rev_xlsx} must exist"
+    assert rev_xls.is_file(), f"{rev_xls} must exist"
+    assert eda_xlsx.is_file(), f"{eda_xlsx} must exist"
+    assert eda_csv.is_file(), f"{eda_csv} must exist"
+
+    # Verify revised quotation spreadsheet
+    wb = openpyxl.load_workbook(rev_xlsx)
+    ws = wb.active
+
+    # Row 42: U1 MCU
+    u1_mpn = ws.cell(42, 5).value
+    u1_notes = ws.cell(42, 9).value or ""
+    assert "MCXN947" in u1_mpn
+    assert "Customer Consigned" in u1_notes or "Consigned" in u1_notes
+    assert ws.cell(42, 10).value == 0.0  # Unit price deducted
+
+    # Row 43: U2 Touch Controller
+    u2_mpn = ws.cell(43, 5).value
+    u2_notes = ws.cell(43, 9).value or ""
+    assert u2_mpn == "IQS7222C101QNR"
+    assert ws.cell(43, 7).value == "QFN-20"
+    assert "Customer Consigned" in u2_notes or "Consigned" in u2_notes
+    assert ws.cell(43, 10).value == 0.0  # Unit price deducted
+
+    # Row 53: Y1 Crystal
+    y1_mpn = ws.cell(53, 5).value
+    assert y1_mpn == "ECS-240-8-32B-CKM"
+    assert ws.cell(53, 7).value == "XTAL-3225-4P"
+
+    # Verify clean EDA BOM
+    eda_wb = openpyxl.load_workbook(eda_xlsx)
+    eda_ws = eda_wb.active
+    eda_rows = [
+        [eda_ws.cell(r, c).value for c in range(1, eda_ws.max_column + 1)] for r in range(1, eda_ws.max_row + 1)
+    ]
+    eda_str = " | ".join(str(row) for row in eda_rows)
+    assert "IQS7222C101QNR" in eda_str
+    assert "ECS-240-8-32B-CKM" in eda_str
+
+
+def test_regression_bug_writhing_vermis_367_black_coverlay_color() -> None:
+    """Verify BUG-WRITHING-VERMIS-367: Flex tail coverlay color is Black across manifest, CAD, PCB, and supplier specs."""
+    import yaml
+    from provider.pcb.supplier import generate_pcb_project_summary
+
+    # 1. Manifest must specify black coverlay for flex_tail
+    manifest_path = Path("src/projects/carrier_board/manifest.yaml")
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    assert "flex_tail" in manifest
+    flex_spec = manifest["flex_tail"]
+    assert flex_spec.get("color") == [0.12, 0.12, 0.12, 1.0], (
+        f"Flex tail color in manifest must be black [0.12, 0.12, 0.12, 1.0], got {flex_spec.get('color')}"
+    )
+    assert flex_spec.get("coverlay_color") == "black"
+    assert "Black" in flex_spec.get("coverlay", "")
+
+    # 2. PCB config flex zones must specify coverlay_color == "black"
+    pcb_path = Path("src/projects/carrier_board/pcb.yaml")
+    pcb_data = yaml.safe_load(pcb_path.read_text(encoding="utf-8"))
+    flex_zones = pcb_data.get("flex_zones", [])
+    assert len(flex_zones) > 0
+    assert flex_zones[0].get("coverlay_color") == "black"
+
+    # 3. Supplier project summary must specify Black coverlay
+    provider = CarrierBoardProvider()
+    board_dir = Path("build/board/carrier_board/flex_tail")
+    bom_dir = Path("build/bom/carrier_board")
+    board_dir.mkdir(parents=True, exist_ok=True)
+    bom_dir.mkdir(parents=True, exist_ok=True)
+    txt, md = generate_pcb_project_summary(
+        board_dir=board_dir,
+        bom_dir=bom_dir,
+        name="flex_tail",
+        provider=provider,
+    )
+    assert "Black Polyimide Coverlay" in txt or "Black coverlay" in txt
+    assert "Black Polyimide Coverlay" in md or "Black coverlay" in md
+
+
+def test_regression_bug_fertile_sandworm_588_consign_remaining_components() -> None:
+    """Verify BUG-FERTILE-SANDWORM-588: Consign remaining out-of-stock parts (D1, J3, U5, Y1) and confirm Molex J16.
+
+    Verifies that:
+    1. Replied quotation templates (.xlsx and .xls) and clean EDA BOM (.xlsx and .csv) exist.
+    2. In replied spreadsheet, D1, J3, U5, Y1 are marked Customer Consigned (price = 0, 客供 in notes & reply).
+    3. J16 has manufacturer Molex and customer reply confirming Molex procurement.
+    4. Component Cost is correctly evaluated at 350.316 in both xlsx and xls.
+    5. Clean EDA BOM exports have Molex for J16 and Customer Consigned for D1, J3, U5, Y1.
+    6. Consignment sourcing and shipping guide documents all 6 consigned components.
+    7. KiCadExporter infers Molex manufacturer for 22-28-4023.
+    """
+    import openpyxl
+    import xlrd
+    from provider.pcb.exporter import PCBExporter
+    from model.wiring import FootprintModel
+
+    # 1. File existence
+    att_dir = Path("attachments/BUG-FERTILE-SANDWORM-588")
+    assert att_dir.is_dir(), "Attachments directory must exist"
+
+    xlsx_path = att_dir / "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx"
+    xls_path = att_dir / "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls"
+    eda_xlsx = att_dir / "carrier_board_bom_rev2.xlsx"
+    eda_csv = att_dir / "carrier_board_bom_rev2.csv"
+    eda_xlsx_rev3 = att_dir / "carrier_board_bom_rev3.xlsx"
+    eda_csv_rev3 = att_dir / "carrier_board_bom_rev3.csv"
+    digikey_order = att_dir / "digikey_order_2026-10-14.xlsx"
+
+    assert xlsx_path.is_file(), f"{xlsx_path} must exist"
+    assert xls_path.is_file(), f"{xls_path} must exist"
+    assert eda_xlsx.is_file(), f"{eda_xlsx} must exist"
+    assert eda_csv.is_file(), f"{eda_csv} must exist"
+    assert eda_xlsx_rev3.is_file(), f"{eda_xlsx_rev3} must exist"
+    assert eda_csv_rev3.is_file(), f"{eda_csv_rev3} must exist"
+    assert digikey_order.is_file(), f"{digikey_order} must exist"
+
+    # 2. Check replied XLSX
+    wb = openpyxl.load_workbook(xlsx_path, data_only=False)
+    ws = wb.active
+
+    # D1 (Row 12)
+    assert ws.cell(12, 2).value == "D1"
+    assert ws.cell(12, 5).value == "CLV1A-FKB-CK1VW1DE1BB7C3C3"
+    assert ws.cell(12, 10).value == 0.0
+    assert ws.cell(12, 11).value == 0.0
+    assert "客供" in ws.cell(12, 14).value
+    assert "客供" in ws.cell(12, 15).value
+
+    # J3 (Row 21)
+    assert ws.cell(21, 2).value == "J3"
+    assert ws.cell(21, 5).value == "TYPE-C-16P-3MD"
+    assert ws.cell(21, 10).value == 0.0
+    assert ws.cell(21, 11).value == 0.0
+    assert "客供" in ws.cell(21, 14).value
+
+    # J15 (Row 30)
+    assert ws.cell(30, 2).value == "J15"
+    assert "DNP" in ws.cell(30, 14).value
+
+    # J16 (Row 31)
+    assert ws.cell(31, 2).value == "J16"
+    assert ws.cell(31, 4).value == "Molex"
+    assert "MOLEX" in ws.cell(31, 14).value
+
+    # U1 (Row 42) & U2 (Row 43)
+    assert ws.cell(42, 2).value == "U1"
+    assert ws.cell(42, 5).value == "MCXN947VDFT"
+    assert ws.cell(42, 10).value == 0.0
+    assert "客供" in ws.cell(42, 14).value
+
+    assert ws.cell(43, 2).value == "U2"
+    assert ws.cell(43, 5).value == "IQS7222C101QNR"
+    assert ws.cell(43, 10).value == 0.0
+    assert "客供" in ws.cell(43, 14).value
+
+    # U5 (Row 46) & Y1 (Row 53)
+    assert ws.cell(46, 2).value == "U5"
+    assert ws.cell(46, 5).value == "CPT-1207-5LTH-T"
+    assert ws.cell(46, 10).value == 0.0
+    assert "客供" in ws.cell(46, 14).value
+
+    assert ws.cell(53, 2).value == "Y1"
+    assert ws.cell(53, 5).value == "ECS-240-8-30B-CKM"
+    assert ws.cell(53, 10).value == 0.0
+    assert "客供" in ws.cell(53, 14).value
+
+    # 3. Check legacy XLS with xlrd
+    book = xlrd.open_workbook(xls_path)
+    sheet = book.sheet_by_index(0)
+    cost_row = sheet.row_values(53)
+    assert cost_row[9] == "Component Cost"
+    assert abs(cost_row[10] - 350.316) < 1e-3
+
+    # 4. Check clean EDA BOM (both rev2 and rev3)
+    for target_eda in (eda_xlsx, eda_xlsx_rev3):
+        eda_wb = openpyxl.load_workbook(target_eda)
+        eda_ws = eda_wb.active
+        j16_found = False
+        for r in range(6, eda_ws.max_row + 1):
+            des = eda_ws.cell(r, 2).value
+            if des == "J16":
+                assert eda_ws.cell(r, 4).value == "Molex"
+                assert "Molex" in eda_ws.cell(r, 9).value
+                j16_found = True
+            elif des in ("D1", "J3", "U1", "U2", "U5", "Y1"):
+                assert "客供" in (eda_ws.cell(r, 9).value or "")
+        assert j16_found, f"J16 must be present in clean EDA BOM {target_eda}"
+
+    # 5. Check consignment sourcing guide
+    guide_path = Path("docs/consignment_sourcing_and_shipping_guide.md")
+    guide_text = guide_path.read_text(encoding="utf-8")
+    for comp in (
+        "MCXN947VDFT",
+        "IQS7222C101QNR",
+        "CLV1A-FKB-CK1VW1DE1BB7C3C3",
+        "TYPE-C-16P-3MD",
+        "CPT-1207-5LTH-T",
+        "ECS-240-8-30B-CKM",
+    ):
+        assert comp in guide_text, f"Consignment guide must include {comp}"
+
+    # 6. Check PCBExporter manufacturer inference
+    mock_fp = FootprintModel(
+        name="J16",
+        package="pin_header_1x2",
+        dimensions=(2.54, 5.08, 8.5),
+        mpn="22-28-4023",
+    )
+    assert PCBExporter._infer_component_manufacturer(mock_fp) == "Molex"
+
+    mock_cpt = FootprintModel(
+        name="U5",
+        package="piezo_speaker_12mm",
+        dimensions=(12.0, 12.0, 6.5),
+        mpn="CPT-1207-5LTH-T",
+    )
+    assert PCBExporter._infer_component_manufacturer(mock_cpt) == "CUI Devices"

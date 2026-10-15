@@ -13,8 +13,8 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: MCXN947VDF
-  supplier_pn: 568-MCXN947VDF-ND
+  mpn: MCXN947VDFT
+  supplier_pn: 568-MCXN947VDFT-ND
 - name: U2
   package: QFN-20
   position:
@@ -26,8 +26,8 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: IQS7222A001QNR
-  supplier_pn: IQS7222A-QNR-ND
+  mpn: IQS7222C101QNR
+  supplier_pn: 1790-IQS7222C101QNRCT-ND
 - name: U11
   package: MOD-BLE-PCB-ANT
   position:
@@ -198,8 +198,8 @@ footprints:
   - 0.0
   - 0.0
   - 270.0
-  mpn: TYPE-C-16P
-  supplier_pn: C2765186
+  mpn: TYPE-C-16P-3MD
+  supplier_pn: 6652-TYPE-C-16P-3MDTR-ND
 - name: R3
   package: '0402'
   position:
@@ -299,8 +299,8 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: PKM13EPYH4000-B0
-  supplier_pn: 490-4700-ND
+  mpn: CPT-1207-5LTH-T
+  supplier_pn: 2223-CPT-1207-5LTH-T-ND
 - name: Y1
   package: XTAL-3225-4P
   position:
@@ -311,8 +311,8 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: ECS-240-8-32B-CKM
-  supplier_pn: XC2345-ND
+  mpn: ECS-240-8-30B-CKM
+  supplier_pn: XC1842CT-ND
 - name: C9
   package: '0402'
   position:
@@ -729,8 +729,8 @@ footprints:
   - 0.0
   - 0.0
   - 0.0
-  mpn: CLV1A-FKB-CJ1M1F1BB7R3S3
-  supplier_pn: CLV1A-FKB-ND
+  mpn: CLV1A-FKB-CK1VW1DE1BB7C3C3
+  supplier_pn: CLV1A-FKB-CK1VW1DE1BB7C3C3CT-ND
 - name: U7
   package: TDFN-8
   position:

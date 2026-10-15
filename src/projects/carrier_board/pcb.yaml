@@ -223,6 +223,7 @@ flex_zones:
   length_mm: 54.0
   substrate_thickness_mm: 0.05
   coverlay_thickness_mm: 0.025
+  coverlay_color: black
   min_bend_radius_mm: 3.0
   shape_ref: flex_tail
 capacitive_sensors:

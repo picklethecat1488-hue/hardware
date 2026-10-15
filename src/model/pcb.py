@@ -641,6 +641,7 @@ class FlexZoneModel(BaseModel):
     base_substrate: str = Field(default="polyimide", description="Flex core dielectric substrate")
     substrate_thickness_mm: float = Field(default=0.025, gt=0.0, description="Polyimide dielectric core thickness")
     coverlay_thickness_mm: float = Field(default=0.025, gt=0.0, description="Protective coverlay film thickness")
+    coverlay_color: str = Field(default="black", description="Protective coverlay film color")
     min_bend_radius_mm: float = Field(
         default=2.5, gt=0.0, description="Minimum allowable bend radius under dynamic/static flexing"
     )
@@ -881,6 +882,7 @@ class PCBConfig(BaseModel):
     flex_type: Optional[FlexType] = Field(
         default=None, description="Flexible PCB application type ('connector', 'component', 'capacitive')"
     )
+    coverlay_color: Optional[str] = Field(default=None, description="Protective coverlay film color (e.g. 'black')")
     revision: str = Field(default="1.0", description="Board revision identifier (e.g. '1.0', 'A', 'rev2')")
     dimensions_mm: Optional[Tuple[float, float, float]] = Field(
         default=None,

@@ -2032,7 +2032,7 @@
           </div>
           <div class="commit-subject" title="${c.subject}">${c.subject}</div>
           <div class="commit-bottom">
-            <span>${c.author}</span>
+            <span>${escapeHtml(sanitizeAuthor(c.author))}</span>
             <span><span class="stat-add">+${c.additions}</span> / <span class="stat-del">-${c.deletions}</span>${statExtra}</span>
           </div>
         `;
@@ -2588,7 +2588,7 @@
                 <div style="display:flex; align-items:center; gap:8px;">
                   <span class="quake-badge ${badgeClass}">[${displayLabel}]</span>
                   <span style="font-size: 9px; color: var(--quake-gold); font-weight:700;">Lines L${comment.start_line}${comment.start_line !== comment.end_line ? '-L' + comment.end_line : ''}</span>
-                  <span style="font-size: 8px; color: var(--quake-text-dim);">by ${comment.author} (${comment.created_at.slice(11, 19)})</span>
+                  <span style="font-size: 8px; color: var(--quake-text-dim);">by ${escapeHtml(sanitizeAuthor(comment.author))} (${comment.created_at.slice(11, 19)})</span>
                 </div>
                 <div style="display:flex; align-items:center; gap:4px;">
                   <button class="quake-btn quake-btn-default" style="padding: 1px 6px; font-size:8px;" onclick="editCommentViaCli('${comment.id}')">Edit ✎</button>
@@ -3987,6 +3987,16 @@
     function escapeHtml(str) {
       if (!str) return "";
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    const FORBIDDEN_AUTHORS = {{ session.author_blacklist | tojson if session and session.author_blacklist else [] }};
+    function sanitizeAuthor(str) {
+      if (!str) return "";
+      const lower = String(str).toLowerCase().trim();
+      if (FORBIDDEN_AUTHORS.some(f => lower === f.toLowerCase() || lower.includes(f.toLowerCase()))) {
+        return "User";
+      }
+      return str;
     }
   </script>
   <div class="window-resize-gripper" title="Resize Window" aria-label="Resize Window"></div>
