@@ -579,7 +579,7 @@ nets:
       - [fuel_gauge, ALRT]
 
   - name: ctrl_uh
-    color: cyan
+    color: brown
     pins:
       - [pico, GP16]
       - [motor_driver, UH]

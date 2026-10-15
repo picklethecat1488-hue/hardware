@@ -1708,3 +1708,18 @@ class TestCatFountainProvider:
         assert "GP26" in provider.RP2040_KEY_RIGHT_GPIOS
         key_entry_pins = [entry[0] for entry in provider.TMC6300_KEY_ENTRIES]
         assert key_entry_pins == ["UH", "UL", "VH", "VL", "WH", "WL", "U", "V", "W"]
+
+    def test_regression_bug_camouflaged_midge_831_no_cyan_wire_in_cat_fountain_wiring(self):
+        """Verify BUG-CAMOUFLAGED-MIDGE-831: Cat fountain wiring diagram does not use cyan wire color."""
+        from pathlib import Path
+        from model.wiring import Wiring
+
+        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+        wiring = Wiring(yaml_path)
+
+        cyan_nets = [net.name for net in wiring.nets if net.color.lower() == "cyan"]
+        assert not cyan_nets, f"Cyan wire color is prohibited in loom, but found in nets: {cyan_nets}"
+
+        ctrl_uh_net = next((net for net in wiring.nets if net.name == "ctrl_uh"), None)
+        assert ctrl_uh_net is not None, "ctrl_uh net must be present"
+        assert ctrl_uh_net.color.lower() == "brown", f"Expected ctrl_uh net color to be brown, got {ctrl_uh_net.color}"
