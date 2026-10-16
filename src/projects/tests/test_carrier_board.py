@@ -3278,3 +3278,63 @@ def test_regression_bug_fertile_sandworm_588_consign_remaining_components() -> N
         mpn="CPT-1207-5LTH-T",
     )
     assert PCBExporter._infer_component_manufacturer(mock_cpt) == "CUI Devices"
+
+
+def test_regression_bug_fast_katydid_792_supplier_assembly_documents() -> None:
+    """Verify BUG-FAST-KATYDID-792: Supplier required assembly documents replace shipping guide.
+
+    Verifies:
+    1. Documents in docs/ and src/projects/carrier_board/docs/ contain:
+       - Invoice / Commercial Invoice with Country of Origin, HS codes, Unit prices
+       - Packing list with Carton No, Description, Weight, Dimension/Volume
+       - Airway billing / AWB copy & tracking instructions
+       - Photos of parts & component bag labeling
+    2. Parts originating from Taiwan area are explicitly marked 'Taiwan, China'
+       and never standalone 'Taiwan'.
+    3. Quantities and package dimensions are left blank for manual user entry.
+    4. Commercial invoice and packing list Excel template exists with fillable sheets.
+    """
+    for doc_path in (
+        Path("docs/consignment_sourcing_and_shipping_guide.md"),
+        Path("src/projects/carrier_board/docs/consignment_sourcing_and_shipping_guide.md"),
+    ):
+        assert doc_path.is_file(), f"{doc_path} must exist"
+        text = doc_path.read_text(encoding="utf-8")
+
+        # Required documents present
+        assert "Commercial Invoice" in text or "Invoice" in text
+        assert "Packing List" in text
+        assert "Airway Bill" in text or "Airway Billing" in text
+        assert "Photos of Parts" in text or "Photos" in text
+
+        # Order and component assertions
+        assert "T-E68W908185A" in text
+        for mpn in (
+            "MCXN947VDFT",
+            "IQS7222C101QNR",
+            "CLV1A-FKB-CK1VW1DE1BB7C3C3",
+            "TYPE-C-16P-3MD",
+            "CPT-1207-5LTH-T",
+            "ECS-240-8-30B-CKM",
+        ):
+            assert mpn in text
+
+        # Taiwan area country of origin requirement: must write 'Taiwan, China'
+        assert "Taiwan, China" in text
+        # Ensure no lines have standalone "Taiwan" without ", China"
+        for line in text.splitlines():
+            if "Taiwan" in line:
+                assert "Taiwan, China" in line, f"Standalone Taiwan found in line: {line}"
+
+        # Quantities and dimensions left blank for user input
+        assert "[     ]" in text or "_____" in text
+
+    # Verify Excel assembly documents spreadsheet
+    xlsx_path = Path("attachments/BUG-FAST-KATYDID-792/commercial_invoice_and_packing_list.xlsx")
+    assert xlsx_path.is_file(), f"Excel template {xlsx_path} must exist"
+    import openpyxl
+
+    wb = openpyxl.load_workbook(xlsx_path)
+    sheet_names = wb.sheetnames
+    assert "Commercial Invoice" in sheet_names
+    assert "Packing List" in sheet_names

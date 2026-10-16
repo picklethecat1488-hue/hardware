@@ -1,69 +1,133 @@
-# Carrier Board Consignment Parts Sourcing & PCBWay Shipping Guide
+# Carrier Board Consignment Assembly Documents & Customs Declaration
 
 **Order Reference**: PCBWay Order `#T-E68W908185A`  
 **Project**: `carrier_board`  
-**Assembly Quantity**: 2 Production Units  
-**Date**: October 14, 2026  
+**Shipper / Exporter**: `[Customer Name]`  
+**Consignee**: PCBWay SMT Assembly Team, Order `#T-E68W908185A`, `[Supplier Delivery Facility Address]`, `[Postal Code]`  
+**Date**: October 16, 2026  
 
 ---
 
-## 1. Overview & Sourcing Strategy
+## 1. Overview & Required Assembly Documents
 
-During BOM audit for Order `#T-E68W908185A`, PCBWay flagged stock availability and part inquiries on 7 components. To ensure factory-fresh production silicon, avoid out-of-stock component delays, and maintain design integrity, the customer is self-sourcing and consigning all out-of-stock components (**U1**, **U2**, **D1**, **J3**, **U5**, **Y1**) directly to PCBWay's assembly facility in Shenzhen, while confirming the single manufacturer clarification for **J16** (Molex 22-28-4023) to be procured by PCBWay.
+This document package provides the complete set of supplier-required assembly, shipping, and customs documents requested by PCBWay for consigned component assembly under Order `#T-E68W908185A`.
 
----
+The consigned components comprise 6 customer-supplied parts:
+1. **`U1`**: NXP Semiconductors **`MCXN947VDFT`** (Dual-Core Cortex-M33 MCU, VFBGA-184)
+2. **`U2`**: Azoteq **`IQS7222C101QNR`** (ProxFusion Touch Controller, QFN-20; substitute for `IQS7222A001QNR`)
+3. **`D1`**: Cree LED **`CLV1A-FKB-CK1VW1DE1BB7C3C3`** (Tri-Color RGB 4-PLCC SMD LED)
+4. **`J3`**: Korean Hroparts / Standard **`TYPE-C-16P-3MD`** (USB Type-C 16-Pin Receptacle SMD RA)
+5. **`U5`**: CUI Devices / Same Sky **`CPT-1207-5LTH-T`** (12.5mm Piezoelectric Sounder Buzzer, Through-Hole)
+6. **`Y1`**: ECS Inc **`ECS-240-8-30B-CKM`** (24.000 MHz Crystal Resonator, XTAL-3225-4P)
 
-## 2. Consigned Parts Order Form (Distributor Sourcing List)
-
-When consigning parts to contract manufacturers, automated SMT feeders require tape/reel leader margin and setup attrition. For a 2-unit build, order the recommended quantities below to guarantee assembly coverage without downtime:
-
-| Ref Des | Function | Manufacturer | Manufacturer Part # (MPN) | Distributor PN | Pkg / Footprint | Build Qty | Order Qty | Order Status & Unit Price |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`U1`** | NXP Dual-Core Cortex-M33 MCU | NXP Semiconductors | **`MCXN947VDFT`** | DigiKey: `568-MCXN947VDFT-ND` | VFBGA-184 (11x11mm, 0.8mm pitch) | 2 | **5 pcs** (Cut Tape / Tray) | **Received** ($16.41 / ea, $82.05 total) |
-| **`U2`** | ProxFusion Capacitive Touch Controller | Azoteq | **`IQS7222C101QNR`** (sub for `IQS7222A001QNR`) | DigiKey: `1790-IQS7222C101QNRCT-ND` | QFN-20 (3x3mm, 0.4mm pitch) | 2 | **5 pcs** (Cut Tape) | **Received** ($0.84 / ea, $4.20 total) |
-| **`D1`** | Common-Anode RGB LED | Cree LED | **`CLV1A-FKB-CK1VW1DE1BB7C3C3`** | DigiKey: `CLV1A-FKB-CK1VW1DE1BB7C3C3CT-ND` | 4-PLCC SMD (2.1x2.1mm) | 2 | **10 pcs** (Cut Tape) | **Ordered** ($0.255 / ea, $2.55 total) |
-| **`J3`** | 16-Pin USB Type-C Receptacle | Korean Hroparts / Standard | **`TYPE-C-16P-3MD`** | DigiKey: `6652-TYPE-C-16P-3MDTR-ND` | USB-C-16P SMD | 2 | **10 pcs** (Tape & Reel) | **Ordered** ($0.19 / ea, $1.90 total) |
-| **`U5`** | Piezoelectric Sounder | CUI Devices / Same Sky | **`CPT-1207-5LTH-T`** | DigiKey: `2223-CPT-1207-5LTH-T-ND` | 12.5mm TH (piezo_speaker_12mm, 5mm pitch) | 2 | **5 pcs** (Box/Tube) | **Ordered** ($0.78 / ea, $3.90 total) |
-| **`Y1`** | 24.000 MHz Crystal Resonator | ECS Inc | **`ECS-240-8-30B-CKM`** | DigiKey: `XC1842CT-ND` | XTAL-3225-4P (3.2x2.5mm) | 2 | **5 pcs** (Cut Tape) | **Ordered** ($0.98 / ea, $4.90 total) |
+Per customer instructions, all shipment quantities, carton dimensions, and package weights are formatted with blank fillable fields (`[     ]`) for manual completion prior to final dispatch. An editable spreadsheet workbook is also provided at `attachments/BUG-FAST-KATYDID-792/commercial_invoice_and_packing_list.xlsx`.
 
 ---
 
-## 3. Summary of PCBWay BOM Inquiry Responses (October 14, 2026)
+## 2. Document A: Commercial Invoice (商业发票)
 
-The updated Excel file with responses in the `Customer Reply` column has been generated at:  
-`attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx` (and legacy `.xls`)
+**Shipper / Exporter**:
+- Name / Company: `[Customer Name]`
+- Address: `[Customer Address]`
+- Phone / Contact: `[Customer Contact]`
 
-| Item # | Ref Des | Quoted MPN | Footprint | PCBWay Inquiry | Customer Reply / Resolution | Action by PCBWay |
-| :---: | :---: | :---: | :---: | :--- | :--- | :--- |
-| **10** | `D1` | `CLV1A-FKB-CJ1M1F1BB7R3S3` | `LED_RGB_4P` | Out of stock. Please recommend substitutes or you can supply this part to us. | **Customer Consigned (客供)**. Customer will consign Cree `CLV1A-FKB-CK1VW1DE1BB7C3C3` directly. Please mark as Customer Consigned and deduct from quotation. | Customer Consigned Part |
-| **19** | `J3` | `TYPE-C-16P` | `USB-C-16P` | Out of stock. Please recommend substitutes or you can supply this part to us. | **Customer Consigned (客供)**. Customer will consign Korean Hroparts `TYPE-C-16P-3MD` directly. Please mark as Customer Consigned and deduct from quotation. | Customer Consigned Part |
-| **28** | `J15` | `DNP` | `pin_header_2x5_1.27mm` | `[DNS/DNP/Do Not Stuff] components[DNP不要贴];` | **Confirmed**. J15 is Do Not Stuff (DNP). Please do not purchase or populate. | Mark DNP (Do Not Solder) |
-| **29** | `J16` | `22-28-4023` | `pin_header_1x2` | `brand:MOLEX.Please confirm.` | **Confirmed brand: MOLEX** (MPN: `22-28-4023`). Please purchase and assemble. | PCBWay Procured |
-| **40** | `U1` | `MCXN947VDF` | `VFBGA-184` | `[Supplied by customer客供];` | **Confirmed Customer Consigned (客供)**. Customer will supply fresh production NXP MCXN947VDFT directly. | Customer Consigned Part |
-| **41** | `U2` | `IQS7222C101QNR` | `QFN-20` | `[Supplied by customer客供];` | **Confirmed Customer Consigned (客供)**. Customer will supply Azoteq IQS7222C101QNR directly. | Customer Consigned Part |
-| **44** | `U5` | `PKM13EPYH4000-B0` | `piezo_speaker_12mm` | Out of stock. Please recommend substitutes or you can supply this part to us. | **Customer Consigned (客供)**. Customer will consign CUI Devices `CPT-1207-5LTH-T` directly. Please mark as Customer Consigned and deduct from quotation. | Customer Consigned Part |
-| **51** | `Y1` | `ECS-240-8-32B-CKM` | `XTAL-3225-4P` | Out of stock. Please recommend substitutes or you can supply this part to us. | **Customer Consigned (客供)**. Customer will consign ECS Inc `ECS-240-8-30B-CKM` directly. Please mark as Customer Consigned and deduct from quotation. | Customer Consigned Part |
+**Consignee / Importer**:
+- Company: PCBWay SMT Assembly Team
+- Order Reference: `#T-E68W908185A`
+- Facility Address: `[Supplier Delivery Facility Address]`
+- Postal Code: `[Postal Code]`
+- Country: China
+
+**Invoice Metadata**:
+- Invoice Number: `INV-T-E68W908185A-C01`
+- Invoice Date: October 16, 2026
+- Delivery Terms / Incoterms: **DDP (Delivery Duty Paid) Shenzhen, China**
+- Reason for Export: **Consigned prototype components for PCB assembly (Temporary import for processing & re-export under Order #T-E68W908185A). Not for commercial resale.**
+
+> **Customs Compliance Notice**: When parts are from the Taiwan area, customs regulations require writing **"Taiwan, China"** (never write standalone "Taiwan").
+
+| Item # | Ref Des | Manufacturer | Manufacturer Part Number (MPN) | Detailed Description | Country of Origin | HS Tariff Code | Quantity (PCS) | Unit Price (USD) | Total Amount (USD) |
+| :---: | :---: | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| 1 | `U1` | NXP Semiconductors | `MCXN947VDFT` | Integrated Circuit: Dual-Core Cortex-M33 MCU, VFBGA-184 | Taiwan, China | `8542.31.0000` | [     ] | $16.41 | [     ] |
+| 2 | `U2` | Azoteq | `IQS7222C101QNR` | Integrated Circuit: ProxFusion Touch Controller, QFN-20 (sub for `IQS7222A001QNR`) | Taiwan, China | `8542.39.0000` | [     ] | $0.84 | [     ] |
+| 3 | `D1` | Cree LED | `CLV1A-FKB-CK1VW1DE1BB7C3C3` | Light Emitting Diode: Tri-Color RGB LED, 4-PLCC SMD | China | `8541.41.0000` | [     ] | $0.255 | [     ] |
+| 4 | `J3` | Korean Hroparts | `TYPE-C-16P-3MD` | Electrical Connector: 16-Pin USB Type-C Receptacle SMD | China | `8536.69.0000` | [     ] | $0.19 | [     ] |
+| 5 | `U5` | CUI Devices | `CPT-1207-5LTH-T` | Acoustic Sounder: 12.5mm Piezoelectric Buzzer, Through-Hole | China | `8531.80.0000` | [     ] | $0.78 | [     ] |
+| 6 | `Y1` | ECS Inc | `ECS-240-8-30B-CKM` | Piezoelectric Crystal: 24.000 MHz Resonator, 3225-4P SMD | Taiwan, China | `8541.60.0000` | [     ] | $0.98 | [     ] |
+| **TOTAL** | | | | **Total Consigned Parts** | | | **[     ] PCS** | | **$[     ] USD** |
+
+**Exporter Certification**:  
+I declare that the information above is true and correct, and that the declared contents and values are strictly for customs purposes for temporary assembly and processing.  
+**Authorized Signature**: `_______________________________`  
+**Date**: `_______________________________`
 
 ---
 
-## 4. Packing, Moisture & ESD Protection Guidelines
+## 3. Document B: Packing List (装箱单)
 
-To prevent damage during transit and reflow:
+**Consignment Shipment Packing List**:
+- **Order Reference**: `T-E68W908185A`
+- **Subassembly**: `carrier_board`
+- **Carton Identifier**: `Carton No. 1 of 1`
+- **Gross Weight**: `[     ] kg`
+- **Net Weight**: `[     ] kg`
+- **Carton Dimensions (L x W x H)**: `[     ] cm`
+- **Total Volume**: `[     ] CBM`
 
-1. **Moisture Sensitivity Level (MSL)**:
-   - **`U1` (`MCXN947VDFT`, VFBGA-184)** is **MSL 3** (168-hour floor life).
-   - Must be sealed in an airtight **Moisture Barrier Bag (MBB)** containing fresh desiccant pouches and a Humidity Indicator Card (HIC).
-   - If cut tape is repacked, do not break factory seal until shipment, or bake per J-STD-033 prior to packing.
-2. **Electrostatic Discharge (ESD)**:
-   - All components must be in static-shielding bags or antistatic carrier tape. Do not use plain ziplock polyethylene bags.
-3. **Outer Package Cushioning**:
-   - Pack into a rigid corrugated cardboard box with bubble wrap or antistatic foam. Do not ship ICs in padded envelopes.
+| Carton No. | Package Type | Item # | Ref Des | Manufacturer Part Number (MPN) | Detailed Description | Quantity (PCS) | Moisture & ESD Handling Protection |
+| :---: | :---: | :---: | :---: | :--- | :--- | :---: | :--- |
+| Carton 1 | Moisture Barrier Bag | 1 | `U1` | `MCXN947VDFT` | NXP Dual-Core Cortex-M33 MCU (VFBGA-184) | [     ] | MSL 3 Moisture Barrier Bag, Desiccant, HIC |
+| Carton 1 | Antistatic Bag | 2 | `U2` | `IQS7222C101QNR` | Azoteq ProxFusion Touch Controller (QFN-20) | [     ] | ESD Static Shielding Bag |
+| Carton 1 | Antistatic Cut Tape | 3 | `D1` | `CLV1A-FKB-CK1VW1DE1BB7C3C3` | Cree Tri-Color RGB LED (PLCC-4) | [     ] | ESD Antistatic Carrier Tape |
+| Carton 1 | Antistatic Tape/Bag | 4 | `J3` | `TYPE-C-16P-3MD` | Korean Hroparts USB Type-C Receptacle | [     ] | ESD Antistatic Packaging |
+| Carton 1 | Rigid Protective Box | 5 | `U5` | `CPT-1207-5LTH-T` | CUI Devices 12.5mm Piezo Sounder Buzzer | [     ] | Rigid Protective Tube / Box |
+| Carton 1 | Antistatic Cut Tape | 6 | `Y1` | `ECS-240-8-30B-CKM` | ECS 24.000 MHz Crystal Resonator (3225-4P) | [     ] | ESD Antistatic Carrier Tape |
+| **TOTAL** | | | | | **Total Packed Units** | **[     ] PCS** | |
+
+**Packing Inspector**: `[Customer Name]`  
+**Date Packed**: `_______________________________`
 
 ---
 
-## 5. Labeling Requirements for Consigned Bags
+## 4. Document C: Copy of Airway Billing (AWB) & Logistics Declaration (空运提单与申报说明)
 
-Attach a clearly printed label to **each individual component bag**:
+**Airway Bill / Courier Logistics Declaration**:
+- **Logistics Courier / Carrier**: `[     ]` (e.g. DHL Express, FedEx International Priority, UPS Worldwide Express)
+- **Airway Bill (AWB) / Tracking Number**: `[     ]`
+- **Dispatch Date**: `[     ]`
+- **Logistics Shipping Method**: Express Air Courier (Door-to-Door, DDP)
+- **Declared Customs Value**: `$[     ] USD`  
+  *(Important: Declared value must strictly equal the total declared amount on Document A Commercial Invoice).*
+- **Consignee & Delivery Address**:
+  ```text
+  Company:       PCBWay SMT Assembly Team
+  Order Number:  T-E68W908185A
+  Address:       [Supplier Delivery Facility Address]
+  Postal Code:   [Postal Code]
+  Country:       China
+  ```
+- **Customs Declaration Statement**:  
+  *"Consigned electronic components for prototype PCB assembly under Order #T-E68W908185A. Temporary import for processing and re-export. Not for commercial resale. Declared value is strictly for customs purposes."*
+
+---
+
+## 5. Document D: Photos of Parts & Component Bag Labeling (零件实物照片与包装标签)
+
+### 5.1 Category Photos of Parts (To be attached by customer in reply)
+Take one high-resolution photo for each category of consigned parts prior to sealing the carton:
+1. **Photo 1: Integrated Circuits (ICs)**
+   - Includes: `U1` (`MCXN947VDFT`, VFBGA-184) and `U2` (`IQS7222C101QNR`, QFN-20).
+   - Ensure manufacturer markings and pin 1 orientation indicators are clearly visible.
+2. **Photo 2: Discrete Semiconductor / Optoelectronics (LEDs)**
+   - Includes: `D1` (`CLV1A-FKB-CK1VW1DE1BB7C3C3`, PLCC-4 RGB LED).
+   - Show tape packaging and component top marking.
+3. **Photo 3: Electromechanical & Connectors**
+   - Includes: `J3` (`TYPE-C-16P-3MD`, USB-C 16P) and `U5` (`CPT-1207-5LTH-T`, 12.5mm Piezo Sounder).
+4. **Photo 4: Frequency Control & Crystals**
+   - Includes: `Y1` (`ECS-240-8-30B-CKM`, 24.000 MHz 3225-4P Crystal).
+
+### 5.2 Component Bag Labels
+Affix one clearly printed label to each individual component bag before packing into Carton 1:
 
 ```text
 =====================================================
@@ -74,7 +138,8 @@ Reference Des:    U1
 Manufacturer:     NXP Semiconductors
 MPN:              MCXN947VDFT
 Footprint:        VFBGA-184
-Quantity:         5 PCS
+Country of Origin: Taiwan, China
+Quantity:         [     ] PCS
 Customer Name:    [Customer Name]
 =====================================================
 ```
@@ -88,7 +153,8 @@ Reference Des:    U2
 Manufacturer:     Azoteq
 MPN:              IQS7222C101QNR
 Footprint:        QFN-20
-Quantity:         5 PCS
+Country of Origin: Taiwan, China
+Quantity:         [     ] PCS
 Customer Name:    [Customer Name]
 =====================================================
 ```
@@ -102,7 +168,8 @@ Reference Des:    D1
 Manufacturer:     Cree LED
 MPN:              CLV1A-FKB-CK1VW1DE1BB7C3C3
 Footprint:        LED_RGB_4P (PLCC-4)
-Quantity:         10 PCS
+Country of Origin: China
+Quantity:         [     ] PCS
 Customer Name:    [Customer Name]
 =====================================================
 ```
@@ -116,7 +183,8 @@ Reference Des:    J3
 Manufacturer:     Korean Hroparts / Standard
 MPN:              TYPE-C-16P-3MD
 Footprint:        USB-C-16P
-Quantity:         10 PCS
+Country of Origin: China
+Quantity:         [     ] PCS
 Customer Name:    [Customer Name]
 =====================================================
 ```
@@ -130,7 +198,8 @@ Reference Des:    U5
 Manufacturer:     CUI Devices / Same Sky
 MPN:              CPT-1207-5LTH-T
 Footprint:        piezo_speaker_12mm
-Quantity:         5 PCS
+Country of Origin: China
+Quantity:         [     ] PCS
 Customer Name:    [Customer Name]
 =====================================================
 ```
@@ -144,37 +213,8 @@ Reference Des:    Y1
 Manufacturer:     ECS Inc
 MPN:              ECS-240-8-30B-CKM
 Footprint:        XTAL-3225-4P
-Quantity:         5 PCS
+Country of Origin: Taiwan, China
+Quantity:         [     ] PCS
 Customer Name:    [Customer Name]
 =====================================================
 ```
-
----
-
-## 6. Shipping & International Customs Clearance Instructions
-
-When shipping parts to PCBWay in Shenzhen, China:
-
-1. **Carrier**: Use **DHL Express**, **FedEx International Priority**, or **UPS Worldwide Express**. These provide seamless customs brokerage into Shenzhen.
-2. **Incoterms / Duties**: Select **DDP (Delivery Duty Paid)** so all import duties, VAT, and customs fees are billed to your account. Deliveries requiring the recipient to pay customs fees locally may be rejected or delayed.
-3. **Commercial Invoice Declaration**:
-   - Provide 3 signed copies of the Commercial Invoice with the shipment.
-   - **Description**: *"Consigned electronic components for prototype PCB assembly under Order #T-E68W908185A. Temporary import for processing and re-export. Not for commercial resale."*
-   - **HTS / HS Tariff Classification Codes & Declared Breakdown**:
-     - `U1` (MCXN947VDFT Microcontroller): **`8542.31.0000`** | 5 pcs @ $16.41 = **$82.05**
-     - `U2` (IQS7222C101QNR Touch IC): **`8542.39.0000`** | 5 pcs @ $0.84 = **$4.20**
-     - `D1` (CLV1A-FKB-CK1VW1DE1BB7C3C3 RGB LED): **`8541.41.0000`** | 10 pcs @ $0.255 = **$2.55**
-     - `J3` (TYPE-C-16P-3MD USB Receptacle): **`8536.69.0000`** | 10 pcs @ $0.19 = **$1.90**
-     - `U5` (CPT-1207-5LTH-T Piezo Sounder): **`8531.80.0000`** | 5 pcs @ $0.78 = **$3.90**
-     - `Y1` (ECS-240-8-30B-CKM Crystal): **`8541.60.0000`** | 5 pcs @ $0.98 = **$4.90**
-   - **Total Declared Customs Value**: **$99.50 USD** with invoice note: *"Value for Customs Purposes Only - Consigned Prototype Assembly Parts. Temporary import for processing and re-export. Not for commercial resale."*.
-4. **Delivery Address Format** (confirm exact delivery address on your PCBWay Order Details page under "Consigned Material Delivery"):
-   ```text
-   Consignee:     PCBWay SMT Assembly Team
-   Order #:       T-E68W908185A
-   Address:       [Supplier Delivery Facility Address]
-   Postal Code:   [Postal Code]
-   Phone / Attn:  (See contact details in PCBWay Order Portal)
-   ```
-5. **Post-Shipping Action**:
-   - Once shipped, log into your PCBWay account, go to **Order #T-E68W908185A**, click **"Consign Materials" / "Upload Tracking No."**, and submit the courier name and tracking number.
