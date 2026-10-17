@@ -3365,7 +3365,7 @@ def test_regression_worm_annelidic_caterpillar_258_smartlog_node_selected_highli
     assert "{% if node.commit_hash in session.selected_commits %}selected{% endif %}" in tpl_text
 
     # 3. Dynamic renderSmartlogList must apply selected class when commit is checked/selected
-    assert "${isSelected}" in tpl_text or "node.classList.toggle(\"selected\"" in tpl_text
+    assert "${isSelected}" in tpl_text or 'node.classList.toggle("selected"' in tpl_text
 
 
 def test_regression_cr_findings_8715cab2_ui_scale_selector_hardware() -> None:
@@ -3387,13 +3387,17 @@ def test_regression_cr_findings_8715cab2_ui_scale_selector_hardware() -> None:
 
 def test_regression_cr_findings_5d8eff1f_code_review_selection_hardware() -> None:
     """Verify finding 5d8eff1f: commit-item.selected and smartlog-node.selected high-contrast styles."""
-    cr_text = (Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2").read_text(encoding="utf-8")
+    cr_text = (Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2").read_text(
+        encoding="utf-8"
+    )
     assert ".commit-item.selected" in cr_text
     assert ".commit-item.selected.active" in cr_text
     assert ".commit-item.selected .commit-hash" in cr_text
     assert "isSelected" in cr_text
 
-    diff_text = (Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2").read_text(encoding="utf-8")
+    diff_text = (Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2").read_text(
+        encoding="utf-8"
+    )
     assert ".smartlog-node.selected" in diff_text
     assert ".smartlog-node.selected.active" in diff_text
     assert ".smartlog-node.selected .node-sha" in diff_text
@@ -3425,8 +3429,5 @@ def test_common_stylesheet_linkage_and_presence() -> None:
     for tmpl in ["diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"]:
         content = (tpl_dir / tmpl).read_text(encoding="utf-8")
         assert '<link rel="stylesheet" href="/static/common.css">' in content, (
-            f"{tmpl} missing <link rel=\"stylesheet\" href=\"/static/common.css\">"
+            f'{tmpl} missing <link rel="stylesheet" href="/static/common.css">'
         )
-
-
-

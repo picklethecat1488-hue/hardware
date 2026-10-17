@@ -165,3 +165,13 @@ def test_main_violation(mock_check, mock_parse, mock_run):
         assert exc_info.value.code == 1
 
     mock_run.assert_not_called()
+
+
+def test_regression_bug_flying_grasshopper_413_pluggy_compatibility():
+    """Verify BUG-FLYING-GRASSHOPPER-413: pluggy < 1.7.0 compatibility for scancode/plugincode."""
+    import pluggy
+    from packaging.version import parse as parse_version
+
+    assert parse_version(pluggy.__version__) < parse_version("1.7.0"), (
+        f"pluggy version {pluggy.__version__} is >= 1.7.0 which breaks scancode-toolkit / plugincode hookspecs"
+    )
