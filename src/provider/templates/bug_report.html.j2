@@ -606,6 +606,19 @@
       <div class="metric-pill">RESOLVED: <span id="m-resolved" class="metric-highlight" style="color:var(--quake-green);">0</span></div>
     </div>
     <div class="header-actions">
+      <!-- UI Scale Selector (8715cab2) -->
+      <div style="display:flex;align-items:center;gap:4px;margin-right:4px;">
+        <span style="font-size:8px;color:var(--quake-text-dim);">SCALE:</span>
+        <select id="uiScaleSelect" class="quake-select" onchange="onUiScaleChange(this.value)" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 9px; height: 22px;">
+          <option value="75%">75%</option>
+          <option value="80%">80%</option>
+          <option value="90%">90%</option>
+          <option value="100%" selected>100%</option>
+          <option value="110%">110%</option>
+          <option value="125%">125%</option>
+          <option value="150%">150%</option>
+        </select>
+      </div>
       <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
       <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
       <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
@@ -823,6 +836,7 @@
     const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "PLANNED": 2, "RESOLVED": 3, "CLOSED": 4 };
 
     function init() {
+      initUiScale();
       // Disambiguate duplicate IDs if any exist in in-memory state
       const seenIds = new Set();
       (db.bugs || []).forEach(b => {
@@ -1257,7 +1271,72 @@
       } catch (err) {}
     }
 
+    // UI Scale Management (8715cab2)
+    const UI_SCALES = ["75%", "80%", "90%", "100%", "110%", "125%", "150%"];
+    const UI_SCALE_KEY = "ui_scale";
+
+    function applyUiScale(scale) {
+      if (!UI_SCALES.includes(scale)) {
+        scale = "100%";
+      }
+      const factor = parseInt(scale, 10) / 100;
+      if (document.documentElement) {
+        document.documentElement.style.zoom = factor;
+      }
+      try {
+        localStorage.setItem(UI_SCALE_KEY, scale);
+      } catch (e) {}
+      const sel = document.getElementById("uiScaleSelect");
+      if (sel && sel.value !== scale) {
+        sel.value = scale;
+      }
+    }
+
+    function onUiScaleChange(scale) {
+      applyUiScale(scale);
+    }
+
+    function adjustUiScale(delta) {
+      let current = "100%";
+      try {
+        current = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      let idx = UI_SCALES.indexOf(current);
+      if (idx === -1) idx = UI_SCALES.indexOf("100%");
+      const nextIdx = Math.max(0, Math.min(UI_SCALES.length - 1, idx + delta));
+      applyUiScale(UI_SCALES[nextIdx]);
+    }
+
+    function resetUiScale() {
+      applyUiScale("100%");
+    }
+
+    function initUiScale() {
+      let saved = "100%";
+      try {
+        saved = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      applyUiScale(saved);
+    }
+
     window.addEventListener("keydown", (e) => {
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === "=" || e.key === "+" || e.code === "Equal" || e.code === "NumpadAdd") {
+          e.preventDefault();
+          adjustUiScale(1);
+          return;
+        }
+        if (e.key === "-" || e.key === "_" || e.code === "Minus" || e.code === "NumpadSubtract") {
+          e.preventDefault();
+          adjustUiScale(-1);
+          return;
+        }
+        if (e.key === "0" || e.code === "Digit0" || e.code === "Numpad0") {
+          e.preventDefault();
+          resetUiScale();
+          return;
+        }
+      }
       if (e.key === "Escape") {
         const loadingModal = document.getElementById("feedback-loading-modal");
         if (!loadingModal || loadingModal.style.display === "none") {

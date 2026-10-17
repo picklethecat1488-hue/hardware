@@ -3367,3 +3367,25 @@ def test_regression_worm_annelidic_caterpillar_258_smartlog_node_selected_highli
     # 3. Dynamic renderSmartlogList must apply selected class when commit is checked/selected
     assert "${isSelected}" in tpl_text or "node.classList.toggle(\"selected\"" in tpl_text
 
+
+def test_regression_cr_findings_8715cab2_ui_scale_selector_hardware() -> None:
+    """Verify finding 8715cab2: UI scale selector in hardware dashboard templates."""
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    for tmpl in ["diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"]:
+        content = (tpl_dir / tmpl).read_text(encoding="utf-8")
+        assert 'id="uiScaleSelect"' in content, f"{tmpl} missing uiScaleSelect"
+        for scale in ["75%", "80%", "90%", "100%", "110%", "125%", "150%"]:
+            assert f'value="{scale}"' in content, f"{tmpl} missing {scale}"
+        assert "applyUiScale" in content, f"{tmpl} missing applyUiScale"
+        assert "adjustUiScale" in content, f"{tmpl} missing adjustUiScale"
+        assert "initUiScale" in content, f"{tmpl} missing initUiScale"
+
+
+def test_regression_cr_findings_5d8eff1f_code_review_selection_hardware() -> None:
+    """Verify finding 5d8eff1f: commit-item.selected styles in hardware code_review.html.j2."""
+    cr_text = (Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2").read_text(encoding="utf-8")
+    assert ".commit-item.selected" in cr_text
+    assert ".commit-item.selected.active" in cr_text
+    assert "isSelected" in cr_text
+
+

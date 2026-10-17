@@ -331,6 +331,20 @@
       background: rgba(255, 184, 0, 0.12);
       border-left: 3px solid var(--quake-gold);
     }
+    .commit-item.selected {
+      background: #261609;
+      border-color: var(--quake-copper);
+      box-shadow: inset 2px 0 0 var(--quake-copper);
+    }
+    .commit-item.selected:hover {
+      background: #2e1a0b;
+      border-color: var(--quake-amber);
+    }
+    .commit-item.selected.active {
+      background: #331d0d;
+      border-color: var(--quake-gold);
+      box-shadow: inset 2px 0 0 var(--quake-gold), 0 0 8px rgba(255, 184, 0, 0.25);
+    }
     .commit-item.reviewed {
       opacity: 0.55;
       filter: grayscale(0.75);
@@ -1421,6 +1435,19 @@
     </div>
 
     <div class="header-actions">
+      <!-- UI Scale Selector (8715cab2) -->
+      <div style="display:flex;align-items:center;gap:4px;margin-right:4px;">
+        <span style="font-size:8px;color:var(--quake-text-dim);">SCALE:</span>
+        <select id="uiScaleSelect" class="quake-select" onchange="onUiScaleChange(this.value)" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 9px; height: 22px;">
+          <option value="75%">75%</option>
+          <option value="80%">80%</option>
+          <option value="90%">90%</option>
+          <option value="100%" selected>100%</option>
+          <option value="110%">110%</option>
+          <option value="125%">125%</option>
+          <option value="150%">150%</option>
+        </select>
+      </div>
       <button id="btnSyncFeedback" class="quake-btn quake-btn-default" onclick="syncFeedback()" title="Synchronize review feedback with feedback/ directory and merge commit feedback">
         🔄 Sync Feedback
       </button>
@@ -1871,6 +1898,7 @@
     }
 
     document.addEventListener("DOMContentLoaded", async () => {
+      initUiScale();
       initWordWrap();
       await loadSession();
       await loadCommits();
@@ -2017,7 +2045,9 @@
         const ancestorBadge = c.is_ancestor_top
           ? `<span class="quake-badge quake-badge-cyan" style="font-size: 0.65em; margin-left: 6px;" title="Top of ancestor branch (${c.ancestor_name || 'main'})">📌 ${c.ancestor_name || 'main'}</span>`
           : "";
-        li.className = "commit-item" + (c.commit_hash === state.selectedCommit ? " active" : "") + (isReviewed ? " reviewed" : "");
+        const isActive = c.commit_hash === state.selectedCommit;
+        const isSelected = isActive || (state.selectedCommits && state.selectedCommits.includes(c.commit_hash));
+        li.className = "commit-item" + (isActive ? " active" : "") + (isSelected ? " selected" : "") + (isReviewed ? " reviewed" : "");
         li.onclick = () => selectCommit(c.commit_hash);
         const timeDisplay = c.time ? ` ${c.time}` : (c.date.includes('T') ? ` ${c.date.split('T')[1].slice(0, 8)}` : '');
         li.innerHTML = `
@@ -3958,8 +3988,73 @@
       setTimeout(() => { t.style.display = "none"; }, 2500);
     }
 
+    // UI Scale Management (8715cab2)
+    const UI_SCALES = ["75%", "80%", "90%", "100%", "110%", "125%", "150%"];
+    const UI_SCALE_KEY = "ui_scale";
+
+    function applyUiScale(scale) {
+      if (!UI_SCALES.includes(scale)) {
+        scale = "100%";
+      }
+      const factor = parseInt(scale, 10) / 100;
+      if (document.documentElement) {
+        document.documentElement.style.zoom = factor;
+      }
+      try {
+        localStorage.setItem(UI_SCALE_KEY, scale);
+      } catch (e) {}
+      const sel = document.getElementById("uiScaleSelect");
+      if (sel && sel.value !== scale) {
+        sel.value = scale;
+      }
+    }
+
+    function onUiScaleChange(scale) {
+      applyUiScale(scale);
+    }
+
+    function adjustUiScale(delta) {
+      let current = "100%";
+      try {
+        current = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      let idx = UI_SCALES.indexOf(current);
+      if (idx === -1) idx = UI_SCALES.indexOf("100%");
+      const nextIdx = Math.max(0, Math.min(UI_SCALES.length - 1, idx + delta));
+      applyUiScale(UI_SCALES[nextIdx]);
+    }
+
+    function resetUiScale() {
+      applyUiScale("100%");
+    }
+
+    function initUiScale() {
+      let saved = "100%";
+      try {
+        saved = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      applyUiScale(saved);
+    }
+
     function setupKeyboardShortcuts() {
       window.addEventListener("keydown", async (e) => {
+        if (e.metaKey || e.ctrlKey) {
+          if (e.key === "=" || e.key === "+" || e.code === "Equal" || e.code === "NumpadAdd") {
+            e.preventDefault();
+            adjustUiScale(1);
+            return;
+          }
+          if (e.key === "-" || e.key === "_" || e.code === "Minus" || e.code === "NumpadSubtract") {
+            e.preventDefault();
+            adjustUiScale(-1);
+            return;
+          }
+          if (e.key === "0" || e.code === "Digit0" || e.code === "Numpad0") {
+            e.preventDefault();
+            resetUiScale();
+            return;
+          }
+        }
         if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
         if (e.key === "[") togglePane("commits");
         if (e.key === "]") togglePane("files");
