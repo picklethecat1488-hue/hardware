@@ -47,6 +47,11 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html {
+      height: 100%;
+      width: 100%;
+    }
+
     body {
       background-color: var(--quake-bg);
       background-image:
@@ -55,7 +60,8 @@
       color: var(--quake-text-light);
       font-family: var(--font-mono);
       letter-spacing: 0.02em;
-      height: 100vh;
+      height: 100%;
+      width: 100%;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -1282,6 +1288,13 @@
       const factor = parseInt(scale, 10) / 100;
       if (document.documentElement) {
         document.documentElement.style.zoom = factor;
+        if (factor === 1.0) {
+          document.documentElement.style.width = "";
+          document.documentElement.style.height = "";
+        } else {
+          document.documentElement.style.width = (window.innerWidth / factor) + "px";
+          document.documentElement.style.height = (window.innerHeight / factor) + "px";
+        }
       }
       try {
         localStorage.setItem(UI_SCALE_KEY, scale);
@@ -1291,6 +1304,14 @@
         sel.value = scale;
       }
     }
+
+    window.addEventListener("resize", () => {
+      let current = "100%";
+      try {
+        current = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      applyUiScale(current);
+    });
 
     function onUiScaleChange(scale) {
       applyUiScale(scale);

@@ -3379,13 +3379,25 @@ def test_regression_cr_findings_8715cab2_ui_scale_selector_hardware() -> None:
         assert "applyUiScale" in content, f"{tmpl} missing applyUiScale"
         assert "adjustUiScale" in content, f"{tmpl} missing adjustUiScale"
         assert "initUiScale" in content, f"{tmpl} missing initUiScale"
+        # Viewport compensation on zoom
+        assert "window.innerWidth / factor" in content, f"{tmpl} missing width compensation"
+        assert "window.innerHeight / factor" in content, f"{tmpl} missing height compensation"
+        assert 'window.addEventListener("resize"' in content, f"{tmpl} missing resize handler"
 
 
 def test_regression_cr_findings_5d8eff1f_code_review_selection_hardware() -> None:
-    """Verify finding 5d8eff1f: commit-item.selected styles in hardware code_review.html.j2."""
+    """Verify finding 5d8eff1f: commit-item.selected and smartlog-node.selected high-contrast styles."""
     cr_text = (Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2").read_text(encoding="utf-8")
     assert ".commit-item.selected" in cr_text
     assert ".commit-item.selected.active" in cr_text
+    assert ".commit-item.selected .commit-hash" in cr_text
     assert "isSelected" in cr_text
+
+    diff_text = (Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2").read_text(encoding="utf-8")
+    assert ".smartlog-node.selected" in diff_text
+    assert ".smartlog-node.selected.active" in diff_text
+    assert ".smartlog-node.selected .node-sha" in diff_text
+    # Verify !important removed from has-pr border to avoid clobbering selection
+    assert "border-left: 3px solid #a855f7;" in diff_text
 
 

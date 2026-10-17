@@ -152,6 +152,11 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Stop any running background dashboard workstation server.",
     )
+    parser.add_argument(
+        "--restart",
+        action="store_true",
+        help="Restart existing dashboard workstation if already running.",
+    )
 
     # Database & Session Configuration
     parser.add_argument(
@@ -373,6 +378,44 @@ def parse_arguments(args: Optional[List[str]] = None) -> argparse.Namespace:
     p_verd = subparsers.add_parser("set-verdict", help="Set overall review verdict from CLI.")
     p_verd.add_argument("verdict", choices=[s.value for s in ReviewStatus])
 
+    # stop
+    subparsers.add_parser("stop", help="Stop running dashboard workstation.")
+
+    # restart
+    p_restart = subparsers.add_parser("restart", help="Restart existing dashboard workstation.")
+    p_restart.add_argument(
+        "--port",
+        type=int,
+        default=8767,
+        help="Local port number for the unified dashboard web workstation.",
+    )
+    p_restart.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host interface address to bind.",
+    )
+    p_restart.add_argument(
+        "--browser",
+        choices=["webview", "eel"],
+        default="webview",
+        help="Target display environment ('webview' native window, or 'eel').",
+    )
+    p_restart.add_argument(
+        "--no-browser",
+        "--no-app",
+        action="store_true",
+        dest="no_browser",
+        help="Disable automatic desktop application window launch on server start.",
+    )
+    p_restart.add_argument(
+        "--no-detach",
+        "--foreground",
+        action="store_true",
+        dest="no_detach",
+        help="Run workstation server in the foreground without detaching from terminal.",
+    )
+
     parsed = parser.parse_args(args)
     if not hasattr(parsed, "commits"):
         parsed.commits = []
@@ -491,6 +534,40 @@ def check_existing_instance(
         return (0, f"http://{host}:{port}")
 
     return None
+
+
+def stop_dashboard_instance(pid: int, lock_file: Path, host: str, port: int) -> bool:
+    """Terminate a running dashboard process and clear its lockfile.
+
+    Args:
+        pid: Process ID of the running dashboard instance.
+        lock_file: Path to the dashboard lockfile.
+        host: Host interface string.
+        port: Port integer.
+
+    Returns:
+        True if an instance was stopped, False otherwise.
+    """
+    stopped = False
+    if pid > 0:
+        try:
+            os.kill(pid, signal.SIGTERM)
+            deadline = time.time() + 3.0
+            while time.time() < deadline and is_pid_alive(pid):
+                time.sleep(0.05)
+            if is_pid_alive(pid):
+                os.kill(pid, signal.SIGKILL)
+            stopped = True
+        except OSError:
+            pass
+    try:
+        lock_file.unlink(missing_ok=True)
+    except OSError:
+        pass
+    port_deadline = time.time() + 3.0
+    while time.time() < port_deadline and is_port_in_use(host, port):
+        time.sleep(0.05)
+    return stopped
 
 
 def launch_browser(
@@ -777,25 +854,35 @@ def main(cli_args: Optional[List[str]] = None) -> None:
 
     lock_file = get_dashboard_lock_file(repo_root, args.port)
 
-    if getattr(args, "stop", False):
+    if getattr(args, "stop", False) or subcmd == "stop":
         existing = check_existing_instance(lock_file, args.host, args.port)
         if existing is not None:
             pid, _ = existing
             if pid > 0:
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                    print(f"Stopped dashboard workstation (PID {pid}).")
-                except OSError as e:
-                    print(f"Failed to stop dashboard workstation: {e}", file=sys.stderr)
+                stop_dashboard_instance(pid, lock_file, args.host, args.port)
+                print(f"Stopped dashboard workstation (PID {pid}).")
             else:
+                try:
+                    lock_file.unlink(missing_ok=True)
+                except OSError:
+                    pass
                 print("Dashboard workstation is running on port, but PID is unknown.")
-            try:
-                lock_file.unlink(missing_ok=True)
-            except OSError:
-                pass
         else:
             print("No dashboard workstation is running.")
         return
+
+    if getattr(args, "restart", False) or subcmd == "restart":
+        existing = check_existing_instance(lock_file, args.host, args.port)
+        if existing is not None:
+            pid, _ = existing
+            if pid > 0:
+                print(f"Restarting dashboard workstation (stopping existing PID {pid})...")
+                stop_dashboard_instance(pid, lock_file, args.host, args.port)
+            else:
+                try:
+                    lock_file.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     if not is_cli_only:
         existing = check_existing_instance(

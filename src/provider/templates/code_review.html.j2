@@ -52,6 +52,11 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html {
+      height: 100%;
+      width: 100%;
+    }
+
     body {
       background-color: var(--quake-bg);
       background-image:
@@ -60,7 +65,8 @@
       color: var(--quake-text-light);
       font-family: var(--font-mono);
       letter-spacing: 0.02em;
-      height: 100vh;
+      height: 100%;
+      width: 100%;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -328,22 +334,37 @@
       background: var(--quake-panel-hover);
     }
     .commit-item.active {
-      background: rgba(255, 184, 0, 0.12);
-      border-left: 3px solid var(--quake-gold);
+      background: linear-gradient(90deg, rgba(255, 184, 0, 0.22) 0%, rgba(27, 18, 10, 0.85) 100%) !important;
+      border-left: 4px solid var(--quake-gold, #ffb800) !important;
+      box-shadow: inset 3px 0 0 var(--quake-gold, #ffb800), 0 0 10px rgba(255, 184, 0, 0.3) !important;
     }
     .commit-item.selected {
-      background: #261609;
-      border-color: var(--quake-copper);
-      box-shadow: inset 2px 0 0 var(--quake-copper);
+      background: linear-gradient(90deg, rgba(255, 184, 0, 0.16) 0%, rgba(200, 122, 50, 0.12) 50%, rgba(27, 18, 10, 0.90) 100%) !important;
+      border-left: 4px solid var(--quake-amber, #e59400) !important;
+      border-top: 1px solid rgba(255, 184, 0, 0.3) !important;
+      border-bottom: 1px solid rgba(255, 184, 0, 0.3) !important;
+      box-shadow: inset 3px 0 0 var(--quake-amber, #e59400), 0 0 8px rgba(229, 148, 0, 0.25) !important;
     }
     .commit-item.selected:hover {
-      background: #2e1a0b;
-      border-color: var(--quake-amber);
+      background: linear-gradient(90deg, rgba(255, 184, 0, 0.24) 0%, rgba(200, 122, 50, 0.16) 50%, rgba(38, 26, 15, 0.95) 100%) !important;
     }
     .commit-item.selected.active {
-      background: #331d0d;
-      border-color: var(--quake-gold);
-      box-shadow: inset 2px 0 0 var(--quake-gold), 0 0 8px rgba(255, 184, 0, 0.25);
+      background: linear-gradient(90deg, rgba(255, 184, 0, 0.32) 0%, rgba(200, 122, 50, 0.20) 40%, rgba(27, 18, 10, 0.95) 100%) !important;
+      border-left: 4px solid var(--quake-gold, #ffb800) !important;
+      border-top: 1px solid rgba(255, 184, 0, 0.5) !important;
+      border-bottom: 1px solid rgba(255, 184, 0, 0.5) !important;
+      box-shadow: inset 4px 0 0 var(--quake-gold, #ffb800), 0 0 14px rgba(255, 184, 0, 0.45) !important;
+    }
+    .commit-item.active .commit-hash,
+    .commit-item.selected .commit-hash {
+      color: var(--quake-gold, #ffb800) !important;
+      font-weight: 700;
+      text-shadow: 0 0 6px rgba(255, 184, 0, 0.6);
+    }
+    .commit-item.active .commit-subject,
+    .commit-item.selected .commit-subject {
+      color: #ffffff !important;
+      font-weight: 600;
     }
     .commit-item.reviewed {
       opacity: 0.55;
@@ -3999,6 +4020,13 @@
       const factor = parseInt(scale, 10) / 100;
       if (document.documentElement) {
         document.documentElement.style.zoom = factor;
+        if (factor === 1.0) {
+          document.documentElement.style.width = "";
+          document.documentElement.style.height = "";
+        } else {
+          document.documentElement.style.width = (window.innerWidth / factor) + "px";
+          document.documentElement.style.height = (window.innerHeight / factor) + "px";
+        }
       }
       try {
         localStorage.setItem(UI_SCALE_KEY, scale);
@@ -4008,6 +4036,14 @@
         sel.value = scale;
       }
     }
+
+    window.addEventListener("resize", () => {
+      let current = "100%";
+      try {
+        current = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      applyUiScale(current);
+    });
 
     function onUiScaleChange(scale) {
       applyUiScale(scale);
