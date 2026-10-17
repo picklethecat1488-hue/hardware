@@ -3411,3 +3411,22 @@ def test_regression_cr_finding_a2ee1118_iframe_scale_isolation() -> None:
         assert "if (isInsideIframe())" in content, f"{tmpl} missing iframe branch in applyUiScale"
 
 
+def test_common_stylesheet_linkage_and_presence() -> None:
+    """Verify common.css stylesheet exists in static assets and is linked across all UI templates."""
+    static_css = Path(__file__).resolve().parent.parent / "provider" / "code_review" / "static" / "common.css"
+    assert static_css.is_file(), "static/common.css missing in code_review static directory"
+    css_content = static_css.read_text(encoding="utf-8")
+    assert "font-size: 80% !important;" in css_content
+    assert ".ui-scale-container" in css_content
+    assert ".ui-scale-select" in css_content
+    assert ".workstation-modal-overlay" in css_content
+
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    for tmpl in ["diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"]:
+        content = (tpl_dir / tmpl).read_text(encoding="utf-8")
+        assert '<link rel="stylesheet" href="/static/common.css">' in content, (
+            f"{tmpl} missing <link rel=\"stylesheet\" href=\"/static/common.css\">"
+        )
+
+
+
