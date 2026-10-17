@@ -3350,3 +3350,20 @@ def test_regression_bug_translucent_tapeworm_953_dashboard_js_syntax_and_sync_sc
             script_file.write_text(script, encoding="utf-8")
             res = subprocess.run([node_bin, "-c", str(script_file)], capture_output=True, text=True)
             assert res.returncode == 0, f"Node syntax error in bug_report script block {idx}:\n{res.stderr}"
+
+
+def test_regression_worm_annelidic_caterpillar_258_smartlog_node_selected_highlight() -> None:
+    """Verify WORM-ANNELIDIC-CATERPILLAR-258: Selected commits receive highlight styling in VCS UI."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # 1. CSS must define .smartlog-node.selected styling
+    assert ".smartlog-node.selected" in tpl_text
+    assert ".smartlog-node.selected.active" in tpl_text
+
+    # 2. SSR template must include 'selected' class when node.commit_hash is in session.selected_commits
+    assert "{% if node.commit_hash in session.selected_commits %}selected{% endif %}" in tpl_text
+
+    # 3. Dynamic renderSmartlogList must apply selected class when commit is checked/selected
+    assert "${isSelected}" in tpl_text or "node.classList.toggle(\"selected\"" in tpl_text
+
