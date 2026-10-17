@@ -3401,3 +3401,13 @@ def test_regression_cr_findings_5d8eff1f_code_review_selection_hardware() -> Non
     assert "border-left: 3px solid #a855f7;" in diff_text
 
 
+def test_regression_cr_finding_a2ee1118_iframe_scale_isolation() -> None:
+    """Verify finding a2ee1118: prevent double-scaling and CLI displacement when workstations are embedded in iframe."""
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    for tmpl in ["code_review.html.j2", "bug_report.html.j2"]:
+        content = (tpl_dir / tmpl).read_text(encoding="utf-8")
+        assert "function isInsideIframe()" in content, f"{tmpl} missing isInsideIframe guard"
+        assert "window.self !== window.top" in content, f"{tmpl} missing frame hierarchy check"
+        assert "if (isInsideIframe())" in content, f"{tmpl} missing iframe branch in applyUiScale"
+
+

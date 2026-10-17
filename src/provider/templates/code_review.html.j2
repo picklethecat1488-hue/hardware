@@ -4013,9 +4013,32 @@
     const UI_SCALES = ["75%", "80%", "90%", "100%", "110%", "125%", "150%"];
     const UI_SCALE_KEY = "ui_scale";
 
+    function isInsideIframe() {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return true;
+      }
+    }
+
     function applyUiScale(scale) {
       if (!UI_SCALES.includes(scale)) {
         scale = "100%";
+      }
+      try {
+        localStorage.setItem(UI_SCALE_KEY, scale);
+      } catch (e) {}
+      const sel = document.getElementById("uiScaleSelect");
+      if (sel && sel.value !== scale) {
+        sel.value = scale;
+      }
+      if (isInsideIframe()) {
+        if (document.documentElement) {
+          document.documentElement.style.zoom = "";
+          document.documentElement.style.width = "";
+          document.documentElement.style.height = "";
+        }
+        return;
       }
       const factor = parseInt(scale, 10) / 100;
       if (document.documentElement) {
@@ -4028,16 +4051,10 @@
           document.documentElement.style.height = (window.innerHeight / factor) + "px";
         }
       }
-      try {
-        localStorage.setItem(UI_SCALE_KEY, scale);
-      } catch (e) {}
-      const sel = document.getElementById("uiScaleSelect");
-      if (sel && sel.value !== scale) {
-        sel.value = scale;
-      }
     }
 
     window.addEventListener("resize", () => {
+      if (isInsideIframe()) return;
       let current = "100%";
       try {
         current = localStorage.getItem(UI_SCALE_KEY) || "100%";
