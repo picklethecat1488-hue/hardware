@@ -1642,3 +1642,31 @@ class TestCatFountainProvider:
         assert clip.part.is_inside((6.0, -10.0, clip_h * 0.5)), (
             "Motor clip continuous arm at (6.0, -10.0) is missing: structural integrity lost!"
         )
+
+    def test_regression_tmc6300_vcp_charge_pump_capacitor_bom_and_wiring_guide(self):
+        """Verify TMC6300 100 nF VCP charge pump capacitor is codified in BOM and wiring guide."""
+        from pathlib import Path
+        import re
+
+        doc_path = Path(__file__).parent.parent / "cat_fountain.md"
+        assert doc_path.is_file(), "cat_fountain.md must exist"
+        doc_text = doc_path.read_text(encoding="utf-8")
+
+        # 1. Parse BOM table for VCP capacitor specification
+        bom_lines = [line.strip() for line in doc_text.splitlines() if line.strip().startswith("|")]
+        vcp_cap_row = next((line for line in bom_lines if "VCP Charge Pump Capacitor" in line), None)
+        assert vcp_cap_row is not None, "BOM table must include 'VCP Charge Pump Capacitor'"
+        assert "100 nF" in vcp_cap_row and ("0.1 µF" in vcp_cap_row or "0.1 uF" in vcp_cap_row)
+        assert "≥ 10V" in vcp_cap_row or ">= 10V" in vcp_cap_row or "50V" in vcp_cap_row
+        assert "X7R Ceramic Capacitor" in vcp_cap_row
+        assert "TMC6300 VCP" in vcp_cap_row
+        assert "25 kHz PWM" in vcp_cap_row
+
+        # 2. Verify Technical Integration Notes / Wiring Guide details
+        assert "VCP Charge Pump Reservoir Capacitor Wiring" in doc_text
+        assert re.search(r"between\s+(the\s+)?(TMC6300\s+)?`?VCP`?\s+pin\s+and\s+`?VS`?\s*/\s*`?VM`?", doc_text)
+        assert "25 kHz PWM" in doc_text
+
+        # 3. Verify Wiring Gauge & lead length safety notes
+        assert "TMC6300 VCP Capacitor" in doc_text
+        assert "parasitic loop inductance" in doc_text
