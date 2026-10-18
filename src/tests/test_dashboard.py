@@ -3350,3 +3350,84 @@ def test_regression_bug_translucent_tapeworm_953_dashboard_js_syntax_and_sync_sc
             script_file.write_text(script, encoding="utf-8")
             res = subprocess.run([node_bin, "-c", str(script_file)], capture_output=True, text=True)
             assert res.returncode == 0, f"Node syntax error in bug_report script block {idx}:\n{res.stderr}"
+
+
+def test_regression_worm_annelidic_caterpillar_258_smartlog_node_selected_highlight() -> None:
+    """Verify WORM-ANNELIDIC-CATERPILLAR-258: Selected commits receive highlight styling in VCS UI."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # 1. CSS must define .smartlog-node.selected styling
+    assert ".smartlog-node.selected" in tpl_text
+    assert ".smartlog-node.selected.active" in tpl_text
+
+    # 2. SSR template must include 'selected' class when node.commit_hash is in session.selected_commits
+    assert "{% if node.commit_hash in session.selected_commits %}selected{% endif %}" in tpl_text
+
+    # 3. Dynamic renderSmartlogList must apply selected class when commit is checked/selected
+    assert "${isSelected}" in tpl_text or 'node.classList.toggle("selected"' in tpl_text
+
+
+def test_regression_cr_findings_8715cab2_ui_scale_selector_hardware() -> None:
+    """Verify finding 8715cab2: UI scale selector in hardware dashboard templates."""
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    for tmpl in ["diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"]:
+        content = (tpl_dir / tmpl).read_text(encoding="utf-8")
+        assert 'id="uiScaleSelect"' in content, f"{tmpl} missing uiScaleSelect"
+        for scale in ["75%", "80%", "90%", "100%", "110%", "125%", "150%"]:
+            assert f'value="{scale}"' in content, f"{tmpl} missing {scale}"
+        assert "applyUiScale" in content, f"{tmpl} missing applyUiScale"
+        assert "adjustUiScale" in content, f"{tmpl} missing adjustUiScale"
+        assert "initUiScale" in content, f"{tmpl} missing initUiScale"
+        # Viewport compensation on zoom
+        assert "window.innerWidth / factor" in content, f"{tmpl} missing width compensation"
+        assert "window.innerHeight / factor" in content, f"{tmpl} missing height compensation"
+        assert 'window.addEventListener("resize"' in content, f"{tmpl} missing resize handler"
+
+
+def test_regression_cr_findings_5d8eff1f_code_review_selection_hardware() -> None:
+    """Verify finding 5d8eff1f: commit-item.selected and smartlog-node.selected high-contrast styles."""
+    cr_text = (Path(__file__).resolve().parent.parent / "provider" / "templates" / "code_review.html.j2").read_text(
+        encoding="utf-8"
+    )
+    assert ".commit-item.selected" in cr_text
+    assert ".commit-item.selected.active" in cr_text
+    assert ".commit-item.selected .commit-hash" in cr_text
+    assert "isSelected" in cr_text
+
+    diff_text = (Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2").read_text(
+        encoding="utf-8"
+    )
+    assert ".smartlog-node.selected" in diff_text
+    assert ".smartlog-node.selected.active" in diff_text
+    assert ".smartlog-node.selected .node-sha" in diff_text
+    # Verify !important removed from has-pr border to avoid clobbering selection
+    assert "border-left: 3px solid #a855f7;" in diff_text
+
+
+def test_regression_cr_finding_a2ee1118_iframe_scale_isolation() -> None:
+    """Verify finding a2ee1118: prevent double-scaling and CLI displacement when workstations are embedded in iframe."""
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    for tmpl in ["code_review.html.j2", "bug_report.html.j2"]:
+        content = (tpl_dir / tmpl).read_text(encoding="utf-8")
+        assert "function isInsideIframe()" in content, f"{tmpl} missing isInsideIframe guard"
+        assert "window.self !== window.top" in content, f"{tmpl} missing frame hierarchy check"
+        assert "if (isInsideIframe())" in content, f"{tmpl} missing iframe branch in applyUiScale"
+
+
+def test_common_stylesheet_linkage_and_presence() -> None:
+    """Verify common.css stylesheet exists in static assets and is linked across all UI templates."""
+    static_css = Path(__file__).resolve().parent.parent / "provider" / "code_review" / "static" / "common.css"
+    assert static_css.is_file(), "static/common.css missing in code_review static directory"
+    css_content = static_css.read_text(encoding="utf-8")
+    assert "font-size: 80% !important;" in css_content
+    assert ".ui-scale-container" in css_content
+    assert ".ui-scale-select" in css_content
+    assert ".workstation-modal-overlay" in css_content
+
+    tpl_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    for tmpl in ["diff_view.html.j2", "code_review.html.j2", "bug_report.html.j2"]:
+        content = (tpl_dir / tmpl).read_text(encoding="utf-8")
+        assert '<link rel="stylesheet" href="/static/common.css">' in content, (
+            f'{tmpl} missing <link rel="stylesheet" href="/static/common.css">'
+        )

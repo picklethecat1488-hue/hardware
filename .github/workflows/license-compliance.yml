@@ -20,7 +20,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install scancode-toolkit
-        run: pip install scancode-toolkit typecode-libmagic
+        run: pip install "pluggy<1.7.0" scancode-toolkit typecode-libmagic
 
       - name: Verify license compliance
         run: python scripts/license_compliance.py --run-scan

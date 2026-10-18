@@ -1,0 +1,175 @@
+/* =========================================================
+   COMMON UI WORKSTATION BASE STYLESHEET
+   Unified scale, typography, reset, scrollbars, and widgets
+   ========================================================= */
+
+html {
+  font-size: 80% !important;
+  height: 100%;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  letter-spacing: 0.02em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* UI Scale Toolbar Dropdown & Indicators */
+.ui-scale-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8.5px;
+  color: var(--quake-text-muted, var(--xerxes-text-muted, #9e8a78));
+  font-family: var(--font-mono, ui-monospace, monospace);
+  user-select: none;
+}
+
+.ui-scale-label {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+.ui-scale-select {
+  background: var(--quake-bg, var(--xerxes-bg, #110a05));
+  color: var(--quake-gold, var(--xerxes-cyan, #ffb800));
+  border: 1px solid var(--quake-border-mid, var(--xerxes-border-mid, #5a381e));
+  border-radius: 2px;
+  font-size: 8.5px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  padding: 2px 4px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ui-scale-select:hover,
+.ui-scale-select:focus {
+  border-color: var(--quake-gold, var(--xerxes-cyan, #ffb800));
+  box-shadow: 0 0 6px rgba(255, 184, 0, 0.3);
+}
+
+/* Visible Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--quake-copper, var(--xerxes-teal, #c87a32)) var(--quake-panel, var(--xerxes-panel, #1b120a));
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--quake-copper, var(--xerxes-teal, #c87a32));
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--quake-gold, var(--xerxes-cyan, #ffb800));
+}
+
+/* Common Modal Overlays and Containers */
+.quake-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.workstation-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.workstation-modal-container {
+  border-radius: 4px;
+  width: calc(100vw - 36px);
+  height: calc(100vh - 36px);
+  max-width: calc(100vw - 36px);
+  max-height: calc(100vh - 36px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.workstation-modal-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  display: block;
+  flex: 1;
+}
+
+/* Toast Notifications */
+#quakeToast {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  pointer-events: none;
+  border: 1px solid var(--quake-gold, var(--xerxes-cyan, #ffb800));
+  background: var(--quake-panel, var(--xerxes-panel, #1b120a));
+  color: var(--quake-gold, var(--xerxes-cyan, #ffb800));
+}
+
+/* Window Resize Gripper */
+.window-resize-gripper {
+  position: fixed;
+  bottom: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 99999;
+  pointer-events: none;
+}

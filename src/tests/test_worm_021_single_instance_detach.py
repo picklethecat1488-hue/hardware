@@ -101,15 +101,16 @@ def test_second_instance_exits_cleanly(tmp_path: Path) -> None:
 
 def test_cli_stop_active_instance(tmp_path: Path) -> None:
     """Verify --stop flag terminates active instance and cleans lock file."""
-    lock_file = tmp_path / "dashboard_8877.lock"
-    lock_file.write_text(json.dumps({"pid": 12345, "url": "http://127.0.0.1:8877"}), encoding="utf-8")
+    lock_file = tmp_path / "dashboard_8767.lock"
+    lock_file.write_text(json.dumps({"pid": 12345, "url": "http://127.0.0.1:8767"}), encoding="utf-8")
 
     from src.dashboard import main
 
     out = StringIO()
     with (
         patch("src.dashboard.get_dashboard_lock_file", return_value=lock_file),
-        patch("src.dashboard.check_existing_instance", return_value=(12345, "http://127.0.0.1:8877")),
+        patch("src.dashboard.check_existing_instance", return_value=(12345, "http://127.0.0.1:8767")),
+        patch("src.dashboard.is_pid_alive", return_value=False),
         patch("os.kill") as mock_kill,
         patch("sys.stdout", out),
         patch("sys.argv", ["dashboard.py", "--stop"]),
@@ -123,7 +124,7 @@ def test_cli_stop_active_instance(tmp_path: Path) -> None:
 
 def test_cli_stop_no_instance(tmp_path: Path) -> None:
     """Verify --stop flag prints message when no instance is running."""
-    lock_file = tmp_path / "dashboard_8877.lock"
+    lock_file = tmp_path / "dashboard_8767.lock"
 
     from src.dashboard import main
 
@@ -137,3 +138,51 @@ def test_cli_stop_no_instance(tmp_path: Path) -> None:
         main()
 
     assert "No dashboard workstation is running" in out.getvalue()
+
+
+def test_cli_restart_active_instance(tmp_path: Path) -> None:
+    """Verify --restart terminates active instance and cleans lock before starting."""
+    lock_file = tmp_path / "dashboard_8767.lock"
+    lock_file.write_text(json.dumps({"pid": 12345, "url": "http://127.0.0.1:8767"}), encoding="utf-8")
+
+    from src.dashboard import main
+
+    out = StringIO()
+    with (
+        patch("src.dashboard.get_dashboard_lock_file", return_value=lock_file),
+        patch("src.dashboard.check_existing_instance", side_effect=[(12345, "http://127.0.0.1:8767"), None]),
+        patch("src.dashboard.stop_dashboard_instance") as mock_stop,
+        patch("src.dashboard.DashboardServer") as mock_server,
+        patch("src.dashboard.launch_browser"),
+        patch("sys.stdout", out),
+        patch("sys.argv", ["dashboard.py", "--restart", "--no-detach", "--no-browser"]),
+    ):
+        mock_server.return_value.get_url.return_value = "http://127.0.0.1:8767"
+        main()
+
+    mock_stop.assert_called_once_with(12345, lock_file, "127.0.0.1", 8767)
+    assert "Restarting dashboard" in out.getvalue()
+
+
+def test_cli_restart_subcommand(tmp_path: Path) -> None:
+    """Verify restart subcommand terminates active instance and starts new server."""
+    lock_file = tmp_path / "dashboard_8767.lock"
+    lock_file.write_text(json.dumps({"pid": 12345, "url": "http://127.0.0.1:8767"}), encoding="utf-8")
+
+    from src.dashboard import main
+
+    out = StringIO()
+    with (
+        patch("src.dashboard.get_dashboard_lock_file", return_value=lock_file),
+        patch("src.dashboard.check_existing_instance", side_effect=[(12345, "http://127.0.0.1:8767"), None]),
+        patch("src.dashboard.stop_dashboard_instance") as mock_stop,
+        patch("src.dashboard.DashboardServer") as mock_server,
+        patch("src.dashboard.launch_browser"),
+        patch("sys.stdout", out),
+        patch("sys.argv", ["dashboard.py", "restart", "--no-detach", "--no-browser"]),
+    ):
+        mock_server.return_value.get_url.return_value = "http://127.0.0.1:8767"
+        main()
+
+    mock_stop.assert_called_once_with(12345, lock_file, "127.0.0.1", 8767)
+    assert "Restarting dashboard" in out.getvalue()

@@ -1082,3 +1082,22 @@ def test_regression_bug_subterranean_vinegarworm_291_duplicate_screenshot_paste(
             assert r2.read() == b"SECOND_SCREENSHOT_DATA"
     finally:
         server.server_close()
+
+
+def test_bug_report_server_static_css_content_type(tmp_path: Path) -> None:
+    """Verify BugReportServer serves .css static assets with Content-Type: text/css."""
+    server = BugReportServer(host="127.0.0.1", port=0, feedback_dir=tmp_path)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    base_url = server.get_url()
+    try:
+        req = urllib.request.Request(f"{base_url}/static/common.css")
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            content_type = resp.headers.get("Content-Type", "")
+            assert "text/css" in content_type, f"Expected text/css Content-Type, got: {content_type}"
+            body = resp.read().decode("utf-8")
+            assert ".ui-scale-container" in body
+    finally:
+        server.server_close()

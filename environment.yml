@@ -29,6 +29,7 @@ dependencies:
     - jax
     - jaxlib
     - jax-md
+    - pluggy<1.7.0
     - scancode-toolkit
     - typecode-libmagic
     - cbor2
