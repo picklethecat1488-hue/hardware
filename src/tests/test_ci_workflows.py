@@ -140,3 +140,16 @@ def test_daemon_server_sigterm_handling() -> None:
         if proc.poll() is None:
             proc.kill()
             proc.wait()
+
+
+def test_regression_bug_flying_grasshopper_413_ci_dependencies() -> None:
+    """Verify BUG-FLYING-GRASSHOPPER-413: pluggy is pinned <1.7.0 for scancode-toolkit and CI gate formats cleanly."""
+    lc_workflow = WORKSPACE_ROOT / ".github" / "workflows" / "license-compliance.yml"
+    assert lc_workflow.exists(), "license-compliance.yml must exist"
+    lc_text = lc_workflow.read_text(encoding="utf-8")
+    assert "pluggy<1.7.0" in lc_text, "license-compliance.yml must constrain pluggy<1.7.0"
+
+    env_path = WORKSPACE_ROOT / "environment.yml"
+    assert env_path.exists(), "environment.yml must exist"
+    env_text = env_path.read_text(encoding="utf-8")
+    assert "pluggy<1.7.0" in env_text, "environment.yml must constrain pluggy<1.7.0"

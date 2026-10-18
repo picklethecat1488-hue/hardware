@@ -194,7 +194,17 @@ def _get_git_author_identities() -> Tuple[Set[str], Set[str]]:
     clean_emails = {
         e
         for e in emails
-        if len(e) >= 3 and not any(r in e.lower() for r in ("noreply", "actions@github.com", "example.com"))
+        if len(e) >= 3
+        and not any(
+            r in e.lower()
+            for r in (
+                "noreply",
+                "actions@github.com",
+                "example.com",
+                "user@workspace",
+                "@workspace",
+            )
+        )
     }
     return clean_names, clean_emails
 

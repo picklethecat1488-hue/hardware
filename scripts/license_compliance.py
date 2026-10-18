@@ -62,7 +62,7 @@ def run_scancode(workspace_root: str, report_path: str):
             sys.exit(1)
 
     print("Error: 'scancode' executable not found on host.", file=sys.stderr)
-    print("To install it locally, run: pip install scancode-toolkit", file=sys.stderr)
+    print("To install it locally, run: pip install 'pluggy<1.7.0' scancode-toolkit", file=sys.stderr)
     print("Or ensure it is available in your PATH.", file=sys.stderr)
     sys.exit(1)
 
