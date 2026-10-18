@@ -405,11 +405,14 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         if not str(file_target).startswith(str(static_dir)) or not file_target.is_file():
             self.send_error(404, "Static asset not found")
             return
-        content_type = (
-            "image/svg+xml"
-            if file_target.suffix == ".svg"
-            else ("application/javascript" if file_target.suffix == ".js" else "text/plain")
-        )
+        if file_target.suffix == ".svg":
+            content_type = "image/svg+xml"
+        elif file_target.suffix == ".js":
+            content_type = "application/javascript"
+        elif file_target.suffix == ".css":
+            content_type = "text/css"
+        else:
+            content_type = "text/plain"
         data = file_target.read_bytes()
         try:
             self.send_response(200)
