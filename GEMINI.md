@@ -61,6 +61,7 @@ Host anvil
   pytest -m "slow"
   ```
 * **Regression Unit Testing Mandate**: Whenever a regression is identified, investigated, or bisected to a prior change, you MUST introduce dedicated regression unit tests (or add active regression assertions to existing test suites) that explicitly guard against the identified regression before concluding the task.
+* **Functional Behavioral Testing Mandate**: All test code (Python unit/integration tests, CAD validation, and physics simulation suites) MUST test the actual functionality and runtime behavioral invariants of the code being run (e.g. verifying state transitions, execution outcomes, geometric properties, and physical boundary interactions). Tests must NOT verify behavior by simply inspecting source files for the existence of specific statements, strings, or AST tokens.
 
 ### 2. Geometry Providers & Discoverability
 * Custom geometry projects must be packages nested within [src/projects/](src/projects/).
