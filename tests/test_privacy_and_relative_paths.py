@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 import subprocess
+from unittest import mock
 
 from model.code_review import CommentModel, ReviewSessionModel, ReviewSeverity, ReviewStatus
 from model.bug_report import BugCategory, BugDatabaseModel, BugReportModel, BugSeverity, BugStatus
@@ -37,11 +38,19 @@ def test_dynamic_personal_identifiers_discovered() -> None:
     assert isinstance(names, set)
     assert isinstance(emails, set)
     assert isinstance(handles, set)
-    # The active user's environment must yield discovered usernames/handles
+    # The active user's environment must yield discovered usernames/handles on developer workstations
     usernames = get_usernames_to_redact()
-    assert len(usernames) > 0, "Expected at least one discovered username candidate"
-    blacklist = get_author_blacklist()
-    assert len(blacklist) > 0, "Expected non-empty author blacklist"
+    if not (os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS")):
+        assert len(usernames) > 0, "Expected at least one discovered username candidate"
+        blacklist = get_author_blacklist()
+        assert len(blacklist) > 0, "Expected non-empty author blacklist"
+
+    # Verify dynamic derivation successfully derives candidate when a non-reserved user is present
+    with mock.patch.dict(os.environ, {"USER": "testdeveloper"}):
+        get_personal_identifiers.cache_clear()
+        discovered = get_usernames_to_redact()
+        assert "testdeveloper" in discovered
+        get_personal_identifiers.cache_clear()
 
 
 def test_no_personal_username_or_email_in_tracked_files() -> None:
