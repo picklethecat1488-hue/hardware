@@ -6,7 +6,7 @@ Guidelines for schematic capture, routing engines, DRC checks, headless KiCad to
 * **Pipeline Architecture**: The PCB engine follows a strict declarative pipeline:
   `pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files`.
 * **Headless CAM Generation**: Manufacturing board files (RS-274X Gerbers, Excellon NC drills, Gerber job files) must be generated strictly via headless `kicad-cli` (`KiCadCLI`), not custom DIY string formatting.
-* **Pre-Computed Route Persistence**: PCB viewing workflows (`view.py`) and standard artifact generation MUST consume pre-computed, persisted routing artifacts (`routing.yaml`, `routing_flex.yaml`) rather than invoking the A* auto-router on the fly. Auto-routing is an explicit orchestration action performed via `python src/config.py '<target>'`.
+* **Pre-Computed Route Persistence**: PCB viewing workflows (`view.py`) and standard artifact generation MUST consume pre-computed, persisted routing artifacts (`routing.yaml`, `routing_flex.yaml`) rather than invoking the A* auto-router on the fly. Auto-routing is an explicit orchestration action performed via `python tools/config.py '<target>'`.
 
 ## 2. Component Scoping & Canonical Reference Designators
 * **Subassembly Footprint Scoping**: Multi-board and rigid-flex assemblies must scope footprints, passives, and connectors explicitly to target subassemblies (via `shape_ref: carrier_board` or `shape_ref: flex_tail`). Never duplicate components across subassemblies or rely on hardcoded component names for footprint queries.

@@ -2,27 +2,27 @@
 
 ## Source Paths
 
- - **src/build.py** - Orchestrates the generation and export of 3D-printable geometry.
- - **src/config.py** - Automated utility for part placement and geometry optimization.
- - **src/view.py** - Interactive CAD visualization tool for inspection and debugging.
- - **src/dashboard.py** - Unified Quake-themed workstation integrating VCS Diff Viewer, Smartlog DAG tree, Code Review, and Bug Tracker.
- - **src/model/** - Core application data models and configuration schemas.
- - **src/provider/** - Framework for geometry generation and build orchestration.
- - **src/projects/** - Specific geometry provider implementations.
- - **src/projects_config/** - Configuration models specific to individual projects.
+ - **tools/build.py** - Orchestrates the generation and export of 3D-printable geometry.
+ - **tools/config.py** - Automated utility for part placement and geometry optimization.
+ - **tools/view.py** - Interactive CAD visualization tool for inspection and debugging.
+ - **tools/dashboard.py** - Unified Quake-themed workstation integrating VCS Diff Viewer, Smartlog DAG tree, Code Review, and Bug Tracker.
+ - **model/** - Core application data models and configuration schemas.
+ - **provider/** - Framework for geometry generation and build orchestration.
+ - **projects/** - Specific geometry provider implementations.
+ - **projects_config/** - Configuration models specific to individual projects.
 
  ## Creating Projects
 
-Projects are self-contained packages located in `src/projects/`. They define how specific geometry is built, configured, and visualized. To add a new project, follow these steps:
+Projects are self-contained packages located in `projects/`. They define how specific geometry is built, configured, and visualized. To add a new project, follow these steps:
 
 ### 1. Create the Project Directory
-Create a new directory under `src/projects/` (e.g., `src/projects/exhaust_manifolds/`).
+Create a new directory under `projects/` (e.g., `projects/exhaust_manifolds/`).
 
 ### 2. Define the Manifest
 Create a `manifest.yaml` file in your project folder. This file tells the orchestrator what parts are available and what actions (part, diagram, config, view) they support.
 
 ```yaml
-# src/projects/bracket/manifest.yaml
+# projects/bracket/manifest.yaml
 main_plate:
   part:
     modes: [default]
@@ -38,7 +38,7 @@ main_plate:
 If your geometry depends on raw coordinates, store them in a `measurements.yaml` file.
 
 ```yaml
-# src/projects/bracket/measurements.yaml
+# projects/bracket/measurements.yaml
 hole_center: [100, 50, 0]
 support_point: [120, 60, 10]
 ```
@@ -47,7 +47,7 @@ support_point: [120, 60, 10]
 The provider acts as the interface between your builder and the application's orchestrator. Decorate it with `@discover_provider` so the ProviderManager can find it. 
 
 ```python
-# src/projects/bracket/provider.py
+# projects/bracket/provider.py
 from functools import cached_property
 from build123d import *
 from pathlib import Path
@@ -95,7 +95,7 @@ class BracketProvider(Provider):
 Ensure the provider is accessible at the package level so the discovery mechanism can import it.
 
 ```python
-# src/projects/bracket/__init__.py
+# projects/bracket/__init__.py
 from .provider import BracketProvider
 ```
 
@@ -103,7 +103,7 @@ from .provider import BracketProvider
 Finally, add the import to the top-level projects init file.
 
 ```python
-# src/projects/__init__.py
+# projects/__init__.py
 from .exhaust_manifolds import ExhaustManifoldsProvider
 from .bracket import BracketProvider
 ```
@@ -112,7 +112,7 @@ from .bracket import BracketProvider
 If your project supports physical simulation (`Mode.SIMULATE`), you should register custom simulation callbacks to manage initialization, joint control, and fluid behavior:
 
 ```python
-# src/projects/bracket/provider.py
+# projects/bracket/provider.py
 def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[..., Any]]:
     """Return simulation callbacks mapped to execution hooks."""
     from .simulate_hooks import get_simulate_hooks_impl as impl
@@ -123,7 +123,7 @@ def get_simulate_hooks_impl(self, sim_name: str) -> dict[Simulate, Callable[...,
 Create a `simulate_hooks.py` file within your project package to specify hooks for `Simulate.INIT`, `Simulate.PRE_STEP`, etc.:
 
 ```python
-# src/projects/bracket/simulate_hooks.py
+# projects/bracket/simulate_hooks.py
 from provider import Simulate, Room, Bullet, Fluid
 
 
@@ -252,9 +252,9 @@ The repository incorporates an end-to-end PCB design, simulation, and manufactur
 ```
 pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -> kicad_cli -> board and schematic files
 ```
-- **Materials Library**: Physical and electrical properties (dielectric constants, loss tangents, copper thickness, solder mask) are declared in `src/projects/pcb_materials.yaml` and imported into project manifests.
+- **Materials Library**: Physical and electrical properties (dielectric constants, loss tangents, copper thickness, solder mask) are declared in `projects/pcb_materials.yaml` and imported into project manifests.
 - **Manifest Integration**: PCB targets are registered in the project's `manifest.yaml` under `pcb:`.
-- **Native KiCad Generation**: Board geometry and schematics are generated directly into canonical `.kicad_pcb` and `.kicad_sch` formats via clean Jinja templates (`src/provider/templates/kicad_pcb.j2`).
+- **Native KiCad Generation**: Board geometry and schematics are generated directly into canonical `.kicad_pcb` and `.kicad_sch` formats via clean Jinja templates (`provider/templates/kicad_pcb.j2`).
 - **Headless CAM Compilation**: Manufacturing files (RS-274X Gerbers, Excellon NC drills, Gerber job files) are compiled strictly by `kicad-cli` rather than hand-rolled custom formatters.
 
 ### 2. KiCad Dependency & Multi-Platform Support
@@ -266,23 +266,23 @@ pcb_materials.yaml imports -> manifest.yaml -> .kicad_pcb / .kicad_sch targets -
 - **Interactive Viewer CLI (`view.py`)**:
   ```bash
   # View PCB target (opens KiCode tab in VS Code and renders 3D substrate in ocp_vscode):
-  python src/view.py carrier_board:pcb
+  python tools/view.py carrier_board:pcb
 
   # View a direct board or schematic file:
-  python src/view.py build/board/carrier_board/carrier_board.kicad_pcb
+  python tools/view.py build/board/carrier_board/carrier_board.kicad_pcb
   ```
 - **In-Browser Gerber Viewers**: Drag the `build/board/<project>/` folder into open-source [tracespace.io/view](https://tracespace.io/view/) or online fab viewers (JLCPCB, PCBWay).
 - **Vector Schematics**: Open `build/schematics/<project>/<project>_schematic.svg` in any browser or SVG editor.
 
 ## Testing
-Add validation tests in `src/projects/tests/`. Your tests should:
+Add validation tests in `projects/tests/`. Your tests should:
 - Verify geometry volumes are non-zero.
 - Ensure mirrored parts do not intersect unexpectedly.
 - Validate that configuration updates correctly modify the `settings` model.
 
 Run tests for your provider from the repo root using:
 ```bash
-pytest src/projects/tests/test_your_project.py
+pytest projects/tests/test_your_project.py
 ```
 
 After updating, these commands should be run to ensure proper formatting:
@@ -309,33 +309,33 @@ Inspect commits, branches, working tree states, ancestors, code review findings,
 
 ```bash
 # Launch interactive dashboard web workstation (Diff View at /, Code Review at /review, Bugs at /bugs)
-python src/dashboard.py
+python tools/dashboard.py
 
 # Print the smartlog ancestor tree (sl) and working tree status directly to the terminal
-python src/dashboard.py --list
+python tools/dashboard.py --list
 
 # Inspect a specific branch or jump to a commit
-python src/dashboard.py --branch main
-python src/dashboard.py --goto 75d5f92
+python tools/dashboard.py --branch main
+python tools/dashboard.py --goto 75d5f92
 
 # Download latest changes from remote repository
-python src/dashboard.py --sync
+python tools/dashboard.py --sync
 
 # Launch on custom port
-python src/dashboard.py --port 8767
+python tools/dashboard.py --port 8767
 
 # Bug tracking via CLI
-python src/dashboard.py --bugs
-python src/dashboard.py --bugs --open
-python src/dashboard.py --add-bug "Antenna on Q1" --severity HIGH --category PCB --component carrier_board
-python src/dashboard.py --resolve-bug BUG-014 --notes "Fixed trace routing"
+python tools/dashboard.py --bugs
+python tools/dashboard.py --bugs --open
+python tools/dashboard.py --add-bug "Antenna on Q1" --severity HIGH --category PCB --component carrier_board
+python tools/dashboard.py --resolve-bug BUG-014 --notes "Fixed trace routing"
 
 # Code review via CLI
-python src/dashboard.py --reviews
-python src/dashboard.py --reviews --open
-python src/dashboard.py --add-comment "Check crystal routing" --file src/dashboard.py --line 10 --severity MUST_FIX
-python src/dashboard.py --resolve-comment abc123
-python src/dashboard.py --verdict APPROVED
+python tools/dashboard.py --reviews
+python tools/dashboard.py --reviews --open
+python tools/dashboard.py --add-comment "Check crystal routing" --file tools/dashboard.py --line 10 --severity MUST_FIX
+python tools/dashboard.py --resolve-comment abc123
+python tools/dashboard.py --verdict APPROVED
 ```
 
 ### Dashboard Features & Workflow
@@ -353,7 +353,7 @@ python src/dashboard.py --verdict APPROVED
 - **Commit Manipulation**:
   - **Split Commit**: Resets `HEAD~1` so its changes return to the working tree for selective restaging and granular committing.
   - **Combine Commits**: Squashes two or more selected contiguous commits into a single commit with a custom commit message.
-- **Merge Conflict Resolution**: Detects conflicted files (`UU`, `AA`, etc.), displays conflict marker counts, and offers instant resolution buttons: **Ours**, **Theirs**, or **Mark Resolved**.
+  - **Merge Conflict Resolution**: Detects conflicted files (`UU`, `AA`, etc.), displays conflict marker counts, and offers instant resolution buttons: **Ours**, **Theirs**, or **Mark Resolved**.
 - **Interactive Code Review (`/review`)**: 3-column layout displaying the revision stream, changed files list, side-by-side or unified syntax-highlighted diffs, inline line-range comments (`[MUST FIX]`, `[PROPOSAL]`, `[NIT]`), and bottom Quake terminal. Concluding review with **Approve** or **Request Changes** persists findings to SQLite (`build/code_review.sqlite`), Markdown (`feedback/CR.md`), and returns cleanly to Dashboard.
 - **Interactive Bug Tracker (`/bugs`)**: Issue triage, reproduction steps, drag-and-drop or clipboard screenshot uploads (tracked automatically in **Git LFS** under public non-confidential attachments policy), status filtering (`OPEN`, `ALL`, `RESOLVED`), and "Save and Exit" returning seamlessly to the VCS Dashboard.
 
@@ -368,7 +368,7 @@ If you need to debug a script while passing specific CLI arguments:
 2. Start the script using the debugpy wrapper:
 
 ```bash
-python -m debugpy --listen 5678 --wait-for-client src/build.py 'exhaust_manifolds/*'
+python -m debugpy --listen 5678 --wait-for-client tools/build.py 'exhaust_manifolds/*'
 ```
 
 3. In VS Code, go to the Run and Debug sidebar, select "Python: Attach via Port", and press F5. The script will pause at the start and wait for the debugger to connect. 
