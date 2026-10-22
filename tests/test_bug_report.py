@@ -1191,7 +1191,7 @@ def test_bug_report_server_streams_attachment_chunks(tmp_path: Path) -> None:
 
 def test_bug_report_template_client_side_limit() -> None:
     """Verify bug_report.html.j2 enforces MAX_ATTACHMENT_SIZE_BYTES client-side before FileReader."""
-    template_path = Path("/Users/daparker/gh/hardware/provider/templates/bug_report.html.j2")
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
     assert template_path.exists()
     content = template_path.read_text(encoding="utf-8")
     assert "MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024 * 1024" in content
@@ -1200,4 +1200,3 @@ def test_bug_report_template_client_side_limit() -> None:
     idx_limit = content.find("if (f.size >= MAX_ATTACHMENT_SIZE_BYTES)")
     idx_reader = content.find("reader.readAsDataURL(f)", idx_limit)
     assert idx_limit != -1 and idx_reader != -1, "Expected client-side size check before readAsDataURL"
-
