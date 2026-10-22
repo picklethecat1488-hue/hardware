@@ -78,7 +78,7 @@ kill_remote_sim() {
 
 kill_remote_smoke() {
     echo "🛑 Terminating preceding smoke tests on ${REMOTE_HOST}..."
-    ssh ${SSH_OPTS} "${REMOTE_HOST}" "pkill -9 -f 'smoke.py' 2>/dev/null || true" 2>/dev/null || true
+    ssh ${SSH_OPTS} "${REMOTE_HOST}" "pkill -9 -f 'smoke.py|daemon.py|build.py|view.py|config.py' 2>/dev/null || true; rm -f ${REMOTE_DIR}/build/.daemon.* 2>/dev/null || true" 2>/dev/null || true
 }
 
 kill_remote_pytest() {
@@ -108,7 +108,7 @@ case "$1" in
         echo "✨ Combining staged RRD recordings..."
         python -c "
 import sys, os, glob
-sys.path.insert(0, os.path.abspath('src'))
+sys.path.insert(0, os.path.abspath('.'))
 from provider.utils import merge_rrd_recordings
 
 args = sys.argv[1:]
@@ -145,7 +145,7 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
         sync_code
         echo "🌊 Running simulation on ${REMOTE_HOST}..."
         trap kill_remote_sim INT TERM
-        ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} python src/view.py $*"
+        ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} python tools/view.py $*"
         trap - INT TERM
         auto_download_simulate "$@"
         ;;
@@ -154,7 +154,7 @@ print(f'✅ Successfully merged {len(inputs)} recording(s) into {out}')
         sync_code
         echo "🚀 Running smoke test suite on ${REMOTE_HOST}..."
         trap kill_remote_smoke INT TERM
-        ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} pytest src/smoke.py"
+        ssh ${SSH_OPTS} "${REMOTE_HOST}" "cd ${REMOTE_DIR} && ${REMOTE_CONDA} pytest -n 0 tools/smoke.py"
         trap - INT TERM
         ;;
     pytest)
