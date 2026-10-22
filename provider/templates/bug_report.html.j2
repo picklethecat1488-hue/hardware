@@ -1538,10 +1538,16 @@
       }
     }
 
+    const MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB (GitHub LFS maximum file limit)
+
     function handleFileUpload(files, isPaste = false) {
       if (!files || files.length === 0) return;
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
+        if (f.size >= MAX_ATTACHMENT_SIZE_BYTES) {
+          showToast(`Error: ${f.name} exceeds maximum allowed size of 2 GB (GitHub LFS limit).`, 5000);
+          continue;
+        }
         const reader = new FileReader();
         reader.onload = () => {
           const b64 = reader.result.split(",")[1];
@@ -1568,6 +1574,10 @@
     }
 
     function uploadBlob(blob, filename, fileType) {
+      if (blob.size >= MAX_ATTACHMENT_SIZE_BYTES) {
+        showToast("Error: Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
         const b64 = reader.result.split(",")[1];
@@ -1582,6 +1592,10 @@
     }
 
     function uploadTextDocument(text, filename) {
+      if (text.length >= MAX_ATTACHMENT_SIZE_BYTES) {
+        showToast("Error: Document exceeds maximum allowed size of 2 GB.", 5000);
+        return;
+      }
       uploadPayload({
         filename: filename,
         file_type: "document",
@@ -1600,6 +1614,15 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+      if (res.status === 413) {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || "Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
+        return;
+      }
+      if (!res.ok) {
+        showToast("Failed to upload attachment: HTTP " + res.status);
+        return;
+      }
       const att = await res.json();
       const bug = db.bugs.find(b => b.id === activeBugId);
       if (bug) {
