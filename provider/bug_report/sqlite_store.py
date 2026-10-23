@@ -7,6 +7,7 @@ reproduction steps, attachments, and tracker metadata using SQLite.
 import contextlib
 import json
 from pathlib import Path
+import re
 import sqlite3
 from typing import Any, Dict, Generator, List, Optional
 import uuid as uuid_pkg
@@ -164,14 +165,11 @@ class SQLiteBugStore:
                 "updated_at, resolved_at, resolution_notes FROM bugs"
             ).fetchall()
 
-            def _sort_key(r: sqlite3.Row) -> int:
-                b_id = r["id"]
-                if b_id.startswith("BUG-"):
-                    try:
-                        return int(b_id[4:])
-                    except ValueError:
-                        pass
-                return 999999
+            def _sort_key(r: sqlite3.Row) -> tuple[str, int, str]:
+                created = r["created_at"] or ""
+                m = re.search(r"\d+", r["id"] or "")
+                num = int(m.group(0)) if m else 999999
+                return (created if created else f"0000-{num:06d}", num, r["id"] or "")
 
             sorted_bug_rows = sorted(bug_rows, key=_sort_key)
 
