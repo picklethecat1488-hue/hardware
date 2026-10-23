@@ -33,6 +33,7 @@ class MarkdownBugExporter:
             repo_root: Base path of repository for file links.
         """
         self.repo_root = repo_root
+        self._file_mtimes: Dict[str, float] = {}
 
     def export_markdown(
         self,
@@ -69,7 +70,14 @@ class MarkdownBugExporter:
             store.resolve_duplicate_ids()
 
         md_text = elide_personal_info(self.render_markdown(database))
-        output_path.write_text(md_text, encoding="utf-8")
+        if not output_path.exists():
+            output_path.write_text(md_text, encoding="utf-8")
+        else:
+            try:
+                if output_path.read_text(encoding="utf-8") != md_text:
+                    output_path.write_text(md_text, encoding="utf-8")
+            except OSError:
+                output_path.write_text(md_text, encoding="utf-8")
 
         # Export individual BUG_<id>.md files into feedback/ (or custom feedback_dir)
         target_feedback_dir = feedback_dir or (
@@ -910,15 +918,34 @@ class MarkdownBugExporter:
         renamed = 0
         merged = 0
 
+        # Load cached modification times from SQLite store or in-memory cache
+        known_mtimes: Dict[str, float] = {}
+        if store and hasattr(store, "get_file_mtimes"):
+            known_mtimes = store.get_file_mtimes()
+        if not known_mtimes and hasattr(self, "_file_mtimes"):
+            known_mtimes = dict(self._file_mtimes)
+
+        # Build in-memory lookup map of existing bugs in database by canonical and raw ID
+        existing_by_id: Dict[str, BugReportModel] = {}
+        for b in database.bugs:
+            existing_by_id[b.id] = b
+            num_clean = re.sub(r"^(?:WORM|BUG)[-_]", "", b.id, flags=re.IGNORECASE)
+            existing_by_id[f"WORM-{num_clean}"] = b
+            existing_by_id[f"BUG-{num_clean}"] = b
+            if num_clean.isdigit():
+                norm = f"{int(num_clean):03d}"
+                existing_by_id[f"WORM-{norm}"] = b
+                existing_by_id[f"BUG-{norm}"] = b
+
+        updated_mtimes: Dict[str, float] = {}
+
         bug_files = sorted(set(list(feedback_dir.glob("BUG_*.md")) + list(feedback_dir.glob("WORM_*.md"))))
         for bug_file in bug_files:
             scanned += 1
-            md_bug = self.parse_individual_bug_file(bug_file)
-            if not md_bug:
-                continue
+            file_name = bug_file.name
 
             # Determine ID implied by filename
-            m_fn = re.match(r"^(BUG|WORM)[_-](.+)\.md$", bug_file.name, re.IGNORECASE)
+            m_fn = re.match(r"^(BUG|WORM)[_-](.+)\.md$", file_name, re.IGNORECASE)
             expected_id_from_fn = ""
             if m_fn:
                 fn_prefix = m_fn.group(1).upper()
@@ -929,6 +956,25 @@ class MarkdownBugExporter:
                     expected_id_from_fn = raw_part
                 else:
                     expected_id_from_fn = f"{fn_prefix}-{raw_part}"
+
+            try:
+                curr_mtime = bug_file.stat().st_mtime
+            except OSError:
+                curr_mtime = 0.0
+
+            # Incremental sync: If file mtime matches cached mtime and bug is already loaded in database, skip re-parsing!
+            if (
+                file_name in known_mtimes
+                and abs(known_mtimes[file_name] - curr_mtime) < 1e-4
+                and expected_id_from_fn in existing_by_id
+            ):
+                continue
+
+            md_bug = self.parse_individual_bug_file(bug_file)
+            if not md_bug:
+                continue
+
+            updated_mtimes[file_name] = curr_mtime
 
             # Check if this bug already exists by UUID
             existing_by_uuid = database.get_bug_by_uuid(md_bug.uuid)
@@ -958,5 +1004,11 @@ class MarkdownBugExporter:
 
         if store and hasattr(store, "save_database") and (merged > 0 or renamed > 0):
             store.save_database(database)
+
+        if updated_mtimes:
+            if store and hasattr(store, "update_file_mtimes"):
+                store.update_file_mtimes(updated_mtimes)
+            if hasattr(self, "_file_mtimes"):
+                self._file_mtimes.update(updated_mtimes)
 
         return {"merged": merged, "renamed": renamed, "scanned": scanned}

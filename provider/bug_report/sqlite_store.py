@@ -62,6 +62,9 @@ class SQLiteBugStore:
         cols = [row["name"] for row in cursor.fetchall()]
         if "uuid" not in cols:
             self._init_schema_with_conn(conn)
+        cursor = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='file_mtimes'")
+        if not cursor.fetchone():
+            conn.execute("CREATE TABLE IF NOT EXISTS file_mtimes (filename TEXT PRIMARY KEY, mtime REAL NOT NULL)")
 
     def _init_schema(self) -> None:
         """Initialize tables and indices if they do not already exist."""
@@ -111,6 +114,11 @@ class SQLiteBugStore:
             CREATE INDEX IF NOT EXISTS idx_attachments_bug_id ON attachments(bug_id);
             CREATE INDEX IF NOT EXISTS idx_bugs_status ON bugs(status);
             CREATE INDEX IF NOT EXISTS idx_bugs_severity ON bugs(severity);
+
+            CREATE TABLE IF NOT EXISTS file_mtimes (
+                filename TEXT PRIMARY KEY,
+                mtime REAL NOT NULL
+            );
             """
         )
         # Ensure uuid column exists on preexisting databases
@@ -479,3 +487,24 @@ class SQLiteBugStore:
                     reassigned[b_uuid] = new_id
 
             return reassigned
+
+    def get_file_mtimes(self) -> Dict[str, float]:
+        """Retrieve cached modification times of scanned feedback files."""
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT filename, mtime FROM file_mtimes")
+            return {row["filename"]: float(row["mtime"]) for row in cursor.fetchall()}
+
+    def update_file_mtimes(self, mtimes: Dict[str, float]) -> None:
+        """Update cached modification times of scanned feedback files."""
+        if not mtimes:
+            return
+        with self._get_connection() as conn:
+            conn.executemany(
+                "INSERT INTO file_mtimes (filename, mtime) VALUES (?, ?) ON CONFLICT(filename) DO UPDATE SET mtime=excluded.mtime",
+                list(mtimes.items()),
+            )
+
+    def delete_file_mtime(self, filename: str) -> None:
+        """Remove a deleted file from cached modification times."""
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM file_mtimes WHERE filename = ?", (filename,))
