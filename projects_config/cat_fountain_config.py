@@ -502,6 +502,11 @@ class CatFountainConfig(BaseModel):
         """Return pocket height for the proximity sensor."""
         return float(self._raw_data.get("proximity_sensor_pocket_height", 14.0))
 
+    @cached_property
+    def proximity_sensor_inner_wall_extension(self) -> float:
+        """Return height of inner wall extension for proximity sensor openings to interface with ToF PCB."""
+        return float(self._raw_data.get("proximity_sensor_inner_wall_extension", 3.0))
+
     # Raspberry Pi Pico
     @cached_property
     def pico_spacing_x(self) -> float:

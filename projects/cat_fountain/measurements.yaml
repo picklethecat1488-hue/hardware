@@ -119,6 +119,7 @@ proximity_sensor_spacing_y: 13.5
 proximity_sensor_standoff_height: 4.0
 proximity_sensor_pocket_width: 12.0
 proximity_sensor_pocket_height: 14.0
+proximity_sensor_inner_wall_extension: 3.0
 
 # ==========================================
 # 8. LED & Plug

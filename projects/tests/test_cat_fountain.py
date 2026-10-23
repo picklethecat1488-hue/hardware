@@ -1909,3 +1909,34 @@ class TestCatFountainProvider:
         assert bowl.part.is_inside((-38.95, -45.0, track_z)), (
             "SWD clip guide track should be present at (-38.95, -45.0)"
         )
+
+    def test_regression_bug_springing_mosquito_703_proximity_sensor_inner_wall_extension(self, provider):
+        """Verify BUG-SPRINGING-MOSQUITO-703: Extend inner wall of proximity sensor openings down 3mm to ToF PCB."""
+        from build123d import Location
+
+        assert hasattr(provider.settings, "proximity_sensor_inner_wall_extension"), (
+            "proximity_sensor_inner_wall_extension setting missing"
+        )
+        assert provider.settings.proximity_sensor_inner_wall_extension == 3.0
+
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        assert bowl.part.is_valid()
+
+        r = provider.settings.bowl_radius
+        t = provider.settings.bowl_thickness
+        ext_h = provider.settings.proximity_sensor_inner_wall_extension
+
+        # Point inside the 3mm inner wall extension at the top of the opening (dz = 5.0 - ext_h / 2 = 3.5)
+        # at X = -5.0 (interfacing with the top surface of the ToF sensor PCB at X = -6.0)
+        pt_wall_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0)) * Location((-5.0, 0, 5.0 - ext_h / 2.0))
+        pt_wall = (pt_wall_loc.position.X, pt_wall_loc.position.Y, pt_wall_loc.position.Z)
+
+        assert bowl.part.is_inside(pt_wall), (
+            "Inner wall of proximity sensor opening must be extended down 3mm to interface with top of ToF sensor PCB"
+        )
+
+        # Center of opening remains open aperture for ToF sensor beam
+        pt_center_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0)) * Location((-5.0, 0, 0.0))
+        pt_center = (pt_center_loc.position.X, pt_center_loc.position.Y, pt_center_loc.position.Z)
+        assert not bowl.part.is_inside(pt_center), "Proximity sensor optical aperture center must remain open"

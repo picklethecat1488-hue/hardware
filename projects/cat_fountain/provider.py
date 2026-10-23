@@ -579,6 +579,7 @@ class CatFountainProvider(Provider):
             tof_spacing_x = self.settings.proximity_sensor_spacing_x
             tof_spacing_y = self.settings.proximity_sensor_spacing_y
             tof_standoff = self.settings.proximity_sensor_standoff_height
+            ext_h = self.settings.proximity_sensor_inner_wall_extension
 
             for s_angle in [0.0, 90.0, 180.0]:
                 with Locations(Rot(0, 0, s_angle)):
@@ -599,6 +600,16 @@ class CatFountainProvider(Provider):
                                 align=(Align.MAX, Align.CENTER, Align.CENTER),
                                 mode=Mode.SUBTRACT,
                             )
+
+                        # Extend inner wall down to interface with top of ToF sensor PCB
+                        if ext_h > 0.0:
+                            with Locations(Location((-4.0, 0, 5.0 - ext_h / 2.0))):
+                                Box(
+                                    4.0,
+                                    self.settings.proximity_sensor_pocket_width,
+                                    ext_h,
+                                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                )
 
                         # Flat mounting standoff posts on the INSIDE of the bowl wall
                         # Build in a private block in local coordinates
