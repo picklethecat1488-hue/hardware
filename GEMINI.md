@@ -121,6 +121,9 @@ Host anvil
 ### 5. User-Managed Code Review & Autonomous PR Prohibition
 * The assistant is strictly PROHIBITED from autonomously creating pull requests (`gh pr create`) or merging pull requests (`gh pr merge`). All pull request creation, peer code reviews, and PR merges MUST be performed manually by the user.
 
+### 6. Codebase & Text Search Tooling (`ag`)
+* **Mandatory Silver Searcher Usage**: Always use The Silver Searcher (`ag`) for all text searches, codebase queries, pattern matching, and symbol lookups across the repository. Do NOT use `grep`, `egrep`, `fgrep`, or other ad-hoc search commands when searching repository files.
+
 ---
 
 ## Modular Subsystem & Domain Architecture Guides
