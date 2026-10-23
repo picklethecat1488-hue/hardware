@@ -39,7 +39,7 @@ from model.vcs import (
     MergeConflictFileModel,
     WorkingTreeFileModel,
 )
-from provider.bug_report.server import BugReportServer
+from provider.bug_report.server import BugReportServer, MAX_ATTACHMENT_SIZE_BYTES
 from provider.code_review.server import ReviewServer
 from provider.sanitizer import get_author_blacklist
 from provider.vcs.git_engine import GitEngine, extract_line_snippet, get_git_root
@@ -311,9 +311,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         content_len = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(content_len).decode("utf-8") if content_len > 0 else "{}"
+        if content_len >= MAX_ATTACHMENT_SIZE_BYTES:
+            self.send_error(413, "Payload Too Large: Request exceeds maximum allowed size of 2 GB (GitHub LFS limit)")
+            return
+
         try:
+            body = self.rfile.read(content_len).decode("utf-8") if content_len > 0 else "{}"
             data = json.loads(body) if body else {}
+        except (MemoryError, OverflowError):
+            self.send_error(413, "Payload Too Large: Insufficient memory to process request payload")
+            return
         except json.JSONDecodeError:
             self._send_json({"error": "Invalid JSON body"}, status=400)
             return
@@ -686,15 +693,19 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         mime_type, _ = mimetypes.guess_type(str(file_target))
         if not mime_type:
             mime_type = "application/octet-stream"
-        content = file_target.read_bytes()
+        file_size = file_target.stat().st_size
         try:
             self.send_response(200)
             self.send_header("Content-Type", mime_type)
-            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Content-Length", str(file_size))
             self.send_header("Connection", "close")
             self.end_headers()
-            self.wfile.write(content)
+            with open(file_target, "rb") as f:
+                while chunk := f.read(64 * 1024):
+                    self.wfile.write(chunk)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True
+        finally:
             self.close_connection = True
 
     def _handle_add_comment(self, data: Dict[str, Any]) -> None:
@@ -939,15 +950,47 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             filename = f"{stem}_{counter}{suffix}"
             dest_path = dest_dir / filename
 
-        if b64_content:
-            file_bytes = base64.b64decode(b64_content)
-            dest_path.write_bytes(file_bytes)
-        elif text_content:
-            file_bytes = text_content.encode("utf-8")
-            dest_path.write_bytes(file_bytes)
-        else:
-            file_bytes = b""
-            dest_path.write_bytes(file_bytes)
+        if b64_content and (len(b64_content) * 3) // 4 >= MAX_ATTACHMENT_SIZE_BYTES:
+            self._send_json(
+                {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                status=413,
+            )
+            return
+        if text_content and len(text_content.encode("utf-8")) >= MAX_ATTACHMENT_SIZE_BYTES:
+            self._send_json(
+                {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                status=413,
+            )
+            return
+
+        try:
+            if b64_content:
+                file_bytes = base64.b64decode(b64_content)
+                if len(file_bytes) >= MAX_ATTACHMENT_SIZE_BYTES:
+                    self._send_json(
+                        {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                        status=413,
+                    )
+                    return
+                dest_path.write_bytes(file_bytes)
+            elif text_content:
+                file_bytes = text_content.encode("utf-8")
+                if len(file_bytes) >= MAX_ATTACHMENT_SIZE_BYTES:
+                    self._send_json(
+                        {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                        status=413,
+                    )
+                    return
+                dest_path.write_bytes(file_bytes)
+            else:
+                file_bytes = b""
+                dest_path.write_bytes(file_bytes)
+        except (MemoryError, OverflowError):
+            self._send_json(
+                {"error": "Payload Too Large: Insufficient memory to decode attachment payload"},
+                status=413,
+            )
+            return
 
         rel_path = (
             dest_path.relative_to(self.server.repo_root)
