@@ -1790,11 +1790,88 @@ class TestCatFountainProvider:
         sample_dys = [-0.5, 0.0, 0.5]
 
         # At old location (Y = 2.5), bowl floor must be solid plastic (no engraved text cutout)
-        assert all(
-            bowl.part.is_inside((50.0 + dx, 2.5 + dy, text_z)) for dx in sample_dxs for dy in sample_dys
-        ), "TMC6300 text must not be engraved on the negative Y side (adjacent to CURRENT text)"
+        assert all(bowl.part.is_inside((50.0 + dx, 2.5 + dy, text_z)) for dx in sample_dxs for dy in sample_dys), (
+            "TMC6300 text must not be engraved on the negative Y side (adjacent to CURRENT text)"
+        )
 
         # At new location (Y = 27.5), engraved text strokes cut into bowl floor
-        assert any(
-            not bowl.part.is_inside((50.0 + dx, 27.5 + dy, text_z)) for dx in sample_dxs for dy in sample_dys
-        ), "TMC6300 text must be engraved on the positive Y side opposite CURRENT text"
+        assert any(not bowl.part.is_inside((50.0 + dx, 27.5 + dy, text_z)) for dx in sample_dxs for dy in sample_dys), (
+            "TMC6300 text must be engraved on the positive Y side opposite CURRENT text"
+        )
+
+    def test_regression_bug_swarming_cicada_917_clip_in_mounts(self, provider):
+        """Verify BUG-SWARMING-CICADA-917: Replace motor room mount holes with press-fit clip mounts except charger."""
+        # 1. Config properties exist
+        assert hasattr(provider.settings, "pcb_mounting_post_diameter")
+        assert hasattr(provider.settings, "pcb_mounting_post_height")
+        assert hasattr(provider.settings, "hall_sensor_spacing_x")
+        assert hasattr(provider.settings, "hall_sensor_spacing_y")
+
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        assert bowl.part.is_valid()
+
+        t = provider.settings.bowl_thickness
+        floor_z = provider.settings.floor_z
+        sh = provider.settings.pico_standoff_height
+        post_z = floor_z - t - sh - 1.0  # Middle of press-fit post shaft
+        boss_z = floor_z - t - (sh * 0.5)  # Inside the standoff boss body
+
+        # 2. Charger retains screw mount holes: at hole center inside boss, geometry is hollow (hole)
+        cx, cy = 0.0, -79.0
+        ch_dx = provider.settings.charger_spacing_x / 2.0
+        ch_dy = provider.settings.charger_spacing_y / 2.0
+        assert not bowl.part.is_inside((cx + ch_dx, cy + ch_dy, boss_z)), (
+            "Charger standoff should retain blind screw hole"
+        )
+
+        # 3. Pico W uses press-fit clip mounts: at post location, post shaft is solid plastic
+        px, py = -50.0, 0.0
+        pico_dx = provider.settings.pico_spacing_x / 2.0
+        pico_dy = provider.settings.pico_spacing_y / 2.0
+        assert bowl.part.is_inside((px - pico_dx, py - pico_dy, post_z)), (
+            "Pico W standoff should feature solid press-fit post shaft instead of screw hole"
+        )
+        assert bowl.part.is_inside((px - pico_dx, py - pico_dy, boss_z)), (
+            "Pico W boss must be solid plastic (no blind screw hole)"
+        )
+
+        # 4. Current monitor uses press-fit clip mounts
+        ix, iy = 50.0, -15.0
+        ina_dx = provider.settings.current_monitor_spacing_x / 2.0
+        ina_dy = provider.settings.current_monitor_spacing_y / 2.0
+        assert bowl.part.is_inside((ix - ina_dx, iy - ina_dy, post_z)), (
+            "Current monitor standoff should feature solid press-fit post shaft"
+        )
+
+        # 5. Fuel gauge has 2 posts and 2 bosses with NO posts
+        fx, fy = 50.0, -45.0
+        fuel_dx = provider.settings.fuel_gauge_spacing_x / 2.0
+        fuel_dy = provider.settings.fuel_gauge_spacing_y / 2.0
+        # Post point (index 0) has post
+        assert bowl.part.is_inside((fx - fuel_dx, fy - fuel_dy, post_z)), (
+            "Fuel gauge mount point 0 should have press-fit post"
+        )
+        # Boss-only point (index 1) has no post (empty air at post_z, solid boss at boss_z)
+        assert not bowl.part.is_inside((fx - fuel_dx, fy + fuel_dy, post_z)), (
+            "Fuel gauge mount point 1 should have NO post (boss only)"
+        )
+        assert bowl.part.is_inside((fx - fuel_dx, fy + fuel_dy, boss_z)), (
+            "Fuel gauge mount point 1 must have solid boss pad"
+        )
+
+        # 6. Hall sensor board has 2 posts and 2 bosses with NO posts
+        hx, hy = 0.0, 40.0
+        hall_dx = provider.settings.hall_sensor_spacing_x / 2.0
+        hall_dy = provider.settings.hall_sensor_spacing_y / 2.0
+        # Post point (index 0) has post
+        assert bowl.part.is_inside((hx - hall_dx, hy - hall_dy, post_z)), (
+            "Hall sensor mount point 0 should have press-fit post"
+        )
+        # Boss-only point (index 1) has no post
+        assert not bowl.part.is_inside((hx - hall_dx, hy + hall_dy, post_z)), (
+            "Hall sensor mount point 1 should have NO post (boss only)"
+        )
+        assert bowl.part.is_inside((hx - hall_dx, hy + hall_dy, boss_z)), (
+            "Hall sensor mount point 1 must have solid boss pad"
+        )

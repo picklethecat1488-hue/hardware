@@ -391,7 +391,7 @@ class CatFountainProvider(Provider):
                 ext_text = extrude(mirrored_sketch, amount=1.5, mode=Mode.PRIVATE)
                 bowl.part -= Location((center_x, center_y + label_y_offset, floor_z - t)) * ext_text
 
-            # Helper function to generate standoff posts and blind screw holes on the ceiling
+            # Helper function to generate standoff posts or press-fit clip mounts on the ceiling
             def add_pcb_mount(
                 center_x: float,
                 center_y: float,
@@ -399,6 +399,8 @@ class CatFountainProvider(Provider):
                 spacing_y: Optional[float],
                 standoff_h: float,
                 label: str,
+                mount_type: str = "press_fit",
+                post_indices: Optional[set[int]] = None,
             ):
                 dxs = [-spacing_x / 2.0, spacing_x / 2.0]
                 dys = [-spacing_y / 2.0, spacing_y / 2.0] if spacing_y else [0.0]
@@ -408,16 +410,46 @@ class CatFountainProvider(Provider):
                     for dy in dys:
                         locs.append(Location((center_x + dx, center_y + dy, floor_z - t)))
 
-                add_standoffs(
-                    locations=locs,
-                    boss_radius=boss_r,
-                    standoff_height=standoff_h,
-                    hole_radius=hole_r,
-                    hole_depth=standoff_h + 2.5,
-                    boss_align=(Align.CENTER, Align.CENTER, Align.MAX),
-                    hole_align=(Align.CENTER, Align.CENTER, Align.MIN),
-                    hole_z_offset=-standoff_h,
-                )
+                if mount_type == "standoff":
+                    # Screw mount: standoffs with blind screw holes (used for CHARGER)
+                    add_standoffs(
+                        locations=locs,
+                        boss_radius=boss_r,
+                        standoff_height=standoff_h,
+                        hole_radius=hole_r,
+                        hole_depth=standoff_h + 2.5,
+                        boss_align=(Align.CENTER, Align.CENTER, Align.MAX),
+                        hole_align=(Align.CENTER, Align.CENTER, Align.MIN),
+                        hole_z_offset=-standoff_h,
+                    )
+                else:
+                    # Clip-in mount: press-fit onto bossed posts with flared heads (carrier_board enclosure style)
+                    post_r = self.settings.pcb_mounting_post_diameter / 2.0
+                    flare_r = self.settings.pcb_mounting_post_flare_diameter / 2.0
+                    tip_r = self.settings.pcb_mounting_post_tip_diameter / 2.0
+                    flare_h = self.settings.pcb_mounting_post_flare_height
+                    shaft_h = self.settings.pcb_mounting_post_height - flare_h
+
+                    for idx, loc in enumerate(locs):
+                        with Locations(loc):
+                            # Cylindrical standoff boss
+                            Cylinder(radius=boss_r, height=standoff_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                            # Determine whether this mount point gets a post
+                            has_post = (post_indices is None) or (idx in post_indices)
+                            if has_post:
+                                with Locations((0, 0, -standoff_h)):
+                                    Cylinder(
+                                        radius=post_r,
+                                        height=shaft_h,
+                                        align=(Align.CENTER, Align.CENTER, Align.MAX),
+                                    )
+                                with Locations((0, 0, -standoff_h - shaft_h)):
+                                    Cone(
+                                        bottom_radius=tip_r,
+                                        top_radius=flare_r,
+                                        height=flare_h,
+                                        align=(Align.CENTER, Align.CENTER, Align.MAX),
+                                    )
 
                 label_y_offset = (spacing_y / 2.0 + 5.0) if spacing_y is not None else 8.0
                 if center_y + label_y_offset > r - t - 10.0:
@@ -438,7 +470,8 @@ class CatFountainProvider(Provider):
                     self.settings.fuel_gauge_spacing_y,
                     self.settings.fuel_gauge_standoff_height,
                     "FUEL",
-                    "standoff",
+                    "press_fit",
+                    {0, 3},
                 ),
                 (
                     -50.0,
@@ -447,7 +480,8 @@ class CatFountainProvider(Provider):
                     self.settings.pico_spacing_y,
                     self.settings.pico_standoff_height,
                     "PICO W",
-                    "standoff",
+                    "press_fit",
+                    None,
                 ),
                 (
                     0.0,
@@ -457,6 +491,7 @@ class CatFountainProvider(Provider):
                     self.settings.charger_standoff_height,
                     "CHARGER",
                     "standoff",
+                    None,
                 ),
                 (
                     50.0,
@@ -465,7 +500,8 @@ class CatFountainProvider(Provider):
                     self.settings.current_monitor_spacing_y,
                     self.settings.current_monitor_standoff_height,
                     "CURRENT",
-                    "standoff",
+                    "press_fit",
+                    None,
                 ),
                 (
                     50.0,
@@ -475,14 +511,25 @@ class CatFountainProvider(Provider):
                     self.settings.motor_driver_standoff_height,
                     "TMC6300",
                     "clip",
+                    None,
+                ),
+                (
+                    0.0,
+                    40.0,
+                    self.settings.hall_sensor_spacing_x,
+                    self.settings.hall_sensor_spacing_y,
+                    self.settings.hall_sensor_standoff_height,
+                    "HALL",
+                    "press_fit",
+                    {0, 3},
                 ),
             ]
-            for cx, cy, sx, sy, sh, lbl, mtype in pcb_mounts:
+            for cx, cy, sx, sy, sh, lbl, mtype, p_indices in pcb_mounts:
                 if mtype == "clip":
                     # For the clip bracket, sx (spacing_x) is board length, sy (spacing_y) is board width
                     add_pcb_clip(cx, cy, sy, sx, sh, lbl)
                 else:
-                    add_pcb_mount(cx, cy, sx, sy, sh, lbl)
+                    add_pcb_mount(cx, cy, sx, sy, sh, lbl, mount_type=mtype, post_indices=p_indices)
 
             # Charging port hole in the outer wall of the dry compartment (back side, y = -r)
             # Centered on the USB port, which is located on the underside of the PCB

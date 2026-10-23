@@ -403,6 +403,47 @@ class CatFountainConfig(BaseModel):
         """Return the outer boss radius for PCB mounting posts."""
         return float(self._raw_data.get("pcb_boss_radius", 2.2))
 
+    @cached_property
+    def pcb_mounting_post_diameter(self) -> float:
+        """Return the shaft diameter for press-fit PCB mounting posts."""
+        return float(self._raw_data.get("pcb_mounting_post_diameter", 1.8))
+
+    @cached_property
+    def pcb_mounting_post_height(self) -> float:
+        """Return the overall height of press-fit PCB mounting posts."""
+        return float(self._raw_data.get("pcb_mounting_post_height", 2.6))
+
+    @cached_property
+    def pcb_mounting_post_flare_diameter(self) -> float:
+        """Return the flared head diameter for press-fit PCB mounting posts."""
+        return float(self._raw_data.get("pcb_mounting_post_flare_diameter", 2.3))
+
+    @cached_property
+    def pcb_mounting_post_flare_height(self) -> float:
+        """Return the flared head height for press-fit PCB mounting posts."""
+        return float(self._raw_data.get("pcb_mounting_post_flare_height", 0.8))
+
+    @cached_property
+    def pcb_mounting_post_tip_diameter(self) -> float:
+        """Return the insertion tip diameter for press-fit PCB mounting posts."""
+        return float(self._raw_data.get("pcb_mounting_post_tip_diameter", 1.6))
+
+    # Hall Sensor Board
+    @cached_property
+    def hall_sensor_spacing_x(self) -> float:
+        """Return X hole spacing for the Hall sensor board."""
+        return float(self._raw_data.get("hall_sensor_spacing_x", 10.0))
+
+    @cached_property
+    def hall_sensor_spacing_y(self) -> float:
+        """Return Y hole spacing for the Hall sensor board."""
+        return float(self._raw_data.get("hall_sensor_spacing_y", 20.0))
+
+    @cached_property
+    def hall_sensor_standoff_height(self) -> float:
+        """Return standoff height for the Hall sensor board."""
+        return float(self._raw_data.get("hall_sensor_standoff_height", 4.0))
+
     # Fuel Gauge
     @cached_property
     def fuel_gauge_spacing_x(self) -> float:

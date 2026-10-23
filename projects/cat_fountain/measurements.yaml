@@ -132,9 +132,14 @@ led_plug_width: 4.8
 # ==========================================
 # 9. PCBs & Mounting Standoffs
 # ==========================================
-# General PCB bosses
+# General PCB bosses & clip-on mounting posts
 pcb_boss_radius: 2.2
 pcb_hole_radius: 1.0
+pcb_mounting_post_diameter: 1.8
+pcb_mounting_post_height: 2.6
+pcb_mounting_post_flare_diameter: 2.3
+pcb_mounting_post_flare_height: 0.8
+pcb_mounting_post_tip_diameter: 1.6
 
 # Raspberry Pi Pico
 pico_spacing_x: 11.4
@@ -162,6 +167,11 @@ current_monitor_standoff_height: 4.0
 motor_driver_spacing_x: 20.0
 motor_driver_spacing_y: 15.0
 motor_driver_standoff_height: 4.0
+
+# Hall Sensor Board
+hall_sensor_spacing_x: 10.0
+hall_sensor_spacing_y: 20.0
+hall_sensor_standoff_height: 4.0
 
 # ==========================================
 # 10. Magnetic Centrifugal Pump Redesign
