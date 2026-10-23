@@ -3434,3 +3434,22 @@ def test_common_stylesheet_linkage_and_presence() -> None:
         assert '<link rel="stylesheet" href="/static/common.css">' in content, (
             f'{tmpl} missing <link rel="stylesheet" href="/static/common.css">'
         )
+
+
+def test_diff_view_optimizations_polling_and_file_priority() -> None:
+    """Verify diff view optimizations: 10s auto-sync polling interval and regular files prioritized over LFS."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "diff_view.html.j2"
+    tpl_text = template_path.read_text(encoding="utf-8")
+
+    # 1. Lightweight Polling: Auto-sync interval set to 10s (10000ms)
+    assert "setInterval(syncWorkingAndCommitsSilently, 10000)" in tpl_text
+
+    # 2. Prioritize Regular Files Over Attachments:
+    # renderCommitFiles must auto-select regular files before LFS files
+    assert "const first = regular[0]?.path || lfs[0]?.path || feedback[0]?.path;" in tpl_text
+
+    # renderWorkingTreeFiles must auto-select staged/unstaged/untracked before LFS files
+    assert (
+        "conflicts[0]?.path || staged[0]?.path || unstaged[0]?.path || untracked[0]?.path || lfs[0]?.path ||"
+        " feedback[0]?.path;" in tpl_text
+    )

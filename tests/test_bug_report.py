@@ -1101,3 +1101,138 @@ def test_bug_report_server_static_css_content_type(tmp_path: Path) -> None:
             assert ".ui-scale-container" in body
     finally:
         server.server_close()
+
+
+def test_bug_report_server_rejects_oversized_payload(tmp_path: Path) -> None:
+    """Verify BugReportServer rejects requests with Content-Length >= 2GB with HTTP 413."""
+    server = BugReportServer(host="127.0.0.1", port=0, feedback_dir=tmp_path)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    base_url = server.get_url()
+    try:
+        req = urllib.request.Request(
+            f"{base_url}/api/bugs",
+            data=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": str(2 * 1024 * 1024 * 1024 + 100),
+            },
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req)
+        assert exc_info.value.code == 413
+    finally:
+        server.server_close()
+
+
+def test_bug_report_server_rejects_oversized_upload(tmp_path: Path) -> None:
+    """Verify BugReportServer rejects base64 upload payload claiming >= 2GB with HTTP 413."""
+    from unittest.mock import MagicMock
+    from provider.bug_report.server import BugReportRequestHandler, MAX_ATTACHMENT_SIZE_BYTES
+
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=tmp_path,
+        feedback_dir=tmp_path / "feedback",
+        attachments_dir=tmp_path / "attachments",
+        bind_and_activate=False,
+    )
+    handler = BugReportRequestHandler.__new__(BugReportRequestHandler)
+    handler.server = server
+    handler._send_json = MagicMock()
+
+    class MockOversizedStr:
+        def __len__(self) -> int:
+            return MAX_ATTACHMENT_SIZE_BYTES * 2
+
+    handler._handle_file_upload({"filename": "huge.bin", "content_base64": MockOversizedStr()})
+    assert handler._send_json.called
+    args, kwargs = handler._send_json.call_args
+    assert kwargs.get("status") == 413
+    assert "Payload Too Large" in args[0]["error"]
+
+
+def test_bug_report_server_streams_attachment_chunks(tmp_path: Path) -> None:
+    """Verify attachment downloads are streamed in chunks without loading entirely into memory."""
+    att_dir = tmp_path / "attachments"
+    att_dir.mkdir(parents=True, exist_ok=True)
+    test_file = att_dir / "stream_test.bin"
+    chunk_pattern = b"0123456789abcdef" * 4096  # 64 KiB
+    total_chunks = 4
+    with open(test_file, "wb") as f:
+        for _ in range(total_chunks):
+            f.write(chunk_pattern)
+
+    server = BugReportServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=tmp_path,
+        feedback_dir=tmp_path / "feedback",
+        attachments_dir=att_dir,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    base_url = server.get_url()
+    try:
+        req = urllib.request.Request(f"{base_url}/attachments/stream_test.bin")
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            assert int(resp.headers.get("Content-Length")) == total_chunks * len(chunk_pattern)
+            received = b""
+            while piece := resp.read(64 * 1024):
+                received += piece
+            assert len(received) == total_chunks * len(chunk_pattern)
+    finally:
+        server.server_close()
+
+
+def test_bug_report_template_client_side_limit() -> None:
+    """Verify bug_report.html.j2 enforces MAX_ATTACHMENT_SIZE_BYTES client-side before FileReader."""
+    template_path = Path(__file__).resolve().parent.parent / "provider" / "templates" / "bug_report.html.j2"
+    assert template_path.exists()
+    content = template_path.read_text(encoding="utf-8")
+    assert "MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024 * 1024" in content
+    assert "MAX_ATTACHMENT_SIZE_BYTES" in content
+    assert "FileReader" in content
+    idx_limit = content.find("if (f.size >= MAX_ATTACHMENT_SIZE_BYTES)")
+    idx_reader = content.find("reader.readAsDataURL(f)", idx_limit)
+    assert idx_limit != -1 and idx_reader != -1, "Expected client-side size check before readAsDataURL"
+
+
+def test_regression_worm_creeping_larva_820_worm_prefixed_bug_files(tmp_path: Path) -> None:
+    """Verify MarkdownBugExporter and BugReportServer support WORM_*.md files alongside BUG_*.md."""
+    feedback_dir = tmp_path / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    exporter = MarkdownBugExporter(repo_root=tmp_path)
+
+    bug = BugReportModel(
+        id="WORM-CREEPING-LARVA-820",
+        uuid="c9679ffa-7211-4f3f-bea5-a57be3bc91a4",
+        title="Regression tests are not useful",
+        status=BugStatus.RESOLVED,
+        severity=BugSeverity.HIGH,
+        category=BugCategory.GENERAL,
+        description="Audit regression test suites.",
+        resolution="Codified best practices.",
+    )
+
+    # 1. Verify export creates WORM_*.md
+    exported_path = exporter.export_individual_bug(bug, feedback_dir)
+    assert exported_path.name == "WORM_CREEPING-LARVA-820.md"
+    assert exported_path.exists()
+
+    # 2. Verify scan_and_sync_feedback_dir merges WORM_*.md
+    new_db = BugDatabaseModel(bugs=[])
+    stats = exporter.scan_and_sync_feedback_dir(feedback_dir, new_db)
+    assert stats["scanned"] == 1
+    assert len(new_db.bugs) == 1
+    assert new_db.bugs[0].id == "WORM-CREEPING-LARVA-820"
+    assert new_db.bugs[0].status == BugStatus.RESOLVED
+
+    # 3. Verify server mtime tracking includes WORM_*.md
+    server = BugReportServer(host="127.0.0.1", port=0, feedback_dir=feedback_dir, bind_and_activate=False)
+    mtime = server._get_feedback_dir_mtime()
+    assert mtime == exported_path.stat().st_mtime

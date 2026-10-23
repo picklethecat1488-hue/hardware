@@ -1760,7 +1760,7 @@
 
     function startAutoSync() {
       if (autoSyncTimer) clearInterval(autoSyncTimer);
-      autoSyncTimer = setInterval(syncWorkingAndCommitsSilently, 2500);
+      autoSyncTimer = setInterval(syncWorkingAndCommitsSilently, 10000);
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
           syncWorkingAndCommitsSilently();
@@ -2189,7 +2189,7 @@
 
       // Auto-select first file if none selected
       if (!state.activeFile) {
-        const first = conflicts[0]?.path || lfs[0]?.path || staged[0]?.path || unstaged[0]?.path || untracked[0]?.path || feedback[0]?.path;
+        const first = conflicts[0]?.path || staged[0]?.path || unstaged[0]?.path || untracked[0]?.path || lfs[0]?.path || feedback[0]?.path;
         if (first) selectFile(first);
       }
     }
@@ -2269,7 +2269,7 @@
 
       // Auto select first file
       if (!state.activeFile) {
-        const first = lfs[0]?.path || regular[0]?.path || feedback[0]?.path;
+        const first = regular[0]?.path || lfs[0]?.path || feedback[0]?.path;
         if (first) selectFile(first);
       }
     }

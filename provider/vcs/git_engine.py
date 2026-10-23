@@ -171,6 +171,7 @@ class GitEngine:
         self._commit_diff_cache: Dict[str, Tuple[int, int, int, bool]] = {}
         self._commit_stat_cache: Dict[str, Tuple[int, int, int, List[str]]] = {}
         self._bug_tag_cache: Dict[str, Dict[str, str]] = {}
+        self._file_diff_cache: Dict[Tuple[str, str], FileDiffModel] = {}
 
     def get_head_commit(self) -> str:
         """Retrieve the commit hash of HEAD in the repository.
@@ -305,6 +306,7 @@ class GitEngine:
                         break
                     except RuntimeError:
                         pass
+            self.clear_diff_cache()
             return {
                 "status": "ok",
                 "message": out.strip() or "Repository successfully fetched and synchronized.",
@@ -354,6 +356,7 @@ class GitEngine:
 
         try:
             out = run_git_command(["rebase", target], cwd=self.repo_root)
+            self.clear_diff_cache()
             if "origin/main" in target:
                 try:
                     run_git_command(["branch", "-f", "main", "refs/remotes/origin/main"], cwd=self.repo_root)
@@ -1581,6 +1584,10 @@ class GitEngine:
 
     def get_file_diff(self, commit: str, file_path: str, staged_only: bool = False) -> FileDiffModel:
         """Construct comprehensive diff model including hunks and side-by-side rows."""
+        cache_key = (commit, file_path)
+        if commit != "working" and cache_key in self._file_diff_cache:
+            return self._file_diff_cache[cache_key]
+
         binary_exts = {
             ".png",
             ".jpg",
@@ -1626,7 +1633,7 @@ class GitEngine:
         new_content = ""
 
         if is_binary:
-            return FileDiffModel(
+            diff_model = FileDiffModel(
                 file_path=file_path,
                 old_path=file_path,
                 new_path=file_path,
@@ -1642,6 +1649,9 @@ class GitEngine:
                 new_content="",
                 raw_diff=f"Binary files a/{file_path} and b/{file_path} differ",
             )
+            if commit != "working":
+                self._file_diff_cache[cache_key] = diff_model
+            return diff_model
 
         if commit == "working":
             old_content = self.get_file_content("working", file_path, parent=True)
@@ -1683,7 +1693,7 @@ class GitEngine:
         elif old_content and not new_content:
             status = "D"
 
-        return FileDiffModel(
+        diff_model = FileDiffModel(
             file_path=file_path,
             old_path=file_path,
             new_path=file_path,
@@ -1699,6 +1709,16 @@ class GitEngine:
             new_content=new_content,
             raw_diff=raw_diff,
         )
+        if commit != "working":
+            self._file_diff_cache[cache_key] = diff_model
+        return diff_model
+
+    def clear_diff_cache(self) -> None:
+        """Clear all in-memory cached commit summaries and file diff models."""
+        self._commit_diff_cache.clear()
+        self._commit_stat_cache.clear()
+        self._bug_tag_cache.clear()
+        self._file_diff_cache.clear()
 
     def _parse_diff_hunks(self, raw_diff: str) -> List[DiffHunk]:
         """Parse raw unified diff text into structured DiffHunk instances."""
@@ -2026,6 +2046,7 @@ class GitEngine:
             except OSError:
                 pass
 
+        self.clear_diff_cache()
         return head_commit
 
     # Commit manipulation: split and combine
@@ -2042,12 +2063,14 @@ class GitEngine:
         head = self.get_head_commit()
         if commit_hash in [head, "HEAD"] or head.startswith(commit_hash):
             run_git_command(["reset", "HEAD~1"], cwd=self.repo_root)
+            self.clear_diff_cache()
             return {
                 "status": "ok",
                 "message": "Commit reset to working tree. You can now selectively stage and commit parts.",
             }
         # If not HEAD, create branch or perform mixed reset
         run_git_command(["reset", "--mixed", f"{commit_hash}~1"], cwd=self.repo_root)
+        self.clear_diff_cache()
         return {
             "status": "ok",
             "message": f"Reset to parent of {commit_hash[:8]}. Changes are now in working tree.",
@@ -2069,6 +2092,7 @@ class GitEngine:
         count = len(commit_hashes)
         run_git_command(["reset", "--soft", f"HEAD~{count}"], cwd=self.repo_root)
         run_git_command(["commit", "-m", message], cwd=self.repo_root)
+        self.clear_diff_cache()
         return self.get_head_commit()
 
     # Merge conflict inspection and resolution
