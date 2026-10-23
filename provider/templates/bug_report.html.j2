@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bug Report Workstation - Hardware Engineering</title>
+  <meta name="theme-color" content="#291a10">
+  <meta name="color-scheme" content="dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Quake">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+  <link rel="shortcut icon" href="/static/favicon.ico">
+  <link rel="stylesheet" href="/static/common.css">
+  <style>
+    html { font-size: 80%; }
+    /* =========================================================
+       QUAKE I / GLQUAKE CONSOLE & RETRO HUD ENGINE THEME
+       ========================================================= */
+    :root {
+      --quake-bg: #120c08;
+      --quake-panel: #1b120a;
+      --quake-panel-hover: #261a0f;
+      --quake-header-bg: #291a10;
+      --quake-border-light: #8d5d33;
+      --quake-border-mid: #5a381e;
+      --quake-border-dark: #120a05;
+
+      --quake-gold: #ffb800;
+      --quake-gold-dim: #c98c00;
+      --quake-amber: #e59400;
+      --quake-copper: #c87a32;
+      --quake-red: #ef4444;
+      --quake-green: #22c55e;
+      --quake-cyan: #38bdf8;
+      --quake-purple: #c084fc;
+      --quake-text-light: #dedede;
+      --quake-text-muted: #9e8a78;
+      --quake-text-dim: #716053;
+
+      --font-mono: ui-monospace, "SF Mono", "Courier New", "Lucida Console", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      height: 100%;
+      width: 100%;
+    }
+
+    body {
+      background-color: var(--quake-bg);
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.45) 0px, rgba(0, 0, 0, 0.45) 2px, transparent 2px, transparent 4px),
+        radial-gradient(ellipse at 50% 0%, #2e1d13 0%, #0d0704 100%);
+      color: var(--quake-text-light);
+      font-family: var(--font-mono);
+      letter-spacing: 0.02em;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 0 0 0 1px rgba(255, 184, 0, 0.2), 0 0 10px rgba(200, 122, 50, 0.1);
+    }
+
+    /* Window Resize Gripper (WORM-027) */
+    .window-resize-gripper {
+      position: fixed;
+      bottom: 2px;
+      right: 2px;
+      width: 16px;
+      height: 16px;
+      cursor: nwse-resize;
+      z-index: 99999;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, transparent 0%, transparent 40%, var(--quake-border-mid) 40%, var(--quake-border-mid) 50%, transparent 50%, transparent 65%, var(--quake-border-light) 65%, var(--quake-border-light) 75%, transparent 75%, transparent 90%, var(--quake-gold) 90%, var(--quake-gold) 100%);
+      opacity: 0.85;
+      filter: drop-shadow(0 0 2px var(--quake-gold));
+    }
+
+    /* Visible Quake Scrollbars (BUG-202, BUG-233) */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--quake-copper, #c87a32) #1e130b;
+    }
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e130b;
+      border: 1px solid #3d2311;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #965a25;
+      border-radius: 4px;
+      border: 1px solid #c87a32;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--quake-gold, #ffb800);
+      border-color: #ffd700;
+      box-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
+
+    /* Quake Stone Plaque / Beveled Panels */
+    .quake-card {
+      background-color: var(--quake-panel);
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 1px 1px 0px var(--quake-border-light), inset -1px -1px 0px var(--quake-border-dark), 0 6px 18px rgba(0,0,0,0.85);
+      border-radius: 4px;
+    }
+
+    /* Quake Buttons */
+    .quake-btn {
+      font-family: var(--font-mono);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 700;
+      font-size: 9px;
+      padding: 6px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      white-space: nowrap !important;
+      flex-shrink: 0;
+    }
+    .quake-btn * {
+      white-space: nowrap !important;
+    }
+    .quake-btn-default {
+      background: linear-gradient(180deg, #3a2618 0%, #20140c 100%);
+      border: 2px solid;
+      border-color: #7d4e28 #1a0f07 #1a0f07 #7d4e28;
+      color: #d6c6b2;
+      box-shadow: inset 1px 1px 0 #9c6838, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-default:hover {
+      background: linear-gradient(180deg, #4d3320 0%, #2c1c11 100%);
+      border-color: #9c6838 #1a0f07 #1a0f07 #9c6838;
+      color: var(--quake-gold);
+      text-shadow: 0 0 6px rgba(255, 184, 0, 0.4);
+    }
+    .quake-btn-gold {
+      background: linear-gradient(180deg, #664614 0%, #3d2807 100%);
+      border: 2px solid;
+      border-color: #a8792a #1c1102 #1c1102 #a8792a;
+      color: #ffe699;
+      box-shadow: inset 1px 1px 0 #d49d3b, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-gold:hover {
+      background: linear-gradient(180deg, #805719 0%, #4a3209 100%);
+      color: #fff;
+      box-shadow: inset 1px 1px 0 #ffc107, 0 0 10px rgba(255, 184, 0, 0.5);
+    }
+    .quake-btn-green {
+      background: linear-gradient(180deg, #164e22 0%, #0d2e14 100%);
+      border: 2px solid;
+      border-color: #22c55e #071f0c #071f0c #22c55e;
+      color: #86efac;
+      box-shadow: inset 1px 1px 0 #4ade80, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-green:hover {
+      background: linear-gradient(180deg, #226b31 0%, #123d1a 100%);
+      box-shadow: inset 1px 1px 0 #86efac, 0 0 10px rgba(34, 197, 94, 0.5);
+    }
+    .quake-btn-red {
+      background: linear-gradient(180deg, #571616 0%, #330b0b 100%);
+      border: 2px solid;
+      border-color: #ef4444 #1f0707 #1f0707 #ef4444;
+      color: #fca5a5;
+      box-shadow: inset 1px 1px 0 #f87171, 0 3px 6px rgba(0,0,0,0.7);
+    }
+    .quake-btn-red:hover {
+      background: linear-gradient(180deg, #751f1f 0%, #450f0f 100%);
+      box-shadow: inset 1px 1px 0 #fca5a5, 0 0 10px rgba(239, 68, 68, 0.5);
+    }
+    .quake-btn-active {
+      background: linear-gradient(180deg, #130a05 0%, #24140a 100%) !important;
+      border: 2px solid !important;
+      border-color: #1a0f07 #7d4e28 #7d4e28 #1a0f07 !important;
+      color: var(--quake-gold) !important;
+      box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9) !important;
+      text-shadow: 0 0 8px rgba(255, 184, 0, 0.6);
+    }
+
+    /* Badges */
+    .quake-badge {
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      padding: 2px 6px;
+      border-radius: 2px;
+      border: 1px solid;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .quake-badge-gold { background: #331f08; color: var(--quake-gold); border-color: #8d5d33; }
+    .quake-badge-red { background: #380808; color: #f87171; border-color: #991b1b; }
+    .quake-badge-green { background: #082d12; color: #4ade80; border-color: #166534; }
+    .quake-badge-cyan { background: #082436; color: #38bdf8; border-color: #075985; }
+    .quake-badge-amber { background: #3a1c06; color: #fbbf24; border-color: #92400e; }
+    .quake-badge-muted { background: #1c130d; color: var(--quake-text-muted); border-color: #4a301a; }
+
+    /* Inputs */
+    input[type="text"], select, textarea {
+      background-color: #0d0704;
+      border: 2px solid;
+      border-color: #140b06 #663f21 #663f21 #140b06;
+      color: var(--quake-gold);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 6px 10px;
+      border-radius: 3px;
+      box-shadow: inset 2px 2px 4px rgba(0,0,0,0.8);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--quake-gold);
+      box-shadow: 0 0 8px rgba(255, 184, 0, 0.3), inset 2px 2px 4px rgba(0,0,0,0.8);
+    }
+    textarea {
+      resize: both !important;
+      min-height: 80px;
+      min-width: 200px;
+      max-width: 100%;
+      line-height: 1.5;
+    }
+    input[type="text"] {
+      resize: horizontal;
+      min-width: 150px;
+      max-width: 100%;
+    }
+
+    .panel-expand-btn {
+      font-size: 8px;
+      padding: 2px 8px;
+      letter-spacing: 0.04em;
+    }
+    .form-section.expanded-vertical textarea {
+      min-height: 380px !important;
+      height: 480px;
+    }
+    .form-section.expanded-vertical .row .col textarea {
+      min-height: 240px !important;
+      height: 300px;
+    }
+    .attachment-lfs-notice {
+      font-size: 9px;
+      color: var(--quake-text-muted);
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--quake-border-mid);
+      padding: 6px 10px;
+      border-radius: 3px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Top Review / Status Bar */
+    header.quake-header {
+      min-height: 50px;
+      height: auto;
+      background: var(--quake-header-bg);
+      border-bottom: 2px solid var(--quake-border-mid);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      scrollbar-width: thin;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      flex-shrink: 0;
+      gap: 12px;
+      z-index: 100;
+    }
+    .brand-block,
+    .header-actions {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .brand-block {
+      gap: 10px;
+    }
+    .brand-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--quake-gold);
+      text-shadow: 1px 1px 0 #000, 0 0 8px rgba(255, 184, 0, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .metrics-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .metric-pill {
+      font-size: 9px;
+      color: var(--quake-text-muted);
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--quake-border-mid);
+      padding: 4px 10px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .metric-highlight {
+      color: var(--quake-gold);
+      font-weight: 700;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    /* Main Container */
+    .main-container {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 340px;
+      background: #140d08;
+      border-right: 2px solid var(--quake-border-mid);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .sidebar-header {
+      padding: 10px 12px;
+      background: #1b120a;
+      border-bottom: 2px solid var(--quake-border-mid);
+      display: flex;
+      gap: 8px;
+    }
+    .sidebar-search {
+      flex: 1;
+      width: 100%;
+    }
+    .bug-list {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+    }
+    .bug-item {
+      padding: 12px 14px;
+      border-bottom: 1px solid #2d1b0f;
+      cursor: pointer;
+      transition: background 0.12s ease;
+      border-left: 3px solid transparent;
+    }
+    .bug-item:hover {
+      background: #22150b;
+    }
+    .bug-item.active {
+      background: #2b180a;
+      border-left: 3px solid var(--quake-gold);
+      box-shadow: inset 2px 0 8px rgba(255, 184, 0, 0.15);
+    }
+    .bug-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 9px;
+    }
+    .bug-id {
+      font-weight: 800;
+      color: var(--quake-gold);
+    }
+    .bug-item-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--quake-text-light);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .copy-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 1px 3px;
+      margin-left: 3px;
+      font-size: 9px;
+      color: var(--quake-text-dim);
+      opacity: 0.75;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+      line-height: 1;
+      vertical-align: middle;
+    }
+    .copy-icon-btn:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--quake-gold);
+      transform: scale(1.12);
+    }
+    .copy-icon-btn:active {
+      transform: scale(0.92);
+    }
+    .copy-badge-btn {
+      font-size: 7.5px;
+      padding: 0 2px;
+    }
+
+    /* Content Area */
+    .content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: transparent;
+      overflow-y: auto;
+      padding: 20px 28px;
+      gap: 18px;
+    }
+
+    .form-section {
+      background-color: var(--quake-panel);
+      border: 2px solid var(--quake-border-mid);
+      box-shadow: inset 1px 1px 0px var(--quake-border-light), inset -1px -1px 0px var(--quake-border-dark), 0 4px 12px rgba(0,0,0,0.7);
+      border-radius: 4px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .section-title {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--quake-gold);
+      text-shadow: 1px 1px 0 #000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #3d2413;
+      padding-bottom: 6px;
+    }
+
+    .row { display: flex; gap: 14px; flex-wrap: wrap; }
+    .col { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 6px; }
+
+    label {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: var(--quake-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Dropzone & Paste Area */
+    .dropzone {
+      border: 2px dashed var(--quake-border-mid);
+      background: rgba(18, 12, 8, 0.6);
+      box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
+      border-radius: 4px;
+      padding: 22px 18px;
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--quake-text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--quake-gold);
+      background: rgba(255, 184, 0, 0.08);
+      color: var(--quake-gold);
+      box-shadow: 0 0 12px rgba(255, 184, 0, 0.25);
+    }
+    .dropzone-prompt {
+      font-weight: 700;
+      color: var(--quake-gold);
+    }
+    .dropzone-hint {
+      font-size: 8.5px;
+      color: var(--quake-text-dim);
+    }
+
+    /* Attachments & Previews */
+    .attachments-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+      margin-top: 6px;
+    }
+    .attachment-card {
+      background: #120a05;
+      border: 1px solid var(--quake-border-mid);
+      box-shadow: inset 1px 1px 0 #3d2413, 0 3px 6px rgba(0,0,0,0.6);
+      border-radius: 3px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .attachment-preview {
+      width: 100%;
+      height: 120px;
+      background: #000;
+      border-radius: 2px;
+      object-fit: contain;
+      border: 1px solid #331f0f;
+    }
+    .document-preview-box {
+      width: 100%;
+      height: 120px;
+      background: linear-gradient(180deg, #1c120a 0%, #0d0704 100%);
+      border: 1px solid #331f0f;
+      border-radius: 2px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 12px;
+      text-align: center;
+    }
+    .document-preview-box .doc-icon {
+      font-size: 22px;
+    }
+    .document-preview-box .doc-type {
+      font-size: 8px;
+      font-weight: 800;
+      color: var(--quake-gold);
+      letter-spacing: 0.05em;
+    }
+    .attachment-name {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--quake-text-light);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .attachment-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8px;
+      color: var(--quake-text-muted);
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: linear-gradient(180deg, #3a2618 0%, #1a0f07 100%);
+      color: var(--quake-gold);
+      border: 2px solid var(--quake-gold);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.9), 0 0 10px rgba(255, 184, 0, 0.3);
+      padding: 10px 18px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      display: none;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Quake Top Bar Header -->
+  <header class="quake-header">
+    <div class="brand-block">
+      <span class="brand-title">⚡ QUAKE BUG REPORT WORKSTATION</span>
+    </div>
+    <div class="metrics-group">
+      <div class="metric-pill">TOTAL: <span id="m-total" class="metric-highlight">0</span></div>
+      <div class="metric-pill">OPEN: <span id="m-open" class="metric-highlight" style="color:var(--quake-amber);">0</span></div>
+      <div class="metric-pill">RESOLVED: <span id="m-resolved" class="metric-highlight" style="color:var(--quake-green);">0</span></div>
+    </div>
+    <div class="header-actions">
+      <!-- UI Scale Selector (8715cab2) -->
+      <div style="display:flex;align-items:center;gap:4px;margin-right:4px;">
+        <span style="font-size:8px;color:var(--quake-text-dim);">SCALE:</span>
+        <select id="uiScaleSelect" class="quake-select" onchange="onUiScaleChange(this.value)" title="UI Scale (Shortcuts: Cmd/Ctrl +/- or 0 to reset)" style="padding: 2px 4px; font-size: 9px; height: 22px;">
+          <option value="75%">75%</option>
+          <option value="80%">80%</option>
+          <option value="90%">90%</option>
+          <option value="100%" selected>100%</option>
+          <option value="110%">110%</option>
+          <option value="125%">125%</option>
+          <option value="150%">150%</option>
+        </select>
+      </div>
+      <button class="quake-btn quake-btn-default" onclick="syncFeedback()">🔄 Sync Feedback</button>
+      <button class="quake-btn quake-btn-default" onclick="newBug()">+ New Bug</button>
+      <button class="quake-btn quake-btn-gold" id="btn-save-exit" onclick="saveAndExit()">💾 Save and Exit</button>
+      <a href="/" target="hardware_vcs_diff_viewer" onclick="returnToDashboard(event)" class="quake-btn quake-btn-default modal-close-btn" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;padding:2px 10px;line-height:1;" title="Close workstation (Esc)">✕</a>
+    </div>
+  </header>
+
+  <!-- Feedback Sync Progress Modal -->
+  <div id="feedback-loading-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:99999; align-items:center; justify-content:center;">
+    <div class="quake-card" style="padding:24px 32px; max-width:480px; width:90%; text-align:center; border:2px solid var(--quake-gold);">
+      <h3 style="color:var(--quake-gold); margin-bottom:12px; font-size:13px;">🔄 MERGING AGENT FEEDBACK</h3>
+      <p id="loading-status-text" style="color:var(--quake-text-light); font-size:10px; margin-bottom:16px;">Merging stored agent feedback from feedback/ directory into SQLite database...</p>
+      <div style="background:#120c08; border:1px solid #5a381e; border-radius:4px; height:12px; overflow:hidden; margin-bottom:12px;">
+        <div id="loading-progress-bar" style="background:var(--quake-gold); width:30%; height:100%; transition:width 0.3s ease;"></div>
+      </div>
+      <div id="loading-step-text" style="color:var(--quake-text-muted); font-size:9px;">Scanning feedback/ directory for BUG_*.md files...</div>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="main-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header" style="flex-direction:column; gap:8px;">
+        <input type="text" id="search-input" class="sidebar-search" placeholder="Search bugs..." oninput="renderBugList()">
+        <div class="filter-pills" style="display:flex; gap:6px; width:100%;">
+          <button id="filter-open" class="quake-btn quake-btn-default quake-btn-active" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('open')">OPEN</button>
+          <button id="filter-planned" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('planned')">PLANNED</button>
+          <button id="filter-all" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('all')">ALL</button>
+          <button id="filter-resolved" class="quake-btn quake-btn-default" style="flex:1; padding:4px 6px; font-size:8px;" onclick="setBugFilter('resolved')">RESOLVED</button>
+        </div>
+        <div style="display:flex; gap:6px; width:100%;">
+          <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+            <label style="font-size:7.5px;">Category</label>
+            <select id="select-filter-category" onchange="onFilterCategoryChanged(this.value)" style="width:100%; padding:4px; font-size:8px;">
+              <option value="ALL">ALL</option>
+              {% for cat in categories %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+            <label style="font-size:7.5px;">Severity</label>
+            <select id="select-filter-severity" onchange="onFilterSeverityChanged(this.value)" style="width:100%; padding:4px; font-size:8px;">
+              <option value="ALL">ALL</option>
+              {% for sev in severities %}
+              <option value="{{ sev }}">{{ sev }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:2px; width:100%;">
+          <label style="font-size:7.5px;">Sort By</label>
+          <select id="select-bug-sort" onchange="onBugSortChanged(this.value)" style="width:100%; padding:4px; font-size:8px;">
+            <option value="id_desc">ID (Newest first)</option>
+            <option value="id_asc">ID (Oldest first)</option>
+            <option value="severity">Severity (Critical first)</option>
+            <option value="status">Status (Open first)</option>
+            <option value="component">Component</option>
+            <option value="title">Title</option>
+          </select>
+        </div>
+      </div>
+      <ul id="bug-list" class="bug-list"></ul>
+    </div>
+
+    <!-- Content Area -->
+    <div class="content-area">
+      <!-- Bug Identity Section -->
+      <div class="form-section quake-card">
+        <div class="section-title">
+          <span style="display:flex; align-items:center; gap:8px;">
+            <span>Issue Identity</span>
+            <span id="active-bug-id-display" style="color:var(--quake-gold); font-size:10px;"></span>
+            <button id="btn-copy-active-bug" class="copy-icon-btn copy-badge-btn" onclick="copyActiveBugId()" title="Copy active bug ID" style="display:none;">📋</button>
+          </span>
+          <div style="display:flex; gap:8px;">
+            <button id="btn-save" class="quake-btn quake-btn-green" onclick="saveActiveBug()">Save Bug</button>
+            <button id="btn-delete" class="quake-btn quake-btn-red" onclick="deleteActiveBug()">Delete</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col" style="flex:2;">
+            <label>Bug Title</label>
+            <input type="text" id="bug-title" placeholder="Descriptive title of the issue...">
+          </div>
+          <div class="col">
+            <label>Severity</label>
+            <select id="bug-severity">
+              {% for sev in severities %}
+              <option value="{{ sev }}">{{ sev }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col">
+            <label>Status</label>
+            <select id="bug-status">
+              {% for st in statuses %}
+              <option value="{{ st }}">{{ st }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col">
+            <label>Category</label>
+            <select id="bug-category">
+              {% for cat in categories %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col">
+            <label>Component</label>
+            <input type="text" id="bug-component" placeholder="e.g. carrier_board, flex_tail, U1" list="bug-component-list">
+            <datalist id="bug-component-list">
+              {% if components is defined and components %}
+                {% for comp in components %}
+                <option value="{{ comp }}"></option>
+                {% endfor %}
+              {% else %}
+                {% set bugs_list = (database.bugs if database and database.bugs is defined else (database.worms if database and database.worms is defined else [])) %}
+                {% if bugs_list %}
+                {% for comp in bugs_list | map(attribute='component', default='') | reject('none') | map('trim') | reject('equalto', '') | unique | sort %}
+                <option value="{{ comp }}"></option>
+                {% endfor %}
+                {% endif %}
+              {% endif %}
+            </datalist>
+          </div>
+        </div>
+      </div>
+
+      <!-- Description Section -->
+      <div class="form-section quake-card">
+        <div class="section-title">
+          <span>Description & Details</span>
+          <button class="panel-expand-btn quake-btn quake-btn-default" onclick="toggleExpandPanel(this)" title="Extend panel vertically">⤢ Expand</button>
+        </div>
+        <div class="col">
+          <label>Problem Description</label>
+          <textarea id="bug-description" placeholder="Comprehensive explanation of defect or invariant failure..."></textarea>
+        </div>
+        <div class="col">
+          <label>Reproduction Steps (one per line)</label>
+          <textarea id="bug-steps" placeholder="1. python tools/view.py carrier_board:pcb&#10;2. Inspect net NRST&#10;3. Observe collision"></textarea>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label>Expected Behavior</label>
+            <textarea id="bug-expected" style="min-height:60px;" placeholder="What should have happened..."></textarea>
+          </div>
+          <div class="col">
+            <label>Actual Behavior</label>
+            <textarea id="bug-actual" style="min-height:60px;" placeholder="What actually occurred..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs Section -->
+      <div class="form-section quake-card">
+        <div class="section-title">
+          <span>Execution Logs & Tracebacks</span>
+          <button class="panel-expand-btn quake-btn quake-btn-default" onclick="toggleExpandPanel(this)" title="Extend panel vertically">⤢ Expand</button>
+        </div>
+        <div class="col">
+          <label>Console Output / Python Traceback</label>
+          <textarea id="bug-logs" style="font-family:var(--font-mono); min-height:100px;" placeholder="Paste runtime failure logs or traceback here..."></textarea>
+        </div>
+      </div>
+
+      <!-- Attachments & References Section -->
+      <div class="form-section quake-card" id="attachments-section">
+        <div class="section-title">
+          <span>Attachments & References</span>
+          <div style="display:flex; gap:8px;">
+            <button class="quake-btn quake-btn-default" onclick="pasteFromClipboard()">📋 Paste from Clipboard</button>
+            <button class="quake-btn quake-btn-default" onclick="document.getElementById('file-upload').click()">📁 Browse Files</button>
+          </div>
+        </div>
+        <div class="attachment-lfs-notice">
+          <span>ℹ️ <strong>GitHub LFS Storage:</strong> Attachments are stored in Git LFS and are considered public / non-confidential. Do not include passwords, private tokens, or proprietary secrets.</span>
+        </div>
+        <div id="dropzone" class="dropzone" onclick="document.getElementById('file-upload').click()">
+          <span class="dropzone-prompt">📋 DRAG & DROP OR PASTE (⌘V / Ctrl+V) SCREENSHOTS & DOCUMENTS</span>
+          <span class="dropzone-hint">Supports Images (.png, .jpg, .svg), Documents (.pdf, .txt, .log, .md, .json, .yaml), or Clipboard files</span>
+          <input type="file" id="file-upload" multiple style="display:none;" onchange="handleFileUpload(this.files)">
+        </div>
+        <div id="attachments-grid" class="attachments-grid"></div>
+      </div>
+
+      <!-- Resolution Section -->
+      <div class="form-section quake-card">
+        <div class="section-title">
+          <span>Resolution Notes</span>
+          <button class="panel-expand-btn quake-btn quake-btn-default" onclick="toggleExpandPanel(this)" title="Extend panel vertically">⤢ Expand</button>
+        </div>
+        <div class="col">
+          <label>Fix Details & Commit References</label>
+          <textarea id="bug-resolution" placeholder="Document root cause, code changes made, and test regression verifications..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    let db = {{ database_json | safe }};
+    let activeBugId = null;
+    let currentFilter = sessionStorage.getItem("bug_filter_status") || 'open';
+    let currentCategoryFilter = sessionStorage.getItem("bug_filter_category") || 'ALL';
+    let currentSeverityFilter = sessionStorage.getItem("bug_filter_severity") || 'ALL';
+    let currentBugSort = sessionStorage.getItem("bug_sort") || 'id_desc';
+
+    const severityOrder = { "CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3 };
+    const statusOrder = { "OPEN": 0, "IN_PROGRESS": 1, "PLANNED": 2, "RESOLVED": 3, "CLOSED": 4 };
+
+    function init() {
+      initUiScale();
+      // Disambiguate duplicate IDs if any exist in in-memory state
+      const seenIds = new Set();
+      (db.bugs || []).forEach(b => {
+        if (seenIds.has(b.id)) {
+          b.id = generateNextBugId();
+        }
+        seenIds.add(b.id);
+      });
+
+      // Restore dropdown UI selections
+      const sortSel = document.getElementById("select-bug-sort");
+      if (sortSel) sortSel.value = currentBugSort;
+      const catSel = document.getElementById("select-filter-category");
+      if (catSel) catSel.value = currentCategoryFilter;
+      const sevSel = document.getElementById("select-filter-severity");
+      if (sevSel) sevSel.value = currentSeverityFilter;
+
+      const visibleBugs = getFilteredAndSortedBugs();
+      if (visibleBugs.length > 0) {
+        activeBugId = visibleBugs[0].id;
+      } else if (db.bugs && db.bugs.length > 0) {
+        activeBugId = db.bugs[0].id;
+      }
+      updateMetrics();
+      updateComponentDatalist();
+      setBugFilter(currentFilter);
+      loadActiveBug();
+      autoResizeAllTextareas();
+      setupPasteDrop();
+    }
+
+    function onBugSortChanged(val) {
+      currentBugSort = val;
+      sessionStorage.setItem("bug_sort", val);
+      renderBugList();
+    }
+
+    function onFilterCategoryChanged(val) {
+      currentCategoryFilter = val;
+      sessionStorage.setItem("bug_filter_category", val);
+      renderBugList();
+      ensureActiveBugVisible();
+    }
+
+    function onFilterSeverityChanged(val) {
+      currentSeverityFilter = val;
+      sessionStorage.setItem("bug_filter_severity", val);
+      renderBugList();
+      ensureActiveBugVisible();
+    }
+
+    function ensureActiveBugVisible() {
+      const visibleBugs = getFilteredAndSortedBugs();
+      if (visibleBugs.length > 0 && !visibleBugs.some(b => b.id === activeBugId)) {
+        selectBug(visibleBugs[0].id);
+      }
+    }
+
+    function setBugFilter(filter) {
+      currentFilter = filter;
+      sessionStorage.setItem("bug_filter_status", filter);
+      const btnOpen = document.getElementById("filter-open");
+      const btnPlanned = document.getElementById("filter-planned");
+      const btnAll = document.getElementById("filter-all");
+      const btnResolved = document.getElementById("filter-resolved");
+      if (btnOpen) btnOpen.classList.toggle("quake-btn-active", filter === "open");
+      if (btnPlanned) btnPlanned.classList.toggle("quake-btn-active", filter === "planned");
+      if (btnAll) btnAll.classList.toggle("quake-btn-active", filter === "all");
+      if (btnResolved) btnResolved.classList.toggle("quake-btn-active", filter === "resolved");
+      renderBugList();
+      ensureActiveBugVisible();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.innerText = msg;
+      t.style.display = "block";
+      setTimeout(() => { t.style.display = "none"; }, 3500);
+    }
+
+    function copyText(text) {
+      if (!text) return;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(`Copied: ${text}`);
+        }).catch(() => fallbackCopy(text));
+      } else {
+        fallbackCopy(text);
+      }
+    }
+
+    function fallbackCopy(text) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        showToast(`Copied: ${text}`);
+      } catch (err) {
+        console.error("Failed to copy", err);
+      }
+    }
+
+    function copyActiveBugId() {
+      if (activeBugId) {
+        copyText(activeBugId);
+      }
+    }
+
+    function updateMetrics() {
+      const total = db.bugs.length;
+      const open = db.bugs.filter(b => b.status === "OPEN" || b.status === "IN_PROGRESS").length;
+      const resolved = db.bugs.filter(b => b.status === "RESOLVED" || b.status === "CLOSED").length;
+      document.getElementById("m-total").innerText = total;
+      document.getElementById("m-open").innerText = open;
+      document.getElementById("m-resolved").innerText = resolved;
+    }
+
+    function updateComponentDatalist() {
+      const datalist = document.getElementById("bug-component-list") || document.getElementById("component-list");
+      if (!datalist) return;
+      const items = (db.bugs || db.worms || []);
+      const comps = new Set();
+      items.forEach(item => {
+        if (item && item.component && typeof item.component === "string") {
+          const c = item.component.trim();
+          if (c) comps.add(c);
+        }
+      });
+      const sortedComps = Array.from(comps).sort((a, b) => a.localeCompare(b));
+      datalist.innerHTML = "";
+      sortedComps.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        datalist.appendChild(opt);
+      });
+    }
+
+    function getFilteredAndSortedBugs() {
+      const searchInput = document.getElementById("search-input");
+      const query = (searchInput ? searchInput.value || "" : "").toLowerCase();
+      let list = (db.bugs || []).filter(bug => {
+        const isResolved = (bug.status === "RESOLVED" || bug.status === "CLOSED");
+        if (currentFilter === "open" && (isResolved || bug.status === "PLANNED")) return false;
+        if (currentFilter === "planned" && bug.status !== "PLANNED") return false;
+        if (currentFilter === "resolved" && !isResolved) return false;
+        if (currentCategoryFilter && currentCategoryFilter !== "ALL" && bug.category !== currentCategoryFilter) return false;
+        if (currentSeverityFilter && currentSeverityFilter !== "ALL" && bug.severity !== currentSeverityFilter) return false;
+        if (query && !bug.title.toLowerCase().includes(query) && !bug.id.toLowerCase().includes(query) && !(bug.component || "").toLowerCase().includes(query)) {
+          return false;
+        }
+        return true;
+      });
+
+      list.sort((a, b) => {
+        switch (currentBugSort) {
+          case "id_asc": {
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) {
+              return timeA < timeB ? -1 : 1;
+            }
+            if (timeA && !timeB) return -1;
+            if (!timeA && timeB) return 1;
+            const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
+            const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
+            if (numA !== numB) return numA - numB;
+            return (a.id || "").localeCompare(b.id || "");
+          }
+          case "id_desc": {
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) {
+              return timeA > timeB ? -1 : 1;
+            }
+            if (timeA && !timeB) return -1;
+            if (!timeA && timeB) return 1;
+            const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
+            const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
+            if (numA !== numB) return numB - numA;
+            return (b.id || "").localeCompare(a.id || "");
+          }
+          case "severity": {
+            const rankA = severityOrder[a.severity] !== undefined ? severityOrder[a.severity] : 99;
+            const rankB = severityOrder[b.severity] !== undefined ? severityOrder[b.severity] : 99;
+            if (rankA !== rankB) return rankA - rankB;
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) return timeA > timeB ? -1 : 1;
+            return (b.id || "").localeCompare(a.id || "");
+          }
+          case "status": {
+            const rankA = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 99;
+            const rankB = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 99;
+            if (rankA !== rankB) return rankA - rankB;
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) return timeA > timeB ? -1 : 1;
+            return (b.id || "").localeCompare(a.id || "");
+          }
+          case "component": {
+            const compA = (a.component || "").toLowerCase();
+            const compB = (b.component || "").toLowerCase();
+            return compA.localeCompare(compB);
+          }
+          case "title": {
+            const titleA = (a.title || "").toLowerCase();
+            const titleB = (b.title || "").toLowerCase();
+            return titleA.localeCompare(titleB);
+          }
+          default:
+            return 0;
+        }
+      });
+
+      return list;
+    }
+
+    function renderBugList() {
+      const list = document.getElementById("bug-list");
+      list.innerHTML = "";
+      const visibleBugs = getFilteredAndSortedBugs();
+
+      visibleBugs.forEach(bug => {
+        const li = document.createElement("li");
+        li.className = "bug-item" + (bug.id === activeBugId ? " active" : "");
+        li.onclick = () => selectBug(bug.id);
+
+        let sevBadgeClass = "quake-badge quake-badge-muted";
+        if (bug.severity === "CRITICAL") sevBadgeClass = "quake-badge quake-badge-red";
+        else if (bug.severity === "HIGH") sevBadgeClass = "quake-badge quake-badge-amber";
+        else if (bug.severity === "MEDIUM") sevBadgeClass = "quake-badge quake-badge-gold";
+        else if (bug.severity === "LOW") sevBadgeClass = "quake-badge quake-badge-muted";
+
+        let stBadgeClass = "quake-badge quake-badge-amber";
+        if (bug.status === "RESOLVED" || bug.status === "CLOSED") {
+          stBadgeClass = "quake-badge quake-badge-green";
+        } else if (bug.status === "PLANNED") {
+          stBadgeClass = "quake-badge quake-badge-muted";
+        }
+
+        li.innerHTML = `
+          <div class="bug-item-top">
+            <span class="bug-id">${bug.id} <button class="copy-icon-btn copy-badge-btn" onclick="event.stopPropagation(); copyText('${bug.id}')" title="Copy Bug ID ${bug.id}">📋</button></span>
+            <span class="${sevBadgeClass}">${bug.severity}</span>
+            <span class="${stBadgeClass}">${bug.status}</span>
+          </div>
+          <div class="bug-item-title">${bug.title || "Untitled Bug"}</div>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function selectBug(id) {
+      activeBugId = id;
+      renderBugList();
+      loadActiveBug();
+    }
+
+    function loadActiveBug() {
+      const bug = db.bugs.find(b => b.id === activeBugId);
+      if (!bug) return;
+
+      const bugIdDisp = document.getElementById("active-bug-id-display");
+      const btnCopyActiveBug = document.getElementById("btn-copy-active-bug");
+      if (bugIdDisp) bugIdDisp.textContent = `[${bug.id}]`;
+      if (btnCopyActiveBug) btnCopyActiveBug.style.display = "inline-flex";
+
+      document.getElementById("bug-title").value = bug.title || "";
+      document.getElementById("bug-severity").value = bug.severity || "MEDIUM";
+      document.getElementById("bug-status").value = bug.status || "OPEN";
+      document.getElementById("bug-category").value = bug.category || "PCB";
+      document.getElementById("bug-component").value = bug.component || "";
+      document.getElementById("bug-description").value = bug.description || "";
+      document.getElementById("bug-steps").value = (bug.reproduction_steps || []).join("\n");
+      document.getElementById("bug-expected").value = bug.expected_behavior || "";
+      document.getElementById("bug-actual").value = bug.actual_behavior || "";
+      document.getElementById("bug-logs").value = bug.logs || "";
+      document.getElementById("bug-resolution").value = bug.resolution_notes || "";
+
+      renderAttachments(bug.attachments || []);
+      autoResizeAllTextareas();
+    }
+
+
+    function renderAttachments(attachments) {
+      const grid = document.getElementById("attachments-grid");
+      grid.innerHTML = "";
+      attachments.forEach((att, idx) => {
+        const card = document.createElement("div");
+        card.className = "attachment-card";
+        const fname = att.filename.toLowerCase();
+        const isImg = fname.endsWith(".png") || fname.endsWith(".jpg") || fname.endsWith(".jpeg") || fname.endsWith(".svg") || fname.endsWith(".gif") || fname.endsWith(".webp");
+        const isPdf = fname.endsWith(".pdf");
+
+        let previewHtml = "";
+        if (isImg) {
+          previewHtml = `<a href="/${att.file_path}" target="_blank"><img src="/${att.file_path}?t=${encodeURIComponent(att.created_at || Date.now())}" class="attachment-preview" alt="${att.filename}"></a>`;
+        } else {
+          const icon = isPdf ? "📕" : "📄";
+          const docTypeLabel = isPdf ? "PDF DOCUMENT" : (att.file_type ? att.file_type.toUpperCase() : "DOCUMENT");
+          previewHtml = `
+            <a href="/${att.file_path}" target="_blank" style="text-decoration:none;">
+              <div class="document-preview-box">
+                <div class="doc-icon">${icon}</div>
+                <div class="doc-type">${docTypeLabel}</div>
+              </div>
+            </a>
+          `;
+        }
+
+        const sizeStr = att.size_bytes ? (att.size_bytes > 1024 ? Math.round(att.size_bytes / 1024) + " KB" : att.size_bytes + " B") : "";
+
+        card.innerHTML = `
+          ${previewHtml}
+          <div class="attachment-name" title="${att.filename}">${att.filename}</div>
+          <div class="attachment-footer">
+            <span>${sizeStr}</span>
+            <button class="quake-btn quake-btn-red" style="font-size:9.5px;padding:2px 6px;" onclick="removeAttachment(${idx})">Remove</button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    const DOCKER_ADJS = "AGILE AMBER ANTENNAL ARMORED BANDED BARBED BRIGHT BRISTLY BUZZING CAMOUFLAGED CHITINOUS CLICKING CREEPING CRIMSON DARTING DIURNAL DORSAL EMERALD FAST FEATHERED FIERCE FLEET FLITTING FLYING GLOWING GOLDEN HAIRY HARVEST HOVERING HUNTER IRIDESCENT JUMPING LEAPING LUMINESCENT LUSTROUS MANDIBLED METALLIC MIMIC MOTTLED NIMBLE NOCTURNAL OBSIDIAN PINCERED PLUMED POLLEN PROBOSCID PUNCTATE QUICK RADIANT RUSTY SCALED SEGMENTED SERRATED SHINING SILKEN SPECKLED SPOTTED SPRINGING STINGING STRIDULATING STRIPED SWARMING SWIFT TARSIAL THORACIC TRANSLUCENT VELVETY VIBRANT WINGED".split(" ");
+    const DOCKER_NOUNS = "ANT APHID BACKSWIMMER BEE BEETLE BLOWFLY BUMBLEBEE BUTTERFLY CADDISFLY CATERPILLAR CENTIPEDE CHRYSALIS CICADA COCKROACH COCOON CRICKET DAMSELFLY DARNER DOBSONFLY DRAGONFLY EARWIG FIREBUG FIREFLY FLEA FLY FRUITFLY GNAT GRASSHOPPER GRUB HARVESTMAN HORNET HORSEFLY HOVERFLY INSTAR JEWELBEETLE KATYDID LACEWING LADYBUG LARVA LEAFHOPPER LOCUST LONGHORN MANTIS MAYFLY MIDGE MILLIPEDE MITE MOSQUITO MOTH NYMPH PLANTHOPPER PUPA ROACH ROVEBEETLE SAWFLY SCARAB SCORPION SILVERFISH SKIPPER SPIDER SPRINGTAIL STAGBEETLE STINKBUG STONEFLY TARANTULA TERMITE THRIPS TICK TIGERBEETLE TREEHOPPER WASP WATERSTRIDER WEEVIL WOODBORER".split(" ");
+
+    function generateNextBugId() {
+      const cryptoObj = window.crypto || window.msCrypto;
+      const randArr = new Uint32Array(3);
+      if (cryptoObj && cryptoObj.getRandomValues) {
+        cryptoObj.getRandomValues(randArr);
+      } else {
+        randArr[0] = Math.floor(Math.random() * 1000000);
+        randArr[1] = Math.floor(Math.random() * 1000000);
+        randArr[2] = Math.floor(Math.random() * 1000000);
+      }
+      const adj = DOCKER_ADJS[randArr[0] % DOCKER_ADJS.length];
+      const noun = DOCKER_NOUNS[randArr[1] % DOCKER_NOUNS.length];
+      const num = (randArr[2] % 999) + 1;
+      let nextId = `BUG-${adj}-${noun}-${num}`;
+      let attempts = 0;
+      while (db.bugs && db.bugs.some(b => b.id === nextId) && attempts < 100) {
+        attempts++;
+        const nextNum = Math.floor(Math.random() * 999) + 1;
+        nextId = `BUG-${adj}-${noun}-${nextNum}`;
+      }
+      return nextId;
+    }
+
+    async function newBug() {
+      let newId = generateNextBugId();
+      try {
+        const res = await fetch("/api/next_bug_id");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.next_id && !db.bugs.some(b => b.id === data.next_id)) {
+            newId = data.next_id;
+          }
+        }
+      } catch (e) {
+        // Fallback to locally calculated generateNextBugId
+      }
+
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const nowStr = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())} UTC`;
+
+      const bug = {
+        id: newId,
+        title: "New Bug Report",
+        status: "OPEN",
+        severity: "MEDIUM",
+        category: "PCB",
+        component: "",
+        description: "",
+        reproduction_steps: [],
+        expected_behavior: "",
+        actual_behavior: "",
+        logs: "",
+        attachments: [],
+        created_at: nowStr,
+        resolution_notes: ""
+      };
+      db.bugs.unshift(bug);
+      activeBugId = newId;
+      updateMetrics();
+      renderBugList();
+      loadActiveBug();
+      saveActiveBug();
+    }
+
+    async function saveActiveBug() {
+      const bug = db.bugs.find(b => b.id === activeBugId);
+      if (!bug) return;
+
+      bug.title = document.getElementById("bug-title").value;
+      bug.severity = document.getElementById("bug-severity").value;
+      bug.status = document.getElementById("bug-status").value;
+      bug.category = document.getElementById("bug-category").value;
+      bug.component = document.getElementById("bug-component").value;
+      bug.description = document.getElementById("bug-description").value;
+      bug.reproduction_steps = document.getElementById("bug-steps").value.split("\n").filter(s => s.trim());
+      bug.expected_behavior = document.getElementById("bug-expected").value;
+      bug.actual_behavior = document.getElementById("bug-actual").value;
+      bug.logs = document.getElementById("bug-logs").value;
+      bug.resolution_notes = document.getElementById("bug-resolution").value;
+
+      const res = await fetch("/api/bugs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bug)
+      });
+      const saved = await res.json();
+      updateMetrics();
+      renderBugList();
+      updateComponentDatalist();
+      showToast("Saved bug " + saved.id + " & synced BUGS.md");
+      return saved;
+    }
+
+    async function deleteActiveBug() {
+      if (!confirm("Are you sure you want to delete this bug report?")) return;
+      await fetch("/api/bugs/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: activeBugId })
+      });
+      db.bugs = db.bugs.filter(b => b.id !== activeBugId);
+      activeBugId = db.bugs.length > 0 ? db.bugs[0].id : null;
+      updateMetrics();
+      renderBugList();
+      updateComponentDatalist();
+      loadActiveBug();
+      showToast("Deleted bug & updated BUGS.md");
+    }
+
+    function returnToDashboard(e) {
+      if (e) e.preventDefault();
+      closeWorkstation();
+    }
+
+    function closeWorkstation() {
+      if (window.parent && window.parent !== window && typeof window.parent.closeWorkstationModal === "function") {
+        window.parent.closeWorkstationModal();
+      } else if (window.opener && !window.opener.closed) {
+        window.opener.focus();
+        window.close();
+      } else {
+        window.location.href = "/";
+      }
+      try {
+        window.parent.postMessage({ action: "close_workstation", type: "close_modal" }, "*");
+      } catch (err) {}
+    }
+
+    // UI Scale Management (8715cab2)
+    const UI_SCALES = ["75%", "80%", "90%", "100%", "110%", "125%", "150%"];
+    const UI_SCALE_KEY = "ui_scale";
+
+    function isInsideIframe() {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return true;
+      }
+    }
+
+    function applyUiScale(scale) {
+      if (!UI_SCALES.includes(scale)) {
+        scale = "100%";
+      }
+      try {
+        localStorage.setItem(UI_SCALE_KEY, scale);
+      } catch (e) {}
+      const sel = document.getElementById("uiScaleSelect");
+      if (sel && sel.value !== scale) {
+        sel.value = scale;
+      }
+      if (isInsideIframe()) {
+        if (document.documentElement) {
+          document.documentElement.style.zoom = "";
+          document.documentElement.style.width = "";
+          document.documentElement.style.height = "";
+        }
+        return;
+      }
+      const factor = parseInt(scale, 10) / 100;
+      if (document.documentElement) {
+        document.documentElement.style.zoom = factor;
+        if (factor === 1.0) {
+          document.documentElement.style.width = "";
+          document.documentElement.style.height = "";
+        } else {
+          document.documentElement.style.width = (window.innerWidth / factor) + "px";
+          document.documentElement.style.height = (window.innerHeight / factor) + "px";
+        }
+      }
+    }
+
+    window.addEventListener("resize", () => {
+      if (isInsideIframe()) return;
+      let current = "100%";
+      try {
+        current = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      applyUiScale(current);
+    });
+
+    function onUiScaleChange(scale) {
+      applyUiScale(scale);
+    }
+
+    function adjustUiScale(delta) {
+      let current = "100%";
+      try {
+        current = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      let idx = UI_SCALES.indexOf(current);
+      if (idx === -1) idx = UI_SCALES.indexOf("100%");
+      const nextIdx = Math.max(0, Math.min(UI_SCALES.length - 1, idx + delta));
+      applyUiScale(UI_SCALES[nextIdx]);
+    }
+
+    function resetUiScale() {
+      applyUiScale("100%");
+    }
+
+    function initUiScale() {
+      let saved = "100%";
+      try {
+        saved = localStorage.getItem(UI_SCALE_KEY) || "100%";
+      } catch (e) {}
+      applyUiScale(saved);
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === "=" || e.key === "+" || e.code === "Equal" || e.code === "NumpadAdd") {
+          e.preventDefault();
+          adjustUiScale(1);
+          return;
+        }
+        if (e.key === "-" || e.key === "_" || e.code === "Minus" || e.code === "NumpadSubtract") {
+          e.preventDefault();
+          adjustUiScale(-1);
+          return;
+        }
+        if (e.key === "0" || e.code === "Digit0" || e.code === "Numpad0") {
+          e.preventDefault();
+          resetUiScale();
+          return;
+        }
+      }
+      if (e.key === "Escape") {
+        const loadingModal = document.getElementById("feedback-loading-modal");
+        if (!loadingModal || loadingModal.style.display === "none") {
+          closeWorkstation();
+        }
+      }
+    });
+
+    async function saveAndExit() {
+      const btn = document.getElementById("btn-save-exit");
+      btn.innerText = "⏳ Saving...";
+      btn.disabled = true;
+
+      try {
+        await saveActiveBug();
+        await fetch("/api/exit", { method: "POST" });
+        showToast("Bug state saved. Returning to Dashboard...");
+      } catch (err) {
+        showToast("Saved state. Returning to Dashboard...");
+      }
+
+      setTimeout(() => {
+        closeWorkstation();
+      }, 500);
+    }
+
+    function removeAttachment(idx) {
+      const bug = db.bugs.find(b => b.id === activeBugId);
+      if (bug && bug.attachments) {
+        bug.attachments.splice(idx, 1);
+        renderAttachments(bug.attachments);
+        saveActiveBug();
+      }
+    }
+
+    function setupPasteDrop() {
+      const dz = document.getElementById("dropzone");
+      dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("dragover"); };
+      dz.ondragleave = () => dz.classList.remove("dragover");
+      dz.ondrop = (e) => {
+        e.preventDefault();
+        dz.classList.remove("dragover");
+        handleFileUpload(e.dataTransfer.files);
+      };
+
+      // Global and targeted paste event handler supporting screenshots & documents
+      window.addEventListener("paste", (e) => {
+        // If the focused element is a text input and clipboard has ONLY plain text, allow standard paste
+        const activeElem = document.activeElement;
+        const isTextInput = activeElem && (activeElem.tagName === "INPUT" || activeElem.tagName === "TEXTAREA");
+        const hasFiles = e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0;
+
+        if (isTextInput && !hasFiles) {
+          // If the user is specifically pasting inside dropzone or attachments, capture text as document
+          if (activeElem.closest && activeElem.closest("#attachments-section")) {
+            e.preventDefault();
+            const text = e.clipboardData.getData("text");
+            if (text && text.trim()) {
+              uploadTextDocument(text, "clipboard_doc_" + Date.now() + ".txt");
+            }
+          }
+          return;
+        }
+
+        if (hasFiles) {
+          e.preventDefault();
+          handleFileUpload(e.clipboardData.files, true);
+          return;
+        }
+
+        // Check clipboard items
+        if (e.clipboardData && e.clipboardData.items) {
+          let handled = false;
+          for (let item of e.clipboardData.items) {
+            if (item.kind === "file") {
+              const blob = item.getAsFile();
+              if (blob) {
+                const isGeneric = !blob.name || blob.name === "image.png" || blob.name === "blob" || blob.name === "screenshot.png";
+                const randSuffix = Math.random().toString(36).slice(2, 7);
+                const fname = (!isGeneric && blob.name) ? blob.name : (blob.type.startsWith("image/") ? "screenshot_paste_" + Date.now() + "_" + randSuffix + ".png" : "doc_paste_" + Date.now() + "_" + randSuffix + ".txt");
+                const ftype = blob.type.startsWith("image/") ? "screenshot" : "document";
+                uploadBlob(blob, fname, ftype);
+                handled = true;
+              }
+            }
+          }
+          if (handled) {
+            e.preventDefault();
+            return;
+          }
+        }
+
+        // If target is dropzone and clipboard has text, save text document
+        if (e.clipboardData) {
+          const text = e.clipboardData.getData("text");
+          if (text && text.trim() && (!isTextInput || activeElem.id === "dropzone")) {
+            e.preventDefault();
+            uploadTextDocument(text, "clipboard_text_" + Date.now() + ".txt");
+          }
+        }
+      });
+    }
+
+    async function pasteFromClipboard() {
+      try {
+        if (navigator.clipboard && navigator.clipboard.read) {
+          const clipboardItems = await navigator.clipboard.read();
+          for (const item of clipboardItems) {
+            for (const type of item.types) {
+              const randSuffix = Math.random().toString(36).slice(2, 7);
+              if (type.startsWith("image/")) {
+                const blob = await item.getType(type);
+                uploadBlob(blob, "pasted_screenshot_" + Date.now() + "_" + randSuffix + ".png", "screenshot");
+                return;
+              } else if (type === "application/pdf") {
+                const blob = await item.getType(type);
+                uploadBlob(blob, "pasted_document_" + Date.now() + "_" + randSuffix + ".pdf", "document");
+                return;
+              }
+            }
+          }
+        }
+        // Fallback to clipboard text
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          const text = await navigator.clipboard.readText();
+          if (text && text.trim()) {
+            uploadTextDocument(text, "pasted_document_" + Date.now() + ".txt");
+            return;
+          }
+        }
+      } catch (err) {
+        showToast("Tip: Press ⌘V / Ctrl+V to paste screenshot or document");
+      }
+    }
+
+    const MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB (GitHub LFS maximum file limit)
+
+    function handleFileUpload(files, isPaste = false) {
+      if (!files || files.length === 0) return;
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (f.size >= MAX_ATTACHMENT_SIZE_BYTES) {
+          showToast(`Error: ${f.name} exceeds maximum allowed size of 2 GB (GitHub LFS limit).`, 5000);
+          continue;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const b64 = reader.result.split(",")[1];
+          const lowerName = f.name.toLowerCase();
+          const isImg = lowerName.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i);
+          const isDoc = lowerName.match(/\.(pdf|txt|log|json|yaml|yml|md|csv)$/i);
+          const fileType = isImg ? "screenshot" : (isDoc ? "document" : "reference");
+          let targetName = f.name;
+          const isGeneric = targetName === "image.png" || targetName === "blob" || targetName === "screenshot.png";
+          if (isPaste || isGeneric) {
+            const randSuffix = Math.random().toString(36).slice(2, 7);
+            const ext = isImg ? (lowerName.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i)[0]) : ".png";
+            targetName = `screenshot_paste_${Date.now()}_${randSuffix}${ext}`;
+          }
+          uploadPayload({
+            filename: targetName,
+            file_type: fileType,
+            content_base64: b64,
+            description: (isPaste ? "Pasted " : "Uploaded ") + fileType + " " + targetName
+          });
+        };
+        reader.readAsDataURL(f);
+      }
+    }
+
+    function uploadBlob(blob, filename, fileType) {
+      if (blob.size >= MAX_ATTACHMENT_SIZE_BYTES) {
+        showToast("Error: Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const b64 = reader.result.split(",")[1];
+        uploadPayload({
+          filename: filename,
+          file_type: fileType,
+          content_base64: b64,
+          description: "Pasted " + fileType
+        });
+      };
+      reader.readAsDataURL(blob);
+    }
+
+    function uploadTextDocument(text, filename) {
+      if (text.length >= MAX_ATTACHMENT_SIZE_BYTES) {
+        showToast("Error: Document exceeds maximum allowed size of 2 GB.", 5000);
+        return;
+      }
+      uploadPayload({
+        filename: filename,
+        file_type: "document",
+        content_text: text,
+        description: "Pasted text document"
+      });
+    }
+
+    async function uploadPayload(payload) {
+      if (activeBugId && !payload.bug_id) {
+        payload.bug_id = activeBugId;
+      }
+      showToast("Uploading " + payload.filename + "...");
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.status === 413) {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || "Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
+        return;
+      }
+      if (!res.ok) {
+        showToast("Failed to upload attachment: HTTP " + res.status);
+        return;
+      }
+      const att = await res.json();
+      const bug = db.bugs.find(b => b.id === activeBugId);
+      if (bug) {
+        if (!bug.attachments) bug.attachments = [];
+        bug.attachments.push(att);
+        renderAttachments(bug.attachments);
+        saveActiveBug();
+        showToast("Attached " + att.filename);
+      }
+    }
+
+    async function syncFeedback() {
+      const modal = document.getElementById("feedback-loading-modal");
+      if (modal) modal.style.display = "flex";
+      try {
+        const res = await fetch("/api/sync_feedback", { method: "POST" });
+        const data = await res.json();
+        if (data.status === "ok") {
+          const stats = data.stats || {};
+          showToast(`Feedback synced: ${stats.imported || 0} imported, ${stats.renamed || 0} renamed, ${stats.total || 0} total bugs.`);
+          const dbRes = await fetch("/api/database");
+          if (dbRes.ok) {
+            db = await dbRes.json();
+            updateMetrics();
+            renderBugList();
+            loadActiveBug();
+          }
+        } else {
+          showToast("Sync failed: " + (data.message || "Unknown error"));
+        }
+      } catch (err) {
+        showToast("Error syncing feedback: " + err.message);
+      } finally {
+        if (modal) modal.style.display = "none";
+      }
+    }
+
+    function toggleExpandPanel(btn) {
+      const section = btn.closest(".form-section");
+      if (!section) return;
+      const isExp = section.classList.toggle("expanded-vertical");
+      btn.textContent = isExp ? "⤡ Compact" : "⤢ Expand";
+      btn.classList.toggle("quake-btn-gold", isExp);
+      btn.classList.toggle("quake-btn-default", !isExp);
+      if (!isExp) {
+        section.querySelectorAll("textarea").forEach(ta => autoResizeTextarea(ta));
+      }
+    }
+
+    function autoResizeTextarea(el, maxLimit = 500) {
+      if (!el) return;
+      if (el.closest && el.closest(".form-section.expanded-vertical")) return;
+      el.style.height = "auto";
+      const scrollH = el.scrollHeight;
+      const minH = el.dataset.minHeight ? parseInt(el.dataset.minHeight) : 80;
+      const targetHeight = Math.min(Math.max(scrollH, minH), maxLimit);
+      el.style.height = targetHeight + "px";
+      if (scrollH > maxLimit) {
+        el.style.overflowY = "auto";
+      } else {
+        el.style.overflowY = "hidden";
+      }
+    }
+
+    function autoResizeAllTextareas() {
+      const textareas = document.querySelectorAll(".content-area textarea");
+      textareas.forEach(ta => autoResizeTextarea(ta));
+    }
+
+    let lastKnownVersion = null;
+    let isUserTyping = false;
+
+    document.addEventListener("input", (e) => {
+      if (e.target && e.target.tagName === "TEXTAREA") {
+        autoResizeTextarea(e.target);
+      }
+    });
+
+    document.addEventListener("focusin", (e) => {
+      if (e.target && (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")) {
+        isUserTyping = true;
+      }
+    });
+
+    document.addEventListener("focusout", (e) => {
+      if (e.target && (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")) {
+        isUserTyping = false;
+      }
+    });
+
+
+    async function pollForExternalUpdates() {
+      try {
+        const res = await fetch("/api/version");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (lastKnownVersion === null) {
+          lastKnownVersion = data.version;
+          return;
+        }
+        if (data.version !== lastKnownVersion) {
+          lastKnownVersion = data.version;
+          const dbRes = await fetch("/api/database");
+          if (!dbRes.ok) return;
+          db = await dbRes.json();
+          updateMetrics();
+          renderBugList();
+          updateComponentDatalist();
+          if (!isUserTyping && activeBugId) {
+            loadActiveBug();
+          } else if (activeBugId) {
+            const curBug = db.bugs.find(b => b.id === activeBugId);
+            if (curBug) {
+              const statusSel = document.getElementById("bug-status");
+              if (statusSel && statusSel.value !== curBug.status) {
+                statusSel.value = curBug.status;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore polling connection glitches
+      }
+    }
+
+    setInterval(pollForExternalUpdates, 2000);
+
+    window.onload = init;
+  </script>
+  <div class="window-resize-gripper" title="Resize Window" aria-label="Resize Window"></div>
+</body>
+</html>

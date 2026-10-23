@@ -1,0 +1,1725 @@
+"""Comprehensive unit tests for the Quake Code Review tool and Markdown Exporter.
+
+Validates Git diff parsing, side-by-side line alignment, Markdown rendering,
+REST API endpoints, and session persistence.
+"""
+
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+import subprocess
+import threading
+import time
+import urllib.request
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from model.code_review import (
+    CommentModel,
+    CommitInfoModel,
+    FileReviewStatus,
+    FileStateModel,
+    ReviewSessionModel,
+    ReviewSeverity,
+    ReviewStatus,
+)
+from provider.vcs.git_engine import (
+    GitEngine,
+    extract_line_snippet,
+    get_git_root,
+)
+from provider.code_review.markdown_exporter import MarkdownReviewExporter
+from provider.code_review.server import ReviewServer
+from provider.code_review.sqlite_store import SQLiteReviewStore
+from dashboard import launch_browser, parse_arguments
+
+
+def create_isolated_git_repo(path: Path) -> tuple[Path, list[str]]:
+    """Create a minimal isolated git repository with commits for deterministic tests."""
+    repo_dir = path / "git_fixture"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    commit_shas: list[str] = []
+    for i in range(1, 4):
+        file_path = repo_dir / f"test_{i}.txt"
+        file_path.write_text(f"content {i}\n", encoding="utf-8")
+        subprocess.run(["git", "add", file_path.name], cwd=repo_dir, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", f"Commit {i}"], cwd=repo_dir, check=True, capture_output=True)
+        sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        commit_shas.append(sha)
+
+    return repo_dir, commit_shas
+
+
+def test_git_review_engine_basics() -> None:
+    """Verify GitEngine correctly discovers repository and queries commits."""
+    root = get_git_root()
+    assert root.exists()
+    assert (root / "pyproject.toml").exists()
+
+    engine = GitEngine(repo_root=root)
+    commits = engine.get_commits(limit=5)
+    assert len(commits) > 0
+    assert commits[0].commit_hash != ""
+    assert commits[0].short_hash != ""
+
+
+def test_git_review_engine_diff_and_snippets() -> None:
+    """Verify GitEngine parses diff hunks and extracts source snippets."""
+    root = get_git_root()
+    engine = GitEngine(repo_root=root)
+
+    # Check diff for pyproject.toml
+    diff_model = engine.get_file_diff("HEAD", "pyproject.toml")
+    assert diff_model.file_path == "pyproject.toml"
+    assert not diff_model.is_binary
+    assert len(diff_model.side_by_side) > 0
+
+    snippet = extract_line_snippet("pyproject.toml", start_line=1, end_line=5, commit="HEAD", repo_root=root)
+    assert "[project]" in snippet
+
+
+def test_markdown_exporter_rendering(tmp_path: Path) -> None:
+    """Verify MarkdownReviewExporter formats review findings with links, snippets, and action items."""
+    exporter = MarkdownReviewExporter(repo_root=tmp_path)
+
+    session = ReviewSessionModel(
+        title="Test Review",
+        verdict=ReviewStatus.CHANGES_REQUESTED,
+        summary="Found 1 critical architectural issue.",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        comments=[
+            CommentModel(
+                id="c1",
+                file_path="src/model/pcb.py",
+                start_line=10,
+                end_line=15,
+                severity=ReviewSeverity.MUST_FIX,
+                body="Critical null pointer risk on unrouted trace.",
+                code_snippet="def route_trace():\n    pass",
+                created_at=datetime.now(timezone.utc).isoformat(),
+            ),
+            CommentModel(
+                id="c2",
+                file_path="src/model/pcb.py",
+                start_line=20,
+                end_line=20,
+                severity=ReviewSeverity.NIT,
+                body="Rename parameter for clarity.",
+                code_snippet="x = 1",
+                created_at=datetime.now(timezone.utc).isoformat(),
+            ),
+            CommentModel(
+                id="c3",
+                file_path="src/model/pcb.py",
+                start_line=25,
+                end_line=30,
+                severity=ReviewSeverity.PROPOSAL,
+                body="Consider using coplanar waveguide solver.",
+                code_snippet="def calculate_cpw():\n    pass",
+                created_at=datetime.now(timezone.utc).isoformat(),
+            ),
+        ],
+        files={
+            "src/model/pcb.py": {
+                "path": "src/model/pcb.py",
+                "status": FileReviewStatus.REVIEWED,
+                "notes": "LGTM otherwise",
+            },
+        },
+    )
+
+    output_file = tmp_path / "build" / "CR.md"
+    exported_path = exporter.export_markdown(session, output_file, total_repo_files=1)
+
+    assert exported_path.exists()
+    content = exported_path.read_text(encoding="utf-8")
+
+    assert "# Code Review Report: Test Review" in content
+    assert "**`CHANGES_REQUESTED`**" in content
+    assert "[MUST FIX]" in content
+    assert "[PROPOSAL]" in content
+    assert "[NIT]" in content
+    assert "src/model/pcb.py" in content
+    assert "Critical null pointer risk on unrouted trace." in content
+    assert "```python" in content
+    assert "- [ ] **[MUST FIX]**" in content
+
+
+def test_session_json_persistence(tmp_path: Path) -> None:
+    """Verify review session state correctly serializes and deserializes to JSON."""
+    exporter = MarkdownReviewExporter(repo_root=tmp_path)
+    state_file = tmp_path / "cr_feedback.json"
+
+    session = ReviewSessionModel(
+        title="Persistent Review",
+        verdict=ReviewStatus.APPROVED,
+        created_at=datetime.now(timezone.utc).isoformat(),
+        comments=[
+            CommentModel(
+                id="abc123",
+                file_path="tools/build.py",
+                start_line=5,
+                end_line=10,
+                severity=ReviewSeverity.MUST_FIX,
+                body="Ensure build lock is released.",
+                created_at=datetime.now(timezone.utc).isoformat(),
+            )
+        ],
+    )
+
+    exporter.save_session_json(session, state_file)
+    assert state_file.exists()
+
+    loaded = exporter.load_session_json(state_file)
+    assert loaded is not None
+    assert loaded.title == "Persistent Review"
+    assert loaded.verdict == ReviewStatus.APPROVED
+    assert len(loaded.comments) == 1
+    assert loaded.comments[0].id == "abc123"
+
+
+def test_review_server_api_flow(tmp_path: Path) -> None:
+    """Verify ReviewServer endpoints: UI serving, diff query, comment addition, and markdown sync."""
+    repo_root = get_git_root()
+    md_out = tmp_path / "CR.md"
+    state_out = tmp_path / "cr_state.json"
+
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,  # Ephemeral port
+        repo_root=repo_root,
+        markdown_output=md_out,
+        state_file=state_out,
+    )
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    base_url = server.get_url()
+
+    try:
+        # 1. Test GET / serves UI HTML
+        req = urllib.request.Request(base_url)
+        with urllib.request.urlopen(req) as response:
+            assert response.status == 200
+            html_body = response.read().decode("utf-8")
+            assert "QUAKE // CODE REVIEW TERMINAL" in html_body
+            assert "GLQUAKE v1.09" in html_body
+
+        # 2. Test GET /api/session
+        with urllib.request.urlopen(f"{base_url}api/session") as response:
+            assert response.status == 200
+            session_data = json.loads(response.read().decode("utf-8"))
+            assert session_data["verdict"] == "IN_REVIEW"
+
+        # 3. Test GET /api/commits
+        with urllib.request.urlopen(f"{base_url}api/commits") as response:
+            assert response.status == 200
+            commits_data = json.loads(response.read().decode("utf-8"))
+            assert isinstance(commits_data, list)
+            assert len(commits_data) > 0
+
+        # 4. Test GET /api/files
+        with urllib.request.urlopen(f"{base_url}api/files?commit=HEAD") as response:
+            assert response.status == 200
+            files_data = json.loads(response.read().decode("utf-8"))
+            assert isinstance(files_data, list)
+
+        # 5. Test POST /api/comment
+        comment_payload = {
+            "file_path": "pyproject.toml",
+            "start_line": 1,
+            "end_line": 3,
+            "severity": "MUST_FIX",
+            "body": "Test comment via API",
+            "author": "TestReviewer",
+        }
+        post_req = urllib.request.Request(
+            f"{base_url}api/comment",
+            data=json.dumps(comment_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(post_req) as response:
+            assert response.status == 200
+            res_data = json.loads(response.read().decode("utf-8"))
+            assert res_data["status"] == "ok"
+            comment_id = res_data["comment"]["id"]
+
+        # Verify markdown file and JSON state were synchronized immediately
+        assert md_out.exists()
+        assert state_out.exists()
+        md_text = md_out.read_text(encoding="utf-8")
+        assert "Test comment via API" in md_text
+        assert "[MUST FIX]" in md_text
+
+        # 6. Test POST /api/file_status
+        status_req = urllib.request.Request(
+            f"{base_url}api/file_status",
+            data=json.dumps({"path": "pyproject.toml", "status": "REVIEWED"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(status_req) as response:
+            assert response.status == 200
+            status_data = json.loads(response.read().decode("utf-8"))
+            assert status_data["file"]["status"] == "REVIEWED"
+
+        # 7. Test DELETE /api/comment
+        del_req = urllib.request.Request(
+            f"{base_url}api/comment?id={comment_id}",
+            method="DELETE",
+        )
+        with urllib.request.urlopen(del_req) as response:
+            assert response.status == 200
+            del_data = json.loads(response.read().decode("utf-8"))
+            assert del_data["status"] == "ok"
+
+        # 8. Test POST /api/verdict
+        verdict_req = urllib.request.Request(
+            f"{base_url}api/verdict",
+            data=json.dumps({"verdict": "APPROVED", "summary": "Looks great!", "terminate": False}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(verdict_req) as response:
+            assert response.status == 200
+            verdict_data = json.loads(response.read().decode("utf-8"))
+            assert verdict_data["session"]["verdict"] == "APPROVED"
+            assert verdict_data["exported_to"] != ""
+
+        # 9. Test POST /api/commit_reviewed
+        reviewed_req = urllib.request.Request(
+            f"{base_url}api/commit_reviewed",
+            data=json.dumps({"commit": "abcdef123456"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(reviewed_req) as response:
+            assert response.status == 200
+            reviewed_data = json.loads(response.read().decode("utf-8"))
+            assert reviewed_data["status"] == "ok"
+            assert reviewed_data["commit"] == "abcdef123456"
+
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_review_status_lifecycle_and_auto_reset_to_in_review(tmp_path: Path) -> None:
+    """Verify reviewer can approve right away and adding comments resets status to IN_REVIEW."""
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr_state.json",
+    )
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    base_url = server.get_url()
+
+    try:
+        # 1. Approve right away
+        verdict_req = urllib.request.Request(
+            f"{base_url}api/verdict",
+            data=json.dumps({"verdict": "APPROVED", "terminate": False}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(verdict_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["session"]["verdict"] == "APPROVED"
+
+        # 2. Type/post comments into the feedback window -> resets status to IN_REVIEW
+        comment_payload = {
+            "file_path": "pyproject.toml",
+            "start_line": 1,
+            "end_line": 2,
+            "severity": "PROPOSAL",
+            "body": "Add new linter rule",
+        }
+        comment_req = urllib.request.Request(
+            f"{base_url}api/comment",
+            data=json.dumps(comment_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(comment_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["verdict"] == "IN_REVIEW"
+
+        # Verify session model reflects IN_REVIEW
+        assert server.session.verdict == ReviewStatus.IN_REVIEW
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_static_assets_and_diff_syntax_highlighting_content(tmp_path: Path) -> None:
+    """Verify static assets are served and FileDiffModel contains old and new content."""
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr_state.json",
+    )
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    base_url = server.get_url()
+
+    try:
+        # 1. Test GET /static/highlight.min.js
+        with urllib.request.urlopen(f"{base_url}static/highlight.min.js") as resp:
+            assert resp.status == 200
+            content = resp.read()
+            assert len(content) > 10000
+            assert resp.headers.get("Content-Type") == "application/javascript; charset=utf-8"
+
+        # 2. Test GET /api/diff returns old_content and new_content
+        with urllib.request.urlopen(f"{base_url}api/diff?commit=working&file=pyproject.toml") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert "old_content" in data
+            assert "new_content" in data
+            assert "full_content" in data
+
+        # 3. Test UI rendering includes syntax highlighting CSS and scripts
+        with urllib.request.urlopen(base_url) as resp:
+            html = resp.read().decode("utf-8")
+            assert "highlight.min.js" in html
+            assert "hljs-keyword" in html
+            assert "activeFileLang" in html
+            assert "btnVerdictApprove" in html
+            assert "btnVerdictChanges" in html
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_parse_at_file_references_in_markdown_and_ui(tmp_path: Path) -> None:
+    """Verify @ file references are parsed into markdown links and UI badges."""
+    repo_root = get_git_root()
+    exporter = MarkdownReviewExporter(repo_root=repo_root)
+
+    # 1. Test markdown parsing of @path:line, @[path], and bare mentions
+    text = "Please check @model/pcb.py:42 and @[build/CR.md] and @build/. Ask @author or email user@test.com."
+    formatted = exporter._format_file_references(text)
+    assert "[`@model/pcb.py:42`](file://" in formatted
+    assert "#L42" in formatted
+    assert "[`@build/CR.md`](file://" in formatted
+    assert "[`@build/`](file://" in formatted
+    assert "@author" in formatted  # bare author untouched
+    assert "user@test.com" in formatted  # email untouched
+
+    # 2. Test UI rendering contains file reference parsing and CLI suggestions
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr_state.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(base_url) as resp:
+            html = resp.read().decode("utf-8")
+            assert "parseFileReferences" in html
+            assert "quake-file-ref" in html
+            assert "cliSuggestions" in html
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_review_server_termination_and_auto_export_on_approve_and_reject(tmp_path: Path) -> None:
+    """Verify that approving or requesting changes auto-exports CR.md and gracefully terminates server."""
+    repo_root = get_git_root()
+
+    # 1. Test APPROVE termination
+    md_approve = tmp_path / "CR_approve.md"
+    state_approve = tmp_path / "cr_approve.json"
+    server1 = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=md_approve,
+        state_file=state_approve,
+    )
+    thread1 = threading.Thread(target=server1.serve_forever, daemon=True)
+    thread1.start()
+    time.sleep(0.1)
+
+    try:
+        base_url1 = server1.get_url()
+        # Verify UI does not contain legacy IN_REVIEW or PROVIDE FEEDBACK buttons, but contains terminationOverlay
+        with urllib.request.urlopen(base_url1) as resp:
+            html = resp.read().decode("utf-8")
+            assert "btnVerdictInReview" not in html
+            assert "PROVIDE FEEDBACK" not in html
+            assert "EXPORT CR.md" not in html
+            assert "terminationOverlay" in html
+            assert "handleSessionTermination" in html
+
+        verdict_req = urllib.request.Request(
+            f"{base_url1}api/verdict",
+            data=json.dumps({"verdict": "APPROVED"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(verdict_req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert data["terminating"] is True
+            assert data["session"]["verdict"] == "APPROVED"
+            assert data["exported_to"] == str(md_approve)
+
+        # Verify automated Markdown report export
+        assert md_approve.exists()
+        assert state_approve.exists()
+        md_text = md_approve.read_text(encoding="utf-8")
+        assert "APPROVED" in md_text
+
+        # Verify server thread terminates and releases terminal
+        thread1.join(timeout=3.0)
+        assert not thread1.is_alive()
+        assert not server1.is_serving
+    finally:
+        server1.server_close()
+
+    # 2. Test CHANGES_REQUESTED termination
+    md_reject = tmp_path / "CR_reject.md"
+    state_reject = tmp_path / "cr_reject.json"
+    server2 = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=md_reject,
+        state_file=state_reject,
+    )
+    thread2 = threading.Thread(target=server2.serve_forever, daemon=True)
+    thread2.start()
+    time.sleep(0.1)
+
+    try:
+        base_url2 = server2.get_url()
+        verdict_req = urllib.request.Request(
+            f"{base_url2}api/verdict",
+            data=json.dumps({"verdict": "CHANGES_REQUESTED", "summary": "Needs design changes."}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(verdict_req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            assert data["terminating"] is True
+            assert data["session"]["verdict"] == "CHANGES_REQUESTED"
+            assert data["exported_to"] == str(md_reject)
+
+        # Verify automated Markdown report export
+        assert md_reject.exists()
+        assert state_reject.exists()
+        md_text = md_reject.read_text(encoding="utf-8")
+        assert "CHANGES_REQUESTED" in md_text
+        assert "Needs design changes." in md_text
+
+        # Verify server thread terminates and releases terminal
+        thread2.join(timeout=3.0)
+        assert not thread2.is_alive()
+        assert not server2.is_serving
+    finally:
+        server2.server_close()
+
+
+def test_launch_browser_and_webpage_title(tmp_path: Path) -> None:
+    """Verify webpage title formatting and browser launch defaults to VS Code."""
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr_state.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(base_url) as resp:
+            html = resp.read().decode("utf-8")
+            assert f"<title>Code Review: {repo_root.name}</title>" in html
+
+        # Test CLI arguments default to native webview standalone app window
+        with patch("sys.argv", ["dashboard.py"]):
+            args = parse_arguments()
+            assert args.browser == "webview"
+            assert not args.no_browser
+
+        with patch("sys.argv", ["dashboard.py", "--no-browser"]):
+            args_no = parse_arguments()
+            assert args_no.no_browser
+
+        with patch("sys.argv", ["dashboard.py", "--no-app"]):
+            args_no_app = parse_arguments()
+            assert args_no_app.no_browser
+
+        # Test launch_browser invokes native webview launcher by default
+        with patch("provider.webview.launcher.launch_webview") as mock_launch:
+            launch_browser("http://127.0.0.1:8765/")
+            mock_launch.assert_called_once_with("http://127.0.0.1:8765/")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_commit_stream_collapsed_when_single_commit(tmp_path: Path) -> None:
+    """Verify that the commit stream pane defaults to collapsed when only one commit is reviewed."""
+    repo_root, shas = create_isolated_git_repo(tmp_path)
+
+    # 1. Single commit: paneCommits should be collapsed
+    server_single = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_single.md",
+        state_file=tmp_path / "cr_single.json",
+        revisions=[shas[0]],
+    )
+    thread_single = threading.Thread(target=server_single.serve_forever, daemon=True)
+    thread_single.start()
+    time.sleep(0.1)
+
+    try:
+        with urllib.request.urlopen(server_single.get_url()) as resp:
+            html = resp.read().decode("utf-8")
+            assert 'id="paneCommits" class="pane-commits collapsed"' in html
+            assert "commits: false, files: true, cli: true" in html
+    finally:
+        server_single.shutdown()
+        server_single.server_close()
+
+    # 2. Multiple commits: paneCommits should NOT be collapsed
+    server_multi = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_multi.md",
+        state_file=tmp_path / "cr_multi.json",
+        revisions=[shas[0], shas[1]],
+    )
+    thread_multi = threading.Thread(target=server_multi.serve_forever, daemon=True)
+    thread_multi.start()
+    time.sleep(0.1)
+
+    try:
+        with urllib.request.urlopen(server_multi.get_url()) as resp:
+            html = resp.read().decode("utf-8")
+            assert 'id="paneCommits" class="pane-commits"' in html
+            assert "commits: true, files: true, cli: true" in html
+    finally:
+        server_multi.shutdown()
+        server_multi.server_close()
+
+
+def test_diff_navigation_and_next_prev_change_cli(tmp_path: Path) -> None:
+    """Verify that the review UI and CLI support next/prev change navigation across diff hunks."""
+    repo_root = get_git_root()
+
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_nav.md",
+        state_file=tmp_path / "cr_nav.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        with urllib.request.urlopen(server.get_url()) as resp:
+            html = resp.read().decode("utf-8")
+            # Verify toolbar buttons for change navigation exist
+            assert 'id="btnPrevChange"' in html
+            assert 'id="btnNextChange"' in html
+            assert "navigateChange(-1)" in html
+            assert "navigateChange(1)" in html
+
+            # Verify CLI commands and helper functions are defined in frontend logic
+            assert "navigateChange" in html
+            assert "getFileChanges" in html
+            assert 'case "next_change":' in html
+            assert 'case "prev_change":' in html
+            assert 'case "nc":' in html
+            assert 'case "pc":' in html
+            assert "next change / nc" in html
+            assert "prev change / pc" in html
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_untracked_files_diff_and_working_tree_handling(tmp_path: Path) -> None:
+    """Verify that untracked and uncommitted files are properly diffed with additions."""
+    repo_root = get_git_root()
+    engine = GitEngine(repo_root=repo_root)
+
+    # Create a temporary untracked file in the repo
+    temp_untracked = repo_root / "test_untracked_sample.txt"
+    try:
+        temp_untracked.write_text("line 1\nline 2\nline 3\n", encoding="utf-8")
+        assert engine.has_working_tree_changes()
+
+        working_files = engine.get_changed_files("working")
+        match_untracked = [f for f in working_files if f["path"] == "test_untracked_sample.txt"]
+        assert len(match_untracked) == 1
+        assert match_untracked[0]["status"] == "??"
+        assert int(match_untracked[0]["additions"]) == 3
+
+        # Verify synthetic diff generation for untracked file
+        diff = engine.get_file_diff("working", "test_untracked_sample.txt")
+        assert not diff.is_binary
+        assert diff.additions == 3
+        assert diff.deletions == 0
+        assert len(diff.hunks) == 1
+        assert "+line 1" in diff.raw_diff
+    finally:
+        if temp_untracked.exists():
+            temp_untracked.unlink()
+
+
+def test_regression_bug_128_untracked_folder_files(tmp_path: Path) -> None:
+    """Verify that newly created untracked subfolders show their contained files in changed files (BUG-128)."""
+    repo_root = get_git_root()
+    engine = GitEngine(repo_root=repo_root)
+
+    temp_folder = repo_root / "temp_untracked_folder_bug128"
+    try:
+        temp_folder.mkdir(parents=True, exist_ok=True)
+        sample_file = temp_folder / "nested_sample.txt"
+        sample_file.write_text("hello\nworld\n", encoding="utf-8")
+
+        working_files = engine.get_changed_files("working")
+        file_paths = [f["path"] for f in working_files]
+        expected_path = "temp_untracked_folder_bug128/nested_sample.txt"
+        assert expected_path in file_paths
+        assert "temp_untracked_folder_bug128/" not in file_paths
+
+        # Check diff
+        diff = engine.get_file_diff("working", expected_path)
+        assert diff.additions == 2
+        assert "+hello" in diff.raw_diff
+    finally:
+        if (temp_folder / "nested_sample.txt").exists():
+            (temp_folder / "nested_sample.txt").unlink()
+        if temp_folder.exists():
+            temp_folder.rmdir()
+
+
+def test_code_review_comment_editing_and_custom_snippet(tmp_path: Path) -> None:
+    """Verify that comments can be edited via API and custom code snippets/commits are preserved."""
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_edit.md",
+        state_file=tmp_path / "cr_edit.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        # Add comment with explicit code snippet and commit
+        add_req = urllib.request.Request(
+            f"{server.get_url()}/api/comment",
+            data=json.dumps(
+                {
+                    "file_path": "pyproject.toml",
+                    "start_line": 1,
+                    "end_line": 2,
+                    "severity": "MUST_FIX",
+                    "body": "Initial comment text",
+                    "code_snippet": "[project]\nname = 'hardware'",
+                    "commit": "HEAD",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(add_req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            comment = data["comment"]
+            cid = comment["id"]
+            assert comment["body"] == "Initial comment text"
+            assert "[project]" in comment["code_snippet"]
+
+        # Edit the comment via /api/comment/edit
+        edit_req = urllib.request.Request(
+            f"{server.get_url()}/api/comment/edit",
+            data=json.dumps(
+                {
+                    "id": cid,
+                    "body": "Updated comment text via CLI",
+                    "severity": "PROPOSAL",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(edit_req) as resp:
+            edit_data = json.loads(resp.read().decode("utf-8"))
+            assert edit_data["status"] == "ok"
+            updated_c = edit_data["comment"]
+            assert updated_c["body"] == "Updated comment text via CLI"
+            assert updated_c["severity"] == "PROPOSAL"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_code_review_stale_session_reset_on_startup(tmp_path: Path) -> None:
+    """Verify that concluded reviews (APPROVED or CHANGES_REQUESTED) do not leak stale feedback."""
+    repo_root = get_git_root()
+    state_file = tmp_path / "cr_stale.json"
+
+    # Write a concluded session
+    stale_session = ReviewSessionModel(
+        title="Concluded Review",
+        verdict=ReviewStatus.APPROVED,
+        comments=[
+            CommentModel(
+                id="old1",
+                file_path="tools/build.py",
+                start_line=1,
+                end_line=1,
+                severity=ReviewSeverity.MUST_FIX,
+                body="Old feedback",
+                created_at=datetime.now(timezone.utc).isoformat(),
+            )
+        ],
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+    )
+    state_file.write_text(stale_session.model_dump_json(), encoding="utf-8")
+
+    # Launch ReviewServer without fresh flag: should automatically start fresh because previous review concluded
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_clean.md",
+        state_file=state_file,
+    )
+    assert len(server.session.comments) == 0
+    assert server.session.verdict == ReviewStatus.IN_REVIEW
+    server.server_close()
+
+
+def test_code_review_ui_cli_focus_and_edit_button(tmp_path: Path) -> None:
+    """Verify that the served UI template contains the Edit button and CLI console focus handler."""
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_ui.md",
+        state_file=tmp_path / "cr_ui.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        with urllib.request.urlopen(server.get_url()) as resp:
+            html = resp.read().decode("utf-8")
+            assert "editCommentViaCli" in html
+            assert "Edit ✎" in html
+            assert 'case "edit":' in html
+            assert "editComment(" in html
+            assert 'cliDrawer.addEventListener("click"' in html
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_git_review_engine_resolve_revisions_range_syntax(tmp_path: Path) -> None:
+    """Verify GitEngine resolves A..B commit ranges, individual hashes, and raises on invalid ranges."""
+    repo_root, _ = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_root)
+
+    # 1. Resolving HEAD~2..HEAD should return exactly 2 commit hashes
+    revs = engine.resolve_revisions(["HEAD~2..HEAD"])
+    assert len(revs) == 2
+    assert all(len(h) == 40 for h in revs)
+
+    # 2. Resolving single ref or working tree token
+    rev_single = engine.resolve_revisions(["HEAD", "working"])
+    assert len(rev_single) == 2
+    assert rev_single[1] == "working"
+    assert len(rev_single[0]) == 40
+
+    # 3. get_commits accepts range syntax directly
+    commits = engine.get_commits(rev_args=["HEAD~2..HEAD"])
+    assert len(commits) == 2
+    assert commits[0].commit_hash == revs[0]
+    assert commits[1].commit_hash == revs[1]
+
+    # 4. Invalid revision range raises descriptive ValueError
+    with pytest.raises(ValueError, match="Invalid git revision range"):
+        engine.resolve_revisions(["invalid_ref_xyz..also_invalid_abc"])
+
+
+def test_review_server_with_range_revisions(tmp_path: Path) -> None:
+    """Verify ReviewServer resolves revision ranges on initialization and records concrete commits."""
+    repo_root, _ = create_isolated_git_repo(tmp_path)
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR_range.md",
+        state_file=tmp_path / "cr_range.json",
+        revisions=["HEAD~2..HEAD"],
+    )
+    assert len(server.session.revisions) == 2
+    assert all(len(r) == 40 for r in server.session.revisions)
+    server.server_close()
+
+
+def test_code_review_html_unified_diff_delete_styling(tmp_path: Path) -> None:
+    """Verify code_review HTML template styles deleted diff lines with red background in unified diff view.
+
+    Regression test: Ensures deleted/unmodified lines in unified diffs are styled with .delete/.del
+    and var(--bg-diff-del) rather than appearing as unstyled context lines.
+    """
+    repo_root = get_git_root()
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        with urllib.request.urlopen(server.get_url()) as resp:
+            html = resp.read().decode("utf-8")
+            # Must contain both .delete and .del selectors for deleted unified diff rows
+            assert ".unified-row.delete" in html
+            assert "var(--bg-diff-del)" in html
+            # Must map l.type delete in renderUnified
+            assert 'l.type === "delete"' in html
+            assert "del delete" in html
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_code_review_commit_time_ascending_and_code_search(tmp_path: Path) -> None:
+    """Verify commits include formatted time HH:MM:SS, are in ascending order, and search API returns matches."""
+    repo_root, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_root=repo_root)
+
+    # 1. Verify commits have time formatted as HH:MM:SS
+    commits = engine.get_commits(rev_args=["HEAD~2..HEAD"])
+    assert len(commits) == 2
+    for c in commits:
+        assert len(c.time) == 8
+        assert c.time.count(":") == 2
+
+    # 2. Verify ascending chronological order: commits[0] is older commit (Commit 2), commits[1] is Commit 3
+    assert commits[0].commit_hash == shas[1]
+    assert commits[1].commit_hash == shas[2]
+
+    # 3. Test search API via server
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(f"{base_url}api/search?q=content") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["query"] == "content"
+            assert len(data["results"]) >= 1
+            assert any("test_" in r["file_path"] for r in data["results"])
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_code_review_html_responsive_and_cli_navigation(tmp_path: Path) -> None:
+    """Verify that code review HTML template includes responsive toolbar styles and commit navigation commands."""
+    repo_root, _ = create_isolated_git_repo(tmp_path)
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=tmp_path / "CR.md",
+        state_file=tmp_path / "cr.json",
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        with urllib.request.urlopen(base_url) as resp:
+            html = resp.read().decode("utf-8")
+
+            # 1. Responsive toolbar styles
+            assert "flex-wrap: wrap" in html
+            assert "codeSearchInput" in html
+            assert "min-height: 48px" in html
+            assert "min-height: 42px" in html
+
+            # 2. Empty line repeating last command
+            assert "state.cmdHistory[state.cmdHistory.length - 1]" in html
+
+            # 3. Stack commit navigation
+            assert "navigateCommit" in html
+            assert "next_commit" in html
+            assert "prev_commit" in html
+            assert "next commit" in html or 'sub === "commit"' in html
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_sqlite_review_store_lifecycle(tmp_path: Path) -> None:
+    """Verify SQLiteReviewStore handles session loading, saving, comments, files, and json import/export."""
+    db_path = tmp_path / "test_cr.sqlite"
+    store = SQLiteReviewStore(db_path)
+
+    # 1. Empty store returns None
+    assert store.load_session() is None
+
+    # 2. Save new session
+    session = ReviewSessionModel(
+        title="Hardware Core Review",
+        summary="Initial review of core subsystem.",
+        verdict=ReviewStatus.IN_REVIEW,
+        repo_name="hardware",
+        revisions=["working", "HEAD"],
+        created_at="2026-09-20T23:00:00Z",
+        updated_at="2026-09-20T23:00:00Z",
+    )
+    store.save_session(session)
+
+    loaded = store.load_session()
+    assert loaded is not None
+    assert loaded.title == "Hardware Core Review"
+    assert loaded.verdict == ReviewStatus.IN_REVIEW
+    assert loaded.revisions == ["working", "HEAD"]
+
+    # 3. Add and update comments
+    comment = CommentModel(
+        id="c101",
+        file_path="model/pcb.py",
+        start_line=10,
+        end_line=12,
+        severity=ReviewSeverity.MUST_FIX,
+        body="Missing ground return path.",
+        author="Alice",
+        code_snippet="wire = Net('GND')",
+        created_at="2026-09-20T23:01:00Z",
+        resolved=False,
+    )
+    store.save_comment(comment)
+
+    loaded = store.load_session()
+    assert loaded is not None
+    assert len(loaded.comments) == 1
+    assert loaded.comments[0].id == "c101"
+    assert loaded.comments[0].body == "Missing ground return path."
+    assert loaded.comments[0].severity == ReviewSeverity.MUST_FIX
+
+    # 4. Edit comment
+    comment.body = "Updated comment: check coplanar waveguide."
+    comment.severity = ReviewSeverity.PROPOSAL
+    comment.resolved = True
+    store.save_comment(comment)
+
+    loaded = store.load_session()
+    assert loaded is not None
+    assert loaded.comments[0].body == "Updated comment: check coplanar waveguide."
+    assert loaded.comments[0].severity == ReviewSeverity.PROPOSAL
+    assert loaded.comments[0].resolved is True
+
+    # 5. Save file state
+    file_state = FileStateModel(
+        path="model/pcb.py",
+        status=FileReviewStatus.REVIEWED,
+        notes="Reviewed and confirmed OK",
+    )
+    store.save_file_state(file_state)
+
+    loaded = store.load_session()
+    assert loaded is not None
+    assert "model/pcb.py" in loaded.files
+    assert loaded.files["model/pcb.py"].status == FileReviewStatus.REVIEWED
+
+    # 6. Update verdict
+    store.update_verdict(ReviewStatus.CHANGES_REQUESTED, summary="Needs waveguide review.")
+    loaded = store.load_session()
+    assert loaded is not None
+    assert loaded.verdict == ReviewStatus.CHANGES_REQUESTED
+    assert loaded.summary == "Needs waveguide review."
+
+    # 7. JSON export and import
+    json_path = tmp_path / "cr_export.json"
+    store.export_to_json(json_path)
+    assert json_path.exists()
+
+    db_path2 = tmp_path / "test_cr2.sqlite"
+    store2 = SQLiteReviewStore(db_path2)
+    imported = store2.import_from_json(json_path)
+    assert imported.title == "Hardware Core Review"
+    assert imported.verdict == ReviewStatus.CHANGES_REQUESTED
+    assert len(imported.comments) == 1
+
+    # 8. Delete comment
+    store.delete_comment("c101")
+    loaded = store.load_session()
+    assert loaded is not None
+    assert len(loaded.comments) == 0
+
+
+def test_review_server_sqlite_integration(tmp_path: Path) -> None:
+    """Verify ReviewServer automatically loads from and syncs to SQLite backing store."""
+    repo_root = get_git_root()
+    db_file = tmp_path / "server_test.sqlite"
+    state_file = tmp_path / "server_test.json"
+    md_file = tmp_path / "server_test.md"
+
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=md_file,
+        state_file=state_file,
+        sqlite_file=db_file,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    time.sleep(0.1)
+
+    try:
+        base_url = server.get_url()
+        # Add comment via HTTP
+        payload = {
+            "file_path": "pyproject.toml",
+            "start_line": 1,
+            "end_line": 2,
+            "severity": "MUST_FIX",
+            "body": "SQLite integration comment",
+            "author": "Tester",
+        }
+        req = urllib.request.Request(
+            f"{base_url}api/comment",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "ok"
+            cid = data["comment"]["id"]
+
+        # Check SQLite file exists and has the comment
+        assert db_file.exists()
+        store = SQLiteReviewStore(db_file)
+        session_from_db = store.load_session()
+        assert session_from_db is not None
+        assert len(session_from_db.comments) == 1
+        assert session_from_db.comments[0].id == cid
+        assert session_from_db.comments[0].body == "SQLite integration comment"
+
+        # Update verdict
+        v_payload = {"verdict": "CHANGES_REQUESTED", "summary": "DB verdict test", "terminate": False}
+        v_req = urllib.request.Request(
+            f"{base_url}api/verdict",
+            data=json.dumps(v_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(v_req) as resp:
+            assert resp.status == 200
+
+        session_from_db2 = store.load_session()
+        assert session_from_db2 is not None
+        assert session_from_db2.verdict == ReviewStatus.CHANGES_REQUESTED
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    # Now verify a new ReviewServer recovers state directly from the SQLite store
+    server2 = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        repo_root=repo_root,
+        markdown_output=md_file,
+        state_file=tmp_path / "non_existent.json",
+        sqlite_file=db_file,
+        bind_and_activate=False,
+    )
+    assert server2.session.verdict == ReviewStatus.CHANGES_REQUESTED
+    assert len(server2.session.comments) == 1
+    assert server2.session.comments[0].body == "SQLite integration comment"
+
+
+def test_code_review_cli_features(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """Verify dashboard.py CLI commands for comment addition, resolution, and listing."""
+    db_file = tmp_path / "cli_test.sqlite"
+
+    from dashboard import main
+
+    # 1. Quick add comment
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "dashboard.py",
+            "--db-file",
+            str(db_file),
+            "--add-comment",
+            "Check crystal routing",
+            "--file",
+            "tools/dashboard.py",
+            "--line",
+            "10",
+            "--severity",
+            "MUST_FIX",
+        ],
+    )
+    main()
+    captured = capsys.readouterr().out
+    assert "Added comment [" in captured
+
+    # 2. List comments
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "dashboard.py",
+            "--db-file",
+            str(db_file),
+            "--list",
+        ],
+    )
+    main()
+    list_out = capsys.readouterr().out
+    assert "Check crystal routing" in list_out
+    assert "[MUST_FIX]" in list_out
+    assert "[ ]" in list_out
+
+    # Extract comment ID
+    store = SQLiteReviewStore(db_file)
+    session = store.load_session()
+    assert session is not None
+    cid = session.comments[0].id
+
+    # 3. Resolve comment
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "dashboard.py",
+            "--db-file",
+            str(db_file),
+            "--resolve-comment",
+            cid,
+        ],
+    )
+    main()
+    res_out = capsys.readouterr().out
+    assert f"Resolved comment [{cid}]" in res_out
+
+    # 4. List with --open -> should show 0 unresolved
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "dashboard.py",
+            "--db-file",
+            str(db_file),
+            "--list",
+            "--open",
+        ],
+    )
+    main()
+    open_out = capsys.readouterr().out
+    assert "0 unresolved" in open_out
+
+
+def test_regression_bug_078_code_review_highlight_markers_preserve_diff_colors() -> None:
+    """Verify BUG-078: highlight markers are in a column grid on the left side of text and do not elide diff colors."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    template_file = templates_dir / "code_review.html.j2"
+    assert template_file.exists()
+    content = template_file.read_text(encoding="utf-8")
+
+    # 1. Ensure selection on code text does not overwrite background with !important eliding diff colors
+    assert ".sbs-row.selected td {\n      background: var(--bg-diff-sel) !important;" not in content, (
+        "Selected SBS rows must not wipe out diff colors on code cells with !important background"
+    )
+    assert ".unified-row.selected {\n      background: var(--bg-diff-sel) !important;" not in content, (
+        "Selected unified rows must not wipe out diff colors across the entire row with !important background"
+    )
+
+    # 2. Ensure marker column grid exists for highlight markers on the left side of text
+    assert "col-marker" in content, "Table column grid must include col-marker"
+    assert "diff-marker" in content, "Diff row structure must have diff-marker cell on left of code text"
+    assert "unified-marker" in content, "Unified row structure must have unified-marker cell on left of code text"
+
+    # 3. Highlight markers on the left column grid receive selection highlight
+    assert "td.diff-marker" in content, "diff-marker styles must exist"
+    assert ".unified-marker" in content, "unified-marker styles must exist"
+
+
+def test_code_review_ignores_bugs_md(tmp_path: Path) -> None:
+    """Verify that BUGS.md and BUGS.txt are excluded from code review diffs and files."""
+    from provider.vcs.git_engine import GitEngine, is_file_ignored
+
+    assert is_file_ignored("BUGS.md")
+    assert is_file_ignored("./BUGS.md")
+    assert is_file_ignored("build/BUGS.md")
+    assert is_file_ignored("BUGS.txt")
+    assert not is_file_ignored("provider/drc.py")
+    assert not is_file_ignored("pyproject.toml")
+
+    repo_root = Path(__file__).parent.parent
+    engine = GitEngine(repo_root=repo_root)
+    assert engine.is_file_ignored("BUGS.md")
+
+    # Working tree changed files must never include BUGS.md
+    changed_files = engine.get_changed_files("working")
+    assert not any(f["path"] == "BUGS.md" or f["path"].endswith("/BUGS.md") for f in changed_files)
+
+
+def test_regression_bug_091_diff_view_horizontal_scrollbar_on_bottom() -> None:
+    """Verify BUG-091: diff view lines do not have per-line scrollbars; horizontal scrollbar is at the bottom."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    template_file = templates_dir / "code_review.html.j2"
+    assert template_file.exists()
+    content = template_file.read_text(encoding="utf-8")
+
+    # 1. No per-line overflow-x: auto on sbs-row td or unified-text
+    assert (
+        ".sbs-row td {\n      padding: 1px 6px;\n      white-space: pre;\n      word-break: normal;\n      vertical-align: top;\n      max-width: 0;\n      overflow-x: auto;\n    }"
+        not in content
+    )
+    assert "overflow-x: auto" not in content.split(".sbs-row td")[1].split("}")[0], (
+        ".sbs-row td must not have overflow-x: auto"
+    )
+    assert "overflow-x: auto" not in content.split(".unified-text")[1].split("}")[0], (
+        ".unified-text must not have overflow-x: auto"
+    )
+
+    # 2. Diff container has overflow: auto for bottom-level scrolling
+    assert ".diff-container {\n      flex: 1;\n      overflow: auto;" in content, (
+        ".diff-container must have overflow: auto so horizontal scrollbars reside at the bottom of the container"
+    )
+
+    # 3. Tables and wrappers have min-width: max-content to prevent truncation while expanding container
+    assert "min-width: max-content" in content.split(".sbs-table")[1].split("}")[0]
+    assert "min-width: 100%" in content.split(".unified-wrap")[1].split("}")[0]
+
+
+def test_code_review_tracker_only_commit_handling(tmp_path: Path) -> None:
+    """Verify that commits modifying only BUGS.md report ignored_files and render clear UI notices."""
+    templates_dir = Path(__file__).resolve().parent.parent / "provider" / "templates"
+    template_file = templates_dir / "code_review.html.j2"
+    assert template_file.exists()
+    content = template_file.read_text(encoding="utf-8")
+
+    # 1. UI template must contain TRACKER ONLY badge and informative notice
+    assert "TRACKER ONLY" in content
+    assert "Issue Tracker & Documentation Update Only" in content
+    assert "filtered" in content
+    assert "isTrackerOnly" in content
+
+    # 2. Verify commit model tracks ignored files on CommitInfoModel
+    c = CommitInfoModel(
+        commit_hash="abc1234",
+        short_hash="abc1234",
+        author="Tester",
+        date="2026-09-24T00:00:00Z",
+        subject="docs: update bug tracker",
+        files_count=0,
+        ignored_files_count=1,
+        ignored_files=["BUGS.md"],
+    )
+    assert c.files_count == 0
+    assert c.ignored_files_count == 1
+    assert "BUGS.md" in c.ignored_files
+
+
+def test_diff_line_length_truncation_bug_136(tmp_path: Path) -> None:
+    """Verify that extremely long diff lines are truncated to MAX_DIFF_LINE_LENGTH (BUG-136)."""
+    repo_dir = tmp_path / "long_line_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    test_file = repo_dir / "long.py"
+    test_file.write_text("initial = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "long.py"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Write a very long line (e.g. 2500 characters)
+    long_line = "x = '" + ("A" * 2500) + "'\n"
+    test_file.write_text(long_line, encoding="utf-8")
+
+    engine = GitEngine(repo_root=repo_dir)
+    diff_model = engine.get_file_diff("working", "long.py")
+
+    assert not diff_model.is_binary
+    assert len(diff_model.hunks) > 0
+    # Hunk lines must be capped
+    for hunk in diff_model.hunks:
+        for line in hunk.lines:
+            assert len(line.content) <= 1005
+            if "A" * 100 in line.content:
+                assert line.content.endswith("…")
+
+    # Side by side rows must also be capped
+    assert len(diff_model.side_by_side) > 0
+    for row in diff_model.side_by_side:
+        if row.new_text and "A" * 100 in row.new_text:
+            assert len(row.new_text) <= 1005
+            assert row.new_text.endswith("…")
+
+
+def test_binary_diff_and_raw_endpoint_bug_137(tmp_path: Path) -> None:
+    """Verify binary file diff detection and raw binary download/view endpoint (BUG-137)."""
+    repo_dir = tmp_path / "binary_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 1: Initial image
+    img_file = repo_dir / "logo.png"
+    fake_png_old = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDRold_version"
+    img_file.write_bytes(fake_png_old)
+    subprocess.run(["git", "add", "logo.png"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add old logo"], cwd=repo_dir, check=True, capture_output=True)
+
+    # Commit 2: Modified image
+    fake_png_new = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDRnew_version"
+    img_file.write_bytes(fake_png_new)
+
+    engine = GitEngine(repo_root=repo_dir)
+    diff_model = engine.get_file_diff("working", "logo.png")
+
+    assert diff_model.is_binary is True
+
+    # Test get_file_bytes
+    old_bytes = engine.get_file_bytes("working", "logo.png", parent=True)
+    new_bytes = engine.get_file_bytes("working", "logo.png", parent=False)
+    assert old_bytes == fake_png_old
+    assert new_bytes == fake_png_new
+
+    # Test server endpoint /api/raw
+    server = ReviewServer(
+        host="127.0.0.1",
+        port=0,
+        revisions=["working"],
+        repo_root=repo_dir,
+    )
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    time.sleep(0.1)
+    try:
+        base_url = server.get_url()
+        url_old = f"{base_url}/api/raw?commit=working&file=logo.png&side=old"
+        req_old = urllib.request.Request(url_old)
+        with urllib.request.urlopen(req_old) as resp_old:
+            assert resp_old.status == 200
+            assert resp_old.headers.get("Content-Type") == "image/png"
+            assert resp_old.read() == fake_png_old
+
+        url_new = f"{base_url}/api/raw?commit=working&file=logo.png&side=new"
+        req_new = urllib.request.Request(url_new)
+        with urllib.request.urlopen(req_new) as resp_new:
+            assert resp_new.status == 200
+            assert resp_new.headers.get("Content-Type") == "image/png"
+            assert resp_new.read() == fake_png_new
+    finally:
+        server.trigger_shutdown()
+
+
+def test_regression_bug_175_sqlite_store_missing_commit_hash_migration(tmp_path: Path) -> None:
+    """Verify BUG-175: SQLiteReviewStore correctly migrates databases missing commit_hash without throwing OperationalError."""
+    import sqlite3
+    from provider.code_review.sqlite_store import SQLiteReviewStore
+
+    db_path = tmp_path / "legacy_review.sqlite"
+    # Pre-create legacy database with comments table lacking commit_hash and uuid
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        """
+        CREATE TABLE metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        """
+    )
+    conn.execute("INSERT INTO metadata (key, value) VALUES ('title', 'Code Review');")
+    conn.execute(
+        """
+        CREATE TABLE comments (
+            id TEXT PRIMARY KEY,
+            file_path TEXT NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            severity TEXT NOT NULL,
+            body TEXT NOT NULL,
+            author TEXT NOT NULL DEFAULT 'Reviewer',
+            code_snippet TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT '',
+            resolved INTEGER NOT NULL DEFAULT 0
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO comments (id, file_path, start_line, end_line, severity, body) "
+        "VALUES ('c1', 'src/test.py', 10, 15, 'MUST_FIX', 'Fix legacy comment');"
+    )
+    conn.commit()
+    conn.close()
+
+    # Initializing SQLiteReviewStore on legacy database must succeed and migrate schema
+    store = SQLiteReviewStore(db_path)
+    session = store.load_session()
+    assert session is not None
+    assert len(session.comments) == 1
+    assert session.comments[0].id == "c1"
+
+    # Verify column and index exist
+    with sqlite3.connect(str(db_path)) as verify_conn:
+        cursor = verify_conn.execute("PRAGMA table_info(comments)")
+        cols = [row[1] for row in cursor.fetchall()]
+        assert "commit_hash" in cols
+        assert "uuid" in cols
+        idx_cursor = verify_conn.execute("PRAGMA index_list(comments)")
+        indices = [row[1] for row in idx_cursor.fetchall()]
+        assert "idx_comments_commit" in indices
+
+
+def test_regression_bug_253_sqlite_comment_uuid_integrity(tmp_path: Path) -> None:
+    """Verify BUG-253: SQLiteReviewStore upserts comments without crashing on UNIQUE constraint for comments.uuid."""
+    db_path = tmp_path / "cr_test.sqlite"
+    store = SQLiteReviewStore(db_path)
+
+    # 1. Save an initial session with a comment with an explicit UUID and id
+    comment_uuid = "4c49f1ac-8622-4a28-970a-6dfc0302e31c"
+    c1 = CommentModel(
+        id="4c49f1ac",
+        uuid=comment_uuid,
+        file_path="projects/carrier_board/pcb.yaml",
+        start_line=904,
+        end_line=904,
+        severity=ReviewSeverity.MUST_FIX,
+        body="Initial comment",
+        created_at="2026-10-01T01:00:00Z",
+        commit="working",
+    )
+    session = ReviewSessionModel(
+        title="Test Session",
+        repo_name="hardware",
+        comments=[c1],
+        created_at="2026-10-01T01:00:00Z",
+        updated_at="2026-10-01T01:00:00Z",
+    )
+    store.save_session(session)
+
+    # 2. Upsert a comment with the same UUID but a different temporary id (e.g., from frontend or markdown import)
+    c2 = CommentModel(
+        id="new_temp_id",
+        uuid=comment_uuid,
+        file_path="projects/carrier_board/pcb.yaml",
+        start_line=904,
+        end_line=904,
+        severity=ReviewSeverity.MUST_FIX,
+        body="Updated comment text",
+        created_at="2026-10-01T01:05:00Z",
+        commit="working",
+    )
+    # Must not raise sqlite3.IntegrityError: UNIQUE constraint failed: comments.uuid
+    store.save_comment(c2)
+
+    # 3. Verify comment was updated in place
+    loaded = store.get_comment_by_uuid(comment_uuid)
+    assert loaded is not None
+    assert loaded.body == "Updated comment text"
+    assert loaded.id == "new_temp_id"
+
+    # 4. Save via session upsert
+    loaded_session = store.load_session()
+    assert loaded_session is not None
+    assert len(loaded_session.comments) == 1
+    loaded_session.comments[0].body = "Updated via session"
+    store.save_session(loaded_session)
+
+    loaded_again = store.get_comment_by_uuid(comment_uuid)
+    assert loaded_again is not None
+    assert loaded_again.body == "Updated via session"
+
+
+def test_regression_bug_258_cr_feedback_timestamp_not_modified(tmp_path: Path) -> None:
+    """Verify BUG-258: CR feedback markdown is not rewritten when only timestamp would change.
+
+    When export_commit_markdown or sync_feedback is called on an existing CR_<commit>.md file,
+    the file must NOT be rewritten or touched if the review findings/comments have not changed.
+    """
+    import time
+    import uuid as uuid_pkg
+
+    repo_dir, commits = create_isolated_git_repo(tmp_path)
+    feedback_dir = repo_dir / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    exporter = MarkdownReviewExporter(repo_root=repo_dir)
+
+    commit_sha = commits[-1]
+    c1 = CommentModel(
+        id="c1",
+        uuid=str(uuid_pkg.uuid4()),
+        file_path="model/wiring.py",
+        start_line=364,
+        end_line=364,
+        severity=ReviewSeverity.MUST_FIX,
+        body="Review finding text",
+        author="Reviewer",
+        code_snippet="dnp=False",
+        created_at="2026-10-01T23:52:00Z",
+        resolved=False,
+        commit=commit_sha,
+    )
+    session = ReviewSessionModel(
+        title="Code Review: hardware",
+        revisions=[commit_sha],
+        comments=[c1],
+        created_at="2026-10-01 23:52:00 UTC",
+    )
+
+    # 1. Initial export writes CR_<commit>.md
+    out_file = exporter.export_commit_markdown(session, commit_sha, feedback_dir)
+    assert out_file is not None
+    assert out_file.exists()
+
+    initial_content = out_file.read_text(encoding="utf-8")
+    initial_mtime = out_file.stat().st_mtime_ns
+
+    # Wait slightly to ensure timestamp/mtime would differ if rewritten
+    time.sleep(0.02)
+
+    # 2. Call export_commit_markdown again with session (potentially newly initialized)
+    session_again = ReviewSessionModel(
+        title="Code Review: hardware",
+        revisions=[commit_sha],
+        comments=[c1.model_copy(deep=True)],
+    )
+    out_file_2 = exporter.export_commit_markdown(session_again, commit_sha, feedback_dir)
+    assert out_file_2 is not None
+
+    after_content = out_file.read_text(encoding="utf-8")
+    after_mtime = out_file.stat().st_mtime_ns
+
+    # File content and mtime must remain identical - no timestamp-only rewrite
+    assert initial_content == after_content
+    assert initial_mtime == after_mtime
+
+    # 3. Verify parse_markdown_text preserves Review Date as created_at
+    parsed = exporter.parse_markdown_text(initial_content)
+    assert parsed.created_at == "2026-10-01 23:52:00 UTC"
+
+    # 4. Verify ReviewServer.sync_feedback() does not rewrite or touch mtime of unchanged CR file
+    server = ReviewServer(
+        repo_root=repo_dir,
+        state_file=repo_dir / "review_state.json",
+        markdown_output=repo_dir / "build" / "CR.md",
+        bind_and_activate=False,
+    )
+    time.sleep(0.02)
+    server.sync_feedback()
+
+    after_sync_content = out_file.read_text(encoding="utf-8")
+    after_sync_mtime = out_file.stat().st_mtime_ns
+    assert initial_content == after_sync_content
+    assert initial_mtime == after_sync_mtime
+
+
+def test_git_engine_file_diff_caching(tmp_path: Path) -> None:
+    """Verify GitEngine caches immutable commit FileDiffModel instances in memory."""
+    repo_dir, shas = create_isolated_git_repo(tmp_path)
+    engine = GitEngine(repo_dir)
+
+    target_sha = shas[1]
+    target_file = "test_2.txt"
+
+    # Initially cache should be empty
+    assert (target_sha, target_file) not in engine._file_diff_cache
+
+    # First call: populates cache
+    diff1 = engine.get_file_diff(target_sha, target_file)
+    assert (target_sha, target_file) in engine._file_diff_cache
+    assert diff1.file_path == target_file
+
+    # Second call: returns cached instance directly
+    diff2 = engine.get_file_diff(target_sha, target_file)
+    assert diff1 is diff2
+
+    # Working tree changes are NOT cached
+    (repo_dir / "test_2.txt").write_text("modified working content\n", encoding="utf-8")
+    engine.get_file_diff("working", target_file)
+    assert ("working", target_file) not in engine._file_diff_cache
+
+    # clear_diff_cache clears the cache
+    engine.clear_diff_cache()
+    assert (target_sha, target_file) not in engine._file_diff_cache

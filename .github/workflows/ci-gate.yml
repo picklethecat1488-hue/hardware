@@ -49,23 +49,23 @@ jobs:
       - name: Run Fast Tests
         shell: bash -el {0}
         env:
-          PYTHONPATH: src
+          PYTHONPATH: .:tools
         run: |
           set -o pipefail
-          pytest -n 2 src/tests/ -m "not slow"
+          pytest -n 2 tests/ -m "not slow"
 
       - name: Run Smoke Tests
         shell: bash -el {0}
         env:
-          PYTHONPATH: src
+          PYTHONPATH: .:tools
         run: |
           set -o pipefail
-          python src/smoke.py
+          python tools/smoke.py
 
       - name: Stop Build Daemon
         if: always()
         shell: bash -el {0}
-        run: python src/daemon.py stop || true
+        run: python tools/daemon.py stop || true
 
       - name: Upload Daemon Logs
         if: always()

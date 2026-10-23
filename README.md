@@ -2,9 +2,9 @@
 
 This repository contains CAD models and designs for various hardware projects:
 
-- [Cat Water Fountain](src/projects/cat_fountain.md) - A 3D-printable automatic pet cat water fountain with an impeller, delivery tube, and spout.
-- [Exhaust Manifolds](src/projects/exhaust_manifolds.md) - Custom exhaust manifolds to connect the midpipe section of the kit to exhaust tips.
-- [Valve Actuator Limiter](src/projects/valve_actuator_limiter.md) - A mechanical stop to restrict the sweep of the exhaust valve actuator arm.
+- [Cat Water Fountain](projects/cat_fountain.md) - A 3D-printable automatic pet cat water fountain with an impeller, delivery tube, and spout.
+- [Exhaust Manifolds](projects/exhaust_manifolds.md) - Custom exhaust manifolds to connect the midpipe section of the kit to exhaust tips.
+- [Valve Actuator Limiter](projects/valve_actuator_limiter.md) - A mechanical stop to restrict the sweep of the exhaust valve actuator arm.
 
 ---
 
@@ -34,13 +34,13 @@ All commands should be run from the repository root.
 
 The build command generates geometry and diagrams:
 ```bash
-python src/build.py
+python tools/build.py
 
 # Build all parts from the exhaust_manifolds project
-python src/build.py 'exhaust_manifolds/*'
+python tools/build.py 'exhaust_manifolds/*'
 
 # Build only diagrams for all manifolds
-python src/build.py --parts=false 'exhaust_manifolds/*'
+python tools/build.py --parts=false 'exhaust_manifolds/*'
 ```
 
 ### Geometry Configuration
@@ -48,13 +48,13 @@ python src/build.py --parts=false 'exhaust_manifolds/*'
 If project measurements or parameters have changed, run the configuration utility to optimize part placement and geometry:
 ```bash
 # Configure and optimize all projects
-python src/config.py
+python tools/config.py
 
 # Configure only the driver manifold
-python src/config.py exhaust_manifolds/driver
+python tools/config.py exhaust_manifolds/driver
 
 # Run only text logo placement optimization
-python src/config.py -m text
+python tools/config.py -m text
 ```
 
 ### Listing Targets and Outputs
@@ -63,13 +63,13 @@ Use the list utility to list available targets or predict the exact files that t
 
 ```bash
 # List all valid targets across all actions and modes
-python src/list.py targets
+python tools/list.py targets
 
 # List all files the build will export without actually building them
-python src/list.py outputs
+python tools/list.py outputs
 
 # List build outputs for specific targets
-python src/list.py outputs 'exhaust_manifolds/*'
+python tools/list.py outputs 'exhaust_manifolds/*'
 ```
 
 ### Geometry Visualization
@@ -77,23 +77,23 @@ Use the viewer to inspect geometry in VS Code using the `ocp_vscode` extension. 
 
 ```bash
 # List all available targets and their supported visual actions:
-python src/view.py --list
+python tools/view.py --list
 
 # View the driver manifold part
-python src/view.py exhaust_manifolds/driver
+python tools/view.py exhaust_manifolds/driver
 
 # View the global wire path for all manifold assemblies
-python src/view.py exhaust_manifolds/wire
+python tools/view.py exhaust_manifolds/wire
 
 # View all printable parts for all manifolds 
-python src/view.py 'exhaust_manifolds/*:part/print'
+python tools/view.py 'exhaust_manifolds/*:part/print'
 
 # View PCB target (opens interactive KiCode tab in VS Code and shows 3D substrate in ocp_vscode):
-python src/view.py carrier_board:pcb
-python src/view.py carrier_board/carrier_pcb
+python tools/view.py carrier_board:pcb
+python tools/view.py carrier_board/carrier_pcb
 
 # View any compiled KiCad PCB or schematic file directly in VS Code:
-python src/view.py build/board/carrier_board/carrier_board.kicad_pcb
+python tools/view.py build/board/carrier_board/carrier_board.kicad_pcb
 ```
 
 ### Simulating Rooms and Visualizing in Rerun
@@ -102,16 +102,16 @@ For targets that support simulation (e.g., the cat water fountain room), you can
 
 ```bash
 # Run the simulation and spawn the Rerun visualizer:
-python src/view.py cat_fountain/product:view/simulate
+python tools/view.py cat_fountain/product:view/simulate
 
 # Run the simulation for a specific number of steps:
-python src/view.py cat_fountain/product:view/simulate -s 500
+python tools/view.py cat_fountain/product:view/simulate -s 500
 
 # Skip compiling parts and URDFs prior to starting the simulation:
-python src/view.py cat_fountain/product:view/simulate --no-build
+python tools/view.py cat_fountain/product:view/simulate --no-build
 
 # Save the simulation recording to a (.rrd) file to upload to rerun.io:
-python src/view.py cat_fountain/product:view/simulate --save-rrd output.rrd
+python tools/view.py cat_fountain/product:view/simulate --save-rrd output.rrd
 ```
 
 ### Wiring Diagrams & PCB Manufacturing Pipeline
@@ -130,10 +130,10 @@ This project includes a declarative wiring and PCB engine driven by native KiCad
 To build PCB and wiring outputs:
 ```bash
 # Build PCB board, schematics, CAM files, and BOM/CPL:
-python src/build.py carrier_board:pcb
+python tools/build.py carrier_board:pcb
 
 # Build wiring diagrams:
-python src/build.py cat_fountain/wiring
+python tools/build.py cat_fountain/wiring
 ```
 ---
 
