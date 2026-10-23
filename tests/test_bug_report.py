@@ -1200,3 +1200,39 @@ def test_bug_report_template_client_side_limit() -> None:
     idx_limit = content.find("if (f.size >= MAX_ATTACHMENT_SIZE_BYTES)")
     idx_reader = content.find("reader.readAsDataURL(f)", idx_limit)
     assert idx_limit != -1 and idx_reader != -1, "Expected client-side size check before readAsDataURL"
+
+
+def test_regression_worm_creeping_larva_820_worm_prefixed_bug_files(tmp_path: Path) -> None:
+    """Verify MarkdownBugExporter and BugReportServer support WORM_*.md files alongside BUG_*.md."""
+    feedback_dir = tmp_path / "feedback"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    exporter = MarkdownBugExporter(repo_root=tmp_path)
+
+    bug = BugReportModel(
+        id="WORM-CREEPING-LARVA-820",
+        uuid="c9679ffa-7211-4f3f-bea5-a57be3bc91a4",
+        title="Regression tests are not useful",
+        status=BugStatus.RESOLVED,
+        severity=BugSeverity.HIGH,
+        category=BugCategory.GENERAL,
+        description="Audit regression test suites.",
+        resolution="Codified best practices.",
+    )
+
+    # 1. Verify export creates WORM_*.md
+    exported_path = exporter.export_individual_bug(bug, feedback_dir)
+    assert exported_path.name == "WORM_CREEPING-LARVA-820.md"
+    assert exported_path.exists()
+
+    # 2. Verify scan_and_sync_feedback_dir merges WORM_*.md
+    new_db = BugDatabaseModel(bugs=[])
+    stats = exporter.scan_and_sync_feedback_dir(feedback_dir, new_db)
+    assert stats["scanned"] == 1
+    assert len(new_db.bugs) == 1
+    assert new_db.bugs[0].id == "WORM-CREEPING-LARVA-820"
+    assert new_db.bugs[0].status == BugStatus.RESOLVED
+
+    # 3. Verify server mtime tracking includes WORM_*.md
+    server = BugReportServer(host="127.0.0.1", port=0, feedback_dir=feedback_dir, bind_and_activate=False)
+    mtime = server._get_feedback_dir_mtime()
+    assert mtime == exported_path.stat().st_mtime

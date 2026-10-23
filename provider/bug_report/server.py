@@ -575,7 +575,7 @@ class BugReportServer(ThreadingHTTPServer):
             return 0.0
         try:
             max_mtime = self.feedback_dir.stat().st_mtime
-            for p in self.feedback_dir.glob("BUG_*.md"):
+            for p in list(self.feedback_dir.glob("BUG_*.md")) + list(self.feedback_dir.glob("WORM_*.md")):
                 try:
                     m = p.stat().st_mtime
                     if m > max_mtime:
