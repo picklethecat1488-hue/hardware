@@ -444,6 +444,22 @@ class CatFountainConfig(BaseModel):
         """Return standoff height for the Hall sensor board."""
         return float(self._raw_data.get("hall_sensor_standoff_height", 4.0))
 
+    # SWD Breakout Board (Treedix JTAG/SWD Adapter)
+    @cached_property
+    def swd_board_length(self) -> float:
+        """Return the length of the Treedix JTAG/SWD breakout board."""
+        return float(self._raw_data.get("swd_board_length", 19.1))
+
+    @cached_property
+    def swd_board_width(self) -> float:
+        """Return the width of the Treedix JTAG/SWD breakout board."""
+        return float(self._raw_data.get("swd_board_width", 13.7))
+
+    @cached_property
+    def swd_board_standoff_height(self) -> float:
+        """Return the standoff height for the SWD breakout board."""
+        return float(self._raw_data.get("swd_board_standoff_height", 4.0))
+
     # Fuel Gauge
     @cached_property
     def fuel_gauge_spacing_x(self) -> float:

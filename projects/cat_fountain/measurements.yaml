@@ -173,6 +173,11 @@ hall_sensor_spacing_x: 10.0
 hall_sensor_spacing_y: 20.0
 hall_sensor_standoff_height: 4.0
 
+# SWD Breakout Board (Treedix JTAG/SWD Adapter)
+swd_board_length: 19.1
+swd_board_width: 13.7
+swd_board_standoff_height: 4.0
+
 # ==========================================
 # 10. Magnetic Centrifugal Pump Redesign
 # ==========================================

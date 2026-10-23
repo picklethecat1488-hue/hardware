@@ -523,6 +523,16 @@ class CatFountainProvider(Provider):
                     "press_fit",
                     {0, 3},
                 ),
+                (
+                    -50.0,
+                    -45.0,
+                    self.settings.swd_board_length,
+                    self.settings.swd_board_width,
+                    self.settings.swd_board_standoff_height,
+                    "SWD",
+                    "clip",
+                    None,
+                ),
             ]
             for cx, cy, sx, sy, sh, lbl, mtype, p_indices in pcb_mounts:
                 if mtype == "clip":

@@ -1875,3 +1875,37 @@ class TestCatFountainProvider:
         assert bowl.part.is_inside((hx - hall_dx, hy + hall_dy, boss_z)), (
             "Hall sensor mount point 1 must have solid boss pad"
         )
+
+    def test_regression_bug_pincered_caddisfly_769_swd_clip_mount(self, provider):
+        """Verify BUG-PINCERED-CADDISFLY-769: Add clip-on mount for Treedix JTAG/SWD breakout adapter."""
+        from pathlib import Path
+        from model.wiring import Wiring
+
+        # 1. Config properties exist for SWD breakout board
+        assert hasattr(provider.settings, "swd_board_length"), "swd_board_length property missing"
+        assert hasattr(provider.settings, "swd_board_width"), "swd_board_width property missing"
+        assert provider.settings.swd_board_length == 19.1
+        assert provider.settings.swd_board_width == 13.7
+
+        # 2. Footprint in wiring.yaml
+        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+        wiring = Wiring(yaml_path)
+        swd_fp = next((f for f in wiring.footprints if f.name == "swd_adapter"), None)
+        assert swd_fp is not None, "swd_adapter footprint must exist in wiring.yaml"
+        assert tuple(swd_fp.dimensions) == (19.1, 13.7, 1.6)
+
+        # 3. Bowl CAD model contains clip guide for SWD board
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        assert bowl.part.is_valid()
+
+        t = provider.settings.bowl_thickness
+        floor_z = provider.settings.floor_z
+        sh = provider.settings.swd_board_standoff_height
+        track_z = floor_z - t - (sh + 1.0)
+
+        # SWD is centered at (-50.0, -45.0)
+        # Guide track is positioned at X = -50.0 + (19.1 / 2.0 + 1.5) = -38.95
+        assert bowl.part.is_inside((-38.95, -45.0, track_z)), (
+            "SWD clip guide track should be present at (-38.95, -45.0)"
+        )
