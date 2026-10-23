@@ -62,6 +62,9 @@ Host anvil
   ```
 * **Regression Unit Testing Mandate**: Whenever a regression is identified, investigated, or bisected to a prior change, you MUST introduce dedicated regression unit tests (or add active regression assertions to existing test suites) that explicitly guard against the identified regression before concluding the task.
 * **Functional Behavioral Testing Mandate**: All test code (Python unit/integration tests, CAD validation, and physics simulation suites) MUST test the actual functionality and runtime behavioral invariants of the code being run (e.g. verifying state transitions, execution outcomes, geometric properties, and physical boundary interactions). Tests must NOT verify behavior by simply inspecting source files for the existence of specific statements, strings, or AST tokens.
+* **Prohibition on Redundant Wrapper Tests**: Regression tests must assert new behavioral invariants directly against the code under test. Do NOT create shallow wrapper tests (such as test functions that merely invoke other test suites or test commands via subprocess) without exercising new functionality.
+* **Update Existing Tests Directly Over Duplicate Tests**: If an existing test case intended to guard an invariant does not properly check for a bug, update the original test case directly to assert the missing invariant rather than creating redundant wrapper or duplicate test listings.
+* **Omit Tests When Invariant Cannot Be Unit Tested**: If it is not possible to unit test a regression fix and existing test suites already verify logical invariants, omit adding an artificial regression test rather than introducing a meaningless test that merely wraps other tests.
 
 ### 2. Geometry Providers & Discoverability
 * Custom geometry projects must be packages nested within [projects/](projects/).
