@@ -1005,25 +1005,47 @@
       list.sort((a, b) => {
         switch (currentBugSort) {
           case "id_asc": {
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) {
+              return timeA < timeB ? -1 : 1;
+            }
+            if (timeA && !timeB) return -1;
+            if (!timeA && timeB) return 1;
             const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
             const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
-            return numA - numB;
+            if (numA !== numB) return numA - numB;
+            return (a.id || "").localeCompare(b.id || "");
           }
           case "id_desc": {
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) {
+              return timeA > timeB ? -1 : 1;
+            }
+            if (timeA && !timeB) return -1;
+            if (!timeA && timeB) return 1;
             const numA = parseInt((a.id || "").replace(/\D/g, ""), 10) || 0;
             const numB = parseInt((b.id || "").replace(/\D/g, ""), 10) || 0;
-            return numB - numA;
+            if (numA !== numB) return numB - numA;
+            return (b.id || "").localeCompare(a.id || "");
           }
           case "severity": {
             const rankA = severityOrder[a.severity] !== undefined ? severityOrder[a.severity] : 99;
             const rankB = severityOrder[b.severity] !== undefined ? severityOrder[b.severity] : 99;
             if (rankA !== rankB) return rankA - rankB;
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) return timeA > timeB ? -1 : 1;
             return (b.id || "").localeCompare(a.id || "");
           }
           case "status": {
             const rankA = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 99;
             const rankB = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 99;
             if (rankA !== rankB) return rankA - rankB;
+            const timeA = a.created_at ? (Date.parse(a.created_at.replace(" UTC", "Z")) || a.created_at) : "";
+            const timeB = b.created_at ? (Date.parse(b.created_at.replace(" UTC", "Z")) || b.created_at) : "";
+            if (timeA && timeB && timeA !== timeB) return timeA > timeB ? -1 : 1;
             return (b.id || "").localeCompare(a.id || "");
           }
           case "component": {
@@ -1191,6 +1213,10 @@
         // Fallback to locally calculated generateNextBugId
       }
 
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const nowStr = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())} UTC`;
+
       const bug = {
         id: newId,
         title: "New Bug Report",
@@ -1204,6 +1230,7 @@
         actual_behavior: "",
         logs: "",
         attachments: [],
+        created_at: nowStr,
         resolution_notes: ""
       };
       db.bugs.unshift(bug);
@@ -1511,10 +1538,16 @@
       }
     }
 
+    const MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB (GitHub LFS maximum file limit)
+
     function handleFileUpload(files, isPaste = false) {
       if (!files || files.length === 0) return;
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
+        if (f.size >= MAX_ATTACHMENT_SIZE_BYTES) {
+          showToast(`Error: ${f.name} exceeds maximum allowed size of 2 GB (GitHub LFS limit).`, 5000);
+          continue;
+        }
         const reader = new FileReader();
         reader.onload = () => {
           const b64 = reader.result.split(",")[1];
@@ -1541,6 +1574,10 @@
     }
 
     function uploadBlob(blob, filename, fileType) {
+      if (blob.size >= MAX_ATTACHMENT_SIZE_BYTES) {
+        showToast("Error: Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
         const b64 = reader.result.split(",")[1];
@@ -1555,6 +1592,10 @@
     }
 
     function uploadTextDocument(text, filename) {
+      if (text.length >= MAX_ATTACHMENT_SIZE_BYTES) {
+        showToast("Error: Document exceeds maximum allowed size of 2 GB.", 5000);
+        return;
+      }
       uploadPayload({
         filename: filename,
         file_type: "document",
@@ -1573,6 +1614,15 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+      if (res.status === 413) {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || "Attachment exceeds maximum allowed size of 2 GB (GitHub LFS limit).", 5000);
+        return;
+      }
+      if (!res.ok) {
+        showToast("Failed to upload attachment: HTTP " + res.status);
+        return;
+      }
       const att = await res.json();
       const bug = db.bugs.find(b => b.id === activeBugId);
       if (bug) {
