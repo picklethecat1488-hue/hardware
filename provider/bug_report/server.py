@@ -29,6 +29,8 @@ from model.bug_report import (
 from provider.bug_report.markdown_exporter import MarkdownBugExporter
 from provider.bug_report.sqlite_store import SQLiteBugStore
 
+MAX_ATTACHMENT_SIZE_BYTES: int = 2 * 1024 * 1024 * 1024  # 2 GiB (GitHub LFS maximum file limit)
+
 
 class BugReportRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler dispatching bug report UI and REST API endpoints."""
@@ -114,9 +116,16 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
+        if length >= MAX_ATTACHMENT_SIZE_BYTES:
+            self.send_error(413, "Payload Too Large: Request exceeds maximum allowed size of 2 GB (GitHub LFS limit)")
+            return
+
         try:
+            body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
             data = json.loads(body)
+        except (MemoryError, OverflowError):
+            self.send_error(413, "Payload Too Large: Insufficient memory to process request payload")
+            return
         except json.JSONDecodeError:
             data = {}
 
@@ -187,7 +196,7 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
                 self.send_error(404, f"Attachment '{rel_name}' not found")
                 return
 
-        content = file_path.read_bytes()
+        file_size = file_path.stat().st_size
         suffix = file_path.suffix.lower()
         content_type = {
             ".png": "image/png",
@@ -209,10 +218,12 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         try:
             self.send_response(200)
             self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Content-Length", str(file_size))
             self.send_header("Connection", "close")
             self.end_headers()
-            self.wfile.write(content)
+            with open(file_path, "rb") as f:
+                while chunk := f.read(64 * 1024):
+                    self.wfile.write(chunk)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             self.close_connection = True
         finally:
@@ -337,15 +348,47 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
             filename = f"{stem}_{counter}{suffix}"
             dest_path = dest_dir / filename
 
-        if b64_content:
-            file_bytes = base64.b64decode(b64_content)
-            dest_path.write_bytes(file_bytes)
-        elif text_content:
-            file_bytes = text_content.encode("utf-8")
-            dest_path.write_bytes(file_bytes)
-        else:
-            file_bytes = b""
-            dest_path.write_bytes(file_bytes)
+        if b64_content and (len(b64_content) * 3) // 4 >= MAX_ATTACHMENT_SIZE_BYTES:
+            self._send_json(
+                {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                status=413,
+            )
+            return
+        if text_content and len(text_content.encode("utf-8")) >= MAX_ATTACHMENT_SIZE_BYTES:
+            self._send_json(
+                {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                status=413,
+            )
+            return
+
+        try:
+            if b64_content:
+                file_bytes = base64.b64decode(b64_content)
+                if len(file_bytes) >= MAX_ATTACHMENT_SIZE_BYTES:
+                    self._send_json(
+                        {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                        status=413,
+                    )
+                    return
+                dest_path.write_bytes(file_bytes)
+            elif text_content:
+                file_bytes = text_content.encode("utf-8")
+                if len(file_bytes) >= MAX_ATTACHMENT_SIZE_BYTES:
+                    self._send_json(
+                        {"error": "Payload Too Large: Attachment exceeds 2 GB limit (GitHub LFS limit)"},
+                        status=413,
+                    )
+                    return
+                dest_path.write_bytes(file_bytes)
+            else:
+                file_bytes = b""
+                dest_path.write_bytes(file_bytes)
+        except (MemoryError, OverflowError):
+            self._send_json(
+                {"error": "Payload Too Large: Insufficient memory to decode attachment payload"},
+                status=413,
+            )
+            return
 
         rel_path = (
             dest_path.relative_to(self.server.repo_root)
@@ -532,7 +575,7 @@ class BugReportServer(ThreadingHTTPServer):
             return 0.0
         try:
             max_mtime = self.feedback_dir.stat().st_mtime
-            for p in self.feedback_dir.glob("BUG_*.md"):
+            for p in list(self.feedback_dir.glob("BUG_*.md")) + list(self.feedback_dir.glob("WORM_*.md")):
                 try:
                     m = p.stat().st_mtime
                     if m > max_mtime:

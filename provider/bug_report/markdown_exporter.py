@@ -677,8 +677,9 @@ class MarkdownBugExporter:
             Path to written markdown file.
         """
         feedback_dir.mkdir(parents=True, exist_ok=True)
-        clean_id = bug.id.removeprefix("BUG-").removeprefix("BUG_")
-        target_file = feedback_dir / f"BUG_{clean_id}.md"
+        prefix = "WORM" if bug.id.startswith("WORM-") else "BUG"
+        clean_id = bug.id.removeprefix("BUG-").removeprefix("BUG_").removeprefix("WORM-").removeprefix("WORM_")
+        target_file = feedback_dir / f"{prefix}_{clean_id}.md"
         content = elide_personal_info(self.render_bug_markdown(bug))
         if target_file.exists():
             try:
@@ -909,23 +910,25 @@ class MarkdownBugExporter:
         renamed = 0
         merged = 0
 
-        for bug_file in sorted(feedback_dir.glob("BUG_*.md")):
+        bug_files = sorted(set(list(feedback_dir.glob("BUG_*.md")) + list(feedback_dir.glob("WORM_*.md"))))
+        for bug_file in bug_files:
             scanned += 1
             md_bug = self.parse_individual_bug_file(bug_file)
             if not md_bug:
                 continue
 
             # Determine ID implied by filename
-            m_fn = re.match(r"^BUG[_-](.+)\.md$", bug_file.name, re.IGNORECASE)
+            m_fn = re.match(r"^(BUG|WORM)[_-](.+)\.md$", bug_file.name, re.IGNORECASE)
             expected_id_from_fn = ""
             if m_fn:
-                raw_part = m_fn.group(1)
+                fn_prefix = m_fn.group(1).upper()
+                raw_part = m_fn.group(2)
                 if raw_part.isdigit():
-                    expected_id_from_fn = f"BUG-{int(raw_part):03d}"
-                elif raw_part.startswith("BUG-"):
+                    expected_id_from_fn = f"{fn_prefix}-{int(raw_part):03d}"
+                elif raw_part.startswith(f"{fn_prefix}-"):
                     expected_id_from_fn = raw_part
                 else:
-                    expected_id_from_fn = f"BUG-{raw_part}"
+                    expected_id_from_fn = f"{fn_prefix}-{raw_part}"
 
             # Check if this bug already exists by UUID
             existing_by_uuid = database.get_bug_by_uuid(md_bug.uuid)
