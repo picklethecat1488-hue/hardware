@@ -381,8 +381,10 @@ class CatFountainProvider(Provider):
                                 mode=Mode.SUBTRACT,
                             )
 
-                # Add engraved label
-                label_y_offset = -(board_w / 2.0 + 5.0)
+                # Add engraved label (move to opposite side of board to avoid proximity to CURRENT)
+                label_y_offset = board_w / 2.0 + 5.0
+                if center_y + label_y_offset > r - t - 10.0:
+                    label_y_offset = -label_y_offset
                 with BuildSketch() as label_sketch:
                     Text(label, font_size=4.5, align=(Align.CENTER, Align.CENTER))
                 mirrored_sketch = label_sketch.sketch.mirror(Plane.YZ)

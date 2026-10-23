@@ -1746,3 +1746,55 @@ class TestCatFountainProvider:
         assert "VCP Charge Pump Reservoir Capacitor Wiring" not in doc_text, (
             "Wiring guide must not specify external VCP capacitor wiring"
         )
+
+    def test_regression_bug_pollen_backswimmer_846_tmc6300_clip_mount_dimensions_and_text(self, provider):
+        """Verify BUG-POLLEN-BACKSWIMMER-846: TMC6300 clip-on mount matches 20x15mm board and text is opposite CURRENT."""
+        from pathlib import Path
+        from model.wiring import Wiring
+
+        # 1. Check measurements for TMC6300 clip mount
+        assert provider.settings.motor_driver_spacing_x == 20.0, (
+            f"Expected motor_driver_spacing_x to be 20.0mm (approx 20mm length), got {provider.settings.motor_driver_spacing_x}"
+        )
+        assert provider.settings.motor_driver_spacing_y == 15.0, (
+            f"Expected motor_driver_spacing_y to be 15.0mm (approx 15mm width), got {provider.settings.motor_driver_spacing_y}"
+        )
+
+        # 2. Check wiring.yaml footprint dimensions
+        yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
+        wiring = Wiring(yaml_path)
+        driver = next(f for f in wiring.footprints if f.name == "motor_driver")
+        assert tuple(driver.dimensions) == (20.0, 15.0, 1.6), (
+            f"Expected TMC6300 board dimensions [20.0, 15.0, 1.6], got {driver.dimensions}"
+        )
+
+        # 3. Verify bowl CAD geometry: clip tracks fit 20x15mm board and TMC6300 text is on positive Y (opposite CURRENT)
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        assert bowl.part.is_valid()
+
+        # Center of TMC6300 is (50.0, 15.0)
+        # With length 20.0 (along X) and width 15.0 (along Y), guide tracks are around X = 50 +/- 10.75
+        # The PCB slot is at X = 50 +/- 10.15. Inside the track body at X = 50 + 11.5 should be solid plastic:
+        t = provider.settings.bowl_thickness
+        floor_z = provider.settings.floor_z
+        track_z = floor_z - t - (provider.settings.motor_driver_standoff_height + 1.0)
+        assert bowl.part.is_inside((50.0 + 11.5, 15.0, track_z)), (
+            "TMC6300 clip guide track should be positioned for 20mm board length"
+        )
+
+        # "CURRENT" text is at (50.0, -2.5). "TMC6300" text should be moved to opposite side (Y = 15 + 7.5 + 5 = 27.5),
+        # not adjacent to CURRENT at Y = 15 - 12.5 = 2.5.
+        text_z = floor_z - t + 0.5
+        sample_dxs = [-8.0, -6.0, -4.0, -2.0, 0.0, 2.0, 4.0, 6.0, 8.0]
+        sample_dys = [-0.5, 0.0, 0.5]
+
+        # At old location (Y = 2.5), bowl floor must be solid plastic (no engraved text cutout)
+        assert all(
+            bowl.part.is_inside((50.0 + dx, 2.5 + dy, text_z)) for dx in sample_dxs for dy in sample_dys
+        ), "TMC6300 text must not be engraved on the negative Y side (adjacent to CURRENT text)"
+
+        # At new location (Y = 27.5), engraved text strokes cut into bowl floor
+        assert any(
+            not bowl.part.is_inside((50.0 + dx, 27.5 + dy, text_z)) for dx in sample_dxs for dy in sample_dys
+        ), "TMC6300 text must be engraved on the positive Y side opposite CURRENT text"
