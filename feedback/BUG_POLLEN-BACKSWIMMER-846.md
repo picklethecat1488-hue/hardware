@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 23:05:10 UTC`
-- **Resolved**: `2026-10-23 23:34:19 UTC`
+- **Resolved**: `2026-10-24 00:59:24 UTC`
 
 #### Description
 
@@ -15,4 +15,4 @@ The clip on mounts of the TMC6300 are too big for the board to clip into. The bo
 
 #### Resolution Notes
 
-Updated TMC6300 board dimensions and clip mount spacing to 20.0x15.0mm in measurements.yaml and wiring.yaml. Moved engraved TMC6300 text to positive Y side of board to eliminate proximity to CURRENT text. Added dedicated regression unit test test_regression_bug_pollen_backswimmer_846_tmc6300_clip_mount_dimensions_and_text.
+Updated TMC6300 clip mount and footprint dimensions to exact SparkFun dimensions PDF values: 20.32mm x 15.24mm (0.80" x 0.60"), removed obsolete mounting holes entry.

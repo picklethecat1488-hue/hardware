@@ -233,8 +233,7 @@ components:
     package: board
     position: [50.0, 15.0, 23.0]
     rotation: [0.0, 0.0, 0.0]
-    dimensions: [20.0, 15.0, 1.6]
-    mounting_holes: [22.86, 17.78]
+    dimensions: [20.32, 15.24, 1.6]
     label:
       text: "TMC6300"
       position: [15.0, 0.0, 0.0]

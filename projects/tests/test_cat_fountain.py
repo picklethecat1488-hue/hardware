@@ -1754,39 +1754,42 @@ class TestCatFountainProvider:
         )
 
     def test_regression_bug_pollen_backswimmer_846_tmc6300_clip_mount_dimensions_and_text(self, provider):
-        """Verify BUG-POLLEN-BACKSWIMMER-846: TMC6300 clip-on mount matches 20x15mm board and text is opposite CURRENT."""
+        """Verify BUG-POLLEN-BACKSWIMMER-846: TMC6300 clip-on mount matches 0.80x0.60 in (20.32x15.24mm) PDF dimensions."""
         from pathlib import Path
         from model.wiring import Wiring
 
-        # 1. Check measurements for TMC6300 clip mount
-        assert provider.settings.motor_driver_spacing_x == 20.0, (
-            f"Expected motor_driver_spacing_x to be 20.0mm (approx 20mm length), got {provider.settings.motor_driver_spacing_x}"
+        # 1. Check measurements for TMC6300 clip mount (exact 0.80" x 0.60" board dimensions from PDF)
+        assert provider.settings.motor_driver_spacing_x == 20.32, (
+            f"Expected motor_driver_spacing_x to be 20.32mm (0.80 in length), got {provider.settings.motor_driver_spacing_x}"
         )
-        assert provider.settings.motor_driver_spacing_y == 15.0, (
-            f"Expected motor_driver_spacing_y to be 15.0mm (approx 15mm width), got {provider.settings.motor_driver_spacing_y}"
+        assert provider.settings.motor_driver_spacing_y == 15.24, (
+            f"Expected motor_driver_spacing_y to be 15.24mm (0.60 in width), got {provider.settings.motor_driver_spacing_y}"
         )
 
-        # 2. Check wiring.yaml footprint dimensions
+        # 2. Check wiring.yaml footprint dimensions and absence of screw mounting holes
         yaml_path = Path(__file__).parent.parent / "cat_fountain" / "wiring.yaml"
         wiring = Wiring(yaml_path)
         driver = next(f for f in wiring.footprints if f.name == "motor_driver")
-        assert tuple(driver.dimensions) == (20.0, 15.0, 1.6), (
-            f"Expected TMC6300 board dimensions [20.0, 15.0, 1.6], got {driver.dimensions}"
+        assert tuple(driver.dimensions) == (20.32, 15.24, 1.6), (
+            f"Expected TMC6300 board dimensions [20.32, 15.24, 1.6], got {driver.dimensions}"
+        )
+        assert driver.mounting_holes is None, (
+            "SparkFun TMC6300 breakout has no screw mounting holes per official dimensions PDF"
         )
 
-        # 3. Verify bowl CAD geometry: clip tracks fit 20x15mm board and TMC6300 text is on positive Y (opposite CURRENT)
+        # 3. Verify bowl CAD geometry: clip tracks fit 20.32x15.24mm board and TMC6300 text is on positive Y (opposite CURRENT)
         bowl = provider.build_bowl("bowl")
         assert bowl.part.volume > 0.0
         assert bowl.part.is_valid()
 
         # Center of TMC6300 is (50.0, 15.0)
-        # With length 20.0 (along X) and width 15.0 (along Y), guide tracks are around X = 50 +/- 10.75
-        # The PCB slot is at X = 50 +/- 10.15. Inside the track body at X = 50 + 11.5 should be solid plastic:
+        # With length 20.32 (along X) and width 15.24 (along Y), guide tracks are around X = 50 +/- 10.91
+        # Inside the track body at X = 50 + 11.5 should be solid plastic:
         t = provider.settings.bowl_thickness
         floor_z = provider.settings.floor_z
         track_z = floor_z - t - (provider.settings.motor_driver_standoff_height + 1.0)
         assert bowl.part.is_inside((50.0 + 11.5, 15.0, track_z)), (
-            "TMC6300 clip guide track should be positioned for 20mm board length"
+            "TMC6300 clip guide track should be positioned for 20.32mm board length"
         )
 
         # "CURRENT" text is at (50.0, -2.5). "TMC6300" text should be moved to opposite side (Y = 15 + 7.5 + 5 = 27.5),

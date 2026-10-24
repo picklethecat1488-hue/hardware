@@ -569,12 +569,12 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def motor_driver_spacing_x(self) -> float:
         """Return X hole spacing for motor driver."""
-        return float(self._raw_data.get("motor_driver_spacing_x", 20.0))
+        return float(self._raw_data.get("motor_driver_spacing_x", 20.32))
 
     @cached_property
     def motor_driver_spacing_y(self) -> float:
         """Return Y hole spacing for motor driver."""
-        return float(self._raw_data.get("motor_driver_spacing_y", 15.0))
+        return float(self._raw_data.get("motor_driver_spacing_y", 15.24))
 
     @cached_property
     def motor_driver_standoff_height(self) -> float:
