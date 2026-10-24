@@ -177,7 +177,7 @@ hall_sensor_standoff_height: 4.0
 # SWD Breakout Board (Treedix JTAG/SWD Adapter)
 swd_board_length: 19.1
 swd_board_width: 13.7
-swd_board_standoff_height: 4.0
+swd_board_standoff_height: 2.0
 
 # ==========================================
 # 10. Magnetic Centrifugal Pump Redesign
@@ -202,7 +202,7 @@ pump_cover_snap_clearance: 0.45
 pump_cover_lip_thickness: 1.5
 pump_cover_internal_clearance: 0.40
 pump_cover_clip_opening_width: 10.5
-pump_outlet_radius: 4.0      # 8mm inner diameter (10mm OD)
+pump_outlet_radius: 4.0  # 8mm inner diameter (10mm OD)
 pump_casing_clearance: 1.0
 
 # ==========================================
@@ -220,9 +220,18 @@ motor_hub_width: 17.6
 motor_hub_thickness: 1.6
 motor_hub_length: 26.0
 motor_hub_flange_width: 36.0
+motor_hub_socket_radius: 18.0
+motor_hub_socket_wall: 2.5
+motor_hub_snap_groove_radius_offset: 0.6
+motor_hub_snap_groove_height: 1.2
+motor_hub_collar_clearance: 0.25
 motor_hub_arm_stub_length: 10.0
 motor_hub_side_relief_radius: 20.0
 motor_hub_side_relief_fillet: 1.0
 motor_hub_support_rise: 6.0
 motor_hub_support_radius: 15.0
-
+motor_hub_detent_y: -14.0
+motor_hub_detent_width: 3.0
+motor_hub_detent_depth: 0.8
+pcb_clip_detent_lip: 0.5
+pcb_clip_stop_wall: 1.5

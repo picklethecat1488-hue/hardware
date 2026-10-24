@@ -265,10 +265,9 @@ class CatFountainProvider(Provider):
                 Cylinder(radius=pin_r + 1.5, height=2.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
                 Cylinder(radius=pin_r, height=12.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Slide-in clip mount guide tracks for dedicated motor hub assembly (BUG-VIBRANT-WOODBORER-940)
-            # Replaces the integrated enclosed well with open slide-in guide tracks so the motor,
-            # drive hub, and clip housing can be installed and removed as a single unit without
-            # detaching the drive hub from the motor shaft.
+            # Groove-style cylindrical mounting socket for dedicated motor hub assembly (BUG-VIBRANT-WOODBORER-940)
+            # Replaces slide-in tracks with an annular snap-groove socket (matching the lid and bottom cover style)
+            # so the motor, drive hub, Hall sensor, and bracket install and remove axially as a single unit.
             ceiling_z = floor_z - self.settings.pump_well_wall
             recess_r = self.settings.drive_hub_recess_radius
             recess_depth = t - self.settings.pump_well_wall + 0.1
@@ -280,33 +279,62 @@ class CatFountainProvider(Provider):
                         align=(Align.CENTER, Align.CENTER, Align.MAX),
                         mode=Mode.SUBTRACT,
                     )
-                    with Locations((0, -recess_r, 0)):
-                        Box(
-                            recess_r * 2.0,
-                            recess_r * 2.0,
-                            recess_depth,
-                            align=(Align.CENTER, Align.CENTER, Align.MAX),
-                            mode=Mode.SUBTRACT,
-                        )
 
+            standoff_h = self.settings.drive_hub_standoff_height
             hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 0.8
             motor_h = 9.3
-            mount_seat_z = ceiling_z - hub_h - 1.0 - motor_h
-            flange_w = self.settings.motor_hub_flange_width
-            track_x = flange_w / 2.0
             clip_h = self.settings.motor_hub_thickness
-            slot_h = clip_h + 0.3
+            collar_gap = 0.5
+            mount_seat_z = ceiling_z - standoff_h - hub_h - collar_gap - motor_h - clip_h
+
+            socket_in_r = self.settings.motor_hub_socket_radius
+            socket_wall = self.settings.motor_hub_socket_wall
+            socket_out_r = socket_in_r + socket_wall
+            socket_h = (floor_z - t) - mount_seat_z + 0.5
+            groove_offset = self.settings.motor_hub_snap_groove_radius_offset
+            groove_h = self.settings.motor_hub_snap_groove_height
 
             with Locations((0, 0, floor_z - t)):
-                # Left and Right guide tracks projecting down from dry compartment ceiling
-                track_h_from_ceiling = (floor_z - t) - mount_seat_z + clip_h
-                with Locations((-track_x - 1.5, -5.0, 0), (track_x + 1.5, -5.0, 0)):
-                    Box(3.0, 26.0, track_h_from_ceiling, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                # Outer solid cylinder of mounting socket
+                Cylinder(radius=socket_out_r, height=socket_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                # Inner bore receiving the motor hub collar
+                Cylinder(
+                    radius=socket_in_r,
+                    height=socket_h + 2.0,
+                    align=(Align.CENTER, Align.CENTER, Align.MAX),
+                    mode=Mode.SUBTRACT,
+                )
 
-            # Inward-facing guide slots in the left and right tracks
-            with Locations((0, -5.0, mount_seat_z)):
-                with Locations((-track_x, 0, 0), (track_x, 0, 0)):
-                    Box(2.0, 28.0, slot_h, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+            # Internal annular snap-fit groove in socket inner wall (aligns with motor hub snap ring)
+            with Locations((0, 0, mount_seat_z + clip_h + 2.0)):
+                Cylinder(
+                    radius=socket_in_r + groove_offset,
+                    height=groove_h,
+                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                    mode=Mode.SUBTRACT,
+                )
+
+            # Keyway slot at North (+Y) in socket wall allowing Hall sensor platform to pass through
+            keyway_w = self.settings.hall_sensor_spacing_x + 6.0
+            with Locations((0, socket_out_r / 2.0, mount_seat_z - 1.0)):
+                Box(
+                    keyway_w,
+                    socket_out_r + 2.0,
+                    socket_h + 4.0,
+                    align=(Align.CENTER, Align.MIN, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
+
+            # Clearance opening at South (-Y) in socket wall for motor mount plate and wiring
+            south_slot_w = self.settings.motor_hub_width + 1.0
+            with Locations((0, -socket_out_r / 2.0, mount_seat_z - 1.0)):
+                Box(
+                    south_slot_w,
+                    socket_out_r + 2.0,
+                    socket_h + 4.0,
+                    align=(Align.CENTER, Align.MAX, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
 
             # Helper to create cylindrical standoff posts with blind holes
             def add_standoffs(
@@ -334,36 +362,49 @@ class CatFountainProvider(Provider):
             def add_pcb_clip(
                 center_x: float,
                 center_y: float,
-                board_w: float,  # Width along Y (20.3)
-                board_l: float,  # Length along X (25.4)
+                board_span: float,  # Board width across the guide rails (along X)
+                board_slide: float,  # Board length along slide direction (along Y)
                 standoff_h: float,
                 label: str,
             ):
+                stop_wall = self.settings.pcb_clip_stop_wall
+                detent_lip = self.settings.pcb_clip_detent_lip
+                track_w = board_slide + stop_wall
+                track_l = 3.0
+                track_h = standoff_h + 3.2
+
+                half_span = board_span / 2.0
+                track_center_x = half_span + 0.5
+                slot_center_x = half_span - 0.25
+
                 with Locations((center_x, center_y, floor_z - t)):
                     # 1. Base plate connecting the two guide tracks (recessed to save material and provide airflow)
-                    Box(board_l - 4.0, board_w - 2.0, standoff_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
+                    Box(board_span - 2.5, board_slide - 2.0, standoff_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-                    # 2. Left and Right guide tracks (at X = +/- board_l/2)
-                    track_w = board_w
-                    track_l = 3.0
-                    track_h = standoff_h + 3.2
-
-                    with Locations((-board_l / 2.0 - 0.75, 0, 0), (board_l / 2.0 + 0.75, 0, 0)):
+                    # 2. Left and Right guide tracks (extended at +Y for positive stop wall)
+                    with Locations((-track_center_x, stop_wall / 2.0, 0), (track_center_x, stop_wall / 2.0, 0)):
                         Box(track_l, track_w, track_h, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-                    # 3. Subtract the slot for the PCB inside the left/right tracks (1.9mm height)
-                    with Locations((0, 0, -standoff_h)):
-                        with Locations((-board_l / 2.0 - 0.15, 0, 0), (board_l / 2.0 + 0.15, 0, 0)):
+                    # 3. Guide slots inside left/right tracks (open at entrance -Y, closed at +Y)
+                    slot_len = board_slide + 1.0
+                    slot_y_center = -0.5
+                    with Locations((0, slot_y_center, -standoff_h)):
+                        with Locations((-slot_center_x, 0, 0), (slot_center_x, 0, 0)):
                             Box(
-                                2.0,
-                                board_w + 0.3,
-                                1.9,
+                                1.5,
+                                slot_len,
+                                1.85,
                                 align=(Align.CENTER, Align.CENTER, Align.MAX),
                                 mode=Mode.SUBTRACT,
                             )
 
+                    # 4. Inward snap detent lips at entrance (-Y) to lock PCB in place
+                    with Locations((0, -board_slide / 2.0 + 0.5, -standoff_h)):
+                        with Locations((-half_span + detent_lip / 2.0, 0, 0), (half_span - detent_lip / 2.0, 0, 0)):
+                            Box(detent_lip, 1.2, 1.6, align=(Align.CENTER, Align.CENTER, Align.MAX))
+
                 # Add engraved label (move to opposite side of board to avoid proximity to CURRENT)
-                label_y_offset = board_w / 2.0 + 5.0
+                label_y_offset = board_slide / 2.0 + 5.0
                 if center_y + label_y_offset > r - t - 10.0:
                     label_y_offset = -label_y_offset
                 with BuildSketch() as label_sketch:
@@ -452,7 +493,7 @@ class CatFountainProvider(Provider):
                     self.settings.fuel_gauge_standoff_height,
                     "FUEL",
                     "press_fit",
-                    {0, 3},
+                    {1, 3},
                 ),
                 (
                     -50.0,
@@ -482,33 +523,23 @@ class CatFountainProvider(Provider):
                     self.settings.current_monitor_standoff_height,
                     "CURRENT",
                     "press_fit",
-                    None,
+                    {1, 3},
                 ),
                 (
                     50.0,
                     15.0,
-                    self.settings.motor_driver_spacing_x,
                     self.settings.motor_driver_spacing_y,
+                    self.settings.motor_driver_spacing_x,
                     self.settings.motor_driver_standoff_height,
                     "TMC6300",
                     "clip",
                     None,
                 ),
                 (
-                    0.0,
-                    40.0,
-                    self.settings.hall_sensor_spacing_x,
-                    self.settings.hall_sensor_spacing_y,
-                    self.settings.hall_sensor_standoff_height,
-                    "HALL",
-                    "press_fit",
-                    {0, 3},
-                ),
-                (
                     -50.0,
                     -45.0,
-                    self.settings.swd_board_length,
                     self.settings.swd_board_width,
+                    self.settings.swd_board_length,
                     self.settings.swd_board_standoff_height,
                     "SWD",
                     "clip",
@@ -517,8 +548,8 @@ class CatFountainProvider(Provider):
             ]
             for cx, cy, sx, sy, sh, lbl, mtype, p_indices in pcb_mounts:
                 if mtype == "clip":
-                    # For the clip bracket, sx (spacing_x) is board length, sy (spacing_y) is board width
-                    add_pcb_clip(cx, cy, sy, sx, sh, lbl)
+                    # sx is board span across rails (along X), sy is board slide length (along Y)
+                    add_pcb_clip(cx, cy, sx, sy, sh, lbl)
                 else:
                     add_pcb_mount(cx, cy, sx, sy, sh, lbl, mount_type=mtype, post_indices=p_indices)
 
@@ -582,51 +613,78 @@ class CatFountainProvider(Provider):
                                 mode=Mode.SUBTRACT,
                             )
 
-                        # Extend inner wall down to interface with top of ToF sensor PCB
+                        # Extend inner wall to enclose each side of ToF sensor against ambient light noise (Finding 1)
                         if ext_h > 0.0:
                             with Locations(Location((-4.0, 0, 5.0 - ext_h / 2.0))):
+                                # Top inner wall interface
                                 Box(
                                     4.0,
                                     self.settings.proximity_sensor_pocket_width,
                                     ext_h,
                                     align=(Align.CENTER, Align.CENTER, Align.CENTER),
                                 )
+                            # Side enclosing walls on left (+Y) and right (-Y) to shield optical sensor from ambient LED light
+                            side_wall_t = 2.0
+                            y_offset = (self.settings.proximity_sensor_pocket_width + side_wall_t) / 2.0
+                            with Locations(Location((-4.0, y_offset, 0)), Location((-4.0, -y_offset, 0))):
+                                Box(
+                                    4.0,
+                                    side_wall_t,
+                                    self.settings.proximity_sensor_pocket_height + ext_h,
+                                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                )
+                            # Bottom enclosing wall (-Z)
+                            z_bottom_offset = -(self.settings.proximity_sensor_pocket_height + ext_h) / 2.0
+                            with Locations(Location((-4.0, 0, z_bottom_offset))):
+                                Box(
+                                    4.0,
+                                    self.settings.proximity_sensor_pocket_width + side_wall_t * 2.0,
+                                    side_wall_t,
+                                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                )
 
-                        # Flat mounting standoff posts on the INSIDE of the bowl wall
-                        # Build in a private block in local coordinates
+                        # Press-fit mounting standoffs on the INSIDE of the bowl wall (Finding 5)
+                        post_r = self.settings.pcb_mounting_post_diameter / 2.0
+                        flare_r = self.settings.pcb_mounting_post_flare_diameter / 2.0
+                        tip_r = self.settings.pcb_mounting_post_tip_diameter / 2.0
+                        flare_h = self.settings.pcb_mounting_post_flare_height
+                        shaft_h = self.settings.pcb_mounting_post_height - flare_h
+
                         with BuildPart(mode=Mode.PRIVATE) as standoffs_part:
-                            # Bottom standoffs (dz = -tof_spacing_y / 2.0)
-                            locs_bottom = []
+                            # Bottom standoff boss bodies
                             for dy in [-tof_spacing_x / 2.0, tof_spacing_x / 2.0]:
                                 dz = -tof_spacing_y / 2.0
-                                locs_bottom.append(Location((-4.0, dy, dz), (0, 90, 0)))
+                                with Locations(Location((-4.0, dy, dz), (0, 90, 0))):
+                                    Cylinder(
+                                        radius=boss_r,
+                                        height=tof_standoff,
+                                        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                                    )
 
-                            add_standoffs(
-                                locations=locs_bottom,
-                                boss_radius=boss_r,
-                                standoff_height=tof_standoff,
-                                hole_radius=hole_r,
-                                hole_depth=7.0,
-                                boss_align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                                hole_align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                            )
-
-                            # Top standoffs (dz = tof_spacing_y / 2.0) extended to merge with the wall
-                            locs_top = []
+                            # Top standoff boss bodies extended into the inclined wall
                             for dy in [-tof_spacing_x / 2.0, tof_spacing_x / 2.0]:
                                 dz = tof_spacing_y / 2.0
-                                locs_top.append(Location((-4.0, dy, dz), (0, 90, 0)) * Location((0, 0, 5.0)))
+                                with Locations(Location((-4.0, dy, dz), (0, 90, 0)) * Location((0, 0, 5.0))):
+                                    Cylinder(
+                                        radius=boss_r, height=14.0, align=(Align.CENTER, Align.CENTER, Align.CENTER)
+                                    )
 
-                            add_standoffs(
-                                locations=locs_top,
-                                boss_radius=boss_r,
-                                standoff_height=14.0,  # 4.0 original + 10.0 extension towards wall
-                                hole_radius=hole_r,
-                                hole_depth=7.0,
-                                boss_align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                                hole_align=(Align.CENTER, Align.CENTER, Align.CENTER),
-                                hole_z_offset=-5.0,  # Shift hole back to original centering
-                            )
+                            # Press-fit flared retaining posts projecting inward from the standoff face at X = -6.0
+                            for dy in [-tof_spacing_x / 2.0, tof_spacing_x / 2.0]:
+                                for dz in [-tof_spacing_y / 2.0, tof_spacing_y / 2.0]:
+                                    with Locations(Location((-6.0, dy, dz), (0, -90, 0))):
+                                        Cylinder(
+                                            radius=post_r,
+                                            height=shaft_h,
+                                            align=(Align.CENTER, Align.CENTER, Align.MIN),
+                                        )
+                                        with Locations((0, 0, shaft_h)):
+                                            Cone(
+                                                bottom_radius=flare_r,
+                                                top_radius=tip_r,
+                                                height=flare_h,
+                                                align=(Align.CENTER, Align.CENTER, Align.MIN),
+                                            )
 
                         # Transform local standoffs to global coordinates using active locations
                         from build123d import LocationList
@@ -715,10 +773,13 @@ class CatFountainProvider(Provider):
 
         # Define joints
         ceiling_z = floor_z - self.settings.pump_well_wall
+        standoff_h = self.settings.drive_hub_standoff_height
         hub_h = self.settings.magnet_thickness + self.settings.magnet_clearance + 0.8
+        clip_h = self.settings.motor_hub_thickness
         motor_h = 9.3
-        mount_seat_z = ceiling_z - hub_h - 1.0 - motor_h
-        motor_shaft_z = mount_seat_z + self.settings.motor_hub_thickness + motor_h + 1.0
+        collar_gap = 0.5
+        mount_seat_z = ceiling_z - standoff_h - hub_h - collar_gap - motor_h - clip_h
+        motor_shaft_z = mount_seat_z + clip_h + motor_h + collar_gap
 
         RigidJoint("impeller_post", bowl.part, Location((0, 0, floor_z + 2.0)))
         RigidJoint("motor_shaft", bowl.part, Location((0, 0, motor_shaft_z)))
@@ -1529,16 +1590,94 @@ class CatFountainProvider(Provider):
             with Locations((0, -clip_l, 0)):
                 Box(clip_w, clip_l + 5.0, clip_h, align=(Align.CENTER, Align.MIN, Align.MIN))
 
-            # 2. Lateral slide flanges engaging with the bowl's slide-in guide tracks
-            with Locations((0, -clip_l / 2.0, 0)):
-                Box(flange_w, clip_l * 0.8, clip_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            # 2. Circular cylindrical snap-fit collar with annular ridge (groove-style mount matching lid and bowl bottom)
+            collar_r = self.settings.motor_hub_socket_radius - self.settings.motor_hub_collar_clearance
+            collar_h = 5.0
+            groove_offset = self.settings.motor_hub_snap_groove_radius_offset
 
-            # 3. Integrated Hall sensor module mounting cradle at North end (extending to Y = 18.5)
-            with Locations((0, 12.0, 0)):
-                Box(6.0, 14.0, clip_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-            with Locations((0, self.settings.speed_sensor_pocket_y, clip_h)):
-                # Sensor locator boss
-                Box(4.0, 2.0, 3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            with Locations((0, 0, clip_h)):
+                Cylinder(radius=collar_r, height=collar_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                Cylinder(
+                    radius=13.5,
+                    height=collar_h + 1.0,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
+
+            # Annular snap ridge matching the internal groove in the bowl mounting socket
+            with BuildPart(mode=Mode.PRIVATE) as snap_ring_part:
+                Cylinder(
+                    radius=collar_r + groove_offset - 0.1,
+                    height=1.0,
+                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                )
+                Cylinder(
+                    radius=collar_r - 1.0,
+                    height=2.0,
+                    align=(Align.CENTER, Align.CENTER, Align.CENTER),
+                    mode=Mode.SUBTRACT,
+                )
+                fillet(snap_ring_part.edges().filter_by(GeomType.CIRCLE), radius=0.35)
+            with Locations((0, 0, clip_h + 2.0)):
+                add(snap_ring_part.part)
+
+            # Vertical expansion slits to provide radial snap compliance during insertion/removal
+            with Locations(Rot(0, 0, 45)), Locations(Rot(0, 0, 135)):
+                with Locations((0, 0, clip_h)):
+                    Box(
+                        1.2,
+                        collar_r * 2.0 + 2.0,
+                        collar_h + 1.0,
+                        align=(Align.CENTER, Align.CENTER, Align.MIN),
+                        mode=Mode.SUBTRACT,
+                    )
+
+            # 3. Dedicated Hall sensor PCB module mount directly on motor hub (FORIOT A3144 module)
+            # Front tongue only needs 2 mounting points for holes on the front of the board
+            hall_front_y = self.settings.speed_sensor_pocket_y
+            hall_sp_x = self.settings.hall_sensor_spacing_x
+            hall_sh = self.settings.hall_sensor_standoff_height
+            hall_dx = hall_sp_x / 2.0
+
+            # Mounting platform base supporting the 2 front mounting points
+            tongue_len = hall_front_y - 5.0 + 5.0
+            tongue_center_y = 5.0 + tongue_len / 2.0
+            with Locations((0, tongue_center_y, 0)):
+                Box(hall_sp_x + 6.0, tongue_len, clip_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+            # 2 press-fit mounting points for holes on front of the Hall sensor board
+            post_r = self.settings.pcb_mounting_post_diameter / 2.0
+            flare_r = self.settings.pcb_mounting_post_flare_diameter / 2.0
+            tip_r = self.settings.pcb_mounting_post_tip_diameter / 2.0
+            flare_h = self.settings.pcb_mounting_post_flare_height
+            shaft_h = self.settings.pcb_mounting_post_height - flare_h
+            boss_r = 2.8
+
+            for hx in [-hall_dx, hall_dx]:
+                with Locations((hx, hall_front_y, clip_h)):
+                    # Cylindrical boss pad
+                    Cylinder(radius=boss_r, height=hall_sh, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    # Press-fit flared retaining post
+                    with Locations((0, 0, hall_sh)):
+                        Cylinder(radius=post_r, height=shaft_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    with Locations((0, 0, hall_sh + shaft_h)):
+                        Cone(
+                            bottom_radius=flare_r,
+                            top_radius=tip_r,
+                            height=flare_h,
+                            align=(Align.CENTER, Align.CENTER, Align.MIN),
+                        )
+
+            # Sensor element locator pocket aligning with drive hub magnet pitch circle (R = 9.0mm)
+            ring_r = self.settings.magnet_ring_radius
+            with Locations((0, ring_r, clip_h)):
+                Box(4.5, 2.5, hall_sh + 1.0, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+
+            # Debossed label "HALL" on sensor platform
+            with BuildSketch() as hall_label_sketch:
+                Text("HALL", font_size=3.5, align=(Align.CENTER, Align.CENTER))
+            ext_label = extrude(hall_label_sketch.sketch, amount=0.5, mode=Mode.PRIVATE)
+            hub_bracket.part -= Location((0, hall_front_y - 4.5, clip_h)) * ext_label
 
             # 4. Pull handle at the back (South end, Y = -clip_l) for toolless removal
             with Locations((0, -clip_l, 0)):
@@ -1616,7 +1755,8 @@ class CatFountainProvider(Provider):
             )
 
         RigidJoint("mount", hub_bracket.part, Location((0, 0, 0)))
-        RigidJoint("motor_shaft", hub_bracket.part, Location((0, 0, clip_h + 9.3 + 1.0)))
+        RigidJoint("motor_shaft", hub_bracket.part, Location((0, 0, clip_h + 9.3 + 0.5)))
+        RigidJoint("hall_mount", hub_bracket.part, Location((0, hall_front_y, clip_h + hall_sh)))
         return hub_bracket
 
     def build_wiring_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:

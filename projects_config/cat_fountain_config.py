@@ -458,7 +458,7 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def swd_board_standoff_height(self) -> float:
         """Return the standoff height for the SWD breakout board."""
-        return float(self._raw_data.get("swd_board_standoff_height", 4.0))
+        return float(self._raw_data.get("swd_board_standoff_height", 2.0))
 
     # Fuel Gauge
     @cached_property
@@ -897,7 +897,7 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def motor_hub_thickness(self) -> float:
         """Return the thickness of the motor hub assembly bracket."""
-        return float(self._raw_data.get("motor_hub_thickness", 1.8))
+        return float(self._raw_data.get("motor_hub_thickness", 1.6))
 
     @cached_property
     def motor_hub_length(self) -> float:
@@ -908,6 +908,31 @@ class CatFountainConfig(BaseModel):
     def motor_hub_flange_width(self) -> float:
         """Return the outer flange width of the motor hub assembly bracket."""
         return float(self._raw_data.get("motor_hub_flange_width", 36.0))
+
+    @cached_property
+    def motor_hub_socket_radius(self) -> float:
+        """Return inner radius of motor hub mounting socket."""
+        return float(self._raw_data.get("motor_hub_socket_radius", 18.0))
+
+    @cached_property
+    def motor_hub_socket_wall(self) -> float:
+        """Return wall thickness of motor hub mounting socket."""
+        return float(self._raw_data.get("motor_hub_socket_wall", 2.5))
+
+    @cached_property
+    def motor_hub_snap_groove_radius_offset(self) -> float:
+        """Return radial depth offset of motor hub snap groove."""
+        return float(self._raw_data.get("motor_hub_snap_groove_radius_offset", 0.6))
+
+    @cached_property
+    def motor_hub_snap_groove_height(self) -> float:
+        """Return vertical height of motor hub snap groove."""
+        return float(self._raw_data.get("motor_hub_snap_groove_height", 1.2))
+
+    @cached_property
+    def motor_hub_collar_clearance(self) -> float:
+        """Return print clearance between motor hub collar and socket."""
+        return float(self._raw_data.get("motor_hub_collar_clearance", 0.25))
 
     @cached_property
     def motor_hub_arm_stub_length(self) -> float:
@@ -927,12 +952,37 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def motor_hub_support_rise(self) -> float:
         """Return the vertical rise along Y of the motor hub support web."""
-        return float(self._raw_data.get("motor_hub_support_rise", 0.0))
+        return float(self._raw_data.get("motor_hub_support_rise", 6.0))
 
     @cached_property
     def motor_hub_support_radius(self) -> float:
         """Return the curvature radius of the motor hub support web."""
-        return float(self._raw_data.get("motor_hub_support_radius", 0.0))
+        return float(self._raw_data.get("motor_hub_support_radius", 15.0))
+
+    @cached_property
+    def motor_hub_detent_y(self) -> float:
+        """Return the Y coordinate of the retention detent notches on the motor hub flange."""
+        return float(self._raw_data.get("motor_hub_detent_y", -14.0))
+
+    @cached_property
+    def motor_hub_detent_width(self) -> float:
+        """Return the width along Y of the motor hub retention detent notches."""
+        return float(self._raw_data.get("motor_hub_detent_width", 3.0))
+
+    @cached_property
+    def motor_hub_detent_depth(self) -> float:
+        """Return the lateral depth of the motor hub retention detent notches."""
+        return float(self._raw_data.get("motor_hub_detent_depth", 0.8))
+
+    @cached_property
+    def pcb_clip_detent_lip(self) -> float:
+        """Return the retention snap lip projection for slide-in PCB card guides."""
+        return float(self._raw_data.get("pcb_clip_detent_lip", 0.5))
+
+    @cached_property
+    def pcb_clip_stop_wall(self) -> float:
+        """Return the thickness of the positive end stop wall for slide-in PCB card guides."""
+        return float(self._raw_data.get("pcb_clip_stop_wall", 1.5))
 
     @cached_property
     def motor_radius(self) -> float:

@@ -1784,13 +1784,15 @@ class TestCatFountainProvider:
         assert bowl.part.is_valid()
 
         # Center of TMC6300 is (50.0, 15.0)
-        # With length 20.32 (along X) and width 15.24 (along Y), guide tracks are around X = 50 +/- 10.91
-        # Inside the track body at X = 50 + 11.5 should be solid plastic:
+        # With span 15.24mm (along X) and slide length 20.32mm (along Y), guide tracks are around X = 50 +/- 8.12
+        # Inside the track body at X = 50 + (15.24/2 + 0.5) should be solid plastic:
         t = provider.settings.bowl_thickness
         floor_z = provider.settings.floor_z
         track_z = floor_z - t - (provider.settings.motor_driver_standoff_height + 1.0)
-        assert bowl.part.is_inside((50.0 + 11.5, 15.0, track_z)), (
-            "TMC6300 clip guide track should be positioned for 20.32mm board length"
+        tmc_span = provider.settings.motor_driver_spacing_y
+        tmc_slide = provider.settings.motor_driver_spacing_x
+        assert bowl.part.is_inside((50.0 + tmc_span / 2.0 + 0.5, 15.0, track_z)), (
+            "TMC6300 clip guide track should be positioned for 15.24mm board width"
         )
 
         # "CURRENT" text is at (50.0, -2.5). "TMC6300" text should be moved to opposite side (Y = 15 + 7.5 + 5 = 27.5),
@@ -1804,10 +1806,11 @@ class TestCatFountainProvider:
             "TMC6300 text must not be engraved on the negative Y side (adjacent to CURRENT text)"
         )
 
-        # At new location (Y = 27.5), engraved text strokes cut into bowl floor
-        assert any(not bowl.part.is_inside((50.0 + dx, 27.5 + dy, text_z)) for dx in sample_dxs for dy in sample_dys), (
-            "TMC6300 text must be engraved on the positive Y side opposite CURRENT text"
-        )
+        # At new location (Y = 15.0 + tmc_slide / 2.0 + 5.0), engraved text strokes cut into bowl floor
+        text_y = 15.0 + tmc_slide / 2.0 + 5.0
+        assert any(
+            not bowl.part.is_inside((50.0 + dx, text_y + dy, text_z)) for dx in sample_dxs for dy in sample_dys
+        ), "TMC6300 text must be engraved on the positive Y side opposite CURRENT text"
 
     def test_regression_bug_swarming_cicada_917_clip_in_mounts(self, provider):
         """Verify BUG-SWARMING-CICADA-917: Replace motor room mount holes with press-fit clip mounts except charger."""
@@ -1846,44 +1849,65 @@ class TestCatFountainProvider:
             "Pico W boss must be solid plastic (no blind screw hole)"
         )
 
-        # 4. Current monitor uses press-fit clip mounts
+        # 4. Current monitor uses press-fit clip mounts with posts at {1, 3} (nearest to "CURRENT" text)
         ix, iy = 50.0, -15.0
         ina_dx = provider.settings.current_monitor_spacing_x / 2.0
         ina_dy = provider.settings.current_monitor_spacing_y / 2.0
-        assert bowl.part.is_inside((ix - ina_dx, iy - ina_dy, post_z)), (
-            "Current monitor standoff should feature solid press-fit post shaft"
+        # Post points at {1, 3} (nearest to text at +dy) have press-fit posts
+        assert bowl.part.is_inside((ix - ina_dx, iy + ina_dy, post_z)), (
+            "Current monitor mount point 1 must have press-fit post"
+        )
+        assert bowl.part.is_inside((ix + ina_dx, iy + ina_dy, post_z)), (
+            "Current monitor mount point 3 must have press-fit post"
+        )
+        # Boss-only points at {0, 2} have no post
+        assert not bowl.part.is_inside((ix - ina_dx, iy - ina_dy, post_z)), (
+            "Current monitor mount point 0 should have NO post (boss only)"
+        )
+        assert bowl.part.is_inside((ix - ina_dx, iy - ina_dy, boss_z)), (
+            "Current monitor mount point 0 must have solid boss pad"
+        )
+        assert not bowl.part.is_inside((ix + ina_dx, iy - ina_dy, post_z)), (
+            "Current monitor mount point 2 should have NO post (boss only)"
+        )
+        assert bowl.part.is_inside((ix + ina_dx, iy - ina_dy, boss_z)), (
+            "Current monitor mount point 2 must have solid boss pad"
         )
 
-        # 5. Fuel gauge has 2 posts and 2 bosses with NO posts
+        # 5. Fuel gauge has 2 posts at {1, 3} (nearest to "FUEL" text) and 2 bosses at {0, 2}
         fx, fy = 50.0, -45.0
         fuel_dx = provider.settings.fuel_gauge_spacing_x / 2.0
         fuel_dy = provider.settings.fuel_gauge_spacing_y / 2.0
-        # Post point (index 0) has post
-        assert bowl.part.is_inside((fx - fuel_dx, fy - fuel_dy, post_z)), (
-            "Fuel gauge mount point 0 should have press-fit post"
+        # Post points at {1, 3} (nearest to text at +dy) have press-fit posts
+        assert bowl.part.is_inside((fx - fuel_dx, fy + fuel_dy, post_z)), (
+            "Fuel gauge mount point 1 must have press-fit post"
         )
-        # Boss-only point (index 1) has no post (empty air at post_z, solid boss at boss_z)
-        assert not bowl.part.is_inside((fx - fuel_dx, fy + fuel_dy, post_z)), (
-            "Fuel gauge mount point 1 should have NO post (boss only)"
+        assert bowl.part.is_inside((fx + fuel_dx, fy + fuel_dy, post_z)), (
+            "Fuel gauge mount point 3 must have press-fit post"
         )
-        assert bowl.part.is_inside((fx - fuel_dx, fy + fuel_dy, boss_z)), (
-            "Fuel gauge mount point 1 must have solid boss pad"
+        # Boss-only points at {0, 2} have no post
+        assert not bowl.part.is_inside((fx - fuel_dx, fy - fuel_dy, post_z)), (
+            "Fuel gauge mount point 0 should have NO post (boss only)"
+        )
+        assert bowl.part.is_inside((fx - fuel_dx, fy - fuel_dy, boss_z)), (
+            "Fuel gauge mount point 0 must have solid boss pad"
+        )
+        assert not bowl.part.is_inside((fx + fuel_dx, fy - fuel_dy, post_z)), (
+            "Fuel gauge mount point 2 should have NO post (boss only)"
+        )
+        assert bowl.part.is_inside((fx + fuel_dx, fy - fuel_dy, boss_z)), (
+            "Fuel gauge mount point 2 must have solid boss pad"
         )
 
-        # 6. Hall sensor board has 2 posts and 2 bosses with NO posts
+        # 6. Legacy Hall sensor board mount on bowl ceiling is removed (moved directly to motor_hub)
         hx, hy = 0.0, 40.0
         hall_dx = provider.settings.hall_sensor_spacing_x / 2.0
         hall_dy = provider.settings.hall_sensor_spacing_y / 2.0
-        # Post point (index 0) has post
-        assert bowl.part.is_inside((hx - hall_dx, hy - hall_dy, post_z)), (
-            "Hall sensor mount point 0 should have press-fit post"
+        assert not bowl.part.is_inside((hx - hall_dx, hy - hall_dy, post_z)), (
+            "Legacy Hall sensor mount point on ceiling should be removed"
         )
-        # Boss-only point (index 1) has no post
-        assert not bowl.part.is_inside((hx - hall_dx, hy + hall_dy, post_z)), (
-            "Hall sensor mount point 1 should have NO post (boss only)"
-        )
-        assert bowl.part.is_inside((hx - hall_dx, hy + hall_dy, boss_z)), (
-            "Hall sensor mount point 1 must have solid boss pad"
+        assert not bowl.part.is_inside((hx - hall_dx, hy + hall_dy, boss_z)), (
+            "Legacy Hall sensor boss pad on ceiling should be removed"
         )
 
     def test_regression_bug_pincered_caddisfly_769_swd_clip_mount(self, provider):
@@ -1914,10 +1938,11 @@ class TestCatFountainProvider:
         sh = provider.settings.swd_board_standoff_height
         track_z = floor_z - t - (sh + 1.0)
 
-        # SWD is centered at (-50.0, -45.0)
-        # Guide track is positioned at X = -50.0 + (19.1 / 2.0 + 1.5) = -38.95
-        assert bowl.part.is_inside((-38.95, -45.0, track_z)), (
-            "SWD clip guide track should be present at (-38.95, -45.0)"
+        # SWD is centered at (-50.0, -45.0) with clip spacing swd_board_width (13.7mm)
+        # Guide track wall is positioned at X = -50.0 + (13.7 / 2.0 + 1.5) = -41.65
+        track_x = -50.0 + (provider.settings.swd_board_width / 2.0 + 1.5)
+        assert bowl.part.is_inside((track_x, -45.0, track_z)), (
+            f"SWD clip guide track should be present at ({track_x}, -45.0)"
         )
 
     def test_regression_bug_springing_mosquito_703_proximity_sensor_inner_wall_extension(self, provider):
@@ -1946,10 +1971,30 @@ class TestCatFountainProvider:
             "Inner wall of proximity sensor opening must be extended down 3mm to interface with top of ToF sensor PCB"
         )
 
+        # Enclosing sidewalls shielding optical sensor from ambient motor room LED light (Finding 1)
+        y_side = (provider.settings.proximity_sensor_pocket_width + 2.0) / 2.0
+        pt_left_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0)) * Location((-4.0, y_side, 0.0))
+        pt_left = (pt_left_loc.position.X, pt_left_loc.position.Y, pt_left_loc.position.Z)
+        assert bowl.part.is_inside(pt_left), "Left enclosing sidewall of ToF sensor must be solid"
+
         # Center of opening remains open aperture for ToF sensor beam
         pt_center_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0)) * Location((-5.0, 0, 0.0))
         pt_center = (pt_center_loc.position.X, pt_center_loc.position.Y, pt_center_loc.position.Z)
         assert not bowl.part.is_inside(pt_center), "Proximity sensor optical aperture center must remain open"
+
+        # Press-fit mounting posts on ToF sensor standoffs (Finding 5)
+        shaft_h = provider.settings.pcb_mounting_post_height - provider.settings.pcb_mounting_post_flare_height
+        tof_sp_x = provider.settings.proximity_sensor_spacing_x
+        tof_sp_y = provider.settings.proximity_sensor_spacing_y
+        for dy in [-tof_sp_x / 2.0, tof_sp_x / 2.0]:
+            for dz in [-tof_sp_y / 2.0, tof_sp_y / 2.0]:
+                pt_post_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0)) * Location(
+                    (-6.0 - shaft_h / 2.0, dy, dz)
+                )
+                pt_post = (pt_post_loc.position.X, pt_post_loc.position.Y, pt_post_loc.position.Z)
+                assert bowl.part.is_inside(pt_post), (
+                    f"ToF sensor mount at dy={dy}, dz={dz} must have a solid press-fit post"
+                )
 
     def test_regression_bug_vibrant_woodborer_940_motor_hub_assembly(self, provider):
         """Verify BUG-VIBRANT-WOODBORER-940: Motor hub assembly combining motor, clip, hub, and Hall sensor."""
@@ -2013,21 +2058,80 @@ class TestCatFountainProvider:
         assert motor_hub.part.is_valid()
         assert isinstance(motor_hub.part, Part)
 
-        # 5. Bowl base allows installing and removing motor while connected to drive hub
-        # The corridor along -Y where drive hub (Z = floor_z - pump_well_wall - 2.0) and
-        # motor body (Z = floor_z - 13.0) slide through must be unobstructed (not solid).
+        # 5. Integrated Hall sensor module mount directly on motor_hub (2 front press-fit mounting points)
+        sh = provider.settings.hall_sensor_standoff_height
+        clip_h = provider.settings.motor_hub_thickness
+        boss_z = clip_h + sh * 0.5
+        post_z = clip_h + sh + 1.0
+        hall_front_y = provider.settings.speed_sensor_pocket_y
+        hall_dx = provider.settings.hall_sensor_spacing_x / 2.0
+        # Both front mounting points (-hall_dx, hall_front_y) and (+hall_dx, hall_front_y) have press-fit posts and boss pads
+        for hx in [-hall_dx, hall_dx]:
+            assert motor_hub.part.is_inside((hx, hall_front_y, boss_z)), (
+                f"Hall sensor mount on motor_hub at X={hx}: must have solid boss pad"
+            )
+            assert motor_hub.part.is_inside((hx, hall_front_y, post_z)), (
+                f"Hall sensor mount on motor_hub at X={hx}: must have press-fit post"
+            )
+
+        # 6. Bowl base features groove-style cylindrical mounting socket for motor hub assembly
         pump_well_wall = provider.settings.pump_well_wall
         ceiling_z = floor_z - pump_well_wall
-        assert not bowl.part.is_inside((0.0, -10.0, ceiling_z - 2.0)), (
-            "Drive hub corridor along -Y must be open to allow removing motor while connected to drive hub"
+        standoff_h = provider.settings.drive_hub_standoff_height
+        hub_h = provider.settings.magnet_thickness + provider.settings.magnet_clearance + 0.8
+        mount_seat_z = ceiling_z - standoff_h - hub_h - 0.5 - 9.3 - clip_h
+
+        socket_in_r = provider.settings.motor_hub_socket_radius
+        socket_wall = provider.settings.motor_hub_socket_wall
+        socket_out_r = socket_in_r + socket_wall
+        r_socket_wall = (socket_in_r + socket_out_r) / 2.0
+
+        # Bowl socket wall is solid
+        assert bowl.part.is_inside((r_socket_wall, 0.0, mount_seat_z + 3.0)), (
+            "Bowl mounting socket wall for motor_hub groove-style retention must be solid"
         )
-        assert not bowl.part.is_inside((0.0, -10.0, ceiling_z - 8.0)), (
-            "Motor body corridor along -Y must be open to allow removing motor while connected to drive hub"
+        # Socket interior bore is open for drive hub and motor assembly
+        assert not bowl.part.is_inside((0.0, 0.0, mount_seat_z + 3.0)), (
+            "Interior bore of bowl motor hub socket must be open"
+        )
+        # Internal annular snap groove is present in socket inner wall
+        assert not bowl.part.is_inside((socket_in_r + 0.3, 0.0, mount_seat_z + clip_h + 2.0)), (
+            "Internal annular snap groove in bowl socket wall must be open"
+        )
+        # Keyway slot at +Y in socket wall is open for Hall sensor arm
+        assert not bowl.part.is_inside((0.0, socket_out_r, mount_seat_z + 1.0)), (
+            "Keyway slot at +Y in socket wall must be open for Hall sensor platform"
+        )
+        # Clearance slot at -Y in socket wall is open for motor mount plate and wiring
+        assert not bowl.part.is_inside((0.0, -socket_out_r, mount_seat_z + 1.0)), (
+            "Clearance slot at -Y in socket wall must be open for motor mount plate"
         )
 
-        # Slide-in guide tracks are present on the bowl to retain motor_hub
-        flange_w = provider.settings.motor_hub_flange_width
-        track_x = flange_w / 2.0
-        assert bowl.part.is_inside((track_x + 1.5, -5.0, ceiling_z - 5.0)), (
-            "Bowl guide track for motor_hub slide-in retention must be solid"
+        # Motor hub features matching circular cylindrical snap collar with annular snap ridge
+        collar_r = socket_in_r - provider.settings.motor_hub_collar_clearance
+        r_collar_wall = (collar_r + 13.5) / 2.0
+        assert motor_hub.part.is_inside((r_collar_wall, 0.0, clip_h + 3.0)), (
+            "Motor hub circular mounting collar wall must be solid"
         )
+        assert not motor_hub.part.is_inside((0.0, 0.0, clip_h + 3.0)), (
+            "Motor hub central bore must be open for motor shaft clearance"
+        )
+        assert motor_hub.part.is_inside((collar_r + 0.3, 0.0, clip_h + 2.0)), (
+            "Motor hub collar must feature an external annular snap ridge to engage socket groove"
+        )
+
+        # 7. TMC6300 slide clip features positive back stop wall and retention detent lip
+        t = provider.settings.bowl_thickness
+        tmc_x, tmc_y = 50.0, 15.0
+        tmc_span = provider.settings.motor_driver_spacing_y
+        tmc_slide = provider.settings.motor_driver_spacing_x
+        tmc_sh = provider.settings.motor_driver_standoff_height
+        half_span = tmc_span / 2.0
+        # Positive back stop wall at +Y is solid
+        assert bowl.part.is_inside(
+            (tmc_x + half_span + 0.5, tmc_y + tmc_slide / 2.0 + 1.0, floor_z - t - tmc_sh - 1.0)
+        ), "TMC6300 clip must feature a solid positive back stop wall"
+        # Retention detent lip at -Y is solid
+        assert bowl.part.is_inside(
+            (tmc_x - half_span + 0.3, tmc_y - tmc_slide / 2.0 + 0.5, floor_z - t - tmc_sh - 1.0)
+        ), "TMC6300 clip must feature an inward retention detent lip"
