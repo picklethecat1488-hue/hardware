@@ -35,6 +35,8 @@ class TestCatFountainProvider:
             "drive_hub": {"material": "petg"},
             "pump_cover": {"material": "utr8100"},
             "motor_clip": {"material": "petg"},
+            "motor_hub": {"material": "petg"},
+            "motor_hub_assembly": {"material": "petg"},
         }
         with patch("provider.provider.load_manifest", return_value=mock_manifest):
             yield CatFountainProvider()
@@ -990,7 +992,7 @@ class TestCatFountainProvider:
 
     @pytest.mark.slow
     def test_drive_hub_standoff_thrust_ring(self, provider):
-        """Verify that the drive hub has an integral outer perimeter standoff thrust ring for anti-wobble stability."""
+        """Verify that the drive hub has a centered thrust collar around shaft collar and outer ring is removed."""
         hub = provider.build_drive_hub("drive_hub")
         solid = hub.part
 
@@ -999,13 +1001,17 @@ class TestCatFountainProvider:
         standoff_h = provider.settings.drive_hub_standoff_height
         assert standoff_h > 0.0, "Expected positive standoff height"
 
-        # Point inside the outer perimeter standoff ring (R = hub_r - 0.7mm) at Z = hub_h + standoff_h / 2.0 must be solid
+        # Point at the outer perimeter (R = hub_r - 0.7mm) at Z = hub_h + standoff_h / 2.0 must NOT be solid (outer ring removed)
         test_r = hub_r - 0.7
         z_mid = hub_h + standoff_h / 2.0
-        assert solid.is_inside((test_r, 0.0, z_mid)), "Outer perimeter standoff ring is missing or hollow!"
+        assert not solid.is_inside((test_r, 0.0, z_mid)), "Outer perimeter standoff ring must be removed!"
+
+        # Point inside the centered thrust collar around the 1.5mm motor shaft collar (R <= 1.5mm) must be solid
+        r_collar = (provider.settings.drive_hub_shaft_radius + provider.settings.drive_hub_thrust_collar_radius) / 2.0
+        assert solid.is_inside((r_collar, 0.0, z_mid)), "Centered thrust collar is missing or hollow!"
 
         # Point inside the recessed magnet region (R = 9.0mm) at Z = hub_h + standoff_h / 2.0 must be empty space (recessed)
-        assert not solid.is_inside((9.0, 0.0, z_mid)), "Magnet pocket region is not recessed below outer standoff ring!"
+        assert not solid.is_inside((9.0, 0.0, z_mid)), "Magnet pocket region is not recessed below thrust collar!"
 
         # Central shaft hole at Z = hub_h + standoff_h / 2.0 must be open
         assert not solid.is_inside((0.0, 0.0, z_mid)), "Shaft hole is blocked!"
@@ -1940,3 +1946,64 @@ class TestCatFountainProvider:
         pt_center_loc = Location((r - t / 2.0 - 3.0, 0, 16.0), (0, -30, 0)) * Location((-5.0, 0, 0.0))
         pt_center = (pt_center_loc.position.X, pt_center_loc.position.Y, pt_center_loc.position.Z)
         assert not bowl.part.is_inside(pt_center), "Proximity sensor optical aperture center must remain open"
+
+    def test_regression_bug_vibrant_woodborer_940_motor_hub_assembly(self, provider):
+        """Verify BUG-VIBRANT-WOODBORER-940: Motor hub assembly combining motor, clip, hub, and Hall sensor."""
+        from build123d import Part
+
+        # 1. Centered thrust bearing (R <= 1.5mm)
+        assert hasattr(provider.settings, "drive_hub_thrust_collar_radius"), (
+            "drive_hub_thrust_collar_radius setting missing"
+        )
+        assert provider.settings.drive_hub_thrust_collar_radius <= 1.5, (
+            "Thrust collar radius must be <= 1.5mm to reduce friction torque by >90%"
+        )
+
+        hub = provider.build_drive_hub("drive_hub")
+        assert hub.part.volume > 0.0
+        assert hub.part.is_valid()
+
+        hub_r = provider.settings.impeller_radius + provider.settings.magnet_radius + 1.6
+        hub_h = provider.settings.magnet_thickness + provider.settings.magnet_clearance + 0.8
+        standoff_h = provider.settings.drive_hub_standoff_height
+        z_mid = hub_h + standoff_h / 2.0
+
+        # Outer perimeter standoff ring at R = hub_r - 0.7 must be removed (not solid)
+        test_r_outer = hub_r - 0.7
+        assert not hub.part.is_inside((test_r_outer, 0.0, z_mid)), (
+            "Outer perimeter standoff ring at R = 15.6mm must be removed"
+        )
+
+        # Central thrust collar around 1.5mm motor shaft collar at R <= 1.5mm must be solid
+        r_collar = (provider.settings.drive_hub_shaft_radius + provider.settings.drive_hub_thrust_collar_radius) / 2.0
+        assert hub.part.is_inside((r_collar, 0.0, z_mid)), (
+            "Central thrust collar directly around 1.5mm motor shaft collar must be solid"
+        )
+
+        # 2. Optimized magnetic coupling axial air gap (2.0 - 2.5mm)
+        assert 2.0 <= provider.settings.pump_well_wall <= 2.5, (
+            "Axial air gap (pump_well_wall) must be increased to 2.0 - 2.5mm"
+        )
+
+        # 3. Speed sensor pocket directly aligns with drive hub magnet pitch circle
+        bowl = provider.build_bowl("bowl")
+        assert bowl.part.volume > 0.0
+        floor_z = provider.settings.floor_z
+        ring_r = provider.settings.magnet_ring_radius
+
+        # Point at the magnet pitch circle inside the speed sensor pocket (Z = floor_z - 10.0, Y = ring_r)
+        # must be open (subtracted) so the bent A3144 Hall sensor receives pulses directly from the magnets
+        pt_sensor_pitch = (0.0, ring_r, floor_z - 10.0)
+        assert not bowl.part.is_inside(pt_sensor_pitch), (
+            f"Speed sensor pocket must align directly with magnet pitch circle at Y = {ring_r}"
+        )
+
+        # 4. Motor hub assembly unit
+        assert "motor_hub" in provider.part, "motor_hub target missing from provider.part"
+        assert "motor_hub_assembly" in provider.part, "motor_hub_assembly target missing from provider.part"
+        assert hasattr(provider, "build_motor_hub"), "build_motor_hub method missing"
+
+        motor_hub = provider.build_motor_hub("motor_hub")
+        assert motor_hub.part.volume > 0.0
+        assert motor_hub.part.is_valid()
+        assert isinstance(motor_hub.part, Part)

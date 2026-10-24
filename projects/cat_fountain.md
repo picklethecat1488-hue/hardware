@@ -89,7 +89,8 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 | **BLDC Motor (15W)** | **BetaFPV 1102 (18000KV) Brushless Motor** | Ultra-lightweight 1S-compatible brushless motor to drive the dry-side magnet hub. | *N/A (Driven by TMC6300)* | 15W power class, 13.8mm diameter, 1.5mm shaft, lightweight 2.9g, mounts with M1.4 screws. |
 | **Coupling Magnets (Qty: 6)** | **6mm x 3mm N52 Neodymium Discs** | Rare-earth magnets to couple the dry motor shaft to the wet impeller. | *N/A (Magnetic)* | Strong N52 grade, 3 magnets on the dry hub and 3 on the wet impeller with alternating polarities. |
 | **I2C Current Sensor** | [Adafruit INA219 Current Sensor](https://www.adafruit.com/product/904) | High-side current and power monitor to measure motor current draw, stall detection, and load torque. | `0x40` | Measures current up to 3.2A with 1% accuracy. Used for low water / refill detection and stall protection. |
-| **Speed Sensor** | **Digital Latching Hall Sensor (e.g., US1881 / AH3577)** | Measures impeller rotation speed contactlessly by detecting alternating magnet poles. | *N/A (Driven by GP26)* | Latching digital output, SOT-23 or TO-92 package, fits inside custom pocket in the motor boss. |
+| **Speed Sensor** | [FORIOT A3144 Hall Effect Sensor Module](https://www.amazon.com/FORIOT-Effect-Sensor-3144E-A3144/dp/B0H69BSJ4Z) | Measures impeller rotation speed contactlessly by detecting alternating magnet poles. Mounted on PCB with mounting holes. | *N/A (Driven by GP26)* | Standard A3144 Hall sensor on PCB with built-in LM393 comparator and LED. Bending the sensor leads off the PCB directly aligns the sensing element with the drive hub magnet pitch circle. |
+| **Thrust Bearing Washer** | **PTFE (Teflon) / POM Thrust Washer (1.5mm ID x 3.0mm OD x 0.8mm)** | Centered thrust bearing washer directly around 1.5mm motor shaft collar at R ≤ 1.5mm. | *N/A (Mechanical)* | Dropping friction contact radius from 15.6mm down to 1.5mm reduces friction torque by over 90% ($T_f \propto R$). |
 
 ### Technical Integration Notes
 
@@ -118,6 +119,11 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 8. **Wiring Gauge Recommendations & Safety**:
    * **Low-Power Control and Logic (Pico, VL53L0X, MAX17048, INA219, WS2812B)**: Use **30AWG wire wrap wire** since these signals carry very low current (< 50mA).
    * **High-Power Motor Lines (TMC6300 VCC/GND and Motor Phases U/V/W)**: Use **20AWG solid core wire**. Since the 15W brushless motor can draw up to 4.0A at peak load, the 20AWG wire (rated up to 11A) is required to prevent overheating, thermal degradation, or voltage drop.
+9. **Motor Hub Subassembly, Centered Thrust Collar & Magnetic Air Gap**:
+   * **Motor Hub Subassembly**: To streamline assembly and debugging, the BetaFPV 1102 motor, drive hub, Teflon thrust washer, and FORIOT A3144 Hall sensor module are integrated into a single clip-in motor hub unit (`motor_hub` / `motor_clip`) that slides directly into the bottom of the bowl.
+   * **Centered Thrust Collar (90% Friction Reduction)**: The outer perimeter standoff ring on the drive hub (at R = 15.6mm) is removed. Instead, a centered PTFE/POM thrust collar (R ≤ 1.5mm) directly surrounds the 1.5mm motor shaft collar, reducing parasitic friction torque by over 90% ($T_f \propto R$).
+   * **Optimized Magnetic Coupling Air Gap**: The axial isolation wall (`pump_well_wall`) between the dry drive hub and the wet impeller is set to 2.0mm (2.0–2.5mm range). This minimizes magnetic axial clamp force ($F \propto 1/d^2$) while retaining full rotational magnetic coupling torque for centrifugal water pumping.
+   * **Speed Sensor Direct Pitch Circle Alignment**: The speed sensor pocket at Y = 18.5mm spans radially inward to the drive hub's magnet pitch circle (`magnet_ring_radius = 9.0mm`), allowing the bent A3144 Hall sensor leads to place the sensor element directly in the alternating magnetic field of the rotating drive magnets to reliably pulse `SPEED_SENSE` (`GP26`).
 
 
 ### 3D-Printed Parts & Materials
@@ -133,6 +139,8 @@ The following parts are manufactured to form the physical structure and assembly
 | **LED Cover** | 1 | UTR-8100 Translucent (SLA) | Translucent push-fit diffuser plug for the status RGB LED. |
 | **Drive Hub** | 1 | PETG | Dry-side hub carrying the driving coupling magnets, mounted to the motor shaft. |
 | **Pump Cover** | 1 | PETG | Wet-side snap-fit cap with an axial intake hole that seals the impeller casing. |
+| **Motor Clip** | 1 | PETG | Slide-in retaining clip securing the motor and housing the Hall sensor cradle. |
+| **Motor Hub Assembly** | 1 | PETG | Single clip-in subassembly combining motor clip, BetaFPV 1102 motor, drive hub, Teflon thrust washer, and FORIOT A3144 Hall sensor module. |
 
 > [!NOTE]
 > **Manufacturing & Post-Processing Details**:

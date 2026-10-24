@@ -58,6 +58,13 @@ motor_clip:
   export: [stl, obj]
   color: [0.18, 0.18, 0.22, 1.0]
 
+motor_hub:
+  part:
+    modes: [default, print]
+  material: petg
+  export: [stl, obj]
+  color: [0.18, 0.18, 0.22, 1.0]
+
 
 product:
   diagram:

@@ -782,7 +782,7 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def pump_well_wall(self) -> float:
         """Return the wall thickness of the central isolation pump well."""
-        return float(self._raw_data.get("pump_well_wall", 1.5))
+        return float(self._raw_data.get("pump_well_wall", 2.0))
 
     @cached_property
     def pump_inlet_radius(self) -> float:
@@ -862,7 +862,22 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def drive_hub_standoff_radius(self) -> float:
         """Return the outer radius of the drive hub standoff thrust ring."""
-        return float(self._raw_data.get("drive_hub_standoff_radius", 2.5))
+        return float(self._raw_data.get("drive_hub_standoff_radius", 1.5))
+
+    @cached_property
+    def drive_hub_thrust_collar_radius(self) -> float:
+        """Return the outer radius of the centered thrust collar around the motor shaft collar."""
+        return float(self._raw_data.get("drive_hub_thrust_collar_radius", self.drive_hub_standoff_radius))
+
+    @cached_property
+    def magnetic_coupling_air_gap(self) -> float:
+        """Return the axial magnetic coupling air gap (equal to pump well wall thickness)."""
+        return self.pump_well_wall
+
+    @cached_property
+    def speed_sensor_pocket_y(self) -> float:
+        """Return the Y coordinate of the speed sensor pocket."""
+        return float(self._raw_data.get("speed_sensor_pocket_y", 18.5))
 
     @cached_property
     def drive_hub_standoff_height(self) -> float:

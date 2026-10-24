@@ -131,6 +131,8 @@ class CatFountainProvider(Provider):
             "drive_hub": self.build_drive_hub,
             "pump_cover": self.build_pump_cover,
             "motor_clip": self.build_motor_clip,
+            "motor_hub": self.build_motor_hub,
+            "motor_hub_assembly": self.build_motor_hub,
         }
 
     @property
@@ -297,9 +299,15 @@ class CatFountainProvider(Provider):
                             mode=Mode.SUBTRACT,
                         )
 
-                # Speed sensor pocket (5.0mm wide, 2.2mm thick, open from Z = -3.0 down through bottom)
-                with Locations((0, 18.5, -3.0)):
-                    Box(5.0, 2.2, 20.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+                # Speed sensor pocket directly aligning with drive hub magnet pitch circle
+                # Spans from the PCB pocket at Y = 18.5mm to the magnet pitch circle (Y = ring_r)
+                # to allow the bent A3144 Hall sensor leads to reach and detect alternating magnet poles
+                pocket_y_outer = self.settings.speed_sensor_pocket_y + 1.1
+                pocket_y_inner = self.settings.magnet_ring_radius - 1.5
+                pocket_len_y = pocket_y_outer - pocket_y_inner
+                pocket_center_y = (pocket_y_outer + pocket_y_inner) / 2.0
+                with Locations((0, pocket_center_y, -3.0)):
+                    Box(5.0, pocket_len_y, 20.0, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 
                 # 2. Pocket for the BetaFPV 1102 motor body (open from motor_pocket_z down through bottom)
                 motor_pocket_z = -(self.settings.pump_well_wall + recess_d)
@@ -1159,24 +1167,19 @@ class CatFountainProvider(Provider):
         mr = self.settings.magnet_radius + self.settings.magnet_clearance
         mt = self.settings.magnet_thickness + self.settings.magnet_clearance
         ring_r = self.settings.magnet_ring_radius
-        ring_inner_r = hub_r - 1.4
+        thrust_r = self.settings.drive_hub_thrust_collar_radius
+        shaft_r = self.settings.drive_hub_shaft_radius
 
         with BuildPart() as hub:
             Cylinder(radius=hub_r, height=hub_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
-            # Add integral outer perimeter standoff thrust ring on top face (Z = hub_h) for anti-wobble stability
-            if standoff_h > 0.0:
+            # Central PTFE/POM thrust collar directly around 1.5mm motor shaft collar at R <= 1.5mm
+            # Dropping contact radius from R = 15.6mm down to R <= 1.5mm reduces friction torque by over 90%
+            if standoff_h > 0.0 and thrust_r > 0.0:
                 with Locations((0, 0, hub_h)):
-                    Cylinder(radius=hub_r, height=standoff_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                    Cylinder(
-                        radius=ring_inner_r,
-                        height=standoff_h + 0.1,
-                        align=(Align.CENTER, Align.CENTER, Align.MIN),
-                        mode=Mode.SUBTRACT,
-                    )
+                    Cylinder(radius=thrust_r, height=standoff_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
             # Motor shaft hole with generous print-shrinkage clearance for smooth hand press-fit
-            shaft_r = self.settings.drive_hub_shaft_radius
             total_h = hub_h + standoff_h
             with BuildSketch() as hole_sketch:
                 Circle(radius=shaft_r)
@@ -1542,6 +1545,13 @@ class CatFountainProvider(Provider):
             with Locations((0, -clip_l, 0)):
                 Box(clip_w, clip_l + 5.0, clip_h, align=(Align.CENTER, Align.MIN, Align.MIN))
 
+            # Integrated Hall sensor module mounting cradle at North end (extending to Y = 18.5)
+            with Locations((0, 12.0, 0)):
+                Box(6.0, 14.0, clip_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            with Locations((0, self.settings.speed_sensor_pocket_y, clip_h)):
+                # Sensor locator boss
+                Box(4.0, 2.0, 3.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
             # Add a pull handle at the back (South end, Y = -clip_l)
             with Locations((0, -clip_l, 0)):
                 Box(clip_w + 4.0, 3.0, clip_h + 3.0, align=(Align.CENTER, Align.MAX, Align.MIN))
@@ -1625,6 +1635,72 @@ class CatFountainProvider(Provider):
 
         RigidJoint("mount", clip.part, Location((0, 0, 0)))
         return clip
+
+    @method_cache
+    def build_motor_hub(
+        self, target: str, subassembly: str = "default", mode: ProviderMode = ProviderMode.DEFAULT
+    ) -> BuildPart:
+        """Build the motor hub assembly unit combining motor clip, motor, drive hub, thrust washer, and Hall sensor."""
+        clip_part = self.build_motor_clip("motor_clip", mode=mode).part
+        hub_part = self.build_drive_hub("drive_hub", mode=mode).part
+
+        clip_h = self.settings.motor_clip_thickness
+        motor_h = 9.3  # BetaFPV 1102 motor body height
+        motor_r = self.settings.motor_radius  # ~6.9mm
+        shaft_r = self.settings.drive_hub_shaft_radius
+        thrust_r = self.settings.drive_hub_thrust_collar_radius
+        thrust_h = self.settings.drive_hub_standoff_height
+        hub_z = clip_h + motor_h + 1.0
+
+        with BuildPart() as hub_assembly:
+            # 1. Base motor clip
+            if clip_part is not None:
+                add(clip_part)
+
+            # 2. BetaFPV 1102 BLDC Motor body mounted on top of clip
+            with Locations((0, 0, clip_h)):
+                Cylinder(radius=motor_r, height=motor_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                # 1.5mm motor shaft extending upward
+                Cylinder(radius=0.75, height=motor_h + 6.0, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+            # 3. Drive hub mounted on motor shaft
+            if hub_part is not None:
+                with Locations((0, 0, hub_z)):
+                    add(hub_part)
+
+            # 4. Centered PTFE (Teflon) thrust washer at R <= 1.5mm directly around shaft collar
+            with Locations((0, 0, hub_z + self.settings.magnet_thickness + self.settings.magnet_clearance + 0.8)):
+                Cylinder(radius=thrust_r, height=thrust_h, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                Cylinder(
+                    radius=shaft_r,
+                    height=thrust_h + 0.2,
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
+                    mode=Mode.SUBTRACT,
+                )
+
+            # 5. FORIOT A3144 Hall Effect Sensor PCB module mounted at Y = 18.5mm
+            # with bent A3144 sensing element aligned with drive hub magnet pitch circle
+            ring_r = self.settings.magnet_ring_radius
+            with Locations((0, self.settings.speed_sensor_pocket_y, clip_h)):
+                # Sensor module PCB
+                Box(11.0, 15.0, 1.6, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                # A3144 sensor element extending to magnet pitch circle
+                with Locations((0, ring_r - self.settings.speed_sensor_pocket_y, 4.0)):
+                    Box(4.5, 2.2, 4.5, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+            URDFMetadata(
+                label=target,
+                material=self.get_material(target) or "petg",
+                density=self.settings.petg_density,
+                boundary_friction=self.settings.petg_boundary_friction,
+                collision_type=URDFCollisionType.CONVEX,
+                parent="bowl",
+                joint_type=URDFJointType.FIXED,
+            )
+
+        RigidJoint("mount", hub_assembly.part, Location((0, 0, 0)))
+        RigidJoint("hub", hub_assembly.part, Location((0, 0, hub_z)))
+        return hub_assembly
 
     def build_wiring_diagram(self, room: Room, targets: Sequence[str], mode: ProviderMode) -> None:
         """Build a 2D colored wiring diagram for the cat water fountain."""
