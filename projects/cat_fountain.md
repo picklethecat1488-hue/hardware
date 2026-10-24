@@ -119,8 +119,8 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 8. **Wiring Gauge Recommendations & Safety**:
    * **Low-Power Control and Logic (Pico, VL53L0X, MAX17048, INA219, WS2812B)**: Use **30AWG wire wrap wire** since these signals carry very low current (< 50mA).
    * **High-Power Motor Lines (TMC6300 VCC/GND and Motor Phases U/V/W)**: Use **20AWG solid core wire**. Since the 15W brushless motor can draw up to 4.0A at peak load, the 20AWG wire (rated up to 11A) is required to prevent overheating, thermal degradation, or voltage drop.
-9. **Motor Hub Subassembly, Centered Thrust Collar & Magnetic Air Gap**:
-   * **Motor Hub Subassembly**: To streamline assembly and debugging, the BetaFPV 1102 motor, drive hub, Teflon thrust washer, and FORIOT A3144 Hall sensor module are integrated into a single clip-in motor hub unit (`motor_hub` / `motor_clip`) that slides directly into the bottom of the bowl.
+9. **Motor Hub Assembly, Centered Thrust Collar & Magnetic Air Gap**:
+   * **Dedicated Motor Drive Hub Assembly**: Replaces the separate motor clip and integrated enclosed well beneath the impeller with open slide-in guide tracks on the bowl base and a dedicated motor hub bracket (`motor_hub`). The BetaFPV 1102 motor, rotating drive unit (`drive_hub`), Teflon thrust washer, and FORIOT A3144 Hall sensor module install and remove as a single unit into the bowl base without having to disconnect the drive hub from the motor shaft.
    * **Centered Thrust Collar (90% Friction Reduction)**: The outer perimeter standoff ring on the drive hub (at R = 15.6mm) is removed. Instead, a centered PTFE/POM thrust collar (R ≤ 1.5mm) directly surrounds the 1.5mm motor shaft collar, reducing parasitic friction torque by over 90% ($T_f \propto R$).
    * **Optimized Magnetic Coupling Air Gap**: The axial isolation wall (`pump_well_wall`) between the dry drive hub and the wet impeller is set to 2.0mm (2.0–2.5mm range). This minimizes magnetic axial clamp force ($F \propto 1/d^2$) while retaining full rotational magnetic coupling torque for centrifugal water pumping.
    * **Speed Sensor Direct Pitch Circle Alignment**: The speed sensor pocket at Y = 18.5mm spans radially inward to the drive hub's magnet pitch circle (`magnet_ring_radius = 9.0mm`), allowing the bent A3144 Hall sensor leads to place the sensor element directly in the alternating magnetic field of the rotating drive magnets to reliably pulse `SPEED_SENSE` (`GP26`).
@@ -132,15 +132,14 @@ The following parts are manufactured to form the physical structure and assembly
 
 | Part Name | Qty | Recommended Material | Description / Use Case |
 | :--- | :--- | :--- | :--- |
-| **Bowl** | 1 | UTR-8100 Translucent (SLA) | The main water reservoir (2L capacity) with integrated offset tube, static guide post, and raised volute casing. |
+| **Bowl** | 1 | UTR-8100 Translucent (SLA) | The main water reservoir (2L capacity) with integrated offset tube, static guide post, raised volute casing, and slide-in guide tracks for the motor drive hub assembly. |
 | **Lid** | 1 | UTR-8100 Translucent (SLA) | Top cover acting as a drinking shelf, stabilizing the delivery tube, and containing a terrace shelf. |
 | **Impeller** | 1 | PETG / ABS | The lightweight magnetic-drive centrifugal impeller with 6 radial blades. |
 | **Bottom Cover** | 1 | UTR-8100 Translucent (SLA) | Bottom enclosure cover protecting the electronics compartment. |
 | **LED Cover** | 1 | UTR-8100 Translucent (SLA) | Translucent push-fit diffuser plug for the status RGB LED. |
-| **Drive Hub** | 1 | PETG | Dry-side hub carrying the driving coupling magnets, mounted to the motor shaft. |
+| **Drive Hub** | 1 | PETG | Dedicated rotating dry-side drive unit carrying the driving coupling magnets and centered thrust collar, mounted to the motor shaft. |
 | **Pump Cover** | 1 | PETG | Wet-side snap-fit cap with an axial intake hole that seals the impeller casing. |
-| **Motor Clip** | 1 | PETG | Slide-in retaining clip securing the motor and housing the Hall sensor cradle. |
-| **Motor Hub Assembly** | 1 | PETG | Single clip-in subassembly combining motor clip, BetaFPV 1102 motor, drive hub, Teflon thrust washer, and FORIOT A3144 Hall sensor module. |
+| **Motor Hub** | 1 | PETG | Dedicated motor drive hub assembly bracket securing the BetaFPV 1102 motor and Hall sensor, sliding into guide tracks beneath the bowl base as a single unit with the motor and drive hub. |
 
 > [!NOTE]
 > **Manufacturing & Post-Processing Details**:

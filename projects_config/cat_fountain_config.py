@@ -890,44 +890,49 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("bottom_cover_opening_width", 20.0))
 
     @cached_property
-    def motor_clip_width(self) -> float:
-        """Return the width of the motor retaining clip."""
-        return float(self._raw_data.get("motor_clip_width", 17.6))
+    def motor_hub_width(self) -> float:
+        """Return the width of the motor hub assembly bracket."""
+        return float(self._raw_data.get("motor_hub_width", 17.6))
 
     @cached_property
-    def motor_clip_thickness(self) -> float:
-        """Return the thickness of the motor retaining clip."""
-        return float(self._raw_data.get("motor_clip_thickness", 1.8))
+    def motor_hub_thickness(self) -> float:
+        """Return the thickness of the motor hub assembly bracket."""
+        return float(self._raw_data.get("motor_hub_thickness", 1.8))
 
     @cached_property
-    def motor_clip_length(self) -> float:
-        """Return the length of the motor retaining clip."""
-        return float(self._raw_data.get("motor_clip_length", 26.0))
+    def motor_hub_length(self) -> float:
+        """Return the length of the motor hub assembly bracket."""
+        return float(self._raw_data.get("motor_hub_length", 26.0))
 
     @cached_property
-    def motor_clip_arm_stub_length(self) -> float:
-        """Return the length of the remaining guide stub on the relieved arm of the motor clip."""
-        return float(self._raw_data.get("motor_clip_arm_stub_length", 10.0))
+    def motor_hub_flange_width(self) -> float:
+        """Return the outer flange width of the motor hub assembly bracket."""
+        return float(self._raw_data.get("motor_hub_flange_width", 36.0))
 
     @cached_property
-    def motor_clip_side_relief_radius(self) -> float:
-        """Return the arc radius for the wiring connector relief on the motor clip."""
-        return float(self._raw_data.get("motor_clip_side_relief_radius", 20.0))
+    def motor_hub_arm_stub_length(self) -> float:
+        """Return the length of the remaining guide stub on the relieved arm of the motor hub bracket."""
+        return float(self._raw_data.get("motor_hub_arm_stub_length", 10.0))
 
     @cached_property
-    def motor_clip_side_relief_fillet(self) -> float:
-        """Return the fillet radius for the re-entrant corner of the motor clip relief."""
-        return float(self._raw_data.get("motor_clip_side_relief_fillet", 1.0))
+    def motor_hub_side_relief_radius(self) -> float:
+        """Return the arc radius for the wiring connector relief on the motor hub bracket."""
+        return float(self._raw_data.get("motor_hub_side_relief_radius", 20.0))
 
     @cached_property
-    def motor_clip_support_rise(self) -> float:
-        """Return the vertical rise along Y of the motor clip support web."""
-        return float(self._raw_data.get("motor_clip_support_rise", 0.0))
+    def motor_hub_side_relief_fillet(self) -> float:
+        """Return the fillet radius for the re-entrant corner of the motor hub relief."""
+        return float(self._raw_data.get("motor_hub_side_relief_fillet", 1.0))
 
     @cached_property
-    def motor_clip_support_radius(self) -> float:
-        """Return the curvature radius of the motor clip support web."""
-        return float(self._raw_data.get("motor_clip_support_radius", 0.0))
+    def motor_hub_support_rise(self) -> float:
+        """Return the vertical rise along Y of the motor hub support web."""
+        return float(self._raw_data.get("motor_hub_support_rise", 0.0))
+
+    @cached_property
+    def motor_hub_support_radius(self) -> float:
+        """Return the curvature radius of the motor hub support web."""
+        return float(self._raw_data.get("motor_hub_support_radius", 0.0))
 
     @cached_property
     def motor_radius(self) -> float:

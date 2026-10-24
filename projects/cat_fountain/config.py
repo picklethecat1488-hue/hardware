@@ -29,7 +29,6 @@ def config_tune(provider: Any, target: str, subassembly: Optional[str]) -> None:
             "cat_fountain/led_cover",
             "cat_fountain/drive_hub",
             "cat_fountain/pump_cover",
-            "cat_fountain/motor_clip",
             "cat_fountain/motor_hub",
         ],
     )

@@ -51,13 +51,6 @@ pump_cover:
   color: [0.08, 0.45, 0.88, 0.65]
 
 
-motor_clip:
-  part:
-    modes: [default, print]
-  material: petg
-  export: [stl, obj]
-  color: [0.18, 0.18, 0.22, 1.0]
-
 motor_hub:
   part:
     modes: [default, print]

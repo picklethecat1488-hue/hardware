@@ -7,7 +7,7 @@
 - **Category**: `CAD`
 - **Component**: `cat_fountain`
 - **Created**: `2026-10-23 22:54:57 UTC`
-- **Resolved**: `2026-10-24 00:05:54 UTC`
+- **Resolved**: `2026-10-24 01:29:24 UTC`
 
 #### Description
 
@@ -36,4 +36,4 @@ https://www.amazon.com/FORIOT-Effect-Sensor-3144E-A3144/dp/B0H69BSJ4Z/ref=sr_1_4
 
 #### Resolution Notes
 
-Created motor hub assembly combining motor clip, drive hub, motor, and Hall sensor. Replaced outer drive hub ring with centered PTFE thrust collar (R<=1.5mm) reducing friction torque by >90%. Increased magnetic coupling air gap to 2.0mm. Directly aligned speed sensor pocket with magnet pitch circle. Updated documentation and BOM with FORIOT A3144 Hall module and Teflon thrust washer.
+Replaced motor_clip and integrated enclosed well beneath the impeller with dedicated motor drive hub assembly (motor_hub) sliding into guide tracks on bowl base, while keeping drive_hub as separate rotating drive unit so motor and drive hub install and remove as a single unit without detaching.

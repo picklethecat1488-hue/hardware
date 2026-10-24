@@ -34,9 +34,7 @@ class TestCatFountainProvider:
             "led_cover": {"material": "utr8100"},
             "drive_hub": {"material": "petg"},
             "pump_cover": {"material": "utr8100"},
-            "motor_clip": {"material": "petg"},
             "motor_hub": {"material": "petg"},
-            "motor_hub_assembly": {"material": "petg"},
         }
         with patch("provider.provider.load_manifest", return_value=mock_manifest):
             yield CatFountainProvider()
@@ -53,25 +51,28 @@ class TestCatFountainProvider:
         assert "bottom_cover" in provider.part
         assert "lid" in provider.part
         assert "led_cover" in provider.part
+        assert "drive_hub" in provider.part
+        assert "motor_hub" in provider.part
+        assert "motor_clip" not in provider.part
 
-    def test_motor_clip_r_shape_relief(self, provider):
-        """Verify motor clip R-shape connector relief geometry without building full bowl (BUG-TRANSLUCENT-LARVA-792)."""
-        clip = provider.build_motor_clip("motor_clip")
-        assert clip.part.volume > 0.0
-        assert clip.part.is_valid()
+    def test_motor_hub_r_shape_relief(self, provider):
+        """Verify motor hub R-shape connector relief geometry without building full bowl (BUG-TRANSLUCENT-LARVA-792)."""
+        hub = provider.build_motor_hub("motor_hub")
+        assert hub.part.volume > 0.0
+        assert hub.part.is_valid()
 
-        clip_h = provider.settings.motor_clip_thickness
+        clip_h = provider.settings.motor_hub_thickness
         # Relieved arm must be open at Y = -10.0 to allow connector rotation
-        assert not clip.part.is_inside((-6.0, -10.0, clip_h * 0.5))
+        assert not hub.part.is_inside((-6.0, -10.0, clip_h * 0.5))
         # Guide stub near handle must remain solid for slide-in slot alignment
-        assert clip.part.is_inside((-6.0, -20.0, clip_h * 0.5))
+        assert hub.part.is_inside((-6.0, -20.0, clip_h * 0.5))
         # Opposite continuous arm must remain solid
-        assert clip.part.is_inside((6.0, -10.0, clip_h * 0.5))
+        assert hub.part.is_inside((6.0, -10.0, clip_h * 0.5))
         # Support web connecting stub to continuous arm must be solid below the support curve
-        assert clip.part.is_inside((0.0, -18.0, clip_h * 0.5))
-        assert clip.part.is_inside((0.0, -14.5, clip_h * 0.5))
+        assert hub.part.is_inside((0.0, -18.0, clip_h * 0.5))
+        assert hub.part.is_inside((0.0, -14.5, clip_h * 0.5))
         # Wire channel above support web must remain open
-        assert not clip.part.is_inside((0.0, -5.0, clip_h * 0.5))
+        assert not hub.part.is_inside((0.0, -5.0, clip_h * 0.5))
 
     @pytest.mark.slow
     def test_build_part_geometry(self, provider):
@@ -908,9 +909,9 @@ class TestCatFountainProvider:
     @pytest.mark.slow
     def test_assembly_and_fitment_tolerances(self, provider):
         """Verify assembly clearances: clip fits through bottom cover, and drive hub fits in recess."""
-        # 1. Verify that the bottom cover's opening width is larger than the motor clip width.
-        # This ensures the fork can actually be slid in from the side.
-        assert provider.settings.bottom_cover_opening_width > provider.settings.motor_clip_width
+        # 1. Verify that the bottom cover's opening width is larger than the motor hub mount plate width.
+        # This ensures the assembly can actually be accessed from the side.
+        assert provider.settings.bottom_cover_opening_width > provider.settings.motor_hub_width
 
         # 2. Verify that the drive hub outer radius is smaller than the bowl's drive hub recess radius.
         # This ensures the drive hub can be physically inserted into the recess on the motor shaft.
@@ -1626,12 +1627,12 @@ class TestCatFountainProvider:
             "Motor pocket at radius 7.8mm is solid: motor diameter 15.2mm (radius 7.6mm) will rub or not fit!"
         )
 
-        # 2. Verify motor clip mounting and anti-rotation features
-        clip = provider.build_motor_clip("motor_clip")
-        assert clip.part.volume > 0.0
-        assert clip.part.is_valid()
+        # 2. Verify motor hub mounting and anti-rotation features
+        hub = provider.build_motor_hub("motor_hub")
+        assert hub.part.volume > 0.0
+        assert hub.part.is_valid()
 
-        clip_h = provider.settings.motor_clip_thickness
+        clip_h = provider.settings.motor_hub_thickness
         r_bcd = provider.settings.motor_mount_bolt_circle_radius
         assert r_bcd == 3.3, f"Expected BCD radius 3.3mm for BetaFPV 1102, got {r_bcd}"
 
@@ -1640,35 +1641,35 @@ class TestCatFountainProvider:
             rad = math.radians(angle)
             hx = r_bcd * math.cos(rad)
             hy = r_bcd * math.sin(rad)
-            assert not clip.part.is_inside((hx, hy, clip_h * 0.5)), (
+            assert not hub.part.is_inside((hx, hy, clip_h * 0.5)), (
                 f"Mount screw hole at ({hx:.2f}, {hy:.2f}) is blocked!"
             )
 
         # Center shaft / bearing clearance hole must be open
-        assert not clip.part.is_inside((0.0, 0.0, clip_h * 0.5)), "Central shaft clearance hole is blocked!"
+        assert not hub.part.is_inside((0.0, 0.0, clip_h * 0.5)), "Central shaft clearance hole is blocked!"
 
         # Solid plate area outside shaft hole supporting motor base
-        assert clip.part.is_inside((3.5, 0.0, clip_h * 0.5)), (
-            "Motor clip is hollowed out around motor base: expected solid plastic to mount and secure motor!"
+        assert hub.part.is_inside((3.5, 0.0, clip_h * 0.5)), (
+            "Motor hub bracket is hollowed out around motor base: expected solid plastic to mount and secure motor!"
         )
 
         # Wire relief channel extending South along -Y
-        assert not clip.part.is_inside((0.0, -10.0, clip_h - 0.2)), (
+        assert not hub.part.is_inside((0.0, -10.0, clip_h - 0.2)), (
             "Wire relief channel at Y = -10.0 is blocked: 3-wire motor cable would be pinched!"
         )
 
         # Dedicated R-shape side relief for 1102 motor connector rotation (BUG-TRANSLUCENT-LARVA-792)
         # Relieved arm must be open to allow connector rotation
-        assert not clip.part.is_inside((-6.0, -10.0, clip_h * 0.5)), (
-            "Motor clip side relief cutout at (-6.0, -10.0) is blocked: connector cannot rotate into position!"
+        assert not hub.part.is_inside((-6.0, -10.0, clip_h * 0.5)), (
+            "Motor hub side relief cutout at (-6.0, -10.0) is blocked: connector cannot rotate into position!"
         )
         # Guide stub near handle must remain solid for slide-in slot alignment
-        assert clip.part.is_inside((-6.0, -20.0, clip_h * 0.5)), (
-            "Motor clip guide stub at (-6.0, -20.0) is missing: clip cannot align in bowl slide slot!"
+        assert hub.part.is_inside((-6.0, -20.0, clip_h * 0.5)), (
+            "Motor hub guide stub at (-6.0, -20.0) is missing: hub cannot align in bowl slide slot!"
         )
         # Opposite continuous arm must remain solid
-        assert clip.part.is_inside((6.0, -10.0, clip_h * 0.5)), (
-            "Motor clip continuous arm at (6.0, -10.0) is missing: structural integrity lost!"
+        assert hub.part.is_inside((6.0, -10.0, clip_h * 0.5)), (
+            "Motor hub continuous arm at (6.0, -10.0) is missing: structural integrity lost!"
         )
 
     def test_regression_bug_hairy_wasp_932_tmc6300_6pwm_wiring_and_no_sense_pin(self, provider):
@@ -2001,12 +2002,32 @@ class TestCatFountainProvider:
             f"Speed sensor pocket must align directly with magnet pitch circle at Y = {ring_r}"
         )
 
-        # 4. Motor hub assembly unit
+        # 4. Motor hub assembly unit replaces motor_clip while drive_hub remains separate drive unit
         assert "motor_hub" in provider.part, "motor_hub target missing from provider.part"
-        assert "motor_hub_assembly" in provider.part, "motor_hub_assembly target missing from provider.part"
+        assert "motor_clip" not in provider.part, "motor_clip must be replaced by motor_hub in provider.part"
+        assert "drive_hub" in provider.part, "drive_hub must remain as the separate rotating drive unit"
         assert hasattr(provider, "build_motor_hub"), "build_motor_hub method missing"
 
         motor_hub = provider.build_motor_hub("motor_hub")
         assert motor_hub.part.volume > 0.0
         assert motor_hub.part.is_valid()
         assert isinstance(motor_hub.part, Part)
+
+        # 5. Bowl base allows installing and removing motor while connected to drive hub
+        # The corridor along -Y where drive hub (Z = floor_z - pump_well_wall - 2.0) and
+        # motor body (Z = floor_z - 13.0) slide through must be unobstructed (not solid).
+        pump_well_wall = provider.settings.pump_well_wall
+        ceiling_z = floor_z - pump_well_wall
+        assert not bowl.part.is_inside((0.0, -10.0, ceiling_z - 2.0)), (
+            "Drive hub corridor along -Y must be open to allow removing motor while connected to drive hub"
+        )
+        assert not bowl.part.is_inside((0.0, -10.0, ceiling_z - 8.0)), (
+            "Motor body corridor along -Y must be open to allow removing motor while connected to drive hub"
+        )
+
+        # Slide-in guide tracks are present on the bowl to retain motor_hub
+        flange_w = provider.settings.motor_hub_flange_width
+        track_x = flange_w / 2.0
+        assert bowl.part.is_inside((track_x + 1.5, -5.0, ceiling_z - 5.0)), (
+            "Bowl guide track for motor_hub slide-in retention must be solid"
+        )
