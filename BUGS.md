@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-04 15:04:31 UTC` |
+| **Report Date** | `2026-11-04 15:04:33 UTC` |
 | **Total Issues** | `1` |
 | **Open Issues** | `0` |
 | **Resolved / Closed** | `1 (100%)` |
@@ -42,9 +42,14 @@
 - **Status**: `RESOLVED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
+- **Created**: `2026-11-04 15:04:33 UTC`
 
 #### Attached Commits
 
 - `f00ba42`
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:d0187ad3 --> CLI Verification Step | `ls -la`
 
 ---
