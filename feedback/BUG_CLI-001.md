@@ -5,7 +5,12 @@
 - **Status**: `RESOLVED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
+- **Created**: `2026-11-04 14:46:11 UTC`
 
 #### Attached Commits
 
 - `f00ba42`
+
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:bd10937c --> CLI Verification Step | `ls -la`
