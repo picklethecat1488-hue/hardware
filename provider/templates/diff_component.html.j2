@@ -362,7 +362,7 @@
   }
 
   .diff-binary-icon {
-    font-size: 36px;
+    font-size: 26px;
     color: var(--quake-amber, #e59400);
   }
 
@@ -378,7 +378,7 @@
     justify-content: center;
     height: 100%;
     color: var(--quake-text-dim, #716053);
-    font-size: 10px;
+    font-size: 9px;
     gap: 8px;
   }
 </style>
@@ -681,7 +681,7 @@
       container.innerHTML = `
         <div class="diff-binary-box">
           <div class="diff-binary-icon">💾</div>
-          <div style="font-weight:700;font-size:11px;color:var(--quake-gold);">Binary File Diff</div>
+          <div style="font-weight:700;font-size:10px;color:var(--quake-gold);">Binary File Diff</div>
           <div>${this.escapeHtml(filePath)}</div>
           <div class="diff-binary-links">
             <a href="/api/raw?commit=${encodeURIComponent(diffData.commit || 'HEAD')}&file=${encodeURIComponent(filePath)}&parent=true" download class="quake-btn quake-btn-default">Download Old</a>
