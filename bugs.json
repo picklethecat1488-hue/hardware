@@ -29,13 +29,13 @@
         }
       ],
       "created_at": "2026-11-04 15:04:33 UTC",
-      "updated_at": "2026-11-04 15:04:34 UTC",
+      "updated_at": "",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": "",
+      "rejection_notes": "CLI rejected this",
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-04 15:04:34 UTC"
+  "updated_at": "2026-11-04 15:04:36 UTC"
 }
