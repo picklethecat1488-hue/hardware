@@ -4,7 +4,7 @@
   "bugs": [
     {
       "id": "BUG-CLI-001",
-      "uuid": "cc81ef55-9f1b-4abe-971f-4083792d332b",
+      "uuid": "88e8d556-8e41-4265-8f49-56ddac2d0061",
       "title": "CLI Review Bug",
       "status": "RESOLVED",
       "severity": "HIGH",
@@ -19,23 +19,15 @@
       "commit_ids": [
         "f00ba42"
       ],
-      "review_tasks": [
-        {
-          "id": "bd10937c",
-          "title": "CLI Verification Step",
-          "command": "ls -la",
-          "status": "COMPLETED",
-          "notes": ""
-        }
-      ],
-      "created_at": "2026-11-04 14:46:11 UTC",
-      "updated_at": "2026-11-04 14:46:12 UTC",
+      "review_tasks": [],
+      "created_at": "",
+      "updated_at": "2026-11-04 15:04:31 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": "CLI rejected this",
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-04 14:46:15 UTC"
+  "updated_at": "2026-11-04 15:04:31 UTC"
 }
