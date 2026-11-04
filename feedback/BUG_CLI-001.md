@@ -13,4 +13,4 @@
 
 #### Review Tasks & Functional Checklist
 
-- [ ] <!-- task:bd10937c --> CLI Verification Step | `ls -la`
+- [x] <!-- task:bd10937c --> CLI Verification Step | `ls -la`
