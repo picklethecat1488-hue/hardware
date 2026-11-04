@@ -119,6 +119,7 @@ proximity_sensor_spacing_y: 13.5
 proximity_sensor_standoff_height: 4.0
 proximity_sensor_pocket_width: 12.0
 proximity_sensor_pocket_height: 14.0
+proximity_sensor_inner_wall_extension: 3.0
 
 # ==========================================
 # 8. LED & Plug
@@ -132,9 +133,14 @@ led_plug_width: 4.8
 # ==========================================
 # 9. PCBs & Mounting Standoffs
 # ==========================================
-# General PCB bosses
+# General PCB bosses & clip-on mounting posts
 pcb_boss_radius: 2.2
 pcb_hole_radius: 1.0
+pcb_mounting_post_diameter: 1.8
+pcb_mounting_post_height: 2.6
+pcb_mounting_post_flare_diameter: 2.3
+pcb_mounting_post_flare_height: 0.8
+pcb_mounting_post_tip_diameter: 1.6
 
 # Raspberry Pi Pico
 pico_spacing_x: 11.4
@@ -158,10 +164,20 @@ current_monitor_spacing_x: 20.32
 current_monitor_spacing_y: 12.7
 current_monitor_standoff_height: 4.0
 
-# Motor Driver
-motor_driver_spacing_x: 25.4
-motor_driver_spacing_y: 20.3
+# Motor Driver (SparkFun TMC6300: 0.80" x 0.60")
+motor_driver_spacing_x: 20.32
+motor_driver_spacing_y: 15.24
 motor_driver_standoff_height: 4.0
+
+# Hall Sensor Board
+hall_sensor_spacing_x: 10.0
+hall_sensor_spacing_y: 20.0
+hall_sensor_standoff_height: 4.0
+
+# SWD Breakout Board (Treedix JTAG/SWD Adapter)
+swd_board_length: 19.1
+swd_board_width: 13.7
+swd_board_standoff_height: 2.0
 
 # ==========================================
 # 10. Magnetic Centrifugal Pump Redesign
@@ -175,7 +191,7 @@ magnet_ring_radius: 9.0
 
 # Volute Casing & Well Geometry
 pump_well_depth: 10.0
-pump_well_wall: 1.5
+pump_well_wall: 2.0
 pump_inlet_radius: 6.0
 pump_inlet_width: 12.0
 pump_inlet_height: 5.0
@@ -186,7 +202,7 @@ pump_cover_snap_clearance: 0.45
 pump_cover_lip_thickness: 1.5
 pump_cover_internal_clearance: 0.40
 pump_cover_clip_opening_width: 10.5
-pump_outlet_radius: 4.0      # 8mm inner diameter (10mm OD)
+pump_outlet_radius: 4.0  # 8mm inner diameter (10mm OD)
 pump_casing_clearance: 1.0
 
 # ==========================================
@@ -195,15 +211,27 @@ pump_casing_clearance: 1.0
 drive_hub_shaft_radius: 0.85
 drive_hub_recess_radius: 17.0
 drive_hub_recess_depth: 5.3
-drive_hub_standoff_radius: 2.5
+drive_hub_standoff_radius: 1.5
+drive_hub_thrust_collar_radius: 1.5
 drive_hub_standoff_height: 0.8
+speed_sensor_pocket_y: 18.5
 bottom_cover_opening_width: 20.0
-motor_clip_width: 17.6
-motor_clip_thickness: 1.6
-motor_clip_length: 26.0
-motor_clip_arm_stub_length: 10.0
-motor_clip_side_relief_radius: 20.0
-motor_clip_side_relief_fillet: 1.0
-motor_clip_support_rise: 6.0
-motor_clip_support_radius: 15.0
-
+motor_hub_width: 17.6
+motor_hub_thickness: 1.6
+motor_hub_length: 26.0
+motor_hub_flange_width: 36.0
+motor_hub_socket_radius: 18.0
+motor_hub_socket_wall: 2.5
+motor_hub_snap_groove_radius_offset: 0.6
+motor_hub_snap_groove_height: 1.2
+motor_hub_collar_clearance: 0.25
+motor_hub_arm_stub_length: 10.0
+motor_hub_side_relief_radius: 20.0
+motor_hub_side_relief_fillet: 1.0
+motor_hub_support_rise: 6.0
+motor_hub_support_radius: 15.0
+motor_hub_detent_y: -14.0
+motor_hub_detent_width: 3.0
+motor_hub_detent_depth: 0.8
+pcb_clip_detent_lip: 0.5
+pcb_clip_stop_wall: 1.5

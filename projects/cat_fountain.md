@@ -85,11 +85,12 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 | **USBC Charger & Boost** | **Adafruit BQ25185 Charger & Boost (6106)** | USB-C power management IC for charging the battery and boosting to 5V for the water pump motor. | *N/A (Standalone)* | Standalone linear charger. Uses jumpers/resistors to configure chemistry/current. S1 (FAULT) & S2 (CHG) are left disconnected. |
 | **Battery Fuel Gauge** | **Adafruit MAX17048 LiPo Fuel Gauge** | Battery monitor board to track cell voltage and state of charge (percentage) over I2C. | `0x36` | Primary interface to access battery and charging status. The 18650 battery connects directly to this board, which is then jumpered to the charger. Includes configurable alert interrupt (ALRT) pin connected to GP14. |
 | **Battery** | **Standard 18650 3.7V Li-ion Cell** | Main energy source (e.g. Samsung 30Q or Panasonic NCR18650B, 3000+ mAh). | *N/A (Analog)* | Rechargeable lithium-ion cell to fit the internal battery storage area. |
-| **BLDC Motor Driver** | **SparkFun TMC6300 Breakout** | Low-voltage three-phase brushless motor driver breakout to drive the 15W BLDC motor. | *N/A (Driven by GP16..GP22)* | Supports 2V-11V range, up to 2A continuous, breadboard-compatible 25.4mm x 20.3mm footprint. |
+| **BLDC Motor Driver** | **SparkFun TMC6300 Breakout** | Low-voltage three-phase brushless motor driver breakout to drive the 15W BLDC motor. | *N/A (Driven by GP16..GP22)* | Supports 2V-11V range, up to 2A continuous, compact 20.32mm x 15.24mm (0.80" x 0.60") footprint. |
 | **BLDC Motor (15W)** | **BetaFPV 1102 (18000KV) Brushless Motor** | Ultra-lightweight 1S-compatible brushless motor to drive the dry-side magnet hub. | *N/A (Driven by TMC6300)* | 15W power class, 13.8mm diameter, 1.5mm shaft, lightweight 2.9g, mounts with M1.4 screws. |
 | **Coupling Magnets (Qty: 6)** | **6mm x 3mm N52 Neodymium Discs** | Rare-earth magnets to couple the dry motor shaft to the wet impeller. | *N/A (Magnetic)* | Strong N52 grade, 3 magnets on the dry hub and 3 on the wet impeller with alternating polarities. |
 | **I2C Current Sensor** | [Adafruit INA219 Current Sensor](https://www.adafruit.com/product/904) | High-side current and power monitor to measure motor current draw, stall detection, and load torque. | `0x40` | Measures current up to 3.2A with 1% accuracy. Used for low water / refill detection and stall protection. |
-| **Speed Sensor** | **Digital Latching Hall Sensor (e.g., US1881 / AH3577)** | Measures impeller rotation speed contactlessly by detecting alternating magnet poles. | *N/A (Driven by GP26)* | Latching digital output, SOT-23 or TO-92 package, fits inside custom pocket in the motor boss. |
+| **Speed Sensor** | [FORIOT A3144 Hall Effect Sensor Module](https://www.amazon.com/FORIOT-Effect-Sensor-3144E-A3144/dp/B0H69BSJ4Z) | Measures impeller rotation speed contactlessly by detecting alternating magnet poles. Mounted on PCB with mounting holes. | *N/A (Driven by GP26)* | Standard A3144 Hall sensor on PCB with built-in LM393 comparator and LED. Bending the sensor leads off the PCB directly aligns the sensing element with the drive hub magnet pitch circle. |
+| **Thrust Bearing Washer** | **PTFE (Teflon) / POM Thrust Washer (1.5mm ID x 3.0mm OD x 0.8mm)** | Centered thrust bearing washer directly around 1.5mm motor shaft collar at R ≤ 1.5mm. | *N/A (Mechanical)* | Dropping friction contact radius from 15.6mm down to 1.5mm reduces friction torque by over 90% ($T_f \propto R$). |
 
 ### Technical Integration Notes
 
@@ -118,6 +119,15 @@ To build the cat fountain with I2C communication across key monitoring subsystem
 8. **Wiring Gauge Recommendations & Safety**:
    * **Low-Power Control and Logic (Pico, VL53L0X, MAX17048, INA219, WS2812B)**: Use **30AWG wire wrap wire** since these signals carry very low current (< 50mA).
    * **High-Power Motor Lines (TMC6300 VCC/GND and Motor Phases U/V/W)**: Use **20AWG solid core wire**. Since the 15W brushless motor can draw up to 4.0A at peak load, the 20AWG wire (rated up to 11A) is required to prevent overheating, thermal degradation, or voltage drop.
+9. **Motor Hub Assembly, Groove-Style Retention, PCB Card Guides, Centered Thrust Collar & Magnetic Air Gap**:
+   * **Single-Unit Motor Drive Hub Assembly**: Replaces the separate motor clip and integrated enclosed well beneath the impeller with a groove-style cylindrical snap socket beneath the bowl base and a dedicated motor hub bracket (`motor_hub`). The BetaFPV 1102 motor, rotating drive unit (`drive_hub`), Teflon thrust washer, and FORIOT A3144 Hall sensor module install and remove axially as a single subassembly into the bowl base without having to disconnect the drive hub or unscrew the motor.
+   * **Direct Hall Sensor Mount on Motor Hub**: The legacy ceiling press-fit mount for the Hall sensor has been removed from the dry compartment ceiling. The FORIOT A3144 Hall effect sensor PCB mounts directly onto the forward tongue of the `motor_hub` bracket via 2 front flared press-fit posts and boss pads, placing the bent A3144 sensing element directly within the rotating magnet pitch circle (`magnet_ring_radius = 9.0mm`) to pulse `SPEED_SENSE` (`GP26`).
+   * **Groove-Style Snap Retention (Matching Lid & Bottom Cover)**:
+     - The bowl base features a circular cylindrical socket with an internal annular snap-fit groove and a North-facing keyway slot.
+     - The `motor_hub` bracket features a matching circular cylindrical snap collar with an external annular snap ridge and compliance relief slits, allowing toolless push-in snap installation and pull-down removal as a single unit without twisting or vibrating loose.
+     - The TMC6300 and SWD driver slide card guides feature precision-spaced rails (15.24mm span for TMC6300, 13.7mm span for SWD) with 1.0mm solid retention lips, 0.25mm snug clearance, solid positive back stop walls at $+Y$, and inward retention detent lips at the $-Y$ entrance to prevent the boards from moving or falling out.
+   * **Centered Thrust Collar (90% Friction Reduction)**: The outer perimeter standoff ring on the drive hub (at R = 15.6mm) is removed. Instead, a centered PTFE/POM thrust collar (R ≤ 1.5mm) directly surrounds the 1.5mm motor shaft collar, reducing parasitic friction torque by over 90% ($T_f \propto R$).
+   * **Optimized Magnetic Coupling Air Gap**: The axial isolation wall (`pump_well_wall`) between the dry drive hub and the wet impeller is set to 2.0mm (2.0–2.5mm range). This minimizes magnetic axial clamp force ($F \propto 1/d^2$) while retaining full rotational magnetic coupling torque for centrifugal water pumping.
 
 
 ### 3D-Printed Parts & Materials
@@ -126,13 +136,14 @@ The following parts are manufactured to form the physical structure and assembly
 
 | Part Name | Qty | Recommended Material | Description / Use Case |
 | :--- | :--- | :--- | :--- |
-| **Bowl** | 1 | UTR-8100 Translucent (SLA) | The main water reservoir (2L capacity) with integrated offset tube, static guide post, and raised volute casing. |
+| **Bowl** | 1 | UTR-8100 Translucent (SLA) | The main water reservoir (2L capacity) with integrated offset tube, static guide post, raised volute casing, and groove-style mounting socket for the motor drive hub assembly. |
 | **Lid** | 1 | UTR-8100 Translucent (SLA) | Top cover acting as a drinking shelf, stabilizing the delivery tube, and containing a terrace shelf. |
 | **Impeller** | 1 | PETG / ABS | The lightweight magnetic-drive centrifugal impeller with 6 radial blades. |
 | **Bottom Cover** | 1 | UTR-8100 Translucent (SLA) | Bottom enclosure cover protecting the electronics compartment. |
 | **LED Cover** | 1 | UTR-8100 Translucent (SLA) | Translucent push-fit diffuser plug for the status RGB LED. |
-| **Drive Hub** | 1 | PETG | Dry-side hub carrying the driving coupling magnets, mounted to the motor shaft. |
+| **Drive Hub** | 1 | PETG | Dedicated rotating dry-side drive unit carrying the driving coupling magnets and centered thrust collar, mounted to the motor shaft. |
 | **Pump Cover** | 1 | PETG | Wet-side snap-fit cap with an axial intake hole that seals the impeller casing. |
+| **Motor Hub** | 1 | PETG | Dedicated motor drive hub assembly bracket securing the BetaFPV 1102 motor and Hall sensor, snapping into the groove socket beneath the bowl base as a single unit with the motor and drive hub. |
 
 > [!NOTE]
 > **Manufacturing & Post-Processing Details**:

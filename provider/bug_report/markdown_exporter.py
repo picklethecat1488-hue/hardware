@@ -35,6 +35,16 @@ class MarkdownBugExporter:
         self.repo_root = repo_root
         self._file_mtimes: Dict[str, float] = {}
 
+    @staticmethod
+    def _is_content_unchanged(disk_content: str, new_content: str) -> bool:
+        """Check if bug markdown content is unchanged, ignoring volatile Report Date."""
+        if disk_content == new_content:
+            return True
+        date_pattern = r"\|\s*\*\*Report Date\*\*\s*\|\s*`[^`]*`\s*\|"
+        disk_normalized = re.sub(date_pattern, "", disk_content).strip()
+        new_normalized = re.sub(date_pattern, "", new_content).strip()
+        return disk_normalized == new_normalized
+
     def export_markdown(
         self,
         database: BugDatabaseModel,
@@ -74,7 +84,8 @@ class MarkdownBugExporter:
             output_path.write_text(md_text, encoding="utf-8")
         else:
             try:
-                if output_path.read_text(encoding="utf-8") != md_text:
+                disk_content = output_path.read_text(encoding="utf-8")
+                if not self._is_content_unchanged(disk_content, md_text):
                     output_path.write_text(md_text, encoding="utf-8")
             except OSError:
                 output_path.write_text(md_text, encoding="utf-8")

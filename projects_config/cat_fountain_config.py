@@ -403,6 +403,63 @@ class CatFountainConfig(BaseModel):
         """Return the outer boss radius for PCB mounting posts."""
         return float(self._raw_data.get("pcb_boss_radius", 2.2))
 
+    @cached_property
+    def pcb_mounting_post_diameter(self) -> float:
+        """Return the shaft diameter for press-fit PCB mounting posts."""
+        return float(self._raw_data.get("pcb_mounting_post_diameter", 1.8))
+
+    @cached_property
+    def pcb_mounting_post_height(self) -> float:
+        """Return the overall height of press-fit PCB mounting posts."""
+        return float(self._raw_data.get("pcb_mounting_post_height", 2.6))
+
+    @cached_property
+    def pcb_mounting_post_flare_diameter(self) -> float:
+        """Return the flared head diameter for press-fit PCB mounting posts."""
+        return float(self._raw_data.get("pcb_mounting_post_flare_diameter", 2.3))
+
+    @cached_property
+    def pcb_mounting_post_flare_height(self) -> float:
+        """Return the flared head height for press-fit PCB mounting posts."""
+        return float(self._raw_data.get("pcb_mounting_post_flare_height", 0.8))
+
+    @cached_property
+    def pcb_mounting_post_tip_diameter(self) -> float:
+        """Return the insertion tip diameter for press-fit PCB mounting posts."""
+        return float(self._raw_data.get("pcb_mounting_post_tip_diameter", 1.6))
+
+    # Hall Sensor Board
+    @cached_property
+    def hall_sensor_spacing_x(self) -> float:
+        """Return X hole spacing for the Hall sensor board."""
+        return float(self._raw_data.get("hall_sensor_spacing_x", 10.0))
+
+    @cached_property
+    def hall_sensor_spacing_y(self) -> float:
+        """Return Y hole spacing for the Hall sensor board."""
+        return float(self._raw_data.get("hall_sensor_spacing_y", 20.0))
+
+    @cached_property
+    def hall_sensor_standoff_height(self) -> float:
+        """Return standoff height for the Hall sensor board."""
+        return float(self._raw_data.get("hall_sensor_standoff_height", 4.0))
+
+    # SWD Breakout Board (Treedix JTAG/SWD Adapter)
+    @cached_property
+    def swd_board_length(self) -> float:
+        """Return the length of the Treedix JTAG/SWD breakout board."""
+        return float(self._raw_data.get("swd_board_length", 19.1))
+
+    @cached_property
+    def swd_board_width(self) -> float:
+        """Return the width of the Treedix JTAG/SWD breakout board."""
+        return float(self._raw_data.get("swd_board_width", 13.7))
+
+    @cached_property
+    def swd_board_standoff_height(self) -> float:
+        """Return the standoff height for the SWD breakout board."""
+        return float(self._raw_data.get("swd_board_standoff_height", 2.0))
+
     # Fuel Gauge
     @cached_property
     def fuel_gauge_spacing_x(self) -> float:
@@ -444,6 +501,11 @@ class CatFountainConfig(BaseModel):
     def proximity_sensor_pocket_height(self) -> float:
         """Return pocket height for the proximity sensor."""
         return float(self._raw_data.get("proximity_sensor_pocket_height", 14.0))
+
+    @cached_property
+    def proximity_sensor_inner_wall_extension(self) -> float:
+        """Return height of inner wall extension for proximity sensor openings to interface with ToF PCB."""
+        return float(self._raw_data.get("proximity_sensor_inner_wall_extension", 3.0))
 
     # Raspberry Pi Pico
     @cached_property
@@ -507,12 +569,12 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def motor_driver_spacing_x(self) -> float:
         """Return X hole spacing for motor driver."""
-        return float(self._raw_data.get("motor_driver_spacing_x", 20.0))
+        return float(self._raw_data.get("motor_driver_spacing_x", 20.32))
 
     @cached_property
     def motor_driver_spacing_y(self) -> float:
         """Return Y hole spacing for motor driver."""
-        return float(self._raw_data.get("motor_driver_spacing_y", 15.0))
+        return float(self._raw_data.get("motor_driver_spacing_y", 15.24))
 
     @cached_property
     def motor_driver_standoff_height(self) -> float:
@@ -720,7 +782,7 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def pump_well_wall(self) -> float:
         """Return the wall thickness of the central isolation pump well."""
-        return float(self._raw_data.get("pump_well_wall", 1.5))
+        return float(self._raw_data.get("pump_well_wall", 2.0))
 
     @cached_property
     def pump_inlet_radius(self) -> float:
@@ -800,7 +862,22 @@ class CatFountainConfig(BaseModel):
     @cached_property
     def drive_hub_standoff_radius(self) -> float:
         """Return the outer radius of the drive hub standoff thrust ring."""
-        return float(self._raw_data.get("drive_hub_standoff_radius", 2.5))
+        return float(self._raw_data.get("drive_hub_standoff_radius", 1.5))
+
+    @cached_property
+    def drive_hub_thrust_collar_radius(self) -> float:
+        """Return the outer radius of the centered thrust collar around the motor shaft collar."""
+        return float(self._raw_data.get("drive_hub_thrust_collar_radius", self.drive_hub_standoff_radius))
+
+    @cached_property
+    def magnetic_coupling_air_gap(self) -> float:
+        """Return the axial magnetic coupling air gap (equal to pump well wall thickness)."""
+        return self.pump_well_wall
+
+    @cached_property
+    def speed_sensor_pocket_y(self) -> float:
+        """Return the Y coordinate of the speed sensor pocket."""
+        return float(self._raw_data.get("speed_sensor_pocket_y", 18.5))
 
     @cached_property
     def drive_hub_standoff_height(self) -> float:
@@ -813,44 +890,99 @@ class CatFountainConfig(BaseModel):
         return float(self._raw_data.get("bottom_cover_opening_width", 20.0))
 
     @cached_property
-    def motor_clip_width(self) -> float:
-        """Return the width of the motor retaining clip."""
-        return float(self._raw_data.get("motor_clip_width", 17.6))
+    def motor_hub_width(self) -> float:
+        """Return the width of the motor hub assembly bracket."""
+        return float(self._raw_data.get("motor_hub_width", 17.6))
 
     @cached_property
-    def motor_clip_thickness(self) -> float:
-        """Return the thickness of the motor retaining clip."""
-        return float(self._raw_data.get("motor_clip_thickness", 1.8))
+    def motor_hub_thickness(self) -> float:
+        """Return the thickness of the motor hub assembly bracket."""
+        return float(self._raw_data.get("motor_hub_thickness", 1.6))
 
     @cached_property
-    def motor_clip_length(self) -> float:
-        """Return the length of the motor retaining clip."""
-        return float(self._raw_data.get("motor_clip_length", 26.0))
+    def motor_hub_length(self) -> float:
+        """Return the length of the motor hub assembly bracket."""
+        return float(self._raw_data.get("motor_hub_length", 26.0))
 
     @cached_property
-    def motor_clip_arm_stub_length(self) -> float:
-        """Return the length of the remaining guide stub on the relieved arm of the motor clip."""
-        return float(self._raw_data.get("motor_clip_arm_stub_length", 10.0))
+    def motor_hub_flange_width(self) -> float:
+        """Return the outer flange width of the motor hub assembly bracket."""
+        return float(self._raw_data.get("motor_hub_flange_width", 36.0))
 
     @cached_property
-    def motor_clip_side_relief_radius(self) -> float:
-        """Return the arc radius for the wiring connector relief on the motor clip."""
-        return float(self._raw_data.get("motor_clip_side_relief_radius", 20.0))
+    def motor_hub_socket_radius(self) -> float:
+        """Return inner radius of motor hub mounting socket."""
+        return float(self._raw_data.get("motor_hub_socket_radius", 18.0))
 
     @cached_property
-    def motor_clip_side_relief_fillet(self) -> float:
-        """Return the fillet radius for the re-entrant corner of the motor clip relief."""
-        return float(self._raw_data.get("motor_clip_side_relief_fillet", 1.0))
+    def motor_hub_socket_wall(self) -> float:
+        """Return wall thickness of motor hub mounting socket."""
+        return float(self._raw_data.get("motor_hub_socket_wall", 2.5))
 
     @cached_property
-    def motor_clip_support_rise(self) -> float:
-        """Return the vertical rise along Y of the motor clip support web."""
-        return float(self._raw_data.get("motor_clip_support_rise", 0.0))
+    def motor_hub_snap_groove_radius_offset(self) -> float:
+        """Return radial depth offset of motor hub snap groove."""
+        return float(self._raw_data.get("motor_hub_snap_groove_radius_offset", 0.6))
 
     @cached_property
-    def motor_clip_support_radius(self) -> float:
-        """Return the curvature radius of the motor clip support web."""
-        return float(self._raw_data.get("motor_clip_support_radius", 0.0))
+    def motor_hub_snap_groove_height(self) -> float:
+        """Return vertical height of motor hub snap groove."""
+        return float(self._raw_data.get("motor_hub_snap_groove_height", 1.2))
+
+    @cached_property
+    def motor_hub_collar_clearance(self) -> float:
+        """Return print clearance between motor hub collar and socket."""
+        return float(self._raw_data.get("motor_hub_collar_clearance", 0.25))
+
+    @cached_property
+    def motor_hub_arm_stub_length(self) -> float:
+        """Return the length of the remaining guide stub on the relieved arm of the motor hub bracket."""
+        return float(self._raw_data.get("motor_hub_arm_stub_length", 10.0))
+
+    @cached_property
+    def motor_hub_side_relief_radius(self) -> float:
+        """Return the arc radius for the wiring connector relief on the motor hub bracket."""
+        return float(self._raw_data.get("motor_hub_side_relief_radius", 20.0))
+
+    @cached_property
+    def motor_hub_side_relief_fillet(self) -> float:
+        """Return the fillet radius for the re-entrant corner of the motor hub relief."""
+        return float(self._raw_data.get("motor_hub_side_relief_fillet", 1.0))
+
+    @cached_property
+    def motor_hub_support_rise(self) -> float:
+        """Return the vertical rise along Y of the motor hub support web."""
+        return float(self._raw_data.get("motor_hub_support_rise", 6.0))
+
+    @cached_property
+    def motor_hub_support_radius(self) -> float:
+        """Return the curvature radius of the motor hub support web."""
+        return float(self._raw_data.get("motor_hub_support_radius", 15.0))
+
+    @cached_property
+    def motor_hub_detent_y(self) -> float:
+        """Return the Y coordinate of the retention detent notches on the motor hub flange."""
+        return float(self._raw_data.get("motor_hub_detent_y", -14.0))
+
+    @cached_property
+    def motor_hub_detent_width(self) -> float:
+        """Return the width along Y of the motor hub retention detent notches."""
+        return float(self._raw_data.get("motor_hub_detent_width", 3.0))
+
+    @cached_property
+    def motor_hub_detent_depth(self) -> float:
+        """Return the lateral depth of the motor hub retention detent notches."""
+        return float(self._raw_data.get("motor_hub_detent_depth", 0.8))
+
+    @cached_property
+    def pcb_clip_detent_lip(self) -> float:
+        """Return the retention snap lip projection for slide-in PCB card guides."""
+        return float(self._raw_data.get("pcb_clip_detent_lip", 0.5))
+
+    @cached_property
+    def pcb_clip_stop_wall(self) -> float:
+        """Return the thickness of the positive end stop wall for slide-in PCB card guides."""
+        return float(self._raw_data.get("pcb_clip_stop_wall", 1.5))
 
     @cached_property
     def motor_radius(self) -> float:
