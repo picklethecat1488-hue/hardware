@@ -24,12 +24,12 @@
           "id": "d0187ad3",
           "title": "CLI Verification Step",
           "command": "ls -la",
-          "status": "PENDING",
+          "status": "COMPLETED",
           "notes": ""
         }
       ],
       "created_at": "2026-11-04 15:04:33 UTC",
-      "updated_at": "2026-11-04 15:04:33 UTC",
+      "updated_at": "2026-11-04 15:04:34 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": "",
@@ -37,5 +37,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-04 15:04:33 UTC"
+  "updated_at": "2026-11-04 15:04:34 UTC"
 }
