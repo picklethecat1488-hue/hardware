@@ -4,7 +4,7 @@
   "bugs": [
     {
       "id": "BUG-CLI-001",
-      "uuid": "39c4860b-6fab-4fb5-8e91-21bc871d3c22",
+      "uuid": "1626f048-142a-4ce6-bf57-7162f7311e7a",
       "title": "CLI Review Bug",
       "status": "RESOLVED",
       "severity": "HIGH",
@@ -21,7 +21,7 @@
       ],
       "review_tasks": [],
       "created_at": "",
-      "updated_at": "2026-11-04 14:37:36 UTC",
+      "updated_at": "2026-11-04 14:41:31 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": "",
@@ -29,5 +29,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-04 14:37:36 UTC"
+  "updated_at": "2026-11-04 14:41:31 UTC"
 }

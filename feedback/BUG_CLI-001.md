@@ -1,6 +1,6 @@
 # 🟢 `[BUG-CLI-001]` CLI Review Bug
 
-- **UUID**: `39c4860b-6fab-4fb5-8e91-21bc871d3c22`
+- **UUID**: `1626f048-142a-4ce6-bf57-7162f7311e7a`
 - **ID**: `BUG-CLI-001`
 - **Status**: `RESOLVED`
 - **Severity**: `HIGH`

@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-04 14:37:36 UTC` |
+| **Report Date** | `2026-11-04 14:41:32 UTC` |
 | **Total Issues** | `1` |
 | **Open Issues** | `0` |
 | **Resolved / Closed** | `1 (100%)` |
@@ -38,7 +38,7 @@
 
 ### <a id="bug-cli-001"></a> 🟢 `[BUG-CLI-001]` CLI Review Bug
 
-- **UUID**: `39c4860b-6fab-4fb5-8e91-21bc871d3c22`
+- **UUID**: `1626f048-142a-4ce6-bf57-7162f7311e7a`
 - **Status**: `RESOLVED`
 - **Severity**: `HIGH`
 - **Category**: `PCB`
