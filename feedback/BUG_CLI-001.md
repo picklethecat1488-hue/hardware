@@ -14,3 +14,7 @@
 #### Review Tasks & Functional Checklist
 
 - [x] <!-- task:bd10937c --> CLI Verification Step | `ls -la`
+
+#### Rejection Feedback
+
+CLI rejected this
