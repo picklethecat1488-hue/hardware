@@ -6,10 +6,10 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 15:33:09 UTC` |
+| **Report Date** | `2026-11-05 15:45:40 UTC` |
 | **Total Issues** | `313` |
-| **Open Issues** | `5` |
-| **Resolved / Closed** | `308 (98%)` |
+| **Open Issues** | `4` |
+| **Resolved / Closed** | `309 (98%)` |
 
 ## Issues by Severity
 
@@ -335,7 +335,7 @@
 - [x] **`[LOW]`** [#BUG-TRANSLUCENT-TERMITE-733](#bug-translucent-termite-733): Fold directories under src/ into the repo root (`CLOSED`)
 - [x] **`[HIGH]`** [#WORM-CREEPING-LARVA-820](#worm-creeping-larva-820): Regression tests are not useful (`CLOSED`)
 - [x] **`[HIGH]`** [#BUG-VIBRANT-WOODBORER-940](#bug-vibrant-woodborer-940): Create motor hub assembly `[cat_fountain]` (`CLOSED`)
-- [ ] **`[MEDIUM]`** [#BUG-BARBED-MIDGE-630](#bug-barbed-midge-630): There are 3 outer borders in my dashboard window? `[dashboard]` (`OPEN`)
+- [x] **`[MEDIUM]`** [#BUG-BARBED-MIDGE-630](#bug-barbed-midge-630): There are 3 outer borders in my dashboard window? `[dashboard]` (`RESOLVED`)
 - [x] **`[MEDIUM]`** [#BUG-SPRINGING-MOSQUITO-703](#bug-springing-mosquito-703): Extend inner wall to surface of ToF sensor PCB `[cat_fountain]` (`CLOSED`)
 - [x] **`[MEDIUM]`** [#BUG-FEATHERED-CENTIPEDE-381](#bug-feathered-centipede-381): It takes 10s to save bugs now `[dashboard]` (`RESOLVED`)
 - [x] **`[HIGH]`** [#BUG-POLLEN-BACKSWIMMER-846](#bug-pollen-backswimmer-846): TMC6300-clip on mounts are too big `[cat_fountain]` (`CLOSED`)
@@ -27563,14 +27563,14 @@ Pls see attached, we should plan to consign all remaining components to them exc
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
-| `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
 | `reference` | [carrier_board_bom_rev2.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv) | CSV export of clean EDA BOM |
 | `reference` | [carrier_board_bom_rev3.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx) | Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM) |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14) questions.xlsx) | Uploaded reference questions spreadsheet from PCBWay |
 | `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xlsx) | Replied quotation BOM with customer consignment notes for D1, J3, U5, Y1 and Molex confirmation for J16 |
 | `reference` | [carrier_board_bom_rev3.csv](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.csv) | CSV export of clean EDA BOM Rev 3 |
 | `reference` | [digikey_order_2026-10-14.xlsx](attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx) | Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2) |
+| `reference` | [T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls](attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls) | Legacy Excel 97-2004 format of replied quotation BOM |
+| `reference` | [carrier_board_bom_rev2.xlsx](attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx) | Clean EDA export BOM generated directly from updated carrier board model |
 
 #### Resolution Notes
 
@@ -27743,8 +27743,8 @@ See attachments below. Both nightly license compliance and CI jobs are failing
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
-| `document` | [clipboard_text_1792279938306.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt) | Pasted text document |
 | `document` | [clipboard_text_1792279899940.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt) | Pasted text document |
+| `document` | [clipboard_text_1792279938306.txt](attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt) | Pasted text document |
 
 #### Resolution Notes
 
@@ -27925,20 +27925,25 @@ Replaced motor_clip and integrated enclosed well beneath the impeller with dedic
 
 ---
 
-### <a id="bug-barbed-midge-630"></a> 🔴 `[BUG-BARBED-MIDGE-630]` There are 3 outer borders in my dashboard window?
+### <a id="bug-barbed-midge-630"></a> 🟢 `[BUG-BARBED-MIDGE-630]` There are 3 outer borders in my dashboard window?
 
 - **UUID**: `e4da4b73-81ef-4863-baf3-d4af7519adfc`
-- **Status**: `OPEN`
+- **Status**: `RESOLVED`
 - **Severity**: `MEDIUM`
 - **Category**: `INFRASTRUCTURE`
 - **Component**: `dashboard`
 - **Created**: `2026-10-23 23:00:18 UTC`
+- **Resolved**: `2026-11-05 15:45:39 UTC`
 
 #### Attachments & References
 
 | Type | Filename | Description |
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1792806350220_dct9c.png](attachments/BUG-BARBED-MIDGE-630/screenshot_paste_1792806350220_dct9c.png) | Pasted screenshot screenshot_paste_1792806350220_dct9c.png |
+
+#### Resolution Notes
+
+Eliminate duplicate outer window borders and resize grippers by applying .in-iframe rules to common.css and workstation templates, and add frame-busting to diff_view.
 
 ---
 

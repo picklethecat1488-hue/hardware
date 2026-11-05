@@ -8712,24 +8712,6 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-1",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
-          "size_bytes": 0,
-          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
-          "created_at": ""
-        },
-        {
-          "id": "att-2",
-          "filename": "carrier_board_bom_rev2.xlsx",
-          "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
-          "size_bytes": 0,
-          "description": "Clean EDA export BOM generated directly from updated carrier board model",
-          "created_at": ""
-        },
-        {
           "id": "att-3",
           "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
@@ -8781,6 +8763,24 @@
           "file_path": "attachments/BUG-FERTILE-SANDWORM-588/digikey_order_2026-10-14.xlsx",
           "size_bytes": 0,
           "description": "Customer DigiKey order confirmation for additional consigned parts (D1, J3, U5, Y1) and received MCUs (U1, U2)",
+          "created_at": ""
+        },
+        {
+          "id": "att-1",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "size_bytes": 0,
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
+          "created_at": ""
+        },
+        {
+          "id": "att-2",
+          "filename": "carrier_board_bom_rev2.xlsx",
+          "file_type": "reference",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
+          "size_bytes": 0,
+          "description": "Clean EDA export BOM generated directly from updated carrier board model",
           "created_at": ""
         }
       ],
@@ -8953,19 +8953,19 @@
       "logs": "",
       "attachments": [
         {
-          "id": "att-1",
-          "filename": "clipboard_text_1792279938306.txt",
+          "id": "att-2",
+          "filename": "clipboard_text_1792279899940.txt",
           "file_type": "document",
-          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
           "size_bytes": 0,
           "description": "Pasted text document",
           "created_at": ""
         },
         {
-          "id": "att-2",
-          "filename": "clipboard_text_1792279899940.txt",
+          "id": "att-1",
+          "filename": "clipboard_text_1792279938306.txt",
           "file_type": "document",
-          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279899940.txt",
+          "file_path": "attachments/BUG-FLYING-GRASSHOPPER-413/clipboard_text_1792279938306.txt",
           "size_bytes": 0,
           "description": "Pasted text document",
           "created_at": ""
@@ -9057,7 +9057,7 @@
       "id": "BUG-BARBED-MIDGE-630",
       "uuid": "e4da4b73-81ef-4863-baf3-d4af7519adfc",
       "title": "There are 3 outer borders in my dashboard window?",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "severity": "MEDIUM",
       "category": "INFRASTRUCTURE",
       "component": "dashboard",
@@ -9081,8 +9081,8 @@
       "review_tasks": [],
       "created_at": "2026-10-23 23:00:18 UTC",
       "updated_at": "",
-      "resolved_at": null,
-      "resolution_notes": "",
+      "resolved_at": "2026-11-05 15:45:39 UTC",
+      "resolution_notes": "Eliminate duplicate outer window borders and resize grippers by applying .in-iframe rules to common.css and workstation templates, and add frame-busting to diff_view.",
       "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
@@ -9237,7 +9237,7 @@
       "updated_at": "2026-11-05 15:05:58 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9271,7 +9271,7 @@
       "updated_at": "2026-11-05 15:02:26 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9314,7 +9314,7 @@
       "updated_at": "2026-11-05 15:02:01 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     },
@@ -9357,10 +9357,10 @@
       "updated_at": "2026-11-05 15:12:38 UTC",
       "resolved_at": null,
       "resolution_notes": "",
-      "rejection_notes": null,
+      "rejection_notes": "",
       "accepted_at": null,
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 15:33:07 UTC"
+  "updated_at": "2026-11-05 15:45:39 UTC"
 }
