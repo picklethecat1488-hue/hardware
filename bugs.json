@@ -9321,21 +9321,31 @@
     {
       "id": "BUG-THORACIC-HARVESTMAN-529",
       "uuid": "cdda94d6-e538-437c-9940-01516226d9ab",
-      "title": "New Bug Report",
+      "title": "Add grooves for triangular motor struts to drive hub",
       "status": "OPEN",
       "severity": "MEDIUM",
-      "category": "PCB",
-      "component": "",
-      "description": "",
+      "category": "CAD",
+      "component": "cat_fountain",
+      "description": "As indicated on the mechanical drawing for the 1102 18000kv motor, there are 3 struts on the top of the motor frame which connect to the drive shaft. Can we add a triangular groove pattern with central hole to the bottom of the drive hub so that the struts can be fit into the drive hub bottom to prevent torque slippage without gluing. Additionally, can we revise the design of the drive hub to be a convex hull with minimum 1.5mm wall thickness around all magnets, grooves, and mounting holes. ",
       "reproduction_steps": [],
       "expected_behavior": "",
       "actual_behavior": "",
       "logs": "",
-      "attachments": [],
+      "attachments": [
+        {
+          "id": "40820920",
+          "filename": "clipboard_text_1793891371006.txt",
+          "file_type": "document",
+          "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/clipboard_text_1793891371006.txt",
+          "size_bytes": 520,
+          "description": "Pasted text document",
+          "created_at": "2026-11-05 15:09:31 UTC"
+        }
+      ],
       "commit_ids": [],
       "review_tasks": [],
       "created_at": "2026-11-05 15:06:09 UTC",
-      "updated_at": "2026-11-05 15:06:09 UTC",
+      "updated_at": "2026-11-05 15:09:31 UTC",
       "resolved_at": null,
       "resolution_notes": "",
       "rejection_notes": null,
@@ -9343,5 +9353,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 15:06:09 UTC"
+  "updated_at": "2026-11-05 15:09:31 UTC"
 }

@@ -6,7 +6,7 @@
 
 | Metric | Details |
 | :--- | :--- |
-| **Report Date** | `2026-11-05 15:06:12 UTC` |
+| **Report Date** | `2026-11-05 15:09:33 UTC` |
 | **Total Issues** | `313` |
 | **Open Issues** | `6` |
 | **Resolved / Closed** | `307 (98%)` |
@@ -24,8 +24,8 @@
 
 | Category | Count | Description |
 | :--- | :---: | :--- |
-| **`PCB`** | 171 | Schematics, routing, footprints, nets, DRC, silkscreen. |
-| **`CAD`** | 36 | 3D geometry, step models, enclosures, mechanical assembly. |
+| **`PCB`** | 170 | Schematics, routing, footprints, nets, DRC, silkscreen. |
+| **`CAD`** | 37 | 3D geometry, step models, enclosures, mechanical assembly. |
 | **`SIMULATION`** | 11 | JAX SPH fluid dynamics, PyBullet kinematics, physics. |
 | **`INFRASTRUCTURE`** | 83 | Build tooling, compilers, test runners, headless tools. |
 | **`UI`** | 2 | Web dashboards, CLI viewers, review interfaces. |
@@ -344,7 +344,7 @@
 - [ ] **`[MEDIUM]`** [#BUG-SPECKLED-ROVEBEETLE-352](#bug-speckled-rovebeetle-352): Sensor shield design on inner bowl wall is too complicated `[cat_fountain]` (`OPEN`)
 - [ ] **`[MEDIUM]`** [#BUG-STINGING-LACEWING-799](#bug-stinging-lacewing-799): Mounting system for hole-less PCBs is too complicated `[cat_fountain]` (`OPEN`)
 - [ ] **`[HIGH]`** [#BUG-LUSTROUS-COCOON-669](#bug-lustrous-cocoon-669): Motor base design is way too complicated `[cat_fountain]` (`OPEN`)
-- [ ] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): New Bug Report (`OPEN`)
+- [ ] **`[MEDIUM]`** [#BUG-THORACIC-HARVESTMAN-529](#bug-thoracic-harvestman-529): Add grooves for triangular motor struts to drive hub `[cat_fountain]` (`OPEN`)
 
 ## Detailed Issue Log
 
@@ -28122,12 +28122,23 @@ Defects circled in red.
 
 ---
 
-### <a id="bug-thoracic-harvestman-529"></a> 🔴 `[BUG-THORACIC-HARVESTMAN-529]` New Bug Report
+### <a id="bug-thoracic-harvestman-529"></a> 🔴 `[BUG-THORACIC-HARVESTMAN-529]` Add grooves for triangular motor struts to drive hub
 
 - **UUID**: `cdda94d6-e538-437c-9940-01516226d9ab`
 - **Status**: `OPEN`
 - **Severity**: `MEDIUM`
-- **Category**: `PCB`
+- **Category**: `CAD`
+- **Component**: `cat_fountain`
 - **Created**: `2026-11-05 15:06:09 UTC`
+
+#### Description
+
+As indicated on the mechanical drawing for the 1102 18000kv motor, there are 3 struts on the top of the motor frame which connect to the drive shaft. Can we add a triangular groove pattern with central hole to the bottom of the drive hub so that the struts can be fit into the drive hub bottom to prevent torque slippage without gluing. Additionally, can we revise the design of the drive hub to be a convex hull with minimum 1.5mm wall thickness around all magnets, grooves, and mounting holes.
+
+#### Attachments & References
+
+| Type | Filename | Description |
+| :--- | :--- | :--- |
+| `document` | [clipboard_text_1793891371006.txt](attachments/BUG-THORACIC-HARVESTMAN-529/clipboard_text_1793891371006.txt) | Pasted text document |
 
 ---
