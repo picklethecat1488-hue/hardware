@@ -19,6 +19,10 @@
 
 - `bf875947`
 
+#### Review Tasks & Functional Checklist
+
+- [ ] <!-- task:23326223 --> Verify absence of nested iframe borders and duplicate resize grippers | `python -m pytest tests/test_dashboard.py -k test_iframe_border_suppression`
+
 #### Resolution Notes
 
 Eliminate duplicate outer window borders and resize grippers by applying .in-iframe rules to common.css and workstation templates, and add frame-busting to diff_view.

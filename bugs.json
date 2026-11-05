@@ -8713,20 +8713,20 @@
       "attachments": [
         {
           "id": "att-3",
-          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "filename": "carrier_board_bom_rev2.csv",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
           "size_bytes": 0,
-          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
+          "description": "CSV export of clean EDA BOM",
           "created_at": ""
         },
         {
           "id": "att-4",
-          "filename": "carrier_board_bom_rev2.xlsx",
+          "filename": "carrier_board_bom_rev3.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
           "size_bytes": 0,
-          "description": "Clean EDA export BOM generated directly from updated carrier board model",
+          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
           "created_at": ""
         },
         {
@@ -8766,21 +8766,21 @@
           "created_at": ""
         },
         {
-          "id": "att-3",
-          "filename": "carrier_board_bom_rev2.csv",
+          "id": "att-1",
+          "filename": "T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.csv",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/T-E68W908185A-2units-bom_templates(2026-10-14)_replied.xls",
           "size_bytes": 0,
-          "description": "CSV export of clean EDA BOM",
+          "description": "Legacy Excel 97-2004 format of replied quotation BOM",
           "created_at": ""
         },
         {
-          "id": "att-4",
-          "filename": "carrier_board_bom_rev3.xlsx",
+          "id": "att-2",
+          "filename": "carrier_board_bom_rev2.xlsx",
           "file_type": "reference",
-          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev3.xlsx",
+          "file_path": "attachments/BUG-FERTILE-SANDWORM-588/carrier_board_bom_rev2.xlsx",
           "size_bytes": 0,
-          "description": "Clean EDA export BOM Rev 3 with DigiKey substituted MPNs (CLV1A-FKB-CK1VW1DE1BB7C3C3, TYPE-C-16P-3MD, CPT-1207-5LTH-T, ECS-240-8-30B-CKM)",
+          "description": "Clean EDA export BOM generated directly from updated carrier board model",
           "created_at": ""
         }
       ],
@@ -9080,9 +9080,17 @@
       "commit_ids": [
         "bf875947"
       ],
-      "review_tasks": [],
+      "review_tasks": [
+        {
+          "id": "23326223",
+          "title": "Verify absence of nested iframe borders and duplicate resize grippers",
+          "command": "python -m pytest tests/test_dashboard.py -k test_iframe_border_suppression",
+          "status": "PENDING",
+          "notes": ""
+        }
+      ],
       "created_at": "2026-10-23 23:00:18 UTC",
-      "updated_at": "2026-11-05 23:53:48 UTC",
+      "updated_at": "2026-11-05 23:53:52 UTC",
       "resolved_at": "2026-11-05 15:45:39 UTC",
       "resolution_notes": "Eliminate duplicate outer window borders and resize grippers by applying .in-iframe rules to common.css and workstation templates, and add frame-busting to diff_view.",
       "rejection_notes": "",
@@ -9354,7 +9362,7 @@
           "created_at": ""
         },
         {
-          "id": "att-1",
+          "id": "att-2",
           "filename": "screenshot_paste_1793891547400_gyg0h.png",
           "file_type": "screenshot",
           "file_path": "attachments/BUG-THORACIC-HARVESTMAN-529/screenshot_paste_1793891547400_gyg0h.png",
@@ -9374,5 +9382,5 @@
       "rejected_at": null
     }
   ],
-  "updated_at": "2026-11-05 23:53:48 UTC"
+  "updated_at": "2026-11-05 23:53:52 UTC"
 }
