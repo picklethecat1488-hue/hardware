@@ -19,6 +19,10 @@ Giving the TMC6300 mounting system as an example below, there are micro-gaps bet
 | :--- | :--- | :--- |
 | `screenshot` | [screenshot_paste_1793890436150_8301p.png](attachments/BUG-STINGING-LACEWING-799/screenshot_paste_1793890436150_8301p.png) | Pasted screenshot screenshot_paste_1793890436150_8301p.png |
 
+#### Attached Commits
+
+- `57973376`
+
 #### Resolution Notes
 
 Replaced slide-in guide rail system for hole-less PCBs with axial snap-socket frame featuring an internal perimeter snap groove and entrance lead-in chamfer, eliminating micro-gaps and assembly collision with current sensor.
