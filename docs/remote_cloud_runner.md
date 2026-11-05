@@ -32,9 +32,11 @@ To provide on-demand, cost-effective, high-throughput cloud compute via Vast.ai 
 ## Instance Lifecycle & Bootstrapping Protocols
 
 ### 1. Provisioning & Discovery (`bin/anvil provision`)
-* **Offer Search**: Queries the Vast.ai REST API (`https://cloud.vast.ai/api/v0/bundles/`) for rentable, verified instances with disk space $\ge 40$GB.
+* **Offer Search & Hardware Guardrails**: Queries the Vast.ai REST API (`https://cloud.vast.ai/api/v0/bundles/`) for rentable, verified instances with disk space $\ge 40$GB, strictly enforcing hardware throughput and cost constraints to prevent claiming old or overpriced junk hardware:
+  - `MIN_TOPS` ($\ge 50.0$ TOPS / TFLOPS, e.g. modern RTX 3090/4090/5090 tiers, filtering out underpowered legacy cards).
+  - `MAX_COST` ($\le \$1.50/\text{hr}$, capping hourly rental spend).
 * **Base Image**: Deploys the basic Ubuntu container image (`ubuntu:22.04`).
-* **Connection Handshake**: Polls instance status until `actual_status == "running"`, extracts dynamic `ssh_host` and `ssh_port`, and atomically updates `~/.anvil.env`.
+* **Connection Handshake**: Polls instance status until `actual_status == "running"`, extracts dynamic `ssh_host` and `ssh_port`, and atomically updates `~/.anvil.env` (persisting `MIN_TOPS` and `MAX_COST`).
 * **Automated Bootstrap**: Automatically triggers remote bootstrapping upon successful SSH connection.
 
 ### 2. Remote Dependency Bootstrapping (`bin/anvil bootstrap`)

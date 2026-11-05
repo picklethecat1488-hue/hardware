@@ -31,6 +31,8 @@ DEFAULT_UBUNTU_IMAGE = "ubuntu:22.04"
 DEFAULT_DISK_SIZE_GB = 40
 DEFAULT_COB_HOUR = 18  # 18:00 (6:00 PM)
 DEFAULT_IDLE_TIMEOUT_SEC = 1800  # 30 minutes
+DEFAULT_MIN_TOPS = 50.0  # Minimum compute throughput in TOPS / TFLOPS
+DEFAULT_MAX_COST = 1.50  # Maximum hourly rental cost in USD/hr
 
 
 def get_api_key() -> Optional[str]:
@@ -144,8 +146,12 @@ def search_offers(
     gpu_name: Optional[str] = None,
     min_disk_gb: int = DEFAULT_DISK_SIZE_GB,
     max_dph: Optional[float] = None,
+    min_tops: Optional[float] = None,
+    max_cost: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
-    """Search available rentable machines on Vast.ai."""
+    """Search available rentable machines on Vast.ai with hardware constraints (min TOPS, max cost)."""
+    effective_max_cost = max_cost if max_cost is not None else max_dph
+
     query: Dict[str, Any] = {
         "rentable": {"eq": True},
         "disk_space": {"gte": min_disk_gb},
@@ -153,16 +159,41 @@ def search_offers(
     }
     if gpu_name:
         query["gpu_name"] = {"eq": gpu_name}
-    if max_dph is not None:
-        query["dph_total"] = {"lte": max_dph}
+    if effective_max_cost is not None:
+        query["dph_total"] = {"lte": effective_max_cost}
+    if min_tops is not None:
+        query["total_flops"] = {"gte": min_tops}
 
     q_param = urllib.parse.quote(json.dumps(query))
     res = api_request(f"bundles/?q={q_param}")
+    raw_offers: List[Dict[str, Any]] = []
     if "offers" in res and isinstance(res["offers"], list):
-        return res["offers"]
-    if isinstance(res, list):
-        return res
-    return []
+        raw_offers = res["offers"]
+    elif isinstance(res, list):
+        raw_offers = res
+
+    # Client-side verification to strictly guarantee min_tops and max_cost
+    filtered_offers: List[Dict[str, Any]] = []
+    for o in raw_offers:
+        dph = float(
+            o.get("dph_total")
+            if o.get("dph_total") is not None
+            else (o.get("dph") if o.get("dph") is not None else 999.0)
+        )
+        if effective_max_cost is not None and dph > effective_max_cost:
+            continue
+        flops = float(
+            o.get("total_flops")
+            if o.get("total_flops") is not None
+            else (o.get("flops") if o.get("flops") is not None else 0.0)
+        )
+        if min_tops is not None and flops < min_tops:
+            continue
+        if gpu_name and gpu_name.lower() not in str(o.get("gpu_name", "")).lower():
+            continue
+        filtered_offers.append(o)
+
+    return filtered_offers
 
 
 def get_instance_info(instance_id: int) -> Dict[str, Any]:
@@ -186,6 +217,8 @@ def provision_instance(
     offer_id: Optional[int] = None,
     gpu: Optional[str] = None,
     max_dph: Optional[float] = None,
+    min_tops: Optional[float] = None,
+    max_cost: Optional[float] = None,
     env_file: Path = DEFAULT_GLOBAL_ENV_FILE,
 ) -> Dict[str, Any]:
     """Provision a new instance on Vast.ai and write connection details to ~/.anvil.env."""
@@ -195,27 +228,122 @@ def provision_instance(
         print("Please export VAST_API_KEY='<key>' or save your key in ~/.vast_api_key", file=sys.stderr)
         return {"error": "Missing API key"}
 
+    env_vars = load_env_file(env_file)
+
+    # 1. Resolve min_tops constraint (CLI arg -> env var -> env_file -> DEFAULT_MIN_TOPS)
+    if min_tops is None:
+        for k in ["ANVIL_MIN_TOPS", "MIN_TOPS", "VAST_MIN_TOPS"]:
+            if k in os.environ and os.environ[k].strip():
+                try:
+                    min_tops = float(os.environ[k].strip())
+                    break
+                except ValueError:
+                    pass
+    if min_tops is None and env_vars:
+        for k in ["ANVIL_MIN_TOPS", "MIN_TOPS", "VAST_MIN_TOPS"]:
+            if k in env_vars and env_vars[k].strip():
+                try:
+                    min_tops = float(env_vars[k].strip())
+                    break
+                except ValueError:
+                    pass
+    if min_tops is None:
+        min_tops = DEFAULT_MIN_TOPS
+
+    # 2. Resolve max_cost constraint (CLI arg -> max_dph -> env var -> env_file -> DEFAULT_MAX_COST)
+    effective_max_cost = max_cost if max_cost is not None else max_dph
+    if effective_max_cost is None:
+        for k in ["ANVIL_MAX_COST", "MAX_COST", "ANVIL_MAX_DPH", "MAX_DPH", "VAST_MAX_COST", "VAST_MAX_DPH"]:
+            if k in os.environ and os.environ[k].strip():
+                try:
+                    effective_max_cost = float(os.environ[k].strip())
+                    break
+                except ValueError:
+                    pass
+    if effective_max_cost is None and env_vars:
+        for k in ["ANVIL_MAX_COST", "MAX_COST", "ANVIL_MAX_DPH", "MAX_DPH", "VAST_MAX_COST", "VAST_MAX_DPH"]:
+            if k in env_vars and env_vars[k].strip():
+                try:
+                    effective_max_cost = float(env_vars[k].strip())
+                    break
+                except ValueError:
+                    pass
+    if effective_max_cost is None:
+        effective_max_cost = DEFAULT_MAX_COST
+
     selected_offer = offer_id
     if not selected_offer:
-        print(f"🔍 Searching available Vast.ai offers (disk >= {disk_gb}GB, image: {image})...")
-        offers = search_offers(gpu_name=gpu, min_disk_gb=disk_gb, max_dph=max_dph)
+        print(
+            f"🔍 Searching available Vast.ai offers (disk >= {disk_gb}GB, min TOPS >= {min_tops:.1f}, "
+            f"max cost <= ${effective_max_cost:.2f}/hr, image: {image})..."
+        )
+        offers = search_offers(gpu_name=gpu, min_disk_gb=disk_gb, max_cost=effective_max_cost, min_tops=min_tops)
         if not offers:
-            print("⚠️ No matching offers found with strict criteria; retrying unverified/any GPU...", file=sys.stderr)
-            q_param = urllib.parse.quote(json.dumps({"rentable": {"eq": True}, "disk_space": {"gte": disk_gb}}))
+            print("⚠️ No verified offers found with strict criteria; retrying unverified instances...", file=sys.stderr)
+            q_param = urllib.parse.quote(
+                json.dumps(
+                    {
+                        "rentable": {"eq": True},
+                        "disk_space": {"gte": disk_gb},
+                        "total_flops": {"gte": min_tops},
+                        "dph_total": {"lte": effective_max_cost},
+                    }
+                )
+            )
             res = api_request(f"bundles/?q={q_param}")
-            offers = res.get("offers", []) if isinstance(res, dict) else res
+            raw_offers = res.get("offers", []) if isinstance(res, dict) else (res if isinstance(res, list) else [])
+            # Strictly filter unverified offers to guarantee min_tops and max_cost
+            offers = [
+                o
+                for o in raw_offers
+                if float(
+                    o.get("total_flops")
+                    if o.get("total_flops") is not None
+                    else (o.get("flops") if o.get("flops") is not None else 0.0)
+                )
+                >= min_tops
+                and float(
+                    o.get("dph_total")
+                    if o.get("dph_total") is not None
+                    else (o.get("dph") if o.get("dph") is not None else 999.0)
+                )
+                <= effective_max_cost
+            ]
 
         if not offers:
-            print("❌ No rentable machines available matching criteria.", file=sys.stderr)
-            return {"error": "No offers available"}
+            print(
+                f"❌ No rentable machines available matching criteria (min TOPS: {min_tops:.1f}, max cost: ${effective_max_cost:.2f}/hr).",
+                file=sys.stderr,
+            )
+            return {
+                "error": f"No offers available matching hardware constraints (min TOPS: {min_tops:.1f}, max cost: ${effective_max_cost:.2f}/hr)"
+            }
 
         # Sort by total dollars-per-hour
-        offers.sort(key=lambda o: float(o.get("dph_total", 999.0)))
+        offers.sort(
+            key=lambda o: float(
+                o.get("dph_total")
+                if o.get("dph_total") is not None
+                else (o.get("dph") if o.get("dph") is not None else 999.0)
+            )
+        )
         chosen = offers[0]
         selected_offer = chosen.get("id") or chosen.get("ask_id")
         gpu_model = chosen.get("gpu_name", "GPU/CPU")
-        dph = chosen.get("dph_total", 0.0)
-        print(f"🎯 Selected offer #{selected_offer}: {gpu_model} @ ${dph:.3f}/hr")
+        dph = float(
+            chosen.get("dph_total")
+            if chosen.get("dph_total") is not None
+            else (chosen.get("dph") if chosen.get("dph") is not None else 0.0)
+        )
+        flops = float(
+            chosen.get("total_flops")
+            if chosen.get("total_flops") is not None
+            else (chosen.get("flops") if chosen.get("flops") is not None else 0.0)
+        )
+        print(
+            f"🎯 Selected offer #{selected_offer}: {gpu_model} ({flops:.1f} TOPS) @ ${dph:.3f}/hr "
+            f"(Limits: >= {min_tops:.1f} TOPS, <= ${effective_max_cost:.2f}/hr)"
+        )
 
     print(f"🚀 Creating Vast.ai instance from offer #{selected_offer}...")
     payload = {
@@ -257,13 +385,15 @@ def provision_instance(
     else:
         print(f"✅ Instance is running! SSH connection: ssh -p {ssh_port} root@{ssh_host}")
 
-    # Write connection details to ~/.anvil.env
+    # Write connection details and hardware constraints to ~/.anvil.env
     env_updates: Dict[str, Optional[str]] = {
         "VAST_INSTANCE_ID": str(instance_id) if instance_id else None,
         "REMOTE_HOST": ssh_host or "ssh.vast.ai",
         "REMOTE_PORT": ssh_port or "22",
         "REMOTE_USER": "root",
         "REMOTE_IMAGE": image,
+        "MIN_TOPS": f"{min_tops:.1f}",
+        "MAX_COST": f"{effective_max_cost:.2f}",
     }
     write_env_file(env_file, env_updates)
     print(f"📝 Updated shared configuration: {env_file}")
@@ -273,6 +403,8 @@ def provision_instance(
         "ssh_host": ssh_host,
         "ssh_port": ssh_port,
         "image": image,
+        "min_tops": min_tops,
+        "max_cost": effective_max_cost,
         "env_file": str(env_file),
     }
 
@@ -461,6 +593,8 @@ def get_status(
     env = load_env_file(env_file)
     active_jobs = prune_locks(lock_file)
     instance_id = env.get("VAST_INSTANCE_ID")
+    min_tops_str = env.get("MIN_TOPS") or env.get("ANVIL_MIN_TOPS")
+    max_cost_str = env.get("MAX_COST") or env.get("ANVIL_MAX_COST") or env.get("MAX_DPH")
 
     status: Dict[str, Any] = {
         "configured": bool(instance_id or env.get("REMOTE_HOST")),
@@ -468,6 +602,8 @@ def get_status(
         "remote_host": env.get("REMOTE_HOST", "anvil"),
         "remote_port": env.get("REMOTE_PORT", "22"),
         "remote_user": env.get("REMOTE_USER", "root"),
+        "min_tops": float(min_tops_str) if min_tops_str else DEFAULT_MIN_TOPS,
+        "max_cost": float(max_cost_str) if max_cost_str else DEFAULT_MAX_COST,
         "active_jobs": active_jobs,
         "is_locked": len(active_jobs) > 0,
     }
@@ -477,6 +613,7 @@ def get_status(
         status["vast_status"] = info.get("actual_status", "unknown")
         status["gpu_name"] = info.get("gpu_name")
         status["dph_total"] = info.get("dph_total")
+        status["total_flops"] = info.get("total_flops")
 
     return status
 
@@ -489,11 +626,21 @@ def print_status_table(status: Dict[str, Any]) -> None:
     print(f" Rented Instance ID: {status.get('instance_id') or 'None (Not provisioned)'}")
     print(f" Remote Host:        {status.get('remote_host')}:{status.get('remote_port')}")
     print(f" Remote User:        {status.get('remote_user')}")
+    print(
+        f" Hardware Limits:    Min TOPS: {status.get('min_tops', DEFAULT_MIN_TOPS):.1f} | "
+        f"Max Cost: ${status.get('max_cost', DEFAULT_MAX_COST):.2f}/hr"
+    )
     if "vast_status" in status:
         print(f" Vast.ai State:      {status.get('vast_status')}")
-        print(f" GPU Model:          {status.get('gpu_name', 'N/A')}")
+        gpu_str = status.get("gpu_name", "N/A")
+        if status.get("total_flops"):
+            gpu_str += f" ({float(status['total_flops']):.1f} TOPS)"
+        print(f" GPU Model:          {gpu_str}")
         if status.get("dph_total"):
-            print(f" Cost Rate:          ${float(status['dph_total']):.3f}/hour")
+            print(
+                f" Cost Rate:          ${float(status['dph_total']):.3f}/hour "
+                f"(Cap: ${status.get('max_cost', DEFAULT_MAX_COST):.2f}/hr)"
+            )
     print(
         f" Active Lock:        {'🔒 YES (' + str(len(status['active_jobs'])) + ' running)' if status['is_locked'] else '🔓 Idle'}"
     )
@@ -629,7 +776,20 @@ def main() -> int:
     prov_p.add_argument("--disk", type=int, default=DEFAULT_DISK_SIZE_GB, help="Disk space in GB")
     prov_p.add_argument("--offer", type=int, default=None, help="Explicit offer ID to rent")
     prov_p.add_argument("--gpu", default=None, help="GPU model filter (e.g. RTX_4090, RTX_3090)")
-    prov_p.add_argument("--max-dph", type=float, default=None, help="Maximum dollars per hour")
+    prov_p.add_argument(
+        "--min-tops",
+        type=float,
+        default=None,
+        help="Minimum compute throughput in TOPS / TFLOPS (default: 50.0 or from ~/.anvil.env)",
+    )
+    prov_p.add_argument(
+        "--max-cost",
+        "--max-dph",
+        dest="max_cost",
+        type=float,
+        default=None,
+        help="Maximum hourly rental cost in USD/hr (default: 1.50 or from ~/.anvil.env)",
+    )
     prov_p.add_argument("--env-file", type=Path, default=DEFAULT_GLOBAL_ENV_FILE, help="Path to write config")
 
     # release
@@ -672,7 +832,8 @@ def main() -> int:
             disk_gb=args.disk,
             offer_id=args.offer,
             gpu=args.gpu,
-            max_dph=args.max_dph,
+            min_tops=args.min_tops,
+            max_cost=args.max_cost,
             env_file=args.env_file,
         )
         return 0 if "error" not in res else 1
