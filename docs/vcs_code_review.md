@@ -22,3 +22,13 @@ Guidelines for Quake VCS dashboard, Jinja2 templating, code review persistence, 
 * **DAG Tree Smartlog**: The VCS engine renders smartlog commit graphs and working tree status dynamically.
 * **CLI Parity**: All major VCS operations (syncing, committing, amending, diff viewing) are supported via both web workstation APIs and CLI subcommands (`python tools/dashboard.py sync`, `python tools/dashboard.py commit`).
 * **Commit Author & Privacy Redaction**: Personal usernames, personal email addresses, and author identities (such as user nicknames and personal email domains) MUST be automatically elided and sanitized in the VCS engine (`GitEngine`), smartlog DAG models, commit info summaries, API responses, and web workstation UI templates (`code_review.html.j2`, `diff_view.html.j2`) into generic labels (`User`, `user@workspace`). Never leak the user's real or personal names in commit logs, smartlog displays, code review sessions, or git-tracked documentation.
+
+## 5. Bidirectional Dashboard & Script Cross-Patching Mandate
+* **Automatic Cross-Repository Synchronization**: Any bug fix, feature enhancement, styling update, or refactoring applied to developer scripts, tooling, or dashboard components in one repository (`firmware` or `hardware`) that is applicable to the other repository MUST be automatically cross-patched and mirrored into that repository, and vice versa.
+* **Synchronized Subsystems**: This includes, but is not limited to:
+  - Remote cloud runner and lifecycle orchestration (`bin/anvil`, `tools/vast_manager.py`, `~/.anvil.env`, `~/.anvil.lock`).
+  - VCS web workstation and dashboard backends (`tools/dashboard.py`, `provider/vcs/git_engine.py`, `provider/worm_report/`, `provider/bug_report/`).
+  - Shared workstation templates (`diff_view.html.j2`, `diff_component.html.j2`, `code_review.html.j2`, `worm_report.html.j2`, `bug_report.html.j2`).
+  - Smartlog DAG tree rendering, commit selection, node highlighting, and author identity sanitization.
+* **Zero Disparity**: Never allow dashboard bug fixes or tooling improvements (such as node highlighting, reverse-proxying, detached branch persistence, or SSH port handling) to remain isolated in one repository when the other repository shares the same architecture or template.
+

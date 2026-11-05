@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import subprocess
 import sys
 import threading
 from typing import Any, Dict, List, Optional
@@ -25,6 +26,8 @@ from model.bug_report import (
     BugReportModel,
     BugSeverity,
     BugStatus,
+    ReviewTaskModel,
+    ReviewTaskStatus,
 )
 from provider.bug_report.markdown_exporter import MarkdownBugExporter
 from provider.bug_report.sqlite_store import SQLiteBugStore
@@ -134,6 +137,18 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
                 self._handle_save_bug(data)
             case "/api/bugs/status":
                 self._handle_update_status(data)
+            case "/api/bugs/accept":
+                self._handle_accept_bug(data)
+            case "/api/bugs/reject":
+                self._handle_reject_bug(data)
+            case "/api/bugs/attach_commit":
+                self._handle_attach_commit(data)
+            case "/api/bugs/add_task":
+                self._handle_add_task(data)
+            case "/api/bugs/update_task":
+                self._handle_update_task(data)
+            case "/api/bugs/run_command":
+                self._handle_run_command(data)
             case "/api/bugs/delete":
                 self._handle_delete_bug(data)
             case "/api/upload":
@@ -313,6 +328,141 @@ class BugReportRequestHandler(BaseHTTPRequestHandler):
         bug.updated_at = now_str
         self.server.save_and_sync()
         self._send_json(bug.model_dump(mode="json"))
+
+    def _handle_accept_bug(self, data: Dict[str, Any]) -> None:
+        """Handle accepting a resolved bug and transitioning directly to CLOSED."""
+        bug_id = data.get("id")
+        notes = data.get("notes", "").strip()
+        bug = self.server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        bug.status = BugStatus.CLOSED
+        bug.accepted_at = now_str
+        if notes:
+            if bug.resolution_notes:
+                bug.resolution_notes += f"\n\n**Acceptance Note**: {notes}"
+            else:
+                bug.resolution_notes = f"**Acceptance Note**: {notes}"
+        bug.updated_at = now_str
+        self.server.save_and_sync()
+        self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
+
+    def _handle_reject_bug(self, data: Dict[str, Any]) -> None:
+        """Handle rejecting a resolved bug and transitioning directly back to OPEN."""
+        bug_id = data.get("id")
+        notes = data.get("notes", "").strip()
+        bug = self.server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        bug.status = BugStatus.OPEN
+        bug.resolved_at = None
+        bug.rejected_at = now_str
+        bug.rejection_notes = notes
+        bug.updated_at = now_str
+        self.server.save_and_sync()
+        self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
+
+    def _handle_attach_commit(self, data: Dict[str, Any]) -> None:
+        """Attach a commit hash to a bug report."""
+        bug_id = data.get("id")
+        commit_id = data.get("commit_id", "").strip()
+        bug = self.server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+        if not commit_id:
+            self._send_json({"error": "Missing commit_id"}, status=400)
+            return
+
+        if commit_id not in bug.commit_ids:
+            bug.commit_ids.append(commit_id)
+
+        bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.server.save_and_sync()
+        self._send_json({"status": "ok", "bug": bug.model_dump(mode="json")})
+
+    def _handle_add_task(self, data: Dict[str, Any]) -> None:
+        """Add a review task to a bug report."""
+        bug_id = data.get("id")
+        title = data.get("title", "").strip()
+        cmd = data.get("command", "").strip()
+        bug = self.server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+        if not title:
+            self._send_json({"error": "Missing task title"}, status=400)
+            return
+
+        task = ReviewTaskModel(title=title, command=cmd)
+        bug.review_tasks.append(task)
+        bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.server.save_and_sync()
+        self._send_json({"status": "ok", "task": task.model_dump(mode="json"), "bug": bug.model_dump(mode="json")})
+
+    def _handle_update_task(self, data: Dict[str, Any]) -> None:
+        """Update review task status or notes."""
+        bug_id = data.get("id")
+        task_id = data.get("task_id")
+        new_status = data.get("status")
+        notes = data.get("notes")
+        bug = self.server.database.get_bug(bug_id) if bug_id else None
+        if not bug:
+            self._send_json({"error": f"Bug {bug_id} not found"}, status=404)
+            return
+
+        target_task = None
+        for t in bug.review_tasks:
+            if t.id == task_id:
+                target_task = t
+                break
+
+        if not target_task:
+            self._send_json({"error": f"Task {task_id} not found"}, status=404)
+            return
+
+        if new_status:
+            try:
+                target_task.status = ReviewTaskStatus(str(new_status).upper())
+            except ValueError:
+                target_task.status = ReviewTaskStatus.PENDING
+        if notes is not None:
+            target_task.notes = str(notes)
+
+        bug.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.server.save_and_sync()
+        self._send_json(
+            {"status": "ok", "task": target_task.model_dump(mode="json"), "bug": bug.model_dump(mode="json")}
+        )
+
+    def _handle_run_command(self, data: Dict[str, Any]) -> None:
+        """Execute a review command and return output."""
+        cmd = data.get("command", "").strip()
+        if not cmd:
+            self._send_json({"error": "Empty command"}, status=400)
+            return
+
+        proc = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=str(self.server.repo_root),
+            capture_output=True,
+            text=True,
+        )
+        self._send_json(
+            {
+                "status": "ok" if proc.returncode == 0 else "error",
+                "exit_code": proc.returncode,
+                "stdout": proc.stdout,
+                "stderr": proc.stderr,
+            }
+        )
 
     def _handle_delete_bug(self, data: Dict[str, Any]) -> None:
         """Delete a bug report by ID."""
@@ -555,9 +705,8 @@ class BugReportServer(ThreadingHTTPServer):
         self.db_version: int = 1
         self.database = self._initialize_database()
         self._watcher_stop = threading.Event()
-        self._start_file_watcher()
-
         if bind_and_activate:
+            self._start_file_watcher()
             super().__init__((host, port), BugReportRequestHandler)
             self.actual_port = self.server_address[1]
         else:
@@ -632,12 +781,17 @@ class BugReportServer(ThreadingHTTPServer):
             super().server_close()
 
     def _ensure_unique_bug_ids(self, db: BugDatabaseModel) -> None:
-        """Ensure all bug IDs in database are unique, disambiguating any duplicates."""
-        seen: set[str] = set()
+        """Ensure all bug IDs and UUIDs in database are unique, disambiguating any duplicates."""
+        seen_ids: set[str] = set()
+        seen_uuids: set[str] = set()
         for bug in db.bugs:
-            if bug.id in seen:
+            if bug.id in seen_ids:
                 bug.id = db.generate_bug_id()
-            seen.add(bug.id)
+                bug.uuid = str(uuid.uuid4())
+            if bug.uuid in seen_uuids:
+                bug.uuid = str(uuid.uuid4())
+            seen_ids.add(bug.id)
+            seen_uuids.add(bug.uuid)
 
     def _initialize_database(self) -> BugDatabaseModel:
         """Load existing database state from SQLite/JSON and perform R+M+W sync with feedback/ and BUGS.md."""
@@ -653,6 +807,16 @@ class BugReportServer(ThreadingHTTPServer):
                 title="Hardware Bug Tracker",
                 summary="Hardware engineering defects, PCB layout issues, and reproduction tracking.",
             )
+
+        if not self.fresh and not db.bugs:
+            try:
+                from provider.bug_report.detached_branch import DetachedBranchBugStore
+
+                detached_db = DetachedBranchBugStore(self.repo_root).load_database()
+                if detached_db and detached_db.bugs:
+                    db = detached_db
+            except Exception:
+                pass
 
         if not self.fresh and self.markdown_output.exists():
             md_db = self.exporter.parse_markdown(self.markdown_output)
@@ -718,6 +882,16 @@ class BugReportServer(ThreadingHTTPServer):
                     self.markdown_mtime = self.markdown_output.stat().st_mtime
                 self.feedback_mtime = self._get_feedback_dir_mtime()
                 self.db_version += 1
+                try:
+                    from provider.bug_report.detached_branch import DetachedBranchBugStore
+
+                    DetachedBranchBugStore(self.repo_root).commit_database(
+                        self.database,
+                        commit_message=f"Update bug database (v{self.db_version})",
+                        sync_local_disk=False,
+                    )
+                except Exception:
+                    pass
                 return out
             finally:
                 self._is_internal_saving = False

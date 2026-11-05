@@ -307,6 +307,12 @@ class GitEngine:
                     except RuntimeError:
                         pass
             self.clear_diff_cache()
+            try:
+                from provider.bug_report.detached_branch import DetachedBranchBugStore
+
+                DetachedBranchBugStore(self.repo_root).sync_branch()
+            except Exception:
+                pass
             return {
                 "status": "ok",
                 "message": out.strip() or "Repository successfully fetched and synchronized.",
@@ -528,6 +534,9 @@ class GitEngine:
             )
         except ValueError:
             rel_path = str(p)
+
+        if is_file_ignored(rel_path):
+            return curr_user
 
         try:
             status_out = run_git_command(["status", "--porcelain", "--", rel_path], cwd=self.repo_root).strip()
